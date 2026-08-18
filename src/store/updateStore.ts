@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export const CURRENT_APP_VERSION = '1.1.0';
+export const CURRENT_APP_VERSION = '1.1.1';
 const GITHUB_REPO = 'julfou7/seenit-app';
+const GITHUB_PAT = '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';
 
 export interface AppReleaseInfo {
   version: string;
@@ -72,19 +73,35 @@ export const useUpdateStore = create<UpdateState>()(
         set({ isChecking: true, error: null });
 
         try {
-          // Use backend proxy to bypass private repo authentication issues.
-          // Hardcode backend URL for standalone APK.
-          const baseUrl = typeof window !== 'undefined' && (window as any).Capacitor 
-            ? 'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app'
-            : '';
-            
-          const response = await fetch(`${baseUrl}/api/update`);
+          let data: any = null;
 
-          if (!response.ok) {
-            throw new Error(`Server returned HTTP ${response.status}`);
+          // 1. Direct GitHub API fetch (Works reliably in Capacitor APK and standalone web)
+          try {
+            const ghRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+              headers: {
+                'Accept': 'application/vnd.github.v3+json',
+                'Authorization': `token ${GITHUB_PAT}`
+              }
+            });
+            if (ghRes.ok) {
+              data = await ghRes.json();
+            }
+          } catch (e) {
+            console.warn('[UpdateCheck] Direct GitHub API fetch failed, trying backend proxy fallback...', e);
           }
 
-          const data = await response.json();
+          // 2. Fallback to backend /api/update
+          if (!data) {
+            const proxyRes = await fetch('/api/update');
+            if (proxyRes.ok) {
+              data = await proxyRes.json();
+            }
+          }
+
+          if (!data || !data.tag_name) {
+            throw new Error('Impossible de contacter le serveur de mise à jour.');
+          }
+
           const tagName = data.tag_name || '';
           const remoteVersion = tagName.replace(/^v/i, '');
           
@@ -99,7 +116,7 @@ export const useUpdateStore = create<UpdateState>()(
             name: data.name || tagName,
             releaseNotes: data.body || '',
             publishedAt: data.published_at || new Date().toISOString(),
-            apkDownloadUrl: apkAsset ? apkAsset.browser_download_url : data.html_url,
+            apkDownloadUrl: apkAsset ? apkAsset.browser_download_url : `https://github.com/${GITHUB_REPO}/releases/download/${tagName}/SeenIt-${tagName}.apk`,
             htmlUrl: data.html_url || `https://github.com/${GITHUB_REPO}/releases`
           };
 

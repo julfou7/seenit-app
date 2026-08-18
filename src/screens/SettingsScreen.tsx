@@ -679,7 +679,18 @@ export function SettingsScreen() {
             </div>
 
             <button
-              onClick={() => checkForUpdates(true)}
+              onClick={async () => {
+                const isNewer = await checkForUpdates(true);
+                const storeError = useUpdateStore.getState().error;
+                const release = useUpdateStore.getState().latestRelease;
+                if (isNewer && release) {
+                  showToast(`🎉 Version v${release.version} disponible !`, 'success');
+                } else if (storeError) {
+                  showToast(`Erreur : ${storeError}`, 'error');
+                } else {
+                  showToast(`Votre application est à jour (v${CURRENT_APP_VERSION})`, 'info');
+                }
+              }}
               disabled={isCheckingUpdates}
               className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 text-zinc-300 hover:text-white border border-white/5 transition-all disabled:opacity-50 flex items-center gap-1.5 text-xs font-medium cursor-pointer"
               title="Vérifier maintenant"
