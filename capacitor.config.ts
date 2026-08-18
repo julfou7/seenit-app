@@ -4,15 +4,13 @@ const config: CapacitorConfig = {
   appId: 'com.seenit.app',
   appName: 'SeenIt',
   webDir: 'dist',
-  // Configuration pour le Live Web View (Pointer vers l'URL de production)
   server: {
-    url: 'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app',
-    cleartext: true,
-    androidScheme: 'https'
+    androidScheme: 'https',
+    cleartext: true
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 1600,
+      launchShowDuration: 1400,
       launchAutoHide: true,
       backgroundColor: '#040406',
       androidSplashResourceName: 'splash',
