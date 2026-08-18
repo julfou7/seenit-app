@@ -25,6 +25,9 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Install Dependencies
         run: npm install
 
@@ -33,12 +36,11 @@ jobs:
           npm run build
           npx cap sync android
 
-      - name: Make gradlew executable
-        run: chmod +x android/gradlew
-
-      - name: Build APK with Gradle
+      - name: Generate fresh Gradle wrapper & Build APK
         run: |
           cd android
+          gradle wrapper
+          chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK Artifact
