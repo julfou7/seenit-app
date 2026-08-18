@@ -3,7 +3,8 @@ import { Cloud, LogIn, LogOut, FileText, CheckCircle2, MonitorPlay, Bell, Refres
 import { auth, db, googleAuthProvider, requestNotificationPermission, sendNativeNotification } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
-import { signInWithPopup, signInWithRedirect, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { cn } from '../lib/utils';
 import { CsvImporter } from '../components/CsvImporter';
 import { useToastStore } from '../store/toastStore';
@@ -205,12 +206,20 @@ export function SettingsScreen() {
 
   const handleLogin = async () => {
     try {
-      try {
-        await signInWithPopup(auth, googleAuthProvider);
-      } catch (popupErr) {
-        console.warn('Popup login in settings failed, trying redirect fallback...', popupErr);
-        await signInWithRedirect(auth, googleAuthProvider);
+      if (Capacitor.isNativePlatform()) {
+        try {
+          const result = await FirebaseAuthentication.signInWithGoogle();
+          if (result.credential?.idToken) {
+            const credential = GoogleAuthProvider.credential(result.credential.idToken);
+            await signInWithCredential(auth, credential);
+            return;
+          }
+        } catch (nativeErr) {
+          console.warn('Native Google sign-in in settings failed, trying popup fallback:', nativeErr);
+        }
       }
+
+      await signInWithPopup(auth, googleAuthProvider);
     } catch (err) {
       console.error(err);
     }

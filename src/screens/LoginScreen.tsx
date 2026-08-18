@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import { signInWithPopup, signInWithCredential, GoogleAuthProvider, getRedirectResult } from 'firebase/auth';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { auth, googleAuthProvider } from '../lib/firebase';
 import { LogIn, Tv2, Film, Clapperboard, Sparkles } from 'lucide-react';
 import { PWAInstallBanner } from '../components/PWAInstallBanner';
@@ -11,12 +12,9 @@ export function LoginScreen() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // If returning from redirect, this will process the result
-    // We stop the loading state if we got a result or an error
     getRedirectResult(auth)
       .then((result) => {
          if (result) {
-            // User signed in successfully
             setIsLoggingIn(false);
          }
       })
@@ -41,12 +39,21 @@ export function LoginScreen() {
     setError('');
 
     try {
-      try {
-        await signInWithPopup(auth, googleAuthProvider);
-      } catch (popupErr: any) {
-        console.warn('Popup login failed, trying redirect fallback...', popupErr);
-        await signInWithRedirect(auth, googleAuthProvider);
+      if (Capacitor.isNativePlatform()) {
+        try {
+          const result = await FirebaseAuthentication.signInWithGoogle();
+          if (result.credential?.idToken) {
+            const credential = GoogleAuthProvider.credential(result.credential.idToken);
+            await signInWithCredential(auth, credential);
+            setIsLoggingIn(false);
+            return;
+          }
+        } catch (nativeErr: any) {
+          console.warn('Native Google sign-in failed, trying popup fallback:', nativeErr);
+        }
       }
+
+      await signInWithPopup(auth, googleAuthProvider);
     } catch (err: any) {
       console.warn('Login error:', err);
       setError(err.message || "Une erreur s'est produite lors de la connexion.");
