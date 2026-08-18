@@ -278,7 +278,7 @@ function MainApp() {
 
   return (
     <div className="w-full min-h-[100dvh] bg-[#040406] flex justify-center selection:bg-[#E5A93D]/30">
-      <div className="w-full max-w-md bg-premium-ambient h-[100dvh] flex flex-col relative shadow-2xl shadow-black/90 overflow-hidden">
+      <div className="w-full max-w-md bg-premium-ambient h-[100dvh] flex flex-col relative shadow-2xl shadow-black/90 overflow-hidden pt-safe">
         
         {/* Banner PWA Install (S25 Ultra / Android / Chrome) */}
         <PWAInstallBanner />
@@ -313,7 +313,7 @@ function MainApp() {
           {/* 2. Vue Fiche Série (Overlay plein écran par-dessus l'onglet actif avec accélération GPU) */}
           {selectedShow && (
             <div 
-              className="fixed inset-0 z-[60] bg-black flex flex-col overflow-hidden max-w-md mx-auto animate-in fade-in slide-in-from-bottom-6 duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] animate-overlay-in"
+              className="fixed inset-0 z-[60] bg-black flex flex-col overflow-hidden max-w-md mx-auto animate-in fade-in slide-in-from-bottom-6 duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] animate-overlay-in pt-safe"
               style={{ willChange: 'transform, opacity' }}
             >
               <ShowDetailScreen 
