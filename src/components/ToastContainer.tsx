@@ -189,7 +189,7 @@ export function ToastContainer() {
           }}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
-          className="fixed top-3 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md px-3 pointer-events-auto touch-pan-y select-none cursor-grab active:cursor-grabbing flex justify-center"
+          className="fixed top-14 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md px-3 pointer-events-auto touch-pan-y select-none cursor-grab active:cursor-grabbing flex justify-center"
         >
           {hasPoster ? (
             /* Rich Media Toast with Poster */

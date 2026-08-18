@@ -63,6 +63,8 @@ export default function App() {
     if (isNative) {
       CapSplashScreen.hide().catch(() => {});
       StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
+      StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
+      StatusBar.setBackgroundColor({ color: '#040406' }).catch(() => {});
     }
   }, [isNative]);
 
