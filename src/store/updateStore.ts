@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export const CURRENT_APP_VERSION = '1.1.2';
+export const CURRENT_APP_VERSION = '1.1.3';
 const GITHUB_REPO = 'julfou7/seenit-app';
 const GITHUB_PAT = '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';
 
@@ -65,8 +65,14 @@ export const useUpdateStore = create<UpdateState>()(
         const state = get();
         const now = Date.now();
         
-        // Don't check more than once every 15 minutes unless forced
-        if (!force && state.lastChecked && (now - state.lastChecked < 15 * 60 * 1000)) {
+        let shouldForce = force;
+        if (state.currentVersion !== CURRENT_APP_VERSION) {
+          set({ currentVersion: CURRENT_APP_VERSION, hasUpdate: false, latestRelease: null });
+          shouldForce = true;
+        }
+
+        // Don't check more than once every 30 seconds unless forced
+        if (!shouldForce && state.lastChecked && (now - state.lastChecked < 30 * 1000)) {
           return state.hasUpdate;
         }
 
