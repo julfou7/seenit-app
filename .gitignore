@@ -6,3 +6,11 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# App release build artifacts and release scripts
+app-release-*/
+release_v*.cjs
+release_patch.cjs
+*.zip
+android/*.zip
+*.apk
