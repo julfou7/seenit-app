@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Cloud, LogIn, LogOut, FileText, CheckCircle2, MonitorPlay, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronDown, ChevronUp, Check, AlertCircle, Info, Bug } from 'lucide-react';
 import { auth, googleAuthProvider, requestNotificationPermission, sendNativeNotification } from '../lib/firebase';
-import { signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
+import { signInWithPopup, signInWithRedirect, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { cn } from '../lib/utils';
 import { CsvImporter } from '../components/CsvImporter';
 import { useToastStore } from '../store/toastStore';
@@ -174,7 +175,11 @@ export function SettingsScreen() {
 
   const handleLogin = async () => {
     try {
-      await signInWithPopup(auth, googleAuthProvider);
+      if (Capacitor.isNativePlatform()) {
+        await signInWithRedirect(auth, googleAuthProvider);
+      } else {
+        await signInWithPopup(auth, googleAuthProvider);
+      }
     } catch (err) {
       console.error(err);
     }

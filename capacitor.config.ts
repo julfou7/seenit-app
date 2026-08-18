@@ -6,9 +6,16 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     androidScheme: 'https',
-    hostname: 'gen-lang-client-0201895414.firebaseapp.com',
-    cleartext: true
+    hostname: 'localhost',
+    cleartext: true,
+    allowNavigation: [
+      "*.firebaseapp.com",
+      "*.google.com",
+      "*.googleapis.com",
+      "accounts.google.com"
+    ]
   },
+  overrideUserAgent: "Mozilla/5.0 (Linux; Android 13; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36",
   plugins: {
     SplashScreen: {
       launchShowDuration: 1200,

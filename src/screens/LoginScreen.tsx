@@ -4,35 +4,44 @@ import { auth, googleAuthProvider } from '../lib/firebase';
 import { LogIn, Tv2, Film, Clapperboard, Sparkles } from 'lucide-react';
 import { PWAInstallBanner } from '../components/PWAInstallBanner';
 import { SeenItLogo } from '../components/SeenItLogo';
+import { Capacitor } from '@capacitor/core';
 
 export function LoginScreen() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    getRedirectResult(auth).catch((err: any) => {
-      console.warn('Redirect auth result check:', err);
-      if (err?.message) setError(err.message);
-    });
+    // If returning from redirect, this will process the result
+    // We stop the loading state if we got a result or an error
+    getRedirectResult(auth)
+      .then((result) => {
+         if (result) {
+            // User signed in successfully
+            setIsLoggingIn(false);
+         }
+      })
+      .catch((err: any) => {
+        console.warn('Redirect auth result check:', err);
+        if (err?.message) setError(err.message);
+        setIsLoggingIn(false);
+      });
   }, []);
 
   const handleLogin = async () => {
     setIsLoggingIn(true);
     setError('');
+
     try {
-      await signInWithPopup(auth, googleAuthProvider);
-    } catch (err: any) {
-      console.warn('signInWithPopup error, trying fallback if applicable:', err);
-      if (err?.code === 'auth/popup-blocked' || err?.code === 'auth/cancelled-popup-request') {
-        try {
-          await signInWithRedirect(auth, googleAuthProvider);
-          return;
-        } catch (redirectErr: any) {
-          setError(redirectErr.message || "Une erreur s'est produite lors de la connexion.");
-        }
+      if (Capacitor.isNativePlatform()) {
+        // Native webviews block popups, use redirect directly
+        await signInWithRedirect(auth, googleAuthProvider);
+        return; // Execution will stop here as the page redirects
       } else {
-        setError(err.message || "Une erreur s'est produite lors de la connexion.");
+        await signInWithPopup(auth, googleAuthProvider);
       }
+    } catch (err: any) {
+      console.warn('Login error:', err);
+      setError(err.message || "Une erreur s'est produite lors de la connexion.");
       setIsLoggingIn(false);
     }
   };
