@@ -132,7 +132,7 @@ interface SearchResponse {
  */
 class TMDBClient {
   private getApiKey(): string | null {
-    return localStorage.getItem('TMDB_API_KEY') || (import.meta.env.VITE_TMDB_API_KEY as string) || '6d0ecde1df5f3e4bc3603d6d67b2d556';
+    return localStorage.getItem('TMDB_API_KEY') || (import.meta.env.VITE_TMDB_API_KEY as string) || '677711df46484bc7129492d4a9267a65';
   }
 
   private baseUrl = 'https://api.themoviedb.org/3';

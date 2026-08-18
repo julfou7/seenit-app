@@ -35,7 +35,7 @@ export async function getRecommendations(limit: number = 20) {
   const peopleIds = favPeople.map(p => p.id).join('|');
 
   let rawResults: any[] = [];
-  const apiKey = import.meta.env.VITE_TMDB_API_KEY || '6d0ecde1df5f3e4bc3603d6d67b2d556';
+  const apiKey = import.meta.env.VITE_TMDB_API_KEY || '677711df46484bc7129492d4a9267a65';
   const minReleaseDate = '2016-01-01';
 
   const promises: Promise<{ type: 'tv' | 'movie', res: any }>[] = [];
