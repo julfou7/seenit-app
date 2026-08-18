@@ -4,6 +4,7 @@ interface SplashScreenProps {
   onComplete: () => void;
   isReady: boolean;
   minimumDisplayTime?: number;
+  animate?: boolean;
 }
 
 export function SplashScreen({ 

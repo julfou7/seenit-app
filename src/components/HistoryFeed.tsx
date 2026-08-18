@@ -40,6 +40,7 @@ function HistoryRowItem({
   onShowClick,
   setUnseenModalItem
 }: {
+  key?: string;
   item: HistoryItem;
   idx: number;
   epTitle?: string;
