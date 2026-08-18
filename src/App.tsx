@@ -8,6 +8,7 @@ import { useState, useEffect, useRef } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { SplashScreen as CapSplashScreen } from '@capacitor/splash-screen';
+import { StatusBar, Style } from '@capacitor/status-bar';
 import { auth } from './lib/firebase';
 import { LoginScreen } from './screens/LoginScreen';
 import { SplashScreen } from './components/SplashScreen';
@@ -57,9 +58,11 @@ export default function App() {
   const isReady = currentUser !== undefined;
 
   // On native platform, hide the static OS splash screen quickly so the animated React splash takes over smoothly.
+  // Also configure the status bar for dark mode to ensure icons (time, battery) are white.
   useEffect(() => {
     if (isNative) {
       CapSplashScreen.hide().catch(() => {});
+      StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
     }
   }, [isNative]);
 

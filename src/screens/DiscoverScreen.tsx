@@ -1554,7 +1554,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         className={cn(
-          "absolute bottom-0 inset-x-0 px-3 pb-[90px] pt-24 bg-gradient-to-t from-black via-black/95 to-transparent pointer-events-none z-40 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
+          "absolute bottom-0 inset-x-0 px-3 pb-[calc(90px+env(safe-area-inset-bottom,0px))] pt-24 bg-gradient-to-t from-black via-black/95 to-transparent pointer-events-none z-40 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
           isSearchVisible ? "translate-y-0" : "translate-y-full"
         )}
       >

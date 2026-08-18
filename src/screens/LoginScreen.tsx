@@ -27,6 +27,15 @@ export function LoginScreen() {
       });
   }, []);
 
+  const handleResetCache = () => {
+    try {
+      indexedDB.deleteDatabase('firebaseLocalStorageDb');
+      window.location.reload();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleLogin = async () => {
     setIsLoggingIn(true);
     setError('');
@@ -34,6 +43,7 @@ export function LoginScreen() {
     try {
       if (Capacitor.isNativePlatform()) {
         // Native webviews block popups, use redirect directly
+        // Note: Google 2FA might throw a 400 error on first redirect. We handle it in getRedirectResult.
         await signInWithRedirect(auth, googleAuthProvider);
         return; // Execution will stop here as the page redirects
       } else {
@@ -82,8 +92,14 @@ export function LoginScreen() {
             </p>
 
             {error && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs px-4 py-3 rounded-xl mb-6 w-full max-w-[280px]">
-                {error}
+              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs px-4 py-3 rounded-xl mb-6 w-full max-w-[280px] flex flex-col gap-3">
+                <div className="text-center">{error}</div>
+                <button 
+                  onClick={handleResetCache}
+                  className="bg-red-500/20 hover:bg-red-500/30 text-red-300 py-2 rounded-lg font-medium transition-colors"
+                >
+                  Réparer (Vider le cache)
+                </button>
               </div>
             )}
 
