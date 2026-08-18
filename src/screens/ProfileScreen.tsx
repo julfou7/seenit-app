@@ -229,7 +229,7 @@ export function ProfileScreen({
           onTouchMove={handleTouchMoveSettings}
           onTouchEnd={handleTouchEndSettings}
         >
-          <div className="flex items-center justify-between p-4 border-b border-white/10 bg-zinc-950/90 backdrop-blur-md sticky top-0 z-10">
+          <div className="flex items-center justify-between pt-10 pb-3.5 px-4 border-b border-white/10 bg-zinc-950/90 backdrop-blur-md sticky top-0 z-10">
             <button 
               onClick={handleAnimatedBackSettings} 
               className="flex items-center gap-1.5 text-zinc-400 hover:text-white font-medium text-sm transition-colors"

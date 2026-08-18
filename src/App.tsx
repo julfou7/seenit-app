@@ -9,7 +9,8 @@ import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { SplashScreen as CapSplashScreen } from '@capacitor/splash-screen';
 import { StatusBar, Style } from '@capacitor/status-bar';
-import { auth } from './lib/firebase';
+import { auth, db } from './lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { LoginScreen } from './screens/LoginScreen';
 import { SplashScreen } from './components/SplashScreen';
 
@@ -49,8 +50,26 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
+      if (user) {
+        try {
+          const prefRef = doc(db, 'users', user.uid, 'settings', 'preferences');
+          const snap = await getDoc(prefRef);
+          const localStr = localStorage.getItem('user_platforms');
+          const localPlatforms = localStr ? JSON.parse(localStr) : [];
+
+          if (snap.exists() && Array.isArray(snap.data()?.platforms)) {
+            const cloudPlatforms: number[] = snap.data().platforms;
+            localStorage.setItem('user_platforms', JSON.stringify(cloudPlatforms));
+            window.dispatchEvent(new Event('storage'));
+          } else if (localPlatforms.length > 0) {
+            await setDoc(prefRef, { platforms: localPlatforms }, { merge: true });
+          }
+        } catch (e) {
+          console.error('[App] Error syncing user streaming platforms from cloud', e);
+        }
+      }
     });
     return unsub;
   }, []);

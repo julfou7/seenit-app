@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Cloud, LogIn, LogOut, FileText, CheckCircle2, MonitorPlay, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronDown, ChevronUp, Check, AlertCircle, Info, Bug, Sparkles, Download } from 'lucide-react';
-import { auth, googleAuthProvider, requestNotificationPermission, sendNativeNotification } from '../lib/firebase';
+import { auth, db, googleAuthProvider, requestNotificationPermission, sendNativeNotification } from '../lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { signInWithPopup, signInWithRedirect, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { cn } from '../lib/utils';
@@ -122,8 +123,26 @@ export function SettingsScreen() {
     };
     window.addEventListener('storage', handleStorage);
         
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
+      if (currentUser) {
+        try {
+          const prefRef = doc(db, 'users', currentUser.uid, 'settings', 'preferences');
+          const snap = await getDoc(prefRef);
+          const localStr = localStorage.getItem('user_platforms');
+          const localPlatforms = localStr ? JSON.parse(localStr) : [];
+
+          if (snap.exists() && Array.isArray(snap.data()?.platforms)) {
+            const cloudPlatforms: number[] = snap.data().platforms;
+            setUserPlatforms(cloudPlatforms);
+            localStorage.setItem('user_platforms', JSON.stringify(cloudPlatforms));
+          } else if (localPlatforms.length > 0) {
+            await setDoc(prefRef, { platforms: localPlatforms }, { merge: true });
+          }
+        } catch (e) {
+          console.error('[Settings] Error syncing cloud streaming platforms', e);
+        }
+      }
     });
 
     return () => {
@@ -165,7 +184,7 @@ export function SettingsScreen() {
     }
   };
 
-  const handleTogglePlatform = (id: number) => {
+  const handleTogglePlatform = async (id: number) => {
     const newPlatforms = userPlatforms.includes(id)
       ? userPlatforms.filter(p => p !== id)
       : [...userPlatforms, id];
@@ -173,6 +192,15 @@ export function SettingsScreen() {
     setUserPlatforms(newPlatforms);
     localStorage.setItem('user_platforms', JSON.stringify(newPlatforms));
     window.dispatchEvent(new Event('storage'));
+
+    if (auth.currentUser) {
+      try {
+        const prefRef = doc(db, 'users', auth.currentUser.uid, 'settings', 'preferences');
+        await setDoc(prefRef, { platforms: newPlatforms }, { merge: true });
+      } catch (e) {
+        console.error('[Settings] Error saving streaming platforms to Firestore', e);
+      }
+    }
   };
 
   const handleLogin = async () => {

@@ -555,7 +555,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
         )}
       >
         {/* Sticky Header */}
-      <div className="relative pt-3 pb-2.5 px-4 flex items-center justify-between z-20 sticky top-0 bg-black/95 backdrop-blur-xl border-b border-white/10">
+      <div className="relative pt-10 pb-2.5 px-4 flex items-center justify-between z-20 sticky top-0 bg-black/95 backdrop-blur-xl border-b border-white/10">
         <button 
           onPointerUp={(e) => {
             e.preventDefault();
