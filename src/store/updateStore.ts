@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export const CURRENT_APP_VERSION = '1.0.6';
+export const CURRENT_APP_VERSION = '1.0.7';
 const GITHUB_REPO = 'julfou7/seenit-app';
 
 export interface AppReleaseInfo {
@@ -72,14 +72,16 @@ export const useUpdateStore = create<UpdateState>()(
         set({ isChecking: true, error: null });
 
         try {
-          const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
-            headers: {
-              'Accept': 'application/vnd.github.v3+json'
-            }
-          });
+          // Use backend proxy to bypass private repo authentication issues.
+          // Hardcode backend URL for standalone APK.
+          const baseUrl = typeof window !== 'undefined' && (window as any).Capacitor 
+            ? 'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app'
+            : '';
+            
+          const response = await fetch(`${baseUrl}/api/update`);
 
           if (!response.ok) {
-            throw new Error(`GitHub API HTTP ${response.status}`);
+            throw new Error(`Server returned HTTP ${response.status}`);
           }
 
           const data = await response.json();

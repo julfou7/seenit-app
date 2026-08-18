@@ -456,6 +456,30 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
+  app.get('/api/update', async (req, res) => {
+    try {
+      const token = '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';
+      const repo = 'julfou7/seenit-app';
+      const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'Authorization': `token ${token}`,
+          'User-Agent': 'SeenIt-Backend'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`GitHub API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error('Error fetching update:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get(['/service-worker.js', '/firebase-messaging-sw.js'], (req, res) => {
     const filename = req.path.replace('/', '');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
