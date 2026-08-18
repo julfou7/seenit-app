@@ -6,11 +6,12 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     androidScheme: 'https',
+    hostname: 'gen-lang-client-0201895414.firebaseapp.com',
     cleartext: true
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 1400,
+      launchShowDuration: 1200,
       launchAutoHide: true,
       backgroundColor: '#040406',
       androidSplashResourceName: 'splash',

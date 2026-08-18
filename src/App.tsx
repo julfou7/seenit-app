@@ -44,7 +44,7 @@ export default function App() {
     (window.navigator as any).standalone === true
   );
 
-  const [showSplash, setShowSplash] = useState(!isNative); // Disable React splash entirely if native
+  const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -55,20 +55,14 @@ export default function App() {
 
   const isReady = currentUser !== undefined;
 
-  // Once Firebase resolves and app is ready, if running natively, hide the native Splash Screen seamlessly.
+  // On native platform, hide the static OS splash screen quickly so the animated React splash takes over smoothly.
   useEffect(() => {
-    if (isReady && isNative) {
-      // Add a tiny delay to ensure React has fully painted the DOM
-      setTimeout(() => {
-        CapSplashScreen.hide();
-      }, 50);
+    if (isNative) {
+      CapSplashScreen.hide().catch(() => {});
     }
-  }, [isReady, isNative]);
+  }, [isNative]);
 
-  // For PWA standalone: the OS already displayed a splash screen for ~1.5s.
-  // We set duration to 0 and disable animation to instantly fade into the app once auth resolves.
-  // For web browser: keep short smooth animated reveal (1600ms)
-  const splashDuration = isPWAStandalone ? 0 : 1600;
+  const splashDuration = 1400;
 
   return (
     <>
@@ -76,7 +70,7 @@ export default function App() {
         <SplashScreen 
           isReady={isReady}
           minimumDisplayTime={splashDuration}
-          animate={!isPWAStandalone}
+          animate={true}
           onComplete={() => setShowSplash(false)} 
         />
       )}

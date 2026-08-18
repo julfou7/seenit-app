@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { signInWithPopup } from 'firebase/auth';
+import { useState, useEffect } from 'react';
+import { signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { auth, googleAuthProvider } from '../lib/firebase';
 import { LogIn, Tv2, Film, Clapperboard, Sparkles } from 'lucide-react';
 import { PWAInstallBanner } from '../components/PWAInstallBanner';
@@ -9,14 +9,30 @@ export function LoginScreen() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    getRedirectResult(auth).catch((err: any) => {
+      console.warn('Redirect auth result check:', err);
+      if (err?.message) setError(err.message);
+    });
+  }, []);
+
   const handleLogin = async () => {
     setIsLoggingIn(true);
     setError('');
     try {
       await signInWithPopup(auth, googleAuthProvider);
     } catch (err: any) {
-      console.error(err);
-      setError(err.message || "Une erreur s'est produite lors de la connexion.");
+      console.warn('signInWithPopup error, trying fallback if applicable:', err);
+      if (err?.code === 'auth/popup-blocked' || err?.code === 'auth/cancelled-popup-request') {
+        try {
+          await signInWithRedirect(auth, googleAuthProvider);
+          return;
+        } catch (redirectErr: any) {
+          setError(redirectErr.message || "Une erreur s'est produite lors de la connexion.");
+        }
+      } else {
+        setError(err.message || "Une erreur s'est produite lors de la connexion.");
+      }
       setIsLoggingIn(false);
     }
   };
