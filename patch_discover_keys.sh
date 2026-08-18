@@ -1,0 +1,3 @@
+sed -i 's/{ media: TMDBMedia, details?: any, onShowClick: (id: number) => void, rank: number }/{ key?: React.Key, media: TMDBMedia, details?: any, onShowClick: (id: number) => void, rank: number }/g' src/screens/DiscoverScreen.tsx
+sed -i 's/{ media: TMDBMedia, onShowClick: (id: number) => void, rank: number }/{ key?: React.Key, media: TMDBMedia, onShowClick: (id: number) => void, rank: number }/g' src/screens/DiscoverScreen.tsx
+sed -i 's/{ media: TMDBMedia, onShowClick: (id: number) => void }/{ key?: React.Key, media: TMDBMedia, onShowClick: (id: number) => void }/g' src/screens/DiscoverScreen.tsx

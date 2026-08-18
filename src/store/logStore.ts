@@ -1,0 +1,102 @@
+import { create } from 'zustand';
+
+export type LogLevel = 'info' | 'success' | 'warn' | 'error';
+export type LogCategory = 'plex' | 'tmdb' | 'sync' | 'system' | 'auth';
+
+export interface AppLogEntry {
+  id: string;
+  timestamp: number;
+  level: LogLevel;
+  category: LogCategory;
+  message: string;
+  details?: any;
+}
+
+interface LogState {
+  logs: AppLogEntry[];
+  addLog: (category: LogCategory, message: string, details?: any, level?: LogLevel) => void;
+  clearLogs: () => void;
+  getLogsAsText: () => string;
+}
+
+const STORAGE_KEY = 'app_activity_logs_v1';
+const MAX_LOGS = 150;
+
+const loadInitialLogs = (): AppLogEntry[] => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.slice(0, MAX_LOGS) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveLogs = (logs: AppLogEntry[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(logs.slice(0, MAX_LOGS)));
+  } catch {
+    // ignore quota error
+  }
+};
+
+export const useLogStore = create<LogState>((set, get) => ({
+  logs: loadInitialLogs(),
+
+  addLog: (category, message, details, level = 'info') => {
+    const newEntry: AppLogEntry = {
+      id: Math.random().toString(36).substring(2, 9) + Date.now().toString(36),
+      timestamp: Date.now(),
+      level,
+      category,
+      message,
+      details: details ? (typeof details === 'object' ? JSON.parse(JSON.stringify(details)) : details) : undefined
+    };
+
+    // Also mirror to browser console for easy inspection
+    const prefix = `[${category.toUpperCase()}]`;
+    if (level === 'error') {
+      console.error(prefix, message, details || '');
+    } else if (level === 'warn') {
+      console.warn(prefix, message, details || '');
+    } else {
+      console.log(prefix, message, details || '');
+    }
+
+    set((state) => {
+      const updated = [newEntry, ...state.logs].slice(0, MAX_LOGS);
+      saveLogs(updated);
+      return { logs: updated };
+    });
+  },
+
+  clearLogs: () => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {}
+    set({ logs: [] });
+  },
+
+  getLogsAsText: () => {
+    const { logs } = get();
+    return logs
+      .map((l) => {
+        const time = new Date(l.timestamp).toLocaleTimeString('fr-FR');
+        const date = new Date(l.timestamp).toLocaleDateString('fr-FR');
+        const lvl = l.level.toUpperCase().padEnd(7);
+        const cat = `[${l.category.toUpperCase()}]`.padEnd(8);
+        const detailsStr = l.details ? ` | ${typeof l.details === 'object' ? JSON.stringify(l.details) : l.details}` : '';
+        return `[${date} ${time}] ${lvl} ${cat} ${l.message}${detailsStr}`;
+      })
+      .join('\n');
+  }
+}));
+
+// Quick helper function for easy logging anywhere
+export const appLogger = {
+  info: (category: LogCategory, message: string, details?: any) => useLogStore.getState().addLog(category, message, details, 'info'),
+  success: (category: LogCategory, message: string, details?: any) => useLogStore.getState().addLog(category, message, details, 'success'),
+  warn: (category: LogCategory, message: string, details?: any) => useLogStore.getState().addLog(category, message, details, 'warn'),
+  error: (category: LogCategory, message: string, details?: any) => useLogStore.getState().addLog(category, message, details, 'error')
+};

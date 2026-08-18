@@ -1,0 +1,1 @@
+sed -i "s/rawTitle: name,/rawTitle: name,\n            rawStatus: 'Imported from TV Time CSV',\n            rawDate: new Date().toISOString(),\n            mediaType: 'tv' as const,/" src/components/CsvImporter.tsx

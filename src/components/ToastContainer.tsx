@@ -1,0 +1,329 @@
+import React, { useEffect, useRef } from 'react';
+import { Archive, Trash2, Ban, CheckCircle2, Info, Clock, AlertCircle, RotateCcw } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { useToastStore, ToastMessageObj } from '../store/toastStore';
+import { useShows } from '../hooks/useShows';
+import { cn, scrollAllCarouselsToStart } from '../lib/utils';
+
+const PlexLogo = ({ className = "w-4 h-4" }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+    <path d="M4 2h7.5l7.5 10-7.5 10H4l7.5-10L4 2z" />
+  </svg>
+);
+
+export function ToastContainer() {
+  const { currentToast, message, type, show, visible, onUndo, hideToast } = useToastStore();
+  const { updateShow } = useShows();
+  const touchStartY = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (visible) {
+      const duration = currentToast?.duration || 5000;
+      const timer = setTimeout(() => {
+        hideToast();
+      }, duration);
+      return () => clearTimeout(timer);
+    }
+  }, [visible, currentToast?.id, hideToast]);
+
+  const handleUndo = async () => {
+    if (onUndo) {
+      try {
+        await onUndo();
+        scrollAllCarouselsToStart();
+      } catch (err) {
+        console.error('Error undoing toast action:', err);
+      }
+      hideToast();
+    } else if (type === 'archive' && show?.id) {
+      await updateShow(show.id, {
+        isArchived: false,
+        updatedAt: Date.now(),
+        lastWatchedAt: Date.now()
+      });
+      scrollAllCarouselsToStart();
+      hideToast();
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartY.current !== null) {
+      const diff = touchStartY.current - e.changedTouches[0].clientY;
+      // If swiped upwards by 25px or more, dismiss the toast
+      if (diff > 25) {
+        hideToast();
+      }
+      touchStartY.current = null;
+    }
+  };
+
+  const hasUndoAction = Boolean(onUndo || (type === 'archive' && show));
+
+  // Parse the message into structured data
+  const getParsedMessage = (): ToastMessageObj => {
+    if (typeof message === 'object') {
+      return message;
+    }
+
+    let title = show?.title;
+    let action = message;
+    let subtitle = undefined;
+
+    // Try to extract title between guillemets if present
+    const match = message.match(/«\s*(.+?)\s*»\s*(.*)/);
+    if (match) {
+      title = match[1]?.trim();
+      action = match[2]?.trim();
+    } else if (show && message.includes(show.title)) {
+      title = show.title;
+      action = message.replace(show.title, '').trim();
+    }
+
+    // Try to extract SXXEXX pattern for subtitle
+    const seasonEpisodeMatch = action.match(/S(\d+)E(\d+)/i);
+    if (seasonEpisodeMatch) {
+      subtitle = `S${seasonEpisodeMatch[1]} | E${seasonEpisodeMatch[2]}`;
+      action = action.replace(/S\d+E\d+/i, '').trim();
+
+      // Strip any episode title before "marqué comme..."
+      const verbMatch = action.match(/(marqué[e]?\s+comme\s+.*)$/i);
+      if (verbMatch) {
+        action = verbMatch[1].trim();
+      }
+    }
+
+    // Clean up leading punctuation or leftover characters
+    action = action.replace(/^[•\-\–\—:]\s*/, '').trim();
+
+    // Capitalize first letter of action if it's lowercased
+    if (action && action.length > 0) {
+      action = action.charAt(0).toUpperCase() + action.slice(1);
+    }
+
+    return {
+      title,
+      subtitle,
+      action,
+      posterPath: show?.posterPath
+    };
+  };
+
+  const parsed = getParsedMessage();
+
+  const rawMsgStr = typeof message === 'string' ? message : '';
+  const isPlexToast = Boolean(
+    rawMsgStr.toLowerCase().includes('plex') ||
+    parsed.action?.toLowerCase().includes('plex') ||
+    parsed.title?.toLowerCase().includes('plex')
+  );
+
+  const getAccentColor = () => {
+    if (isPlexToast) return 'text-[#E5A93D]';
+    switch (type) {
+      case 'success': return 'text-emerald-400';
+      case 'unfollow': return 'text-rose-400';
+      case 'dropped': return 'text-amber-400';
+      case 'follow': return 'text-sky-400';
+      case 'archive': return 'text-zinc-300';
+      case 'error': return 'text-rose-500';
+      default: return 'text-[#E5A93D]';
+    }
+  };
+
+  const getProgressColor = () => {
+    if (isPlexToast) return 'bg-[#E5A93D]';
+    switch (type) {
+      case 'archive': return 'bg-zinc-500';
+      case 'dropped': return 'bg-amber-500';
+      case 'follow': return 'bg-sky-500';
+      case 'unfollow': return 'bg-rose-500';
+      case 'success': return 'bg-emerald-500';
+      case 'error': return 'bg-rose-500';
+      default: return 'bg-[#E5A93D]';
+    }
+  };
+
+  const renderIcon = () => {
+    if (isPlexToast) {
+      return <PlexLogo className="w-4 h-4 text-[#E5A93D] shrink-0" />;
+    }
+    const iconClass = cn("shrink-0", getAccentColor());
+    switch (type) {
+      case 'archive': return <Archive size={14} className={iconClass} />;
+      case 'unfollow': return <Trash2 size={14} className={iconClass} />;
+      case 'dropped': return <Ban size={14} className={iconClass} />;
+      case 'follow': return <Clock size={14} className={iconClass} />;
+      case 'success': return <CheckCircle2 size={14} className={iconClass} />;
+      case 'error': return <AlertCircle size={14} className={iconClass} />;
+      default: return <Info size={14} className={iconClass} />;
+    }
+  };
+
+  const hasPoster = Boolean(parsed.posterPath);
+  const posterUrl = parsed.posterPath
+    ? (parsed.posterPath.startsWith('http')
+        ? parsed.posterPath
+        : `https://image.tmdb.org/t/p/w185${parsed.posterPath.startsWith('/') ? '' : '/'}${parsed.posterPath}`)
+    : null;
+
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          id="toast-notification-wrapper"
+          initial={{ opacity: 0, y: -30, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -40, scale: 0.92, transition: { duration: 0.2 } }}
+          transition={{ type: 'spring', damping: 26, stiffness: 380 }}
+          drag="y"
+          dragConstraints={{ top: 0, bottom: 0 }}
+          dragElastic={{ top: 0.8, bottom: 0.05 }}
+          onDragEnd={(_e, info) => {
+            if (info.offset.y < -20 || info.velocity.y < -200) {
+              hideToast();
+            }
+          }}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          className="fixed top-3 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md px-3 pointer-events-auto touch-pan-y select-none cursor-grab active:cursor-grabbing flex justify-center"
+        >
+          {hasPoster ? (
+            /* Rich Media Toast with Poster */
+            <div className="w-full relative overflow-hidden bg-zinc-900/95 backdrop-blur-xl border border-white/15 rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.85)] flex items-stretch">
+              
+              {/* Full Poster on the left with gradient fade into background */}
+              <div className="w-16 sm:w-20 shrink-0 relative bg-zinc-800 self-stretch min-h-[64px]">
+                <img 
+                  src={posterUrl!} 
+                  alt={parsed.title || "Affiche"} 
+                  className="w-full h-full object-cover object-center"
+                />
+                {/* Smooth gradient blend into the toast card */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-zinc-900/40 to-zinc-900" />
+              </div>
+
+              {/* Content Area */}
+              <div className="flex-1 py-2.5 px-3 flex flex-col justify-center min-w-0">
+                {/* Title + Subtitle */}
+                {(parsed.title || parsed.subtitle) && (
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 leading-tight mb-1">
+                    {parsed.title && (
+                      <span className={cn("font-bold text-[13px] sm:text-sm line-clamp-2 break-words max-w-full", getAccentColor())}>
+                        {parsed.title}
+                      </span>
+                    )}
+                    {parsed.subtitle && parsed.subtitle !== parsed.action && parsed.subtitle.length < 35 && (
+                      <span className="text-[10px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-md shrink-0">
+                        {parsed.subtitle}
+                      </span>
+                    )}
+                  </div>
+                )}
+                
+                {/* Action Text */}
+                <div className="flex items-center gap-1.5 text-zinc-300 text-xs font-normal leading-snug">
+                  {renderIcon()}
+                  <span className="line-clamp-2 break-words text-zinc-300 font-medium">
+                    {parsed.action}
+                  </span>
+                </div>
+              </div>
+
+              {/* Actions Button Area */}
+              {hasUndoAction && (
+                <div className="flex items-center shrink-0 pr-3 py-2.5">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleUndo();
+                    }}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 text-xs font-bold border border-amber-500/30 shadow-sm transition-all cursor-pointer touch-manipulation select-none"
+                    title="Annuler l'action"
+                  >
+                    <RotateCcw size={12} className="stroke-[2.5]" />
+                    <span>Annuler</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Dynamic Progress Bar */}
+              <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-white/5 overflow-hidden">
+                <div
+                  key={currentToast?.id || (typeof message === 'string' ? message : parsed.action)}
+                  className={cn(
+                    "h-full w-full origin-left animate-toast-progress",
+                    getProgressColor()
+                  )}
+                />
+              </div>
+            </div>
+          ) : (
+            /* Floating Compact Pill for Simple & System Notifications */
+            <div className="relative overflow-hidden bg-zinc-900/95 backdrop-blur-2xl border border-white/15 rounded-full shadow-[0_14px_40px_rgba(0,0,0,0.85)] px-3.5 py-2 sm:px-4 sm:py-2.5 flex items-center gap-2.5 w-auto max-w-full">
+              
+              {/* Icon badge - Solid 100% Opaque for Plex */}
+              {isPlexToast ? (
+                <div className="w-6 h-6 rounded-full bg-[#E5A93D] text-zinc-950 flex items-center justify-center shrink-0 font-black shadow-md shadow-amber-500/20">
+                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-zinc-950">
+                    <path d="M4 2h7.5l7.5 10-7.5 10H4l7.5-10L4 2z" />
+                  </svg>
+                </div>
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-white/10 border border-white/10 flex items-center justify-center shrink-0 text-zinc-300">
+                  {renderIcon()}
+                </div>
+              )}
+
+              {/* Message text with auto-fitting width */}
+              <div className="flex flex-col justify-center min-w-0">
+                {parsed.title && (
+                  <span className={cn("font-bold text-[12px] leading-tight line-clamp-1 mb-0.5", getAccentColor())}>
+                    {parsed.title}
+                  </span>
+                )}
+                <span className="text-zinc-100 text-[12px] sm:text-xs font-semibold leading-snug whitespace-nowrap sm:whitespace-normal line-clamp-2">
+                  {parsed.action || (typeof message === 'string' ? message : '')}
+                </span>
+              </div>
+
+              {/* Undo action button if present */}
+              {hasUndoAction && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleUndo();
+                  }}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 text-xs font-bold border border-amber-500/30 shadow-sm transition-all cursor-pointer shrink-0 ml-1"
+                  title="Annuler"
+                >
+                  <RotateCcw size={11} className="stroke-[2.5]" />
+                  <span>Annuler</span>
+                </button>
+              )}
+
+              {/* Dynamic Progress Bar along bottom */}
+              <div className="absolute bottom-0 left-4 right-4 h-[2px] bg-white/5 overflow-hidden rounded-full">
+                <div
+                  key={currentToast?.id || (typeof message === 'string' ? message : parsed.action)}
+                  className={cn(
+                    "h-full w-full origin-left animate-toast-progress",
+                    getProgressColor()
+                  )}
+                />
+              </div>
+            </div>
+          )}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+

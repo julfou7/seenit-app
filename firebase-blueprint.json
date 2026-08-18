@@ -1,0 +1,77 @@
+{
+  "entities": {
+    "Show": {
+      "title": "Show",
+      "description": "User show tracked in library",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "tmdbId": { "type": "number" },
+        "title": { "type": "string" },
+        "mediaType": { "type": "string" },
+        "posterPath": { "type": "string" },
+        "backdropPath": { "type": "string" },
+        "status": { "type": "string" },
+        "isArchived": { "type": "boolean" },
+        "updatedAt": { "type": "number" },
+        "createdAt": { "type": "number" },
+        "seenEpisodes": { "type": "array" },
+        "episodeRecords": { "type": "object" },
+        "detailsSyncedAt": { "type": "number" },
+        "totalEpisodes": { "type": "number" },
+        "firstAirDate": { "type": "string" },
+        "seasonsCache": { "type": "array" },
+        "nextEpisodeToAir": { "type": "object" },
+        "nextEpisodeToWatch": { "type": "object" },
+        "networks": { "type": "array" }
+      },
+      "required": ["userId", "tmdbId", "title", "mediaType", "status"]
+    },
+    "ImportTask": {
+      "title": "ImportTask",
+      "description": "CSV import task processing queue item",
+      "type": "object",
+      "properties": {
+        "rawTitle": { "type": "string" },
+        "seenEpisodes": { "type": "array" },
+        "season": { "type": "number" },
+        "episode": { "type": "number" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "error": { "type": "string" }
+      },
+      "required": ["rawTitle", "status"]
+    },
+    "Reminder": {
+      "title": "Reminder",
+      "description": "Push notification reminder for an upcoming episode",
+      "type": "object",
+      "properties": {
+        "showId": { "type": "string" },
+        "showTitle": { "type": "string" },
+        "episodeString": { "type": "string" },
+        "seasonNumber": { "type": "number" },
+        "episodeNumber": { "type": "number" },
+        "episodeTitle": { "type": "string" },
+        "air_date": { "type": "string" },
+        "fcmToken": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["showId", "episodeString", "air_date"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/shows/{showId}": {
+      "schema": { "$ref": "#/entities/Show" },
+      "description": "Shows saved by a specific user"
+    },
+    "/users/{userId}/importTasks/{taskId}": {
+      "schema": { "$ref": "#/entities/ImportTask" },
+      "description": "Import tasks queue for a specific user"
+    },
+    "/users/{userId}/reminders/{reminderId}": {
+      "schema": { "$ref": "#/entities/Reminder" },
+      "description": "Upcoming episode push notification reminders for a specific user"
+    }
+  }
+}
