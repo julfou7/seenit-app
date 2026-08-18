@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, getRedirectResult } from 'firebase/auth';
-import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { auth, googleAuthProvider } from '../lib/firebase';
 import { LogIn, Tv2, Film, Clapperboard, Sparkles } from 'lucide-react';
 import { PWAInstallBanner } from '../components/PWAInstallBanner';
@@ -40,28 +40,24 @@ export function LoginScreen() {
 
     try {
       if (Capacitor.isNativePlatform()) {
-        try {
-          const result = await FirebaseAuthentication.signInWithGoogle();
-          if (result.credential?.idToken) {
-            const credential = GoogleAuthProvider.credential(result.credential.idToken);
-            await signInWithCredential(auth, credential);
-          } else if (result.user) {
-            // Already signed in via plugin
-          }
-          setIsLoggingIn(false);
-          return;
-        } catch (nativeErr: any) {
-          console.warn('Native Google sign-in error:', nativeErr);
-          setError(nativeErr?.message || "Erreur lors de la connexion Google.");
-          setIsLoggingIn(false);
-          return;
-        }
+        // 1. FLUX NATIF MOBILE (APK Android)
+        await GoogleAuth.initialize({
+          clientId: '799043440232-web.apps.googleusercontent.com',
+          scopes: ['profile', 'email'],
+          grantOfflineAccess: true,
+        });
+        const googleUser = await GoogleAuth.signIn();
+        const idToken = googleUser.authentication.idToken;
+        const credential = GoogleAuthProvider.credential(idToken);
+        await signInWithCredential(auth, credential);
+      } else {
+        // 2. FLUX WEB STANDARD (Navigateur)
+        await signInWithPopup(auth, googleAuthProvider);
       }
-
-      await signInWithPopup(auth, googleAuthProvider);
     } catch (err: any) {
-      console.warn('Login error:', err);
+      console.warn("Erreur d'authentification Google :", err);
       setError(err.message || "Une erreur s'est produite lors de la connexion.");
+    } finally {
       setIsLoggingIn(false);
     }
   };

@@ -26,6 +26,11 @@ const config: CapacitorConfig = {
       splashFullScreen: true,
       splashImmersive: true,
     },
+    GoogleAuth: {
+      scopes: ['profile', 'email'],
+      serverClientId: '799043440232-web.apps.googleusercontent.com',
+      forceCodeForRefreshToken: true,
+    },
     FirebaseAuthentication: {
       skipNativeAuth: true,
       providers: ["google.com"],

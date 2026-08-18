@@ -4,7 +4,7 @@ import { auth, db, googleAuthProvider, requestNotificationPermission, sendNative
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged, User } from 'firebase/auth';
-import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { cn } from '../lib/utils';
 import { CsvImporter } from '../components/CsvImporter';
 import { useToastStore } from '../store/toastStore';
@@ -207,22 +207,21 @@ export function SettingsScreen() {
   const handleLogin = async () => {
     try {
       if (Capacitor.isNativePlatform()) {
-        try {
-          const result = await FirebaseAuthentication.signInWithGoogle();
-          if (result.credential?.idToken) {
-            const credential = GoogleAuthProvider.credential(result.credential.idToken);
-            await signInWithCredential(auth, credential);
-          }
-          return;
-        } catch (nativeErr: any) {
-          console.warn('Native Google sign-in in settings error:', nativeErr);
-          return;
-        }
+        await GoogleAuth.initialize({
+          clientId: '799043440232-web.apps.googleusercontent.com',
+          scopes: ['profile', 'email'],
+          grantOfflineAccess: true,
+        });
+        const googleUser = await GoogleAuth.signIn();
+        const idToken = googleUser.authentication.idToken;
+        const credential = GoogleAuthProvider.credential(idToken);
+        await signInWithCredential(auth, credential);
+        return;
       }
 
       await signInWithPopup(auth, googleAuthProvider);
     } catch (err) {
-      console.error(err);
+      console.error("Erreur d'authentification Google in settings :", err);
     }
   };
 
