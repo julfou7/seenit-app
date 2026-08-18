@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Cloud, LogIn, LogOut, FileText, CheckCircle2, MonitorPlay, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronDown, ChevronUp, Check, AlertCircle, Info, Bug } from 'lucide-react';
+import { Cloud, LogIn, LogOut, FileText, CheckCircle2, MonitorPlay, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronDown, ChevronUp, Check, AlertCircle, Info, Bug, Sparkles, Download } from 'lucide-react';
 import { auth, googleAuthProvider, requestNotificationPermission, sendNativeNotification } from '../lib/firebase';
 import { Capacitor } from '@capacitor/core';
 import { signInWithPopup, signInWithRedirect, signOut, onAuthStateChanged, User } from 'firebase/auth';
@@ -9,6 +9,7 @@ import { useToastStore } from '../store/toastStore';
 import { useSyncStore } from '../store/syncStore';
 import { useShowsStore } from '../store/showsStore';
 import { useLogStore, appLogger, LogCategory } from '../store/logStore';
+import { useUpdateStore, CURRENT_APP_VERSION } from '../store/updateStore';
 import { performDetailsSync } from '../hooks/useDetailsSyncWorker';
 import { getPlexPin, checkPlexPin } from '../services/plex';
 import { performPlexSync } from '../features/plex/syncPlex';
@@ -31,6 +32,7 @@ export function SettingsScreen() {
   const syncStatus = useSyncStore(state => state.syncStatus);
   const shows = useShowsStore(state => state.shows);
   const { logs, clearLogs, getLogsAsText } = useLogStore();
+  const { currentVersion, latestRelease, hasUpdate, isChecking: isCheckingUpdates, lastChecked, checkForUpdates } = useUpdateStore();
   const [user, setUser] = useState<User | null>(null);
   const [userPlatforms, setUserPlatforms] = useState<number[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -655,6 +657,73 @@ export function SettingsScreen() {
                     })
                 )}
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Application Updates & Version Section */}
+        <div className="bg-zinc-900/60 border border-white/10 rounded-2xl p-5 space-y-4 shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                <Sparkles size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  Mises à jour de l'application
+                </h3>
+                <p className="text-xs text-zinc-400">
+                  Version installée : <span className="font-semibold text-zinc-200">v{currentVersion}</span>
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => checkForUpdates(true)}
+              disabled={isCheckingUpdates}
+              className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 text-zinc-300 hover:text-white border border-white/5 transition-all disabled:opacity-50 flex items-center gap-1.5 text-xs font-medium cursor-pointer"
+              title="Vérifier maintenant"
+            >
+              <RefreshCw size={13} className={cn(isCheckingUpdates && "animate-spin text-amber-400")} />
+              <span>{isCheckingUpdates ? 'Recherche...' : 'Vérifier'}</span>
+            </button>
+          </div>
+
+          {/* Status Display */}
+          {hasUpdate && latestRelease ? (
+            <div className="bg-gradient-to-r from-amber-500/15 via-amber-600/10 to-transparent border border-amber-500/30 rounded-xl p-3.5 space-y-3 animate-in fade-in duration-200">
+              <div>
+                <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-amber-400" />
+                  <span>Nouvelle version v{latestRelease.version} disponible !</span>
+                </div>
+                <div className="text-[11px] text-zinc-300 mt-1 whitespace-pre-wrap leading-relaxed">
+                  {latestRelease.releaseNotes || 'Améliorations générales et corrections de bugs.'}
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if (latestRelease.apkDownloadUrl) {
+                    window.open(latestRelease.apkDownloadUrl, '_system');
+                  }
+                }}
+                className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 active:scale-[0.99] text-black font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
+              >
+                <Download size={15} />
+                <span>Télécharger et installer l'APK v{latestRelease.version}</span>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between bg-white/[0.02] border border-white/5 rounded-xl px-3.5 py-2.5 text-xs text-zinc-400">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={15} className="text-emerald-400 shrink-0" />
+                <span>Votre application est à jour</span>
+              </div>
+              {lastChecked && (
+                <span className="text-[10px] text-zinc-500 font-mono">
+                  {new Date(lastChecked).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
             </div>
           )}
         </div>

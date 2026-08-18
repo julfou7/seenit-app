@@ -20,6 +20,7 @@ import { ShowDetailScreen } from './screens/ShowDetailScreen';
 import { WatchListScreen } from './screens/WatchListScreen';
 import { DiscoverScreen } from './screens/DiscoverScreen';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
+import { AppUpdateBanner } from './components/AppUpdateBanner';
 import { useNavigation } from './features/navigation/useNavigation';
 import { useDetailsSyncWorker } from './hooks/useDetailsSyncWorker';
 import { useRemindersNotifier } from './hooks/useRemindersNotifier';
@@ -282,6 +283,9 @@ function MainApp() {
         
         {/* Banner PWA Install (S25 Ultra / Android / Chrome) */}
         <PWAInstallBanner />
+
+        {/* In-App Automatic Update Checker Banner */}
+        <AppUpdateBanner />
         
         {/* Global Toast */}
         <ToastContainer />
