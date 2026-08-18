@@ -12,6 +12,13 @@ export function AppUpdateBanner() {
     checkForUpdates(false);
   }, [checkForUpdates]);
 
+  // Automatically show modal on startup when an update is available (unless dismissed for this version)
+  useEffect(() => {
+    if (hasUpdate && latestRelease && dismissedVersion !== latestRelease.version) {
+      setShowModal(true);
+    }
+  }, [hasUpdate, latestRelease, dismissedVersion]);
+
   if (!hasUpdate || !latestRelease) return null;
   if (dismissedVersion === latestRelease.version && !showModal) return null;
 
@@ -82,10 +89,10 @@ export function AppUpdateBanner() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    SeenIt v{latestRelease.version}
+                    Une nouvelle version est disponible !
                   </h3>
                   <p className="text-xs text-amber-400/90 font-medium">
-                    Nouvelle version prête à être installée
+                    SeenIt v{latestRelease.version} est prête à être installée
                   </p>
                 </div>
               </div>
