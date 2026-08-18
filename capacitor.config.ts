@@ -25,6 +25,11 @@ const config: CapacitorConfig = {
       showSpinner: false,
       splashFullScreen: true,
       splashImmersive: true,
+    },
+    FirebaseAuthentication: {
+      skipNativeAuth: true,
+      providers: ["google.com"],
+      authDomain: "gen-lang-client-0201895414.firebaseapp.com"
     }
   }
 };

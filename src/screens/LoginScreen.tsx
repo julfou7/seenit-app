@@ -45,11 +45,16 @@ export function LoginScreen() {
           if (result.credential?.idToken) {
             const credential = GoogleAuthProvider.credential(result.credential.idToken);
             await signInWithCredential(auth, credential);
-            setIsLoggingIn(false);
-            return;
+          } else if (result.user) {
+            // Already signed in via plugin
           }
+          setIsLoggingIn(false);
+          return;
         } catch (nativeErr: any) {
-          console.warn('Native Google sign-in failed, trying popup fallback:', nativeErr);
+          console.warn('Native Google sign-in error:', nativeErr);
+          setError(nativeErr?.message || "Erreur lors de la connexion Google.");
+          setIsLoggingIn(false);
+          return;
         }
       }
 

@@ -212,10 +212,11 @@ export function SettingsScreen() {
           if (result.credential?.idToken) {
             const credential = GoogleAuthProvider.credential(result.credential.idToken);
             await signInWithCredential(auth, credential);
-            return;
           }
-        } catch (nativeErr) {
-          console.warn('Native Google sign-in in settings failed, trying popup fallback:', nativeErr);
+          return;
+        } catch (nativeErr: any) {
+          console.warn('Native Google sign-in in settings error:', nativeErr);
+          return;
         }
       }
 
