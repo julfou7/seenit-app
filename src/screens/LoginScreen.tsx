@@ -41,13 +41,11 @@ export function LoginScreen() {
     setError('');
 
     try {
-      if (Capacitor.isNativePlatform()) {
-        // Native webviews block popups, use redirect directly
-        // Note: Google 2FA might throw a 400 error on first redirect. We handle it in getRedirectResult.
-        await signInWithRedirect(auth, googleAuthProvider);
-        return; // Execution will stop here as the page redirects
-      } else {
+      try {
         await signInWithPopup(auth, googleAuthProvider);
+      } catch (popupErr: any) {
+        console.warn('Popup login failed, trying redirect fallback...', popupErr);
+        await signInWithRedirect(auth, googleAuthProvider);
       }
     } catch (err: any) {
       console.warn('Login error:', err);

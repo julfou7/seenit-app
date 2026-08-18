@@ -7,20 +7,7 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
     hostname: 'localhost',
-    cleartext: true,
-    allowNavigation: [
-      "*.firebaseapp.com",
-      "*.firebaseio.com",
-      "*.google.com",
-      "*.google.fr",
-      "*.googleapis.com",
-      "*.gstatic.com",
-      "*.googleusercontent.com",
-      "accounts.google.com",
-      "accounts.google.fr",
-      "myaccount.google.com",
-      "gds.google.com"
-    ]
+    cleartext: true
   },
   overrideUserAgent: "Mozilla/5.0 (Linux; Android 14; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
   plugins: {

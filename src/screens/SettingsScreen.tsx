@@ -205,10 +205,11 @@ export function SettingsScreen() {
 
   const handleLogin = async () => {
     try {
-      if (Capacitor.isNativePlatform()) {
-        await signInWithRedirect(auth, googleAuthProvider);
-      } else {
+      try {
         await signInWithPopup(auth, googleAuthProvider);
+      } catch (popupErr) {
+        console.warn('Popup login in settings failed, trying redirect fallback...', popupErr);
+        await signInWithRedirect(auth, googleAuthProvider);
       }
     } catch (err) {
       console.error(err);
