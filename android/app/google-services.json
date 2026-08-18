@@ -1,0 +1,34 @@
+{
+  "project_info": {
+    "project_number": "799043440232",
+    "project_id": "gen-lang-client-0201895414",
+    "storage_bucket": "gen-lang-client-0201895414.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:799043440232:android:54f4f27f8e1493c9275dd",
+        "android_client_info": {
+          "package_name": "com.seenit.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "799043440232-web.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCfrB6vxS5DsgwGYKgFnFwy67Ik2_1ZiBs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
