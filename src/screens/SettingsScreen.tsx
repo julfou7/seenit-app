@@ -6,7 +6,7 @@ import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
-import { cn } from '../lib/utils';
+import { cn, openExternalUrl } from '../lib/utils';
 import { CsvImporter } from '../components/CsvImporter';
 import { useToastStore } from '../store/toastStore';
 import { useSyncStore } from '../store/syncStore';
@@ -83,7 +83,8 @@ export function SettingsScreen() {
     try {
       const pin = await getPlexPin();
       setPlexPin(pin);
-      window.open(`https://app.plex.tv/auth#?clientID=${pin.clientIdentifier}&code=${pin.code}&context[device][product]=TV%20Time%20Sync`, '_blank');
+      const authUrl = `https://app.plex.tv/auth#?clientID=${pin.clientIdentifier}&code=${pin.code}&context[device][product]=TV%20Time%20Sync`;
+      await openExternalUrl(authUrl);
     } catch (e: any) {
       showToast("Erreur de connexion à Plex", "error");
       appLogger.error('plex', 'Erreur génération PIN Plex', e);

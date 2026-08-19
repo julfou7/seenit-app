@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { FileOpener } from '@capacitor-community/file-opener';
+import { openExternalUrl } from '../lib/utils';
 import { GITHUB_PAT } from '../store/updateStore';
 
 export interface UpdateProgress {
@@ -24,7 +25,7 @@ export async function downloadAndInstallApk(
   // If running on web / preview
   if (!Capacitor.isNativePlatform()) {
     onProgress?.({ percent: 100, status: 'done', message: 'Ouverture du lien de téléchargement...' });
-    window.open(apkUrl, '_blank');
+    await openExternalUrl(apkUrl);
     return { success: true };
   }
 

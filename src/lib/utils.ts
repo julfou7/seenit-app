@@ -1,8 +1,26 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { Browser } from '@capacitor/browser';
+import { Capacitor } from '@capacitor/core';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+/**
+ * Opens external URLs safely on both Web and Native Android/iOS Capacitor apps using Chrome Custom Tabs
+ */
+export async function openExternalUrl(url: string) {
+  if (!url) return;
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await Browser.open({ url, windowName: '_system' });
+      return;
+    } catch (e) {
+      console.warn('Browser.open failed, falling back to window.open', e);
+    }
+  }
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 /**
