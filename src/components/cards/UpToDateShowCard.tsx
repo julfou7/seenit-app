@@ -327,7 +327,7 @@ export function UpToDateShowCard({ show, onShowClick, onEpisodeClick, onMarkAsSe
         </div>
         
         {categoryInfo.type === 'CURRENTLY_AIRING' || isFullyWatched ? (
-          <div className="p-1 -mr-1 -mt-1 text-amber-400" title="À jour">
+          <div className="text-amber-400" title="À jour">
             <SeenItCheckButton onClick={(e) => e.stopPropagation()} isWatched={true} size={28} />
           </div>
         ) : (
@@ -336,7 +336,6 @@ export function UpToDateShowCard({ show, onShowClick, onEpisodeClick, onMarkAsSe
               e.stopPropagation();
               onMarkAsSeen(show);
             }}
-            className="-mr-1 -mt-1"
             title="Marquer le prochain épisode comme vu"
           />
         )}

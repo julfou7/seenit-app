@@ -320,7 +320,7 @@ export function ContinueWatchingCard({ show, onShowClick, onEpisodeClick, onMark
             e.stopPropagation();
             onMarkAsSeen(show);
           }}
-          className="-mr-1 -mt-1 flex-shrink-0"
+          className="flex-shrink-0"
           title="Marquer comme vu"
         />
       </div>

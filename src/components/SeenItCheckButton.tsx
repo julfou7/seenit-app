@@ -54,18 +54,6 @@ export function SeenItCheckButton({
         )}
       />
 
-      {/* Floating "Seen it!" Animation */}
-      <div 
-        className={cn(
-          "absolute -top-4 left-1/2 -translate-x-1/2 pointer-events-none transition-all duration-500 ease-out flex items-center justify-center",
-          isTapped ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-2 scale-90"
-        )}
-      >
-        <span className="bg-gradient-to-r from-[#FFF4D0] via-[#F5C518] to-[#E5A93D] bg-clip-text text-transparent font-black text-[11px] uppercase tracking-wider whitespace-nowrap drop-shadow-md">
-          Seen It!
-        </span>
-      </div>
-
       {/* Bespoke Cinema TV Emblem SVG */}
       <svg
         width={size}
@@ -178,6 +166,18 @@ export function SeenItCheckButton({
           )}
         </g>
       </svg>
+      
+      {/* Floating "Seen it!" Text Below the TV */}
+      <div 
+        className={cn(
+          "absolute -bottom-3 left-1/2 -translate-x-1/2 pointer-events-none transition-all duration-500 ease-out flex items-center justify-center",
+          isTapped ? "opacity-100 translate-y-0 scale-100" : "opacity-0 -translate-y-2 scale-90"
+        )}
+      >
+        <span className="bg-gradient-to-r from-[#FFF4D0] via-[#F5C518] to-[#E5A93D] bg-clip-text text-transparent font-black text-[9px] uppercase tracking-widest whitespace-nowrap drop-shadow-md">
+          Seen It!
+        </span>
+      </div>
     </button>
   );
 }

@@ -186,7 +186,7 @@ export function MovieWatchCard({ show, onShowClick, onMarkAsSeen }: Props) {
             e.stopPropagation();
             onMarkAsSeen(show);
           }}
-          className="-mr-1 -mt-0.5 flex-shrink-0"
+          className="flex-shrink-0"
           title="Marquer comme vu"
         />
       </div>

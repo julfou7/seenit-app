@@ -20,9 +20,9 @@ export function AppUpdateBanner() {
   const [showModal, setShowModal] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<UpdateProgress | null>(null);
 
-  // Automatically check for updates on app startup
+  // Automatically check for updates on app startup (force fetch bypassing 10 min cache)
   useEffect(() => {
-    checkForUpdates();
+    checkForUpdates(true);
   }, [checkForUpdates]);
 
   if (!hasUpdate || !latestRelease) {
