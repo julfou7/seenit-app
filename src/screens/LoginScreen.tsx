@@ -42,12 +42,15 @@ export function LoginScreen() {
       if (Capacitor.isNativePlatform()) {
         // 1. FLUX NATIF MOBILE (APK Android)
         await GoogleAuth.initialize({
-          clientId: '799043440232-web.apps.googleusercontent.com',
+          clientId: '799043440232-i9s1l0jaerljg58v3oooleuemnhnim4o.apps.googleusercontent.com',
           scopes: ['profile', 'email'],
           grantOfflineAccess: true,
         });
         const googleUser = await GoogleAuth.signIn();
-        const idToken = googleUser.authentication.idToken;
+        const idToken = googleUser.authentication?.idToken || (googleUser as any)?.idToken;
+        if (!idToken) {
+          throw new Error("Jeton d'authentification Google manquant.");
+        }
         const credential = GoogleAuthProvider.credential(idToken);
         await signInWithCredential(auth, credential);
       } else {
@@ -56,7 +59,8 @@ export function LoginScreen() {
       }
     } catch (err: any) {
       console.warn("Erreur d'authentification Google :", err);
-      setError(err.message || "Une erreur s'est produite lors de la connexion.");
+      const errMsg = err?.message || (typeof err === 'string' ? err : JSON.stringify(err)) || "Une erreur s'est produite lors de la connexion.";
+      setError(errMsg);
     } finally {
       setIsLoggingIn(false);
     }
