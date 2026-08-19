@@ -70,6 +70,18 @@ jobs:
           path: SeenIt-v${{ steps.version_step.outputs.APP_VERSION }}.apk
           retention-days: 30
 
+      - name: Generate Release Notes
+        id: release_notes
+        run: |
+          LATEST_MSG=$(git log -1 --pretty=%s)
+          echo "NOTES<<EOF" >> $GITHUB_OUTPUT
+          echo "### ✨ Nouveautés de la version v${{ steps.version_step.outputs.APP_VERSION }}" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "- **Mise à jour directe** : Téléchargement natif fluide et lancement automatique de l'installeur Android." >> $GITHUB_OUTPUT
+          echo "- **Écran de démarrage** : Élimination du double écran d'accueil et animation 120 FPS haute définition." >> $GITHUB_OUTPUT
+          echo "- **Détail du commit** : $LATEST_MSG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
@@ -78,7 +90,8 @@ jobs:
           name: SeenIt v${{ steps.version_step.outputs.APP_VERSION }}
           draft: false
           prerelease: false
-          generate_release_notes: true
+          body: ${{ steps.release_notes.outputs.NOTES }}
+          generate_release_notes: false
           files: |
             SeenIt-v${{ steps.version_step.outputs.APP_VERSION }}.apk
             android/app/build/outputs/apk/debug/app-debug.apk

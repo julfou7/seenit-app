@@ -10,7 +10,8 @@ export interface UpdateProgress {
 }
 
 /**
- * Downloads APK directly inside the app and opens the native Android package installer.
+ * Downloads APK directly inside the app using Capacitor's native Filesystem downloadFile
+ * and triggers Android Package Installer with FileOpener.
  */
 export async function downloadAndInstallApk(
   apkUrl: string,
@@ -20,112 +21,97 @@ export async function downloadAndInstallApk(
     return { success: false, error: 'URL de téléchargement introuvable.' };
   }
 
-  // If running on web / non-native
+  // If running on web / preview
   if (!Capacitor.isNativePlatform()) {
     onProgress?.({ percent: 100, status: 'done', message: 'Ouverture du lien de téléchargement...' });
     window.open(apkUrl, '_blank');
     return { success: true };
   }
 
+  let progressListener: any = null;
+
   try {
     onProgress?.({ percent: 5, status: 'downloading', message: 'Connexion au serveur de mise à jour...' });
 
     const fileName = 'SeenIt-update.apk';
 
-    // 1. Download file with progress using fetch + Filesystem or direct download
-    const response = await fetch(apkUrl);
-    if (!response.ok) {
-      throw new Error(`Erreur lors du téléchargement (${response.status})`);
+    // 1. Delete previous cache file if existing
+    try {
+      await Filesystem.deleteFile({
+        path: fileName,
+        directory: Directory.Cache
+      });
+    } catch {
+      // Ignored if file does not exist
     }
 
-    const contentLengthHeader = response.headers.get('content-length');
-    const totalBytes = contentLengthHeader ? parseInt(contentLengthHeader, 10) : 0;
+    // 2. Attach native download progress listener
+    try {
+      progressListener = await Filesystem.addListener('progress', (progress: any) => {
+        if (progress.bytes && progress.contentLength) {
+          const percent = Math.min(98, Math.round((progress.bytes / progress.contentLength) * 100));
+          const mbReceived = (progress.bytes / (1024 * 1024)).toFixed(1);
+          const mbTotal = (progress.contentLength / (1024 * 1024)).toFixed(1);
 
-    let blob: Blob;
-
-    if (response.body && totalBytes > 0) {
-      const reader = response.body.getReader();
-      let receivedBytes = 0;
-      const chunks: Uint8Array[] = [];
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        chunks.push(value);
-        receivedBytes += value.length;
-
-        const percent = Math.min(95, Math.round((receivedBytes / totalBytes) * 90) + 5);
-        const mbReceived = (receivedBytes / (1024 * 1024)).toFixed(1);
-        const mbTotal = (totalBytes / (1024 * 1024)).toFixed(1);
-
-        onProgress?.({
-          percent,
-          status: 'downloading',
-          message: `Téléchargement : ${mbReceived} Mo / ${mbTotal} Mo (${percent}%)`
-        });
-      }
-
-      blob = new Blob(chunks, { type: 'application/vnd.android.package-archive' });
-    } else {
-      onProgress?.({ percent: 50, status: 'downloading', message: 'Téléchargement de la mise à jour...' });
-      blob = await response.blob();
+          onProgress?.({
+            percent,
+            status: 'downloading',
+            message: `Téléchargement : ${mbReceived} Mo / ${mbTotal} Mo (${percent}%)`
+          });
+        }
+      });
+    } catch (e) {
+      console.warn('Progress listener unsupported, continuing download...', e);
     }
 
-    onProgress?.({ percent: 95, status: 'installing', message: 'Préparation du paquet d\'installation...' });
+    onProgress?.({ percent: 15, status: 'downloading', message: 'Téléchargement de la mise à jour...' });
 
-    // 2. Convert blob to base64 to save with Filesystem
-    const reader = new FileReader();
-    const base64Promise = new Promise<string>((resolve, reject) => {
-      reader.onloadend = () => {
-        const base64data = reader.result as string;
-        // remove the data:*/*;base64, header
-        const base64 = base64data.split(',')[1] || '';
-        resolve(base64);
-      };
-      reader.onerror = reject;
-    });
-    reader.readAsDataURL(blob);
-    const base64Data = await base64Promise;
-
-    // 3. Write APK to Cache directory
-    await Filesystem.writeFile({
+    // 3. Native Android HTTP download (executes in Java, bypasses browser CORS completely)
+    const downloadRes = await Filesystem.downloadFile({
+      url: apkUrl,
       path: fileName,
-      data: base64Data,
-      directory: Directory.Cache
+      directory: Directory.Cache,
+      progress: true,
+      recursive: true
     });
 
-    // 4. Get native File URI
+    if (progressListener) {
+      try {
+        await progressListener.remove();
+      } catch {}
+      progressListener = null;
+    }
+
+    onProgress?.({ percent: 99, status: 'installing', message: 'Ouverture de l\'installeur Android...' });
+
+    // 4. Get file URI
     const fileUri = await Filesystem.getUri({
       path: fileName,
       directory: Directory.Cache
     });
 
-    onProgress?.({ percent: 100, status: 'installing', message: 'Lancement de l\'installeur Android...' });
+    const targetPath = downloadRes.path || fileUri.uri;
 
-    // 5. Open APK with Android Package Installer
+    // 5. Open with Android package installer
     await FileOpener.open({
-      filePath: fileUri.uri,
+      filePath: targetPath,
       contentType: 'application/vnd.android.package-archive',
       openWithDefault: true
     });
 
-    onProgress?.({ percent: 100, status: 'done', message: 'Installeur prêt !' });
+    onProgress?.({ percent: 100, status: 'done', message: 'Installeur lancé !' });
     return { success: true };
   } catch (err: any) {
-    console.error('Failed to in-app update APK:', err);
+    if (progressListener) {
+      try { await progressListener.remove(); } catch {}
+    }
+    console.error('Failed to download & install APK natively:', err);
+
     onProgress?.({
       percent: 0,
       status: 'error',
-      message: 'Basculement vers le navigateur...'
+      message: 'Erreur lors du téléchargement'
     });
-
-    // Fallback: Open URL in external browser
-    try {
-      await Browser.open({ url: apkUrl });
-    } catch {
-      window.open(apkUrl, '_system');
-    }
 
     return {
       success: false,
