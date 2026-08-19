@@ -3,6 +3,7 @@ import { SeenItCheckButton } from '../SeenItCheckButton';
 import { type Show } from '../../types';
 import { getAiredProgress, cn, getTodayStr } from '../../lib/utils';
 import { tmdb } from '../../features/shows/tmdb';
+import { getFormattedProviderLogo } from '../../utils/providerLogos';
 
 interface Props {
   key?: React.Key;
@@ -210,6 +211,7 @@ export function ContinueWatchingCard({ show, onShowClick, onEpisodeClick, onMark
   }
 
   const [providerLogo, setProviderLogo] = useState<string | null>(null);
+  const [providerName, setProviderName] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -220,6 +222,7 @@ export function ContinueWatchingCard({ show, onShowClick, onEpisodeClick, onMark
           const topProv = fr?.flatrate?.[0] || fr?.free?.[0] || fr?.ads?.[0] || fr?.buy?.[0] || fr?.rent?.[0];
           if (topProv?.logo_path) {
             setProviderLogo(topProv.logo_path);
+            if (topProv.provider_name) setProviderName(topProv.provider_name);
           }
         }
       }).catch(() => {});
@@ -254,11 +257,10 @@ export function ContinueWatchingCard({ show, onShowClick, onEpisodeClick, onMark
     }
   };
 
-  const networkLogo = providerLogo
-    ? (providerLogo.startsWith('http') ? providerLogo : `https://image.tmdb.org/t/p/w92${providerLogo}`)
-    : (show.networks && show.networks.length > 0 && show.networks[0].logo_path
-        ? `https://image.tmdb.org/t/p/w92${show.networks[0].logo_path}`
-        : null);
+  const networkLogo = getFormattedProviderLogo(
+    providerLogo || (show.networks && show.networks.length > 0 ? show.networks[0].logo_path : null),
+    providerName || (show.networks && show.networks.length > 0 ? show.networks[0].name : (show as any).network || (show as any).platform)
+  );
 
   return (
     <div className="flex-shrink-0 w-64 flex flex-col cursor-pointer snap-start group" onClick={handleCardClick}>
@@ -268,8 +270,8 @@ export function ContinueWatchingCard({ show, onShowClick, onEpisodeClick, onMark
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/[0.04] to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10" />
 
         {networkLogo && (
-          <div className="absolute top-0 right-0 bg-white/95 backdrop-blur-md rounded-bl-xl px-2 py-1 shadow-sm max-h-[28px] flex items-center justify-center z-20 pointer-events-none">
-            <img loading="lazy" decoding="async" src={networkLogo} alt="" className="h-4.5 w-auto max-w-[60px] max-h-[20px] object-contain rounded-[2px]" />
+          <div className="absolute top-0 right-0 bg-white/95 backdrop-blur-md w-7 h-7 rounded-bl-xl p-1 shadow-sm flex items-center justify-center z-20 pointer-events-none">
+            <img loading="lazy" decoding="async" src={networkLogo} alt="" className="w-5 h-5 object-contain rounded-[3px]" />
           </div>
         )}
 

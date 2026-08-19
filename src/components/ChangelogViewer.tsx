@@ -10,10 +10,8 @@ interface ChangelogViewerProps {
  */
 function cleanReleaseNotes(raw: string): string {
   if (!raw || !raw.trim()) {
-    return `### ✨ Nouveautés & Améliorations
-- **Téléchargement direct intégré** : Installez les futures mises à jour en un clic sans passer par votre explorateur de fichiers.
-- **Animation de démarrage fluide** : Suppression du double écran d'accueil et logo haute définition 120 FPS.
-- **Améliorations générales** : Optimisation des performances et corrections diverses.`;
+    return `### ✨ Nouveautés de cette version
+- **Améliorations générales** : Correctifs visuels, optimisations des performances et mise à jour des services.`;
   }
 
   let text = raw.trim();
@@ -22,12 +20,10 @@ function cleanReleaseNotes(raw: string): string {
   if (
     text.startsWith('**Full Changelog**') || 
     text.startsWith('Full Changelog:') || 
-    text.includes('compare/v') && text.length < 120
+    (text.includes('compare/v') && text.length < 120)
   ) {
     return `### ✨ Nouveautés de cette version
-- **Mise à jour directe** : Téléchargement et lancement automatique de l'installeur Android en tâche de fond.
-- **Écran de démarrage optimisé** : Élimination du double écran d'accueil et affichage instantané du logo haute définition.
-- **Fluidité & Graphismes** : Animation 120 FPS et affichage net du logo Play.`;
+- **Mises à jour & correctifs** : Améliorations de la stabilité, correctifs d'affichage et optimisations générales.`;
   }
 
   // Remove boilerplate lines like "**Full Changelog**: https://..." or "## What's Changed"
@@ -63,9 +59,7 @@ function cleanReleaseNotes(raw: string): string {
   const result = filteredLines.join('\n').trim();
   if (!result) {
     return `### ✨ Nouveautés de cette version
-- **Mise à jour directe** : Téléchargement et lancement automatique de l'installeur Android en tâche de fond.
-- **Écran de démarrage optimisé** : Élimination du double écran d'accueil et affichage instantané du logo haute définition.
-- **Fluidité & Graphismes** : Animation 120 FPS et affichage net du logo Play.`;
+- **Améliorations générales** : Correctifs d'affichage, stabilité et optimisations.`;
   }
 
   return result;

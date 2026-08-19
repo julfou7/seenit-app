@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { SeenItCheckButton } from '../SeenItCheckButton';
 import { type Show } from '../../types';
 import { tmdb } from '../../features/shows/tmdb';
+import { getFormattedProviderLogo } from '../../utils/providerLogos';
 
 interface Props {
   key?: React.Key;
@@ -27,6 +28,9 @@ export function MovieWatchCard({ show, onShowClick, onMarkAsSeen }: Props) {
     show.networks && show.networks.length > 0 && show.networks[0].logo_path
       ? show.networks[0].logo_path
       : null
+  );
+  const [providerName, setProviderName] = useState<string | null>(
+    show.networks && show.networks.length > 0 ? show.networks[0].name : null
   );
   const [hasFlatrate, setHasFlatrate] = useState<boolean>(false);
 
@@ -57,6 +61,7 @@ export function MovieWatchCard({ show, onShowClick, onMarkAsSeen }: Props) {
           const topProv = flatrate || free || ads || buy || rent;
           if (topProv?.logo_path) {
             setProviderLogo(topProv.logo_path);
+            if (topProv.provider_name) setProviderName(topProv.provider_name);
           }
           if (flatrate) {
             setHasFlatrate(true);
@@ -132,17 +137,24 @@ export function MovieWatchCard({ show, onShowClick, onMarkAsSeen }: Props) {
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/[0.04] to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10" />
 
         {/* Diffuseur / Provider logo */}
-        {providerLogo && (
-          <div className="absolute top-0 right-0 bg-white/95 backdrop-blur-md rounded-bl-xl px-2 py-1 shadow-sm max-h-[28px] flex items-center justify-center z-20 pointer-events-none">
-            <img 
-              loading="lazy" 
-              decoding="async" 
-              src={providerLogo.startsWith('http') ? providerLogo : `https://image.tmdb.org/t/p/w92${providerLogo}`} 
-              alt="Diffuseur" 
-              className="h-4.5 w-auto max-w-[60px] max-h-[20px] object-contain rounded-[2px]" 
-            />
-          </div>
-        )}
+        {(() => {
+          const networkLogo = getFormattedProviderLogo(
+            providerLogo || (show.networks && show.networks.length > 0 ? show.networks[0].logo_path : null),
+            providerName || (show.networks && show.networks.length > 0 ? show.networks[0].name : (show as any).network || (show as any).platform)
+          );
+          if (!networkLogo) return null;
+          return (
+            <div className="absolute top-0 right-0 bg-white/95 backdrop-blur-md w-7 h-7 rounded-bl-xl p-1 shadow-sm flex items-center justify-center z-20 pointer-events-none">
+              <img 
+                loading="lazy" 
+                decoding="async" 
+                src={networkLogo} 
+                alt="Diffuseur" 
+                className="w-5 h-5 object-contain rounded-[3px]" 
+              />
+            </div>
+          );
+        })()}
 
         {/* Cinema / Release Badge */}
         {cinemaBadge}
