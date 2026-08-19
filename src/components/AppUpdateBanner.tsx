@@ -59,18 +59,15 @@ export function AppUpdateBanner() {
         setDragY(0);
         setIsDismissing(false);
       }, 200);
-    } else if (Math.abs(dragY) < 5) {
-      // Simple tap -> open modal
-      setShowModal(true);
-      setDragY(0);
     } else {
       setDragY(0);
     }
     setStartY(null);
   };
 
-  const handleBannerClick = () => {
-    if (Math.abs(dragY) < 5 && !isDismissing) {
+  const handleBannerClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isDismissing) {
       setShowModal(true);
     }
   };

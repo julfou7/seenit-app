@@ -245,6 +245,14 @@ function MainApp() {
       navigator.serviceWorker.addEventListener('message', handleSWMessage);
     }
 
+    // Écouteur des notifications Capacitor natives (clic sur notification APK Android)
+    const handleCapacitorAction = (event: CustomEvent) => {
+      if (event.detail) {
+        handleNotificationMessage(event.detail);
+      }
+    };
+    window.addEventListener('capacitor-notification-action' as any, handleCapacitorAction);
+
     // Écouteur BroadcastChannel (ultra-fiable en PWA et arrière-plan)
     let bc: BroadcastChannel | null = null;
     try {
@@ -269,6 +277,7 @@ function MainApp() {
       if (bc) {
         bc.close();
       }
+      window.removeEventListener('capacitor-notification-action' as any, handleCapacitorAction);
       window.removeEventListener('focus', handleVisibilityOrFocus);
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
     };

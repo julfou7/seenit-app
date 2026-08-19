@@ -50,7 +50,38 @@ if (typeof window !== 'undefined' && 'Notification' in window) {
   });
 }
 
-export async function sendNativeNotification(title: string, options?: NotificationOptions) {
+// Register native notification click action listener on Capacitor Native platform
+if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+  try {
+    LocalNotifications.addListener('localNotificationActionPerformed', (notificationAction) => {
+      const extra = notificationAction.notification?.extra || {};
+      const payload = {
+        type: notificationAction.actionId === 'mark_watched' ? 'QUICK_ACTION_MARK_WATCHED' : 'NAVIGATE_SHOW',
+        showId: extra.showId,
+        tmdbId: extra.tmdbId,
+        mediaType: extra.mediaType || 'tv',
+        season: extra.season,
+        episode: extra.episode,
+        url: extra.url
+      };
+      window.dispatchEvent(new CustomEvent('capacitor-notification-action', { detail: payload }));
+    });
+  } catch (err) {
+    console.warn('LocalNotifications listener setup warning:', err);
+  }
+}
+
+export async function sendNativeNotification(title: string, options?: NotificationOptions & { image?: string; icon?: string; badge?: string; data?: any; showId?: string | number; tmdbId?: number; mediaType?: string; season?: number; episode?: number }) {
+  const iconUrl = options?.icon || (options as any)?.image || 'https://seenit.app/icon-192.png';
+  const imageUrl = (options as any)?.image || options?.icon;
+  const extraData = (options as any)?.data || {
+    showId: options?.showId,
+    tmdbId: options?.tmdbId,
+    mediaType: options?.mediaType,
+    season: options?.season,
+    episode: options?.episode
+  };
+
   // On Native Capacitor Android App, use LocalNotifications plugin
   if (Capacitor.isNativePlatform()) {
     try {
@@ -59,15 +90,35 @@ export async function sendNativeNotification(title: string, options?: Notificati
         const req = await LocalNotifications.requestPermissions();
         if (req.display !== 'granted') return;
       }
+
+      // Attachments for poster image/photo on Android notification card
+      const attachments: any[] = [];
+      if (imageUrl && imageUrl.startsWith('http')) {
+        attachments.push({ id: 'photo', url: imageUrl });
+      } else if (iconUrl && iconUrl.startsWith('http')) {
+        attachments.push({ id: 'poster', url: iconUrl });
+      }
+
       await LocalNotifications.schedule({
         notifications: [{
           title: title,
           body: options?.body || '',
+          largeBody: options?.body || '',
+          summaryText: 'SeenIt',
           id: Math.floor(Math.random() * 1000000),
           schedule: { at: new Date(Date.now() + 100) },
           smallIcon: 'ic_launcher',
+          largeIcon: (iconUrl && iconUrl.startsWith('http')) ? iconUrl : undefined,
+          attachments: attachments.length > 0 ? attachments : undefined,
           actionTypeId: '',
-          extra: null
+          extra: {
+            showId: extraData.showId,
+            tmdbId: extraData.tmdbId,
+            mediaType: extraData.mediaType || 'tv',
+            season: extraData.season,
+            episode: extraData.episode,
+            url: extraData.url
+          }
         }]
       });
       return;

@@ -123,11 +123,25 @@ export function UpcomingShowCard({ show, onShowClick, onEpisodeClick }: Props) {
       showToast(`🔔 Rappel activé pour ${show.title} S${sNumStr}E${eNumStr}`, 'success', show);
 
       try {
-         
+        const posterUrl = show.posterPath
+          ? (show.posterPath.startsWith('http') ? show.posterPath : `https://image.tmdb.org/t/p/w185${show.posterPath}`)
+          : 'https://seenit.app/icon-192.png';
+        const backdropUrl = show.backdropPath
+          ? (show.backdropPath.startsWith('http') ? show.backdropPath : `https://image.tmdb.org/t/p/w780${show.backdropPath}`)
+          : undefined;
+
         sendNativeNotification(`🔔 Rappel programmé : ${show.title}`, {
           body: `Rappel enregistré pour l'épisode S${sNumStr}E${eNumStr} (${ep.name || 'Prochainement'})`,
-          icon: show.posterPath || '/icon-192.png'
-        });
+          icon: posterUrl,
+          image: backdropUrl,
+          data: {
+            showId: show.id,
+            tmdbId: show.tmdbId,
+            mediaType: show.mediaType || 'tv',
+            season: ep.season_number,
+            episode: ep.episode_number
+          }
+        } as any);
       } catch (err) {
         console.warn("sendNativeNotification failed:", err);
       }
