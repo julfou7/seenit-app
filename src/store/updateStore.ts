@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Capacitor } from '@capacitor/core';
 
-export const CURRENT_APP_VERSION = '1.2.20';
+export const CURRENT_APP_VERSION = '1.2.21';
 export const GITHUB_REPO = 'julfou7/seenit-app';
 export const GITHUB_PAT = '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';
 
@@ -60,8 +60,8 @@ export const useUpdateStore = create<UpdateState>()(
         const now = Date.now();
         const { lastChecked, isChecking } = get();
 
-        // Avoid polling too frequently unless forced (min 10 mins cache)
-        if (!force && lastChecked && now - lastChecked < 10 * 60 * 1000) {
+        // Avoid polling too frequently unless forced (min 1 min cache)
+        if (!force && lastChecked && now - lastChecked < 60 * 1000) {
           return get().hasUpdate;
         }
 
@@ -127,7 +127,14 @@ export const useUpdateStore = create<UpdateState>()(
             htmlUrl: data.html_url || `https://github.com/${GITHUB_REPO}/releases`
           };
 
-          const isNewer = compareVersions(remoteVersion, CURRENT_APP_VERSION) > 0 && !get().dismissedVersions.includes(remoteVersion);
+          const isNewer = compareVersions(remoteVersion, CURRENT_APP_VERSION) > 0 && (force || !get().dismissedVersions.includes(remoteVersion));
+
+          // If forced check and there is a newer version, clean it from dismissedVersions so the banner shows up
+          if (force && compareVersions(remoteVersion, CURRENT_APP_VERSION) > 0) {
+            set(state => ({
+              dismissedVersions: state.dismissedVersions.filter(v => v !== remoteVersion)
+            }));
+          }
 
           set({
             latestRelease: releaseInfo,
