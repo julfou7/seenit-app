@@ -1,9 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export const CURRENT_APP_VERSION = '1.2.5';
-const GITHUB_REPO = 'julfou7/seenit-app';
-const GITHUB_PAT = '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';
+export const CURRENT_APP_VERSION = '1.2.6';
+export const GITHUB_REPO = 'julfou7/seenit-app';
+export const GITHUB_PAT = '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';
 
 export interface AppReleaseInfo {
   version: string;
@@ -11,7 +11,8 @@ export interface AppReleaseInfo {
   name: string;
   releaseNotes: string;
   publishedAt: string;
-  apkDownloadUrl: string | null;
+  apkDownloadUrl: string;
+  browserDownloadUrl: string;
   htmlUrl: string;
 }
 
@@ -21,29 +22,22 @@ interface UpdateState {
   hasUpdate: boolean;
   isChecking: boolean;
   lastChecked: number | null;
-  dismissedVersion: string | null;
+  dismissedVersions: string[];
   error: string | null;
-  
+
   checkForUpdates: (force?: boolean) => Promise<boolean>;
   dismissUpdate: (version: string) => void;
-  clearDismissed: () => void;
+  resetDismissed: () => void;
 }
 
-/**
- * Compare two semver strings (e.g., "1.0.4" vs "1.0.3")
- * Returns > 0 if v1 > v2, < 0 if v1 < v2, 0 if equal
- */
-export function compareVersions(v1: string, v2: string): number {
-  const cleanV1 = v1.replace(/^v/i, '').trim();
-  const cleanV2 = v2.replace(/^v/i, '').trim();
+// Semver compare: returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal
+function compareVersions(v1: string, v2: string): number {
+  const p1 = v1.replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
+  const p2 = v2.replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
 
-  const parts1 = cleanV1.split('.').map(n => parseInt(n, 10) || 0);
-  const parts2 = cleanV2.split('.').map(n => parseInt(n, 10) || 0);
-
-  const maxLen = Math.max(parts1.length, parts2.length);
-  for (let i = 0; i < maxLen; i++) {
-    const num1 = parts1[i] || 0;
-    const num2 = parts2[i] || 0;
+  for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+    const num1 = p1[i] || 0;
+    const num2 = p2[i] || 0;
     if (num1 > num2) return 1;
     if (num1 < num2) return -1;
   }
@@ -58,35 +52,31 @@ export const useUpdateStore = create<UpdateState>()(
       hasUpdate: false,
       isChecking: false,
       lastChecked: null,
-      dismissedVersion: null,
+      dismissedVersions: [],
       error: null,
 
       checkForUpdates: async (force = false) => {
-        const state = get();
         const now = Date.now();
-        
-        let shouldForce = force;
-        if (state.currentVersion !== CURRENT_APP_VERSION) {
-          set({ currentVersion: CURRENT_APP_VERSION, hasUpdate: false, latestRelease: null });
-          shouldForce = true;
+        const { lastChecked, isChecking } = get();
+
+        // Avoid polling too frequently unless forced (min 10 mins cache)
+        if (!force && lastChecked && now - lastChecked < 10 * 60 * 1000) {
+          return get().hasUpdate;
         }
 
-        // Don't check more than once every 30 seconds unless forced
-        if (!shouldForce && state.lastChecked && (now - state.lastChecked < 30 * 1000)) {
-          return state.hasUpdate;
-        }
+        if (isChecking) return get().hasUpdate;
 
         set({ isChecking: true, error: null });
 
         try {
           let data: any = null;
 
-          // 1. Direct GitHub API fetch (Works reliably in Capacitor APK and standalone web)
+          // 1. Direct GitHub Releases API fetch
           try {
             const ghRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
               headers: {
                 'Accept': 'application/vnd.github.v3+json',
-                'Authorization': `token ${GITHUB_PAT}`
+                'Authorization': `Bearer ${GITHUB_PAT}`
               }
             });
             if (ghRes.ok) {
@@ -113,7 +103,8 @@ export const useUpdateStore = create<UpdateState>()(
           
           // Find APK asset
           const apkAsset = Array.isArray(data.assets) 
-            ? data.assets.find((a: any) => a.name && a.name.toLowerCase().endsWith('.apk') && a.name.startsWith('SeenIt-'))
+            ? data.assets.find((a: any) => a.name && a.name.toLowerCase().endsWith('.apk') && a.name.startsWith('SeenIt-')) ||
+              data.assets.find((a: any) => a.name && a.name.toLowerCase().endsWith('.apk'))
             : null;
 
           const releaseInfo: AppReleaseInfo = {
@@ -122,7 +113,9 @@ export const useUpdateStore = create<UpdateState>()(
             name: data.name || tagName,
             releaseNotes: data.body || '',
             publishedAt: data.published_at || new Date().toISOString(),
-            apkDownloadUrl: apkAsset ? apkAsset.browser_download_url : `https://github.com/${GITHUB_REPO}/releases/download/${tagName}/SeenIt-${tagName}.apk`,
+            // Prefer authenticated API url for private repo native download
+            apkDownloadUrl: apkAsset ? (apkAsset.url || apkAsset.browser_download_url) : `https://github.com/${GITHUB_REPO}/releases/download/${tagName}/SeenIt-${tagName}.apk`,
+            browserDownloadUrl: apkAsset?.browser_download_url || `https://github.com/${GITHUB_REPO}/releases/download/${tagName}/SeenIt-${tagName}.apk`,
             htmlUrl: data.html_url || `https://github.com/${GITHUB_REPO}/releases`
           };
 
@@ -138,29 +131,31 @@ export const useUpdateStore = create<UpdateState>()(
 
           return isNewer;
         } catch (err: any) {
-          console.warn('Update check failed:', err);
-          set({
-            isChecking: false,
-            error: err.message || 'Impossible de vérifier les mises à jour',
-            lastChecked: now
+          console.error('[UpdateCheck] Error checking for updates:', err);
+          set({ 
+            isChecking: false, 
+            error: err?.message || 'Erreur de vérification des mises à jour' 
           });
           return false;
         }
       },
 
       dismissUpdate: (version: string) => {
-        set({ dismissedVersion: version });
+        set(state => ({
+          dismissedVersions: [...state.dismissedVersions, version],
+          hasUpdate: false
+        }));
       },
 
-      clearDismissed: () => {
-        set({ dismissedVersion: null });
+      resetDismissed: () => {
+        set({ dismissedVersions: [] });
       }
     }),
     {
-      name: 'seenit_update_store',
+      name: 'seenit-app-updates',
       partialize: (state) => ({
-        lastChecked: state.lastChecked,
-        dismissedVersion: state.dismissedVersion
+        dismissedVersions: state.dismissedVersions,
+        lastChecked: state.lastChecked
       })
     }
   )

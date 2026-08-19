@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { FileOpener } from '@capacitor-community/file-opener';
-import { Browser } from '@capacitor/browser';
+import { GITHUB_PAT } from '../store/updateStore';
 
 export interface UpdateProgress {
   percent: number;
@@ -11,7 +11,7 @@ export interface UpdateProgress {
 
 /**
  * Downloads APK directly inside the app using Capacitor's native Filesystem downloadFile
- * and triggers Android Package Installer with FileOpener.
+ * with GitHub PAT authentication to support private repositories, and launches Android Package Installer.
  */
 export async function downloadAndInstallApk(
   apkUrl: string,
@@ -66,11 +66,20 @@ export async function downloadAndInstallApk(
 
     onProgress?.({ percent: 15, status: 'downloading', message: 'Téléchargement de la mise à jour...' });
 
+    // Prepare auth headers for GitHub (supports private repo release asset endpoints)
+    const isGitHub = apkUrl.includes('github.com');
+    const headers: Record<string, string> = {};
+    if (isGitHub && GITHUB_PAT) {
+      headers['Authorization'] = `Bearer ${GITHUB_PAT}`;
+      headers['Accept'] = 'application/octet-stream';
+    }
+
     // 3. Native Android HTTP download (executes in Java, bypasses browser CORS completely)
     const downloadRes = await Filesystem.downloadFile({
       url: apkUrl,
       path: fileName,
       directory: Directory.Cache,
+      headers: Object.keys(headers).length > 0 ? headers : undefined,
       progress: true,
       recursive: true
     });
@@ -110,7 +119,7 @@ export async function downloadAndInstallApk(
     onProgress?.({
       percent: 0,
       status: 'error',
-      message: 'Erreur lors du téléchargement'
+      message: err?.message || 'Erreur lors du téléchargement'
     });
 
     return {
