@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useUpdateStore } from '../store/updateStore';
 import { downloadAndInstallApk, UpdateProgress } from '../services/appUpdater';
 import { ChangelogViewer } from './ChangelogViewer';
@@ -139,29 +140,19 @@ export function AppUpdateBanner() {
                 e.stopPropagation();
                 setShowModal(true);
               }}
-              className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-400 active:scale-95 text-black text-xs font-bold rounded-xl flex items-center gap-1 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
+              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 active:scale-95 text-black text-xs font-bold rounded-xl flex items-center gap-1 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
             >
               <span>Mettre à jour</span>
               <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                dismissUpdate(latestRelease.version);
-              }}
-              className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
-              title="Ignorer"
-            >
-              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Detailed Changelog Modal */}
-      {showModal && (
+      {/* Detailed Changelog Modal - Rendered via Portal directly to document.body to stay above all navigation bars */}
+      {showModal && createPortal(
         <div 
-          className="fixed inset-0 z-[9999] bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 pb-24 sm:p-4 animate-in fade-in duration-200 overflow-y-auto"
+          className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 pb-8 sm:p-4 animate-in fade-in duration-200"
           onClick={() => {
             if (downloadProgress?.status !== 'downloading') {
               setShowModal(false);
@@ -169,9 +160,9 @@ export function AppUpdateBanner() {
           }}
         >
           <div 
-            className="bg-[#121218] border border-white/10 rounded-3xl w-full max-w-sm overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] flex flex-col my-auto animate-in zoom-in-95 duration-200 shrink-0"
+            className="bg-[#121218] border border-white/10 rounded-3xl w-full max-w-sm overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.95)] flex flex-col my-auto animate-in zoom-in-95 duration-200 shrink-0"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxHeight: 'min(78vh, calc(100dvh - 110px))' }}
+            style={{ maxHeight: 'min(82vh, calc(100dvh - 32px))' }}
           >
             {/* Header - Fixed */}
             <div className="p-4 sm:p-5 pb-3 bg-gradient-to-b from-amber-500/10 to-transparent border-b border-white/5 flex items-start justify-between shrink-0">
@@ -213,7 +204,7 @@ export function AppUpdateBanner() {
                 Notes de version
               </div>
               
-              <div className="bg-black/40 border border-white/5 rounded-2xl p-3.5 max-h-44 sm:max-h-52 overflow-y-auto custom-scrollbar">
+              <div className="bg-black/40 border border-white/5 rounded-2xl p-3.5 max-h-40 sm:max-h-52 overflow-y-auto custom-scrollbar">
                 <ChangelogViewer content={latestRelease.releaseNotes} />
               </div>
 
@@ -321,7 +312,8 @@ export function AppUpdateBanner() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
