@@ -87,7 +87,7 @@ export default function App() {
     }
   }, [isNative]);
 
-  const splashDuration = 1400;
+  const splashDuration = 2200;
 
   return (
     <>

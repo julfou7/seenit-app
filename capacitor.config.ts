@@ -4,6 +4,7 @@ const config: CapacitorConfig = {
   appId: 'com.seenit.app',
   appName: 'SeenIt',
   webDir: 'dist',
+  backgroundColor: '#040406',
   server: {
     androidScheme: 'https',
     hostname: 'localhost',

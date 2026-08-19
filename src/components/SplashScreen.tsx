@@ -10,7 +10,7 @@ interface SplashScreenProps {
 export function SplashScreen({ 
   onComplete, 
   isReady, 
-  minimumDisplayTime = 1400,
+  minimumDisplayTime = 2200,
   animate = true
 }: SplashScreenProps) {
   const [timeElapsed, setTimeElapsed] = useState(minimumDisplayTime === 0);
@@ -139,41 +139,41 @@ export function SplashScreen({
           }
 
           .anim-bloom {
-            animation: ambientBloomBreath 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            animation: ambientBloomBreath 2.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
             will-change: transform, opacity;
           }
 
           .anim-emblem {
-            animation: cinematicLogoIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            animation: cinematicLogoIn 1.0s cubic-bezier(0.16, 1, 0.3, 1) forwards;
             will-change: transform, opacity;
           }
 
           .anim-play-core {
             transform-origin: 104px 84px;
-            animation: playGlowPulse 0.75s cubic-bezier(0.34, 1.3, 0.64, 1) 0.15s forwards;
+            animation: playGlowPulse 0.9s cubic-bezier(0.34, 1.3, 0.64, 1) 0.2s forwards;
             opacity: 0;
           }
 
           .anim-glass-shimmer {
-            animation: goldGlassShimmer 0.9s cubic-bezier(0.25, 1, 0.5, 1) 0.35s forwards;
+            animation: goldGlassShimmer 1.2s cubic-bezier(0.25, 1, 0.5, 1) 0.45s forwards;
             opacity: 0;
             will-change: transform, opacity;
           }
 
           .anim-title {
-            animation: titleFadeUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
+            animation: titleFadeUp 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards;
             opacity: 0;
             will-change: transform, opacity;
           }
 
           .anim-subtitle {
-            animation: subtitleFadeUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.45s forwards;
+            animation: subtitleFadeUp 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.6s forwards;
             opacity: 0;
             will-change: transform, opacity;
           }
 
           .anim-loader-bar {
-            animation: microLoaderSweep 1.2s ease-in-out infinite 0.1s;
+            animation: microLoaderSweep 1.4s ease-in-out infinite 0.1s;
             will-change: transform;
           }
         `}</style>
