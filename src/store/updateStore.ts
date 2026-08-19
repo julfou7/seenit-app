@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { Capacitor } from '@capacitor/core';
 
-export const CURRENT_APP_VERSION = '1.2.15';
+export const CURRENT_APP_VERSION = '1.2.16';
 export const GITHUB_REPO = 'julfou7/seenit-app';
 export const GITHUB_PAT = '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';
 
@@ -71,29 +72,33 @@ export const useUpdateStore = create<UpdateState>()(
         try {
           let data: any = null;
 
-          // 1. Direct GitHub Releases API fetch
+          // 1. Direct GitHub Releases API fetch (use URL cache-busting param to avoid CORS preflight errors with custom headers)
           try {
-            const ghRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
-              cache: 'no-store',
+            const ghUrl = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest?_ts=${Date.now()}`;
+            const ghRes = await fetch(ghUrl, {
               headers: {
                 'Accept': 'application/vnd.github.v3+json',
-                'Authorization': `Bearer ${GITHUB_PAT}`,
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache'
+                'Authorization': `Bearer ${GITHUB_PAT}`
               }
             });
-            if (ghRes.ok) {
+            const contentType = ghRes.headers.get('content-type') || '';
+            if (ghRes.ok && contentType.includes('application/json')) {
               data = await ghRes.json();
             }
           } catch (e) {
-            console.warn('[UpdateCheck] Direct GitHub API fetch failed, trying backend proxy fallback...', e);
+            console.warn('[UpdateCheck] Direct GitHub API fetch failed:', e);
           }
 
-          // 2. Fallback to backend /api/update
-          if (!data) {
-            const proxyRes = await fetch('/api/update');
-            if (proxyRes.ok) {
-              data = await proxyRes.json();
+          // 2. Fallback to backend /api/update (ONLY on web preview, NEVER on native Capacitor app where relative fetch hits local SPA index.html)
+          if (!data && !Capacitor.isNativePlatform() && typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
+            try {
+              const proxyRes = await fetch('/api/update');
+              const proxyContentType = proxyRes.headers.get('content-type') || '';
+              if (proxyRes.ok && proxyContentType.includes('application/json')) {
+                data = await proxyRes.json();
+              }
+            } catch (e) {
+              console.warn('[UpdateCheck] Backend proxy fallback failed:', e);
             }
           }
 
