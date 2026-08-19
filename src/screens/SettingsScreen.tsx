@@ -315,7 +315,7 @@ export function SettingsScreen() {
                     icon: "/icon-192.png"
                   });
                 } else {
-                  showToast("Permission refusée par le navigateur ou bloquée dans l'aperçu", "info");
+                  showToast("Permission refusée par le système ou désactivée dans les paramètres de votre téléphone", "info");
                 }
               }}
               className="w-full flex items-center justify-center gap-2 bg-[#E5A93D]/10 hover:bg-[#E5A93D]/20 active:scale-95 text-[#E5A93D] border border-[#E5A93D]/30 font-bold py-2.5 px-4 rounded-xl text-xs transition-all cursor-pointer"

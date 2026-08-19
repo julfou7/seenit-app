@@ -2,6 +2,8 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getMessaging, getToken, isSupported, type Messaging } from 'firebase/messaging';
+import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
@@ -49,6 +51,31 @@ if (typeof window !== 'undefined' && 'Notification' in window) {
 }
 
 export async function sendNativeNotification(title: string, options?: NotificationOptions) {
+  // On Native Capacitor Android App, use LocalNotifications plugin
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const perm = await LocalNotifications.checkPermissions();
+      if (perm.display !== 'granted') {
+        const req = await LocalNotifications.requestPermissions();
+        if (req.display !== 'granted') return;
+      }
+      await LocalNotifications.schedule({
+        notifications: [{
+          title: title,
+          body: options?.body || '',
+          id: Math.floor(Math.random() * 1000000),
+          schedule: { at: new Date(Date.now() + 100) },
+          smallIcon: 'ic_launcher',
+          actionTypeId: '',
+          extra: null
+        }]
+      });
+      return;
+    } catch (err) {
+      console.warn('LocalNotifications native schedule failed:', err);
+    }
+  }
+
   if (typeof window === 'undefined' || !('Notification' in window)) return;
   if (Notification.permission !== 'granted') return;
 
@@ -77,6 +104,27 @@ export async function sendNativeNotification(title: string, options?: Notificati
 }
 
 export async function requestNotificationPermission(): Promise<string | null> {
+  // On Native Capacitor Android Platform, use native Android LocalNotifications permissions
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const permStatus = await LocalNotifications.checkPermissions();
+      let granted = permStatus.display === 'granted';
+      if (!granted) {
+        const req = await LocalNotifications.requestPermissions();
+        granted = req.display === 'granted';
+      }
+      if (granted) {
+        return 'native-android-granted';
+      } else {
+        console.warn('Native LocalNotifications permission was not granted.');
+        return null;
+      }
+    } catch (err) {
+      console.warn('LocalNotifications.requestPermissions error:', err);
+      return null;
+    }
+  }
+
   if (typeof window === 'undefined' || !('Notification' in window)) {
     console.warn('Notification API not supported in this browser.');
     return null;
@@ -92,7 +140,7 @@ export async function requestNotificationPermission(): Promise<string | null> {
     const supported = await isSupported();
     if (!supported) {
       console.warn('Firebase Messaging is not supported in this browser.');
-      return null;
+      return 'web-notification-granted';
     }
 
     if (!messaging) {
@@ -121,7 +169,7 @@ export async function requestNotificationPermission(): Promise<string | null> {
       token = await getToken(messaging);
     }
 
-    return token;
+    return token || 'web-notification-granted';
   } catch (error) {
     console.error('Error in requestNotificationPermission:', error);
     return null;
