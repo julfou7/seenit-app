@@ -1472,7 +1472,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       );
     }
     return (
-      <div className="flex-1 overflow-y-auto bg-black text-white relative pb-20 w-full h-full animate-in fade-in duration-150">
+      <div className="flex-1 overflow-y-auto bg-black text-white relative pb-nav w-full h-full animate-in fade-in duration-150">
         {/* Skeleton Hero Header */}
         <div className="relative">
           <div className="absolute top-0 inset-x-0 h-96 bg-zinc-900/60 animate-pulse" />
@@ -1704,7 +1704,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         transform: isExiting ? 'translateX(100%)' : (dragX > 0 ? `translateX(${dragX}px)` : undefined),
       }}
       className={cn(
-        "flex-1 overflow-y-auto bg-transparent text-white relative pb-20 w-full h-full",
+        "flex-1 overflow-y-auto bg-transparent text-white relative pb-nav w-full h-full",
         isDragging 
           ? "transition-none" 
           : "transition-transform duration-300 ease-out",

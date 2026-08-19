@@ -101,7 +101,7 @@ export const GridMediaCard = React.memo(function GridMediaCard({
     }
   }
 
-  const longPressTimer = useRef<NodeJS.Timeout>();
+  const longPressTimer = useRef<any>(null);
   const isLongPressRef = useRef(false);
 
   const handleTouchStart = () => {

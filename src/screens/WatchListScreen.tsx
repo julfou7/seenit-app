@@ -857,7 +857,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
   };
 
   return (
-    <div id="watchlist-container" className="flex-1 overflow-y-auto bg-transparent text-white pb-20">
+    <div id="watchlist-container" className="flex-1 overflow-y-auto bg-transparent text-white pb-nav">
       <div className="sticky top-0 z-40 px-4 sm:px-6 pt-6 pb-4 flex flex-col gap-3 bg-zinc-950/60 backdrop-blur-xl">
         <div className="absolute top-0 left-0 w-72 h-40 bg-[#E5A93D]/15 blur-[120px] -z-10 rounded-full mix-blend-screen pointer-events-none" />
         <div className="flex items-center justify-between gap-3">
@@ -921,7 +921,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
         )}
 
         {loading ? (
-          <div className="space-y-6 pt-2 pb-20">
+          <div className="space-y-6 pt-2 pb-nav">
             {/* ShowNewsFeed Skeleton */}
             <div className="mb-8 mt-4">
               <div className="flex items-center gap-2 mb-4 px-4 sm:px-6">

@@ -830,7 +830,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
               </div>
 
               {/* Info & Content Section */}
-              <div className="px-5 -mt-16 relative z-10 space-y-4 pb-24">
+              <div className="px-5 -mt-16 relative z-10 space-y-4 pb-nav">
                 {/* Badge + Titre + Nom Série */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 flex-wrap">

@@ -3,6 +3,7 @@ import { Cloud, LogIn, LogOut, FileText, CheckCircle2, MonitorPlay, Bell, Refres
 import { auth, db, googleAuthProvider, requestNotificationPermission, sendNativeNotification } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { cn } from '../lib/utils';
@@ -16,6 +17,8 @@ import { performDetailsSync } from '../hooks/useDetailsSyncWorker';
 import { getPlexPin, checkPlexPin } from '../services/plex';
 import { performPlexSync } from '../features/plex/syncPlex';
 import { SeenItLogo } from '../components/SeenItLogo';
+import { ChangelogViewer } from '../components/ChangelogViewer';
+import { downloadAndInstallApk, UpdateProgress } from '../services/appUpdater';
 
 const STREAMING_PLATFORMS = [
   { id: 8, name: 'Netflix' },
@@ -35,6 +38,7 @@ export function SettingsScreen() {
   const shows = useShowsStore(state => state.shows);
   const { logs, clearLogs, getLogsAsText } = useLogStore();
   const { currentVersion, latestRelease, hasUpdate, isChecking: isCheckingUpdates, lastChecked, checkForUpdates } = useUpdateStore();
+  const [apkUpdateProgress, setApkUpdateProgress] = useState<UpdateProgress | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [userPlatforms, setUserPlatforms] = useState<number[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -233,7 +237,7 @@ export function SettingsScreen() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-black text-white px-6 pt-12 pb-36 custom-scrollbar relative">
+    <div className="flex-1 overflow-y-auto bg-black text-white px-6 pt-12 pb-nav custom-scrollbar relative">
       <div className="max-w-md mx-auto w-full">
         <div className="absolute top-0 left-0 w-64 h-32 bg-[#E5A93D]/10 blur-[100px] -z-10 rounded-full mix-blend-screen pointer-events-none" />
         {/* Header Mobile Compact */}
@@ -743,26 +747,84 @@ export function SettingsScreen() {
 
           {/* Status Display */}
           {hasUpdate && latestRelease ? (
-            <div className="bg-gradient-to-r from-amber-500/15 via-amber-600/10 to-transparent border border-amber-500/30 rounded-xl p-3.5 space-y-3 animate-in fade-in duration-200">
+            <div className="bg-gradient-to-r from-amber-500/15 via-amber-600/10 to-transparent border border-amber-500/30 rounded-2xl p-4 space-y-3.5 animate-in fade-in duration-200">
               <div>
-                <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5 mb-2">
                   <Sparkles size={14} className="text-amber-400" />
                   <span>Nouvelle version v{latestRelease.version} disponible !</span>
                 </div>
-                <div className="text-[11px] text-zinc-300 mt-1 whitespace-pre-wrap leading-relaxed">
-                  {latestRelease.releaseNotes || 'Améliorations générales et corrections de bugs.'}
+                <div className="bg-black/40 border border-white/5 rounded-xl p-3.5">
+                  <ChangelogViewer content={latestRelease.releaseNotes} />
                 </div>
               </div>
+
+              {/* In-app Progress Bar */}
+              {apkUpdateProgress && apkUpdateProgress.status !== 'idle' && (
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-semibold">
+                    <span className="text-amber-300 flex items-center gap-2">
+                      {apkUpdateProgress.status === 'downloading' && (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0" />
+                      )}
+                      {apkUpdateProgress.status === 'installing' && (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      )}
+                      {apkUpdateProgress.status === 'error' && (
+                        <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                      )}
+                      <span>{apkUpdateProgress.message}</span>
+                    </span>
+                    <span className="text-amber-400 font-mono">{apkUpdateProgress.percent}%</span>
+                  </div>
+
+                  <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden">
+                    <div 
+                      className={cn(
+                        "h-full rounded-full transition-all duration-300",
+                        apkUpdateProgress.status === 'error' ? "bg-red-500" : "bg-gradient-to-r from-amber-400 to-amber-500"
+                      )}
+                      style={{ width: `${apkUpdateProgress.percent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
               <button
-                onClick={() => {
+                disabled={apkUpdateProgress?.status === 'downloading'}
+                onClick={async () => {
                   if (latestRelease.apkDownloadUrl) {
-                    window.open(latestRelease.apkDownloadUrl, '_system');
+                    setApkUpdateProgress({
+                      percent: 0,
+                      status: 'downloading',
+                      message: 'Démarrage du téléchargement...'
+                    });
+
+                    const res = await downloadAndInstallApk(latestRelease.apkDownloadUrl, (p) => {
+                      setApkUpdateProgress(p);
+                    });
+
+                    if (!res.success && res.error) {
+                      setApkUpdateProgress({
+                        percent: 0,
+                        status: 'error',
+                        message: res.error
+                      });
+                    }
                   }
                 }}
-                className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 active:scale-[0.99] text-black font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
+                className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 active:scale-[0.99] text-black font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
               >
-                <Download size={15} />
-                <span>Télécharger et installer l'APK v{latestRelease.version}</span>
+                {apkUpdateProgress?.status === 'downloading' ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    <span>Téléchargement en cours...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download size={15} />
+                    <span>Télécharger et installer v{latestRelease.version}</span>
+                  </>
+                )}
               </button>
             </div>
           ) : (

@@ -353,7 +353,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
           );
         } else {
           await updateShow(existingShow.id, {
-            status: 'up_to_date'
+            status: 'completed'
           });
           showToast(
             `« ${existingShow.title} » marquée à jour`, 
@@ -377,7 +377,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
         mediaType: isTv ? 'tv' : 'movie' as 'tv' | 'movie',
         seasonRecords: {},
         episodeRecords: {},
-        status: isTv ? 'up_to_date' as const : 'completed' as const,
+        status: isTv ? 'watching' as const : 'completed' as const,
         updatedAt: Date.now(),
         createdAt: Date.now(),
         seenEpisodes: isTv ? [] : ['movie'],
@@ -547,7 +547,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
           transform: isExiting ? 'translateX(100%)' : (dragX > 0 ? `translateX(${dragX}px)` : undefined),
         }}
         className={cn(
-          "relative bg-black w-full max-w-md h-full overflow-y-auto pb-36 flex flex-col hide-scrollbar shadow-2xl border-x border-white/10",
+          "relative bg-black w-full max-w-md h-full overflow-y-auto pb-nav flex flex-col hide-scrollbar shadow-2xl border-x border-white/10",
           isDragging 
             ? "transition-none" 
             : "transition-transform duration-300 ease-out",

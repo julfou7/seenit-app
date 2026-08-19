@@ -238,7 +238,7 @@ export function LibraryScreen({ onShowClick }: Props) {
   }, [shows]);
 
   return (
-    <div className="flex-1 overflow-y-auto bg-transparent text-white pb-20">
+    <div className="flex-1 overflow-y-auto bg-transparent text-white pb-nav">
       <div className="px-4 sm:px-6 pt-6 pb-4 relative">
         <div className="absolute top-0 left-0 w-72 h-40 bg-[#E5A93D]/15 blur-[120px] -z-10 rounded-full mix-blend-screen pointer-events-none" />
         <h1 className="text-3xl font-black tracking-tight text-white mb-1 flex items-center gap-3">

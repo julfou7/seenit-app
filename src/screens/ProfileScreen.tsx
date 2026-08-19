@@ -142,7 +142,7 @@ export function ProfileScreen({
     : 2024;
 
   return (
-    <div className="flex-1 overflow-y-auto bg-transparent text-white pb-20 custom-scrollbar">
+    <div className="flex-1 overflow-y-auto bg-transparent text-white pb-nav custom-scrollbar">
       
       {/* 1. HERO SECTION */}
       <div className="px-6 pt-12 pb-6 relative">
@@ -195,7 +195,7 @@ export function ProfileScreen({
       </div>
 
       {/* 2. BENTO & STATS DASHBOARD */}
-      <div className="px-4 pb-8">
+      <div className="px-4 pb-2">
         <ProAnalyticsDashboard shows={shows} onPersonClick={openPersonModal} />
       </div>
 

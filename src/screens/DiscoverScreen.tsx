@@ -848,7 +848,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
     const qClean = debouncedQuery.trim().toLowerCase();
 
     // Filtre sur le nombre d'avis
-    list = list.filter(item => {
+    list = list.filter((item: any) => {
       if (qClean) return true;
       if (activeCategory === 'Personnes' || item.media_type === 'person') return true;
 
@@ -886,7 +886,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
 
     if (selectedGenreIds.length > 0 && !qClean && activeCategory !== 'Personnes') {
       const allowedTmdbIds = selectedGenreIds.flatMap(id => GENRE_OPTIONS.find(g => g.id === id)?.tmdbIds || []);
-      list = list.filter(item => {
+      list = list.filter((item: any) => {
         const itemG = item.genre_ids || (item.genres ? item.genres.map((g: any) => g.id) : []);
         return allowedTmdbIds.some(gId => itemG.includes(gId));
       });
@@ -907,14 +907,14 @@ export function DiscoverScreen({ onShowClick }: Props) {
         'Thriller': [53, 80]
       };
       const allowedTmdbIds = selectedGenres.flatMap(g => NEW_GENRE_MAPPING[g] || []);
-      list = list.filter(item => {
+      list = list.filter((item: any) => {
         const itemG = item.genre_ids || (item.genres ? item.genres.map((g: any) => g.id) : []);
         return allowedTmdbIds.some(gId => itemG.includes(gId));
       });
     }
 
     if (pegi !== 'Tous' && activeCategory !== 'Personnes') {
-      list = list.filter(item => {
+      list = list.filter((item: any) => {
         const itemG = item.genre_ids || (item.genres ? item.genres.map((g: any) => g.id) : []);
         const details = heroDetails[item.id];
         
@@ -967,21 +967,21 @@ export function DiscoverScreen({ onShowClick }: Props) {
 
     if (minRating !== 'Toutes' && !qClean && activeCategory !== 'Personnes') {
       const min = parseFloat(minRating.replace('+', ''));
-      list = list.filter(item => (item.vote_average || 0) >= min);
+      list = list.filter((item: any) => (item.vote_average || 0) >= min);
     }
 
     if (!qClean) {
       if (activeCategory === 'Séries') {
-        list = list.filter(item => item.media_type === 'tv' || item.media_type === 'series' || !!item.first_air_date);
+        list = list.filter((item: any) => item.media_type === 'tv' || item.media_type === 'series' || !!item.first_air_date);
       } else if (activeCategory === 'Films') {
-        list = list.filter(item => item.media_type === 'movie' || !!item.release_date);
+        list = list.filter((item: any) => item.media_type === 'movie' || !!item.release_date);
       } else if (activeCategory === 'Personnes') {
-        list = list.filter(item => item.media_type === 'person');
+        list = list.filter((item: any) => item.media_type === 'person');
       }
     }
 
     if (qClean && sortBy === 'popular') {
-      list.sort((a, b) => {
+      list.sort((a: any, b: any) => {
         const titleA = (a.title || a.name || a.original_title || a.original_name || '').toLowerCase();
         const titleB = (b.title || b.name || b.original_title || b.original_name || '').toLowerCase();
 
@@ -993,7 +993,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
       });
     } else if (sortBy !== 'popular' || (!qClean && sortBy === 'popular')) {
       if (sortBy !== 'popular') {
-        list.sort((a, b) => {
+        list.sort((a: any, b: any) => {
           let valA = 0;
           let valB = 0;
 
@@ -1171,7 +1171,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
       <div 
         ref={containerRef}
         className={cn(
-          "flex-1 overflow-y-auto px-0 pb-20 hide-scrollbar space-y-5",
+          "flex-1 overflow-y-auto px-0 pb-nav hide-scrollbar space-y-5",
           debouncedQuery.trim() ? "pt-4 sm:pt-6" : "pt-0"
         )}
         onScroll={handleScroll}
