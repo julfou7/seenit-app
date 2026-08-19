@@ -48,6 +48,7 @@ export default function App() {
   );
 
   const [showSplash, setShowSplash] = useState(true);
+  const [isSplashClosing, setIsSplashClosing] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -96,11 +97,18 @@ export default function App() {
           isReady={isReady}
           minimumDisplayTime={splashDuration}
           animate={true}
+          onStartClose={() => setIsSplashClosing(true)}
           onComplete={() => setShowSplash(false)} 
         />
       )}
       
-      {isReady ? (
+      {/* 
+        CRITICAL PERFORMANCE OPTIMIZATION:
+        We completely defer mounting the heavy MainApp (which downloads images, parses IndexedDB, and creates hundreds of DOM nodes) 
+        until the splash screen has FINISHED its 2-second vector animation and is starting to fade out.
+        This guarantees perfectly smooth 60fps/120fps CSS animations for the splash screen on all devices.
+      */}
+      {isReady && isSplashClosing ? (
         currentUser === null ? <LoginScreen /> : <MainApp />
       ) : (
         <div className="w-full min-h-[100dvh] bg-[#040406]" />

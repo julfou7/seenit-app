@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 interface SplashScreenProps {
   onComplete: () => void;
+  onStartClose?: () => void;
   isReady: boolean;
   minimumDisplayTime?: number;
   animate?: boolean;
@@ -9,6 +10,7 @@ interface SplashScreenProps {
 
 export function SplashScreen({ 
   onComplete, 
+  onStartClose,
   isReady, 
   minimumDisplayTime = 2200,
   animate = true
@@ -31,12 +33,13 @@ export function SplashScreen({
   useEffect(() => {
     if (timeElapsed && isReady && !isClosing) {
       setIsClosing(true);
+      if (onStartClose) onStartClose();
       const closeTimer = setTimeout(() => {
         onComplete();
       }, 500);
       return () => clearTimeout(closeTimer);
     }
-  }, [timeElapsed, isReady, isClosing, onComplete]);
+  }, [timeElapsed, isReady, isClosing, onComplete, onStartClose]);
 
   return (
     <div

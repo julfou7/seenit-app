@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export const CURRENT_APP_VERSION = '1.2.13';
+export const CURRENT_APP_VERSION = '1.2.14';
 export const GITHUB_REPO = 'julfou7/seenit-app';
 export const GITHUB_PAT = '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';
 
@@ -74,9 +74,12 @@ export const useUpdateStore = create<UpdateState>()(
           // 1. Direct GitHub Releases API fetch
           try {
             const ghRes = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+              cache: 'no-store',
               headers: {
                 'Accept': 'application/vnd.github.v3+json',
-                'Authorization': `Bearer ${GITHUB_PAT}`
+                'Authorization': `Bearer ${GITHUB_PAT}`,
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
               }
             });
             if (ghRes.ok) {
@@ -119,7 +122,7 @@ export const useUpdateStore = create<UpdateState>()(
             htmlUrl: data.html_url || `https://github.com/${GITHUB_REPO}/releases`
           };
 
-          const isNewer = compareVersions(remoteVersion, CURRENT_APP_VERSION) > 0;
+          const isNewer = compareVersions(remoteVersion, CURRENT_APP_VERSION) > 0 && !get().dismissedVersions.includes(remoteVersion);
 
           set({
             latestRelease: releaseInfo,
