@@ -94,6 +94,5 @@ jobs:
           generate_release_notes: false
           files: |
             SeenIt-v${{ steps.version_step.outputs.APP_VERSION }}.apk
-            android/app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

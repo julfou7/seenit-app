@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export const CURRENT_APP_VERSION = '1.2.3';
+export const CURRENT_APP_VERSION = '1.2.4';
 const GITHUB_REPO = 'julfou7/seenit-app';
 const GITHUB_PAT = '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';
 
@@ -113,7 +113,7 @@ export const useUpdateStore = create<UpdateState>()(
           
           // Find APK asset
           const apkAsset = Array.isArray(data.assets) 
-            ? data.assets.find((a: any) => a.name && a.name.toLowerCase().endsWith('.apk'))
+            ? data.assets.find((a: any) => a.name && a.name.toLowerCase().endsWith('.apk') && a.name.startsWith('SeenIt-'))
             : null;
 
           const releaseInfo: AppReleaseInfo = {

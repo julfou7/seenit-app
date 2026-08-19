@@ -128,7 +128,7 @@ export function AppUpdateBanner() {
             </div>
 
             {/* Release Notes / Markdown */}
-            <div className="p-5 overflow-y-auto space-y-4 flex-1 text-sm text-zinc-300 custom-scrollbar">
+            <div className="p-5 overflow-y-auto min-h-0 space-y-4 flex-1 text-sm text-zinc-300 custom-scrollbar">
               <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
                 Notes de version
               </div>
