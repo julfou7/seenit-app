@@ -7,7 +7,7 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:799043440232:android:54f4f27f8e1493c9275dd",
+        "mobilesdk_app_id": "1:799043440232:android:729435c4ab36bc039275dd",
         "android_client_info": {
           "package_name": "com.seenit.app"
         }
@@ -20,12 +20,17 @@
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyCfrB6vxS5DsgwGYKgFnFwy67Ik2_1ZiBs"
+          "current_key": "AIzaSyAKjntYVwu1HR5MPOThktT4CoN9UOWxybY"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "799043440232-i9s1l0jaerljg58v3oooleuemnhnim4o.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
