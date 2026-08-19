@@ -47,6 +47,11 @@ export function SplashScreen({
       className={`fixed inset-0 z-[999] bg-[#040406] flex flex-col items-center justify-center overflow-hidden select-none transition-opacity duration-500 ease-out ${
         isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
+      style={{
+        transform: 'translate3d(0, 0, 0)',
+        willChange: 'opacity',
+        backfaceVisibility: 'hidden'
+      }}
     >
       {/* 120 FPS Ultra-Smooth GPU Keyframes */}
       {animate && (
