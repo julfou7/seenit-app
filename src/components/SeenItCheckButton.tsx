@@ -25,7 +25,7 @@ export function SeenItCheckButton({
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsTapped(true);
-    setTimeout(() => setIsTapped(false), 600);
+    setTimeout(() => setIsTapped(false), 1200);
     onClick(e);
   };
 
@@ -139,23 +139,42 @@ export function SeenItCheckButton({
 
         {/* Inside Core: SeenIt Signature Cinema Checkmark ("VU !") */}
         <g className="transform-gpu transition-all duration-200">
+          {/* Inner TV text shown temporarily on tap */}
+          <text
+            x="50"
+            y="49"
+            textAnchor="middle"
+            alignmentBaseline="middle"
+            fill="url(#btn-gold-grad)"
+            className={cn(
+              "text-[16px] font-black tracking-tighter font-sans transition-all duration-300",
+              isTapped ? "opacity-100 scale-100" : "opacity-0 scale-50"
+            )}
+            style={{ textShadow: '0 0 10px rgba(245,197,24,0.5)', transformOrigin: '50px 44px' }}
+          >
+            <tspan x="50" dy="-0.2em">SEEN</tspan>
+            <tspan x="50" dy="1.1em">IT!</tspan>
+          </text>
+
           {/* Subtle Checkmark Outline / Filled Glow */}
           <path
             d="M 38 44 L 46 52 L 62 34"
             fill="none"
             className={cn(
               "transition-all duration-200",
-              active 
+              active && !isTapped
                 ? "stroke-[url(#btn-gold-grad)] opacity-100" 
-                : "stroke-zinc-500/70 group-hover:stroke-amber-300/90 opacity-60 group-hover:opacity-100"
+                : "stroke-zinc-500/70 group-hover:stroke-amber-300/90 opacity-60 group-hover:opacity-100",
+              isTapped ? "opacity-0 scale-75" : "scale-100"
             )}
             strokeWidth={active ? "6.2" : "5.0"}
             strokeLinecap="round"
             strokeLinejoin="round"
+            style={{ transformOrigin: '50px 44px' }}
           />
 
           {/* Golden Apex Sparkle when active */}
-          {active && (
+          {active && !isTapped && (
             <circle
               cx="62"
               cy="34"
@@ -166,18 +185,6 @@ export function SeenItCheckButton({
           )}
         </g>
       </svg>
-      
-      {/* Floating "Seen it!" Text Below the TV */}
-      <div 
-        className={cn(
-          "absolute -bottom-3 left-1/2 -translate-x-1/2 pointer-events-none transition-all duration-500 ease-out flex items-center justify-center",
-          isTapped ? "opacity-100 translate-y-0 scale-100" : "opacity-0 -translate-y-2 scale-90"
-        )}
-      >
-        <span className="bg-gradient-to-r from-[#FFF4D0] via-[#F5C518] to-[#E5A93D] bg-clip-text text-transparent font-black text-[9px] uppercase tracking-widest whitespace-nowrap drop-shadow-md">
-          Seen It!
-        </span>
-      </div>
     </button>
   );
 }

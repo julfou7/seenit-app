@@ -210,8 +210,7 @@ export function SplashScreen({
       <div 
         className={`${animate ? 'anim-bloom' : 'opacity-30 scale-100'} absolute w-[340px] h-[340px] rounded-full pointer-events-none`}
         style={{
-          background: 'radial-gradient(circle, rgba(245,197,24,0.28) 0%, rgba(217,119,6,0.08) 50%, transparent 70%)',
-          filter: 'blur(50px)',
+          background: 'radial-gradient(circle, rgba(245,197,24,0.18) 0%, rgba(217,119,6,0.05) 50%, transparent 70%)',
           transform: 'translate3d(0, 0, 0)'
         }}
       />
@@ -270,16 +269,15 @@ export function SplashScreen({
               </clipPath>
             </defs>
 
-            {/* Ambient TV Glow */}
+            {/* Ambient TV Glow (Optimized) */}
             <rect
-              x="28"
-              y="34"
-              width="144"
-              height="104"
-              rx="20"
+              x="26"
+              y="32"
+              width="148"
+              height="108"
+              rx="22"
               fill="#E5A93D"
-              fillOpacity="0.12"
-              filter="blur(10px)"
+              fillOpacity="0.08"
             />
 
             {/* Cinema Screen Outer Frame (Rounded Bezel) */}
@@ -333,7 +331,7 @@ export function SplashScreen({
 
             {/* "Seen It !" Golden Verification Checkmark Core */}
             <g className={animate ? "anim-seen-check" : ""}>
-              {/* Checkmark Depth Shadow Glow */}
+              {/* Checkmark Depth Shadow Glow (Optimized) */}
               <path
                 d="M 75 87 L 93 104 L 127 67"
                 fill="none"
@@ -341,8 +339,7 @@ export function SplashScreen({
                 strokeWidth="15"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeOpacity="0.25"
-                filter="blur(4px)"
+                strokeOpacity="0.15"
               />
               {/* Solid Golden Checkmark */}
               <path

@@ -55,7 +55,8 @@ export function AppUpdateBanner() {
       {/* Top Floating Discreet Notification Capsule */}
       <div 
         id="seenit-update-banner"
-        className="fixed top-3 left-4 right-4 z-50 animate-in slide-in-from-top duration-300 select-none max-w-md mx-auto"
+        className="fixed left-4 right-4 z-50 animate-in slide-in-from-top duration-300 select-none max-w-md mx-auto"
+        style={{ top: 'calc(env(safe-area-inset-top, 32px) + 16px)' }}
       >
         <div className="bg-[#181822]/95 backdrop-blur-md border border-amber-500/30 rounded-2xl p-3 shadow-xl shadow-amber-500/10 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
