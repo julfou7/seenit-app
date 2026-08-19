@@ -291,7 +291,7 @@ export function UpToDateShowCard({ show, onShowClick, onEpisodeClick, onMarkAsSe
         )}
       </div>
 
-      <div className="flex justify-between items-start">
+      <div className="flex justify-between items-center">
         <div className="flex flex-col pr-2">
           <button 
             className="text-[#E5A93D] font-extrabold text-xs sm:text-[13px] uppercase tracking-wider mb-1 line-clamp-2 text-left hover:underline leading-tight"
