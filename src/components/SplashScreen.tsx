@@ -51,7 +51,7 @@ export function SplashScreen({
         <style>{`
           @keyframes cinematicLogoIn {
             0% {
-              transform: scale(0.86) translateY(8px) translate3d(0, 0, 0);
+              transform: scale(0.88) translateY(6px) translate3d(0, 0, 0);
               opacity: 0;
             }
             100% {
@@ -60,18 +60,38 @@ export function SplashScreen({
             }
           }
 
-          @keyframes playGlowPulse {
+          @keyframes checkmarkStamp {
             0% {
-              transform: scale(0.85) translate3d(0, 0, 0);
+              transform: scale(0.5) translate3d(0, 0, 0);
               opacity: 0;
+              stroke-dashoffset: 120;
             }
-            60% {
-              transform: scale(1.05) translate3d(0, 0, 0);
+            45% {
               opacity: 1;
+              stroke-dashoffset: 20;
+            }
+            75% {
+              transform: scale(1.12) translate3d(0, 0, 0);
+              stroke-dashoffset: 0;
             }
             100% {
               transform: scale(1) translate3d(0, 0, 0);
+              stroke-dashoffset: 0;
               opacity: 1;
+            }
+          }
+
+          @keyframes stampBurst {
+            0% {
+              transform: scale(0.4) translate3d(0, 0, 0);
+              opacity: 0;
+            }
+            40% {
+              opacity: 0.8;
+            }
+            100% {
+              transform: scale(1.6) translate3d(0, 0, 0);
+              opacity: 0;
             }
           }
 
@@ -99,7 +119,7 @@ export function SplashScreen({
             }
             50% {
               transform: scale(1.15) translate3d(0, 0, 0);
-              opacity: 0.4;
+              opacity: 0.45;
             }
             100% {
               transform: scale(1) translate3d(0, 0, 0);
@@ -144,13 +164,20 @@ export function SplashScreen({
           }
 
           .anim-emblem {
-            animation: cinematicLogoIn 1.0s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            animation: cinematicLogoIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
             will-change: transform, opacity;
           }
 
-          .anim-play-core {
-            transform-origin: 104px 84px;
-            animation: playGlowPulse 0.9s cubic-bezier(0.34, 1.3, 0.64, 1) 0.2s forwards;
+          .anim-seen-check {
+            transform-origin: 100px 86px;
+            stroke-dasharray: 120;
+            animation: checkmarkStamp 0.85s cubic-bezier(0.34, 1.4, 0.64, 1) 0.18s forwards;
+            opacity: 0;
+          }
+
+          .anim-stamp-burst {
+            transform-origin: 100px 86px;
+            animation: stampBurst 0.9s ease-out 0.3s forwards;
             opacity: 0;
           }
 
@@ -205,7 +232,7 @@ export function SplashScreen({
             style={{ transform: 'translate3d(0, 0, 0)' }}
           >
             <defs>
-              {/* Luxury Apple TV Gold Gradient */}
+              {/* Luxury Gold Gradient */}
               <linearGradient id="splash-gold-grad" x1="10%" y1="10%" x2="90%" y2="90%">
                 <stop offset="0%" stopColor="#FFF4D0" />
                 <stop offset="25%" stopColor="#FDE68A" />
@@ -214,11 +241,12 @@ export function SplashScreen({
                 <stop offset="100%" stopColor="#B37812" />
               </linearGradient>
 
-              {/* Crisp Play Core Gradient */}
-              <linearGradient id="splash-play-grad" x1="15%" y1="15%" x2="85%" y2="85%">
+              {/* High-Impact Gold Core Gradient */}
+              <linearGradient id="splash-check-grad" x1="15%" y1="15%" x2="85%" y2="85%">
                 <stop offset="0%" stopColor="#FFFFFF" />
-                <stop offset="25%" stopColor="#FFF3C4" />
-                <stop offset="65%" stopColor="#F5C518" />
+                <stop offset="20%" stopColor="#FFF2B8" />
+                <stop offset="55%" stopColor="#F5C518" />
+                <stop offset="85%" stopColor="#E5A93D" />
                 <stop offset="100%" stopColor="#D97706" />
               </linearGradient>
 
@@ -290,20 +318,48 @@ export function SplashScreen({
               strokeLinecap="round"
             />
 
-            {/* Play Button - High-Definition Vector Triangle with Soft Depth */}
-            <g className={animate ? "anim-play-core" : ""}>
-              {/* Play Triangle Glow */}
-              <path
-                d="M 86 64.5 C 86 62 88.8 60.5 91 61.8 L 126 83.3 C 128.2 84.6 128.2 87.8 126 89.1 L 91 110.6 C 88.8 111.9 86 110.4 86 107.9 Z"
-                fill="#F5C518"
-                fillOpacity="0.3"
-                transform="scale(1.08)"
-                style={{ transformOrigin: '104px 84px' }}
+            {/* "Seen It !" Validation Stamp Halo Burst */}
+            {animate && (
+              <circle
+                cx="100"
+                cy="86"
+                r="36"
+                fill="none"
+                stroke="#F5C518"
+                strokeWidth="3"
+                className="anim-stamp-burst"
               />
-              {/* Solid Play Triangle */}
+            )}
+
+            {/* "Seen It !" Golden Verification Checkmark Core */}
+            <g className={animate ? "anim-seen-check" : ""}>
+              {/* Checkmark Depth Shadow Glow */}
               <path
-                d="M 86 64.5 C 86 62 88.8 60.5 91 61.8 L 126 83.3 C 128.2 84.6 128.2 87.8 126 89.1 L 91 110.6 C 88.8 111.9 86 110.4 86 107.9 Z"
-                fill="url(#splash-play-grad)"
+                d="M 75 87 L 93 104 L 127 67"
+                fill="none"
+                stroke="#F5C518"
+                strokeWidth="15"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeOpacity="0.25"
+                filter="blur(4px)"
+              />
+              {/* Solid Golden Checkmark */}
+              <path
+                d="M 75 87 L 93 104 L 127 67"
+                fill="none"
+                stroke="url(#splash-check-grad)"
+                strokeWidth="11"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {/* Golden Apex Dot */}
+              <circle
+                cx="127"
+                cy="67"
+                r="3.5"
+                fill="#FFFFFF"
+                opacity="0.85"
               />
             </g>
 
