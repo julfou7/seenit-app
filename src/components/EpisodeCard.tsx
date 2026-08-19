@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { MouseEvent } from 'react';
 import { Check, Calendar, Circle } from 'lucide-react';
+import { SeenItCheckButton } from './SeenItCheckButton';
 import { cn } from '../lib/utils';
 import type { Show } from '../types';
 import { tmdb } from '../features/shows/tmdb';
@@ -155,19 +156,13 @@ export function EpisodeCard({ show, type, onShowClick, onMarkAsSeen }: EpisodeCa
         </div>
       </div>
 
-      <div className={cn("pr-3.5 flex items-center justify-center shrink-0 relative z-20", networkLogo && "pt-3.5")}>
-        <button 
+      <div className={cn("pr-2 flex items-center justify-center shrink-0 relative z-20", networkLogo && "pt-3.5")}>
+        <SeenItCheckButton 
           onClick={handleActionClick}
-          className={cn(
-            "w-9 h-9 shrink-0 rounded-full border border-white/20 flex items-center justify-center transition-all",
-            isAnimating 
-              ? "bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/30 scale-105" 
-              : "bg-white/5 hover:bg-white/10 hover:border-white/40 text-zinc-400 hover:text-white"
-          )}
+          isWatched={isAnimating}
+          size={30}
           title={type === 'watch_next' ? "Marquer comme vu" : "Épisode à venir"}
-        >
-          {isAnimating ? <Check size={18} strokeWidth={2.5} /> : <Circle size={20} strokeWidth={1.5} />}
-        </button>
+        />
       </div>
     </div>
   );

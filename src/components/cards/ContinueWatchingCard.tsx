@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Circle, CheckCircle2 } from 'lucide-react';
+import { SeenItCheckButton } from '../SeenItCheckButton';
 import { type Show } from '../../types';
 import { getAiredProgress, cn, getTodayStr } from '../../lib/utils';
 import { tmdb } from '../../features/shows/tmdb';
@@ -315,15 +315,14 @@ export function ContinueWatchingCard({ show, onShowClick, onEpisodeClick, onMark
           </span>
         </div>
         
-        <button 
+        <SeenItCheckButton 
           onClick={(e) => {
             e.stopPropagation();
             onMarkAsSeen(show);
           }}
-          className="text-zinc-500 hover:text-emerald-500 transition-colors p-2 -mr-2 -mt-1 flex-shrink-0"
-        >
-          <Circle size={24} strokeWidth={1.5} />
-        </button>
+          className="-mr-1 -mt-1 flex-shrink-0"
+          title="Marquer comme vu"
+        />
       </div>
     </div>
   );

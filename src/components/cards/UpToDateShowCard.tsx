@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Circle, CheckCircle2, Sparkles, Tv, Calendar } from 'lucide-react';
+import { SeenItCheckButton } from '../SeenItCheckButton';
 import { type Show } from '../../types';
 import { getNextEpisodeNumber, getAiredProgress, cn, getTodayStr } from '../../lib/utils';
 import { tmdb } from '../../features/shows/tmdb';
@@ -326,20 +327,18 @@ export function UpToDateShowCard({ show, onShowClick, onEpisodeClick, onMarkAsSe
         </div>
         
         {categoryInfo.type === 'CURRENTLY_AIRING' || isFullyWatched ? (
-          <div className="p-2 -mr-2 -mt-1 text-emerald-500" title="À jour">
-            <CheckCircle2 size={24} strokeWidth={2} />
+          <div className="p-1 -mr-1 -mt-1 text-amber-400" title="À jour">
+            <SeenItCheckButton onClick={(e) => e.stopPropagation()} isWatched={true} size={28} />
           </div>
         ) : (
-          <button 
+          <SeenItCheckButton 
             onClick={(e) => {
               e.stopPropagation();
               onMarkAsSeen(show);
             }}
-            className="text-zinc-500 hover:text-emerald-500 transition-colors p-2 -mr-2 -mt-1"
+            className="-mr-1 -mt-1"
             title="Marquer le prochain épisode comme vu"
-          >
-            <Circle size={24} strokeWidth={1.5} />
-          </button>
+          />
         )}
       </div>
     </div>

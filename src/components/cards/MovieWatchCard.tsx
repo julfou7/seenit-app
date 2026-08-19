@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Circle } from 'lucide-react';
+import { SeenItCheckButton } from '../SeenItCheckButton';
 import { type Show } from '../../types';
 import { tmdb } from '../../features/shows/tmdb';
 
@@ -181,16 +181,14 @@ export function MovieWatchCard({ show, onShowClick, onMarkAsSeen }: Props) {
           </span>
         </div>
         
-        <button 
+        <SeenItCheckButton 
           onClick={(e) => {
             e.stopPropagation();
             onMarkAsSeen(show);
           }}
-          className="text-zinc-500 hover:text-emerald-500 transition-colors p-1 -mr-1 -mt-0.5 flex-shrink-0 cursor-pointer"
+          className="-mr-1 -mt-0.5 flex-shrink-0"
           title="Marquer comme vu"
-        >
-          <Circle size={22} strokeWidth={1.5} />
-        </button>
+        />
       </div>
     </div>
   );

@@ -21,6 +21,7 @@ import { useSyncStore } from '../store/syncStore';
 import { useShowsStore } from '../store/showsStore';
 import { SwipeableCard } from '../components/cards/SwipeableCard';
 import { SeenItLogo } from '../components/SeenItLogo';
+import { SeenItCheckButton } from '../components/SeenItCheckButton';
 
 interface ExpandedItemCardProps {
   key?: React.Key;
@@ -261,17 +262,15 @@ function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMa
         )}
       </div>
 
-      <div className={cn("pr-3.5 flex items-center justify-center shrink-0 relative z-20", networkLogo && "pt-3.5")}>
-        <button 
+      <div className={cn("pr-2 flex items-center justify-center shrink-0 relative z-20", networkLogo && "pt-3.5")}>
+        <SeenItCheckButton 
           onClick={(e) => {
             e.stopPropagation();
             onMarkAsSeen(show);
           }}
-          className="w-9 h-9 shrink-0 rounded-full border border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/40 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+          size={30}
           title="Marquer comme vu"
-        >
-          <Circle size={20} strokeWidth={1.5} />
-        </button>
+        />
       </div>
     </div>
   );
