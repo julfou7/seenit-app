@@ -33,7 +33,7 @@ export function SplashScreen({
       setIsClosing(true);
       const closeTimer = setTimeout(() => {
         onComplete();
-      }, 450);
+      }, 500);
       return () => clearTimeout(closeTimer);
     }
   }, [timeElapsed, isReady, isClosing, onComplete]);
@@ -41,10 +41,9 @@ export function SplashScreen({
   return (
     <div
       id="seenit-splash-screen"
-      className={`fixed inset-0 z-[999] bg-[#040406] flex flex-col items-center justify-center overflow-hidden select-none transition-all duration-450 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-        isClosing ? 'opacity-0 scale-[1.04] pointer-events-none' : 'opacity-100 scale-100'
+      className={`fixed inset-0 z-[999] bg-[#040406] flex flex-col items-center justify-center overflow-hidden select-none transition-opacity duration-500 ease-out ${
+        isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
-      style={{ willChange: 'opacity, transform', transform: 'translate3d(0, 0, 0)' }}
     >
       {/* 120 FPS Ultra-Smooth GPU Keyframes */}
       {animate && (
@@ -64,19 +63,15 @@ export function SplashScreen({
             0% {
               transform: scale(0.5) translate3d(0, 0, 0);
               opacity: 0;
-              stroke-dashoffset: 120;
             }
             45% {
               opacity: 1;
-              stroke-dashoffset: 20;
             }
             75% {
               transform: scale(1.12) translate3d(0, 0, 0);
-              stroke-dashoffset: 0;
             }
             100% {
               transform: scale(1) translate3d(0, 0, 0);
-              stroke-dashoffset: 0;
               opacity: 1;
             }
           }
@@ -87,7 +82,7 @@ export function SplashScreen({
               opacity: 0;
             }
             40% {
-              opacity: 0.8;
+              opacity: 0.6;
             }
             100% {
               transform: scale(1.6) translate3d(0, 0, 0);
@@ -95,34 +90,14 @@ export function SplashScreen({
             }
           }
 
-          @keyframes goldGlassShimmer {
-            0% {
-              transform: translateX(-180px) translate3d(0, 0, 0);
-              opacity: 0;
-            }
-            25% {
-              opacity: 0.9;
-            }
-            80% {
-              opacity: 0.9;
-            }
-            100% {
-              transform: translateX(260px) translate3d(0, 0, 0);
-              opacity: 0;
-            }
-          }
-
           @keyframes ambientBloomBreath {
             0% {
-              transform: scale(0.75) translate3d(0, 0, 0);
               opacity: 0.1;
             }
             50% {
-              transform: scale(1.15) translate3d(0, 0, 0);
               opacity: 0.45;
             }
             100% {
-              transform: scale(1) translate3d(0, 0, 0);
               opacity: 0.3;
             }
           }
@@ -131,12 +106,10 @@ export function SplashScreen({
             0% {
               transform: translateY(12px) translate3d(0, 0, 0);
               opacity: 0;
-              letter-spacing: 0.05em;
             }
             100% {
               transform: translateY(0) translate3d(0, 0, 0);
               opacity: 1;
-              letter-spacing: -0.02em;
             }
           }
 
@@ -144,12 +117,10 @@ export function SplashScreen({
             0% {
               transform: translateY(8px) translate3d(0, 0, 0);
               opacity: 0;
-              letter-spacing: 0.28em;
             }
             100% {
               transform: translateY(0) translate3d(0, 0, 0);
               opacity: 0.7;
-              letter-spacing: 0.18em;
             }
           }
 
@@ -159,18 +130,15 @@ export function SplashScreen({
           }
 
           .anim-bloom {
-            animation: ambientBloomBreath 2.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-            will-change: transform, opacity;
+            animation: ambientBloomBreath 2.4s ease-in-out forwards;
           }
 
           .anim-emblem {
             animation: cinematicLogoIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-            will-change: transform, opacity;
           }
 
           .anim-seen-check {
             transform-origin: 100px 86px;
-            stroke-dasharray: 120;
             animation: checkmarkStamp 0.85s cubic-bezier(0.34, 1.4, 0.64, 1) 0.18s forwards;
             opacity: 0;
           }
@@ -181,27 +149,18 @@ export function SplashScreen({
             opacity: 0;
           }
 
-          .anim-glass-shimmer {
-            animation: goldGlassShimmer 1.2s cubic-bezier(0.25, 1, 0.5, 1) 0.45s forwards;
-            opacity: 0;
-            will-change: transform, opacity;
-          }
-
           .anim-title {
             animation: titleFadeUp 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards;
             opacity: 0;
-            will-change: transform, opacity;
           }
 
           .anim-subtitle {
             animation: subtitleFadeUp 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.6s forwards;
             opacity: 0;
-            will-change: transform, opacity;
           }
 
           .anim-loader-bar {
             animation: microLoaderSweep 1.4s ease-in-out infinite 0.1s;
-            will-change: transform;
           }
         `}</style>
       )}
@@ -360,20 +319,6 @@ export function SplashScreen({
               />
             </g>
 
-            {/* Specular Light Sweep across Glass */}
-            {animate && (
-              <g clipPath="url(#splash-inner-screen)">
-                <line
-                  x1="16"
-                  y1="20"
-                  x2="50"
-                  y2="160"
-                  stroke="url(#splash-shimmer-grad)"
-                  strokeWidth="32"
-                  className="anim-glass-shimmer"
-                />
-              </g>
-            )}
           </svg>
         </div>
 
