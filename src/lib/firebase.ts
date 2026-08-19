@@ -163,7 +163,7 @@ export async function sendNativeNotification(title: string, options?: Notificati
           summaryText: 'SeenIt',
           id: Math.floor(Math.random() * 1000000),
           schedule: { at: new Date(Date.now() + 100) },
-          smallIcon: 'ic_launcher_foreground',
+          smallIcon: 'ic_stat_seenit',
           iconColor: '#E5A93D',
           largeIcon: thumbImage,
           attachments: attachments.length > 0 ? attachments : undefined,

@@ -34,6 +34,10 @@ const config: CapacitorConfig = {
       skipNativeAuth: true,
       providers: ["google.com"],
       authDomain: "gen-lang-client-0201895414.firebaseapp.com"
+    },
+    LocalNotifications: {
+      smallIcon: "ic_stat_seenit",
+      iconColor: "#E5A93D"
     }
   }
 };
