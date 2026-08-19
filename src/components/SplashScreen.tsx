@@ -53,11 +53,11 @@ export function SplashScreen({
         <style>{`
           @keyframes cinematicLogoIn {
             0% {
-              transform: scale(0.88) translateY(6px) translate3d(0, 0, 0);
-              opacity: 0;
+              transform: scale(0.96) translate3d(0, 0, 0);
+              opacity: 1;
             }
             100% {
-              transform: scale(1) translateY(0) translate3d(0, 0, 0);
+              transform: scale(1) translate3d(0, 0, 0);
               opacity: 1;
             }
           }
@@ -95,7 +95,7 @@ export function SplashScreen({
 
           @keyframes ambientBloomBreath {
             0% {
-              opacity: 0.1;
+              opacity: 0.2;
             }
             50% {
               opacity: 0.45;
@@ -107,8 +107,8 @@ export function SplashScreen({
 
           @keyframes titleFadeUp {
             0% {
-              transform: translateY(12px) translate3d(0, 0, 0);
-              opacity: 0;
+              transform: translateY(0) translate3d(0, 0, 0);
+              opacity: 1;
             }
             100% {
               transform: translateY(0) translate3d(0, 0, 0);
@@ -118,7 +118,7 @@ export function SplashScreen({
 
           @keyframes subtitleFadeUp {
             0% {
-              transform: translateY(8px) translate3d(0, 0, 0);
+              transform: translateY(6px) translate3d(0, 0, 0);
               opacity: 0;
             }
             100% {
@@ -137,7 +137,8 @@ export function SplashScreen({
           }
 
           .anim-emblem {
-            animation: cinematicLogoIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            animation: cinematicLogoIn 0.5s ease-out forwards;
+            opacity: 1;
           }
 
           .anim-seen-check {
@@ -153,12 +154,12 @@ export function SplashScreen({
           }
 
           .anim-title {
-            animation: titleFadeUp 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards;
-            opacity: 0;
+            animation: titleFadeUp 0.5s ease-out forwards;
+            opacity: 1;
           }
 
           .anim-subtitle {
-            animation: subtitleFadeUp 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.6s forwards;
+            animation: subtitleFadeUp 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
             opacity: 0;
           }
 

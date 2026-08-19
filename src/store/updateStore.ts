@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export const CURRENT_APP_VERSION = '1.2.14';
+export const CURRENT_APP_VERSION = '1.2.15';
 export const GITHUB_REPO = 'julfou7/seenit-app';
 export const GITHUB_PAT = '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';
 

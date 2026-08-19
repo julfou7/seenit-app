@@ -9,9 +9,9 @@ import {
   Loader2, 
   CheckCircle2, 
   AlertCircle, 
-  ArrowRight,
   ExternalLink,
-  RefreshCw
+  RefreshCw,
+  ChevronUp
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -19,6 +19,11 @@ export function AppUpdateBanner() {
   const { latestRelease, hasUpdate, checkForUpdates, dismissUpdate } = useUpdateStore();
   const [showModal, setShowModal] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<UpdateProgress | null>(null);
+
+  // Swipe up gesture state
+  const [startY, setStartY] = useState<number | null>(null);
+  const [dragY, setDragY] = useState(0);
+  const [isDismissing, setIsDismissing] = useState(false);
 
   // Automatically check for updates on app startup (force fetch bypassing 10 min cache)
   useEffect(() => {
@@ -28,6 +33,46 @@ export function AppUpdateBanner() {
   if (!hasUpdate || !latestRelease) {
     return null;
   }
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setStartY(e.touches[0].clientY);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (startY === null) return;
+    const currentY = e.touches[0].clientY;
+    const deltaY = currentY - startY;
+    // Only drag upwards
+    if (deltaY < 0) {
+      setDragY(deltaY);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (startY === null) return;
+    if (dragY < -30) {
+      // Swiped up sufficiently -> dismiss
+      setIsDismissing(true);
+      setTimeout(() => {
+        dismissUpdate(latestRelease.version);
+        setDragY(0);
+        setIsDismissing(false);
+      }, 200);
+    } else if (Math.abs(dragY) < 5) {
+      // Simple tap -> open modal
+      setShowModal(true);
+      setDragY(0);
+    } else {
+      setDragY(0);
+    }
+    setStartY(null);
+  };
+
+  const handleBannerClick = () => {
+    if (Math.abs(dragY) < 5 && !isDismissing) {
+      setShowModal(true);
+    }
+  };
 
   const handleStartUpdate = async () => {
     setDownloadProgress({
@@ -55,11 +100,23 @@ export function AppUpdateBanner() {
       {/* Top Floating Discreet Notification Capsule */}
       <div 
         id="seenit-update-banner"
-        className="fixed left-4 right-4 z-50 animate-in slide-in-from-top duration-300 select-none max-w-md mx-auto"
-        style={{ top: 'calc(env(safe-area-inset-top, 32px) + 16px)' }}
+        className="fixed left-4 right-4 z-50 animate-in slide-in-from-top duration-300 max-w-md mx-auto cursor-pointer select-none"
+        style={{ 
+          top: 'calc(env(safe-area-inset-top, 32px) + 12px)',
+          transform: `translateY(${dragY}px)`,
+          opacity: isDismissing ? 0 : 1,
+          transition: startY !== null ? 'none' : 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease-out'
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onClick={handleBannerClick}
       >
-        <div className="bg-[#181822]/95 backdrop-blur-md border border-amber-500/30 rounded-2xl p-3 shadow-xl shadow-amber-500/10 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
+        <div className="bg-[#181822]/95 backdrop-blur-md border border-amber-500/30 rounded-2xl p-3 shadow-xl shadow-amber-500/10 flex items-center justify-between gap-3 relative overflow-hidden active:scale-[0.99] transition-transform">
+          {/* Subtle Swipe indicator bar */}
+          <div className="absolute top-1 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-amber-500/30 rounded-full" />
+
+          <div className="flex items-center gap-2.5 min-w-0 pt-0.5">
             <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30">
               <Sparkles className="w-4 h-4" />
             </div>
@@ -71,26 +128,13 @@ export function AppUpdateBanner() {
                 </span>
               </div>
               <p className="text-[11px] text-zinc-400 truncate">
-                Découvrez les nouveautés et améliorations
+                Toucher pour voir les nouveautés • Glisser vers le haut pour fermer
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              onClick={() => setShowModal(true)}
-              className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-400 active:scale-95 text-black text-[11px] font-bold rounded-lg flex items-center gap-1 transition-all shadow-md shadow-amber-500/20 cursor-pointer"
-            >
-              <span>Voir</span>
-              <ArrowRight className="w-3 h-3" />
-            </button>
-            <button
-              onClick={() => dismissUpdate(latestRelease.version)}
-              className="p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
-              title="Ignorer"
-            >
-              <X className="w-4 h-4" />
-            </button>
+          <div className="flex items-center shrink-0 text-amber-400/80 pr-1">
+            <ChevronUp className="w-4 h-4 animate-bounce" />
           </div>
         </div>
       </div>
@@ -106,9 +150,9 @@ export function AppUpdateBanner() {
           }}
         >
           <div 
-            className="bg-[#121218] border border-white/10 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200"
+            className="bg-[#121218] border border-white/10 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col max-h-[82vh] animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxHeight: 'calc(100dvh - 48px)' }}
+            style={{ maxHeight: 'calc(100dvh - 64px)' }}
           >
             {/* Header - Fixed */}
             <div className="p-5 pb-4 bg-gradient-to-b from-amber-500/10 to-transparent border-b border-white/5 flex items-start justify-between shrink-0">
@@ -139,8 +183,12 @@ export function AppUpdateBanner() {
 
             {/* Scrollable Body Content */}
             <div 
-              className="p-5 overflow-y-auto min-h-0 space-y-4 flex-1 text-sm text-zinc-300 custom-scrollbar overscroll-contain"
-              style={{ WebkitOverflowScrolling: 'touch' }}
+              className="p-5 overflow-y-auto min-h-0 space-y-4 flex-1 text-sm text-zinc-300 custom-scrollbar overscroll-contain touch-pan-y"
+              style={{ 
+                WebkitOverflowScrolling: 'touch',
+                touchAction: 'pan-y',
+                overscrollBehavior: 'contain'
+              }}
             >
               <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
                 Notes de version
