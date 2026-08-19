@@ -103,12 +103,12 @@ export default function App() {
       )}
       
       {/* 
-        CRITICAL 120 FPS ULTRA-PERFORMANCE OPTIMIZATION:
-        We pre-mount MainApp in the DOM underneath the full-screen fixed z-[999] SplashScreen as soon as auth/state is ready.
-        By rendering MainApp 1.5s BEFORE the splash screen fades out, IndexedDB queries, DOM nodes, and poster images are fully hydrated in the background.
-        When SplashScreen fades out (transition-opacity), the main thread is 100% idle, resulting in a locked 120 FPS GPU transition on Android APK.
+        CRITICAL PERFORMANCE OPTIMIZATION:
+        We completely defer mounting the heavy MainApp (which downloads images, parses IndexedDB, and creates hundreds of DOM nodes) 
+        until the splash screen has FINISHED its 2-second vector animation and is starting to fade out.
+        This guarantees perfectly smooth 60fps/120fps CSS animations for the splash screen on all devices.
       */}
-      {isReady ? (
+      {isReady && isSplashClosing ? (
         currentUser === null ? <LoginScreen /> : <MainApp />
       ) : (
         <div className="w-full min-h-[100dvh] bg-[#040406]" />

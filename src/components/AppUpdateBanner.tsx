@@ -11,7 +11,7 @@ import {
   AlertCircle, 
   ExternalLink,
   RefreshCw,
-  ChevronUp
+  ArrowRight
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
@@ -112,29 +112,48 @@ export function AppUpdateBanner() {
         onTouchEnd={handleTouchEnd}
         onClick={handleBannerClick}
       >
-        <div className="bg-[#181822]/95 backdrop-blur-md border border-amber-500/30 rounded-2xl p-3 shadow-xl shadow-amber-500/10 flex items-center justify-between gap-3 relative overflow-hidden active:scale-[0.99] transition-transform">
+        <div className="bg-[#181822]/95 backdrop-blur-md border border-amber-500/30 rounded-2xl p-3 shadow-xl shadow-amber-500/10 flex items-center justify-between gap-2.5 relative overflow-hidden active:scale-[0.99] transition-transform">
           {/* Subtle Swipe indicator bar */}
-          <div className="absolute top-1 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-amber-500/30 rounded-full" />
+          <div className="absolute top-1 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-white/20 rounded-full pointer-events-none" />
 
-          <div className="flex items-center gap-2.5 min-w-0 pt-0.5">
+          <div className="flex items-center gap-2.5 min-w-0 pt-0.5 flex-1">
             <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30">
               <Sparkles className="w-4 h-4" />
             </div>
-            <div className="min-w-0">
-              <div className="text-xs font-bold text-white flex items-center gap-1.5 truncate">
-                <span>Version {latestRelease.version} disponible</span>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                <span>Version {latestRelease.version}</span>
                 <span className="px-1.5 py-0.5 text-[9px] bg-amber-500 text-black font-extrabold rounded-full shrink-0">
                   NEW
                 </span>
               </div>
-              <p className="text-[11px] text-zinc-400 truncate">
-                Toucher pour voir les nouveautés • Glisser vers le haut pour fermer
+              <p className="text-[11px] text-zinc-400 whitespace-nowrap overflow-hidden text-ellipsis">
+                Découvrez les nouveautés
               </p>
             </div>
           </div>
 
-          <div className="flex items-center shrink-0 text-amber-400/80 pr-1">
-            <ChevronUp className="w-4 h-4 animate-bounce" />
+          <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowModal(true);
+              }}
+              className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-400 active:scale-95 text-black text-xs font-bold rounded-xl flex items-center gap-1 shadow-md shadow-amber-500/20 transition-all cursor-pointer"
+            >
+              <span>Mettre à jour</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                dismissUpdate(latestRelease.version);
+              }}
+              className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+              title="Ignorer"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </div>
