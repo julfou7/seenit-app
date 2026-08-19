@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useUpdateStore } from '../store/updateStore';
 import { downloadAndInstallApk, UpdateProgress } from '../services/appUpdater';
 import { ChangelogViewer } from './ChangelogViewer';
@@ -16,9 +16,14 @@ import {
 import { cn } from '../lib/utils';
 
 export function AppUpdateBanner() {
-  const { latestRelease, hasUpdate, dismissUpdate } = useUpdateStore();
+  const { latestRelease, hasUpdate, checkForUpdates, dismissUpdate } = useUpdateStore();
   const [showModal, setShowModal] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<UpdateProgress | null>(null);
+
+  // Automatically check for updates on app startup
+  useEffect(() => {
+    checkForUpdates();
+  }, [checkForUpdates]);
 
   if (!hasUpdate || !latestRelease) {
     return null;
