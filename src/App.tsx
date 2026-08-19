@@ -81,10 +81,17 @@ export default function App() {
   // Also configure the status bar for dark mode to ensure icons (time, battery) are white.
   useEffect(() => {
     if (isNative) {
-      CapSplashScreen.hide().catch(() => {});
       StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
       StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
       StatusBar.setBackgroundColor({ color: '#040406' }).catch(() => {});
+
+      // Hide native splash screen only AFTER React DOM frame is fully painted on screen
+      const animFrame = requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          CapSplashScreen.hide().catch(() => {});
+        });
+      });
+      return () => cancelAnimationFrame(animFrame);
     }
   }, [isNative]);
 

@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import { db, auth } from '../../lib/firebase';
 import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
 import { tmdb } from '../shows/tmdb';
@@ -112,6 +113,83 @@ const findShowInLocalLibrary = (
   return undefined;
 };
 
+const PLEX_BACKEND_ENDPOINTS = [
+  'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/history',
+  'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/history'
+];
+
+async function fetchPlexHistoryData(token: string, clientId: string, delta: boolean, since?: number) {
+  const isNative = Capacitor.isNativePlatform();
+  const urlsToTry = isNative 
+    ? [...PLEX_BACKEND_ENDPOINTS, '/api/plex/history'] 
+    : ['/api/plex/history', ...PLEX_BACKEND_ENDPOINTS];
+
+  for (const url of urlsToTry) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, clientId, delta, since }),
+        signal: AbortSignal.timeout(12000)
+      });
+
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
+        const data = await res.json();
+        if (data && (Array.isArray(data.history) || Array.isArray(data.watchlist))) {
+          return data;
+        }
+      }
+    } catch (e) {
+      console.warn(`[Plex Sync] Call to ${url} failed, trying next fallback...`, e);
+    }
+  }
+
+  // Fallback: Fetch directly from official Plex Cloud APIs on native device
+  return fetchPlexDirectlyFromClient(token, clientId);
+}
+
+async function fetchPlexDirectlyFromClient(token: string, clientId: string) {
+  const rawWatchlistItems: any[] = [];
+  const watchlistEndpoints = [
+    'https://discover.provider.plex.tv/library/sections/watchlist/all?includeUserState=1',
+    'https://metadata.provider.plex.tv/library/sections/watchlist/all?includeUserState=1'
+  ];
+
+  for (const endpoint of watchlistEndpoints) {
+    try {
+      const res = await fetch(endpoint, {
+        headers: {
+          'X-Plex-Token': token,
+          'Accept': 'application/json',
+          'X-Plex-Client-Identifier': clientId,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        },
+        signal: AbortSignal.timeout(8000)
+      });
+      if (res.ok) {
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await res.json();
+          const items = data?.MediaContainer?.Metadata || data?.Metadata || data?.items || [];
+          if (Array.isArray(items) && items.length > 0) {
+            rawWatchlistItems.push(...items);
+            break;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Plex Sync] Direct client fetch from Plex Cloud failed:', err);
+    }
+  }
+
+  return {
+    history: [],
+    watchlist: rawWatchlistItems,
+    visitedSources: ['Plex Cloud (Direct)']
+  };
+}
+
 let activePlexSyncPromise: Promise<PlexSyncResult> | null = null;
 
 export async function performPlexSync(options: { delta?: boolean; silent?: boolean; ignoreCooldown?: boolean } = {}): Promise<PlexSyncResult> {
@@ -173,26 +251,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
     };
 
     try {
-      const res = await fetch('/api/plex/history', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          token: plexToken, 
-          clientId, 
-          delta, 
-          since: delta ? lastSyncTimestamp : undefined 
-        })
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        const msg = errData.error || `Erreur serveur Plex (HTTP ${res.status})`;
-        appLogger.error('plex', msg, errData);
-        clearPlexSyncStatusDelayed(`Erreur Plex : ${msg}`, 4000);
-        return { success: false, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [], error: msg };
-      }
-
-      const { history = [], watchlist = [], visitedSources } = await res.json();
+      const plexData = await fetchPlexHistoryData(plexToken, clientId, delta, delta ? lastSyncTimestamp : undefined);
+      const { history = [], watchlist = [], visitedSources = [] } = plexData || {};
       localStorage.setItem('plex_last_sync_timestamp', String(Date.now()));
       const hasHistory = Array.isArray(history) && history.length > 0;
       const hasWatchlist = Array.isArray(watchlist) && watchlist.length > 0;

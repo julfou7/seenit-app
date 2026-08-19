@@ -161,7 +161,7 @@ export function AppUpdateBanner() {
       {/* Detailed Changelog Modal */}
       {showModal && (
         <div 
-          className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-[9999] bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 pb-24 sm:p-4 animate-in fade-in duration-200 overflow-y-auto"
           onClick={() => {
             if (downloadProgress?.status !== 'downloading') {
               setShowModal(false);
@@ -169,18 +169,18 @@ export function AppUpdateBanner() {
           }}
         >
           <div 
-            className="bg-[#121218] border border-white/10 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col max-h-[82vh] animate-in zoom-in-95 duration-200"
+            className="bg-[#121218] border border-white/10 rounded-3xl w-full max-w-sm overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] flex flex-col my-auto animate-in zoom-in-95 duration-200 shrink-0"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxHeight: 'calc(100dvh - 64px)' }}
+            style={{ maxHeight: 'min(78vh, calc(100dvh - 110px))' }}
           >
             {/* Header - Fixed */}
-            <div className="p-5 pb-4 bg-gradient-to-b from-amber-500/10 to-transparent border-b border-white/5 flex items-start justify-between shrink-0">
+            <div className="p-4 sm:p-5 pb-3 bg-gradient-to-b from-amber-500/10 to-transparent border-b border-white/5 flex items-start justify-between shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-amber-500 flex items-center justify-center text-black shadow-lg shadow-amber-500/30 shrink-0">
-                  <Sparkles className="w-6 h-6" />
+                <div className="w-10 h-10 rounded-2xl bg-amber-500 flex items-center justify-center text-black shadow-lg shadow-amber-500/30 shrink-0">
+                  <Sparkles className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
                     Mise à jour disponible !
                   </h3>
                   <p className="text-xs text-amber-400/90 font-medium">
@@ -202,25 +202,25 @@ export function AppUpdateBanner() {
 
             {/* Scrollable Body Content */}
             <div 
-              className="p-5 overflow-y-auto min-h-0 space-y-4 flex-1 text-sm text-zinc-300 custom-scrollbar overscroll-contain touch-pan-y"
+              className="p-4 sm:p-5 overflow-y-auto min-h-0 space-y-3.5 flex-1 text-sm text-zinc-300 custom-scrollbar overscroll-contain touch-pan-y"
               style={{ 
                 WebkitOverflowScrolling: 'touch',
                 touchAction: 'pan-y',
                 overscrollBehavior: 'contain'
               }}
             >
-              <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
                 Notes de version
               </div>
               
-              <div className="bg-black/40 border border-white/5 rounded-2xl p-4">
+              <div className="bg-black/40 border border-white/5 rounded-2xl p-3.5 max-h-44 sm:max-h-52 overflow-y-auto custom-scrollbar">
                 <ChangelogViewer content={latestRelease.releaseNotes} />
               </div>
 
               {/* Download Progress / Status Bar if active */}
               {downloadProgress && downloadProgress.status !== 'idle' && (
                 <div className={cn(
-                  "border rounded-2xl p-4 space-y-2.5 animate-in fade-in duration-200",
+                  "border rounded-2xl p-3.5 space-y-2 animate-in fade-in duration-200",
                   downloadProgress.status === 'error' 
                     ? "bg-red-500/10 border-red-500/30" 
                     : "bg-amber-500/10 border-amber-500/30"
@@ -273,27 +273,27 @@ export function AppUpdateBanner() {
                 </div>
               )}
 
-              <div className="space-y-2 text-xs text-zinc-400">
+              <div className="space-y-1.5 text-xs text-zinc-400">
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                   <span>Installation automatique sans perte de vos données</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                   <span>Ouverture directe de l'installeur Android</span>
                 </div>
               </div>
             </div>
 
             {/* Actions - Fixed at Bottom */}
-            <div className="p-4 bg-black/40 border-t border-white/5 flex gap-2.5 shrink-0">
+            <div className="p-3.5 sm:p-4 bg-black/60 border-t border-white/5 flex gap-2.5 shrink-0 z-10">
               <button
                 disabled={downloadProgress?.status === 'downloading'}
                 onClick={() => {
                   dismissUpdate(latestRelease.version);
                   setShowModal(false);
                 }}
-                className="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-zinc-300 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                className="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 active:scale-98 disabled:opacity-50 text-zinc-300 text-xs font-semibold rounded-xl transition-all cursor-pointer"
               >
                 Plus tard
               </button>
