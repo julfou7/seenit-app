@@ -50,6 +50,38 @@ if (typeof window !== 'undefined' && 'Notification' in window) {
   });
 }
 
+async function fetchImageAsDataUrl(url?: string): Promise<string | undefined> {
+  if (!url || typeof window === 'undefined') return undefined;
+  if (url.startsWith('data:')) return url;
+  
+  let fullUrl = url;
+  if (url.startsWith('/')) {
+    fullUrl = window.location.origin + url;
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3500);
+    const res = await fetch(fullUrl, { signal: controller.signal });
+    clearTimeout(timer);
+    
+    if (!res.ok) return undefined;
+    const blob = await res.blob();
+    
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        resolve(reader.result as string);
+      };
+      reader.onerror = () => resolve(undefined);
+      reader.readAsDataURL(blob);
+    });
+  } catch (err) {
+    console.warn('fetchImageAsDataUrl error for:', fullUrl, err);
+    return undefined;
+  }
+}
+
 // Register native notification click action listener on Capacitor Native platform
 if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
   try {
@@ -91,13 +123,37 @@ export async function sendNativeNotification(title: string, options?: Notificati
         if (req.display !== 'granted') return;
       }
 
-      // Attachments for poster image/photo on Android notification card
+      // Convert remote HTTP image URLs to Base64 Data URIs so native Android can render them
+      const [base64Backdrop, base64Poster] = await Promise.all([
+        imageUrl ? fetchImageAsDataUrl(imageUrl) : Promise.resolve(undefined),
+        iconUrl ? fetchImageAsDataUrl(iconUrl) : Promise.resolve(undefined)
+      ]);
+
+      const mainImage = base64Backdrop || base64Poster;
+      const thumbImage = base64Poster || base64Backdrop;
+
       const attachments: any[] = [];
-      if (imageUrl && imageUrl.startsWith('http')) {
-        attachments.push({ id: 'photo', url: imageUrl });
-      } else if (iconUrl && iconUrl.startsWith('http')) {
-        attachments.push({ id: 'poster', url: iconUrl });
+      if (mainImage) {
+        attachments.push({ id: 'photo', url: mainImage });
       }
+
+      // Register action types for notification buttons
+      try {
+        await LocalNotifications.registerActionTypes({
+          types: [
+            {
+              id: 'EPISODE_NOTIF_ACTIONS',
+              actions: [
+                {
+                  id: 'mark_watched',
+                  title: '✓ Marquer comme vu',
+                  foreground: true
+                }
+              ]
+            }
+          ]
+        });
+      } catch (e) {}
 
       await LocalNotifications.schedule({
         notifications: [{
@@ -107,10 +163,11 @@ export async function sendNativeNotification(title: string, options?: Notificati
           summaryText: 'SeenIt',
           id: Math.floor(Math.random() * 1000000),
           schedule: { at: new Date(Date.now() + 100) },
-          smallIcon: 'ic_launcher',
-          largeIcon: (iconUrl && iconUrl.startsWith('http')) ? iconUrl : undefined,
+          smallIcon: 'ic_launcher_foreground',
+          iconColor: '#E5A93D',
+          largeIcon: thumbImage,
           attachments: attachments.length > 0 ? attachments : undefined,
-          actionTypeId: '',
+          actionTypeId: 'EPISODE_NOTIF_ACTIONS',
           extra: {
             showId: extraData.showId,
             tmdbId: extraData.tmdbId,
