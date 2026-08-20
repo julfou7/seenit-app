@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Star, ChevronRight, ChevronDown } from 'lucide-react';
+import { Star, ChevronRight, ChevronDown, Check, X } from 'lucide-react';
 import { cn, formatAirDateSafe } from '../lib/utils';
 import { getSeasonImdbRatings, getEpisodeImdbVotes, type EpisodeImdbData } from '../features/shows/omdbService';
 
@@ -82,6 +82,7 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [imdbRatings, setImdbRatings] = useState<Record<number, EpisodeImdbData>>({});
   const [activeEpisodeVotes, setActiveEpisodeVotes] = useState<string | null>(null);
+  const [isSeasonPickerOpen, setIsSeasonPickerOpen] = useState<boolean>(false);
 
   // Sync selected season when default change or initial load
   useEffect(() => {
@@ -246,21 +247,66 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
           )}
         </div>
 
-        {/* Season Selector : Dropdown if > 3 seasons, else horizontal pills */}
+        {/* Season Selector : Custom Modal Picker if > 3 seasons, else horizontal pills */}
         {validSeasons.length > 3 ? (
-          <div className="relative shrink-0">
-            <select
-              value={selectedSeasonNum}
-              onChange={(e) => setSelectedSeasonNum(Number(e.target.value))}
-              className="appearance-none bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 font-bold text-xs pl-3 pr-7 py-1 rounded-xl cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500/50 transition-all"
+          <div className="shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsSeasonPickerOpen(true)}
+              className="flex items-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 active:bg-amber-500/30 border border-amber-500/30 text-amber-400 font-bold text-xs px-3 py-1.5 rounded-xl cursor-pointer transition-all shadow-sm active:scale-95"
             >
-              {validSeasons.map((s) => (
-                <option key={s.id || s.season_number} value={s.season_number} className="bg-zinc-900 text-zinc-200">
-                  Saison {s.season_number}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-amber-400 pointer-events-none" />
+              <span>Saison {selectedSeasonNum}</span>
+              <ChevronDown size={14} className="text-amber-400 shrink-0" />
+            </button>
+
+            {/* Custom Dark Modal Picker for Android/iOS/Web compatibility */}
+            {isSeasonPickerOpen && (
+              <div 
+                className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+                onClick={() => setIsSeasonPickerOpen(false)}
+              >
+                <div 
+                  className="bg-zinc-900 border border-white/10 rounded-2xl w-full max-w-xs p-4 space-y-3 shadow-2xl animate-scale-in"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                    <h4 className="text-sm font-extrabold text-white">Sélectionner une saison</h4>
+                    <button 
+                      type="button"
+                      onClick={() => setIsSeasonPickerOpen(false)}
+                      className="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <div className="max-h-64 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                    {validSeasons.map((s) => {
+                      const isSelected = s.season_number === selectedSeasonNum;
+                      return (
+                        <button
+                          key={s.id || s.season_number}
+                          type="button"
+                          onClick={() => {
+                            setSelectedSeasonNum(s.season_number);
+                            setIsSeasonPickerOpen(false);
+                          }}
+                          className={cn(
+                            "w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-left cursor-pointer",
+                            isSelected
+                              ? "bg-amber-500 text-zinc-950 font-black shadow-md shadow-amber-500/20"
+                              : "text-zinc-300 hover:bg-white/5 active:bg-white/10"
+                          )}
+                        >
+                          <span>Saison {s.season_number}</span>
+                          {isSelected && <Check size={16} className="text-zinc-950 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar shrink-0 pb-1">

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Search, Plus, Check, WifiOff, Star, X, 
   SlidersHorizontal, ArrowUp, ArrowDown, Film, Tv, Users, User,
-  Info, Sparkles, ChevronRight, CheckCircle, CheckCircle2, Play, Archive, XCircle,
+  Info, Sparkles, ChevronRight, ChevronDown, CheckCircle, CheckCircle2, Play, Archive, XCircle,
   Ticket, MonitorPlay, Flame, Loader2, Calendar
 } from 'lucide-react';
 import { tmdb, isMovieAtCinema, isMovieUpcoming, type TMDBMedia } from '../features/shows/tmdb';
@@ -138,6 +138,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
     });
   }, [recommendations, showsByTmdbId]);
   const [sortBy, setSortBy] = useState<'popular' | 'rating' | 'date' | 'title'>('popular');
+  const [isSortPickerOpen, setIsSortPickerOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedGenreIds, setSelectedGenreIds] = useState<string[]>([]);
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
@@ -1271,16 +1272,64 @@ export function DiscoverScreen({ onShowClick }: Props) {
                 </>
               )}
             </h2>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as 'popular' | 'rating' | 'date' | 'title')}
-              className="bg-[#1C1C1E] text-xs font-semibold text-zinc-300 py-1.5 px-3 rounded-full border border-white/10 outline-none cursor-pointer hover:bg-zinc-800 transition-colors"
-            >
-              <option value="popular">Popularité</option>
-              <option value="rating">Mieux notés</option>
-              <option value="date">Plus récents</option>
-              <option value="title">Titre</option>
-            </select>
+            <div>
+              <button
+                type="button"
+                onClick={() => setIsSortPickerOpen(true)}
+                className="bg-[#1C1C1E] hover:bg-zinc-800 active:bg-zinc-700 text-xs font-semibold text-zinc-300 py-1.5 px-3 rounded-full border border-white/10 flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <span>{SORT_OPTIONS.find(o => o.id === sortBy)?.label || 'Trier'}</span>
+                <ChevronDown size={14} className="text-zinc-400" />
+              </button>
+
+              {isSortPickerOpen && (
+                <div 
+                  className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+                  onClick={() => setIsSortPickerOpen(false)}
+                >
+                  <div 
+                    className="bg-zinc-900 border border-white/10 rounded-2xl w-full max-w-xs p-4 space-y-3 shadow-2xl animate-scale-in"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                      <h4 className="text-sm font-extrabold text-white">Trier les résultats</h4>
+                      <button 
+                        type="button"
+                        onClick={() => setIsSortPickerOpen(false)}
+                        className="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div className="space-y-1">
+                      {SORT_OPTIONS.map((opt) => {
+                        const isSelected = opt.id === sortBy;
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => {
+                              setSortBy(opt.id as any);
+                              setIsSortPickerOpen(false);
+                            }}
+                            className={cn(
+                              "w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-left cursor-pointer",
+                              isSelected
+                                ? "bg-amber-500 text-zinc-950 font-black shadow-md shadow-amber-500/20"
+                                : "text-zinc-300 hover:bg-white/5 active:bg-white/10"
+                            )}
+                          >
+                            <span>{opt.label}</span>
+                            {isSelected && <Check size={16} className="text-zinc-950 shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {debouncedQuery.trim() && (
