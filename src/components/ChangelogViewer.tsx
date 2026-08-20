@@ -89,8 +89,8 @@ function cleanReleaseNotes(raw: string): string {
 - **Mises à jour & correctifs** : Améliorations de la stabilité, correctifs d'affichage et optimisations générales.`;
   }
 
-  // Pre-process inline bullets "• **" or "• " into newlines so each item gets its own line
-  text = text.replace(/([^\n])\s*[•\*]\s*/g, '$1\n- ');
+  // Pre-process inline bullets "• " into newlines so each item gets its own line (do not match asterisks * which are used for markdown bolding)
+  text = text.replace(/([^\n])\s*[•]\s*/g, '$1\n- ');
 
   const lines = text.split('\n');
   const filteredLines: string[] = [];

@@ -103,6 +103,16 @@ if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
   }
 }
 
+function normalizeImageUrl(url?: string): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('/')) {
+    const origin = window.location.origin.includes('localhost') ? 'https://seenit.app' : window.location.origin;
+    return origin + url;
+  }
+  return url;
+}
+
 export async function sendNativeNotification(title: string, options?: NotificationOptions & { image?: string; icon?: string; badge?: string; data?: any; showId?: string | number; tmdbId?: number; mediaType?: string; season?: number; episode?: number }) {
   const iconUrl = options?.icon || (options as any)?.image || 'https://seenit.app/icon-192.png';
   const imageUrl = (options as any)?.image || options?.icon;
@@ -123,17 +133,15 @@ export async function sendNativeNotification(title: string, options?: Notificati
         if (req.display !== 'granted') return;
       }
 
-      // Convert remote HTTP image URLs to Base64 Data URIs so native Android can render them
-      const [base64Backdrop, base64Poster] = await Promise.all([
-        imageUrl ? fetchImageAsDataUrl(imageUrl) : Promise.resolve(undefined),
-        iconUrl ? fetchImageAsDataUrl(iconUrl) : Promise.resolve(undefined)
-      ]);
+      // Use normalized full HTTP/HTTPS URLs which Capacitor downloads native-side
+      const resolvedImage = normalizeImageUrl(imageUrl);
+      const resolvedIcon = normalizeImageUrl(iconUrl);
 
-      const mainImage = base64Backdrop || base64Poster;
-      const thumbImage = base64Poster || base64Backdrop;
+      const mainImage = resolvedImage || resolvedIcon;
+      const thumbImage = resolvedIcon || resolvedImage;
 
       const attachments: any[] = [];
-      if (mainImage) {
+      if (mainImage && mainImage.startsWith('http')) {
         attachments.push({ id: 'photo', url: mainImage });
       }
 
