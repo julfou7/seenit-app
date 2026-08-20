@@ -25,20 +25,24 @@ export function MovieWatchCard({ show, onShowClick, onMarkAsSeen }: Props) {
   const [releaseYear, setReleaseYear] = useState<string | null>(
     show.firstAirDate ? show.firstAirDate.slice(0, 4) : null
   );
+  const [fullReleaseDate, setFullReleaseDate] = useState<string | null>(
+    show.firstAirDate || null
+  );
   const [providerLogo, setProviderLogo] = useState<string | null>(null);
   const [providerName, setProviderName] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
     if (show.tmdbId) {
-      if (!runtime || !releaseYear) {
+      if (!runtime || !releaseYear || !fullReleaseDate || fullReleaseDate.length <= 4) {
         tmdb.getMovieDetails(show.tmdbId).then(res => {
           if (isMounted && res.ok && res.value) {
             if (res.value.runtime && !runtime) {
               setRuntime(res.value.runtime);
             }
-            if (res.value.release_date && !releaseYear) {
-              setReleaseYear(res.value.release_date.slice(0, 4));
+            if (res.value.release_date) {
+              if (!releaseYear) setReleaseYear(res.value.release_date.slice(0, 4));
+              if (fullReleaseDate !== res.value.release_date) setFullReleaseDate(res.value.release_date);
             }
           }
         }).catch(() => {});
@@ -88,9 +92,10 @@ export function MovieWatchCard({ show, onShowClick, onMarkAsSeen }: Props) {
 
   // Badge "AU CINÉMA" / sortie récente
   let cinemaBadge = null;
+  const mockTmdbData = { media_type: 'movie', release_date: fullReleaseDate };
   
-  if (show.firstAirDate) {
-    const [y, m, d] = show.firstAirDate.split('-').map(Number);
+  if (fullReleaseDate) {
+    const [y, m, d] = fullReleaseDate.split('-').map(Number);
     if (y && m && d) {
       const relDate = new Date(y, m - 1, d);
       relDate.setHours(0, 0, 0, 0);
@@ -117,13 +122,27 @@ export function MovieWatchCard({ show, onShowClick, onMarkAsSeen }: Props) {
             SORTI IL Y A {diffDays}J 🆕
           </div>
         );
-      } else if (isMovieAtCinema(show)) {
+      } else if (isMovieAtCinema(mockTmdbData)) {
         cinemaBadge = (
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-20 bg-gradient-to-r from-amber-600 to-rose-600 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-t-lg shadow-lg uppercase tracking-wider whitespace-nowrap shadow-black/50">
             AU CINÉMA 🎬
           </div>
         );
-      } else if (isMovieUpcoming(show)) {
+      } else if (isMovieUpcoming(mockTmdbData)) {
+        cinemaBadge = (
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-20 bg-purple-600 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-t-lg shadow-lg uppercase tracking-wider whitespace-nowrap shadow-black/50">
+            À VENIR 🗓️
+          </div>
+        );
+      }
+    } else {
+      if (isMovieAtCinema(mockTmdbData)) {
+        cinemaBadge = (
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-20 bg-gradient-to-r from-amber-600 to-rose-600 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-t-lg shadow-lg uppercase tracking-wider whitespace-nowrap shadow-black/50">
+            AU CINÉMA 🎬
+          </div>
+        );
+      } else if (isMovieUpcoming(mockTmdbData)) {
         cinemaBadge = (
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-20 bg-purple-600 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-t-lg shadow-lg uppercase tracking-wider whitespace-nowrap shadow-black/50">
             À VENIR 🗓️
