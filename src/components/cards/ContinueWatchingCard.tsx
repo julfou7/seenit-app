@@ -367,7 +367,7 @@ export function ContinueWatchingCard({ show, onShowClick, onEpisodeClick, onMark
             <span className="text-white font-semibold text-sm">
               {watched === 0 ? 'Commencer' : 'Continuer'} S{(nextEpNum?.season_number ?? 1).toString().padStart(2, '0')} | E{(nextEpNum?.episode_number ?? 1).toString().padStart(2, '0')}
             </span>
-            {remainingAiredCount > 0 && (
+            {remainingAiredCount > 1 && (
               <span className="text-zinc-400 font-medium text-xs sm:text-[13px]">
                 + {remainingAiredCount}
               </span>
