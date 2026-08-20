@@ -349,6 +349,31 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     return Array.from(uniqueMap.values());
   }, [providers]);
 
+  const sortedProviders = useMemo(() => {
+    const list: any[] = [...uniqueProviders];
+    if (plexMediaInfo?.available) {
+      list.push({
+        provider_id: 999999,
+        provider_name: plexMediaInfo.serverName ? `Plex (${plexMediaInfo.serverName})` : 'Plex',
+        logo_path: 'PLEX_CUSTOM_SVG',
+        isPlex: true,
+        serverName: plexMediaInfo.serverName,
+        plexUrl: plexMediaInfo.plexUrl || 'https://app.plex.tv/desktop'
+      });
+    }
+    return list.sort((a: any, b: any) => {
+      // Les diffuseurs officiels restent prioritaires
+      if (a.isPlex && !b.isPlex) return 1;
+      if (!a.isPlex && b.isPlex) return -1;
+
+      const aHas = userPlatforms.includes(a.provider_id);
+      const bHas = userPlatforms.includes(b.provider_id);
+      if (aHas && !bHas) return -1;
+      if (!aHas && bHas) return 1;
+      return 0;
+    });
+  }, [uniqueProviders, plexMediaInfo, userPlatforms]);
+
   const startXRef = useRef<number | null>(null);
   const startYRef = useRef<number | null>(null);
   const isEdgeSwipeRef = useRef<boolean>(false);
@@ -1638,31 +1663,6 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
 
   const ytVideos = tmdbDetails?.videos?.results?.filter((v: any) => v.site === 'YouTube') || [];
   const hasTrailer = ytVideos.length > 0;
-  
-  const sortedProviders = useMemo(() => {
-    const list: any[] = [...uniqueProviders];
-    if (plexMediaInfo?.available) {
-      list.push({
-        provider_id: 999999,
-        provider_name: plexMediaInfo.serverName ? `Plex (${plexMediaInfo.serverName})` : 'Plex',
-        logo_path: 'PLEX_CUSTOM_SVG',
-        isPlex: true,
-        serverName: plexMediaInfo.serverName,
-        plexUrl: plexMediaInfo.plexUrl || 'https://app.plex.tv/desktop'
-      });
-    }
-
-    return list.sort((a: any, b: any) => {
-      // Les diffuseurs officiels restent prioritaires
-      if (a.isPlex && !b.isPlex) return 1;
-      if (!a.isPlex && b.isPlex) return -1;
-      const aHas = userPlatforms.includes(a.provider_id);
-      const bHas = userPlatforms.includes(b.provider_id);
-      if (aHas && !bHas) return -1;
-      if (!aHas && bHas) return 1;
-      return 0;
-    });
-  }, [uniqueProviders, plexMediaInfo, userPlatforms]);
 
   const firstSubscribedProvider = sortedProviders.find((p: any) => userPlatforms.includes(p.provider_id));
   const watchLink = providers?.link;
