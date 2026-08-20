@@ -323,58 +323,70 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
           {/* Interactive Bar Chart Container */}
           <div className="relative pt-4 pb-2 px-1 bg-zinc-950/50 rounded-xl border border-white/5 overflow-hidden">
             {/* Grid lines (2 subtle clean lines, no watermark numbers) */}
-            <div className="absolute inset-x-2 top-5 bottom-7 flex flex-col justify-between pointer-events-none opacity-40">
+            <div className="absolute inset-x-2 top-11 bottom-9 flex flex-col justify-between pointer-events-none opacity-40">
               <div className="border-t border-white/10 w-full" />
               <div className="border-t border-white/5 w-full" />
             </div>
 
             <div className="relative">
-              {/* Ligne moyenne de la saison */}
-              {seasonStats && (
-                <div
-                  className="absolute left-1 right-1 border-b-2 border-dashed border-amber-400/50 z-20 pointer-events-none flex items-center justify-between"
-                  style={{
-                    // The bar graphics have height 80px (h-20). The episode labels have height 15px (mt-1 + text). 
-                    // So the bottom of the bar graphic is exactly 19px from the bottom of the parent container.
-                    bottom: `calc(${Math.max(10, Math.min(100, (Number(seasonStats.average) / 10) * 100))}% * 0.8 + 19px)`
-                  }}
-                >
-                  <span className="bg-amber-500/95 text-zinc-950 font-black text-[9px] px-1.5 py-0.5 rounded-full shadow-md ml-2 -translate-y-1/2">
-                    Moy: {Number(seasonStats.average).toFixed(1)}
-                  </span>
-                </div>
-              )}
-
-              {/* Bars container */}
-              <div className="flex items-end justify-between gap-1 sm:gap-2 px-1.5 overflow-x-auto hide-scrollbar relative z-10 pt-2 pb-1">
+              {/* Row 1: Score labels above bars */}
+              <div className="flex items-center justify-between gap-1 sm:gap-2 px-1.5 mb-1 relative z-10">
                 {episodes.map((ep: any) => {
                   const vote = getEpisodeVote(ep);
                   const formattedVote = vote > 0 ? vote.toFixed(1) : '-';
                   const colorInfo = getRatingColor(vote);
                   const isActive = activeEpisode?.id === ep.id || activeEpisode?.episode_number === ep.episode_number;
 
-                  // Scale height: minimum 12% so bar is visible even if vote is low
-                  const heightPercent = vote > 0 ? Math.max(12, (vote / 10) * 100) : 10;
-
                   return (
                     <div
                       key={ep.id || ep.episode_number}
                       onClick={() => setActiveEpisode(ep)}
                       onMouseEnter={() => setActiveEpisode(ep)}
-                      className="flex-1 min-w-[26px] max-w-[44px] flex flex-col items-center justify-end group cursor-pointer"
+                      className="flex-1 min-w-[26px] max-w-[44px] text-center cursor-pointer"
                     >
-                      {/* Score Label above bar */}
                       <span
                         className={cn(
-                          "text-[10px] font-bold mb-1 transition-transform group-hover:scale-110",
+                          "text-[10px] font-bold block transition-transform duration-200",
                           isActive ? "text-amber-400 font-extrabold scale-110" : colorInfo.text
                         )}
                       >
                         {formattedVote}
                       </span>
+                    </div>
+                  );
+                })}
+              </div>
 
-                      {/* Bar graphic (Fixed height h-20 for perfect alignment of average line) */}
-                      <div className="w-full bg-zinc-800/60 rounded-t-md p-0.5 h-20 flex items-end">
+              {/* Row 2: Bar graphics with the perfectly aligned dashed average line */}
+              <div className="relative h-20 mb-2">
+                {/* Ligne moyenne de la saison */}
+                {seasonStats && Number(seasonStats.average) > 0 && (
+                  <div
+                    className="absolute left-1 right-1 border-b-2 border-dashed border-amber-400/80 z-20 pointer-events-none"
+                    style={{
+                      bottom: `${Math.max(10, Math.min(100, (Number(seasonStats.average) / 10) * 100))}%`
+                    }}
+                  >
+                    <span className="absolute bg-amber-500 text-zinc-950 font-black text-[9px] px-1.5 py-0.5 rounded-full shadow-md left-2 -translate-y-1/2 z-30">
+                      Moy: {Number(seasonStats.average).toFixed(1)}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-end justify-between gap-1 sm:gap-2 h-full px-1.5 relative z-10">
+                  {episodes.map((ep: any) => {
+                    const vote = getEpisodeVote(ep);
+                    const heightPercent = vote > 0 ? Math.max(12, (vote / 10) * 100) : 10;
+                    const isActive = activeEpisode?.id === ep.id || activeEpisode?.episode_number === ep.episode_number;
+                    const colorInfo = getRatingColor(vote);
+
+                    return (
+                      <div
+                        key={ep.id || ep.episode_number}
+                        onClick={() => setActiveEpisode(ep)}
+                        onMouseEnter={() => setActiveEpisode(ep)}
+                        className="flex-1 min-w-[26px] max-w-[44px] h-full flex items-end justify-center group cursor-pointer relative bg-zinc-800/15 rounded-t-sm"
+                      >
                         <div
                           style={{ height: `${heightPercent}%` }}
                           className={cn(
@@ -384,11 +396,26 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
                           )}
                         />
                       </div>
+                    );
+                  })}
+                </div>
+              </div>
 
-                      {/* Episode label below bar */}
+              {/* Row 3: Episode labels below bars */}
+              <div className="flex items-center justify-between gap-1 sm:gap-2 px-1.5 relative z-10">
+                {episodes.map((ep: any) => {
+                  const isActive = activeEpisode?.id === ep.id || activeEpisode?.episode_number === ep.episode_number;
+
+                  return (
+                    <div
+                      key={ep.id || ep.episode_number}
+                      onClick={() => setActiveEpisode(ep)}
+                      onMouseEnter={() => setActiveEpisode(ep)}
+                      className="flex-1 min-w-[26px] max-w-[44px] text-center cursor-pointer"
+                    >
                       <span
                         className={cn(
-                          "text-[10px] font-medium mt-1 transition-colors",
+                          "text-[10px] font-medium block transition-colors",
                           isActive ? "text-white font-bold" : "text-zinc-500 group-hover:text-zinc-300"
                         )}
                       >
@@ -467,8 +494,9 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
 function useMemoSeasons(seasons: any[]) {
   return React.useMemo(() => {
     if (!seasons || seasons.length === 0) return [];
-    const filtered = seasons.filter((s: any) => s.season_number > 0);
-    return filtered.length > 0 ? filtered : seasons;
+    // Filter out seasons with season_number <= 0 (specials) or with 0 episodes
+    const filtered = seasons.filter((s: any) => s.season_number > 0 && s.episode_count > 0);
+    return filtered.length > 0 ? filtered : seasons.filter((s: any) => s.episode_count > 0);
   }, [seasons]);
 }
 
