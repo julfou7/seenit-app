@@ -4,6 +4,7 @@ import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { auth, googleAuthProvider } from '../lib/firebase';
 import { LogIn, Tv2, Film, Clapperboard, Sparkles } from 'lucide-react';
 import { PWAInstallBanner } from '../components/PWAInstallBanner';
+import { AppUpdateBanner } from '../components/AppUpdateBanner';
 import { SeenItLogo } from '../components/SeenItLogo';
 import { Capacitor } from '@capacitor/core';
 
@@ -70,6 +71,7 @@ export function LoginScreen() {
     <div className="w-full min-h-[100dvh] bg-[#040406] flex justify-center selection:bg-[#E5A93D]/30">
       <div className="w-full max-w-md bg-premium-ambient h-[100dvh] flex flex-col relative shadow-2xl shadow-black/90 overflow-hidden">
         <PWAInstallBanner />
+        <AppUpdateBanner />
         
         <div className="flex-1 flex flex-col items-center justify-center p-8 relative z-10">
           
