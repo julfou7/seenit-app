@@ -132,39 +132,39 @@ export function ContinueWatchingCard({ show, onShowClick, onEpisodeClick, onMark
     }
   }
 
-  if (!badge) {
-    const cachedSeason = show.seasonsCache?.find((s: any) => s.season_number === nextEpNum.season_number);
-    let totalSeasonEpisodes = nextEpNum.episode_count || 
-      cachedSeason?.episode_count || 
-      cachedSeason?.episodes?.length || 
-      (show.nextEpisodeToAir?.season_number === nextEpNum.season_number ? show.nextEpisodeToAir?.episode_count : null) || 
-      1;
-    let airedInSeason = totalSeasonEpisodes;
+  const cachedSeason = show.seasonsCache?.find((s: any) => s.season_number === nextEpNum.season_number);
+  let totalSeasonEpisodes = nextEpNum.episode_count || 
+    cachedSeason?.episode_count || 
+    cachedSeason?.episodes?.length || 
+    (show.nextEpisodeToAir?.season_number === nextEpNum.season_number ? show.nextEpisodeToAir?.episode_count : null) || 
+    1;
+  let airedInSeason = totalSeasonEpisodes;
 
-    // Logique infaillible pour connaître les épisodes sortis dans la saison
-    const nextEpToAir = show.nextEpisodeToAir || (show as any).next_episode_to_air;
-    let isAiringSeason = false;
-    
-    if (nextEpToAir && nextEpToAir.season_number === nextEpNum.season_number) {
-      airedInSeason = Math.max(0, nextEpToAir.episode_number - 1);
+  // Logique infaillible pour connaître les épisodes sortis dans la saison
+  const nextEpToAir = show.nextEpisodeToAir || (show as any).next_episode_to_air;
+  let isAiringSeason = false;
+  const todayStr = getTodayStr();
+  
+  if (nextEpToAir && nextEpToAir.season_number === nextEpNum.season_number) {
+    airedInSeason = Math.max(0, nextEpToAir.episode_number - 1);
+    isAiringSeason = true;
+  } else if (nextEpNum.air_date) {
+    if (nextEpNum.air_date > todayStr) {
+      airedInSeason = Math.max(0, nextEpNum.episode_number - 1);
       isAiringSeason = true;
-    } else if (nextEpNum.air_date) {
-      const todayStr = getTodayStr();
-      if (nextEpNum.air_date > todayStr) {
-        airedInSeason = Math.max(0, nextEpNum.episode_number - 1);
-        isAiringSeason = true;
-      }
     }
+  }
 
-    if (isAiringSeason && totalSeasonEpisodes <= airedInSeason) {
-        totalSeasonEpisodes = Math.max(totalSeasonEpisodes, airedInSeason + 1);
-    } else if (!isAiringSeason) {
-        isAiringSeason = airedInSeason < totalSeasonEpisodes;
-    }
+  if (isAiringSeason && totalSeasonEpisodes <= airedInSeason) {
+      totalSeasonEpisodes = Math.max(totalSeasonEpisodes, airedInSeason + 1);
+  } else if (!isAiringSeason) {
+      isAiringSeason = airedInSeason < totalSeasonEpisodes;
+  }
 
-    const seasonTotal = nextEpNum.episode_count || cachedSeason?.episode_count || cachedSeason?.episodes?.length || (show.nextEpisodeToAir?.season_number === nextEpNum.season_number ? show.nextEpisodeToAir?.episode_count : null);
-    const knownTotal = (seasonTotal && seasonTotal >= airedInSeason && seasonTotal > 1) ? seasonTotal : null;
+  const seasonTotal = nextEpNum.episode_count || cachedSeason?.episode_count || cachedSeason?.episodes?.length || (show.nextEpisodeToAir?.season_number === nextEpNum.season_number ? show.nextEpisodeToAir?.episode_count : null);
+  const knownTotal = (seasonTotal && seasonTotal >= airedInSeason && seasonTotal > 1) ? seasonTotal : null;
 
+  if (!badge) {
     const remainingToWatch = totalSeasonEpisodes - nextEpNum.episode_number + 1;
     const isLastEpisodeOfSeason = remainingToWatch === 1 && nextEpNum.episode_number > 1;
     const isLastEpisodeOfSeries = isLastEpisodeOfSeason && (nextEpNum.series_ended || show.seriesEnded);
@@ -188,39 +188,32 @@ export function ContinueWatchingCard({ show, onShowClick, onEpisodeClick, onMark
     }
   }
 
-  // Calcul du nombre total d'épisodes sortis et disponibles restant à voir (X)
-  let remainingAiredCount = 0;
-  const todayStr = getTodayStr();
+  // Calcul du nombre d'autres épisodes disponibles restant à voir AU-DELÀ de l'épisode courant
+  // Exemple: 7 épisodes sortis, on est sur E05 (Continuer S03 | E05) -> il reste E06 et E07 disponibles, soit "+ 2"
+  // Si on est sur le dernier épisode disponible (ex: E10 sur 10), extraAvailableEpisodes = 0 -> pas de "+ X" affiché
+  let extraAvailableEpisodes = 0;
+  const sNum = nextEpNum?.season_number ?? 1;
+  const eNum = nextEpNum?.episode_number ?? 1;
+
   if (show.seasonsCache && Array.isArray(show.seasonsCache) && show.seasonsCache.length > 0) {
     const seenSet = new Set(show.seenEpisodes || []);
+    let totalUnwatchedAired = 0;
     for (const s of show.seasonsCache) {
       if (s.season_number > 0 && Array.isArray(s.episodes)) {
         for (const ep of s.episodes) {
           if (ep.air_date && ep.air_date <= todayStr) {
             const key = `${s.season_number}x${ep.episode_number}`;
             if (!seenSet.has(key)) {
-              remainingAiredCount++;
+              totalUnwatchedAired++;
             }
           }
         }
       }
     }
-  } else if (typeof show.totalAiredEpisodes === 'number' && show.totalAiredEpisodes > 0) {
-    remainingAiredCount = Math.max(0, show.totalAiredEpisodes - (show.seenEpisodes?.length || 0));
+    extraAvailableEpisodes = Math.max(0, totalUnwatchedAired - 1);
   } else {
-    // Calcul de repli robuste pour la saison en cours
-    const nextEpToAir = show.nextEpisodeToAir || (show as any).next_episode_to_air;
-    let airedInSeason = nextEpNum.episode_count || 1;
-    if (nextEpToAir && nextEpToAir.season_number === nextEpNum.season_number) {
-      airedInSeason = Math.max(0, nextEpToAir.episode_number - 1);
-    } else if (nextEpNum.air_date && nextEpNum.air_date > todayStr) {
-      airedInSeason = Math.max(0, nextEpNum.episode_number - 1);
-    }
-    remainingAiredCount = Math.max(0, airedInSeason - (nextEpNum.episode_number - 1));
+    extraAvailableEpisodes = Math.max(0, airedInSeason - eNum);
   }
-
-  const sNum = nextEpNum?.season_number ?? 1;
-  const eNum = nextEpNum?.episode_number ?? 1;
 
   const [fetchedStillMap, setFetchedStillMap] = useState<Record<string, string>>({});
 
@@ -367,9 +360,9 @@ export function ContinueWatchingCard({ show, onShowClick, onEpisodeClick, onMark
             <span className="text-white font-semibold text-sm">
               {watched === 0 ? 'Commencer' : 'Continuer'} S{(nextEpNum?.season_number ?? 1).toString().padStart(2, '0')} | E{(nextEpNum?.episode_number ?? 1).toString().padStart(2, '0')}
             </span>
-            {remainingAiredCount > 1 && (
+            {extraAvailableEpisodes > 0 && (
               <span className="text-zinc-400 font-medium text-xs sm:text-[13px]">
-                + {remainingAiredCount}
+                + {extraAvailableEpisodes}
               </span>
             )}
           </div>
