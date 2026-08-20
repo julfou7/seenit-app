@@ -133,7 +133,15 @@ async function startServer() {
         return res.json({ available: false });
       }
 
-      const normalizeStr = (s?: string) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+      const normalizeStr = (s?: string) => 
+        (s || '')
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
       const normTitle = normalizeStr(title);
       const normOriginal = originalTitle ? normalizeStr(originalTitle) : '';
 
@@ -156,29 +164,54 @@ async function startServer() {
         return null;
       };
 
-      const searchQueries = [title];
-      if (originalTitle && originalTitle !== title) {
-        searchQueries.push(originalTitle);
-      }
+      const searchQueries = new Set<string>();
+      if (title && title.trim()) searchQueries.add(title.trim());
+      if (originalTitle && originalTitle.trim() && originalTitle !== title) searchQueries.add(originalTitle.trim());
+      if (normTitle && normTitle.length >= 3) searchQueries.add(normTitle);
 
       for (const server of servers) {
         const serverName = server.name || 'Serveur Plex';
         const serverAccessToken = server.accessToken || token;
-        const connections = server.connections || [];
+        const rawConnections = server.connections || [];
 
-        for (const conn of connections) {
+        // Sort connections: Prioritize remote HTTPS plex.direct and relays over private local IPs
+        const sortedConnections = [...rawConnections].sort((a: any, b: any) => {
+          const aIsRemoteHttps = !a.local && (a.uri || '').startsWith('https://');
+          const bIsRemoteHttps = !b.local && (b.uri || '').startsWith('https://');
+          if (aIsRemoteHttps && !bIsRemoteHttps) return -1;
+          if (!aIsRemoteHttps && bIsRemoteHttps) return 1;
+
+          if (a.relay && !b.relay) return -1;
+          if (!a.relay && b.relay) return 1;
+
+          if (!a.local && b.local) return -1;
+          if (a.local && !b.local) return 1;
+
+          return 0;
+        });
+
+        // If remote / relay connections exist, filter out private LAN IPs to prevent slow timeouts from cloud
+        const hasRemoteOrRelay = sortedConnections.some((c: any) => !c.local || c.relay);
+        const candidateConnections = hasRemoteOrRelay 
+          ? sortedConnections.filter((c: any) => !c.local || c.relay)
+          : sortedConnections;
+
+        for (const conn of candidateConnections) {
           const uri = conn.uri;
           if (!uri) continue;
 
           let foundOnServer = false;
 
-          for (const q of searchQueries) {
+          for (const q of Array.from(searchQueries)) {
             if (foundOnServer) break;
             try {
-              const searchUrl = `${uri}/hubs/search?query=${encodeURIComponent(q)}&limit=10&X-Plex-Token=${serverAccessToken}`;
+              const searchUrl = `${uri}/hubs/search?query=${encodeURIComponent(q)}&limit=15&X-Plex-Token=${serverAccessToken}`;
               const searchRes = await fetch(searchUrl, {
-                headers: { 'Accept': 'application/json' },
-                signal: AbortSignal.timeout(3500)
+                headers: { 
+                  'Accept': 'application/json',
+                  'X-Plex-Token': serverAccessToken 
+                },
+                signal: AbortSignal.timeout(3000)
               });
 
               if (searchRes.ok) {
@@ -195,27 +228,32 @@ async function startServer() {
                 }
 
                 for (const it of items) {
-                  const itType = it.type;
-                  if (mediaType === 'movie' && itType !== 'movie') continue;
-                  if (mediaType === 'tv' && itType !== 'show' && itType !== 'season' && itType !== 'episode') continue;
-
+                  // 1. Direct TMDB ID match (highest confidence)
                   const itTmdbId = extractTmdbId(it);
                   if (tmdbId && itTmdbId && Number(itTmdbId) === Number(tmdbId)) {
                     foundOnServer = true;
+                    const directPlexUrl = (server.clientIdentifier && it.ratingKey)
+                      ? `https://app.plex.tv/desktop/#!/server/${server.clientIdentifier}/details?key=${encodeURIComponent(`/library/metadata/${it.ratingKey}`)}`
+                      : 'https://app.plex.tv/desktop';
+
+                    console.log(`[Plex Availability] TMDB ID match: ${it.title} on ${serverName}`);
                     return res.json({
                       available: true,
                       serverName,
                       serverId: server.clientIdentifier,
                       title: it.title,
                       year: it.year,
-                      ratingKey: it.ratingKey
+                      ratingKey: it.ratingKey,
+                      plexUrl: directPlexUrl
                     });
                   }
 
+                  // 2. Title & Year matching
                   const itTitle = normalizeStr(it.title || it.grandparentTitle);
                   const itOriginal = normalizeStr(it.originalTitle);
 
-                  const titleMatch = (normTitle && (itTitle === normTitle || (normTitle.length >= 4 && (itTitle.includes(normTitle) || normTitle.includes(itTitle))))) ||
+                  const titleMatch = 
+                    (normTitle && (itTitle === normTitle || (normTitle.length >= 4 && (itTitle.includes(normTitle) || normTitle.includes(itTitle))))) ||
                     (normOriginal && (itTitle === normOriginal || itOriginal === normOriginal));
 
                   if (titleMatch) {
@@ -223,19 +261,28 @@ async function startServer() {
                       const diff = Math.abs(Number(year) - Number(it.year));
                       if (diff > 2) continue;
                     }
+
                     foundOnServer = true;
+                    const directPlexUrl = (server.clientIdentifier && it.ratingKey)
+                      ? `https://app.plex.tv/desktop/#!/server/${server.clientIdentifier}/details?key=${encodeURIComponent(`/library/metadata/${it.ratingKey}`)}`
+                      : 'https://app.plex.tv/desktop';
+
+                    console.log(`[Plex Availability] Title match: ${it.title} (${it.year}) on ${serverName}`);
                     return res.json({
                       available: true,
                       serverName,
                       serverId: server.clientIdentifier,
                       title: it.title,
                       year: it.year,
-                      ratingKey: it.ratingKey
+                      ratingKey: it.ratingKey,
+                      plexUrl: directPlexUrl
                     });
                   }
                 }
               }
-            } catch (e) {}
+            } catch (e) {
+              // Try next query or next connection
+            }
           }
 
           if (foundOnServer) break;

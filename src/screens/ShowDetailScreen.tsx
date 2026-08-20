@@ -450,6 +450,30 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       if (res.ok) {
         setTmdbDetails(res.value);
         setFetchError(false);
+
+        const realMediaType: 'tv' | 'movie' = (res.value.name || res.value.number_of_seasons !== undefined) ? 'tv' : 'movie';
+        const realTitle = res.value.title || res.value.name;
+        const realOriginal = res.value.original_title || res.value.original_name;
+        const realYear = (res.value.release_date || res.value.first_air_date)?.slice(0, 4);
+
+        // Fetch / update Plex availability with the verified TMDB details
+        checkPlexAvailability({
+          tmdbId: effectiveTmdbId,
+          title: realTitle,
+          originalTitle: realOriginal,
+          year: realYear,
+          mediaType: realMediaType,
+          forceRefresh: true
+        }).then(info => {
+          if (isMounted) {
+            setPlexMediaInfo(info);
+          }
+        }).catch(() => {
+          if (isMounted) {
+            setPlexMediaInfo({ available: false, lastChecked: Date.now() });
+          }
+        });
+
         tmdb.getFranchiseTimeline(res.value).then(sagaParts => {
           if (sagaParts && sagaParts.length > 0 && isMounted) {
             setCollectionData({ parts: sagaParts });
@@ -468,21 +492,23 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       }
     });
 
-    checkPlexAvailability({
-      tmdbId: effectiveTmdbId,
-      title: show?.title || title,
-      originalTitle: (show as any)?.originalTitle || (show as any)?.original_title,
-      year: (show?.firstAirDate)?.slice(0, 4),
-      mediaType: targetMediaType === 'tv' ? 'tv' : 'movie'
-    }).then(info => {
-      if (isMounted) {
-        setPlexMediaInfo(info);
-      }
-    }).catch(() => {
-      if (isMounted) {
-        setPlexMediaInfo({ available: false });
-      }
-    });
+    if (show?.title && show.title !== 'Chargement...') {
+      checkPlexAvailability({
+        tmdbId: effectiveTmdbId,
+        title: show.title,
+        originalTitle: (show as any)?.originalTitle || (show as any)?.original_title,
+        year: (show?.firstAirDate)?.slice(0, 4),
+        mediaType: targetMediaType === 'tv' ? 'tv' : 'movie'
+      }).then(info => {
+        if (isMounted) {
+          setPlexMediaInfo(info);
+        }
+      }).catch(() => {
+        if (isMounted) {
+          setPlexMediaInfo({ available: false, lastChecked: Date.now() });
+        }
+      });
+    }
 
     // Récupération et Nettoyage des thèmes profonds (keywords)
     tmdb.getMediaKeywords(effectiveTmdbId, targetMediaType).then(res => {
@@ -2296,7 +2322,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                       key={part.id}
                       media={part}
                       isActive={part.id === effectiveTmdbId}
-                      onClick={() => onShowClick && onShowClick(part.id, part.media_type || 'tv')}
+                      onClick={() => onShowClick && onShowClick(part.id, part.media_type || (part.title ? 'movie' : 'tv'))}
                     />
                   ))}
                 </div>
@@ -2451,7 +2477,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                       return (
                         <div
                           key={item.id}
-                          onClick={() => onShowClick?.(item.id, item.media_type || (isSeries ? 'tv' : 'movie'))}
+                          onClick={() => onShowClick?.(item.id, item.media_type || (item.title ? 'movie' : (isSeries ? 'tv' : 'movie')))}
                           className="w-[115px] shrink-0 snap-start flex flex-col gap-1.5 cursor-pointer group active:scale-95 transition-transform"
                         >
                           <div className="w-full aspect-[2/3] bg-zinc-900 rounded-xl overflow-hidden relative shadow-md border border-white/5">

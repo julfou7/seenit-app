@@ -3,6 +3,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { getPlexClientId } from '../../services/plex';
 
+import { appLogger } from '../../store/logStore';
+
 export interface PlexMediaInfo {
   available: boolean;
   serverName?: string;
@@ -65,16 +67,27 @@ export async function checkPlexAvailability(params: {
   originalTitle?: string;
   year?: number | string;
   mediaType?: 'movie' | 'tv';
+  forceRefresh?: boolean;
 }): Promise<PlexMediaInfo> {
-  const { tmdbId, title = '', originalTitle, year, mediaType = 'movie' } = params;
+  const { tmdbId, title = '', originalTitle, year, mediaType = 'movie', forceRefresh = false } = params;
+
+  // Don't query or cache empty placeholders
+  if (!tmdbId && (!title || title.trim() === '' || title === 'Chargement...')) {
+    return { available: false, lastChecked: Date.now() };
+  }
+
   const key = getPlexMediaKey(tmdbId, title, mediaType);
   const store = usePlexAvailabilityStore.getState();
-
-  // Check store cache (valid for 6 hours)
   const cached = store.getMediaAvailability(key);
   const now = Date.now();
-  if (cached && (now - cached.lastChecked < 6 * 60 * 60 * 1000)) {
-    return cached;
+
+  // Cache policy: Positive cache = 24h, Negative cache = 30s
+  if (!forceRefresh && cached) {
+    const isPositiveValid = cached.available && (now - cached.lastChecked < 24 * 60 * 60 * 1000);
+    const isNegativeValid = !cached.available && (now - cached.lastChecked < 30 * 1000);
+    if (isPositiveValid || isNegativeValid) {
+      return cached;
+    }
   }
 
   const plexToken = localStorage.getItem('plex_auth_token') || localStorage.getItem('plex_token');
@@ -103,13 +116,14 @@ export async function checkPlexAvailability(params: {
           year: year ? Number(year) : undefined,
           mediaType
         }),
-        signal: AbortSignal.timeout(6000)
+        signal: AbortSignal.timeout(8000)
       });
 
       if (res.ok) {
         const data = await res.json();
+        const isAvailable = !!data.available;
         const info: PlexMediaInfo = {
-          available: !!data.available,
+          available: isAvailable,
           serverName: data.serverName,
           serverId: data.serverId,
           plexUrl: data.plexUrl,
@@ -117,7 +131,13 @@ export async function checkPlexAvailability(params: {
           year: data.year,
           lastChecked: now
         };
+
         store.setMediaAvailability(key, info);
+
+        if (isAvailable) {
+          appLogger.info('plex', `Média disponible sur Plex : « ${title || data.title} » (${data.serverName || 'Serveur'})`);
+        }
+
         return info;
       }
     } catch (e) {
@@ -125,7 +145,7 @@ export async function checkPlexAvailability(params: {
     }
   }
 
-  // Fallback if network fails: retain previous cached or default to false
-  const fallbackInfo: PlexMediaInfo = cached || { available: false, lastChecked: now };
+  // Fallback if network fails
+  const fallbackInfo: PlexMediaInfo = { available: false, lastChecked: now };
   return fallbackInfo;
 }
