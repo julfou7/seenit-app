@@ -85,6 +85,70 @@ export function getTodayStr(date: Date = new Date()): string {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * Calcule la différence de jours calendaires stricts entre deux dates au format YYYY-MM-DD
+ * en utilisant Date.UTC pour éliminer TOUT décalage lié au fuseau horaire ou à l'heure d'été.
+ * > 0 : date future (ex: +1 = demain)
+ * === 0 : aujourd'hui
+ * < 0 : date passée (ex: -1 = hier)
+ */
+export function getCalendarDaysDiff(targetDateStr?: string | null, fromDateStr: string = getTodayStr()): number {
+  if (!targetDateStr) return 0;
+  const tParts = targetDateStr.split('-').map(Number);
+  const fParts = fromDateStr.split('-').map(Number);
+  if (tParts.length < 3 || fParts.length < 3) return 0;
+  const [tY, tM, tD] = tParts;
+  const [fY, fM, fD] = fParts;
+  if (!tY || !tM || !tD || !fY || !fM || !fD) return 0;
+
+  const utcTarget = Date.UTC(tY, tM - 1, tD);
+  const utcFrom = Date.UTC(fY, fM - 1, fD);
+
+  return Math.round((utcTarget - utcFrom) / (24 * 60 * 60 * 1000));
+}
+
+/**
+ * Retourne le libellé textuel relatif français pour une date de diffusion (ex: "Demain", "Aujourd'hui", "Dans 3 jours")
+ */
+export function getEpisodeRelativeAirDate(airDateStr?: string | null): string {
+  if (!airDateStr) return 'Bientôt';
+  const diffDays = getCalendarDaysDiff(airDateStr);
+  if (diffDays === 0) return "Aujourd'hui";
+  if (diffDays === 1) return 'Demain';
+  if (diffDays === -1) return 'Hier';
+  if (diffDays > 1 && diffDays <= 7) return `Dans ${diffDays} jours`;
+  if (diffDays > 7) return `le ${formatAirDateSafe(airDateStr, 'short')}`;
+  return `il y a ${Math.abs(diffDays)} jours`;
+}
+
+/**
+ * Formate proprement une date YYYY-MM-DD en français sans risque de décalage de fuseau horaire.
+ */
+export function formatAirDateSafe(dateStr?: string | null, format: 'full' | 'short' | 'long' | 'relative' = 'full'): string {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length < 3) return dateStr;
+  const [year, month, day] = parts.map(Number);
+  if (!year || !month || !day) return dateStr;
+
+  const dateObj = new Date(year, month - 1, day);
+
+  if (format === 'short') {
+    return dateObj.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  }
+  if (format === 'long') {
+    return dateObj.toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    }).toUpperCase();
+  }
+  if (format === 'relative') {
+    return getEpisodeRelativeAirDate(dateStr);
+  }
+  return dateObj.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
 export function getAiredProgress(show: any) {
   if (!show) return 0;
 
@@ -169,27 +233,6 @@ export function computeAutoArchiveStatus(show: {
   }
 
   return false;
-}
-
-export function formatAirDateSafe(dateStr?: string | null, format: 'short' | 'long' = 'short') {
-  if (!dateStr) return '';
-  const parts = dateStr.split('-');
-  if (parts.length < 3) return dateStr;
-
-  const [year, month, day] = parts.map(p => parseInt(p, 10));
-
-  if (format === 'long') {
-    // Force UTC pour éviter que la date locale n'enlève des heures et ne recule d'un jour
-    const utcDate = new Date(Date.UTC(year, month - 1, day));
-    return utcDate.toLocaleDateString('fr-FR', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      timeZone: 'UTC'
-    }).toUpperCase();
-  }
-
-  return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
 }
 
 export function formatVoteCount(votes: number | string | undefined | null): string {

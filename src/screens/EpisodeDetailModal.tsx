@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'motion/react';
 import { type Show } from '../types';
 import { X, Check, Star, Smile, Frown, Zap, Coffee, Heart, ChevronLeft, ChevronRight, Clock, ArrowLeft, Clapperboard, Play, Sparkles } from 'lucide-react';
-import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, scrollAllCarouselsToStart } from '../lib/utils';
+import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getTodayStr, getCalendarDaysDiff, scrollAllCarouselsToStart } from '../lib/utils';
 import { useShows } from '../hooks/useShows';
 import { useToastStore } from '../store/toastStore';
 import { tmdb } from '../features/shows/tmdb';
@@ -628,27 +628,20 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
     year: 'numeric', month: 'long', day: 'numeric'
   }) : null;
 
+  const todayStr = getTodayStr();
   const isFutureEpisode = currentEpisode.air_date 
-    ? new Date(currentEpisode.air_date).getTime() > Date.now() 
+    ? currentEpisode.air_date > todayStr 
     : false;
 
   const getRelativeAirDateLabel = () => {
     if (!currentEpisode.air_date) return 'Prochainement';
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const parts = currentEpisode.air_date.split('-');
-    if (parts.length < 3) return 'Prochainement';
-    const [year, month, day] = parts.map((p: string) => parseInt(p, 10));
-    const airDateObj = new Date(Date.UTC(year, month - 1, day));
-
-    const diffTime = airDateObj.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffDays = getCalendarDaysDiff(currentEpisode.air_date);
 
     if (diffDays <= 0) return 'Disponible';
     if (diffDays === 1) return 'Demain';
-    return `Dans ${diffDays} jours`;
+    if (diffDays <= 7) return `Dans ${diffDays} jours`;
+    return `le ${formatAirDateSafe(currentEpisode.air_date, 'short')}`;
   };
 
   const relativeAirDateLabel = getRelativeAirDateLabel();

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { MouseEvent } from 'react';
 import { Check, Calendar, Circle } from 'lucide-react';
 import { SeenItCheckButton } from './SeenItCheckButton';
-import { cn } from '../lib/utils';
+import { cn, getCalendarDaysDiff, formatAirDateSafe } from '../lib/utils';
 import type { Show } from '../types';
 import { tmdb } from '../features/shows/tmdb';
 import { getFormattedProviderLogo } from '../utils/providerLogos';
@@ -62,20 +62,14 @@ export function EpisodeCard({ show, type, onShowClick, onMarkAsSeen }: EpisodeCa
   } else if (type === 'upcoming' && nextAir) {
     subtitle = `S${(nextAir.season_number ?? 1).toString().padStart(2, '0')} | E${(nextAir.episode_number ?? 1).toString().padStart(2, '0')} • ${nextAir.name}`;
     
-    const airDateStr = nextAir.air_date;
-    const [year, month, day] = airDateStr.split('-').map(Number);
-    const airDate = new Date(year, month - 1, day);
-    airDate.setHours(0, 0, 0, 0);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const daysDiff = Math.round((airDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
+    const daysDiff = getCalendarDaysDiff(nextAir.air_date);
     
     if (daysDiff === 0) contextualText = "Aujourd'hui";
     else if (daysDiff === 1) contextualText = 'Demain';
-    else if (daysDiff > 1 && daysDiff < 7) contextualText = `Dans ${daysDiff} jours`;
+    else if (daysDiff > 1 && daysDiff <= 7) contextualText = `Dans ${daysDiff} jours`;
     else if (daysDiff === -1) contextualText = 'Hier';
     else if (daysDiff < -1) contextualText = `Il y a ${Math.abs(daysDiff)} jours`;
-    else contextualText = airDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+    else contextualText = `le ${formatAirDateSafe(nextAir.air_date, 'short')}`;
     
     ContextIcon = Calendar;
     contextualClass = "text-emerald-400 font-semibold";

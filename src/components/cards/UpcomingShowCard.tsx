@@ -5,7 +5,7 @@ import { requestNotificationPermission, auth, db, sendNativeNotification } from 
 import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { useToastStore } from '../../store/toastStore';
 import { useShows } from '../../hooks/useShows';
-import { cn, getTodayStr } from '../../lib/utils';
+import { cn, getTodayStr, getCalendarDaysDiff, formatAirDateSafe, getEpisodeRelativeAirDate } from '../../lib/utils';
 import { tmdb } from '../../features/shows/tmdb';
 import { getFormattedProviderLogo, extractOfficialStreamingProvider, PLEX_LOGO_SVG } from '../../utils/providerLogos';
 import { checkPlexAvailability } from '../../features/plex/plexAvailability';
@@ -195,15 +195,7 @@ export function UpcomingShowCard({ show, onShowClick, onEpisodeClick }: Props) {
     }
   };
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const [aYear, aMonth, aDay] = ep.air_date.split('-').map(Number);
-  const airDate = new Date(aYear, aMonth - 1, aDay);
-  airDate.setHours(0, 0, 0, 0);
-
-  const diffMs = airDate.getTime() - today.getTime();
-  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+  const diffDays = getCalendarDaysDiff(ep.air_date);
   
   let relativeStr = '';
   if (diffDays === 0) {
@@ -218,9 +210,9 @@ export function UpcomingShowCard({ show, onShowClick, onEpisodeClick }: Props) {
     relativeStr = `Il y a ${Math.abs(diffDays)} jours`;
   }
 
-  const formattedShortDate = airDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
-  const capitalizedShortDate = formattedShortDate.charAt(0).toUpperCase() + formattedShortDate.slice(1);
-  const fullDateLabel = `${relativeStr} • ${capitalizedShortDate}`;
+  const formattedShortDate = formatAirDateSafe(ep.air_date, 'short');
+  const capitalizedShortDate = formattedShortDate ? (formattedShortDate.charAt(0).toUpperCase() + formattedShortDate.slice(1)) : '';
+  const fullDateLabel = capitalizedShortDate ? `${relativeStr} • ${capitalizedShortDate}` : relativeStr;
 
   const sNum = (ep.season_number ?? 1).toString().padStart(2, '0');
   const eNum = (ep.episode_number ?? 1).toString().padStart(2, '0');

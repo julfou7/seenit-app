@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { type Show } from '../types';
 import { tmdb, isAdultOrParodyMedia, isMovieAtCinema, isMovieUpcoming } from '../features/shows/tmdb';
 import { ChevronLeft, Star, Heart, CheckCircle2, Circle, Tv, Zap, X, EyeOff, Archive, Trash2, MoreVertical, Plus, Check, Share, Share2, Play, Calendar, ChevronUp, ChevronDown, ArchiveRestore, Ban, RotateCcw, MonitorPlay, Ticket, Youtube, Clapperboard, ExternalLink, Clock, RefreshCw } from 'lucide-react';
-import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getBestLogoPath, getTodayStr, scrollAllCarouselsToStart } from '../lib/utils';
+import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getBestLogoPath, getTodayStr, getCalendarDaysDiff, getEpisodeRelativeAirDate, scrollAllCarouselsToStart } from '../lib/utils';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
 import { PersonDetailModal } from './PersonDetailModal';
 import { TimelineMediaCard } from '../components/cards/TimelineMediaCard';
@@ -63,22 +63,9 @@ const getSeasonReleaseDateText = (airDate?: string): string | null => {
 const getEpisodeAirDateLabel = (airDate?: string | null) => {
   if (!airDate) return 'Bientôt';
 
-  const todayStr = getTodayStr();
-  if (airDate < todayStr) return null; // Déjà sorti
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const parts = airDate.split('-');
-  if (parts.length < 3) return 'Bientôt';
-  const [year, month, day] = parts.map(p => parseInt(p, 10));
-  const releaseDate = new Date(year, month - 1, day);
-  releaseDate.setHours(0, 0, 0, 0);
-
-  const diffTime = releaseDate.getTime() - today.getTime();
-  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-
-  if (diffDays <= 0) return "Aujourd'hui";
+  const diffDays = getCalendarDaysDiff(airDate);
+  if (diffDays < 0) return null; // Déjà sorti
+  if (diffDays === 0) return "Aujourd'hui";
   if (diffDays === 1) return 'Demain';
   if (diffDays <= 7) return `Dans ${diffDays} jours`;
 
@@ -1590,29 +1577,15 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
 
     // Check if the episode explicitly has a future air date
     if (airDate) {
-      if (airDate > todayStr) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const parts = airDate.split('-');
-        if (parts.length >= 3) {
-          const [year, month, day] = parts.map(p => parseInt(p, 10));
-          const airDateObj = new Date(Date.UTC(year, month - 1, day));
-
-          const diffTime = airDateObj.getTime() - today.getTime();
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-          if (diffDays === 1) {
-            return { isUpcoming: true, label: `${fullEpCode} demain` };
-          }
-          if (diffDays <= 7 && diffDays > 0) {
-            return { isUpcoming: true, label: `${fullEpCode} dans ${diffDays} jours` };
-          }
-          if (diffDays > 0) {
-            return { isUpcoming: true, label: `${fullEpCode} le ${formatAirDateSafe(airDate, 'short')}` };
-          }
+      const diffDays = getCalendarDaysDiff(airDate);
+      if (diffDays > 0) {
+        if (diffDays === 1) {
+          return { isUpcoming: true, label: `${fullEpCode} demain` };
         }
-        return { isUpcoming: true, label: `${fullEpCode} bientôt` };
+        if (diffDays <= 7) {
+          return { isUpcoming: true, label: `${fullEpCode} dans ${diffDays} jours` };
+        }
+        return { isUpcoming: true, label: `${fullEpCode} le ${formatAirDateSafe(airDate, 'short')}` };
       }
     } else {
       // If air_date is unknown, check if the show hasn't premiered yet

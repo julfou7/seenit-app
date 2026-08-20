@@ -4,7 +4,7 @@ import {
   Archive, Play, X, Loader2, CheckCircle, Info, RotateCcw, Check
 } from 'lucide-react';
 import { tmdb, isMovieAtCinema, isMovieUpcoming, type TMDBMedia } from '../features/shows/tmdb';
-import { cn, checkIsUpToDate, computeAutoArchiveStatus, getTodayStr, formatAirDateSafe } from '../lib/utils';
+import { cn, checkIsUpToDate, computeAutoArchiveStatus, getTodayStr, getCalendarDaysDiff, formatAirDateSafe } from '../lib/utils';
 import { useShowsStore } from '../store/showsStore';
 
 export interface GridMediaCardProps {
@@ -445,19 +445,13 @@ export function PreviewModal({
       let airDate = nextEp.air_date;
       const todayStr = getTodayStr();
 
-      if (airDate && airDate > todayStr) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const parts = airDate.split('-');
-        if (parts.length >= 3) {
-          const [year, month, day] = parts.map((p: string) => parseInt(p, 10));
-          const airDateObj = new Date(Date.UTC(year, month - 1, day));
-          const diffDays = Math.ceil((airDateObj.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      if (airDate) {
+        const diffDays = getCalendarDaysDiff(airDate);
+        if (diffDays > 0) {
           if (diffDays === 1) return { isUpcoming: true, label: `${fullEpCode} demain` };
-          if (diffDays <= 7 && diffDays > 0) return { isUpcoming: true, label: `${fullEpCode} dans ${diffDays} jours` };
-          if (diffDays > 0) return { isUpcoming: true, label: `${fullEpCode} le ${formatAirDateSafe(airDate, 'short')}` };
+          if (diffDays <= 7) return { isUpcoming: true, label: `${fullEpCode} dans ${diffDays} jours` };
+          return { isUpcoming: true, label: `${fullEpCode} le ${formatAirDateSafe(airDate, 'short')}` };
         }
-        return { isUpcoming: true, label: `${fullEpCode} bientôt` };
       }
 
       const prefix = hasSeenMedia ? "Reprendre" : "Commencer";
