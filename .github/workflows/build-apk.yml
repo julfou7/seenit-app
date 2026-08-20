@@ -91,4 +91,4 @@ jobs:
           files: |
             SeenIt-v${{ steps.version_step.outputs.APP_VERSION }}.apk
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: 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
