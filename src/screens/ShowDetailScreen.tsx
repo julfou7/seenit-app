@@ -2441,7 +2441,11 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                       {/* Indicateur discret si une vérification est encore en cours */}
                       {(isLoadingPlex || isLoadingProviders) && (
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-zinc-900/60 border border-white/5 text-zinc-400 text-xs animate-pulse">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#E5A93D] animate-ping" />
+                          <img
+                            src={PLEX_LOGO_SVG}
+                            alt="Plex"
+                            className="w-3.5 h-3.5 object-contain rounded shrink-0"
+                          />
                           <span>Vérification...</span>
                         </div>
                       )}
@@ -2454,7 +2458,11 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                   return (
                     <div className="flex items-center gap-2 flex-wrap">
                       <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/10 bg-zinc-900/80 text-zinc-400 text-xs font-medium animate-pulse">
-                        <span className="w-2 h-2 rounded-full bg-[#E5A93D] animate-ping" />
+                        <img
+                          src={PLEX_LOGO_SVG}
+                          alt="Plex"
+                          className="w-4 h-4 object-contain rounded shrink-0"
+                        />
                         <span>Recherche des disponibilités (Plex & Streaming)...</span>
                       </div>
                     </div>
