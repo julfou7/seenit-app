@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from '../lib/utils';
 
-export type SeenItSymbolType = 'play' | 'watch' | 'library' | 'discover' | 'vip' | 'cinema';
+export type SeenItSymbolType = 'check' | 'play' | 'watch' | 'library' | 'discover' | 'vip' | 'cinema';
 
 export interface SeenItLogoProps {
   className?: string;
@@ -13,8 +13,8 @@ export interface SeenItLogoProps {
 
 /**
  * Pure Vector SVG Cinema TV & Symbol Ecosystem for SeenIt
- * Brand variations for:
- * - 'watch' / 'play': À Voir (En direct / Active Streaming)
+ * Official Brand Emblem:
+ * - 'check' / 'watch' / 'play': Official Verification Checkmark inside Cinema TV Screen
  * - 'library': Ma Liste (Curated Vault / Personal Library)
  * - 'discover': Explorer (Cinema Discovery & Spark)
  * - 'vip': Profil VIP (Crown / Royal Star)
@@ -23,7 +23,7 @@ export interface SeenItLogoProps {
 export function SeenItGlyph({ 
   size = 32, 
   className = '', 
-  symbol = 'play',
+  symbol = 'check',
   glow = true,
   idPrefix = 'seenit'
 }: { 
@@ -109,12 +109,16 @@ export function SeenItGlyph({
 
       {/* ---------------- SYMBOL VARIATIONS ---------------- */}
       
-      {/* 1. 'watch' / 'play' : Golden Cinema Play Icon */}
-      {(symbol === 'play' || symbol === 'watch') && (
+      {/* 1. 'check' / 'watch' / 'play' : Official Golden Verification Checkmark Icon */}
+      {(symbol === 'check' || symbol === 'watch' || symbol === 'play') && (
         <g>
           <path
-            d="M 43 32.5 C 43 31.2 44.4 30.4 45.5 31.1 L 63 41.6 C 64 42.2 64 43.8 63 44.4 L 45.5 54.9 C 44.4 55.6 43 54.8 43 53.5 Z"
-            fill={`url(#${playGradId})`}
+            d="M 38 44 L 46 52 L 62 34"
+            fill="none"
+            stroke={`url(#${playGradId})`}
+            strokeWidth="6.0"
+            strokeLinecap="round"
+            strokeLinejoin="round"
             filter="drop-shadow(0 2px 4px rgba(0,0,0,0.6))"
           />
         </g>
@@ -220,7 +224,7 @@ export function SeenItLogo({
   className = '',
   size = 32,
   variant = 'glyph',
-  symbol = 'play',
+  symbol = 'check',
   animated = false,
 }: SeenItLogoProps) {
   // Horizontal Brand Lockup (Icon + Typography)

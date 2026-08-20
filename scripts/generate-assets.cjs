@@ -3,6 +3,9 @@ const path = require('path');
 const sharp = require('sharp');
 
 // 1. Adaptive Foreground SVG (108x108 viewBox, centered in safe-zone)
+// Drawing: TV + Stand (X span: 14 to 86 -> center 50, Y span: 17 to 79 -> center 48)
+// Scale: 0.70 => Scaled X center: 35.0, Scaled Y center: 33.6
+// Canvas center: (54, 54) => tx = 54 - 35 = 19.0, ty = 54 - 33.6 = 20.4
 const foregroundSvg = `
 <svg width="432" height="432" viewBox="0 0 108 108" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
@@ -12,7 +15,7 @@ const foregroundSvg = `
       <stop offset="70%" stop-color="#E5A93D" />
       <stop offset="100%" stop-color="#B37812" />
     </linearGradient>
-    <linearGradient id="fg-play-grad" x1="15%" y1="15%" x2="85%" y2="85%">
+    <linearGradient id="fg-check-grad" x1="15%" y1="15%" x2="85%" y2="85%">
       <stop offset="0%" stop-color="#FFFFFF" />
       <stop offset="25%" stop-color="#FFEAA0" />
       <stop offset="65%" stop-color="#F5C518" />
@@ -25,11 +28,12 @@ const foregroundSvg = `
     </linearGradient>
   </defs>
 
-  <g transform="translate(19, 19) scale(0.7)">
+  <g transform="translate(19, 20.4) scale(0.70)">
     <circle cx="50" cy="43" r="22" fill="#E5A93D" opacity="0.35" />
     <rect x="14" y="17" width="72" height="52" rx="10" fill="#0B0B0F" stroke="url(#fg-gold-grad)" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round" />
     <path d="M 16 26 L 68 18 L 16 60 Z" fill="url(#fg-glass-grad)" />
-    <path d="M 43 32.5 C 43 31.2 44.4 30.4 45.5 31.1 L 63 41.6 C 64 42.2 64 43.8 63 44.4 L 45.5 54.9 C 44.4 55.6 43 54.8 43 53.5 Z" fill="url(#fg-play-grad)" />
+    <!-- SeenIt Official Verification Checkmark Symbol -->
+    <path d="M 38 44 L 46 52 L 62 34" fill="none" stroke="url(#fg-check-grad)" stroke-width="6.2" stroke-linecap="round" stroke-linejoin="round" />
     <path d="M 50 69 L 50 78.5" stroke="url(#fg-gold-grad)" stroke-width="4.2" stroke-linecap="round" />
     <path d="M 32 79 C 32 79 41 78 50 78 C 59 78 68 79 68 79" stroke="url(#fg-gold-grad)" stroke-width="4.2" stroke-linecap="round" />
   </g>
@@ -37,6 +41,9 @@ const foregroundSvg = `
 `;
 
 // 2. Full Square / Rounded Icon SVG (512x512)
+// Drawing: TV + Stand (X center: 50, Y center: 48)
+// Scale: 4.0 => Scaled X center: 200, Scaled Y center: 192
+// Canvas center: (256, 256) => tx = 256 - 200 = 56, ty = 256 - 192 = 64
 const fullIconSvg = `
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
@@ -51,7 +58,7 @@ const fullIconSvg = `
       <stop offset="70%" stop-color="#E5A93D" />
       <stop offset="100%" stop-color="#B37812" />
     </linearGradient>
-    <linearGradient id="sq-play-grad" x1="15%" y1="15%" x2="85%" y2="85%">
+    <linearGradient id="sq-check-grad" x1="15%" y1="15%" x2="85%" y2="85%">
       <stop offset="0%" stop-color="#FFFFFF" />
       <stop offset="25%" stop-color="#FFEAA0" />
       <stop offset="65%" stop-color="#F5C518" />
@@ -62,7 +69,7 @@ const fullIconSvg = `
       <stop offset="45%" stop-color="#FFFFFF" stop-opacity="0.05" />
       <stop offset="70%" stop-color="#000000" stop-opacity="0" />
     </linearGradient>
-    <radialGradient id="sq-ambient-glow" cx="50%" cy="40%" r="50%">
+    <radialGradient id="sq-ambient-glow" cx="50%" cy="48%" r="50%">
       <stop offset="0%" stop-color="#E5A93D" stop-opacity="0.25" />
       <stop offset="100%" stop-color="#E5A93D" stop-opacity="0" />
     </radialGradient>
@@ -71,11 +78,12 @@ const fullIconSvg = `
   <rect width="512" height="512" fill="url(#sq-bg-grad)" />
   <rect width="512" height="512" fill="url(#sq-ambient-glow)" />
 
-  <g transform="translate(68, 68) scale(3.76)">
+  <g transform="translate(56, 64) scale(4.0)">
     <circle cx="50" cy="43" r="22" fill="#E5A93D" opacity="0.35" />
     <rect x="14" y="17" width="72" height="52" rx="10" fill="#0B0B0F" stroke="url(#sq-gold-grad)" stroke-width="4.0" stroke-linecap="round" stroke-linejoin="round" />
     <path d="M 16 26 L 68 18 L 16 60 Z" fill="url(#sq-glass-grad)" />
-    <path d="M 43 32.5 C 43 31.2 44.4 30.4 45.5 31.1 L 63 41.6 C 64 42.2 64 43.8 63 44.4 L 45.5 54.9 C 44.4 55.6 43 54.8 43 53.5 Z" fill="url(#sq-play-grad)" />
+    <!-- SeenIt Official Verification Checkmark Symbol -->
+    <path d="M 38 44 L 46 52 L 62 34" fill="none" stroke="url(#sq-check-grad)" stroke-width="6.2" stroke-linecap="round" stroke-linejoin="round" />
     <path d="M 50 69 L 50 78.5" stroke="url(#sq-gold-grad)" stroke-width="4.0" stroke-linecap="round" />
     <path d="M 32 79 C 32 79 41 78 50 78 C 59 78 68 79 68 79" stroke="url(#sq-gold-grad)" stroke-width="4.0" stroke-linecap="round" />
   </g>
@@ -100,7 +108,7 @@ const roundIconSvg = `
       <stop offset="70%" stop-color="#E5A93D" />
       <stop offset="100%" stop-color="#B37812" />
     </linearGradient>
-    <linearGradient id="rd-play-grad" x1="15%" y1="15%" x2="85%" y2="85%">
+    <linearGradient id="rd-check-grad" x1="15%" y1="15%" x2="85%" y2="85%">
       <stop offset="0%" stop-color="#FFFFFF" />
       <stop offset="25%" stop-color="#FFEAA0" />
       <stop offset="65%" stop-color="#F5C518" />
@@ -111,7 +119,7 @@ const roundIconSvg = `
       <stop offset="45%" stop-color="#FFFFFF" stop-opacity="0.05" />
       <stop offset="70%" stop-color="#000000" stop-opacity="0" />
     </linearGradient>
-    <radialGradient id="rd-ambient-glow" cx="50%" cy="40%" r="50%">
+    <radialGradient id="rd-ambient-glow" cx="50%" cy="48%" r="50%">
       <stop offset="0%" stop-color="#E5A93D" stop-opacity="0.25" />
       <stop offset="100%" stop-color="#E5A93D" stop-opacity="0" />
     </radialGradient>
@@ -121,11 +129,12 @@ const roundIconSvg = `
     <rect width="512" height="512" fill="url(#rd-bg-grad)" />
     <rect width="512" height="512" fill="url(#rd-ambient-glow)" />
 
-    <g transform="translate(68, 68) scale(3.76)">
+    <g transform="translate(56, 64) scale(4.0)">
       <circle cx="50" cy="43" r="22" fill="#E5A93D" opacity="0.35" />
       <rect x="14" y="17" width="72" height="52" rx="10" fill="#0B0B0F" stroke="url(#rd-gold-grad)" stroke-width="4.0" stroke-linecap="round" stroke-linejoin="round" />
       <path d="M 16 26 L 68 18 L 16 60 Z" fill="url(#rd-glass-grad)" />
-      <path d="M 43 32.5 C 43 31.2 44.4 30.4 45.5 31.1 L 63 41.6 C 64 42.2 64 43.8 63 44.4 L 45.5 54.9 C 44.4 55.6 43 54.8 43 53.5 Z" fill="url(#rd-play-grad)" />
+      <!-- SeenIt Official Verification Checkmark Symbol -->
+      <path d="M 38 44 L 46 52 L 62 34" fill="none" stroke="url(#rd-check-grad)" stroke-width="6.2" stroke-linecap="round" stroke-linejoin="round" />
       <path d="M 50 69 L 50 78.5" stroke="url(#rd-gold-grad)" stroke-width="4.0" stroke-linecap="round" />
       <path d="M 32 79 C 32 79 41 78 50 78 C 59 78 68 79 68 79" stroke="url(#rd-gold-grad)" stroke-width="4.0" stroke-linecap="round" />
     </g>
@@ -190,14 +199,15 @@ async function generateAll() {
   await sharp(Buffer.from(fullIconSvg)).resize(192, 192).png().toFile(path.join(publicDir, 'icon-maskable-192.png'));
   await sharp(Buffer.from(fullIconSvg)).resize(180, 180).png().toFile(path.join(publicDir, 'apple-touch-icon.png'));
   await sharp(Buffer.from(fullIconSvg)).resize(64, 64).png().toFile(path.join(publicDir, 'favicon.png'));
-  await sharp(Buffer.from(foregroundSvg)).resize(512, 512).png().toFile(path.join(publicDir, 'logo.png'));
+  await sharp(Buffer.from(fullIconSvg)).resize(512, 512).png().toFile(path.join(publicDir, 'logo.png'));
 
   // Generate splash image in android/app/src/main/res/drawable/splash.png
   const drawableDir = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res', 'drawable');
   if (!fs.existsSync(drawableDir)) fs.mkdirSync(drawableDir, { recursive: true });
-  await sharp(Buffer.from(foregroundSvg)).resize(480, 480).png().toFile(path.join(drawableDir, 'splash.png'));
+  await sharp(Buffer.from(fullIconSvg)).resize(480, 480).png().toFile(path.join(drawableDir, 'splash.png'));
 
   console.log('All assets generated successfully!');
 }
 
 generateAll().catch(console.error);
+
