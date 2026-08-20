@@ -2375,70 +2375,78 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
             {/* Où regarder (Format discret) */}
             <div>
               <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-2">Où regarder</h3>
-              {providers === null || plexMediaInfo === null ? (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/10 bg-zinc-900/80 text-zinc-400 text-xs font-medium animate-pulse">
-                    <span className="w-2 h-2 rounded-full bg-[#E5A93D] animate-ping" />
-                    <span>Recherche des disponibilités (Plex & Streaming)...</span>
-                  </div>
-                </div>
-              ) : sortedProviders.length > 0 ? (
-                <div className="flex items-center gap-2 flex-wrap">
-                  {sortedProviders.map((provider: any) => {
-                    if (provider.isPlex) {
-                      return (
+              {(() => {
+                const hasPlex = plexMediaInfo?.available;
+                const hasProviders = sortedProviders.length > 0;
+                const isLoadingPlex = plexMediaInfo === null;
+                const isLoadingProviders = providers === null;
+
+                // 1. Affichage immédiat dès qu'au moins une source est disponible (Plex ou SVOD)
+                if (hasPlex || hasProviders) {
+                  return (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Badge Plex si disponible */}
+                      {hasPlex && (
                         <a
-                          key="plex-provider-item"
-                          href={provider.plexUrl || "https://app.plex.tv/desktop"}
+                          href={plexMediaInfo.plexUrl || 'https://app.plex.tv/desktop'}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#E5A93D]/40 bg-[#E5A93D]/10 text-[#E5A93D] hover:bg-[#E5A93D]/20 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-[0_0_12px_rgba(229,169,61,0.2)]"
-                          title={`Disponible sur Plex : ${provider.serverName || 'Serveur'}`}
+                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#E5A93D]/30 bg-[#E5A93D]/10 hover:bg-[#E5A93D]/20 text-[#E5A93D] text-xs font-semibold transition-all shadow-sm active:scale-95"
+                          title={`Disponible sur ${plexMediaInfo.serverName || 'Plex'}`}
                         >
-                          <img 
-                            src={PLEX_LOGO_SVG}
-                            alt="Plex"
-                            className="w-4 h-4 object-contain rounded shrink-0"
-                          />
-                          <span>Disponible sur Plex {provider.serverName ? `(${provider.serverName})` : ''}</span>
+                          <span dangerouslySetInnerHTML={{ __html: PLEX_LOGO_SVG }} className="w-4 h-4" />
+                          <span>Disponible sur Plex ({plexMediaInfo.serverName || 'Serveur'})</span>
                         </a>
-                      );
-                    }
+                      )}
 
-                    const isSubscribed = userPlatforms.includes(provider.provider_id);
-                    const directLink = getProviderDirectLink(provider.provider_id, title, watchLink);
-                    const logo = getFormattedProviderLogo(provider.logo_path, provider.provider_name);
-                    return (
-                      <a
-                        key={provider.provider_id}
-                        href={directLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={cn(
-                          "inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all active:scale-95 cursor-pointer",
-                          isSubscribed
-                            ? "bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 hover:border-amber-400/50 shadow-[0_0_10px_rgba(245,158,11,0.15)]"
-                            : "bg-zinc-900/80 border-white/10 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
-                        )}
-                        title={`Ouvrir ${provider.provider_name}`}
-                      >
-                        {logo ? (
-                          <img loading="lazy" decoding="async"
-                            src={logo}
-                            alt={provider.provider_name}
-                            className="w-4 h-4 object-cover rounded shrink-0"
-                          />
-                        ) : (
-                          <MonitorPlay size={14} className={cn("shrink-0", isSubscribed ? "text-amber-400" : "text-zinc-400")} />
-                        )}
-                        <span>{provider.provider_name}</span>
-                      </a>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-xs text-zinc-500 italic">Non disponible en streaming actuellement</p>
-              )}
+                      {/* Providers SVOD officiels */}
+                      {sortedProviders.map((provider: any) => {
+                        const logoInfo = getFormattedProviderLogo(provider.logo_path, provider.provider_name);
+                        return (
+                          <div
+                            key={provider.provider_id}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/10 bg-zinc-900/80 text-zinc-200 text-xs font-medium"
+                          >
+                            {logoInfo.logoUrl ? (
+                              <img src={logoInfo.logoUrl} alt={provider.provider_name} className="w-4 h-4 rounded object-cover" />
+                            ) : (
+                              <span dangerouslySetInnerHTML={{ __html: logoInfo.svg }} className="w-4 h-4" />
+                            )}
+                            <span>{provider.provider_name}</span>
+                          </div>
+                        );
+                      })}
+
+                      {/* Indicateur de recherche si l'autre source est encore en cours */}
+                      {(isLoadingPlex || isLoadingProviders) && (
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-zinc-900/60 border border-white/5 text-zinc-400 text-xs animate-pulse">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#E5A93D] animate-ping" />
+                          <span>Vérification...</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
+                // 2. Si les deux sont en cours de chargement initial
+                if (isLoadingPlex || isLoadingProviders) {
+                  return (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/10 bg-zinc-900/80 text-zinc-400 text-xs font-medium animate-pulse">
+                        <span className="w-2 h-2 rounded-full bg-[#E5A93D] animate-ping" />
+                        <span>Recherche des disponibilités (Plex & Streaming)...</span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // 3. Si les deux ont terminé et rien n'a été trouvé
+                return (
+                  <p className="text-xs text-zinc-500 italic">
+                    Non disponible en streaming actuellement
+                  </p>
+                );
+              })()}
             </div>
 
             {/* Graphique interactif des notes par épisode */}
