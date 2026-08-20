@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Browser } from '@capacitor/browser';
+import { AppLauncher } from '@capacitor/app-launcher';
 import { Capacitor } from '@capacitor/core';
 
 export function cn(...inputs: ClassValue[]) {
@@ -8,22 +9,46 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Opens external URLs safely on both Web and Native Android/iOS Capacitor apps using Chrome Custom Tabs
+ * Opens external URLs safely on both Web and Native Android/iOS Capacitor apps.
+ * For deep-link schemes like plex://, it attempts to launch the native app via AppLauncher.
+ * If the app is not installed, it gracefully falls back to Chrome Custom Tabs/Safari View Controller.
  */
 export async function openExternalUrl(url: string) {
   if (!url) return;
-  let targetUrl = url;
+  
   if (Capacitor.isNativePlatform()) {
-    if (url.startsWith('https://app.plex.tv/')) {
-      targetUrl = url.replace('https://', 'plex://');
+    if (url.startsWith('https://app.plex.tv/') && !url.includes('/auth')) {
+      const nativePlexUrl = url.replace('https://', 'plex://');
+      
+      // Try to check and open via AppLauncher first
+      try {
+        const canOpen = await AppLauncher.canOpenUrl({ url: nativePlexUrl });
+        if (canOpen.value) {
+          await AppLauncher.openUrl({ url: nativePlexUrl });
+          return;
+        }
+      } catch (err) {
+        console.warn('AppLauncher.canOpenUrl check failed, trying direct launch', err);
+      }
+      
+      // Fallback: direct launch in case canOpenUrl returned false due to missing AndroidManifest queries
+      try {
+        await AppLauncher.openUrl({ url: nativePlexUrl });
+        return;
+      } catch (err) {
+        console.warn('Direct AppLauncher launch failed, falling back to in-app browser', err);
+      }
     }
+
+    // Standard URL or fallback: use Browser Custom Tabs
     try {
-      await Browser.open({ url: targetUrl, windowName: '_system' });
+      await Browser.open({ url, windowName: '_system' });
       return;
     } catch (e) {
       console.warn('Browser.open failed, falling back to window.open', e);
     }
   }
+  
   window.open(url, '_blank', 'noopener,noreferrer');
 }
 
