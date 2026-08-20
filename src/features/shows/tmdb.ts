@@ -1,5 +1,6 @@
 import { type Result, ok, err, tryCatch } from '../../core/Result';
 import { getWikidataFranchiseTimeline } from '../../services/wikidata';
+import { adjustTMDBShowDataForEurope, adjustTMDBSeasonDataForEurope } from '../../lib/utils';
 
 export interface TMDBMedia {
   id: number;
@@ -210,6 +211,7 @@ class TMDBClient {
       if (data.value.recommendations?.results) {
         data.value.recommendations.results = data.value.recommendations.results.filter((m: any) => !isAdultOrParodyMedia(m));
       }
+      adjustTMDBShowDataForEurope(data.value);
       this.detailsCache.set(cacheKey, data.value);
     }
     return data;
@@ -354,6 +356,13 @@ class TMDBClient {
     const data = await tryCatch(res.value.json());
     if (!data.ok) return err((data as any).error);
     if (data.value && data.value.status_code) return err(new Error(data.value.status_message || 'TMDB Error'));
+    
+    // Globally adjust season dates for European viewers if the show belongs to an offset network
+    if (data.value) {
+      const tvDetails = this.detailsCache.get(`tv_${id}`);
+      adjustTMDBSeasonDataForEurope(data.value, tvDetails?.networks);
+    }
+    
     return data;
   }
 
@@ -367,6 +376,12 @@ class TMDBClient {
     const data = await tryCatch(res.value.json());
     if (!data.ok) return err((data as any).error);
     if (data.value && data.value.status_code) return err(new Error(data.value.status_message || 'TMDB Error'));
+    
+    if (data.value) {
+      const tvDetails = this.detailsCache.get(`tv_${id}`);
+      adjustTMDBSeasonDataForEurope({ episodes: [data.value] }, tvDetails?.networks);
+    }
+    
     return data;
   }
   async searchMulti(query: string, page: number = 1, watchProviders?: string[]): Promise<Result<SearchResponse>> {

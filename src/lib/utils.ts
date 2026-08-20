@@ -284,6 +284,63 @@ export function getBestLogoPath(images: any): string | null {
   return images.logos[0]?.file_path || null;
 }
 
+const OFFSET_NETWORKS = [
+  2552, // Apple TV+
+  49,   // HBO
+  174,  // AMC
+  17,   // FX
+  453,  // Hulu
+  1024, // Amazon
+  67,   // Showtime
+  318,  // Starz
+  71,   // The CW
+  3353, // Peacock
+  4330, // Paramount+
+];
+
+export function requiresDateOffset(networks?: any[]): boolean {
+  if (!networks || !Array.isArray(networks)) return false;
+  return networks.some(n => OFFSET_NETWORKS.includes(n.id));
+}
+
+export function addOneDayToDateStr(dateStr?: string | null): string | null | undefined {
+  if (!dateStr) return dateStr;
+  const parts = dateStr.split('-');
+  if (parts.length < 3) return dateStr;
+  const [y, m, d] = parts.map(Number);
+  if (!y || !m || !d) return dateStr;
+  
+  const dateObj = new Date(Date.UTC(y, m - 1, d + 1));
+  return dateObj.toISOString().split('T')[0];
+}
+
+export function adjustTMDBShowDataForEurope(showDetails: any) {
+  if (!showDetails || !requiresDateOffset(showDetails.networks)) return;
+
+  if (showDetails.first_air_date) showDetails.first_air_date = addOneDayToDateStr(showDetails.first_air_date);
+  if (showDetails.last_air_date) showDetails.last_air_date = addOneDayToDateStr(showDetails.last_air_date);
+  if (showDetails.next_episode_to_air?.air_date) showDetails.next_episode_to_air.air_date = addOneDayToDateStr(showDetails.next_episode_to_air.air_date);
+  if (showDetails.last_episode_to_air?.air_date) showDetails.last_episode_to_air.air_date = addOneDayToDateStr(showDetails.last_episode_to_air.air_date);
+  
+  if (showDetails.seasons && Array.isArray(showDetails.seasons)) {
+    showDetails.seasons.forEach((s: any) => {
+      if (s.air_date) s.air_date = addOneDayToDateStr(s.air_date);
+    });
+  }
+}
+
+export function adjustTMDBSeasonDataForEurope(seasonDetails: any, networks?: any[]) {
+  if (!seasonDetails || !requiresDateOffset(networks)) return;
+
+  if (seasonDetails.air_date) seasonDetails.air_date = addOneDayToDateStr(seasonDetails.air_date);
+  
+  if (seasonDetails.episodes && Array.isArray(seasonDetails.episodes)) {
+    seasonDetails.episodes.forEach((ep: any) => {
+      if (ep.air_date) ep.air_date = addOneDayToDateStr(ep.air_date);
+    });
+  }
+}
+
 export function scrollAllCarouselsToStart() {
   const scroll = () => {
     const ids = [
