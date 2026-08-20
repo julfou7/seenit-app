@@ -455,10 +455,12 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         const realTitle = res.value.title || res.value.name;
         const realOriginal = res.value.original_title || res.value.original_name;
         const realYear = (res.value.release_date || res.value.first_air_date)?.slice(0, 4);
+        const realImdbId = res.value.imdb_id || res.value.external_ids?.imdb_id;
 
         // Fetch / update Plex availability with the verified TMDB details
         checkPlexAvailability({
           tmdbId: effectiveTmdbId,
+          imdbId: realImdbId,
           title: realTitle,
           originalTitle: realOriginal,
           year: realYear,
@@ -2373,10 +2375,12 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
             {/* Où regarder (Format discret) */}
             <div>
               <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-2">Où regarder</h3>
-              {providers === null && plexMediaInfo === null ? (
+              {providers === null || plexMediaInfo === null ? (
                 <div className="flex items-center gap-2 flex-wrap">
-                  <div className="h-8 w-28 bg-zinc-800/80 rounded-xl border border-white/5 animate-pulse" />
-                  <div className="h-8 w-24 bg-zinc-800/80 rounded-xl border border-white/5 animate-pulse" />
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/10 bg-zinc-900/80 text-zinc-400 text-xs font-medium animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-[#E5A93D] animate-ping" />
+                    <span>Recherche des disponibilités (Plex & Streaming)...</span>
+                  </div>
                 </div>
               ) : sortedProviders.length > 0 ? (
                 <div className="flex items-center gap-2 flex-wrap">

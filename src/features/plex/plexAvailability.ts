@@ -63,13 +63,14 @@ const PLEX_ENDPOINTS = [
 
 export async function checkPlexAvailability(params: {
   tmdbId?: number | string | null;
+  imdbId?: string | null;
   title?: string;
   originalTitle?: string;
   year?: number | string;
   mediaType?: 'movie' | 'tv';
   forceRefresh?: boolean;
 }): Promise<PlexMediaInfo> {
-  const { tmdbId, title = '', originalTitle, year, mediaType = 'movie', forceRefresh = false } = params;
+  const { tmdbId, imdbId, title = '', originalTitle, year, mediaType = 'movie', forceRefresh = false } = params;
 
   // Don't query or cache empty placeholders
   if (!tmdbId && (!title || title.trim() === '' || title === 'Chargement...')) {
@@ -102,6 +103,7 @@ export async function checkPlexAvailability(params: {
     ? [...PLEX_ENDPOINTS] 
     : ['/api/plex/availability', ...PLEX_ENDPOINTS];
 
+  // 1. Try via Cloud / Express API proxy
   for (const url of urlsToTry) {
     try {
       const res = await fetch(url, {
@@ -111,41 +113,262 @@ export async function checkPlexAvailability(params: {
           token: plexToken,
           clientId,
           tmdbId: tmdbId ? Number(tmdbId) : undefined,
+          imdbId,
           title,
           originalTitle,
           year: year ? Number(year) : undefined,
           mediaType
         }),
-        signal: AbortSignal.timeout(8000)
+        signal: AbortSignal.timeout(6000)
       });
 
       if (res.ok) {
         const data = await res.json();
         const isAvailable = !!data.available;
-        const info: PlexMediaInfo = {
-          available: isAvailable,
-          serverName: data.serverName,
-          serverId: data.serverId,
-          plexUrl: data.plexUrl,
-          title: data.title,
-          year: data.year,
-          lastChecked: now
-        };
-
-        store.setMediaAvailability(key, info);
-
         if (isAvailable) {
-          appLogger.info('plex', `Média disponible sur Plex : « ${title || data.title} » (${data.serverName || 'Serveur'})`);
-        }
+          const info: PlexMediaInfo = {
+            available: true,
+            serverName: data.serverName,
+            serverId: data.serverId,
+            plexUrl: data.plexUrl,
+            title: data.title,
+            year: data.year,
+            lastChecked: now
+          };
 
-        return info;
+          store.setMediaAvailability(key, info);
+          appLogger.info('plex', `Média disponible sur Plex : « ${title || data.title} » (${data.serverName || 'Serveur'})`);
+          return info;
+        }
       }
     } catch (e) {
-      // Continue to next endpoint
+      // Continue to next endpoint or direct client fallback
     }
   }
 
-  // Fallback if network fails
+  // 2. Fallback: Direct client search from the user's device (phone or browser)
+  try {
+    const directResult = await checkPlexDirectFromDevice({
+      token: plexToken,
+      clientId,
+      tmdbId,
+      imdbId,
+      title,
+      originalTitle,
+      year,
+      mediaType
+    });
+
+    if (directResult && directResult.available) {
+      store.setMediaAvailability(key, directResult);
+      appLogger.info('plex', `Média trouvé via connexion directe Plex : « ${title || directResult.title} » (${directResult.serverName || 'Serveur'})`);
+      return directResult;
+    }
+  } catch (err) {
+    // Ignore fallback errors
+  }
+
+  // 3. Negative cache
   const fallbackInfo: PlexMediaInfo = { available: false, lastChecked: now };
+  store.setMediaAvailability(key, fallbackInfo);
   return fallbackInfo;
+}
+
+async function checkPlexDirectFromDevice(params: {
+  token: string;
+  clientId: string;
+  tmdbId?: number | string | null;
+  imdbId?: string | null;
+  title?: string;
+  originalTitle?: string;
+  year?: number | string;
+  mediaType?: 'movie' | 'tv';
+}): Promise<PlexMediaInfo | null> {
+  try {
+    const { token, clientId, tmdbId, imdbId, title = '', originalTitle, year } = params;
+    const resourcesRes = await fetch('https://plex.tv/api/v2/resources?includeHttps=1&includeRelay=1', {
+      headers: {
+        'X-Plex-Token': token,
+        'Accept': 'application/json',
+        'X-Plex-Client-Identifier': clientId
+      },
+      signal: AbortSignal.timeout(5000)
+    });
+
+    if (!resourcesRes.ok) return null;
+    const resources = await resourcesRes.json();
+    if (!Array.isArray(resources)) return null;
+
+    const servers = resources.filter((r: any) => r.provides && r.provides.includes('server'));
+    if (servers.length === 0) return null;
+
+    const normalizeStr = (s?: string) => 
+      (s || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const STOP_WORDS = new Set(['de', 'des', 'du', 'la', 'le', 'les', 'un', 'une', 'et', 'en', 'a', 'au', 'aux', 'the', 'of', 'in', 'and', 'for', 'to', 'a', 'an']);
+    const getSignificantWords = (s?: string) => normalizeStr(s).split(' ').filter(w => w.length >= 3 && !STOP_WORDS.has(w));
+
+    const normTitle = normalizeStr(title);
+    const normOriginal = originalTitle ? normalizeStr(originalTitle) : '';
+    const targetWords = Array.from(new Set([...getSignificantWords(title), ...getSignificantWords(originalTitle)]));
+
+    const extractTmdbId = (item: any): number | null => {
+      if (!item) return null;
+      if (Array.isArray(item.Guid)) {
+        for (const g of item.Guid) {
+          if (typeof g?.id === 'string') {
+            const match = g.id.match(/^tmdb:\/\/(\d+)/i) || g.id.match(/^themoviedb:\/\/(\d+)/i);
+            if (match) return Number(match[1]);
+          }
+        }
+      }
+      for (const field of [item.guid, item.grandparentGuid, item.parentGuid]) {
+        if (typeof field === 'string') {
+          const match = field.match(/themoviedb:\/\/(\d+)|tmdb:\/\/(\d+)|com\.plexapp\.agents\.themoviedb:\/\/(\d+)/i);
+          if (match) return Number(match[1] || match[2] || match[3]);
+        }
+      }
+      return null;
+    };
+
+    const extractImdbId = (item: any): string | null => {
+      if (!item) return null;
+      if (Array.isArray(item.Guid)) {
+        for (const g of item.Guid) {
+          if (typeof g?.id === 'string') {
+            const match = g.id.match(/^imdb:\/\/(tt\d+)/i);
+            if (match) return match[1].toLowerCase();
+          }
+        }
+      }
+      for (const field of [item.guid, item.grandparentGuid, item.parentGuid]) {
+        if (typeof field === 'string') {
+          const match = field.match(/imdb:\/\/(tt\d+)|com\.plexapp\.agents\.imdb:\/\/(tt\d+)/i);
+          if (match) return (match[1] || match[2]).toLowerCase();
+        }
+      }
+      return null;
+    };
+
+    const isMatch = (item: any): boolean => {
+      const itTmdbId = extractTmdbId(item);
+      if (tmdbId && itTmdbId && Number(itTmdbId) === Number(tmdbId)) return true;
+
+      const itImdbId = extractImdbId(item);
+      if (imdbId && itImdbId && itImdbId === String(imdbId).toLowerCase()) return true;
+
+      const itTitle = normalizeStr(item.title || item.grandparentTitle);
+      const itOriginal = normalizeStr(item.originalTitle);
+
+      if (normTitle && (itTitle === normTitle || itOriginal === normTitle)) {
+        if (year && item.year && Math.abs(Number(year) - Number(item.year)) > 2) return false;
+        return true;
+      }
+      if (normOriginal && (itTitle === normOriginal || itOriginal === normOriginal)) {
+        if (year && item.year && Math.abs(Number(year) - Number(item.year)) > 2) return false;
+        return true;
+      }
+      if (normTitle.length >= 4 && (itTitle.includes(normTitle) || normTitle.includes(itTitle))) {
+        if (year && item.year && Math.abs(Number(year) - Number(item.year)) > 2) return false;
+        return true;
+      }
+      if (targetWords.length > 0) {
+        const itemWords = new Set([...normalizeStr(item.title).split(' '), ...normalizeStr(item.originalTitle).split(' ')]);
+        const allFound = targetWords.every(tw => itemWords.has(tw) || Array.from(itemWords).some(iw => iw.includes(tw) || tw.includes(iw)));
+        if (allFound) {
+          if (year && item.year) {
+            if (Math.abs(Number(year) - Number(item.year)) <= 2) return true;
+          } else {
+            return true;
+          }
+        }
+      }
+      return false;
+    };
+
+    const searchQueries = new Set<string>();
+    if (title && title.trim()) searchQueries.add(title.trim());
+    if (originalTitle && originalTitle.trim() && originalTitle !== title) searchQueries.add(originalTitle.trim());
+    if (normTitle && normTitle.length >= 3 && normTitle !== title) searchQueries.add(normTitle);
+    if (targetWords.length > 0 && targetWords[0].length >= 4) searchQueries.add(targetWords[0]);
+    const queriesArray = Array.from(searchQueries);
+
+    const searchPromises = servers.map(async (server: any) => {
+      const serverName = server.name || 'Serveur Plex';
+      const serverAccessToken = server.accessToken || token;
+      const rawConnections = server.connections || [];
+      
+      const sortedConnections = [...rawConnections].sort((a: any, b: any) => {
+        const aIsRemoteHttps = !a.local && (a.uri || '').startsWith('https://');
+        const bIsRemoteHttps = !b.local && (b.uri || '').startsWith('https://');
+        if (aIsRemoteHttps && !bIsRemoteHttps) return -1;
+        if (!aIsRemoteHttps && bIsRemoteHttps) return 1;
+        if (a.relay && !b.relay) return -1;
+        if (!a.relay && b.relay) return 1;
+        return 0;
+      });
+
+      for (const conn of sortedConnections) {
+        const uri = conn.uri;
+        if (!uri) continue;
+
+        const searchTasks = queriesArray.map(async (q) => {
+          const ep = `${uri}/hubs/search?query=${encodeURIComponent(q)}&limit=20&X-Plex-Token=${serverAccessToken}`;
+          try {
+            const searchRes = await fetch(ep, {
+              headers: { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
+              signal: AbortSignal.timeout(2500)
+            });
+            if (searchRes.ok) {
+              const searchData = await searchRes.json();
+              let items: any[] = [];
+              if (searchData.MediaContainer?.Hub) {
+                for (const hub of searchData.MediaContainer.Hub) {
+                  if (Array.isArray(hub.Metadata)) items.push(...hub.Metadata);
+                }
+              } else if (Array.isArray(searchData.MediaContainer?.Metadata)) {
+                items = searchData.MediaContainer.Metadata;
+              }
+              for (const it of items) {
+                if (isMatch(it)) {
+                  const directPlexUrl = (server.clientIdentifier && it.ratingKey)
+                    ? `https://app.plex.tv/desktop/#!/server/${server.clientIdentifier}/details?key=${encodeURIComponent(`/library/metadata/${it.ratingKey}`)}`
+                    : 'https://app.plex.tv/desktop';
+                  return {
+                    available: true,
+                    serverName,
+                    serverId: server.clientIdentifier,
+                    title: it.title,
+                    year: it.year,
+                    ratingKey: it.ratingKey,
+                    plexUrl: directPlexUrl,
+                    lastChecked: Date.now()
+                  };
+                }
+              }
+            }
+          } catch (e) {
+            // try next
+          }
+          return null;
+        });
+
+        const queryResults = await Promise.all(searchTasks);
+        const match = queryResults.find(r => r && r.available);
+        if (match) return match;
+      }
+      return null;
+    });
+
+    const results = await Promise.all(searchPromises);
+    return results.find(r => r && r.available) || null;
+  } catch (err) {
+    return null;
+  }
 }
