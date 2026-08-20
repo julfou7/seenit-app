@@ -99,6 +99,156 @@ async function startServer() {
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   const upload = multer();
 
+  app.post('/api/plex/availability', async (req, res) => {
+    try {
+      const { token, clientId, tmdbId, title, originalTitle, year, mediaType = 'movie' } = req.body || {};
+      if (!token || (!title && !tmdbId)) {
+        return res.status(400).json({ error: 'Paramètres manquants' });
+      }
+
+      const plexClientIdentifier = clientId || 'tv-time-ai-studio';
+
+      let servers: any[] = [];
+      try {
+        const resourcesRes = await fetch('https://plex.tv/api/v2/resources?includeHttps=1&includeRelay=1', {
+          headers: {
+            'X-Plex-Token': token,
+            'Accept': 'application/json',
+            'X-Plex-Client-Identifier': plexClientIdentifier
+          },
+          signal: AbortSignal.timeout(5000)
+        });
+
+        if (resourcesRes.ok) {
+          const resources = await resourcesRes.json();
+          if (Array.isArray(resources)) {
+            servers = resources.filter((r: any) => r.provides && r.provides.includes('server'));
+          }
+        }
+      } catch (err: any) {
+        console.warn('[Plex Availability] Resources fetch error:', err?.message);
+      }
+
+      if (servers.length === 0) {
+        return res.json({ available: false });
+      }
+
+      const normalizeStr = (s?: string) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+      const normTitle = normalizeStr(title);
+      const normOriginal = originalTitle ? normalizeStr(originalTitle) : '';
+
+      const extractTmdbId = (item: any): number | null => {
+        if (!item) return null;
+        if (Array.isArray(item.Guid)) {
+          for (const g of item.Guid) {
+            if (typeof g?.id === 'string') {
+              const match = g.id.match(/^tmdb:\/\/(\d+)/i);
+              if (match) return Number(match[1]);
+            }
+          }
+        }
+        for (const field of [item.guid, item.grandparentGuid, item.parentGuid]) {
+          if (typeof field === 'string') {
+            const match = field.match(/themoviedb:\/\/(\d+)|tmdb:\/\/(\d+)/i);
+            if (match) return Number(match[1] || match[2]);
+          }
+        }
+        return null;
+      };
+
+      const searchQueries = [title];
+      if (originalTitle && originalTitle !== title) {
+        searchQueries.push(originalTitle);
+      }
+
+      for (const server of servers) {
+        const serverName = server.name || 'Serveur Plex';
+        const serverAccessToken = server.accessToken || token;
+        const connections = server.connections || [];
+
+        for (const conn of connections) {
+          const uri = conn.uri;
+          if (!uri) continue;
+
+          let foundOnServer = false;
+
+          for (const q of searchQueries) {
+            if (foundOnServer) break;
+            try {
+              const searchUrl = `${uri}/hubs/search?query=${encodeURIComponent(q)}&limit=10&X-Plex-Token=${serverAccessToken}`;
+              const searchRes = await fetch(searchUrl, {
+                headers: { 'Accept': 'application/json' },
+                signal: AbortSignal.timeout(3500)
+              });
+
+              if (searchRes.ok) {
+                const searchData = await searchRes.json();
+                let items: any[] = [];
+                if (searchData.MediaContainer?.Hub) {
+                  for (const hub of searchData.MediaContainer.Hub) {
+                    if (Array.isArray(hub.Metadata)) {
+                      items.push(...hub.Metadata);
+                    }
+                  }
+                } else if (Array.isArray(searchData.MediaContainer?.Metadata)) {
+                  items = searchData.MediaContainer.Metadata;
+                }
+
+                for (const it of items) {
+                  const itType = it.type;
+                  if (mediaType === 'movie' && itType !== 'movie') continue;
+                  if (mediaType === 'tv' && itType !== 'show' && itType !== 'season' && itType !== 'episode') continue;
+
+                  const itTmdbId = extractTmdbId(it);
+                  if (tmdbId && itTmdbId && Number(itTmdbId) === Number(tmdbId)) {
+                    foundOnServer = true;
+                    return res.json({
+                      available: true,
+                      serverName,
+                      serverId: server.clientIdentifier,
+                      title: it.title,
+                      year: it.year,
+                      ratingKey: it.ratingKey
+                    });
+                  }
+
+                  const itTitle = normalizeStr(it.title || it.grandparentTitle);
+                  const itOriginal = normalizeStr(it.originalTitle);
+
+                  const titleMatch = (normTitle && (itTitle === normTitle || (normTitle.length >= 4 && (itTitle.includes(normTitle) || normTitle.includes(itTitle))))) ||
+                    (normOriginal && (itTitle === normOriginal || itOriginal === normOriginal));
+
+                  if (titleMatch) {
+                    if (year && it.year) {
+                      const diff = Math.abs(Number(year) - Number(it.year));
+                      if (diff > 2) continue;
+                    }
+                    foundOnServer = true;
+                    return res.json({
+                      available: true,
+                      serverName,
+                      serverId: server.clientIdentifier,
+                      title: it.title,
+                      year: it.year,
+                      ratingKey: it.ratingKey
+                    });
+                  }
+                }
+              }
+            } catch (e) {}
+          }
+
+          if (foundOnServer) break;
+        }
+      }
+
+      return res.json({ available: false });
+    } catch (err: any) {
+      console.error('[Plex Availability] Error:', err);
+      return res.status(500).json({ error: err?.message || 'Erreur interne' });
+    }
+  });
+
   app.post(['/api/plex/history', '/api/plex-sync'], async (req, res) => {
     try {
       const { token, clientId, delta = false, since } = req.body || {};

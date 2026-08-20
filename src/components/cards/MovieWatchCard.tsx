@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { SeenItCheckButton } from '../SeenItCheckButton';
 import { type Show } from '../../types';
 import { tmdb } from '../../features/shows/tmdb';
-import { getFormattedProviderLogo } from '../../utils/providerLogos';
+import { getFormattedProviderLogo, extractOfficialStreamingProvider, PLEX_LOGO_SVG } from '../../utils/providerLogos';
+import { checkPlexAvailability } from '../../features/plex/plexAvailability';
 
 interface Props {
   key?: React.Key;
@@ -24,15 +25,8 @@ export function MovieWatchCard({ show, onShowClick, onMarkAsSeen }: Props) {
   const [releaseYear, setReleaseYear] = useState<string | null>(
     show.firstAirDate ? show.firstAirDate.slice(0, 4) : null
   );
-  const [providerLogo, setProviderLogo] = useState<string | null>(
-    show.networks && show.networks.length > 0 && show.networks[0].logo_path
-      ? show.networks[0].logo_path
-      : null
-  );
-  const [providerName, setProviderName] = useState<string | null>(
-    show.networks && show.networks.length > 0 ? show.networks[0].name : null
-  );
-  const [hasFlatrate, setHasFlatrate] = useState<boolean>(false);
+  const [providerLogo, setProviderLogo] = useState<string | null>(null);
+  const [providerName, setProviderName] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -51,26 +45,36 @@ export function MovieWatchCard({ show, onShowClick, onMarkAsSeen }: Props) {
       }
 
       tmdb.getWatchProviders(show.tmdbId, 'movie').then(res => {
-        if (isMounted && res.ok && res.value?.results) {
-          const fr = res.value.results.FR || res.value.results.US || res.value.results.BE || res.value.results.CH || res.value.results.CA || Object.values(res.value.results)[0];
-          const flatrate = fr?.flatrate?.[0];
-          const free = fr?.free?.[0];
-          const ads = fr?.ads?.[0];
-          const buy = fr?.buy?.[0];
-          const rent = fr?.rent?.[0];
-          const topProv = flatrate || free || ads || buy || rent;
-          if (topProv?.logo_path) {
-            setProviderLogo(topProv.logo_path);
-            if (topProv.provider_name) setProviderName(topProv.provider_name);
+        if (!isMounted) return;
+        let officialFound = false;
+        if (res.ok && res.value?.results) {
+          const stream = extractOfficialStreamingProvider(res.value.results);
+          if (stream) {
+            setProviderLogo(stream.logo_path);
+            setProviderName(stream.provider_name);
+            officialFound = true;
           }
-          if (flatrate) {
-            setHasFlatrate(true);
-          }
+        }
+
+        // Si aucun diffuseur officiel SVOD/Streaming n'est disponible, on vérifie la disponibilité sur Plex
+        if (!officialFound) {
+          checkPlexAvailability({
+            tmdbId: show.tmdbId,
+            title: show.title,
+            originalTitle: (show as any).originalTitle || (show as any).original_title,
+            year: releaseYear || show.firstAirDate?.slice(0, 4),
+            mediaType: 'movie'
+          }).then(plexInfo => {
+            if (isMounted && plexInfo.available) {
+              setProviderLogo(PLEX_LOGO_SVG);
+              setProviderName(plexInfo.serverName ? `Plex (${plexInfo.serverName})` : 'Plex');
+            }
+          }).catch(() => {});
         }
       }).catch(() => {});
     }
     return () => { isMounted = false; };
-  }, [show.tmdbId, runtime, releaseYear]);
+  }, [show.tmdbId, runtime, releaseYear, show.title]);
 
   const rawPath = show.posterPath || show.backdropPath;
   const imgSrc = rawPath ? (rawPath.startsWith('http') ? rawPath : `https://image.tmdb.org/t/p/w500${rawPath}`) : null;
@@ -112,7 +116,7 @@ export function MovieWatchCard({ show, onShowClick, onMarkAsSeen }: Props) {
             SORTI IL Y A {diffDays}J 🆕
           </div>
         );
-      } else if (diffDays > 7 && diffDays <= 120 && !hasFlatrate) {
+      } else if (diffDays > 7 && diffDays <= 120 && !providerLogo) {
         cinemaBadge = (
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-20 bg-gradient-to-r from-amber-600 to-rose-600 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-t-lg shadow-lg uppercase tracking-wider whitespace-nowrap shadow-black/50">
             AU CINÉMA 🎬

@@ -9,7 +9,8 @@ import { UpcomingShowCard, getUpcomingEpisodeInfo } from '../components/cards/Up
 import { HistoryFeed } from '../components/HistoryFeed';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
 import { tmdb } from '../features/shows/tmdb';
-import { getFormattedProviderLogo } from '../utils/providerLogos';
+import { getFormattedProviderLogo, extractOfficialStreamingProvider, PLEX_LOGO_SVG } from '../utils/providerLogos';
+import { checkPlexAvailability } from '../features/plex/plexAvailability';
 import { syncSingleItem } from "../hooks/useDetailsSyncWorker";
 import { User, Circle, CheckCircle2, Trash2, Archive, X, Clock, Ban } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
@@ -64,18 +65,35 @@ function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMa
         }).catch(() => {});
       }
       tmdb.getWatchProviders(show.tmdbId, isMovie ? 'movie' : 'tv').then(res => {
-        if (isMounted && res.ok && res.value?.results) {
-          const fr = res.value.results.FR || res.value.results.US || res.value.results.BE || res.value.results.CH || res.value.results.CA || Object.values(res.value.results)[0];
-          const topProv = fr?.flatrate?.[0] || fr?.free?.[0] || fr?.ads?.[0] || fr?.buy?.[0] || fr?.rent?.[0];
-          if (topProv?.logo_path) {
-            setProviderLogo(topProv.logo_path);
-            if (topProv.provider_name) setProviderName(topProv.provider_name);
+        if (!isMounted) return;
+        let officialFound = false;
+        if (res.ok && res.value?.results) {
+          const stream = extractOfficialStreamingProvider(res.value.results);
+          if (stream) {
+            setProviderLogo(stream.logo_path);
+            setProviderName(stream.provider_name);
+            officialFound = true;
           }
+        }
+
+        if (!officialFound && !show.networks?.length) {
+          checkPlexAvailability({
+            tmdbId: show.tmdbId,
+            title: show.title,
+            originalTitle: (show as any).originalTitle || (show as any).original_title,
+            year: show.firstAirDate?.slice(0, 4),
+            mediaType: isMovie ? 'movie' : 'tv'
+          }).then(plexInfo => {
+            if (isMounted && plexInfo.available) {
+              setProviderLogo(PLEX_LOGO_SVG);
+              setProviderName(plexInfo.serverName ? `Plex (${plexInfo.serverName})` : 'Plex');
+            }
+          }).catch(() => {});
         }
       }).catch(() => {});
     }
     return () => { isMounted = false; };
-  }, [isMovie, show.tmdbId, movieRuntime]);
+  }, [isMovie, show.tmdbId, movieRuntime, show.title]);
 
   let nextEp = show.nextEpisodeToWatch;
   if (!isMovie && !nextEp && sectionType !== 'upToDate') {

@@ -15,6 +15,8 @@ import { doc, setDoc } from 'firebase/firestore';
 import { TrailerModal } from '../components/TrailerModal';
 import { useShowsStore } from '../store/showsStore';
 import { getSeriesImdbData } from '../features/shows/omdbService';
+import { getFormattedProviderLogo, PLEX_LOGO_SVG } from '../utils/providerLogos';
+import { checkPlexAvailability, PlexMediaInfo } from '../features/plex/plexAvailability';
 
 
 interface ShowDetailScreenProps {
@@ -322,6 +324,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const [dragX, setDragX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [userPlatforms, setUserPlatforms] = useState<number[]>([]);
+  const [plexMediaInfo, setPlexMediaInfo] = useState<PlexMediaInfo | null>(null);
 
   useEffect(() => {
     const handleStorage = () => {
@@ -392,6 +395,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     setCollectionData(null);
     setImdbData(null);
     setProviders(null);
+    setPlexMediaInfo(null);
     setKeywords([]);
     setSeasonsCache({});
     setExpandedSeason(null);
@@ -442,9 +446,21 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
 
     tmdb.getWatchProviders(effectiveTmdbId, targetMediaType).then(res => {
       if (res.ok && isMounted) {
-         setProviders(res.value.results?.FR || res.value.results?.US);
+         setProviders(res.value.results?.FR || null);
       }
     });
+
+    checkPlexAvailability({
+      tmdbId: effectiveTmdbId,
+      title: show?.title || title,
+      originalTitle: (show as any)?.originalTitle || (show as any)?.original_title,
+      year: (show?.firstAirDate)?.slice(0, 4),
+      mediaType: targetMediaType === 'tv' ? 'tv' : 'movie'
+    }).then(info => {
+      if (isMounted && info.available) {
+        setPlexMediaInfo(info);
+      }
+    }).catch(() => {});
 
     // Récupération et Nettoyage des thèmes profonds (keywords)
     tmdb.getMediaKeywords(effectiveTmdbId, targetMediaType).then(res => {
@@ -1636,25 +1652,44 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const ytVideos = tmdbDetails?.videos?.results?.filter((v: any) => v.site === 'YouTube') || [];
   const hasTrailer = ytVideos.length > 0;
   
-  const sortedProviders = [...uniqueProviders].sort((a: any, b: any) => {
-    const aHas = userPlatforms.includes(a.provider_id);
-    const bHas = userPlatforms.includes(b.provider_id);
-    if (aHas && !bHas) return -1;
-    if (!aHas && bHas) return 1;
-    return 0;
-  });
+  const sortedProviders = useMemo(() => {
+    const list: any[] = [...uniqueProviders];
+    if (plexMediaInfo?.available) {
+      list.push({
+        provider_id: 999999,
+        provider_name: plexMediaInfo.serverName ? `Plex (${plexMediaInfo.serverName})` : 'Plex',
+        logo_path: 'PLEX_CUSTOM_SVG',
+        isPlex: true,
+        serverName: plexMediaInfo.serverName,
+        plexUrl: plexMediaInfo.plexUrl || 'https://app.plex.tv/desktop'
+      });
+    }
+
+    return list.sort((a: any, b: any) => {
+      // Les diffuseurs officiels restent prioritaires
+      if (a.isPlex && !b.isPlex) return 1;
+      if (!a.isPlex && b.isPlex) return -1;
+      const aHas = userPlatforms.includes(a.provider_id);
+      const bHas = userPlatforms.includes(b.provider_id);
+      if (aHas && !bHas) return -1;
+      if (!aHas && bHas) return 1;
+      return 0;
+    });
+  }, [uniqueProviders, plexMediaInfo, userPlatforms]);
 
   const firstSubscribedProvider = sortedProviders.find((p: any) => userPlatforms.includes(p.provider_id));
   const watchLink = providers?.link;
 
   const mainProvider = firstSubscribedProvider || sortedProviders[0];
-  const isMainProviderSubscribed = mainProvider ? userPlatforms.includes(mainProvider.provider_id) : false;
-  const mainProviderName = mainProvider ? mainProvider.provider_name : (tmdbDetails?.networks?.[0]?.name || (show as any)?.network || (show as any)?.platform);
-  const mainProviderLogo = mainProvider?.logo_path 
-    ? `https://image.tmdb.org/t/p/w92${mainProvider.logo_path}` 
-    : (tmdbDetails?.networks?.[0]?.logo_path ? `https://image.tmdb.org/t/p/w92${tmdbDetails.networks[0].logo_path}` : null);
+  const isMainProviderSubscribed = mainProvider ? (mainProvider.isPlex || userPlatforms.includes(mainProvider.provider_id)) : false;
+  const mainProviderName = mainProvider 
+    ? mainProvider.provider_name 
+    : (tmdbDetails?.networks?.[0]?.name || (show as any)?.network || (show as any)?.platform);
+  const mainProviderLogo = mainProvider
+    ? (mainProvider.isPlex ? PLEX_LOGO_SVG : getFormattedProviderLogo(mainProvider.logo_path, mainProvider.provider_name))
+    : (tmdbDetails?.networks?.[0]?.logo_path ? getFormattedProviderLogo(tmdbDetails.networks[0].logo_path, tmdbDetails.networks[0].name) : null);
   const mainProviderLink = mainProvider 
-    ? getProviderDirectLink(mainProvider.provider_id, title, watchLink)
+    ? (mainProvider.isPlex ? (mainProvider.plexUrl || 'https://app.plex.tv/desktop') : getProviderDirectLink(mainProvider.provider_id, title, watchLink))
     : (watchLink || `https://www.google.com/search?q=${encodeURIComponent(title + ' ' + (mainProviderName || ''))}`);
 
   const getRatingInfo = () => {
@@ -2325,7 +2360,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
             {/* Où regarder (Format discret) */}
             <div>
               <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-2">Où regarder</h3>
-              {providers === null ? (
+              {providers === null && plexMediaInfo === null ? (
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="h-8 w-28 bg-zinc-800/80 rounded-xl border border-white/5 animate-pulse" />
                   <div className="h-8 w-24 bg-zinc-800/80 rounded-xl border border-white/5 animate-pulse" />
@@ -2333,8 +2368,29 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
               ) : sortedProviders.length > 0 ? (
                 <div className="flex items-center gap-2 flex-wrap">
                   {sortedProviders.map((provider: any) => {
+                    if (provider.isPlex) {
+                      return (
+                        <a
+                          key="plex-provider-item"
+                          href={provider.plexUrl || "https://app.plex.tv/desktop"}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#E5A93D]/40 bg-[#E5A93D]/10 text-[#E5A93D] hover:bg-[#E5A93D]/20 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-[0_0_12px_rgba(229,169,61,0.2)]"
+                          title={`Disponible sur Plex : ${provider.serverName || 'Serveur'}`}
+                        >
+                          <img 
+                            src={PLEX_LOGO_SVG}
+                            alt="Plex"
+                            className="w-4 h-4 object-contain rounded shrink-0"
+                          />
+                          <span>Disponible sur Plex {provider.serverName ? `(${provider.serverName})` : ''}</span>
+                        </a>
+                      );
+                    }
+
                     const isSubscribed = userPlatforms.includes(provider.provider_id);
                     const directLink = getProviderDirectLink(provider.provider_id, title, watchLink);
+                    const logo = getFormattedProviderLogo(provider.logo_path, provider.provider_name);
                     return (
                       <a
                         key={provider.provider_id}
@@ -2349,9 +2405,9 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                         )}
                         title={`Ouvrir ${provider.provider_name}`}
                       >
-                        {provider.logo_path ? (
+                        {logo ? (
                           <img loading="lazy" decoding="async"
-                            src={`https://image.tmdb.org/t/p/w92${provider.logo_path}`}
+                            src={logo}
                             alt={provider.provider_name}
                             className="w-4 h-4 object-cover rounded shrink-0"
                           />
