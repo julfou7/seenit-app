@@ -7,6 +7,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
+import { App as CapApp } from '@capacitor/app';
 import { SplashScreen as CapSplashScreen } from '@capacitor/splash-screen';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { auth, db } from './lib/firebase';
@@ -141,6 +142,62 @@ function MainApp() {
   useDetailsSyncWorker();
   useRemindersNotifier();
   const { currentTab, changeTab, selectedShow, openShow, closeShow } = useNavigation();
+
+  // Gestion de la touche retour physique Android sur APK Native via Capacitor App
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    let listenerHandler: any = null;
+
+    const setupBackButton = async () => {
+      listenerHandler = await CapApp.addListener('backButton', ({ canGoBack }) => {
+        // 1. Fermer les sous-menus et fenêtres flottantes non gérées dans l'historique
+        window.dispatchEvent(new CustomEvent('app-close-modals'));
+
+        const state = window.history.state;
+        const isModalOpen = Boolean(
+          state?.isModal || 
+          state?.isEpisodeDetailModal || 
+          state?.isPersonDetailModal
+        );
+
+        // 2. Si une modale est ouverte (fiche épisode, personne, filtres...)
+        if (isModalOpen) {
+          window.history.back();
+          return;
+        }
+
+        // 3. Si la fiche d'un média est ouverte
+        if (selectedShow) {
+          closeShow();
+          return;
+        }
+
+        // 4. Si on peut revenir en arrière dans l'historique
+        if (canGoBack && state && !state.isRoot) {
+          window.history.back();
+          return;
+        }
+
+        // 5. Si on est sur un onglet secondaire, retourner à l'onglet principal (watchlist)
+        if (currentTab !== 'watchlist') {
+          changeTab('watchlist');
+          return;
+        }
+
+        // 6. Si on est sur l'écran racine principal, fermer/quitter l'application
+        CapApp.exitApp();
+      });
+    };
+
+    setupBackButton();
+
+    return () => {
+      if (listenerHandler) {
+        listenerHandler.remove();
+      }
+    };
+  }, [selectedShow, closeShow, currentTab, changeTab]);
 
   // Écouter les messages et actions provenant des notifications push Service Worker (BroadcastChannel + postMessage)
   useEffect(() => {

@@ -71,7 +71,7 @@ export function useNavigation() {
     window.dispatchEvent(new CustomEvent('app-close-modals'));
     setCurrentTab(tab);
     setSelectedShow(null);
-    window.history.pushState({ tab, selectedShow: null }, '');
+    window.history.pushState({ tab, selectedShow: null, isRoot: tab === 'watchlist' }, '');
   }, []);
 
   const openShow = useCallback((id: any, type: 'local' | 'tmdb' = 'local', mediaType?: 'tv' | 'movie', tmdbId?: number, initialSeason?: number, initialEpisode?: number) => {
@@ -82,9 +82,9 @@ export function useNavigation() {
     (window as any).isNavigatingForward = true;
     
     if (window.history.state?.isModal || window.history.state?.isEpisodeDetailModal || window.history.state?.isPersonDetailModal) {
-       window.history.replaceState({ tab: currentTab, selectedShow: showState }, '');
+       window.history.replaceState({ tab: currentTab, selectedShow: showState, isRoot: false }, '');
     } else {
-       window.history.pushState({ tab: currentTab, selectedShow: showState }, '');
+       window.history.pushState({ tab: currentTab, selectedShow: showState, isRoot: false }, '');
     }
     
     setTimeout(() => {
