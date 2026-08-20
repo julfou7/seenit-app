@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { SeenItCheckButton } from '../SeenItCheckButton';
 import { type Show } from '../../types';
-import { tmdb } from '../../features/shows/tmdb';
+import { tmdb, isMovieAtCinema, isMovieUpcoming } from '../../features/shows/tmdb';
 import { getFormattedProviderLogo, extractOfficialStreamingProvider, PLEX_LOGO_SVG } from '../../utils/providerLogos';
 import { checkPlexAvailability } from '../../features/plex/plexAvailability';
 
@@ -88,6 +88,7 @@ export function MovieWatchCard({ show, onShowClick, onMarkAsSeen }: Props) {
 
   // Badge "AU CINÉMA" / sortie récente
   let cinemaBadge = null;
+  
   if (show.firstAirDate) {
     const [y, m, d] = show.firstAirDate.split('-').map(Number);
     if (y && m && d) {
@@ -116,10 +117,16 @@ export function MovieWatchCard({ show, onShowClick, onMarkAsSeen }: Props) {
             SORTI IL Y A {diffDays}J 🆕
           </div>
         );
-      } else if (diffDays > 7 && diffDays <= 120 && !providerLogo) {
+      } else if (isMovieAtCinema(show)) {
         cinemaBadge = (
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-20 bg-gradient-to-r from-amber-600 to-rose-600 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-t-lg shadow-lg uppercase tracking-wider whitespace-nowrap shadow-black/50">
             AU CINÉMA 🎬
+          </div>
+        );
+      } else if (isMovieUpcoming(show)) {
+        cinemaBadge = (
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-20 bg-purple-600 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-t-lg shadow-lg uppercase tracking-wider whitespace-nowrap shadow-black/50">
+            À VENIR 🗓️
           </div>
         );
       }

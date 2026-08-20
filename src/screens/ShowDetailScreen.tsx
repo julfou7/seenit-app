@@ -437,7 +437,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
 
     tmdb.getWatchProviders(effectiveTmdbId, targetMediaType).then(res => {
       if (res.ok && isMounted) {
-         setProviders(res.value.results?.FR || null);
+         setProviders(res.value.results?.FR || []);
       }
     });
 
@@ -448,10 +448,14 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       year: (show?.firstAirDate)?.slice(0, 4),
       mediaType: targetMediaType === 'tv' ? 'tv' : 'movie'
     }).then(info => {
-      if (isMounted && info.available) {
+      if (isMounted) {
         setPlexMediaInfo(info);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      if (isMounted) {
+        setPlexMediaInfo({ available: false });
+      }
+    });
 
     // Récupération et Nettoyage des thèmes profonds (keywords)
     tmdb.getMediaKeywords(effectiveTmdbId, targetMediaType).then(res => {
@@ -489,7 +493,12 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     setImdbLoading(true);
     getSeriesImdbData(resolvedImdbId).then((data) => {
       if (isMounted) {
-        if (data) setImdbData(data);
+        setImdbData(data || { rating: 0 });
+        setImdbLoading(false);
+      }
+    }).catch(() => {
+      if (isMounted) {
+        setImdbData({ rating: 0 });
         setImdbLoading(false);
       }
     });
