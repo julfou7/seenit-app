@@ -72,15 +72,9 @@ jobs:
 
       - name: Generate Release Notes
         id: release_notes
-        run: |
-          LATEST_MSG=$(git log -1 --pretty=%s)
-          echo "NOTES<<EOF" >> $GITHUB_OUTPUT
-          echo "### ✨ Nouveautés de la version v${{ steps.version_step.outputs.APP_VERSION }}" >> $GITHUB_OUTPUT
-          echo "" >> $GITHUB_OUTPUT
-          echo "- **Mise à jour directe** : Téléchargement natif fluide et lancement automatique de l'installeur Android." >> $GITHUB_OUTPUT
-          echo "- **Écran de démarrage** : Élimination du double écran d'accueil et animation 120 FPS haute définition." >> $GITHUB_OUTPUT
-          echo "- **Détail du commit** : $LATEST_MSG" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+        run: node scripts/generate-release-notes.js
+        env:
+          APP_VERSION: ${{ steps.version_step.outputs.APP_VERSION }}
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
