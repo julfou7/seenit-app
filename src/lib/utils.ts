@@ -12,9 +12,13 @@ export function cn(...inputs: ClassValue[]) {
  */
 export async function openExternalUrl(url: string) {
   if (!url) return;
+  let targetUrl = url;
   if (Capacitor.isNativePlatform()) {
+    if (url.startsWith('https://app.plex.tv/')) {
+      targetUrl = url.replace('https://', 'plex://');
+    }
     try {
-      await Browser.open({ url, windowName: '_system' });
+      await Browser.open({ url: targetUrl, windowName: '_system' });
       return;
     } catch (e) {
       console.warn('Browser.open failed, falling back to window.open', e);

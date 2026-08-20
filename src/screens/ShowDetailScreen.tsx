@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { type Show } from '../types';
 import { tmdb, isAdultOrParodyMedia, isMovieAtCinema, isMovieUpcoming } from '../features/shows/tmdb';
 import { ChevronLeft, Star, Heart, CheckCircle2, Circle, Tv, Zap, X, EyeOff, Archive, Trash2, MoreVertical, Plus, Check, Share, Share2, Play, Calendar, ChevronUp, ChevronDown, ArchiveRestore, Ban, RotateCcw, MonitorPlay, Ticket, Youtube, Clapperboard, ExternalLink, Clock, RefreshCw } from 'lucide-react';
-import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getBestLogoPath, getTodayStr, getCalendarDaysDiff, getEpisodeRelativeAirDate, scrollAllCarouselsToStart } from '../lib/utils';
+import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getBestLogoPath, getTodayStr, getCalendarDaysDiff, getEpisodeRelativeAirDate, scrollAllCarouselsToStart, openExternalUrl } from '../lib/utils';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
 import { PersonDetailModal } from './PersonDetailModal';
 import { TimelineMediaCard } from '../components/cards/TimelineMediaCard';
@@ -2392,6 +2392,10 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                               href={provider.plexUrl || "https://app.plex.tv/desktop"}
                               target="_blank"
                               rel="noopener noreferrer"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                openExternalUrl(provider.plexUrl || "https://app.plex.tv/desktop");
+                              }}
                               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#E5A93D]/40 bg-[#E5A93D]/10 text-[#E5A93D] hover:bg-[#E5A93D]/20 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-[0_0_12px_rgba(229,169,61,0.2)]"
                               title={`Disponible sur Plex : ${provider.serverName || 'Serveur'}`}
                             >
@@ -2414,6 +2418,12 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                             href={directLink}
                             target="_blank"
                             rel="noopener noreferrer"
+                            onClick={(e) => {
+                              if (directLink && directLink !== '#') {
+                                e.preventDefault();
+                                openExternalUrl(directLink);
+                              }
+                            }}
                             className={cn(
                               "inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all active:scale-95 cursor-pointer",
                               isSubscribed
