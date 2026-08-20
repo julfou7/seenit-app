@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Star, ChevronRight } from 'lucide-react';
+import { Star, ChevronRight, ChevronDown } from 'lucide-react';
 import { cn, formatAirDateSafe } from '../lib/utils';
 import { getSeasonImdbRatings, getEpisodeImdbVotes, type EpisodeImdbData } from '../features/shows/omdbService';
 
@@ -246,26 +246,43 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
           )}
         </div>
 
-        {/* Season Selector Pills */}
-        <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar flex-1 min-w-0 pb-1">
-          {validSeasons.map((s) => {
-            const isSelected = s.season_number === selectedSeasonNum;
-            return (
-              <button
-                key={s.id || s.season_number}
-                onClick={() => setSelectedSeasonNum(s.season_number)}
-                className={cn(
-                  "px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all duration-200 cursor-pointer active:scale-95 shrink-0",
-                  isSelected
-                    ? "bg-amber-500 text-zinc-950 font-black shadow-sm"
-                    : "bg-zinc-800/80 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-white/5"
-                )}
-              >
-                S{s.season_number}
-              </button>
-            );
-          })}
-        </div>
+        {/* Season Selector : Dropdown if > 3 seasons, else horizontal pills */}
+        {validSeasons.length > 3 ? (
+          <div className="relative shrink-0">
+            <select
+              value={selectedSeasonNum}
+              onChange={(e) => setSelectedSeasonNum(Number(e.target.value))}
+              className="appearance-none bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 font-bold text-xs pl-3 pr-7 py-1 rounded-xl cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500/50 transition-all"
+            >
+              {validSeasons.map((s) => (
+                <option key={s.id || s.season_number} value={s.season_number} className="bg-zinc-900 text-zinc-200">
+                  Saison {s.season_number}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-amber-400 pointer-events-none" />
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar shrink-0 pb-1">
+            {validSeasons.map((s) => {
+              const isSelected = s.season_number === selectedSeasonNum;
+              return (
+                <button
+                  key={s.id || s.season_number}
+                  onClick={() => setSelectedSeasonNum(s.season_number)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all duration-200 cursor-pointer active:scale-95 shrink-0",
+                    isSelected
+                      ? "bg-amber-500 text-zinc-950 font-black shadow-sm"
+                      : "bg-zinc-800/80 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-white/5"
+                  )}
+                >
+                  S{s.season_number}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Discrete Color Legend Line */}
@@ -304,77 +321,102 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
       ) : (
         <div className="space-y-3">
           {/* Interactive Bar Chart Container */}
-          <div className="relative pt-4 pb-2 px-1 bg-zinc-950/50 rounded-xl border border-white/5">
+          <div className="relative pt-4 pb-2 px-1 bg-zinc-950/50 rounded-xl border border-white/5 overflow-hidden">
             {/* Grid lines (2 subtle clean lines, no watermark numbers) */}
             <div className="absolute inset-x-2 top-5 bottom-7 flex flex-col justify-between pointer-events-none opacity-40">
               <div className="border-t border-white/10 w-full" />
               <div className="border-t border-white/5 w-full" />
             </div>
 
-            {/* Bars container */}
-            <div className="flex items-end justify-between gap-1 sm:gap-2 h-36 overflow-x-auto pb-5 px-1.5 hide-scrollbar relative z-10">
-              {episodes.map((ep: any) => {
-                const vote = getEpisodeVote(ep);
-                const formattedVote = vote > 0 ? vote.toFixed(1) : '-';
-                const colorInfo = getRatingColor(vote);
-                const isActive = activeEpisode?.id === ep.id || activeEpisode?.episode_number === ep.episode_number;
+            <div className="relative">
+              {/* Ligne moyenne de la saison */}
+              {seasonStats && (
+                <div
+                  className="absolute left-1 right-1 border-b-2 border-dashed border-amber-400/50 z-20 pointer-events-none flex items-center justify-between"
+                  style={{
+                    // The bar graphics have height 80px (h-20). The episode labels have height 15px (mt-1 + text). 
+                    // So the bottom of the bar graphic is exactly 19px from the bottom of the parent container.
+                    bottom: `calc(${Math.max(10, Math.min(100, (Number(seasonStats.average) / 10) * 100))}% * 0.8 + 19px)`
+                  }}
+                >
+                  <span className="bg-amber-500/95 text-zinc-950 font-black text-[9px] px-1.5 py-0.5 rounded-full shadow-md ml-2 -translate-y-1/2">
+                    Moy: {Number(seasonStats.average).toFixed(1)}
+                  </span>
+                </div>
+              )}
 
-                // Scale height: minimum 12% so bar is visible even if vote is low
-                const heightPercent = vote > 0 ? Math.max(12, (vote / 10) * 100) : 10;
+              {/* Bars container */}
+              <div className="flex items-end justify-between gap-1 sm:gap-2 px-1.5 overflow-x-auto hide-scrollbar relative z-10 pt-2 pb-1">
+                {episodes.map((ep: any) => {
+                  const vote = getEpisodeVote(ep);
+                  const formattedVote = vote > 0 ? vote.toFixed(1) : '-';
+                  const colorInfo = getRatingColor(vote);
+                  const isActive = activeEpisode?.id === ep.id || activeEpisode?.episode_number === ep.episode_number;
 
-                return (
-                  <div
-                    key={ep.id || ep.episode_number}
-                    onClick={() => setActiveEpisode(ep)}
-                    onMouseEnter={() => setActiveEpisode(ep)}
-                    className="flex-1 min-w-[26px] max-w-[44px] h-full flex flex-col items-center justify-end group cursor-pointer"
-                  >
-                    {/* Score Label above bar */}
-                    <span
-                      className={cn(
-                        "text-[10px] font-bold mb-1 transition-transform group-hover:scale-110",
-                        isActive ? "text-amber-400 font-extrabold scale-110" : colorInfo.text
-                      )}
+                  // Scale height: minimum 12% so bar is visible even if vote is low
+                  const heightPercent = vote > 0 ? Math.max(12, (vote / 10) * 100) : 10;
+
+                  return (
+                    <div
+                      key={ep.id || ep.episode_number}
+                      onClick={() => setActiveEpisode(ep)}
+                      onMouseEnter={() => setActiveEpisode(ep)}
+                      className="flex-1 min-w-[26px] max-w-[44px] flex flex-col items-center justify-end group cursor-pointer"
                     >
-                      {formattedVote}
-                    </span>
-
-                    {/* Bar graphic */}
-                    <div className="w-full bg-zinc-800/60 rounded-t-md p-0.5 h-full flex items-end">
-                      <div
-                        style={{ height: `${heightPercent}%` }}
+                      {/* Score Label above bar */}
+                      <span
                         className={cn(
-                          "w-full rounded-t-sm transition-all duration-300 relative group-hover:brightness-125",
-                          colorInfo.bg,
-                          isActive ? "ring-2 ring-white/80 shadow-[0_0_10px_rgba(255,255,255,0.3)] brightness-125 scale-[1.02]" : "opacity-85"
+                          "text-[10px] font-bold mb-1 transition-transform group-hover:scale-110",
+                          isActive ? "text-amber-400 font-extrabold scale-110" : colorInfo.text
                         )}
-                      />
-                    </div>
+                      >
+                        {formattedVote}
+                      </span>
 
-                    {/* Episode label below bar */}
-                    <span
-                      className={cn(
-                        "text-[10px] font-medium mt-1 transition-colors",
-                        isActive ? "text-white font-bold" : "text-zinc-500 group-hover:text-zinc-300"
-                      )}
-                    >
-                      E{ep.episode_number < 10 ? `0${ep.episode_number}` : ep.episode_number}
-                    </span>
-                  </div>
-                );
-              })}
+                      {/* Bar graphic (Fixed height h-20 for perfect alignment of average line) */}
+                      <div className="w-full bg-zinc-800/60 rounded-t-md p-0.5 h-20 flex items-end">
+                        <div
+                          style={{ height: `${heightPercent}%` }}
+                          className={cn(
+                            "w-full rounded-t-sm transition-all duration-300 relative group-hover:brightness-125",
+                            colorInfo.bg,
+                            isActive ? "ring-2 ring-white/80 shadow-[0_0_10px_rgba(255,255,255,0.3)] brightness-125 scale-[1.02]" : "opacity-85"
+                          )}
+                        />
+                      </div>
+
+                      {/* Episode label below bar */}
+                      <span
+                        className={cn(
+                          "text-[10px] font-medium mt-1 transition-colors",
+                          isActive ? "text-white font-bold" : "text-zinc-500 group-hover:text-zinc-300"
+                        )}
+                      >
+                        E{ep.episode_number < 10 ? `0${ep.episode_number}` : ep.episode_number}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
-          {/* Active Episode Card Detail (Purified & Clean) */}
+          {/* Active Episode Card Detail (Fully Clickable & Clean) */}
           {activeEpisode && (
-            <div className="bg-zinc-800/70 border border-white/10 rounded-xl p-2.5 flex items-center justify-between gap-3 animate-in fade-in duration-200">
-              <div className="flex items-center gap-2.5 min-w-0">
+            <div 
+              onClick={() => {
+                if (onSelectEpisode) {
+                  onSelectEpisode(selectedSeasonNum, activeEpisode);
+                }
+              }}
+              className="bg-zinc-800/70 border border-white/10 hover:border-amber-500/30 hover:bg-zinc-800/90 rounded-xl p-2.5 flex items-center justify-between gap-3 animate-in fade-in duration-200 cursor-pointer group active:scale-[0.99] transition-all shadow-md"
+            >
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
                 {activeEpisode.still_path ? (
                   <img loading="lazy" decoding="async"
                     src={`https://image.tmdb.org/t/p/w185${activeEpisode.still_path}`}
                     alt={activeEpisode.name}
-                    className="w-16 h-10 object-cover rounded-lg border border-white/10 shrink-0"
+                    className="w-16 h-10 object-cover rounded-lg border border-white/10 shrink-0 group-hover:opacity-90 transition-opacity"
                   />
                 ) : (
                   <div className="w-16 h-10 rounded-lg bg-zinc-900 border border-white/10 flex items-center justify-center text-zinc-600 text-[10px] font-bold shrink-0">
@@ -393,14 +435,14 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
                       </span>
                     )}
                   </div>
-                  <h4 className="text-xs font-semibold text-white truncate mt-0.5">
+                  <h4 className="text-xs font-semibold text-white truncate mt-0.5 group-hover:text-amber-300 transition-colors">
                     {activeEpisode.name || `Épisode ${activeEpisode.episode_number}`}
                   </h4>
                 </div>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-zinc-900/90 border border-white/10 text-xs font-bold">
+                <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-zinc-900/90 border border-white/10 text-xs font-bold text-amber-400">
                   <Star size={12} className="fill-amber-400 text-amber-400 shrink-0" />
                   <span className="text-white">
                     {getEpisodeVote(activeEpisode) > 0 ? getEpisodeVote(activeEpisode).toFixed(1) : '-'}
@@ -412,15 +454,7 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
                   )}
                 </div>
 
-                {onSelectEpisode && (
-                  <button
-                    onClick={() => onSelectEpisode(selectedSeasonNum, activeEpisode)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded-lg text-xs font-semibold border border-white/10 transition-all active:scale-95 cursor-pointer"
-                  >
-                    <span>Détails</span>
-                    <ChevronRight size={13} />
-                  </button>
-                )}
+                <ChevronRight size={16} className="text-zinc-500 group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
               </div>
             </div>
           )}
