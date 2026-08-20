@@ -211,41 +211,11 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
 
   return (
     <div className="bg-zinc-900/90 border border-white/10 rounded-2xl p-3.5 space-y-3 shadow-xl w-full overflow-hidden">
-      {/* 1. Header + Season Selector on a single compact line */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2 min-w-0">
-          <h3 className="text-xs font-bold text-white uppercase tracking-wider truncate shrink-0">
-            Notes par épisode
-          </h3>
-          {seasonStats && (
-            <span className={cn(
-              "inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-800 border border-white/10 text-[11px] font-bold shrink-0",
-              hasImdbRatings ? "text-amber-400" : "text-blue-400"
-            )}>
-              <Star 
-                size={11} 
-                className={cn(
-                  "shrink-0",
-                  hasImdbRatings ? "fill-amber-400 text-amber-400" : "fill-blue-400 text-blue-400"
-                )} 
-              />
-              S{selectedSeasonNum} • {seasonStats.average}
-              {!hasImdbRatings && totalTmdbVotes > 0 && (
-                <span className="text-[9px] text-zinc-400 font-normal">
-                  ({totalTmdbVotes.toLocaleString()})
-                </span>
-              )}
-              <span className={cn(
-                "ml-0.5 px-1 py-0.2 text-[9px] font-black rounded border",
-                hasImdbRatings
-                  ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
-                  : "bg-blue-500/20 text-blue-300 border-blue-500/30"
-              )}>
-                {hasImdbRatings ? 'IMDb' : 'TMDB'}
-              </span>
-            </span>
-          )}
-        </div>
+      {/* 1. Header Row: Title on Left, Season Selector strictly on Right */}
+      <div className="flex items-center justify-between gap-2 pb-2 border-b border-white/5">
+        <h3 className="text-xs font-extrabold text-white uppercase tracking-wider shrink-0">
+          Notes par épisode
+        </h3>
 
         {/* Season Selector : Custom Modal Picker if > 3 seasons, else horizontal pills */}
         {validSeasons.length > 3 ? (
@@ -253,7 +223,7 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
             <button
               type="button"
               onClick={() => setIsSeasonPickerOpen(true)}
-              className="flex items-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 active:bg-amber-500/30 border border-amber-500/30 text-amber-400 font-bold text-xs px-3 py-1.5 rounded-xl cursor-pointer transition-all shadow-sm active:scale-95"
+              className="flex items-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 active:bg-amber-500/30 border border-amber-500/30 text-amber-400 font-bold text-xs px-2.5 py-1 rounded-xl cursor-pointer transition-all shadow-sm active:scale-95"
             >
               <span>Saison {selectedSeasonNum}</span>
               <ChevronDown size={14} className="text-amber-400 shrink-0" />
@@ -309,7 +279,7 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
             )}
           </div>
         ) : (
-          <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar shrink-0 pb-1">
+          <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar shrink-0">
             {validSeasons.map((s) => {
               const isSelected = s.season_number === selectedSeasonNum;
               return (
@@ -317,7 +287,7 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
                   key={s.id || s.season_number}
                   onClick={() => setSelectedSeasonNum(s.season_number)}
                   className={cn(
-                    "px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all duration-200 cursor-pointer active:scale-95 shrink-0",
+                    "px-2 py-0.5 rounded-lg text-[11px] font-bold transition-all duration-200 cursor-pointer active:scale-95 shrink-0",
                     isSelected
                       ? "bg-amber-500 text-zinc-950 font-black shadow-sm"
                       : "bg-zinc-800/80 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-white/5"
@@ -331,9 +301,38 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
         )}
       </div>
 
-      {/* Discrete Color Legend Line */}
-      <div className="flex flex-wrap items-center justify-between gap-y-2 text-[10px] text-zinc-400 font-medium">
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+      {/* 2. Subheader Row: Season Average Score + Legend */}
+      <div className="flex items-center justify-between gap-2 flex-wrap text-[11px]">
+        {seasonStats && (
+          <span className={cn(
+            "inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-800/80 border border-white/10 text-[11px] font-bold shrink-0",
+            hasImdbRatings ? "text-amber-400" : "text-blue-400"
+          )}>
+            <Star 
+              size={11} 
+              className={cn(
+                "shrink-0",
+                hasImdbRatings ? "fill-amber-400 text-amber-400" : "fill-blue-400 text-blue-400"
+              )} 
+            />
+            S{selectedSeasonNum} • {seasonStats.average}
+            {!hasImdbRatings && totalTmdbVotes > 0 && (
+              <span className="text-[9px] text-zinc-400 font-normal">
+                ({totalTmdbVotes.toLocaleString()})
+              </span>
+            )}
+            <span className={cn(
+              "ml-0.5 px-1 py-0.2 text-[9px] font-black rounded border",
+              hasImdbRatings
+                ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                : "bg-blue-500/20 text-blue-300 border-blue-500/30"
+            )}>
+              {hasImdbRatings ? 'IMDb' : 'TMDB'}
+            </span>
+          </span>
+        )}
+
+        <div className="flex items-center gap-2 text-[10px] text-zinc-400 font-medium ml-auto">
           <span className="flex items-center gap-1 shrink-0">
             <span className="w-2 h-2 rounded-full bg-[#34d399] inline-block"></span> ≥8.5
           </span>
@@ -347,12 +346,6 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
             <span className="w-2 h-2 rounded-full bg-rose-900/80 border border-rose-500/40 inline-block"></span> &lt;6.5
           </span>
         </div>
-        <span className={cn(
-          "text-[10px] font-medium shrink-0",
-          hasImdbRatings ? "text-amber-400/90" : "text-blue-400/90"
-        )}>
-          Source: {hasImdbRatings ? 'IMDb' : 'TMDB'}
-        </span>
       </div>
 
       {/* Chart Canvas */}
