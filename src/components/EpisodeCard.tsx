@@ -65,9 +65,10 @@ export function EpisodeCard({ show, type, onShowClick, onMarkAsSeen }: EpisodeCa
     const airDateStr = nextAir.air_date;
     const [year, month, day] = airDateStr.split('-').map(Number);
     const airDate = new Date(year, month - 1, day);
+    airDate.setHours(0, 0, 0, 0);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const daysDiff = Math.ceil((airDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
+    const daysDiff = Math.round((airDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
     
     if (daysDiff === 0) contextualText = "Aujourd'hui";
     else if (daysDiff === 1) contextualText = 'Demain';

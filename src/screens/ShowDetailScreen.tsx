@@ -63,18 +63,22 @@ const getSeasonReleaseDateText = (airDate?: string): string | null => {
 const getEpisodeAirDateLabel = (airDate?: string | null) => {
   if (!airDate) return 'Bientôt';
 
+  const todayStr = getTodayStr();
+  if (airDate < todayStr) return null; // Déjà sorti
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   const parts = airDate.split('-');
   if (parts.length < 3) return 'Bientôt';
   const [year, month, day] = parts.map(p => parseInt(p, 10));
-  const releaseDate = new Date(Date.UTC(year, month - 1, day));
+  const releaseDate = new Date(year, month - 1, day);
+  releaseDate.setHours(0, 0, 0, 0);
 
   const diffTime = releaseDate.getTime() - today.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
-  if (diffDays <= 0) return null; // Déjà sorti
+  if (diffDays <= 0) return "Aujourd'hui";
   if (diffDays === 1) return 'Demain';
   if (diffDays <= 7) return `Dans ${diffDays} jours`;
 
@@ -2502,13 +2506,11 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
               const cachedSeason = seasonsCache[seasonNum];
               const displayAirDate = cachedSeason?.episodes?.[0]?.air_date || season.air_date;
               
-              const [y, m, day] = (displayAirDate || "").split('-').map(Number);
-              const seasonAirTime = y && m && day ? Date.UTC(y, m - 1, day) : 0;
-              const isFutureByDate = seasonAirTime > Date.now();
+              const todayStr = getTodayStr();
+              const isFutureByDate = displayAirDate ? displayAirDate > todayStr : false;
               const hasAiredEpisodesInCache = cachedSeason?.episodes?.some((ep: any) => {
                 if (!ep.air_date) return true;
-                const [ey, em, ed] = ep.air_date.split('-').map(Number);
-                return Date.UTC(ey, em - 1, ed) <= Date.now();
+                return ep.air_date <= todayStr;
               });
 
               const isFutureSeason = isFutureByDate || seasonEpCount === 0 || (cachedSeason?.episodes && !hasAiredEpisodesInCache);
@@ -2609,7 +2611,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                           seasonsCache[season.season_number].episodes.map((ep: any) => {
                         const epKey = `${season.season_number}x${ep.episode_number}`;
                         const isSeen = show?.seenEpisodes?.includes(epKey);
-                        const isFutureEp = ep.air_date ? new Date(ep.air_date).getTime() > Date.now() : false;
+                        const isFutureEp = ep.air_date ? ep.air_date > todayStr : false;
                         
                         return (
                           <div 

@@ -144,10 +144,20 @@ export function ContinueWatchingCard({ show, onShowClick, onEpisodeClick, onMark
   const nextEpToAir = show.nextEpisodeToAir || (show as any).next_episode_to_air;
   let isAiringSeason = false;
   const todayStr = getTodayStr();
-  
-  if (nextEpToAir && nextEpToAir.season_number === nextEpNum.season_number) {
-    airedInSeason = Math.max(0, nextEpToAir.episode_number - 1);
-    isAiringSeason = true;
+
+  if (cachedSeason?.episodes && cachedSeason.episodes.length > 0) {
+    const airedFromCache = cachedSeason.episodes.filter((ep: any) => !ep.air_date || ep.air_date <= todayStr).length;
+    if (airedFromCache > 0) {
+      airedInSeason = airedFromCache;
+      isAiringSeason = airedInSeason < totalSeasonEpisodes;
+    }
+  } else if (nextEpToAir && nextEpToAir.season_number === nextEpNum.season_number) {
+    if (nextEpToAir.air_date && nextEpToAir.air_date > todayStr) {
+      airedInSeason = Math.max(0, nextEpToAir.episode_number - 1);
+      isAiringSeason = true;
+    } else if (nextEpToAir.episode_number) {
+      airedInSeason = Math.max(airedInSeason, nextEpToAir.episode_number);
+    }
   } else if (nextEpNum.air_date) {
     if (nextEpNum.air_date > todayStr) {
       airedInSeason = Math.max(0, nextEpNum.episode_number - 1);

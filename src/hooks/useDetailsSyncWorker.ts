@@ -204,8 +204,10 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
           airedEpisodesInSeason = seasonForNextEp.episodes.filter((ep: any) => ep.air_date && ep.air_date <= todayStr).length;
         }
         if (details.next_episode_to_air && details.next_episode_to_air.season_number === nextEp?.season && typeof details.next_episode_to_air.episode_number === 'number') {
-          const airedBeforeNextToAir = Math.max(0, details.next_episode_to_air.episode_number - 1);
-          airedEpisodesInSeason = Math.min(airedEpisodesInSeason, airedBeforeNextToAir);
+          if (details.next_episode_to_air.air_date && details.next_episode_to_air.air_date > todayStr) {
+            const airedBeforeNextToAir = Math.max(0, details.next_episode_to_air.episode_number - 1);
+            airedEpisodesInSeason = Math.min(airedEpisodesInSeason, airedBeforeNextToAir);
+          }
         }
 
         const nextEpisodeToWatch = nextEp ? {
@@ -221,7 +223,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         } : null;
 
         let nextEpisodeToAir: any = null;
-        if (details.next_episode_to_air) {
+        if (details.next_episode_to_air && (!details.next_episode_to_air.air_date || details.next_episode_to_air.air_date >= todayStr)) {
           const sNum = details.next_episode_to_air.season_number;
           nextEpisodeToAir = {
             season_number: sNum,
@@ -252,7 +254,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
             }
           }
           if (futureEpisodes.length > 0) {
-            futureEpisodes.sort((a, b) => new Date(a.air_date).getTime() - new Date(b.air_date).getTime());
+            futureEpisodes.sort((a, b) => new Date(a.air_date + 'T00:00:00').getTime() - new Date(b.air_date + 'T00:00:00').getTime());
             nextEpisodeToAir = futureEpisodes[0];
           }
         }
@@ -597,8 +599,10 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
       airedEpisodesInSeason = seasonForNextEp.episodes.filter((ep: any) => ep.air_date && ep.air_date <= todayStr).length;
     }
     if (details.next_episode_to_air && details.next_episode_to_air.season_number === nextEp?.season && typeof details.next_episode_to_air.episode_number === 'number') {
-      const airedBeforeNextToAir = Math.max(0, details.next_episode_to_air.episode_number - 1);
-      airedEpisodesInSeason = Math.min(airedEpisodesInSeason, airedBeforeNextToAir);
+      if (details.next_episode_to_air.air_date && details.next_episode_to_air.air_date > todayStr) {
+        const airedBeforeNextToAir = Math.max(0, details.next_episode_to_air.episode_number - 1);
+        airedEpisodesInSeason = Math.min(airedEpisodesInSeason, airedBeforeNextToAir);
+      }
     }
 
     const nextEpisodeToWatch = nextEp ? {
@@ -614,7 +618,7 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
     } : null;
 
     let nextEpisodeToAir: any = null;
-    if (details.next_episode_to_air) {
+    if (details.next_episode_to_air && (!details.next_episode_to_air.air_date || details.next_episode_to_air.air_date >= todayStr)) {
       const sNum = details.next_episode_to_air.season_number;
       nextEpisodeToAir = {
         season_number: sNum,
@@ -645,7 +649,7 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
         }
       }
       if (futureEpisodes.length > 0) {
-        futureEpisodes.sort((a, b) => new Date(a.air_date).getTime() - new Date(b.air_date).getTime());
+        futureEpisodes.sort((a, b) => new Date(a.air_date + 'T00:00:00').getTime() - new Date(b.air_date + 'T00:00:00').getTime());
         nextEpisodeToAir = futureEpisodes[0];
       }
     }
