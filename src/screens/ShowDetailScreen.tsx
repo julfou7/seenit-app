@@ -220,6 +220,8 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const effectiveTmdbId = show?.tmdbId || externalTmdbId || (showId && !isNaN(Number(showId)) ? Number(showId) : undefined);
 
   const [tmdbDetails, setTmdbDetails] = useState<any>(null);
+  const title = show?.title || tmdbDetails?.name || tmdbDetails?.title || 'Chargement...';
+
   const [fetchError, setFetchError] = useState<boolean>(false);
   const [collectionData, setCollectionData] = useState<any>(null);
   const [imdbData, setImdbData] = useState<any>(null);
@@ -1610,7 +1612,6 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
 
   const epStatus = getNextEpisodeStatus();
 
-  const title = show?.title || tmdbDetails?.name || tmdbDetails?.title || 'Chargement...';
   const logoPath = !logoError ? getBestLogoPath(tmdbDetails?.images) : null;
   
   const rawPoster = tmdbDetails?.poster_path || show?.posterPath;
