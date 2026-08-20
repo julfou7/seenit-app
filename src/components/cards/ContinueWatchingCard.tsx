@@ -133,7 +133,12 @@ export function ContinueWatchingCard({ show, onShowClick, onEpisodeClick, onMark
   }
 
   if (!badge) {
-    let totalSeasonEpisodes = nextEpNum.episode_count || 1;
+    const cachedSeason = show.seasonsCache?.find((s: any) => s.season_number === nextEpNum.season_number);
+    let totalSeasonEpisodes = nextEpNum.episode_count || 
+      cachedSeason?.episode_count || 
+      cachedSeason?.episodes?.length || 
+      (show.nextEpisodeToAir?.season_number === nextEpNum.season_number ? show.nextEpisodeToAir?.episode_count : null) || 
+      1;
     let airedInSeason = totalSeasonEpisodes;
 
     // Logique infaillible pour connaître les épisodes sortis dans la saison
@@ -157,7 +162,7 @@ export function ContinueWatchingCard({ show, onShowClick, onEpisodeClick, onMark
         isAiringSeason = airedInSeason < totalSeasonEpisodes;
     }
 
-    const seasonTotal = nextEpNum.episode_count;
+    const seasonTotal = nextEpNum.episode_count || cachedSeason?.episode_count || cachedSeason?.episodes?.length || (show.nextEpisodeToAir?.season_number === nextEpNum.season_number ? show.nextEpisodeToAir?.episode_count : null);
     const knownTotal = (seasonTotal && seasonTotal >= airedInSeason && seasonTotal > 1) ? seasonTotal : null;
 
     const remainingToWatch = totalSeasonEpisodes - nextEpNum.episode_number + 1;
@@ -181,6 +186,37 @@ export function ContinueWatchingCard({ show, onShowClick, onEpisodeClick, onMark
     } else if (isFirstEpisodeOfSeason) {
       badge = <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-20 bg-emerald-500 text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-t-lg shadow-lg uppercase tracking-wider whitespace-nowrap">SAISON DISPO 🍿</div>;
     }
+  }
+
+  // Calcul du nombre total d'épisodes sortis et disponibles restant à voir (X)
+  let remainingAiredCount = 0;
+  const todayStr = getTodayStr();
+  if (show.seasonsCache && Array.isArray(show.seasonsCache) && show.seasonsCache.length > 0) {
+    const seenSet = new Set(show.seenEpisodes || []);
+    for (const s of show.seasonsCache) {
+      if (s.season_number > 0 && Array.isArray(s.episodes)) {
+        for (const ep of s.episodes) {
+          if (ep.air_date && ep.air_date <= todayStr) {
+            const key = `${s.season_number}x${ep.episode_number}`;
+            if (!seenSet.has(key)) {
+              remainingAiredCount++;
+            }
+          }
+        }
+      }
+    }
+  } else if (typeof show.totalAiredEpisodes === 'number' && show.totalAiredEpisodes > 0) {
+    remainingAiredCount = Math.max(0, show.totalAiredEpisodes - (show.seenEpisodes?.length || 0));
+  } else {
+    // Calcul de repli robuste pour la saison en cours
+    const nextEpToAir = show.nextEpisodeToAir || (show as any).next_episode_to_air;
+    let airedInSeason = nextEpNum.episode_count || 1;
+    if (nextEpToAir && nextEpToAir.season_number === nextEpNum.season_number) {
+      airedInSeason = Math.max(0, nextEpToAir.episode_number - 1);
+    } else if (nextEpNum.air_date && nextEpNum.air_date > todayStr) {
+      airedInSeason = Math.max(0, nextEpNum.episode_number - 1);
+    }
+    remainingAiredCount = Math.max(0, airedInSeason - (nextEpNum.episode_number - 1));
   }
 
   const sNum = nextEpNum?.season_number ?? 1;
@@ -327,9 +363,16 @@ export function ContinueWatchingCard({ show, onShowClick, onEpisodeClick, onMark
           >
             {show.title}
           </button>
-          <span className="text-white font-semibold text-sm mb-0.5">
-            {watched === 0 ? 'Commencer' : 'Continuer'} S{(nextEpNum?.season_number ?? 1).toString().padStart(2, '0')} | E{(nextEpNum?.episode_number ?? 1).toString().padStart(2, '0')}
-          </span>
+          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+            <span className="text-white font-semibold text-sm">
+              {watched === 0 ? 'Commencer' : 'Continuer'} S{(nextEpNum?.season_number ?? 1).toString().padStart(2, '0')} | E{(nextEpNum?.episode_number ?? 1).toString().padStart(2, '0')}
+            </span>
+            {remainingAiredCount > 0 && (
+              <span className="text-zinc-400 font-medium text-xs sm:text-[13px]">
+                + {remainingAiredCount}
+              </span>
+            )}
+          </div>
           <span className="text-indigo-400 text-xs font-medium">
             {lastWatchedStr ? `Vu ${lastWatchedStr}${lastWatchedTime ? ` - ${lastWatchedTime}` : ''}` : 'Jamais regardé'}
           </span>

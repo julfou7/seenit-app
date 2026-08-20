@@ -20,10 +20,17 @@ export function useRemindersNotifier() {
       const upcoming = getUpcomingEpisodeInfo(s);
       if (!upcoming) return;
 
-      // Check if episode airs today
+      const sNum = String(upcoming.season_number).padStart(2, '0');
+      const eNum = String(upcoming.episode_number).padStart(2, '0');
+
+      // Check if user has enabled notifications for this show or set a specific episode reminder
+      const isSpecificReminder = localStorage.getItem(`reminder_${s.id}_S${upcoming.season_number}E${upcoming.episode_number}`) === 'true';
+      const isShowNotification = s.notificationsEnabled === true || localStorage.getItem(`reminder_${s.id}`) === 'true';
+
+      if (!isSpecificReminder && !isShowNotification) return;
+
+      // Check if episode airs strictly today in local timezone
       if (upcoming.air_date === todayStr) {
-        const sNum = String(upcoming.season_number).padStart(2, '0');
-        const eNum = String(upcoming.episode_number).padStart(2, '0');
         const notifiedKey = `notified_today_${s.id}_S${sNum}E${eNum}_${todayStr}`;
 
         if (!localStorage.getItem(notifiedKey)) {

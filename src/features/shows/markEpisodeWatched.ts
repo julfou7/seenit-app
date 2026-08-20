@@ -70,7 +70,11 @@ export async function markEpisodeWatched(
               episode_number: nextInSeason.episode_number,
               air_date: nextInSeason.air_date || null,
               name: nextInSeason.name || null,
-              still_path: nextInSeason.still_path || null
+              still_path: nextInSeason.still_path || null,
+              episode_count: seasonRes.value.episodes?.length || targetShow.nextEpisodeToWatch?.episode_count || 1,
+              aired_episodes_in_season: targetShow.nextEpisodeToWatch?.aired_episodes_in_season,
+              is_final_season: targetShow.nextEpisodeToWatch?.is_final_season,
+              series_ended: targetShow.nextEpisodeToWatch?.series_ended || targetShow.seriesEnded
             };
           } else {
             const nextSeasonRes = await tmdb.getSeasonDetails(targetShow.tmdbId, sNum + 1);
@@ -81,7 +85,11 @@ export async function markEpisodeWatched(
                 episode_number: nextSeasonFirst.episode_number,
                 air_date: nextSeasonFirst.air_date || null,
                 name: nextSeasonFirst.name || null,
-                still_path: nextSeasonFirst.still_path || null
+                still_path: nextSeasonFirst.still_path || null,
+                episode_count: nextSeasonRes.value.episodes?.length || 1,
+                aired_episodes_in_season: nextSeasonRes.value.episodes?.filter((ep: any) => ep.air_date && ep.air_date <= new Date().toISOString().slice(0, 10)).length || 1,
+                is_final_season: targetShow.nextEpisodeToWatch?.is_final_season,
+                series_ended: targetShow.nextEpisodeToWatch?.series_ended || targetShow.seriesEnded
               };
             }
           }
