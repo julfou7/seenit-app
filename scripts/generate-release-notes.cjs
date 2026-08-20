@@ -1,6 +1,66 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 
+function fixFrenchFormatting(text) {
+  if (!text) return '';
+  return text
+    // Missing apostrophes
+    .replace(/\bd\s+([aáàâeéèêiíìîoóòôuúùûh])/gi, "d'$1")
+    .replace(/\bl\s+([aáàâeéèêiíìîoóòôuúùûh])/gi, "l'$1")
+    .replace(/\bc\s+est\b/gi, "c'est")
+    .replace(/\bn\s+est\b/gi, "n'est")
+    .replace(/\bj\s+([aáàâeéèêiíìîoóòôuúùû])/gi, "j'$1")
+    .replace(/\bqu\s+([aáàâeéèêiíìîoóòôuúùûh])/gi, "qu'$1")
+    .replace(/\bm\s+([aáàâeéèêiíìîoóòôuúùû])/gi, "m'$1")
+    .replace(/\bs\s+([aáàâeéèêiíìîoóòôuúùû])/gi, "s'$1")
+    // Missing accents & common words
+    .replace(/\bpassage a la\b/gi, "passage à la")
+    .replace(/\bPassage a la\b/g, "Passage à la")
+    .replace(/\bmise a jour\b/gi, "mise à jour")
+    .replace(/\bmises a jour\b/gi, "mises à jour")
+    .replace(/\ba jour\b/gi, "à jour")
+    .replace(/\bA jour\b/g, "À jour")
+    .replace(/\bsynthetique\b/gi, "synthétique")
+    .replace(/\bsynthetiques\b/gi, "synthétiques")
+    .replace(/\becriture\b/gi, "écriture")
+    .replace(/\bamelioration\b/gi, "amélioration")
+    .replace(/\bameliorations\b/gi, "améliorations")
+    .replace(/\bgenerale\b/gi, "générale")
+    .replace(/\bgenerales\b/gi, "générales")
+    .replace(/\ben-tete\b/gi, "en-tête")
+    .replace(/\bentete\b/gi, "en-tête")
+    .replace(/\bselecteur\b/gi, "sélecteur")
+    .replace(/\bselecteurs\b/gi, "sélecteurs")
+    .replace(/\belement\b/gi, "élément")
+    .replace(/\belements\b/gi, "éléments")
+    .replace(/\bderoulant\b/gi, "déroulant")
+    .replace(/\bderoulants\b/gi, "déroulants")
+    .replace(/\bfenetre\b/gi, "fenêtre")
+    .replace(/\bfenetres\b/gi, "fenêtres")
+    .replace(/\bselection\b/gi, "sélection")
+    .replace(/\bselections\b/gi, "sélections")
+    .replace(/\bprete\b/gi, "prête")
+    .replace(/\bpretes\b/gi, "prêtes")
+    .replace(/\bsecurite\b/gi, "sécurité")
+    .replace(/\bverifier\b/gi, "vérifier")
+    .replace(/\bverification\b/gi, "vérification")
+    .replace(/\bverifications\b/gi, "vérifications")
+    .replace(/\bdeploiement\b/gi, "déploiement")
+    .replace(/\bdeploiements\b/gi, "déploiements")
+    .replace(/\benregistre\b/gi, "enregistré")
+    .replace(/\benregistree\b/gi, "enregistrée")
+    .replace(/\benregistres\b/gi, "enregistrés")
+    .replace(/\bpersonnalise\b/gi, "personnalisé")
+    .replace(/\bpersonnalisee\b/gi, "personnalisée")
+    .replace(/\bpersonnalises\b/gi, "personnalisés")
+    .replace(/\breorganise\b/gi, "réorganisé")
+    .replace(/\breorganisation\b/gi, "réorganisation")
+    .replace(/\bgenere\b/gi, "généré")
+    .replace(/\bgeneration\b/gi, "génération")
+    .replace(/\bcle\b/gi, "clé")
+    .replace(/\bcles\b/gi, "clés");
+}
+
 function generate() {
   const version = process.env.APP_VERSION || '1.2.0';
   let items = [];
@@ -41,11 +101,11 @@ function generate() {
           body = match[4].trim();
         }
 
-        let prefix = '• ';
-        if (type === 'fix') prefix = '• **Correction** : ';
-        else if (type === 'feat') prefix = '• **Nouveauté** : ';
-        else if (type === 'style' || scope === 'ui') prefix = '• **Interface** : ';
-        else if (type === 'perf') prefix = '• **Performance** : ';
+        let prefix = '- ';
+        if (type === 'fix') prefix = '- **Correction** : ';
+        else if (type === 'feat') prefix = '- **Nouveauté** : ';
+        else if (type === 'style' || scope === 'ui') prefix = '- **Interface** : ';
+        else if (type === 'perf') prefix = '- **Performance** : ';
 
         let text = body
           .replace(/^reorganize\s+/i, 'Réorganisation de ')
@@ -68,6 +128,7 @@ function generate() {
           .replace(/\balignment\b/gi, "l'alignement");
 
         text = text.charAt(0).toUpperCase() + text.slice(1);
+        text = fixFrenchFormatting(text);
         items.push(`${prefix}${text}`);
       }
     }
@@ -76,7 +137,7 @@ function generate() {
   }
 
   if (items.length === 0) {
-    items.push('• Améliorations générales de l\'interface et de la stabilité.');
+    items.push("- Améliorations générales de l'interface et de la stabilité.");
   }
 
   const releaseBody = `### ✨ Nouveautés de la version v${version}\n\n${items.join('\n')}`;
