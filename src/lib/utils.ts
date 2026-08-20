@@ -18,7 +18,26 @@ export async function openExternalUrl(url: string) {
   
   if (Capacitor.isNativePlatform()) {
     if (url.startsWith('https://app.plex.tv/') && !url.includes('/auth')) {
-      const nativePlexUrl = url.replace('https://', 'plex://');
+      let nativePlexUrl = 'plex://app.plex.tv';
+      
+      const serverMatch = url.match(/\/server\/([a-f0-9]+)/i);
+      const serverId = serverMatch ? serverMatch[1] : '';
+      
+      const keyMatch = url.match(/[?&]key=([^&]+)/i);
+      let ratingKey = '';
+      if (keyMatch) {
+        const decodedKey = decodeURIComponent(keyMatch[1]);
+        const ratingKeyMatch = decodedKey.match(/\/metadata\/(\d+)/i);
+        if (ratingKeyMatch) {
+          ratingKey = ratingKeyMatch[1];
+        }
+      }
+      
+      if (serverId && ratingKey) {
+        nativePlexUrl = `plex://play/?metadataKey=${encodeURIComponent(`/library/metadata/${ratingKey}`)}&server=${serverId}`;
+      } else {
+        nativePlexUrl = url.replace('https://', 'plex://');
+      }
       
       // Try to check and open via AppLauncher first
       try {
