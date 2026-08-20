@@ -28,7 +28,7 @@ const foregroundSvg = `
     </linearGradient>
   </defs>
 
-  <g transform="translate(19, 20.4) scale(0.70)">
+  <g transform="translate(19, 23.9) scale(0.70)">
     <circle cx="50" cy="43" r="22" fill="#E5A93D" opacity="0.35" />
     <rect x="14" y="17" width="72" height="52" rx="10" fill="#0B0B0F" stroke="url(#fg-gold-grad)" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round" />
     <path d="M 16 26 L 68 18 L 16 60 Z" fill="url(#fg-glass-grad)" />
@@ -78,7 +78,7 @@ const fullIconSvg = `
   <rect width="512" height="512" fill="url(#sq-bg-grad)" />
   <rect width="512" height="512" fill="url(#sq-ambient-glow)" />
 
-  <g transform="translate(56, 64) scale(4.0)">
+  <g transform="translate(56, 80) scale(4.0)">
     <circle cx="50" cy="43" r="22" fill="#E5A93D" opacity="0.35" />
     <rect x="14" y="17" width="72" height="52" rx="10" fill="#0B0B0F" stroke="url(#sq-gold-grad)" stroke-width="4.0" stroke-linecap="round" stroke-linejoin="round" />
     <path d="M 16 26 L 68 18 L 16 60 Z" fill="url(#sq-glass-grad)" />
@@ -129,7 +129,7 @@ const roundIconSvg = `
     <rect width="512" height="512" fill="url(#rd-bg-grad)" />
     <rect width="512" height="512" fill="url(#rd-ambient-glow)" />
 
-    <g transform="translate(56, 64) scale(4.0)">
+    <g transform="translate(56, 80) scale(4.0)">
       <circle cx="50" cy="43" r="22" fill="#E5A93D" opacity="0.35" />
       <rect x="14" y="17" width="72" height="52" rx="10" fill="#0B0B0F" stroke="url(#rd-gold-grad)" stroke-width="4.0" stroke-linecap="round" stroke-linejoin="round" />
       <path d="M 16 26 L 68 18 L 16 60 Z" fill="url(#rd-glass-grad)" />

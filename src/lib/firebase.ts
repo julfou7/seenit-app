@@ -54,10 +54,8 @@ async function fetchImageAsDataUrl(url?: string): Promise<string | undefined> {
   if (!url || typeof window === 'undefined') return undefined;
   if (url.startsWith('data:')) return url;
   
-  let fullUrl = url;
-  if (url.startsWith('/')) {
-    fullUrl = window.location.origin + url;
-  }
+  const fullUrl = normalizeImageUrl(url);
+  if (!fullUrl) return undefined;
 
   try {
     const controller = new AbortController();
@@ -133,15 +131,17 @@ export async function sendNativeNotification(title: string, options?: Notificati
         if (req.display !== 'granted') return;
       }
 
-      // Use normalized full HTTP/HTTPS URLs which Capacitor downloads native-side
-      const resolvedImage = normalizeImageUrl(imageUrl);
-      const resolvedIcon = normalizeImageUrl(iconUrl);
+      // Convert remote HTTP image URLs to Base64 Data URIs so native Android can render them
+      const [base64Backdrop, base64Poster] = await Promise.all([
+        imageUrl ? fetchImageAsDataUrl(imageUrl) : Promise.resolve(undefined),
+        iconUrl ? fetchImageAsDataUrl(iconUrl) : Promise.resolve(undefined)
+      ]);
 
-      const mainImage = resolvedImage || resolvedIcon;
-      const thumbImage = resolvedIcon || resolvedImage;
+      const mainImage = base64Backdrop || base64Poster;
+      const thumbImage = base64Poster || base64Backdrop;
 
       const attachments: any[] = [];
-      if (mainImage && mainImage.startsWith('http')) {
+      if (mainImage) {
         attachments.push({ id: 'photo', url: mainImage });
       }
 
@@ -168,7 +168,7 @@ export async function sendNativeNotification(title: string, options?: Notificati
           title: title,
           body: options?.body || '',
           largeBody: options?.body || '',
-          summaryText: 'SeenIt',
+          summaryText: 'Nouvel épisode',
           id: Math.floor(Math.random() * 1000000),
           schedule: { at: new Date(Date.now() + 100) },
           smallIcon: 'ic_stat_seenit',
