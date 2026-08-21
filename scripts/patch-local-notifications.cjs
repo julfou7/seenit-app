@@ -52,31 +52,20 @@ if (fs.existsSync(localNotificationPath)) {
 if (fs.existsSync(localNotificationManagerPath)) {
   let content = fs.readFileSync(localNotificationManagerPath, 'utf8');
 
-  if (!content.includes('NotificationCompat.BigPictureStyle')) {
-    if (!content.includes('import android.graphics.Bitmap')) {
-      content = content.replace(
-        'import android.graphics.Color',
-        'import android.graphics.Bitmap\nimport android.graphics.BitmapFactory\nimport android.graphics.Color'
-      );
-    }
-
+  // Add Bitmap imports if missing
+  if (!content.includes('import android.graphics.Bitmap')) {
     content = content.replace(
-      /mBuilder\.setLargeIcon\(localNotification\.resolveLargeIcon\(context\)\)/,
-      `val largeIconBitmap = localNotification.resolveLargeIcon(context)
-        if (largeIconBitmap != null) {
-            mBuilder.setLargeIcon(largeIconBitmap)
-        }`
+      'import android.graphics.Color',
+      'import android.graphics.Bitmap\nimport android.graphics.BitmapFactory\nimport android.graphics.Color'
     );
+  }
 
-    const oldStyleBlock = `        if (localNotification.largeBody != null) {
-            mBuilder.setStyle(
-                NotificationCompat.BigTextStyle()
-                    .bigText(localNotification.largeBody)
-                    .setSummaryText(localNotification.summaryText)
-            )
-        }`;
+  // Ensure fresh replacement for buildNotification logic
+  const originalOrPatchedStyleRegex = /var bigPictureBitmap: Bitmap\? = null[\s\S]*?mBuilder\.setStyle\(bigPicStyle\)[\s\S]*?mBuilder\.setStyle\(inboxStyle\)\s*\}/m;
+  const standardStyleRegex = /if \(localNotification\.largeBody != null\) \{\s*mBuilder\.setStyle\(\s*NotificationCompat\.BigTextStyle\(\)\s*\.bigText\(localNotification\.largeBody\)\s*\.setSummaryText\(localNotification\.summaryText\)\s*\)\s*\}\s*localNotification\.inboxList\?\.let \{\s*lines ->\s*val inboxStyle = NotificationCompat\.InboxStyle\(\)\s*for \(line in lines\) inboxStyle\.addLine\(line\)\s*inboxStyle\.setBigContentTitle\(localNotification\.title\)\s*inboxStyle\.setSummaryText\(localNotification\.summaryText\)\s*mBuilder\.setStyle\(inboxStyle\)\s*\}/m;
 
-    const newStyleBlock = `        var bigPictureBitmap: Bitmap? = null
+  const targetReplacement = `val largeIconBitmap = localNotification.resolveLargeIcon(context)
+        var bigPictureBitmap: Bitmap? = null
         val attachments = localNotification.attachments
         if (!attachments.isNullOrEmpty()) {
             for (attachment in attachments) {
@@ -113,10 +102,34 @@ if (fs.existsSync(localNotificationManagerPath)) {
                     .bigText(localNotification.largeBody)
                     .setSummaryText(localNotification.summaryText)
             )
+        }
+
+        localNotification.inboxList?.let { lines ->
+            val inboxStyle = NotificationCompat.InboxStyle()
+            for (line in lines) inboxStyle.addLine(line)
+            inboxStyle.setBigContentTitle(localNotification.title)
+            inboxStyle.setSummaryText(localNotification.summaryText)
+            mBuilder.setStyle(inboxStyle)
         }`;
 
-    content = content.replace(oldStyleBlock, newStyleBlock);
-    fs.writeFileSync(localNotificationManagerPath, content, 'utf8');
-    console.log('✅ Patched LocalNotificationManager.kt successfully.');
+  if (originalOrPatchedStyleRegex.test(content)) {
+    content = content.replace(originalOrPatchedStyleRegex, targetReplacement);
+  } else if (standardStyleRegex.test(content)) {
+    content = content.replace(standardStyleRegex, targetReplacement);
   }
+
+  // Handle setLargeIcon call in builder
+  content = content.replace(
+    /mBuilder\.setLargeIcon\(localNotification\.resolveLargeIcon\(context\)\)/g,
+    `if (largeIconBitmap != null) {\n            mBuilder.setLargeIcon(largeIconBitmap)\n        }`
+  );
+
+  // If there's duplicate 'val largeIconBitmap = localNotification.resolveLargeIcon(context)' later in the method, simplify it
+  content = content.replace(
+    /val largeIconBitmap = localNotification\.resolveLargeIcon\(context\)\s+if \(largeIconBitmap != null\) \{\s+mBuilder\.setLargeIcon\(largeIconBitmap\)\s+\}/g,
+    `if (largeIconBitmap != null) {\n            mBuilder.setLargeIcon(largeIconBitmap)\n        }`
+  );
+
+  fs.writeFileSync(localNotificationManagerPath, content, 'utf8');
+  console.log('✅ Patched LocalNotificationManager.kt successfully.');
 }
