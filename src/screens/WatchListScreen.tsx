@@ -819,23 +819,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
     // Si la série était dans "Pas vu depuis un moment", faire remonter le scroll vers "Continuer à regarder"
     if (wasInPasVu) {
       setTimeout(() => {
-        const container = document.getElementById('watchlist-container');
-        if (container) {
-          container.scrollTop = 0;
-          try {
-            container.scrollTo({ top: 0, behavior: 'smooth' });
-          } catch (e) {}
-        }
-        document.documentElement.scrollTop = 0;
-        document.body.scrollTop = 0;
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        
-        if (watchNextRef.current) {
-          try {
-            watchNextRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          } catch (e) {}
-        }
-        
+        document.getElementById('continue-watching-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         const continueCarousel = document.getElementById('continue-watching-carousel');
         if (continueCarousel) {
           continueCarousel.scrollLeft = 0;
@@ -844,7 +828,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
           } catch (e) {}
         }
         scrollAllCarouselsToStart();
-      }, 250);
+      }, 500);
     }
 
     showToast(
@@ -1027,7 +1011,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
         ) : (
           <>
             {/* Section A: À Regarder */}
-            <div ref={watchNextRef} className="scroll-mt-36">
+            <div ref={watchNextRef} id="continue-watching-section" className="scroll-mt-36">
           <ShowNewsFeed onShowClick={onShowClickProp} onNavigateToShow={onShowClickProp} />
 
           {continueWatchingShows.length > 0 && (
