@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { MessageCircle, ExternalLink, Lock } from 'lucide-react';
-import { Browser } from '@capacitor/browser';
+import { openExternalUrl } from '../../lib/utils';
 import { searchRedditDiscussions, RedditPost, RedditResponse } from '../../services/reddit';
 
 interface RedditSectionProps {
@@ -38,7 +38,7 @@ export function RedditSection({
   }, [query, isLocked]);
 
   const openLink = async (url: string) => {
-    await Browser.open({ url });
+    await openExternalUrl(url);
   };
 
   const searchUrl = `https://www.reddit.com/search/?q=${encodeURIComponent(query)}&sort=relevance`;
@@ -114,30 +114,31 @@ export function RedditSection({
           ))}
           <div 
             onClick={() => openLink(searchUrl)}
-            className="mt-2 text-center py-3 text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer font-medium"
+            className="mt-2 text-center py-3 text-xs text-[#E5A93D]/90 hover:text-[#E5A93D] transition-colors cursor-pointer font-medium flex items-center justify-center gap-1.5"
           >
-            Voir plus de discussions sur Reddit
+            <span>Ouvrir toutes les discussions dans l'application Reddit</span>
+            <ExternalLink size={13} />
           </div>
         </div>
       ) : (
         <div 
           onClick={() => openLink(searchUrl)}
-          className="group cursor-pointer rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 transition-all hover:bg-zinc-800/60 hover:border-[#E5A93D]/50 active:scale-[0.98] flex items-center justify-between"
+          className="group cursor-pointer rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 transition-all hover:bg-zinc-800/60 hover:border-[#E5A93D]/50 active:scale-[0.98] flex items-center justify-between shadow-lg"
         >
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-[#ff4500]/10 flex items-center justify-center">
-              <MessageCircle size={24} className="text-[#ff4500]" />
+            <div className="w-12 h-12 rounded-full bg-[#ff4500]/15 flex items-center justify-center shrink-0 border border-[#ff4500]/20">
+              <MessageCircle size={22} className="text-[#ff4500]" />
             </div>
             <div>
               <h3 className="text-white font-bold text-sm mb-1 group-hover:text-[#E5A93D] transition-colors">
-                Ouvrir la discussion de l'épisode sur Reddit
+                Ouvrir la discussion dans l'application Reddit
               </h3>
-              <p className="text-zinc-500 text-xs">
-                Lancer la recherche directement sur Reddit
+              <p className="text-zinc-400 text-xs">
+                Accéder directement aux avis, théories et spoilers du thread
               </p>
             </div>
           </div>
-          <ExternalLink size={20} className="text-zinc-600 group-hover:text-[#E5A93D] transition-colors" />
+          <ExternalLink size={18} className="text-zinc-500 group-hover:text-[#E5A93D] transition-colors shrink-0 ml-2" />
         </div>
       )}
     </div>

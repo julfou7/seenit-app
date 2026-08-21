@@ -39,6 +39,7 @@ function HistoryRowItem({
   idx,
   epTitle,
   onShowClick,
+  onEpisodeClick,
   setUnseenModalItem
 }: {
   key?: string;
@@ -46,6 +47,7 @@ function HistoryRowItem({
   idx: number;
   epTitle?: string;
   onShowClick?: (id: string, mediaType?: 'tv' | 'movie') => void;
+  onEpisodeClick?: (showId: string, season: number, episode: number) => void;
   setUnseenModalItem: (item: HistoryItem) => void;
 }) {
   const [providerLogo, setProviderLogo] = useState<string | null>(null);
@@ -73,10 +75,22 @@ function HistoryRowItem({
     providerName || (item.showNetworks && item.showNetworks.length > 0 ? item.showNetworks[0].name : null)
   );
 
+  const handleRowClick = () => {
+    if (item.mediaType === 'movie') {
+      if (onShowClick) onShowClick(item.showId, 'movie');
+    } else {
+      if (onEpisodeClick) {
+        onEpisodeClick(item.showId, item.season, item.episode);
+      } else if (onShowClick) {
+        onShowClick(item.showId, item.mediaType);
+      }
+    }
+  };
+
   return (
     <div 
       key={`${item.showId}-${item.season}x${item.episode}-${idx}`} 
-      onClick={() => { if (onShowClick) onShowClick(item.showId, item.mediaType); }}
+      onClick={handleRowClick}
       className="w-full flex items-stretch justify-between gap-3 bg-zinc-900/60 hover:bg-zinc-900/80 rounded-2xl overflow-hidden relative isolate transition-all active:scale-[0.98] cursor-pointer mb-3 group shadow-xl"
     >
       {/* OVERLAY PREMIUM : Bordure interne parfaite + Effet lumière */}
@@ -90,7 +104,7 @@ function HistoryRowItem({
       )}
 
       <div 
-        onClick={(e) => { e.stopPropagation(); if (onShowClick) onShowClick(item.showId, item.mediaType); }}
+        onClick={(e) => { e.stopPropagation(); handleRowClick(); }}
         className="w-[60px] sm:w-[70px] shrink-0 bg-zinc-950 rounded-l-2xl overflow-hidden flex items-center justify-center relative z-20 cursor-pointer"
       >
         {Boolean(item.showPoster) && (
@@ -104,7 +118,7 @@ function HistoryRowItem({
       <div className="flex-1 min-w-0 py-3 px-0.5 flex flex-col justify-center relative z-20">
         <div className={cn("flex items-center gap-2 min-w-0", networkLogo ? "pr-12" : "pr-1")}>
           <h4 
-            onClick={(e) => { e.stopPropagation(); if (onShowClick) onShowClick(item.showId, item.mediaType); }}
+            onClick={(e) => { e.stopPropagation(); handleRowClick(); }}
             className="text-[#E5A93D] font-extrabold text-xs sm:text-[13px] uppercase tracking-wider line-clamp-2 cursor-pointer hover:underline text-left leading-tight"
           >
             {item.showTitle}
@@ -145,7 +159,13 @@ function HistoryRowItem({
   );
 }
 
-export function HistoryFeed({ onShowClick }: { onShowClick?: (id: string, mediaType?: 'tv' | 'movie') => void }) {
+export function HistoryFeed({ 
+  onShowClick,
+  onEpisodeClick
+}: { 
+  onShowClick?: (id: string, mediaType?: 'tv' | 'movie') => void;
+  onEpisodeClick?: (showId: string, season: number, episode: number) => void;
+}) {
   const [page, setPage] = useState(1);
   const itemsPerPage = 20;
   
@@ -418,6 +438,7 @@ export function HistoryFeed({ onShowClick }: { onShowClick?: (id: string, mediaT
             idx={idx}
             epTitle={epTitle}
             onShowClick={onShowClick}
+            onEpisodeClick={onEpisodeClick}
             setUnseenModalItem={setUnseenModalItem}
           />
         );

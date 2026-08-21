@@ -1265,7 +1265,17 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
             <span className="text-lg">📜</span>
             <span>Historique</span>
           </h2>
-          <HistoryFeed onShowClick={onShowClick} />
+          <HistoryFeed 
+            onShowClick={onShowClick} 
+            onEpisodeClick={(showId, season, episode) => {
+              const show = allShows?.find(s => s.id === showId || s.tmdbId?.toString() === showId);
+              if (show) {
+                handleEpisodeClick(show, season, episode);
+              } else if (onShowClick) {
+                onShowClick(showId, 'tv');
+              }
+            }}
+          />
         </div>
         </>
         )}
