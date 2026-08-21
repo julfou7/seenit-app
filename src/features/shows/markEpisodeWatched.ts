@@ -5,7 +5,7 @@ import { useToastStore } from '../../store/toastStore';
 import { scrollAllCarouselsToStart } from '../../lib/utils';
 import { type Show } from '../../types';
 import { db, auth } from '../../lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 
 export async function markEpisodeWatched(
   showIdOrTmdbId: string | number,
@@ -119,10 +119,14 @@ export async function markEpisodeWatched(
     const user = auth.currentUser;
     if (user && targetShow.id) {
       try {
-        const cleanUpdates: any = {};
-        Object.entries(updates).forEach(([key, val]) => {
-          cleanUpdates[key] = val === undefined ? null : val;
-        });
+        const cleanUpdates: any = {
+          seenEpisodes: arrayUnion(epKey),
+          [`episodeRecords.${epKey}`]: newRecords[epKey],
+          lastWatchedAt: updates.lastWatchedAt,
+          nextEpisodeToWatch: updates.nextEpisodeToWatch === undefined ? null : updates.nextEpisodeToWatch,
+          status: updates.status,
+          updatedAt: updates.updatedAt
+        };
         await updateDoc(doc(db, 'users', user.uid, 'shows', targetShow.id), cleanUpdates);
       } catch (e) {
         console.error('[markEpisodeWatched] Direct Firestore update failed:', e);

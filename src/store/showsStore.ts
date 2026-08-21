@@ -46,74 +46,6 @@ let unsubscribeShowsListener: Unsubscribe | null = null;
 let currentListeningUid: string | null = null;
 
 /**
- * Fusionne en toute sécurité les données d'un snapshot remote avec le state local existant.
- * Préserve les modifications optimistes locales (non encore confirmées par le cloud ou plus récentes)
- * et cumule les épisodes vus / historiques sans écraser le state.
- */
-function mergeWithLocalState(remoteShows: Show[], localShows: Show[]): Show[] {
-  const mergedMap = new Map<string, Show>();
-
-  const getShowKey = (s: Show): string => {
-    const tmdbIdNum = Number(s.tmdbId);
-    const mType = s.mediaType || 'tv';
-    if (tmdbIdNum && !isNaN(tmdbIdNum)) {
-      return `${mType}_tmdb_${tmdbIdNum}`;
-    }
-    return `doc_${s.id}`;
-  };
-
-  const remoteMap = new Map<string, Show>();
-  for (const remote of remoteShows) {
-    const key = getShowKey(remote);
-    remoteMap.set(key, remote);
-  }
-
-  for (const local of localShows) {
-    const key = getShowKey(local);
-    const remote = remoteMap.get(key);
-
-    if (!remote) {
-      // Élément local absent du snapshot remote.
-      // S'il est marqué isSynced === false ou récent (< 30 sec), conserver la version locale optimiste !
-      const isPendingLocal = local.isSynced === false || (Date.now() - (local.updatedAt || 0) < 30000);
-      if (isPendingLocal) {
-        mergedMap.set(key, local);
-      }
-    } else {
-      // Élément présent à la fois localement et dans le snapshot remote
-      // Fusion cumulative des épisodes vus et des enregistrements
-      const mergedSeen = Array.from(new Set([
-        ...(remote.seenEpisodes || []),
-        ...(local.seenEpisodes || [])
-      ]));
-      const mergedRecords = {
-        ...(remote.episodeRecords || {}),
-        ...(local.episodeRecords || {})
-      };
-
-      const localIsNewerOrPending = local.isSynced === false || (local.updatedAt || 0) > (remote.updatedAt || 0);
-      const baseObj = localIsNewerOrPending ? { ...remote, ...local } : { ...local, ...remote };
-
-      mergedMap.set(key, {
-        ...baseObj,
-        seenEpisodes: mergedSeen,
-        episodeRecords: mergedRecords,
-        updatedAt: Math.max(local.updatedAt || 0, remote.updatedAt || 0)
-      });
-
-      remoteMap.delete(key);
-    }
-  }
-
-  for (const [, remote] of remoteMap.entries()) {
-    const key = getShowKey(remote);
-    mergedMap.set(key, remote);
-  }
-
-  return deduplicateAndMergeShows(Array.from(mergedMap.values()));
-}
-
-/**
  * Fusionne et déduplique intelligemment les séries (en combinant seenEpisodes et records)
  */
 function deduplicateAndMergeShows(rawShows: Show[]): Show[] {
@@ -244,8 +176,7 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
         snapshot.forEach((doc) => {
           remoteShows.push({ ...doc.data(), id: String(doc.id) } as Show);
         });
-        const currentLocalShows = get().shows;
-        const merged = mergeWithLocalState(remoteShows, currentLocalShows);
+        const merged = deduplicateAndMergeShows(remoteShows);
         saveToLocalStorage(merged);
         set({ shows: merged, loading: false, initialized: true });
       }, (err: any) => {

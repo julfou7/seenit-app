@@ -819,7 +819,8 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
     // Si la série était dans "Pas vu depuis un moment", faire remonter le scroll vers "Continuer à regarder"
     if (wasInPasVu) {
       setTimeout(() => {
-        document.getElementById('continue-watching-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const container = document.getElementById('watchlist-container');
+        if (container) container.scrollTo({ top: 0, behavior: 'smooth' });
         const continueCarousel = document.getElementById('continue-watching-carousel');
         if (continueCarousel) {
           continueCarousel.scrollLeft = 0;
@@ -828,7 +829,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
           } catch (e) {}
         }
         scrollAllCarouselsToStart();
-      }, 500);
+      }, 300);
     }
 
     showToast(
