@@ -145,8 +145,16 @@ export function SettingsScreen() {
           } else if (localPlatforms.length > 0) {
             await setDoc(prefRef, { platforms: localPlatforms }, { merge: true });
           }
-        } catch (e) {
-          console.error('[Settings] Error syncing cloud streaming platforms', e);
+        } catch (e: any) {
+          const errorMessage = e?.message || String(e);
+          const isOffline = !navigator.onLine || 
+                            errorMessage.toLowerCase().includes('offline') || 
+                            e?.code === 'unavailable';
+          if (isOffline) {
+            console.warn('[Settings] Client is offline, using local cached streaming platforms:', errorMessage);
+          } else {
+            console.error('[Settings] Error syncing cloud streaming platforms', e);
+          }
         }
       }
     });

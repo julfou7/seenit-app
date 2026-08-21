@@ -65,8 +65,16 @@ export default function App() {
           } else if (localPlatforms.length > 0) {
             await setDoc(prefRef, { platforms: localPlatforms }, { merge: true });
           }
-        } catch (e) {
-          console.error('[App] Error syncing user streaming platforms from cloud', e);
+        } catch (e: any) {
+          const errorMessage = e?.message || String(e);
+          const isOffline = !navigator.onLine || 
+                            errorMessage.toLowerCase().includes('offline') || 
+                            e?.code === 'unavailable';
+          if (isOffline) {
+            console.warn('[App] Client is offline, using local cached streaming platforms:', errorMessage);
+          } else {
+            console.error('[App] Error syncing user streaming platforms from cloud', e);
+          }
         }
       }
     });
