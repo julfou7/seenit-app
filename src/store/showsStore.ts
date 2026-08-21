@@ -16,6 +16,7 @@ interface ShowsState {
   removeShowOptimistic: (id: string) => void;
   addShowOptimistic: (show: Show) => void;
   fetchShows: () => Promise<void>;
+  forceResync: () => void;
 }
 
 const getInitialCache = (): { shows: Show[]; loading: boolean } => {
@@ -40,6 +41,9 @@ const saveToLocalStorage = (shows: Show[]) => {
     localStorage.setItem('cached_shows_v1', JSON.stringify(shows));
   } catch (e) {}
 };
+
+let unsubscribeShowsListener: Unsubscribe | null = null;
+let currentListeningUid: string | null = null;
 
 /**
  * Fusionne et déduplique intelligemment les séries (en combinant seenEpisodes et records)
@@ -102,7 +106,7 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
   updateShowOptimistic: (id, updates) => {
     set(state => {
       const updatedShows = state.shows.map(show => 
-        show.id === id ? { ...show, ...updates } : show
+        (show.id === id || (show.tmdbId && updates.tmdbId && Number(show.tmdbId) === Number(updates.tmdbId))) ? { ...show, ...updates } : show
       );
       saveToLocalStorage(updatedShows);
       return { shows: updatedShows };
@@ -119,7 +123,10 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
   
   addShowOptimistic: (show) => {
     set(state => {
-      const existingIdx = state.shows.findIndex(s => s.id === show.id || (s.tmdbId && show.tmdbId && s.tmdbId === show.tmdbId && s.mediaType === show.mediaType));
+      const existingIdx = state.shows.findIndex(s => 
+        s.id === show.id || 
+        (s.tmdbId && show.tmdbId && Number(s.tmdbId) === Number(show.tmdbId) && s.mediaType === show.mediaType)
+      );
       let updatedShows: Show[];
       if (existingIdx >= 0) {
         updatedShows = state.shows.map((s, idx) => idx === existingIdx ? { ...s, ...show } : s);
@@ -129,6 +136,15 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
       saveToLocalStorage(updatedShows);
       return { shows: updatedShows };
     });
+  },
+
+  forceResync: () => {
+    if (unsubscribeShowsListener) {
+      try { unsubscribeShowsListener(); } catch (e) {}
+      unsubscribeShowsListener = null;
+    }
+    currentListeningUid = null;
+    get().fetchShows();
   },
   
   fetchShows: async () => {
@@ -140,12 +156,20 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
     }
     
     if (unsubscribeShowsListener) {
-      // Déjà en écoute
-      return;
+      if (currentListeningUid === user.uid) {
+        // Déjà en écoute sur le bon utilisateur
+        return;
+      } else {
+        // L'utilisateur a changé, nettoyer l'ancien listener
+        try { unsubscribeShowsListener(); } catch (e) {}
+        unsubscribeShowsListener = null;
+        currentListeningUid = null;
+      }
     }
     
     try {
       const showsRef = collection(db, 'users', user.uid, 'shows');
+      currentListeningUid = user.uid;
       
       unsubscribeShowsListener = onSnapshot(showsRef, (snapshot) => {
         const remoteShows: Show[] = [];
@@ -156,6 +180,13 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
         saveToLocalStorage(merged);
         set({ shows: merged, loading: false, initialized: true });
       }, (err: any) => {
+        // En cas d'erreur sur l'écouteur, réinitialiser la référence pour autoriser une nouvelle tentative
+        if (unsubscribeShowsListener) {
+          try { unsubscribeShowsListener(); } catch (e) {}
+          unsubscribeShowsListener = null;
+        }
+        currentListeningUid = null;
+
         const errStr = err?.message || String(err);
         const isQuotaError = 
           err?.code === 'resource-exhausted' || 
@@ -174,19 +205,23 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
       });
     } catch (err) {
       console.error('[showsStore] Failed to setup realtime listener:', err);
+      if (unsubscribeShowsListener) {
+        try { unsubscribeShowsListener(); } catch (e) {}
+        unsubscribeShowsListener = null;
+      }
+      currentListeningUid = null;
       set({ loading: false });
     }
   }
 }));
 
-let unsubscribeShowsListener: Unsubscribe | null = null;
-
 auth.onAuthStateChanged(user => {
   if (!user) {
     if (unsubscribeShowsListener) {
-      unsubscribeShowsListener();
+      try { unsubscribeShowsListener(); } catch (e) {}
       unsubscribeShowsListener = null;
     }
+    currentListeningUid = null;
     useShowsStore.getState().setShows([]);
     useShowsStore.getState().setLoading(false);
     useShowsStore.getState().setInitialized(false);

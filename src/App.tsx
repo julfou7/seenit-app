@@ -136,6 +136,24 @@ function MainApp() {
     useSyncStore.getState().resetQuotaError();
     // Nettoyage asynchrone du cache IndexedDB pour libérer de la mémoire
     cleanOldCache();
+
+    // Re-synchronisation automatique au retour au premier plan
+    const handleFocus = () => {
+      useShowsStore.getState().fetchShows();
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        useShowsStore.getState().fetchShows();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
 

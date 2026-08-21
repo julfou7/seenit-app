@@ -821,16 +821,30 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
       setTimeout(() => {
         const container = document.getElementById('watchlist-container');
         if (container) {
-          container.scrollTo({ top: 0, behavior: 'smooth' });
+          container.scrollTop = 0;
+          try {
+            container.scrollTo({ top: 0, behavior: 'smooth' });
+          } catch (e) {}
         }
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
         window.scrollTo({ top: 0, behavior: 'smooth' });
-        watchNextRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        if (watchNextRef.current) {
+          try {
+            watchNextRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          } catch (e) {}
+        }
+        
         const continueCarousel = document.getElementById('continue-watching-carousel');
         if (continueCarousel) {
-          continueCarousel.scrollTo({ left: 0, behavior: 'smooth' });
+          continueCarousel.scrollLeft = 0;
+          try {
+            continueCarousel.scrollTo({ left: 0, behavior: 'smooth' });
+          } catch (e) {}
         }
         scrollAllCarouselsToStart();
-      }, 350);
+      }, 250);
     }
 
     showToast(
