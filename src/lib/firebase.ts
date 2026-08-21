@@ -111,7 +111,41 @@ function normalizeImageUrl(url?: string): string | undefined {
   return url;
 }
 
-export async function sendNativeNotification(title: string, options?: NotificationOptions & { image?: string; icon?: string; badge?: string; data?: any; showId?: string | number; tmdbId?: number; mediaType?: string; season?: number; episode?: number }) {
+export interface NativeNotificationOptions extends NotificationOptions {
+  image?: string;
+  icon?: string;
+  badge?: string;
+  data?: any;
+  showId?: string | number;
+  tmdbId?: number;
+  mediaType?: string;
+  season?: number;
+  episode?: number;
+  scheduleDate?: Date;
+  notificationId?: number;
+}
+
+export function generateNotificationNumericId(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash |= 0;
+  }
+  return Math.abs(hash) % 2000000000;
+}
+
+export async function cancelScheduledNotification(id: number) {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await LocalNotifications.cancel({ notifications: [{ id }] });
+    } catch (err) {
+      console.warn('cancelScheduledNotification error:', err);
+    }
+  }
+}
+
+export async function sendNativeNotification(title: string, options?: NativeNotificationOptions) {
   const iconUrl = options?.icon || (options as any)?.image || 'https://seenit.app/icon-192.png';
   const imageUrl = (options as any)?.image || options?.icon;
   const extraData = (options as any)?.data || {
@@ -121,6 +155,16 @@ export async function sendNativeNotification(title: string, options?: Notificati
     season: options?.season,
     episode: options?.episode
   };
+
+  const notificationId = options?.notificationId ?? (
+    options?.showId && options?.season !== undefined && options?.episode !== undefined
+      ? generateNotificationNumericId(`ep_${options.showId}_S${options.season}E${options.episode}`)
+      : Math.floor(Math.random() * 1000000)
+  );
+
+  const targetDate = options?.scheduleDate && options.scheduleDate.getTime() > Date.now()
+    ? options.scheduleDate
+    : new Date(Date.now() + 100);
 
   // On Native Capacitor Android App, use LocalNotifications plugin
   if (Capacitor.isNativePlatform()) {
@@ -169,8 +213,11 @@ export async function sendNativeNotification(title: string, options?: Notificati
           body: options?.body || '',
           largeBody: options?.body || '',
           summaryText: 'Nouvel épisode',
-          id: Math.floor(Math.random() * 1000000),
-          schedule: { at: new Date(Date.now() + 100) },
+          id: notificationId,
+          schedule: { 
+            at: targetDate,
+            allowWhileIdle: true
+          },
           smallIcon: 'ic_stat_seenit',
           iconColor: '#E5A93D',
           largeIcon: thumbImage,
@@ -190,6 +237,18 @@ export async function sendNativeNotification(title: string, options?: Notificati
     } catch (err) {
       console.warn('LocalNotifications native schedule failed:', err);
     }
+  }
+
+  // If not future schedule on web, trigger web notification
+  if (options?.scheduleDate && options.scheduleDate.getTime() > Date.now()) {
+    // Web scheduled reminder in memory timer
+    const delay = options.scheduleDate.getTime() - Date.now();
+    if (delay < 24 * 60 * 60 * 1000) {
+      setTimeout(() => {
+        sendNativeNotification(title, { ...options, scheduleDate: undefined });
+      }, delay);
+    }
+    return;
   }
 
   if (typeof window === 'undefined' || !('Notification' in window)) return;

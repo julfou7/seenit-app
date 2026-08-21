@@ -292,10 +292,10 @@ export function SettingsScreen() {
         <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 sm:p-5">
           <div className="flex items-center gap-2.5 mb-2.5">
             <Bell className="text-[#E5A93D]" size={18} />
-            <h2 className="font-bold text-sm text-zinc-100">Notifications & Rappels Android</h2>
+            <h2 className="font-bold text-sm text-zinc-100">Notifications & Rappels Android (09h00)</h2>
           </div>
           <p className="text-xs text-zinc-400 mb-3 leading-relaxed font-medium">
-            Activez les notifications système pour recevoir des rappels le jour de la sortie de vos séries.
+            Activez les notifications système pour être alerté automatiquement chaque matin à <strong>09h00</strong> dès qu'un nouvel épisode de vos séries sort.
           </p>
 
           {typeof window !== 'undefined' && window.self !== window.top && (

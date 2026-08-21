@@ -1,5 +1,6 @@
 import React from 'react';
 import Markdown from 'react-markdown';
+import { cn } from '../lib/utils';
 
 interface ChangelogViewerProps {
   content: string;
@@ -69,7 +70,7 @@ function fixFrenchFormatting(text: string): string {
 }
 
 /**
- * Transforms raw GitHub release text into clean, readable Markdown without mangling headers and subheadings.
+ * Transforms raw GitHub release text into clean, readable Markdown preserving multi-level hierarchy.
  */
 function cleanReleaseNotes(raw: string): string {
   if (!raw || !raw.trim()) {
@@ -89,13 +90,15 @@ function cleanReleaseNotes(raw: string): string {
 - **Mises à jour & correctifs** : Améliorations de la stabilité, correctifs d'affichage et optimisations générales.`;
   }
 
-  // Pre-process inline bullets "• " into newlines with bullet points
-  text = text.replace(/([^\n])\s*[•]\s*/g, '$1\n- ');
-
   const lines = text.split('\n');
   const filteredLines: string[] = [];
 
   for (const line of lines) {
+    // Determine leading whitespace indentation (e.g. 2 spaces, 4 spaces, tab)
+    const matchIndent = line.match(/^(\s+)/);
+    const indentSpaces = matchIndent ? matchIndent[1].length : 0;
+    const isSubLevel = indentSpaces >= 2;
+
     let trimmed = line.trim();
     if (
       !trimmed ||
@@ -106,39 +109,44 @@ function cleanReleaseNotes(raw: string): string {
       continue;
     }
 
-    // Replace leading '• ' with '- '
-    if (/^[•]\s+/.test(trimmed)) {
-      trimmed = trimmed.replace(/^[•]\s+/, '- ');
-    }
-
     // Clean commit logs like "* feat(splash): ... by @username in https://..."
-    let cleanedLine = trimmed
-      .replace(/\s+by\s+@[\w-]+(?:\s+in\s+https?:\/\/[^\s]+)?/gi, '')
-      .replace(/^-?\s*(feat|fix|perf|refactor|chore|style|docs|build)(?:\([^\)]+\))?:\s*/i, (match, type) => {
-        const t = type.toLowerCase();
-        if (t === 'feat') return '- ✨ **Nouveauté** : ';
-        if (t === 'fix') return '- 🛠️ **Correction** : ';
-        if (t === 'perf') return '- ⚡ **Performance** : ';
-        if (t === 'style') return '- 🎨 **Interface** : ';
-        return '- 🔹 ';
-      });
+    trimmed = trimmed.replace(/\s+by\s+@[\w-]+(?:\s+in\s+https?:\/\/[^\s]+)?/gi, '');
 
-    // Check if this line is a section subtitle (e.g. ends with `:` and doesn't start with list item or heading)
-    const isHeader = cleanedLine.startsWith('#');
-    const isBullet = cleanedLine.startsWith('- ') || cleanedLine.startsWith('* ');
-    const isSectionSubtitle = !isHeader && !isBullet && cleanedLine.endsWith(':');
+    // Replace Conventional Commit prefix
+    trimmed = trimmed.replace(/^-?\s*(feat|fix|perf|refactor|chore|style|docs|build)(?:\([^\)]+\))?:\s*/i, (match, type) => {
+      const t = type.toLowerCase();
+      if (t === 'feat') return '- ✨ **Nouveauté** : ';
+      if (t === 'fix') return '- 🛠️ **Correction** : ';
+      if (t === 'perf') return '- ⚡ **Performance** : ';
+      if (t === 'style') return '- 🎨 **Interface** : ';
+      return '- 🔹 ';
+    });
 
-    if (isSectionSubtitle) {
-      // Make it a bold subtitle with margin
-      if (!cleanedLine.startsWith('**')) {
-        cleanedLine = `\n**${cleanedLine}**`;
-      }
+    // Check if line is a category title (e.g. ends with `:` or is bolded category header, even if prefixed with a bullet)
+    const isAlreadyHeader = trimmed.startsWith('#');
+    const endsWithColon = trimmed.endsWith(':') || trimmed.endsWith(' :');
+    const isCategoryTitle = !isAlreadyHeader && endsWithColon && !isSubLevel;
+
+    if (isCategoryTitle) {
+      // Remove leading bullet if any (e.g. "• Nettoyage :" or "- Nettoyage :")
+      const cleanTitle = trimmed.replace(/^[•\-\*]\s+/, '').replace(/\s*:$/, '');
+      // Format as Markdown Level 4 Subheading
+      filteredLines.push(`\n#### 📌 ${fixFrenchFormatting(cleanTitle)}`);
+      continue;
     }
 
-    // Apply french formatting (accents & apostrophes)
-    cleanedLine = fixFrenchFormatting(cleanedLine);
-
-    filteredLines.push(cleanedLine);
+    // Standard Bullet Point formatting
+    if (/^[•\-\*]\s+/.test(trimmed)) {
+      const itemContent = trimmed.replace(/^[•\-\*]\s+/, '');
+      const prefix = isSubLevel ? '    - ' : '- ';
+      filteredLines.push(`${prefix}${fixFrenchFormatting(itemContent)}`);
+    } else if (isAlreadyHeader) {
+      filteredLines.push(fixFrenchFormatting(trimmed));
+    } else {
+      // Regular text or paragraph
+      const prefix = isSubLevel ? '    ' : '';
+      filteredLines.push(`${prefix}${fixFrenchFormatting(trimmed)}`);
+    }
   }
 
   const result = filteredLines.join('\n').trim();
@@ -154,8 +162,45 @@ export function ChangelogViewer({ content }: ChangelogViewerProps) {
   const formattedContent = cleanReleaseNotes(content);
 
   return (
-    <div className="text-xs text-zinc-300 space-y-2 leading-relaxed [&_h3]:text-sm [&_h3]:font-black [&_h3]:text-amber-400 [&_h3]:mt-1 [&_h3]:mb-3 [&_h4]:text-xs [&_h4]:font-bold [&_h4]:text-amber-300 [&_ul]:space-y-2.5 [&_ul]:my-2 [&_li]:list-disc [&_li]:ml-4 [&_li]:pl-1 [&_strong]:text-white [&_strong]:font-bold [&_strong]:text-zinc-100 [&_p]:my-2">
-      <Markdown>{formattedContent}</Markdown>
+    <div className="text-xs text-zinc-300 leading-relaxed max-h-[60vh] overflow-y-auto pr-1">
+      <Markdown
+        components={{
+          h3: ({ children }) => (
+            <h3 className="text-sm font-black text-amber-400 mt-2 mb-2 pb-1 border-b border-amber-500/20 flex items-center gap-1.5 tracking-tight">
+              {children}
+            </h3>
+          ),
+          h4: ({ children }) => (
+            <h4 className="text-xs font-bold text-amber-300/90 mt-3 mb-1.5 pl-0.5 tracking-tight flex items-center gap-1">
+              {children}
+            </h4>
+          ),
+          ul: ({ children, depth }: any) => {
+            const isNested = depth > 0;
+            return (
+              <ul className={cn(
+                "space-y-1.5 my-1.5",
+                isNested ? "pl-4 border-l border-zinc-700/60 ml-2 py-0.5" : "pl-1"
+              )}>
+                {children}
+              </ul>
+            );
+          },
+          li: ({ children }: any) => (
+            <li className="text-zinc-300 list-disc ml-3 text-xs leading-relaxed marker:text-amber-400/80">
+              {children}
+            </li>
+          ),
+          strong: ({ children }) => (
+            <strong className="text-white font-bold">{children}</strong>
+          ),
+          p: ({ children }) => (
+            <p className="my-1.5 leading-relaxed text-zinc-300">{children}</p>
+          )
+        }}
+      >
+        {formattedContent}
+      </Markdown>
     </div>
   );
 }
