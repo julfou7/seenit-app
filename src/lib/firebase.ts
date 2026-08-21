@@ -26,14 +26,14 @@ export const db = initializeFirestore(
       ? memoryLocalCache() 
       : persistentLocalCache({ tabManager: persistentMultipleTabManager() })
   },
-  (firebaseConfig as any).firestoreDatabaseId || 'default'
+  (firebaseConfig as any).firestoreDatabaseId || '(default)'
 );
 
 // Log diagnostic for Firestore initialization
 try {
   const cacheType = isNative ? 'MÉMOIRE (Évite les blocages de verrous Android)' : 'PERSISTANT (Multi-onglets PWA)';
   setTimeout(() => {
-    useLogStore.getState().addLog(`[Système] Firestore initialisé avec cache ${cacheType} sur base '${(firebaseConfig as any).firestoreDatabaseId || 'default'}'`, 'info');
+    useLogStore.getState().addLog(`[Système] Firestore initialisé avec cache ${cacheType} sur base '${(firebaseConfig as any).firestoreDatabaseId || '(default)'}'`, 'info');
   }, 1000);
 } catch (e) {}
 

@@ -4,6 +4,7 @@ import { collection, query, getDocs, getDocsFromCache, getDocsFromServer } from 
 import { type Show } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/firebaseErrors';
 import { useSyncStore } from './syncStore';
+import { appLogger } from './logStore';
 
 interface ShowsState {
   shows: Show[];
@@ -194,7 +195,12 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
   
   fetchShows: async () => {
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user) {
+      appLogger.warn('auth', '[showsStore] fetchShows ignoré car aucun utilisateur n\'est connecté');
+      return;
+    }
+    
+    appLogger.info('sync', `[showsStore] Début de fetchShows pour l'utilisateur UID: ${user.uid}`);
     
     if (!get().initialized && get().shows.length === 0) {
       set({ loading: true });
@@ -206,26 +212,34 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
 
       // 1. Tenter de lire depuis le cache local Firestore pour un affichage instantané
       try {
+        appLogger.info('sync', `[showsStore] Tentative de lecture depuis le cache Firestore local...`);
         const cachedSnapshot = await getDocsFromCache(q);
         if (!cachedSnapshot.empty) {
           const cachedShows: Show[] = [];
           cachedSnapshot.forEach((doc) => {
             cachedShows.push({ ...doc.data(), id: String(doc.id) } as Show);
           });
+          appLogger.success('sync', `[showsStore] Cache Firestore local lu avec succès : ${cachedSnapshot.size} séries trouvées`);
           const merged = deduplicateAndMergeShows(cachedShows, get().shows);
           saveToLocalStorage(merged);
           set({ shows: merged, loading: false, initialized: true });
+        } else {
+          appLogger.info('sync', `[showsStore] Cache Firestore local vide ou indisponible`);
         }
-      } catch (cacheErr) {
-        // Le cache peut être vide
+      } catch (cacheErr: any) {
+        appLogger.info('sync', `[showsStore] Cache local non disponible : ${cacheErr?.message || cacheErr}`);
       }
 
       // 2. Fetch depuis le réseau (FORCÉ DEPUIS LE SERVEUR pour casser le cache PWA)
       let snapshot;
       try {
+        appLogger.info('sync', `[showsStore] Récupération forcée depuis le serveur Firestore (getDocsFromServer)...`);
         snapshot = await getDocsFromServer(q);
-      } catch (e) {
+        appLogger.success('sync', `[showsStore] Récupération serveur réussie : ${snapshot.size} documents chargés`);
+      } catch (e: any) {
+        appLogger.warn('sync', `[showsStore] Échec de getDocsFromServer : ${e?.message || e}. Tentative de getDocs standard...`);
         snapshot = await getDocs(q);
+        appLogger.success('sync', `[showsStore] Récupération getDocs standard réussie : ${snapshot.size} documents chargés`);
       }
       
       const rawLoadedShows: Show[] = [];
@@ -233,12 +247,16 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
         rawLoadedShows.push({ ...doc.data(), id: String(doc.id) } as Show);
       });
 
+      appLogger.info('sync', `[showsStore] Fusion de ${rawLoadedShows.length} séries Firestore avec les données locales (${get().shows.length} séries actuellement)`);
       const loadedShows = deduplicateAndMergeShows(rawLoadedShows, get().shows);
 
       saveToLocalStorage(loadedShows);
       set({ shows: loadedShows, loading: false, initialized: true });
+      appLogger.success('sync', `[showsStore] Chargement et fusion terminés. Total : ${loadedShows.length} séries en mémoire.`);
     } catch (err: any) {
       const errStr = err?.message || String(err);
+      appLogger.error('sync', `[showsStore] Erreur fatale lors de fetchShows : ${errStr}`, err);
+      
       const isQuotaError = 
         err?.code === 'resource-exhausted' || 
         errStr.toLowerCase().includes('quota exceeded') || 
