@@ -1,11 +1,10 @@
 import { useShowsStore } from '../../store/showsStore';
 import { tmdb } from './tmdb';
-import { syncSingleItem } from '../../hooks/useDetailsSyncWorker';
 import { useToastStore } from '../../store/toastStore';
 import { scrollAllCarouselsToStart } from '../../lib/utils';
 import { type Show } from '../../types';
 import { db, auth } from '../../lib/firebase';
-import { doc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 
 export async function markEpisodeWatched(
   showIdOrTmdbId: string | number,
@@ -31,27 +30,21 @@ export async function markEpisodeWatched(
   const sNumStr = String(sNum).padStart(2, '0');
   const eNumStr = String(eNum).padStart(2, '0');
 
-  // Save previous state for undo capability
+  // Sauvegarde de l'état précédent pour l'annulation (undo)
   const prevSeenEpisodes = targetShow.seenEpisodes || [];
   const prevEpisodeRecords = targetShow.episodeRecords || {};
   const prevLastWatchedAt = targetShow.lastWatchedAt || null;
   const prevNextEpisodeToWatch = targetShow.nextEpisodeToWatch || null;
   const prevStatus = targetShow.status;
 
-  const newSeen = new Set(prevSeenEpisodes);
-  newSeen.add(epKey);
+  const newSeenSet = new Set(prevSeenEpisodes);
+  newSeenSet.add(epKey);
+  const newSeenArray = Array.from(newSeenSet);
 
-  const newRecords = { ...prevEpisodeRecords };
-  newRecords[epKey] = {
-    watchedAt: Date.now(),
-    episodeTitle: prevEpisodeRecords[epKey]?.episodeTitle || null,
-    ...(newRecords[epKey] || {})
-  };
-
-  // Try to get episode title & next episode
+  // Recherche du titre de l'épisode et du prochain épisode via TMDB
+  let fetchedEpTitle: string | null = null;
   let optimisticNextEp: any = null;
   const totalEps = targetShow.totalAiredEpisodes || targetShow.totalEpisodes || 0;
-  const newSeenArray = Array.from(newSeen as Set<string>);
 
   if (targetShow.tmdbId) {
     try {
@@ -59,14 +52,14 @@ export async function markEpisodeWatched(
       if (seasonRes.ok && seasonRes.value?.episodes) {
         const curEp = seasonRes.value.episodes.find((x: any) => x.episode_number === eNum);
         if (curEp && curEp.name) {
-          newRecords[epKey].episodeTitle = curEp.name;
+          fetchedEpTitle = curEp.name;
         }
 
         if (totalEps > 0 && newSeenArray.length >= totalEps) {
           optimisticNextEp = null;
         } else {
           // Trouver le premier épisode non vu de la saison
-          const nextInSeason = seasonRes.value.episodes.find((x: any) => x.episode_number > eNum && !newSeen.has(`${sNum}x${x.episode_number}`));
+          const nextInSeason = seasonRes.value.episodes.find((x: any) => x.episode_number > eNum && !newSeenSet.has(`${sNum}x${x.episode_number}`));
           if (nextInSeason) {
             optimisticNextEp = {
               season_number: nextInSeason.season_number,
@@ -82,7 +75,7 @@ export async function markEpisodeWatched(
           } else {
             const nextSeasonRes = await tmdb.getSeasonDetails(targetShow.tmdbId, sNum + 1);
             if (nextSeasonRes.ok && nextSeasonRes.value?.episodes) {
-              const nextSeasonUnseen = nextSeasonRes.value.episodes.find((x: any) => !newSeen.has(`${sNum + 1}x${x.episode_number}`));
+              const nextSeasonUnseen = nextSeasonRes.value.episodes.find((x: any) => !newSeenSet.has(`${sNum + 1}x${x.episode_number}`));
               if (nextSeasonUnseen) {
                 optimisticNextEp = {
                   season_number: nextSeasonUnseen.season_number,
@@ -108,15 +101,24 @@ export async function markEpisodeWatched(
   // Fallback si TMDB n'a pas répondu ou est indisponible
   if (!optimisticNextEp && (totalEps === 0 || newSeenArray.length < totalEps)) {
     let checkEp = eNum + 1;
-    while (newSeen.has(`${sNum}x${checkEp}`) && checkEp <= 100) {
+    while (newSeenSet.has(`${sNum}x${checkEp}`) && checkEp <= 100) {
       checkEp++;
     }
     optimisticNextEp = { season_number: sNum, episode_number: checkEp };
   }
 
-  const updates: Partial<Show> = {
+  const episodeTitle = fetchedEpTitle || optimisticNextEp?.name || null;
+
+  // 1. Mise à jour optimiste dans le store local Zustand pour réactivité instantanée UI
+  const localUpdates: Partial<Show> = {
     seenEpisodes: newSeenArray,
-    episodeRecords: newRecords,
+    episodeRecords: {
+      ...prevEpisodeRecords,
+      [epKey]: {
+        watchedAt: Date.now(),
+        episodeTitle
+      }
+    },
     lastWatchedAt: Date.now(),
     nextEpisodeToWatch: optimisticNextEp,
     status: targetShow.status === 'plan_to_watch' ? 'watching' : targetShow.status,
@@ -124,29 +126,36 @@ export async function markEpisodeWatched(
     isSynced: false
   };
 
-  if (updateShowFn) {
-    await updateShowFn(targetShow.id, updates);
-  } else {
-    useShowsStore.getState().updateShowOptimistic(targetShow.id, updates);
-    const user = auth.currentUser;
-    if (user && targetShow.id) {
-      try {
-        const firestoreUpdates: Record<string, any> = {
-          seenEpisodes: arrayUnion(epKey),
-          [`episodeRecords.${epKey}`]: {
-            watchedAt: Date.now(),
-            episodeTitle: newRecords[epKey]?.episodeTitle || optimisticNextEp?.name || null
-          },
-          lastWatchedAt: Date.now(),
-          nextEpisodeToWatch: optimisticNextEp === undefined ? null : optimisticNextEp,
-          status: targetShow.status === 'plan_to_watch' ? 'watching' : targetShow.status,
-          updatedAt: Date.now(),
-          isSynced: false
-        };
-        await updateDoc(doc(db, 'users', user.uid, 'shows', targetShow.id), firestoreUpdates);
-      } catch (e) {
-        console.error('[markEpisodeWatched] Direct Firestore update failed:', e);
+  useShowsStore.getState().updateShowOptimistic(targetShow.id, localUpdates);
+
+  // 2. Envoi strict et ciblé à Firestore avec la notation pointée (dot-notation)
+  const user = auth.currentUser;
+  if (user && targetShow.id) {
+    try {
+      const updatePayload: any = {
+        seenEpisodes: arrayUnion(epKey),
+        lastWatchedAt: Date.now(),
+        updatedAt: Date.now(),
+        isSynced: false
+      };
+
+      // Seule la clé spécifique de l'épisode est mise à jour dans le dictionnaire
+      updatePayload[`episodeRecords.${epKey}`] = {
+        watchedAt: Date.now(),
+        episodeTitle
+      };
+
+      // Mise à jour du prochain épisode et du statut si nécessaire
+      if (optimisticNextEp !== undefined) {
+        updatePayload.nextEpisodeToWatch = optimisticNextEp;
       }
+      if (targetShow.status === 'plan_to_watch') {
+        updatePayload.status = 'watching';
+      }
+
+      await updateDoc(doc(db, 'users', user.uid, 'shows', targetShow.id), updatePayload);
+    } catch (e) {
+      console.error('[markEpisodeWatched] Direct Firestore update failed:', e);
     }
   }
 
@@ -166,21 +175,18 @@ export async function markEpisodeWatched(
         updatedAt: Date.now(),
         isSynced: false
       };
-      if (updateShowFn) {
-        await updateShowFn(targetShow.id, rollbackUpdates);
-      } else {
-        useShowsStore.getState().updateShowOptimistic(targetShow.id, rollbackUpdates);
-        const user = auth.currentUser;
-        if (user && targetShow.id) {
-          try {
-            const cleanRollback: any = {};
-            Object.entries(rollbackUpdates).forEach(([key, val]) => {
-              cleanRollback[key] = val === undefined ? null : val;
-            });
-            await setDoc(doc(db, 'users', user.uid, 'shows', targetShow.id), cleanRollback, { merge: true });
-          } catch (e) {
-            console.error('[markEpisodeWatched] Direct rollback failed:', e);
-          }
+
+      useShowsStore.getState().updateShowOptimistic(targetShow.id, rollbackUpdates);
+      const user = auth.currentUser;
+      if (user && targetShow.id) {
+        try {
+          const cleanRollback: any = {};
+          Object.entries(rollbackUpdates).forEach(([key, val]) => {
+            cleanRollback[key] = val === undefined ? null : val;
+          });
+          await updateDoc(doc(db, 'users', user.uid, 'shows', targetShow.id), cleanRollback);
+        } catch (e) {
+          console.error('[markEpisodeWatched] Direct rollback failed:', e);
         }
       }
       scrollAllCarouselsToStart();
