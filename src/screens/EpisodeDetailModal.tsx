@@ -1,15 +1,12 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'motion/react';
 import { type Show } from '../types';
-import { X, Check, Star, Smile, Frown, Zap, Coffee, Heart, ChevronLeft, ChevronRight, Clock, ArrowLeft, Clapperboard, Play, Sparkles } from 'lucide-react';
+import { X, Check, Star, ChevronLeft, ChevronRight, Clock, ArrowLeft, Sparkles } from 'lucide-react';
 import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getTodayStr, getCalendarDaysDiff, scrollAllCarouselsToStart } from '../lib/utils';
 import { useShows } from '../hooks/useShows';
 import { useToastStore } from '../store/toastStore';
 import { tmdb } from '../features/shows/tmdb';
-
-import { TrailerModal } from '../components/TrailerModal';
 import { RedditSection } from '../components/community/RedditSection';
-
 import { syncSingleItem } from "../hooks/useDetailsSyncWorker";
 
 interface EpisodeDetailModalProps {
@@ -27,7 +24,6 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   const [currentSeason, setCurrentSeason] = useState(initialSeason);
   const [currentEpisode, setCurrentEpisode] = useState(initialEpisode);
   const [isSynopsisExpanded, setIsSynopsisExpanded] = useState(false);
-  const [trailerModalVideos, setTrailerModalVideos] = useState<any[] | null>(null);
   const [isLoadingEpisode, setIsLoadingEpisode] = useState(false);
 
   const [showFutureConfirm, setShowFutureConfirm] = useState(false);
@@ -215,9 +211,6 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   const isNextSeasonChange = currentSeasonEpCount && currentEpisode?.episode_number && nextSeasonEpCount !== null && nextSeasonEpCount > 0
     ? currentEpisode.episode_number >= currentSeasonEpCount
     : false;
-
-  const ytVideos = currentEpisode?.videos?.results?.filter((v: any) => v.site === 'YouTube') || [];
-  const hasTrailer = ytVideos.length > 0;
 
   const hasPrevious = currentSeason > minSeason || (currentEpisode?.episode_number || 1) > 1;
   const hasNext = useMemo(() => {
@@ -683,7 +676,8 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -15, scale: 0.9 }}
               transition={{ type: 'spring', damping: 20, stiffness: 350 }}
-              className="absolute top-16 left-1/2 -translate-x-1/2 z-50 bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-black px-4 py-2 rounded-full font-black text-xs shadow-[0_4px_30px_rgba(245,158,11,0.6)] flex items-center gap-2 border border-amber-300 pointer-events-none uppercase tracking-wider whitespace-nowrap max-w-[92%]"
+              style={{ top: 'calc(env(safe-area-inset-top, 0px) + 68px)' }}
+              className="absolute left-1/2 -translate-x-1/2 z-50 bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-black px-4 py-2 rounded-full font-black text-xs shadow-[0_4px_30px_rgba(245,158,11,0.6)] flex items-center gap-2 border border-amber-300 pointer-events-none uppercase tracking-wider whitespace-nowrap max-w-[92%]"
             >
               <Sparkles size={16} className="text-black shrink-0" />
               <span className="whitespace-nowrap">{seasonChangeNotice.type === 'next' ? '🍿 Passage à la' : '🎬 Retour à la'} Saison {seasonChangeNotice.season}</span>
@@ -777,8 +771,11 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                 </div>
               </div>
             )}
-            {/* 1. FLOATING BUTTONS (Positioned over the banner) */}
-            <div className="absolute top-4 left-4 right-4 z-30 flex items-center justify-between pointer-events-auto">
+            {/* 1. FLOATING BUTTONS (Positioned over the banner with safe-area support) */}
+            <div 
+              className="absolute left-4 right-4 z-30 flex items-center justify-between pointer-events-auto"
+              style={{ top: 'calc(env(safe-area-inset-top, 0px) + 14px)' }}
+            >
               {/* Series Button */}
               <button 
                 onClick={(e) => {
@@ -790,7 +787,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                     onClose();
                   }
                 }}
-                className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-zinc-900/80 backdrop-blur-md border border-white/10 text-white active:scale-95 transition-all max-w-[200px] group"
+                className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-zinc-900/85 backdrop-blur-md border border-white/10 text-white active:scale-95 transition-all max-w-[200px] group shadow-lg"
               >
                 <ArrowLeft size={16} className="text-[#E5A93D] shrink-0 group-hover:-translate-x-0.5 transition-transform" />
                 <div className="flex flex-col text-left overflow-hidden leading-tight">
@@ -802,7 +799,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
               {/* Close Button */}
               <button 
                 onClick={onClose}
-                className="w-9 h-9 rounded-full bg-zinc-900/80 backdrop-blur-md border border-white/10 flex items-center justify-center text-zinc-300 hover:text-white active:scale-95 transition-all"
+                className="w-9 h-9 rounded-full bg-zinc-900/85 backdrop-blur-md border border-white/10 flex items-center justify-center text-zinc-300 hover:text-white active:scale-95 transition-all shadow-lg"
                 aria-label="Fermer"
               >
                 <X size={18} />
@@ -812,7 +809,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
             {/* 2. FREELY SCROLLING CONTENT */}
             <div className="w-full">
               {/* Banner Section */}
-              <div className="relative w-full h-[260px] sm:h-[320px] bg-zinc-900 overflow-hidden">
+              <div className="relative w-full h-[280px] sm:h-[340px] bg-zinc-900 overflow-hidden">
                 {currentEpisode.still_path && (
                   <img loading="lazy" decoding="async" 
                     src={`https://image.tmdb.org/t/p/w1280${currentEpisode.still_path}`} 
@@ -861,165 +858,110 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                   </button>
                 </div>
 
-                <div className="space-y-8">
-                  {/* Main Action Button & Trailer */}
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      {isSeen ? (
-                        <button 
-                          onClick={handleMainButtonClick}
-                          className="w-full py-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] bg-emerald-500 hover:bg-emerald-400 text-black font-bold shadow-lg shadow-emerald-500/20 touch-manipulation select-none cursor-pointer"
-                        >
-                          <Check size={22} className="stroke-[3]" />
-                          Épisode vu
-                        </button>
-                      ) : isFutureEpisode ? (
-                        <button 
-                          onClick={handleMainButtonClick}
-                          className="w-full py-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] bg-zinc-800 text-zinc-400 border border-zinc-700 font-medium cursor-pointer hover:bg-zinc-700 touch-manipulation select-none"
-                        >
-                          <Clock size={20} className="text-amber-400" />
-                          {relativeAirDateLabel}
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={handleMainButtonClick}
-                          className="w-full py-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] bg-[#E5A93D] hover:bg-[#d4982f] text-black font-bold shadow-lg shadow-[#E5A93D]/20 touch-manipulation select-none cursor-pointer"
-                        >
-                          <Check size={22} className="stroke-[3]" />
-                          Marquer comme vu
-                        </button>
-                      )}
-                    </div>
-                    {hasTrailer && (
-                      <button
-                        onClick={() => setTrailerModalVideos(ytVideos)}
-                        className="w-14 h-[56px] bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-center text-amber-400 hover:text-amber-300 hover:bg-amber-500/20 hover:border-amber-400/50 hover:shadow-[0_0_20px_rgba(245,158,11,0.25)] shrink-0 active:scale-95 transition-all cursor-pointer backdrop-blur-md"
-                        title="Voir la bande-annonce"
+                <div className="space-y-6">
+                  {/* Main Action Button (Pleine largeur) */}
+                  <div>
+                    {isSeen ? (
+                      <button 
+                        onClick={handleMainButtonClick}
+                        className="w-full py-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] bg-emerald-500 hover:bg-emerald-400 text-black font-bold shadow-lg shadow-emerald-500/20 touch-manipulation select-none cursor-pointer"
                       >
-                        <Clapperboard size={22} className="stroke-[2]" />
+                        <Check size={22} className="stroke-[3]" />
+                        Épisode vu
+                      </button>
+                    ) : isFutureEpisode ? (
+                      <button 
+                        onClick={handleMainButtonClick}
+                        className="w-full py-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] bg-zinc-800 text-zinc-400 border border-zinc-700 font-medium cursor-pointer hover:bg-zinc-700 touch-manipulation select-none"
+                      >
+                        <Clock size={20} className="text-amber-400" />
+                        {relativeAirDateLabel}
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={handleMainButtonClick}
+                        className="w-full py-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] bg-[#E5A93D] hover:bg-[#d4982f] text-black font-bold shadow-lg shadow-[#E5A93D]/20 touch-manipulation select-none cursor-pointer"
+                      >
+                        <Check size={22} className="stroke-[3]" />
+                        Marquer comme vu
                       </button>
                     )}
                   </div>
 
-          {/* Synopsis - Interactif & Déroulable */}
-          {currentEpisode.overview && (
-            <div className="mt-4 mb-2 animate-in fade-in duration-700">
-              <p
-                onClick={() => setIsSynopsisExpanded(!isSynopsisExpanded)}
-                className={cn(
-                  "text-[13px] text-zinc-300 leading-relaxed cursor-pointer transition-all duration-300 ease-in-out",
-                  !isSynopsisExpanded && "line-clamp-3"
-                )}
-              >
-                {currentEpisode.overview}
-              </p>
-              {!isSynopsisExpanded && currentEpisode.overview.length > 120 && (
-                <button
-                  onClick={() => setIsSynopsisExpanded(true)}
-                  className="text-[11px] font-extrabold uppercase tracking-wider text-zinc-500 mt-1 hover:text-white transition-colors cursor-pointer"
-                >
-                  Suite...
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Custom Future Episode Confirmation Dialog */}
-          {showFutureConfirm && (
-            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-center space-y-3 animate-in fade-in duration-200">
-              <p className="text-xs text-amber-200 font-medium leading-relaxed">
-                Cet épisode n'a pas encore été diffusé. Veux-tu vraiment le marquer comme vu ?
-              </p>
-              <div className="flex gap-2 justify-center">
-                <button
-                  onClick={() => setShowFutureConfirm(false)}
-                  className="px-4 py-2.5 rounded-xl bg-zinc-800 text-zinc-300 text-xs font-semibold hover:bg-zinc-700 transition-colors touch-manipulation select-none cursor-pointer"
-                >
-                  Annuler
-                </button>
-                <button
-                  onClick={() => {
-                    setShowFutureConfirm(false);
-                    toggleSeen();
-                  }}
-                  className="px-4 py-2.5 rounded-xl bg-[#E5A93D] text-black text-xs font-bold hover:bg-[#d4982f] transition-colors touch-manipulation select-none cursor-pointer"
-                >
-                  Marquer comme vu
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Dates */}
-          <div className="grid grid-cols-2 gap-4">
-             <div className="bg-zinc-900 p-3 rounded-xl border border-zinc-800/50">
-               <span className="block text-[10px] uppercase text-zinc-500 font-bold mb-1">Diffusé le</span>
-               <span className="text-sm font-medium text-zinc-200">{formattedAirDate}</span>
-             </div>
-             <div className="bg-zinc-900 p-3 rounded-xl border border-zinc-800/50">
-               <span className="block text-[10px] uppercase text-zinc-500 font-bold mb-1">Vu le</span>
-               <span className="text-sm font-medium text-zinc-200">{isSeen ? (watchedDate || '--') : '--'}</span>
-             </div>
-          </div>
-
-          {/* Interactions (Only if seen) */}
-          {isSeen ? (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              {/* Emotions */}
-              <div>
-                <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-3 text-center">Ta réaction</h3>
-                <div className="grid grid-cols-5 gap-2">
-                  {[
-                    { id: 'shocked', icon: Zap, label: 'Choqué' },
-                    { id: 'sad', icon: Frown, label: 'Triste' },
-                    { id: 'happy', icon: Smile, label: 'Génial' },
-                    { id: 'bored', icon: Coffee, label: 'Bof' },
-                    { id: 'love', icon: Heart, label: 'Love' },
-                  ].map(emo => (
-                    <button 
-                      key={emo.id}
-                      onClick={() => updateRecord({ emotion: emo.id })}
-                      className={cn(
-                        "flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all active:scale-95 touch-manipulation select-none cursor-pointer",
-                        record?.emotion === emo.id 
-                          ? "bg-indigo-500/10 border-indigo-500/50 text-indigo-400" 
-                          : "bg-zinc-900 border-zinc-800 text-zinc-500 hover:bg-zinc-800"
+                  {/* Synopsis - Interactif & Déroulable */}
+                  {currentEpisode.overview && (
+                    <div className="mt-2 mb-2 animate-in fade-in duration-700">
+                      <p
+                        onClick={() => setIsSynopsisExpanded(!isSynopsisExpanded)}
+                        className={cn(
+                          "text-[13px] text-zinc-300 leading-relaxed cursor-pointer transition-all duration-300 ease-in-out",
+                          !isSynopsisExpanded && "line-clamp-3"
+                        )}
+                      >
+                        {currentEpisode.overview}
+                      </p>
+                      {!isSynopsisExpanded && currentEpisode.overview.length > 120 && (
+                        <button
+                          onClick={() => setIsSynopsisExpanded(true)}
+                          className="text-[11px] font-extrabold uppercase tracking-wider text-zinc-500 mt-1 hover:text-white transition-colors cursor-pointer"
+                        >
+                          Suite...
+                        </button>
                       )}
-                    >
-                      <emo.icon size={20} className={record?.emotion === emo.id ? "fill-current" : ""} />
-                      <span className="text-[9px] font-bold uppercase tracking-wider">{emo.label}</span>
-                    </button>
-                  ))}
+                    </div>
+                  )}
+
+                  {/* Custom Future Episode Confirmation Dialog */}
+                  {showFutureConfirm && (
+                    <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-center space-y-3 animate-in fade-in duration-200">
+                      <p className="text-xs text-amber-200 font-medium leading-relaxed">
+                        Cet épisode n'a pas encore été diffusé. Veux-tu vraiment le marquer comme vu ?
+                      </p>
+                      <div className="flex gap-2 justify-center">
+                        <button
+                          onClick={() => setShowFutureConfirm(false)}
+                          className="px-4 py-2.5 rounded-xl bg-zinc-800 text-zinc-300 text-xs font-semibold hover:bg-zinc-700 transition-colors touch-manipulation select-none cursor-pointer"
+                        >
+                          Annuler
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowFutureConfirm(false);
+                            toggleSeen();
+                          }}
+                          className="px-4 py-2.5 rounded-xl bg-[#E5A93D] text-black text-xs font-bold hover:bg-[#d4982f] transition-colors touch-manipulation select-none cursor-pointer"
+                        >
+                          Marquer comme vu
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dates */}
+                  <div className="grid grid-cols-2 gap-4">
+                     <div className="bg-zinc-900 p-3 rounded-xl border border-zinc-800/50">
+                       <span className="block text-[10px] uppercase text-zinc-500 font-bold mb-1">Diffusé le</span>
+                       <span className="text-sm font-medium text-zinc-200">{formattedAirDate}</span>
+                     </div>
+                     <div className="bg-zinc-900 p-3 rounded-xl border border-zinc-800/50">
+                       <span className="block text-[10px] uppercase text-zinc-500 font-bold mb-1">Vu le</span>
+                       <span className="text-sm font-medium text-zinc-200">{isSeen ? (watchedDate || '--') : '--'}</span>
+                     </div>
+                  </div>
+
+                  {/* Reddit Section direct sans chargement */}
+                  <RedditSection 
+                    query={`${tmdbShowTitle || show?.title || ''} S${String(currentSeason).padStart(2, '0')}E${String(currentEpisode.episode_number).padStart(2, '0')} Discussion`} 
+                    isLocked={!isSeen} 
+                    unlockMessage="Débloquez les discussions de la communauté sur cet épisode en le marquant comme vu."
+                  />
                 </div>
               </div>
             </div>
-          ) : (
-            <div className="my-6 p-4 rounded-2xl bg-zinc-900/60 border border-white/5 text-center">
-              <p className="text-xs text-zinc-400 font-medium">
-                Marque cet épisode comme vu pour laisser une note et une réaction !
-              </p>
-            </div>
-          )}
-
-          <RedditSection 
-            query={`${tmdbShowTitle || show?.title || ''} S${String(currentSeason).padStart(2, '0')}E${String(currentEpisode.episode_number).padStart(2, '0')} Discussion`} 
-            isLocked={!isSeen} 
-            unlockMessage="Débloquez les discussions de la communauté sur cet épisode en le marquant comme vu."
-          />
-        </div>
-      </div>
-    </div>
-  </motion.div>
-</AnimatePresence>
+          </motion.div>
+        </AnimatePresence>
       </motion.div>
     </motion.div>
-      {trailerModalVideos && (
-        <TrailerModal
-          videos={trailerModalVideos}
-          onClose={() => setTrailerModalVideos(null)}
-        />
-      )}
-    </div>
+  </div>
   );
 }

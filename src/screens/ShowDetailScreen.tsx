@@ -229,7 +229,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const [imdbLoading, setImdbLoading] = useState<boolean>(false);
   const [providers, setProviders] = useState<any>(null);
   const [keywords, setKeywords] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<'about' | 'episodes' | 'casting' | 'community'>('about');
+  const [activeTab, setActiveTab] = useState<'about' | 'episodes' | 'casting'>('about');
   
   const [seasonsCache, setSeasonsCache] = useState<Record<number, any>>({});
   const [expandedSeason, setExpandedSeason] = useState<number | null>(null);
@@ -392,7 +392,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const handleTouchMove = (e: React.TouchEvent) => {};
   const handleTouchEnd = () => {};
 
-  const handleTabChange = (tab: 'about' | 'episodes' | 'casting' | 'community') => {
+  const handleTabChange = (tab: 'about' | 'episodes' | 'casting') => {
     setActiveTab(tab);
     isManualScrollingRef.current = true;
     setTimeout(() => {
@@ -2277,15 +2277,6 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
               Casting
             </button>
           )}
-          <button 
-            onClick={() => handleTabChange('community')}
-            className={cn(
-              "flex-1 py-2 text-xs font-bold tracking-wider uppercase transition-all rounded-full touch-manipulation",
-              activeTab === 'community' ? "bg-zinc-800 text-[#E5A93D] shadow-lg" : "text-zinc-500"
-            )}
-          >
-            Communauté
-          </button>
         </div>
       </div>
 
@@ -2521,6 +2512,16 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                 />
               </div>
             )}
+
+            {/* Discussions Reddit (Placé après les notes de saison) */}
+            <div className="pt-1">
+              <RedditSection 
+                query={`${tmdbDetails?.name || tmdbDetails?.title || show?.title || ''} ${isSeries ? 'series discussion' : 'movie discussion'}`} 
+                isLocked={false} 
+                title="Discussions Reddit"
+                description="Retrouvez les avis, théories et spoilers de la communauté."
+              />
+            </div>
 
             {/* Séries / Films similaires remontés dans À Propos */}
             {(() => {
@@ -2798,15 +2799,6 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
             </div>
           </div>
         )}
-
-        <div id="section-community" className="scroll-mt-40 mt-12 animate-in fade-in duration-200">
-          <RedditSection 
-            query={`${tmdbDetails?.name || tmdbDetails?.title || show?.title || ''} ${isSeries ? '(discussion OR theories OR review)' : '(movie OR film discussion OR review)'}`} 
-            isLocked={false} 
-            title="Communauté & Théories"
-            description="Rejoignez les discussions globales autour de cette oeuvre. Attention aux spoilers si vous n'avez pas tout vu !"
-          />
-        </div>
       </div>
 
       {/* Episode Modal */}
