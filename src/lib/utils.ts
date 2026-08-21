@@ -18,12 +18,10 @@ export async function openExternalUrl(url: string) {
   
   if (Capacitor.isNativePlatform()) {
     if (url.startsWith('https://app.plex.tv/') && !url.includes('/auth')) {
-      let nativePlexUrl = 'plex://app.plex.tv';
-      
-      const serverMatch = url.match(/\/server\/([a-f0-9]+)/i);
+      const serverMatch = url.match(/\/server\/([a-zA-Z0-9_-]+)/i);
       const serverId = serverMatch ? serverMatch[1] : '';
       
-      const keyMatch = url.match(/[?&]key=([^&]+)/i);
+      const keyMatch = url.match(/[?&]key=([^&#]+)/i);
       let ratingKey = '';
       if (keyMatch) {
         const decodedKey = decodeURIComponent(keyMatch[1]);
@@ -33,29 +31,32 @@ export async function openExternalUrl(url: string) {
         }
       }
       
+      const candidatePlexUrls: string[] = [];
       if (serverId && ratingKey) {
-        nativePlexUrl = `plex://play/?metadataKey=${encodeURIComponent(`/library/metadata/${ratingKey}`)}&server=${serverId}`;
+        candidatePlexUrls.push(`plex://server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`);
+        candidatePlexUrls.push(`plex://details?server=${serverId}&key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`);
+        candidatePlexUrls.push(`plex://desktop/#!/server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`);
+        candidatePlexUrls.push(url);
       } else {
-        nativePlexUrl = url.replace('https://', 'plex://');
+        candidatePlexUrls.push(url.replace('https://', 'plex://'));
+        candidatePlexUrls.push(url);
       }
       
-      // Try to check and open via AppLauncher first
-      try {
-        const canOpen = await AppLauncher.canOpenUrl({ url: nativePlexUrl });
-        if (canOpen.value) {
-          await AppLauncher.openUrl({ url: nativePlexUrl });
+      for (const pUrl of candidatePlexUrls) {
+        try {
+          await AppLauncher.openUrl({ url: pUrl });
           return;
+        } catch (err) {
+          console.warn(`AppLauncher openUrl attempt failed for ${pUrl}`, err);
         }
-      } catch (err) {
-        console.warn('AppLauncher.canOpenUrl check failed, trying direct launch', err);
       }
       
-      // Fallback: direct launch in case canOpenUrl returned false due to missing AndroidManifest queries
+      // Fallback: Browser Custom Tabs
       try {
-        await AppLauncher.openUrl({ url: nativePlexUrl });
+        await Browser.open({ url, windowName: '_system' });
         return;
-      } catch (err) {
-        console.warn('Direct AppLauncher launch failed, falling back to in-app browser', err);
+      } catch (e) {
+        console.warn('Browser.open failed for Plex URL, falling back to window.open', e);
       }
     }
 

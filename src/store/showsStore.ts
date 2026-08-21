@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { db, auth } from '../lib/firebase';
-import { collection, query, getDocs, getDocsFromCache } from 'firebase/firestore';
+import { collection, query, getDocs, getDocsFromCache, onSnapshot, type Unsubscribe } from 'firebase/firestore';
 import { type Show } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/firebaseErrors';
 import { useSyncStore } from './syncStore';
@@ -41,6 +41,53 @@ const saveToLocalStorage = (shows: Show[]) => {
   } catch (e) {}
 };
 
+/**
+ * Fusionne et déduplique intelligemment les séries (en combinant seenEpisodes et records)
+ */
+function deduplicateAndMergeShows(rawShows: Show[]): Show[] {
+  const deduplicatedMap = new Map<string, Show>();
+
+  for (const show of rawShows) {
+    const tmdbIdNum = Number(show.tmdbId);
+    const mType = show.mediaType || 'tv';
+    
+    if (!tmdbIdNum || isNaN(tmdbIdNum)) {
+      deduplicatedMap.set(`${mType}_${show.id || Math.random()}`, show);
+      continue;
+    }
+
+    const key = `${mType}_${tmdbIdNum}`;
+    const existing = deduplicatedMap.get(key);
+
+    if (!existing) {
+      deduplicatedMap.set(key, { ...show });
+    } else {
+      // Fusionner les épisodes vus des deux instances
+      const mergedSeen = Array.from(new Set([
+        ...(existing.seenEpisodes || []),
+        ...(show.seenEpisodes || [])
+      ]));
+
+      const mergedRecords = {
+        ...(existing.episodeRecords || {}),
+        ...(show.episodeRecords || {})
+      };
+
+      const mostRecentTime = Math.max(existing.updatedAt || 0, show.updatedAt || 0);
+      const chosenDoc = (show.updatedAt || 0) >= (existing.updatedAt || 0) ? show : existing;
+
+      deduplicatedMap.set(key, {
+        ...chosenDoc,
+        seenEpisodes: mergedSeen,
+        episodeRecords: mergedRecords,
+        updatedAt: mostRecentTime || Date.now()
+      });
+    }
+  }
+
+  return Array.from(deduplicatedMap.values());
+}
+
 export const useShowsStore = create<ShowsState>((set, get) => ({
   shows: initialCache.shows,
   loading: initialCache.loading,
@@ -72,7 +119,13 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
   
   addShowOptimistic: (show) => {
     set(state => {
-      const updatedShows = [...state.shows, show];
+      const existingIdx = state.shows.findIndex(s => s.id === show.id || (s.tmdbId && show.tmdbId && s.tmdbId === show.tmdbId && s.mediaType === show.mediaType));
+      let updatedShows: Show[];
+      if (existingIdx >= 0) {
+        updatedShows = state.shows.map((s, idx) => idx === existingIdx ? { ...s, ...show } : s);
+      } else {
+        updatedShows = [...state.shows, show];
+      }
       saveToLocalStorage(updatedShows);
       return { shows: updatedShows };
     });
@@ -98,8 +151,9 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
           cachedSnapshot.forEach((doc) => {
             cachedShows.push({ ...doc.data(), id: String(doc.id) } as Show);
           });
-          saveToLocalStorage(cachedShows);
-          set({ shows: cachedShows, loading: false, initialized: true });
+          const merged = deduplicateAndMergeShows(cachedShows);
+          saveToLocalStorage(merged);
+          set({ shows: merged, loading: false, initialized: true });
         }
       } catch (cacheErr) {
         // Le cache peut être vide ou indisponible, on ignore silencieusement
@@ -113,34 +167,7 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
         rawLoadedShows.push({ ...doc.data(), id: String(doc.id) } as Show);
       });
 
-      // Deduplicate by mediaType + tmdbId (keep the one with most seenEpisodes, then latest updatedAt)
-      const deduplicatedMap = new Map<string, Show>();
-      for (const show of rawLoadedShows) {
-        const tmdbIdNum = Number(show.tmdbId);
-        const mType = show.mediaType || 'tv';
-        if (!tmdbIdNum || isNaN(tmdbIdNum)) {
-          deduplicatedMap.set(`${mType}_${show.id || Math.random()}`, show); // fallback for shows without tmdbId
-          continue;
-        }
-        const key = `${mType}_${tmdbIdNum}`;
-        const existing = deduplicatedMap.get(key);
-        if (!existing) {
-          deduplicatedMap.set(key, show);
-        } else {
-          const existingCount = existing.seenEpisodes?.length || 0;
-          const newCount = show.seenEpisodes?.length || 0;
-          if (newCount > existingCount) {
-            deduplicatedMap.set(key, show);
-          } else if (newCount === existingCount) {
-            const existingTime = existing.updatedAt || 0;
-            const newTime = show.updatedAt || 0;
-            if (newTime > existingTime) {
-              deduplicatedMap.set(key, show);
-            }
-          }
-        }
-      }
-      const loadedShows = Array.from(deduplicatedMap.values());
+      const loadedShows = deduplicateAndMergeShows(rawLoadedShows);
 
       saveToLocalStorage(loadedShows);
       set({ shows: loadedShows, loading: false, initialized: true });
@@ -164,9 +191,36 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
   }
 }));
 
+let unsubscribeShowsListener: Unsubscribe | null = null;
+
 auth.onAuthStateChanged(user => {
+  if (unsubscribeShowsListener) {
+    unsubscribeShowsListener();
+    unsubscribeShowsListener = null;
+  }
+
   if (user) {
     useShowsStore.getState().fetchShows();
+
+    // Écouteur en temps réel sur la collection shows pour propager immédiatement les changements entre APK et Web DEV
+    try {
+      const showsRef = collection(db, 'users', user.uid, 'shows');
+      unsubscribeShowsListener = onSnapshot(showsRef, (snapshot) => {
+        if (!snapshot.empty) {
+          const remoteShows: Show[] = [];
+          snapshot.forEach((doc) => {
+            remoteShows.push({ ...doc.data(), id: String(doc.id) } as Show);
+          });
+          const merged = deduplicateAndMergeShows(remoteShows);
+          saveToLocalStorage(merged);
+          useShowsStore.setState({ shows: merged, loading: false, initialized: true });
+        }
+      }, (err) => {
+        console.warn('[showsStore] Realtime shows listener warning:', err?.message || err);
+      });
+    } catch (listenerErr) {
+      console.warn('[showsStore] Failed to attach realtime listener:', listenerErr);
+    }
   } else {
     useShowsStore.getState().setShows([]);
     useShowsStore.getState().setLoading(false);

@@ -49,6 +49,8 @@
 
     <queries>
         <package android:name="com.reddit.frontpage" />
+        <package android:name="com.plexapp.android" />
+        <package android:name="com.plexapp.plex" />
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="reddit" />
@@ -64,6 +66,10 @@
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="plex" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" android:host="app.plex.tv" />
         </intent>
     </queries>
 </manifest>

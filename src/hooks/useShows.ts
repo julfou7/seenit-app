@@ -16,6 +16,27 @@ export function useShows() {
 
   const addShow = useCallback(async (showData: Omit<Show, 'id' | 'userId'>) => {
     if (!auth.currentUser) throw new Error("Not authenticated");
+    
+    // Vérifier si un document avec le même tmdbId et mediaType existe déjà
+    const currentShows = useShowsStore.getState().shows;
+    const existingShow = currentShows.find(s => 
+      s.tmdbId && showData.tmdbId && 
+      Number(s.tmdbId) === Number(showData.tmdbId) && 
+      (s.mediaType || 'tv') === (showData.mediaType || 'tv')
+    );
+
+    if (existingShow && existingShow.id) {
+      // Mettre à jour le document existant plutôt que créer un doublon
+      const cleanData: any = {};
+      Object.entries(showData).forEach(([key, val]) => {
+        cleanData[key] = val === undefined ? null : val;
+      });
+      updateShowOptimistic(existingShow.id, cleanData);
+      const docRef = doc(db, 'users', auth.currentUser.uid, 'shows', existingShow.id);
+      await updateDoc(docRef, cleanData);
+      return existingShow.id;
+    }
+
     const showsRef = collection(db, 'users', auth.currentUser.uid, 'shows');
     const docRef = doc(showsRef);
     
@@ -45,7 +66,7 @@ export function useShows() {
       handleFirestoreError(err, OperationType.CREATE, `users/${auth.currentUser.uid}/shows`);
       throw err;
     }
-  }, [addShowOptimistic, removeShowOptimistic]);
+  }, [addShowOptimistic, removeShowOptimistic, updateShowOptimistic]);
 
   const updateShow = useCallback(async (id: string, updates: Partial<Show>) => {
     if (!auth.currentUser) throw new Error("Not authenticated");

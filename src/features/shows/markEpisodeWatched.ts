@@ -4,6 +4,8 @@ import { syncSingleItem } from '../../hooks/useDetailsSyncWorker';
 import { useToastStore } from '../../store/toastStore';
 import { scrollAllCarouselsToStart } from '../../lib/utils';
 import { type Show } from '../../types';
+import { db, auth } from '../../lib/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 
 export async function markEpisodeWatched(
   showIdOrTmdbId: string | number,
@@ -114,6 +116,18 @@ export async function markEpisodeWatched(
     await updateShowFn(targetShow.id, updates);
   } else {
     useShowsStore.getState().updateShowOptimistic(targetShow.id, updates);
+    const user = auth.currentUser;
+    if (user && targetShow.id) {
+      try {
+        const cleanUpdates: any = {};
+        Object.entries(updates).forEach(([key, val]) => {
+          cleanUpdates[key] = val === undefined ? null : val;
+        });
+        await updateDoc(doc(db, 'users', user.uid, 'shows', targetShow.id), cleanUpdates);
+      } catch (e) {
+        console.error('[markEpisodeWatched] Direct Firestore update failed:', e);
+      }
+    }
   }
 
   syncSingleItem(targetShow.id, true).catch(console.error);
@@ -137,6 +151,18 @@ export async function markEpisodeWatched(
         await updateShowFn(targetShow.id, rollbackUpdates);
       } else {
         useShowsStore.getState().updateShowOptimistic(targetShow.id, rollbackUpdates);
+        const user = auth.currentUser;
+        if (user && targetShow.id) {
+          try {
+            const cleanRollback: any = {};
+            Object.entries(rollbackUpdates).forEach(([key, val]) => {
+              cleanRollback[key] = val === undefined ? null : val;
+            });
+            await updateDoc(doc(db, 'users', user.uid, 'shows', targetShow.id), cleanRollback);
+          } catch (e) {
+            console.error('[markEpisodeWatched] Direct rollback failed:', e);
+          }
+        }
       }
       syncSingleItem(targetShow.id, true).catch(console.error);
       scrollAllCarouselsToStart();
