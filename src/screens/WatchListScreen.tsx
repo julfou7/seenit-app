@@ -750,7 +750,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
     const wasInPasVu = pasVuDepuisUnMomentShows.some(s => s.id === show.id);
 
     // Appel de la fonction atomique sécurisée
-    await markEpisodeWatched(show.id, season_number, episode_number);
+    await markEpisodeWatched(show, season_number, episode_number);
 
     // Conservation stricte de la logique de scroll Android native
     if (wasInPasVu) {

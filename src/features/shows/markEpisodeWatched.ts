@@ -7,18 +7,23 @@ import { db, auth } from '../../lib/firebase';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 
 export async function markEpisodeWatched(
-  showIdOrTmdbId: string | number,
+  showOrId: Show | string | number,
   season: number,
   episode: number,
   updateShowFn?: (id: string, updates: Partial<Show>) => Promise<void>
 ) {
-  const showIdStr = String(showIdOrTmdbId);
-  const targetShow = useShowsStore.getState().shows.find(
-    s => String(s.id) === showIdStr || String(s.tmdbId) === showIdStr
-  );
+  let targetShow: Show | undefined;
+  if (typeof showOrId === 'object' && showOrId !== null) {
+    targetShow = useShowsStore.getState().shows.find(s => s.id === showOrId.id) || showOrId;
+  } else {
+    const showIdStr = String(showOrId);
+    targetShow = useShowsStore.getState().shows.find(
+      s => String(s.id) === showIdStr || String(s.tmdbId) === showIdStr
+    );
+  }
 
   if (!targetShow || !targetShow.id) {
-    console.warn(`[markEpisodeWatched] Show not found: ${showIdOrTmdbId}`);
+    console.warn(`[markEpisodeWatched] Show not found: ${typeof showOrId === 'object' ? showOrId?.id : showOrId}`);
     return;
   }
 
