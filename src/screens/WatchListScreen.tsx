@@ -11,7 +11,6 @@ import { EpisodeDetailModal } from './EpisodeDetailModal';
 import { tmdb } from '../features/shows/tmdb';
 import { getFormattedProviderLogo, extractOfficialStreamingProvider, PLEX_LOGO_SVG } from '../utils/providerLogos';
 import { checkPlexAvailability } from '../features/plex/plexAvailability';
-import { syncSingleItem } from "../hooks/useDetailsSyncWorker";
 import { User, Circle, CheckCircle2, Trash2, Archive, X, Clock, Ban } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
@@ -815,20 +814,30 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
       nextEpisodeToWatch: optimisticNextEp,
       isSynced: false
     });
-    syncSingleItem(show.id, true).catch(console.error);
     scrollAllCarouselsToStart();
 
     // Si la série était dans "Pas vu depuis un moment", faire remonter le scroll vers "Continuer à regarder"
     if (wasInPasVu) {
       setTimeout(() => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        watchNextRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const container = document.getElementById('watchlist-container');
+        if (container) {
+          container.style.scrollBehavior = 'smooth';
+          container.scrollTop = 0;
+        }
+        
         const continueCarousel = document.getElementById('continue-watching-carousel');
         if (continueCarousel) {
-          continueCarousel.scrollTo({ left: 0, behavior: 'smooth' });
+          continueCarousel.style.scrollBehavior = 'smooth';
+          continueCarousel.scrollLeft = 0;
         }
+
         scrollAllCarouselsToStart();
-      }, 100);
+
+        setTimeout(() => {
+          if (container) container.style.scrollBehavior = 'auto';
+          if (continueCarousel) continueCarousel.style.scrollBehavior = 'auto';
+        }, 600);
+      }, 350);
     }
 
     showToast(
@@ -845,7 +854,6 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
             updatedAt: Date.now(),
             isSynced: false
           });
-          syncSingleItem(show.id, true).catch(console.error);
           scrollAllCarouselsToStart();
         }
       }
