@@ -21,6 +21,7 @@ import { useShows } from '../hooks/useShows';
 import { useToastStore } from '../store/toastStore';
 import { useSyncStore } from '../store/syncStore';
 import { useShowsStore } from '../store/showsStore';
+import { useLogStore } from '../store/logStore';
 import { SwipeableCard } from '../components/cards/SwipeableCard';
 import { SeenItLogo } from '../components/SeenItLogo';
 import { SeenItCheckButton } from '../components/SeenItCheckButton';
@@ -800,7 +801,17 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
 
     // Update réseau atomique
     if (auth.currentUser && show.id) {
-      await updateDoc(doc(db, 'users', auth.currentUser.uid, 'shows', show.id), updatePayload);
+      try {
+        const stringId = String(show.id);
+        useLogStore.getState().addLog(`[Firestore] Tentative de màj atomique pour le film ${stringId}`, "info");
+
+        const docRef = doc(db, 'users', auth.currentUser.uid, 'shows', stringId);
+        await updateDoc(docRef, updatePayload);
+
+        useLogStore.getState().addLog(`[Firestore] Succès de la màj atomique pour le film ${stringId}`, "success");
+      } catch (error: any) {
+        useLogStore.getState().addLog(`[Firestore] ERREUR màj film ${show.id} : ${error.message}`, "error");
+      }
     }
 
     scrollAllCarouselsToStart();

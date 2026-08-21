@@ -1,6 +1,7 @@
 import { useShowsStore } from '../../store/showsStore';
 import { tmdb } from './tmdb';
 import { useToastStore } from '../../store/toastStore';
+import { useLogStore } from '../../store/logStore';
 import { scrollAllCarouselsToStart } from '../../lib/utils';
 import { type Show } from '../../types';
 import { db, auth } from '../../lib/firebase';
@@ -137,6 +138,9 @@ export async function markEpisodeWatched(
   const user = auth.currentUser;
   if (user && targetShow.id) {
     try {
+      const stringId = String(targetShow.id);
+      useLogStore.getState().addLog(`[Firestore] Tentative de màj atomique pour la série ${stringId} (Ep: ${epKey})`, "info");
+
       const updatePayload: any = {
         seenEpisodes: arrayUnion(epKey),
         lastWatchedAt: Date.now(),
@@ -159,9 +163,13 @@ export async function markEpisodeWatched(
         updatePayload.status = 'watching';
       }
 
-      await updateDoc(doc(db, 'users', user.uid, 'shows', targetShow.id), updatePayload);
-    } catch (e) {
-      console.error('[markEpisodeWatched] Direct Firestore update failed:', e);
+      const docRef = doc(db, 'users', user.uid, 'shows', stringId);
+      await updateDoc(docRef, updatePayload);
+
+      useLogStore.getState().addLog(`[Firestore] Succès de la màj atomique pour ${stringId}`, "success");
+    } catch (error: any) {
+      useLogStore.getState().addLog(`[Firestore] ERREUR lors de la màj pour la série ${targetShow.id} : ${error.message}`, "error");
+      console.error("Firestore update error:", error);
     }
   }
 
@@ -186,11 +194,13 @@ export async function markEpisodeWatched(
       const user = auth.currentUser;
       if (user && targetShow.id) {
         try {
+          const stringId = String(targetShow.id);
           const cleanRollback: any = {};
           Object.entries(rollbackUpdates).forEach(([key, val]) => {
             cleanRollback[key] = val === undefined ? null : val;
           });
-          await updateDoc(doc(db, 'users', user.uid, 'shows', targetShow.id), cleanRollback);
+          const docRef = doc(db, 'users', user.uid, 'shows', stringId);
+          await updateDoc(docRef, cleanRollback);
         } catch (e) {
           console.error('[markEpisodeWatched] Direct rollback failed:', e);
         }

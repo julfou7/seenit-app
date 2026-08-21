@@ -14,7 +14,7 @@ export interface AppLogEntry {
 
 interface LogState {
   logs: AppLogEntry[];
-  addLog: (category: LogCategory, message: string, details?: any, level?: LogLevel) => void;
+  addLog: (categoryOrMsg: any, messageOrLevel?: any, details?: any, level?: LogLevel) => void;
   clearLogs: () => void;
   getLogsAsText: () => string;
 }
@@ -44,24 +44,43 @@ const saveLogs = (logs: AppLogEntry[]) => {
 export const useLogStore = create<LogState>((set, get) => ({
   logs: loadInitialLogs(),
 
-  addLog: (category, message, details, level = 'info') => {
+  addLog: (categoryOrMsg: any, messageOrLevel?: any, details?: any, level: LogLevel = 'info') => {
+    let category: LogCategory = 'sync';
+    let message: string = '';
+    let actualLevel: LogLevel = level;
+    let actualDetails = details;
+
+    const validCategories = ['plex', 'tmdb', 'sync', 'system', 'auth'];
+    const validLevels = ['info', 'success', 'warn', 'error'];
+
+    if (typeof categoryOrMsg === 'string' && validCategories.includes(categoryOrMsg)) {
+      category = categoryOrMsg as LogCategory;
+      message = String(messageOrLevel || '');
+    } else {
+      category = 'sync';
+      message = String(categoryOrMsg || '');
+      if (typeof messageOrLevel === 'string' && validLevels.includes(messageOrLevel)) {
+        actualLevel = messageOrLevel as LogLevel;
+      }
+    }
+
     const newEntry: AppLogEntry = {
       id: Math.random().toString(36).substring(2, 9) + Date.now().toString(36),
       timestamp: Date.now(),
-      level,
+      level: actualLevel,
       category,
       message,
-      details: details ? (typeof details === 'object' ? JSON.parse(JSON.stringify(details)) : details) : undefined
+      details: actualDetails ? (typeof actualDetails === 'object' ? JSON.parse(JSON.stringify(actualDetails)) : actualDetails) : undefined
     };
 
     // Also mirror to browser console for easy inspection
     const prefix = `[${category.toUpperCase()}]`;
-    if (level === 'error') {
-      console.error(prefix, message, details || '');
-    } else if (level === 'warn') {
-      console.warn(prefix, message, details || '');
+    if (actualLevel === 'error') {
+      console.error(prefix, message, actualDetails || '');
+    } else if (actualLevel === 'warn') {
+      console.warn(prefix, message, actualDetails || '');
     } else {
-      console.log(prefix, message, details || '');
+      console.log(prefix, message, actualDetails || '');
     }
 
     set((state) => {
