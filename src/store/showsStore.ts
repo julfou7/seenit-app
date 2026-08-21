@@ -122,7 +122,6 @@ function deduplicateAndMergeShows(rawShows: Show[], currentLocalShows: Show[] = 
     let nextEp = show.nextEpisodeToWatch;
 
     if (nextEp && seen.includes(`${nextEp.season_number}x${nextEp.episode_number}`)) {
-      // nextEpisodeToWatch est obsolète car cet épisode est déjà dans seenEpisodes !
       let maxS = 1;
       let maxE = 0;
       seen.forEach(epKey => {
@@ -218,16 +217,14 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
           set({ shows: merged, loading: false, initialized: true });
         }
       } catch (cacheErr) {
-        // Le cache peut être vide ou indisponible, on ignore silencieusement
+        // Le cache peut être vide
       }
 
-      // 2. Fetch depuis le réseau pour mettre à jour
+      // 2. Fetch depuis le réseau (FORCÉ DEPUIS LE SERVEUR pour casser le cache PWA)
       let snapshot;
       try {
-        // Force la lecture depuis le serveur pour bypasser le cache agressif de la PWA
         snapshot = await getDocsFromServer(q);
       } catch (e) {
-        // Fallback si l'appareil est hors-ligne
         snapshot = await getDocs(q);
       }
       

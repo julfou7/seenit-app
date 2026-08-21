@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-
 import { useState, useEffect, useRef } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
@@ -36,13 +35,11 @@ import { cn } from './lib/utils';
 import { cleanOldCache } from './db/dexie';
 import './store/showsStore';
 
-
 export default function App() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null | undefined>(undefined);
   
   const isNative = Capacitor.isNativePlatform();
 
-  // Detect if app is launched as an installed PWA (where Android/iOS already shows native OS splash)
   const isPWAStandalone = typeof window !== 'undefined' && (
     window.matchMedia('(display-mode: standalone)').matches || 
     (window.navigator as any).standalone === true
@@ -78,15 +75,12 @@ export default function App() {
 
   const isReady = currentUser !== undefined;
 
-  // On native platform, hide the static OS splash screen quickly so the animated React splash takes over smoothly.
-  // Also configure the status bar for dark mode to ensure icons (time, battery) are white.
   useEffect(() => {
     if (isNative) {
       StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
       StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
       StatusBar.setBackgroundColor({ color: '#040406' }).catch(() => {});
 
-      // Hide native splash screen only AFTER React DOM frame is fully painted on screen
       const animFrame = requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           CapSplashScreen.hide().catch(() => {});
@@ -110,12 +104,6 @@ export default function App() {
         />
       )}
       
-      {/* 
-        CRITICAL PERFORMANCE OPTIMIZATION:
-        We completely defer mounting the heavy MainApp (which downloads images, parses IndexedDB, and creates hundreds of DOM nodes) 
-        until the splash screen has FINISHED its 2-second vector animation and is starting to fade out.
-        This guarantees perfectly smooth 60fps/120fps CSS animations for the splash screen on all devices.
-      */}
       {isReady && isSplashClosing ? (
         currentUser === null ? <LoginScreen /> : <MainApp />
       ) : (
@@ -126,7 +114,6 @@ export default function App() {
 }
 
 function MainApp() {
-
   const { updateShow } = useShows();
   const shows = useShowsStore(state => state.shows);
   const showToast = useToastStore(state => state.showToast);
@@ -134,16 +121,13 @@ function MainApp() {
 
   useEffect(() => {
     useSyncStore.getState().resetQuotaError();
-    // Nettoyage asynchrone du cache IndexedDB pour libérer de la mémoire
     cleanOldCache();
   }, []);
-
 
   useDetailsSyncWorker();
   useRemindersNotifier();
   const { currentTab, changeTab, selectedShow, openShow, closeShow } = useNavigation();
 
-  // Gestion de la touche retour physique Android sur APK Native via Capacitor App
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
 
@@ -151,7 +135,6 @@ function MainApp() {
 
     const setupBackButton = async () => {
       listenerHandler = await CapApp.addListener('backButton', ({ canGoBack }) => {
-        // 1. Fermer les sous-menus et fenêtres flottantes non gérées dans l'historique
         window.dispatchEvent(new CustomEvent('app-close-modals'));
 
         const state = window.history.state;
@@ -161,31 +144,26 @@ function MainApp() {
           state?.isPersonDetailModal
         );
 
-        // 2. Si une modale est ouverte (fiche épisode, personne, filtres...)
         if (isModalOpen) {
           window.history.back();
           return;
         }
 
-        // 3. Si la fiche d'un média est ouverte
         if (selectedShow) {
           closeShow();
           return;
         }
 
-        // 4. Si on peut revenir en arrière dans l'historique
         if (canGoBack && state && !state.isRoot) {
           window.history.back();
           return;
         }
 
-        // 5. Si on est sur un onglet secondaire, retourner à l'onglet principal (watchlist)
         if (currentTab !== 'watchlist') {
           changeTab('watchlist');
           return;
         }
 
-        // 6. Si on est sur l'écran racine principal, fermer/quitter l'application
         CapApp.exitApp();
       });
     };
@@ -199,7 +177,6 @@ function MainApp() {
     };
   }, [selectedShow, closeShow, currentTab, changeTab]);
 
-  // Écouter les messages et actions provenant des notifications push Service Worker (BroadcastChannel + postMessage)
   useEffect(() => {
     const checkUrlParams = () => {
       if (typeof window === 'undefined') return;
@@ -216,7 +193,6 @@ function MainApp() {
 
       if (!effectiveId) return;
 
-      // Nettoyer immédiatement l'URL pour ne jamais la re-traiter
       const cleanPath = window.location.pathname;
       window.history.replaceState({ tab: 'watchlist' }, '', cleanPath);
 
@@ -237,7 +213,6 @@ function MainApp() {
           episode ? Number(episode) : undefined
         );
       } else {
-        // Clic d'ouverture simple : ouvrir la fiche / l'épisode SANS marquer comme vu
         openShow(
           effectiveId, 
           'local', 
@@ -249,10 +224,8 @@ function MainApp() {
       }
     };
 
-    // 1. Exécuter à l'initialisation
     checkUrlParams();
 
-    // 2. Gestionnaire universel de messages notifications
     const handleNotificationMessage = (data: any) => {
       if (!data) return;
 
@@ -279,7 +252,6 @@ function MainApp() {
           markEpisodeWatched(idToWatch, Number(season), Number(episode), updateShow);
         }
 
-        // Also open the show at the specific episode
         if (idToWatch) {
           openShow(
             idToWatch,
@@ -293,7 +265,6 @@ function MainApp() {
       }
     };
 
-    // Écouteur Service Worker postMessage
     const handleSWMessage = (event: MessageEvent) => {
       handleNotificationMessage(event.data);
     };
@@ -302,7 +273,6 @@ function MainApp() {
       navigator.serviceWorker.addEventListener('message', handleSWMessage);
     }
 
-    // Écouteur des notifications Capacitor natives (clic sur notification APK Android)
     const handleCapacitorAction = (event: CustomEvent) => {
       if (event.detail) {
         handleNotificationMessage(event.detail);
@@ -310,7 +280,6 @@ function MainApp() {
     };
     window.addEventListener('capacitor-notification-action' as any, handleCapacitorAction);
 
-    // Écouteur BroadcastChannel (ultra-fiable en PWA et arrière-plan)
     let bc: BroadcastChannel | null = null;
     try {
       bc = new BroadcastChannel('app_notifications');
@@ -319,7 +288,7 @@ function MainApp() {
       };
     } catch (e) {}
 
-    // Écouter quand la fenêtre redevient active (retour d'arrière-plan Android)
+    // Écouter quand la fenêtre redevient active (retour d'arrière-plan ou focus onglet)
     const handleVisibilityOrFocus = () => {
       checkUrlParams();
       if (document.visibilityState === 'visible' && auth.currentUser) {
@@ -344,10 +313,8 @@ function MainApp() {
   }, [openShow, updateShow, showToast]);
 
   const handleActiveTabClick = () => {
-    // 1. Fermer toutes les modales ouvertes (fiche épisode, personne, filtres, trailers)
     window.dispatchEvent(new CustomEvent('app-close-modals'));
 
-    // 2. Priorité à la fermeture de modale dans l'historique si on est dedans
     if (
       typeof window !== 'undefined' &&
       (window.history.state?.isModal ||
@@ -361,7 +328,6 @@ function MainApp() {
   };
 
   const handleActiveTabDoubleClick = () => {
-    // Recherche de tous les conteneurs défilants pour les remonter tout en haut
     const scrollableElements = document.querySelectorAll('.overflow-y-auto, .custom-scrollbar, [style*="overflow-y: auto"]');
     scrollableElements.forEach(el => {
       try {
@@ -375,11 +341,9 @@ function MainApp() {
       }
     });
 
-    // Cas particulier : si on est sur l'onglet Explorer (discover), réinitialiser tous les filtres et tout remettre par défaut
     if (currentTab === 'discover') {
       window.dispatchEvent(new CustomEvent('discover-reset-all'));
     }
-    // Cas onglet Profil : réinitialiser les réglages, modals et états Voir plus
     if (currentTab === 'profile') {
       window.dispatchEvent(new CustomEvent('profile-reset-all'));
     }
@@ -389,15 +353,10 @@ function MainApp() {
     <div className="w-full min-h-[100dvh] bg-[#040406] flex justify-center selection:bg-[#E5A93D]/30">
       <div className="w-full max-w-md bg-premium-ambient h-[100dvh] flex flex-col relative shadow-2xl shadow-black/90 overflow-hidden pt-safe">
         
-        {/* Banner PWA Install (S25 Ultra / Android / Chrome) */}
         <PWAInstallBanner />
-
-        {/* In-App Automatic Update Checker Banner */}
         <AppUpdateBanner />
         
-        {/* Main Content Area */}
         <div className="flex-1 min-h-0 flex flex-col relative">
-          {/* 1. Écrans d'onglets principaux (Tous montés, visibilité basculée par CSS) */}
           <div className="flex-1 min-h-0 flex flex-col">
             <div className={cn("flex-1 min-h-0 flex flex-col", currentTab !== 'watchlist' && "hidden")}>
               <WatchListScreen onShowClick={(id, mediaType) => openShow(id, 'local', mediaType)} />
@@ -419,7 +378,6 @@ function MainApp() {
             </div>
           </div>
 
-          {/* 2. Vue Fiche Série (Overlay plein écran par-dessus l'onglet actif avec accélération GPU) */}
           {selectedShow && (
             <div 
               className="fixed inset-0 z-[60] bg-black flex flex-col overflow-hidden max-w-md mx-auto animate-in fade-in slide-in-from-bottom-6 duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] animate-overlay-in pt-safe"
@@ -439,7 +397,6 @@ function MainApp() {
           )}
         </div>
 
-        {/* Navigation Bottom (Fixe) - Always Visible */}
         <BottomNav 
           currentTab={currentTab} 
           onTabChange={changeTab}
@@ -447,7 +404,6 @@ function MainApp() {
           onActiveTabDoubleClick={handleActiveTabDoubleClick}
         />
 
-        {/* Global Toast */}
         <ToastContainer />
       </div>
     </div>
