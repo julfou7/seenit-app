@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, persistentSingleTabManager } from 'firebase/firestore';
 import { getMessaging, getToken, isSupported, type Messaging } from 'firebase/messaging';
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
@@ -20,7 +20,7 @@ export const db = initializeFirestore(
   app,
   { 
     localCache: Capacitor.isNativePlatform() 
-      ? memoryLocalCache() 
+      ? persistentLocalCache({ tabManager: persistentSingleTabManager({}) })
       : persistentLocalCache({ tabManager: persistentMultipleTabManager() })
   },
   (firebaseConfig as any).firestoreDatabaseId || 'default'
