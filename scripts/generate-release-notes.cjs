@@ -63,84 +63,95 @@ function fixFrenchFormatting(text) {
 
 function generate() {
   const version = process.env.APP_VERSION || '1.2.0';
-  let items = [];
+  let releaseBody = '';
 
   try {
-    let rawLogs = '';
-
+    // 1. Check if the latest commit message has detailed body text
+    let latestCommitFull = '';
     try {
-      // Try getting logs since last tag
-      const lastTag = execSync('git describe --tags --abbrev=0', { stdio: ['pipe', 'pipe', 'ignore'] }).toString().trim();
-      if (lastTag) {
-        rawLogs = execSync(`git log ${lastTag}..HEAD --pretty=%s`, { stdio: ['pipe', 'pipe', 'ignore'] }).toString().trim();
-      }
+      latestCommitFull = execSync('git log -n 1 --pretty=%B', { stdio: ['pipe', 'pipe', 'ignore'] }).toString().trim();
     } catch (e) {}
 
-    if (!rawLogs) {
-      try {
-        rawLogs = execSync('git log -n 5 --pretty=%s', { stdio: ['pipe', 'pipe', 'ignore'] }).toString().trim();
-      } catch (e) {}
+    // Check if the commit message has structured notes
+    if (latestCommitFull && (latestCommitFull.includes('🛠️') || latestCommitFull.includes('Ce qui a été fait') || latestCommitFull.includes('\n- ') || latestCommitFull.includes('\n• '))) {
+      // Clean commit message first line header if it's "fix: ..." and start directly from body or section
+      let cleaned = latestCommitFull;
+      const lines = cleaned.split('\n');
+      if (/^(fix|feat|perf|style|chore|refactor)(\([^)]+\))?:/i.test(lines[0])) {
+        lines.shift(); // remove subject line
+        cleaned = lines.join('\n').trim();
+      }
+
+      if (cleaned) {
+        releaseBody = fixFrenchFormatting(cleaned);
+      }
     }
 
-    if (rawLogs) {
-      const lines = rawLogs.split('\n').map(l => l.trim()).filter(Boolean);
+    // 2. Fallback to commits range if no detailed body was found
+    if (!releaseBody) {
+      let rawLogs = '';
+      try {
+        const lastTag = execSync('git describe --tags --abbrev=0', { stdio: ['pipe', 'pipe', 'ignore'] }).toString().trim();
+        if (lastTag) {
+          rawLogs = execSync(`git log ${lastTag}..HEAD --pretty=%B`, { stdio: ['pipe', 'pipe', 'ignore'] }).toString().trim();
+        }
+      } catch (e) {}
 
-      for (let rawMsg of lines) {
-        if (/^\d+\.\d+\.\d+$/i.test(rawMsg) || /^bump/i.test(rawMsg) || rawMsg.includes('Merge branch')) continue;
+      if (!rawLogs) {
+        try {
+          rawLogs = execSync('git log -n 5 --pretty=%s', { stdio: ['pipe', 'pipe', 'ignore'] }).toString().trim();
+        } catch (e) {}
+      }
 
-        const ccRegex = /^(fix|feat|style|perf|refactor|docs|build|chore)(\(([^)]+)\))?:\s*(.*)$/i;
-        const match = rawMsg.match(ccRegex);
+      if (rawLogs) {
+        const lines = rawLogs.split('\n').map(l => l.trim()).filter(Boolean);
+        const items = [];
 
-        let type = '';
-        let scope = '';
-        let body = rawMsg;
+        for (let rawMsg of lines) {
+          if (/^\d+\.\d+\.\d+$/i.test(rawMsg) || /^bump/i.test(rawMsg) || rawMsg.includes('Merge branch')) continue;
 
-        if (match) {
-          type = match[1].toLowerCase();
-          scope = match[3] ? match[3].toLowerCase() : '';
-          body = match[4].trim();
+          const ccRegex = /^(fix|feat|style|perf|refactor|docs|build|chore)(\(([^)]+)\))?:\s*(.*)$/i;
+          const match = rawMsg.match(ccRegex);
+
+          let type = '';
+          let scope = '';
+          let body = rawMsg;
+
+          if (match) {
+            type = match[1].toLowerCase();
+            scope = match[3] ? match[3].toLowerCase() : '';
+            body = match[4].trim();
+          }
+
+          let prefix = '- ';
+          if (type === 'fix') prefix = '- **Correction** : ';
+          else if (type === 'feat') prefix = '- **Nouveauté** : ';
+          else if (type === 'style' || scope === 'ui') prefix = '- **Interface** : ';
+          else if (type === 'perf') prefix = '- **Performance** : ';
+
+          let text = body;
+          text = text.charAt(0).toUpperCase() + text.slice(1);
+          text = fixFrenchFormatting(text);
+          items.push(`${prefix}${text}`);
         }
 
-        let prefix = '- ';
-        if (type === 'fix') prefix = '- **Correction** : ';
-        else if (type === 'feat') prefix = '- **Nouveauté** : ';
-        else if (type === 'style' || scope === 'ui') prefix = '- **Interface** : ';
-        else if (type === 'perf') prefix = '- **Performance** : ';
-
-        let text = body
-          .replace(/^reorganize\s+/i, 'Réorganisation de ')
-          .replace(/^reorganisation\s+/i, 'Réorganisation de ')
-          .replace(/^replace\s+/i, 'Remplacement de ')
-          .replace(/^modernize\s+/i, 'Modernisation de ')
-          .replace(/^fix\s+/i, 'Correction de ')
-          .replace(/^add\s+/i, 'Ajout de ')
-          .replace(/^update\s+/i, 'Mise à jour de ')
-          .replace(/^remove\s+/i, 'Suppression de ')
-          .replace(/^improve\s+/i, 'Amélioration de ')
-          .replace(/\bheader\b/gi, "l'en-tête")
-          .replace(/\bselecteur de saison\b/gi, 'sélecteur de saison')
-          .replace(/\bseason selector\b/gi, 'sélecteur de saison')
-          .replace(/\bratings chart\b/gi, 'graphique des notes')
-          .replace(/\bstatus bar\b/gi, 'barre de statut')
-          .replace(/\bnotification\b/gi, 'notification')
-          .replace(/\bselect elements\b/gi, 'menus déroulants')
-          .replace(/\bmodal pickers\b/gi, 'fenêtres de sélection')
-          .replace(/\balignment\b/gi, "l'alignement");
-
-        text = text.charAt(0).toUpperCase() + text.slice(1);
-        text = fixFrenchFormatting(text);
-        items.push(`${prefix}${text}`);
+        if (items.length > 0) {
+          releaseBody = `### 🛠️ Ce qui a été fait\n\n${items.join('\n')}`;
+        }
       }
     }
   } catch (err) {
     console.error('Error generating release notes:', err);
   }
 
-  if (items.length === 0) {
-    items.push("- Améliorations générales de l'interface et de la stabilité.");
+  if (!releaseBody) {
+    releaseBody = `### 🛠️ Ce qui a été fait\n\n- Améliorations générales de l'interface, stabilité et optimisations.`;
   }
 
-  const releaseBody = `### ✨ Nouveautés de la version v${version}\n\n${items.join('\n')}`;
+  // Ensure header exists
+  if (!releaseBody.startsWith('#')) {
+    releaseBody = `### 🛠️ Ce qui a été fait\n\n${releaseBody}`;
+  }
 
   if (process.env.GITHUB_OUTPUT) {
     try {

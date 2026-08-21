@@ -69,12 +69,12 @@ function fixFrenchFormatting(text: string): string {
 }
 
 /**
- * Transforms raw GitHub release text / commit logs into clean, readable release notes.
+ * Transforms raw GitHub release text into clean, readable Markdown without mangling headers and subheadings.
  */
 function cleanReleaseNotes(raw: string): string {
   if (!raw || !raw.trim()) {
-    return `### ✨ Nouveautés de cette version
-- **Améliorations générales** : Correctifs visuels, optimisations des performances et mise à jour des services.`;
+    return `### 🛠️ Ce qui a été fait
+- Améliorations générales de l'interface, stabilité et optimisations.`;
   }
 
   let text = raw.trim();
@@ -85,11 +85,11 @@ function cleanReleaseNotes(raw: string): string {
     text.startsWith('Full Changelog:') || 
     (text.includes('compare/v') && text.length < 120)
   ) {
-    return `### ✨ Nouveautés de cette version
+    return `### 🛠️ Ce qui a été fait
 - **Mises à jour & correctifs** : Améliorations de la stabilité, correctifs d'affichage et optimisations générales.`;
   }
 
-  // Pre-process inline bullets "• " into newlines so each item gets its own line (do not match asterisks * which are used for markdown bolding)
+  // Pre-process inline bullets "• " into newlines with bullet points
   text = text.replace(/([^\n])\s*[•]\s*/g, '$1\n- ');
 
   const lines = text.split('\n');
@@ -106,9 +106,9 @@ function cleanReleaseNotes(raw: string): string {
       continue;
     }
 
-    // Replace leading '• ' or '* '
-    if (/^[•\*]\s+/.test(trimmed)) {
-      trimmed = trimmed.replace(/^[•\*]\s+/, '- ');
+    // Replace leading '• ' with '- '
+    if (/^[•]\s+/.test(trimmed)) {
+      trimmed = trimmed.replace(/^[•]\s+/, '- ');
     }
 
     // Clean commit logs like "* feat(splash): ... by @username in https://..."
@@ -123,9 +123,16 @@ function cleanReleaseNotes(raw: string): string {
         return '- 🔹 ';
       });
 
-    // Ensure line starts with '- ' if it's not a header
-    if (!cleanedLine.startsWith('#') && !cleanedLine.startsWith('-')) {
-      cleanedLine = '- ' + cleanedLine;
+    // Check if this line is a section subtitle (e.g. ends with `:` and doesn't start with list item or heading)
+    const isHeader = cleanedLine.startsWith('#');
+    const isBullet = cleanedLine.startsWith('- ') || cleanedLine.startsWith('* ');
+    const isSectionSubtitle = !isHeader && !isBullet && cleanedLine.endsWith(':');
+
+    if (isSectionSubtitle) {
+      // Make it a bold subtitle with margin
+      if (!cleanedLine.startsWith('**')) {
+        cleanedLine = `\n**${cleanedLine}**`;
+      }
     }
 
     // Apply french formatting (accents & apostrophes)
@@ -136,8 +143,8 @@ function cleanReleaseNotes(raw: string): string {
 
   const result = filteredLines.join('\n').trim();
   if (!result) {
-    return `### ✨ Nouveautés de cette version
-- **Améliorations générales** : Correctifs d'affichage, stabilité et optimisations.`;
+    return `### 🛠️ Ce qui a été fait
+- Améliorations générales de l'interface, stabilité et optimisations.`;
   }
 
   return result;
@@ -147,7 +154,7 @@ export function ChangelogViewer({ content }: ChangelogViewerProps) {
   const formattedContent = cleanReleaseNotes(content);
 
   return (
-    <div className="text-xs text-zinc-300 space-y-2 leading-relaxed [&_h3]:text-sm [&_h3]:font-bold [&_h3]:text-amber-300 [&_h3]:mt-1 [&_h3]:mb-2.5 [&_h4]:text-xs [&_h4]:font-bold [&_h4]:text-amber-400 [&_ul]:space-y-2.5 [&_ul]:my-2 [&_li]:list-disc [&_li]:ml-4 [&_li]:pl-1 [&_strong]:text-white [&_strong]:font-bold [&_p]:my-1.5">
+    <div className="text-xs text-zinc-300 space-y-2 leading-relaxed [&_h3]:text-sm [&_h3]:font-black [&_h3]:text-amber-400 [&_h3]:mt-1 [&_h3]:mb-3 [&_h4]:text-xs [&_h4]:font-bold [&_h4]:text-amber-300 [&_ul]:space-y-2.5 [&_ul]:my-2 [&_li]:list-disc [&_li]:ml-4 [&_li]:pl-1 [&_strong]:text-white [&_strong]:font-bold [&_strong]:text-zinc-100 [&_p]:my-2">
       <Markdown>{formattedContent}</Markdown>
     </div>
   );
