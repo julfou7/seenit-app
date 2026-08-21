@@ -48,6 +48,7 @@ export function getUpcomingEpisodeInfo(s: Show): UpcomingEpisodeInfo | null {
         episode_number: s.nextEpisodeToAir.episode_number,
         name: s.nextEpisodeToAir.name,
         air_date: s.nextEpisodeToAir.air_date,
+        still_path: s.nextEpisodeToAir.still_path,
       });
     }
   }
@@ -60,6 +61,7 @@ export function getUpcomingEpisodeInfo(s: Show): UpcomingEpisodeInfo | null {
         episode_number: s.nextEpisodeToWatch.episode_number,
         name: s.nextEpisodeToWatch.name,
         air_date: s.nextEpisodeToWatch.air_date,
+        still_path: s.nextEpisodeToWatch.still_path,
       });
     }
   }
@@ -125,12 +127,15 @@ export function UpcomingShowCard({ show, onShowClick, onEpisodeClick }: Props) {
       showToast(`🔔 Rappel activé pour ${show.title} S${sNumStr}E${eNumStr}`, 'success', show);
 
       try {
+        const epStill = ep.still_path || show.nextEpisodeToAir?.still_path || show.nextEpisodeToWatch?.still_path;
         const posterUrl = show.posterPath
           ? (show.posterPath.startsWith('http') ? show.posterPath : `https://image.tmdb.org/t/p/w185${show.posterPath}`)
           : 'https://seenit.app/icon-192.png';
-        const backdropUrl = show.backdropPath
-          ? (show.backdropPath.startsWith('http') ? show.backdropPath : `https://image.tmdb.org/t/p/w780${show.backdropPath}`)
-          : undefined;
+        const backdropUrl = epStill
+          ? (epStill.startsWith('http') ? epStill : `https://image.tmdb.org/t/p/w780${epStill}`)
+          : (show.backdropPath
+              ? (show.backdropPath.startsWith('http') ? show.backdropPath : `https://image.tmdb.org/t/p/w780${show.backdropPath}`)
+              : posterUrl);
 
         sendNativeNotification(`🔔 Rappel programmé : ${show.title}`, {
           body: `Rappel enregistré pour l'épisode S${sNumStr}E${eNumStr} (${ep.name || 'Prochainement'})`,

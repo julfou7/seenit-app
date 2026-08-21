@@ -149,7 +149,7 @@ export function AppUpdateBanner() {
       {/* Detailed Changelog Modal - Rendered via Portal directly to document.body to stay above all navigation bars */}
       {showModal && createPortal(
         <div 
-          className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 pb-8 sm:p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-md flex items-center justify-center p-2.5 pb-6 sm:p-4 animate-in fade-in duration-200"
           onClick={() => {
             if (downloadProgress?.status !== 'downloading') {
               setShowModal(false);
@@ -157,9 +157,9 @@ export function AppUpdateBanner() {
           }}
         >
           <div 
-            className="bg-[#121218] border border-white/10 rounded-3xl w-full max-w-md sm:max-w-lg overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.95)] flex flex-col my-auto animate-in zoom-in-95 duration-200 shrink-0"
+            className="bg-[#121218] border border-white/10 rounded-3xl w-full max-w-lg sm:max-w-2xl overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.95)] flex flex-col my-auto animate-in zoom-in-95 duration-200 shrink-0"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxHeight: 'min(88vh, calc(100dvh - 24px))' }}
+            style={{ maxHeight: 'min(94vh, calc(100dvh - 16px))' }}
           >
             {/* Header - Fixed */}
             <div className="p-4 sm:p-5 pb-3 bg-gradient-to-b from-amber-500/10 to-transparent border-b border-white/5 flex items-start justify-between shrink-0">
@@ -190,7 +190,7 @@ export function AppUpdateBanner() {
 
             {/* Scrollable Body Content */}
             <div 
-              className="p-4 sm:p-5 overflow-y-auto min-h-0 space-y-3.5 flex-1 text-sm text-zinc-300 custom-scrollbar overscroll-contain touch-pan-y"
+              className="p-4 sm:p-5 overflow-y-auto min-h-0 space-y-4 flex-1 text-sm text-zinc-300 custom-scrollbar overscroll-contain touch-pan-y"
               style={{ 
                 WebkitOverflowScrolling: 'touch',
                 touchAction: 'pan-y',
@@ -201,7 +201,7 @@ export function AppUpdateBanner() {
                 Notes de version
               </div>
               
-              <div className="bg-black/40 border border-white/5 rounded-2xl p-4 max-h-64 sm:max-h-80 overflow-y-auto custom-scrollbar">
+              <div className="bg-black/40 border border-white/5 rounded-2xl p-4 max-h-80 sm:max-h-[28rem] md:max-h-[32rem] overflow-y-auto custom-scrollbar">
                 <ChangelogViewer content={latestRelease.releaseNotes} />
               </div>
 

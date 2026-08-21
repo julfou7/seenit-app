@@ -39,17 +39,22 @@ export function useRemindersNotifier() {
 
       const title = s.title;
       const body = `L'épisode S${sNum}E${eNum} ${upcoming.name ? `« ${upcoming.name} » ` : ''}est disponible aujourd'hui !`;
+      
       const iconUrl = s.posterPath 
         ? (s.posterPath.startsWith('http') ? s.posterPath : `https://image.tmdb.org/t/p/w185${s.posterPath}`)
-        : '/icon-192.png';
-      const imageUrl = s.backdropPath 
-        ? (s.backdropPath.startsWith('http') ? s.backdropPath : `https://image.tmdb.org/t/p/w780${s.backdropPath}`)
-        : undefined;
+        : 'https://seenit.app/icon-192.png';
+
+      const episodeStill = upcoming.still_path || s.nextEpisodeToAir?.still_path || s.nextEpisodeToWatch?.still_path;
+      const imageUrl = episodeStill
+        ? (episodeStill.startsWith('http') ? episodeStill : `https://image.tmdb.org/t/p/w780${episodeStill}`)
+        : (s.backdropPath 
+            ? (s.backdropPath.startsWith('http') ? s.backdropPath : `https://image.tmdb.org/t/p/w780${s.backdropPath}`)
+            : (s.posterPath ? (s.posterPath.startsWith('http') ? s.posterPath : `https://image.tmdb.org/t/p/w500${s.posterPath}`) : iconUrl));
 
       const notificationPayload = {
         body,
         icon: iconUrl,
-        badge: '/icon-192.png',
+        badge: 'https://seenit.app/icon-192.png',
         image: imageUrl,
         showId: s.id,
         tmdbId: s.tmdbId,
