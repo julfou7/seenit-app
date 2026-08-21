@@ -30,7 +30,7 @@ interface ToastState {
   showToast: (
     message: string | ToastMessageObj, 
     type?: ToastType, 
-    show?: Show, 
+    show?: any, 
     onUndo?: (() => void | Promise<void>) | null,
     duration?: number
   ) => void;
@@ -50,13 +50,32 @@ export const useToastStore = create<ToastState>((set, get) => ({
   onUndo: null,
 
   showToast: (message, type = 'info', show, onUndo, duration = 5000) => {
+    let finalShow: Show | undefined = undefined;
+    let finalUndo: (() => void | Promise<void>) | null = null;
+    let finalDuration = typeof duration === 'number' ? duration : 5000;
+
+    if (typeof show === 'function') {
+      finalUndo = show as any;
+    } else if (typeof show === 'string') {
+      if (typeof onUndo === 'function') {
+        finalUndo = onUndo;
+      }
+    } else if (show && typeof show === 'object' && ('id' in show || 'tmdbId' in show || 'title' in show)) {
+      finalShow = show as Show;
+      if (typeof onUndo === 'function') {
+        finalUndo = onUndo;
+      }
+    } else if (typeof onUndo === 'function') {
+      finalUndo = onUndo;
+    }
+
     const newItem: ToastItem = {
       id: Math.random().toString(36).substring(2, 9) + Date.now().toString(36),
       message,
       type,
-      show,
-      onUndo: onUndo || null,
-      duration
+      show: finalShow,
+      onUndo: finalUndo,
+      duration: finalDuration
     };
 
     const state = get();

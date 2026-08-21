@@ -392,9 +392,6 @@ function MainApp() {
         {/* In-App Automatic Update Checker Banner */}
         <AppUpdateBanner />
         
-        {/* Global Toast */}
-        <ToastContainer />
-
         {/* Main Content Area */}
         <div className="flex-1 min-h-0 flex flex-col relative">
           {/* 1. Écrans d'onglets principaux (Tous montés, visibilité basculée par CSS) */}
@@ -446,6 +443,9 @@ function MainApp() {
           onActiveTabClick={handleActiveTabClick}
           onActiveTabDoubleClick={handleActiveTabDoubleClick}
         />
+
+        {/* Global Toast */}
+        <ToastContainer />
       </div>
     </div>
   );
