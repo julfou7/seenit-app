@@ -128,7 +128,7 @@ export async function markEpisodeWatched(
 
   useShowsStore.getState().updateShowOptimistic(targetShow.id, localUpdates);
 
-  // 2. Envoi strict et ciblé à Firestore avec la notation pointée (dot-notation)
+  // 2. Envoi strict et ciblé à Firestore avec la VRAIE notation pointée (dot-notation)
   const user = auth.currentUser;
   if (user && targetShow.id) {
     try {
@@ -139,16 +139,17 @@ export async function markEpisodeWatched(
         isSynced: false
       };
 
-      // Seule la clé spécifique de l'épisode est mise à jour dans le dictionnaire
+      // C'est ICI qu'on utilise la VRAIE notation pointée de Firestore pour mettre à jour
+      // UNE SEULE CLÉ dans le dictionnaire distant, SANS lire ni écraser le reste.
       updatePayload[`episodeRecords.${epKey}`] = {
         watchedAt: Date.now(),
-        episodeTitle
+        episodeTitle: fetchedEpTitle || optimisticNextEp?.name || null
       };
 
-      // Mise à jour du prochain épisode et du statut si nécessaire
       if (optimisticNextEp !== undefined) {
         updatePayload.nextEpisodeToWatch = optimisticNextEp;
       }
+
       if (targetShow.status === 'plan_to_watch') {
         updatePayload.status = 'watching';
       }
