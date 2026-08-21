@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { db, auth } from '../lib/firebase';
-import { collection, query, getDocs, getDocsFromCache } from 'firebase/firestore';
+import { collection, query, getDocs, getDocsFromCache, getDocsFromServer } from 'firebase/firestore';
 import { type Show } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/firebaseErrors';
 import { useSyncStore } from './syncStore';
@@ -222,7 +222,14 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
       }
 
       // 2. Fetch depuis le réseau pour mettre à jour
-      const snapshot = await getDocs(q);
+      let snapshot;
+      try {
+        // Force la lecture depuis le serveur pour bypasser le cache agressif de la PWA
+        snapshot = await getDocsFromServer(q);
+      } catch (e) {
+        // Fallback si l'appareil est hors-ligne
+        snapshot = await getDocs(q);
+      }
       
       const rawLoadedShows: Show[] = [];
       snapshot.forEach((doc) => {

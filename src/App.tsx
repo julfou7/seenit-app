@@ -322,6 +322,9 @@ function MainApp() {
     // Écouter quand la fenêtre redevient active (retour d'arrière-plan Android)
     const handleVisibilityOrFocus = () => {
       checkUrlParams();
+      if (document.visibilityState === 'visible' && auth.currentUser) {
+        useShowsStore.getState().fetchShows();
+      }
     };
 
     window.addEventListener('focus', handleVisibilityOrFocus);
