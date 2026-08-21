@@ -9,11 +9,12 @@ import { UpcomingShowCard, getUpcomingEpisodeInfo } from '../components/cards/Up
 import { HistoryFeed } from '../components/HistoryFeed';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
 import { tmdb } from '../features/shows/tmdb';
+import { markEpisodeWatched } from '../features/shows/markEpisodeWatched';
 import { getFormattedProviderLogo, extractOfficialStreamingProvider, PLEX_LOGO_SVG } from '../utils/providerLogos';
 import { checkPlexAvailability } from '../features/plex/plexAvailability';
 import { User, Circle, CheckCircle2, Trash2, Archive, X, Clock, Ban } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { SyncStatusIndicator } from '../components/SyncStatusIndicator';
 import { useShows } from '../hooks/useShows';
@@ -744,79 +745,14 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
     .map(item => item.show);
 
   const markNextEpisodeAsSeen = async (show: Show) => {
-    if (!show.id) return;
-    const nextEpNum = show.nextEpisodeToWatch;
-    if (!nextEpNum) return;
-    
-    const epKey = `${nextEpNum.season_number}x${nextEpNum.episode_number}`;
-    const sNumStr = String(nextEpNum.season_number).padStart(2, '0');
-    const eNumStr = String(nextEpNum.episode_number).padStart(2, '0');
-
-    // Save previous state for undo capability
-    const prevSeenEpisodes = show.seenEpisodes || [];
-    const prevEpisodeRecords = show.episodeRecords || {};
-    const prevLastWatchedAt = show.lastWatchedAt || null;
-    const prevNextEpisodeToWatch = show.nextEpisodeToWatch || null;
-
-    const newSeen = new Set(prevSeenEpisodes);
-    newSeen.add(epKey);
-    const newRecords = { ...prevEpisodeRecords };
-    newRecords[epKey] = { 
-      watchedAt: Date.now(),
-      episodeTitle: nextEpNum.name || null
-    };
-    
-    const totalEps = show.totalAiredEpisodes || show.totalEpisodes || 0;
-    const newSeenArray = Array.from(newSeen as Set<string>);
-    let optimisticNextEp: any = null;
-    
-    if (totalEps > 0 && newSeenArray.length >= totalEps) {
-      // Done!
-      optimisticNextEp = null;
-    } else {
-      let nextEpObj: any = null;
-      if (show.tmdbId) {
-        try {
-          const seasonRes = await tmdb.getSeasonDetails(show.tmdbId, nextEpNum.season_number);
-          if (seasonRes.ok && seasonRes.value?.episodes) {
-            const match = seasonRes.value.episodes.find((x: any) => x.episode_number === nextEpNum.episode_number + 1);
-            if (match) {
-              nextEpObj = match;
-            } else {
-              const nextSeasonRes = await tmdb.getSeasonDetails(show.tmdbId, nextEpNum.season_number + 1);
-              if (nextSeasonRes.ok && nextSeasonRes.value?.episodes?.[0]) {
-                nextEpObj = nextSeasonRes.value.episodes[0];
-              }
-            }
-          }
-        } catch (e) {
-          console.error('Error fetching next ep in markNextEpisodeAsSeen:', e);
-        }
-      }
-
-      optimisticNextEp = {
-        season_number: nextEpObj ? nextEpObj.season_number : nextEpNum.season_number,
-        episode_number: nextEpObj ? nextEpObj.episode_number : (nextEpNum.episode_number + 1),
-        air_date: nextEpObj?.air_date || null,
-        name: nextEpObj?.name || null,
-        still_path: nextEpObj?.still_path || null
-      };
-    }
-    
-    // Check if the show was currently in "Pas vu depuis un moment"
+    if (!show.id || !show.nextEpisodeToWatch) return;
+    const { season_number, episode_number } = show.nextEpisodeToWatch;
     const wasInPasVu = pasVuDepuisUnMomentShows.some(s => s.id === show.id);
 
-    await updateShow(show.id, {
-      seenEpisodes: newSeenArray,
-      episodeRecords: newRecords,
-      lastWatchedAt: Date.now(),
-      updatedAt: Date.now(),
-      nextEpisodeToWatch: optimisticNextEp,
-      isSynced: false
-    });
-    scrollAllCarouselsToStart();
+    // Appel de la fonction atomique sécurisée
+    await markEpisodeWatched(show.id, season_number, episode_number);
 
-    // Si la série était dans "Pas vu depuis un moment", faire remonter le scroll vers "Continuer à regarder"
+    // Conservation stricte de la logique de scroll Android native
     if (wasInPasVu) {
       setTimeout(() => {
         const container = document.getElementById('watchlist-container');
@@ -824,83 +760,51 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
           container.style.scrollBehavior = 'smooth';
           container.scrollTop = 0;
         }
-        
         const continueCarousel = document.getElementById('continue-watching-carousel');
         if (continueCarousel) {
           continueCarousel.style.scrollBehavior = 'smooth';
           continueCarousel.scrollLeft = 0;
         }
-
         scrollAllCarouselsToStart();
-
         setTimeout(() => {
           if (container) container.style.scrollBehavior = 'auto';
           if (continueCarousel) continueCarousel.style.scrollBehavior = 'auto';
         }, 600);
       }, 350);
     }
-
-    showToast(
-      `« ${show.title} » S${sNumStr}E${eNumStr} marqué comme vu !`,
-      'success',
-      show,
-      async () => {
-        if (show.id) {
-          await updateShow(show.id, {
-            seenEpisodes: prevSeenEpisodes,
-            episodeRecords: prevEpisodeRecords,
-            lastWatchedAt: prevLastWatchedAt,
-            nextEpisodeToWatch: prevNextEpisodeToWatch,
-            updatedAt: Date.now(),
-            isSynced: false
-          });
-          scrollAllCarouselsToStart();
-        }
-      }
-    );
   };
 
   const markMovieAsSeen = async (show: Show) => {
     if (!show.id) return;
-    const prevSeen = show.seenEpisodes || [];
-    const prevRecords = show.episodeRecords || {};
-    const prevStatus = show.status;
-    const prevLastWatchedAt = show.lastWatchedAt || null;
-
-    const newRecords = { ...prevRecords };
-    newRecords['movie'] = {
+    
+    const updatePayload: any = {
+      seenEpisodes: arrayUnion('movie'),
+      status: 'completed',
+      lastWatchedAt: Date.now(),
+      updatedAt: Date.now(),
+      isSynced: false
+    };
+    
+    updatePayload['episodeRecords.movie'] = {
       watchedAt: Date.now(),
       episodeTitle: show.title || 'Film'
     };
 
-    await updateShow(show.id, {
-      seenEpisodes: ['movie'],
-      episodeRecords: newRecords,
+    // Update optimiste local
+    useShowsStore.getState().updateShowOptimistic(show.id, {
+      seenEpisodes: [...(show.seenEpisodes || []), 'movie'],
       status: 'completed',
       lastWatchedAt: Date.now(),
-      updatedAt: Date.now(),
-      isSynced: false,
+      updatedAt: Date.now()
     });
-    scrollAllCarouselsToStart();
 
-    showToast(
-      `« ${show.title} » marqué comme vu !`,
-      'success',
-      show,
-      async () => {
-        if (show.id) {
-          await updateShow(show.id, {
-            seenEpisodes: prevSeen,
-            episodeRecords: prevRecords,
-            status: prevStatus,
-            lastWatchedAt: prevLastWatchedAt,
-            updatedAt: Date.now(),
-            isSynced: false,
-          });
-          scrollAllCarouselsToStart();
-        }
-      }
-    );
+    // Update réseau atomique
+    if (auth.currentUser && show.id) {
+      await updateDoc(doc(db, 'users', auth.currentUser.uid, 'shows', show.id), updatePayload);
+    }
+
+    scrollAllCarouselsToStart();
+    useToastStore.getState().showToast(`« ${show.title} » marqué comme vu !`, 'success', show);
   };
 
   return (
