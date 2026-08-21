@@ -1,4 +1,4 @@
-import { CapacitorHttp } from '@capacitor/core';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 
 export interface RedditPost {
   id: string;
@@ -14,6 +14,12 @@ export interface RedditResponse {
 }
 
 export const searchRedditDiscussions = async (query: string): Promise<RedditResponse> => {
+  // In Web preview, browser CORS blocks direct client-side requests to reddit.com
+  // Gracefully return fallback mode so the UI shows the direct Reddit browser launcher.
+  if (!Capacitor.isNativePlatform()) {
+    return { status: 'fallback', posts: [] };
+  }
+
   try {
     const url = `https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&sort=relevance&limit=3`;
     
@@ -42,8 +48,8 @@ export const searchRedditDiscussions = async (query: string): Promise<RedditResp
     }));
 
     return { status: 'success', posts };
-  } catch (error) {
-    console.error('Reddit Search Error:', error);
+  } catch (_error) {
+    // Resilient fallback on any network error without throwing or polluting console
     return { status: 'fallback', posts: [] };
   }
 };
