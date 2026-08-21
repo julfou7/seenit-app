@@ -52,9 +52,9 @@ export function ToastContainer() {
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (touchStartY.current !== null) {
-      const diff = touchStartY.current - e.changedTouches[0].clientY;
-      // If swiped upwards by 25px or more, dismiss the toast
-      if (diff > 25) {
+      const diff = e.changedTouches[0].clientY - touchStartY.current;
+      // If swiped downwards by 25px or more, dismiss the toast
+      if (Math.abs(diff) > 25) {
         hideToast();
       }
       touchStartY.current = null;
@@ -175,21 +175,21 @@ export function ToastContainer() {
       {visible && (
         <motion.div
           id="toast-notification-wrapper"
-          initial={{ opacity: 0, y: -30, scale: 0.95 }}
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -40, scale: 0.92, transition: { duration: 0.2 } }}
+          exit={{ opacity: 0, y: 20, scale: 0.92, transition: { duration: 0.2 } }}
           transition={{ type: 'spring', damping: 26, stiffness: 380 }}
           drag="y"
           dragConstraints={{ top: 0, bottom: 0 }}
-          dragElastic={{ top: 0.8, bottom: 0.05 }}
+          dragElastic={{ top: 0.05, bottom: 0.8 }}
           onDragEnd={(_e, info) => {
-            if (info.offset.y < -20 || info.velocity.y < -200) {
+            if (info.offset.y > 20 || info.velocity.y > 200) {
               hideToast();
             }
           }}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
-          className="fixed top-[calc(1.25rem+env(safe-area-inset-top,0px))] left-1/2 -translate-x-1/2 z-[9999] w-full max-w-md px-3 pointer-events-auto touch-pan-y select-none cursor-grab active:cursor-grabbing flex justify-center"
+          className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 z-[99999] w-full max-w-md px-3 pointer-events-auto touch-pan-y select-none cursor-grab active:cursor-grabbing flex justify-center"
         >
           {hasPoster ? (
             /* Rich Media Toast with Poster */
