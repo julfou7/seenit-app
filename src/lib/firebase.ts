@@ -23,7 +23,7 @@ export const db = initializeFirestore(
       ? memoryLocalCache() 
       : persistentLocalCache({ tabManager: persistentMultipleTabManager() })
   },
-  '(default)'
+  (firebaseConfig as any).firestoreDatabaseId || 'default'
 );
 
 export let messaging: Messaging | null = null;
