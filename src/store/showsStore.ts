@@ -139,53 +139,41 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
       set({ loading: true });
     }
     
+    if (unsubscribeShowsListener) {
+      // Déjà en écoute
+      return;
+    }
+    
     try {
       const showsRef = collection(db, 'users', user.uid, 'shows');
-      const q = query(showsRef);
-
-      // 1. Tenter de lire depuis le cache local Firestore pour un affichage instantané
-      try {
-        const cachedSnapshot = await getDocsFromCache(q);
-        if (!cachedSnapshot.empty) {
-          const cachedShows: Show[] = [];
-          cachedSnapshot.forEach((doc) => {
-            cachedShows.push({ ...doc.data(), id: String(doc.id) } as Show);
-          });
-          const merged = deduplicateAndMergeShows(cachedShows);
-          saveToLocalStorage(merged);
-          set({ shows: merged, loading: false, initialized: true });
-        }
-      } catch (cacheErr) {
-        // Le cache peut être vide ou indisponible, on ignore silencieusement
-      }
-
-      // 2. Fetch depuis le réseau pour mettre à jour
-      const snapshot = await getDocs(q);
       
-      const rawLoadedShows: Show[] = [];
-      snapshot.forEach((doc) => {
-        rawLoadedShows.push({ ...doc.data(), id: String(doc.id) } as Show);
+      unsubscribeShowsListener = onSnapshot(showsRef, (snapshot) => {
+        const remoteShows: Show[] = [];
+        snapshot.forEach((doc) => {
+          remoteShows.push({ ...doc.data(), id: String(doc.id) } as Show);
+        });
+        const merged = deduplicateAndMergeShows(remoteShows);
+        saveToLocalStorage(merged);
+        set({ shows: merged, loading: false, initialized: true });
+      }, (err: any) => {
+        const errStr = err?.message || String(err);
+        const isQuotaError = 
+          err?.code === 'resource-exhausted' || 
+          errStr.toLowerCase().includes('quota exceeded') || 
+          errStr.toLowerCase().includes('quota-exceeded') ||
+          errStr.toLowerCase().includes('resource-exhausted') ||
+          errStr.toLowerCase().includes('resource_exhausted');
+  
+        if (isQuotaError) {
+          console.warn("[showsStore] Firestore quota exhausted on realtime listener.");
+          useSyncStore.getState().setQuotaExceeded(true);
+        } else {
+          console.error('[showsStore] Realtime listener error:', err);
+        }
+        set({ loading: false });
       });
-
-      const loadedShows = deduplicateAndMergeShows(rawLoadedShows);
-
-      saveToLocalStorage(loadedShows);
-      set({ shows: loadedShows, loading: false, initialized: true });
-    } catch (err: any) {
-      const errStr = err?.message || String(err);
-      const isQuotaError = 
-        err?.code === 'resource-exhausted' || 
-        errStr.toLowerCase().includes('quota exceeded') || 
-        errStr.toLowerCase().includes('quota-exceeded') ||
-        errStr.toLowerCase().includes('resource-exhausted') ||
-        errStr.toLowerCase().includes('resource_exhausted');
-
-      if (isQuotaError) {
-        console.warn("[showsStore] Firestore quota exhausted on fetch.");
-        useSyncStore.getState().setQuotaExceeded(true);
-      } else {
-        handleFirestoreError(err, OperationType.GET, `users/${user.uid}/shows`);
-      }
+    } catch (err) {
+      console.error('[showsStore] Failed to setup realtime listener:', err);
       set({ loading: false });
     }
   }
@@ -194,36 +182,15 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
 let unsubscribeShowsListener: Unsubscribe | null = null;
 
 auth.onAuthStateChanged(user => {
-  if (unsubscribeShowsListener) {
-    unsubscribeShowsListener();
-    unsubscribeShowsListener = null;
-  }
-
-  if (user) {
-    useShowsStore.getState().fetchShows();
-
-    // Écouteur en temps réel sur la collection shows pour propager immédiatement les changements entre APK et Web DEV
-    try {
-      const showsRef = collection(db, 'users', user.uid, 'shows');
-      unsubscribeShowsListener = onSnapshot(showsRef, (snapshot) => {
-        if (!snapshot.empty) {
-          const remoteShows: Show[] = [];
-          snapshot.forEach((doc) => {
-            remoteShows.push({ ...doc.data(), id: String(doc.id) } as Show);
-          });
-          const merged = deduplicateAndMergeShows(remoteShows);
-          saveToLocalStorage(merged);
-          useShowsStore.setState({ shows: merged, loading: false, initialized: true });
-        }
-      }, (err) => {
-        console.warn('[showsStore] Realtime shows listener warning:', err?.message || err);
-      });
-    } catch (listenerErr) {
-      console.warn('[showsStore] Failed to attach realtime listener:', listenerErr);
+  if (!user) {
+    if (unsubscribeShowsListener) {
+      unsubscribeShowsListener();
+      unsubscribeShowsListener = null;
     }
-  } else {
     useShowsStore.getState().setShows([]);
     useShowsStore.getState().setLoading(false);
     useShowsStore.getState().setInitialized(false);
+  } else {
+    useShowsStore.getState().fetchShows();
   }
 });
