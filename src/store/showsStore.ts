@@ -44,9 +44,10 @@ const saveToLocalStorage = (shows: Show[]) => {
 /**
  * Fusionne et déduplique intelligemment les séries (en combinant seenEpisodes et records)
  */
-function deduplicateAndMergeShows(rawShows: Show[]): Show[] {
+function deduplicateAndMergeShows(rawShows: Show[], currentLocalShows: Show[] = []): Show[] {
   const deduplicatedMap = new Map<string, Show>();
 
+  // 1. D'abord charger tous les rawShows depuis Firestore
   for (const show of rawShows) {
     const tmdbIdNum = Number(show.tmdbId);
     const mType = show.mediaType || 'tv';
@@ -85,7 +86,68 @@ function deduplicateAndMergeShows(rawShows: Show[]): Show[] {
     }
   }
 
-  return Array.from(deduplicatedMap.values());
+  // 2. Fusionner avec les séries locales actuelles pour garantir qu'aucun épisode vu localement ne disparaisse
+  for (const localShow of currentLocalShows) {
+    const tmdbIdNum = Number(localShow.tmdbId);
+    const mType = localShow.mediaType || 'tv';
+    if (!tmdbIdNum || isNaN(tmdbIdNum)) continue;
+
+    const key = `${mType}_${tmdbIdNum}`;
+    const remoteShow = deduplicatedMap.get(key);
+
+    if (remoteShow) {
+      const mergedSeen = Array.from(new Set([
+        ...(remoteShow.seenEpisodes || []),
+        ...(localShow.seenEpisodes || [])
+      ]));
+
+      const mergedRecords = {
+        ...(remoteShow.episodeRecords || {}),
+        ...(localShow.episodeRecords || {})
+      };
+
+      deduplicatedMap.set(key, {
+        ...remoteShow,
+        seenEpisodes: mergedSeen,
+        episodeRecords: mergedRecords,
+        lastWatchedAt: Math.max(remoteShow.lastWatchedAt || 0, localShow.lastWatchedAt || 0)
+      });
+    }
+  }
+
+  // 3. Vérifier que nextEpisodeToWatch ne pointe pas vers un épisode DÉJÀ VU
+  const finalShows: Show[] = [];
+  for (const show of deduplicatedMap.values()) {
+    const seen = show.seenEpisodes || [];
+    let nextEp = show.nextEpisodeToWatch;
+
+    if (nextEp && seen.includes(`${nextEp.season_number}x${nextEp.episode_number}`)) {
+      // nextEpisodeToWatch est obsolète car cet épisode est déjà dans seenEpisodes !
+      let maxS = 1;
+      let maxE = 0;
+      seen.forEach(epKey => {
+        const [s, e] = epKey.split('x').map(Number);
+        if (!isNaN(s) && !isNaN(e)) {
+          if (s > maxS || (s === maxS && e > maxE)) {
+            maxS = s;
+            maxE = e;
+          }
+        }
+      });
+      nextEp = {
+        ...nextEp,
+        season_number: maxS,
+        episode_number: maxE + 1
+      };
+    }
+
+    finalShows.push({
+      ...show,
+      nextEpisodeToWatch: nextEp
+    });
+  }
+
+  return finalShows;
 }
 
 export const useShowsStore = create<ShowsState>((set, get) => ({
@@ -151,7 +213,7 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
           cachedSnapshot.forEach((doc) => {
             cachedShows.push({ ...doc.data(), id: String(doc.id) } as Show);
           });
-          const merged = deduplicateAndMergeShows(cachedShows);
+          const merged = deduplicateAndMergeShows(cachedShows, get().shows);
           saveToLocalStorage(merged);
           set({ shows: merged, loading: false, initialized: true });
         }
@@ -167,7 +229,7 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
         rawLoadedShows.push({ ...doc.data(), id: String(doc.id) } as Show);
       });
 
-      const loadedShows = deduplicateAndMergeShows(rawLoadedShows);
+      const loadedShows = deduplicateAndMergeShows(rawLoadedShows, get().shows);
 
       saveToLocalStorage(loadedShows);
       set({ shows: loadedShows, loading: false, initialized: true });

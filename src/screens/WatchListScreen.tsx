@@ -96,8 +96,10 @@ function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMa
   }, [isMovie, show.tmdbId, movieRuntime, show.title]);
 
   let nextEp = show.nextEpisodeToWatch;
-  if (!isMovie && !nextEp && sectionType !== 'upToDate') {
-    const seen = show.seenEpisodes || [];
+  const seen = show.seenEpisodes || [];
+  const isCurrentNextSeen = Boolean(nextEp && seen.includes(`${nextEp.season_number}x${nextEp.episode_number}`));
+
+  if (!isMovie && (!nextEp || isCurrentNextSeen) && sectionType !== 'upToDate') {
     if (seen.length > 0) {
       let maxS = 1;
       let maxE = 0;

@@ -65,7 +65,8 @@ export async function markEpisodeWatched(
         if (totalEps > 0 && newSeenArray.length >= totalEps) {
           optimisticNextEp = null;
         } else {
-          const nextInSeason = seasonRes.value.episodes.find((x: any) => x.episode_number === eNum + 1);
+          // Trouver le premier épisode non vu de la saison
+          const nextInSeason = seasonRes.value.episodes.find((x: any) => x.episode_number > eNum && !newSeen.has(`${sNum}x${x.episode_number}`));
           if (nextInSeason) {
             optimisticNextEp = {
               season_number: nextInSeason.season_number,
@@ -80,19 +81,21 @@ export async function markEpisodeWatched(
             };
           } else {
             const nextSeasonRes = await tmdb.getSeasonDetails(targetShow.tmdbId, sNum + 1);
-            if (nextSeasonRes.ok && nextSeasonRes.value?.episodes?.[0]) {
-              const nextSeasonFirst = nextSeasonRes.value.episodes[0];
-              optimisticNextEp = {
-                season_number: nextSeasonFirst.season_number,
-                episode_number: nextSeasonFirst.episode_number,
-                air_date: nextSeasonFirst.air_date || null,
-                name: nextSeasonFirst.name || null,
-                still_path: nextSeasonFirst.still_path || null,
-                episode_count: nextSeasonRes.value.episodes?.length || 1,
-                aired_episodes_in_season: nextSeasonRes.value.episodes?.filter((ep: any) => ep.air_date && ep.air_date <= new Date().toISOString().slice(0, 10)).length || 1,
-                is_final_season: targetShow.nextEpisodeToWatch?.is_final_season,
-                series_ended: targetShow.nextEpisodeToWatch?.series_ended || targetShow.seriesEnded
-              };
+            if (nextSeasonRes.ok && nextSeasonRes.value?.episodes) {
+              const nextSeasonUnseen = nextSeasonRes.value.episodes.find((x: any) => !newSeen.has(`${sNum + 1}x${x.episode_number}`));
+              if (nextSeasonUnseen) {
+                optimisticNextEp = {
+                  season_number: nextSeasonUnseen.season_number,
+                  episode_number: nextSeasonUnseen.episode_number,
+                  air_date: nextSeasonUnseen.air_date || null,
+                  name: nextSeasonUnseen.name || null,
+                  still_path: nextSeasonUnseen.still_path || null,
+                  episode_count: nextSeasonRes.value.episodes?.length || 1,
+                  aired_episodes_in_season: nextSeasonRes.value.episodes?.filter((ep: any) => ep.air_date && ep.air_date <= new Date().toISOString().slice(0, 10)).length || 1,
+                  is_final_season: targetShow.nextEpisodeToWatch?.is_final_season,
+                  series_ended: targetShow.nextEpisodeToWatch?.series_ended || targetShow.seriesEnded
+                };
+              }
             }
           }
         }
@@ -100,6 +103,15 @@ export async function markEpisodeWatched(
     } catch (e) {
       console.error('[markEpisodeWatched] TMDB fetch error:', e);
     }
+  }
+
+  // Fallback si TMDB n'a pas répondu ou est indisponible
+  if (!optimisticNextEp && (totalEps === 0 || newSeenArray.length < totalEps)) {
+    let checkEp = eNum + 1;
+    while (newSeen.has(`${sNum}x${checkEp}`) && checkEp <= 100) {
+      checkEp++;
+    }
+    optimisticNextEp = { season_number: sNum, episode_number: checkEp };
   }
 
   const updates: Partial<Show> = {
@@ -130,7 +142,6 @@ export async function markEpisodeWatched(
     }
   }
 
-  syncSingleItem(targetShow.id, true).catch(console.error);
   scrollAllCarouselsToStart();
 
   useToastStore.getState().showToast(
@@ -164,7 +175,6 @@ export async function markEpisodeWatched(
           }
         }
       }
-      syncSingleItem(targetShow.id, true).catch(console.error);
       scrollAllCarouselsToStart();
     }
   );

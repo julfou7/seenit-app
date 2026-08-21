@@ -517,13 +517,20 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
 
   const userUid = user.uid;
   try {
+    const localShow = useShowsStore.getState().shows.find(s => s.id === showId);
     const showRef = doc(db, 'users', userUid, 'shows', showId);
     const showSnap = await getDoc(showRef);
-    if (!showSnap.exists()) {
+    if (!showSnap.exists() && !localShow) {
       return { success: false, error: 'Élément introuvable dans votre bibliothèque' };
     }
 
-    const showToSync = { ...showSnap.data(), id: String(showSnap.id) } as any;
+    const dbShow = showSnap.exists() ? { ...showSnap.data(), id: String(showSnap.id) } : {};
+    const showToSync: any = {
+      ...dbShow,
+      ...(localShow || {}),
+      seenEpisodes: localShow?.seenEpisodes?.length ? localShow.seenEpisodes : (dbShow as any).seenEpisodes || [],
+      episodeRecords: localShow?.episodeRecords ? localShow.episodeRecords : (dbShow as any).episodeRecords || {}
+    };
     if (!silent) setSyncStatus({ current: showToSync.title || 'Mise à jour', total: 1, pending: 1 });
 
     const tmdbIdNum = Number(showToSync.tmdbId || showToSync.tmdb_id);
@@ -698,7 +705,7 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
     updatePayload['seasonsCache'] = null;
 
     await updateDoc(showRef, updatePayload);
-    useShowsStore.getState().fetchShows();
+    useShowsStore.getState().updateShowOptimistic(showId, updatePayload);
     if (!silent) setSyncStatus(null);
     return { success: true, title: showToSync.title };
   } catch (err: any) {
