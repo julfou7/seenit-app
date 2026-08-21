@@ -712,6 +712,60 @@ async function startServer() {
     }
   });
 
+  app.get("/api/reddit/search", async (req, res) => {
+    try {
+      const { q, limit = 5 } = req.query;
+      if (!q) {
+        return res.status(400).json({ error: "Query parameter 'q' is required" });
+      }
+
+      const clientId = process.env.REDDIT_CLIENT_ID;
+      const clientSecret = process.env.REDDIT_CLIENT_SECRET;
+
+      if (!clientId || !clientSecret) {
+        return res.status(500).json({ error: "Reddit API credentials are not configured in environment variables." });
+      }
+
+      // 1. Get access token
+      const authString = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+      const tokenRes = await fetch("https://www.reddit.com/api/v1/access_token", {
+        method: "POST",
+        headers: {
+          "Authorization": `Basic ${authString}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": "SeenIt-App/1.0"
+        },
+        body: "grant_type=client_credentials"
+      });
+
+      if (!tokenRes.ok) {
+        throw new Error(`Reddit Auth Error: ${tokenRes.status}`);
+      }
+
+      const tokenData = await tokenRes.json();
+      const accessToken = tokenData.access_token;
+
+      // 2. Perform search
+      const redditUrl = `https://oauth.reddit.com/search.json?q=${encodeURIComponent(q as string)}&sort=relevance&limit=${limit}`;
+      const searchRes = await fetch(redditUrl, {
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "User-Agent": "SeenIt-App/1.0"
+        }
+      });
+
+      if (!searchRes.ok) {
+        throw new Error(`Reddit Search Error: ${searchRes.status}`);
+      }
+
+      const data = await searchRes.json();
+      res.json(data);
+    } catch (err: any) {
+      console.error("[Reddit Proxy Error]", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.post("/api/ai/summarize-discussions", express.json(), async (req, res) => {
     try {
       const { threads, queryContext } = req.body;
