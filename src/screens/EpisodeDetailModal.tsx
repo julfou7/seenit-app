@@ -1003,7 +1003,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
           )}
 
           <RedditSection 
-            query={`${tmdbShowTitle || show?.title || ''} S${String(currentSeason).padStart(2, '0')}E${String(currentEpisode.episode_number).padStart(2, '0')} discussion`} 
+            query={`${tmdbShowTitle || show?.title || ''} S${String(currentSeason).padStart(2, '0')}E${String(currentEpisode.episode_number).padStart(2, '0')} Discussion`} 
             isLocked={!isSeen} 
             unlockMessage="Débloquez les discussions de la communauté sur cet épisode en le marquant comme vu."
           />

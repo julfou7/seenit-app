@@ -1,18 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { MessageCircle, ExternalLink, Lock, Sparkles, AlertCircle } from 'lucide-react';
-import { openExternalUrl } from '../../lib/utils';
-import { CapacitorHttp } from '@capacitor/core';
-
-interface RedditPost {
-  id: string;
-  title: string;
-  subreddit: string;
-  score: number;
-  numComments: number;
-  url: string;
-  text: string;
-  created: number;
-}
+import { MessageCircle, ExternalLink, Lock } from 'lucide-react';
+import { Browser } from '@capacitor/browser';
+import { searchRedditDiscussions, RedditPost, RedditResponse } from '../../services/reddit';
 
 interface RedditSectionProps {
   query: string;
@@ -29,59 +18,30 @@ export function RedditSection({
   title = "Théories & Discussions",
   description = "Découvrez ce que la communauté Reddit pense."
 }: RedditSectionProps) {
+  const [status, setStatus] = useState<'loading' | 'success' | 'fallback'>('loading');
   const [posts, setPosts] = useState<RedditPost[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     if (isLocked) return;
     
     let isMounted = true;
-    setLoading(true);
+    setStatus('loading');
     
-    const fetchReddit = async () => {
-      try {
-        const response = await fetch(`/api/reddit/search?q=${encodeURIComponent(query)}&limit=10`);
-        
-        if (!response.ok) {
-          throw new Error('Erreur de connexion à Reddit');
-        }
-
-        const redditData = await response.json();
-
-        if (!isMounted) return;
-
-        if (!redditData?.data?.children || redditData.data.children.length === 0) {
-          setPosts([]);
-          setLoading(false);
-          return;
-        }
-
-        const validPosts = redditData.data.children.map((child: any) => ({
-          id: child.data.id,
-          title: child.data.title,
-          subreddit: child.data.subreddit_name_prefixed,
-          score: child.data.score,
-          numComments: child.data.num_comments,
-          url: `https://www.reddit.com${child.data.permalink}`,
-          text: child.data.selftext || '',
-          created: child.data.created_utc
-        })).sort((a: RedditPost, b: RedditPost) => b.score - a.score).slice(0, 5);
-        
-        setPosts(validPosts);
-        setLoading(false);
-      } catch (err: any) {
-        if (isMounted) {
-          setError('Configurez les identifiants Reddit OAuth dans le fichier .env pour afficher les discussions.');
-          setLoading(false);
-        }
+    searchRedditDiscussions(query).then((res: RedditResponse) => {
+      if (isMounted) {
+        setStatus(res.status);
+        setPosts(res.posts);
       }
-    };
-
-    fetchReddit();
+    });
 
     return () => { isMounted = false; };
   }, [query, isLocked]);
+
+  const openLink = async (url: string) => {
+    await Browser.open({ url });
+  };
+
+  const searchUrl = `https://www.reddit.com/search/?q=${encodeURIComponent(query)}&sort=relevance`;
 
   if (isLocked) {
     return (
@@ -108,8 +68,6 @@ export function RedditSection({
     );
   }
 
-  const searchUrl = `https://www.reddit.com/search/?q=${encodeURIComponent(query)}&sort=relevance`;
-
   return (
     <div className="mt-8 mb-4">
       <div className="flex items-center justify-between mb-2">
@@ -123,65 +81,66 @@ export function RedditSection({
         <p className="text-zinc-400 text-sm mb-6">{description}</p>
       )}
 
-      {loading ? (
+      {status === 'loading' ? (
         <div className="flex justify-center p-8 border border-zinc-800/50 rounded-2xl bg-zinc-900/20">
           <div className="w-6 h-6 border-2 border-[#E5A93D] border-t-transparent rounded-full animate-spin"></div>
         </div>
-      ) : error ? (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center gap-2">
-          <AlertCircle size={16} />
-          <span>{error}</span>
-        </div>
-      ) : posts.length === 0 ? (
-        <div className="p-8 rounded-2xl border border-zinc-800/50 bg-zinc-900/30 text-center text-zinc-500 text-sm flex flex-col items-center justify-center gap-4">
-          <p>Aucune discussion trouvée pour le moment.</p>
-          <button 
-            onClick={() => openExternalUrl(searchUrl)}
-            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-xs transition-colors"
-          >
-            Chercher manuellement
-          </button>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-3">
-            {posts.map(post => (
-              <div 
-                key={post.id}
-                onClick={() => openExternalUrl(post.url)}
-                className="group cursor-pointer rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 transition-all hover:bg-zinc-800/60 hover:border-zinc-700 active:scale-[0.98]"
-              >
-                <div className="flex items-start justify-between gap-4 mb-2">
-                  <h3 className="text-white font-semibold text-sm leading-snug line-clamp-2 group-hover:text-[#E5A93D] transition-colors">
-                    {post.title}
-                  </h3>
-                  <ExternalLink size={14} className="text-zinc-600 shrink-0 group-hover:text-[#E5A93D] mt-0.5" />
+      ) : status === 'success' && posts.length > 0 ? (
+        <div className="flex flex-col gap-3">
+          {posts.map(post => (
+            <div 
+              key={post.id}
+              onClick={() => openLink(post.url)}
+              className="group cursor-pointer rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 transition-all hover:bg-zinc-800/60 hover:border-zinc-700 active:scale-[0.98]"
+            >
+              <div className="flex items-start justify-between gap-4 mb-3">
+                <h3 className="text-white font-semibold text-sm leading-snug line-clamp-2 group-hover:text-[#E5A93D] transition-colors">
+                  {post.title}
+                </h3>
+                <ExternalLink size={14} className="text-zinc-600 shrink-0 group-hover:text-[#E5A93D] mt-0.5" />
+              </div>
+              
+              <div className="flex items-center flex-wrap gap-4 text-xs font-medium text-zinc-500">
+                <div className="flex items-center gap-1">
+                  <span className="text-red-400 font-bold">↑</span>
+                  <span>{post.score}</span>
                 </div>
-                
-                {post.text && (
-                  <p className="text-zinc-400 text-xs line-clamp-3 mb-3 leading-relaxed opacity-80 whitespace-pre-wrap">
-                    {post.text.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')}
-                  </p>
-                )}
-                
-                <div className="flex items-center flex-wrap gap-3 text-xs font-medium text-zinc-500">
-                  <div className="flex items-center gap-1.5 bg-zinc-950/50 px-2 py-1 rounded-md">
-                    <span className="text-orange-500 text-[10px] uppercase font-bold tracking-wider">{post.subreddit}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-red-400 font-bold">↑</span>
-                    <span>{post.score}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <MessageCircle size={12} className="text-zinc-400" />
-                    <span>{post.numComments} commentaires</span>
-                  </div>
+                <div className="flex items-center gap-1">
+                  <MessageCircle size={12} className="text-zinc-400" />
+                  <span>{post.numComments} réponses</span>
                 </div>
               </div>
-            ))}
+            </div>
+          ))}
+          <div 
+            onClick={() => openLink(searchUrl)}
+            className="mt-2 text-center py-3 text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer font-medium"
+          >
+            Voir plus de discussions sur Reddit
           </div>
+        </div>
+      ) : (
+        <div 
+          onClick={() => openLink(searchUrl)}
+          className="group cursor-pointer rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 transition-all hover:bg-zinc-800/60 hover:border-[#E5A93D]/50 active:scale-[0.98] flex items-center justify-between"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-[#ff4500]/10 flex items-center justify-center">
+              <MessageCircle size={24} className="text-[#ff4500]" />
+            </div>
+            <div>
+              <h3 className="text-white font-bold text-sm mb-1 group-hover:text-[#E5A93D] transition-colors">
+                Ouvrir la discussion de l'épisode sur Reddit
+              </h3>
+              <p className="text-zinc-500 text-xs">
+                Lancer la recherche directement sur Reddit
+              </p>
+            </div>
+          </div>
+          <ExternalLink size={20} className="text-zinc-600 group-hover:text-[#E5A93D] transition-colors" />
         </div>
       )}
     </div>
   );
 }
+
