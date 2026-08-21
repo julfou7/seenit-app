@@ -708,6 +708,48 @@ async function startServer() {
     }
   });
 
+  app.get('/api/reddit/search', async (req, res) => {
+    try {
+      const { q, limit = 5 } = req.query;
+      if (!q) {
+        return res.status(400).json({ error: 'Query parameter "q" is required' });
+      }
+      
+      const redditUrl = `https://www.reddit.com/search.json?q=${encodeURIComponent(q as string)}&sort=relevance&limit=${limit}`;
+      const response = await fetch(redditUrl, {
+        headers: {
+          'User-Agent': 'SeenIt-App/1.0 (Contact: julian)'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Reddit API returned ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data?.data?.children) {
+        return res.json({ posts: [] });
+      }
+
+      const posts = data.data.children.map((child: any) => ({
+        id: child.data.id,
+        title: child.data.title,
+        subreddit: child.data.subreddit_name_prefixed,
+        score: child.data.score,
+        numComments: child.data.num_comments,
+        url: `https://www.reddit.com${child.data.permalink}`,
+        text: child.data.selftext || '',
+        created: child.data.created_utc
+      }));
+
+      res.json({ posts });
+    } catch (error: any) {
+      console.error('Error fetching Reddit data:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });

@@ -8,6 +8,7 @@ import { useToastStore } from '../store/toastStore';
 import { tmdb } from '../features/shows/tmdb';
 
 import { TrailerModal } from '../components/TrailerModal';
+import { RedditSection } from '../components/community/RedditSection';
 
 import { syncSingleItem } from "../hooks/useDetailsSyncWorker";
 
@@ -1000,6 +1001,12 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
               </p>
             </div>
           )}
+
+          <RedditSection 
+            query={`${tmdbShowTitle || show?.title || ''} S${String(currentSeason).padStart(2, '0')}E${String(currentEpisode.episode_number).padStart(2, '0')} discussion`} 
+            isLocked={!isSeen} 
+            unlockMessage="Débloquez les discussions de la communauté sur cet épisode en le marquant comme vu."
+          />
         </div>
       </div>
     </div>
