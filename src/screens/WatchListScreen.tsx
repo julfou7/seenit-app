@@ -802,6 +802,9 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
       };
     }
     
+    // Check if the show was currently in "Pas vu depuis un moment"
+    const wasInPasVu = pasVuDepuisUnMomentShows.some(s => s.id === show.id);
+
     await updateShow(show.id, {
       seenEpisodes: newSeenArray,
       episodeRecords: newRecords,
@@ -812,6 +815,19 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
     });
     syncSingleItem(show.id, true).catch(console.error);
     scrollAllCarouselsToStart();
+
+    // Si la série était dans "Pas vu depuis un moment", faire remonter le scroll vers "Continuer à regarder"
+    if (wasInPasVu) {
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        watchNextRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const continueCarousel = document.getElementById('continue-watching-carousel');
+        if (continueCarousel) {
+          continueCarousel.scrollTo({ left: 0, behavior: 'smooth' });
+        }
+        scrollAllCarouselsToStart();
+      }, 100);
+    }
 
     showToast(
       `« ${show.title} » S${sNumStr}E${eNumStr} marqué comme vu !`,
