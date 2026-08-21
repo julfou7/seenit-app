@@ -137,10 +137,11 @@ export async function markEpisodeWatched(
   // 2. Envoi strict et ciblé à Firestore avec la VRAIE notation pointée (dot-notation)
   const user = auth.currentUser;
   if (user && targetShow.id) {
-    try {
-      const stringId = String(targetShow.id);
-      useLogStore.getState().addLog(`[Firestore] Tentative de màj atomique pour la série ${stringId} (Ep: ${epKey})`, "info");
+    const stringId = String(targetShow.id);
+    const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+    useLogStore.getState().addLog(`[Firestore] Début màj atomique pour ${stringId} (${targetShow.title}) - En ligne : ${isOnline}`, "info");
 
+    try {
       const updatePayload: any = {
         seenEpisodes: arrayUnion(epKey),
         lastWatchedAt: Date.now(),
@@ -170,13 +171,29 @@ export async function markEpisodeWatched(
         updatePayload.status = 'watching';
       }
 
-      const docRef = doc(db, 'users', user.uid, 'shows', stringId);
-      await updateDoc(docRef, updatePayload);
+      useLogStore.getState().addLog(`[Firestore] Envoi payload (${Object.keys(updatePayload).join(', ')}) pour la série ${stringId}`, "info");
 
-      useLogStore.getState().addLog(`[Firestore] Succès de la màj atomique pour ${stringId}`, "success");
+      const docRef = doc(db, 'users', user.uid, 'shows', stringId);
+      
+      // Configuration d'un timeout de 4 secondes pour lever une alerte claire si le réseau ou le cache bloque
+      const updatePromise = updateDoc(docRef, updatePayload);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Délai d'attente dépassé (4s) - Écriture Firestore en attente")), 4000)
+      );
+
+      await Promise.race([updatePromise, timeoutPromise]);
+
+      useLogStore.getState().addLog(`[Firestore] Succès de la màj atomique pour ${stringId} (Ep: ${epKey})`, "success");
     } catch (error: any) {
       useLogStore.getState().addLog(`[Firestore] ERREUR lors de la màj pour la série ${targetShow.id} : ${error.message}`, "error");
       console.error("Firestore update error:", error);
+    }
+  } else {
+    if (!user) {
+      useLogStore.getState().addLog(`[Firestore] Échec màj : Aucun utilisateur connecté`, "error");
+    }
+    if (!targetShow.id) {
+      useLogStore.getState().addLog(`[Firestore] Échec màj : ID de série manquant`, "error");
     }
   }
 

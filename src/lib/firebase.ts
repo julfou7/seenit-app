@@ -1,9 +1,10 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, persistentSingleTabManager } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache } from 'firebase/firestore';
 import { getMessaging, getToken, isSupported, type Messaging } from 'firebase/messaging';
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { useLogStore } from '../store/logStore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
@@ -16,15 +17,25 @@ googleAuthProvider.setCustomParameters({
   prompt: 'select_account'
 });
 
+const isNative = Capacitor.isNativePlatform();
+
 export const db = initializeFirestore(
   app,
   { 
-    localCache: Capacitor.isNativePlatform() 
-      ? persistentLocalCache({ tabManager: persistentSingleTabManager({}) })
+    localCache: isNative 
+      ? memoryLocalCache() 
       : persistentLocalCache({ tabManager: persistentMultipleTabManager() })
   },
   (firebaseConfig as any).firestoreDatabaseId || 'default'
 );
+
+// Log diagnostic for Firestore initialization
+try {
+  const cacheType = isNative ? 'MÉMOIRE (Évite les blocages de verrous Android)' : 'PERSISTANT (Multi-onglets PWA)';
+  setTimeout(() => {
+    useLogStore.getState().addLog(`[Système] Firestore initialisé avec cache ${cacheType} sur base '${(firebaseConfig as any).firestoreDatabaseId || 'default'}'`, 'info');
+  }, 1000);
+} catch (e) {}
 
 export let messaging: Messaging | null = null;
 
