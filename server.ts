@@ -95,6 +95,43 @@ function startCronJobs() {
   });
 }
 
+// In-memory cache for Plex servers by token (TTL 5 minutes) to avoid repeated slow fetches and timeouts
+const plexServersCache = new Map<string, { servers: any[]; timestamp: number }>();
+
+async function getPlexServers(token: string, clientId: string, timeoutMs: number = 7000): Promise<any[]> {
+  const cached = plexServersCache.get(token);
+  if (cached && (Date.now() - cached.timestamp) < 5 * 60 * 1000) {
+    return cached.servers;
+  }
+
+  let servers: any[] = [];
+  try {
+    const resourcesRes = await fetch('https://plex.tv/api/v2/resources?includeHttps=1&includeRelay=1', {
+      headers: {
+        'X-Plex-Token': token,
+        'Accept': 'application/json',
+        'X-Plex-Client-Identifier': clientId
+      },
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+
+    if (resourcesRes.ok) {
+      const resources = await resourcesRes.json();
+      if (Array.isArray(resources)) {
+        servers = resources.filter((r: any) => r.provides && r.provides.includes('server'));
+        plexServersCache.set(token, { servers, timestamp: Date.now() });
+      }
+    }
+  } catch (err: any) {
+    // If timeout or network glitch, return previously cached if available
+    if (cached && cached.servers.length > 0) {
+      return cached.servers;
+    }
+  }
+
+  return servers;
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -111,27 +148,7 @@ async function startServer() {
       }
 
       const plexClientIdentifier = clientId || 'tv-time-ai-studio';
-
-      let servers: any[] = [];
-      try {
-        const resourcesRes = await fetch('https://plex.tv/api/v2/resources?includeHttps=1&includeRelay=1', {
-          headers: {
-            'X-Plex-Token': token,
-            'Accept': 'application/json',
-            'X-Plex-Client-Identifier': plexClientIdentifier
-          },
-          signal: AbortSignal.timeout(5000)
-        });
-
-        if (resourcesRes.ok) {
-          const resources = await resourcesRes.json();
-          if (Array.isArray(resources)) {
-            servers = resources.filter((r: any) => r.provides && r.provides.includes('server'));
-          }
-        }
-      } catch (err: any) {
-        console.warn('[Plex Availability] Resources fetch error:', err?.message);
-      }
+      const servers = await getPlexServers(token, plexClientIdentifier, 7000);
 
       if (servers.length === 0) {
         return res.json({ available: false });
@@ -458,28 +475,7 @@ async function startServer() {
       }
 
       // 2. Fetch user's servers from Plex.tv (Both owned servers & shared servers from friends)
-      let servers: any[] = [];
-      try {
-        const resourcesRes = await fetch('https://plex.tv/api/v2/resources?includeHttps=1&includeRelay=1', {
-          headers: {
-            'X-Plex-Token': token,
-            'Accept': 'application/json',
-            'X-Plex-Client-Identifier': plexClientIdentifier
-          },
-          signal: AbortSignal.timeout(delta ? 4000 : 8000)
-        });
-
-        if (resourcesRes.ok) {
-          const resources = await resourcesRes.json();
-          if (Array.isArray(resources)) {
-            servers = resources.filter((r: any) => r.provides && r.provides.includes('server'));
-          }
-        } else {
-          console.warn('[Plex Sync] Failed to fetch resources:', resourcesRes.status);
-        }
-      } catch (err: any) {
-        console.warn('[Plex Sync] Resources fetch timed out or failed:', err?.message);
-      }
+      const servers = await getPlexServers(token, plexClientIdentifier, delta ? 6000 : 9000);
 
       console.log(`[Plex Sync] Found ${servers.length} Plex server(s) (personal & shared)`);
 
