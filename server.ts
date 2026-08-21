@@ -7,6 +7,10 @@ import { getMessaging } from "firebase-admin/messaging";
 import { adminAuth, adminDb } from "./src/lib/firebase-admin.ts";
 import { DecodedIdToken } from "firebase-admin/auth";
 import multer from "multer";
+import { GoogleGenAI } from "@google/genai";
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
 
 export interface AuthRequest extends Request {
   user?: DecodedIdToken;
@@ -705,6 +709,33 @@ async function startServer() {
     } catch (err: any) {
       console.error('[Plex Sync Error]', err);
       return res.status(500).json({ error: err?.message || 'Erreur lors de la synchronisation de l\'historique Plex' });
+    }
+  });
+
+  app.post("/api/ai/summarize-discussions", express.json(), async (req, res) => {
+    try {
+      const { threads, queryContext } = req.body;
+      if (!threads || !Array.isArray(threads) || threads.length === 0) {
+        return res.status(400).json({ error: "No threads provided" });
+      }
+
+      const prompt = `Voici plusieurs discussions Reddit (titres et textes principaux) autour de : "${queryContext}".
+Ton objectif est d'analyser ces échanges et de rédiger un court résumé des principales théories, avis et questions de la communauté.
+Rédige un texte structuré (avec des puces si pertinent), concis et engageant. N'invente rien, base-toi uniquement sur les discussions fournies. Ne mets pas de titre introductif générique, va droit au but.
+
+Discussions :
+${threads.map((t: any, i) => `Thread ${i + 1} - Titre: ${t.title}\nContenu: ${t.text}`).join('\n\n')}
+`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+      });
+
+      res.json({ summary: response.text });
+    } catch (err: any) {
+      console.error("[Gemini Summarize Error]", err);
+      res.status(500).json({ error: err.message });
     }
   });
 
