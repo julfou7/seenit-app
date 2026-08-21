@@ -156,7 +156,14 @@ export async function markEpisodeWatched(
       };
 
       if (optimisticNextEp !== undefined) {
-        updatePayload.nextEpisodeToWatch = optimisticNextEp;
+        // Firebase refuse le type undefined. On assainit l'objet en remplaçant undefined par null.
+        const cleanNextEp: any = { ...optimisticNextEp };
+        Object.keys(cleanNextEp).forEach(key => {
+          if (cleanNextEp[key] === undefined) {
+            cleanNextEp[key] = null;
+          }
+        });
+        updatePayload.nextEpisodeToWatch = cleanNextEp;
       }
 
       if (targetShow.status === 'plan_to_watch') {
