@@ -1,0 +1,6 @@
+feat: remontée automatique du scroll et du carrousel vers Continuer à regarder pour les séries réactivées
+
+- Ajout de la détection lorsque la série provient de la section 'Pas vu depuis un moment'
+- Remontée fluide de la page vers le haut / carrousel 'Continuer à regarder'
+- Réinitialisation du défilement horizontal du carrousel à gauche (swipe vers la gauche) pour afficher immédiatement l'épisode suivant
+- Incrémentation de la version vers 1.2.96

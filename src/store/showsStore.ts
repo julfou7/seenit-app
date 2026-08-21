@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { db, auth } from '../lib/firebase';
-import { collection, query, getDocs, getDocsFromCache, onSnapshot, type Unsubscribe } from 'firebase/firestore';
+import { collection, query, getDocs, getDocsFromCache } from 'firebase/firestore';
 import { type Show } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/firebaseErrors';
 import { useSyncStore } from './syncStore';
@@ -16,7 +16,6 @@ interface ShowsState {
   removeShowOptimistic: (id: string) => void;
   addShowOptimistic: (show: Show) => void;
   fetchShows: () => Promise<void>;
-  forceResync: () => void;
 }
 
 const getInitialCache = (): { shows: Show[]; loading: boolean } => {
@@ -41,9 +40,6 @@ const saveToLocalStorage = (shows: Show[]) => {
     localStorage.setItem('cached_shows_v1', JSON.stringify(shows));
   } catch (e) {}
 };
-
-let unsubscribeShowsListener: Unsubscribe | null = null;
-let currentListeningUid: string | null = null;
 
 /**
  * Fusionne et déduplique intelligemment les séries (en combinant seenEpisodes et records)
@@ -106,7 +102,7 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
   updateShowOptimistic: (id, updates) => {
     set(state => {
       const updatedShows = state.shows.map(show => 
-        (show.id === id || (show.tmdbId && updates.tmdbId && Number(show.tmdbId) === Number(updates.tmdbId))) ? { ...show, ...updates } : show
+        show.id === id ? { ...show, ...updates } : show
       );
       saveToLocalStorage(updatedShows);
       return { shows: updatedShows };
@@ -123,10 +119,7 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
   
   addShowOptimistic: (show) => {
     set(state => {
-      const existingIdx = state.shows.findIndex(s => 
-        s.id === show.id || 
-        (s.tmdbId && show.tmdbId && Number(s.tmdbId) === Number(show.tmdbId) && s.mediaType === show.mediaType)
-      );
+      const existingIdx = state.shows.findIndex(s => s.id === show.id || (s.tmdbId && show.tmdbId && s.tmdbId === show.tmdbId && s.mediaType === show.mediaType));
       let updatedShows: Show[];
       if (existingIdx >= 0) {
         updatedShows = state.shows.map((s, idx) => idx === existingIdx ? { ...s, ...show } : s);
@@ -137,15 +130,6 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
       return { shows: updatedShows };
     });
   },
-
-  forceResync: () => {
-    if (unsubscribeShowsListener) {
-      try { unsubscribeShowsListener(); } catch (e) {}
-      unsubscribeShowsListener = null;
-    }
-    currentListeningUid = null;
-    get().fetchShows();
-  },
   
   fetchShows: async () => {
     const user = auth.currentUser;
@@ -155,77 +139,64 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
       set({ loading: true });
     }
     
-    if (unsubscribeShowsListener) {
-      if (currentListeningUid === user.uid) {
-        // Déjà en écoute sur le bon utilisateur
-        return;
-      } else {
-        // L'utilisateur a changé, nettoyer l'ancien listener
-        try { unsubscribeShowsListener(); } catch (e) {}
-        unsubscribeShowsListener = null;
-        currentListeningUid = null;
-      }
-    }
-    
     try {
       const showsRef = collection(db, 'users', user.uid, 'shows');
-      currentListeningUid = user.uid;
-      
-      unsubscribeShowsListener = onSnapshot(showsRef, (snapshot) => {
-        const remoteShows: Show[] = [];
-        snapshot.forEach((doc) => {
-          remoteShows.push({ ...doc.data(), id: String(doc.id) } as Show);
-        });
-        const merged = deduplicateAndMergeShows(remoteShows);
-        saveToLocalStorage(merged);
-        set({ shows: merged, loading: false, initialized: true });
-      }, (err: any) => {
-        // En cas d'erreur sur l'écouteur, réinitialiser la référence pour autoriser une nouvelle tentative
-        if (unsubscribeShowsListener) {
-          try { unsubscribeShowsListener(); } catch (e) {}
-          unsubscribeShowsListener = null;
-        }
-        currentListeningUid = null;
+      const q = query(showsRef);
 
-        const errStr = err?.message || String(err);
-        const isQuotaError = 
-          err?.code === 'resource-exhausted' || 
-          errStr.toLowerCase().includes('quota exceeded') || 
-          errStr.toLowerCase().includes('quota-exceeded') ||
-          errStr.toLowerCase().includes('resource-exhausted') ||
-          errStr.toLowerCase().includes('resource_exhausted');
-  
-        if (isQuotaError) {
-          console.warn("[showsStore] Firestore quota exhausted on realtime listener.");
-          useSyncStore.getState().setQuotaExceeded(true);
-        } else {
-          console.error('[showsStore] Realtime listener error:', err);
+      // 1. Tenter de lire depuis le cache local Firestore pour un affichage instantané
+      try {
+        const cachedSnapshot = await getDocsFromCache(q);
+        if (!cachedSnapshot.empty) {
+          const cachedShows: Show[] = [];
+          cachedSnapshot.forEach((doc) => {
+            cachedShows.push({ ...doc.data(), id: String(doc.id) } as Show);
+          });
+          const merged = deduplicateAndMergeShows(cachedShows);
+          saveToLocalStorage(merged);
+          set({ shows: merged, loading: false, initialized: true });
         }
-        set({ loading: false });
-      });
-    } catch (err) {
-      console.error('[showsStore] Failed to setup realtime listener:', err);
-      if (unsubscribeShowsListener) {
-        try { unsubscribeShowsListener(); } catch (e) {}
-        unsubscribeShowsListener = null;
+      } catch (cacheErr) {
+        // Le cache peut être vide ou indisponible, on ignore silencieusement
       }
-      currentListeningUid = null;
+
+      // 2. Fetch depuis le réseau pour mettre à jour
+      const snapshot = await getDocs(q);
+      
+      const rawLoadedShows: Show[] = [];
+      snapshot.forEach((doc) => {
+        rawLoadedShows.push({ ...doc.data(), id: String(doc.id) } as Show);
+      });
+
+      const loadedShows = deduplicateAndMergeShows(rawLoadedShows);
+
+      saveToLocalStorage(loadedShows);
+      set({ shows: loadedShows, loading: false, initialized: true });
+    } catch (err: any) {
+      const errStr = err?.message || String(err);
+      const isQuotaError = 
+        err?.code === 'resource-exhausted' || 
+        errStr.toLowerCase().includes('quota exceeded') || 
+        errStr.toLowerCase().includes('quota-exceeded') ||
+        errStr.toLowerCase().includes('resource-exhausted') ||
+        errStr.toLowerCase().includes('resource_exhausted');
+
+      if (isQuotaError) {
+        console.warn("[showsStore] Firestore quota exhausted on fetch.");
+        useSyncStore.getState().setQuotaExceeded(true);
+      } else {
+        handleFirestoreError(err, OperationType.GET, `users/${user.uid}/shows`);
+      }
       set({ loading: false });
     }
   }
 }));
 
 auth.onAuthStateChanged(user => {
-  if (!user) {
-    if (unsubscribeShowsListener) {
-      try { unsubscribeShowsListener(); } catch (e) {}
-      unsubscribeShowsListener = null;
-    }
-    currentListeningUid = null;
+  if (user) {
+    useShowsStore.getState().fetchShows();
+  } else {
     useShowsStore.getState().setShows([]);
     useShowsStore.getState().setLoading(false);
     useShowsStore.getState().setInitialized(false);
-  } else {
-    useShowsStore.getState().fetchShows();
   }
 });

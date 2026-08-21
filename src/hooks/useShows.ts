@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { db, auth } from '../lib/firebase';
-import { collection, query, doc, setDoc, updateDoc, deleteDoc, getDocs, where, arrayUnion } from 'firebase/firestore';
+import { collection, query, doc, setDoc, updateDoc, deleteDoc, getDocs, where } from 'firebase/firestore';
 import { type Show } from '../types';
 import { useShowsStore } from '../store/showsStore';
 import { handleFirestoreError, OperationType } from '../lib/firebaseErrors';
@@ -78,17 +78,7 @@ export function useShows() {
     
     const cleanUpdates: any = {};
     Object.entries(updates).forEach(([key, val]) => {
-      if (val === undefined) {
-        cleanUpdates[key] = null;
-      } else if (key === 'seenEpisodes' && Array.isArray(val) && val.length > 0) {
-        cleanUpdates['seenEpisodes'] = arrayUnion(...val);
-      } else if (key === 'episodeRecords' && val && typeof val === 'object' && !Array.isArray(val)) {
-        Object.entries(val).forEach(([epKey, recVal]) => {
-          cleanUpdates[`episodeRecords.${epKey}`] = recVal === undefined ? null : recVal;
-        });
-      } else {
-        cleanUpdates[key] = val;
-      }
+      cleanUpdates[key] = val === undefined ? null : val;
     });
 
     try {

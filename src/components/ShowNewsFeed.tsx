@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { collection, query, orderBy, onSnapshot, doc, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, getDoc, doc, deleteDoc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { X, Ban, CheckCircle, Sparkles, Calendar, Tv, Eye, Layers, Flag, Play, Clapperboard } from 'lucide-react';
 import { useShowsStore } from '../store/showsStore';
@@ -49,7 +49,7 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
   useEffect(() => {
     if (!currentUser) return;
     const prefRef = doc(db, 'users', currentUser.uid, 'settings', 'news_preferences');
-    const unsubPref = onSnapshot(prefRef, (snap) => {
+    getDoc(prefRef).then((snap) => {
       if (snap.exists()) {
         const firestoreReadIds = snap.data()?.readNewsIds;
         if (Array.isArray(firestoreReadIds)) {
@@ -63,11 +63,9 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
           });
         }
       }
-    }, (err) => {
-      console.warn('News preferences listener error:', err);
+    }).catch((err) => {
+      console.warn('News preferences fetch error:', err);
     });
-
-    return () => unsubPref();
   }, [currentUser]);
 
   useEffect(() => {
@@ -272,19 +270,17 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
     const newsRef = collection(db, 'users', currentUser.uid, 'news');
     const q = query(newsRef, orderBy('createdAt', 'desc'));
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    getDocs(q).then((snapshot) => {
       const newsData: ShowNews[] = [];
       snapshot.forEach((doc) => {
         newsData.push({ ...doc.data(), id: String(doc.id) } as ShowNews);
       });
       setNews(newsData);
       setHasLoaded(true);
-    }, (err) => {
-      console.warn('News subscription error:', err);
+    }).catch((err) => {
+      console.warn('News fetch error:', err);
       setHasLoaded(true);
     });
-
-    return () => unsubscribe();
   }, [currentUser]);
 
   const demoNews: ShowNews[] = [
