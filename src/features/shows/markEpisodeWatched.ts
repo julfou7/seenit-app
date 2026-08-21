@@ -5,7 +5,7 @@ import { useToastStore } from '../../store/toastStore';
 import { scrollAllCarouselsToStart } from '../../lib/utils';
 import { type Show } from '../../types';
 import { db, auth } from '../../lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 
 export async function markEpisodeWatched(
   showIdOrTmdbId: string | number,
@@ -131,11 +131,19 @@ export async function markEpisodeWatched(
     const user = auth.currentUser;
     if (user && targetShow.id) {
       try {
-        const cleanUpdates: any = {};
-        Object.entries(updates).forEach(([key, val]) => {
-          cleanUpdates[key] = val === undefined ? null : val;
-        });
-        await setDoc(doc(db, 'users', user.uid, 'shows', targetShow.id), cleanUpdates, { merge: true });
+        const firestoreUpdates: Record<string, any> = {
+          seenEpisodes: arrayUnion(epKey),
+          [`episodeRecords.${epKey}`]: {
+            watchedAt: Date.now(),
+            episodeTitle: newRecords[epKey]?.episodeTitle || optimisticNextEp?.name || null
+          },
+          lastWatchedAt: Date.now(),
+          nextEpisodeToWatch: optimisticNextEp === undefined ? null : optimisticNextEp,
+          status: targetShow.status === 'plan_to_watch' ? 'watching' : targetShow.status,
+          updatedAt: Date.now(),
+          isSynced: false
+        };
+        await updateDoc(doc(db, 'users', user.uid, 'shows', targetShow.id), firestoreUpdates);
       } catch (e) {
         console.error('[markEpisodeWatched] Direct Firestore update failed:', e);
       }
