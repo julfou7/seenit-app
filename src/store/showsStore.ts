@@ -48,6 +48,18 @@ const saveToLocalStorage = (shows: Show[]) => {
 function deduplicateAndMergeShows(rawShows: Show[], currentLocalShows: Show[] = []): Show[] {
   const deduplicatedMap = new Map<string, Show>();
 
+  // Fonction utilitaire pour conserver la version la plus récente (règle le bug du "non vu")
+  const mergeBasedOnTime = (older: Show, newer: Show): Show => {
+    return {
+      ...newer,
+      // On prend strictement les données du plus récent (qui peut avoir des suppressions d'épisodes)
+      seenEpisodes: newer.seenEpisodes,
+      episodeRecords: newer.episodeRecords,
+      lastWatchedAt: Math.max(newer.lastWatchedAt || 0, older.lastWatchedAt || 0),
+      updatedAt: newer.updatedAt || Date.now()
+    };
+  };
+
   // 1. D'abord charger tous les rawShows depuis Firestore
   for (const show of rawShows) {
     const tmdbIdNum = Number(show.tmdbId);
@@ -64,30 +76,12 @@ function deduplicateAndMergeShows(rawShows: Show[], currentLocalShows: Show[] = 
     if (!existing) {
       deduplicatedMap.set(key, { ...show });
     } else {
-      // Fusionner les épisodes vus des deux instances
-      const mergedSeen = Array.from(new Set([
-        ...(existing.seenEpisodes || []),
-        ...(show.seenEpisodes || [])
-      ]));
-
-      const mergedRecords = {
-        ...(existing.episodeRecords || {}),
-        ...(show.episodeRecords || {})
-      };
-
-      const mostRecentTime = Math.max(existing.updatedAt || 0, show.updatedAt || 0);
-      const chosenDoc = (show.updatedAt || 0) >= (existing.updatedAt || 0) ? show : existing;
-
-      deduplicatedMap.set(key, {
-        ...chosenDoc,
-        seenEpisodes: mergedSeen,
-        episodeRecords: mergedRecords,
-        updatedAt: mostRecentTime || Date.now()
-      });
+      const isExistingNewer = (existing.updatedAt || 0) > (show.updatedAt || 0);
+      deduplicatedMap.set(key, isExistingNewer ? mergeBasedOnTime(show, existing) : mergeBasedOnTime(existing, show));
     }
   }
 
-  // 2. Fusionner avec les séries locales actuelles pour garantir qu'aucun épisode vu localement ne disparaisse
+  // 2. Fusionner avec les séries locales actuelles (seulement si le local est strictement plus récent, ex: hors ligne)
   for (const localShow of currentLocalShows) {
     const tmdbIdNum = Number(localShow.tmdbId);
     const mType = localShow.mediaType || 'tv';
@@ -97,22 +91,10 @@ function deduplicateAndMergeShows(rawShows: Show[], currentLocalShows: Show[] = 
     const remoteShow = deduplicatedMap.get(key);
 
     if (remoteShow) {
-      const mergedSeen = Array.from(new Set([
-        ...(remoteShow.seenEpisodes || []),
-        ...(localShow.seenEpisodes || [])
-      ]));
-
-      const mergedRecords = {
-        ...(remoteShow.episodeRecords || {}),
-        ...(localShow.episodeRecords || {})
-      };
-
-      deduplicatedMap.set(key, {
-        ...remoteShow,
-        seenEpisodes: mergedSeen,
-        episodeRecords: mergedRecords,
-        lastWatchedAt: Math.max(remoteShow.lastWatchedAt || 0, localShow.lastWatchedAt || 0)
-      });
+      const isLocalNewer = (localShow.updatedAt || 0) > (remoteShow.updatedAt || 0);
+      if (isLocalNewer) {
+        deduplicatedMap.set(key, mergeBasedOnTime(remoteShow, localShow));
+      }
     }
   }
 
