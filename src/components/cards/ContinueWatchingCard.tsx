@@ -199,28 +199,44 @@ export function ContinueWatchingCard({ show, onShowClick, onEpisodeClick, onMark
   }
 
   // Calcul du nombre d'autres épisodes disponibles restant à voir AU-DELÀ de l'épisode courant
-  // Exemple: 7 épisodes sortis, on est sur E05 (Continuer S03 | E05) -> il reste E06 et E07 disponibles, soit "+ 2"
-  // Si on est sur le dernier épisode disponible (ex: E10 sur 10), extraAvailableEpisodes = 0 -> pas de "+ X" affiché
+  // Exemple: série de 3 saisons (24 épisodes sortis au total), l'utilisateur a vu 1 épisode et est sur S01|E02 -> il reste 22 épisodes disponibles, soit "+ 22"
+  // Si on est sur le dernier épisode disponible de la série, extraAvailableEpisodes = 0 -> pas de "+ X" affiché
   let extraAvailableEpisodes = 0;
   const sNum = nextEpNum?.season_number ?? 1;
   const eNum = nextEpNum?.episode_number ?? 1;
+  const watchedCount = show.seenEpisodes ? show.seenEpisodes.length : 0;
 
+  // 1. Total des épisodes sortis/disponibles sur l'ensemble de la série
+  const totalAiredCount = (typeof show.totalAiredEpisodes === 'number' && show.totalAiredEpisodes > 0)
+    ? show.totalAiredEpisodes
+    : (typeof show.totalEpisodes === 'number' && show.totalEpisodes > 0)
+      ? show.totalEpisodes
+      : 0;
+
+  // 2. Épisodes non vus comptés depuis le cache des saisons si disponible
+  let cacheUnwatchedCount = 0;
   if (show.seasonsCache && Array.isArray(show.seasonsCache) && show.seasonsCache.length > 0) {
     const seenSet = new Set(show.seenEpisodes || []);
-    let totalUnwatchedAired = 0;
     for (const s of show.seasonsCache) {
       if (s.season_number > 0 && Array.isArray(s.episodes)) {
         for (const ep of s.episodes) {
-          if (ep.air_date && ep.air_date <= todayStr) {
+          if (!ep.air_date || ep.air_date <= todayStr) {
             const key = `${s.season_number}x${ep.episode_number}`;
             if (!seenSet.has(key)) {
-              totalUnwatchedAired++;
+              cacheUnwatchedCount++;
             }
           }
         }
       }
     }
-    extraAvailableEpisodes = Math.max(0, totalUnwatchedAired - 1);
+  }
+
+  if (totalAiredCount > 0) {
+    const unwatchedFromTotal = Math.max(0, totalAiredCount - watchedCount);
+    const effectiveUnwatched = Math.max(unwatchedFromTotal, cacheUnwatchedCount);
+    extraAvailableEpisodes = Math.max(0, effectiveUnwatched - 1);
+  } else if (cacheUnwatchedCount > 0) {
+    extraAvailableEpisodes = Math.max(0, cacheUnwatchedCount - 1);
   } else {
     extraAvailableEpisodes = Math.max(0, airedInSeason - eNum);
   }
