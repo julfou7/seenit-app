@@ -1,8 +1,9 @@
+import { appLogger } from './logStore';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Capacitor } from '@capacitor/core';
 
-export const CURRENT_APP_VERSION = '1.2.126';
+export const CURRENT_APP_VERSION = '1.2.127';
 export const GITHUB_REPO = 'julfou7/seenit-app';
 export const GITHUB_PAT = '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';
 
@@ -147,6 +148,7 @@ export const useUpdateStore = create<UpdateState>()(
           return isNewer;
         } catch (err: any) {
           console.error('[UpdateCheck] Error checking for updates:', err);
+          appLogger.error('system', `Erreur lors de la recherche de mise à jour: ${err.message || String(err)}`, err);
           set({ 
             isChecking: false, 
             error: err?.message || 'Erreur de vérification des mises à jour' 

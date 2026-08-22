@@ -196,7 +196,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
   const { delta = true, silent = false, ignoreCooldown = false } = options;
 
   if (activePlexSyncPromise) {
-    appLogger.info('plex', 'Une synchronisation Plex est déjà en cours, réutilisation de la requête existante...');
+    // // appLogger.info('plex', 'Une synchronisation Plex est déjà en cours, réutilisation de la requête existante...');
     return activePlexSyncPromise;
   }
 
@@ -214,7 +214,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
     if (!plexToken) {
       if (!silent) {
-        appLogger.info('plex', 'Aucun compte Plex associé');
+        // // appLogger.info('plex', 'Aucun compte Plex associé');
       }
       return { success: false, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [], error: 'Aucun compte Plex associé' };
     }
@@ -223,12 +223,12 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
     if (!ignoreCooldown && lastSyncTimestamp && !isNaN(lastSyncTimestamp)) {
       const elapsedMinutes = (Date.now() - lastSyncTimestamp) / (1000 * 60);
       if (elapsedMinutes < 30) {
-        appLogger.info('plex', `Synchronisation automatique Plex ignorée : dernière synchronisation il y a ${Math.round(elapsedMinutes)} min (< 30 min)`);
+        // // appLogger.info('plex', `Synchronisation automatique Plex ignorée : dernière synchronisation il y a ${Math.round(elapsedMinutes)} min (< 30 min)`);
         return { success: true, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [] };
       }
     }
 
-    appLogger.info('plex', `Démarrage de la synchronisation Plex (${delta ? 'Mode Delta / Rapide' : 'Mode Complet'})...`);
+    // // appLogger.info('plex', `Démarrage de la synchronisation Plex (${delta ? 'Mode Delta / Rapide' : 'Mode Complet'})...`);
     if (!silent) {
       useSyncStore.getState().setPlexSyncStatus({ 
         message: delta 
@@ -259,7 +259,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
       if (!hasHistory && !hasWatchlist) {
         const sourcesMsg = visitedSources && visitedSources.length > 0 ? ` (${visitedSources.join(', ')})` : '';
-        appLogger.info('plex', `Plex vérifié : aucun nouveau média ni watchlist${sourcesMsg}`);
+        // // appLogger.info('plex', `Plex vérifié : aucun nouveau média ni watchlist${sourcesMsg}`);
         localStorage.setItem('plex_last_sync_timestamp', String(Date.now()));
         clearPlexSyncStatusDelayed('Sync Plex terminée (à jour)', 3500);
         return { success: true, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [] };
@@ -267,7 +267,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
       const totalItemsCount = (history?.length || 0) + (watchlist?.length || 0);
       const sourcesSummary = visitedSources && visitedSources.length > 0 ? ` [Sources: ${visitedSources.join(', ')}]` : '';
-      appLogger.info('plex', `${history?.length || 0} historique(s) + ${watchlist?.length || 0} watchlist(s) récupéré(s) depuis Plex${sourcesSummary}`, { sample: (history || []).slice(0, 5) });
+      // // appLogger.info('plex', `${history?.length || 0} historique(s) + ${watchlist?.length || 0} watchlist(s) récupéré(s) depuis Plex${sourcesSummary}`, { sample: (history || []).slice(0, 5) });
       if (!silent) {
         useSyncStore.getState().setPlexSyncStatus({ 
           message: `Analyse Plex (${totalItemsCount} élément(s)...)` 
@@ -409,7 +409,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
                 show: showData
               });
 
-              appLogger.success('plex', `Épisode synchronisé : « ${showData.title} » ${subtitle} (${item.source || 'Plex'})`, {
+              // appLogger.success('plex', `Épisode synchronisé : « ${showData.title} » ${subtitle} (${item.source || 'Plex'})`, {
                 showId,
                 epKey,
                 source: item.source,
@@ -471,7 +471,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               show: newShowData
             });
 
-            appLogger.success('plex', `Nouvelle série ajoutée & épisode vu : « ${newShowData.title} » ${subtitle} (${item.source || 'Plex'})`, {
+            // appLogger.success('plex', `Nouvelle série ajoutée & épisode vu : « ${newShowData.title} » ${subtitle} (${item.source || 'Plex'})`, {
               showId,
               tmdbId: tmdbData.id,
               epKey
@@ -578,7 +578,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
                 show: showData
               });
 
-              appLogger.success('plex', `Film synchronisé : « ${showData.title} » (${item.source || 'Plex'})`, {
+              // appLogger.success('plex', `Film synchronisé : « ${showData.title} » (${item.source || 'Plex'})`, {
                 showId,
                 source: item.source,
                 viewedAt: new Date(viewedTimestamp).toLocaleString('fr-FR')
@@ -635,7 +635,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               show: newShowData
             });
 
-            appLogger.success('plex', `Nouveau film ajouté & marqué vu : « ${newShowData.title} » (${item.source || 'Plex'})`, {
+            // appLogger.success('plex', `Nouveau film ajouté & marqué vu : « ${newShowData.title} » (${item.source || 'Plex'})`, {
               showId,
               tmdbId: tmdbData.id,
               source: item.source
@@ -741,7 +741,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               show: newShowData
             });
 
-            appLogger.success('plex', `Watchlist Plex : « ${newShowData.title} » ajouté aux médias À Voir`, {
+            // appLogger.success('plex', `Watchlist Plex : « ${newShowData.title} » ajouté aux médias À Voir`, {
               showId,
               tmdbId: tmdbData.id
             });
@@ -761,7 +761,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         }
 
         await batch.commit();
-        appLogger.success('plex', `Batch Firestore validé avec succès (${syncCount} élément(s) mis à jour)`);
+        // appLogger.success('plex', `Batch Firestore validé avec succès (${syncCount} élément(s) mis à jour)`);
         localStorage.setItem('plex_last_sync_timestamp', String(Date.now()));
 
         // Optimistically update the store
@@ -800,7 +800,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
         clearPlexSyncStatusDelayed(`Synchro terminée (${syncCount} nouveau(x))`, 3500);
       } else {
-        appLogger.info('plex', 'Synchronisation terminée : 0 nouveau média (votre bibliothèque est déjà à jour)');
+        // // appLogger.info('plex', 'Synchronisation terminée : 0 nouveau média (votre bibliothèque est déjà à jour)');
         clearPlexSyncStatusDelayed('Sync Plex terminée (à jour)', 3500);
       }
 

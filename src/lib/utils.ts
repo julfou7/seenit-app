@@ -17,8 +17,8 @@ export async function openExternalUrl(url: string) {
   if (!url) return;
   
   if (Capacitor.isNativePlatform()) {
-    if (url.startsWith('https://app.plex.tv/') && !url.includes('/auth')) {
-      const serverMatch = url.match(/\/server\/([a-zA-Z0-9_-]+)/i);
+    if (url.includes('plex.tv') && !url.includes('/auth')) {
+      const serverMatch = url.match(/\/server\/([a-zA-Z0-9_-]+)/i) || url.match(/server=([a-zA-Z0-9_-]+)/i);
       const serverId = serverMatch ? serverMatch[1] : '';
       
       const keyMatch = url.match(/[?&]key=([^&#]+)/i);
@@ -31,32 +31,23 @@ export async function openExternalUrl(url: string) {
         }
       }
       
-      const candidatePlexUrls: string[] = [];
+      const candidatePlexUrls = [];
       if (serverId && ratingKey) {
-        candidatePlexUrls.push(`plex://server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`);
-        candidatePlexUrls.push(`plex://details?server=${serverId}&key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`);
-        candidatePlexUrls.push(`plex://desktop/#!/server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`);
-        candidatePlexUrls.push(url);
-      } else {
-        candidatePlexUrls.push(url.replace('https://', 'plex://'));
-        candidatePlexUrls.push(url);
+        // Tentatives d'intent Android directs vers le contenu
+        candidatePlexUrls.push(`plex://server/${serverId}/com.plexapp.plugins.library/library/metadata/${ratingKey}`);
+        candidatePlexUrls.push(`plex://${serverId}/com.plexapp.plugins.library/library/metadata/${ratingKey}`);
       }
+      // On tente de laisser l'OS ouvrir l'URL https (qui sera interceptée par l'app Plex via les Android App Links)
+      candidatePlexUrls.push(url);
       
       for (const pUrl of candidatePlexUrls) {
         try {
           await AppLauncher.openUrl({ url: pUrl });
+          if (pUrl !== url) return; // Si c'est l'URL intent, on s'arrête là. Si c'est le lien https, openUrl retournera true mais on va quand même continuer et return si réussi
           return;
         } catch (err) {
           console.warn(`AppLauncher openUrl attempt failed for ${pUrl}`, err);
         }
-      }
-      
-      // Fallback: Browser Custom Tabs
-      try {
-        await Browser.open({ url, windowName: '_system' });
-        return;
-      } catch (e) {
-        console.warn('Browser.open failed for Plex URL, falling back to window.open', e);
       }
     }
 

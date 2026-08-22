@@ -187,6 +187,7 @@ export async function markEpisodeWatched(
     } catch (error: any) {
       useLogStore.getState().addLog(`[Firestore] ERREUR lors de la màj pour la série ${targetShow.id} : ${error.message}`, "error");
       console.error("Firestore update error:", error);
+      useLogStore.getState().addLog(`[Système] Erreur de mise à jour Firestore: ${error.message || String(error)}`, 'error', error);
     }
   } else {
     if (!user) {

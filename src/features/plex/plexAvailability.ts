@@ -137,7 +137,7 @@ export async function checkPlexAvailability(params: {
           };
 
           store.setMediaAvailability(key, info);
-          appLogger.info('plex', `Média disponible sur Plex : « ${title || data.title} » (${data.serverName || 'Serveur'})`);
+          // appLogger.info('plex', `Média disponible sur Plex : « ${title || data.title} » (${data.serverName || 'Serveur'})`);
           return info;
         }
       }
@@ -161,7 +161,7 @@ export async function checkPlexAvailability(params: {
 
     if (directResult && directResult.available) {
       store.setMediaAvailability(key, directResult);
-      appLogger.info('plex', `Média trouvé via connexion directe Plex : « ${title || directResult.title} » (${directResult.serverName || 'Serveur'})`);
+      // appLogger.info('plex', `Média trouvé via connexion directe Plex : « ${title || directResult.title} » (${directResult.serverName || 'Serveur'})`);
       return directResult;
     }
   } catch (err) {
