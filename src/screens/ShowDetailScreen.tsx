@@ -1491,7 +1491,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         notificationsEnabled: newFav ? true : undefined,
       };
       const newId = await addShow(newShowData);
-      showToast(newFav ? `« ${titleToUse} » ajoutée aux favoris (Notifications activées 🔔)` : `« ${titleToUse} » retirée des favoris`, 'info', currentShow);
+      showToast(newFav ? `« ${titleToUse} » ${isSeries ? 'ajoutée' : 'ajouté'} aux favoris` : `« ${titleToUse} » ${isSeries ? 'retirée' : 'retiré'} des favoris`, 'favorite', currentShow);
       return;
     }
 
@@ -1501,7 +1501,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         ...(newFav ? { notificationsEnabled: true } : {}),
         updatedAt: Date.now(),
       });
-      showToast(newFav ? `« ${currentShow.title} » ajoutée aux favoris (Notifications activées 🔔)` : `« ${currentShow.title} » retirée des favoris`, 'info', currentShow);
+      showToast(newFav ? `« ${currentShow.title} » ${isSeries ? 'ajoutée' : 'ajouté'} aux favoris` : `« ${currentShow.title} » ${isSeries ? 'retirée' : 'retiré'} des favoris`, 'favorite', currentShow);
     }
   };
 

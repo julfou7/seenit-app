@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Archive, Trash2, Ban, CheckCircle2, Info, Clock, AlertCircle, RotateCcw } from 'lucide-react';
+import { Archive, Trash2, Ban, CheckCircle2, Info, Clock, AlertCircle, RotateCcw, Bell, BellOff, Heart, HeartOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToastStore, ToastMessageObj } from '../store/toastStore';
 import { useShows } from '../hooks/useShows';
@@ -97,13 +97,19 @@ export function ToastContainer() {
     }
 
     // Clean up leading punctuation or leftover characters and emojis
-    action = action.replace(/^[🔔🔕🎉•\-\–\—:]\s*/, '').trim();
+    action = action.replace(/^[🔔🔕🎉❤️•\-\–\—:]\s*/, '').trim();
 
     // Clean up dangling prepositions left over after stripping title / episode (e.g. "Rappel activé pour")
     if (/rappel\s+activ[eé]/i.test(action)) {
       action = 'Rappel activé';
     } else if (/rappel\s+(retir[eé]|d[eé]sactiv[eé])/i.test(action)) {
       action = 'Rappel désactivé';
+    } else if (/favori/i.test(action)) {
+      if (/retir[eé]/i.test(action)) {
+        action = 'Retirée des favoris';
+      } else {
+        action = 'Ajoutée aux favoris';
+      }
     } else {
       action = action.replace(/\s+(pour|de|du|sur)\s*$/i, '').trim();
     }
@@ -123,15 +129,29 @@ export function ToastContainer() {
 
   const parsed = getParsedMessage();
 
-  const rawMsgStr = typeof message === 'string' ? message : '';
+  const rawMsgStr = typeof message === 'string' ? message : (parsed.action || '');
   const isPlexToast = Boolean(
     rawMsgStr.toLowerCase().includes('plex') ||
     parsed.action?.toLowerCase().includes('plex') ||
     parsed.title?.toLowerCase().includes('plex')
   );
 
+  const isReminderToast = Boolean(
+    type === 'reminder' ||
+    rawMsgStr.toLowerCase().includes('rappel') ||
+    parsed.action?.toLowerCase().includes('rappel')
+  );
+
+  const isFavoriteToast = Boolean(
+    type === 'favorite' ||
+    rawMsgStr.toLowerCase().includes('favori') ||
+    parsed.action?.toLowerCase().includes('favori')
+  );
+
   const getAccentColor = () => {
     if (isPlexToast) return 'text-[#E5A93D]';
+    if (isReminderToast) return 'text-amber-400';
+    if (isFavoriteToast) return 'text-rose-500';
     switch (type) {
       case 'success': return 'text-emerald-400';
       case 'unfollow': return 'text-rose-400';
@@ -139,12 +159,16 @@ export function ToastContainer() {
       case 'follow': return 'text-sky-400';
       case 'archive': return 'text-zinc-300';
       case 'error': return 'text-rose-500';
+      case 'reminder': return 'text-amber-400';
+      case 'favorite': return 'text-rose-500';
       default: return 'text-[#E5A93D]';
     }
   };
 
   const getProgressColor = () => {
     if (isPlexToast) return 'bg-[#E5A93D]';
+    if (isReminderToast) return 'bg-amber-500';
+    if (isFavoriteToast) return 'bg-rose-500';
     switch (type) {
       case 'archive': return 'bg-zinc-500';
       case 'dropped': return 'bg-amber-500';
@@ -152,6 +176,8 @@ export function ToastContainer() {
       case 'unfollow': return 'bg-rose-500';
       case 'success': return 'bg-emerald-500';
       case 'error': return 'bg-rose-500';
+      case 'reminder': return 'bg-amber-500';
+      case 'favorite': return 'bg-rose-500';
       default: return 'bg-[#E5A93D]';
     }
   };
@@ -159,6 +185,22 @@ export function ToastContainer() {
   const renderIcon = () => {
     if (isPlexToast) {
       return <PlexLogo className="w-4 h-4 text-[#E5A93D] shrink-0" />;
+    }
+    if (isReminderToast) {
+      const isOff = parsed.action?.toLowerCase().includes('désactivé') || parsed.action?.toLowerCase().includes('retiré');
+      return isOff ? (
+        <BellOff size={14} className="shrink-0 text-amber-400" />
+      ) : (
+        <Bell size={14} className="shrink-0 text-amber-400 fill-amber-400" />
+      );
+    }
+    if (isFavoriteToast) {
+      const isOff = parsed.action?.toLowerCase().includes('retiré');
+      return isOff ? (
+        <HeartOff size={14} className="shrink-0 text-rose-500" />
+      ) : (
+        <Heart size={14} className="shrink-0 text-rose-500 fill-rose-500" />
+      );
     }
     const iconClass = cn("shrink-0", getAccentColor());
     switch (type) {
@@ -276,12 +318,20 @@ export function ToastContainer() {
             /* Floating Compact Pill for Simple & System Notifications */
             <div className="relative overflow-hidden bg-zinc-900/95 backdrop-blur-2xl border border-white/15 rounded-full shadow-[0_14px_40px_rgba(0,0,0,0.85)] px-3.5 py-2 sm:px-4 sm:py-2.5 flex items-center gap-2.5 w-auto max-w-full">
               
-              {/* Icon badge - Solid 100% Opaque for Plex */}
+              {/* Icon badge - Solid 100% Opaque for Plex, Amber for Reminder, Rose for Favorite */}
               {isPlexToast ? (
                 <div className="w-6 h-6 rounded-full bg-[#E5A93D] text-zinc-950 flex items-center justify-center shrink-0 font-black shadow-md shadow-amber-500/20">
                   <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-zinc-950">
                     <path d="M4 2h7.5l7.5 10-7.5 10H4l7.5-10L4 2z" />
                   </svg>
+                </div>
+              ) : isReminderToast ? (
+                <div className="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-400 shadow-md shadow-amber-500/20">
+                  {renderIcon()}
+                </div>
+              ) : isFavoriteToast ? (
+                <div className="w-6 h-6 rounded-full bg-rose-500/15 border border-rose-500/30 flex items-center justify-center shrink-0 text-rose-500 shadow-md shadow-rose-500/20">
+                  {renderIcon()}
                 </div>
               ) : (
                 <div className="w-6 h-6 rounded-full bg-white/10 border border-white/10 flex items-center justify-center shrink-0 text-zinc-300">
