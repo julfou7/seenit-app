@@ -281,7 +281,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const openPersonModal = (personId: number) => {
     setSelectedPersonId(personId);
     const currentState = window.history.state || {};
-    window.history.pushState({ ...currentState, isModal: true, isPersonDetailModal: true }, '');
+    window.history.pushState({ ...currentState, isModal: true, isPersonDetailModal: true, personId }, '');
   };
 
   useEffect(() => {
@@ -289,13 +289,13 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       if (!event.state || !event.state.isEpisodeDetailModal) {
         setSelectedEpisode(null);
       }
-      if (!event.state || !event.state.isPersonDetailModal) {
+      if (event.state && event.state.isPersonDetailModal && event.state.personId) {
+        setSelectedPersonId(event.state.personId);
+      } else if (!event.state || !event.state.isPersonDetailModal) {
         setSelectedPersonId(null);
       }
     };
     const handleCloseModals = () => {
-      setSelectedEpisode(null);
-      setSelectedPersonId(null);
       setTrailerModalVideos(null);
     };
     window.addEventListener('popstate', handlePopState);

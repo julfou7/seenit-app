@@ -33,12 +33,14 @@ export function ProfileScreen({
   const openPersonModal = (personId: number) => {
     setSelectedPersonId(personId);
     const currentState = window.history.state || {};
-    window.history.pushState({ ...currentState, isModal: true, isPersonDetailModal: true }, '');
+    window.history.pushState({ ...currentState, isModal: true, isPersonDetailModal: true, personId }, '');
   };
 
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
-      if (!event.state || !event.state.isPersonDetailModal) {
+      if (event.state && event.state.isPersonDetailModal && event.state.personId) {
+        setSelectedPersonId(event.state.personId);
+      } else if (!event.state || !event.state.isPersonDetailModal) {
         setSelectedPersonId(null);
       }
     };
@@ -210,7 +212,6 @@ export function ProfileScreen({
             }
           }}
           onShowClick={(id, mediaType) => {
-            setSelectedPersonId(null);
             if (onShowClick) {
               onShowClick(id, mediaType);
             }

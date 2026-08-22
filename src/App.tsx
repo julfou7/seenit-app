@@ -143,8 +143,6 @@ function MainApp() {
 
     const setupBackButton = async () => {
       listenerHandler = await CapApp.addListener('backButton', ({ canGoBack }) => {
-        window.dispatchEvent(new CustomEvent('app-close-modals'));
-
         const state = window.history.state;
         const isModalOpen = Boolean(
           state?.isModal || 

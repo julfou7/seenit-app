@@ -49,9 +49,6 @@ export function useNavigation() {
     }
 
     const handlePopState = (e: PopStateEvent) => {
-      if (e.state && (e.state.isModal || e.state.isEpisodeDetailModal || e.state.isPersonDetailModal)) {
-        return;
-      }
       if (e.state && e.state.selectedShow !== undefined) {
         setSelectedShow(e.state.selectedShow);
       } else {
@@ -75,17 +72,12 @@ export function useNavigation() {
   }, []);
 
   const openShow = useCallback((id: any, type: 'local' | 'tmdb' = 'local', mediaType?: 'tv' | 'movie', tmdbId?: number, initialSeason?: number, initialEpisode?: number) => {
-    window.dispatchEvent(new CustomEvent('app-close-modals'));
     const showState = { id, type, mediaType, tmdbId, initialSeason, initialEpisode };
     setSelectedShow(showState);
     
     (window as any).isNavigatingForward = true;
     
-    if (window.history.state?.isModal || window.history.state?.isEpisodeDetailModal || window.history.state?.isPersonDetailModal) {
-       window.history.replaceState({ tab: currentTab, selectedShow: showState, isRoot: false }, '');
-    } else {
-       window.history.pushState({ tab: currentTab, selectedShow: showState, isRoot: false }, '');
-    }
+    window.history.pushState({ tab: currentTab, selectedShow: showState, isRoot: false }, '');
     
     setTimeout(() => {
        (window as any).isNavigatingForward = false;
