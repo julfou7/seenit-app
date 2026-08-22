@@ -338,8 +338,8 @@ async function checkPlexDirectFromDevice(params: {
               for (const it of items) {
                 if (isMatch(it)) {
                   const directPlexUrl = (server.clientIdentifier && it.ratingKey)
-                    ? `https://app.plex.tv/desktop/#!/server/${server.clientIdentifier}/details?key=${encodeURIComponent(`/library/metadata/${it.ratingKey}`)}`
-                    : 'https://app.plex.tv/desktop';
+                    ? `https://watch.plex.tv/desktop/#!/server/${server.clientIdentifier}/details?key=${encodeURIComponent(`/library/metadata/${it.ratingKey}`)}`
+                    : 'https://watch.plex.tv/desktop';
                   return {
                     available: true,
                     serverName,

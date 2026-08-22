@@ -124,7 +124,7 @@ export function UpcomingShowCard({ show, onShowClick, onEpisodeClick }: Props) {
       }
 
       if (show.id && !show.notificationsEnabled) { updateShow(show.id, { notificationsEnabled: true }); }
-      showToast(`🔔 Rappel activé pour ${show.title} S${sNumStr}E${eNumStr}`, 'success', show);
+      showToast(`« ${show.title} » S${sNumStr}E${eNumStr} • Rappel activé`, 'success', show);
 
       try {
         const epStill = ep.still_path || show.nextEpisodeToAir?.still_path || show.nextEpisodeToWatch?.still_path;
@@ -184,7 +184,7 @@ export function UpcomingShowCard({ show, onShowClick, onEpisodeClick }: Props) {
       }
 
       if (show.id && show.notificationsEnabled) { updateShow(show.id, { notificationsEnabled: false }); }
-      showToast(`🔕 Rappel retiré pour ${show.title} S${sNumStr}E${eNumStr}`, 'info', show);
+      showToast(`« ${show.title} » S${sNumStr}E${eNumStr} • Rappel désactivé`, 'info', show);
 
       try {
         const user = auth.currentUser;

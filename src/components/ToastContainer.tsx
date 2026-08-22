@@ -96,8 +96,17 @@ export function ToastContainer() {
       }
     }
 
-    // Clean up leading punctuation or leftover characters
-    action = action.replace(/^[•\-\–\—:]\s*/, '').trim();
+    // Clean up leading punctuation or leftover characters and emojis
+    action = action.replace(/^[🔔🔕🎉•\-\–\—:]\s*/, '').trim();
+
+    // Clean up dangling prepositions left over after stripping title / episode (e.g. "Rappel activé pour")
+    if (/rappel\s+activ[eé]/i.test(action)) {
+      action = 'Rappel activé';
+    } else if (/rappel\s+(retir[eé]|d[eé]sactiv[eé])/i.test(action)) {
+      action = 'Rappel désactivé';
+    } else {
+      action = action.replace(/\s+(pour|de|du|sur)\s*$/i, '').trim();
+    }
 
     // Capitalize first letter of action if it's lowercased
     if (action && action.length > 0) {

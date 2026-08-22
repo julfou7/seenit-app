@@ -18,13 +18,22 @@ export async function openExternalUrl(url: string) {
   
   if (Capacitor.isNativePlatform()) {
     if (url.includes('plex.tv') && !url.includes('/auth')) {
-      // Sous Android, le lien web https://app.plex.tv/... est intercepté nativement par l'application Plex (Android App Links).
-      // Les schémas plex:// personnalisés provoquent souvent une redirection vers l'accueil de Plex car l'intent n'est plus supporté.
+      // Les domaines pris en charge par l'appli Plex sous Android sont watch.plex.tv, links.plex.tv, plex.smart.link, click.plex.tv, l.plex.tv.
+      // Le domaine app.plex.tv est le domaine Web Desktop qui n'est pas associé nativement et s'ouvre dans Chrome.
+      // On convertit app.plex.tv en watch.plex.tv pour déclencher l'ouverture de l'application native Plex.
+      const nativePlexUrl = url.replace(/https?:\/\/app\.plex\.tv/i, 'https://watch.plex.tv');
       try {
-        await AppLauncher.openUrl({ url });
+        await AppLauncher.openUrl({ url: nativePlexUrl });
         return;
       } catch (err) {
-        console.warn('AppLauncher openUrl attempt failed for Plex URL', err);
+        console.warn('AppLauncher openUrl failed for watch.plex.tv, trying links.plex.tv...', err);
+        try {
+          const linksPlexUrl = url.replace(/https?:\/\/app\.plex\.tv/i, 'https://links.plex.tv');
+          await AppLauncher.openUrl({ url: linksPlexUrl });
+          return;
+        } catch (e2) {
+          console.warn('AppLauncher openUrl attempt failed for Plex URL', e2);
+        }
       }
     }
 
