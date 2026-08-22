@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useShowsStore } from '../../store/showsStore';
 
 export function useNavigation() {
   const getInitialState = () => {
@@ -72,7 +73,26 @@ export function useNavigation() {
   }, []);
 
   const openShow = useCallback((id: any, type: 'local' | 'tmdb' = 'local', mediaType?: 'tv' | 'movie', tmdbId?: number, initialSeason?: number, initialEpisode?: number) => {
-    const showState = { id, type, mediaType, tmdbId, initialSeason, initialEpisode };
+    let resolvedTmdbId = tmdbId;
+    let resolvedMediaType = mediaType;
+
+    if (type === 'local') {
+      const found = useShowsStore.getState().shows.find(s => String(s.id) === String(id) || String(s.tmdbId) === String(id));
+      if (found) {
+        if (!resolvedTmdbId && found.tmdbId) {
+          resolvedTmdbId = Number(found.tmdbId);
+        }
+        if (!resolvedMediaType && found.mediaType) {
+          resolvedMediaType = found.mediaType;
+        }
+      }
+    } else if (type === 'tmdb') {
+      if (!resolvedTmdbId && !isNaN(Number(id))) {
+        resolvedTmdbId = Number(id);
+      }
+    }
+
+    const showState = { id, type, mediaType: resolvedMediaType, tmdbId: resolvedTmdbId, initialSeason, initialEpisode };
     setSelectedShow(showState);
     
     (window as any).isNavigatingForward = true;

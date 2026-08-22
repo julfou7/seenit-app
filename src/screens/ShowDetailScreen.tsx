@@ -216,8 +216,23 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     (showId && (String(s.id) === String(showId) || String(s.tmdbId) === String(showId))) || 
     (externalTmdbId && String(s.tmdbId) === String(externalTmdbId))
   );
+
+  const lastKnownShowRef = useRef<any>(show);
+  if (show) {
+    lastKnownShowRef.current = show;
+  }
   
-  const effectiveTmdbId = show?.tmdbId || externalTmdbId || (showId && !isNaN(Number(showId)) ? Number(showId) : undefined);
+  // Mémoriser de façon persistante le TMDB ID pour qu'une suppression de show ne rende jamais effectiveTmdbId undefined
+  const persistentTmdbIdRef = useRef<number | undefined>(
+    externalTmdbId ? Number(externalTmdbId) : (show?.tmdbId ? Number(show.tmdbId) : (showId && !isNaN(Number(showId)) ? Number(showId) : undefined))
+  );
+  if (!persistentTmdbIdRef.current) {
+    if (externalTmdbId) persistentTmdbIdRef.current = Number(externalTmdbId);
+    else if (show?.tmdbId) persistentTmdbIdRef.current = Number(show.tmdbId);
+    else if (showId && !isNaN(Number(showId))) persistentTmdbIdRef.current = Number(showId);
+  }
+
+  const effectiveTmdbId = show?.tmdbId || (externalTmdbId ? Number(externalTmdbId) : undefined) || persistentTmdbIdRef.current;
 
   const [tmdbDetails, setTmdbDetails] = useState<any>(null);
   const title = show?.title || tmdbDetails?.name || tmdbDetails?.title || 'Chargement...';
@@ -407,7 +422,13 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     }, 50);
   };
 
+  const lastLoadedTmdbIdRef = useRef<number | undefined>(undefined);
+
   useEffect(() => {
+    if (!effectiveTmdbId) return;
+    if (lastLoadedTmdbIdRef.current === effectiveTmdbId) return;
+    lastLoadedTmdbIdRef.current = effectiveTmdbId;
+
     setTmdbDetails(null);
     setFetchError(false);
     setCollectionData(null);
@@ -426,7 +447,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     if (mainScrollRef.current) {
       mainScrollRef.current.scrollTo({ top: 0, behavior: 'instant' });
     }
-  }, [effectiveTmdbId, showId]);
+  }, [effectiveTmdbId]);
 
   useEffect(() => {
     if (!effectiveTmdbId) return;
@@ -1189,18 +1210,20 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   };
 
   const toggleDropShow = async () => {
-    if (!show?.id) return;
+    const targetShow = show || lastKnownShowRef.current;
+    if (!targetShow?.id) return;
     const now = Date.now();
-    const isUnfollowing = show.status !== 'dropped';
-    const previousStatus = show.status || 'watching';
-    const savedShow = { ...show };
+    const isUnfollowing = targetShow.status !== 'dropped';
+    const previousStatus = targetShow.status || 'watching';
+    const savedShow = { ...targetShow };
     
     if (isUnfollowing && !hasSeenMedia) {
-      await deleteShow(show.id);
+      handleAnimatedBack();
+      await deleteShow(targetShow.id);
       showToast(
-        `« ${show.title} » a été supprimée de votre suivi.`,
+        `« ${targetShow.title} » a été supprimée de votre suivi.`,
         'unfollow',
-        show,
+        targetShow,
         async () => {
           if (auth.currentUser && savedShow.id) {
             const docRef = doc(db, 'users', auth.currentUser.uid, 'shows', savedShow.id);
@@ -1209,21 +1232,20 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
           }
         }
       );
-      handleAnimatedBack();
       return;
     }
 
-    const newStatus = show.status === 'dropped' ? 'watching' : 'dropped';
-    await updateShow(show.id, { 
+    const newStatus = targetShow.status === 'dropped' ? 'watching' : 'dropped';
+    await updateShow(targetShow.id, { 
       status: newStatus,
       updatedAt: now
     });
 
     if (newStatus === 'dropped') {
       showToast(
-        `« ${show.title} » marquée comme abandonnée.`,
+        `« ${targetShow.title} » marquée comme abandonnée.`,
         'dropped',
-        show,
+        targetShow,
         async () => {
           if (savedShow.id) {
             await updateShow(savedShow.id, { status: previousStatus, updatedAt: Date.now() });
@@ -1234,14 +1256,19 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   };
 
   const handleDeleteShow = async () => {
-    if (!show?.id) return;
-    const savedShow = { ...show };
+    const targetShow = show || lastKnownShowRef.current;
+    if (!targetShow?.id) return;
+    const savedShow = { ...targetShow };
+    
+    // Déclenche immédiatement l'animation de sortie fluide
+    handleAnimatedBack();
+
     try {
-      await deleteShow(show.id);
+      await deleteShow(targetShow.id);
       showToast(
-        `« ${show.title} » a été supprimée de votre suivi.`,
+        `« ${targetShow.title} » a été supprimée de votre suivi.`,
         'unfollow',
-        show,
+        targetShow,
         async () => {
           if (auth.currentUser && savedShow.id) {
             const docRef = doc(db, 'users', auth.currentUser.uid, 'shows', savedShow.id);
@@ -1253,7 +1280,6 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     } catch (err) {
       console.error("Delete error:", err);
     }
-    handleAnimatedBack();
   };
 
   const rateShow = async (rating: number) => {
