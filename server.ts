@@ -7,10 +7,6 @@ import { getMessaging } from "firebase-admin/messaging";
 import { adminAuth, adminDb } from "./src/lib/firebase-admin.ts";
 import { DecodedIdToken } from "firebase-admin/auth";
 import multer from "multer";
-import { GoogleGenAI } from "@google/genai";
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
 
 export interface AuthRequest extends Request {
   user?: DecodedIdToken;

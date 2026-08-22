@@ -60,16 +60,6 @@ export async function openExternalUrl(url: string) {
       }
     }
 
-    // Reddit handling: Launch native Reddit app via system intent / AppLauncher
-    if (url.includes('reddit.com') || url.startsWith('reddit://')) {
-      try {
-        await AppLauncher.openUrl({ url });
-        return;
-      } catch (err) {
-        console.warn('Reddit AppLauncher launch failed, falling back to Browser', err);
-      }
-    }
-
     // Standard URL or fallback: use Browser Custom Tabs
     try {
       await Browser.open({ url, windowName: '_system' });
