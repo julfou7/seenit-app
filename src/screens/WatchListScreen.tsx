@@ -8,6 +8,7 @@ import { UpToDateShowCard, getUpToDateOrNewSeasonCategory } from '../components/
 import { UpcomingShowCard, getUpcomingEpisodeInfo } from '../components/cards/UpcomingShowCard';
 import { HistoryFeed } from '../components/HistoryFeed';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
+import { PersonDetailModal } from './PersonDetailModal';
 import { tmdb } from '../features/shows/tmdb';
 import { markEpisodeWatched } from '../features/shows/markEpisodeWatched';
 import { getFormattedProviderLogo, extractOfficialStreamingProvider, PLEX_LOGO_SVG } from '../utils/providerLogos';
@@ -33,6 +34,7 @@ interface ExpandedItemCardProps {
   onShowClick: (id: string, mediaType?: 'tv' | 'movie') => void;
   onEpisodeClick: (show: Show, seasonNumber: number, episodeNumber: number) => void;
   onMarkAsSeen: (show: Show) => void;
+  onPersonClick?: (personId: number) => void;
 }
 
 function formatRuntime(minutes?: number) {
@@ -43,9 +45,10 @@ function formatRuntime(minutes?: number) {
   return `${m}min`;
 }
 
-function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMarkAsSeen }: ExpandedItemCardProps) {
+function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMarkAsSeen, onPersonClick }: ExpandedItemCardProps) {
   const isMovie = show.mediaType === 'movie';
   const [movieRuntime, setMovieRuntime] = useState<number | null>((show as any).runtime || null);
+  const [movieDetails, setMovieDetails] = useState<any>(null);
   const [providerLogo, setProviderLogo] = useState<string | null>(
     show.networks && show.networks.length > 0 && show.networks[0].logo_path
       ? show.networks[0].logo_path
@@ -58,10 +61,13 @@ function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMa
   useEffect(() => {
     let isMounted = true;
     if (show.tmdbId) {
-      if (isMovie && !movieRuntime) {
+      if (isMovie) {
         tmdb.getMovieDetails(show.tmdbId).then(res => {
-          if (isMounted && res.ok && res.value?.runtime) {
-            setMovieRuntime(res.value.runtime);
+          if (isMounted && res.ok && res.value) {
+            setMovieDetails(res.value);
+            if (res.value.runtime && !movieRuntime) {
+              setMovieRuntime(res.value.runtime);
+            }
           }
         }).catch(() => {});
       }
@@ -223,6 +229,23 @@ function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMa
   if (formattedMovieRuntime) movieMetaParts.push(formattedMovieRuntime);
   const movieMetaStr = movieMetaParts.join(' • ') || 'Film';
 
+  // Genre / Thème du film
+  const movieGenres: string[] = [];
+  if (movieDetails?.genres && Array.isArray(movieDetails.genres)) {
+    movieDetails.genres.forEach((g: any) => {
+      if (g?.name) movieGenres.push(g.name);
+    });
+  } else if ((show as any).genres && Array.isArray((show as any).genres)) {
+    (show as any).genres.forEach((g: any) => {
+      if (typeof g === 'string') movieGenres.push(g);
+      else if (g?.name) movieGenres.push(g.name);
+    });
+  }
+  const movieThemeStr = movieGenres.slice(0, 2).join(', ');
+
+  // 3 Acteurs principaux
+  const topCast: any[] = (movieDetails?.credits?.cast || []).slice(0, 3);
+
   return (
     <div 
       onClick={handleCardClick}
@@ -265,10 +288,46 @@ function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMa
         </div>
         
         {isMovie ? (
-          <div className="flex items-center gap-1.5 my-0.5 min-w-0">
-            <span className="text-indigo-400 text-xs font-medium truncate">
-              {movieMetaStr}
-            </span>
+          <div className="flex flex-col gap-1 my-0.5 min-w-0">
+            {/* Durée • Thème / Genre */}
+            <div className="flex items-center gap-1.5 flex-wrap text-xs min-w-0 leading-tight">
+              {movieMetaStr && (
+                <span className="text-indigo-400 font-semibold text-xs shrink-0">
+                  {movieMetaStr}
+                </span>
+              )}
+              {movieThemeStr && (
+                <>
+                  <span className="text-zinc-500 text-[10px] shrink-0">•</span>
+                  <span className="text-zinc-300 font-medium text-xs truncate">
+                    {movieThemeStr}
+                  </span>
+                </>
+              )}
+            </div>
+
+            {/* 3 Acteurs principaux cliquables */}
+            {topCast.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap mt-0.5 min-w-0" onClick={(e) => e.stopPropagation()}>
+                {topCast.map((actor: any) => (
+                  <button
+                    key={actor.id}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (actor.id && onPersonClick) {
+                        onPersonClick(actor.id);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 hover:bg-[#E5A93D]/20 active:scale-95 border border-white/10 hover:border-[#E5A93D]/40 text-[11px] font-semibold text-zinc-300 hover:text-[#E5A93D] transition-all cursor-pointer select-none touch-manipulation truncate max-w-[130px]"
+                    title={`Voir la filmographie de ${actor.name}`}
+                  >
+                    <User size={10} className="text-zinc-400 shrink-0" />
+                    <span className="truncate">{actor.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           <>
@@ -382,8 +441,15 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
   const [activeTab, setActiveTab] = useState<'watch_next' | 'upcoming' | 'history'>('watch_next');
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [selectedEpisodeModal, setSelectedEpisodeModal] = useState<{ show: Show; season: number; episode: any } | null>(null);
+  const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState<number>(8);
+
+  const openPersonModal = (personId: number) => {
+    setSelectedPersonId(personId);
+    const currentState = window.history.state || {};
+    window.history.pushState({ ...currentState, isModal: true, isPersonDetailModal: true, personId }, '');
+  };
 
   const handleToggleVoirTout = (sectionKey: string) => {
     if (expandedSection === sectionKey) {
@@ -442,9 +508,15 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
       if (!event.state || !event.state.isEpisodeDetailModal) {
         setSelectedEpisodeModal(null);
       }
+      if (event.state && event.state.isPersonDetailModal && event.state.personId) {
+        setSelectedPersonId(event.state.personId);
+      } else if (!event.state || !event.state.isPersonDetailModal) {
+        setSelectedPersonId(null);
+      }
     };
     const handleCloseModals = () => {
       setSelectedEpisodeModal(null);
+      setSelectedPersonId(null);
     };
     window.addEventListener('popstate', handlePopState);
     window.addEventListener('app-close-modals', handleCloseModals);
@@ -778,6 +850,11 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
   const markMovieAsSeen = async (show: Show) => {
     if (!show.id) return;
     
+    const prevSeenEpisodes = [...(show.seenEpisodes || [])];
+    const prevStatus = show.status;
+    const prevLastWatchedAt = show.lastWatchedAt;
+    const prevEpisodeRecords = show.episodeRecords ? { ...show.episodeRecords } : {};
+
     const updatePayload: any = {
       seenEpisodes: arrayUnion('movie'),
       status: 'completed',
@@ -815,7 +892,38 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
     }
 
     scrollAllCarouselsToStart();
-    useToastStore.getState().showToast(`« ${show.title} » marqué comme vu !`, 'success', show);
+    useToastStore.getState().showToast(
+      `« ${show.title} » marqué comme vu !`,
+      'success',
+      show,
+      async () => {
+        const rollbackUpdates: Partial<Show> = {
+          seenEpisodes: prevSeenEpisodes,
+          status: prevStatus,
+          lastWatchedAt: prevLastWatchedAt,
+          episodeRecords: prevEpisodeRecords,
+          updatedAt: Date.now(),
+          isSynced: false
+        };
+
+        useShowsStore.getState().updateShowOptimistic(show.id, rollbackUpdates);
+        const user = auth.currentUser;
+        if (user && show.id) {
+          try {
+            const stringId = String(show.id);
+            const cleanRollback: any = {};
+            Object.entries(rollbackUpdates).forEach(([key, val]) => {
+              cleanRollback[key] = val === undefined ? null : val;
+            });
+            const docRef = doc(db, 'users', user.uid, 'shows', stringId);
+            await updateDoc(docRef, cleanRollback);
+          } catch (e) {
+            console.error('[markMovieAsSeen] Rollback failed:', e);
+          }
+        }
+        scrollAllCarouselsToStart();
+      }
+    );
   };
 
   return (
@@ -966,6 +1074,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                         onShowClick={onShowClick}
                         onEpisodeClick={handleEpisodeClick}
                         onMarkAsSeen={markNextEpisodeAsSeen}
+                        onPersonClick={openPersonModal}
                       />
                     </SwipeableCard>
                   ))}
@@ -1023,6 +1132,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                         onShowClick={onShowClick}
                         onEpisodeClick={handleEpisodeClick}
                         onMarkAsSeen={markNextEpisodeAsSeen}
+                        onPersonClick={openPersonModal}
                       />
                     </SwipeableCard>
                   ))}
@@ -1080,6 +1190,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                         onShowClick={onShowClick}
                         onEpisodeClick={handleEpisodeClick}
                         onMarkAsSeen={markNextEpisodeAsSeen}
+                        onPersonClick={openPersonModal}
                       />
                     </SwipeableCard>
                   ))}
@@ -1137,6 +1248,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                         onShowClick={onShowClick}
                         onEpisodeClick={handleEpisodeClick}
                         onMarkAsSeen={markMovieAsSeen}
+                        onPersonClick={openPersonModal}
                       />
                     </SwipeableCard>
                   ))}
@@ -1249,6 +1361,29 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
             if (window.history.state?.isEpisodeDetailModal || window.history.state?.isModal) {
               window.history.back();
             }
+          }}
+        />
+      )}
+
+      {selectedPersonId && (
+        <PersonDetailModal 
+          personId={selectedPersonId}
+          onClose={() => {
+            setSelectedPersonId(null);
+            if (window.history.state?.isPersonDetailModal || window.history.state?.isModal) {
+              window.history.back();
+            }
+          }}
+          onShowClick={(tmdbId, mediaType) => {
+            setSelectedPersonId(null);
+            if (window.history.state?.isPersonDetailModal || window.history.state?.isModal) {
+              window.history.back();
+            }
+            setTimeout(() => {
+              if (onShowClick) {
+                onShowClick(String(tmdbId), mediaType);
+              }
+            }, 50);
           }}
         />
       )}

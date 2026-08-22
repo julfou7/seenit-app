@@ -1,9 +1,10 @@
 import React, { useEffect, useRef } from 'react';
-import { Archive, Trash2, Ban, CheckCircle2, Info, Clock, AlertCircle, RotateCcw, Bell, BellOff, Heart, HeartOff } from 'lucide-react';
+import { Archive, Trash2, Ban, Info, Clock, AlertCircle, RotateCcw, Bell, BellOff, Heart, HeartOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToastStore, ToastMessageObj } from '../store/toastStore';
 import { useShows } from '../hooks/useShows';
 import { cn, scrollAllCarouselsToStart } from '../lib/utils';
+import { SeenItGlyph } from './SeenItLogo';
 
 const PlexLogo = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor">
@@ -153,7 +154,7 @@ export function ToastContainer() {
     if (isReminderToast) return 'text-amber-400';
     if (isFavoriteToast) return 'text-rose-500';
     switch (type) {
-      case 'success': return 'text-emerald-400';
+      case 'success': return 'text-[#E5A93D]';
       case 'unfollow': return 'text-rose-400';
       case 'dropped': return 'text-amber-400';
       case 'follow': return 'text-sky-400';
@@ -174,7 +175,7 @@ export function ToastContainer() {
       case 'dropped': return 'bg-amber-500';
       case 'follow': return 'bg-sky-500';
       case 'unfollow': return 'bg-rose-500';
-      case 'success': return 'bg-emerald-500';
+      case 'success': return 'bg-[#E5A93D]';
       case 'error': return 'bg-rose-500';
       case 'reminder': return 'bg-amber-500';
       case 'favorite': return 'bg-rose-500';
@@ -208,7 +209,7 @@ export function ToastContainer() {
       case 'unfollow': return <Trash2 size={14} className={iconClass} />;
       case 'dropped': return <Ban size={14} className={iconClass} />;
       case 'follow': return <Clock size={14} className={iconClass} />;
-      case 'success': return <CheckCircle2 size={14} className={iconClass} />;
+      case 'success': return <SeenItGlyph size={15} symbol="check" glow={false} idPrefix="toast-seenit" className="shrink-0" />;
       case 'error': return <AlertCircle size={14} className={iconClass} />;
       default: return <Info size={14} className={iconClass} />;
     }
