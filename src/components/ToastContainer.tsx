@@ -108,7 +108,7 @@ export function ToastContainer() {
       if (/retir[eé]/i.test(action)) {
         action = 'Retirée des favoris';
       } else {
-        action = 'Ajoutée aux favoris';
+        action = 'Ajoutée aux favoris (Toutes les notifs activées)';
       }
     } else {
       action = action.replace(/\s+(pour|de|du|sur)\s*$/i, '').trim();
