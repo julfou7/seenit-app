@@ -409,12 +409,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
                 show: showData
               });
 
-              // appLogger.success('plex', `Épisode synchronisé : « ${showData.title} » ${subtitle} (${item.source || 'Plex'})`, {
-                showId,
-                epKey,
-                source: item.source,
-                viewedAt: new Date(viewedTimestamp).toLocaleString('fr-FR')
-              });
+              
             }
           } else if (tmdbData && tmdbData.id) {
             // Genuinely new show discovered from Plex!
@@ -471,11 +466,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               show: newShowData
             });
 
-            // appLogger.success('plex', `Nouvelle série ajoutée & épisode vu : « ${newShowData.title} » ${subtitle} (${item.source || 'Plex'})`, {
-              showId,
-              tmdbId: tmdbData.id,
-              epKey
-            });
+            
           }
         } else if (type === 'movie') {
           const movieTitle = item.title;
@@ -578,11 +569,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
                 show: showData
               });
 
-              // appLogger.success('plex', `Film synchronisé : « ${showData.title} » (${item.source || 'Plex'})`, {
-                showId,
-                source: item.source,
-                viewedAt: new Date(viewedTimestamp).toLocaleString('fr-FR')
-              });
+              
             }
           } else if (tmdbData && tmdbData.id) {
             // Genuinely new movie discovered from Plex!
@@ -635,11 +622,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               show: newShowData
             });
 
-            // appLogger.success('plex', `Nouveau film ajouté & marqué vu : « ${newShowData.title} » (${item.source || 'Plex'})`, {
-              showId,
-              tmdbId: tmdbData.id,
-              source: item.source
-            });
+            
           }
         }
       }
@@ -741,10 +724,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               show: newShowData
             });
 
-            // appLogger.success('plex', `Watchlist Plex : « ${newShowData.title} » ajouté aux médias À Voir`, {
-              showId,
-              tmdbId: tmdbData.id
-            });
+            
           }
         }
       }
