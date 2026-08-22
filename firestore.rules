@@ -1,34 +1,15 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Default deny all documents
+    // Par défaut, accès interdit
     match /{document=**} {
       allow read, write: if false;
     }
 
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    match /users/{userId} {
-      allow read, write: if isOwner(userId);
-
-      match /shows/{showId} {
-        allow read, write: if isOwner(userId);
-      }
-
-      match /importTasks/{taskId} {
-        allow read, write: if isOwner(userId);
-      }
-
-      match /reminders/{reminderId} {
-        allow read, write: if isOwner(userId);
-      }
+    // L'utilisateur a accès à son document et à TOUTES ses sous-collections (shows, settings, reminders, etc.)
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }

@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, persistentSingleTabManager } from 'firebase/firestore';
 import { getMessaging, getToken, isSupported, type Messaging } from 'firebase/messaging';
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
@@ -19,19 +19,30 @@ googleAuthProvider.setCustomParameters({
 
 const isNative = Capacitor.isNativePlatform();
 
-export const db = initializeFirestore(
-  app,
-  { 
-    localCache: isNative 
-      ? memoryLocalCache() 
-      : persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-  },
-  (firebaseConfig as any).firestoreDatabaseId || '(default)'
-);
+export const db = (firebaseConfig as any).firestoreDatabaseId && (firebaseConfig as any).firestoreDatabaseId !== '(default)' && (firebaseConfig as any).firestoreDatabaseId !== 'default'
+  ? initializeFirestore(
+      app,
+      { 
+        localCache: isNative 
+          ? persistentLocalCache({ tabManager: persistentSingleTabManager({}) }) 
+          : persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+        experimentalForceLongPolling: isNative
+      },
+      (firebaseConfig as any).firestoreDatabaseId
+    )
+  : initializeFirestore(
+      app,
+      { 
+        localCache: isNative 
+          ? persistentLocalCache({ tabManager: persistentSingleTabManager({}) }) 
+          : persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+        experimentalForceLongPolling: isNative
+      }
+    );
 
 // Log diagnostic for Firestore initialization
 try {
-  const cacheType = isNative ? 'MÉMOIRE (Évite les blocages de verrous Android)' : 'PERSISTANT (Multi-onglets PWA)';
+  const cacheType = isNative ? 'PERSISTANT (Mono-onglet natif)' : 'PERSISTANT (Multi-onglets PWA)';
   setTimeout(() => {
     useLogStore.getState().addLog(`[Système] Firestore initialisé avec cache ${cacheType} sur base '${(firebaseConfig as any).firestoreDatabaseId || '(default)'}'`, 'info');
   }, 1000);

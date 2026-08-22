@@ -10,4 +10,7 @@ if (!getApps().length) {
 }
 
 export const adminAuth = getAuth();
-export const adminDb = getFirestore((firebaseConfig as any).firestoreDatabaseId || '(default)');
+const dbId = (firebaseConfig as any).firestoreDatabaseId;
+export const adminDb = dbId && dbId !== '(default)' && dbId !== 'default'
+  ? getFirestore(dbId)
+  : getFirestore();
