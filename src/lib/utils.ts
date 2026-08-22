@@ -18,36 +18,13 @@ export async function openExternalUrl(url: string) {
   
   if (Capacitor.isNativePlatform()) {
     if (url.includes('plex.tv') && !url.includes('/auth')) {
-      const serverMatch = url.match(/\/server\/([a-zA-Z0-9_-]+)/i) || url.match(/server=([a-zA-Z0-9_-]+)/i);
-      const serverId = serverMatch ? serverMatch[1] : '';
-      
-      const keyMatch = url.match(/[?&]key=([^&#]+)/i);
-      let ratingKey = '';
-      if (keyMatch) {
-        const decodedKey = decodeURIComponent(keyMatch[1]);
-        const ratingKeyMatch = decodedKey.match(/\/metadata\/(\d+)/i);
-        if (ratingKeyMatch) {
-          ratingKey = ratingKeyMatch[1];
-        }
-      }
-      
-      const candidatePlexUrls = [];
-      if (serverId && ratingKey) {
-        // Tentatives d'intent Android directs vers le contenu
-        candidatePlexUrls.push(`plex://server/${serverId}/com.plexapp.plugins.library/library/metadata/${ratingKey}`);
-        candidatePlexUrls.push(`plex://${serverId}/com.plexapp.plugins.library/library/metadata/${ratingKey}`);
-      }
-      // On tente de laisser l'OS ouvrir l'URL https (qui sera interceptée par l'app Plex via les Android App Links)
-      candidatePlexUrls.push(url);
-      
-      for (const pUrl of candidatePlexUrls) {
-        try {
-          await AppLauncher.openUrl({ url: pUrl });
-          if (pUrl !== url) return; // Si c'est l'URL intent, on s'arrête là. Si c'est le lien https, openUrl retournera true mais on va quand même continuer et return si réussi
-          return;
-        } catch (err) {
-          console.warn(`AppLauncher openUrl attempt failed for ${pUrl}`, err);
-        }
+      // Sous Android, le lien web https://app.plex.tv/... est intercepté nativement par l'application Plex (Android App Links).
+      // Les schémas plex:// personnalisés provoquent souvent une redirection vers l'accueil de Plex car l'intent n'est plus supporté.
+      try {
+        await AppLauncher.openUrl({ url });
+        return;
+      } catch (err) {
+        console.warn('AppLauncher openUrl attempt failed for Plex URL', err);
       }
     }
 
