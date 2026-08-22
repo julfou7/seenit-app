@@ -386,7 +386,7 @@ function MainApp() {
 
           {selectedShow && (
             <div 
-              className="fixed inset-0 z-[60] bg-black flex flex-col overflow-hidden max-w-md mx-auto animate-in fade-in slide-in-from-bottom-6 duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] animate-overlay-in pt-safe"
+              className="fixed inset-0 z-[150] bg-black flex flex-col overflow-hidden max-w-md mx-auto animate-in fade-in slide-in-from-bottom-6 duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] animate-overlay-in pt-safe"
               style={{ willChange: 'transform, opacity' }}
             >
               <ShowDetailScreen 
