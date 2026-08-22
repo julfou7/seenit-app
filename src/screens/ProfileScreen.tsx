@@ -209,7 +209,12 @@ export function ProfileScreen({
               window.history.back();
             }
           }}
-          onShowClick={onShowClick}
+          onShowClick={(id, mediaType) => {
+            setSelectedPersonId(null);
+            if (onShowClick) {
+              onShowClick(id, mediaType);
+            }
+          }}
         />
       )}
 

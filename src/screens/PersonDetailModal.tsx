@@ -201,14 +201,6 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
   const { shows, addShow, updateShow, deleteShow } = useShows();
   const { showToast } = useToastStore();
 
-  useEffect(() => {
-    const handleCloseAll = () => {
-      onClose();
-    };
-    window.addEventListener('app-close-modals', handleCloseAll);
-    return () => window.removeEventListener('app-close-modals', handleCloseAll);
-  }, [onClose]);
-
   const showsByTmdbId = React.useMemo(() => {
     const map = new Map<number, Show>();
     shows.forEach(s => {
