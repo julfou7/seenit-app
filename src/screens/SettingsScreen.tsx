@@ -650,7 +650,7 @@ export function SettingsScreen() {
                        apkUpdateProgress.status === 'installing' ? 'Installation prête...' : 
                        'Erreur'}
                     </span>
-                    <span>{apkUpdateProgress.progress}%</span>
+                    <span>{apkUpdateProgress.percent}%</span>
                   </div>
                   <div className="w-full bg-black/40 rounded-full h-1.5 overflow-hidden">
                     <div 
@@ -658,12 +658,12 @@ export function SettingsScreen() {
                         "h-full transition-all duration-300",
                         apkUpdateProgress.status === 'error' ? "bg-red-500" : "bg-[#E5A93D]"
                       )}
-                      style={{ width: `${apkUpdateProgress.progress}%` }}
+                      style={{ width: `${apkUpdateProgress.percent}%` }}
                     />
                   </div>
                   {apkUpdateProgress.status === 'error' && (
                     <p className="text-[10px] text-red-400 leading-tight">
-                      {apkUpdateProgress.error || "Une erreur est survenue."}
+                      {apkUpdateProgress.message || "Une erreur est survenue."}
                     </p>
                   )}
                 </div>
@@ -716,9 +716,9 @@ export function SettingsScreen() {
                             log.level === 'warn' ? "text-amber-300" : "text-zinc-300"
                           )}>
                             {log.message}
-                            {log.data && (
+                            {log.details && (
                               <pre className="mt-1 p-1.5 bg-black/50 rounded overflow-x-auto text-[9px] text-zinc-500">
-                                {typeof log.data === 'object' ? JSON.stringify(log.data, null, 2) : String(log.data)}
+                                {typeof log.details === 'object' ? JSON.stringify(log.details, null, 2) : String(log.details)}
                               </pre>
                             )}
                           </div>
@@ -758,7 +758,7 @@ export function SettingsScreen() {
           </div>
         </div>
       </div>
-      <ChangelogViewer />
+      {latestRelease && <ChangelogViewer content={latestRelease.releaseNotes} />}
     </div>
   );
 }
