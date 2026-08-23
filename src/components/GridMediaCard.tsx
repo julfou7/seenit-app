@@ -6,6 +6,8 @@ import {
 import { tmdb, isMovieAtCinema, isMovieUpcoming, type TMDBMedia } from '../features/shows/tmdb';
 import { cn, checkIsUpToDate, computeAutoArchiveStatus, getTodayStr, getCalendarDaysDiff, formatAirDateSafe } from '../lib/utils';
 import { useShowsStore } from '../store/showsStore';
+import { getFormattedProviderLogo, extractOfficialStreamingProvider, PLEX_LOGO_SVG } from '../utils/providerLogos';
+import { checkPlexAvailability } from '../features/plex/plexAvailability';
 
 export interface GridMediaCardProps {
   media: TMDBMedia;
@@ -120,6 +122,64 @@ export const GridMediaCard = React.memo(function GridMediaCard({
     }
   };
 
+  const [providerLogo, setProviderLogo] = useState<string | null>(null);
+  const [providerName, setProviderName] = useState<string | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    let hasFetched = false;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && !hasFetched && media.id) {
+        hasFetched = true;
+        observer.disconnect();
+
+        tmdb.getWatchProviders(Number(media.id), mediaType).then(res => {
+          if (!isMounted) return;
+          let officialFound = false;
+          if (res.ok && res.value?.results) {
+            const stream = extractOfficialStreamingProvider(res.value.results);
+            if (stream) {
+              setProviderLogo(stream.logo_path);
+              setProviderName(stream.provider_name);
+              officialFound = true;
+            }
+          }
+
+          if (!officialFound && (!show || !show.networks?.length)) {
+            checkPlexAvailability({
+              tmdbId: Number(media.id),
+              title: displayTitle,
+              originalTitle: (media as any).original_title || (media as any).original_name,
+              year,
+              mediaType
+            }).then(plexInfo => {
+              if (isMounted && plexInfo.available) {
+                setProviderLogo(PLEX_LOGO_SVG);
+                setProviderName(plexInfo.serverName ? `Plex (${plexInfo.serverName})` : 'Plex');
+              }
+            }).catch(() => {});
+          }
+        }).catch(() => {});
+      }
+    }, { rootMargin: '200px' });
+
+    if (cardRef.current) {
+      observer.observe(cardRef.current);
+    }
+
+    return () => {
+      isMounted = false;
+      observer.disconnect();
+    };
+  }, [media.id, mediaType, displayTitle, year, show]);
+
+  const networkLogo = getFormattedProviderLogo(
+    providerLogo || (show?.networks && show.networks.length > 0 ? show.networks[0].logo_path : null),
+    providerName || (show?.networks && show.networks.length > 0 ? show.networks[0].name : (show as any)?.network || (show as any)?.platform)
+  );
+
   const handleClick = (e: React.MouseEvent) => {
     if (isLongPressRef.current) {
       e.preventDefault();
@@ -132,6 +192,7 @@ export const GridMediaCard = React.memo(function GridMediaCard({
 
   return (
     <div 
+      ref={cardRef}
       onClick={handleClick}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
@@ -172,6 +233,13 @@ export const GridMediaCard = React.memo(function GridMediaCard({
             <div className="absolute top-0 left-0 bg-black/60 backdrop-blur-md px-1.5 py-1 rounded-br-lg text-[10px] font-bold text-white flex items-center gap-1 shadow-sm border-b border-r border-white/10">
               <Star size={10} className="text-[#E5A93D] fill-[#E5A93D]" />
               <span>{rating}</span>
+            </div>
+          )}
+
+          {/* Logo du provider en haut à droite */}
+          {networkLogo && (
+            <div className="absolute top-0 right-0 z-30 bg-white/95 backdrop-blur-md w-7 h-7 rounded-bl-lg flex items-center justify-center shrink-0 p-1 shadow-sm pointer-events-none">
+              <img src={networkLogo} alt="" className="w-5 h-5 object-contain rounded-[3px]" />
             </div>
           )}
 

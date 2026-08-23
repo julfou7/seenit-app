@@ -280,7 +280,7 @@ export function LibraryScreen({ onShowClick }: Props) {
                 </div>
                 
                 {expandedSection === section.id ? (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-x-1.5 gap-y-4 px-4 sm:px-6">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-x-1.5 gap-y-4 px-4 sm:px-6">
                     {section.data.map((media, idx) => {
                       const show = shows.find(s => s.tmdbId === media.id);
                       return (
@@ -303,7 +303,7 @@ export function LibraryScreen({ onShowClick }: Props) {
                     {section.data.map((media, idx) => {
                       const show = shows.find(s => s.tmdbId === media.id);
                       return (
-                        <div key={`${media.id}_${idx}`} className="w-[calc((100vw-2rem-12px)/3)] sm:w-[calc((100vw-3rem-18px)/4)] shrink-0 snap-start">
+                        <div key={`${media.id}_${idx}`} className="w-[calc((100vw-2rem-12px)/3)] sm:w-[calc((100vw-3rem-18px)/4)] md:w-[calc((100vw-3rem-24px)/5)] lg:w-[calc((100vw-3rem-30px)/6)] xl:w-[calc((100vw-3rem-36px)/7)] 2xl:w-[calc((100vw-3rem-42px)/8)] shrink-0 snap-start">
                           <GridMediaCard
                             media={media}
                             show={show}
