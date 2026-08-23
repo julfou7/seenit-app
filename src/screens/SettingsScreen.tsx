@@ -43,6 +43,23 @@ export function SettingsScreen() {
   const [userPlatforms, setUserPlatforms] = useState<number[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   
+  const [notificationPrefs, setNotificationPrefs] = useState(() => {
+    const saved = localStorage.getItem('user_notifications');
+    return saved ? JSON.parse(saved) : {
+      release_today_tv: true,
+      season_d7: true,
+      movie_theater: true,
+      movie_dvd_vod: true
+    };
+  });
+
+  const handleToggleNotif = (key, value) => {
+    const newPrefs = { ...notificationPrefs, [key]: value };
+    setNotificationPrefs(newPrefs);
+    localStorage.setItem('user_notifications', JSON.stringify(newPrefs));
+  };
+
+  
   // Plex Auth State
   const [plexPin, setPlexPin] = useState<any>(null);
   const [plexToken, setPlexToken] = useState<string | null>(
@@ -296,14 +313,14 @@ export function SettingsScreen() {
           </div>
         </div>
 
-        {/* Notifications & Rappels */}
+                {/* Notifications & Rappels */}
         <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 sm:p-5">
           <div className="flex items-center gap-2.5 mb-2.5">
             <Bell className="text-[#E5A93D]" size={18} />
-            <h2 className="font-bold text-sm text-zinc-100">Notifications & Rappels Android (09h00)</h2>
+            <h2 className="font-bold text-sm text-zinc-100">Notifications & Rappels</h2>
           </div>
           <p className="text-xs text-zinc-400 mb-3 leading-relaxed font-medium">
-            Activez les notifications système pour être alerté automatiquement chaque matin à <strong>09h00</strong> dès qu'un nouvel épisode de vos séries sort.
+            Choisissez les alertes que vous souhaitez recevoir. Les notifications système sont envoyées à <strong>09h00</strong>.
           </p>
 
           {typeof window !== 'undefined' && window.self !== window.top && (
@@ -312,14 +329,65 @@ export function SettingsScreen() {
             </div>
           )}
 
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3 mb-5">
+            <label className="flex items-center justify-between cursor-pointer group">
+              <div className="flex flex-col">
+                <span className="text-xs text-zinc-200 font-bold group-hover:text-white transition-colors">Nouvel épisode (Séries)</span>
+                <span className="text-[10px] text-zinc-500">Le jour de la diffusion</span>
+              </div>
+              <input 
+                type="checkbox" 
+                className="w-4 h-4 rounded text-[#E5A93D] focus:ring-[#E5A93D] bg-zinc-800 border-zinc-700"
+                checked={notificationPrefs.release_today_tv}
+                onChange={(e) => handleToggleNotif('release_today_tv', e.target.checked)}
+              />
+            </label>
+            <label className="flex items-center justify-between cursor-pointer group">
+              <div className="flex flex-col">
+                <span className="text-xs text-zinc-200 font-bold group-hover:text-white transition-colors">Nouvelle saison (Séries)</span>
+                <span className="text-[10px] text-zinc-500">Rappel 7 jours avant la sortie</span>
+              </div>
+              <input 
+                type="checkbox" 
+                className="w-4 h-4 rounded text-[#E5A93D] focus:ring-[#E5A93D] bg-zinc-800 border-zinc-700"
+                checked={notificationPrefs.season_d7}
+                onChange={(e) => handleToggleNotif('season_d7', e.target.checked)}
+              />
+            </label>
+            <label className="flex items-center justify-between cursor-pointer group">
+              <div className="flex flex-col">
+                <span className="text-xs text-zinc-200 font-bold group-hover:text-white transition-colors">Sortie au cinéma (Films)</span>
+                <span className="text-[10px] text-zinc-500">Le jour de la sortie en salles</span>
+              </div>
+              <input 
+                type="checkbox" 
+                className="w-4 h-4 rounded text-[#E5A93D] focus:ring-[#E5A93D] bg-zinc-800 border-zinc-700"
+                checked={notificationPrefs.movie_theater}
+                onChange={(e) => handleToggleNotif('movie_theater', e.target.checked)}
+              />
+            </label>
+            <label className="flex items-center justify-between cursor-pointer group">
+              <div className="flex flex-col">
+                <span className="text-xs text-zinc-200 font-bold group-hover:text-white transition-colors">Sortie DVD / VOD (Films)</span>
+                <span className="text-[10px] text-zinc-500">Environ 4 mois après le cinéma</span>
+              </div>
+              <input 
+                type="checkbox" 
+                className="w-4 h-4 rounded text-[#E5A93D] focus:ring-[#E5A93D] bg-zinc-800 border-zinc-700"
+                checked={notificationPrefs.movie_dvd_vod}
+                onChange={(e) => handleToggleNotif('movie_dvd_vod', e.target.checked)}
+              />
+            </label>
+          </div>
+
+          <div className="flex flex-col gap-2 border-t border-zinc-800 pt-4">
             <button
               onClick={async () => {
                 const token = await requestNotificationPermission();
                 if (token || (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted')) {
                   showToast("Notifications système activées avec succès !", "success");
                   sendNativeNotification("Notifications Activées", {
-                    body: "Vous recevrez désormais un rappel lors des sorties de nouveaux épisodes !",
+                    body: "Vous recevrez désormais vos alertes configurées !",
                     icon: "/icon-192.png"
                   });
                 } else {
@@ -329,7 +397,7 @@ export function SettingsScreen() {
               className="w-full flex items-center justify-center gap-2 bg-[#E5A93D]/10 hover:bg-[#E5A93D]/20 active:scale-95 text-[#E5A93D] border border-[#E5A93D]/30 font-bold py-2.5 px-4 rounded-xl text-xs transition-all cursor-pointer"
             >
               <Bell size={15} />
-              Activer les notifications
+              Autoriser le système Android/Web
             </button>
             <button
               onClick={() => {
