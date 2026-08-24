@@ -169,9 +169,11 @@ export async function sendNativeNotification(title: string, options?: NativeNoti
   };
 
   const notificationId = options?.notificationId ?? (
-    options?.showId && options?.season !== undefined && options?.episode !== undefined
-      ? generateNotificationNumericId(`ep_${options.showId}_S${options.season}E${options.episode}`)
-      : Math.floor(Math.random() * 1000000)
+    options?.tag 
+      ? generateNotificationNumericId(options.tag)
+      : (options?.showId && options?.season !== undefined && options?.episode !== undefined
+          ? generateNotificationNumericId(`ep_${options.showId}_S${options.season}E${options.episode}`)
+          : Math.floor(Math.random() * 1000000))
   );
 
   const targetDate = options?.scheduleDate && options.scheduleDate.getTime() > Date.now()
@@ -187,18 +189,9 @@ export async function sendNativeNotification(title: string, options?: NativeNoti
         if (req.display !== 'granted') return;
       }
 
-      // Convert remote HTTP image URLs to Base64 Data URIs so native Android can render them
-      const [base64Backdrop, base64Poster] = await Promise.all([
-        imageUrl ? fetchImageAsDataUrl(imageUrl) : Promise.resolve(undefined),
-        iconUrl ? fetchImageAsDataUrl(iconUrl) : Promise.resolve(undefined)
-      ]);
-
-      const mainImage = base64Backdrop || base64Poster;
-      const thumbImage = base64Poster || base64Backdrop;
-
       const attachments: any[] = [];
-      if (mainImage) {
-        attachments.push({ id: 'photo', url: mainImage });
+      if (imageUrl) {
+        attachments.push({ id: 'photo', url: imageUrl });
       }
 
       // Register action types for notification buttons

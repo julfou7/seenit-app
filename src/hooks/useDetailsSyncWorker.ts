@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { db, auth } from '../lib/firebase';
+import { db, auth, sendNativeNotification } from '../lib/firebase';
 import { doc, updateDoc, getDoc, getDocs, collection, addDoc } from 'firebase/firestore';
 import { tmdb } from '../features/shows/tmdb';
 import { getNextEpisodeNumber, computeAutoArchiveStatus, getTodayStr } from '../lib/utils';
@@ -354,6 +354,26 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         const hasArchivedChanged = showToSync.isArchived !== shouldBeArchived;
         const hasSeriesEndedChanged = showToSync.seriesEnded !== isEnded;
         const hasTmdbStatusChanged = showToSync.tmdbStatus !== (details.status || null);
+        
+        // Notification pour les saisons renouvelées
+        if (showToSync.tmdbStatus && (showToSync.tmdbStatus === 'Ended' || showToSync.tmdbStatus === 'Canceled') && details.status === 'Returning Series') {
+           sendNativeNotification(showToSync.title, {
+             body: `Bonne nouvelle ! La série a été renouvelée pour une suite.`,
+             tag: `notif_${showId}_renewed_${Date.now()}`,
+             showId,
+             tmdbId: tmdbIdNum,
+             mediaType: 'tv'
+           });
+        } else if (nextEpisodeToAir && !showToSync.nextEpisodeToAir && nextEpisodeToAir.season_number > 1 && (!showToSync.seasons || showToSync.seasons.length < nextEpisodeToAir.season_number)) {
+           // Détection d'une nouvelle saison annoncée via un prochain épisode
+           sendNativeNotification(showToSync.title, {
+             body: `La saison ${nextEpisodeToAir.season_number} a été annoncée et est prévue pour le ${new Date(nextEpisodeToAir.air_date).toLocaleDateString('fr-FR')} !`,
+             tag: `notif_${showId}_new_season_${nextEpisodeToAir.season_number}`,
+             showId,
+             tmdbId: tmdbIdNum,
+             mediaType: 'tv'
+           });
+        }
 
         const docRef = doc(db, 'users', userUid, 'shows', showId);
 

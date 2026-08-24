@@ -39,6 +39,7 @@ const CATEGORIES = [
   { id: "Tout", label: "Tout" },
   { id: "Séries", label: "Séries" },
   { id: "Films", label: "Films" },
+  { id: "Top 100", label: "Top 100" },
   { id: "Pépites", label: "Pépites" },
   { id: "Au cinéma", label: "Au cinéma" },
   { id: "Documentaires", label: "Documentaires" },
@@ -648,6 +649,37 @@ export function DiscoverScreen({ onShowClick }: Props) {
         } else {
           setHasMore(false);
         }
+      } else if (activeCategory === 'Top 100') {
+        const [topMovRes, topTvRes] = await Promise.all([
+          tmdb.getTopRated('movie', page),
+          tmdb.getTopRated('tv', page)
+        ]);
+        const tops = [
+          ...(topMovRes?.ok ? topMovRes.value.results.map((r: any) => ({ ...r, media_type: 'movie' })) : []),
+          ...(topTvRes?.ok ? topTvRes.value.results.map((r: any) => ({ ...r, media_type: 'tv' })) : [])
+        ];
+        // Sort globally by vote average descending
+        tops.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
+        
+        setPopular(prev => {
+          const updated = page === 1 ? tops : mergeMedia(prev, tops);
+          if (page > 1 && updated.length === prev.length) setHasMore(false);
+          return updated;
+        });
+        if (page === 1) {
+          const top10List = tops.slice(0, 10);
+          setTrending(top10List);
+          for (const item of top10List) {
+            if (item.media_type === 'tv') {
+              tmdb.getShowDetails(item.id).then(res => { if (res.ok) setHeroDetails(prev => ({ ...prev, [item.id]: res.value })); });
+            } else {
+              tmdb.getMovieDetails(item.id).then(res => { if (res.ok) setHeroDetails(prev => ({ ...prev, [item.id]: res.value })); });
+            }
+          }
+        }
+        if (tops.length === 0 || page >= 5) { // 5 pages max for top 100 (20 results per page)
+          setHasMore(false);
+        }
       } else if (activeCategory === 'Au cinéma') {
         const cinemaRes = await tmdb.getNowPlaying(page);
         if (cinemaRes?.ok && cinemaRes.value.results) {
@@ -1038,6 +1070,8 @@ export function DiscoverScreen({ onShowClick }: Props) {
     const list: TMDBMedia[] = [];
     for (const item of processedResults) {
       if (activeCategory === 'Au cinéma' && !isMovieAtCinema(item)) continue;
+      // Pour le Top 100 on ne filtre pas le top10
+      if (activeCategory === 'Top 100' && !item.vote_average) continue;
       if (item.media_type === 'person') continue;
       const type = item.media_type || (item.first_air_date ? 'tv' : 'movie');
       const key = `${type}_${item.id}`;
@@ -1069,7 +1103,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
 
   const uniqueProcessedResults = useMemo(() => {
     const seen = new Set<string>();
-    const top10Keys = (!debouncedQuery.trim() && top10.length > 0 && (activeCategory === 'Tout' || activeCategory === 'Séries' || activeCategory === 'Films' || activeCategory === 'Pépites' || activeCategory === 'Au cinéma'))
+    const top10Keys = (!debouncedQuery.trim() && top10.length > 0 && (activeCategory === 'Tout' || activeCategory === 'Séries' || activeCategory === 'Films' || activeCategory === 'Pépites' || activeCategory === 'Top 100' || activeCategory === 'Au cinéma'))
       ? new Set(top10.map(item => {
           const type = item.media_type || (item.first_air_date ? 'tv' : 'movie');
           return `${type}_${item.id}`;
