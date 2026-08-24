@@ -271,7 +271,8 @@ class TMDBClient {
     }
 
     // B. Si c'est une série ou un univers hybride : interroger Wikidata
-    const franchiseItems = await getWikidataFranchiseTimeline(media.id, media.media_type || 'tv');
+    const imdbId = media.external_ids?.imdb_id || media.imdb_id;
+    const franchiseItems = await getWikidataFranchiseTimeline(media.id, media.media_type || 'tv', imdbId);
 
     if (franchiseItems.length <= 1) return [];
 

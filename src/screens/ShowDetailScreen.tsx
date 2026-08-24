@@ -239,6 +239,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
 
   const [fetchError, setFetchError] = useState<boolean>(false);
   const [collectionData, setCollectionData] = useState<any>(null);
+  const [collectionLoading, setCollectionLoading] = useState<boolean>(true);
   const [imdbData, setImdbData] = useState<any>(null);
   const [imdbLoading, setImdbLoading] = useState<boolean>(false);
   const [providers, setProviders] = useState<any>(null);
@@ -432,6 +433,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     setTmdbDetails(null);
     setFetchError(false);
     setCollectionData(null);
+    setCollectionLoading(true);
     setImdbData(null);
     setProviders(null);
     setPlexMediaInfo(null);
@@ -498,12 +500,14 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         });
 
         tmdb.getFranchiseTimeline(res.value).then(sagaParts => {
+          if (isMounted) setCollectionLoading(false);
           if (sagaParts && sagaParts.length > 0 && isMounted) {
             setCollectionData({ parts: sagaParts });
           }
         });
       } else {
         setFetchError(true);
+        if (isMounted) setCollectionLoading(false);
       }
     };
 
@@ -2346,19 +2350,32 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
             </div>
 
             {/* Ordre de visionnage / Saga */}
-            {collectionData && collectionData.parts && collectionData.parts.length > 0 && (
+            {(collectionLoading || (collectionData && collectionData.parts && collectionData.parts.length > 0)) && (
               <div>
-                <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-3">Ordre de visionnage</h3>
-                <div className="flex overflow-x-auto gap-3.5 hide-scrollbar py-2 px-1 -mx-1">
-                  {collectionData.parts.map((part: any) => (
-                    <TimelineMediaCard
-                      key={part.id}
-                      media={part}
-                      isActive={part.id === effectiveTmdbId}
-                      onClick={() => onShowClick && onShowClick(part.id, part.media_type || (part.title ? 'movie' : 'tv'))}
-                    />
-                  ))}
-                </div>
+                <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-3">
+                  {isSeries ? "Prequel / Spin-off" : "Ordre de visionnage"}
+                </h3>
+                {collectionLoading ? (
+                  <div className="flex overflow-x-auto gap-3.5 hide-scrollbar py-2 px-1 -mx-1">
+                    {[1, 2, 3, 4].map(i => (
+                      <div key={i} className="flex-none w-[110px] animate-pulse">
+                        <div className="w-full aspect-[2/3] bg-zinc-800/80 rounded-xl mb-2" />
+                        <div className="h-3 bg-zinc-800/80 rounded w-3/4 mx-auto" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex overflow-x-auto gap-3.5 hide-scrollbar py-2 px-1 -mx-1">
+                    {collectionData.parts.map((part: any) => (
+                      <TimelineMediaCard
+                        key={part.id}
+                        media={part}
+                        isActive={part.id === effectiveTmdbId}
+                        onClick={() => onShowClick && onShowClick(part.id, part.media_type || (part.title ? 'movie' : 'tv'))}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

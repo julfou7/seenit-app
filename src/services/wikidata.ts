@@ -3,23 +3,24 @@ export interface FranchiseItem {
   media_type: 'tv' | 'movie';
 }
 
-export async function getWikidataFranchiseTimeline(tmdbId: number, mediaType: 'tv' | 'movie'): Promise<FranchiseItem[]> {
-  const propertyId = mediaType === 'tv' ? 'P4983' : 'P4947';
+export async function getWikidataFranchiseTimeline(tmdbId: number, mediaType: 'tv' | 'movie', imdbId?: string | null): Promise<FranchiseItem[]> {
+  const propertyId = mediaType === 'tv' ? 'wdt:P4983' : 'wdt:P4947';
+  const imdbFilter = imdbId ? `UNION { ?item wdt:P345 "${imdbId}" }` : '';
 
-  // SPARQL query: finds franchise (P179), direct links (P155/P156), spin-offs (P4552 / P8345), based-on (P144) and 2-hop relations
+  // SPARQL query: finds franchise (P179), spin-offs (P4552 / P8345), sequels/prequels (P155/P156) up to 3 hops
   const sparqlQuery = `
     SELECT DISTINCT ?relatedTmdbTv ?relatedTmdbMovie ?date WHERE {
-      ?item wdt:${propertyId} "${tmdbId}" .
+      { ?item ${propertyId} "${tmdbId}" } ${imdbFilter} .
       {
-        ?item (wdt:P4552|wdt:P8345|wdt:P144|^wdt:P144|wdt:P155|wdt:P156|wdt:P179|^wdt:P179) ?related .
-      } UNION {
-        ?item (wdt:P4552|wdt:P8345|wdt:P144|^wdt:P144|wdt:P155|wdt:P156|wdt:P179|^wdt:P179) ?mid .
-        ?mid (wdt:P4552|wdt:P8345|wdt:P144|^wdt:P144|wdt:P155|wdt:P156|wdt:P179|^wdt:P179) ?related .
+        ?item (wdt:P179|^wdt:P179|wdt:P4552|^wdt:P4552|wdt:P8345|^wdt:P8345|wdt:P155|^wdt:P155|wdt:P156|^wdt:P156)? ?level1 .
+        ?level1 (wdt:P179|^wdt:P179|wdt:P4552|^wdt:P4552|wdt:P8345|^wdt:P8345|wdt:P155|^wdt:P155|wdt:P156|^wdt:P156)? ?level2 .
+        ?level2 (wdt:P179|^wdt:P179|wdt:P4552|^wdt:P4552|wdt:P8345|^wdt:P8345|wdt:P155|^wdt:P155|wdt:P156|^wdt:P156)? ?related .
       }
       OPTIONAL { ?related wdt:P4983 ?relatedTmdbTv . }
       OPTIONAL { ?related wdt:P4947 ?relatedTmdbMovie . }
       OPTIONAL { ?related wdt:P577|wdt:P580 ?date . }
-    } ORDER BY ?date
+      FILTER(BOUND(?relatedTmdbTv) || BOUND(?relatedTmdbMovie))
+    }
   `;
 
   const url = `https://query.wikidata.org/sparql?query=${encodeURIComponent(sparqlQuery)}&format=json`;
