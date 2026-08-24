@@ -19,6 +19,7 @@ import { auth, db } from '../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { useShowsStore } from '../store/showsStore';
 import { getRecommendations } from '../lib/recommendations';
+import { SeenItGlyph } from '../components/SeenItLogo';
 
 function useDebounce<T>(value: T, delay: number): [T] {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
@@ -1305,7 +1306,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
                 </>
               ) : (
                 <>
-                  <span className="text-base">🧭</span>
+                  <SeenItGlyph size={22} symbol="discover" glow={false} idPrefix="discover-header-spark" className="shrink-0" />
                   <span>Explorer</span>
                 </>
               )}

@@ -1,6 +1,5 @@
 import React, { useRef } from 'react';
-import { Tv, PlayCircle, User } from 'lucide-react';
-import { SeenItGlyph } from './SeenItLogo';
+import { SeenItGlyph, type SeenItSymbolType } from './SeenItLogo';
 import { cn } from '../lib/utils';
 
 interface Props {
@@ -10,22 +9,20 @@ interface Props {
   onActiveTabDoubleClick?: () => void;
 }
 
-function ExplorerIcon({ size = 22, className = '' }: { size?: number; className?: string; strokeWidth?: number }) {
-  return (
-    <div className={cn("relative flex items-center justify-center", className)}>
-      <SeenItGlyph size={size} symbol="discover" glow={false} idPrefix="bottomnav-discover" />
-    </div>
-  );
+interface TabItem {
+  id: 'watchlist' | 'library' | 'discover' | 'profile';
+  label: string;
+  symbol: SeenItSymbolType;
 }
 
 export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveTabDoubleClick }: Props) {
   const lastTapRef = useRef<number>(0);
 
-  const tabs = [
-    { id: 'watchlist', label: 'À Voir', icon: PlayCircle },
-    { id: 'library', label: 'Ma Liste', icon: Tv },
-    { id: 'discover', label: 'Explorer', icon: ExplorerIcon },
-    { id: 'profile', label: 'Profil', icon: User },
+  const tabs: readonly TabItem[] = [
+    { id: 'watchlist', label: 'À Voir', symbol: 'watch' },
+    { id: 'library', label: 'Ma Liste', symbol: 'library' },
+    { id: 'discover', label: 'Explorer', symbol: 'discover' },
+    { id: 'profile', label: 'Profil', symbol: 'profile' },
   ] as const;
 
   const handleTabClick = (e: React.MouseEvent, tabId: string) => {
@@ -55,9 +52,8 @@ export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveT
   };
 
   return (
-    <div className="absolute bottom-0 inset-x-0 bg-zinc-950/95 backdrop-blur-2xl border-t border-white/10 pt-1.5 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] px-6 flex justify-between items-center z-[120]">
+    <div className="absolute bottom-0 inset-x-0 bg-zinc-950/95 backdrop-blur-2xl border-t border-white/10 pt-1.5 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] px-4 sm:px-6 flex justify-between items-center z-[120]">
       {tabs.map((tab) => {
-        const Icon = tab.icon;
         const isActive = currentTab === tab.id;
         return (
           <button
@@ -65,14 +61,22 @@ export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveT
             type="button"
             onClick={(e) => handleTabClick(e, tab.id)}
             className={cn(
-              "flex flex-col items-center gap-0.5 transition-all duration-300 p-1 min-w-[64px] rounded-xl touch-manipulation active:scale-95",
+              "flex flex-col items-center gap-0.5 transition-all duration-200 p-1 min-w-[64px] rounded-xl touch-manipulation active:scale-95 cursor-pointer",
               isActive ? "text-[#E5A93D]" : "text-zinc-500 hover:text-zinc-400"
             )}
           >
-            <div className={cn("p-1.5 rounded-xl transition-all", isActive ? "bg-[#E5A93D]/10" : "bg-transparent")}>
-              <Icon size={22} strokeWidth={isActive ? 2.5 : 2} className={cn(!isActive && tab.id === 'discover' && "opacity-50 grayscale")} />
+            <div className={cn("p-1 rounded-xl transition-all flex items-center justify-center", isActive ? "bg-[#E5A93D]/12" : "bg-transparent")}>
+              <SeenItGlyph
+                size={25}
+                symbol={tab.symbol}
+                active={isActive}
+                glow={isActive}
+                idPrefix={`bnav-${tab.id}`}
+              />
             </div>
-            <span className={cn("text-[9px] font-bold uppercase tracking-wider", isActive ? "text-[#E5A93D]" : "text-zinc-500")}>{tab.label}</span>
+            <span className={cn("text-[9px] font-bold uppercase tracking-wider", isActive ? "text-[#E5A93D]" : "text-zinc-500")}>
+              {tab.label}
+            </span>
           </button>
         );
       })}

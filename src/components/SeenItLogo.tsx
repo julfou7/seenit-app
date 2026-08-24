@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from '../lib/utils';
 
-export type SeenItSymbolType = 'check' | 'play' | 'watch' | 'library' | 'discover' | 'vip' | 'cinema';
+export type SeenItSymbolType = 'check' | 'play' | 'watch' | 'library' | 'discover' | 'vip' | 'cinema' | 'profile';
 
 export interface SeenItLogoProps {
   className?: string;
@@ -9,14 +9,17 @@ export interface SeenItLogoProps {
   variant?: 'glyph' | 'icon' | 'horizontal' | 'badge' | 'text';
   symbol?: SeenItSymbolType;
   animated?: boolean;
+  active?: boolean;
 }
 
 /**
  * Pure Vector SVG Cinema TV & Symbol Ecosystem for SeenIt
  * Official Brand Emblem:
- * - 'check' / 'watch' / 'play': Official Verification Checkmark inside Cinema TV Screen
+ * - 'watch' / 'play': Cinema Play Triangle inside Cinema TV Screen
+ * - 'check': Official Verification Checkmark inside Cinema TV Screen
  * - 'library': Ma Liste (Curated Vault / Personal Library)
- * - 'discover': Explorer (Cinema Discovery & Spark)
+ * - 'discover': Explorer (Cinema Discovery Spark & Compass)
+ * - 'profile': Profil (User Silhouette / Cinephile Account)
  * - 'vip': Profil VIP (Crown / Royal Star)
  * - 'cinema': Clapperboard / Big Screen
  */
@@ -25,12 +28,14 @@ export function SeenItGlyph({
   className = '', 
   symbol = 'check',
   glow = true,
+  active = true,
   idPrefix = 'seenit'
 }: { 
   size?: number; 
   className?: string; 
   symbol?: SeenItSymbolType;
   glow?: boolean;
+  active?: boolean;
   idPrefix?: string;
 }) {
   const gradientId = `${idPrefix}-gold-grad`;
@@ -38,7 +43,10 @@ export function SeenItGlyph({
   const glassId = `${idPrefix}-glass-grad`;
 
   // Scale stroke width slightly for small sizes to maintain crisp visibility
-  const strokeW = size <= 28 ? 4.5 : size <= 36 ? 4.0 : 3.6;
+  const strokeW = size <= 28 ? 4.8 : size <= 36 ? 4.2 : 3.6;
+
+  const frameStroke = active ? `url(#${gradientId})` : '#71717A';
+  const symbolFill = active ? `url(#${playGradId})` : '#71717A';
 
   return (
     <svg
@@ -69,20 +77,20 @@ export function SeenItGlyph({
 
         {/* Glass Screen Reflection Highlight */}
         <linearGradient id={glassId} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.22" />
-          <stop offset="45%" stopColor="#FFFFFF" stopOpacity="0.04" />
+          <stop offset="0%" stopColor="#FFFFFF" stopOpacity={active ? "0.22" : "0.08"} />
+          <stop offset="45%" stopColor="#FFFFFF" stopOpacity={active ? "0.04" : "0.01"} />
           <stop offset="70%" stopColor="#000000" stopOpacity="0" />
         </linearGradient>
       </defs>
 
       {/* Subtle Backlight Glow */}
-      {glow && (
+      {glow && active && (
         <circle 
           cx="50" 
           cy="43" 
-          r="20" 
+          r="22" 
           fill="#E5A93D" 
-          opacity={size <= 28 ? "0.2" : "0.35"} 
+          opacity={size <= 28 ? "0.28" : "0.38"} 
           className="blur-[6px] pointer-events-none"
         />
       )}
@@ -95,7 +103,7 @@ export function SeenItGlyph({
         height="52"
         rx="10"
         fill="#0B0B0F"
-        stroke={`url(#${gradientId})`}
+        stroke={frameStroke}
         strokeWidth={strokeW}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -109,79 +117,107 @@ export function SeenItGlyph({
 
       {/* ---------------- SYMBOL VARIATIONS ---------------- */}
       
-      {/* 1. 'check' / 'watch' / 'play' : Official Golden Verification Checkmark Icon */}
-      {(symbol === 'check' || symbol === 'watch' || symbol === 'play') && (
+      {/* 1. 'play' / 'watch' : Sleek Cinema Play Triangle */}
+      {(symbol === 'play' || symbol === 'watch') && (
         <g>
           <path
-            d="M 38 44 L 46 52 L 62 34"
-            fill="none"
-            stroke={`url(#${playGradId})`}
-            strokeWidth="6.0"
-            strokeLinecap="round"
+            d="M 43 32.5 L 65 43.5 L 43 54.5 Z"
+            fill={symbolFill}
+            stroke={frameStroke}
+            strokeWidth={size <= 28 ? "1.5" : "1.2"}
             strokeLinejoin="round"
-            filter="drop-shadow(0 2px 4px rgba(0,0,0,0.6))"
+            filter={active ? "drop-shadow(0 2px 5px rgba(0,0,0,0.7))" : undefined}
           />
         </g>
       )}
 
-      {/* 2. 'library' : Curated Vault / Stacked Media Cards & Bookmark */}
+      {/* 2. 'check' : Official Golden Verification Checkmark Icon */}
+      {symbol === 'check' && (
+        <g>
+          <path
+            d="M 38 44 L 46 52 L 62 34"
+            fill="none"
+            stroke={symbolFill}
+            strokeWidth={size <= 28 ? "6.8" : "6.0"}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            filter={active ? "drop-shadow(0 2px 4px rgba(0,0,0,0.6))" : undefined}
+          />
+        </g>
+      )}
+
+      {/* 3. 'library' : Curated Vault / Stacked Media Cards & Bookmark */}
       {symbol === 'library' && (
         <g>
           {/* Back subtle stacked card */}
           <rect
             x="34"
-            y="28"
+            y="27"
             width="32"
             height="22"
             rx="4"
             fill="none"
-            stroke={`url(#${gradientId})`}
-            strokeWidth="1.8"
-            opacity="0.4"
+            stroke={active ? `url(#${gradientId})` : '#52525B'}
+            strokeWidth={size <= 28 ? "2.2" : "1.8"}
+            opacity={active ? "0.45" : "0.3"}
           />
           {/* Main Vault Bookmark / Media Stack */}
           <rect
             x="38"
-            y="32"
+            y="31"
             width="24"
-            height="26"
+            height="27"
             rx="3.5"
-            fill={`url(#${playGradId})`}
-            filter="drop-shadow(0 2px 4px rgba(0,0,0,0.7))"
+            fill={symbolFill}
+            filter={active ? "drop-shadow(0 2px 5px rgba(0,0,0,0.7))" : undefined}
           />
           {/* Inner Bookmark Cutout */}
           <path
-            d="M 45 32 L 45 42 L 50 39 L 55 42 L 55 32 Z"
+            d="M 45 31 L 45 42 L 50 38.5 L 55 42 L 55 31 Z"
             fill="#0B0B0F"
           />
         </g>
       )}
 
-      {/* 3. 'discover' : Cinema Spark / Compass Star */}
+      {/* 4. 'discover' : Cinema Spark / Compass Star */}
       {symbol === 'discover' && (
         <g>
           <path
-            d="M 50 28 C 50 36 56 42 64 43 C 56 44 50 50 50 58 C 50 50 44 44 36 43 C 44 42 50 36 50 28 Z"
-            fill={`url(#${playGradId})`}
-            filter="drop-shadow(0 0 6px rgba(245,197,24,0.6))"
+            d="M 50 26 C 50 35 56 42 65 43 C 56 44 50 51 50 60 C 50 51 44 44 35 43 C 44 42 50 35 50 26 Z"
+            fill={symbolFill}
+            filter={active ? "drop-shadow(0 0 7px rgba(245,197,24,0.7))" : undefined}
           />
-          <circle cx="50" cy="43" r="2.5" fill="#FFFFFF" />
+          <circle cx="50" cy="43" r={size <= 28 ? 2.8 : 2.5} fill={active ? "#FFFFFF" : "#0B0B0F"} />
         </g>
       )}
 
-      {/* 4. 'vip' : Crown / Royal Crest */}
+      {/* 5. 'profile' : User Silhouette / Cinephile Account */}
+      {symbol === 'profile' && (
+        <g>
+          {/* User Head */}
+          <circle cx="50" cy="34" r="7.5" fill={symbolFill} />
+          {/* User Body / Shoulders */}
+          <path
+            d="M 33 55 C 33 45.5 40.5 44.5 50 44.5 C 59.5 44.5 67 45.5 67 55 Z"
+            fill={symbolFill}
+            filter={active ? "drop-shadow(0 2px 4px rgba(0,0,0,0.6))" : undefined}
+          />
+        </g>
+      )}
+
+      {/* 6. 'vip' : Crown / Royal Crest */}
       {symbol === 'vip' && (
         <g>
           <path
             d="M 36 52 L 34 35 L 43 43 L 50 32 L 57 43 L 66 35 L 64 52 Z"
-            fill={`url(#${playGradId})`}
-            filter="drop-shadow(0 2px 4px rgba(0,0,0,0.6))"
+            fill={symbolFill}
+            filter={active ? "drop-shadow(0 2px 4px rgba(0,0,0,0.6))" : undefined}
           />
           <circle cx="50" cy="47" r="1.8" fill="#0B0B0F" />
         </g>
       )}
 
-      {/* 5. 'cinema' : Cinema Filmstrip */}
+      {/* 7. 'cinema' : Cinema Filmstrip */}
       {symbol === 'cinema' && (
         <g>
           <rect
@@ -190,7 +226,7 @@ export function SeenItGlyph({
             width="34"
             height="26"
             rx="4"
-            fill={`url(#${playGradId})`}
+            fill={symbolFill}
           />
           <circle cx="39" cy="35" r="2" fill="#0B0B0F" />
           <circle cx="50" cy="35" r="2" fill="#0B0B0F" />
@@ -204,7 +240,7 @@ export function SeenItGlyph({
       {/* TV Screen Stand Neck */}
       <path
         d="M 50 69 L 50 78.5"
-        stroke={`url(#${gradientId})`}
+        stroke={frameStroke}
         strokeWidth={strokeW}
         strokeLinecap="round"
       />
@@ -212,7 +248,7 @@ export function SeenItGlyph({
       {/* TV Screen Stand Base */}
       <path
         d="M 32 79 C 32 79 41 78 50 78 C 59 78 68 79 68 79"
-        stroke={`url(#${gradientId})`}
+        stroke={frameStroke}
         strokeWidth={strokeW}
         strokeLinecap="round"
       />
@@ -226,6 +262,7 @@ export function SeenItLogo({
   variant = 'glyph',
   symbol = 'check',
   animated = false,
+  active = true,
 }: SeenItLogoProps) {
   // Horizontal Brand Lockup (Icon + Typography)
   if (variant === 'horizontal') {
@@ -233,7 +270,7 @@ export function SeenItLogo({
     return (
       <div className={cn("inline-flex items-center gap-2.5 select-none transform-gpu", className)}>
         <div className={cn("relative shrink-0 flex items-center justify-center", animated && "transition-transform duration-300 hover:scale-105")}>
-          <SeenItGlyph size={glyphSize} symbol={symbol} idPrefix={`seenit-h-${symbol}`} />
+          <SeenItGlyph size={glyphSize} symbol={symbol} active={active} idPrefix={`seenit-h-${symbol}`} />
         </div>
         <div className="flex items-baseline tracking-tight font-black font-sans leading-none" style={{ fontSize: `${Math.round(size * 0.36)}px` }}>
           <span className="text-white">Seen</span>
@@ -252,7 +289,7 @@ export function SeenItLogo({
         "inline-flex items-center gap-1.5 bg-gradient-to-r from-[#E5A93D]/15 to-[#E5A93D]/5 border border-[#E5A93D]/30 px-2.5 py-1 rounded-full text-xs font-bold text-[#E5A93D] shadow-[0_0_12px_rgba(229,169,61,0.15)] select-none backdrop-blur-md transform-gpu",
         className
       )}>
-        <SeenItGlyph size={14} symbol="vip" glow={false} idPrefix="seenit-badge" />
+        <SeenItGlyph size={14} symbol="vip" glow={false} active={active} idPrefix="seenit-badge" />
         <span className="tracking-wide">SeenIt VIP</span>
       </div>
     );
@@ -289,12 +326,12 @@ export function SeenItLogo({
         <div className="absolute inset-0 rounded-[22%] bg-gradient-to-tr from-white/[0.08] to-transparent pointer-events-none" />
 
         <div className="relative z-10 flex items-center justify-center">
-          <SeenItGlyph size={glyphSize} symbol={symbol} idPrefix={`seenit-tile-${symbol}-${size}`} />
+          <SeenItGlyph size={glyphSize} symbol={symbol} active={active} idPrefix={`seenit-tile-${symbol}-${size}`} />
         </div>
       </div>
     );
   }
 
   // Default: Pure Vector Glyph (Floating without box boundary)
-  return <SeenItGlyph size={size} symbol={symbol} className={className} idPrefix={`seenit-g-${symbol}-${size}`} />;
+  return <SeenItGlyph size={size} symbol={symbol} active={active} className={className} idPrefix={`seenit-g-${symbol}-${size}`} />;
 }
