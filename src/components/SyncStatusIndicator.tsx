@@ -21,11 +21,11 @@ export function SyncStatusIndicator() {
   if (syncStatus) {
     return (
       <div 
-        className="flex items-center gap-1.5 bg-[#E5A93D]/10 text-[#E5A93D] px-2.5 py-1.5 rounded-xl border border-[#E5A93D]/20 text-[10px] font-bold tracking-tight max-w-[140px] xs:max-w-[180px] sm:max-w-[280px] min-w-0 overflow-hidden animate-pulse"
+        className="flex items-center gap-1.5 bg-[#E5A93D]/10 text-[#E5A93D] px-2.5 py-1.5 rounded-xl border border-[#E5A93D]/20 text-[10px] font-bold tracking-tight max-w-[180px] xs:max-w-[220px] sm:max-w-[320px] min-w-0 overflow-hidden animate-pulse"
         title={`Synchronisation en cours de "${syncStatus.current}" (${syncStatus.pending} restants)`}
       >
         <Loader2 size={12} className="animate-spin shrink-0" />
-        <span className="line-clamp-2 leading-tight break-words text-left min-w-0 flex-1">Sync ({syncStatus.pending})</span>
+        <span className="line-clamp-2 leading-tight break-words text-left min-w-0 flex-1">Synchronisation ({syncStatus.pending})</span>
       </div>
     );
   }

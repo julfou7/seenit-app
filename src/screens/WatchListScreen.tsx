@@ -223,8 +223,14 @@ function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMa
     }
   };
 
+  const movieYear = show.firstAirDate?.slice(0, 4)
+    || movieDetails?.release_date?.slice(0, 4)
+    || (show as any).release_date?.slice(0, 4)
+    || (show as any).releaseDate?.slice(0, 4)
+    || ((show as any).year ? String((show as any).year) : null);
+
   const movieMetaParts: string[] = [];
-  if (show.firstAirDate) movieMetaParts.push(show.firstAirDate.slice(0, 4));
+  if (movieYear) movieMetaParts.push(movieYear);
   const formattedMovieRuntime = formatRuntime(movieRuntime || undefined);
   if (formattedMovieRuntime) movieMetaParts.push(formattedMovieRuntime);
   const movieMetaStr = movieMetaParts.join(' • ') || 'Film';
@@ -261,7 +267,7 @@ function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMa
         </div>
       )}
 
-      <div className="w-[60px] sm:w-[70px] shrink-0 bg-zinc-950 rounded-l-2xl overflow-hidden flex items-center justify-center relative z-20">
+      <div className="w-[65px] sm:w-[75px] shrink-0 bg-zinc-950 rounded-l-2xl overflow-hidden flex items-center justify-center relative z-20 min-h-[90px]">
         {imgSrc ? (
           <img 
             loading="lazy" 
@@ -277,7 +283,7 @@ function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMa
         )}
       </div>
 
-      <div className="flex-1 min-w-0 py-3 px-0.5 flex flex-col justify-center relative z-20">
+      <div className="flex-1 min-w-0 py-2.5 px-0.5 flex flex-col justify-center relative z-20">
         <div className={cn("flex items-center gap-2 min-w-0", networkLogo ? "pr-10" : "pr-1")}>
           <h4 
             onClick={(e) => { e.stopPropagation(); if (show.id) onShowClick(show.id, show.mediaType); }}
@@ -288,7 +294,7 @@ function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMa
         </div>
         
         {isMovie ? (
-          <div className="flex flex-col gap-1 my-0.5 min-w-0">
+          <div className="flex flex-col gap-0.5 my-0.5 min-w-0">
             {/* Durée • Thème / Genre */}
             <div className="flex items-center gap-1.5 flex-wrap text-xs min-w-0 leading-tight">
               {movieMetaStr && (
@@ -306,25 +312,27 @@ function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMa
               )}
             </div>
 
-            {/* 3 Acteurs principaux cliquables */}
+            {/* 3 Acteurs principaux en ligne propre */}
             {topCast.length > 0 && (
-              <div className="flex items-center gap-1.5 flex-wrap mt-0.5 min-w-0" onClick={(e) => e.stopPropagation()}>
-                {topCast.map((actor: any) => (
-                  <button
-                    key={actor.id}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (actor.id && onPersonClick) {
-                        onPersonClick(actor.id);
-                      }
-                    }}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 hover:bg-[#E5A93D]/20 active:scale-95 border border-white/10 hover:border-[#E5A93D]/40 text-[11px] font-semibold text-zinc-300 hover:text-[#E5A93D] transition-all cursor-pointer select-none touch-manipulation truncate max-w-[130px]"
-                    title={`Voir la filmographie de ${actor.name}`}
-                  >
-                    <User size={10} className="text-zinc-400 shrink-0" />
-                    <span className="truncate">{actor.name}</span>
-                  </button>
+              <div className="text-[11px] text-zinc-400 font-medium truncate mt-0.5 min-w-0 leading-tight" onClick={(e) => e.stopPropagation()}>
+                <span className="text-zinc-500 mr-1 font-normal">Avec</span>
+                {topCast.map((actor: any, idx: number) => (
+                  <span key={actor.id}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (actor.id && onPersonClick) {
+                          onPersonClick(actor.id);
+                        }
+                      }}
+                      className="text-zinc-300 hover:text-[#E5A93D] hover:underline cursor-pointer transition-colors"
+                      title={`Voir la filmographie de ${actor.name}`}
+                    >
+                      {actor.name}
+                    </button>
+                    {idx < topCast.length - 1 && <span className="text-zinc-500 mr-1">, </span>}
+                  </span>
                 ))}
               </div>
             )}

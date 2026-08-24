@@ -355,19 +355,19 @@ export function SettingsScreen() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-black text-white px-6 pt-12 pb-nav custom-scrollbar relative">
+    <div className="flex-1 overflow-y-auto bg-black text-white px-4 sm:px-6 pt-4 sm:pt-5 pb-nav custom-scrollbar relative">
       <div className="max-w-md mx-auto w-full">
         <div className="absolute top-0 left-0 w-64 h-32 bg-[#E5A93D]/10 blur-[100px] -z-10 rounded-full mix-blend-screen pointer-events-none" />
         
         {/* Header Mobile Compact */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-black tracking-tight text-white mb-1">Réglages</h1>
-          <p className="text-zinc-400 text-xs font-medium">
+        <div className="mb-4">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white mb-0.5">Réglages</h1>
+          <p className="text-zinc-400 text-[11px] font-medium">
             Profil, Plateformes, Notifications & Intégrations.
           </p>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           
           {/* SECTION 1: MON COMPTE */}
           <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 sm:p-5">
@@ -382,28 +382,22 @@ export function SettingsScreen() {
                 </p>
                 <button
                   onClick={handleLogin}
-                  className="w-full flex items-center justify-center gap-2 bg-white text-zinc-950 font-bold py-2.5 px-4 rounded-xl hover:bg-zinc-200 active:scale-95 transition-all text-xs shadow-lg"
+                  className="w-full flex items-center justify-center gap-2 bg-white text-zinc-950 font-bold py-2.5 px-4 rounded-xl hover:bg-zinc-200 active:scale-95 transition-all text-xs shadow-lg cursor-pointer"
                 >
                   <LogIn size={16} />
                   Continuer avec Google
                 </button>
               </div>
             ) : (
-              <div className="flex flex-col">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex flex-col min-w-0 pr-2">
-                    <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Connecté avec</span>
-                    <span className="font-bold text-xs text-white truncate">{user.email}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-full text-[10px] font-bold shrink-0 border border-emerald-500/20">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Synchro Active
-                  </div>
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col min-w-0 bg-zinc-950/50 p-2.5 rounded-xl border border-white/5">
+                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Connecté avec</span>
+                  <span className="font-bold text-xs text-white truncate">{user.email}</span>
                 </div>
                 
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center justify-center gap-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 font-bold py-2.5 px-4 rounded-xl transition-colors text-xs border border-red-500/20"
+                  className="w-full flex items-center justify-center gap-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 active:scale-95 font-bold py-2 px-4 rounded-xl transition-all text-xs border border-red-500/20 cursor-pointer"
                 >
                   <LogOut size={14} />
                   Se déconnecter

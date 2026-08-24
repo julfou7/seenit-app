@@ -23,10 +23,12 @@ function formatRuntime(minutes?: number) {
 export const MovieWatchCard = React.memo(function MovieWatchCard({ show, onShowClick, onMarkAsSeen }: Props) {
   const [runtime, setRuntime] = useState<number | null>((show as any).runtime || null);
   const [releaseYear, setReleaseYear] = useState<string | null>(
-    show.firstAirDate ? show.firstAirDate.slice(0, 4) : null
+    show.firstAirDate 
+      ? show.firstAirDate.slice(0, 4) 
+      : ((show as any).release_date ? (show as any).release_date.slice(0, 4) : ((show as any).year ? String((show as any).year) : null))
   );
   const [fullReleaseDate, setFullReleaseDate] = useState<string | null>(
-    show.firstAirDate || null
+    show.firstAirDate || (show as any).release_date || (show as any).releaseDate || null
   );
   const [providerLogo, setProviderLogo] = useState<string | null>(null);
   const [providerName, setProviderName] = useState<string | null>(null);
