@@ -2398,9 +2398,9 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                   </div>
                 ) : (
                   <div className="flex overflow-x-auto gap-3.5 hide-scrollbar py-2 px-1 -mx-1">
-                    {collectionData.parts.map((part: any) => (
+                    {collectionData.parts.map((part: any, idx: number) => (
                       <TimelineMediaCard
-                        key={part.id}
+                        key={`part_${part.media_type || 'media'}_${part.id}_${idx}`}
                         media={part}
                         isActive={part.id === effectiveTmdbId}
                         onClick={() => onShowClick && onShowClick(part.id, part.media_type || (part.title ? 'movie' : 'tv'))}
@@ -2430,9 +2430,9 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                 </span>
                 <div className="flex flex-wrap gap-2">
                   {/* Genres principaux (Glassmorphism) */}
-                  {tmdbDetails?.genres?.map((g: any) => (
+                  {tmdbDetails?.genres?.map((g: any, idx: number) => (
                     <span 
-                      key={g.id} 
+                      key={`genre_${g.id}_${idx}`} 
                       className="px-3 py-1.5 bg-white/10 border border-white/15 text-white text-[11px] font-bold uppercase tracking-wide rounded-full backdrop-blur-md shadow-sm"
                     >
                       {g.name}
@@ -2464,11 +2464,11 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                 if (hasProviders) {
                   return (
                     <div className="flex items-center gap-2 flex-wrap">
-                      {sortedProviders.map((provider: any) => {
+                      {sortedProviders.map((provider: any, idx: number) => {
                         if (provider.isPlex) {
                           return (
                             <a
-                              key="plex-provider-item"
+                              key={`plex-provider-item-${idx}`}
                               href={provider.plexUrl || "https://app.plex.tv/desktop"}
                               target="_blank"
                               rel="noopener noreferrer"
@@ -2494,7 +2494,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                         const logoUrl = getFormattedProviderLogo(provider.logo_path, provider.provider_name);
                         return (
                           <a
-                            key={provider.provider_id}
+                            key={`provider_${provider.provider_id}_${idx}`}
                             href={directLink}
                             target="_blank"
                             rel="noopener noreferrer"
@@ -2612,12 +2612,12 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                     {isSeries ? "Séries similaires" : "Films similaires"}
                   </h3>
                   <div className="flex gap-3.5 overflow-x-auto pb-2 snap-x snap-mandatory hide-scrollbar">
-                    {similarList.slice(0, 15).map((item: any) => {
+                    {similarList.slice(0, 15).map((item: any, idx: number) => {
                       const title = item.title || item.name;
 
                       return (
                         <div
-                          key={item.id}
+                          key={`similar_${item.media_type || 'media'}_${item.id}_${idx}`}
                           onClick={() => onShowClick?.(item.id, item.media_type || (item.title ? 'movie' : (isSeries ? 'tv' : 'movie')))}
                           className="w-[115px] shrink-0 snap-start flex flex-col gap-1.5 cursor-pointer group active:scale-95 transition-transform"
                         >
@@ -2669,7 +2669,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
               const isFullyWatched = seasonEpCount > 0 && watchedInSeason >= seasonEpCount;
 
               return (
-              <div key={season.id} className={cn("bg-[#1a1b26] border border-white/5 rounded-2xl overflow-hidden transition-all", isFutureSeason && "opacity-75")}>
+              <div key={`season_${season.id || season.season_number}_${idx}`} className={cn("bg-[#1a1b26] border border-white/5 rounded-2xl overflow-hidden transition-all", isFutureSeason && "opacity-75")}>
                 {/* Season Header */}
                 <div className="w-full p-4 flex items-center gap-3">
                   <button 
@@ -2758,14 +2758,14 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                             </span>
                           </div>
                         ) : (
-                          seasonsCache[season.season_number].episodes.map((ep: any) => {
+                          seasonsCache[season.season_number].episodes.map((ep: any, epIdx: number) => {
                         const epKey = `${season.season_number}x${ep.episode_number}`;
                         const isSeen = show?.seenEpisodes?.includes(epKey);
                         const isFutureEp = ep.air_date ? ep.air_date > todayStr : false;
                         
                         return (
                           <div 
-                            key={ep.id} 
+                            key={`ep_${ep.id || ep.episode_number}_${epIdx}`} 
                             onClick={() => openEpisodeModal(season.season_number, ep)}
                             className={cn("p-3 flex items-center gap-3 hover:bg-white/5 transition-colors cursor-pointer active:bg-white/10", isFutureEp && "opacity-50")}
                           >
@@ -2833,9 +2833,9 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
           <div id="section-casting" className="scroll-mt-40 mt-12 animate-in fade-in duration-200">
             <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-3">Casting</h3>
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 py-2">
-              {(tmdbDetails?.aggregate_credits?.cast || tmdbDetails?.credits?.cast)?.map((actor: any) => (
+              {(tmdbDetails?.aggregate_credits?.cast || tmdbDetails?.credits?.cast)?.map((actor: any, actorIdx: number) => (
                 <div 
-                  key={actor.id}
+                  key={`actor_${actor.id}_${actorIdx}`}
                   onClick={() => openPersonModal(actor.id)}
                   className="flex flex-col items-center cursor-pointer group active:scale-95 transition-transform"
                 >

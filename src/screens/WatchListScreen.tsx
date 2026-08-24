@@ -325,7 +325,7 @@ function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMa
               <div className="text-[11px] text-zinc-400 font-medium line-clamp-2 mt-0.5 min-w-0 leading-snug" onClick={(e) => e.stopPropagation()}>
                 <span className="text-zinc-500 mr-1 font-normal">Avec</span>
                 {topCast.map((actor: any, idx: number) => (
-                  <span key={actor.id}>
+                  <span key={`actor_${actor.id}_${idx}`}>
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1118,9 +1118,9 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
 
               {expandedSection === 'continueWatching' ? (
                 <div className="flex flex-col gap-3 my-2 px-4 sm:px-6">
-                  {continueWatchingShows.slice(0, visibleCount).map(show => (
+                  {continueWatchingShows.slice(0, visibleCount).map((show, idx) => (
                     <SwipeableCard
-                      key={show.id}
+                      key={`cw_exp_${show.id}_${idx}`}
                       onSwipeLeft={() => setPendingAction({ type: 'unfollow', item: show })}
                       onSwipeRight={() => setPendingAction({ type: 'drop', item: show })}
                     >
@@ -1145,9 +1145,9 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                 </div>
               ) : (
                 <div id="continue-watching-carousel" className="flex overflow-x-auto gap-4 px-4 sm:px-6 scroll-px-4 sm:scroll-px-6 scrollbar-none snap-x snap-mandatory pb-1">
-                  {continueWatchingShows.map(show => (
+                  {continueWatchingShows.map((show, idx) => (
                     <ContinueWatchingCard 
-                      key={show.id}
+                      key={`cw_${show.id}_${idx}`}
                       show={show}
                       onShowClick={onShowClick}
                       onEpisodeClick={handleEpisodeClick}
@@ -1176,9 +1176,9 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
 
               {expandedSection === 'nouveautes' ? (
                 <div className="flex flex-col gap-3 my-2 px-4 sm:px-6">
-                  {nouveautesShows.slice(0, visibleCount).map(show => (
+                  {nouveautesShows.slice(0, visibleCount).map((show, idx) => (
                     <SwipeableCard
-                      key={show.id}
+                      key={`nouveautes_swipe_${show.id}_${idx}`}
                       onSwipeLeft={() => setPendingAction({ type: 'unfollow', item: show })}
                       onSwipeRight={() => setPendingAction({ type: 'drop', item: show })}
                     >
@@ -1203,9 +1203,9 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                 </div>
               ) : (
                 <div id="nouveautes-carousel" className="flex overflow-x-auto gap-4 px-4 sm:px-6 scroll-px-4 sm:scroll-px-6 scrollbar-none snap-x snap-mandatory pb-1">
-                  {nouveautesShows.map(show => (
+                  {nouveautesShows.map((show, idx) => (
                     <ContinueWatchingCard 
-                      key={show.id}
+                      key={`nouveautes_card_${show.id}_${idx}`}
                       show={show}
                       onShowClick={onShowClick}
                       onEpisodeClick={handleEpisodeClick}
@@ -1234,9 +1234,9 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
 
               {expandedSection === 'notWatched' ? (
                 <div className="flex flex-col gap-3 my-2 px-4 sm:px-6">
-                  {pasVuDepuisUnMomentShows.slice(0, visibleCount).map(show => (
+                  {pasVuDepuisUnMomentShows.slice(0, visibleCount).map((show, idx) => (
                     <SwipeableCard
-                      key={show.id}
+                      key={`notwatched_swipe_${show.id}_${idx}`}
                       onSwipeLeft={() => setPendingAction({ type: 'unfollow', item: show })}
                       onSwipeRight={() => setPendingAction({ type: 'drop', item: show })}
                     >
@@ -1261,9 +1261,9 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                 </div>
               ) : (
                 <div id="pas-vu-depuis-un-moment-carousel" className="flex overflow-x-auto gap-4 px-4 sm:px-6 scroll-px-4 sm:scroll-px-6 scrollbar-none snap-x snap-mandatory pb-1">
-                  {pasVuDepuisUnMomentShows.map(show => (
+                  {pasVuDepuisUnMomentShows.map((show, idx) => (
                     <ContinueWatchingCard 
-                      key={show.id}
+                      key={`notwatched_card_${show.id}_${idx}`}
                       show={show}
                       onShowClick={onShowClick}
                       onEpisodeClick={handleEpisodeClick}
@@ -1292,9 +1292,9 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
 
               {expandedSection === 'filmsAVoir' ? (
                 <div className="flex flex-col gap-3 my-2 px-4 sm:px-6">
-                  {filmsAVoirShows.slice(0, visibleCount).map(show => (
+                  {filmsAVoirShows.slice(0, visibleCount).map((show, idx) => (
                     <SwipeableCard
-                      key={show.id}
+                      key={`films_swipe_${show.id}_${idx}`}
                       onSwipeLeft={() => setPendingAction({ type: 'unfollow', item: show })}
                       onSwipeRight={() => setPendingAction({ type: 'drop', item: show })}
                     >
@@ -1319,9 +1319,9 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                 </div>
               ) : (
                 <div id="films-a-voir-carousel" className="flex overflow-x-auto gap-4 px-4 sm:px-6 scroll-px-4 sm:scroll-px-6 scrollbar-none snap-x snap-mandatory pb-1">
-                  {filmsAVoirShows.map(show => (
+                  {filmsAVoirShows.map((show, idx) => (
                     <MovieWatchCard 
-                      key={show.id}
+                      key={`films_card_${show.id}_${idx}`}
                       show={show}
                       onShowClick={onShowClick}
                       onMarkAsSeen={markMovieAsSeen}
@@ -1347,9 +1347,9 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
           </h2>
           {upcomingShows.length > 0 ? (
             <div className="space-y-3">
-              {upcomingShows.map(show => (
+              {upcomingShows.map((show, idx) => (
                 <SwipeableCard
-                  key={show.id}
+                  key={`upcoming_swipe_${show.id}_${idx}`}
                   onSwipeLeft={() => setPendingAction({ type: 'unfollow', item: show })}
                   onSwipeRight={() => setPendingAction({ type: 'drop', item: show })}
                 >
