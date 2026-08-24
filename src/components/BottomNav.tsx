@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
-import { Tv, PlayCircle, Compass, User } from 'lucide-react';
+import { Tv, PlayCircle, User } from 'lucide-react';
+import { SeenItGlyph } from './SeenItLogo';
 import { cn } from '../lib/utils';
 
 interface Props {
@@ -7,6 +8,14 @@ interface Props {
   onTabChange: (tab: 'watchlist' | 'library' | 'discover' | 'profile') => void;
   onActiveTabClick?: () => void;
   onActiveTabDoubleClick?: () => void;
+}
+
+function ExplorerIcon({ size = 22, className = '' }: { size?: number; className?: string; strokeWidth?: number }) {
+  return (
+    <div className={cn("relative flex items-center justify-center", className)}>
+      <SeenItGlyph size={size} symbol="discover" glow={false} idPrefix="bottomnav-discover" />
+    </div>
+  );
 }
 
 export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveTabDoubleClick }: Props) {
@@ -61,7 +70,7 @@ export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveT
             )}
           >
             <div className={cn("p-1.5 rounded-xl transition-all", isActive ? "bg-[#E5A93D]/10" : "bg-transparent")}>
-              <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+              <Icon size={22} strokeWidth={isActive ? 2.5 : 2} className={cn(!isActive && tab.id === 'discover' && "opacity-50 grayscale")} />
             </div>
             <span className={cn("text-[9px] font-bold uppercase tracking-wider", isActive ? "text-[#E5A93D]" : "text-zinc-500")}>{tab.label}</span>
           </button>
