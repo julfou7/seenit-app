@@ -511,11 +511,6 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
                     <span className="text-[10px] font-bold uppercase text-amber-400">
                       Épisode {activeEpisode.episode_number}
                     </span>
-                    {activeEpisode.air_date && (
-                      <span className="text-[10px] text-zinc-400">
-                        • {formatAirDateSafe(activeEpisode.air_date, 'short')}
-                      </span>
-                    )}
                   </div>
                   <h4 className="text-xs font-semibold text-white line-clamp-2 mt-0.5 leading-snug group-hover:text-amber-300 transition-colors">
                     {activeEpisode.name || `Épisode ${activeEpisode.episode_number}`}
