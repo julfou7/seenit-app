@@ -93,6 +93,22 @@ export function useNavigation() {
     }
 
     const showState = { id, type, mediaType: resolvedMediaType, tmdbId: resolvedTmdbId, initialSeason, initialEpisode };
+    
+    // Check if the show is already the currently selected show in history
+    const currentSelected = window.history.state?.selectedShow;
+    if (
+      currentSelected &&
+      (
+        (currentSelected.id && String(currentSelected.id) === String(id)) ||
+        (currentSelected.tmdbId && resolvedTmdbId && Number(currentSelected.tmdbId) === Number(resolvedTmdbId))
+      ) &&
+      currentSelected.initialSeason === initialSeason &&
+      currentSelected.initialEpisode === initialEpisode
+    ) {
+      setSelectedShow(showState);
+      return;
+    }
+
     setSelectedShow(showState);
     
     (window as any).isNavigatingForward = true;

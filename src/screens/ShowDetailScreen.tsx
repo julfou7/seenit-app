@@ -2870,11 +2870,14 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
             if (window.history.state?.isEpisodeDetailModal || window.history.state?.isModal) {
               window.history.back();
             }
-            setTimeout(() => {
-              if (onShowClick) {
+            const isSameShow = (effectiveTmdbId && Number(effectiveTmdbId) === Number(tmdbId)) ||
+                               (show?.tmdbId && Number(show.tmdbId) === Number(tmdbId)) ||
+                               (show?.id && String(show.id) === String(tmdbId));
+            if (!isSameShow && onShowClick) {
+              setTimeout(() => {
                 onShowClick(tmdbId, show?.mediaType || 'tv');
-              }
-            }, 50);
+              }, 50);
+            }
           }}
           onClose={() => {
             setSelectedEpisode(null);
@@ -2907,8 +2910,16 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
           }}
           onShowClick={(tmdbId, type) => {
             setSelectedPersonId(null);
-            if (onShowClick) {
-              onShowClick(tmdbId, type || 'movie');
+            if (window.history.state?.isPersonDetailModal || window.history.state?.isModal) {
+              window.history.back();
+            }
+            const isSameShow = (effectiveTmdbId && Number(effectiveTmdbId) === Number(tmdbId)) ||
+                               (show?.tmdbId && Number(show.tmdbId) === Number(tmdbId)) ||
+                               (show?.id && String(show.id) === String(tmdbId));
+            if (!isSameShow && onShowClick) {
+              setTimeout(() => {
+                onShowClick(tmdbId, type || 'movie');
+              }, 50);
             }
           }}
         />

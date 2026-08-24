@@ -893,9 +893,10 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                     onClick={(e) => {
                       e.stopPropagation();
                       const targetTmdbId = tmdbShowId || show?.tmdbId;
-                      onClose();
                       if (onShowClick && targetTmdbId) {
                         onShowClick(targetTmdbId, show?.mediaType || 'tv');
+                      } else {
+                        onClose();
                       }
                     }}
                     className="text-[#E5A93D] hover:text-[#f0c05a] text-sm font-bold transition-colors flex items-center gap-1.5 group uppercase tracking-wider"
