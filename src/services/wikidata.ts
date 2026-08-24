@@ -4,17 +4,20 @@ export interface FranchiseItem {
 }
 
 export async function getWikidataFranchiseTimeline(tmdbId: number, mediaType: 'tv' | 'movie', imdbId?: string | null): Promise<FranchiseItem[]> {
-  const propertyId = mediaType === 'tv' ? 'wdt:P4983' : 'wdt:P4947';
+  const primaryProperty = mediaType === 'tv' ? 'wdt:P4983' : 'wdt:P4947';
+  const fallbackProperty = mediaType === 'tv' ? 'wdt:P4947' : 'wdt:P4983';
   const imdbFilter = imdbId ? `UNION { ?item wdt:P345 "${imdbId}" }` : '';
 
-  // SPARQL query: finds franchise (P179), spin-offs (P4552 / P8345), sequels/prequels (P155/P156) up to 3 hops
+  // SPARQL query: finds franchise (P179), spin-offs (P4552 / P8345), sequels/prequels (P155/P156), part of / has part (P361/P527), fictional universe (P1434), and based on (P144)
+  const relProps = 'wdt:P179|^wdt:P179|wdt:P4552|^wdt:P4552|wdt:P8345|^wdt:P8345|wdt:P155|^wdt:P155|wdt:P156|^wdt:P156|wdt:P361|^wdt:P361|wdt:P1434|^wdt:P1434|wdt:P144|^wdt:P144|wdt:P527|^wdt:P527';
+
   const sparqlQuery = `
     SELECT DISTINCT ?relatedTmdbTv ?relatedTmdbMovie ?date WHERE {
-      { ?item ${propertyId} "${tmdbId}" } ${imdbFilter} .
+      { { ?item ${primaryProperty} "${tmdbId}" } UNION { ?item ${fallbackProperty} "${tmdbId}" } ${imdbFilter} } .
       {
-        ?item (wdt:P179|^wdt:P179|wdt:P4552|^wdt:P4552|wdt:P8345|^wdt:P8345|wdt:P155|^wdt:P155|wdt:P156|^wdt:P156)? ?level1 .
-        ?level1 (wdt:P179|^wdt:P179|wdt:P4552|^wdt:P4552|wdt:P8345|^wdt:P8345|wdt:P155|^wdt:P155|wdt:P156|^wdt:P156)? ?level2 .
-        ?level2 (wdt:P179|^wdt:P179|wdt:P4552|^wdt:P4552|wdt:P8345|^wdt:P8345|wdt:P155|^wdt:P155|wdt:P156|^wdt:P156)? ?related .
+        ?item (${relProps})? ?level1 .
+        ?level1 (${relProps})? ?level2 .
+        ?level2 (${relProps})? ?related .
       }
       OPTIONAL { ?related wdt:P4983 ?relatedTmdbTv . }
       OPTIONAL { ?related wdt:P4947 ?relatedTmdbMovie . }

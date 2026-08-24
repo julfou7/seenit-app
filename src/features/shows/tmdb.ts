@@ -251,32 +251,24 @@ class TMDBClient {
   async getFranchiseTimeline(media: any): Promise<any[]> {
     if (!media) return [];
 
-    let parts: any[] = [];
+    let collectionParts: any[] = [];
 
-    // A. Si c'est un film appartenant à une collection native TMDB (ex: Harry Potter)
+    // A. Si c'est un film appartenant à une collection native TMDB (ex: Harry Potter, Dune)
     if (media.belongs_to_collection?.id) {
       const collectionRes = await this.getCollectionDetails(media.belongs_to_collection.id);
       if (collectionRes.ok && collectionRes.value?.parts) {
-        parts = collectionRes.value.parts
-          .filter((p: any) => p.release_date && !isAdultOrParodyMedia(p))
+        collectionParts = collectionRes.value.parts
+          .filter((p: any) => (p.release_date || p.first_air_date) && !isAdultOrParodyMedia(p))
           .map((p: any) => ({ ...p, media_type: 'movie' }));
-          
-        parts.sort((a: any, b: any) => new Date(a.release_date).getTime() - new Date(b.release_date).getTime());
-        
-        return parts.map((part: any, index: number) => ({
-          ...part,
-          sagaOrder: index + 1
-        }));
       }
     }
 
-    // B. Si c'est une série ou un univers hybride : interroger Wikidata
+    // B. Interroger Wikidata pour obtenir tous les spin-offs, préquelles, séries dérivées et univers de fiction
     const imdbId = media.external_ids?.imdb_id || media.imdb_id;
-    const franchiseItems = await getWikidataFranchiseTimeline(media.id, media.media_type || 'tv', imdbId);
+    const mediaType = media.media_type || (media.title ? 'movie' : 'tv');
+    const franchiseItems = await getWikidataFranchiseTimeline(media.id, mediaType, imdbId);
 
-    if (franchiseItems.length <= 1) return [];
-
-    // Récupérer les détails TMDB de chaque média trouvé
+    // Récupérer les détails TMDB de chaque média trouvé via Wikidata
     const detailsPromises = franchiseItems.map(async (item) => {
       const res = await this.getMediaDetails(item.id, item.media_type);
       if (res.ok && res.value) {
@@ -288,18 +280,32 @@ class TMDBClient {
       return null;
     });
 
-    const results = await Promise.all(detailsPromises);
+    const wikidataResults = await Promise.all(detailsPromises);
+    const validWikidataMedia = wikidataResults.filter((r): r is any => r !== null && !isAdultOrParodyMedia(r));
 
-    const validMedia = results
-      .filter((r): r is any => r !== null && !isAdultOrParodyMedia(r))
-      .sort((a, b) => {
-        const dateA = new Date(a.release_date || a.first_air_date || 0).getTime();
-        const dateB = new Date(b.release_date || b.first_air_date || 0).getTime();
-        return dateA - dateB;
-      });
+    // Fusionner collection TMDB + Wikidata en supprimant les doublons
+    const map = new Map<string, any>();
+    [...collectionParts, ...validWikidataMedia].forEach((item) => {
+      const type = item.media_type || (item.title ? 'movie' : 'tv');
+      const key = `${type}_${item.id}`;
+      if (!map.has(key)) {
+        map.set(key, { ...item, media_type: type });
+      }
+    });
+
+    const combined = Array.from(map.values());
+
+    if (combined.length <= 1) return [];
+
+    // Tri chronologique par date de sortie / 1re diffusion
+    combined.sort((a, b) => {
+      const dateA = new Date(a.release_date || a.first_air_date || 0).getTime();
+      const dateB = new Date(b.release_date || b.first_air_date || 0).getTime();
+      return dateA - dateB;
+    });
 
     // Ajouter la numérotation d'ordre chronologique (#1, #2, #3...)
-    return validMedia.map((item, index) => ({
+    return combined.map((item, index) => ({
       ...item,
       sagaOrder: index + 1
     }));
