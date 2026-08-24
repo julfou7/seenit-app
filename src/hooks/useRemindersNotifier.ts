@@ -23,7 +23,12 @@ export function useRemindersNotifier() {
       movie_dvd_vod: true
     };
 
-    shows.forEach(s => {
+        const processReminders = async () => {
+      // Delay execution to avoid hanging the app during startup
+      await new Promise(r => setTimeout(r, 5000));
+      for (const s of shows) {
+        // Small delay between each processing to let the JS event loop breathe
+        await new Promise(r => setTimeout(r, 50));
       if (s.isArchived || s.status === 'dropped') return;
 
       const isShowNotification = s.notificationsEnabled === true || localStorage.getItem(`reminder_${s.id}`) === 'true';
@@ -47,7 +52,7 @@ export function useRemindersNotifier() {
         // VOD/DVD Release approx 4 months (120 days) after theatrical release in France
         const dvdDate = new Date(releaseDate.getTime() + 120 * 24 * 60 * 60 * 1000);
         
-        const scheduleMovieAlert = (targetDate: Date, tag: string, msgTitle: string, msgBody: string, isVOD: boolean = false) => {
+        const scheduleMovieAlert = async (targetDate: Date, tag: string, msgTitle: string, msgBody: string, isVOD: boolean = false) => {
           const targetStr = targetDate.toISOString().split('T')[0];
           
           const notificationPayload = {
@@ -73,23 +78,23 @@ export function useRemindersNotifier() {
             const scheduleKey = `scheduled_9am_${s.id}_${tag}_${targetStr}`;
             if (!localStorage.getItem(scheduleKey)) {
               try { localStorage.setItem(scheduleKey, 'true'); } catch {}
-              sendNativeNotification(msgTitle, { ...notificationPayload, scheduleDate: targetDate } as any);
+              await sendNativeNotification(msgTitle, { ...notificationPayload, scheduleDate: targetDate } as any);
             }
           } else if (targetStr === todayStr) {
             const notifiedKey = `notified_today_${s.id}_${tag}_${todayStr}`;
             if (!localStorage.getItem(notifiedKey)) {
               try { localStorage.setItem(notifiedKey, 'true'); } catch {}
               showToast(`🍿 ${msgBody}`, 'info', s);
-              sendNativeNotification(msgTitle, { ...notificationPayload, scheduleDate: undefined } as any);
+              await sendNativeNotification(msgTitle, { ...notificationPayload, scheduleDate: undefined } as any);
             }
           }
         };
 
         if (userPrefs.movie_theater) {
-          scheduleMovieAlert(releaseDate, 'theater', title, `Sortie Cinéma : ${title} est dans les salles aujourd'hui !`);
+          await scheduleMovieAlert(releaseDate, 'theater', title, `Sortie Cinéma : ${title} est dans les salles aujourd'hui !`);
         }
         if (userPrefs.movie_dvd_vod) {
-          scheduleMovieAlert(dvdDate, 'vod', title, `Sortie DVD / VOD : ${title} est désormais disponible !`, true);
+          await scheduleMovieAlert(dvdDate, 'vod', title, `Sortie DVD / VOD : ${title} est désormais disponible !`, true);
         }
         return;
       }
@@ -136,7 +141,7 @@ export function useRemindersNotifier() {
         }
       };
 
-      const scheduleTvAlert = (targetDate: Date, tagPrefix: string, msgBody: string, addActions: boolean = false) => {
+      const scheduleTvAlert = async (targetDate: Date, tagPrefix: string, msgBody: string, addActions: boolean = false) => {
         const targetStr = targetDate.toISOString().split('T')[0];
         const fullPayload = {
           ...tvPayload,
@@ -149,25 +154,27 @@ export function useRemindersNotifier() {
           const scheduleKey = `scheduled_9am_${s.id}_${tagPrefix}_S${sNum}E${eNum}_${targetStr}`;
           if (!localStorage.getItem(scheduleKey)) {
             try { localStorage.setItem(scheduleKey, 'true'); } catch {}
-            sendNativeNotification(title, { ...fullPayload, scheduleDate: targetDate } as any);
+            await sendNativeNotification(title, { ...fullPayload, scheduleDate: targetDate } as any);
           }
         } else if (targetStr === todayStr) {
           const notifiedKey = `notified_today_${s.id}_${tagPrefix}_S${sNum}E${eNum}_${todayStr}`;
           if (!localStorage.getItem(notifiedKey)) {
             try { localStorage.setItem(notifiedKey, 'true'); } catch {}
             showToast(`🎉 ${msgBody}`, 'info', s);
-            sendNativeNotification(title, { ...fullPayload, scheduleDate: undefined } as any);
+            await sendNativeNotification(title, { ...fullPayload, scheduleDate: undefined } as any);
           }
         }
       };
 
       if (userPrefs.season_d7 && upcoming.episode_number === 1) {
-        scheduleTvAlert(d7Date9Am, 'd7', `La saison ${upcoming.season_number} de ${title} sort dans 7 jours ! Préparez-vous !`);
+        await scheduleTvAlert(d7Date9Am, 'd7', `La saison ${upcoming.season_number} de ${title} sort dans 7 jours ! Préparez-vous !`);
       }
 
       if (userPrefs.release_today_tv || isSpecificReminder) {
-        scheduleTvAlert(airDate9Am, 'today', `L'épisode S${sNum}E${eNum} ${upcoming.name ? `« ${upcoming.name} » ` : ''}est disponible aujourd'hui !`, true);
+        await scheduleTvAlert(airDate9Am, 'today', `L'épisode S${sNum}E${eNum} ${upcoming.name ? `« ${upcoming.name} » ` : ''}est disponible aujourd'hui !`, true);
       }
-    });
+      }
+    };
+    processReminders().catch(err => console.warn('Reminder scheduling error:', err));
   }, [shows, showToast]);
 }
