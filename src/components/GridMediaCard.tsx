@@ -490,6 +490,7 @@ export function PreviewModal({
     show.isArchived || 
     show.status === 'completed' || 
     computeAutoArchiveStatus(show) || 
+    (isTv && checkIsUpToDate(show) && !show.nextEpisodeToAir) ||
     (isTv && Boolean(show.seenEpisodes && show.seenEpisodes.length > 0 && !show.nextEpisodeToWatch && !show.nextEpisodeToAir))
   ) {
     buttonLabel = isTv ? "Revoir la série" : "Revoir le film";

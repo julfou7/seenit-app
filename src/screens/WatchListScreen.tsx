@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, type RefObject } from 'react';
 import { type Show } from '../types';
-import { cn, getNextEpisodeNumber, scrollAllCarouselsToStart } from '../lib/utils';
+import { cn, getNextEpisodeNumber, scrollAllCarouselsToStart, checkIsUpToDate, getAiredProgress } from '../lib/utils';
 import { ContinueWatchingCard } from '../components/cards/ContinueWatchingCard';
 import { MovieWatchCard } from '../components/cards/MovieWatchCard';
 import { ShowNewsFeed } from '../components/ShowNewsFeed';
@@ -694,10 +694,21 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
     const isNotUpToDate = (s: Show): boolean => {
       if (s.isArchived) return false;
       if (s.status === 'dropped') return false;
+      if (s.status === 'completed') return false;
+      if (checkIsUpToDate(s)) return false;
+
       const watchedCount = s.seenEpisodes ? s.seenEpisodes.length : 0;
       
       // Si l'utilisateur a vu des épisodes et qu'il n'y a plus d'épisodes suivants enregistrés : considéré comme à jour !
       if (watchedCount > 0 && !s.nextEpisodeToWatch) {
+        return false;
+      }
+
+      // Si la progression de diffusion est à 100%
+      const progress = getAiredProgress(s);
+      if (progress >= 100) return false;
+
+      if (typeof s.totalAiredEpisodes === 'number' && s.totalAiredEpisodes > 0 && watchedCount >= s.totalAiredEpisodes) {
         return false;
       }
       

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { type Show } from '../types';
 import { tmdb, isAdultOrParodyMedia, isMovieAtCinema, isMovieUpcoming } from '../features/shows/tmdb';
 import { ChevronLeft, Star, Heart, CheckCircle2, Circle, Tv, Zap, X, EyeOff, Archive, Trash2, MoreVertical, Plus, Check, Share, Share2, Play, Calendar, ChevronUp, ChevronDown, ArchiveRestore, Ban, RotateCcw, MonitorPlay, Ticket, Youtube, Clapperboard, ExternalLink, Clock, RefreshCw } from 'lucide-react';
-import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getBestLogoPath, getTodayStr, getCalendarDaysDiff, getEpisodeRelativeAirDate, scrollAllCarouselsToStart, openExternalUrl } from '../lib/utils';
+import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getBestLogoPath, getTodayStr, getCalendarDaysDiff, getEpisodeRelativeAirDate, scrollAllCarouselsToStart, openExternalUrl, checkIsUpToDate } from '../lib/utils';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
 import { PersonDetailModal } from './PersonDetailModal';
 import { TimelineMediaCard } from '../components/cards/TimelineMediaCard';
@@ -1666,11 +1666,15 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       ? (show?.seenEpisodes && show.seenEpisodes.length > 0)
       : (show?.seenEpisodes?.includes('movie') || show?.status === 'completed');
 
+  const isUpToDate = isSeries && show ? checkIsUpToDate(show) : false;
+
   const fallbackNextEp = isSeries && (!hasSeenMedia)
     ? { season_number: 1, episode_number: 1, name: 'Épisode 1' }
     : null;
 
-  const nextEp = show?.nextEpisodeToWatch || fallbackNextEp || show?.nextEpisodeToAir || tmdbDetails?.next_episode_to_air;
+  const nextEp = isUpToDate
+    ? (show?.nextEpisodeToAir || tmdbDetails?.next_episode_to_air || null)
+    : (show?.nextEpisodeToWatch || fallbackNextEp || show?.nextEpisodeToAir || tmdbDetails?.next_episode_to_air);
 
   const handleWatchNextEpisode = () => {
     if (!nextEp) return;
@@ -1678,10 +1682,17 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   };
 
   const getNextEpisodeStatus = () => {
+    if (isUpToDate && !show?.nextEpisodeToAir && !tmdbDetails?.next_episode_to_air) {
+      return null;
+    }
     if (!nextEp) return null;
 
-    const seasonNum = String(nextEp.season_number).padStart(2, '0');
-    const epNum = String(nextEp.episode_number).padStart(2, '0');
+    const sNum = nextEp.season_number ?? 1;
+    const eNum = nextEp.episode_number ?? 1;
+    if (isNaN(Number(sNum)) || isNaN(Number(eNum))) return null;
+
+    const seasonNum = String(sNum).padStart(2, '0');
+    const epNum = String(eNum).padStart(2, '0');
     const fullEpCode = `S${seasonNum} | E${epNum}`;
 
     let airDate = nextEp.air_date;

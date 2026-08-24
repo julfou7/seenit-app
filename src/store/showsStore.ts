@@ -5,6 +5,7 @@ import { type Show } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/firebaseErrors';
 import { useSyncStore } from './syncStore';
 import { appLogger } from './logStore';
+import { getNextEpisodeNumber, checkIsUpToDate } from '../lib/utils';
 
 interface ShowsState {
   shows: Show[];
@@ -105,22 +106,45 @@ function deduplicateAndMergeShows(rawShows: Show[], currentLocalShows: Show[] = 
     let nextEp = show.nextEpisodeToWatch;
 
     if (nextEp && seen.includes(`${nextEp.season_number}x${nextEp.episode_number}`)) {
-      let maxS = 1;
-      let maxE = 0;
-      seen.forEach(epKey => {
-        const [s, e] = epKey.split('x').map(Number);
-        if (!isNaN(s) && !isNaN(e)) {
-          if (s > maxS || (s === maxS && e > maxE)) {
-            maxS = s;
-            maxE = e;
-          }
+      if (show.seasonsCache && Array.isArray(show.seasonsCache) && show.seasonsCache.length > 0) {
+        const foundNext = getNextEpisodeNumber(show.seasonsCache, seen);
+        if (foundNext) {
+          nextEp = {
+            ...nextEp,
+            season_number: foundNext.season,
+            episode_number: foundNext.episode,
+            air_date: foundNext.episodeData?.air_date || null,
+            name: foundNext.episodeData?.name || null,
+            still_path: foundNext.episodeData?.still_path || null
+          };
+        } else {
+          nextEp = null;
         }
-      });
-      nextEp = {
-        ...nextEp,
-        season_number: maxS,
-        episode_number: maxE + 1
-      };
+      } else {
+        const total = show.totalAiredEpisodes || show.totalEpisodes || 0;
+        if (total > 0 && seen.length >= total) {
+          nextEp = null;
+        } else if (checkIsUpToDate(show)) {
+          nextEp = null;
+        } else {
+          let maxS = 1;
+          let maxE = 0;
+          seen.forEach(epKey => {
+            const [s, e] = epKey.split('x').map(Number);
+            if (!isNaN(s) && !isNaN(e)) {
+              if (s > maxS || (s === maxS && e > maxE)) {
+                maxS = s;
+                maxE = e;
+              }
+            }
+          });
+          nextEp = {
+            ...nextEp,
+            season_number: maxS,
+            episode_number: maxE + 1
+          };
+        }
+      }
     }
 
     finalShows.push({

@@ -76,15 +76,45 @@ export function checkIsUpToDate(show: any): boolean {
   
   const watchedCount = show.seenEpisodes ? show.seenEpisodes.length : 0;
   if (watchedCount > 0) {
+    // 1. Si la progression de diffusion est à 100%
+    const progress = getAiredProgress(show);
+    if (progress >= 100) return true;
+
+    // 2. Si pas de prochain épisode à regarder
     if (!show.nextEpisodeToWatch) return true;
+
+    // 3. Si le prochain épisode a une date de diffusion future
     if (show.nextEpisodeToWatch.air_date) {
       const airMs = new Date(show.nextEpisodeToWatch.air_date).getTime();
       if (!isNaN(airMs) && airMs > Date.now()) {
         return true;
       }
     }
-    if (show.totalEpisodes && show.totalEpisodes > 0 && watchedCount >= show.totalEpisodes) {
+
+    // 4. Si le nombre d'épisodes vus atteint le total d'épisodes diffusés
+    if (typeof show.totalAiredEpisodes === 'number' && show.totalAiredEpisodes > 0 && watchedCount >= show.totalAiredEpisodes) {
       return true;
+    }
+
+    // 5. Si le nombre d'épisodes vus atteint le total d'épisodes de la série
+    if (typeof show.totalEpisodes === 'number' && show.totalEpisodes > 0 && watchedCount >= show.totalEpisodes) {
+      return true;
+    }
+
+    // 6. Si dans le cache des saisons, tous les épisodes diffusés ont été vus
+    if (show.seasonsCache && Array.isArray(show.seasonsCache) && show.seasonsCache.length > 0) {
+      const todayStr = getTodayStr();
+      const seenSet = new Set(show.seenEpisodes || []);
+      const episodes = show.seasonsCache
+        .filter((s: any) => s.season_number > 0)
+        .flatMap((s: any) => s.episodes || []);
+      
+      if (episodes.length > 0) {
+        const airedUnseen = episodes.filter((ep: any) => (!ep.air_date || ep.air_date <= todayStr) && !seenSet.has(`${ep.season_number}x${ep.episode_number}`));
+        if (airedUnseen.length === 0) {
+          return true;
+        }
+      }
     }
   }
   return false;

@@ -384,7 +384,7 @@ export const ContinueWatchingCard = React.memo(function ContinueWatchingCard({ s
           </button>
           <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
             <span className="text-white font-semibold text-sm">
-              {watched === 0 ? 'Commencer' : 'Continuer'} S{(nextEpNum?.season_number ?? 1).toString().padStart(2, '0')} | E{(nextEpNum?.episode_number ?? 1).toString().padStart(2, '0')}
+              {watched === 0 ? 'Commencer' : 'Continuer'} S{(Number(nextEpNum?.season_number) || 1).toString().padStart(2, '0')} | E{(Number(nextEpNum?.episode_number) || 1).toString().padStart(2, '0')}
             </span>
             {extraAvailableEpisodes > 0 && (
               <span className="text-zinc-400 font-medium text-xs sm:text-[13px]">
