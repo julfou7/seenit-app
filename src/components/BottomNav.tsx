@@ -15,7 +15,7 @@ export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveT
   const tabs = [
     { id: 'watchlist', label: 'À Voir', icon: PlayCircle },
     { id: 'library', label: 'Ma Liste', icon: Tv },
-    { id: 'discover', label: 'Explorer', icon: Compass },
+    { id: 'discover', label: 'Explorer', icon: ExplorerIcon },
     { id: 'profile', label: 'Profil', icon: User },
   ] as const;
 

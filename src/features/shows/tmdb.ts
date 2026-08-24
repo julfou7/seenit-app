@@ -669,8 +669,8 @@ class TMDBClient {
     if (!apiKey) return err(new Error('Missing API Key'));
     
     // Pour simuler un Top 100 IMDb, on prend les mieux notés avec au moins 3000 votes
-    const url = `${BASE_URL}/discover/${type}?api_key=${apiKey}&language=${LANGUAGE}&sort_by=vote_average.desc&vote_count.gte=3000&page=${page}`;
-    return this.fetchFromApi(url.replace(`${BASE_URL}/`, ''));
+    const url = `${this.baseUrl}/discover/${type}?api_key=${apiKey}&language=${LANGUAGE}&sort_by=vote_average.desc&vote_count.gte=3000&page=${page}`;
+    return this.fetchFromApi(url.replace(`${this.baseUrl}/`, ''));
   }
 
   async getTopRatedRecent(type: 'tv' | 'movie' | 'all', page: number = 1, watchProviders?: string[]): Promise<Result<SearchResponse>> {
