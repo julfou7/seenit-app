@@ -328,8 +328,8 @@ async function startServer() {
                 for (const it of items) {
                   if (isMatch(it)) {
                     const directPlexUrl = (server.clientIdentifier && it.ratingKey)
-                      ? `https://watch.plex.tv/desktop/#!/server/${server.clientIdentifier}/details?key=${encodeURIComponent(`/library/metadata/${it.ratingKey}`)}`
-                      : 'https://watch.plex.tv/desktop';
+                      ? `https://app.plex.tv/desktop/#!/server/${server.clientIdentifier}/details?key=${encodeURIComponent(`/library/metadata/${it.ratingKey}`)}`
+                      : 'https://app.plex.tv/desktop';
 
                     console.log(`[Plex Availability] MATCH FOUND: "${it.title}" (${it.year}) on server "${serverName}"`);
                     return {

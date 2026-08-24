@@ -17,27 +17,83 @@ export async function openExternalUrl(url: string) {
   if (!url) return;
   
   if (Capacitor.isNativePlatform()) {
-    if (url.includes('plex.tv') && !url.includes('/auth')) {
-      // Les domaines pris en charge par l'appli Plex sous Android sont watch.plex.tv, links.plex.tv, plex.smart.link, click.plex.tv, l.plex.tv.
-      // Le domaine app.plex.tv est le domaine Web Desktop qui n'est pas associé nativement et s'ouvre dans Chrome.
-      // On convertit app.plex.tv en watch.plex.tv pour déclencher l'ouverture de l'application native Plex.
-      const nativePlexUrl = url.replace(/https?:\/\/app\.plex\.tv/i, 'https://watch.plex.tv');
-      try {
-        await AppLauncher.openUrl({ url: nativePlexUrl });
-        return;
-      } catch (err) {
-        console.warn('AppLauncher openUrl failed for watch.plex.tv, trying links.plex.tv...', err);
-        try {
-          const linksPlexUrl = url.replace(/https?:\/\/app\.plex\.tv/i, 'https://links.plex.tv');
-          await AppLauncher.openUrl({ url: linksPlexUrl });
-          return;
-        } catch (e2) {
-          console.warn('AppLauncher openUrl attempt failed for Plex URL', e2);
+    // 1. Gestion Plex : extraction du serveur et de la clé de média pour deep linking natif
+    if ((url.includes('plex.tv') || url.startsWith('plex://')) && !url.includes('/auth')) {
+      const serverMatch = url.match(/\/server\/([a-zA-Z0-9_-]+)/i) || url.match(/server=([a-zA-Z0-9_-]+)/i);
+      const serverId = serverMatch ? serverMatch[1] : '';
+
+      const keyMatch = url.match(/[?&]key=([^&#]+)/i);
+      let ratingKey = '';
+      if (keyMatch) {
+        const decodedKey = decodeURIComponent(keyMatch[1]);
+        const ratingKeyMatch = decodedKey.match(/\/metadata\/(\d+)/i) || decodedKey.match(/^(\d+)$/);
+        if (ratingKeyMatch) {
+          ratingKey = ratingKeyMatch[1];
         }
+      }
+
+      const candidatePlexUrls: string[] = [];
+      if (serverId && ratingKey) {
+        candidatePlexUrls.push(`plex://server/${serverId}/com.plexapp.plugins.library/library/metadata/${ratingKey}`);
+        candidatePlexUrls.push(`plex://server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`);
+        candidatePlexUrls.push(`plex://details?server=${serverId}&key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`);
+      }
+      
+      const cleanWebPlexUrl = (serverId && ratingKey)
+        ? `https://app.plex.tv/desktop/#!/server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`
+        : url.replace(/watch\.plex\.tv/g, 'app.plex.tv');
+
+      candidatePlexUrls.push(cleanWebPlexUrl);
+
+      for (const pUrl of candidatePlexUrls) {
+        try {
+          await AppLauncher.openUrl({ url: pUrl });
+          return;
+        } catch (err) {
+          console.warn('AppLauncher openUrl failed for Plex URL:', pUrl, err);
+        }
+      }
+
+      try {
+        await Browser.open({ url: cleanWebPlexUrl, windowName: '_system' });
+        return;
+      } catch (e) {
+        console.warn('Browser.open failed for Plex URL', e);
       }
     }
 
-    // Standard URL or fallback: use Browser Custom Tabs
+    // 2. Gestion Reddit : ouverture via l'application native Reddit (Intent Android)
+    if (url.includes('reddit.com') || url.startsWith('reddit://')) {
+      const redditSchemeUrl = url.startsWith('reddit://')
+        ? url
+        : url.replace(/^https?:\/\/(www\.)?reddit\.com\//i, 'reddit://');
+
+      const candidateRedditUrls = [url, redditSchemeUrl];
+      for (const rUrl of candidateRedditUrls) {
+        try {
+          await AppLauncher.openUrl({ url: rUrl });
+          return;
+        } catch (err) {
+          console.warn('AppLauncher openUrl failed for Reddit URL:', rUrl, err);
+        }
+      }
+
+      try {
+        await Browser.open({ url, windowName: '_system' });
+        return;
+      } catch (e) {
+        console.warn('Browser.open failed for Reddit URL', e);
+      }
+    }
+
+    // 3. Autres liens externes : essai préalable AppLauncher pour déclencher les applications natives
+    try {
+      await AppLauncher.openUrl({ url });
+      return;
+    } catch (err) {
+      // Fallback Chrome Custom Tabs si pas d'application associée
+    }
+
     try {
       await Browser.open({ url, windowName: '_system' });
       return;
@@ -45,8 +101,10 @@ export async function openExternalUrl(url: string) {
       console.warn('Browser.open failed, falling back to window.open', e);
     }
   }
-  
-  window.open(url, '_blank', 'noopener,noreferrer');
+
+  // Sur le Web, remplacer watch.plex.tv par le domaine officiel de l'application Web Plex app.plex.tv
+  const cleanUrl = url.includes('plex.tv') ? url.replace(/watch\.plex\.tv/g, 'app.plex.tv') : url;
+  window.open(cleanUrl, '_blank', 'noopener,noreferrer');
 }
 
 /**

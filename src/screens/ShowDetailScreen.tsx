@@ -395,7 +395,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         logo_path: 'PLEX_CUSTOM_SVG',
         isPlex: true,
         serverName: plexMediaInfo.serverName,
-        plexUrl: plexMediaInfo.plexUrl || 'https://watch.plex.tv/desktop'
+        plexUrl: plexMediaInfo.plexUrl || 'https://app.plex.tv/desktop'
       });
     }
     return list.sort((a: any, b: any) => {
@@ -1771,7 +1771,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     ? (mainProvider.isPlex ? PLEX_LOGO_SVG : getFormattedProviderLogo(mainProvider.logo_path, mainProvider.provider_name))
     : (tmdbDetails?.networks?.[0]?.logo_path ? getFormattedProviderLogo(tmdbDetails.networks[0].logo_path, tmdbDetails.networks[0].name) : null);
   const mainProviderLink = mainProvider 
-    ? (mainProvider.isPlex ? (mainProvider.plexUrl || 'https://watch.plex.tv/desktop') : getProviderDirectLink(mainProvider.provider_id, title, watchLink))
+    ? (mainProvider.isPlex ? (mainProvider.plexUrl || 'https://app.plex.tv/desktop') : getProviderDirectLink(mainProvider.provider_id, title, watchLink))
     : (watchLink || `https://www.google.com/search?q=${encodeURIComponent(title + ' ' + (mainProviderName || ''))}`);
 
   const getRatingInfo = () => {
@@ -2469,12 +2469,12 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                           return (
                             <a
                               key="plex-provider-item"
-                              href={provider.plexUrl || "https://watch.plex.tv/desktop"}
+                              href={provider.plexUrl || "https://app.plex.tv/desktop"}
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={(e) => {
                                 e.preventDefault();
-                                openExternalUrl(provider.plexUrl || "https://watch.plex.tv/desktop");
+                                openExternalUrl(provider.plexUrl || "https://app.plex.tv/desktop");
                               }}
                               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#E5A93D]/40 bg-[#E5A93D]/10 text-[#E5A93D] hover:bg-[#E5A93D]/20 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-[0_0_12px_rgba(229,169,61,0.2)]"
                               title={`Disponible sur Plex : ${provider.serverName || 'Serveur'}`}
