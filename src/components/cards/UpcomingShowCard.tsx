@@ -28,6 +28,11 @@ export function getUpcomingEpisodeInfo(s: Show): UpcomingEpisodeInfo | null {
   // If it's a movie with a future release date
   if (s.mediaType === 'movie') {
     if (s.firstAirDate && s.firstAirDate >= todayStr) {
+      const diffDays = getCalendarDaysDiff(s.firstAirDate);
+      // Masquer les films prévus à plus d'un an (> 365 jours) pour éviter d'encombrer l'onglet "À Venir"
+      if (diffDays > 365) {
+        return null;
+      }
       return {
         season_number: 1,
         episode_number: 1,
@@ -43,26 +48,32 @@ export function getUpcomingEpisodeInfo(s: Show): UpcomingEpisodeInfo | null {
   // Check nextEpisodeToAir
   if (s.nextEpisodeToAir?.air_date) {
     if (s.nextEpisodeToAir.air_date >= todayStr) {
-      candidates.push({
-        season_number: s.nextEpisodeToAir.season_number,
-        episode_number: s.nextEpisodeToAir.episode_number,
-        name: s.nextEpisodeToAir.name,
-        air_date: s.nextEpisodeToAir.air_date,
-        still_path: s.nextEpisodeToAir.still_path,
-      });
+      const diffDays = getCalendarDaysDiff(s.nextEpisodeToAir.air_date);
+      if (diffDays <= 365) {
+        candidates.push({
+          season_number: s.nextEpisodeToAir.season_number,
+          episode_number: s.nextEpisodeToAir.episode_number,
+          name: s.nextEpisodeToAir.name,
+          air_date: s.nextEpisodeToAir.air_date,
+          still_path: s.nextEpisodeToAir.still_path,
+        });
+      }
     }
   }
 
   // Check nextEpisodeToWatch
   if (s.nextEpisodeToWatch?.air_date) {
     if (s.nextEpisodeToWatch.air_date >= todayStr) {
-      candidates.push({
-        season_number: s.nextEpisodeToWatch.season_number,
-        episode_number: s.nextEpisodeToWatch.episode_number,
-        name: s.nextEpisodeToWatch.name,
-        air_date: s.nextEpisodeToWatch.air_date,
-        still_path: s.nextEpisodeToWatch.still_path,
-      });
+      const diffDays = getCalendarDaysDiff(s.nextEpisodeToWatch.air_date);
+      if (diffDays <= 365) {
+        candidates.push({
+          season_number: s.nextEpisodeToWatch.season_number,
+          episode_number: s.nextEpisodeToWatch.episode_number,
+          name: s.nextEpisodeToWatch.name,
+          air_date: s.nextEpisodeToWatch.air_date,
+          still_path: s.nextEpisodeToWatch.still_path,
+        });
+      }
     }
   }
 
