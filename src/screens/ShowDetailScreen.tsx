@@ -133,51 +133,71 @@ const getProviderDirectLink = (providerId: number, title: string, fallbackLink: 
 const ASIAN_COUNTRIES = new Set(['KR', 'JP', 'CN', 'TW', 'TH', 'HK']);
 const NON_FICTION_GENRES = [10767, 10763, 10764, 10766]; // Talk, News, Reality, Soap
 
-const getPrioritizedSimilarMedia = (tmdbDetails: any) => {
+const getPrioritizedSimilarMedia = (tmdbDetails: any, collectionData?: any) => {
   if (!tmdbDetails) return [];
 
-  // 1. Privilégier les recommandations (comportement réel). Fallback sur "similar" uniquement si vide.
-  // Ne PAS les fusionner pour ne pas diluer la qualité des recommandations.
-  let rawList = tmdbDetails.recommendations?.results || [];
-  if (rawList.length === 0) {
-    rawList = tmdbDetails.similar?.results || [];
-  }
-
-  if (rawList.length === 0) return [];
+  const collectionIds = new Set<number>(
+    (collectionData?.parts || []).map((p: any) => p.id)
+  );
+  
+  // Toujours exclure le media actuel et ses spin-offs directs
+  const isDuplicate = (item: any) => {
+    if (!item || !item.poster_path) return true;
+    if (item.id === tmdbDetails.id) return true;
+    if (collectionIds.has(item.id)) return true;
+    if (isAdultOrParodyMedia(item)) return true;
+    if ((item.vote_count || 0) < 50) return true;
+    return false;
+  };
 
   const currentGenreIds = new Set<number>(
     (tmdbDetails.genres || []).map((g: any) => g.id)
   );
-
   const forbiddenGenres = new Set<number>(
     NON_FICTION_GENRES.filter(gId => !currentGenreIds.has(gId))
   );
 
-  // 2. Filtrer le contenu poubelle sans toucher à l'ordre
-  const filteredList = rawList.filter((item: any) => {
-    if (!item || !item.poster_path) return false;
-
-    if (isAdultOrParodyMedia(item)) return false;
-
-    // Exclure les contenus avec très peu de votes pour éviter les résultats obscurs
-    if ((item.vote_count || 0) < 50) return false;
-
+  const filterItem = (item: any, isSimilarFallback: boolean = false) => {
+    if (isDuplicate(item)) return false;
+    
     const itemGenres: number[] = item.genre_ids || [];
     if (itemGenres.some(gId => forbiddenGenres.has(gId))) return false;
-
+    
     const countries = item.origin_country || [];
     const isAsian = countries.some((c: string) => ASIAN_COUNTRIES.has(c));
     if (isAsian) {
       const isGlobalHit = (item.vote_count || 0) >= 1000 || (item.popularity || 0) >= 80;
       if (!isGlobalHit) return false;
     }
-
+    
+    // Si ça vient de "similar" (basé sur mots clés), on est plus strict sur la qualité
+    if (isSimilarFallback) {
+      if ((item.vote_average || 0) < 6.5) return false;
+      if ((item.vote_count || 0) < 300) return false;
+    }
+    
     return true;
-  });
+  };
 
-  // 3. Retourner la liste filtrée SANS altérer le tri natif de TMDB
-  // L'API renvoie nativement les résultats par ordre de pertinence absolue.
-  return filteredList;
+  let recommendations = (tmdbDetails.recommendations?.results || []).filter((i: any) => filterItem(i, false));
+  let similar = (tmdbDetails.similar?.results || []).filter((i: any) => filterItem(i, true));
+  
+  // Trier le fallback similar par popularité pour éviter les résultats obscurs
+  similar.sort((a: any, b: any) => (b.vote_count || 0) - (a.vote_count || 0));
+
+  // Fusionner intelligemment : on garde les recommandations (comportement utilisateur) 
+  // et on complète avec les meilleurs "similar" si on manque de recommandations.
+  const seenIds = new Set<number>(recommendations.map((i: any) => i.id));
+  const combined = [...recommendations];
+  
+  for (const item of similar) {
+    if (!seenIds.has(item.id)) {
+      combined.push(item);
+      seenIds.add(item.id);
+    }
+  }
+
+  return combined;
 };
 
 const getSmartDefaultSeason = (show: any, tmdbDetails: any): number => {
@@ -2561,7 +2581,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
 
             {/* Séries / Films similaires remontés dans À Propos */}
             {(() => {
-              const similarList = getPrioritizedSimilarMedia(tmdbDetails);
+              const similarList = getPrioritizedSimilarMedia(tmdbDetails, collectionData);
               if (similarList.length === 0) return null;
 
               return (
