@@ -34,9 +34,12 @@ export async function openExternalUrl(url: string) {
 
       const candidatePlexUrls: string[] = [];
       if (serverId && ratingKey) {
+        candidatePlexUrls.push(`plex://preplay/?metadataKey=${encodeURIComponent(`/library/metadata/${ratingKey}`)}&server=${serverId}`);
+        candidatePlexUrls.push(`plex://preplay?metadataKey=${encodeURIComponent(`/library/metadata/${ratingKey}`)}&server=${serverId}`);
+        candidatePlexUrls.push(`plex://play/?metadataKey=${encodeURIComponent(`/library/metadata/${ratingKey}`)}&server=${serverId}`);
+        candidatePlexUrls.push(`plex://server/${serverId}/library/metadata/${ratingKey}`);
         candidatePlexUrls.push(`plex://server/${serverId}/com.plexapp.plugins.library/library/metadata/${ratingKey}`);
         candidatePlexUrls.push(`plex://server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`);
-        candidatePlexUrls.push(`plex://details?server=${serverId}&key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`);
       }
       
       const cleanWebPlexUrl = (serverId && ratingKey)

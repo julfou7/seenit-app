@@ -210,6 +210,21 @@ async function startServer() {
       };
 
       const isMatch = (item: any): boolean => {
+        if (!item) return false;
+
+        // 0. Vérification stricte du type de média (Film vs Série)
+        const itType = (item.type || '').toLowerCase();
+        if (mediaType === 'movie') {
+          // Pour un film, ignorer absolument les épisodes, séries, saisons
+          if (itType && itType !== 'movie') return false;
+        } else if (mediaType === 'tv') {
+          // Pour une série, accepter uniquement 'show' ou 'series'
+          if (itType && itType !== 'show' && itType !== 'series') return false;
+        } else {
+          // Si mediaType non spécifié, ignorer au moins les épisodes et saisons
+          if (itType === 'episode' || itType === 'season' || itType === 'track') return false;
+        }
+
         // 1. Direct TMDB ID match
         const itTmdbId = extractTmdbId(item);
         if (tmdbId && itTmdbId && Number(itTmdbId) === Number(tmdbId)) {
@@ -222,35 +237,38 @@ async function startServer() {
           return true;
         }
 
+        // Helper pour vérifier la concordance de l'année
+        const isYearCompatible = (): boolean => {
+          if (!year || !item.year) return true;
+          return Math.abs(Number(year) - Number(item.year)) <= 1;
+        };
+
         // 3. Title match (Exact, substring or tokenized)
-        const itTitle = normalizeStr(item.title || item.grandparentTitle);
+        const itTitle = normalizeStr(item.title);
         const itOriginal = normalizeStr(item.originalTitle);
 
         if (normTitle && (itTitle === normTitle || itOriginal === normTitle)) {
-          if (year && item.year && Math.abs(Number(year) - Number(item.year)) > 2) return false;
+          if (!isYearCompatible()) return false;
           return true;
         }
 
         if (normOriginal && (itTitle === normOriginal || itOriginal === normOriginal)) {
-          if (year && item.year && Math.abs(Number(year) - Number(item.year)) > 2) return false;
+          if (!isYearCompatible()) return false;
           return true;
         }
 
         if (normTitle.length >= 4 && (itTitle.includes(normTitle) || normTitle.includes(itTitle))) {
-          if (year && item.year && Math.abs(Number(year) - Number(item.year)) > 2) return false;
+          if (!isYearCompatible()) return false;
           return true;
         }
 
         // 4. Tokenized significant words overlap
         if (targetWords.length > 0) {
-          const itemWords = new Set([...normalizeStr(item.title).split(' '), ...normalizeStr(item.originalTitle).split(' ')]);
+          const itemWords = new Set([...itTitle.split(' '), ...itOriginal.split(' ')]);
           const allFound = targetWords.every(tw => itemWords.has(tw) || Array.from(itemWords).some(iw => iw.includes(tw) || tw.includes(iw)));
           if (allFound) {
-            if (year && item.year) {
-              if (Math.abs(Number(year) - Number(item.year)) <= 2) return true;
-            } else {
-              return true;
-            }
+            if (!isYearCompatible()) return false;
+            return true;
           }
         }
 
