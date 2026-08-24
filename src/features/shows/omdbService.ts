@@ -87,6 +87,8 @@ export async function getSeasonImdbRatings(
     const thirtyDaysAgo = Date.now() - 30 * ONE_DAY;
 
     const ratingsMap: Record<number, EpisodeImdbData> = {};
+    const missingEpisodesToFetch: { epNum: number; epImdbId: string }[] = [];
+
     data.Episodes.forEach((ep: any) => {
       const epNum = parseInt(ep.Episode, 10);
       const rating = parseFloat(ep.imdbRating);
@@ -94,6 +96,9 @@ export async function getSeasonImdbRatings(
 
       if (ep.imdbRating === 'N/A' || !ep.imdbRating || isNaN(rating) || rating <= 0) {
         hasNAs = true;
+        if (epImdbId && !isNaN(epNum)) {
+          missingEpisodesToFetch.push({ epNum, epImdbId });
+        }
       }
 
       if (ep.Released && ep.Released !== 'N/A') {
@@ -112,6 +117,27 @@ export async function getSeasonImdbRatings(
         };
       }
     });
+
+    // Si certains épisodes ont une note 'N/A' dans la liste de la saison OMDb mais un imdbID valide,
+    // tenter de les récupérer individuellement (car l'API OMDb a parfois les notes par épisode individuel)
+    if (missingEpisodesToFetch.length > 0 && missingEpisodesToFetch.length <= 25) {
+      await Promise.all(
+        missingEpisodesToFetch.map(async ({ epNum, epImdbId }) => {
+          try {
+            const epRes = await fetch(`https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&i=${epImdbId}`);
+            if (epRes.ok) {
+              const epData = await epRes.json();
+              const epRating = parseFloat(epData.imdbRating);
+              if (!isNaN(epRating) && epRating > 0) {
+                ratingsMap[epNum] = { rating: epRating, imdbId: epImdbId };
+              }
+            }
+          } catch (e) {
+            // Ignorer l'erreur d'un appel individuel
+          }
+        })
+      );
+    }
 
     const isOngoing = hasNAs || hasFutureEpisodes;
 

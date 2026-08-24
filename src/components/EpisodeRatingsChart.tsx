@@ -145,12 +145,12 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
     });
   }, [imdbRatings, episodes, hasAnyImdbRating]);
 
-  // Helper to resolve episode rating (IMDb priority if available, otherwise TMDB fallback)
+  // Helper to resolve episode rating (IMDb priority if ALL aired episodes have IMDb rating, otherwise 100% TMDB fallback)
   const getEpisodeRatingInfo = (ep: any): { rating: number; source: 'imdb' | 'tmdb' } => {
     if (!ep) return { rating: 0, source: 'tmdb' };
     const epNum = ep.episode_number;
     const imdbData = epNum !== undefined ? imdbRatings[epNum] : null;
-    if (imdbData && typeof imdbData.rating === 'number' && imdbData.rating > 0) {
+    if (hasFullImdbRatings && imdbData && typeof imdbData.rating === 'number' && imdbData.rating > 0) {
       return { rating: imdbData.rating, source: 'imdb' };
     }
     const tmdbRating = ep.vote_average ? Number(ep.vote_average) : 0;
@@ -213,7 +213,7 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
       average: avg.toFixed(1),
       count: ratedValues.length,
     };
-  }, [episodes, imdbRatings]);
+  }, [episodes, imdbRatings, hasFullImdbRatings]);
 
   if (!seasons || seasons.length === 0) return null;
 
@@ -314,28 +314,28 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
         {seasonStats && (
           <span className={cn(
             "inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-800/80 border border-white/10 text-[11px] font-bold shrink-0",
-            hasAnyImdbRating ? "text-amber-400" : "text-blue-400"
+            hasFullImdbRatings ? "text-amber-400" : "text-blue-400"
           )}>
             <Star 
               size={11} 
               className={cn(
                 "shrink-0",
-                hasAnyImdbRating ? "fill-amber-400 text-amber-400" : "fill-blue-400 text-blue-400"
+                hasFullImdbRatings ? "fill-amber-400 text-amber-400" : "fill-blue-400 text-blue-400"
               )} 
             />
             S{selectedSeasonNum} • {seasonStats.average}
-            {!hasAnyImdbRating && totalTmdbVotes > 0 && (
+            {!hasFullImdbRatings && totalTmdbVotes > 0 && (
               <span className="text-[9px] text-zinc-400 font-normal">
                 ({totalTmdbVotes.toLocaleString()})
               </span>
             )}
             <span className={cn(
               "ml-0.5 px-1 py-0.2 text-[9px] font-black rounded border",
-              hasAnyImdbRating
+              hasFullImdbRatings
                 ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
                 : "bg-blue-500/20 text-blue-300 border-blue-500/30"
             )}>
-              {hasAnyImdbRating ? 'IMDb' : 'TMDB'}
+              {hasFullImdbRatings ? 'IMDb' : 'TMDB'}
             </span>
           </span>
         )}

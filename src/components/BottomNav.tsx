@@ -52,7 +52,7 @@ export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveT
   };
 
   return (
-    <div className="absolute bottom-0 inset-x-0 bg-zinc-950/95 backdrop-blur-2xl border-t border-white/10 pt-1.5 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] px-4 sm:px-6 flex justify-between items-center z-[120]">
+    <div className="absolute bottom-0 inset-x-0 bg-zinc-950/95 backdrop-blur-2xl border-t border-white/10 pt-1.5 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] px-4 sm:px-6 flex justify-between items-center z-[160]">
       {tabs.map((tab) => {
         const isActive = currentTab === tab.id;
         return (
