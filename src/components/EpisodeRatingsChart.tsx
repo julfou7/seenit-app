@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Star, ChevronRight, ChevronDown, Check, X } from 'lucide-react';
+import { Star, ChevronDown, Check, X } from 'lucide-react';
 import { cn, formatAirDateSafe } from '../lib/utils';
 import { getSeasonImdbRatings, getEpisodeImdbVotes, type EpisodeImdbData } from '../features/shows/omdbService';
 
@@ -179,20 +179,28 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
     const epNum = activeEpisode.episode_number;
     const epImdbData = epNum !== undefined ? imdbRatings[epNum] : null;
 
-    if (epImdbData && epImdbData.imdbId) {
+    if (hasFullImdbRatings && epImdbData && epImdbData.imdbId) {
       let isMounted = true;
       getEpisodeImdbVotes(epImdbData.imdbId).then(votes => {
-        if (isMounted) setActiveEpisodeVotes(votes);
+        if (isMounted) {
+          if (votes) {
+            setActiveEpisodeVotes(votes);
+          } else if (activeEpisode.vote_count) {
+            setActiveEpisodeVotes(typeof activeEpisode.vote_count === 'number' ? activeEpisode.vote_count.toLocaleString() : String(activeEpisode.vote_count));
+          } else {
+            setActiveEpisodeVotes(null);
+          }
+        }
       });
       return () => { isMounted = false; };
     } else {
-      if (activeEpisode.vote_count) {
-        setActiveEpisodeVotes(String(activeEpisode.vote_count));
+      if (activeEpisode.vote_count !== undefined && activeEpisode.vote_count !== null && activeEpisode.vote_count > 0) {
+        setActiveEpisodeVotes(typeof activeEpisode.vote_count === 'number' ? activeEpisode.vote_count.toLocaleString() : String(activeEpisode.vote_count));
       } else {
         setActiveEpisodeVotes(null);
       }
     }
-  }, [activeEpisode, imdbRatings]);
+  }, [activeEpisode, imdbRatings, hasFullImdbRatings]);
 
   // Total TMDB votes for the season
   const totalTmdbVotes = React.useMemo(() => {
@@ -509,19 +517,19 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
                       </span>
                     )}
                   </div>
-                  <h4 className="text-xs font-semibold text-white truncate mt-0.5 group-hover:text-amber-300 transition-colors">
+                  <h4 className="text-xs font-semibold text-white line-clamp-2 mt-0.5 leading-snug group-hover:text-amber-300 transition-colors">
                     {activeEpisode.name || `Épisode ${activeEpisode.episode_number}`}
                   </h4>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0">
                 {(() => {
                   const ratingInfo = getEpisodeRatingInfo(activeEpisode);
                   const isImdb = ratingInfo.source === 'imdb';
                   return (
                     <div className={cn(
-                      "flex items-center gap-1 px-2 py-1 rounded-lg bg-zinc-900/90 border text-xs font-bold",
+                      "flex items-center gap-1 px-2 py-1 rounded-lg bg-zinc-900/90 border text-xs font-bold shrink-0",
                       isImdb ? "border-amber-500/30 text-amber-400" : "border-blue-500/30 text-blue-400"
                     )}>
                       <Star size={12} className={cn("shrink-0", isImdb ? "fill-amber-400 text-amber-400" : "fill-blue-400 text-blue-400")} />
@@ -535,15 +543,13 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
                         {isImdb ? 'IMDb' : 'TMDB'}
                       </span>
                       {activeEpisodeVotes && (
-                        <span className="text-[9px] text-zinc-400 font-normal ml-0.5">
+                        <span className="text-[9px] text-zinc-400 font-normal ml-0.5 whitespace-nowrap">
                           ({activeEpisodeVotes})
                         </span>
                       )}
                     </div>
                   );
                 })()}
-
-                <ChevronRight size={16} className="text-zinc-500 group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
               </div>
             </div>
           )}
