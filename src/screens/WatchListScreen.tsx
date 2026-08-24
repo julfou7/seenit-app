@@ -235,7 +235,7 @@ function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMa
   if (formattedMovieRuntime) movieMetaParts.push(formattedMovieRuntime);
   const movieMetaStr = movieMetaParts.join(' • ') || 'Film';
 
-  // Genre / Thème du film
+  // Genre / Thème du film (un seul style au lieu de deux)
   const movieGenres: string[] = [];
   if (movieDetails?.genres && Array.isArray(movieDetails.genres)) {
     movieDetails.genres.forEach((g: any) => {
@@ -247,7 +247,7 @@ function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMa
       else if (g?.name) movieGenres.push(g.name);
     });
   }
-  const movieThemeStr = movieGenres.slice(0, 2).join(', ');
+  const singleGenre = movieGenres[0] || '';
 
   // 3 Acteurs principaux
   const topCast: any[] = (movieDetails?.credits?.cast || []).slice(0, 3);
@@ -295,26 +295,34 @@ function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMa
         
         {isMovie ? (
           <div className="flex flex-col gap-0.5 my-0.5 min-w-0">
-            {/* Durée • Thème / Genre */}
-            <div className="flex items-center gap-1.5 flex-wrap text-xs min-w-0 leading-tight">
-              {movieMetaStr && (
-                <span className="text-indigo-400 font-semibold text-xs shrink-0">
-                  {movieMetaStr}
+            {/* Année • Durée • Style (1 genre) sur UNE SEULE LIGNE avec couleurs distinctes */}
+            <div className="flex items-center gap-1.5 text-xs min-w-0 leading-tight truncate">
+              {movieYear && (
+                <span className="text-indigo-400 font-bold shrink-0">
+                  {movieYear}
                 </span>
               )}
-              {movieThemeStr && (
-                <>
-                  <span className="text-zinc-500 text-[10px] shrink-0">•</span>
-                  <span className="text-zinc-300 font-medium text-xs truncate">
-                    {movieThemeStr}
-                  </span>
-                </>
+              {movieYear && formattedMovieRuntime && (
+                <span className="text-zinc-600 shrink-0">•</span>
+              )}
+              {formattedMovieRuntime && (
+                <span className="text-sky-400 font-semibold shrink-0">
+                  {formattedMovieRuntime}
+                </span>
+              )}
+              {(movieYear || formattedMovieRuntime) && singleGenre && (
+                <span className="text-zinc-600 shrink-0">•</span>
+              )}
+              {singleGenre && (
+                <span className="text-zinc-300 font-normal truncate">
+                  {singleGenre}
+                </span>
               )}
             </div>
 
-            {/* 3 Acteurs principaux en ligne propre */}
+            {/* 3 Acteurs principaux pouvant aller sur 2 lignes */}
             {topCast.length > 0 && (
-              <div className="text-[11px] text-zinc-400 font-medium truncate mt-0.5 min-w-0 leading-tight" onClick={(e) => e.stopPropagation()}>
+              <div className="text-[11px] text-zinc-400 font-medium line-clamp-2 mt-0.5 min-w-0 leading-snug" onClick={(e) => e.stopPropagation()}>
                 <span className="text-zinc-500 mr-1 font-normal">Avec</span>
                 {topCast.map((actor: any, idx: number) => (
                   <span key={actor.id}>
