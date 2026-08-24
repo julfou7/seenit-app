@@ -24,7 +24,7 @@ function timeAgo(ms: number) {
   return `Il y a ${d} jour${d > 1 ? 's' : ''}`;
 }
 
-export function ContinueWatchingCard({ show, onShowClick, onEpisodeClick, onMarkAsSeen }: Props) {
+export const ContinueWatchingCard = React.memo(function ContinueWatchingCard({ show, onShowClick, onEpisodeClick, onMarkAsSeen }: Props) {
   let nextEpNum = show.nextEpisodeToWatch;
 
   // 1. Fallback si nextEpisodeToWatch est temporairement null
@@ -408,4 +408,4 @@ export function ContinueWatchingCard({ show, onShowClick, onEpisodeClick, onMark
       </div>
     </div>
   );
-}
+});

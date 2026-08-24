@@ -13,22 +13,25 @@ export interface SeriesImdbData {
   updatedAt: number;
 }
 
-// 1 day in milliseconds
+// 4 hours for ongoing or partially rated seasons / pending titles
+const FOUR_HOURS = 4 * 60 * 60 * 1000;
+// 1 day in milliseconds for recently ended or settled titles
 const ONE_DAY = 24 * 60 * 60 * 1000;
-// 14 days in milliseconds
+// 14 days in milliseconds for fully completed past seasons
 const FOURTEEN_DAYS = 14 * 24 * 60 * 60 * 1000;
 
 /**
  * Récupère les notes IMDb d'une saison.
- * Stratégie CACHE-FIRST avec Expiration Inteligente :
- * - Si les données sont en cache et encore valides, retourne directement le cache.
- * - Si le cache est expiré, tente de rafraîchir en réseau.
- * - Si le réseau échoue ou rate-limit, retourne le cache comme fallback.
- * - Durée de vie du cache : 1 jour pour les saisons en cours ou récentes, 14 jours pour les terminées.
+ * Stratégie CACHE-FIRST avec Expiration Intelligente & Récupération Dynamique :
+ * - Si les données sont en cache et encore valides, retourne le cache.
+ * - Si une saison est en cours ou a des épisodes avec note 0 / N/A (non encore parues sur IMDb),
+ *   la durée de cache est raccourcie à 4h pour basculer automatiquement vers les vraies notes IMDb dès publication.
+ * - Si forceRefresh est activé, interroge immédiatement l'API OMDb pour récupérer les dernières notes.
  */
 export async function getSeasonImdbRatings(
   imdbId: string | null | undefined,
-  seasonNumber: number
+  seasonNumber: number,
+  forceRefresh: boolean = false
 ): Promise<Record<number, EpisodeImdbData>> {
   if (!imdbId) return {};
 
@@ -52,16 +55,19 @@ export async function getSeasonImdbRatings(
 
       // Calculer l'âge du cache
       const age = Date.now() - (cachedData.updatedAt || 0);
-      const isOngoing = cachedData.isOngoing || Object.values(normalizedCache).some(ep => ep.rating === 0);
-      const cacheLifetime = isOngoing ? ONE_DAY : FOURTEEN_DAYS;
+      const hasMissingRatings = Object.values(normalizedCache).some(ep => !ep || ep.rating === 0);
+      const isOngoing = cachedData.isOngoing || hasMissingRatings;
+      
+      // Si la saison a des épisodes sans note (ou en cours), cache très court (4h) pour capter les nouvelles notes IMDb
+      const cacheLifetime = hasMissingRatings ? FOUR_HOURS : isOngoing ? ONE_DAY : FOURTEEN_DAYS;
 
-      // Si le cache est récent, on l'utilise sans appel réseau !
-      if (age < cacheLifetime) {
+      // Si le cache est récent et sans demande de forceRefresh, on l'utilise sans appel réseau
+      if (!forceRefresh && age < cacheLifetime) {
         return normalizedCache;
       }
     }
 
-    // 2. SI ABSENT OU EXPIRÉ -> APPEL RÉSEAU OMDB
+    // 2. SI ABSENT, EXPIRÉ OU FORCE_REFRESH -> APPEL RÉSEAU OMDB
     const res = await fetch(
       `https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&i=${imdbId}&Season=${seasonNumber}`
     );
@@ -86,7 +92,7 @@ export async function getSeasonImdbRatings(
       const rating = parseFloat(ep.imdbRating);
       const epImdbId = ep.imdbID || ep.imdbId || '';
 
-      if (ep.imdbRating === 'N/A' || !ep.imdbRating) {
+      if (ep.imdbRating === 'N/A' || !ep.imdbRating || isNaN(rating) || rating <= 0) {
         hasNAs = true;
       }
 
@@ -128,12 +134,14 @@ export async function getSeasonImdbRatings(
 
 /**
  * Récupère la note globale d'une série ou d'un film sur IMDb.
- * Stratégie CACHE-FIRST avec Expiration Inteligente :
+ * Stratégie CACHE-FIRST avec Expiration Intelligente :
+ * - Cache de 4h si note manquante/0 (pour mise à niveau rapide dès que IMDb la publie)
  * - Cache de 1 jour pour les séries en cours de production/diffusion.
- * - Cache de 14 jours pour les séries terminées.
+ * - Cache de 14 jours pour les séries et films terminés.
  */
 export async function getSeriesImdbData(
-  imdbId: string | null | undefined
+  imdbId: string | null | undefined,
+  forceRefresh: boolean = false
 ): Promise<SeriesImdbData | null> {
   if (!imdbId) return null;
 
@@ -144,9 +152,11 @@ export async function getSeriesImdbData(
     if (cached) {
       const age = Date.now() - (cached.updatedAt || 0);
       const isOngoing = (cached as any).isOngoing;
-      const cacheLifetime = isOngoing ? ONE_DAY : FOURTEEN_DAYS;
+      const hasValidRating = typeof cached.rating === 'number' && cached.rating > 0;
+      
+      const cacheLifetime = !hasValidRating ? FOUR_HOURS : isOngoing ? ONE_DAY : FOURTEEN_DAYS;
 
-      if (age < cacheLifetime && cached.rating !== undefined) {
+      if (!forceRefresh && age < cacheLifetime && cached.rating !== undefined) {
         return {
           rating: cached.rating,
           votes: cached.votes,
@@ -155,7 +165,7 @@ export async function getSeriesImdbData(
       }
     }
 
-    // 2. Appel réseau si absent ou expiré
+    // 2. Appel réseau si absent, expiré ou forcé
     const res = await fetch(`https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&i=${imdbId}`);
     if (!res.ok) {
       if (cached && cached.rating !== undefined) {
@@ -180,7 +190,7 @@ export async function getSeriesImdbData(
     const isOngoing = yearStr.endsWith('–') || yearStr.endsWith('-') || (yearStr.includes('–') && !yearStr.split('–')[1]?.trim());
 
     const result: SeriesImdbData = {
-      rating,
+      rating: !isNaN(rating) && rating > 0 ? rating : 0,
       votes,
       updatedAt: Date.now()
     };
@@ -189,7 +199,7 @@ export async function getSeriesImdbData(
     await db.omdbEpisodesCache.put({
       imdbId,
       votes,
-      rating,
+      rating: result.rating,
       isOngoing,
       updatedAt: Date.now()
     } as any);

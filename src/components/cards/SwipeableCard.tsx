@@ -10,7 +10,7 @@ interface SwipeableCardProps {
   className?: string;
 }
 
-export const SwipeableCard = ({ children, onSwipeLeft, onSwipeRight, className }: SwipeableCardProps) => {
+export const SwipeableCard = React.memo(({ children, onSwipeLeft, onSwipeRight, className }: SwipeableCardProps) => {
   const [translateX, setTranslateX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   
@@ -304,4 +304,4 @@ export const SwipeableCard = ({ children, onSwipeLeft, onSwipeRight, className }
       </div>
     </div>
   );
-};
+});

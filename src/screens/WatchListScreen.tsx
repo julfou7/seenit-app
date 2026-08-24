@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, type RefObject } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, type RefObject } from 'react';
 import { type Show } from '../types';
 import { cn, getNextEpisodeNumber, scrollAllCarouselsToStart } from '../lib/utils';
 import { ContinueWatchingCard } from '../components/cards/ContinueWatchingCard';
@@ -433,10 +433,10 @@ const getAddedTime = (s: Show): number => {
 };
 
 export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick: (id: string, mediaType?: 'tv' | 'movie') => void; onOpenProfile?: () => void }) {
-  const onShowClick = (id: string, mediaType?: 'tv' | 'movie') => {
+  const onShowClick = useCallback((id: string, mediaType?: 'tv' | 'movie') => {
     sessionStorage.setItem('home_scroll', window.scrollY.toString());
     onShowClickProp(id, mediaType);
-  };
+  }, [onShowClickProp]);
 
   const [activeTab, setActiveTab] = useState<'watch_next' | 'upcoming' | 'history'>('watch_next');
   const [user, setUser] = useState<FirebaseUser | null>(null);
@@ -445,13 +445,13 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState<number>(8);
 
-  const openPersonModal = (personId: number) => {
+  const openPersonModal = useCallback((personId: number) => {
     setSelectedPersonId(personId);
     const currentState = window.history.state || {};
     window.history.pushState({ ...currentState, isModal: true, isPersonDetailModal: true, personId }, '');
-  };
+  }, []);
 
-  const handleToggleVoirTout = (sectionKey: string) => {
+  const handleToggleVoirTout = useCallback((sectionKey: string) => {
     if (expandedSection === sectionKey) {
       setExpandedSection(null);
       setVisibleCount(8);
@@ -459,7 +459,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
       setExpandedSection(sectionKey);
       setVisibleCount(8);
     }
-  };
+  }, [expandedSection]);
 
   const watchNextRef = useRef<HTMLDivElement>(null);
   const upcomingRef = useRef<HTMLDivElement>(null);
@@ -468,7 +468,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
 
   const [isOpeningEpisode, setIsOpeningEpisode] = useState<boolean>(false);
 
-  const handleEpisodeClick = async (show: Show, seasonNumber: number, episodeNumber: number) => {
+  const handleEpisodeClick = useCallback(async (show: Show, seasonNumber: number, episodeNumber: number) => {
     if (isOpeningEpisode || selectedEpisodeModal) return;
     setIsOpeningEpisode(true);
     try {
@@ -501,7 +501,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
     } finally {
       setIsOpeningEpisode(false);
     }
-  };
+  }, [isOpeningEpisode, selectedEpisodeModal]);
 
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
@@ -613,27 +613,38 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
     );
   };
 
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+
   useEffect(() => {
     if (loading) return;
 
     let isScrollingFromTab = false;
     let scrollTimeout: NodeJS.Timeout;
+    let rafId: number | null = null;
 
     const handleScroll = () => {
       if (isScrollingFromTab) return;
+      if (rafId !== null) return;
 
-      const upcomingRect = upcomingRef.current?.getBoundingClientRect();
-      const historyRect = historyRef.current?.getBoundingClientRect();
-      
-      const offset = 250; // Threshold from top of viewport
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        const upcomingRect = upcomingRef.current?.getBoundingClientRect();
+        const historyRect = historyRef.current?.getBoundingClientRect();
+        
+        const offset = 250; // Threshold from top of viewport
 
-      if (historyRect && historyRect.top < offset) {
-        setActiveTab('history');
-      } else if (upcomingRect && upcomingRect.top < offset) {
-        setActiveTab('upcoming');
-      } else {
-        setActiveTab('watch_next');
-      }
+        let newTab: 'watch_next' | 'upcoming' | 'history' = 'watch_next';
+        if (historyRect && historyRect.top < offset) {
+          newTab = 'history';
+        } else if (upcomingRect && upcomingRect.top < offset) {
+          newTab = 'upcoming';
+        }
+
+        if (activeTabRef.current !== newTab) {
+          setActiveTab(newTab);
+        }
+      });
     };
 
     const container = document.getElementById('watchlist-container');
@@ -660,6 +671,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('tab-scroll', handleTabScroll);
       clearTimeout(scrollTimeout);
+      if (rafId !== null) cancelAnimationFrame(rafId);
     };
   }, [loading]);
 
@@ -669,155 +681,172 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const shows = allShows.filter(s => s.mediaType !== 'movie');
+  const {
+    shows,
+    nouveautesShows,
+    continueWatchingShows,
+    pasVuDepuisUnMomentShows,
+    filmsAVoirShows,
+    upcomingShows
+  } = useMemo(() => {
+    const shows = allShows.filter(s => s.mediaType !== 'movie');
 
-  const isNotUpToDate = (s: Show): boolean => {
-    if (s.isArchived) return false;
-    if (s.status === 'dropped') return false;
-    const watchedCount = s.seenEpisodes ? s.seenEpisodes.length : 0;
-    
-    // Si l'utilisateur a vu des épisodes et qu'il n'y a plus d'épisodes suivants enregistrés : considéré comme à jour !
-    if (watchedCount > 0 && !s.nextEpisodeToWatch) {
-      return false;
-    }
-    
-    if (s.totalEpisodes && s.totalEpisodes > 0) {
-      if (watchedCount >= s.totalEpisodes) {
-        if (!s.nextEpisodeToWatch?.air_date) return false;
+    const isNotUpToDate = (s: Show): boolean => {
+      if (s.isArchived) return false;
+      if (s.status === 'dropped') return false;
+      const watchedCount = s.seenEpisodes ? s.seenEpisodes.length : 0;
+      
+      // Si l'utilisateur a vu des épisodes et qu'il n'y a plus d'épisodes suivants enregistrés : considéré comme à jour !
+      if (watchedCount > 0 && !s.nextEpisodeToWatch) {
+        return false;
+      }
+      
+      if (s.totalEpisodes && s.totalEpisodes > 0) {
+        if (watchedCount >= s.totalEpisodes) {
+          if (!s.nextEpisodeToWatch?.air_date) return false;
+          const airTime = parseTimestamp(s.nextEpisodeToWatch.air_date);
+          if (airTime > Date.now()) return false;
+        }
+      }
+      if (s.nextEpisodeToWatch?.air_date) {
         const airTime = parseTimestamp(s.nextEpisodeToWatch.air_date);
-        if (airTime > Date.now()) return false;
-      }
-    }
-    if (s.nextEpisodeToWatch?.air_date) {
-      const airTime = parseTimestamp(s.nextEpisodeToWatch.air_date);
-      if (airTime > Date.now()) {
-        return false;
-      }
-    }
-    return true;
-  };
-
-  const SIXTY_DAYS_MS = 60 * 24 * 60 * 60 * 1000;
-  const candidateWatchShows = shows.filter(isNotUpToDate);
-  const now = Date.now();
-
-  const isWatchedRecently = (s: Show): boolean => {
-    const watchedCount = s.seenEpisodes ? s.seenEpisodes.length : 0;
-    if (watchedCount === 0) return false;
-
-    const lastWatched = getExplicitLastWatchedTime(s);
-    if (lastWatched > 0) return (Date.now() - lastWatched) <= SIXTY_DAYS_MS;
-
-    const fallbackTime = parseTimestamp(s.lastWatchedAt) || parseTimestamp(s.createdAt);
-    if (fallbackTime > 0) return (Date.now() - fallbackTime) <= SIXTY_DAYS_MS;
-    return false;
-  };
-
-  const isNouveaute = (s: Show): boolean => {
-    // 1. Nouvelle saison (catégorie NEW_SEASON ou S2+ ép 1 avec air_date <= 60 jours)
-    const cat = getUpToDateOrNewSeasonCategory(s);
-    if (cat?.type === 'NEW_SEASON') return true;
-
-    if (s.nextEpisodeToWatch) {
-      if (s.nextEpisodeToWatch.season_number > 1 && s.nextEpisodeToWatch.episode_number === 1) {
-        const airMs = parseTimestamp(s.nextEpisodeToWatch.air_date);
-        if (airMs > 0 && (now - airMs) <= SIXTY_DAYS_MS && airMs <= (now + 24 * 60 * 60 * 1000)) {
-          return true;
+        if (airTime > Date.now()) {
+          return false;
         }
-      }
-    }
-
-    // 2. Pas commencé du tout (0 épisode vu) avec une date de sortie ou d'ajout <= 60 jours
-    const watchedCount = s.seenEpisodes ? s.seenEpisodes.length : 0;
-    if (watchedCount === 0) {
-      const releaseDateStr = s.firstAirDate || s.nextEpisodeToWatch?.air_date;
-      const releaseTime = parseTimestamp(releaseDateStr) || parseTimestamp(s.createdAt);
-      if (releaseTime > 0) {
-        const diff = now - releaseTime;
-        if (diff >= 0 && diff <= SIXTY_DAYS_MS) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  };
-
-  // Nouveautés : nouvelle saison ou pas commencé avec sortie/ajout < 60 jours
-  const nouveautesShows = candidateWatchShows
-    .filter(isNouveaute)
-    .sort((a, b) => {
-      const timeA = getLastWatchedOrUpdatedTime(a);
-      const timeB = getLastWatchedOrUpdatedTime(b);
-      const diff = timeB - timeA;
-      if (diff !== 0) return diff;
-      return a.title.localeCompare(b.title);
-    });
-
-  const nouveautesIds = new Set(nouveautesShows.map(s => s.id));
-
-  // Continuer à regarder : séries commencées et vues dans les 60 derniers jours (et pas dans nouveautés)
-  // Toujours triées par la dernière série vue en premier (du plus récent au plus ancien)
-  const continueWatchingShows = candidateWatchShows
-    .filter(s => !nouveautesIds.has(s.id) && (s.seenEpisodes?.length || 0) > 0 && isWatchedRecently(s))
-    .sort((a, b) => {
-      const timeA = getShowLastWatchedTime(a);
-      const timeB = getShowLastWatchedTime(b);
-      const diff = timeB - timeA;
-      if (diff !== 0) return diff;
-      return a.title.localeCompare(b.title);
-    });
-
-  const continueWatchingIds = new Set(continueWatchingShows.map(s => s.id));
-
-  // Pas vu depuis un moment : rien vu depuis plus de 60 jours
-  const pasVuDepuisUnMomentShows = candidateWatchShows
-    .filter(s => !continueWatchingIds.has(s.id) && !nouveautesIds.has(s.id))
-    .sort((a, b) => {
-      const timeA = getShowLastWatchedTime(a);
-      const timeB = getShowLastWatchedTime(b);
-      const diff = timeA - timeB;
-      if (diff !== 0) return diff;
-      return a.title.localeCompare(b.title);
-    });
-
-  const todayIso = new Date().toISOString().slice(0, 10);
-
-  // Films à voir : films non archivés, non abandonnés, non vus et DÉJÀ DISPONIBLES (date de sortie <= aujourd'hui)
-  const filmsAVoirShows = allShows
-    .filter(s => {
-      if (s.mediaType !== 'movie' || s.isArchived || s.status === 'dropped' || s.status === 'completed') {
-        return false;
-      }
-      if (s.seenEpisodes && s.seenEpisodes.includes('movie')) {
-        return false;
-      }
-      // Ne pas afficher les films non encore disponibles/sortis (ex: date de sortie > aujourd'hui)
-      if (s.firstAirDate && s.firstAirDate > todayIso) {
-        return false;
       }
       return true;
-    })
-    .sort((a, b) => {
-      const addedA = a.updatedAt || a.createdAt || 0;
-      const addedB = b.updatedAt || b.createdAt || 0;
-      const diff = addedB - addedA; // Plus récent d'abord
-      if (diff !== 0) return diff;
-      return a.title.localeCompare(b.title);
-    });
+    };
 
-  const upcomingShows = allShows
-    .map(s => ({ show: s, upcomingEp: getUpcomingEpisodeInfo(s) }))
-    .filter((item): item is { show: Show; upcomingEp: NonNullable<ReturnType<typeof getUpcomingEpisodeInfo>> } => item.upcomingEp !== null)
-    .sort((a, b) => {
-      const da = new Date(a.upcomingEp.air_date + 'T00:00:00').getTime();
-      const db = new Date(b.upcomingEp.air_date + 'T00:00:00').getTime();
-      if (da !== db) return da - db;
-      return a.show.title.localeCompare(b.show.title);
-    })
-    .map(item => item.show);
+    const SIXTY_DAYS_MS = 60 * 24 * 60 * 60 * 1000;
+    const candidateWatchShows = shows.filter(isNotUpToDate);
+    const now = Date.now();
 
-  const markNextEpisodeAsSeen = async (show: Show) => {
+    const isWatchedRecently = (s: Show): boolean => {
+      const watchedCount = s.seenEpisodes ? s.seenEpisodes.length : 0;
+      if (watchedCount === 0) return false;
+
+      const lastWatched = getExplicitLastWatchedTime(s);
+      if (lastWatched > 0) return (Date.now() - lastWatched) <= SIXTY_DAYS_MS;
+
+      const fallbackTime = parseTimestamp(s.lastWatchedAt) || parseTimestamp(s.createdAt);
+      if (fallbackTime > 0) return (Date.now() - fallbackTime) <= SIXTY_DAYS_MS;
+      return false;
+    };
+
+    const isNouveaute = (s: Show): boolean => {
+      // 1. Nouvelle saison (catégorie NEW_SEASON ou S2+ ép 1 avec air_date <= 60 jours)
+      const cat = getUpToDateOrNewSeasonCategory(s);
+      if (cat?.type === 'NEW_SEASON') return true;
+
+      if (s.nextEpisodeToWatch) {
+        if (s.nextEpisodeToWatch.season_number > 1 && s.nextEpisodeToWatch.episode_number === 1) {
+          const airMs = parseTimestamp(s.nextEpisodeToWatch.air_date);
+          if (airMs > 0 && (now - airMs) <= SIXTY_DAYS_MS && airMs <= (now + 24 * 60 * 60 * 1000)) {
+            return true;
+          }
+        }
+      }
+
+      // 2. Pas commencé du tout (0 épisode vu) avec une date de sortie ou d'ajout <= 60 jours
+      const watchedCount = s.seenEpisodes ? s.seenEpisodes.length : 0;
+      if (watchedCount === 0) {
+        const releaseDateStr = s.firstAirDate || s.nextEpisodeToWatch?.air_date;
+        const releaseTime = parseTimestamp(releaseDateStr) || parseTimestamp(s.createdAt);
+        if (releaseTime > 0) {
+          const diff = now - releaseTime;
+          if (diff >= 0 && diff <= SIXTY_DAYS_MS) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    };
+
+    // Nouveautés : nouvelle saison ou pas commencé avec sortie/ajout < 60 jours
+    const nouveautesShows = candidateWatchShows
+      .filter(isNouveaute)
+      .sort((a, b) => {
+        const timeA = getLastWatchedOrUpdatedTime(a);
+        const timeB = getLastWatchedOrUpdatedTime(b);
+        const diff = timeB - timeA;
+        if (diff !== 0) return diff;
+        return a.title.localeCompare(b.title);
+      });
+
+    const nouveautesIds = new Set(nouveautesShows.map(s => s.id));
+
+    // Continuer à regarder : séries commencées et vues dans les 60 derniers jours (et pas dans nouveautés)
+    const continueWatchingShows = candidateWatchShows
+      .filter(s => !nouveautesIds.has(s.id) && (s.seenEpisodes?.length || 0) > 0 && isWatchedRecently(s))
+      .sort((a, b) => {
+        const timeA = getShowLastWatchedTime(a);
+        const timeB = getShowLastWatchedTime(b);
+        const diff = timeB - timeA;
+        if (diff !== 0) return diff;
+        return a.title.localeCompare(b.title);
+      });
+
+    const continueWatchingIds = new Set(continueWatchingShows.map(s => s.id));
+
+    // Pas vu depuis un moment : rien vu depuis plus de 60 jours
+    const pasVuDepuisUnMomentShows = candidateWatchShows
+      .filter(s => !continueWatchingIds.has(s.id) && !nouveautesIds.has(s.id))
+      .sort((a, b) => {
+        const timeA = getShowLastWatchedTime(a);
+        const timeB = getShowLastWatchedTime(b);
+        const diff = timeA - timeB;
+        if (diff !== 0) return diff;
+        return a.title.localeCompare(b.title);
+      });
+
+    const todayIso = new Date().toISOString().slice(0, 10);
+
+    // Films à voir : films non archivés, non abandonnés, non vus et DÉJÀ DISPONIBLES (date de sortie <= aujourd'hui)
+    const filmsAVoirShows = allShows
+      .filter(s => {
+        if (s.mediaType !== 'movie' || s.isArchived || s.status === 'dropped' || s.status === 'completed') {
+          return false;
+        }
+        if (s.seenEpisodes && s.seenEpisodes.includes('movie')) {
+          return false;
+        }
+        // Ne pas afficher les films non encore disponibles/sortis (ex: date de sortie > aujourd'hui)
+        if (s.firstAirDate && s.firstAirDate > todayIso) {
+          return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const addedA = a.updatedAt || a.createdAt || 0;
+        const addedB = b.updatedAt || b.createdAt || 0;
+        const diff = addedB - addedA; // Plus récent d'abord
+        if (diff !== 0) return diff;
+        return a.title.localeCompare(b.title);
+      });
+
+    const upcomingShows = allShows
+      .map(s => ({ show: s, upcomingEp: getUpcomingEpisodeInfo(s) }))
+      .filter((item): item is { show: Show; upcomingEp: NonNullable<ReturnType<typeof getUpcomingEpisodeInfo>> } => item.upcomingEp !== null)
+      .sort((a, b) => {
+        const da = new Date(a.upcomingEp.air_date + 'T00:00:00').getTime();
+        const db = new Date(b.upcomingEp.air_date + 'T00:00:00').getTime();
+        if (da !== db) return da - db;
+        return a.show.title.localeCompare(b.show.title);
+      })
+      .map(item => item.show);
+
+    return {
+      shows,
+      nouveautesShows,
+      continueWatchingShows,
+      pasVuDepuisUnMomentShows,
+      filmsAVoirShows,
+      upcomingShows
+    };
+  }, [allShows]);
+
+  const markNextEpisodeAsSeen = useCallback(async (show: Show) => {
     if (!show.id || !show.nextEpisodeToWatch) return;
     const { season_number, episode_number } = show.nextEpisodeToWatch;
     const wasInPasVu = pasVuDepuisUnMomentShows.some(s => s.id === show.id);
@@ -845,9 +874,9 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
         }, 600);
       }, 350);
     }
-  };
+  }, [pasVuDepuisUnMomentShows]);
 
-  const markMovieAsSeen = async (show: Show) => {
+  const markMovieAsSeen = useCallback(async (show: Show) => {
     if (!show.id) return;
     
     const prevSeenEpisodes = [...(show.seenEpisodes || [])];
@@ -924,7 +953,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
         scrollAllCarouselsToStart();
       }
     );
-  };
+  }, []);
 
   return (
     <div id="watchlist-container" className="flex-1 overflow-y-auto bg-transparent text-white pb-nav">

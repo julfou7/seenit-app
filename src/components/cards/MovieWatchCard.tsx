@@ -20,7 +20,7 @@ function formatRuntime(minutes?: number) {
   return `${m}min`;
 }
 
-export function MovieWatchCard({ show, onShowClick, onMarkAsSeen }: Props) {
+export const MovieWatchCard = React.memo(function MovieWatchCard({ show, onShowClick, onMarkAsSeen }: Props) {
   const [runtime, setRuntime] = useState<number | null>((show as any).runtime || null);
   const [releaseYear, setReleaseYear] = useState<string | null>(
     show.firstAirDate ? show.firstAirDate.slice(0, 4) : null
@@ -234,4 +234,4 @@ export function MovieWatchCard({ show, onShowClick, onMarkAsSeen }: Props) {
       </div>
     </div>
   );
-}
+});

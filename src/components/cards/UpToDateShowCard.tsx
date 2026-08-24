@@ -97,7 +97,7 @@ export function getUpToDateOrNewSeasonCategory(show: Show): UpToDateCategoryInfo
   return null;
 }
 
-export function UpToDateShowCard({ show, onShowClick, onEpisodeClick, onMarkAsSeen }: Props) {
+export const UpToDateShowCard = React.memo(function UpToDateShowCard({ show, onShowClick, onEpisodeClick, onMarkAsSeen }: Props) {
   const categoryInfo = getUpToDateOrNewSeasonCategory(show);
 
   const [providerLogo, setProviderLogo] = useState<string | null>(null);
@@ -362,4 +362,4 @@ export function UpToDateShowCard({ show, onShowClick, onEpisodeClick, onMarkAsSe
       </div>
     </div>
   );
-}
+});

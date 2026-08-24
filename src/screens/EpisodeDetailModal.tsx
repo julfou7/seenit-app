@@ -7,6 +7,7 @@ import { useShows } from '../hooks/useShows';
 import { useToastStore } from '../store/toastStore';
 import { tmdb } from '../features/shows/tmdb';
 import { syncSingleItem } from "../hooks/useDetailsSyncWorker";
+import { getSeasonImdbRatings, getEpisodeImdbVotes } from '../features/shows/omdbService';
 
 interface EpisodeDetailModalProps {
   show?: Show;
@@ -112,6 +113,43 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
 
   const [currentSeasonEpCount, setCurrentSeasonEpCount] = useState<number | null>(null);
   const [nextSeasonEpCount, setNextSeasonEpCount] = useState<number | null>(null);
+  const [episodeImdbRating, setEpisodeImdbRating] = useState<number | null>(null);
+  const [episodeImdbVotes, setEpisodeImdbVotes] = useState<string | null>(null);
+
+  // Fetch episode IMDb rating when season/episode or show changes
+  useEffect(() => {
+    let isMounted = true;
+    const imdbId = activeShow?.imdbId;
+    const epNum = currentEpisode?.episode_number;
+
+    if (imdbId && currentSeason && epNum) {
+      getSeasonImdbRatings(imdbId, currentSeason).then(ratings => {
+        if (!isMounted) return;
+        const epData = ratings[epNum];
+        if (epData && epData.rating > 0) {
+          setEpisodeImdbRating(epData.rating);
+          if (epData.imdbId) {
+            getEpisodeImdbVotes(epData.imdbId).then(votes => {
+              if (isMounted && votes) setEpisodeImdbVotes(votes);
+            });
+          }
+        } else {
+          setEpisodeImdbRating(null);
+          setEpisodeImdbVotes(null);
+        }
+      }).catch(() => {
+        if (isMounted) {
+          setEpisodeImdbRating(null);
+          setEpisodeImdbVotes(null);
+        }
+      });
+    } else {
+      setEpisodeImdbRating(null);
+      setEpisodeImdbVotes(null);
+    }
+
+    return () => { isMounted = false; };
+  }, [activeShow?.imdbId, currentSeason, currentEpisode?.episode_number]);
 
   const [swipeDirection, setSwipeDirection] = useState<'next' | 'prev' | null>(null);
   const isSwipingRef = useRef(false);
@@ -827,11 +865,20 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                     <span className="inline-block px-3 py-1 backdrop-blur-md rounded-full text-[10px] font-bold bg-zinc-800/80 text-zinc-300 border border-white/10">
                       S{currentSeason.toString().padStart(2, '0')} | E{currentEpisode.episode_number.toString().padStart(2, '0')}
                     </span>
-                    {currentEpisode?.vote_average ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 backdrop-blur-md rounded-full text-[10px] font-bold bg-zinc-800/80 text-zinc-300 border border-white/10">
+                    {episodeImdbRating && episodeImdbRating > 0 ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 backdrop-blur-md rounded-full text-[10px] font-bold bg-zinc-800/80 text-amber-400 border border-amber-500/30">
+                        <Star size={11} className="fill-amber-400 text-amber-400 shrink-0" />
+                        <span className="text-zinc-100 font-extrabold">{Number(episodeImdbRating).toFixed(1)}</span>
+                        <span className="bg-amber-500/20 text-amber-300 px-1 py-0.2 rounded font-black text-[9px]">IMDb</span>
+                        {episodeImdbVotes ? (
+                          <span className="text-zinc-400 font-medium">({episodeImdbVotes})</span>
+                        ) : null}
+                      </span>
+                    ) : currentEpisode?.vote_average ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 backdrop-blur-md rounded-full text-[10px] font-bold bg-zinc-800/80 text-blue-400 border border-blue-500/30">
                         <Star size={11} className="fill-[#01b4e4] text-[#01b4e4] shrink-0" />
                         <span className="text-zinc-100 font-extrabold">{Number(currentEpisode.vote_average).toFixed(1)}</span>
-                        <span className="text-[#01b4e4] font-bold">TMDB</span>
+                        <span className="bg-blue-500/20 text-blue-300 px-1 py-0.2 rounded font-black text-[9px]">TMDB</span>
                         {currentEpisode.vote_count ? (
                           <span className="text-zinc-500 font-medium">({formatVoteCount(currentEpisode.vote_count)})</span>
                         ) : null}

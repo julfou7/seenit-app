@@ -140,7 +140,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
       return !show?.isArchived;
     });
   }, [recommendations, showsByTmdbId]);
-  const [sortBy, setSortBy] = useState<'popular' | 'rating' | 'date' | 'title'>('popular');
+  const [sortBy, setSortBy] = useState<'popular' | 'rating' | 'date' | 'title' | 'top100'>('popular');
   const [isSortPickerOpen, setIsSortPickerOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedGenreIds, setSelectedGenreIds] = useState<string[]>([]);

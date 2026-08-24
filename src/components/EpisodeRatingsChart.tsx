@@ -101,7 +101,7 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
     }
   }, [selectedSeasonNum, seasonsCache]);
 
-  // Fetch IMDb ratings for the selected season using Cache-First Dexie service
+  // Fetch IMDb ratings for the selected season using Cache-First Dexie service with auto-upgrade for ongoing episodes
   useEffect(() => {
     if (!imdbId) {
       setImdbRatings({});
@@ -119,10 +119,14 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
   const seasonData = seasonsCache[selectedSeasonNum];
   const episodes = seasonData?.episodes || [];
 
-  // Check if we have a valid IMDb rating for the aired episodes of this season
-  const hasImdbRatings = React.useMemo(() => {
+  // Check if we have at least one valid IMDb rating in the season
+  const hasAnyImdbRating = React.useMemo(() => {
+    return Object.values(imdbRatings).some((data: any) => data && typeof data.rating === 'number' && data.rating > 0);
+  }, [imdbRatings]);
+
+  // Check if all aired episodes have IMDb ratings
+  const hasFullImdbRatings = React.useMemo(() => {
     if (!episodes || episodes.length === 0) return false;
-    
     const now = new Date();
     const airedEpisodes = episodes.filter((ep: any) => {
       if (!ep.air_date) return false;
@@ -131,8 +135,7 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
     });
 
     if (airedEpisodes.length === 0) {
-      // Si aucun épisode n'a de date de diffusion passée, on regarde si on a quand même des notes IMDb chargées
-      return Object.values(imdbRatings).some((data: any) => data && typeof data.rating === 'number' && data.rating > 0);
+      return hasAnyImdbRating;
     }
 
     return airedEpisodes.every((ep: any) => {
@@ -140,17 +143,22 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
       const imdbData = epNum !== undefined ? imdbRatings[epNum] : null;
       return imdbData && typeof imdbData.rating === 'number' && imdbData.rating > 0;
     });
-  }, [imdbRatings, episodes]);
+  }, [imdbRatings, episodes, hasAnyImdbRating]);
 
-  // Helper to resolve episode rating (IMDb priority if complete/aired, otherwise TMDB)
-  const getEpisodeVote = (ep: any): number => {
-    if (!ep) return 0;
+  // Helper to resolve episode rating (IMDb priority if available, otherwise TMDB fallback)
+  const getEpisodeRatingInfo = (ep: any): { rating: number; source: 'imdb' | 'tmdb' } => {
+    if (!ep) return { rating: 0, source: 'tmdb' };
     const epNum = ep.episode_number;
     const imdbData = epNum !== undefined ? imdbRatings[epNum] : null;
-    if (hasImdbRatings && imdbData && typeof imdbData.rating === 'number' && imdbData.rating > 0) {
-      return imdbData.rating;
+    if (imdbData && typeof imdbData.rating === 'number' && imdbData.rating > 0) {
+      return { rating: imdbData.rating, source: 'imdb' };
     }
-    return ep.vote_average ? Number(ep.vote_average) : 0;
+    const tmdbRating = ep.vote_average ? Number(ep.vote_average) : 0;
+    return { rating: tmdbRating, source: 'tmdb' };
+  };
+
+  const getEpisodeVote = (ep: any): number => {
+    return getEpisodeRatingInfo(ep).rating;
   };
 
   // Set active episode when episodes change
@@ -169,7 +177,7 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
       return;
     }
     const epNum = activeEpisode.episode_number;
-    const epImdbData = (hasImdbRatings && epNum !== undefined) ? imdbRatings[epNum] : null;
+    const epImdbData = epNum !== undefined ? imdbRatings[epNum] : null;
 
     if (epImdbData && epImdbData.imdbId) {
       let isMounted = true;
@@ -184,7 +192,7 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
         setActiveEpisodeVotes(null);
       }
     }
-  }, [activeEpisode, imdbRatings, hasImdbRatings]);
+  }, [activeEpisode, imdbRatings]);
 
   // Total TMDB votes for the season
   const totalTmdbVotes = React.useMemo(() => {
@@ -205,7 +213,7 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
       average: avg.toFixed(1),
       count: ratedValues.length,
     };
-  }, [episodes, imdbRatings, hasImdbRatings]);
+  }, [episodes, imdbRatings]);
 
   if (!seasons || seasons.length === 0) return null;
 
@@ -306,28 +314,28 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
         {seasonStats && (
           <span className={cn(
             "inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-800/80 border border-white/10 text-[11px] font-bold shrink-0",
-            hasImdbRatings ? "text-amber-400" : "text-blue-400"
+            hasAnyImdbRating ? "text-amber-400" : "text-blue-400"
           )}>
             <Star 
               size={11} 
               className={cn(
                 "shrink-0",
-                hasImdbRatings ? "fill-amber-400 text-amber-400" : "fill-blue-400 text-blue-400"
+                hasAnyImdbRating ? "fill-amber-400 text-amber-400" : "fill-blue-400 text-blue-400"
               )} 
             />
             S{selectedSeasonNum} • {seasonStats.average}
-            {!hasImdbRatings && totalTmdbVotes > 0 && (
+            {!hasAnyImdbRating && totalTmdbVotes > 0 && (
               <span className="text-[9px] text-zinc-400 font-normal">
                 ({totalTmdbVotes.toLocaleString()})
               </span>
             )}
             <span className={cn(
               "ml-0.5 px-1 py-0.2 text-[9px] font-black rounded border",
-              hasImdbRatings
+              hasAnyImdbRating
                 ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
                 : "bg-blue-500/20 text-blue-300 border-blue-500/30"
             )}>
-              {hasImdbRatings ? 'IMDb' : 'TMDB'}
+              {hasAnyImdbRating ? 'IMDb' : 'TMDB'}
             </span>
           </span>
         )}
@@ -508,17 +516,32 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-zinc-900/90 border border-white/10 text-xs font-bold text-amber-400">
-                  <Star size={12} className="fill-amber-400 text-amber-400 shrink-0" />
-                  <span className="text-white">
-                    {getEpisodeVote(activeEpisode) > 0 ? getEpisodeVote(activeEpisode).toFixed(1) : '-'}
-                  </span>
-                  {activeEpisodeVotes && (
-                    <span className="text-[9px] text-zinc-400 font-normal ml-0.5">
-                      ({activeEpisodeVotes})
-                    </span>
-                  )}
-                </div>
+                {(() => {
+                  const ratingInfo = getEpisodeRatingInfo(activeEpisode);
+                  const isImdb = ratingInfo.source === 'imdb';
+                  return (
+                    <div className={cn(
+                      "flex items-center gap-1 px-2 py-1 rounded-lg bg-zinc-900/90 border text-xs font-bold",
+                      isImdb ? "border-amber-500/30 text-amber-400" : "border-blue-500/30 text-blue-400"
+                    )}>
+                      <Star size={12} className={cn("shrink-0", isImdb ? "fill-amber-400 text-amber-400" : "fill-blue-400 text-blue-400")} />
+                      <span className="text-white">
+                        {ratingInfo.rating > 0 ? ratingInfo.rating.toFixed(1) : '-'}
+                      </span>
+                      <span className={cn(
+                        "text-[8px] font-black px-1 py-0.2 rounded ml-0.5",
+                        isImdb ? "bg-amber-500/20 text-amber-300" : "bg-blue-500/20 text-blue-300"
+                      )}>
+                        {isImdb ? 'IMDb' : 'TMDB'}
+                      </span>
+                      {activeEpisodeVotes && (
+                        <span className="text-[9px] text-zinc-400 font-normal ml-0.5">
+                          ({activeEpisodeVotes})
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 <ChevronRight size={16} className="text-zinc-500 group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all shrink-0 ml-1" />
               </div>

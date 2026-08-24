@@ -80,7 +80,7 @@ interface Props {
   onEpisodeClick: (show: Show, seasonNumber: number, episodeNumber: number) => void;
 }
 
-export function UpcomingShowCard({ show, onShowClick, onEpisodeClick }: Props) {
+export const UpcomingShowCard = React.memo(function UpcomingShowCard({ show, onShowClick, onEpisodeClick }: Props) {
   const ep = getUpcomingEpisodeInfo(show);
   if (!ep) return null;
 
@@ -357,5 +357,5 @@ export function UpcomingShowCard({ show, onShowClick, onEpisodeClick }: Props) {
       </div>
     </div>
   );
-}
+});
 

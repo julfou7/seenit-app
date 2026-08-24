@@ -318,7 +318,17 @@ class TMDBClient {
     return data;
   }
 
+  private watchProvidersCache = new Map<string, { data: any; timestamp: number }>();
+  private episodeDetailsCache = new Map<string, { data: any; timestamp: number }>();
+
   async getWatchProviders(id: number, type: 'tv' | 'movie' = 'tv'): Promise<Result<any>> {
+    const cacheKey = `${type}:${id}`;
+    const cached = this.watchProvidersCache.get(cacheKey);
+    // Cache for 30 minutes in memory
+    if (cached && Date.now() - cached.timestamp < 30 * 60 * 1000) {
+      return ok(cached.data);
+    }
+
     const apiKey = this.getApiKey();
     if (!apiKey) return err(new Error('Missing API Key'));
     const url = new URL(`${this.baseUrl}/${type}/${id}/watch/providers?api_key=${apiKey}`);
@@ -328,6 +338,8 @@ class TMDBClient {
     const data = await tryCatch(res.value.json());
     if (!data.ok) return err((data as any).error);
     if (data.value && data.value.status_code) return err(new Error(data.value.status_message || 'TMDB Error'));
+
+    this.watchProvidersCache.set(cacheKey, { data: data.value, timestamp: Date.now() });
     return data;
   }
 
@@ -368,6 +380,12 @@ class TMDBClient {
   }
 
   async getEpisodeDetails(id: number, seasonNumber: number, episodeNumber: number): Promise<Result<any>> {
+    const cacheKey = `${id}:${seasonNumber}:${episodeNumber}`;
+    const cached = this.episodeDetailsCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < 30 * 60 * 1000) {
+      return ok(cached.data);
+    }
+
     const apiKey = this.getApiKey();
     if (!apiKey) return err(new Error('Missing API Key'));
     const url = new URL(`${this.baseUrl}/tv/${id}/season/${seasonNumber}/episode/${episodeNumber}?api_key=${apiKey}&language=fr-FR&append_to_response=videos&include_video_language=fr,en,null`);
@@ -381,6 +399,7 @@ class TMDBClient {
     if (data.value) {
       const tvDetails = this.detailsCache.get(`tv_${id}`);
       adjustTMDBSeasonDataForEurope({ episodes: [data.value] }, tvDetails?.networks);
+      this.episodeDetailsCache.set(cacheKey, { data: data.value, timestamp: Date.now() });
     }
     
     return data;
@@ -664,13 +683,18 @@ class TMDBClient {
     return ok({ ...res.value, results });
   }
 
-    async getTopRated(type: 'tv' | 'movie', page: number = 1): Promise<Result<SearchResponse>> {
+  async getTopRated(type: 'tv' | 'movie', page: number = 1): Promise<Result<SearchResponse>> {
     const apiKey = this.getApiKey();
     if (!apiKey) return err(new Error('Missing API Key'));
     
     // Pour simuler un Top 100 IMDb, on prend les mieux notés avec au moins 3000 votes
-    const url = `${this.baseUrl}/discover/${type}?api_key=${apiKey}&language=${LANGUAGE}&sort_by=vote_average.desc&vote_count.gte=3000&page=${page}`;
-    return this.fetchFromApi(url.replace(`${this.baseUrl}/`, ''));
+    const url = `${this.baseUrl}/discover/${type}?api_key=${apiKey}&language=fr-FR&sort_by=vote_average.desc&vote_count.gte=3000&page=${page}`;
+    const res = await tryCatch(fetch(url));
+    if (!res.ok) return err((res as any).error);
+    if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
+    const data = await tryCatch(res.value.json());
+    if (!data.ok) return err((data as any).error);
+    return data;
   }
 
   async getTopRatedRecent(type: 'tv' | 'movie' | 'all', page: number = 1, watchProviders?: string[]): Promise<Result<SearchResponse>> {
@@ -902,7 +926,7 @@ class TMDBClient {
     genres?: string[];
     pegi?: string;
     minRating?: string;
-    sortBy?: 'popular' | 'rating' | 'date' | 'title';
+    sortBy?: 'popular' | 'rating' | 'date' | 'title' | 'top100';
     sortOrder?: 'asc' | 'desc';
   }): Promise<Result<SearchResponse>> {
     const apiKey = this.getApiKey();

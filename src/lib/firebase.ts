@@ -225,7 +225,7 @@ export async function sendNativeNotification(title: string, options?: NativeNoti
           },
           smallIcon: 'ic_stat_seenit',
           iconColor: '#E5A93D',
-          largeIcon: thumbImage,
+          largeIcon: imageUrl || undefined,
           attachments: attachments.length > 0 ? attachments : undefined,
           actionTypeId: 'EPISODE_NOTIF_ACTIONS',
           extra: {

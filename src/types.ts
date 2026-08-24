@@ -12,6 +12,7 @@ export interface Show {
   id: string; // Document ID from Firestore
   userId: string;
   tmdbId: number;
+  imdbId?: string;
   title: string;
   originalTitle?: string;
   mediaType: 'tv' | 'movie';
