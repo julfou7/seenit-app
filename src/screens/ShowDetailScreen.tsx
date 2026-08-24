@@ -17,6 +17,7 @@ import { useShowsStore } from '../store/showsStore';
 import { getSeriesImdbData } from '../features/shows/omdbService';
 import { getFormattedProviderLogo, PLEX_LOGO_SVG } from '../utils/providerLogos';
 import { checkPlexAvailability, PlexMediaInfo } from '../features/plex/plexAvailability';
+import { RedditSection } from '../components/community/RedditSection';
 
 
 interface ShowDetailScreenProps {
@@ -2589,6 +2590,16 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                 />
               </div>
             )}
+
+            {/* Discussions Reddit */}
+            <div className="pt-1">
+              <RedditSection
+                query={`${tmdbDetails?.name || tmdbDetails?.title || show?.title || ''} ${isSeries ? 'series discussion' : 'movie discussion'}`}
+                isLocked={false}
+                title="Discussions Reddit"
+                description="Retrouvez les avis, théories et spoilers de la communauté."
+              />
+            </div>
 
             {/* Séries / Films similaires remontés dans À Propos */}
             {(() => {
