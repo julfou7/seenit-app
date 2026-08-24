@@ -1,5 +1,5 @@
 import { type Result, ok, err, tryCatch } from '../../core/Result';
-import { getWikidataFranchiseTimeline } from '../../services/wikidata';
+import { getTVDBFranchiseTimeline } from '../../services/tvdb';
 import { adjustTMDBShowDataForEurope, adjustTMDBSeasonDataForEurope } from '../../lib/utils';
 
 export interface TMDBMedia {
@@ -251,24 +251,44 @@ class TMDBClient {
   async getFranchiseTimeline(media: any): Promise<any[]> {
     if (!media) return [];
 
-    let collectionParts: any[] = [];
+    const mediaType = media.media_type || (media.title ? 'movie' : 'tv');
 
-    // A. Si c'est un film appartenant à une collection native TMDB (ex: Harry Potter, Dune)
-    if (media.belongs_to_collection?.id) {
-      const collectionRes = await this.getCollectionDetails(media.belongs_to_collection.id);
-      if (collectionRes.ok && collectionRes.value?.parts) {
-        collectionParts = collectionRes.value.parts
-          .filter((p: any) => (p.release_date || p.first_air_date) && !isAdultOrParodyMedia(p))
-          .map((p: any) => ({ ...p, media_type: 'movie' }));
+    // A. POUR LES FILMS : Utiliser la collection TMDB (belongs_to_collection) ultra-fiable et propre
+    if (mediaType === 'movie') {
+      if (media.belongs_to_collection?.id) {
+        const collectionRes = await this.getCollectionDetails(media.belongs_to_collection.id);
+        if (collectionRes.ok && collectionRes.value?.parts) {
+          const parts = collectionRes.value.parts
+            .filter((p: any) => (p.release_date || p.first_air_date) && !isAdultOrParodyMedia(p))
+            .map((p: any) => ({ ...p, media_type: 'movie' }));
+
+          if (parts.length <= 1) return [];
+
+          parts.sort((a: any, b: any) => {
+            const dateA = new Date(a.release_date || a.first_air_date || 0).getTime();
+            const dateB = new Date(b.release_date || b.first_air_date || 0).getTime();
+            return dateA - dateB;
+          });
+
+          return parts.map((item: any, index: number) => ({
+            ...item,
+            sagaOrder: index + 1
+          }));
+        }
       }
+      return [];
     }
 
-    // B. Interroger Wikidata pour obtenir tous les spin-offs, préquelles, séries dérivées et univers de fiction
+    // B. POUR LES SÉRIES : Utiliser l'API TVDB v4 pour les préquelles, spin-offs et franchises
+    const tvdbId = media.external_ids?.tvdb_id || media.tvdb_id;
+    const mediaTitle = media.name || media.title || media.original_name;
     const imdbId = media.external_ids?.imdb_id || media.imdb_id;
-    const mediaType = media.media_type || (media.title ? 'movie' : 'tv');
-    const franchiseItems = await getWikidataFranchiseTimeline(media.id, mediaType, imdbId);
 
-    // Récupérer les détails TMDB de chaque média trouvé via Wikidata
+    const franchiseItems = await getTVDBFranchiseTimeline(tvdbId, mediaTitle, imdbId);
+
+    if (!franchiseItems || franchiseItems.length === 0) return [];
+
+    // Récupérer les détails TMDB de chaque média de la franchise
     const detailsPromises = franchiseItems.map(async (item) => {
       const res = await this.getMediaDetails(item.id, item.media_type);
       if (res.ok && res.value) {
@@ -280,12 +300,12 @@ class TMDBClient {
       return null;
     });
 
-    const wikidataResults = await Promise.all(detailsPromises);
-    const validWikidataMedia = wikidataResults.filter((r): r is any => r !== null && !isAdultOrParodyMedia(r));
+    const tvdbResults = await Promise.all(detailsPromises);
+    const validMedia = tvdbResults.filter((r): r is any => r !== null && !isAdultOrParodyMedia(r));
 
-    // Fusionner collection TMDB + Wikidata en supprimant les doublons
+    // Déduplication par ID & type
     const map = new Map<string, any>();
-    [...collectionParts, ...validWikidataMedia].forEach((item) => {
+    validMedia.forEach((item) => {
       const type = item.media_type || (item.title ? 'movie' : 'tv');
       const key = `${type}_${item.id}`;
       if (!map.has(key)) {
