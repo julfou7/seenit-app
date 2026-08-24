@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Cloud, LogIn, LogOut, FileText, CheckCircle2, MonitorPlay, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronDown, ChevronUp, Check, AlertCircle, Info, Bug, Sparkles, Download } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Cloud, LogIn, LogOut, FileText, CheckCircle2, MonitorPlay, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronDown, ChevronUp, ChevronRight, Check, AlertCircle, Info, Bug, Sparkles, Download, X } from 'lucide-react';
 import { auth, db, googleAuthProvider, requestNotificationPermission, sendNativeNotification } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
@@ -39,6 +40,7 @@ export function SettingsScreen() {
   const { logs, clearLogs, getLogsAsText } = useLogStore();
   const { currentVersion, latestRelease, hasUpdate, isChecking: isCheckingUpdates, lastChecked, checkForUpdates } = useUpdateStore();
   const [apkUpdateProgress, setApkUpdateProgress] = useState<UpdateProgress | null>(null);
+  const [showVersionNotesModal, setShowVersionNotesModal] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [userPlatforms, setUserPlatforms] = useState<number[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -303,6 +305,52 @@ export function SettingsScreen() {
         renotify: true,
         vibrate: [150, 80, 150, 80, 250]
       } as any);
+    }
+  };
+
+  const handleCheckUpdates = async () => {
+    showToast("Vérification des mises à jour...", "info");
+    try {
+      const isNewer = await checkForUpdates(true);
+      const state = useUpdateStore.getState();
+      if (state.error) {
+        showToast(`Erreur : ${state.error}`, "error");
+        return;
+      }
+      if (isNewer && state.latestRelease) {
+        showToast(`Mise à jour v${state.latestRelease.version} disponible !`, "success");
+        setShowVersionNotesModal(true);
+      } else {
+        showToast(`Votre application est à jour (v${CURRENT_APP_VERSION}) !`, "success");
+      }
+    } catch (err: any) {
+      showToast("Impossible de contacter le serveur de mise à jour.", "error");
+    }
+  };
+
+  const handleStartUpdate = async () => {
+    if (!latestRelease?.apkDownloadUrl) {
+      showToast("Lien de téléchargement indisponible.", "error");
+      return;
+    }
+
+    setApkUpdateProgress({
+      percent: 5,
+      status: 'downloading',
+      message: 'Initialisation du téléchargement...'
+    });
+
+    const result = await downloadAndInstallApk(
+      latestRelease.apkDownloadUrl,
+      (progress) => setApkUpdateProgress(progress)
+    );
+
+    if (!result.success) {
+      setApkUpdateProgress({
+        percent: 0,
+        status: 'error',
+        message: result.error || 'Erreur lors du téléchargement'
+      });
     }
   };
 
@@ -613,23 +661,85 @@ export function SettingsScreen() {
             </h2>
 
             <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between bg-zinc-800/30 p-3 rounded-xl border border-zinc-800">
-                <span className="text-xs text-zinc-400 font-medium">Version</span>
-                <span className="text-xs font-bold text-white font-mono">v{currentVersion}</span>
-              </div>
+              {/* Interactive Version Card / Button */}
+              <button
+                type="button"
+                onClick={async () => {
+                  setShowVersionNotesModal(true);
+                  if (!latestRelease) {
+                    await checkForUpdates(false);
+                  }
+                }}
+                className="w-full flex items-center justify-between bg-zinc-800/40 hover:bg-zinc-800/80 active:scale-[0.99] p-3 rounded-xl border border-zinc-800 transition-all cursor-pointer group text-left"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center border border-amber-500/20 group-hover:scale-105 transition-transform">
+                    <FileText size={15} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs text-zinc-200 font-bold group-hover:text-white transition-colors">Version installée</span>
+                    <span className="text-[10px] text-zinc-400">Appuyez pour voir les notes de version</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-amber-400 font-mono bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
+                    v{currentVersion}
+                  </span>
+                  <ChevronRight size={15} className="text-zinc-500 group-hover:text-zinc-300 transition-colors" />
+                </div>
+              </button>
+
+              {/* Update Available In-Place Card */}
+              {hasUpdate && latestRelease && (
+                <div className="p-3.5 bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-transparent border border-amber-500/30 rounded-xl flex flex-col gap-2.5 shadow-lg shadow-amber-500/5 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-amber-500 flex items-center justify-center text-black shadow-md shadow-amber-500/20 shrink-0">
+                        <Sparkles size={14} />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                          <span>Nouvelle version v{latestRelease.version}</span>
+                          <span className="px-1.5 py-0.5 text-[9px] bg-amber-500 text-black font-extrabold rounded-full">
+                            DISPONIBLE
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-zinc-300">Une mise à jour de SeenIt est prête à être installée.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      onClick={() => setShowVersionNotesModal(true)}
+                      className="flex-1 py-2 px-3 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-200 text-xs font-bold rounded-xl transition-all cursor-pointer text-center border border-white/5"
+                    >
+                      Voir les notes
+                    </button>
+                    <button
+                      onClick={handleStartUpdate}
+                      disabled={apkUpdateProgress?.status === 'downloading'}
+                      className="flex-1 py-2 px-3 bg-amber-500 hover:bg-amber-400 active:scale-95 text-black text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      <Download size={13} />
+                      Installer
+                    </button>
+                  </div>
+                </div>
+              )}
               
               <div className="flex gap-2">
                 <button
-                  onClick={() => checkForUpdates(true)}
+                  onClick={handleCheckUpdates}
                   disabled={isCheckingUpdates}
-                  className="flex-1 flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-200 font-bold py-2 px-3 rounded-xl text-xs transition-colors border border-white/5 disabled:opacity-50"
+                  className="flex-1 flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-200 font-bold py-2 px-3 rounded-xl text-xs transition-colors border border-white/5 disabled:opacity-50 cursor-pointer"
                 >
-                  <RefreshCw size={14} className={cn(isCheckingUpdates && "animate-spin")} />
+                  <RefreshCw size={14} className={cn(isCheckingUpdates && "animate-spin text-amber-400")} />
                   Vérifier les M.A.J
                 </button>
                 <button
                   onClick={() => setShowLogsPanel(!showLogsPanel)}
-                  className="flex-1 flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-200 font-bold py-2 px-3 rounded-xl text-xs transition-colors border border-white/5"
+                  className="flex-1 flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-200 font-bold py-2 px-3 rounded-xl text-xs transition-colors border border-white/5 cursor-pointer"
                 >
                   <Bug size={14} />
                   Logs Système
@@ -758,7 +868,144 @@ export function SettingsScreen() {
           </div>
         </div>
       </div>
-      {latestRelease && <ChangelogViewer content={latestRelease.releaseNotes} />}
+
+      {/* Dedicated Version Notes Modal */}
+      {showVersionNotesModal && createPortal(
+        <div 
+          className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-md flex items-center justify-center p-2.5 pb-6 sm:p-4 animate-in fade-in duration-200"
+          onClick={() => {
+            if (apkUpdateProgress?.status !== 'downloading') {
+              setShowVersionNotesModal(false);
+            }
+          }}
+        >
+          <div 
+            className="bg-[#121218] border border-white/10 rounded-3xl w-full max-w-lg sm:max-w-2xl overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.95)] flex flex-col my-auto animate-in zoom-in-95 duration-200 shrink-0"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxHeight: 'min(94vh, calc(100dvh - 16px))' }}
+          >
+            {/* Header */}
+            <div className="p-4 sm:p-5 pb-3 bg-gradient-to-b from-amber-500/10 to-transparent border-b border-white/5 flex items-start justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500 flex items-center justify-center text-black shadow-lg shadow-amber-500/30 shrink-0">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                    Notes de version
+                  </h3>
+                  <p className="text-xs text-amber-400/90 font-medium">
+                    SeenIt v{latestRelease?.version || currentVersion}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if (apkUpdateProgress?.status !== 'downloading') {
+                    setShowVersionNotesModal(false);
+                  }
+                }}
+                className="text-zinc-400 hover:text-white p-1.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Body Content */}
+            <div 
+              className="p-4 sm:p-5 overflow-y-auto min-h-0 space-y-4 flex-1 text-sm text-zinc-300 custom-scrollbar overscroll-contain touch-pan-y"
+              style={{ 
+                WebkitOverflowScrolling: 'touch',
+                touchAction: 'pan-y',
+                overscrollBehavior: 'contain'
+              }}
+            >
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+                Changelog & Nouveautés
+              </div>
+              
+              <div className="bg-black/40 border border-white/5 rounded-2xl p-4 max-h-80 sm:max-h-[28rem] md:max-h-[32rem] overflow-y-auto custom-scrollbar">
+                {isCheckingUpdates && !latestRelease ? (
+                  <div className="py-8 flex flex-col items-center justify-center gap-2 text-zinc-400 text-xs">
+                    <Loader2 className="w-5 h-5 animate-spin text-amber-400" />
+                    <span>Chargement des notes de version...</span>
+                  </div>
+                ) : latestRelease?.releaseNotes ? (
+                  <ChangelogViewer content={latestRelease.releaseNotes} />
+                ) : (
+                  <div className="py-6 text-center text-zinc-400 text-xs">
+                    <p>Aucune note de version détaillée disponible pour le moment.</p>
+                    <p className="text-[11px] text-zinc-500 mt-1">Version installée : v{currentVersion}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Download Progress Bar if updating */}
+              {apkUpdateProgress && apkUpdateProgress.status !== 'idle' && (
+                <div className={cn(
+                  "border rounded-2xl p-3.5 space-y-2 animate-in fade-in duration-200",
+                  apkUpdateProgress.status === 'error' 
+                    ? "bg-red-500/10 border-red-500/30" 
+                    : "bg-amber-500/10 border-amber-500/30"
+                )}>
+                  <div className="flex items-center justify-between text-xs font-semibold">
+                    <span className={cn(
+                      "flex items-center gap-2",
+                      apkUpdateProgress.status === 'error' ? "text-red-300" : "text-amber-300"
+                    )}>
+                      {apkUpdateProgress.status === 'downloading' && (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0" />
+                      )}
+                      {apkUpdateProgress.status === 'installing' && (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      )}
+                      {apkUpdateProgress.status === 'error' && (
+                        <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                      )}
+                      <span className="break-words line-clamp-2">{apkUpdateProgress.message}</span>
+                    </span>
+                    <span className={apkUpdateProgress.status === 'error' ? "text-red-400 font-mono" : "text-amber-400 font-mono"}>
+                      {apkUpdateProgress.percent}%
+                    </span>
+                  </div>
+
+                  <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden">
+                    <div 
+                      className={cn(
+                        "h-full rounded-full transition-all duration-300",
+                        apkUpdateProgress.status === 'error' ? "bg-red-500" : "bg-gradient-to-r from-amber-400 to-amber-500"
+                      )}
+                      style={{ width: `${apkUpdateProgress.percent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 sm:p-5 pt-3 bg-zinc-950/80 border-t border-white/5 flex items-center justify-end gap-2.5 shrink-0">
+              <button
+                onClick={() => setShowVersionNotesModal(false)}
+                className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Fermer
+              </button>
+
+              {hasUpdate && latestRelease && (
+                <button
+                  onClick={handleStartUpdate}
+                  disabled={apkUpdateProgress?.status === 'downloading'}
+                  className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 active:scale-95 text-black rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-amber-500/25 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Installer v{latestRelease.version}</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
