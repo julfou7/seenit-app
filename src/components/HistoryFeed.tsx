@@ -342,6 +342,7 @@ export function HistoryFeed({
 
     let newNextEp = targetShow.nextEpisodeToWatch;
     let newStatus = targetShow.status;
+    let newIsArchived = targetShow.isArchived;
 
     if (isMovie) {
       if (targetShow.status === 'completed') {
@@ -374,12 +375,18 @@ export function HistoryFeed({
         name: epDetails?.name || item.episodeTitle || null,
         still_path: epDetails?.still_path || null
       };
+
+      if (newStatus === 'completed') {
+        newStatus = 'watching';
+      }
+      newIsArchived = false;
     }
 
     await updateShow(targetShow.id, {
       seenEpisodes: newSeenEpisodes,
       episodeRecords: newRecords,
       status: newStatus,
+      isArchived: newIsArchived,
       lastWatchedAt: newLastWatchedAt,
       nextEpisodeToWatch: newNextEp,
       updatedAt: Date.now(),

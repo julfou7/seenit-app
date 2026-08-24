@@ -885,6 +885,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     const isEnded = tmdbDetails?.status === 'Ended' || tmdbDetails?.status === 'Canceled' || currentShow.seriesEnded || currentShow.tmdbStatus === 'Ended' || currentShow.tmdbStatus === 'Canceled';
     const autoArchived = computeAutoArchiveStatus({
       ...currentShow,
+      seenEpisodes: Array.from(newSeen as Set<string>),
       tmdbStatus: tmdbDetails?.status || currentShow.tmdbStatus,
       seriesEnded: isEnded,
       nextEpisodeToWatch: optimisticNextEp
@@ -908,7 +909,8 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         updatedAt: Date.now(),
         isSynced: false,
         nextEpisodeToWatch: optimisticNextEp,
-        isArchived: autoArchived
+        isArchived: autoArchived,
+        status: optimisticNextEp ? 'watching' : 'completed'
     });
     syncSingleItem(currentShow.id, true).catch(console.error);
     scrollAllCarouselsToStart();
@@ -1073,6 +1075,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     const isEnded = tmdbDetails?.status === 'Ended' || tmdbDetails?.status === 'Canceled' || currentShow.seriesEnded || currentShow.tmdbStatus === 'Ended' || currentShow.tmdbStatus === 'Canceled';
     const autoArchived = computeAutoArchiveStatus({
       ...currentShow,
+      seenEpisodes: Array.from(existingSeen as Set<string>),
       tmdbStatus: tmdbDetails?.status || currentShow.tmdbStatus,
       seriesEnded: isEnded,
       nextEpisodeToWatch: optimisticNextEp
@@ -1085,7 +1088,8 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       updatedAt: now,
       isSynced: false,
       nextEpisodeToWatch: optimisticNextEp,
-      isArchived: autoArchived
+      isArchived: autoArchived,
+      status: optimisticNextEp ? 'watching' : 'completed'
     });
     syncSingleItem(currentShow.id, true).catch(console.error);
 
