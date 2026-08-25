@@ -1,3 +1,5 @@
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
+
 export interface C411Torrent {
   id: number;
   infoHash: string;
@@ -64,7 +66,40 @@ export function buildMagnetLink(infoHash: string, name: string): string {
 }
 
 /**
- * Recherche des torrents sur C411 via le backend SeenIt ou directement
+ * Helper HTTP multiplateforme (Natif via CapacitorHttp pour contourner CORS / Web via fetch standard)
+ */
+async function performC411Get(url: string, apiKey: string): Promise<any> {
+  const headers = {
+    'Authorization': `Bearer ${apiKey}`,
+    'Accept': 'application/json',
+    'User-Agent': 'SeenIt-App'
+  };
+
+  if (Capacitor.isNativePlatform()) {
+    const res = await CapacitorHttp.get({
+      url,
+      headers,
+      connectTimeout: 8000,
+      readTimeout: 8000
+    });
+    if (res.status >= 200 && res.status < 300) {
+      return typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+    }
+    return null;
+  } else {
+    const res = await fetch(url, {
+      headers,
+      signal: AbortSignal.timeout(8000)
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+    return null;
+  }
+}
+
+/**
+ * Recherche des torrents sur C411 via l'API officielle (avec CapacitorHttp natif sur mobile) ou fallback proxy
  */
 export async function searchC411Torrents(params: C411SearchParams): Promise<C411Torrent[]> {
   const query = (params.query || '').trim();
@@ -72,7 +107,7 @@ export async function searchC411Torrents(params: C411SearchParams): Promise<C411
 
   const apiKey = params.apiKey || '2d4baaf4fdd1dacd26f8dc96b1ab6aa06fc95140a7509456b25c8c0b9b5ac55a';
 
-  // 1. Essai direct via l'API officielle C411 (très rapide sur mobile & navigateur)
+  // 1. Appel direct vers l'API C411 (CapacitorHttp sur Android/iOS pour contourner le CORS, fetch sur Web)
   try {
     const cleanQuery = query.replace(/[:’']/g, ' ').replace(/\s+/g, ' ').trim();
     const searchParams = new URLSearchParams();
@@ -81,47 +116,26 @@ export async function searchC411Torrents(params: C411SearchParams): Promise<C411
     if (params.mediaType === 'tv') searchParams.set('subcategory', '7');
     if (params.mediaType === 'movie') searchParams.set('subcategory', '6');
 
-    const res = await fetch(`https://c411.org/api/torrents?${searchParams.toString()}`, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Accept': 'application/json',
-        'User-Agent': 'SeenIt-App'
-      },
-      signal: AbortSignal.timeout(6000)
-    });
+    let data = await performC411Get(`https://c411.org/api/torrents?${searchParams.toString()}`, apiKey);
+    let torrents: C411Torrent[] = data?.data || [];
 
-    if (res.ok) {
-      const data = await res.json();
-      let torrents: C411Torrent[] = data.data || [];
+    // Fallback recherche large (sans sous-catégorie) si aucun résultat
+    if (torrents.length === 0) {
+      data = await performC411Get(`https://c411.org/api/torrents?name=${encodeURIComponent(cleanQuery)}&category=1`, apiKey);
+      torrents = data?.data || [];
+    }
 
-      // Fallback sans sous-catégorie si liste vide
-      if (torrents.length === 0) {
-        const broadRes = await fetch(`https://c411.org/api/torrents?name=${encodeURIComponent(cleanQuery)}&category=1`, {
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Accept': 'application/json',
-            'User-Agent': 'SeenIt-App'
-          },
-          signal: AbortSignal.timeout(6000)
-        });
-        if (broadRes.ok) {
-          const broadData = await broadRes.json();
-          torrents = broadData.data || [];
-        }
-      }
-
-      if (torrents.length > 0) {
-        return torrents.map((t: C411Torrent) => ({
-          ...t,
-          magnetUri: t.infoHash ? buildMagnetLink(t.infoHash, t.name) : undefined
-        }));
-      }
+    if (torrents.length > 0) {
+      return torrents.map((t: C411Torrent) => ({
+        ...t,
+        magnetUri: t.infoHash ? buildMagnetLink(t.infoHash, t.name) : undefined
+      }));
     }
   } catch (directErr) {
-    // Si direct échoue (CORS ou autre), on passe par le proxy backend
+    console.warn('[C411 Direct Request Error, trying backend fallback]', directErr);
   }
 
-  // 2. Fallback via le backend proxy SeenIt
+  // 2. Fallback via le backend proxy SeenIt si l'appel direct échoue
   try {
     const queryParams = new URLSearchParams();
     queryParams.set('query', query);
@@ -138,13 +152,31 @@ export async function searchC411Torrents(params: C411SearchParams): Promise<C411
     for (const ep of endpoints) {
       try {
         const url = `${ep}?${queryParams.toString()}`;
-        const res = await fetch(url, {
-          headers: { 'Accept': 'application/json' },
-          signal: AbortSignal.timeout(8000)
-        });
-        if (res.ok) {
-          const data = await res.json();
-          return (data.torrents || []).map((t: C411Torrent) => ({
+        let resData: any = null;
+
+        if (Capacitor.isNativePlatform()) {
+          const nativeRes = await CapacitorHttp.get({
+            url,
+            headers: { 'Accept': 'application/json' },
+            connectTimeout: 8000,
+            readTimeout: 8000
+          });
+          if (nativeRes.status >= 200 && nativeRes.status < 300) {
+            resData = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
+          }
+        } else {
+          const res = await fetch(url, {
+            headers: { 'Accept': 'application/json' },
+            signal: AbortSignal.timeout(8000)
+          });
+          if (res.ok) {
+            resData = await res.json();
+          }
+        }
+
+        if (resData && (resData.torrents || resData.data)) {
+          const list = resData.torrents || resData.data || [];
+          return list.map((t: C411Torrent) => ({
             ...t,
             magnetUri: t.infoHash ? buildMagnetLink(t.infoHash, t.name) : undefined
           }));
