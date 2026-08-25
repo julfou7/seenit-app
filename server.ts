@@ -953,6 +953,60 @@ async function startServer() {
     }
   });
 
+  // Proxy pour les requêtes vers les services tiers (Sonarr, Radarr, etc.) en mode Web
+  app.post('/api/service-proxy', async (req, res) => {
+    try {
+      const { targetUrl, method = 'GET', headers = {}, body } = req.body;
+      if (!targetUrl) {
+        return res.status(400).json({ error: 'targetUrl requis' });
+      }
+
+      // Si c'est une adresse IP privée locale directe, le serveur cloud Google ne peut pas y accéder
+      const isLocalIp = targetUrl.includes('192.168.') || targetUrl.includes('10.') || targetUrl.includes('172.16.') || targetUrl.includes('127.0.0.1') || targetUrl.includes('localhost');
+      if (isLocalIp) {
+        return res.status(400).json({
+          error: 'IP_LOCALE_INACCESSIBLE_SERVEUR_CLOUD',
+          message: 'L\'adresse IP 192.168.x.x est sur votre réseau privé local chez vous. Le serveur cloud AI Studio ne peut pas joindre votre box directement. Utilisez un tunnel HTTPS (ngrok, etc.) pour tester en Web ou testez directement sur l\'APK Android connecté à votre Wi-Fi.'
+        });
+      }
+
+      const fetchOptions: any = {
+        method,
+        headers: {
+          ...headers,
+          'User-Agent': 'SeenIt-Proxy/1.0'
+        },
+        signal: AbortSignal.timeout(10000)
+      };
+
+      if (method !== 'GET' && method !== 'HEAD' && body) {
+        fetchOptions.body = typeof body === 'string' ? body : JSON.stringify(body);
+        if (!fetchOptions.headers['Content-Type'] && typeof body !== 'string') {
+          fetchOptions.headers['Content-Type'] = 'application/json';
+        }
+      }
+
+      const response = await fetch(targetUrl, fetchOptions);
+      const text = await response.text();
+      let data: any = text;
+      try {
+        data = JSON.parse(text);
+      } catch {}
+
+      res.status(response.status).json({
+        status: response.status,
+        ok: response.ok,
+        data
+      });
+    } catch (err: any) {
+      console.error('[Service Proxy Error]', err);
+      res.status(500).json({
+        error: 'PROXY_FETCH_ERROR',
+        message: err?.message || 'Erreur lors de la requête proxy'
+      });
+    }
+  });
+
   app.get(['/service-worker.js', '/firebase-messaging-sw.js'], (req, res) => {
     const filename = req.path.replace('/', '');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');

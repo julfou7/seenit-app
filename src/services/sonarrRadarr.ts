@@ -24,9 +24,11 @@ function cleanUrl(url: string): string {
 }
 
 /**
- * Exécute une requête GET multiplateforme (Natif CapacitorHttp sur mobile / Fetch standard sur Web)
+ * Exécute une requête GET multiplateforme (Natif CapacitorHttp sur mobile / Proxy ou Fetch sur Web)
  */
 async function executeGet(url: string, headers: Record<string, string> = {}): Promise<any> {
+  const isLocalIp = url.includes('192.168.') || url.includes('localhost') || url.includes('127.0.0.1') || url.includes('10.') || url.includes('172.16.') || url.includes('172.17.') || url.includes('172.18.') || url.includes('172.19.') || url.includes('172.20.') || url.includes('172.21.') || url.includes('172.22.') || url.includes('172.23.') || url.includes('172.24.') || url.includes('172.25.') || url.includes('172.26.') || url.includes('172.27.') || url.includes('172.28.') || url.includes('172.29.') || url.includes('172.30.') || url.includes('172.31.');
+
   if (Capacitor.isNativePlatform()) {
     try {
       const res = await CapacitorHttp.get({
@@ -43,28 +45,40 @@ async function executeGet(url: string, headers: Record<string, string> = {}): Pr
       throw new Error(err?.message || 'Serveur injoignable sur le réseau local');
     }
   } else {
+    // Mode Navigateur Web (AI Studio Dev ou Web Browser)
+    if (isLocalIp) {
+      throw new Error(`Navigateur Web : Les adresses privées locales (192.168.x.x / localhost) sont protégées et bloquées par le navigateur (CORS / Mixed-Content HTTPS). Testez directement depuis l'application APK Android sur votre Wi-Fi, ou utilisez un tunnel HTTPS (ngrok) pour tester dans le navigateur.`);
+    }
+
     try {
-      const res = await fetch(url, {
-        method: 'GET',
-        headers,
-        signal: AbortSignal.timeout(8000)
+      // Passer par le proxy backend du serveur pour éviter les soucis CORS sur le Web
+      const res = await fetch('/api/service-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetUrl: url,
+          method: 'GET',
+          headers
+        }),
+        signal: AbortSignal.timeout(10000)
       });
-      if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
-      return await res.json();
-    } catch (err: any) {
-      if (url.includes('192.168.') || url.includes('localhost') || url.includes('127.0.0.1') || url.includes('10.')) {
-        throw new Error(`Navigateur Web : Les accès HTTP locaux (192.168.x.x) sont bloqués par la sécurité CORS/HTTPS du navigateur. Utilisez l'APK Android sur votre Wi-Fi.`);
+
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        throw new Error(json.message || json.error || `Erreur proxy ${res.status}`);
       }
+      return json.data;
+    } catch (err: any) {
       throw new Error(err?.message || 'Erreur réseau');
     }
   }
 }
 
 /**
- * Exécute une requête POST multiplateforme (Natif CapacitorHttp sur mobile / Fetch standard sur Web)
+ * Exécute une requête POST multiplateforme (Natif CapacitorHttp sur mobile / Proxy ou Fetch sur Web)
  */
 async function executePost(url: string, body: any, headers: Record<string, string> = {}): Promise<any> {
-  const isFormData = typeof body === 'string' && headers['Content-Type'] === 'application/x-www-form-urlencoded';
+  const isLocalIp = url.includes('192.168.') || url.includes('localhost') || url.includes('127.0.0.1') || url.includes('10.') || url.includes('172.16.') || url.includes('172.17.') || url.includes('172.18.') || url.includes('172.19.') || url.includes('172.20.') || url.includes('172.21.') || url.includes('172.22.') || url.includes('172.23.') || url.includes('172.24.') || url.includes('172.25.') || url.includes('172.26.') || url.includes('172.27.') || url.includes('172.28.') || url.includes('172.29.') || url.includes('172.30.') || url.includes('172.31.');
 
   if (Capacitor.isNativePlatform()) {
     try {
@@ -85,28 +99,30 @@ async function executePost(url: string, body: any, headers: Record<string, strin
       throw new Error(err?.message || 'Serveur injoignable sur le réseau local');
     }
   } else {
+    // Mode Navigateur Web
+    if (isLocalIp) {
+      throw new Error(`Navigateur Web : Les adresses privées locales (192.168.x.x / localhost) sont protégées et bloquées par le navigateur (CORS / Mixed-Content HTTPS). Testez directement depuis l'application APK Android sur votre Wi-Fi, ou utilisez un tunnel HTTPS (ngrok) pour tester dans le navigateur.`);
+    }
+
     try {
-      const res = await fetch(url, {
+      const res = await fetch('/api/service-proxy', {
         method: 'POST',
-        headers,
-        body: isFormData ? body : (typeof body === 'string' ? body : JSON.stringify(body)),
-        signal: AbortSignal.timeout(10000)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetUrl: url,
+          method: 'POST',
+          headers,
+          body
+        }),
+        signal: AbortSignal.timeout(12000)
       });
-      if (!res.ok) {
-        const errTxt = await res.text().catch(() => '');
-        throw new Error(`Erreur HTTP ${res.status} : ${errTxt.substring(0, 100)}`);
+
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        throw new Error(json.message || json.error || `Erreur proxy ${res.status}`);
       }
-      const txt = await res.text().catch(() => '');
-      if (!txt) return { success: true };
-      try {
-        return JSON.parse(txt);
-      } catch {
-        return txt;
-      }
+      return json.data;
     } catch (err: any) {
-      if (url.includes('192.168.') || url.includes('localhost') || url.includes('127.0.0.1') || url.includes('10.')) {
-        throw new Error(`Navigateur Web : Les accès HTTP locaux (192.168.x.x) sont bloqués par la sécurité CORS/HTTPS du navigateur. Utilisez l'APK Android sur votre Wi-Fi.`);
-      }
       throw new Error(err?.message || 'Erreur réseau');
     }
   }
