@@ -93,7 +93,6 @@ export async function getTVDBFranchiseTimeline(
             l.isOfficial ||
             l.name.toLowerCase().includes('franchise') ||
             l.name.toLowerCase().includes('universe') ||
-            l.name.toLowerCase().includes('collection') ||
             l.name.toLowerCase().includes('whoniverse') ||
             l.name.toLowerCase().includes('arrowverse') ||
             l.name.toLowerCase().includes('world') ||
@@ -138,7 +137,6 @@ export async function getTVDBFranchiseTimeline(
             l.isOfficial ||
             l.name.toLowerCase().includes('franchise') ||
             l.name.toLowerCase().includes('universe') ||
-            l.name.toLowerCase().includes('collection') ||
             l.name.toLowerCase().includes('whoniverse') ||
             l.name.toLowerCase().includes('arrowverse') ||
             l.name.toLowerCase().includes('world') ||
