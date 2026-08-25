@@ -103,18 +103,22 @@ export async function getTVDBFranchiseTimeline(
         if (validLists.length > 0) {
           validLists.sort((a: any, b: any) => {
             let aScore = 0; let bScore = 0;
-            if (a.isOfficial) aScore += 1;
-            if (b.isOfficial) bScore += 1;
+            if (a.isOfficial) aScore += 10;
+            if (b.isOfficial) bScore += 10;
             
             const aName = a.name.toLowerCase();
             const bName = b.name.toLowerCase();
-            if (aName.includes('universe') || aName.includes('world') || aName.includes('whoniverse')) aScore += 2;
-            if (bName.includes('universe') || bName.includes('world') || bName.includes('whoniverse')) bScore += 2;
+            if (aName.includes('universe') || aName.includes('world') || aName.includes('whoniverse') || aName.includes('franchise')) aScore += 5;
+            if (bName.includes('universe') || bName.includes('world') || bName.includes('whoniverse') || bName.includes('franchise')) bScore += 5;
+
+            // Prendre en compte le score de popularité TVDB pour départager les listes communautaires
+            if (a.score) aScore += Math.log10(a.score + 1);
+            if (b.score) bScore += Math.log10(b.score + 1);
             
             return bScore - aScore;
           });
-          // We will fetch up to top 3 lists and merge their entities
-          listIds = validLists.slice(0, 3).map((l: any) => l.id);
+          // Récupérer jusqu'aux 5 meilleures listes pour fusionner les spin-offs
+          listIds = validLists.slice(0, 5).map((l: any) => l.id);
         }
       }
     } catch (e) {
@@ -147,17 +151,20 @@ export async function getTVDBFranchiseTimeline(
         if (validLists.length > 0) {
           validLists.sort((a: any, b: any) => {
             let aScore = 0; let bScore = 0;
-            if (a.isOfficial) aScore += 1;
-            if (b.isOfficial) bScore += 1;
+            if (a.isOfficial) aScore += 10;
+            if (b.isOfficial) bScore += 10;
             
             const aName = a.name.toLowerCase();
             const bName = b.name.toLowerCase();
-            if (aName.includes('universe') || aName.includes('world') || aName.includes('whoniverse')) aScore += 2;
-            if (bName.includes('universe') || bName.includes('world') || bName.includes('whoniverse')) bScore += 2;
+            if (aName.includes('universe') || aName.includes('world') || aName.includes('whoniverse') || aName.includes('franchise')) aScore += 5;
+            if (bName.includes('universe') || bName.includes('world') || bName.includes('whoniverse') || bName.includes('franchise')) bScore += 5;
+
+            if (a.score) aScore += Math.log10(a.score + 1);
+            if (b.score) bScore += Math.log10(b.score + 1);
             
             return bScore - aScore;
           });
-          listIds = validLists.slice(0, 3).map((l: any) => l.tvdb_id || l.id);
+          listIds = validLists.slice(0, 5).map((l: any) => l.tvdb_id || l.id);
         }
       }
     } catch (e) {
