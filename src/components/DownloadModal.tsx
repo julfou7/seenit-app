@@ -14,12 +14,22 @@ import {
   Sparkles,
   Server,
   Film,
-  Tv
+  Tv,
+  Layers,
+  PlaySquare,
+  Zap,
+  RefreshCw
 } from 'lucide-react';
-import { C411Torrent, searchC411Torrents, formatTorrentSize, triggerRemoteDownload } from '../services/c411';
+import { C411Torrent, searchC411Torrents, formatTorrentSize } from '../services/c411';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
+import { 
+  searchAndDownloadInSonarr, 
+  searchAndDownloadInRadarr, 
+  pushReleaseDirectly,
+  testServiceConnection
+} from '../services/sonarrRadarr';
 
-interface DownloadModalProps {
+export interface DownloadModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
@@ -27,6 +37,9 @@ interface DownloadModalProps {
   year?: string | number;
   mediaType: 'movie' | 'tv';
   tmdbId?: number | string;
+  initialSeason?: number;
+  initialEpisode?: number;
+  totalSeasons?: number;
   onSuccessToast?: (msg: string) => void;
 }
 
@@ -38,6 +51,9 @@ export function DownloadModal({
   year,
   mediaType,
   tmdbId,
+  initialSeason,
+  initialEpisode,
+  totalSeasons = 1,
   onSuccessToast
 }: DownloadModalProps) {
   const {
@@ -49,31 +65,77 @@ export function DownloadModal({
     qbittorrentUrl,
     qbittorrentUsername,
     qbittorrentPassword,
-    autoSendToDownloader
   } = useDownloadConfigStore();
 
-  const [searchQuery, setSearchQuery] = useState(title);
+  // Mode de portée (Scope) : 'all' (Série entière / Film), 'season' (Saison X), 'episode' (S01E01)
+  const [scopeMode, setScopeMode] = useState<'all' | 'season' | 'episode'>(
+    initialEpisode && initialSeason ? 'episode' : initialSeason ? 'season' : 'all'
+  );
+  const [selectedSeason, setSelectedSeason] = useState<number>(initialSeason || 1);
+  const [selectedEpisode, setSelectedEpisode] = useState<number>(initialEpisode || 1);
+
+  const [searchQuery, setSearchQuery] = useState('');
   const [torrents, setTorrents] = useState<C411Torrent[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
+  
+  // États d'action Sonarr / Radarr
+  const [isTriggeringAuto, setIsTriggeringAuto] = useState(false);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
-  const [actionMessage, setActionMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [actionMessage, setActionMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   // Filtres
   const [selectedQuality, setSelectedQuality] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'seeders' | 'size' | 'date'>('seeders');
 
+  // Génère la requête de recherche idéale selon la portée
+  const generateQuery = (mode: 'all' | 'season' | 'episode', sNum: number, eNum: number) => {
+    const baseTitle = (title || '').trim();
+    if (mediaType === 'movie') {
+      return year ? `${baseTitle} ${year}` : baseTitle;
+    }
+
+    if (mode === 'episode') {
+      const sStr = String(sNum).padStart(2, '0');
+      const eStr = String(eNum).padStart(2, '0');
+      return `${baseTitle} S${sStr}E${eStr}`;
+    }
+
+    if (mode === 'season') {
+      const sStr = String(sNum).padStart(2, '0');
+      return `${baseTitle} S${sStr}`;
+    }
+
+    return baseTitle;
+  };
+
   useEffect(() => {
     if (isOpen) {
-      setSearchQuery(title);
-      performSearch(title);
+      const initialMode = initialEpisode && initialSeason ? 'episode' : initialSeason ? 'season' : 'all';
+      setScopeMode(initialMode);
+      if (initialSeason) setSelectedSeason(initialSeason);
+      if (initialEpisode) setSelectedEpisode(initialEpisode);
+
+      const q = generateQuery(initialMode, initialSeason || 1, initialEpisode || 1);
+      setSearchQuery(q);
+      performSearch(q);
     } else {
       setTorrents([]);
       setHasSearched(false);
       setActionMessage(null);
+      setIsTriggeringAuto(false);
     }
-  }, [isOpen, title]);
+  }, [isOpen, title, initialSeason, initialEpisode]);
+
+  const handleScopeChange = (newMode: 'all' | 'season' | 'episode', sNum = selectedSeason, eNum = selectedEpisode) => {
+    setScopeMode(newMode);
+    setSelectedSeason(sNum);
+    setSelectedEpisode(eNum);
+    const newQ = generateQuery(newMode, sNum, eNum);
+    setSearchQuery(newQ);
+    performSearch(newQ);
+  };
 
   const performSearch = async (queryText: string) => {
     if (!queryText.trim()) return;
@@ -83,7 +145,7 @@ export function DownloadModal({
       const results = await searchC411Torrents({
         query: queryText.trim(),
         mediaType,
-        year,
+        year: mediaType === 'movie' ? year : undefined,
         apiKey: c411ApiKey
       });
       setTorrents(results);
@@ -97,6 +159,55 @@ export function DownloadModal({
     }
   };
 
+  // 1. Déclenchement automatique intelligent via Sonarr / Radarr
+  const handleAutoSearchClient = async () => {
+    setIsTriggeringAuto(true);
+    setActionMessage(null);
+
+    try {
+      if (mediaType === 'tv' && sonarrUrl && sonarrApiKey) {
+        const res = await searchAndDownloadInSonarr({
+          url: sonarrUrl,
+          apiKey: sonarrApiKey,
+          title,
+          tmdbId,
+          season: scopeMode === 'all' ? undefined : selectedSeason,
+          episode: scopeMode === 'episode' ? selectedEpisode : undefined
+        });
+
+        if (res.success) {
+          setActionMessage({ text: res.message, type: 'success' });
+          if (onSuccessToast) onSuccessToast(res.message);
+        } else {
+          setActionMessage({ text: res.message, type: 'error' });
+        }
+      } else if (mediaType === 'movie' && radarrUrl && radarrApiKey) {
+        const res = await searchAndDownloadInRadarr({
+          url: radarrUrl,
+          apiKey: radarrApiKey,
+          title,
+          tmdbId,
+          year
+        });
+
+        if (res.success) {
+          setActionMessage({ text: res.message, type: 'success' });
+          if (onSuccessToast) onSuccessToast(res.message);
+        } else {
+          setActionMessage({ text: res.message, type: 'error' });
+        }
+      }
+    } catch (err: any) {
+      setActionMessage({
+        text: `Erreur client : ${err?.message || 'Serveur injoignable'}`,
+        type: 'error'
+      });
+    } finally {
+      setIsTriggeringAuto(false);
+    }
+  };
+
+  // 2. Copier le lien Magnet
   const handleCopyMagnet = (torrent: C411Torrent) => {
     if (torrent.magnetUri) {
       navigator.clipboard.writeText(torrent.magnetUri);
@@ -106,24 +217,34 @@ export function DownloadModal({
     }
   };
 
-  const handleSendToClient = async (torrent: C411Torrent, targetClient?: 'sonarr' | 'radarr' | 'qbittorrent') => {
+  // 3. Envoyer une release spécifique à Sonarr / Radarr / qBittorrent
+  const handleSendToClient = async (torrent: C411Torrent) => {
     setDownloadingId(torrent.id);
     setActionMessage(null);
 
-    // Déterminer la cible
-    let clientToUse: 'sonarr' | 'radarr' | 'qbittorrent' | null = targetClient || null;
-    if (!clientToUse) {
-      if (mediaType === 'tv' && sonarrUrl && sonarrApiKey) {
-        clientToUse = 'sonarr';
-      } else if (mediaType === 'movie' && radarrUrl && radarrApiKey) {
-        clientToUse = 'radarr';
-      } else if (qbittorrentUrl) {
-        clientToUse = 'qbittorrent';
-      }
+    let clientToUse: 'sonarr' | 'radarr' | 'qbittorrent' | null = null;
+    let url = '';
+    let apiKey = '';
+    let username = '';
+    let password = '';
+
+    if (mediaType === 'tv' && sonarrUrl && sonarrApiKey) {
+      clientToUse = 'sonarr';
+      url = sonarrUrl;
+      apiKey = sonarrApiKey;
+    } else if (mediaType === 'movie' && radarrUrl && radarrApiKey) {
+      clientToUse = 'radarr';
+      url = radarrUrl;
+      apiKey = radarrApiKey;
+    } else if (qbittorrentUrl) {
+      clientToUse = 'qbittorrent';
+      url = qbittorrentUrl;
+      username = qbittorrentUsername;
+      password = qbittorrentPassword;
     }
 
     if (!clientToUse) {
-      // Aucun client distant configuré -> On copie le lien magnet et on ouvre le magnet
+      // Aucun client distant configuré -> ouvrir le lien magnet directement
       if (torrent.magnetUri) {
         window.location.href = torrent.magnetUri;
         if (onSuccessToast) onSuccessToast('Ouverture du client BitTorrent local...');
@@ -132,34 +253,14 @@ export function DownloadModal({
       return;
     }
 
-    let url = '';
-    let apiKey = '';
-    let username = '';
-    let password = '';
-
-    if (clientToUse === 'sonarr') {
-      url = sonarrUrl;
-      apiKey = sonarrApiKey;
-    } else if (clientToUse === 'radarr') {
-      url = radarrUrl;
-      apiKey = radarrApiKey;
-    } else if (clientToUse === 'qbittorrent') {
-      url = qbittorrentUrl;
-      username = qbittorrentUsername;
-      password = qbittorrentPassword;
-    }
-
-    const result = await triggerRemoteDownload({
+    const result = await pushReleaseDirectly({
       service: clientToUse,
       url,
       apiKey,
       username,
       password,
       torrent,
-      mediaType,
-      tmdbId,
-      title,
-      year
+      mediaType
     });
 
     setDownloadingId(null);
@@ -208,11 +309,13 @@ export function DownloadModal({
     qbittorrentUrl
   );
 
+  const clientName = mediaType === 'tv' && sonarrUrl ? 'Sonarr' : mediaType === 'movie' && radarrUrl ? 'Radarr' : 'qBittorrent';
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/90">
@@ -223,10 +326,10 @@ export function DownloadModal({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-base text-white line-clamp-1">
-                  Télécharger sur C411
+                  Téléchargement & Tracker
                 </h3>
                 <span className="text-[10px] uppercase font-black px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                  Tracker Privé
+                  C411 & Serveur
                 </span>
               </div>
               <p className="text-xs text-zinc-400 line-clamp-1">
@@ -242,8 +345,143 @@ export function DownloadModal({
           </button>
         </div>
 
-        {/* Search Bar & Quick Suggestions */}
-        <div className="p-4 bg-zinc-950/60 border-b border-zinc-800/80 space-y-3">
+        {/* Scope Selector for Series (Série entière vs Saison vs Épisode) */}
+        {mediaType === 'tv' && (
+          <div className="p-3 bg-zinc-950/80 border-b border-zinc-800 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase text-zinc-400 tracking-wider flex items-center gap-1.5">
+                <Layers size={13} className="text-blue-400" />
+                Portée du téléchargement :
+              </span>
+              <span className="text-[11px] text-zinc-500 font-semibold">
+                {scopeMode === 'all' ? 'Toute la série' : scopeMode === 'season' ? `Saison ${selectedSeason} entière` : `Saison ${selectedSeason} • Épisode ${selectedEpisode}`}
+              </span>
+            </div>
+
+            <div className="flex gap-1.5 bg-zinc-900/90 p-1 rounded-xl border border-white/5">
+              <button
+                onClick={() => handleScopeChange('all')}
+                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  scopeMode === 'all' ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <Tv size={13} />
+                Série entière
+              </button>
+
+              <button
+                onClick={() => handleScopeChange('season')}
+                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  scopeMode === 'season' ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <Layers size={13} />
+                Saison entière
+              </button>
+
+              <button
+                onClick={() => handleScopeChange('episode')}
+                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  scopeMode === 'episode' ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <PlaySquare size={13} />
+                Épisode précis
+              </button>
+            </div>
+
+            {/* Selecteurs fins de Saison / Épisode */}
+            {scopeMode !== 'all' && (
+              <div className="flex items-center gap-2 pt-1 animate-in fade-in duration-150">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-zinc-400">Saison :</span>
+                  <select
+                    value={selectedSeason}
+                    onChange={(e) => handleScopeChange(scopeMode, Number(e.target.value), selectedEpisode)}
+                    className="bg-zinc-850 bg-zinc-900 text-white border border-zinc-700/80 rounded-lg px-2.5 py-1 text-xs font-bold focus:outline-none focus:border-blue-500"
+                  >
+                    {Array.from({ length: Math.max(totalSeasons, 15) }, (_, i) => i + 1).map((s) => (
+                      <option key={`s_opt_${s}`} value={s}>
+                        Saison {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {scopeMode === 'episode' && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-bold text-zinc-400">Épisode :</span>
+                    <select
+                      value={selectedEpisode}
+                      onChange={(e) => handleScopeChange('episode', selectedSeason, Number(e.target.value))}
+                      className="bg-zinc-850 bg-zinc-900 text-white border border-zinc-700/80 rounded-lg px-2.5 py-1 text-xs font-bold focus:outline-none focus:border-blue-500"
+                    >
+                      {Array.from({ length: 30 }, (_, i) => i + 1).map((ep) => (
+                        <option key={`ep_opt_${ep}`} value={ep}>
+                          Épisode {ep}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Hero Card : Déclenchement Automatique Sonarr / Radarr (si configuré) */}
+        {hasConfiguredClient && (sonarrUrl || radarrUrl) && (
+          <div className="p-3.5 bg-gradient-to-r from-blue-950/40 via-zinc-900/80 to-blue-950/30 border-b border-blue-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                <Zap size={16} />
+              </div>
+              <div className="min-w-0">
+                <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                  Gestion Automatique {clientName}
+                </h4>
+                <p className="text-[10px] text-zinc-400">
+                  {mediaType === 'tv' 
+                    ? scopeMode === 'all' ? `Ajouter et télécharger toute la série dans Sonarr` : scopeMode === 'season' ? `Télécharger la Saison ${selectedSeason} dans Sonarr` : `Télécharger S${String(selectedSeason).padStart(2, '0')}E${String(selectedEpisode).padStart(2, '0')} dans Sonarr`
+                    : `Ajouter et télécharger le film dans Radarr`}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleAutoSearchClient}
+              disabled={isTriggeringAuto}
+              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-95 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-blue-500/20 shrink-0 disabled:opacity-50"
+            >
+              {isTriggeringAuto ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Traitement {clientName}...</span>
+                </>
+              ) : (
+                <>
+                  <Zap size={14} className="text-amber-300" />
+                  <span>Lancer dans {clientName}</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* Action Message Alert */}
+        {actionMessage && (
+          <div className={`px-4 py-2.5 text-xs flex items-center gap-2 ${
+            actionMessage.type === 'success' 
+              ? 'bg-emerald-950/90 text-emerald-300 border-b border-emerald-800' 
+              : 'bg-red-950/90 text-red-300 border-b border-red-800'
+          }`}>
+            {actionMessage.type === 'success' ? <Check size={14} className="shrink-0 text-emerald-400" /> : <AlertCircle size={14} className="shrink-0 text-red-400" />}
+            <span className="leading-snug">{actionMessage.text}</span>
+          </div>
+        )}
+
+        {/* Search Bar & Results Header */}
+        <div className="p-3 bg-zinc-950/60 border-b border-zinc-800/80 space-y-2.5">
           <form 
             onSubmit={(e) => {
               e.preventDefault();
@@ -257,7 +495,7 @@ export function DownloadModal({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Nom du film ou de la série..."
+                placeholder="Recherche de torrent..."
                 className="w-full pl-10 pr-4 py-2 bg-zinc-900 border border-zinc-700/80 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 transition-colors"
               />
             </div>
@@ -270,37 +508,10 @@ export function DownloadModal({
               Rechercher
             </button>
           </form>
-
-          {/* Suggestions rapides */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] font-bold uppercase text-zinc-500 mr-1">Suggestions :</span>
-            <button
-              onClick={() => { setSearchQuery(title); performSearch(title); }}
-              className="px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300 hover:text-white text-[11px] font-medium border border-white/5 transition-colors"
-            >
-              {title}
-            </button>
-            {originalTitle && originalTitle !== title && (
-              <button
-                onClick={() => { setSearchQuery(originalTitle); performSearch(originalTitle); }}
-                className="px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300 hover:text-white text-[11px] font-medium border border-white/5 transition-colors"
-              >
-                {originalTitle} (VO)
-              </button>
-            )}
-            {year && (
-              <button
-                onClick={() => { const q = `${title} ${year}`; setSearchQuery(q); performSearch(q); }}
-                className="px-2 py-0.5 rounded-md bg-zinc-800 text-zinc-300 hover:text-white text-[11px] font-medium border border-white/5 transition-colors"
-              >
-                {title} {year}
-              </button>
-            )}
-          </div>
         </div>
 
         {/* Filters & Sorting */}
-        <div className="px-4 py-2.5 bg-zinc-900 flex items-center justify-between border-b border-zinc-800/60 text-xs">
+        <div className="px-4 py-2 bg-zinc-900 flex items-center justify-between border-b border-zinc-800/60 text-xs">
           <div className="flex items-center gap-2">
             <span className="text-zinc-400 font-medium text-[11px]">Qualité :</span>
             <select
@@ -329,22 +540,12 @@ export function DownloadModal({
           </div>
         </div>
 
-        {/* Action Message Alert */}
-        {actionMessage && (
-          <div className={`px-4 py-2 text-xs flex items-center gap-2 ${
-            actionMessage.type === 'success' ? 'bg-emerald-950/80 text-emerald-300 border-b border-emerald-800' : 'bg-red-950/80 text-red-300 border-b border-red-800'
-          }`}>
-            {actionMessage.type === 'success' ? <Check size={14} /> : <AlertCircle size={14} />}
-            <span>{actionMessage.text}</span>
-          </div>
-        )}
-
         {/* Results List */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2.5">
           {loading ? (
             <div className="py-12 flex flex-col items-center justify-center gap-3 text-zinc-400">
               <Loader2 size={28} className="animate-spin text-blue-400" />
-              <p className="text-xs font-medium">Recherche sur le tracker C411...</p>
+              <p className="text-xs font-medium">Recherche des releases sur C411...</p>
             </div>
           ) : filteredTorrents.length > 0 ? (
             filteredTorrents.map((t) => {
@@ -354,7 +555,7 @@ export function DownloadModal({
               return (
                 <div
                   key={`torrent_${t.id}`}
-                  className="bg-zinc-950/60 hover:bg-zinc-950 border border-zinc-800/80 hover:border-zinc-700 rounded-xl p-3.5 transition-all flex flex-col gap-2.5"
+                  className="bg-zinc-950/60 hover:bg-zinc-950 border border-zinc-800/80 hover:border-zinc-700 rounded-xl p-3 sm:p-3.5 transition-all flex flex-col gap-2.5"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -407,7 +608,7 @@ export function DownloadModal({
                           className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 shadow-sm"
                         >
                           {isSending ? <Loader2 size={13} className="animate-spin" /> : <Server size={13} />}
-                          Envoyer au client ({mediaType === 'tv' && sonarrUrl ? 'Sonarr' : mediaType === 'movie' && radarrUrl ? 'Radarr' : 'qBittorrent'})
+                          Envoyer à {clientName}
                         </button>
                       ) : (
                         <button
@@ -415,7 +616,7 @@ export function DownloadModal({
                           className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
                         >
                           <Download size={13} />
-                          Lancer le téléchargement
+                          Télécharger
                         </button>
                       )}
                     </div>
@@ -428,7 +629,7 @@ export function DownloadModal({
               <AlertCircle size={28} className="text-zinc-500" />
               <p className="text-xs font-bold text-zinc-300">Aucun résultat trouvé sur C411</p>
               <p className="text-[11px] text-zinc-500 max-w-sm">
-                Essayez d'ajuster le titre dans la barre de recherche ci-dessus (sans caractères spéciaux ou en anglais).
+                Essayez d'ajuster le titre dans la barre de recherche ou de basculer la portée (Série complète / Saison / Épisode).
               </p>
             </div>
           ) : null}
@@ -436,9 +637,9 @@ export function DownloadModal({
 
         {/* Footer info */}
         <div className="p-3 bg-zinc-950 border-t border-zinc-800 text-[10px] text-zinc-500 flex items-center justify-between">
-          <span>Connexion sécurisée via l'API C411</span>
+          <span>Tracker C411 actif</span>
           <span className="text-zinc-400">
-            {hasConfiguredClient ? 'Client distant actif' : 'Configuration possible dans Paramètres'}
+            {hasConfiguredClient ? `${clientName} connecté` : 'Configuration possible dans Paramètres'}
           </span>
         </div>
 

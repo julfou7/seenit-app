@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'motion/react';
 import { type Show } from '../types';
-import { X, Check, Star, ChevronLeft, ChevronRight, Clock, ArrowLeft, Sparkles } from 'lucide-react';
+import { X, Check, Star, ChevronLeft, ChevronRight, Clock, ArrowLeft, Sparkles, Download } from 'lucide-react';
 import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getTodayStr, getCalendarDaysDiff, scrollAllCarouselsToStart } from '../lib/utils';
 import { useShows } from '../hooks/useShows';
 import { useToastStore } from '../store/toastStore';
@@ -9,6 +9,7 @@ import { tmdb } from '../features/shows/tmdb';
 import { syncSingleItem } from "../hooks/useDetailsSyncWorker";
 import { getSeasonImdbRatings, getEpisodeImdbVotes } from '../features/shows/omdbService';
 import { RedditSection } from '../components/community/RedditSection';
+import { DownloadModal } from '../components/DownloadModal';
 
 interface EpisodeDetailModalProps {
   show?: Show;
@@ -28,6 +29,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   const [isLoadingEpisode, setIsLoadingEpisode] = useState(false);
 
   const [showFutureConfirm, setShowFutureConfirm] = useState(false);
+  const [isDownloadOpen, setIsDownloadOpen] = useState(false);
 
   const { shows, addShow, updateShow } = useShows();
   const { showToast } = useToastStore();
@@ -936,6 +938,15 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                     )}
                   </div>
 
+                  {/* Bouton Télécharger l'épisode (Sonarr / C411) */}
+                  <button
+                    onClick={() => setIsDownloadOpen(true)}
+                    className="w-full py-3 px-4 rounded-2xl flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] bg-blue-600/15 hover:bg-blue-600/25 border border-blue-500/30 text-blue-400 font-bold text-xs cursor-pointer shadow-sm touch-manipulation select-none"
+                  >
+                    <Download size={16} className="text-blue-400 shrink-0" />
+                    <span>Télécharger S{String(currentSeason).padStart(2, '0')}E{String(currentEpisode.episode_number).padStart(2, '0')}</span>
+                  </button>
+
                   {/* Synopsis - Interactif & Déroulable */}
                   {currentEpisode.overview && (
                     <div className="mt-2 mb-2 animate-in fade-in duration-700">
@@ -1009,6 +1020,17 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
         </AnimatePresence>
       </motion.div>
     </motion.div>
+
+    <DownloadModal
+      isOpen={isDownloadOpen}
+      onClose={() => setIsDownloadOpen(false)}
+      title={activeShow?.title || tmdbShowTitle || 'Série'}
+      mediaType="tv"
+      tmdbId={tmdbShowId || activeShow?.tmdbId}
+      initialSeason={currentSeason}
+      initialEpisode={currentEpisode.episode_number}
+      onSuccessToast={showToast}
+    />
   </div>
   );
 }
