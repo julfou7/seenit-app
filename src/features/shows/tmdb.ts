@@ -322,11 +322,8 @@ class TMDBClient {
           return dateA - dateB;
         });
 
-        // Ajouter la numérotation d'ordre chronologique (#1, #2, #3...)
-        universe = combined.map((item, index) => ({
-          ...item,
-          sagaOrder: index + 1
-        }));
+        // Pas de sagaOrder pour l'univers étendu
+        universe = combined;
       }
     }
     
@@ -336,11 +333,6 @@ class TMDBClient {
       const collectionSet = new Set(collection.map(c => `${c.media_type}_${c.id}`));
       universe = universe.filter(u => !collectionSet.has(`${u.media_type}_${u.id}`));
     }
-
-    // Re-indexer l'univers après filtre (sans sagaOrder)
-    universe = universe.map((item) => ({
-      ...item
-    }));
 
     // On n'exclut plus l'élément courant, car l'utilisateur veut le voir avec le badge 'FILM ACTUEL'
     // pour se repérer dans la chronologie.

@@ -56,7 +56,7 @@ export async function getTVDBFranchiseTimeline(
   if (!token) return [];
 
   let activeTvdbId = tvdbId;
-  let listId: number | string | null = null;
+  let listIds: (number | string)[] = [];
 
   // A. Si aucun ID TVDB fourni, rechercher par titre sur TVDB
   if (!activeTvdbId && mediaTitle) {
@@ -96,20 +96,26 @@ export async function getTVDBFranchiseTimeline(
             l.name.toLowerCase().includes('collection') ||
             l.name.toLowerCase().includes('whoniverse') ||
             l.name.toLowerCase().includes('arrowverse') ||
-            l.name.toLowerCase().includes('world of') ||
+            l.name.toLowerCase().includes('world') ||
+            l.name.toLowerCase().includes('saga') ||
             l.name.toLowerCase().includes('one chicago')
         );
 
         if (validLists.length > 0) {
-          // Priority to 'universe' and 'world' to get broader universes (e.g. Wizarding World vs Harry Potter Franchise)
           validLists.sort((a: any, b: any) => {
+            let aScore = 0; let bScore = 0;
+            if (a.isOfficial) aScore += 1;
+            if (b.isOfficial) bScore += 1;
+            
             const aName = a.name.toLowerCase();
             const bName = b.name.toLowerCase();
-            const aScore = (aName.includes('universe') || aName.includes('world') || aName.includes('whoniverse')) ? 2 : 1;
-            const bScore = (bName.includes('universe') || bName.includes('world') || bName.includes('whoniverse')) ? 2 : 1;
+            if (aName.includes('universe') || aName.includes('world') || aName.includes('whoniverse')) aScore += 2;
+            if (bName.includes('universe') || bName.includes('world') || bName.includes('whoniverse')) bScore += 2;
+            
             return bScore - aScore;
           });
-          listId = validLists[0].id;
+          // We will fetch up to top 3 lists and merge their entities
+          listIds = validLists.slice(0, 3).map((l: any) => l.id);
         }
       }
     } catch (e) {
@@ -118,7 +124,7 @@ export async function getTVDBFranchiseTimeline(
   }
 
   // C. Recherche de liste par le titre principal de la franchise si aucune liste directe
-  if (!listId && mediaTitle) {
+  if (listIds.length === 0 && mediaTitle) {
     try {
       const cleanTitle = mediaTitle.replace(/:(.*)/, '').trim();
       const searchListRes = await fetch(
@@ -127,14 +133,33 @@ export async function getTVDBFranchiseTimeline(
       );
       if (searchListRes.ok) {
         const sListData = await searchListRes.json();
-        const matchedList = sListData.data?.find(
+        const validLists = (sListData.data || []).filter(
           (l: any) =>
+            l.isOfficial ||
             l.name.toLowerCase().includes('franchise') ||
             l.name.toLowerCase().includes('universe') ||
-            l.name.toLowerCase().includes('collection')
+            l.name.toLowerCase().includes('collection') ||
+            l.name.toLowerCase().includes('whoniverse') ||
+            l.name.toLowerCase().includes('arrowverse') ||
+            l.name.toLowerCase().includes('world') ||
+            l.name.toLowerCase().includes('saga') ||
+            l.name.toLowerCase().includes('one chicago')
         );
-        if (matchedList) {
-          listId = matchedList.tvdb_id || matchedList.id;
+
+        if (validLists.length > 0) {
+          validLists.sort((a: any, b: any) => {
+            let aScore = 0; let bScore = 0;
+            if (a.isOfficial) aScore += 1;
+            if (b.isOfficial) bScore += 1;
+            
+            const aName = a.name.toLowerCase();
+            const bName = b.name.toLowerCase();
+            if (aName.includes('universe') || aName.includes('world') || aName.includes('whoniverse')) aScore += 2;
+            if (bName.includes('universe') || bName.includes('world') || bName.includes('whoniverse')) bScore += 2;
+            
+            return bScore - aScore;
+          });
+          listIds = validLists.slice(0, 3).map((l: any) => l.tvdb_id || l.id);
         }
       }
     } catch (e) {
@@ -142,20 +167,31 @@ export async function getTVDBFranchiseTimeline(
     }
   }
 
-  if (!listId) return [];
+  if (listIds.length === 0) return [];
 
-  // D. Récupérer les entités composant la liste de franchise
+  // D. Récupérer et fusionner les entités composant les listes de franchise
   try {
-    const listRes = await fetch(`${BASE_URL}/lists/${listId}/extended`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!listRes.ok) return [];
+    const entitiesMap = new Map();
+    for (const listId of listIds) {
+      const listRes = await fetch(`${BASE_URL}/lists/${listId}/extended`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (listRes.ok) {
+        const listData = (await listRes.json()).data;
+        const entities = listData?.entities || [];
+        entities.forEach((entity: any) => {
+          const key = entity.seriesId ? `tv_${entity.seriesId}` : `movie_${entity.movieId}`;
+          if (!entitiesMap.has(key)) {
+            entitiesMap.set(key, entity);
+          }
+        });
+      }
+    }
 
-    const listData = (await listRes.json()).data;
-    const entities = listData?.entities || [];
+    const mergedEntities = Array.from(entitiesMap.values());
 
     // E. Extraire les identifiants TMDB de chaque entité en parallèle
-    const promises = entities.map(async (entity: any) => {
+    const promises = mergedEntities.map(async (entity: any) => {
       let url: string | null = null;
       let media_type: 'tv' | 'movie' = 'tv';
 
