@@ -88,6 +88,8 @@ export function DownloadModal({
 
   // Saisons et Épisodes réels
   const [availableSeasons, setAvailableSeasons] = useState<SeasonInfo[]>([]);
+  const [isSeasonPickerOpen, setIsSeasonPickerOpen] = useState<boolean>(false);
+  const [isEpisodePickerOpen, setIsEpisodePickerOpen] = useState<boolean>(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [torrents, setTorrents] = useState<C411Torrent[]>([]);
@@ -421,8 +423,8 @@ export function DownloadModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[82vh] sm:max-h-[88vh] mb-12 sm:mb-0">
         
         {/* Header */}
         <div className="p-3.5 sm:p-5 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/90 shrink-0">
@@ -495,54 +497,36 @@ export function DownloadModal({
               </button>
             </div>
 
-            {/* Sélecteurs intelligents et réels de Saison et d'Épisode */}
+            {/* Sélecteurs intelligents et réels de Saison et d'Épisode (Custom Pickers pour compatibilité Android/iOS/Web) */}
             {scopeMode !== 'all' && (
               <div className="flex flex-wrap items-center gap-2.5 pt-1 animate-in fade-in duration-150">
                 {/* Sélecteur de Saison */}
                 <div className="flex items-center gap-1.5">
                   <span className="text-[11px] font-bold text-zinc-400">Saison :</span>
-                  <div className="relative inline-flex items-center">
-                    <select
-                      value={selectedSeason}
-                      onChange={(e) => handleSeasonSelect(Number(e.target.value))}
-                      className="appearance-none bg-zinc-800 text-white border border-zinc-700 rounded-lg pl-2.5 pr-7 py-1 text-xs font-bold focus:outline-none focus:border-blue-500 cursor-pointer shadow-sm"
-                    >
-                      {availableSeasons.length > 0 ? (
-                        availableSeasons.map((s) => (
-                          <option key={`s_opt_${s.season_number}`} value={s.season_number} className="bg-zinc-900 text-white">
-                            {s.name || `Saison ${s.season_number}`} {s.episode_count ? `(${s.episode_count} ép.)` : ''}
-                          </option>
-                        ))
-                      ) : (
-                        Array.from({ length: Math.max(totalSeasons, 1) }, (_, i) => i + 1).map((s) => (
-                          <option key={`s_opt_fb_${s}`} value={s} className="bg-zinc-900 text-white">
-                            Saison {s}
-                          </option>
-                        ))
-                      )}
-                    </select>
-                    <ChevronDown size={13} className="absolute right-2 text-zinc-400 pointer-events-none" />
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsSeasonPickerOpen(true)}
+                    className="bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 text-white border border-zinc-700 rounded-lg px-2.5 py-1 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                  >
+                    <span className="truncate max-w-[170px]">
+                      {currentSeasonData.name || `Saison ${selectedSeason}`} {currentSeasonData.episode_count ? `(${currentSeasonData.episode_count} ép.)` : ''}
+                    </span>
+                    <ChevronDown size={13} className="text-zinc-400 shrink-0" />
+                  </button>
                 </div>
 
-                {/* Sélecteur d'Épisode (strictement filtré sur le nombre réel d'épisodes) */}
+                {/* Sélecteur d'Épisode */}
                 {scopeMode === 'episode' && (
                   <div className="flex items-center gap-1.5">
                     <span className="text-[11px] font-bold text-zinc-400">Épisode :</span>
-                    <div className="relative inline-flex items-center">
-                      <select
-                        value={selectedEpisode}
-                        onChange={(e) => handleEpisodeSelect(Number(e.target.value))}
-                        className="appearance-none bg-zinc-800 text-white border border-zinc-700 rounded-lg pl-2.5 pr-7 py-1 text-xs font-bold focus:outline-none focus:border-blue-500 cursor-pointer shadow-sm"
-                      >
-                        {Array.from({ length: maxEpisodesForCurrentSeason }, (_, i) => i + 1).map((ep) => (
-                          <option key={`ep_opt_${ep}`} value={ep} className="bg-zinc-900 text-white">
-                            Épisode {ep}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown size={13} className="absolute right-2 text-zinc-400 pointer-events-none" />
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsEpisodePickerOpen(true)}
+                      className="bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 text-white border border-zinc-700 rounded-lg px-2.5 py-1 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                    >
+                      <span>Épisode {selectedEpisode}</span>
+                      <ChevronDown size={13} className="text-zinc-400 shrink-0" />
+                    </button>
                   </div>
                 )}
               </div>
@@ -632,37 +616,57 @@ export function DownloadModal({
         </div>
 
         {/* Filters & Sorting */}
-        <div className="px-3 py-1.5 bg-zinc-900 flex items-center justify-between border-b border-zinc-800/60 text-xs shrink-0 gap-2 overflow-x-auto">
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-zinc-400 font-medium text-[10px] sm:text-[11px] whitespace-nowrap">Qualité :</span>
-            <select
-              value={selectedQuality}
-              onChange={(e) => setSelectedQuality(e.target.value)}
-              className="bg-zinc-800 text-zinc-200 border border-zinc-700/60 rounded-lg px-2 py-0.5 text-[10px] sm:text-[11px] focus:outline-none cursor-pointer"
-            >
-              <option value="all">Toutes</option>
-              <option value="2160p">4K / 2160p</option>
-              <option value="1080p">1080p</option>
-              <option value="720p">720p</option>
-            </select>
+        <div className="px-3 py-2 bg-zinc-900 flex flex-wrap items-center justify-between border-b border-zinc-800/80 text-xs shrink-0 gap-2">
+          {/* Filtre Qualité */}
+          <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar">
+            <span className="text-zinc-400 font-bold text-[10px] sm:text-[11px] mr-1">Qualité :</span>
+            {[
+              { id: 'all', label: 'Toutes' },
+              { id: '2160p', label: '4K' },
+              { id: '1080p', label: '1080p' },
+              { id: '720p', label: '720p' },
+            ].map((q) => (
+              <button
+                key={`q_btn_${q.id}`}
+                type="button"
+                onClick={() => setSelectedQuality(q.id)}
+                className={`px-2 py-0.5 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
+                  selectedQuality === q.id
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-zinc-800/80 hover:bg-zinc-800 text-zinc-300 border border-zinc-700/50'
+                }`}
+              >
+                {q.label}
+              </button>
+            ))}
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-zinc-400 font-medium text-[10px] sm:text-[11px] whitespace-nowrap">Tri :</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="bg-zinc-800 text-zinc-200 border border-zinc-700/60 rounded-lg px-2 py-0.5 text-[10px] sm:text-[11px] focus:outline-none cursor-pointer"
-            >
-              <option value="seeders">Seeders</option>
-              <option value="size">Taille</option>
-              <option value="date">Date</option>
-            </select>
+          {/* Tri */}
+          <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar">
+            <span className="text-zinc-400 font-bold text-[10px] sm:text-[11px] mr-1">Tri :</span>
+            {[
+              { id: 'seeders', label: 'Seeders' },
+              { id: 'size', label: 'Taille' },
+              { id: 'date', label: 'Date' },
+            ].map((s) => (
+              <button
+                key={`s_btn_${s.id}`}
+                type="button"
+                onClick={() => setSortBy(s.id as any)}
+                className={`px-2 py-0.5 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
+                  sortBy === s.id
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-zinc-800/80 hover:bg-zinc-800 text-zinc-300 border border-zinc-700/50'
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
           </div>
         </div>
 
         {/* Results List */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2.5">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2.5 pb-28">
           {loading ? (
             <div className="py-12 flex flex-col items-center justify-center gap-3 text-zinc-400">
               <Loader2 size={28} className="animate-spin text-blue-400" />
@@ -808,6 +812,135 @@ export function DownloadModal({
         </div>
 
       </div>
+
+      {/* Custom Season Picker Modal (Garantit 100% de lisibilité sur Android APK, iOS et Web) */}
+      {isSeasonPickerOpen && (
+        <div 
+          className="fixed inset-0 z-[220] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150"
+          onClick={() => setIsSeasonPickerOpen(false)}
+        >
+          <div 
+            className="bg-zinc-900 border border-zinc-700/80 rounded-2xl w-full max-w-sm p-4 space-y-3 shadow-2xl animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800">
+              <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
+                <Layers size={16} className="text-blue-400" />
+                <span>Sélectionner une saison</span>
+              </h4>
+              <button 
+                type="button"
+                onClick={() => setIsSeasonPickerOpen(false)}
+                className="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="max-h-72 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
+              {availableSeasons.length > 0 ? (
+                availableSeasons.map((s) => {
+                  const isSelected = s.season_number === selectedSeason;
+                  return (
+                    <button
+                      key={`s_pick_${s.season_number}`}
+                      type="button"
+                      onClick={() => {
+                        handleSeasonSelect(s.season_number);
+                        setIsSeasonPickerOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-left cursor-pointer ${
+                        isSelected
+                          ? "bg-blue-600 text-white font-black shadow-lg shadow-blue-600/30 border border-blue-400/40"
+                          : "bg-zinc-800/80 hover:bg-zinc-800 text-zinc-100 border border-zinc-700/50"
+                      }`}
+                    >
+                      <div>
+                        <div className="text-xs font-bold text-white">{s.name || `Saison ${s.season_number}`}</div>
+                        {s.episode_count && <div className="text-[10px] text-zinc-300 font-medium">{s.episode_count} épisode{s.episode_count > 1 ? 's' : ''}</div>}
+                      </div>
+                      {isSelected && <Check size={16} className="text-white shrink-0" />}
+                    </button>
+                  );
+                })
+              ) : (
+                Array.from({ length: Math.max(totalSeasons, 1) }, (_, i) => i + 1).map((s) => {
+                  const isSelected = s === selectedSeason;
+                  return (
+                    <button
+                      key={`s_pick_fb_${s}`}
+                      type="button"
+                      onClick={() => {
+                        handleSeasonSelect(s);
+                        setIsSeasonPickerOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-left cursor-pointer ${
+                        isSelected
+                          ? "bg-blue-600 text-white font-black shadow-lg shadow-blue-600/30 border border-blue-400/40"
+                          : "bg-zinc-800/80 hover:bg-zinc-800 text-zinc-100 border border-zinc-700/50"
+                      }`}
+                    >
+                      <span className="text-white font-bold">Saison {s}</span>
+                      {isSelected && <Check size={16} className="text-white shrink-0" />}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Episode Picker Modal (Garantit 100% de lisibilité sur Android APK, iOS et Web) */}
+      {isEpisodePickerOpen && (
+        <div 
+          className="fixed inset-0 z-[220] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150"
+          onClick={() => setIsEpisodePickerOpen(false)}
+        >
+          <div 
+            className="bg-zinc-900 border border-zinc-700/80 rounded-2xl w-full max-w-sm p-4 space-y-3 shadow-2xl animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800">
+              <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
+                <PlaySquare size={16} className="text-blue-400" />
+                <span>Sélectionner un épisode</span>
+              </h4>
+              <button 
+                type="button"
+                onClick={() => setIsEpisodePickerOpen(false)}
+                className="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="max-h-72 overflow-y-auto grid grid-cols-2 gap-2 pr-1 custom-scrollbar">
+              {Array.from({ length: maxEpisodesForCurrentSeason }, (_, i) => i + 1).map((ep) => {
+                const isSelected = ep === selectedEpisode;
+                return (
+                  <button
+                    key={`ep_pick_${ep}`}
+                    type="button"
+                    onClick={() => {
+                      handleEpisodeSelect(ep);
+                      setIsEpisodePickerOpen(false);
+                    }}
+                    className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all text-left cursor-pointer ${
+                      isSelected
+                        ? "bg-blue-600 text-white font-black shadow-lg shadow-blue-600/30 border border-blue-400/40"
+                        : "bg-zinc-800/80 hover:bg-zinc-800 text-zinc-100 border border-zinc-700/50"
+                    }`}
+                  >
+                    <span className="text-white font-bold">Épisode {ep}</span>
+                    {isSelected && <Check size={14} className="text-white shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
