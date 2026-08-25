@@ -464,8 +464,8 @@ export function DownloadModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 pt-10 sm:pt-4 pb-12 sm:pb-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[88vh] my-auto">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 pt-10 sm:pt-4 pb-20 sm:pb-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[78vh] sm:max-h-[85vh] my-auto">
         
         {/* Header */}
         <div className="p-3.5 sm:p-5 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/90 shrink-0">
@@ -1020,8 +1020,8 @@ export function DownloadModal({
 
       {/* MODALE DE CHOIX DE QUALITÉ AVANT TÉLÉCHARGEMENT RADARR / SONARR */}
       {showQualityModal && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
-          <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl p-4 sm:p-5 flex flex-col gap-4 animate-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 pt-10 sm:pt-4 pb-20 sm:pb-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
+          <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl p-4 sm:p-5 flex flex-col gap-4 animate-in zoom-in-95 duration-150 max-h-[82vh] sm:max-h-[85vh] overflow-y-auto my-auto">
             
             {/* Header */}
             <div className="flex items-center justify-between border-b border-zinc-800/80 pb-3">
