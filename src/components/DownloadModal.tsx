@@ -18,7 +18,8 @@ import {
   Layers,
   PlaySquare,
   Zap,
-  RefreshCw
+  RefreshCw,
+  ChevronDown
 } from 'lucide-react';
 import { C411Torrent, searchC411Torrents, formatTorrentSize } from '../services/c411';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
@@ -28,6 +29,13 @@ import {
   pushReleaseDirectly,
   testServiceConnection
 } from '../services/sonarrRadarr';
+import { tmdb } from '../features/shows/tmdb';
+
+export interface SeasonInfo {
+  season_number: number;
+  episode_count: number;
+  name?: string;
+}
 
 export interface DownloadModalProps {
   isOpen: boolean;
@@ -41,6 +49,7 @@ export interface DownloadModalProps {
   initialSeason?: number;
   initialEpisode?: number;
   totalSeasons?: number;
+  seasonsData?: SeasonInfo[];
   onSuccessToast?: (msg: string) => void;
 }
 
@@ -56,6 +65,7 @@ export function DownloadModal({
   initialSeason,
   initialEpisode,
   totalSeasons = 1,
+  seasonsData,
   onSuccessToast
 }: DownloadModalProps) {
   const {
@@ -76,6 +86,9 @@ export function DownloadModal({
   const [selectedSeason, setSelectedSeason] = useState<number>(initialSeason || 1);
   const [selectedEpisode, setSelectedEpisode] = useState<number>(initialEpisode || 1);
 
+  // Saisons et Épisodes réels
+  const [availableSeasons, setAvailableSeasons] = useState<SeasonInfo[]>([]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [torrents, setTorrents] = useState<C411Torrent[]>([]);
   const [loading, setLoading] = useState(false);
@@ -90,6 +103,73 @@ export function DownloadModal({
   // Filtres
   const [selectedQuality, setSelectedQuality] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'seeders' | 'size' | 'date'>('seeders');
+
+  // Charger les saisons réelles depuis les props ou TMDB
+  useEffect(() => {
+    if (!isOpen || mediaType !== 'tv') return;
+
+    if (seasonsData && seasonsData.length > 0) {
+      const filtered = seasonsData.filter(s => s.season_number > 0);
+      setAvailableSeasons(filtered);
+      return;
+    }
+
+    if (tmdbId) {
+      tmdb.getShowDetails(Number(tmdbId)).then((res) => {
+        if (res.ok && res.value && Array.isArray(res.value.seasons)) {
+          const valid = res.value.seasons
+            .filter((s: any) => s.season_number > 0)
+            .map((s: any) => ({
+              season_number: s.season_number,
+              episode_count: s.episode_count || 10,
+              name: s.name || `Saison ${s.season_number}`
+            }));
+          if (valid.length > 0) {
+            setAvailableSeasons(valid);
+            return;
+          }
+        }
+        // Fallback simple
+        const fallbackCount = Math.max(totalSeasons, 1);
+        setAvailableSeasons(
+          Array.from({ length: fallbackCount }, (_, i) => ({
+            season_number: i + 1,
+            episode_count: 24,
+            name: `Saison ${i + 1}`
+          }))
+        );
+      }).catch(() => {
+        const fallbackCount = Math.max(totalSeasons, 1);
+        setAvailableSeasons(
+          Array.from({ length: fallbackCount }, (_, i) => ({
+            season_number: i + 1,
+            episode_count: 24,
+            name: `Saison ${i + 1}`
+          }))
+        );
+      });
+    } else {
+      const fallbackCount = Math.max(totalSeasons, 1);
+      setAvailableSeasons(
+        Array.from({ length: fallbackCount }, (_, i) => ({
+          season_number: i + 1,
+          episode_count: 24,
+          name: `Saison ${i + 1}`
+        }))
+      );
+    }
+  }, [isOpen, mediaType, tmdbId, seasonsData, totalSeasons]);
+
+  // Récupérer le nombre exact d'épisodes pour la saison sélectionnée
+  const currentSeasonData = useMemo(() => {
+    return availableSeasons.find(s => s.season_number === selectedSeason) || availableSeasons[0] || {
+      season_number: selectedSeason,
+      episode_count: 24,
+      name: `Saison ${selectedSeason}`
+    };
+  }, [availableSeasons, selectedSeason]);
+
+  const maxEpisodesForCurrentSeason = Math.max(currentSeasonData.episode_count || 1, 1);
 
   // Génère la requête de recherche idéale selon la portée
   const generateQuery = (mode: 'all' | 'season' | 'episode', sNum: number, eNum: number) => {
@@ -116,10 +196,12 @@ export function DownloadModal({
     if (isOpen) {
       const initialMode = initialEpisode && initialSeason ? 'episode' : initialSeason ? 'season' : 'all';
       setScopeMode(initialMode);
-      if (initialSeason) setSelectedSeason(initialSeason);
-      if (initialEpisode) setSelectedEpisode(initialEpisode);
+      const sVal = initialSeason || 1;
+      const eVal = initialEpisode || 1;
+      setSelectedSeason(sVal);
+      setSelectedEpisode(eVal);
 
-      const q = generateQuery(initialMode, initialSeason || 1, initialEpisode || 1);
+      const q = generateQuery(initialMode, sVal, eVal);
       setSearchQuery(q);
       performSearch(q);
     } else {
@@ -133,10 +215,24 @@ export function DownloadModal({
   const handleScopeChange = (newMode: 'all' | 'season' | 'episode', sNum = selectedSeason, eNum = selectedEpisode) => {
     setScopeMode(newMode);
     setSelectedSeason(sNum);
-    setSelectedEpisode(eNum);
-    const newQ = generateQuery(newMode, sNum, eNum);
+
+    // Ajuster l'épisode si la saison change et qu'elle contient moins d'épisodes
+    const targetSeasonObj = availableSeasons.find(s => s.season_number === sNum);
+    const maxEp = targetSeasonObj ? Math.max(targetSeasonObj.episode_count, 1) : 24;
+    const adjustedEpisode = Math.min(eNum, maxEp);
+    setSelectedEpisode(adjustedEpisode);
+
+    const newQ = generateQuery(newMode, sNum, adjustedEpisode);
     setSearchQuery(newQ);
     performSearch(newQ);
+  };
+
+  const handleSeasonSelect = (newSeasonNum: number) => {
+    handleScopeChange(scopeMode, newSeasonNum, selectedEpisode);
+  };
+
+  const handleEpisodeSelect = (newEpisodeNum: number) => {
+    handleScopeChange('episode', selectedSeason, newEpisodeNum);
   };
 
   const performSearch = async (queryText: string) => {
@@ -263,7 +359,15 @@ export function DownloadModal({
       username,
       password,
       torrent,
-      mediaType
+      mediaType,
+      mediaInfo: {
+        title,
+        tmdbId,
+        imdbId,
+        year,
+        season: selectedSeason,
+        episode: selectedEpisode
+      }
     });
 
     setDownloadingId(null);
@@ -345,7 +449,7 @@ export function DownloadModal({
 
         {/* Scope Selector for Series (Série entière vs Saison vs Épisode) */}
         {mediaType === 'tv' && (
-          <div className="p-3 bg-zinc-950/80 border-b border-zinc-800 space-y-2 shrink-0">
+          <div className="p-3 bg-zinc-950/80 border-b border-zinc-800 space-y-2.5 shrink-0">
             <div className="flex items-center justify-between text-[11px]">
               <span className="font-bold uppercase text-zinc-400 tracking-wider flex items-center gap-1.5">
                 <Layers size={13} className="text-blue-400" />
@@ -391,38 +495,54 @@ export function DownloadModal({
               </button>
             </div>
 
-            {/* Selecteurs fins de Saison / Épisode */}
+            {/* Sélecteurs intelligents et réels de Saison et d'Épisode */}
             {scopeMode !== 'all' && (
-              <div className="flex items-center gap-3 pt-1 animate-in fade-in duration-150">
+              <div className="flex flex-wrap items-center gap-2.5 pt-1 animate-in fade-in duration-150">
+                {/* Sélecteur de Saison */}
                 <div className="flex items-center gap-1.5">
                   <span className="text-[11px] font-bold text-zinc-400">Saison :</span>
-                  <select
-                    value={selectedSeason}
-                    onChange={(e) => handleScopeChange(scopeMode, Number(e.target.value), selectedEpisode)}
-                    className="bg-zinc-900 text-white border border-zinc-700/80 rounded-lg px-2 py-1 text-xs font-bold focus:outline-none focus:border-blue-500 cursor-pointer"
-                  >
-                    {Array.from({ length: Math.max(totalSeasons, 15) }, (_, i) => i + 1).map((s) => (
-                      <option key={`s_opt_${s}`} value={s}>
-                        Saison {s}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative inline-flex items-center">
+                    <select
+                      value={selectedSeason}
+                      onChange={(e) => handleSeasonSelect(Number(e.target.value))}
+                      className="appearance-none bg-zinc-800 text-white border border-zinc-700 rounded-lg pl-2.5 pr-7 py-1 text-xs font-bold focus:outline-none focus:border-blue-500 cursor-pointer shadow-sm"
+                    >
+                      {availableSeasons.length > 0 ? (
+                        availableSeasons.map((s) => (
+                          <option key={`s_opt_${s.season_number}`} value={s.season_number} className="bg-zinc-900 text-white">
+                            {s.name || `Saison ${s.season_number}`} {s.episode_count ? `(${s.episode_count} ép.)` : ''}
+                          </option>
+                        ))
+                      ) : (
+                        Array.from({ length: Math.max(totalSeasons, 1) }, (_, i) => i + 1).map((s) => (
+                          <option key={`s_opt_fb_${s}`} value={s} className="bg-zinc-900 text-white">
+                            Saison {s}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                    <ChevronDown size={13} className="absolute right-2 text-zinc-400 pointer-events-none" />
+                  </div>
                 </div>
 
+                {/* Sélecteur d'Épisode (strictement filtré sur le nombre réel d'épisodes) */}
                 {scopeMode === 'episode' && (
                   <div className="flex items-center gap-1.5">
                     <span className="text-[11px] font-bold text-zinc-400">Épisode :</span>
-                    <select
-                      value={selectedEpisode}
-                      onChange={(e) => handleScopeChange('episode', selectedSeason, Number(e.target.value))}
-                      className="bg-zinc-900 text-white border border-zinc-700/80 rounded-lg px-2 py-1 text-xs font-bold focus:outline-none focus:border-blue-500 cursor-pointer"
-                    >
-                      {Array.from({ length: 30 }, (_, i) => i + 1).map((ep) => (
-                        <option key={`ep_opt_${ep}`} value={ep}>
-                          Épisode {ep}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="relative inline-flex items-center">
+                      <select
+                        value={selectedEpisode}
+                        onChange={(e) => handleEpisodeSelect(Number(e.target.value))}
+                        className="appearance-none bg-zinc-800 text-white border border-zinc-700 rounded-lg pl-2.5 pr-7 py-1 text-xs font-bold focus:outline-none focus:border-blue-500 cursor-pointer shadow-sm"
+                      >
+                        {Array.from({ length: maxEpisodesForCurrentSeason }, (_, i) => i + 1).map((ep) => (
+                          <option key={`ep_opt_${ep}`} value={ep} className="bg-zinc-900 text-white">
+                            Épisode {ep}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown size={13} className="absolute right-2 text-zinc-400 pointer-events-none" />
+                    </div>
                   </div>
                 )}
               </div>

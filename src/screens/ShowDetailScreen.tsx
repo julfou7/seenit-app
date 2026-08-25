@@ -3048,6 +3048,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
           initialSeason={downloadTargetSeason}
           initialEpisode={downloadTargetEpisode}
           totalSeasons={tmdbDetails?.number_of_seasons || tmdbDetails?.seasons?.filter((s: any) => s.season_number > 0)?.length || 1}
+          seasonsData={tmdbDetails?.seasons}
           onSuccessToast={(msg) => showToast(msg, 'success', show || undefined)}
         />
       )}

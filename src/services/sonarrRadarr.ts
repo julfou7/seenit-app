@@ -93,8 +93,24 @@ async function executePost(url: string, body: any, headers: Record<string, strin
         if (!res.data) return { success: true };
         return typeof res.data === 'string' ? (res.data.startsWith('{') || res.data.startsWith('[') ? JSON.parse(res.data) : res.data) : res.data;
       }
-      const errMsg = typeof res.data === 'string' ? res.data : JSON.stringify(res.data || {});
-      throw new Error(`Erreur HTTP ${res.status} : ${errMsg.substring(0, 100)}`);
+      
+      // Parser les erreurs Sonarr / Radarr (souvent un tableau d'objets [{ propertyName, errorMessage }])
+      let readableError = `Erreur HTTP ${res.status}`;
+      try {
+        const parsed = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].errorMessage) {
+          readableError = parsed.map(e => e.errorMessage || e.message).join(' • ');
+        } else if (parsed && parsed.message) {
+          readableError = parsed.message;
+        } else if (parsed && parsed.error) {
+          readableError = typeof parsed.error === 'string' ? parsed.error : JSON.stringify(parsed.error);
+        }
+      } catch {
+        const strData = typeof res.data === 'string' ? res.data : JSON.stringify(res.data || {});
+        if (strData) readableError = `${readableError} : ${strData.substring(0, 100)}`;
+      }
+
+      throw new Error(readableError);
     } catch (err: any) {
       throw new Error(err?.message || 'Serveur injoignable sur le réseau local');
     }
@@ -298,24 +314,71 @@ export async function searchAndDownloadInSonarr(params: {
       };
     }
 
-    // Récupérer le root folder et le profile de qualité par défaut
-    const rootFolders = await executeGet(`${base}/api/v3/rootfolder`, headers).catch(() => []);
-    const qualityProfiles = await executeGet(`${base}/api/v3/qualityprofile`, headers).catch(() => []);
+    // Récupérer le root folder et le profil de qualité configurés dans Sonarr
+    let rootFolders: any[] = [];
+    try {
+      const rfRes = await executeGet(`${base}/api/v3/rootfolder`, headers);
+      if (Array.isArray(rfRes)) rootFolders = rfRes;
+    } catch (e) {
+      console.warn('[Sonarr] Erreur récupération rootfolder:', e);
+    }
 
-    const rootFolderPath = Array.isArray(rootFolders) && rootFolders.length > 0 ? rootFolders[0].path : '/tv';
-    const qualityProfileId = Array.isArray(qualityProfiles) && qualityProfiles.length > 0 ? qualityProfiles[0].id : 1;
+    let qualityProfiles: any[] = [];
+    try {
+      const qpRes = await executeGet(`${base}/api/v3/qualityprofile`, headers);
+      if (Array.isArray(qpRes)) qualityProfiles = qpRes;
+    } catch (e) {
+      console.warn('[Sonarr] Erreur récupération qualityprofile:', e);
+    }
+
+    // Déterminer le meilleur chemin racine valide
+    let rootFolderPath = '';
+    if (rootFolders.length > 0) {
+      const accessibleFolder = rootFolders.find((rf: any) => rf.accessible !== false && rf.path);
+      rootFolderPath = accessibleFolder ? accessibleFolder.path : rootFolders[0].path;
+    } else if (Array.isArray(seriesList) && seriesList.length > 0) {
+      // Si l'API rootfolder n'a rien renvoyé mais que des séries existent, utiliser le chemin d'une série existante
+      const sWithRoot = seriesList.find((s: any) => s.rootFolderPath);
+      if (sWithRoot) {
+        rootFolderPath = sWithRoot.rootFolderPath;
+      } else {
+        const sWithPath = seriesList.find((s: any) => s.path);
+        if (sWithPath && sWithPath.path) {
+          const p = sWithPath.path;
+          const lastSep = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
+          if (lastSep > 0) rootFolderPath = p.substring(0, lastSep);
+        }
+      }
+    }
+
+    if (!rootFolderPath) {
+      return {
+        success: false,
+        message: `Sonarr : Aucun dossier racine ("Root Folder") n'est configuré dans votre serveur Sonarr. Veuillez en ajouter un dans Sonarr (Paramètres > Gestion des médias > Dossiers racine).`
+      };
+    }
+
+    const qualityProfileId = qualityProfiles.length > 0 && qualityProfiles[0].id ? qualityProfiles[0].id : 1;
 
     // Ajouter la série dans Sonarr avec recherche automatique immédiate
-    const addPayload = {
-      ...lookupResult,
+    const addPayload: any = {
+      title: lookupResult.title,
+      seasons: Array.isArray(lookupResult.seasons) ? lookupResult.seasons : [],
       rootFolderPath,
       qualityProfileId,
       monitored: true,
+      seasonFolder: true,
+      tvdbId: lookupResult.tvdbId,
+      year: lookupResult.year,
+      titleSlug: lookupResult.titleSlug,
+      images: lookupResult.images || [],
       addOptions: {
         searchForMissingEpisodes: true,
         monitor: params.season ? 'all' : 'all'
       }
     };
+    if (lookupResult.seriesType) addPayload.seriesType = lookupResult.seriesType;
+    if (lookupResult.overview) addPayload.overview = lookupResult.overview;
 
     const created = await executePost(`${base}/api/v3/series`, addPayload, headers);
     
@@ -410,21 +473,64 @@ export async function searchAndDownloadInRadarr(params: {
       };
     }
 
-    const rootFolders = await executeGet(`${base}/api/v3/rootfolder`, headers).catch(() => []);
-    const qualityProfiles = await executeGet(`${base}/api/v3/qualityprofile`, headers).catch(() => []);
+    // Récupérer le root folder et le profil de qualité configurés dans Radarr
+    let rootFolders: any[] = [];
+    try {
+      const rfRes = await executeGet(`${base}/api/v3/rootfolder`, headers);
+      if (Array.isArray(rfRes)) rootFolders = rfRes;
+    } catch (e) {
+      console.warn('[Radarr] Erreur récupération rootfolder:', e);
+    }
 
-    const rootFolderPath = Array.isArray(rootFolders) && rootFolders.length > 0 ? rootFolders[0].path : '/movies';
-    const qualityProfileId = Array.isArray(qualityProfiles) && qualityProfiles.length > 0 ? qualityProfiles[0].id : 1;
+    let qualityProfiles: any[] = [];
+    try {
+      const qpRes = await executeGet(`${base}/api/v3/qualityprofile`, headers);
+      if (Array.isArray(qpRes)) qualityProfiles = qpRes;
+    } catch (e) {
+      console.warn('[Radarr] Erreur récupération qualityprofile:', e);
+    }
 
-    const addPayload = {
-      ...lookupResult,
+    let rootFolderPath = '';
+    if (rootFolders.length > 0) {
+      const accessibleFolder = rootFolders.find((rf: any) => rf.accessible !== false && rf.path);
+      rootFolderPath = accessibleFolder ? accessibleFolder.path : rootFolders[0].path;
+    } else if (Array.isArray(moviesList) && moviesList.length > 0) {
+      const mWithRoot = moviesList.find((m: any) => m.rootFolderPath);
+      if (mWithRoot) {
+        rootFolderPath = mWithRoot.rootFolderPath;
+      } else {
+        const mWithPath = moviesList.find((m: any) => m.path);
+        if (mWithPath && mWithPath.path) {
+          const p = mWithPath.path;
+          const lastSep = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
+          if (lastSep > 0) rootFolderPath = p.substring(0, lastSep);
+        }
+      }
+    }
+
+    if (!rootFolderPath) {
+      return {
+        success: false,
+        message: `Radarr : Aucun dossier racine ("Root Folder") n'est configuré dans votre serveur Radarr. Veuillez en ajouter un dans Radarr (Paramètres > Gestion des médias > Dossiers racine).`
+      };
+    }
+
+    const qualityProfileId = qualityProfiles.length > 0 && qualityProfiles[0].id ? qualityProfiles[0].id : 1;
+
+    const addPayload: any = {
+      title: lookupResult.title,
       rootFolderPath,
       qualityProfileId,
       monitored: true,
+      tmdbId: lookupResult.tmdbId,
+      year: lookupResult.year,
+      titleSlug: lookupResult.titleSlug,
+      images: lookupResult.images || [],
       addOptions: {
         searchForMovie: true
       }
     };
+    if (lookupResult.overview) addPayload.overview = lookupResult.overview;
 
     await executePost(`${base}/api/v3/movie`, addPayload, headers);
 
@@ -452,6 +558,15 @@ export async function pushReleaseDirectly(payload: {
   password?: string;
   torrent: C411Torrent;
   mediaType: 'movie' | 'tv';
+  mediaInfo?: {
+    title: string;
+    tmdbId?: number | string;
+    tvdbId?: number | string;
+    imdbId?: string;
+    year?: number | string;
+    season?: number;
+    episode?: number;
+  };
 }): Promise<{ success: boolean; message: string }> {
   const base = cleanUrl(payload.url);
   if (!base) return { success: false, message: 'URL du client manquante' };
@@ -471,11 +586,62 @@ export async function pushReleaseDirectly(payload: {
         protocol: 'torrent',
         publishDate: payload.torrent.createdAt || new Date().toISOString()
       };
-      await executePost(endpoint, body, {
+
+      const resData = await executePost(endpoint, body, {
         'X-Api-Key': payload.apiKey,
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       });
+
+      const releaseResult = Array.isArray(resData) ? resData[0] : resData;
+      let rejections: string[] = [];
+      if (releaseResult) {
+        if (Array.isArray(releaseResult.rejections) && releaseResult.rejections.length > 0) {
+          rejections = releaseResult.rejections;
+        } else if (releaseResult.approved === false) {
+          rejections = ['Release non approuvée par Sonarr'];
+        }
+      }
+
+      if (rejections.length > 0) {
+        const reasonStr = rejections.join(' • ');
+        const isUnknown = /unknown|absent|introuvable|not found/i.test(reasonStr);
+
+        // Si la série n'est pas encore ajoutée dans Sonarr, l'ajouter automatiquement puis re-tester
+        if (isUnknown && payload.mediaInfo && payload.mediaInfo.title) {
+          const addRes = await searchAndDownloadInSonarr({
+            url: payload.url,
+            apiKey: payload.apiKey,
+            title: payload.mediaInfo.title,
+            tmdbId: payload.mediaInfo.tmdbId,
+            tvdbId: payload.mediaInfo.tvdbId,
+            imdbId: payload.mediaInfo.imdbId,
+            season: payload.mediaInfo.season,
+            episode: payload.mediaInfo.episode
+          });
+
+          if (addRes.success) {
+            try {
+              const retryRes = await executePost(endpoint, body, {
+                'X-Api-Key': payload.apiKey,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              });
+              const retryResult = Array.isArray(retryRes) ? retryRes[0] : retryRes;
+              if (!retryResult || (!retryResult.rejections?.length && retryResult.approved !== false)) {
+                return { success: true, message: `« ${payload.mediaInfo.title} » ajoutée à Sonarr et torrent envoyé au téléchargement !` };
+              }
+            } catch (retryErr) {}
+            return { success: true, message: `« ${payload.mediaInfo.title} » ajoutée à Sonarr ! Recherche automatique lancée.` };
+          }
+        }
+
+        return {
+          success: false,
+          message: `Sonarr a refusé la release : ${reasonStr}. Cliquez sur « Lancer dans Sonarr » pour ajouter d'abord la série.`
+        };
+      }
+
       return { success: true, message: 'Torrent envoyé avec succès à Sonarr !' };
     }
 
@@ -489,11 +655,58 @@ export async function pushReleaseDirectly(payload: {
         protocol: 'torrent',
         publishDate: payload.torrent.createdAt || new Date().toISOString()
       };
-      await executePost(endpoint, body, {
+
+      const resData = await executePost(endpoint, body, {
         'X-Api-Key': payload.apiKey,
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       });
+
+      const releaseResult = Array.isArray(resData) ? resData[0] : resData;
+      let rejections: string[] = [];
+      if (releaseResult) {
+        if (Array.isArray(releaseResult.rejections) && releaseResult.rejections.length > 0) {
+          rejections = releaseResult.rejections;
+        } else if (releaseResult.approved === false) {
+          rejections = ['Release non approuvée par Radarr'];
+        }
+      }
+
+      if (rejections.length > 0) {
+        const reasonStr = rejections.join(' • ');
+        const isUnknown = /unknown|absent|introuvable|not found/i.test(reasonStr);
+
+        if (isUnknown && payload.mediaInfo && payload.mediaInfo.title) {
+          const addRes = await searchAndDownloadInRadarr({
+            url: payload.url,
+            apiKey: payload.apiKey,
+            title: payload.mediaInfo.title,
+            tmdbId: payload.mediaInfo.tmdbId,
+            year: payload.mediaInfo.year
+          });
+
+          if (addRes.success) {
+            try {
+              const retryRes = await executePost(endpoint, body, {
+                'X-Api-Key': payload.apiKey,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              });
+              const retryResult = Array.isArray(retryRes) ? retryRes[0] : retryRes;
+              if (!retryResult || (!retryResult.rejections?.length && retryResult.approved !== false)) {
+                return { success: true, message: `« ${payload.mediaInfo.title} » ajouté à Radarr et torrent envoyé au téléchargement !` };
+              }
+            } catch (retryErr) {}
+            return { success: true, message: `« ${payload.mediaInfo.title} » ajouté à Radarr ! Recherche automatique lancée.` };
+          }
+        }
+
+        return {
+          success: false,
+          message: `Radarr a refusé la release : ${reasonStr}. Cliquez sur « Lancer dans Radarr » pour ajouter d'abord le film.`
+        };
+      }
+
       return { success: true, message: 'Torrent envoyé avec succès à Radarr !' };
     }
 
