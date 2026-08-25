@@ -19,6 +19,7 @@ import { getPlexPin, checkPlexPin } from '../services/plex';
 import { performPlexSync } from '../features/plex/syncPlex';
 import { SeenItLogo } from '../components/SeenItLogo';
 import { ChangelogViewer } from '../components/ChangelogViewer';
+import { DownloadConfigSection } from '../components/DownloadConfigSection';
 import { downloadAndInstallApk, UpdateProgress } from '../services/appUpdater';
 
 const STREAMING_PLATFORMS = [
@@ -595,6 +596,11 @@ export function SettingsScreen() {
                 </div>
               )}
             </div>
+
+            <div className="h-px w-full bg-zinc-800/80 mb-4" />
+
+            {/* Téléchargement C411 */}
+            <DownloadConfigSection />
 
             <div className="h-px w-full bg-zinc-800/80 mb-4" />
 

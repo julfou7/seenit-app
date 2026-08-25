@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { type Show } from '../types';
 import { tmdb, isAdultOrParodyMedia, isMovieAtCinema, isMovieUpcoming } from '../features/shows/tmdb';
-import { ChevronLeft, Star, Heart, CheckCircle2, Circle, Tv, Zap, X, EyeOff, Archive, Trash2, MoreVertical, Plus, Check, Share, Share2, Play, Calendar, ChevronUp, ChevronDown, ArchiveRestore, Ban, RotateCcw, MonitorPlay, Ticket, Youtube, Clapperboard, ExternalLink, Clock, RefreshCw } from 'lucide-react';
+import { ChevronLeft, Star, Heart, CheckCircle2, Circle, Tv, Zap, X, EyeOff, Archive, Trash2, MoreVertical, Plus, Check, Share, Share2, Play, Calendar, ChevronUp, ChevronDown, ArchiveRestore, Ban, RotateCcw, MonitorPlay, Ticket, Youtube, Clapperboard, ExternalLink, Clock, RefreshCw, Download } from 'lucide-react';
 import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getBestLogoPath, getTodayStr, getCalendarDaysDiff, getEpisodeRelativeAirDate, scrollAllCarouselsToStart, openExternalUrl, checkIsUpToDate } from '../lib/utils';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
 import { PersonDetailModal } from './PersonDetailModal';
@@ -13,6 +13,7 @@ import { syncSingleItem } from '../hooks/useDetailsSyncWorker';
 import { auth, db } from '../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { TrailerModal } from '../components/TrailerModal';
+import { DownloadModal } from '../components/DownloadModal';
 import { useShowsStore } from '../store/showsStore';
 import { getSeriesImdbData } from '../features/shows/omdbService';
 import { getFormattedProviderLogo, PLEX_LOGO_SVG } from '../utils/providerLogos';
@@ -309,6 +310,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const [visibleCast, setVisibleCast] = useState(12);
   const [showAllCast, setShowAllCast] = useState(false);
   const [trailerModalVideos, setTrailerModalVideos] = useState<any[] | null>(null);
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
   const openEpisodeModal = (seasonNum: number, ep: any) => {
     setSelectedEpisode({ season: seasonNum, episode: ep });
@@ -2407,7 +2409,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
             {(universeData && universeData.parts && universeData.parts.length > 0) && (
               <div className={collectionData?.parts?.length > 0 ? "mt-6" : ""}>
                 <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-3">
-                  {isSeries ? "Prequel / Spin-off" : "Dans le même univers"}
+                  Dans le même univers
                 </h3>
                 <div className="flex overflow-x-auto gap-3.5 hide-scrollbar py-2 px-1 -mx-1">
                   {universeData.parts.map((part: any, idx: number) => (
@@ -2426,7 +2428,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
             {collectionLoading && (
               <div>
                 <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-3">
-                  Ordre de visionnage
+                  {isSeries ? "Dans le même univers" : "Ordre de visionnage"}
                 </h3>
                 <div className="flex overflow-x-auto gap-3.5 hide-scrollbar py-2 px-1 -mx-1">
                   {[1, 2, 3, 4].map(i => (
@@ -2589,9 +2591,19 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
 
                 // 3. Si les deux ont terminé et rien n'a été trouvé
                 return (
-                  <p className="text-xs text-zinc-500 italic">
-                    Non disponible en streaming actuellement
-                  </p>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <p className="text-xs text-zinc-500 italic">
+                      Non disponible en streaming actuellement
+                    </p>
+                    <button
+                      onClick={() => setIsDownloadModalOpen(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-500/40 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 active:scale-95 text-xs font-bold transition-all cursor-pointer shadow-[0_0_12px_rgba(59,130,246,0.2)]"
+                      title="Rechercher et télécharger sur C411"
+                    >
+                      <Download size={14} className="shrink-0" />
+                      <span>Télécharger</span>
+                    </button>
+                  </div>
                 );
               })()}
             </div>
@@ -2980,6 +2992,20 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         <TrailerModal
           videos={trailerModalVideos}
           onClose={() => setTrailerModalVideos(null)}
+        />
+      )}
+
+      {/* Download C411 Modal */}
+      {isDownloadModalOpen && (
+        <DownloadModal
+          isOpen={isDownloadModalOpen}
+          onClose={() => setIsDownloadModalOpen(false)}
+          title={title}
+          originalTitle={tmdbDetails?.original_title || tmdbDetails?.original_name || (show as any)?.originalTitle}
+          year={(tmdbDetails?.release_date || tmdbDetails?.first_air_date || show?.firstAirDate)?.slice(0, 4)}
+          mediaType={isSeries ? 'tv' : 'movie'}
+          tmdbId={effectiveTmdbId}
+          onSuccessToast={(msg) => showToast(msg, 'success', show || undefined)}
         />
       )}
     </div>

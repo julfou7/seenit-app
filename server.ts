@@ -722,6 +722,209 @@ async function startServer() {
     }
   });
 
+  // C411 Tracker API proxy
+  app.get('/api/c411/search', async (req, res) => {
+    try {
+      const query = (req.query.query as string || '').trim();
+      const mediaType = req.query.mediaType as string || 'movie';
+      const year = req.query.year as string;
+      const apiKey = (req.query.apiKey as string) || '2d4baaf4fdd1dacd26f8dc96b1ab6aa06fc95140a7509456b25c8c0b9b5ac55a';
+
+      if (!query) {
+        return res.json({ torrents: [] });
+      }
+
+      // Nettoyage de la recherche pour C411
+      const cleanQuery = query
+        .replace(/[:’']/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      const searchParams = new URLSearchParams();
+      searchParams.set('name', cleanQuery);
+      searchParams.set('category', '1'); // Films & Vidéos
+      
+      // Filtrer par sous-catégorie si possible
+      if (mediaType === 'tv') {
+        searchParams.set('subcategory', '7'); // Séries TV
+      } else if (mediaType === 'movie') {
+        searchParams.set('subcategory', '6'); // Film
+      }
+
+      const c411Url = `https://c411.org/api/torrents?${searchParams.toString()}`;
+      const response = await fetch(c411Url, {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Accept': 'application/json',
+          'User-Agent': 'SeenIt-App'
+        }
+      });
+
+      if (!response.ok) {
+        // Fallback sans filtre de sous-catégorie
+        const fallbackUrl = `https://c411.org/api/torrents?name=${encodeURIComponent(cleanQuery)}&category=1`;
+        const fbRes = await fetch(fallbackUrl, {
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Accept': 'application/json',
+            'User-Agent': 'SeenIt-App'
+          }
+        });
+        if (!fbRes.ok) {
+          return res.json({ torrents: [] });
+        }
+        const fbData = await fbRes.json();
+        return res.json({ torrents: fbData.data || [] });
+      }
+
+      const data = await response.json();
+      let torrents = data.data || [];
+
+      // Si aucun résultat avec la sous-catégorie, tentative élargie
+      if (torrents.length === 0) {
+        const broadUrl = `https://c411.org/api/torrents?name=${encodeURIComponent(cleanQuery)}`;
+        const broadRes = await fetch(broadUrl, {
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Accept': 'application/json',
+            'User-Agent': 'SeenIt-App'
+          }
+        });
+        if (broadRes.ok) {
+          const broadData = await broadRes.json();
+          torrents = broadData.data || [];
+        }
+      }
+
+      return res.json({ torrents });
+    } catch (error: any) {
+      console.error('[C411 Search Error]', error);
+      return res.status(500).json({ error: error.message, torrents: [] });
+    }
+  });
+
+  // Remote Download Dispatcher (Sonarr / Radarr / qBittorrent)
+  app.post('/api/downloads/push', express.json(), async (req, res) => {
+    try {
+      const {
+        service,
+        url,
+        apiKey,
+        username,
+        password,
+        torrent,
+        mediaType,
+        tmdbId,
+        title,
+        year
+      } = req.body;
+
+      if (!url) {
+        return res.status(400).json({ error: 'URL du service manquante' });
+      }
+
+      const cleanUrl = url.replace(/\/+$/, '');
+
+      // 1. Envoi vers Sonarr (Séries)
+      if (service === 'sonarr') {
+        const sonarrEndpoint = `${cleanUrl}/api/v3/release/push`;
+        const payload = {
+          title: torrent.name,
+          downloadUrl: torrent.magnetUri,
+          protocol: 'torrent',
+          publishDate: torrent.createdAt || new Date().toISOString()
+        };
+
+        const sonarrRes = await fetch(sonarrEndpoint, {
+          method: 'POST',
+          headers: {
+            'X-Api-Key': apiKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (sonarrRes.ok) {
+          return res.json({ message: 'Release envoyée avec succès à Sonarr !' });
+        } else {
+          const errTxt = await sonarrRes.text();
+          return res.status(sonarrRes.status).json({ error: `Sonarr a retourné : ${errTxt.substring(0, 150)}` });
+        }
+      }
+
+      // 2. Envoi vers Radarr (Films)
+      if (service === 'radarr') {
+        const radarrEndpoint = `${cleanUrl}/api/v3/release/push`;
+        const payload = {
+          title: torrent.name,
+          downloadUrl: torrent.magnetUri,
+          protocol: 'torrent',
+          publishDate: torrent.createdAt || new Date().toISOString()
+        };
+
+        const radarrRes = await fetch(radarrEndpoint, {
+          method: 'POST',
+          headers: {
+            'X-Api-Key': apiKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (radarrRes.ok) {
+          return res.json({ message: 'Release envoyée avec succès à Radarr !' });
+        } else {
+          const errTxt = await radarrRes.text();
+          return res.status(radarrRes.status).json({ error: `Radarr a retourné : ${errTxt.substring(0, 150)}` });
+        }
+      }
+
+      // 3. Envoi vers qBittorrent Web UI
+      if (service === 'qbittorrent') {
+        // Authentification session qBittorrent si username/password
+        let cookieHeader = '';
+        if (username || password) {
+          const loginRes = await fetch(`${cleanUrl}/api/v2/auth/login`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: `username=${encodeURIComponent(username || '')}&password=${encodeURIComponent(password || '')}`
+          });
+          const setCookie = loginRes.headers.get('set-cookie');
+          if (setCookie) {
+            cookieHeader = setCookie.split(';')[0];
+          }
+        }
+
+        const formData = new URLSearchParams();
+        formData.append('urls', torrent.magnetUri);
+        formData.append('category', mediaType === 'tv' ? 'tv' : 'movies');
+
+        const addRes = await fetch(`${cleanUrl}/api/v2/torrents/add`, {
+          method: 'POST',
+          headers: {
+            'Cookie': cookieHeader,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: formData.toString()
+        });
+
+        if (addRes.ok) {
+          return res.json({ message: 'Torrent ajouté avec succès à qBittorrent !' });
+        } else {
+          const errTxt = await addRes.text();
+          return res.status(addRes.status).json({ error: `qBittorrent : ${errTxt}` });
+        }
+      }
+
+      return res.status(400).json({ error: 'Service de téléchargement non reconnu' });
+    } catch (err: any) {
+      console.error('[Downloads Push Error]', err);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
       app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });
