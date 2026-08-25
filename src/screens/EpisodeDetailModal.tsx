@@ -1027,8 +1027,10 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
       title={activeShow?.title || tmdbShowTitle || 'Série'}
       mediaType="tv"
       tmdbId={tmdbShowId || activeShow?.tmdbId}
+      imdbId={activeShow?.imdbId}
       initialSeason={currentSeason}
       initialEpisode={currentEpisode.episode_number}
+      totalSeasons={(activeShow as any)?.numberOfSeasons || (activeShow as any)?.seasonsCount || 1}
       onSuccessToast={showToast}
     />
   </div>

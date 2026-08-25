@@ -28,24 +28,35 @@ function cleanUrl(url: string): string {
  */
 async function executeGet(url: string, headers: Record<string, string> = {}): Promise<any> {
   if (Capacitor.isNativePlatform()) {
-    const res = await CapacitorHttp.get({
-      url,
-      headers,
-      connectTimeout: 7000,
-      readTimeout: 7000
-    });
-    if (res.status >= 200 && res.status < 300) {
-      return typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+    try {
+      const res = await CapacitorHttp.get({
+        url,
+        headers,
+        connectTimeout: 8000,
+        readTimeout: 8000
+      });
+      if (res.status >= 200 && res.status < 300) {
+        return typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+      }
+      throw new Error(`Erreur HTTP ${res.status}`);
+    } catch (err: any) {
+      throw new Error(err?.message || 'Serveur injoignable sur le réseau local');
     }
-    throw new Error(`Erreur HTTP ${res.status}`);
   } else {
-    const res = await fetch(url, {
-      method: 'GET',
-      headers,
-      signal: AbortSignal.timeout(7000)
-    });
-    if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
-    return await res.json();
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        headers,
+        signal: AbortSignal.timeout(8000)
+      });
+      if (!res.ok) throw new Error(`Erreur HTTP ${res.status}`);
+      return await res.json();
+    } catch (err: any) {
+      if (url.includes('192.168.') || url.includes('localhost') || url.includes('127.0.0.1') || url.includes('10.')) {
+        throw new Error(`Navigateur Web : Les accès HTTP locaux (192.168.x.x) sont bloqués par la sécurité CORS/HTTPS du navigateur. Utilisez l'APK Android sur votre Wi-Fi.`);
+      }
+      throw new Error(err?.message || 'Erreur réseau');
+    }
   }
 }
 
@@ -56,36 +67,47 @@ async function executePost(url: string, body: any, headers: Record<string, strin
   const isFormData = typeof body === 'string' && headers['Content-Type'] === 'application/x-www-form-urlencoded';
 
   if (Capacitor.isNativePlatform()) {
-    const res = await CapacitorHttp.post({
-      url,
-      headers,
-      data: body,
-      connectTimeout: 10000,
-      readTimeout: 10000
-    });
-    if (res.status >= 200 && res.status < 300) {
-      if (!res.data) return { success: true };
-      return typeof res.data === 'string' ? (res.data.startsWith('{') || res.data.startsWith('[') ? JSON.parse(res.data) : res.data) : res.data;
-    }
-    const errMsg = typeof res.data === 'string' ? res.data : JSON.stringify(res.data || {});
-    throw new Error(`Erreur HTTP ${res.status} : ${errMsg.substring(0, 100)}`);
-  } else {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: isFormData ? body : (typeof body === 'string' ? body : JSON.stringify(body)),
-      signal: AbortSignal.timeout(10000)
-    });
-    if (!res.ok) {
-      const errTxt = await res.text().catch(() => '');
-      throw new Error(`Erreur HTTP ${res.status} : ${errTxt.substring(0, 100)}`);
-    }
-    const txt = await res.text().catch(() => '');
-    if (!txt) return { success: true };
     try {
-      return JSON.parse(txt);
-    } catch {
-      return txt;
+      const res = await CapacitorHttp.post({
+        url,
+        headers,
+        data: body,
+        connectTimeout: 10000,
+        readTimeout: 10000
+      });
+      if (res.status >= 200 && res.status < 300) {
+        if (!res.data) return { success: true };
+        return typeof res.data === 'string' ? (res.data.startsWith('{') || res.data.startsWith('[') ? JSON.parse(res.data) : res.data) : res.data;
+      }
+      const errMsg = typeof res.data === 'string' ? res.data : JSON.stringify(res.data || {});
+      throw new Error(`Erreur HTTP ${res.status} : ${errMsg.substring(0, 100)}`);
+    } catch (err: any) {
+      throw new Error(err?.message || 'Serveur injoignable sur le réseau local');
+    }
+  } else {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: isFormData ? body : (typeof body === 'string' ? body : JSON.stringify(body)),
+        signal: AbortSignal.timeout(10000)
+      });
+      if (!res.ok) {
+        const errTxt = await res.text().catch(() => '');
+        throw new Error(`Erreur HTTP ${res.status} : ${errTxt.substring(0, 100)}`);
+      }
+      const txt = await res.text().catch(() => '');
+      if (!txt) return { success: true };
+      try {
+        return JSON.parse(txt);
+      } catch {
+        return txt;
+      }
+    } catch (err: any) {
+      if (url.includes('192.168.') || url.includes('localhost') || url.includes('127.0.0.1') || url.includes('10.')) {
+        throw new Error(`Navigateur Web : Les accès HTTP locaux (192.168.x.x) sont bloqués par la sécurité CORS/HTTPS du navigateur. Utilisez l'APK Android sur votre Wi-Fi.`);
+      }
+      throw new Error(err?.message || 'Erreur réseau');
     }
   }
 }
@@ -142,6 +164,8 @@ export async function searchAndDownloadInSonarr(params: {
   apiKey: string;
   title: string;
   tmdbId?: number | string;
+  imdbId?: string;
+  tvdbId?: number | string;
   season?: number;
   episode?: number;
 }): Promise<{ success: boolean; message: string }> {
@@ -161,15 +185,22 @@ export async function searchAndDownloadInSonarr(params: {
     let seriesList: any[] = [];
     try {
       seriesList = await executeGet(`${base}/api/v3/series`, headers);
-    } catch (e) {
-      console.warn('[Sonarr] Impossible de lister les séries:', e);
+    } catch (e: any) {
+      console.warn('[Sonarr] Impossible de joindre Sonarr:', e);
+      return {
+        success: false,
+        message: `Impossible de contacter Sonarr : ${e?.message || 'Vérifiez l\'adresse IP locale de votre PC'}`
+      };
     }
 
     let existingSeries: any = null;
+    const cleanTargetTitle = (params.title || '').trim().toLowerCase();
     if (Array.isArray(seriesList)) {
       existingSeries = seriesList.find((s: any) => {
+        if (params.tvdbId && s.tvdbId && Number(s.tvdbId) === Number(params.tvdbId)) return true;
+        if (params.imdbId && s.imdbId && String(s.imdbId).toLowerCase() === String(params.imdbId).toLowerCase()) return true;
         if (params.tmdbId && s.tmdbId && Number(s.tmdbId) === Number(params.tmdbId)) return true;
-        if (s.title && s.title.toLowerCase() === params.title.toLowerCase()) return true;
+        if (s.title && s.title.toLowerCase() === cleanTargetTitle) return true;
         return false;
       });
     }
@@ -223,11 +254,13 @@ export async function searchAndDownloadInSonarr(params: {
       };
     }
 
-    // 3. Si la série n'est pas dans Sonarr -> Faire un lookup pour obtenir les métadonnées TVDB/TMDB
+    // 3. Si la série n'est pas dans Sonarr -> Faire un lookup pour obtenir les métadonnées TVDB/TheTVDB
     let lookupResult: any = null;
     const lookupTerms = [
-      params.tmdbId ? `tmdb:${params.tmdbId}` : null,
-      params.title
+      params.imdbId ? `imdb:${params.imdbId}` : null,
+      params.tvdbId ? `tvdb:${params.tvdbId}` : null,
+      params.title,
+      params.title.replace(/[:’'–-]/g, ' ').replace(/\s+/g, ' ').trim()
     ].filter(Boolean);
 
     for (const term of lookupTerms) {
@@ -237,13 +270,15 @@ export async function searchAndDownloadInSonarr(params: {
           lookupResult = lookup[0];
           break;
         }
-      } catch (lErr) {}
+      } catch (lErr) {
+        console.warn(`[Sonarr Lookup failed for term ${term}]`, lErr);
+      }
     }
 
     if (!lookupResult) {
       return {
         success: false,
-        message: `Série « ${params.title} » introuvable sur Sonarr. Utilisez la liste des torrents C411 ci-dessous.`
+        message: `Série « ${params.title} » non trouvée sur TheTVDB via Sonarr. Utilisez la liste des torrents C411 ci-dessous.`
       };
     }
 
@@ -262,7 +297,7 @@ export async function searchAndDownloadInSonarr(params: {
       monitored: true,
       addOptions: {
         searchForMissingEpisodes: true,
-        monitor: params.season ? 'future' : 'all'
+        monitor: params.season ? 'all' : 'all'
       }
     };
 

@@ -26,7 +26,7 @@ const config: CapacitorConfig = {
       splashImmersive: true,
     },
     CapacitorHttp: {
-      enabled: false
+      enabled: true
     },
     GoogleAuth: {
       scopes: ['profile', 'email'],

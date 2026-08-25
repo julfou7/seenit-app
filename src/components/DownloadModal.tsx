@@ -37,6 +37,7 @@ export interface DownloadModalProps {
   year?: string | number;
   mediaType: 'movie' | 'tv';
   tmdbId?: number | string;
+  imdbId?: string;
   initialSeason?: number;
   initialEpisode?: number;
   totalSeasons?: number;
@@ -51,6 +52,7 @@ export function DownloadModal({
   year,
   mediaType,
   tmdbId,
+  imdbId,
   initialSeason,
   initialEpisode,
   totalSeasons = 1,
@@ -171,6 +173,7 @@ export function DownloadModal({
           apiKey: sonarrApiKey,
           title,
           tmdbId,
+          imdbId,
           season: scopeMode === 'all' ? undefined : selectedSeason,
           episode: scopeMode === 'episode' ? selectedEpisode : undefined
         });
@@ -625,12 +628,55 @@ export function DownloadModal({
               );
             })
           ) : hasSearched ? (
-            <div className="py-12 flex flex-col items-center justify-center gap-2 text-center text-zinc-400">
-              <AlertCircle size={28} className="text-zinc-500" />
-              <p className="text-xs font-bold text-zinc-300">Aucun résultat trouvé sur C411</p>
-              <p className="text-[11px] text-zinc-500 max-w-sm">
-                Essayez d'ajuster le titre dans la barre de recherche ou de basculer la portée (Série complète / Saison / Épisode).
-              </p>
+            <div className="py-10 px-4 flex flex-col items-center justify-center gap-3 text-center text-zinc-400">
+              <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400">
+                <AlertCircle size={24} className="text-amber-400/80" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-zinc-200">
+                  Aucun résultat pour « {searchQuery} »
+                </p>
+                <p className="text-[11px] text-zinc-400 max-w-sm mt-1 leading-relaxed">
+                  {scopeMode !== 'all' 
+                    ? `Cette saison ou cet épisode n'est peut-être pas encore disponible ou diffusé. Essayez de chercher la série complète ou une autre saison :` 
+                    : `Essayez de modifier le nom ou de retirer les caractères spéciaux dans la barre de recherche.`}
+                </p>
+              </div>
+
+              {/* Bouton rapide de recherche globale */}
+              {mediaType === 'tv' && scopeMode !== 'all' && (
+                <div className="flex flex-col items-center gap-2 mt-1 w-full max-w-xs">
+                  <button
+                    type="button"
+                    onClick={() => handleScopeChange('all')}
+                    className="w-full py-2.5 px-4 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300 font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+                  >
+                    <Search size={13} />
+                    <span>Rechercher toute la série « {title} »</span>
+                  </button>
+
+                  {/* Saisons disponibles */}
+                  {totalSeasons > 1 && (
+                    <div className="flex items-center gap-1.5 flex-wrap justify-center pt-1">
+                      <span className="text-[10px] text-zinc-500 font-medium mr-1">Tester :</span>
+                      {Array.from({ length: Math.min(totalSeasons, 10) }, (_, i) => i + 1).map((sNum) => (
+                        <button
+                          key={`s_pill_${sNum}`}
+                          type="button"
+                          onClick={() => handleScopeChange('season', sNum)}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
+                            selectedSeason === sNum 
+                              ? 'bg-blue-600 text-white border-blue-500' 
+                              : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-700/60'
+                          }`}
+                        >
+                          Saison {sNum}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ) : null}
         </div>
