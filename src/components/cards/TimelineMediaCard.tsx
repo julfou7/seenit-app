@@ -13,6 +13,7 @@ export const TimelineMediaCard: React.FC<TimelineMediaCardProps> = ({ media, onC
   const title = media.title || media.name || media.original_title || media.original_name;
   const year = (media.release_date || media.first_air_date)?.substring(0, 4);
   const isTv = media.media_type === 'tv' || !!media.first_air_date;
+  const isUpcoming = media.release_date ? new Date(media.release_date) > new Date() : (media.first_air_date ? new Date(media.first_air_date) > new Date() : false);
 
   return (
     <div
@@ -52,6 +53,16 @@ export const TimelineMediaCard: React.FC<TimelineMediaCardProps> = ({ media, onC
             #{media.sagaOrder || media.sagaOrderNumber}
           </div>
         )}
+
+        {/* Format Badge (FILM, SÉRIE, À VENIR) */}
+        <div className={cn(
+          "absolute top-2 right-2 z-10 text-[8px] font-black px-1.5 py-0.5 rounded backdrop-blur-md shadow-md uppercase tracking-wider",
+          isUpcoming 
+            ? "bg-purple-500/80 text-white border border-purple-500/50" 
+            : "bg-black/70 text-white/90 border border-white/10"
+        )}>
+          {isUpcoming ? 'À venir' : (isTv ? 'Série' : 'Film')}
+        </div>
 
         {/* Active item badge */}
         {isActive && (

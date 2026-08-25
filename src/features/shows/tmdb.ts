@@ -330,17 +330,22 @@ class TMDBClient {
     }
     
     // Fallback: Si l'univers trouvé est identique à la collection (mêmes IDs), ne garder que l'un ou l'autre pour ne pas polluer l'UI.
-    // Ou on laisse la vue frontend s'en charger. C'est plus propre de filtrer ici :
+    // Filtrer de l'univers tout ce qui est DÉJÀ dans la collection
     if (universe.length > 0 && collection.length > 0) {
-      const collectionIds = collection.map(c => `${c.media_type}_${c.id}`).sort().join(',');
-      const universeIds = universe.map(u => `${u.media_type}_${u.id}`).sort().join(',');
-      if (collectionIds === universeIds) {
-        universe = []; // Inutile d'afficher "Dans le même univers" si c'est la copie parfaite de l'Ordre de Visionnage
-      } else {
-        // On vérifie si l'univers est "pertinent". S'il apporte de nouveaux médias, on le garde.
-        // On ne fait rien, on garde les deux.
-      }
+      const collectionSet = new Set(collection.map(c => `${c.media_type}_${c.id}`));
+      universe = universe.filter(u => !collectionSet.has(`${u.media_type}_${u.id}`));
     }
+
+    // Re-indexer l'univers après filtre
+    universe = universe.map((item, index) => ({
+      ...item,
+      sagaOrder: index + 1
+    }));
+
+    // Exclure l'élément courant des deux listes comme demandé
+    const currentKey = `${mediaType}_${media.id}`;
+    collection = collection.filter(c => `${c.media_type}_${c.id}` !== currentKey);
+    universe = universe.filter(u => `${u.media_type}_${u.id}` !== currentKey);
 
     return { collection, universe };
   }

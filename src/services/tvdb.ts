@@ -88,8 +88,7 @@ export async function getTVDBFranchiseTimeline(
         const seriesData = (await seriesRes.json()).data;
         const lists = seriesData?.lists || [];
 
-        // Filtrer les listes correspondant à une franchise / un univers
-        const franchiseList = lists.find(
+        const validLists = lists.filter(
           (l: any) =>
             l.isOfficial ||
             l.name.toLowerCase().includes('franchise') ||
@@ -101,8 +100,16 @@ export async function getTVDBFranchiseTimeline(
             l.name.toLowerCase().includes('one chicago')
         );
 
-        if (franchiseList) {
-          listId = franchiseList.id;
+        if (validLists.length > 0) {
+          // Priority to 'universe' and 'world' to get broader universes (e.g. Wizarding World vs Harry Potter Franchise)
+          validLists.sort((a: any, b: any) => {
+            const aName = a.name.toLowerCase();
+            const bName = b.name.toLowerCase();
+            const aScore = (aName.includes('universe') || aName.includes('world') || aName.includes('whoniverse')) ? 2 : 1;
+            const bScore = (bName.includes('universe') || bName.includes('world') || bName.includes('whoniverse')) ? 2 : 1;
+            return bScore - aScore;
+          });
+          listId = validLists[0].id;
         }
       }
     } catch (e) {
