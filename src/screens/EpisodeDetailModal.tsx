@@ -10,6 +10,8 @@ import { syncSingleItem } from "../hooks/useDetailsSyncWorker";
 import { getSeasonImdbRatings, getEpisodeImdbVotes } from '../features/shows/omdbService';
 import { RedditSection } from '../components/community/RedditSection';
 import { DownloadModal } from '../components/DownloadModal';
+import { useLiveDownloadStore } from '../store/liveDownloadStore';
+import { LiveDownloadBanner } from '../components/LiveDownloadBanner';
 
 interface EpisodeDetailModalProps {
   show?: Show;
@@ -33,6 +35,15 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
 
   const { shows, addShow, updateShow } = useShows();
   const { showToast } = useToastStore();
+
+  const { startPolling, stopPolling, getEpisodeDownload } = useLiveDownloadStore();
+
+  useEffect(() => {
+    startPolling(4000);
+    return () => {
+      stopPolling();
+    };
+  }, [startPolling, stopPolling]);
 
   // Find live show from Zustand store so updates are instantly reactive
   const liveShow = shows.find(s => 
@@ -946,6 +957,17 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                     <Download size={16} className="text-blue-400 shrink-0" />
                     <span>Télécharger S{String(currentSeason).padStart(2, '0')}E{String(currentEpisode.episode_number).padStart(2, '0')}</span>
                   </button>
+
+                  {/* Single Episode Live Download Banner */}
+                  {(() => {
+                    const epDownload = getEpisodeDownload(tmdbShowId || activeShow?.tmdbId, activeShow?.tvdbId, currentSeason, currentEpisode?.episode_number);
+                    if (!epDownload) return null;
+                    return (
+                      <div className="mt-2">
+                        <LiveDownloadBanner items={[epDownload]} />
+                      </div>
+                    );
+                  })()}
 
                   {/* Synopsis - Interactif & Déroulable */}
                   {currentEpisode.overview && (

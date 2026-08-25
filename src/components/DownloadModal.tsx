@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import { C411Torrent, searchC411Torrents, formatTorrentSize } from '../services/c411';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
+import { useLiveDownloadStore } from '../store/liveDownloadStore';
+import { LiveDownloadBanner } from './LiveDownloadBanner';
 import { 
   searchAndDownloadInSonarr, 
   searchAndDownloadInRadarr, 
@@ -78,6 +80,21 @@ export function DownloadModal({
     qbittorrentUsername,
     qbittorrentPassword,
   } = useDownloadConfigStore();
+
+  const { startPolling, stopPolling, getShowDownloads, getMovieDownload } = useLiveDownloadStore();
+
+  useEffect(() => {
+    if (isOpen) {
+      startPolling(4000);
+      return () => {
+        stopPolling();
+      };
+    }
+  }, [isOpen, startPolling, stopPolling]);
+
+  const activeDownloads = mediaType === 'tv'
+    ? getShowDownloads(tmdbId, undefined, title)
+    : (getMovieDownload(tmdbId, title) ? [getMovieDownload(tmdbId, title)!] : []);
 
   // Mode de portée (Scope) : 'all' (Série entière / Film), 'season' (Saison X), 'episode' (S01E01)
   const [scopeMode, setScopeMode] = useState<'all' | 'season' | 'episode'>(
@@ -582,6 +599,13 @@ export function DownloadModal({
           }`}>
             {actionMessage.type === 'success' ? <Check size={14} className="shrink-0 text-emerald-400" /> : <AlertCircle size={14} className="shrink-0 text-red-400" />}
             <span className="leading-snug text-[11px]">{actionMessage.text}</span>
+          </div>
+        )}
+
+        {/* Live Downloads Progress Banner */}
+        {activeDownloads.length > 0 && (
+          <div className="p-3 bg-zinc-900/90 border-b border-zinc-800">
+            <LiveDownloadBanner items={activeDownloads} />
           </div>
         )}
 

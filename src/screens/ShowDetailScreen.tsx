@@ -19,6 +19,8 @@ import { getSeriesImdbData } from '../features/shows/omdbService';
 import { getFormattedProviderLogo, PLEX_LOGO_SVG } from '../utils/providerLogos';
 import { checkPlexAvailability, PlexMediaInfo } from '../features/plex/plexAvailability';
 import { RedditSection } from '../components/community/RedditSection';
+import { useLiveDownloadStore } from '../store/liveDownloadStore';
+import { LiveDownloadBanner } from '../components/LiveDownloadBanner';
 
 
 interface ShowDetailScreenProps {
@@ -313,6 +315,20 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [downloadTargetSeason, setDownloadTargetSeason] = useState<number | undefined>(undefined);
   const [downloadTargetEpisode, setDownloadTargetEpisode] = useState<number | undefined>(undefined);
+
+  // Téléchargements en direct (Sonarr / Radarr / qBittorrent)
+  const { startPolling, stopPolling, getShowDownloads, getMovieDownload, getEpisodeDownload } = useLiveDownloadStore();
+
+  useEffect(() => {
+    startPolling(4000);
+    return () => {
+      stopPolling();
+    };
+  }, [startPolling, stopPolling]);
+
+  const activeDownloads = isSeries
+    ? getShowDownloads(effectiveTmdbId, tmdbDetails?.external_ids?.tvdb_id || (show as any)?.tvdbId, tmdbDetails?.name || show?.title)
+    : (getMovieDownload(effectiveTmdbId, tmdbDetails?.title || show?.title) ? [getMovieDownload(effectiveTmdbId, tmdbDetails?.title || show?.title)!] : []);
 
   const openEpisodeModal = (seasonNum: number, ep: any) => {
     setSelectedEpisode({ season: seasonNum, episode: ep });
@@ -2321,6 +2337,13 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
               )}
             </div>
           </div>
+
+          {/* Bandeau de téléchargement en direct (Sonarr/Radarr/qBittorrent) */}
+          {activeDownloads.length > 0 && (
+            <div className="mt-4 px-1">
+              <LiveDownloadBanner items={activeDownloads} />
+            </div>
+          )}
         </div>
       </div>
       
@@ -2834,59 +2857,66 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                           </div>
                         ) : (
                           seasonsCache[season.season_number].episodes.map((ep: any, epIdx: number) => {
-                        const epKey = `${season.season_number}x${ep.episode_number}`;
-                        const isSeen = show?.seenEpisodes?.includes(epKey);
-                        const isFutureEp = ep.air_date ? ep.air_date > todayStr : false;
-                        
-                        return (
-                          <div 
-                            key={`ep_${ep.id || ep.episode_number}_${epIdx}`} 
-                            onClick={() => openEpisodeModal(season.season_number, ep)}
-                            className={cn("p-3 flex items-center gap-3 hover:bg-white/5 transition-colors cursor-pointer active:bg-white/10", isFutureEp && "opacity-50")}
-                          >
-                            <div className="relative w-24 h-16 rounded-xl overflow-hidden bg-zinc-800 shrink-0 border border-white/5">
-                               {ep.still_path && (
-                                 <img loading="lazy" decoding="async" src={`https://image.tmdb.org/t/p/w300${ep.still_path}`} className="w-full h-full object-cover" alt="" />
-                               )}
-                               <div className="absolute inset-0 bg-black/20" />
-                            </div>
-                            
-                            <div className="flex-1 min-w-0">
-                               <div className="flex items-center gap-2 mb-0.5">
-                                 {(() => {
-                                   const airDateLabel = getEpisodeAirDateLabel(ep.air_date);
-                                   if (!airDateLabel) return null;
+                            const epKey = `${season.season_number}x${ep.episode_number}`;
+                            const isSeen = show?.seenEpisodes?.includes(epKey);
+                            const isFutureEp = ep.air_date ? ep.air_date > todayStr : false;
+                            const epDownload = getEpisodeDownload(effectiveTmdbId, tmdbDetails?.external_ids?.tvdb_id || (show as any)?.tvdbId, season.season_number, ep.episode_number);
 
-                                   return (
-                                     <span className="inline-block bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md mb-1 w-max">
-                                       {airDateLabel}
-                                     </span>
-                                   );
-                                 })()}
-                               </div>
-                               <p className={cn("text-[14px] font-bold truncate leading-tight", isSeen ? "text-zinc-500 line-through" : "text-zinc-200")}>{ep.name}</p>
-                               <p className="text-[12px] font-semibold text-zinc-500 mt-1">
-                                 E{(ep.episode_number ?? 1).toString().padStart(2, '0')} • {ep.runtime ? `${ep.runtime}min` : '45min'}
-                               </p>
-                            </div>
-
-                            {!isFutureEp && (
-                              <button 
-                                onClick={(e) => toggleEpisodeSeen(e, season.season_number, ep.episode_number)}
-                                className="p-2 shrink-0 touch-manipulation active:scale-90 transition-transform"
+                            return (
+                              <div 
+                                key={`ep_${ep.id || ep.episode_number}_${epIdx}`} 
+                                onClick={() => openEpisodeModal(season.season_number, ep)}
+                                className={cn("p-3 flex items-center gap-3 hover:bg-white/5 transition-colors cursor-pointer active:bg-white/10 relative", isFutureEp && "opacity-50")}
                               >
-                                {isSeen ? (
-                                  <div className="w-6 h-6 rounded-full border border-emerald-500 flex items-center justify-center bg-emerald-500/15">
-                                    <Check size={14} className="text-emerald-400 stroke-[3]" />
-                                  </div>
-                                ) : (
-                                  <div className="w-6 h-6 rounded-full border border-zinc-700" />
+                                <div className="relative w-24 h-16 rounded-xl overflow-hidden bg-zinc-800 shrink-0 border border-white/5">
+                                   {ep.still_path && (
+                                     <img loading="lazy" decoding="async" src={`https://image.tmdb.org/t/p/w300${ep.still_path}`} className="w-full h-full object-cover" alt="" />
+                                   )}
+                                   <div className="absolute inset-0 bg-black/20" />
+                                </div>
+                                
+                                <div className="flex-1 min-w-0">
+                                   <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                                     {(() => {
+                                       const airDateLabel = getEpisodeAirDateLabel(ep.air_date);
+                                       if (!airDateLabel) return null;
+
+                                       return (
+                                         <span className="inline-block bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md mb-1 w-max">
+                                           {airDateLabel}
+                                         </span>
+                                       );
+                                     })()}
+
+                                     {epDownload && (
+                                       <div className="mb-1">
+                                         <LiveDownloadBanner items={[epDownload]} compact={true} />
+                                       </div>
+                                     )}
+                                   </div>
+                                   <p className={cn("text-[14px] font-bold truncate leading-tight", isSeen ? "text-zinc-500 line-through" : "text-zinc-200")}>{ep.name}</p>
+                                   <p className="text-[12px] font-semibold text-zinc-500 mt-1">
+                                     E{(ep.episode_number ?? 1).toString().padStart(2, '0')} • {ep.runtime ? `${ep.runtime}min` : '45min'}
+                                   </p>
+                                </div>
+
+                                {!isFutureEp && (
+                                  <button 
+                                    onClick={(e) => toggleEpisodeSeen(e, season.season_number, ep.episode_number)}
+                                    className="p-2 shrink-0 touch-manipulation active:scale-90 transition-transform"
+                                  >
+                                    {isSeen ? (
+                                      <div className="w-6 h-6 rounded-full border border-emerald-500 flex items-center justify-center bg-emerald-500/15">
+                                        <Check size={14} className="text-emerald-400 stroke-[3]" />
+                                      </div>
+                                    ) : (
+                                      <div className="w-6 h-6 rounded-full border border-zinc-700" />
+                                    )}
+                                  </button>
                                 )}
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })
+                              </div>
+                            );
+                          })
                       )}
                       </>
                     )}

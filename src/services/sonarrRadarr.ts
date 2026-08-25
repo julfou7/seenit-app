@@ -747,3 +747,293 @@ export async function pushReleaseDirectly(payload: {
     };
   }
 }
+
+/* ========================================================================
+   GÉRATION DU SUIVI DES TÉLÉCHARGEMENTS EN DIRECT (SONARR, RADARR, QBIT)
+   ======================================================================== */
+
+export interface LiveDownloadItem {
+  id: string;
+  mediaType: 'tv' | 'movie';
+  title: string;
+  seriesTitle?: string;
+  movieTitle?: string;
+  tmdbId?: number;
+  tvdbId?: number;
+  imdbId?: string;
+  seasonNumber?: number;
+  episodeNumber?: number;
+  size: number;
+  sizeleft: number;
+  progress: number;
+  timeleft?: string;
+  timeleftSeconds?: number;
+  speedBytesPerSec?: number;
+  speedFormatted?: string;
+  status: 'downloading' | 'queued' | 'paused' | 'completed' | 'warning' | string;
+  statusText: string;
+  downloadClient?: string;
+  releaseTitle?: string;
+}
+
+export function formatBytes(bytes: number, decimals = 1): string {
+  if (!bytes || bytes === 0) return '0 Octet';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Octets', 'Ko', 'Mo', 'Go', 'To'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+export function formatSpeed(bytesPerSec: number): string {
+  if (!bytesPerSec || bytesPerSec <= 0) return '0 Ko/s';
+  return `${formatBytes(bytesPerSec)}/s`;
+}
+
+export function formatSecondsToETA(seconds: number): string {
+  if (!seconds || seconds <= 0 || !isFinite(seconds) || seconds > 86400 * 7) return '--';
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  const h = Math.floor(m / 60);
+  const remainingM = m % 60;
+
+  if (h > 0) return `${h}h ${remainingM}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+function parseTimeStringToSeconds(timeStr?: string): number {
+  if (!timeStr) return 0;
+  const parts = timeStr.trim().split(':');
+  if (parts.length === 3) {
+    const hours = parseInt(parts[0], 10) || 0;
+    const mins = parseInt(parts[1], 10) || 0;
+    const secs = parseInt(parts[2], 10) || 0;
+    return hours * 3600 + mins * 60 + secs;
+  }
+  if (parts.length === 2) {
+    const mins = parseInt(parts[0], 10) || 0;
+    const secs = parseInt(parts[1], 10) || 0;
+    return mins * 60 + secs;
+  }
+  return 0;
+}
+
+export function matchShowDownload(
+  item: LiveDownloadItem,
+  tmdbId?: number | string,
+  tvdbId?: number | string,
+  showTitle?: string
+): boolean {
+  if (item.mediaType !== 'tv') return false;
+  if (tmdbId && item.tmdbId && Number(item.tmdbId) === Number(tmdbId)) return true;
+  if (tvdbId && item.tvdbId && Number(item.tvdbId) === Number(tvdbId)) return true;
+
+  if (showTitle && (item.seriesTitle || item.title)) {
+    const normSearch = showTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normItemSeries = (item.seriesTitle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normItemTitle = (item.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (normItemSeries && (normItemSeries === normSearch || normItemSeries.includes(normSearch) || normSearch.includes(normItemSeries))) {
+      return true;
+    }
+    if (normItemTitle && normItemTitle.includes(normSearch)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function matchMovieDownload(
+  item: LiveDownloadItem,
+  tmdbId?: number | string,
+  movieTitle?: string
+): boolean {
+  if (item.mediaType !== 'movie') return false;
+  if (tmdbId && item.tmdbId && Number(item.tmdbId) === Number(tmdbId)) return true;
+
+  if (movieTitle && (item.movieTitle || item.title)) {
+    const normSearch = movieTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normItemMovie = (item.movieTitle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normItemTitle = (item.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (normItemMovie && (normItemMovie === normSearch || normItemMovie.includes(normSearch) || normSearch.includes(normItemMovie))) {
+      return true;
+    }
+    if (normItemTitle && normItemTitle.includes(normSearch)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promise<LiveDownloadItem[]> {
+  const items: LiveDownloadItem[] = [];
+
+  // 1. Sonarr Queue
+  if (config.sonarrUrl && config.sonarrApiKey) {
+    const sonarrBase = cleanUrl(config.sonarrUrl);
+    try {
+      const res = await executeGet(`${sonarrBase}/api/v3/queue?pageSize=100&includeSeries=true&includeEpisode=true`, {
+        'X-Api-Key': config.sonarrApiKey,
+        'Accept': 'application/json'
+      });
+
+      const records = Array.isArray(res) ? res : (Array.isArray(res?.records) ? res.records : []);
+
+      for (const rec of records) {
+        const totalSize = rec.size || 0;
+        const leftSize = rec.sizeleft || 0;
+        const downloaded = Math.max(0, totalSize - leftSize);
+        const progress = totalSize > 0 ? Math.min(100, Math.max(0, Math.round((downloaded / totalSize) * 100))) : (leftSize === 0 ? 100 : 0);
+
+        const timeleftSeconds = parseTimeStringToSeconds(rec.timeleft);
+        const timeleftStr = timeleftSeconds > 0 ? formatSecondsToETA(timeleftSeconds) : (rec.timeleft || '');
+
+        const seriesTitle = rec.series?.title || rec.title || 'Série';
+        const seasonNum = rec.seasonNumber ?? rec.episode?.seasonNumber ?? 1;
+        const epNum = rec.episode?.episodeNumber ?? rec.episodeNumber;
+        const epTitle = epNum ? `S${seasonNum}E${epNum}` : `Saison ${seasonNum}`;
+
+        items.push({
+          id: `sonarr_${rec.id}`,
+          mediaType: 'tv',
+          title: `${seriesTitle} (${epTitle})`,
+          seriesTitle: seriesTitle,
+          tmdbId: rec.series?.tmdbId,
+          tvdbId: rec.series?.tvdbId,
+          imdbId: rec.series?.imdbId,
+          seasonNumber: seasonNum,
+          episodeNumber: epNum,
+          size: totalSize,
+          sizeleft: leftSize,
+          progress,
+          timeleft: timeleftStr,
+          timeleftSeconds,
+          speedBytesPerSec: timeleftSeconds > 0 && leftSize > 0 ? Math.round(leftSize / timeleftSeconds) : 0,
+          speedFormatted: timeleftSeconds > 0 && leftSize > 0 ? formatSpeed(Math.round(leftSize / timeleftSeconds)) : '',
+          status: rec.status || 'downloading',
+          statusText: rec.status === 'downloading' ? `Téléchargement ${progress}%` : (rec.status || 'En cours'),
+          downloadClient: rec.downloadClient || 'Sonarr',
+          releaseTitle: rec.title
+        });
+      }
+    } catch (e) {
+      console.warn('[LiveQueue] Erreur Sonarr queue:', e);
+    }
+  }
+
+  // 2. Radarr Queue
+  if (config.radarrUrl && config.radarrApiKey) {
+    const radarrBase = cleanUrl(config.radarrUrl);
+    try {
+      const res = await executeGet(`${radarrBase}/api/v3/queue?pageSize=100&includeMovie=true`, {
+        'X-Api-Key': config.radarrApiKey,
+        'Accept': 'application/json'
+      });
+
+      const records = Array.isArray(res) ? res : (Array.isArray(res?.records) ? res.records : []);
+
+      for (const rec of records) {
+        const totalSize = rec.size || 0;
+        const leftSize = rec.sizeleft || 0;
+        const downloaded = Math.max(0, totalSize - leftSize);
+        const progress = totalSize > 0 ? Math.min(100, Math.max(0, Math.round((downloaded / totalSize) * 100))) : (leftSize === 0 ? 100 : 0);
+
+        const timeleftSeconds = parseTimeStringToSeconds(rec.timeleft);
+        const timeleftStr = timeleftSeconds > 0 ? formatSecondsToETA(timeleftSeconds) : (rec.timeleft || '');
+
+        const movieTitle = rec.movie?.title || rec.title || 'Film';
+
+        items.push({
+          id: `radarr_${rec.id}`,
+          mediaType: 'movie',
+          title: movieTitle,
+          movieTitle: movieTitle,
+          tmdbId: rec.movie?.tmdbId,
+          imdbId: rec.movie?.imdbId,
+          size: totalSize,
+          sizeleft: leftSize,
+          progress,
+          timeleft: timeleftStr,
+          timeleftSeconds,
+          speedBytesPerSec: timeleftSeconds > 0 && leftSize > 0 ? Math.round(leftSize / timeleftSeconds) : 0,
+          speedFormatted: timeleftSeconds > 0 && leftSize > 0 ? formatSpeed(Math.round(leftSize / timeleftSeconds)) : '',
+          status: rec.status || 'downloading',
+          statusText: rec.status === 'downloading' ? `Téléchargement ${progress}%` : (rec.status || 'En cours'),
+          downloadClient: rec.downloadClient || 'Radarr',
+          releaseTitle: rec.title
+        });
+      }
+    } catch (e) {
+      console.warn('[LiveQueue] Erreur Radarr queue:', e);
+    }
+  }
+
+  // 3. qBittorrent direct
+  if (config.qbittorrentUrl) {
+    const qbitBase = cleanUrl(config.qbittorrentUrl);
+    try {
+      let cookieHeader = '';
+      if (config.qbittorrentUsername || config.qbittorrentPassword) {
+        if (Capacitor.isNativePlatform()) {
+          try {
+            const loginRes = await CapacitorHttp.post({
+              url: `${qbitBase}/api/v2/auth/login`,
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              data: `username=${encodeURIComponent(config.qbittorrentUsername || '')}&password=${encodeURIComponent(config.qbittorrentPassword || '')}`
+            });
+            if (loginRes.headers && (loginRes.headers['set-cookie'] || loginRes.headers['Set-Cookie'])) {
+              cookieHeader = (loginRes.headers['set-cookie'] || loginRes.headers['Set-Cookie']).split(';')[0];
+            }
+          } catch {}
+        }
+      }
+
+      const qHeaders: Record<string, string> = { 'Accept': 'application/json' };
+      if (cookieHeader) qHeaders['Cookie'] = cookieHeader;
+
+      const res = await executeGet(`${qbitBase}/api/v2/torrents/info?filter=downloading`, qHeaders);
+      if (Array.isArray(res)) {
+        for (const t of res) {
+          const rawProgress = typeof t.progress === 'number' ? Math.round(t.progress * 100) : 0;
+          const speed = t.dlspeed || 0;
+          const etaSec = t.eta || 0;
+          const isTv = t.category === 'tv' || /s\d{1,2}e\d{1,2}/i.test(t.name);
+
+          const existing = items.find(it => it.releaseTitle && (it.releaseTitle.toLowerCase() === t.name.toLowerCase() || t.name.toLowerCase().includes(it.releaseTitle.toLowerCase()) || it.releaseTitle.toLowerCase().includes(t.name.toLowerCase())));
+
+          if (existing) {
+            if (speed > 0) {
+              existing.speedBytesPerSec = speed;
+              existing.speedFormatted = formatSpeed(speed);
+            }
+            if (etaSec > 0 && etaSec < 86400 * 7) {
+              existing.timeleftSeconds = etaSec;
+              existing.timeleft = formatSecondsToETA(etaSec);
+            }
+          } else {
+            items.push({
+              id: `qbit_${t.hash || t.name}`,
+              mediaType: isTv ? 'tv' : 'movie',
+              title: t.name,
+              size: t.size || 0,
+              sizeleft: Math.round((t.size || 0) * (1 - (t.progress || 0))),
+              progress: rawProgress,
+              timeleft: formatSecondsToETA(etaSec),
+              timeleftSeconds: etaSec,
+              speedBytesPerSec: speed,
+              speedFormatted: formatSpeed(speed),
+              status: t.state || 'downloading',
+              statusText: `qBittorrent ${rawProgress}%`,
+              downloadClient: 'qBittorrent',
+              releaseTitle: t.name
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[LiveQueue] Erreur qBittorrent queue:', e);
+    }
+  }
+
+  return items;
+}
