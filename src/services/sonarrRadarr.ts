@@ -14,7 +14,7 @@ export interface SonarrRadarrConfig {
 /**
  * Normalise l'URL pour s'assurer qu'elle n'a pas de slash final
  */
-function cleanUrl(url: string): string {
+export function cleanUrl(url: string): string {
   let u = (url || '').trim();
   if (!u) return '';
   if (!u.startsWith('http://') && !u.startsWith('https://')) {
@@ -26,7 +26,7 @@ function cleanUrl(url: string): string {
 /**
  * Exécute une requête GET multiplateforme (Natif CapacitorHttp sur mobile / Proxy ou Fetch sur Web)
  */
-async function executeGet(url: string, headers: Record<string, string> = {}): Promise<any> {
+export async function executeGet(url: string, headers: Record<string, string> = {}): Promise<any> {
   const isLocalIp = url.includes('192.168.') || url.includes('localhost') || url.includes('127.0.0.1') || url.includes('10.') || url.includes('172.16.') || url.includes('172.17.') || url.includes('172.18.') || url.includes('172.19.') || url.includes('172.20.') || url.includes('172.21.') || url.includes('172.22.') || url.includes('172.23.') || url.includes('172.24.') || url.includes('172.25.') || url.includes('172.26.') || url.includes('172.27.') || url.includes('172.28.') || url.includes('172.29.') || url.includes('172.30.') || url.includes('172.31.');
 
   if (Capacitor.isNativePlatform()) {

@@ -18,6 +18,7 @@ import { useShowsStore } from '../store/showsStore';
 import { getSeriesImdbData } from '../features/shows/omdbService';
 import { getFormattedProviderLogo, PLEX_LOGO_SVG } from '../utils/providerLogos';
 import { checkPlexAvailability, PlexMediaInfo } from '../features/plex/plexAvailability';
+import { useMediaPresence } from '../hooks/useMediaPresence';
 import { RedditSection } from '../components/community/RedditSection';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { LiveDownloadBanner } from '../components/LiveDownloadBanner';
@@ -330,6 +331,17 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const activeDownloads = isSeries
     ? getShowDownloads(effectiveTmdbId, tmdbDetails?.external_ids?.tvdb_id || (show as any)?.tvdbId, tmdbDetails?.name || show?.title)
     : (getMovieDownload(effectiveTmdbId, tmdbDetails?.title || show?.title) ? [getMovieDownload(effectiveTmdbId, tmdbDetails?.title || show?.title)!] : []);
+
+  // Vérification présence locale (Sonarr / Radarr / Plex)
+  const presence = useMediaPresence({
+    tmdbId: effectiveTmdbId,
+    tvdbId: tmdbDetails?.external_ids?.tvdb_id || (show as any)?.tvdbId,
+    imdbId: tmdbDetails?.external_ids?.imdb_id || (show as any)?.imdbId,
+    title: title,
+    originalTitle: tmdbDetails?.original_title || tmdbDetails?.original_name || (show as any)?.originalTitle,
+    year: releaseYear ? parseInt(releaseYear) : undefined,
+    mediaType: isSeries ? 'tv' : 'movie'
+  });
 
   const openEpisodeModal = (seasonNum: number, ep: any) => {
     setSelectedEpisode({ season: seasonNum, episode: ep });
@@ -1902,21 +1914,44 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                   }} 
                 />
                 <div className="absolute right-0 top-12 w-56 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col py-1 animate-in fade-in duration-150">
-                  {/* Action Télécharger */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowMenu(false);
-                      setDownloadTargetSeason(undefined);
-                      setDownloadTargetEpisode(undefined);
-                      setIsDownloadModalOpen(true);
-                    }}
-                    className="w-full px-4 py-3 text-left text-sm text-blue-400 hover:bg-zinc-800 transition-colors flex items-center gap-3 font-semibold cursor-pointer active:bg-zinc-800"
-                  >
-                    <Download size={16} className="text-blue-400" />
-                    <span>Télécharger {isSeries ? 'la série' : 'le film'}</span>
-                  </button>
+                  {/* Action Télécharger / Statut Présence */}
+                  {presence.hasFile || presence.plexInfo?.available ? (
+                    <>
+                      <div className="w-full px-4 py-2.5 flex items-center gap-3 text-sm font-semibold text-emerald-400 bg-emerald-500/10">
+                        <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                        <span>{presence.plexInfo?.available ? "Disponible sur Plex" : "Présent sur le serveur"}</span>
+                      </div>
+                      {presence.plexInfo?.available && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowMenu(false);
+                            openExternalUrl(presence.plexInfo?.plexUrl || 'https://app.plex.tv/desktop');
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-sm text-amber-400 hover:bg-zinc-800 transition-colors flex items-center gap-3 font-semibold cursor-pointer active:bg-zinc-800"
+                        >
+                          <Play size={16} className="text-amber-400 fill-amber-400 shrink-0" />
+                          <span>Ouvrir dans Plex</span>
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowMenu(false);
+                        setDownloadTargetSeason(undefined);
+                        setDownloadTargetEpisode(undefined);
+                        setIsDownloadModalOpen(true);
+                      }}
+                      className="w-full px-4 py-3 text-left text-sm text-blue-400 hover:bg-zinc-800 transition-colors flex items-center gap-3 font-semibold cursor-pointer active:bg-zinc-800"
+                    >
+                      <Download size={16} className="text-blue-400" />
+                      <span>Télécharger {isSeries ? 'la série' : 'le film'}</span>
+                    </button>
+                  )}
 
                   <div className="h-px bg-white/5 my-0.5" />
 
@@ -2634,17 +2669,40 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                 // 3. Si les deux ont terminé et rien n'a été trouvé
                 return (
                   <div className="flex items-center gap-3 flex-wrap">
-                    <p className="text-xs text-zinc-500 italic">
-                      Non disponible en streaming actuellement
-                    </p>
-                    <button
-                      onClick={() => setIsDownloadModalOpen(true)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-500/40 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 active:scale-95 text-xs font-bold transition-all cursor-pointer shadow-[0_0_12px_rgba(59,130,246,0.2)]"
-                      title="Rechercher et télécharger sur C411"
-                    >
-                      <Download size={14} className="shrink-0" />
-                      <span>Télécharger</span>
-                    </button>
+                    {presence.hasFile || presence.plexInfo?.available ? (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 text-xs font-bold shadow-sm">
+                          <CheckCircle2 size={14} className="shrink-0 text-emerald-400" />
+                          <span>{presence.plexInfo?.available ? "Sur Plex" : "Disponible"}</span>
+                        </div>
+                        {presence.plexInfo?.available && (
+                          <button
+                            type="button"
+                            onClick={() => openExternalUrl(presence.plexInfo?.plexUrl || 'https://app.plex.tv/desktop')}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 active:scale-95 text-xs font-bold transition-all cursor-pointer shadow-sm"
+                            title="Ouvrir dans l'application Plex"
+                          >
+                            <Play size={14} className="shrink-0 text-amber-400 fill-amber-400" />
+                            <span>Ouvrir dans Plex</span>
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-xs text-zinc-500 italic">
+                          Non disponible en streaming actuellement
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setIsDownloadModalOpen(true)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-500/40 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 active:scale-95 text-xs font-bold transition-all cursor-pointer shadow-[0_0_12px_rgba(59,130,246,0.2)]"
+                          title="Rechercher et télécharger sur C411"
+                        >
+                          <Download size={14} className="shrink-0" />
+                          <span>Télécharger</span>
+                        </button>
+                      </>
+                    )}
                   </div>
                 );
               })()}
@@ -2793,20 +2851,37 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                     </button>
                   )}
 
-                  {/* Bouton Télécharger la saison */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDownloadTargetSeason(seasonNum);
-                      setDownloadTargetEpisode(undefined);
-                      setIsDownloadModalOpen(true);
-                    }}
-                    className="p-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 text-[10px] font-bold flex items-center gap-1 transition-colors active:scale-95 touch-manipulation uppercase tracking-wider shrink-0 cursor-pointer"
-                    title={`Télécharger la saison ${seasonNum} (Sonarr / C411)`}
-                  >
-                    <Download size={12} className="text-blue-400" />
-                    <span className="hidden sm:inline">S{seasonNum}</span>
-                  </button>
+                  {/* Bouton Télécharger la saison ou Badge de Disponibilité */}
+                  {(() => {
+                    const isSeasonAvailable = presence.seasonsHasFile[seasonNum] || (presence.hasFile && (presence.plexInfo?.available || presence.sonarrHasFile));
+                    if (isSeasonAvailable) {
+                      return (
+                        <div
+                          className="px-2.5 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-[10px] font-bold flex items-center gap-1 shrink-0"
+                          title={`Saison ${seasonNum} disponible sur le serveur`}
+                        >
+                          <CheckCircle2 size={12} className="text-emerald-400" />
+                          <span className="hidden sm:inline">Disponible</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDownloadTargetSeason(seasonNum);
+                          setDownloadTargetEpisode(undefined);
+                          setIsDownloadModalOpen(true);
+                        }}
+                        className="p-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 text-[10px] font-bold flex items-center gap-1 transition-colors active:scale-95 touch-manipulation uppercase tracking-wider shrink-0 cursor-pointer"
+                        title={`Télécharger la saison ${seasonNum} (Sonarr / C411)`}
+                      >
+                        <Download size={12} className="text-blue-400" />
+                        <span className="hidden sm:inline">S{seasonNum}</span>
+                      </button>
+                    );
+                  })()}
                   
                   <button onClick={() => loadSeason(seasonNum)} className="text-zinc-500 hover:text-white transition-colors shrink-0 px-2">
                     {expandedSeason === season.season_number ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -2883,6 +2958,16 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                                        return (
                                          <span className="inline-block bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md mb-1 w-max">
                                            {airDateLabel}
+                                         </span>
+                                       );
+                                     })()}
+
+                                     {(() => {
+                                       const epHasFile = presence.episodesHasFile[`S${season.season_number}E${ep.episode_number}`] || presence.seasonsHasFile[season.season_number] || (presence.hasFile && (presence.plexInfo?.available || presence.sonarrHasFile));
+                                       if (!epHasFile) return null;
+                                       return (
+                                         <span className="inline-block bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold uppercase px-2 py-0.5 rounded-md mb-1 w-max">
+                                           Disponible
                                          </span>
                                        );
                                      })()}

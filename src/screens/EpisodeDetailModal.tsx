@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'motion/react';
 import { type Show } from '../types';
-import { X, Check, Star, ChevronLeft, ChevronRight, Clock, ArrowLeft, Sparkles, Download } from 'lucide-react';
-import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getTodayStr, getCalendarDaysDiff, scrollAllCarouselsToStart } from '../lib/utils';
+import { X, Check, Star, ChevronLeft, ChevronRight, Clock, ArrowLeft, Sparkles, Download, CheckCircle2, Play } from 'lucide-react';
+import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getTodayStr, getCalendarDaysDiff, scrollAllCarouselsToStart, openExternalUrl } from '../lib/utils';
 import { useShows } from '../hooks/useShows';
 import { useToastStore } from '../store/toastStore';
 import { tmdb } from '../features/shows/tmdb';
@@ -12,6 +12,7 @@ import { RedditSection } from '../components/community/RedditSection';
 import { DownloadModal } from '../components/DownloadModal';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { LiveDownloadBanner } from '../components/LiveDownloadBanner';
+import { useMediaPresence } from '../hooks/useMediaPresence';
 
 interface EpisodeDetailModalProps {
   show?: Show;
@@ -52,6 +53,15 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
     (tmdbShowId && s.tmdbId === tmdbShowId)
   );
   const activeShow = liveShow || show;
+
+  // Vérification de la présence locale (Sonarr / Plex)
+  const presence = useMediaPresence({
+    tmdbId: tmdbShowId || activeShow?.tmdbId,
+    tvdbId: (activeShow as any)?.tvdbId,
+    imdbId: (activeShow as any)?.imdbId,
+    title: activeShow?.title || tmdbShowTitle,
+    mediaType: 'tv'
+  });
 
   const seasonCacheRef = useRef<Record<string, any[]>>({});
   const episodeCacheRef = useRef<Record<string, any>>({});
@@ -949,14 +959,44 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                     )}
                   </div>
 
-                  {/* Bouton Télécharger l'épisode (Sonarr / C411) */}
-                  <button
-                    onClick={() => setIsDownloadOpen(true)}
-                    className="w-full py-3 px-4 rounded-2xl flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] bg-blue-600/15 hover:bg-blue-600/25 border border-blue-500/30 text-blue-400 font-bold text-xs cursor-pointer shadow-sm touch-manipulation select-none"
-                  >
-                    <Download size={16} className="text-blue-400 shrink-0" />
-                    <span>Télécharger S{String(currentSeason).padStart(2, '0')}E{String(currentEpisode.episode_number).padStart(2, '0')}</span>
-                  </button>
+                  {/* Bouton Télécharger l'épisode ou Badge de Disponibilité */}
+                  {(() => {
+                    const epKey = `S${currentSeason}E${currentEpisode?.episode_number}`;
+                    const isEpisodeAvailable = presence.episodesHasFile[epKey] || presence.seasonsHasFile[currentSeason] || (presence.hasFile && (presence.plexInfo?.available || presence.sonarrHasFile));
+
+                    if (isEpisodeAvailable) {
+                      return (
+                        <div className="flex flex-col gap-2 w-full">
+                          <div className="w-full py-3 px-4 rounded-2xl flex items-center justify-center gap-2.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-xs shadow-sm select-none">
+                            <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                            <span>{presence.plexInfo?.available ? "Épisode disponible sur Plex" : "Épisode disponible"}</span>
+                          </div>
+
+                          {presence.plexInfo?.available && (
+                            <button
+                              type="button"
+                              onClick={() => openExternalUrl(presence.plexInfo?.plexUrl || 'https://app.plex.tv/desktop')}
+                              className="w-full py-2.5 px-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 font-bold text-xs cursor-pointer shadow-sm"
+                            >
+                              <Play size={16} className="text-amber-400 fill-amber-400 shrink-0" />
+                              <span>Ouvrir dans Plex</span>
+                            </button>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => setIsDownloadOpen(true)}
+                        className="w-full py-3 px-4 rounded-2xl flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] bg-blue-600/15 hover:bg-blue-600/25 border border-blue-500/30 text-blue-400 font-bold text-xs cursor-pointer shadow-sm touch-manipulation select-none"
+                      >
+                        <Download size={16} className="text-blue-400 shrink-0" />
+                        <span>Télécharger S{String(currentSeason).padStart(2, '0')}E{String(currentEpisode.episode_number).padStart(2, '0')}</span>
+                      </button>
+                    );
+                  })()}
 
                   {/* Single Episode Live Download Banner */}
                   {(() => {
