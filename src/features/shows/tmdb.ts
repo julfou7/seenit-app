@@ -248,12 +248,37 @@ class TMDBClient {
     return type === 'movie' ? this.getMovieDetails(id) : this.getShowDetails(id);
   }
 
-  async getFranchiseTimeline(media: any): Promise<any[]> {
-    if (!media) return [];
+  async getUniverseAndCollection(media: any): Promise<{ collection: any[], universe: any[] }> {
+    if (!media) return { collection: [], universe: [] };
 
     const mediaType = media.media_type || (media.title ? 'movie' : 'tv');
+    let universe: any[] = [];
+    let collection: any[] = [];
 
-    // A. POUR TOUT LE MONDE : Utiliser l'API TVDB v4 pour les préquelles, spin-offs et franchises (univers complet)
+    // A. POUR LES FILMS : Récupérer l'Ordre de Visionnage direct (Collection TMDB)
+    if (mediaType === 'movie' && media.belongs_to_collection?.id) {
+      const collectionRes = await this.getCollectionDetails(media.belongs_to_collection.id);
+      if (collectionRes.ok && collectionRes.value?.parts) {
+        const parts = collectionRes.value.parts
+          .filter((p: any) => (p.release_date || p.first_air_date) && !isAdultOrParodyMedia(p))
+          .map((p: any) => ({ ...p, media_type: 'movie' }));
+
+        if (parts.length > 1) {
+          parts.sort((a: any, b: any) => {
+            const dateA = new Date(a.release_date || a.first_air_date || 0).getTime();
+            const dateB = new Date(b.release_date || b.first_air_date || 0).getTime();
+            return dateA - dateB;
+          });
+
+          collection = parts.map((item: any, index: number) => ({
+            ...item,
+            sagaOrder: index + 1
+          }));
+        }
+      }
+    }
+
+    // B. POUR TOUT LE MONDE : Utiliser l'API TVDB v4 pour les préquelles, spin-offs et franchises (univers complet)
     const tvdbId = media.external_ids?.tvdb_id || media.tvdb_id;
     const mediaTitle = media.name || media.title || media.original_name;
     const imdbId = media.external_ids?.imdb_id || media.imdb_id;
@@ -297,39 +322,27 @@ class TMDBClient {
         });
 
         // Ajouter la numérotation d'ordre chronologique (#1, #2, #3...)
-        return combined.map((item, index) => ({
+        universe = combined.map((item, index) => ({
           ...item,
           sagaOrder: index + 1
         }));
       }
     }
-
-    // B. FALLBACK POUR LES FILMS : Utiliser la collection TMDB (belongs_to_collection) si TVDB ne trouve rien
-    if (mediaType === 'movie') {
-      if (media.belongs_to_collection?.id) {
-        const collectionRes = await this.getCollectionDetails(media.belongs_to_collection.id);
-        if (collectionRes.ok && collectionRes.value?.parts) {
-          const parts = collectionRes.value.parts
-            .filter((p: any) => (p.release_date || p.first_air_date) && !isAdultOrParodyMedia(p))
-            .map((p: any) => ({ ...p, media_type: 'movie' }));
-
-          if (parts.length <= 1) return [];
-
-          parts.sort((a: any, b: any) => {
-            const dateA = new Date(a.release_date || a.first_air_date || 0).getTime();
-            const dateB = new Date(b.release_date || b.first_air_date || 0).getTime();
-            return dateA - dateB;
-          });
-
-          return parts.map((item: any, index: number) => ({
-            ...item,
-            sagaOrder: index + 1
-          }));
-        }
+    
+    // Fallback: Si l'univers trouvé est identique à la collection (mêmes IDs), ne garder que l'un ou l'autre pour ne pas polluer l'UI.
+    // Ou on laisse la vue frontend s'en charger. C'est plus propre de filtrer ici :
+    if (universe.length > 0 && collection.length > 0) {
+      const collectionIds = collection.map(c => `${c.media_type}_${c.id}`).sort().join(',');
+      const universeIds = universe.map(u => `${u.media_type}_${u.id}`).sort().join(',');
+      if (collectionIds === universeIds) {
+        universe = []; // Inutile d'afficher "Dans le même univers" si c'est la copie parfaite de l'Ordre de Visionnage
+      } else {
+        // On vérifie si l'univers est "pertinent". S'il apporte de nouveaux médias, on le garde.
+        // On ne fait rien, on garde les deux.
       }
     }
 
-    return [];
+    return { collection, universe };
   }
 
   async getCollectionDetails(collectionId: number): Promise<Result<any>> {

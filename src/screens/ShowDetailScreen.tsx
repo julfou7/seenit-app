@@ -260,6 +260,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
 
   const [fetchError, setFetchError] = useState<boolean>(false);
   const [collectionData, setCollectionData] = useState<any>(null);
+  const [universeData, setUniverseData] = useState<any>(null);
   const [collectionLoading, setCollectionLoading] = useState<boolean>(true);
   const [imdbData, setImdbData] = useState<any>(null);
   const [imdbLoading, setImdbLoading] = useState<boolean>(false);
@@ -454,6 +455,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     setTmdbDetails(null);
     setFetchError(false);
     setCollectionData(null);
+    setUniverseData(null);
     setCollectionLoading(true);
     setImdbData(null);
     setProviders(null);
@@ -520,10 +522,11 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
           }
         });
 
-        tmdb.getFranchiseTimeline(res.value).then(sagaParts => {
+        tmdb.getUniverseAndCollection(res.value).then(({ collection, universe }) => {
           if (isMounted) setCollectionLoading(false);
-          if (sagaParts && sagaParts.length > 0 && isMounted) {
-            setCollectionData({ parts: sagaParts });
+          if (isMounted) {
+            if (collection && collection.length > 0) setCollectionData({ parts: collection });
+            if (universe && universe.length > 0) setUniverseData({ parts: universe });
           }
         });
       } else {
@@ -2382,32 +2385,57 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
             </div>
 
             {/* Ordre de visionnage / Saga */}
-            {(collectionLoading || (collectionData && collectionData.parts && collectionData.parts.length > 0)) && (
+            {(collectionData && collectionData.parts && collectionData.parts.length > 0) && (
               <div>
                 <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-3">
-                  {isSeries ? "Prequel / Spin-off" : "Ordre de visionnage"}
+                  Ordre de visionnage
                 </h3>
-                {collectionLoading ? (
-                  <div className="flex overflow-x-auto gap-3.5 hide-scrollbar py-2 px-1 -mx-1">
-                    {[1, 2, 3, 4].map(i => (
-                      <div key={i} className="flex-none w-[110px] animate-pulse">
-                        <div className="w-full aspect-[2/3] bg-zinc-800/80 rounded-xl mb-2" />
-                        <div className="h-3 bg-zinc-800/80 rounded w-3/4 mx-auto" />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex overflow-x-auto gap-3.5 hide-scrollbar py-2 px-1 -mx-1">
-                    {collectionData.parts.map((part: any, idx: number) => (
-                      <TimelineMediaCard
-                        key={`part_${part.media_type || 'media'}_${part.id}_${idx}`}
-                        media={part}
-                        isActive={part.id === effectiveTmdbId}
-                        onClick={() => onShowClick && onShowClick(part.id, part.media_type || (part.title ? 'movie' : 'tv'))}
-                      />
-                    ))}
-                  </div>
-                )}
+                <div className="flex overflow-x-auto gap-3.5 hide-scrollbar py-2 px-1 -mx-1">
+                  {collectionData.parts.map((part: any, idx: number) => (
+                    <TimelineMediaCard
+                      key={`col_part_${part.media_type || 'media'}_${part.id}_${idx}`}
+                      media={part}
+                      isActive={part.id === effectiveTmdbId}
+                      onClick={() => onShowClick && onShowClick(part.id, part.media_type || (part.title ? 'movie' : 'tv'))}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Univers Etendu (TVDB) */}
+            {(universeData && universeData.parts && universeData.parts.length > 0) && (
+              <div className={collectionData?.parts?.length > 0 ? "mt-6" : ""}>
+                <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-3">
+                  {isSeries ? "Prequel / Spin-off" : "Dans le même univers"}
+                </h3>
+                <div className="flex overflow-x-auto gap-3.5 hide-scrollbar py-2 px-1 -mx-1">
+                  {universeData.parts.map((part: any, idx: number) => (
+                    <TimelineMediaCard
+                      key={`univ_part_${part.media_type || 'media'}_${part.id}_${idx}`}
+                      media={part}
+                      isActive={part.id === effectiveTmdbId}
+                      onClick={() => onShowClick && onShowClick(part.id, part.media_type || (part.title ? 'movie' : 'tv'))}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Loading State for Franchises */}
+            {collectionLoading && (
+              <div>
+                <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-3">
+                  Ordre de visionnage
+                </h3>
+                <div className="flex overflow-x-auto gap-3.5 hide-scrollbar py-2 px-1 -mx-1">
+                  {[1, 2, 3, 4].map(i => (
+                    <div key={`saga_loader_${i}`} className="flex-none w-[110px] animate-pulse">
+                      <div className="w-full aspect-[2/3] bg-zinc-800/80 rounded-xl mb-2" />
+                      <div className="h-3 bg-zinc-800/80 rounded w-3/4 mx-auto" />
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
