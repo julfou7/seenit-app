@@ -64,15 +64,70 @@ export function buildMagnetLink(infoHash: string, name: string): string {
 }
 
 /**
- * Recherche des torrents sur C411 via le backend SeenIt
+ * Recherche des torrents sur C411 via le backend SeenIt ou directement
  */
 export async function searchC411Torrents(params: C411SearchParams): Promise<C411Torrent[]> {
+  const query = (params.query || '').trim();
+  if (!query) return [];
+
+  const apiKey = params.apiKey || '2d4baaf4fdd1dacd26f8dc96b1ab6aa06fc95140a7509456b25c8c0b9b5ac55a';
+
+  // 1. Essai direct via l'API officielle C411 (très rapide sur mobile & navigateur)
+  try {
+    const cleanQuery = query.replace(/[:’']/g, ' ').replace(/\s+/g, ' ').trim();
+    const searchParams = new URLSearchParams();
+    searchParams.set('name', cleanQuery);
+    searchParams.set('category', '1');
+    if (params.mediaType === 'tv') searchParams.set('subcategory', '7');
+    if (params.mediaType === 'movie') searchParams.set('subcategory', '6');
+
+    const res = await fetch(`https://c411.org/api/torrents?${searchParams.toString()}`, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Accept': 'application/json',
+        'User-Agent': 'SeenIt-App'
+      },
+      signal: AbortSignal.timeout(6000)
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      let torrents: C411Torrent[] = data.data || [];
+
+      // Fallback sans sous-catégorie si liste vide
+      if (torrents.length === 0) {
+        const broadRes = await fetch(`https://c411.org/api/torrents?name=${encodeURIComponent(cleanQuery)}&category=1`, {
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Accept': 'application/json',
+            'User-Agent': 'SeenIt-App'
+          },
+          signal: AbortSignal.timeout(6000)
+        });
+        if (broadRes.ok) {
+          const broadData = await broadRes.json();
+          torrents = broadData.data || [];
+        }
+      }
+
+      if (torrents.length > 0) {
+        return torrents.map((t: C411Torrent) => ({
+          ...t,
+          magnetUri: t.infoHash ? buildMagnetLink(t.infoHash, t.name) : undefined
+        }));
+      }
+    }
+  } catch (directErr) {
+    // Si direct échoue (CORS ou autre), on passe par le proxy backend
+  }
+
+  // 2. Fallback via le backend proxy SeenIt
   try {
     const queryParams = new URLSearchParams();
-    queryParams.set('query', params.query);
+    queryParams.set('query', query);
     if (params.mediaType) queryParams.set('mediaType', params.mediaType);
     if (params.year) queryParams.set('year', String(params.year));
-    if (params.apiKey) queryParams.set('apiKey', params.apiKey);
+    queryParams.set('apiKey', apiKey);
 
     const endpoints = [
       'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/c411/search',
@@ -80,13 +135,12 @@ export async function searchC411Torrents(params: C411SearchParams): Promise<C411
       '/api/c411/search'
     ];
 
-    let lastError: Error | null = null;
     for (const ep of endpoints) {
       try {
         const url = `${ep}?${queryParams.toString()}`;
         const res = await fetch(url, {
           headers: { 'Accept': 'application/json' },
-          signal: AbortSignal.timeout(10000)
+          signal: AbortSignal.timeout(8000)
         });
         if (res.ok) {
           const data = await res.json();
@@ -96,10 +150,9 @@ export async function searchC411Torrents(params: C411SearchParams): Promise<C411
           }));
         }
       } catch (err: any) {
-        lastError = err;
+        // next endpoint
       }
     }
-    if (lastError) throw lastError;
     return [];
   } catch (err) {
     console.error('[C411] Search failed:', err);

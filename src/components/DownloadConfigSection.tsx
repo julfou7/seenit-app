@@ -54,11 +54,23 @@ export function DownloadConfigSection() {
 
       {isOpen && (
         <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-3.5 space-y-3.5 mt-2 animate-in fade-in duration-150">
+          {/* Info intro */}
+          <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-[11px] text-blue-300 space-y-1">
+            <p className="font-bold flex items-center gap-1.5 text-blue-200">
+              <Sliders size={13} />
+              Fonctionnement des téléchargements
+            </p>
+            <p className="text-zinc-400 text-[10px] leading-relaxed">
+              • <strong>C411</strong> : Permet de trouver les torrents et copier leurs liens Magnet (clé déjà incluse).<br />
+              • <strong>Sonarr / Radarr / qBittorrent</strong> : Optionnels. Servent à lancer le téléchargement directement sur votre serveur/NAS à la maison depuis SeenIt.
+            </p>
+          </div>
+
           {/* C411 API Key */}
           <div>
             <label className="block text-[11px] font-bold text-zinc-300 mb-1 flex items-center gap-1.5">
               <Key size={12} className="text-blue-400" />
-              Clé API C411
+              Clé API C411 (Tracker)
             </label>
             <input
               type="password"
@@ -67,17 +79,26 @@ export function DownloadConfigSection() {
               placeholder="Clé API de votre compte C411"
               className="w-full bg-zinc-900 border border-zinc-700/80 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-blue-500"
             />
+            <p className="text-[10px] text-zinc-500 mt-1">
+              Trouvable dans votre profil C411. Une clé par défaut est déjà configurée.
+            </p>
           </div>
 
           <div className="h-px bg-zinc-800/60" />
 
           {/* Sonarr (Séries) */}
-          <div className="space-y-2">
-            <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5">
-              <Server size={12} className="text-cyan-400" />
-              Sonarr (Séries) - Optionnel
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5">
+                <Server size={12} className="text-cyan-400" />
+                Sonarr (Séries TV) — Optionnel
+              </span>
+              <span className="text-[10px] text-zinc-500">NAS / Serveur</span>
+            </div>
+            <p className="text-[10px] text-zinc-400">
+              URL locale ou domaine distant + Clé API (dans Sonarr : <em>Settings → General → API Key</em>).
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
               <input
                 type="text"
                 value={sonarrUrl}
@@ -96,12 +117,18 @@ export function DownloadConfigSection() {
           </div>
 
           {/* Radarr (Films) */}
-          <div className="space-y-2">
-            <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5">
-              <Server size={12} className="text-amber-400" />
-              Radarr (Films) - Optionnel
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5">
+                <Server size={12} className="text-amber-400" />
+                Radarr (Films) — Optionnel
+              </span>
+              <span className="text-[10px] text-zinc-500">NAS / Serveur</span>
+            </div>
+            <p className="text-[10px] text-zinc-400">
+              URL locale ou domaine distant + Clé API (dans Radarr : <em>Settings → General → API Key</em>).
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
               <input
                 type="text"
                 value={radarrUrl}
@@ -120,12 +147,18 @@ export function DownloadConfigSection() {
           </div>
 
           {/* qBittorrent */}
-          <div className="space-y-2">
-            <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5">
-              <HardDrive size={12} className="text-emerald-400" />
-              qBittorrent Web UI - Optionnel
-            </span>
-            <div className="space-y-2">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5">
+                <HardDrive size={12} className="text-emerald-400" />
+                qBittorrent (Client Torrent Web UI) — Optionnel
+              </span>
+              <span className="text-[10px] text-zinc-500">Web UI</span>
+            </div>
+            <p className="text-[10px] text-zinc-400">
+              URL de l'interface Web qBittorrent + Identifiants de connexion (dans <em>Options → Web UI</em>).
+            </p>
+            <div className="space-y-2 pt-0.5">
               <input
                 type="text"
                 value={qbitUrl}
@@ -138,7 +171,7 @@ export function DownloadConfigSection() {
                   type="text"
                   value={qbitUser}
                   onChange={(e) => setQbitUser(e.target.value)}
-                  placeholder="Nom d'utilisateur"
+                  placeholder="Utilisateur (ex: admin)"
                   className="w-full bg-zinc-900 border border-zinc-700/80 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500"
                 />
                 <input
