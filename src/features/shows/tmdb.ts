@@ -280,7 +280,8 @@ class TMDBClient {
 
     // B. POUR TOUT LE MONDE : Utiliser l'API TVDB v4 pour les préquelles, spin-offs et franchises (univers complet)
     const tvdbId = media.external_ids?.tvdb_id || media.tvdb_id;
-    const mediaTitle = media.name || media.title || media.original_name;
+    // On priorise l'original_title (en anglais) car la recherche textuelle TVDB est plus efficace qu'avec les titres traduits
+    const mediaTitle = media.original_title || media.original_name || media.title || media.name;
     const imdbId = media.external_ids?.imdb_id || media.imdb_id;
 
     const franchiseItems = await getTVDBFranchiseTimeline(tvdbId, mediaTitle, imdbId, mediaType);
@@ -336,16 +337,13 @@ class TMDBClient {
       universe = universe.filter(u => !collectionSet.has(`${u.media_type}_${u.id}`));
     }
 
-    // Re-indexer l'univers après filtre
-    universe = universe.map((item, index) => ({
-      ...item,
-      sagaOrder: index + 1
+    // Re-indexer l'univers après filtre (sans sagaOrder)
+    universe = universe.map((item) => ({
+      ...item
     }));
 
-    // Exclure l'élément courant des deux listes comme demandé
-    const currentKey = `${mediaType}_${media.id}`;
-    collection = collection.filter(c => `${c.media_type}_${c.id}` !== currentKey);
-    universe = universe.filter(u => `${u.media_type}_${u.id}` !== currentKey);
+    // On n'exclut plus l'élément courant, car l'utilisateur veut le voir avec le badge 'FILM ACTUEL'
+    // pour se repérer dans la chronologie.
 
     return { collection, universe };
   }
