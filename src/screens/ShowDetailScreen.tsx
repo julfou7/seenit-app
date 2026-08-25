@@ -260,6 +260,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
 
   const [tmdbDetails, setTmdbDetails] = useState<any>(null);
   const title = show?.title || tmdbDetails?.name || tmdbDetails?.title || 'Chargement...';
+  const isSeries = (show?.mediaType === 'tv') || (tmdbDetails?.number_of_seasons !== undefined);
 
   const [fetchError, setFetchError] = useState<boolean>(false);
   const [collectionData, setCollectionData] = useState<any>(null);
@@ -363,8 +364,6 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       window.removeEventListener('app-close-modals', handleCloseModals);
     };
   }, []);
-
-  const isSeries = (show?.mediaType === 'tv') || (tmdbDetails?.number_of_seasons !== undefined);
 
   const mainScrollRef = useRef<HTMLDivElement>(null);
   const tabsRef = useRef<HTMLDivElement>(null);

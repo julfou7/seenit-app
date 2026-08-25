@@ -960,7 +960,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
 
                   {/* Single Episode Live Download Banner */}
                   {(() => {
-                    const epDownload = getEpisodeDownload(tmdbShowId || activeShow?.tmdbId, activeShow?.tvdbId, currentSeason, currentEpisode?.episode_number);
+                    const epDownload = getEpisodeDownload(tmdbShowId || activeShow?.tmdbId, (activeShow as any)?.tvdbId, currentSeason, currentEpisode?.episode_number);
                     if (!epDownload) return null;
                     return (
                       <div className="mt-2">
