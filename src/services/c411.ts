@@ -119,10 +119,32 @@ export async function searchC411Torrents(params: C411SearchParams): Promise<C411
     let data = await performC411Get(`https://c411.org/api/torrents?${searchParams.toString()}`, apiKey);
     let torrents: C411Torrent[] = data?.data || [];
 
-    // Fallback recherche large (sans sous-catégorie) si aucun résultat
+    // Fallback 1 : recherche large (sans sous-catégorie) si aucun résultat
     if (torrents.length === 0) {
       data = await performC411Get(`https://c411.org/api/torrents?name=${encodeURIComponent(cleanQuery)}&category=1`, apiKey);
       torrents = data?.data || [];
+    }
+
+    // Fallback 2 : Si la recherche ciblait un épisode (ex: "Reacher S01E01" ou "Reacher S01") et ne donne rien, chercher la saison ou le titre de base
+    if (torrents.length === 0 && params.mediaType === 'tv') {
+      const episodeMatch = cleanQuery.match(/(.+?)\s+S(\d+)E\d+/i);
+      const seasonMatch = cleanQuery.match(/(.+?)\s+S(\d+)/i);
+
+      if (episodeMatch) {
+        // Essayer "Titre S01"
+        const fallbackSeasonQuery = `${episodeMatch[1]} S${episodeMatch[2]}`;
+        data = await performC411Get(`https://c411.org/api/torrents?name=${encodeURIComponent(fallbackSeasonQuery)}&category=1`, apiKey);
+        torrents = data?.data || [];
+      }
+
+      if (torrents.length === 0 && (episodeMatch || seasonMatch)) {
+        // Essayer simplement le titre de la série
+        const showTitle = episodeMatch ? episodeMatch[1] : (seasonMatch ? seasonMatch[1] : cleanQuery);
+        if (showTitle && showTitle.length >= 3) {
+          data = await performC411Get(`https://c411.org/api/torrents?name=${encodeURIComponent(showTitle)}&category=1`, apiKey);
+          torrents = data?.data || [];
+        }
+      }
     }
 
     if (torrents.length > 0) {

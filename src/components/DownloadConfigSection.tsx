@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Download, Server, Key, Globe, Check, AlertCircle, Save, Sliders, HardDrive, Loader2, Wifi } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Download, Server, Key, Globe, Check, AlertCircle, Save, Sliders, HardDrive, Loader2, Wifi, Cloud } from 'lucide-react';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useToastStore } from '../store/toastStore';
 import { testServiceConnection } from '../services/sonarrRadarr';
@@ -17,6 +17,27 @@ export function DownloadConfigSection() {
   const [qbitUrl, setQbitUrl] = useState(config.qbittorrentUrl);
   const [qbitUser, setQbitUser] = useState(config.qbittorrentUsername);
   const [qbitPass, setQbitPass] = useState(config.qbittorrentPassword);
+
+  // Synchroniser les champs du formulaire si la config du store est mise à jour depuis le cloud
+  useEffect(() => {
+    setC411Key(config.c411ApiKey);
+    setSonarrUrl(config.sonarrUrl);
+    setSonarrKey(config.sonarrApiKey);
+    setRadarrUrl(config.radarrUrl);
+    setRadarrKey(config.radarrApiKey);
+    setQbitUrl(config.qbittorrentUrl);
+    setQbitUser(config.qbittorrentUsername);
+    setQbitPass(config.qbittorrentPassword);
+  }, [
+    config.c411ApiKey,
+    config.sonarrUrl,
+    config.sonarrApiKey,
+    config.radarrUrl,
+    config.radarrApiKey,
+    config.qbittorrentUrl,
+    config.qbittorrentUsername,
+    config.qbittorrentPassword
+  ]);
 
   const [testingService, setTestingService] = useState<string | null>(null);
 
@@ -236,11 +257,15 @@ export function DownloadConfigSection() {
           <button
             type="button"
             onClick={handleSave}
-            className="w-full mt-2 py-2 px-4 bg-blue-600 hover:bg-blue-500 active:scale-98 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-sm"
+            className="w-full mt-2 py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-98 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md shadow-blue-500/20"
           >
             <Save size={14} />
-            Enregistrer la configuration
+            <span>Enregistrer et synchroniser avec mon compte</span>
           </button>
+          <div className="flex items-center justify-center gap-1.5 text-[10px] text-zinc-500 pt-1">
+            <Cloud size={11} className="text-blue-400" />
+            <span>Vos paramètres sont automatiquement synchronisés sur tous vos appareils (PC & Mobile)</span>
+          </div>
         </div>
       )}
     </div>

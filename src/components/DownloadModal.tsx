@@ -321,28 +321,23 @@ export function DownloadModal({
       <div className="relative w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/90">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
-              <Download size={20} />
+        <div className="p-3.5 sm:p-5 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/90 shrink-0">
+          <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+              <Download size={18} className="sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-base text-white line-clamp-1">
-                  Téléchargement & Tracker
-                </h3>
-                <span className="text-[10px] uppercase font-black px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                  C411 & Serveur
-                </span>
-              </div>
-              <p className="text-xs text-zinc-400 line-clamp-1">
+            <div className="min-w-0 flex-1">
+              <h3 className="font-bold text-sm sm:text-base text-white truncate">
+                Téléchargement
+              </h3>
+              <p className="text-xs text-zinc-400 truncate">
                 {title} {year ? `(${year})` : ''}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-full bg-zinc-800/80 hover:bg-zinc-700 active:scale-95 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
           >
             <X size={18} />
           </button>
@@ -350,58 +345,61 @@ export function DownloadModal({
 
         {/* Scope Selector for Series (Série entière vs Saison vs Épisode) */}
         {mediaType === 'tv' && (
-          <div className="p-3 bg-zinc-950/80 border-b border-zinc-800 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase text-zinc-400 tracking-wider flex items-center gap-1.5">
+          <div className="p-3 bg-zinc-950/80 border-b border-zinc-800 space-y-2 shrink-0">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="font-bold uppercase text-zinc-400 tracking-wider flex items-center gap-1.5">
                 <Layers size={13} className="text-blue-400" />
-                Portée du téléchargement :
+                Portée :
               </span>
-              <span className="text-[11px] text-zinc-500 font-semibold">
-                {scopeMode === 'all' ? 'Toute la série' : scopeMode === 'season' ? `Saison ${selectedSeason} entière` : `Saison ${selectedSeason} • Épisode ${selectedEpisode}`}
+              <span className="text-zinc-400 font-semibold truncate max-w-[200px]">
+                {scopeMode === 'all' ? 'Toute la série' : scopeMode === 'season' ? `Saison ${selectedSeason}` : `S${String(selectedSeason).padStart(2, '0')}E${String(selectedEpisode).padStart(2, '0')}`}
               </span>
             </div>
 
-            <div className="flex gap-1.5 bg-zinc-900/90 p-1 rounded-xl border border-white/5">
+            <div className="grid grid-cols-3 gap-1.5 bg-zinc-900/90 p-1 rounded-xl border border-white/5">
               <button
+                type="button"
                 onClick={() => handleScopeChange('all')}
-                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                className={`py-1.5 px-1 rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer ${
                   scopeMode === 'all' ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-400 hover:text-white'
                 }`}
               >
-                <Tv size={13} />
-                Série entière
+                <Tv size={12} className="shrink-0" />
+                <span className="truncate">Série</span>
               </button>
 
               <button
+                type="button"
                 onClick={() => handleScopeChange('season')}
-                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                className={`py-1.5 px-1 rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer ${
                   scopeMode === 'season' ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-400 hover:text-white'
                 }`}
               >
-                <Layers size={13} />
-                Saison entière
+                <Layers size={12} className="shrink-0" />
+                <span className="truncate">Saison</span>
               </button>
 
               <button
+                type="button"
                 onClick={() => handleScopeChange('episode')}
-                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                className={`py-1.5 px-1 rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer ${
                   scopeMode === 'episode' ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-400 hover:text-white'
                 }`}
               >
-                <PlaySquare size={13} />
-                Épisode précis
+                <PlaySquare size={12} className="shrink-0" />
+                <span className="truncate">Épisode</span>
               </button>
             </div>
 
             {/* Selecteurs fins de Saison / Épisode */}
             {scopeMode !== 'all' && (
-              <div className="flex items-center gap-2 pt-1 animate-in fade-in duration-150">
+              <div className="flex items-center gap-3 pt-1 animate-in fade-in duration-150">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[11px] font-bold text-zinc-400">Saison :</span>
                   <select
                     value={selectedSeason}
                     onChange={(e) => handleScopeChange(scopeMode, Number(e.target.value), selectedEpisode)}
-                    className="bg-zinc-850 bg-zinc-900 text-white border border-zinc-700/80 rounded-lg px-2.5 py-1 text-xs font-bold focus:outline-none focus:border-blue-500"
+                    className="bg-zinc-900 text-white border border-zinc-700/80 rounded-lg px-2 py-1 text-xs font-bold focus:outline-none focus:border-blue-500 cursor-pointer"
                   >
                     {Array.from({ length: Math.max(totalSeasons, 15) }, (_, i) => i + 1).map((s) => (
                       <option key={`s_opt_${s}`} value={s}>
@@ -417,7 +415,7 @@ export function DownloadModal({
                     <select
                       value={selectedEpisode}
                       onChange={(e) => handleScopeChange('episode', selectedSeason, Number(e.target.value))}
-                      className="bg-zinc-850 bg-zinc-900 text-white border border-zinc-700/80 rounded-lg px-2.5 py-1 text-xs font-bold focus:outline-none focus:border-blue-500"
+                      className="bg-zinc-900 text-white border border-zinc-700/80 rounded-lg px-2 py-1 text-xs font-bold focus:outline-none focus:border-blue-500 cursor-pointer"
                     >
                       {Array.from({ length: 30 }, (_, i) => i + 1).map((ep) => (
                         <option key={`ep_opt_${ep}`} value={ep}>
@@ -434,18 +432,18 @@ export function DownloadModal({
 
         {/* Hero Card : Déclenchement Automatique Sonarr / Radarr (si configuré) */}
         {hasConfiguredClient && (sonarrUrl || radarrUrl) && (
-          <div className="p-3.5 bg-gradient-to-r from-blue-950/40 via-zinc-900/80 to-blue-950/30 border-b border-blue-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
-                <Zap size={16} />
+          <div className="p-3 bg-gradient-to-r from-blue-950/40 via-zinc-900/80 to-blue-950/30 border-b border-blue-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shrink-0">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                <Zap size={14} />
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
                   Gestion Automatique {clientName}
                 </h4>
-                <p className="text-[10px] text-zinc-400">
+                <p className="text-[10px] text-zinc-400 truncate">
                   {mediaType === 'tv' 
-                    ? scopeMode === 'all' ? `Ajouter et télécharger toute la série dans Sonarr` : scopeMode === 'season' ? `Télécharger la Saison ${selectedSeason} dans Sonarr` : `Télécharger S${String(selectedSeason).padStart(2, '0')}E${String(selectedEpisode).padStart(2, '0')} dans Sonarr`
+                    ? scopeMode === 'all' ? `Ajouter et télécharger la série dans Sonarr` : scopeMode === 'season' ? `Télécharger la Saison ${selectedSeason} dans Sonarr` : `Télécharger S${String(selectedSeason).padStart(2, '0')}E${String(selectedEpisode).padStart(2, '0')} dans Sonarr`
                     : `Ajouter et télécharger le film dans Radarr`}
                 </p>
               </div>
@@ -454,16 +452,16 @@ export function DownloadModal({
             <button
               onClick={handleAutoSearchClient}
               disabled={isTriggeringAuto}
-              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-95 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-blue-500/20 shrink-0 disabled:opacity-50"
+              className="w-full sm:w-auto px-3.5 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-95 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50 shrink-0"
             >
               {isTriggeringAuto ? (
                 <>
-                  <Loader2 size={14} className="animate-spin" />
-                  <span>Traitement {clientName}...</span>
+                  <Loader2 size={13} className="animate-spin" />
+                  <span>Traitement...</span>
                 </>
               ) : (
                 <>
-                  <Zap size={14} className="text-amber-300" />
+                  <Zap size={13} className="text-amber-300" />
                   <span>Lancer dans {clientName}</span>
                 </>
               )}
@@ -473,18 +471,18 @@ export function DownloadModal({
 
         {/* Action Message Alert */}
         {actionMessage && (
-          <div className={`px-4 py-2.5 text-xs flex items-center gap-2 ${
+          <div className={`px-3.5 py-2 text-xs flex items-center gap-2 shrink-0 ${
             actionMessage.type === 'success' 
               ? 'bg-emerald-950/90 text-emerald-300 border-b border-emerald-800' 
               : 'bg-red-950/90 text-red-300 border-b border-red-800'
           }`}>
             {actionMessage.type === 'success' ? <Check size={14} className="shrink-0 text-emerald-400" /> : <AlertCircle size={14} className="shrink-0 text-red-400" />}
-            <span className="leading-snug">{actionMessage.text}</span>
+            <span className="leading-snug text-[11px]">{actionMessage.text}</span>
           </div>
         )}
 
         {/* Search Bar & Results Header */}
-        <div className="p-3 bg-zinc-950/60 border-b border-zinc-800/80 space-y-2.5">
+        <div className="p-2.5 sm:p-3 bg-zinc-950/60 border-b border-zinc-800/80 shrink-0">
           <form 
             onSubmit={(e) => {
               e.preventDefault();
@@ -493,34 +491,34 @@ export function DownloadModal({
             className="flex gap-2"
           >
             <div className="relative flex-1">
-              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Recherche de torrent..."
-                className="w-full pl-10 pr-4 py-2 bg-zinc-900 border border-zinc-700/80 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 transition-colors"
+                className="w-full pl-9 pr-3 py-1.5 sm:py-2 bg-zinc-900 border border-zinc-700/80 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 transition-colors"
               />
             </div>
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-3.5 py-1.5 sm:py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
             >
-              {loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-              Rechercher
+              {loading ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
+              <span className="hidden sm:inline">Rechercher</span>
             </button>
           </form>
         </div>
 
         {/* Filters & Sorting */}
-        <div className="px-4 py-2 bg-zinc-900 flex items-center justify-between border-b border-zinc-800/60 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="text-zinc-400 font-medium text-[11px]">Qualité :</span>
+        <div className="px-3 py-1.5 bg-zinc-900 flex items-center justify-between border-b border-zinc-800/60 text-xs shrink-0 gap-2 overflow-x-auto">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-zinc-400 font-medium text-[10px] sm:text-[11px] whitespace-nowrap">Qualité :</span>
             <select
               value={selectedQuality}
               onChange={(e) => setSelectedQuality(e.target.value)}
-              className="bg-zinc-800 text-zinc-200 border border-zinc-700/60 rounded-lg px-2 py-1 text-[11px] focus:outline-none"
+              className="bg-zinc-800 text-zinc-200 border border-zinc-700/60 rounded-lg px-2 py-0.5 text-[10px] sm:text-[11px] focus:outline-none cursor-pointer"
             >
               <option value="all">Toutes</option>
               <option value="2160p">4K / 2160p</option>
@@ -529,16 +527,16 @@ export function DownloadModal({
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-zinc-400 font-medium text-[11px]">Trier par :</span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-zinc-400 font-medium text-[10px] sm:text-[11px] whitespace-nowrap">Tri :</span>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="bg-zinc-800 text-zinc-200 border border-zinc-700/60 rounded-lg px-2 py-1 text-[11px] focus:outline-none"
+              className="bg-zinc-800 text-zinc-200 border border-zinc-700/60 rounded-lg px-2 py-0.5 text-[10px] sm:text-[11px] focus:outline-none cursor-pointer"
             >
-              <option value="seeders">Seeders (Vitesse)</option>
+              <option value="seeders">Seeders</option>
               <option value="size">Taille</option>
-              <option value="date">Date d'ajout</option>
+              <option value="date">Date</option>
             </select>
           </div>
         </div>

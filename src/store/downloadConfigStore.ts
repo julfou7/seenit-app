@@ -1,5 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { db, auth } from '../lib/firebase';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 
 export interface DownloadClientConfig {
   c411ApiKey: string;
@@ -14,8 +17,10 @@ export interface DownloadClientConfig {
 }
 
 interface DownloadConfigState extends DownloadClientConfig {
-  setConfig: (config: Partial<DownloadClientConfig>) => void;
+  setConfig: (config: Partial<DownloadClientConfig>, saveToCloud?: boolean) => void;
   resetConfig: () => void;
+  syncFromCloud: () => Promise<void>;
+  saveToCloud: () => Promise<void>;
 }
 
 const DEFAULT_CONFIG: DownloadClientConfig = {
@@ -32,13 +37,101 @@ const DEFAULT_CONFIG: DownloadClientConfig = {
 
 export const useDownloadConfigStore = create<DownloadConfigState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       ...DEFAULT_CONFIG,
-      setConfig: (newConfig) => set((state) => ({ ...state, ...newConfig })),
-      resetConfig: () => set(DEFAULT_CONFIG),
+      setConfig: (newConfig, saveToCloud = true) => {
+        set((state) => ({ ...state, ...newConfig }));
+        if (saveToCloud) {
+          get().saveToCloud().catch((err) => {
+            console.warn('[DownloadConfig] Impossible de sauvegarder dans Firestore:', err);
+          });
+        }
+      },
+      resetConfig: () => {
+        set(DEFAULT_CONFIG);
+        get().saveToCloud().catch(() => {});
+      },
+      syncFromCloud: async () => {
+        const user = auth.currentUser;
+        if (!user) return;
+        try {
+          const docRef = doc(db, 'users', user.uid, 'settings', 'downloadConfig');
+          const snap = await getDoc(docRef);
+          if (snap.exists()) {
+            const data = snap.data() as Partial<DownloadClientConfig>;
+            set((state) => ({ ...state, ...data }));
+          } else {
+            // Si rien dans le cloud mais qu'on a une config locale renseignée, on l'envoie au cloud
+            const current = get();
+            if (current.sonarrUrl || current.radarrUrl || current.qbittorrentUrl || (current.c411ApiKey && current.c411ApiKey !== DEFAULT_CONFIG.c411ApiKey)) {
+              await get().saveToCloud();
+            }
+          }
+        } catch (e) {
+          console.warn('[DownloadConfig] Erreur syncFromCloud:', e);
+        }
+      },
+      saveToCloud: async () => {
+        const user = auth.currentUser;
+        if (!user) return;
+        try {
+          const docRef = doc(db, 'users', user.uid, 'settings', 'downloadConfig');
+          const current = get();
+          const dataToSave: DownloadClientConfig = {
+            c411ApiKey: current.c411ApiKey || DEFAULT_CONFIG.c411ApiKey,
+            sonarrUrl: current.sonarrUrl || '',
+            sonarrApiKey: current.sonarrApiKey || '',
+            radarrUrl: current.radarrUrl || '',
+            radarrApiKey: current.radarrApiKey || '',
+            qbittorrentUrl: current.qbittorrentUrl || '',
+            qbittorrentUsername: current.qbittorrentUsername || '',
+            qbittorrentPassword: current.qbittorrentPassword || '',
+            autoSendToDownloader: current.autoSendToDownloader ?? true,
+          };
+          await setDoc(docRef, dataToSave, { merge: true });
+        } catch (e) {
+          console.warn('[DownloadConfig] Erreur saveToCloud:', e);
+        }
+      }
     }),
     {
       name: 'seenit_download_config',
     }
   )
 );
+
+// Listener automatique d'authentification pour synchroniser Firestore en temps réel
+if (typeof window !== 'undefined') {
+  let unsubscribeSnapshot: (() => void) | null = null;
+
+  onAuthStateChanged(auth, (user) => {
+    if (unsubscribeSnapshot) {
+      unsubscribeSnapshot();
+      unsubscribeSnapshot = null;
+    }
+
+    if (user) {
+      // 1. Synchronisation initiale
+      useDownloadConfigStore.getState().syncFromCloud();
+
+      // 2. Écoute temps réel des modifications faites depuis un autre appareil (Web <-> APK)
+      try {
+        const docRef = doc(db, 'users', user.uid, 'settings', 'downloadConfig');
+        unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const remoteData = docSnap.data() as Partial<DownloadClientConfig>;
+            // Ne pas écraser si les données sont identiques pour éviter les boucles
+            useDownloadConfigStore.setState((prev) => ({
+              ...prev,
+              ...remoteData
+            }));
+          }
+        }, (error) => {
+          console.warn('[DownloadConfig] Firestore snapshot warning:', error);
+        });
+      } catch (e) {
+        console.warn('[DownloadConfig] Impossible d\'établir le snapshot Firestore:', e);
+      }
+    }
+  });
+}
