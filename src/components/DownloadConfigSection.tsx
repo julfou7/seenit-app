@@ -45,6 +45,8 @@ export function DownloadConfigSection() {
     setTestingService(service);
     let url = service === 'sonarr' ? sonarrUrl : service === 'radarr' ? radarrUrl : qbitUrl;
     let apiKey = service === 'sonarr' ? sonarrKey : service === 'radarr' ? radarrKey : undefined;
+    let username = service === 'qbittorrent' ? qbitUser : undefined;
+    let password = service === 'qbittorrent' ? qbitPass : undefined;
 
     if (!url) {
       showToast(`Veuillez renseigner l'URL de ${service}`, 'error');
@@ -52,7 +54,7 @@ export function DownloadConfigSection() {
       return;
     }
 
-    const res = await testServiceConnection(service, url, apiKey);
+    const res = await testServiceConnection(service, url, apiKey, username, password);
     setTestingService(null);
     if (res.success) {
       showToast(res.message, 'success');

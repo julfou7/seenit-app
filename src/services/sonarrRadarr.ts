@@ -38,7 +38,18 @@ async function executeGet(url: string, headers: Record<string, string> = {}): Pr
         readTimeout: 8000
       });
       if (res.status >= 200 && res.status < 300) {
-        return typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+        if (typeof res.data === 'string') {
+          const trimmed = res.data.trim();
+          if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+            try {
+              return JSON.parse(trimmed);
+            } catch {
+              return res.data;
+            }
+          }
+          return res.data;
+        }
+        return res.data;
       }
       throw new Error(`Erreur HTTP ${res.status}`);
     } catch (err: any) {
@@ -278,12 +289,104 @@ export async function fetchQualityProfiles(
 }
 
 /**
- * Test de connectivité avec Sonarr ou Radarr
+ * Effectue l'authentification auprès de l'API Web UI de qBittorrent
+ */
+export async function loginQBittorrent(
+  url: string,
+  username?: string,
+  password?: string
+): Promise<{ success: boolean; cookie?: string; message?: string }> {
+  const base = cleanUrl(url);
+  if (!base) return { success: false, message: 'URL qBittorrent invalide' };
+
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const loginRes = await CapacitorHttp.post({
+        url: `${base}/api/v2/auth/login`,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Referer': base,
+          'Origin': base
+        },
+        data: `username=${encodeURIComponent(username || '')}&password=${encodeURIComponent(password || '')}`,
+        connectTimeout: 8000,
+        readTimeout: 8000
+      });
+
+      const dataStr = typeof loginRes.data === 'string' ? loginRes.data : JSON.stringify(loginRes.data || '');
+      if (dataStr.trim() === 'Fails.' || loginRes.status === 403 || loginRes.status === 401) {
+        return {
+          success: false,
+          message: 'Identifiants qBittorrent incorrects (nom d\'utilisateur ou mot de passe)'
+        };
+      }
+
+      let cookieHeader = '';
+      if (loginRes.headers) {
+        const setCookieKey = Object.keys(loginRes.headers).find(k => k.toLowerCase() === 'set-cookie');
+        if (setCookieKey) {
+          const rawCookie = loginRes.headers[setCookieKey];
+          const cookieStr = Array.isArray(rawCookie) ? rawCookie[0] : String(rawCookie);
+          if (cookieStr) {
+            cookieHeader = cookieStr.split(';')[0];
+          }
+        }
+      }
+
+      return { success: true, cookie: cookieHeader };
+    } catch (err: any) {
+      return {
+        success: false,
+        message: err?.message || 'Impossible de joindre qBittorrent sur le réseau local'
+      };
+    }
+  } else {
+    // Mode Navigateur Web
+    try {
+      const isLocalIp = base.includes('192.168.') || base.includes('localhost') || base.includes('127.0.0.1') || base.includes('10.');
+      if (isLocalIp) {
+        return {
+          success: false,
+          message: 'Navigateur Web : Les IP locales sont bloquées par le navigateur. Testez depuis l\'APK Android.'
+        };
+      }
+
+      const res = await fetch('/api/service-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetUrl: `${base}/api/v2/auth/login`,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Referer': base
+          },
+          body: `username=${encodeURIComponent(username || '')}&password=${encodeURIComponent(password || '')}`
+        }),
+        signal: AbortSignal.timeout(10000)
+      });
+
+      const json = await res.json();
+      const bodyStr = typeof json.data === 'string' ? json.data : JSON.stringify(json.data || '');
+      if (bodyStr.trim() === 'Fails.') {
+        return { success: false, message: 'Identifiants qBittorrent incorrects' };
+      }
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Erreur réseau' };
+    }
+  }
+}
+
+/**
+ * Test de connectivité avec Sonarr, Radarr ou qBittorrent
  */
 export async function testServiceConnection(
   type: 'sonarr' | 'radarr' | 'qbittorrent',
   url: string,
-  apiKey?: string
+  apiKey?: string,
+  username?: string,
+  password?: string
 ): Promise<{ success: boolean; message: string; version?: string }> {
   const base = cleanUrl(url);
   if (!base) return { success: false, message: 'URL manquante' };
@@ -303,13 +406,42 @@ export async function testServiceConnection(
     }
 
     if (type === 'qbittorrent') {
-      const data = await executeGet(`${base}/api/v2/app/version`, {
-        'Accept': 'text/plain, application/json'
-      });
-      return {
-        success: true,
-        message: `Connecté avec succès à qBittorrent (${typeof data === 'string' ? data : 'Web UI'})`
+      let cookieHeader = '';
+      if (username || password) {
+        const loginRes = await loginQBittorrent(base, username, password);
+        if (!loginRes.success) {
+          return {
+            success: false,
+            message: loginRes.message || 'Échec d\'authentification qBittorrent'
+          };
+        }
+        cookieHeader = loginRes.cookie || '';
+      }
+
+      const headers: Record<string, string> = {
+        'Accept': 'text/plain, application/json',
+        'Referer': base,
+        'Origin': base
       };
+      if (cookieHeader) headers['Cookie'] = cookieHeader;
+
+      try {
+        const data = await executeGet(`${base}/api/v2/app/version`, headers);
+        const versionStr = typeof data === 'string' ? data.trim() : 'Web UI';
+        return {
+          success: true,
+          message: `Connecté avec succès à qBittorrent (${versionStr})`,
+          version: versionStr
+        };
+      } catch (err: any) {
+        if (!username && !password && (err?.message?.includes('403') || err?.message?.includes('401'))) {
+          return {
+            success: false,
+            message: 'Authentification requise : Veuillez renseigner le nom d\'utilisateur et le mot de passe qBittorrent'
+          };
+        }
+        throw err;
+      }
     }
 
     return { success: false, message: 'Service inconnu' };
@@ -874,28 +1006,36 @@ export async function pushReleaseDirectly(payload: {
     if (payload.service === 'qbittorrent') {
       let cookieHeader = '';
       if (payload.username || payload.password) {
-        try {
-          if (Capacitor.isNativePlatform()) {
-            const loginRes = await CapacitorHttp.post({
-              url: `${base}/api/v2/auth/login`,
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              data: `username=${encodeURIComponent(payload.username || '')}&password=${encodeURIComponent(payload.password || '')}`
-            });
-            if (loginRes.headers && (loginRes.headers['set-cookie'] || loginRes.headers['Set-Cookie'])) {
-              cookieHeader = (loginRes.headers['set-cookie'] || loginRes.headers['Set-Cookie']).split(';')[0];
-            }
-          }
-        } catch (loginErr) {}
+        const loginRes = await loginQBittorrent(base, payload.username, payload.password);
+        if (!loginRes.success) {
+          return {
+            success: false,
+            message: loginRes.message || 'Échec d\'authentification qBittorrent'
+          };
+        }
+        cookieHeader = loginRes.cookie || '';
       }
 
       const formBody = `urls=${encodeURIComponent(payload.torrent.magnetUri)}&category=${payload.mediaType === 'tv' ? 'tv' : 'movies'}`;
       const qbitHeaders: Record<string, string> = {
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Referer': base,
+        'Origin': base
       };
       if (cookieHeader) qbitHeaders['Cookie'] = cookieHeader;
 
-      await executePost(`${base}/api/v2/torrents/add`, formBody, qbitHeaders);
-      return { success: true, message: 'Torrent ajouté directement à qBittorrent !' };
+      try {
+        await executePost(`${base}/api/v2/torrents/add`, formBody, qbitHeaders);
+        return { success: true, message: 'Torrent ajouté directement à qBittorrent !' };
+      } catch (err: any) {
+        if (!payload.username && !payload.password && (err?.message?.includes('403') || err?.message?.includes('401'))) {
+          return {
+            success: false,
+            message: 'Authentification qBittorrent requise : renseignez votre nom d\'utilisateur et mot de passe'
+          };
+        }
+        throw err;
+      }
     }
 
     return { success: false, message: 'Service non supporté' };
@@ -1134,21 +1274,17 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
     try {
       let cookieHeader = '';
       if (config.qbittorrentUsername || config.qbittorrentPassword) {
-        if (Capacitor.isNativePlatform()) {
-          try {
-            const loginRes = await CapacitorHttp.post({
-              url: `${qbitBase}/api/v2/auth/login`,
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              data: `username=${encodeURIComponent(config.qbittorrentUsername || '')}&password=${encodeURIComponent(config.qbittorrentPassword || '')}`
-            });
-            if (loginRes.headers && (loginRes.headers['set-cookie'] || loginRes.headers['Set-Cookie'])) {
-              cookieHeader = (loginRes.headers['set-cookie'] || loginRes.headers['Set-Cookie']).split(';')[0];
-            }
-          } catch {}
+        const loginRes = await loginQBittorrent(qbitBase, config.qbittorrentUsername, config.qbittorrentPassword);
+        if (loginRes.success && loginRes.cookie) {
+          cookieHeader = loginRes.cookie;
         }
       }
 
-      const qHeaders: Record<string, string> = { 'Accept': 'application/json' };
+      const qHeaders: Record<string, string> = {
+        'Accept': 'application/json',
+        'Referer': qbitBase,
+        'Origin': qbitBase
+      };
       if (cookieHeader) qHeaders['Cookie'] = cookieHeader;
 
       const res = await executeGet(`${qbitBase}/api/v2/torrents/info?filter=downloading`, qHeaders);
