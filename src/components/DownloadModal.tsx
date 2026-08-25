@@ -19,7 +19,8 @@ import {
   PlaySquare,
   Zap,
   RefreshCw,
-  ChevronDown
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { C411Torrent, searchC411Torrents, formatTorrentSize } from '../services/c411';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
@@ -119,6 +120,7 @@ export function DownloadModal({
   
   // États d'action Sonarr / Radarr
   const [isTriggeringAuto, setIsTriggeringAuto] = useState(false);
+  const [showQualityModal, setShowQualityModal] = useState(false);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [actionMessage, setActionMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
 
@@ -297,7 +299,7 @@ export function DownloadModal({
   };
 
   // 1. Déclenchement automatique intelligent via Sonarr / Radarr
-  const handleAutoSearchClient = async () => {
+  const handleAutoSearchClient = async (qualityPreference?: '1080p' | '4k') => {
     setIsTriggeringAuto(true);
     setActionMessage(null);
 
@@ -310,7 +312,8 @@ export function DownloadModal({
           tmdbId,
           imdbId,
           season: scopeMode === 'all' ? undefined : selectedSeason,
-          episode: scopeMode === 'episode' ? selectedEpisode : undefined
+          episode: scopeMode === 'episode' ? selectedEpisode : undefined,
+          qualityPreference
         });
 
         if (res.success) {
@@ -325,7 +328,8 @@ export function DownloadModal({
           apiKey: radarrApiKey,
           title,
           tmdbId,
-          year
+          year,
+          qualityPreference
         });
 
         if (res.success) {
@@ -591,7 +595,8 @@ export function DownloadModal({
             </div>
 
             <button
-              onClick={handleAutoSearchClient}
+              type="button"
+              onClick={() => setShowQualityModal(true)}
               disabled={isTriggeringAuto}
               className="w-full sm:w-auto px-3.5 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-95 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50 shrink-0"
             >
@@ -1009,6 +1014,115 @@ export function DownloadModal({
                 );
               })}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODALE DE CHOIX DE QUALITÉ AVANT TÉLÉCHARGEMENT RADARR / SONARR */}
+      {showQualityModal && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
+          <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl p-4 sm:p-5 flex flex-col gap-4 animate-in zoom-in-95 duration-150">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-zinc-800/80 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                  <Zap size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Choisir la qualité</h3>
+                  <p className="text-[11px] text-zinc-400 truncate max-w-[220px] sm:max-w-[260px]">
+                    Profil {clientName} pour « {title} »
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowQualityModal(false)}
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Description du ciblage */}
+            <div className="px-3 py-2 bg-zinc-950/70 border border-zinc-800/80 rounded-xl flex items-center justify-between text-xs">
+              <span className="text-zinc-400 font-medium text-[11px]">Cible :</span>
+              <span className="font-bold text-blue-400 text-[11px]">
+                {mediaType === 'tv'
+                  ? scopeMode === 'all'
+                    ? 'Toute la série'
+                    : scopeMode === 'season'
+                    ? `Saison ${selectedSeason}`
+                    : `S${String(selectedSeason).padStart(2, '0')}E${String(selectedEpisode).padStart(2, '0')}`
+                  : 'Film complet'}
+              </span>
+            </div>
+
+            {/* Options de Qualité */}
+            <div className="grid grid-cols-1 gap-2.5">
+              {/* Option 1: HD 1080p */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowQualityModal(false);
+                  handleAutoSearchClient('1080p');
+                }}
+                className="group relative p-3.5 rounded-xl bg-zinc-950 hover:bg-zinc-800/90 border border-zinc-800 hover:border-blue-500/60 flex items-center justify-between transition-all active:scale-98 text-left cursor-pointer shadow-sm"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600/10 group-hover:bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-black text-xs shrink-0">
+                    1080p
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white group-hover:text-blue-300 transition-colors flex items-center gap-1.5">
+                      HD 1080p
+                      <span className="px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-400 text-[9px] font-bold border border-blue-500/20">Profil HD-1080p</span>
+                    </h4>
+                    <p className="text-[11px] text-zinc-400 mt-0.5 leading-snug">
+                      Fichiers optimisés (2 Go à 5 Go, téléchargement rapide)
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-zinc-500 group-hover:text-blue-400 transition-colors shrink-0 ml-2" />
+              </button>
+
+              {/* Option 2: Ultra-HD / 4K */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowQualityModal(false);
+                  handleAutoSearchClient('4k');
+                }}
+                className="group relative p-3.5 rounded-xl bg-zinc-950 hover:bg-zinc-800/90 border border-zinc-800 hover:border-amber-500/60 flex items-center justify-between transition-all active:scale-98 text-left cursor-pointer shadow-sm"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 group-hover:bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 font-black text-xs shrink-0">
+                    4K
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white group-hover:text-amber-300 transition-colors flex items-center gap-1.5">
+                      Ultra-HD / 4K
+                      <span className="px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-300 text-[9px] font-bold border border-amber-500/20">Profil Ultra-HD</span>
+                    </h4>
+                    <p className="text-[11px] text-zinc-400 mt-0.5 leading-snug">
+                      Qualité maximale 2160p (HDR / Atmos, fichiers volumineux)
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-zinc-500 group-hover:text-amber-400 transition-colors shrink-0 ml-2" />
+              </button>
+            </div>
+
+            {/* Footer / Cancel */}
+            <button
+              type="button"
+              onClick={() => setShowQualityModal(false)}
+              className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer mt-1"
+            >
+              Annuler
+            </button>
+
           </div>
         </div>
       )}

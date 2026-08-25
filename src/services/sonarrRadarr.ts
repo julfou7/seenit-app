@@ -145,6 +145,139 @@ async function executePost(url: string, body: any, headers: Record<string, strin
 }
 
 /**
+ * Exécute une requête PUT multiplateforme
+ */
+async function executePut(url: string, body: any, headers: Record<string, string> = {}): Promise<any> {
+  const isLocalIp = url.includes('192.168.') || url.includes('localhost') || url.includes('127.0.0.1') || url.includes('10.') || url.includes('172.16.') || url.includes('172.17.') || url.includes('172.18.') || url.includes('172.19.') || url.includes('172.20.') || url.includes('172.21.') || url.includes('172.22.') || url.includes('172.23.') || url.includes('172.24.') || url.includes('172.25.') || url.includes('172.26.') || url.includes('172.27.') || url.includes('172.28.') || url.includes('172.29.') || url.includes('172.30.') || url.includes('172.31.');
+
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const res = await CapacitorHttp.put({
+        url,
+        headers,
+        data: body,
+        connectTimeout: 10000,
+        readTimeout: 10000
+      });
+      if (res.status >= 200 && res.status < 300) {
+        if (!res.data) return { success: true };
+        return typeof res.data === 'string' ? (res.data.startsWith('{') || res.data.startsWith('[') ? JSON.parse(res.data) : res.data) : res.data;
+      }
+      
+      let readableError = `Erreur HTTP ${res.status}`;
+      try {
+        const parsed = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].errorMessage) {
+          readableError = parsed.map(e => e.errorMessage || e.message).join(' • ');
+        } else if (parsed && parsed.message) {
+          readableError = parsed.message;
+        } else if (parsed && parsed.error) {
+          readableError = typeof parsed.error === 'string' ? parsed.error : JSON.stringify(parsed.error);
+        }
+      } catch {
+        const strData = typeof res.data === 'string' ? res.data : JSON.stringify(res.data || {});
+        if (strData) readableError = `${readableError} : ${strData.substring(0, 100)}`;
+      }
+
+      throw new Error(readableError);
+    } catch (err: any) {
+      throw new Error(err?.message || 'Serveur injoignable sur le réseau local');
+    }
+  } else {
+    // Mode Navigateur Web
+    if (isLocalIp) {
+      throw new Error(`Navigateur Web : Les adresses privées locales sont protégées et bloquées par le navigateur.`);
+    }
+
+    try {
+      const res = await fetch('/api/service-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetUrl: url,
+          method: 'PUT',
+          headers,
+          body
+        }),
+        signal: AbortSignal.timeout(12000)
+      });
+
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        throw new Error(json.message || json.error || `Erreur proxy ${res.status}`);
+      }
+      return json.data;
+    } catch (err: any) {
+      throw new Error(err?.message || 'Erreur réseau');
+    }
+  }
+}
+
+/**
+ * Utilitaires de résolution des profils de qualité Sonarr / Radarr (1080p vs 4K)
+ */
+export function resolveQualityProfileId(
+  profiles: Array<{ id: number; name: string }>,
+  preference?: '1080p' | '4k',
+  explicitId?: number
+): number {
+  if (explicitId && explicitId > 0) return explicitId;
+  if (!profiles || profiles.length === 0) return 1;
+
+  if (preference === '1080p') {
+    // Profil 1080p ou HD
+    const hd1080 = profiles.find(p => {
+      const n = (p.name || '').toLowerCase();
+      return n.includes('1080') || n.includes('hd-1080p') || n.includes('hd 1080p') || n.includes('web-1080p');
+    });
+    if (hd1080) return hd1080.id;
+
+    const hdAny = profiles.find(p => {
+      const n = (p.name || '').toLowerCase();
+      return (n.includes('hd') || n.includes('720/1080')) && !n.includes('4k') && !n.includes('2160');
+    });
+    if (hdAny) return hdAny.id;
+
+    return profiles[0].id;
+  }
+
+  if (preference === '4k') {
+    // Profil Ultra-HD / 4K
+    const uhd = profiles.find(p => {
+      const n = (p.name || '').toLowerCase();
+      return n.includes('4k') || n.includes('2160') || n.includes('ultra-hd') || n.includes('uhd') || n.includes('ultra hd');
+    });
+    if (uhd) return uhd.id;
+
+    const anyProfile = profiles.find(p => (p.name || '').toLowerCase().includes('any'));
+    if (anyProfile) return anyProfile.id;
+
+    return profiles[profiles.length - 1].id;
+  }
+
+  return profiles[0].id;
+}
+
+/**
+ * Récupère les profils de qualité configurés dans Sonarr ou Radarr
+ */
+export async function fetchQualityProfiles(
+  type: 'sonarr' | 'radarr',
+  url: string,
+  apiKey: string
+): Promise<Array<{ id: number; name: string }>> {
+  const base = cleanUrl(url);
+  if (!base || !apiKey) return [];
+  const headers = { 'X-Api-Key': apiKey, 'Accept': 'application/json' };
+  try {
+    const res = await executeGet(`${base}/api/v3/qualityprofile`, headers);
+    return Array.isArray(res) ? res.map((p: any) => ({ id: p.id, name: p.name })) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Test de connectivité avec Sonarr ou Radarr
  */
 export async function testServiceConnection(
@@ -200,6 +333,8 @@ export async function searchAndDownloadInSonarr(params: {
   tvdbId?: number | string;
   season?: number;
   episode?: number;
+  qualityProfileId?: number;
+  qualityPreference?: '1080p' | '4k';
 }): Promise<{ success: boolean; message: string }> {
   const base = cleanUrl(params.url);
   if (!base || !params.apiKey) {
@@ -213,6 +348,16 @@ export async function searchAndDownloadInSonarr(params: {
   };
 
   try {
+    // Récupérer les profils de qualité
+    let qualityProfiles: any[] = [];
+    try {
+      const qpRes = await executeGet(`${base}/api/v3/qualityprofile`, headers);
+      if (Array.isArray(qpRes)) qualityProfiles = qpRes;
+    } catch (e) {
+      console.warn('[Sonarr] Erreur récupération qualityprofile:', e);
+    }
+    const targetQualityProfileId = resolveQualityProfileId(qualityProfiles, params.qualityPreference, params.qualityProfileId);
+
     // 1. Vérifier si la série est déjà présente dans la bibliothèque Sonarr
     let seriesList: any[] = [];
     try {
@@ -237,9 +382,21 @@ export async function searchAndDownloadInSonarr(params: {
       });
     }
 
-    // 2. Si la série est déjà dans Sonarr -> Déclencher la commande de recherche spécifique
+    // 2. Si la série est déjà dans Sonarr -> Ajuster le profil si besoin & Déclencher la commande de recherche spécifique
     if (existingSeries && existingSeries.id) {
       const seriesId = existingSeries.id;
+
+      // Si le profil de qualité diffère, le mettre à jour
+      if (existingSeries.qualityProfileId !== targetQualityProfileId) {
+        try {
+          await executePut(`${base}/api/v3/series`, {
+            ...existingSeries,
+            qualityProfileId: targetQualityProfileId
+          }, headers);
+        } catch (updateErr) {
+          console.warn('[Sonarr] Impossible de mettre à jour le profil de qualité:', updateErr);
+        }
+      }
 
       // Recherche par épisode spécifique
       if (params.season && params.episode) {
@@ -254,7 +411,7 @@ export async function searchAndDownloadInSonarr(params: {
             }, headers);
             return {
               success: true,
-              message: `Recherche lancée dans Sonarr pour « ${params.title} » S${String(params.season).padStart(2, '0')}E${String(params.episode).padStart(2, '0')} !`
+              message: `Recherche lancée dans Sonarr pour « ${params.title} » S${String(params.season).padStart(2, '0')}E${String(params.episode).padStart(2, '0')} (${params.qualityPreference === '4k' ? '4K' : '1080p'}) !`
             };
           }
         } catch (epErr) {
@@ -271,7 +428,7 @@ export async function searchAndDownloadInSonarr(params: {
         }, headers);
         return {
           success: true,
-          message: `Recherche lancée dans Sonarr pour la Saison ${params.season} de « ${params.title} » !`
+          message: `Recherche lancée dans Sonarr pour la Saison ${params.season} de « ${params.title} » (${params.qualityPreference === '4k' ? '4K' : '1080p'}) !`
         };
       }
 
@@ -282,7 +439,7 @@ export async function searchAndDownloadInSonarr(params: {
       }, headers);
       return {
         success: true,
-        message: `Recherche lancée dans Sonarr pour toute la série « ${params.title} » !`
+        message: `Recherche lancée dans Sonarr pour toute la série « ${params.title} » (${params.qualityPreference === '4k' ? '4K' : '1080p'}) !`
       };
     }
 
@@ -314,7 +471,7 @@ export async function searchAndDownloadInSonarr(params: {
       };
     }
 
-    // Récupérer le root folder et le profil de qualité configurés dans Sonarr
+    // Récupérer le root folder configuré dans Sonarr
     let rootFolders: any[] = [];
     try {
       const rfRes = await executeGet(`${base}/api/v3/rootfolder`, headers);
@@ -323,21 +480,12 @@ export async function searchAndDownloadInSonarr(params: {
       console.warn('[Sonarr] Erreur récupération rootfolder:', e);
     }
 
-    let qualityProfiles: any[] = [];
-    try {
-      const qpRes = await executeGet(`${base}/api/v3/qualityprofile`, headers);
-      if (Array.isArray(qpRes)) qualityProfiles = qpRes;
-    } catch (e) {
-      console.warn('[Sonarr] Erreur récupération qualityprofile:', e);
-    }
-
     // Déterminer le meilleur chemin racine valide
     let rootFolderPath = '';
     if (rootFolders.length > 0) {
       const accessibleFolder = rootFolders.find((rf: any) => rf.accessible !== false && rf.path);
       rootFolderPath = accessibleFolder ? accessibleFolder.path : rootFolders[0].path;
     } else if (Array.isArray(seriesList) && seriesList.length > 0) {
-      // Si l'API rootfolder n'a rien renvoyé mais que des séries existent, utiliser le chemin d'une série existante
       const sWithRoot = seriesList.find((s: any) => s.rootFolderPath);
       if (sWithRoot) {
         rootFolderPath = sWithRoot.rootFolderPath;
@@ -358,14 +506,12 @@ export async function searchAndDownloadInSonarr(params: {
       };
     }
 
-    const qualityProfileId = qualityProfiles.length > 0 && qualityProfiles[0].id ? qualityProfiles[0].id : 1;
-
-    // Ajouter la série dans Sonarr avec recherche automatique immédiate
+    // Ajouter la série dans Sonarr avec recherche automatique immédiate et profil de qualité choisi
     const addPayload: any = {
       title: lookupResult.title,
       seasons: Array.isArray(lookupResult.seasons) ? lookupResult.seasons : [],
       rootFolderPath,
-      qualityProfileId,
+      qualityProfileId: targetQualityProfileId,
       monitored: true,
       seasonFolder: true,
       tvdbId: lookupResult.tvdbId,
@@ -393,7 +539,7 @@ export async function searchAndDownloadInSonarr(params: {
 
     return {
       success: true,
-      message: `« ${params.title} » ajoutée à Sonarr ! Recherche et téléchargement automatique en cours.`
+      message: `« ${params.title} » ajoutée à Sonarr ! Recherche (${params.qualityPreference === '4k' ? '4K' : '1080p'}) en cours.`
     };
 
   } catch (err: any) {
@@ -414,6 +560,8 @@ export async function searchAndDownloadInRadarr(params: {
   title: string;
   tmdbId?: number | string;
   year?: number | string;
+  qualityProfileId?: number;
+  qualityPreference?: '1080p' | '4k';
 }): Promise<{ success: boolean; message: string }> {
   const base = cleanUrl(params.url);
   if (!base || !params.apiKey) {
@@ -427,6 +575,16 @@ export async function searchAndDownloadInRadarr(params: {
   };
 
   try {
+    // Récupérer les profils de qualité
+    let qualityProfiles: any[] = [];
+    try {
+      const qpRes = await executeGet(`${base}/api/v3/qualityprofile`, headers);
+      if (Array.isArray(qpRes)) qualityProfiles = qpRes;
+    } catch (e) {
+      console.warn('[Radarr] Erreur récupération qualityprofile:', e);
+    }
+    const targetQualityProfileId = resolveQualityProfileId(qualityProfiles, params.qualityPreference, params.qualityProfileId);
+
     // 1. Vérifier si le film est déjà dans Radarr
     const moviesList = await executeGet(`${base}/api/v3/movie`, headers).catch(() => []);
     let existingMovie: any = null;
@@ -439,13 +597,25 @@ export async function searchAndDownloadInRadarr(params: {
     }
 
     if (existingMovie && existingMovie.id) {
+      // Ajuster le profil de qualité si différent
+      if (existingMovie.qualityProfileId !== targetQualityProfileId) {
+        try {
+          await executePut(`${base}/api/v3/movie`, {
+            ...existingMovie,
+            qualityProfileId: targetQualityProfileId
+          }, headers);
+        } catch (uErr) {
+          console.warn('[Radarr] Impossible de mettre à jour le profil de qualité du film:', uErr);
+        }
+      }
+
       await executePost(`${base}/api/v3/command`, {
         name: 'MoviesSearch',
         movieIds: [existingMovie.id]
       }, headers);
       return {
         success: true,
-        message: `Recherche lancée dans Radarr pour « ${params.title} » !`
+        message: `Recherche lancée dans Radarr pour « ${params.title} » (${params.qualityPreference === '4k' ? '4K' : '1080p'}) !`
       };
     }
 
@@ -473,21 +643,13 @@ export async function searchAndDownloadInRadarr(params: {
       };
     }
 
-    // Récupérer le root folder et le profil de qualité configurés dans Radarr
+    // Récupérer le root folder
     let rootFolders: any[] = [];
     try {
       const rfRes = await executeGet(`${base}/api/v3/rootfolder`, headers);
       if (Array.isArray(rfRes)) rootFolders = rfRes;
     } catch (e) {
       console.warn('[Radarr] Erreur récupération rootfolder:', e);
-    }
-
-    let qualityProfiles: any[] = [];
-    try {
-      const qpRes = await executeGet(`${base}/api/v3/qualityprofile`, headers);
-      if (Array.isArray(qpRes)) qualityProfiles = qpRes;
-    } catch (e) {
-      console.warn('[Radarr] Erreur récupération qualityprofile:', e);
     }
 
     let rootFolderPath = '';
@@ -515,12 +677,10 @@ export async function searchAndDownloadInRadarr(params: {
       };
     }
 
-    const qualityProfileId = qualityProfiles.length > 0 && qualityProfiles[0].id ? qualityProfiles[0].id : 1;
-
     const addPayload: any = {
       title: lookupResult.title,
       rootFolderPath,
-      qualityProfileId,
+      qualityProfileId: targetQualityProfileId,
       monitored: true,
       tmdbId: lookupResult.tmdbId,
       year: lookupResult.year,
@@ -536,7 +696,7 @@ export async function searchAndDownloadInRadarr(params: {
 
     return {
       success: true,
-      message: `« ${params.title} » ajouté à Radarr ! Recherche et téléchargement en cours.`
+      message: `« ${params.title} » ajouté à Radarr ! Recherche (${params.qualityPreference === '4k' ? '4K' : '1080p'}) en cours.`
     };
   } catch (err: any) {
     console.error('[Radarr Search & Download Error]', err);
