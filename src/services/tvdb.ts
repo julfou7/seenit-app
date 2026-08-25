@@ -49,7 +49,8 @@ async function getTVDBToken(): Promise<string | null> {
 export async function getTVDBFranchiseTimeline(
   tvdbId?: number | null,
   mediaTitle?: string | null,
-  imdbId?: string | null
+  imdbId?: string | null,
+  mediaType: 'tv' | 'movie' = 'tv'
 ): Promise<TVDBFranchiseItem[]> {
   const token = await getTVDBToken();
   if (!token) return [];
@@ -60,25 +61,27 @@ export async function getTVDBFranchiseTimeline(
   // A. Si aucun ID TVDB fourni, rechercher par titre sur TVDB
   if (!activeTvdbId && mediaTitle) {
     try {
+      const typeParam = mediaType === 'movie' ? 'movie' : 'series';
       const searchRes = await fetch(
-        `${BASE_URL}/search?query=${encodeURIComponent(mediaTitle)}&type=series`,
+        `${BASE_URL}/search?query=${encodeURIComponent(mediaTitle)}&type=${typeParam}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (searchRes.ok) {
         const sData = await searchRes.json();
         if (sData.data && sData.data.length > 0) {
-          activeTvdbId = parseInt(sData.data[0].tvdb_id, 10);
+          activeTvdbId = parseInt(sData.data[0].tvdb_id || sData.data[0].id, 10);
         }
       }
     } catch (e) {
-      console.error('[TVDB] Erreur recherche série:', e);
+      console.error('[TVDB] Erreur recherche série/film:', e);
     }
   }
 
-  // B. Chercher une liste officielle/franchise rattachée à la série sur TVDB
+  // B. Chercher une liste officielle/franchise rattachée à la série/film sur TVDB
   if (activeTvdbId) {
     try {
-      const seriesRes = await fetch(`${BASE_URL}/series/${activeTvdbId}/extended`, {
+      const endpoint = mediaType === 'movie' ? 'movies' : 'series';
+      const seriesRes = await fetch(`${BASE_URL}/${endpoint}/${activeTvdbId}/extended`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (seriesRes.ok) {
@@ -103,7 +106,7 @@ export async function getTVDBFranchiseTimeline(
         }
       }
     } catch (e) {
-      console.error('[TVDB] Erreur récupération détails série:', e);
+      console.error('[TVDB] Erreur récupération détails:', e);
     }
   }
 

@@ -253,7 +253,58 @@ class TMDBClient {
 
     const mediaType = media.media_type || (media.title ? 'movie' : 'tv');
 
-    // A. POUR LES FILMS : Utiliser la collection TMDB (belongs_to_collection) ultra-fiable et propre
+    // A. POUR TOUT LE MONDE : Utiliser l'API TVDB v4 pour les préquelles, spin-offs et franchises (univers complet)
+    const tvdbId = media.external_ids?.tvdb_id || media.tvdb_id;
+    const mediaTitle = media.name || media.title || media.original_name;
+    const imdbId = media.external_ids?.imdb_id || media.imdb_id;
+
+    const franchiseItems = await getTVDBFranchiseTimeline(tvdbId, mediaTitle, imdbId, mediaType);
+
+    if (franchiseItems && franchiseItems.length > 1) {
+      // Récupérer les détails TMDB de chaque média de la franchise
+      const detailsPromises = franchiseItems.map(async (item) => {
+        const res = await this.getMediaDetails(item.id, item.media_type);
+        if (res.ok && res.value) {
+          return {
+            ...res.value,
+            media_type: item.media_type,
+          };
+        }
+        return null;
+      });
+
+      const tvdbResults = await Promise.all(detailsPromises);
+      const validMedia = tvdbResults.filter((r): r is any => r !== null && !isAdultOrParodyMedia(r));
+
+      // Déduplication par ID & type
+      const map = new Map<string, any>();
+      validMedia.forEach((item) => {
+        const type = item.media_type || (item.title ? 'movie' : 'tv');
+        const key = `${type}_${item.id}`;
+        if (!map.has(key)) {
+          map.set(key, { ...item, media_type: type });
+        }
+      });
+
+      const combined = Array.from(map.values());
+
+      if (combined.length > 1) {
+        // Tri chronologique par date de sortie / 1re diffusion
+        combined.sort((a, b) => {
+          const dateA = new Date(a.release_date || a.first_air_date || 0).getTime();
+          const dateB = new Date(b.release_date || b.first_air_date || 0).getTime();
+          return dateA - dateB;
+        });
+
+        // Ajouter la numérotation d'ordre chronologique (#1, #2, #3...)
+        return combined.map((item, index) => ({
+          ...item,
+          sagaOrder: index + 1
+        }));
+      }
+    }
+
+    // B. FALLBACK POUR LES FILMS : Utiliser la collection TMDB (belongs_to_collection) si TVDB ne trouve rien
     if (mediaType === 'movie') {
       if (media.belongs_to_collection?.id) {
         const collectionRes = await this.getCollectionDetails(media.belongs_to_collection.id);
@@ -276,59 +327,9 @@ class TMDBClient {
           }));
         }
       }
-      return [];
     }
 
-    // B. POUR LES SÉRIES : Utiliser l'API TVDB v4 pour les préquelles, spin-offs et franchises
-    const tvdbId = media.external_ids?.tvdb_id || media.tvdb_id;
-    const mediaTitle = media.name || media.title || media.original_name;
-    const imdbId = media.external_ids?.imdb_id || media.imdb_id;
-
-    const franchiseItems = await getTVDBFranchiseTimeline(tvdbId, mediaTitle, imdbId);
-
-    if (!franchiseItems || franchiseItems.length === 0) return [];
-
-    // Récupérer les détails TMDB de chaque média de la franchise
-    const detailsPromises = franchiseItems.map(async (item) => {
-      const res = await this.getMediaDetails(item.id, item.media_type);
-      if (res.ok && res.value) {
-        return {
-          ...res.value,
-          media_type: item.media_type,
-        };
-      }
-      return null;
-    });
-
-    const tvdbResults = await Promise.all(detailsPromises);
-    const validMedia = tvdbResults.filter((r): r is any => r !== null && !isAdultOrParodyMedia(r));
-
-    // Déduplication par ID & type
-    const map = new Map<string, any>();
-    validMedia.forEach((item) => {
-      const type = item.media_type || (item.title ? 'movie' : 'tv');
-      const key = `${type}_${item.id}`;
-      if (!map.has(key)) {
-        map.set(key, { ...item, media_type: type });
-      }
-    });
-
-    const combined = Array.from(map.values());
-
-    if (combined.length <= 1) return [];
-
-    // Tri chronologique par date de sortie / 1re diffusion
-    combined.sort((a, b) => {
-      const dateA = new Date(a.release_date || a.first_air_date || 0).getTime();
-      const dateB = new Date(b.release_date || b.first_air_date || 0).getTime();
-      return dateA - dateB;
-    });
-
-    // Ajouter la numérotation d'ordre chronologique (#1, #2, #3...)
-    return combined.map((item, index) => ({
-      ...item,
-      sagaOrder: index + 1
-    }));
+    return [];
   }
 
   async getCollectionDetails(collectionId: number): Promise<Result<any>> {

@@ -2650,7 +2650,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         {isSeries && (
           <div id="section-episodes" className="scroll-mt-40 mt-12 space-y-4 animate-in fade-in duration-200">
             <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-2">Épisodes</h3>
-            {tmdbDetails?.seasons?.filter((s: any) => s.season_number > 0).slice(0, visibleSeasons).map((season: any) => {
+            {tmdbDetails?.seasons?.filter((s: any) => s.season_number > 0).slice(0, visibleSeasons).map((season: any, idx: number) => {
               const seasonNum = season.season_number;
               const seasonEpCount = season.episode_count || 0;
               const cachedSeason = seasonsCache[seasonNum];
