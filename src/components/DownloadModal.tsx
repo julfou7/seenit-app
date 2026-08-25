@@ -103,6 +103,9 @@ export function DownloadModal({
   const [selectedSeason, setSelectedSeason] = useState<number>(initialSeason || 1);
   const [selectedEpisode, setSelectedEpisode] = useState<number>(initialEpisode || 1);
 
+  // Masquer la liste des torrents par défaut (l'utilisateur utilise Sonarr/Radarr)
+  const [showTorrentList, setShowTorrentList] = useState<boolean>(false);
+
   // Saisons et Épisodes réels
   const [availableSeasons, setAvailableSeasons] = useState<SeasonInfo[]>([]);
   const [isSeasonPickerOpen, setIsSeasonPickerOpen] = useState<boolean>(false);
@@ -222,12 +225,19 @@ export function DownloadModal({
 
       const q = generateQuery(initialMode, sVal, eVal);
       setSearchQuery(q);
-      performSearch(q);
+
+      // Par défaut on réinitialise l'affichage de la liste et les résultats
+      setShowTorrentList(false);
+      setTorrents([]);
+      setHasSearched(false);
+      setActionMessage(null);
+      setIsTriggeringAuto(false);
     } else {
       setTorrents([]);
       setHasSearched(false);
       setActionMessage(null);
       setIsTriggeringAuto(false);
+      setShowTorrentList(false);
     }
   }, [isOpen, title, initialSeason, initialEpisode]);
 
@@ -243,7 +253,17 @@ export function DownloadModal({
 
     const newQ = generateQuery(newMode, sNum, adjustedEpisode);
     setSearchQuery(newQ);
-    performSearch(newQ);
+    if (showTorrentList) {
+      performSearch(newQ);
+    }
+  };
+
+  const handleToggleTorrentList = () => {
+    const nextState = !showTorrentList;
+    setShowTorrentList(nextState);
+    if (nextState && !hasSearched) {
+      performSearch(searchQuery);
+    }
   };
 
   const handleSeasonSelect = (newSeasonNum: number) => {
@@ -440,8 +460,8 @@ export function DownloadModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[82vh] sm:max-h-[88vh] mb-12 sm:mb-0">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 pt-10 sm:pt-4 pb-12 sm:pb-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[88vh] my-auto">
         
         {/* Header */}
         <div className="p-3.5 sm:p-5 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/90 shrink-0">
@@ -609,223 +629,250 @@ export function DownloadModal({
           </div>
         )}
 
-        {/* Search Bar & Results Header */}
-        <div className="p-2.5 sm:p-3 bg-zinc-950/60 border-b border-zinc-800/80 shrink-0">
-          <form 
-            onSubmit={(e) => {
-              e.preventDefault();
-              performSearch(searchQuery);
-            }}
-            className="flex gap-2"
+        {/* Dépliant / Toggle pour la recherche & liste manuelle des torrents C411 */}
+        <div className="p-2.5 sm:p-3 bg-zinc-950/80 border-b border-zinc-800/80 shrink-0">
+          <button
+            type="button"
+            onClick={handleToggleTorrentList}
+            className="w-full py-2 px-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 active:scale-98 border border-zinc-700/60 text-zinc-300 hover:text-white text-xs font-bold transition-all flex items-center justify-between cursor-pointer shadow-sm"
           >
-            <div className="relative flex-1">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Recherche de torrent..."
-                className="w-full pl-9 pr-3 py-1.5 sm:py-2 bg-zinc-900 border border-zinc-700/80 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 transition-colors"
-              />
+            <div className="flex items-center gap-2">
+              <Search size={14} className="text-blue-400" />
+              <span>
+                {showTorrentList 
+                  ? "Masquer la liste des torrents manuels (C411)" 
+                  : "Rechercher manuellement des torrents (C411)"}
+              </span>
             </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-3.5 py-1.5 sm:py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
-            >
-              {loading ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
-              <span className="hidden sm:inline">Rechercher</span>
-            </button>
-          </form>
+            <ChevronDown 
+              size={15} 
+              className={`text-zinc-400 transition-transform duration-200 ${showTorrentList ? "rotate-180" : ""}`} 
+            />
+          </button>
         </div>
 
-        {/* Filters & Sorting */}
-        <div className="px-3 py-2 bg-zinc-900 flex flex-wrap items-center justify-between border-b border-zinc-800/80 text-xs shrink-0 gap-2">
-          {/* Filtre Qualité */}
-          <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar">
-            <span className="text-zinc-400 font-bold text-[10px] sm:text-[11px] mr-1">Qualité :</span>
-            {[
-              { id: 'all', label: 'Toutes' },
-              { id: '2160p', label: '4K' },
-              { id: '1080p', label: '1080p' },
-              { id: '720p', label: '720p' },
-            ].map((q) => (
-              <button
-                key={`q_btn_${q.id}`}
-                type="button"
-                onClick={() => setSelectedQuality(q.id)}
-                className={`px-2 py-0.5 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
-                  selectedQuality === q.id
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-zinc-800/80 hover:bg-zinc-800 text-zinc-300 border border-zinc-700/50'
-                }`}
+        {/* Zone dépliable de Recherche & Résultats Torrents */}
+        {showTorrentList && (
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            {/* Search Bar & Results Header */}
+            <div className="p-2.5 sm:p-3 bg-zinc-950/60 border-b border-zinc-800/80 shrink-0">
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  performSearch(searchQuery);
+                }}
+                className="flex gap-2"
               >
-                {q.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Tri */}
-          <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar">
-            <span className="text-zinc-400 font-bold text-[10px] sm:text-[11px] mr-1">Tri :</span>
-            {[
-              { id: 'seeders', label: 'Seeders' },
-              { id: 'size', label: 'Taille' },
-              { id: 'date', label: 'Date' },
-            ].map((s) => (
-              <button
-                key={`s_btn_${s.id}`}
-                type="button"
-                onClick={() => setSortBy(s.id as any)}
-                className={`px-2 py-0.5 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
-                  sortBy === s.id
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-zinc-800/80 hover:bg-zinc-800 text-zinc-300 border border-zinc-700/50'
-                }`}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Results List */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2.5 pb-28">
-          {loading ? (
-            <div className="py-12 flex flex-col items-center justify-center gap-3 text-zinc-400">
-              <Loader2 size={28} className="animate-spin text-blue-400" />
-              <p className="text-xs font-medium">Recherche des releases sur C411...</p>
-            </div>
-          ) : filteredTorrents.length > 0 ? (
-            filteredTorrents.map((t) => {
-              const isSending = downloadingId === t.id;
-              const isCopied = copiedHash === t.infoHash;
-
-              return (
-                <div
-                  key={`torrent_${t.id}`}
-                  className="bg-zinc-950/60 hover:bg-zinc-950 border border-zinc-800/80 hover:border-zinc-700 rounded-xl p-3 sm:p-3.5 transition-all flex flex-col gap-2.5"
+                <div className="relative flex-1">
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Recherche de torrent..."
+                    className="w-full pl-9 pr-3 py-1.5 sm:py-2 bg-zinc-900 border border-zinc-700/80 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 transition-colors"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="px-3.5 py-1.5 sm:py-2 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <h4 className="text-xs font-bold text-zinc-100 leading-snug break-words">
-                        {t.name}
-                      </h4>
-                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                        {t.quality && (
-                          <span className="px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 font-bold text-[10px]">
-                            {t.quality}
-                          </span>
-                        )}
-                        {t.language && (
-                          <span className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[10px] font-medium border border-white/5">
-                            {t.language}
-                          </span>
-                        )}
-                        <span className="text-[11px] font-semibold text-zinc-300">
-                          {formatTorrentSize(t.size)}
-                        </span>
-                        <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
-                          <Radio size={12} />
-                          {t.seeders} seed{t.seeders > 1 ? 's' : ''}
-                        </span>
-                        {t.isFreeleech && (
-                          <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[9px] font-black uppercase">
-                            FreeLeech
-                          </span>
-                        )}
+                  {loading ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
+                  <span className="hidden sm:inline">Rechercher</span>
+                </button>
+              </form>
+            </div>
+
+            {/* Filters & Sorting */}
+            <div className="px-3 py-2 bg-zinc-900 flex flex-wrap items-center justify-between border-b border-zinc-800/80 text-xs shrink-0 gap-2">
+              {/* Filtre Qualité */}
+              <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar">
+                <span className="text-zinc-400 font-bold text-[10px] sm:text-[11px] mr-1">Qualité :</span>
+                {[
+                  { id: 'all', label: 'Toutes' },
+                  { id: '2160p', label: '4K' },
+                  { id: '1080p', label: '1080p' },
+                  { id: '720p', label: '720p' },
+                ].map((q) => (
+                  <button
+                    key={`q_btn_${q.id}`}
+                    type="button"
+                    onClick={() => setSelectedQuality(q.id)}
+                    className={`px-2 py-0.5 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
+                      selectedQuality === q.id
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'bg-zinc-800/80 hover:bg-zinc-800 text-zinc-300 border border-zinc-700/50'
+                    }`}
+                  >
+                    {q.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tri */}
+              <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar">
+                <span className="text-zinc-400 font-bold text-[10px] sm:text-[11px] mr-1">Tri :</span>
+                {[
+                  { id: 'seeders', label: 'Seeders' },
+                  { id: 'size', label: 'Taille' },
+                  { id: 'date', label: 'Date' },
+                ].map((s) => (
+                  <button
+                    key={`s_btn_${s.id}`}
+                    type="button"
+                    onClick={() => setSortBy(s.id as any)}
+                    className={`px-2 py-0.5 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
+                      sortBy === s.id
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'bg-zinc-800/80 hover:bg-zinc-800 text-zinc-300 border border-zinc-700/50'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Results List */}
+            <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2.5 pb-6">
+              {loading ? (
+                <div className="py-12 flex flex-col items-center justify-center gap-3 text-zinc-400">
+                  <Loader2 size={28} className="animate-spin text-blue-400" />
+                  <p className="text-xs font-medium">Recherche des releases sur C411...</p>
+                </div>
+              ) : filteredTorrents.length > 0 ? (
+                filteredTorrents.map((t) => {
+                  const isSending = downloadingId === t.id;
+                  const isCopied = copiedHash === t.infoHash;
+
+                  return (
+                    <div
+                      key={`torrent_${t.id}`}
+                      className="bg-zinc-950/60 hover:bg-zinc-950 border border-zinc-800/80 hover:border-zinc-700 rounded-xl p-3 sm:p-3.5 transition-all flex flex-col gap-2.5"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <h4 className="text-xs font-bold text-zinc-100 leading-snug break-words">
+                            {t.name}
+                          </h4>
+                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                            {t.quality && (
+                              <span className="px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 font-bold text-[10px]">
+                                {t.quality}
+                              </span>
+                            )}
+                            {t.language && (
+                              <span className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[10px] font-medium border border-white/5">
+                                {t.language}
+                              </span>
+                            )}
+                            <span className="text-[11px] font-semibold text-zinc-300">
+                              {formatTorrentSize(t.size)}
+                            </span>
+                            <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
+                              <Radio size={12} />
+                              {t.seeders} seed{t.seeders > 1 ? 's' : ''}
+                            </span>
+                            {t.isFreeleech && (
+                              <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[9px] font-black uppercase">
+                                FreeLeech
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Actions Buttons */}
+                      <div className="flex items-center justify-between pt-1 border-t border-zinc-800/40 gap-2">
+                        <button
+                          onClick={() => handleCopyMagnet(t)}
+                          className="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-[11px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                          title="Copier le lien Magnet"
+                        >
+                          {isCopied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                          {isCopied ? 'Magnet copié !' : 'Magnet'}
+                        </button>
+
+                        <div className="flex items-center gap-2">
+                          {hasConfiguredClient ? (
+                            <button
+                              onClick={() => handleSendToClient(t)}
+                              disabled={isSending}
+                              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 shadow-sm"
+                            >
+                              {isSending ? <Loader2 size={13} className="animate-spin" /> : <Server size={13} />}
+                              Envoyer à {clientName}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleSendToClient(t)}
+                              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                            >
+                              <Download size={13} />
+                              Télécharger
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
+                  );
+                })
+              ) : hasSearched ? (
+                <div className="py-10 px-4 flex flex-col items-center justify-center gap-3 text-center text-zinc-400">
+                  <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400">
+                    <AlertCircle size={24} className="text-amber-400/80" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-zinc-200">
+                      Aucun résultat pour « {searchQuery} »
+                    </p>
+                    <p className="text-[11px] text-zinc-400 max-w-sm mt-1 leading-relaxed">
+                      {scopeMode !== 'all' 
+                        ? `Cette saison ou cet épisode n'est peut-être pas encore disponible ou diffusé. Essayez de chercher la série complète ou une autre saison :` 
+                        : `Essayez de modifier le nom ou de retirer les caractères spéciaux dans la barre de recherche.`}
+                    </p>
                   </div>
 
-                  {/* Actions Buttons */}
-                  <div className="flex items-center justify-between pt-1 border-t border-zinc-800/40 gap-2">
-                    <button
-                      onClick={() => handleCopyMagnet(t)}
-                      className="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-[11px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-                      title="Copier le lien Magnet"
-                    >
-                      {isCopied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-                      {isCopied ? 'Magnet copié !' : 'Magnet'}
-                    </button>
+                  {/* Bouton rapide de recherche globale */}
+                  {mediaType === 'tv' && scopeMode !== 'all' && (
+                    <div className="flex flex-col items-center gap-2 mt-1 w-full max-w-xs">
+                      <button
+                        type="button"
+                        onClick={() => handleScopeChange('all')}
+                        className="w-full py-2.5 px-4 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300 font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+                      >
+                        <Search size={13} />
+                        <span>Rechercher toute la série « {title} »</span>
+                      </button>
 
-                    <div className="flex items-center gap-2">
-                      {hasConfiguredClient ? (
-                        <button
-                          onClick={() => handleSendToClient(t)}
-                          disabled={isSending}
-                          className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 shadow-sm"
-                        >
-                          {isSending ? <Loader2 size={13} className="animate-spin" /> : <Server size={13} />}
-                          Envoyer à {clientName}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleSendToClient(t)}
-                          className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 active:scale-95 text-white text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
-                        >
-                          <Download size={13} />
-                          Télécharger
-                        </button>
+                      {/* Saisons disponibles */}
+                      {totalSeasons > 1 && (
+                        <div className="flex items-center gap-1.5 flex-wrap justify-center pt-1">
+                          <span className="text-[10px] text-zinc-500 font-medium mr-1">Tester :</span>
+                          {Array.from({ length: Math.min(totalSeasons, 10) }, (_, i) => i + 1).map((sNum) => (
+                            <button
+                              key={`s_pill_${sNum}`}
+                              type="button"
+                              onClick={() => handleScopeChange('season', sNum)}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
+                                selectedSeason === sNum 
+                                  ? 'bg-blue-600 text-white border-blue-500' 
+                                  : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-700/60'
+                              }`}
+                            >
+                              Saison {sNum}
+                            </button>
+                          ))}
+                        </div>
                       )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          ) : hasSearched ? (
-            <div className="py-10 px-4 flex flex-col items-center justify-center gap-3 text-center text-zinc-400">
-              <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400">
-                <AlertCircle size={24} className="text-amber-400/80" />
-              </div>
-              <div>
-                <p className="text-xs font-bold text-zinc-200">
-                  Aucun résultat pour « {searchQuery} »
-                </p>
-                <p className="text-[11px] text-zinc-400 max-w-sm mt-1 leading-relaxed">
-                  {scopeMode !== 'all' 
-                    ? `Cette saison ou cet épisode n'est peut-être pas encore disponible ou diffusé. Essayez de chercher la série complète ou une autre saison :` 
-                    : `Essayez de modifier le nom ou de retirer les caractères spéciaux dans la barre de recherche.`}
-                </p>
-              </div>
-
-              {/* Bouton rapide de recherche globale */}
-              {mediaType === 'tv' && scopeMode !== 'all' && (
-                <div className="flex flex-col items-center gap-2 mt-1 w-full max-w-xs">
-                  <button
-                    type="button"
-                    onClick={() => handleScopeChange('all')}
-                    className="w-full py-2.5 px-4 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300 font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
-                  >
-                    <Search size={13} />
-                    <span>Rechercher toute la série « {title} »</span>
-                  </button>
-
-                  {/* Saisons disponibles */}
-                  {totalSeasons > 1 && (
-                    <div className="flex items-center gap-1.5 flex-wrap justify-center pt-1">
-                      <span className="text-[10px] text-zinc-500 font-medium mr-1">Tester :</span>
-                      {Array.from({ length: Math.min(totalSeasons, 10) }, (_, i) => i + 1).map((sNum) => (
-                        <button
-                          key={`s_pill_${sNum}`}
-                          type="button"
-                          onClick={() => handleScopeChange('season', sNum)}
-                          className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
-                            selectedSeason === sNum 
-                              ? 'bg-blue-600 text-white border-blue-500' 
-                              : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-700/60'
-                          }`}
-                        >
-                          Saison {sNum}
-                        </button>
-                      ))}
                     </div>
                   )}
                 </div>
-              )}
+              ) : null}
             </div>
-          ) : null}
-        </div>
+          </div>
+        )}
 
         {/* Footer info */}
         <div className="p-3 bg-zinc-950 border-t border-zinc-800 text-[10px] text-zinc-500 flex items-center justify-between">
