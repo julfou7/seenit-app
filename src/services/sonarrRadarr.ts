@@ -1121,10 +1121,12 @@ export interface LiveDownloadItem {
   timeleftSeconds?: number;
   speedBytesPerSec?: number;
   speedFormatted?: string;
-  status: 'downloading' | 'queued' | 'paused' | 'completed' | 'warning' | string;
+  status: 'downloading' | 'queued' | 'paused' | 'completed' | 'warning' | 'error' | string;
   statusText: string;
+  errorMessage?: string;
   downloadClient?: string;
   releaseTitle?: string;
+  isOptimistic?: boolean;
 }
 
 export function formatBytes(bytes: number, decimals = 1): string {
@@ -1216,6 +1218,56 @@ export function matchMovieDownload(
   return false;
 }
 
+function parseQueueRecordStatus(rec: any): { status: string; statusText: string; errorMessage?: string } {
+  const statusMsgs: string[] = [];
+  if (Array.isArray(rec.statusMessages)) {
+    for (const sm of rec.statusMessages) {
+      if (Array.isArray(sm?.messages) && sm.messages.length > 0) {
+        statusMsgs.push(...sm.messages.filter(Boolean));
+      } else if (sm?.title && sm.title !== 'Downloading' && sm.title !== 'Queued') {
+        statusMsgs.push(sm.title);
+      }
+    }
+  }
+  if (rec.errorMessage) statusMsgs.push(rec.errorMessage);
+
+  const isTrackedError = rec.trackedDownloadStatus?.toLowerCase() === 'error';
+  const isTrackedWarning = rec.trackedDownloadStatus?.toLowerCase() === 'warning';
+  const isFailed = rec.status?.toLowerCase() === 'failed' || rec.status?.toLowerCase() === 'error';
+
+  let errorMessage: string | undefined;
+  if (statusMsgs.length > 0) {
+    errorMessage = statusMsgs.join(' • ');
+  } else if (isTrackedError || isFailed) {
+    errorMessage = 'Erreur lors du téléchargement (espace disque ou client torrent)';
+  } else if (isTrackedWarning) {
+    errorMessage = 'Avertissement de téléchargement';
+  }
+
+  // Traductions des erreurs courantes en français
+  if (errorMessage) {
+    if (/disk is full|not enough free space|no space left|space left on device/i.test(errorMessage)) {
+      errorMessage = 'Disque plein : espace de stockage insuffisant';
+    } else if (/access denied|permission denied/i.test(errorMessage)) {
+      errorMessage = 'Erreur d\'accès / permissions disque';
+    } else if (/client unavailable|could not connect/i.test(errorMessage)) {
+      errorMessage = 'Client de téléchargement injoignable';
+    }
+  }
+
+  const hasError = Boolean(errorMessage || isTrackedError || isFailed);
+  const status = hasError ? 'error' : (isTrackedWarning ? 'warning' : (rec.status || 'downloading'));
+  
+  let statusText = rec.status === 'downloading' ? 'Téléchargement' : (rec.status || 'En cours');
+  if (hasError) {
+    statusText = 'Erreur';
+  } else if (isTrackedWarning) {
+    statusText = 'Attention';
+  }
+
+  return { status, statusText, errorMessage };
+}
+
 export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promise<LiveDownloadItem[]> {
   const items: LiveDownloadItem[] = [];
 
@@ -1244,6 +1296,8 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
         const epNum = rec.episode?.episodeNumber ?? rec.episodeNumber;
         const epTitle = epNum ? `S${seasonNum}E${epNum}` : `Saison ${seasonNum}`;
 
+        const statusInfo = parseQueueRecordStatus(rec);
+
         items.push({
           id: `sonarr_${rec.id}`,
           mediaType: 'tv',
@@ -1261,8 +1315,9 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           timeleftSeconds,
           speedBytesPerSec: timeleftSeconds > 0 && leftSize > 0 ? Math.round(leftSize / timeleftSeconds) : 0,
           speedFormatted: timeleftSeconds > 0 && leftSize > 0 ? formatSpeed(Math.round(leftSize / timeleftSeconds)) : '',
-          status: rec.status || 'downloading',
-          statusText: rec.status === 'downloading' ? `Téléchargement ${progress}%` : (rec.status || 'En cours'),
+          status: statusInfo.status,
+          statusText: statusInfo.status === 'downloading' ? `Téléchargement ${progress}%` : statusInfo.statusText,
+          errorMessage: statusInfo.errorMessage,
           downloadClient: rec.downloadClient || 'Sonarr',
           releaseTitle: rec.title
         });
@@ -1293,6 +1348,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
         const timeleftStr = timeleftSeconds > 0 ? formatSecondsToETA(timeleftSeconds) : (rec.timeleft || '');
 
         const movieTitle = rec.movie?.title || rec.title || 'Film';
+        const statusInfo = parseQueueRecordStatus(rec);
 
         items.push({
           id: `radarr_${rec.id}`,
@@ -1308,8 +1364,9 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           timeleftSeconds,
           speedBytesPerSec: timeleftSeconds > 0 && leftSize > 0 ? Math.round(leftSize / timeleftSeconds) : 0,
           speedFormatted: timeleftSeconds > 0 && leftSize > 0 ? formatSpeed(Math.round(leftSize / timeleftSeconds)) : '',
-          status: rec.status || 'downloading',
-          statusText: rec.status === 'downloading' ? `Téléchargement ${progress}%` : (rec.status || 'En cours'),
+          status: statusInfo.status,
+          statusText: statusInfo.status === 'downloading' ? `Téléchargement ${progress}%` : statusInfo.statusText,
+          errorMessage: statusInfo.errorMessage,
           downloadClient: rec.downloadClient || 'Radarr',
           releaseTitle: rec.title
         });
@@ -1346,6 +1403,11 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           const etaSec = t.eta || 0;
           const isTv = t.category === 'tv' || /s\d{1,2}e\d{1,2}/i.test(t.name);
 
+          const isQbitError = t.state === 'error' || t.state === 'missingFiles';
+          const qbitErrorMsg = isQbitError ? 'Erreur qBittorrent (espace disque insuffisant ou fichier manquant)' : undefined;
+          const qbitStatus = isQbitError ? 'error' : (t.state === 'stalledDL' ? 'warning' : (t.state || 'downloading'));
+          const qbitStatusText = isQbitError ? 'Erreur' : (t.state === 'stalledDL' ? 'En attente de sources' : `qBittorrent ${rawProgress}%`);
+
           const existing = items.find(it => it.releaseTitle && (it.releaseTitle.toLowerCase() === t.name.toLowerCase() || t.name.toLowerCase().includes(it.releaseTitle.toLowerCase()) || it.releaseTitle.toLowerCase().includes(t.name.toLowerCase())));
 
           if (existing) {
@@ -1359,6 +1421,11 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
             }
             existing.progress = rawProgress;
             existing.sizeleft = Math.round((t.size || 0) * (1 - (t.progress || 0)));
+            if (isQbitError) {
+              existing.status = 'error';
+              existing.statusText = 'Erreur';
+              existing.errorMessage = qbitErrorMsg;
+            }
           } else {
             items.push({
               id: `qbit_${t.hash || t.name}`,
@@ -1371,8 +1438,9 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
               timeleftSeconds: etaSec,
               speedBytesPerSec: speed,
               speedFormatted: formatSpeed(speed),
-              status: t.state || 'downloading',
-              statusText: `qBittorrent ${rawProgress}%`,
+              status: qbitStatus,
+              statusText: qbitStatusText,
+              errorMessage: qbitErrorMsg,
               downloadClient: 'qBittorrent',
               releaseTitle: t.name
             });
