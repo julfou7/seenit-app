@@ -3329,6 +3329,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
           mediaType={isSeries ? 'tv' : 'movie'}
           tmdbId={effectiveTmdbId}
           imdbId={tmdbDetails?.external_ids?.imdb_id || (show as any)?.imdbId}
+          posterPath={posterPath || tmdbDetails?.poster_path || show?.posterPath}
           initialSeason={downloadTargetSeason}
           initialEpisode={downloadTargetEpisode}
           totalSeasons={tmdbDetails?.number_of_seasons || tmdbDetails?.seasons?.filter((s: any) => s.season_number > 0)?.length || 1}

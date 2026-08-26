@@ -49,6 +49,7 @@ export interface DownloadModalProps {
   mediaType: 'movie' | 'tv';
   tmdbId?: number | string;
   imdbId?: string;
+  posterPath?: string;
   initialSeason?: number;
   initialEpisode?: number;
   totalSeasons?: number;
@@ -65,6 +66,7 @@ export function DownloadModal({
   mediaType,
   tmdbId,
   imdbId,
+  posterPath,
   initialSeason,
   initialEpisode,
   totalSeasons = 1,
@@ -317,13 +319,45 @@ export function DownloadModal({
     }
   };
 
-  // 1. Déclenchement automatique intelligent via Sonarr / Radarr
+  // 1. Déclenchement automatique intelligent via Sonarr / Radarr avec retour immédiat et UI optimiste
   const handleAutoSearchClient = async (qualityPreference?: '1080p' | '4k') => {
     setIsTriggeringAuto(true);
     setActionMessage(null);
 
+    const isTv = mediaType === 'tv';
+    const qualName = qualityPreference === '4k' ? '4K' : '1080p';
+    const targetDesc = isTv 
+      ? scopeMode === 'all' 
+        ? 'Toute la série' 
+        : scopeMode === 'season' 
+        ? `Saison ${selectedSeason}` 
+        : `S${String(selectedSeason).padStart(2, '0')}E${String(selectedEpisode).padStart(2, '0')}`
+      : 'Film';
+
+    const displayTitle = isTv ? `${title} (${targetDesc})` : title;
+
+    // ⚡ A. AJOUT OPTIMISTE INSTANTANÉ (Apparaît immédiatement dans "Téléchargements" et la bannière)
+    useLiveDownloadStore.getState().addOptimisticDownload({
+      title: displayTitle,
+      mediaType: isTv ? 'tv' : 'movie',
+      tmdbId: tmdbId ? Number(tmdbId) : undefined,
+      seasonNumber: isTv && scopeMode !== 'all' ? selectedSeason : undefined,
+      episodeNumber: isTv && scopeMode === 'episode' ? selectedEpisode : undefined,
+      posterPath: posterPath,
+      releaseTitle: `${displayTitle} • Recherche ${qualName} dans ${isTv ? 'Sonarr' : 'Radarr'}...`,
+      statusText: `Lancement ${qualName} en cours...`,
+      downloadClient: isTv ? 'Sonarr' : 'Radarr'
+    });
+
+    const toastMsg = `🚀 Recherche ${qualName} lancée pour « ${title} » !`;
+    if (onSuccessToast) onSuccessToast(toastMsg);
+
+    // Fermeture de la modale immédiatement pour offrir une réactivité parfaite (UX 1-clic)
+    onClose();
+
+    // ⚡ B. EXÉCUTION DE LA REQUÊTE EN ARRIÈRE-PLAN
     try {
-      if (mediaType === 'tv' && sonarrUrl && sonarrApiKey) {
+      if (isTv && sonarrUrl && sonarrApiKey) {
         const res = await searchAndDownloadInSonarr({
           url: sonarrUrl,
           apiKey: sonarrApiKey,
@@ -335,13 +369,10 @@ export function DownloadModal({
           qualityPreference
         });
 
-        if (res.success) {
-          setActionMessage({ text: res.message, type: 'success' });
-          if (onSuccessToast) onSuccessToast(res.message);
-        } else {
-          setActionMessage({ text: res.message, type: 'error' });
+        if (!res.success && onSuccessToast) {
+          onSuccessToast(`Sonarr : ${res.message}`);
         }
-      } else if (mediaType === 'movie' && radarrUrl && radarrApiKey) {
+      } else if (!isTv && radarrUrl && radarrApiKey) {
         const res = await searchAndDownloadInRadarr({
           url: radarrUrl,
           apiKey: radarrApiKey,
@@ -351,18 +382,29 @@ export function DownloadModal({
           qualityPreference
         });
 
-        if (res.success) {
-          setActionMessage({ text: res.message, type: 'success' });
-          if (onSuccessToast) onSuccessToast(res.message);
-        } else {
-          setActionMessage({ text: res.message, type: 'error' });
+        // Fallback automatique 1080p si 4K est choisi et qu'aucun téléchargement n'a démarré au bout de 12 secondes
+        if (res.success && qualityPreference === '4k') {
+          setTimeout(async () => {
+            const currentDownloads = useLiveDownloadStore.getState().downloads;
+            const hasStartedOnServer = currentDownloads.some(d => !d.isOptimistic && d.mediaType === 'movie' && (d.tmdbId === Number(tmdbId) || d.title.toLowerCase().includes(title.toLowerCase())));
+            if (!hasStartedOnServer && radarrUrl && radarrApiKey) {
+              if (onSuccessToast) onSuccessToast(`4K indisponible actuellement. Recherche 1080p lancée en fallback !`);
+              await searchAndDownloadInRadarr({
+                url: radarrUrl,
+                apiKey: radarrApiKey,
+                title,
+                tmdbId,
+                year,
+                qualityPreference: '1080p'
+              }).catch(() => {});
+            }
+          }, 12000);
+        } else if (!res.success && onSuccessToast) {
+          onSuccessToast(`Radarr : ${res.message}`);
         }
       }
     } catch (err: any) {
-      setActionMessage({
-        text: `Erreur client : ${err?.message || 'Serveur injoignable'}`,
-        type: 'error'
-      });
+      console.warn('[AutoSearch Client Error]', err);
     } finally {
       setIsTriggeringAuto(false);
     }
@@ -594,43 +636,60 @@ export function DownloadModal({
           </div>
         )}
 
-        {/* Hero Card : Déclenchement Automatique Sonarr / Radarr (si configuré) */}
+        {/* Boutons de Choix Direct de Qualité Sonarr / Radarr (si configuré) */}
         {hasConfiguredClient && (sonarrUrl || radarrUrl) && (
-          <div className="p-3 bg-gradient-to-r from-blue-950/40 via-zinc-900/80 to-blue-950/30 border-b border-blue-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shrink-0">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
-                <Zap size={14} />
-              </div>
-              <div className="min-w-0 flex-1">
+          <div className="p-3.5 bg-gradient-to-r from-blue-950/40 via-zinc-900/90 to-blue-950/30 border-b border-blue-500/20 space-y-2.5 shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                  <Zap size={13} />
+                </div>
                 <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-                  Gestion Automatique {clientName}
+                  Téléchargement automatique {clientName}
                 </h4>
-                <p className="text-[10px] text-zinc-400 truncate">
-                  {mediaType === 'tv' 
-                    ? scopeMode === 'all' ? `Ajouter et télécharger la série dans Sonarr` : scopeMode === 'season' ? `Télécharger la Saison ${selectedSeason} dans Sonarr` : `Télécharger S${String(selectedSeason).padStart(2, '0')}E${String(selectedEpisode).padStart(2, '0')} dans Sonarr`
-                    : `Ajouter et télécharger le film dans Radarr`}
-                </p>
               </div>
+              <span className="text-[10px] font-extrabold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-md">
+                Choix rapide
+              </span>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowQualityModal(true)}
-              disabled={isTriggeringAuto}
-              className="w-full sm:w-auto px-3.5 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-95 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50 shrink-0"
-            >
-              {isTriggeringAuto ? (
-                <>
-                  <Loader2 size={13} className="animate-spin" />
-                  <span>Traitement...</span>
-                </>
-              ) : (
-                <>
-                  <Zap size={13} className="text-amber-300" />
-                  <span>Lancer dans {clientName}</span>
-                </>
-              )}
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              {/* Option 1: HD 1080p */}
+              <button
+                type="button"
+                onClick={() => handleAutoSearchClient('1080p')}
+                disabled={isTriggeringAuto}
+                className="group p-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 hover:border-blue-500/60 transition-all active:scale-95 text-left cursor-pointer flex flex-col justify-between shadow-sm disabled:opacity-50"
+              >
+                <div className="flex items-center justify-between w-full mb-1">
+                  <span className="px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 text-[10px] font-black border border-blue-500/30">
+                    HD 1080p
+                  </span>
+                  <ChevronRight size={14} className="text-zinc-500 group-hover:text-blue-400 transition-colors" />
+                </div>
+                <p className="text-[10px] text-zinc-400 leading-tight">
+                  Profil HD (2 - 5 Go) • Rapide
+                </p>
+              </button>
+
+              {/* Option 2: Ultra-HD / 4K */}
+              <button
+                type="button"
+                onClick={() => handleAutoSearchClient('4k')}
+                disabled={isTriggeringAuto}
+                className="group p-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 hover:border-amber-500/60 transition-all active:scale-95 text-left cursor-pointer flex flex-col justify-between shadow-sm disabled:opacity-50"
+              >
+                <div className="flex items-center justify-between w-full mb-1">
+                  <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[10px] font-black border border-amber-500/30">
+                    Ultra-HD 4K
+                  </span>
+                  <ChevronRight size={14} className="text-zinc-500 group-hover:text-amber-400 transition-colors" />
+                </div>
+                <p className="text-[10px] text-zinc-400 leading-tight">
+                  Profil 4K 2160p (HDR / Atmos)
+                </p>
+              </button>
+            </div>
           </div>
         )}
 
@@ -1094,9 +1153,9 @@ export function DownloadModal({
                     1080p
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-white group-hover:text-blue-300 transition-colors flex items-center gap-1.5">
+                    <h4 className="text-xs font-bold text-white group-hover:text-blue-300 transition-colors flex items-center flex-wrap gap-1.5">
                       HD 1080p
-                      <span className="px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-400 text-[9px] font-bold border border-blue-500/20">Profil HD-1080p</span>
+                      <span className="px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-400 text-[9px] font-bold border border-blue-500/20 shrink-0">Profil HD-1080p</span>
                     </h4>
                     <p className="text-[11px] text-zinc-400 mt-0.5 leading-snug">
                       Fichiers optimisés (2 Go à 5 Go, téléchargement rapide)
@@ -1120,9 +1179,9 @@ export function DownloadModal({
                     4K
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-white group-hover:text-amber-300 transition-colors flex items-center gap-1.5">
+                    <h4 className="text-xs font-bold text-white group-hover:text-amber-300 transition-colors flex items-center flex-wrap gap-1.5">
                       Ultra-HD / 4K
-                      <span className="px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-300 text-[9px] font-bold border border-amber-500/20">Profil Ultra-HD</span>
+                      <span className="px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-300 text-[9px] font-bold border border-amber-500/20 shrink-0">Profil Ultra-HD</span>
                     </h4>
                     <p className="text-[11px] text-zinc-400 mt-0.5 leading-snug">
                       Qualité maximale 2160p (HDR / Atmos, fichiers volumineux)

@@ -109,6 +109,8 @@ export const useLiveDownloadStore = create<LiveDownloadState>((set, get) => ({
       tmdbId: item.tmdbId ? Number(item.tmdbId) : undefined,
       tvdbId: item.tvdbId ? Number(item.tvdbId) : undefined,
       imdbId: item.imdbId,
+      posterPath: item.posterPath,
+      backdropPath: item.backdropPath,
       seasonNumber: item.seasonNumber,
       episodeNumber: item.episodeNumber,
       size: item.size || 0,
@@ -269,16 +271,12 @@ export const useLiveDownloadStore = create<LiveDownloadState>((set, get) => ({
       const hasActive = downloads.some(d => d.progress < 100 && d.status !== 'completed' && d.status !== 'error');
       const hasError = get().error !== null;
 
-      // Fréquence adaptative : 3s si téléchargement actif, 10s si inactif/terminé, 15s si serveur hors ligne
-      let delay = 10000;
+      // Fréquence adaptative : 1s si téléchargement actif (pour mise à jour de vitesse en temps réel), 8s si inactif/terminé, 15s si serveur hors ligne
+      let delay = 8000;
       if (hasError) {
         delay = 15000;
       } else if (hasActive) {
-        delay = 3000;
-      }
-
-      if (intervalMs && intervalMs < delay && hasActive) {
-        delay = intervalMs;
+        delay = intervalMs || 1000;
       }
 
       pollingTimer = setTimeout(async () => {

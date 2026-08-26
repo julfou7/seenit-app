@@ -1308,6 +1308,8 @@ export interface LiveDownloadItem {
   tmdbId?: number;
   tvdbId?: number;
   imdbId?: string;
+  posterPath?: string;
+  backdropPath?: string;
   seasonNumber?: number;
   episodeNumber?: number;
   size: number;

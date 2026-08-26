@@ -215,32 +215,48 @@ export function DownloadsScreen({ onShowClick, onOpenSettings }: Props) {
 
                   <div className="relative z-10 flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 min-w-0 flex-1">
-                      <div className={cn(
-                        "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border",
-                        isError
-                          ? "bg-red-500/15 border-red-500/30 text-red-400"
-                          : isWarning
-                          ? "bg-amber-500/15 border-amber-500/30 text-amber-400"
-                          : item.mediaType === 'tv'
-                          ? "bg-purple-500/10 border-purple-500/20 text-purple-400"
-                          : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                      )}>
-                        {isError ? (
-                          <AlertCircle size={18} />
-                        ) : item.mediaType === 'tv' ? (
-                          <Tv size={18} />
-                        ) : (
-                          <Film size={18} />
-                        )}
-                      </div>
+                      {/* Image Affiche Poster (si disponible) ou Icône Type */}
+                      {item.posterPath ? (
+                        <div className="w-12 h-16 rounded-xl overflow-hidden border border-white/15 shadow-md shrink-0 bg-zinc-950 relative">
+                          <img 
+                            src={`https://image.tmdb.org/t/p/w185${item.posterPath}`} 
+                            alt={item.title}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                            onError={(e) => {
+                              // Fallback si l'image ne charge pas
+                              (e.target as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className={cn(
+                          "w-12 h-16 rounded-xl flex items-center justify-center shrink-0 border shadow-md",
+                          isError
+                            ? "bg-red-500/15 border-red-500/30 text-red-400"
+                            : isWarning
+                            ? "bg-amber-500/15 border-amber-500/30 text-amber-400"
+                            : item.mediaType === 'tv'
+                            ? "bg-purple-500/10 border-purple-500/20 text-purple-400"
+                            : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                        )}>
+                          {isError ? (
+                            <AlertCircle size={20} />
+                          ) : item.mediaType === 'tv' ? (
+                            <Tv size={20} />
+                          ) : (
+                            <Film size={20} />
+                          )}
+                        </div>
+                      )}
 
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                          <span className="font-bold text-sm text-white truncate max-w-[200px] sm:max-w-xs">
+                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                          <span className="font-extrabold text-sm text-white leading-snug break-words">
                             {item.title}
                           </span>
                           <span className={cn(
-                            "px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase",
+                            "px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase shrink-0",
                             item.downloadClient === 'Sonarr' ? "bg-sky-500/20 text-sky-300 border border-sky-500/30" :
                             item.downloadClient === 'Radarr' ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" :
                             "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
@@ -250,7 +266,7 @@ export function DownloadsScreen({ onShowClick, onOpenSettings }: Props) {
                         </div>
 
                         {item.releaseTitle && item.releaseTitle !== item.title && (
-                          <p className="text-[10px] sm:text-[11px] text-zinc-400 truncate mb-1 font-mono">
+                          <p className="text-[10px] sm:text-[11px] text-zinc-400 font-mono break-all leading-relaxed mb-1 bg-black/30 p-1 rounded border border-white/5">
                             {item.releaseTitle}
                           </p>
                         )}
