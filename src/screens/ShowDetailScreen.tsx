@@ -264,6 +264,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const isSeries = (show?.mediaType === 'tv') || (tmdbDetails?.number_of_seasons !== undefined);
 
   const releaseDateStr = isSeries ? (tmdbDetails?.first_air_date || (show as any)?.first_air_date) : (tmdbDetails?.release_date || (show as any)?.release_date);
+  const releaseYear = releaseDateStr ? releaseDateStr.slice(0, 4) : undefined;
   const isUnreleased = releaseDateStr ? new Date(releaseDateStr).getTime() > Date.now() : false;
 
   const [fetchError, setFetchError] = useState<boolean>(false);
