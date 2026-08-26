@@ -2098,20 +2098,6 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
 
                   <div className="h-px bg-white/5 my-0.5" />
 
-                  {/* Action Partager */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowMenu(false);
-                      handleShare();
-                    }}
-                    className="w-full px-4 py-3 text-left text-sm text-zinc-300 hover:bg-zinc-800 transition-colors flex items-center gap-3 font-semibold cursor-pointer active:bg-zinc-800"
-                  >
-                    <Share2 size={16} className="text-zinc-400" />
-                    <span>Partager {isSeries ? 'la série' : 'le film'}</span>
-                  </button>
-
                   {/* Action Synchroniser */}
                   {show && (
                     <button
@@ -2482,7 +2468,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                 )
               )}
 
-              {/* Boutons annexes Favoris & Partage */}
+              {/* Boutons annexes Favoris & Bande-annonce & Téléchargement */}
               {hasTrailer && (
                 <button
                   onClick={() => setTrailerModalVideos(ytVideos)}
@@ -2490,6 +2476,20 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                   title="Voir la bande-annonce"
                 >
                   <Clapperboard size={20} className="stroke-[2]" />
+                </button>
+              )}
+              {!isSeries && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDownloadTargetSeason(undefined);
+                    setDownloadTargetEpisode(undefined);
+                    setIsDownloadModalOpen(true);
+                  }}
+                  className="w-12 h-12 bg-blue-500/15 border border-blue-500/40 rounded-2xl flex items-center justify-center text-blue-400 hover:text-blue-300 hover:bg-blue-500/25 hover:border-blue-400/60 hover:shadow-[0_0_20px_rgba(59,130,246,0.25)] shrink-0 active:scale-95 transition-all cursor-pointer backdrop-blur-md"
+                  title="Télécharger le film (1080p / 4K)"
+                >
+                  <Download size={20} className="stroke-[2.2]" />
                 </button>
               )}
               {hasSeenMedia && (

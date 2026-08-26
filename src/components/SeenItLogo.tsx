@@ -299,11 +299,11 @@ export function SeenItLogo({
 }: SeenItLogoProps) {
   // Horizontal Brand Lockup (Icon + Typography)
   if (variant === 'horizontal') {
-    const glyphSize = Math.max(28, Math.round(size * 0.72));
-    const fontSize = Math.round(size * 0.48);
+    const glyphSize = Math.max(30, Math.round(size * 0.78));
+    const fontSize = Math.round(size * 0.50);
     return (
-      <div className={cn("inline-flex items-center gap-2 select-none transform-gpu", className)}>
-        <div className={cn("relative shrink-0 flex items-center justify-center -mt-[2px]", animated && "transition-transform duration-300 hover:scale-105")}>
+      <div className={cn("inline-flex items-center gap-2.5 select-none transform-gpu", className)}>
+        <div className={cn("relative shrink-0 flex items-center justify-center", animated && "transition-transform duration-300 hover:scale-105")}>
           <SeenItGlyph size={glyphSize} symbol={symbol} active={active} idPrefix={`seenit-h-${symbol}`} />
         </div>
         <div className="flex items-center tracking-tight font-black font-sans leading-none" style={{ fontSize: `${fontSize}px` }}>
