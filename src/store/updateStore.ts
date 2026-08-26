@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Capacitor } from '@capacitor/core';
 
-export const CURRENT_APP_VERSION = '1.3.66';
+export const CURRENT_APP_VERSION = '1.3.67';
 export const GITHUB_REPO = 'julfou7/seenit-app';
 export const GITHUB_PAT = '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';
 

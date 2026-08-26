@@ -29,7 +29,8 @@ export function SeenItGlyph({
   symbol = 'check',
   glow = true,
   active = true,
-  idPrefix = 'seenit'
+  idPrefix = 'seenit',
+  color = 'gold'
 }: { 
   size?: number; 
   className?: string; 
@@ -37,9 +38,11 @@ export function SeenItGlyph({
   glow?: boolean;
   active?: boolean;
   idPrefix?: string;
+  color?: 'gold' | 'blue';
 }) {
-  const gradientId = `${idPrefix}-gold-grad`;
-  const playGradId = `${idPrefix}-play-grad`;
+  const isBlue = color === 'blue' || symbol === 'download';
+  const gradientId = isBlue ? `${idPrefix}-blue-grad` : `${idPrefix}-gold-grad`;
+  const playGradId = isBlue ? `${idPrefix}-blue-symbol-grad` : `${idPrefix}-play-grad`;
   const glassId = `${idPrefix}-glass-grad`;
 
   // Scale stroke width slightly for small sizes to maintain crisp visibility
@@ -59,21 +62,37 @@ export function SeenItGlyph({
       style={{ overflow: 'visible' }}
     >
       <defs>
-        {/* Luxury Apple TV Gold Gradient */}
-        <linearGradient id={gradientId} x1="10%" y1="10%" x2="90%" y2="90%">
-          <stop offset="0%" stopColor="#FFF2B8" />
-          <stop offset="30%" stopColor="#F5C518" />
-          <stop offset="70%" stopColor="#E5A93D" />
-          <stop offset="100%" stopColor="#B37812" />
-        </linearGradient>
-
-        {/* High-Contrast Core Symbol Gradient */}
-        <linearGradient id={playGradId} x1="15%" y1="15%" x2="85%" y2="85%">
-          <stop offset="0%" stopColor="#FFFFFF" />
-          <stop offset="25%" stopColor="#FFEAA0" />
-          <stop offset="65%" stopColor="#F5C518" />
-          <stop offset="100%" stopColor="#D98A11" />
-        </linearGradient>
+        {isBlue ? (
+          <>
+            <linearGradient id={gradientId} x1="10%" y1="10%" x2="90%" y2="90%">
+              <stop offset="0%" stopColor="#93C5FD" />
+              <stop offset="30%" stopColor="#60A5FA" />
+              <stop offset="70%" stopColor="#3B82F6" />
+              <stop offset="100%" stopColor="#1D4ED8" />
+            </linearGradient>
+            <linearGradient id={playGradId} x1="15%" y1="15%" x2="85%" y2="85%">
+              <stop offset="0%" stopColor="#FFFFFF" />
+              <stop offset="25%" stopColor="#BFDBFE" />
+              <stop offset="65%" stopColor="#60A5FA" />
+              <stop offset="100%" stopColor="#2563EB" />
+            </linearGradient>
+          </>
+        ) : (
+          <>
+            <linearGradient id={gradientId} x1="10%" y1="10%" x2="90%" y2="90%">
+              <stop offset="0%" stopColor="#FFF2B8" />
+              <stop offset="30%" stopColor="#F5C518" />
+              <stop offset="70%" stopColor="#E5A93D" />
+              <stop offset="100%" stopColor="#B37812" />
+            </linearGradient>
+            <linearGradient id={playGradId} x1="15%" y1="15%" x2="85%" y2="85%">
+              <stop offset="0%" stopColor="#FFFFFF" />
+              <stop offset="25%" stopColor="#FFEAA0" />
+              <stop offset="65%" stopColor="#F5C518" />
+              <stop offset="100%" stopColor="#D98A11" />
+            </linearGradient>
+          </>
+        )}
 
         {/* Glass Screen Reflection Highlight */}
         <linearGradient id={glassId} x1="0%" y1="0%" x2="100%" y2="100%">
@@ -89,7 +108,7 @@ export function SeenItGlyph({
           cx="50" 
           cy="43" 
           r="22" 
-          fill="#E5A93D" 
+          fill={isBlue ? "#3B82F6" : "#E5A93D"} 
           opacity={size <= 28 ? "0.28" : "0.38"} 
           className="blur-[6px] pointer-events-none"
         />

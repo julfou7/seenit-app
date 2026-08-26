@@ -149,11 +149,21 @@ export function ToastContainer() {
     parsed.action?.toLowerCase().includes('favori')
   );
 
+  const isDownloadToast = Boolean(
+    type === 'download' ||
+    rawMsgStr.toLowerCase().includes('téléchargement') ||
+    rawMsgStr.toLowerCase().includes('recherche') ||
+    parsed.action?.toLowerCase().includes('téléchargement') ||
+    parsed.action?.toLowerCase().includes('recherche')
+  );
+
   const getAccentColor = () => {
+    if (isDownloadToast) return 'text-sky-400';
     if (isPlexToast) return 'text-[#E5A93D]';
     if (isReminderToast) return 'text-amber-400';
     if (isFavoriteToast) return 'text-rose-500';
     switch (type) {
+      case 'download': return 'text-sky-400';
       case 'success': return 'text-[#E5A93D]';
       case 'unfollow': return 'text-rose-400';
       case 'dropped': return 'text-amber-400';
@@ -167,10 +177,12 @@ export function ToastContainer() {
   };
 
   const getProgressColor = () => {
+    if (isDownloadToast) return 'bg-sky-500';
     if (isPlexToast) return 'bg-[#E5A93D]';
     if (isReminderToast) return 'bg-amber-500';
     if (isFavoriteToast) return 'bg-rose-500';
     switch (type) {
+      case 'download': return 'bg-sky-500';
       case 'archive': return 'bg-zinc-500';
       case 'dropped': return 'bg-amber-500';
       case 'follow': return 'bg-sky-500';
@@ -184,6 +196,9 @@ export function ToastContainer() {
   };
 
   const renderIcon = () => {
+    if (isDownloadToast) {
+      return <SeenItGlyph size={17} symbol="download" color="blue" glow={false} idPrefix="toast-dl" className="shrink-0" />;
+    }
     if (isPlexToast) {
       return <PlexLogo className="w-4 h-4 text-[#E5A93D] shrink-0" />;
     }
@@ -205,6 +220,7 @@ export function ToastContainer() {
     }
     const iconClass = cn("shrink-0", getAccentColor());
     switch (type) {
+      case 'download': return <SeenItGlyph size={17} symbol="download" color="blue" glow={false} idPrefix="toast-dl-type" className="shrink-0" />;
       case 'archive': return <Archive size={14} className={iconClass} />;
       case 'unfollow': return <Trash2 size={14} className={iconClass} />;
       case 'dropped': return <Ban size={14} className={iconClass} />;

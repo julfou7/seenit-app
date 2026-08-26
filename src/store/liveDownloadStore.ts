@@ -43,10 +43,21 @@ async function checkAndRequestNotificationPermission() {
   }
 }
 
+function normalizeTitleForMatch(str?: string): string {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .replace(/\(\d{4}\)/g, '')
+    .replace(/s\d{1,2}e\d{1,2}.*/gi, '')
+    .split(':')[0]
+    .replace(/[^a-z0-9]/g, '')
+    .trim();
+}
+
 function sendLocalNotification(title: string, body: string, isSuccess: boolean = false) {
   // Always trigger in-app toast for instantaneous feedback
   try {
-    useToastStore.getState().showToast(`${title}: ${body}`, isSuccess ? 'success' : 'info');
+    useToastStore.getState().showToast(`${title}: ${body}`, isSuccess ? 'success' : 'download');
   } catch (e) {}
 
   if (!Capacitor.isNativePlatform()) {
@@ -161,6 +172,24 @@ export const useLiveDownloadStore = create<LiveDownloadState>((set, get) => ({
       // Filtrer les éléments supprimés manuellement par l'utilisateur
       const serverItems = rawServerItems.filter(si => !removedDownloadIds.has(si.id));
 
+      // Conserver les affiches / métadonnées (posterPath, tmdbId) sur les items serveur depuis la liste courante (optimistes ou polling précédent)
+      serverItems.forEach(si => {
+        const match = currentDownloads.find(d => {
+          if (d.id === si.id) return true;
+          if (d.tmdbId && si.tmdbId && Number(d.tmdbId) === Number(si.tmdbId)) return true;
+          if (d.tvdbId && si.tvdbId && Number(d.tvdbId) === Number(si.tvdbId)) return true;
+          const normD = normalizeTitleForMatch(d.title || d.seriesTitle || d.movieTitle);
+          const normSi = normalizeTitleForMatch(si.title || si.seriesTitle || si.movieTitle || si.releaseTitle);
+          return Boolean(normD && normSi && (normD === normSi || normD.includes(normSi) || normSi.includes(normD)));
+        });
+        if (match) {
+          if (!si.posterPath && match.posterPath) si.posterPath = match.posterPath;
+          if (!si.tmdbId && match.tmdbId) si.tmdbId = match.tmdbId;
+          if (!si.tvdbId && match.tvdbId) si.tvdbId = match.tvdbId;
+          if (!si.backdropPath && match.backdropPath) si.backdropPath = match.backdropPath;
+        }
+      });
+
       // 1. Nettoyer les items optimistes
       const now = Date.now();
       const currentOptimistic = currentDownloads.filter(d => d.isOptimistic && !removedDownloadIds.has(d.id));
@@ -168,6 +197,8 @@ export const useLiveDownloadStore = create<LiveDownloadState>((set, get) => ({
 
       for (const opt of currentOptimistic) {
         const age = now - (optimisticTimestamps[opt.id] || 0);
+        const normOpt = normalizeTitleForMatch(opt.title || opt.movieTitle || opt.seriesTitle);
+
         const matchedOnServer = serverItems.some(si => {
           if (opt.mediaType === 'tv' && si.mediaType === 'tv') {
             if (opt.tmdbId && si.tmdbId && Number(opt.tmdbId) === Number(si.tmdbId)) {
@@ -180,13 +211,17 @@ export const useLiveDownloadStore = create<LiveDownloadState>((set, get) => ({
           if (opt.mediaType === 'movie' && si.mediaType === 'movie') {
             if (opt.tmdbId && si.tmdbId && Number(opt.tmdbId) === Number(si.tmdbId)) return true;
           }
-          if (opt.title && si.title && (opt.title.toLowerCase().includes(si.title.toLowerCase()) || si.title.toLowerCase().includes(opt.title.toLowerCase()))) {
+          if (opt.tvdbId && si.tvdbId && Number(opt.tvdbId) === Number(si.tvdbId)) return true;
+          
+          const normSi = normalizeTitleForMatch(si.title || si.seriesTitle || si.movieTitle || si.releaseTitle);
+          if (normOpt && normSi && (normOpt === normSi || normOpt.includes(normSi) || normSi.includes(normOpt))) {
             return true;
           }
           return false;
         });
 
-        if (!matchedOnServer && age < 25000) {
+        // Si l'item serveur correspond ou si l'item optimiste a dépassé 15s sans confirmation, on le retire au profit du serveur
+        if (!matchedOnServer && age < 15000) {
           validOptimistic.push(opt);
         } else {
           delete optimisticTimestamps[opt.id];
@@ -194,7 +229,6 @@ export const useLiveDownloadStore = create<LiveDownloadState>((set, get) => ({
       }
 
       // 2. Conserver les téléchargements terminés (disparus de la file active du serveur)
-      // Ils restent affichés dans "Téléchargements" jusqu'à ce que l'utilisateur clique sur la croix rouge.
       const preservedCompletedItems: LiveDownloadItem[] = [];
       for (const oldItem of currentDownloads) {
         if (removedDownloadIds.has(oldItem.id)) continue;
@@ -260,7 +294,10 @@ export const useLiveDownloadStore = create<LiveDownloadState>((set, get) => ({
   },
 
   startPolling: (intervalMs) => {
-    if (get().isPolling && pollingTimer) return;
+    if (pollingTimer) {
+      clearTimeout(pollingTimer);
+      pollingTimer = null;
+    }
 
     set({ isPolling: true });
     get().fetchDownloads();
@@ -271,7 +308,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>((set, get) => ({
       const hasActive = downloads.some(d => d.progress < 100 && d.status !== 'completed' && d.status !== 'error');
       const hasError = get().error !== null;
 
-      // Fréquence adaptative : 1s si téléchargement actif (pour mise à jour de vitesse en temps réel), 8s si inactif/terminé, 15s si serveur hors ligne
+      // Fréquence adaptative : 1s si téléchargement actif, 8s si inactif, 15s si erreur
       let delay = 8000;
       if (hasError) {
         delay = 15000;

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Show } from '../types';
 
-export type ToastType = 'archive' | 'unfollow' | 'dropped' | 'success' | 'info' | 'follow' | 'error' | 'reminder' | 'favorite';
+export type ToastType = 'archive' | 'unfollow' | 'dropped' | 'success' | 'info' | 'follow' | 'error' | 'reminder' | 'favorite' | 'download';
 
 export interface ToastMessageObj {
   title?: string;
