@@ -997,7 +997,7 @@ async function startServer() {
     }
   });
 
-  // Proxy pour les requêtes vers les services tiers (Sonarr, Radarr, etc.) en mode Web
+  // Proxy pour les requêtes vers les services tiers (Sonarr, Radarr, qBittorrent, etc.) en mode Web
   app.post('/api/service-proxy', async (req, res) => {
     try {
       const { targetUrl, method = 'GET', headers = {}, body } = req.body;
@@ -1014,18 +1014,31 @@ async function startServer() {
         });
       }
 
+      // Dériver Origin et Referer automatiquement pour qBittorrent et autres services avec vérification CSRF / Host
+      let origin = headers['Origin'] || headers['origin'];
+      let referer = headers['Referer'] || headers['referer'];
+      try {
+        const parsedUrl = new URL(targetUrl);
+        if (!origin) origin = parsedUrl.origin;
+        if (!referer) referer = `${parsedUrl.origin}/`;
+      } catch {}
+
+      const cleanHeaders: Record<string, string> = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 SeenIt/1.0',
+        ...headers
+      };
+      if (origin && !cleanHeaders['Origin'] && !cleanHeaders['origin']) cleanHeaders['Origin'] = origin;
+      if (referer && !cleanHeaders['Referer'] && !cleanHeaders['referer']) cleanHeaders['Referer'] = referer;
+
       const fetchOptions: any = {
         method,
-        headers: {
-          ...headers,
-          'User-Agent': 'SeenIt-Proxy/1.0'
-        },
-        signal: AbortSignal.timeout(6000)
+        headers: cleanHeaders,
+        signal: AbortSignal.timeout(10000)
       };
 
-      if (method !== 'GET' && method !== 'HEAD' && body) {
+      if (method !== 'GET' && method !== 'HEAD' && body !== undefined && body !== null) {
         fetchOptions.body = typeof body === 'string' ? body : JSON.stringify(body);
-        if (!fetchOptions.headers['Content-Type'] && typeof body !== 'string') {
+        if (!fetchOptions.headers['Content-Type'] && !fetchOptions.headers['content-type'] && typeof body !== 'string') {
           fetchOptions.headers['Content-Type'] = 'application/json';
         }
       }
@@ -1037,19 +1050,31 @@ async function startServer() {
         data = JSON.parse(text);
       } catch {}
 
-      res.status(response.status).json({
+      const responseHeaders: Record<string, string> = {};
+      response.headers.forEach((val, key) => {
+        responseHeaders[key.toLowerCase()] = val;
+      });
+      const setCookie = response.headers.get('set-cookie');
+
+      res.status(200).json({
         status: response.status,
         ok: response.ok,
-        data
+        data,
+        headers: responseHeaders,
+        cookie: setCookie
       });
     } catch (err: any) {
       if (err?.name === 'TimeoutError' || err?.message?.includes('aborted') || err?.message?.includes('timeout')) {
-        return res.status(504).json({
+        return res.status(200).json({
+          status: 504,
+          ok: false,
           error: 'TIMEOUT',
           message: 'Délai d\'attente dépassé (timeout) pour joindre le service cible.'
         });
       }
-      res.status(500).json({
+      res.status(200).json({
+        status: 500,
+        ok: false,
         error: 'PROXY_FETCH_ERROR',
         message: err?.message || 'Erreur lors de la requête proxy'
       });

@@ -113,22 +113,27 @@ export async function executeGet(url: string, headers: Record<string, string> = 
             method: 'GET',
             headers
           }),
-          signal: AbortSignal.timeout(6000)
+          signal: AbortSignal.timeout(10000)
         });
 
-        const json = await res.json();
-        if (res.ok && !json.error) {
+        const rawText = await res.text();
+        let json: any = {};
+        try {
+          json = JSON.parse(rawText);
+        } catch {
+          throw new Error(`Réponse inattendue (${res.status})`);
+        }
+
+        if (json.ok && !json.error) {
           return json.data;
         }
-        throw new Error(json.message || json.error || `Erreur proxy ${res.status}`);
+
+        if (json.status === 401 || json.status === 403) {
+          throw new Error(`Accès refusé (${json.status}) : Authentification ou clé API requise / invalide`);
+        }
+
+        throw new Error(json.message || json.error || `Erreur proxy ${json.status || res.status}`);
       } catch (proxyErr: any) {
-        // Fallback fetch direct si le proxy échoue
-        try {
-          const directRes = await fetch(url, { headers, signal: AbortSignal.timeout(4000) });
-          if (directRes.ok) {
-            return await directRes.json();
-          }
-        } catch {}
         throw new Error(proxyErr?.message || 'Impossible de joindre le service');
       }
     }
@@ -209,31 +214,27 @@ async function executePost(url: string, body: any, headers: Record<string, strin
             headers,
             body
           }),
-          signal: AbortSignal.timeout(10000)
+          signal: AbortSignal.timeout(12000)
         });
 
-        const json = await res.json();
-        if (!res.ok || json.error) {
-          throw new Error(json.message || json.error || `Erreur proxy ${res.status}`);
-        }
-        return json.data;
-      } catch (proxyErr: any) {
-        // Tentative direct fetch si proxy échoue
+        const rawText = await res.text();
+        let json: any = {};
         try {
-          const directRes = await fetch(url, {
-            method: 'POST',
-            headers: {
-              ...headers,
-              'Content-Type': headers['Content-Type'] || (typeof body === 'string' ? 'application/x-www-form-urlencoded' : 'application/json')
-            },
-            body: typeof body === 'string' ? body : JSON.stringify(body),
-            signal: AbortSignal.timeout(6000)
-          });
-          if (directRes.ok) {
-            const text = await directRes.text();
-            try { return JSON.parse(text); } catch { return text || { success: true }; }
-          }
-        } catch {}
+          json = JSON.parse(rawText);
+        } catch {
+          throw new Error(`Réponse inattendue (${res.status})`);
+        }
+
+        if (json.ok && !json.error) {
+          return json.data;
+        }
+
+        if (json.status === 401 || json.status === 403) {
+          throw new Error(`Accès refusé (${json.status}) : Identifiants ou clé API incorrects`);
+        }
+
+        throw new Error(json.message || json.error || `Erreur proxy ${json.status || res.status}`);
+      } catch (proxyErr: any) {
         throw new Error(proxyErr?.message || 'Erreur réseau');
       }
     }
@@ -311,14 +312,26 @@ async function executePut(url: string, body: any, headers: Record<string, string
             headers,
             body
           }),
-          signal: AbortSignal.timeout(10000)
+          signal: AbortSignal.timeout(12000)
         });
 
-        const json = await res.json();
-        if (!res.ok || json.error) {
-          throw new Error(json.message || json.error || `Erreur proxy ${res.status}`);
+        const rawText = await res.text();
+        let json: any = {};
+        try {
+          json = JSON.parse(rawText);
+        } catch {
+          throw new Error(`Réponse inattendue (${res.status})`);
         }
-        return json.data;
+
+        if (json.ok && !json.error) {
+          return json.data;
+        }
+
+        if (json.status === 401 || json.status === 403) {
+          throw new Error(`Accès refusé (${json.status}) : Identifiants ou clé API incorrects`);
+        }
+
+        throw new Error(json.message || json.error || `Erreur proxy ${json.status || res.status}`);
       } catch (err: any) {
         throw new Error(err?.message || 'Erreur réseau');
       }
@@ -367,14 +380,22 @@ export async function executeDelete(url: string, headers: Record<string, string>
             method: 'DELETE',
             headers
           }),
-          signal: AbortSignal.timeout(8000)
+          signal: AbortSignal.timeout(10000)
         });
 
-        const json = await res.json();
-        if (!res.ok || json.error) {
-          throw new Error(json.message || json.error || `Erreur proxy ${res.status}`);
+        const rawText = await res.text();
+        let json: any = {};
+        try {
+          json = JSON.parse(rawText);
+        } catch {
+          throw new Error(`Réponse inattendue (${res.status})`);
         }
-        return json.data;
+
+        if (json.ok && !json.error) {
+          return json.data;
+        }
+
+        throw new Error(json.message || json.error || `Erreur proxy ${json.status || res.status}`);
       } catch (err: any) {
         throw new Error(err?.message || 'Erreur réseau');
       }
@@ -535,20 +556,41 @@ export async function loginQBittorrent(
             method: 'POST',
             headers: {
               'Content-Type': 'application/x-www-form-urlencoded',
-              'Referer': base,
+              'Referer': `${base}/`,
               'Origin': base
             },
             body: `username=${encodeURIComponent(username || '')}&password=${encodeURIComponent(password || '')}`
           }),
-          signal: AbortSignal.timeout(8000)
+          signal: AbortSignal.timeout(10000)
         });
 
-        const json = await res.json();
-        const bodyStr = typeof json.data === 'string' ? json.data : JSON.stringify(json.data || '');
-        if (bodyStr.trim() === 'Fails.') {
-          return { success: false, message: 'Identifiants qBittorrent incorrects' };
+        const rawText = await res.text();
+        let json: any = {};
+        try {
+          json = JSON.parse(rawText);
+        } catch {
+          return { success: false, message: 'Réponse inattendue du proxy' };
         }
-        return { success: true };
+
+        const bodyStr = typeof json.data === 'string' ? json.data : JSON.stringify(json.data || '');
+        if (bodyStr.trim() === 'Fails.' || json.status === 401 || json.status === 403) {
+          return { success: false, message: 'Identifiants qBittorrent incorrects (nom d\'utilisateur ou mot de passe)' };
+        }
+        if (!json.ok && json.error) {
+          return { success: false, message: json.message || `Erreur proxy (${json.status || 500})` };
+        }
+
+        // Récupérer le cookie SID
+        let cookieHeader = '';
+        if (json.cookie) {
+          cookieHeader = json.cookie.split(';')[0];
+        } else if (json.headers && json.headers['set-cookie']) {
+          const raw = json.headers['set-cookie'];
+          const cookieStr = Array.isArray(raw) ? raw[0] : String(raw);
+          cookieHeader = cookieStr.split(';')[0];
+        }
+
+        return { success: true, cookie: cookieHeader };
       } catch (err: any) {
         return { success: false, message: err?.message || 'Erreur réseau' };
       }
@@ -598,21 +640,21 @@ export async function testServiceConnection(
 
       const headers: Record<string, string> = {
         'Accept': 'text/plain, application/json',
-        'Referer': base,
+        'Referer': `${base}/`,
         'Origin': base
       };
       if (cookieHeader) headers['Cookie'] = cookieHeader;
 
       try {
         const data = await executeGet(`${base}/api/v2/app/version`, headers);
-        const versionStr = typeof data === 'string' ? data.trim() : 'Web UI';
+        const versionStr = typeof data === 'string' ? data.trim() : (data?.version || 'Web UI');
         return {
           success: true,
           message: `Connecté avec succès à qBittorrent (${versionStr})`,
           version: versionStr
         };
       } catch (err: any) {
-        if (!username && !password && (err?.message?.includes('403') || err?.message?.includes('401'))) {
+        if (!username && !password && (err?.message?.includes('403') || err?.message?.includes('401') || err?.message?.includes('Accès refusé'))) {
           return {
             success: false,
             message: 'Authentification requise : Veuillez renseigner le nom d\'utilisateur et le mot de passe qBittorrent'
