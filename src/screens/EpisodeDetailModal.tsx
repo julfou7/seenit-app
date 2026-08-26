@@ -961,6 +961,16 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
 
                   {/* Bouton Télécharger l'épisode ou Badge de Disponibilité */}
                   {(() => {
+                    const isUnreleased = currentEpisode?.air_date ? new Date(currentEpisode.air_date).getTime() > Date.now() : false;
+                    if (isUnreleased) {
+                      return (
+                        <div className="w-full py-3 px-4 rounded-2xl flex items-center justify-center gap-2.5 bg-zinc-800/50 border border-zinc-700 text-zinc-400 font-bold text-xs shadow-sm select-none">
+                          <Clock size={16} className="text-zinc-500 shrink-0" />
+                          <span>Bientôt disponible</span>
+                        </div>
+                      );
+                    }
+
                     const epKey = `S${currentSeason}E${currentEpisode?.episode_number}`;
                     const isEpisodeAvailable = presence.episodesHasFile[epKey] || presence.seasonsHasFile[currentSeason] || (presence.hasFile && (presence.plexInfo?.available || presence.sonarrHasFile));
 
@@ -969,7 +979,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                         <div className="flex flex-col gap-2 w-full">
                           <div className="w-full py-3 px-4 rounded-2xl flex items-center justify-center gap-2.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-xs shadow-sm select-none">
                             <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
-                            <span>{presence.plexInfo?.available ? "Épisode disponible sur Plex" : "Épisode disponible"}</span>
+                            <span>{presence.plexInfo?.available ? "Épisode disponible sur Plex" : "Téléchargé"}</span>
                           </div>
 
                           {presence.plexInfo?.available && (
@@ -982,6 +992,15 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                               <span>Ouvrir dans Plex</span>
                             </button>
                           )}
+
+                          <button
+                            type="button"
+                            onClick={() => setIsDownloadOpen(true)}
+                            className="w-full py-2.5 px-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] bg-blue-600/15 hover:bg-blue-600/25 border border-blue-500/30 text-blue-400 font-bold text-xs cursor-pointer shadow-sm touch-manipulation select-none"
+                          >
+                            <Download size={16} className="text-blue-400 shrink-0" />
+                            <span>Forcer le téléchargement</span>
+                          </button>
                         </div>
                       );
                     }

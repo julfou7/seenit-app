@@ -1306,6 +1306,8 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
               existing.timeleftSeconds = etaSec;
               existing.timeleft = formatSecondsToETA(etaSec);
             }
+            existing.progress = rawProgress;
+            existing.sizeleft = Math.round((t.size || 0) * (1 - (t.progress || 0)));
           } else {
             items.push({
               id: `qbit_${t.hash || t.name}`,

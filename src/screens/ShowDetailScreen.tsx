@@ -263,6 +263,9 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const title = show?.title || tmdbDetails?.name || tmdbDetails?.title || 'Chargement...';
   const isSeries = (show?.mediaType === 'tv') || (tmdbDetails?.number_of_seasons !== undefined);
 
+  const releaseDateStr = isSeries ? (tmdbDetails?.first_air_date || (show as any)?.first_air_date) : (tmdbDetails?.release_date || (show as any)?.release_date);
+  const isUnreleased = releaseDateStr ? new Date(releaseDateStr).getTime() > Date.now() : false;
+
   const [fetchError, setFetchError] = useState<boolean>(false);
   const [collectionData, setCollectionData] = useState<any>(null);
   const [universeData, setUniverseData] = useState<any>(null);
@@ -1919,7 +1922,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                     <>
                       <div className="w-full px-4 py-2.5 flex items-center gap-3 text-sm font-semibold text-emerald-400 bg-emerald-500/10">
                         <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
-                        <span>{presence.plexInfo?.available ? "Disponible sur Plex" : "Présent sur le serveur"}</span>
+                        <span>{presence.plexInfo?.available ? "Disponible sur Plex" : "Téléchargé"}</span>
                       </div>
                       {presence.plexInfo?.available && (
                         <button
@@ -1935,7 +1938,26 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                           <span>Ouvrir dans Plex</span>
                         </button>
                       )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowMenu(false);
+                          setDownloadTargetSeason(undefined);
+                          setDownloadTargetEpisode(undefined);
+                          setIsDownloadModalOpen(true);
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-blue-400 hover:bg-zinc-800 transition-colors flex items-center gap-3 font-semibold cursor-pointer active:bg-zinc-800"
+                      >
+                        <Download size={16} className="text-blue-400 shrink-0" />
+                        <span>Forcer le téléchargement</span>
+                      </button>
                     </>
+                  ) : isUnreleased ? (
+                    <div className="w-full px-4 py-3 text-left text-sm text-zinc-500 italic flex items-center gap-3 font-semibold">
+                      <Clock size={16} className="text-zinc-500" />
+                      <span>Bientôt disponible</span>
+                    </div>
                   ) : (
                     <button
                       type="button"
@@ -2673,7 +2695,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                       <div className="flex items-center gap-2 flex-wrap">
                         <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 text-xs font-bold shadow-sm">
                           <CheckCircle2 size={14} className="shrink-0 text-emerald-400" />
-                          <span>{presence.plexInfo?.available ? "Sur Plex" : "Disponible"}</span>
+                          <span>{presence.plexInfo?.available ? "Sur Plex" : "Téléchargé"}</span>
                         </div>
                         {presence.plexInfo?.available && (
                           <button
@@ -2687,6 +2709,11 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                           </button>
                         )}
                       </div>
+                    ) : isUnreleased ? (
+                      <p className="text-xs text-zinc-500 italic font-medium flex items-center gap-1.5">
+                        <Clock size={14} />
+                        <span>Bientôt disponible</span>
+                      </p>
                     ) : (
                       <>
                         <p className="text-xs text-zinc-500 italic">
@@ -2853,6 +2880,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
 
                   {/* Bouton Télécharger la saison ou Badge de Disponibilité */}
                   {(() => {
+                    if (isFutureSeason) return null;
                     const isSeasonAvailable = presence.seasonsHasFile[seasonNum] || (presence.hasFile && (presence.plexInfo?.available || presence.sonarrHasFile));
                     if (isSeasonAvailable) {
                       return (
@@ -2935,6 +2963,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                             const isSeen = show?.seenEpisodes?.includes(epKey);
                             const isFutureEp = ep.air_date ? ep.air_date > todayStr : false;
                             const epDownload = getEpisodeDownload(effectiveTmdbId, tmdbDetails?.external_ids?.tvdb_id || (show as any)?.tvdbId, season.season_number, ep.episode_number);
+                            const epHasFile = presence.episodesHasFile[`S${season.season_number}E${ep.episode_number}`] || presence.seasonsHasFile[season.season_number] || (presence.hasFile && (presence.plexInfo?.available || presence.sonarrHasFile));
 
                             return (
                               <div 
@@ -2962,20 +2991,10 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                                        );
                                      })()}
 
-                                     {(() => {
-                                       const epHasFile = presence.episodesHasFile[`S${season.season_number}E${ep.episode_number}`] || presence.seasonsHasFile[season.season_number] || (presence.hasFile && (presence.plexInfo?.available || presence.sonarrHasFile));
-                                       if (!epHasFile) return null;
-                                       return (
-                                         <span className="inline-block bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold uppercase px-2 py-0.5 rounded-md mb-1 w-max">
-                                           Disponible
-                                         </span>
-                                       );
-                                     })()}
-
-                                     {epDownload && (
-                                       <div className="mb-1">
-                                         <LiveDownloadBanner items={[epDownload]} compact={true} />
-                                       </div>
+                                     {epHasFile && (
+                                       <span className="inline-block bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold uppercase px-2 py-0.5 rounded-md mb-1 w-max">
+                                         Téléchargé
+                                       </span>
                                      )}
                                    </div>
                                    <p className={cn("text-[14px] font-bold truncate leading-tight", isSeen ? "text-zinc-500 line-through" : "text-zinc-200")}>{ep.name}</p>
@@ -2984,20 +3003,42 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                                    </p>
                                 </div>
 
-                                {!isFutureEp && (
-                                  <button 
-                                    onClick={(e) => toggleEpisodeSeen(e, season.season_number, ep.episode_number)}
-                                    className="p-2 shrink-0 touch-manipulation active:scale-90 transition-transform"
-                                  >
-                                    {isSeen ? (
-                                      <div className="w-6 h-6 rounded-full border border-emerald-500 flex items-center justify-center bg-emerald-500/15">
-                                        <Check size={14} className="text-emerald-400 stroke-[3]" />
-                                      </div>
-                                    ) : (
-                                      <div className="w-6 h-6 rounded-full border border-zinc-700" />
-                                    )}
-                                  </button>
-                                )}
+                                <div className="flex flex-col gap-2 shrink-0 items-end">
+                                  {epDownload ? (
+                                    <div className="scale-[0.85] origin-right" onClick={(e) => e.stopPropagation()}>
+                                      <LiveDownloadBanner items={[epDownload]} compact={true} />
+                                    </div>
+                                  ) : !isFutureEp && !epHasFile ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDownloadTargetSeason(season.season_number);
+                                        setDownloadTargetEpisode(ep.episode_number);
+                                        setIsDownloadModalOpen(true);
+                                      }}
+                                      className="p-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 transition-colors active:scale-95 touch-manipulation cursor-pointer"
+                                      title="Télécharger l'épisode"
+                                    >
+                                      <Download size={14} className="text-blue-400" />
+                                    </button>
+                                  ) : null}
+
+                                  {!isFutureEp && (
+                                    <button 
+                                      onClick={(e) => toggleEpisodeSeen(e, season.season_number, ep.episode_number)}
+                                      className="p-1.5 touch-manipulation active:scale-90 transition-transform"
+                                    >
+                                      {isSeen ? (
+                                        <div className="w-5 h-5 rounded-full border border-emerald-500 flex items-center justify-center bg-emerald-500/15">
+                                          <Check size={12} className="text-emerald-400 stroke-[3]" />
+                                        </div>
+                                      ) : (
+                                        <div className="w-5 h-5 rounded-full border border-zinc-700" />
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             );
                           })
