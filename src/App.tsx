@@ -9,7 +9,7 @@ import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
 import { SplashScreen as CapSplashScreen } from '@capacitor/splash-screen';
 import { StatusBar, Style } from '@capacitor/status-bar';
-import { auth, db } from './lib/firebase';
+import { auth, db, requestNotificationPermission } from './lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { LoginScreen } from './screens/LoginScreen';
 import { SplashScreen } from './components/SplashScreen';

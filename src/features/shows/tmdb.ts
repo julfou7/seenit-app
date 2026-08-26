@@ -328,6 +328,10 @@ class TMDBClient {
       if (searchRes.ok && searchRes.value?.results) {
         const exactMatches = searchRes.value.results.filter((res: any) => {
           if (isAdultOrParodyMedia(res)) return false;
+          
+          // Exclure les faux positifs (comme les vieux films obscurs) basés sur la popularité/votes
+          if ((res.vote_count || 0) < 50 && (res.popularity || 0) < 15) return false;
+          
           const resTitle = res.title || res.name || res.original_title || res.original_name;
           if (!resTitle) return false;
           
