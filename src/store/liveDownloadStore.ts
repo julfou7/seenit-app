@@ -28,6 +28,7 @@ import { useToastStore } from './toastStore';
 let pollingTimer: any = null;
 let isFetchingInProgress = false;
 const optimisticTimestamps: Record<string, number> = {};
+const removedDownloadIds = new Set<string>();
 
 async function checkAndRequestNotificationPermission() {
   if (!Capacitor.isNativePlatform()) return false;
@@ -145,7 +146,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>((set, get) => ({
     isFetchingInProgress = true;
     try {
       const currentDownloads = get().downloads;
-      const serverItems = await fetchLiveDownloadsQueue({
+      const rawServerItems = await fetchLiveDownloadsQueue({
         sonarrUrl: config.sonarrUrl,
         sonarrApiKey: config.sonarrApiKey,
         radarrUrl: config.radarrUrl,
@@ -155,14 +156,16 @@ export const useLiveDownloadStore = create<LiveDownloadState>((set, get) => ({
         qbittorrentPassword: config.qbittorrentPassword,
       });
 
-      // Nettoyer les items optimistes
+      // Filtrer les éléments supprimés manuellement par l'utilisateur
+      const serverItems = rawServerItems.filter(si => !removedDownloadIds.has(si.id));
+
+      // 1. Nettoyer les items optimistes
       const now = Date.now();
-      const currentOptimistic = currentDownloads.filter(d => d.isOptimistic);
+      const currentOptimistic = currentDownloads.filter(d => d.isOptimistic && !removedDownloadIds.has(d.id));
       const validOptimistic: LiveDownloadItem[] = [];
 
       for (const opt of currentOptimistic) {
         const age = now - (optimisticTimestamps[opt.id] || 0);
-        // Si le serveur a déjà renvoyé un élément correspondant, on supprime l'optimiste
         const matchedOnServer = serverItems.some(si => {
           if (opt.mediaType === 'tv' && si.mediaType === 'tv') {
             if (opt.tmdbId && si.tmdbId && Number(opt.tmdbId) === Number(si.tmdbId)) {
@@ -181,7 +184,6 @@ export const useLiveDownloadStore = create<LiveDownloadState>((set, get) => ({
           return false;
         });
 
-        // Si non trouvé sur le serveur et âgé de moins de 25 secondes, on le garde temporairement
         if (!matchedOnServer && age < 25000) {
           validOptimistic.push(opt);
         } else {
@@ -189,10 +191,39 @@ export const useLiveDownloadStore = create<LiveDownloadState>((set, get) => ({
         }
       }
 
-      // Fusionner les items réels du serveur + les optimistes récents
-      const finalItems = [...serverItems, ...validOptimistic];
+      // 2. Conserver les téléchargements terminés (disparus de la file active du serveur)
+      // Ils restent affichés dans "Téléchargements" jusqu'à ce que l'utilisateur clique sur la croix rouge.
+      const preservedCompletedItems: LiveDownloadItem[] = [];
+      for (const oldItem of currentDownloads) {
+        if (removedDownloadIds.has(oldItem.id)) continue;
+        if (oldItem.isOptimistic) continue;
 
-      // Vérifier les notifications de téléchargements terminés et démarrés
+        const existsOnServer = serverItems.some(si => si.id === oldItem.id);
+        if (!existsOnServer) {
+          preservedCompletedItems.push({
+            ...oldItem,
+            progress: 100,
+            sizeleft: 0,
+            status: 'completed',
+            statusText: 'Téléchargement terminé 🍿',
+            speedBytesPerSec: 0,
+            speedFormatted: '',
+            timeleft: '',
+            timeleftSeconds: 0
+          });
+        }
+      }
+
+      // Fusionner items serveur + terminés conservés + optimistes
+      const itemMap = new Map<string, LiveDownloadItem>();
+      for (const item of [...serverItems, ...preservedCompletedItems, ...validOptimistic]) {
+        if (!removedDownloadIds.has(item.id)) {
+          itemMap.set(item.id, item);
+        }
+      }
+      const finalItems = Array.from(itemMap.values());
+
+      // Notifications
       if (currentDownloads.length > 0) {
         serverItems.forEach(newItem => {
           const wasPresent = currentDownloads.find(oldItem => oldItem.id === newItem.id);
@@ -204,7 +235,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>((set, get) => ({
         currentDownloads.forEach(oldItem => {
           if (oldItem.isOptimistic) return;
           const newItem = serverItems.find(it => it.id === oldItem.id);
-          if (!newItem && oldItem.progress > 80) {
+          if (!newItem && oldItem.progress > 80 && oldItem.status !== 'completed') {
             sendLocalNotification('Téléchargement terminé 🍿', `Le téléchargement de "${oldItem.title}" est terminé !`, true);
           } else if (newItem && newItem.progress === 100 && oldItem.progress < 100) {
             sendLocalNotification('Téléchargement terminé 🍿', `Le téléchargement de "${newItem.title}" est terminé !`, true);
@@ -219,35 +250,58 @@ export const useLiveDownloadStore = create<LiveDownloadState>((set, get) => ({
         error: null,
       });
     } catch (e: any) {
-      console.warn('[LiveDownloadStore] Erreur lors de la mise à jour:', e);
+      // Ignorer silencieusement si c'est une déconnexion ponctuelle
       set({ error: e?.message || 'Erreur réseau', isLoading: false });
     } finally {
       isFetchingInProgress = false;
     }
   },
 
-  startPolling: (intervalMs = 1000) => {
+  startPolling: (intervalMs) => {
     if (get().isPolling && pollingTimer) return;
 
     set({ isPolling: true });
     get().fetchDownloads();
 
-    pollingTimer = setInterval(() => {
-      get().fetchDownloads();
-    }, intervalMs);
+    const scheduleNext = () => {
+      if (!get().isPolling) return;
+      const downloads = get().downloads;
+      const hasActive = downloads.some(d => d.progress < 100 && d.status !== 'completed' && d.status !== 'error');
+      const hasError = get().error !== null;
+
+      // Fréquence adaptative : 3s si téléchargement actif, 10s si inactif/terminé, 15s si serveur hors ligne
+      let delay = 10000;
+      if (hasError) {
+        delay = 15000;
+      } else if (hasActive) {
+        delay = 3000;
+      }
+
+      if (intervalMs && intervalMs < delay && hasActive) {
+        delay = intervalMs;
+      }
+
+      pollingTimer = setTimeout(async () => {
+        await get().fetchDownloads();
+        scheduleNext();
+      }, delay);
+    };
+
+    scheduleNext();
   },
 
   stopPolling: () => {
     if (pollingTimer) {
-      clearInterval(pollingTimer);
+      clearTimeout(pollingTimer);
       pollingTimer = null;
     }
     set({ isPolling: false });
   },
 
   removeDownload: async (item: LiveDownloadItem) => {
+    removedDownloadIds.add(item.id);
     const config = useDownloadConfigStore.getState();
-    // Suppression optimiste de la liste locale
+    // Suppression de la liste locale
     set({ downloads: get().downloads.filter(d => d.id !== item.id) });
     
     try {
@@ -262,13 +316,13 @@ export const useLiveDownloadStore = create<LiveDownloadState>((set, get) => ({
       });
       return res.success;
     } catch (e) {
-      console.warn('[LiveDownloadStore] Erreur suppression item:', e);
       return false;
     }
   },
 
   clearAllDownloads: async () => {
     const current = get().downloads;
+    current.forEach(item => removedDownloadIds.add(item.id));
     const config = useDownloadConfigStore.getState();
     set({ downloads: [] });
 

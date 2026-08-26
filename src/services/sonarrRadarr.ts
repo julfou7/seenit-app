@@ -40,44 +40,34 @@ export function isLocalNetworkUrl(url: string): boolean {
   );
 }
 
+// Cache pour l'authentification et statut hors-ligne qBittorrent
+let qbittorrentOfflineUntil = 0;
+let cachedQbitCookie = '';
+let cachedQbitCookieTime = 0;
+
+export function invalidateQbitCache() {
+  cachedQbitCookie = '';
+  cachedQbitCookieTime = 0;
+  qbittorrentOfflineUntil = Date.now() + 20000;
+}
+
 /**
- * Exécute une requête GET multiplateforme (Natif CapacitorHttp / Proxy / Fetch direct)
+ * Exécute une requête GET multiplateforme (Fetch direct / Proxy)
  */
 export async function executeGet(url: string, headers: Record<string, string> = {}): Promise<any> {
   if (Capacitor.isNativePlatform()) {
     try {
-      const res = await CapacitorHttp.get({
-        url,
-        headers,
-        connectTimeout: 8000,
-        readTimeout: 8000
-      });
-      if (res.status >= 200 && res.status < 300) {
-        if (typeof res.data === 'string') {
-          const trimmed = res.data.trim();
-          if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-            try {
-              return JSON.parse(trimmed);
-            } catch {
-              return res.data;
-            }
-          }
-          return res.data;
-        }
-        return res.data;
+      const directRes = await fetch(url, { headers, signal: AbortSignal.timeout(5000) });
+      if (directRes.ok) {
+        const text = await directRes.text();
+        try { return JSON.parse(text); } catch { return text; }
       }
-      if (res.status === 401 || res.status === 403) {
-        throw new Error(`Accès refusé (${res.status}) : Clé API ou identifiants incorrects`);
+      if (directRes.status === 401 || directRes.status === 403) {
+        throw new Error(`Accès refusé (${directRes.status}) : Clé API ou identifiants incorrects`);
       }
-      throw new Error(`Erreur HTTP ${res.status}`);
+      throw new Error(`Erreur HTTP ${directRes.status}`);
     } catch (err: any) {
-      // Fallback direct fetch si CapacitorHttp a un souci
-      try {
-        const directRes = await fetch(url, { headers, signal: AbortSignal.timeout(6000) });
-        if (directRes.ok) {
-          return await directRes.json();
-        }
-      } catch {}
+      if (err?.message?.includes('Accès refusé')) throw err;
       throw new Error(err?.message || 'Serveur injoignable sur le réseau local');
     }
   } else {
@@ -85,7 +75,6 @@ export async function executeGet(url: string, headers: Record<string, string> = 
     const isLocal = isLocalNetworkUrl(url);
 
     if (isLocal) {
-      // Sur le même réseau local (PC connecté au Wi-Fi) : Tentative directe du client
       try {
         const directRes = await fetch(url, { headers, signal: AbortSignal.timeout(3000) });
         if (directRes.ok) {
@@ -99,11 +88,10 @@ export async function executeGet(url: string, headers: Record<string, string> = 
       } catch (directErr: any) {
         if (directErr?.message?.includes('Accès refusé')) throw directErr;
         throw new Error(
-          "PWA Web : L'accès aux IP locales (192.168.x.x) est restreint par le navigateur (Mixed-Content HTTPS). Utilisez l'APK Android sur votre Wi-Fi ou une URL HTTPS (Cloudflare Tunnel, ngrok, DuckDNS) pour la PWA."
+          "PWA Web : L'accès aux IP locales est restreint. Utilisez l'APK Android sur Wi-Fi."
         );
       }
     } else {
-      // URL publique ou domaine HTTPS : passer par le proxy backend pour éviter les soucis CORS
       try {
         const res = await fetch('/api/service-proxy', {
           method: 'POST',
@@ -141,40 +129,25 @@ export async function executeGet(url: string, headers: Record<string, string> = 
 }
 
 /**
- * Exécute une requête POST multiplateforme (Natif CapacitorHttp sur mobile / Proxy ou Fetch sur Web)
+ * Exécute une requête POST multiplateforme (Fetch direct sur Android / Proxy ou Fetch sur Web)
  */
 async function executePost(url: string, body: any, headers: Record<string, string> = {}): Promise<any> {
   if (Capacitor.isNativePlatform()) {
     try {
-      const res = await CapacitorHttp.post({
-        url,
-        headers,
-        data: body,
-        connectTimeout: 10000,
-        readTimeout: 10000
+      const directRes = await fetch(url, {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'Content-Type': headers['Content-Type'] || (typeof body === 'string' ? 'application/x-www-form-urlencoded' : 'application/json')
+        },
+        body: typeof body === 'string' ? body : JSON.stringify(body),
+        signal: AbortSignal.timeout(8000)
       });
-      if (res.status >= 200 && res.status < 300) {
-        if (!res.data) return { success: true };
-        return typeof res.data === 'string' ? (res.data.startsWith('{') || res.data.startsWith('[') ? JSON.parse(res.data) : res.data) : res.data;
+      if (directRes.ok) {
+        const text = await directRes.text();
+        try { return JSON.parse(text); } catch { return text || { success: true }; }
       }
-      
-      // Parser les erreurs Sonarr / Radarr (souvent un tableau d'objets [{ propertyName, errorMessage }])
-      let readableError = `Erreur HTTP ${res.status}`;
-      try {
-        const parsed = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
-        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].errorMessage) {
-          readableError = parsed.map(e => e.errorMessage || e.message).join(' • ');
-        } else if (parsed && parsed.message) {
-          readableError = parsed.message;
-        } else if (parsed && parsed.error) {
-          readableError = typeof parsed.error === 'string' ? parsed.error : JSON.stringify(parsed.error);
-        }
-      } catch {
-        const strData = typeof res.data === 'string' ? res.data : JSON.stringify(res.data || {});
-        if (strData) readableError = `${readableError} : ${strData.substring(0, 100)}`;
-      }
-
-      throw new Error(readableError);
+      throw new Error(`Erreur HTTP ${directRes.status}`);
     } catch (err: any) {
       throw new Error(err?.message || 'Serveur injoignable sur le réseau local');
     }
@@ -200,7 +173,7 @@ async function executePost(url: string, body: any, headers: Record<string, strin
         throw new Error(`Erreur HTTP ${directRes.status}`);
       } catch (directErr: any) {
         throw new Error(
-          "PWA Web : L'accès aux IP locales (192.168.x.x) est restreint par le navigateur. Utilisez l'APK Android ou une URL HTTPS."
+          "PWA Web : L'accès aux IP locales est restreint par le navigateur."
         );
       }
     } else {
@@ -478,42 +451,44 @@ export async function loginQBittorrent(
   const base = cleanUrl(url);
   if (!base) return { success: false, message: 'URL qBittorrent invalide' };
 
+  // Si un cookie récent (< 5 min) existe, l'utiliser directement
+  if (cachedQbitCookie && Date.now() - cachedQbitCookieTime < 300000) {
+    return { success: true, cookie: cachedQbitCookie };
+  }
+
+  // Si le serveur était hors-ligne récemment (< 20s), temporiser
+  if (Date.now() < qbittorrentOfflineUntil) {
+    return { success: false, message: 'qBittorrent hors-ligne (attente)' };
+  }
+
   if (Capacitor.isNativePlatform()) {
     try {
-      const loginRes = await CapacitorHttp.post({
-        url: `${base}/api/v2/auth/login`,
+      const res = await fetch(`${base}/api/v2/auth/login`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'Referer': base,
           'Origin': base
         },
-        data: `username=${encodeURIComponent(username || '')}&password=${encodeURIComponent(password || '')}`,
-        connectTimeout: 8000,
-        readTimeout: 8000
+        body: `username=${encodeURIComponent(username || '')}&password=${encodeURIComponent(password || '')}`,
+        signal: AbortSignal.timeout(6000)
       });
 
-      const dataStr = typeof loginRes.data === 'string' ? loginRes.data : JSON.stringify(loginRes.data || '');
-      if (dataStr.trim() === 'Fails.' || loginRes.status === 403 || loginRes.status === 401) {
+      const bodyStr = await res.text();
+      if (bodyStr.trim() === 'Fails.' || res.status === 403 || res.status === 401) {
+        invalidateQbitCache();
         return {
           success: false,
-          message: 'Identifiants qBittorrent incorrects (nom d\'utilisateur ou mot de passe)'
+          message: 'Identifiants qBittorrent incorrects'
         };
       }
 
-      let cookieHeader = '';
-      if (loginRes.headers) {
-        const setCookieKey = Object.keys(loginRes.headers).find(k => k.toLowerCase() === 'set-cookie');
-        if (setCookieKey) {
-          const rawCookie = loginRes.headers[setCookieKey];
-          const cookieStr = Array.isArray(rawCookie) ? rawCookie[0] : String(rawCookie);
-          if (cookieStr) {
-            cookieHeader = cookieStr.split(';')[0];
-          }
-        }
-      }
-
-      return { success: true, cookie: cookieHeader };
+      cachedQbitCookie = '';
+      cachedQbitCookieTime = Date.now();
+      qbittorrentOfflineUntil = 0;
+      return { success: true, cookie: '' };
     } catch (err: any) {
+      qbittorrentOfflineUntil = Date.now() + 20000;
       return {
         success: false,
         message: err?.message || 'Impossible de joindre qBittorrent sur le réseau local'
@@ -537,13 +512,17 @@ export async function loginQBittorrent(
         });
         const bodyStr = await directRes.text();
         if (bodyStr.trim() === 'Fails.' || directRes.status === 401 || directRes.status === 403) {
+          invalidateQbitCache();
           return { success: false, message: 'Identifiants qBittorrent incorrects' };
         }
+        cachedQbitCookieTime = Date.now();
+        qbittorrentOfflineUntil = 0;
         return { success: true };
       } catch {
+        qbittorrentOfflineUntil = Date.now() + 20000;
         return {
           success: false,
-          message: "PWA Web : Connexion locale bloquée par le navigateur (Mixed-Content). Utilisez l'APK Android."
+          message: "PWA Web : Connexion locale bloquée par le navigateur."
         };
       }
     } else {
@@ -574,13 +553,14 @@ export async function loginQBittorrent(
 
         const bodyStr = typeof json.data === 'string' ? json.data : JSON.stringify(json.data || '');
         if (bodyStr.trim() === 'Fails.' || json.status === 401 || json.status === 403) {
-          return { success: false, message: 'Identifiants qBittorrent incorrects (nom d\'utilisateur ou mot de passe)' };
+          invalidateQbitCache();
+          return { success: false, message: 'Identifiants qBittorrent incorrects' };
         }
         if (!json.ok && json.error) {
+          qbittorrentOfflineUntil = Date.now() + 20000;
           return { success: false, message: json.message || `Erreur proxy (${json.status || 500})` };
         }
 
-        // Récupérer le cookie SID
         let cookieHeader = '';
         if (json.cookie) {
           cookieHeader = json.cookie.split(';')[0];
@@ -590,8 +570,13 @@ export async function loginQBittorrent(
           cookieHeader = cookieStr.split(';')[0];
         }
 
+        cachedQbitCookie = cookieHeader;
+        cachedQbitCookieTime = Date.now();
+        qbittorrentOfflineUntil = 0;
+
         return { success: true, cookie: cookieHeader };
       } catch (err: any) {
+        qbittorrentOfflineUntil = Date.now() + 20000;
         return { success: false, message: err?.message || 'Erreur réseau' };
       }
     }
