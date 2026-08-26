@@ -96,6 +96,9 @@ function deduplicateAndMergeShows(rawShows: Show[], currentLocalShows: Show[] = 
       if (isLocalNewer) {
         deduplicatedMap.set(key, mergeBasedOnTime(remoteShow, localShow));
       }
+    } else {
+      // Si la série n'existe pas ou n'est pas encore chargée de Firestore, on préserve l'élément local
+      deduplicatedMap.set(key, { ...localShow });
     }
   }
 
@@ -283,10 +286,23 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
 
 auth.onAuthStateChanged(user => {
   if (user) {
+    localStorage.removeItem('explicit_logout');
+    const prevUid = localStorage.getItem('last_active_uid');
+    if (prevUid && prevUid !== user.uid) {
+      // Un utilisateur différent s'est connecté, on vide le cache précédent pour sécurité
+      useShowsStore.getState().setShows([]);
+      useShowsStore.getState().setInitialized(false);
+    }
+    localStorage.setItem('last_active_uid', user.uid);
     useShowsStore.getState().fetchShows();
   } else {
-    useShowsStore.getState().setShows([]);
+    const explicitLogout = localStorage.getItem('explicit_logout') === 'true';
+    if (explicitLogout) {
+      useShowsStore.getState().setShows([]);
+      useShowsStore.getState().setInitialized(false);
+      localStorage.removeItem('last_active_uid');
+      localStorage.removeItem('explicit_logout');
+    }
     useShowsStore.getState().setLoading(false);
-    useShowsStore.getState().setInitialized(false);
   }
 });

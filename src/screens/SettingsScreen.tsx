@@ -262,6 +262,7 @@ export function SettingsScreen() {
   };
 
   const handleLogout = async () => {
+    localStorage.setItem('explicit_logout', 'true');
     await signOut(auth);
   };
 
