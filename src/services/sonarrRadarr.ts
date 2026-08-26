@@ -57,17 +57,28 @@ export function invalidateQbitCache() {
 export async function executeGet(url: string, headers: Record<string, string> = {}): Promise<any> {
   if (Capacitor.isNativePlatform()) {
     try {
-      const directRes = await fetch(url, { headers, signal: AbortSignal.timeout(5000) });
-      if (directRes.ok) {
-        const text = await directRes.text();
-        try { return JSON.parse(text); } catch { return text; }
+      const response = await CapacitorHttp.get({
+        url,
+        headers,
+        connectTimeout: 4000,
+        readTimeout: 4000
+      });
+      if (response.status >= 200 && response.status < 300) {
+        return response.data;
       }
-      if (directRes.status === 401 || directRes.status === 403) {
-        throw new Error(`Accès refusé (${directRes.status}) : Clé API ou identifiants incorrects`);
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(`Accès refusé (${response.status}) : Clé API ou identifiants incorrects`);
       }
-      throw new Error(`Erreur HTTP ${directRes.status}`);
+      throw new Error(`Erreur HTTP ${response.status}`);
     } catch (err: any) {
       if (err?.message?.includes('Accès refusé')) throw err;
+      try {
+        const directRes = await fetch(url, { headers, signal: AbortSignal.timeout(4000) });
+        if (directRes.ok) {
+          const text = await directRes.text();
+          try { return JSON.parse(text); } catch { return text; }
+        }
+      } catch {}
       throw new Error(err?.message || 'Serveur injoignable sur le réseau local');
     }
   } else {
@@ -134,21 +145,36 @@ export async function executeGet(url: string, headers: Record<string, string> = 
 async function executePost(url: string, body: any, headers: Record<string, string> = {}): Promise<any> {
   if (Capacitor.isNativePlatform()) {
     try {
-      const directRes = await fetch(url, {
-        method: 'POST',
+      const response = await CapacitorHttp.post({
+        url,
         headers: {
           ...headers,
           'Content-Type': headers['Content-Type'] || (typeof body === 'string' ? 'application/x-www-form-urlencoded' : 'application/json')
         },
-        body: typeof body === 'string' ? body : JSON.stringify(body),
-        signal: AbortSignal.timeout(8000)
+        data: body,
+        connectTimeout: 5000,
+        readTimeout: 5000
       });
-      if (directRes.ok) {
-        const text = await directRes.text();
-        try { return JSON.parse(text); } catch { return text || { success: true }; }
+      if (response.status >= 200 && response.status < 300) {
+        return response.data;
       }
-      throw new Error(`Erreur HTTP ${directRes.status}`);
+      throw new Error(`Erreur HTTP ${response.status}`);
     } catch (err: any) {
+      try {
+        const directRes = await fetch(url, {
+          method: 'POST',
+          headers: {
+            ...headers,
+            'Content-Type': headers['Content-Type'] || (typeof body === 'string' ? 'application/x-www-form-urlencoded' : 'application/json')
+          },
+          body: typeof body === 'string' ? body : JSON.stringify(body),
+          signal: AbortSignal.timeout(5000)
+        });
+        if (directRes.ok) {
+          const text = await directRes.text();
+          try { return JSON.parse(text); } catch { return text || { success: true }; }
+        }
+      } catch {}
       throw new Error(err?.message || 'Serveur injoignable sur le réseau local');
     }
   } else {
@@ -1597,55 +1623,78 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
       };
       if (cookieHeader) qHeaders['Cookie'] = cookieHeader;
 
-      const res = await executeGet(`${qbitBase}/api/v2/torrents/info?filter=downloading`, qHeaders);
+      const res = await executeGet(`${qbitBase}/api/v2/torrents/info?filter=all&sort=added_on&reverse=true&limit=50`, qHeaders);
       if (Array.isArray(res)) {
         for (const t of res) {
-          const rawProgress = typeof t.progress === 'number' ? Math.round(t.progress * 100) : 0;
+          const isDone = Boolean(
+            (typeof t.progress === 'number' && t.progress >= 0.995) || 
+            ['uploading', 'stalledUP', 'completed', 'pausedUP', 'checkingUP', 'forcedUP'].includes(t.state)
+          );
+          const rawProgress = isDone ? 100 : (typeof t.progress === 'number' ? Math.min(99, Math.round(t.progress * 100)) : 0);
           const speed = t.dlspeed || 0;
           const etaSec = t.eta || 0;
           const isTv = t.category === 'tv' || /s\d{1,2}e\d{1,2}/i.test(t.name);
 
           const isQbitError = t.state === 'error' || t.state === 'missingFiles';
           const qbitErrorMsg = isQbitError ? 'Erreur qBittorrent (espace disque insuffisant ou fichier manquant)' : undefined;
-          const qbitStatus = isQbitError ? 'error' : (t.state === 'stalledDL' ? 'warning' : (t.state || 'downloading'));
-          const qbitStatusText = isQbitError ? 'Erreur' : (t.state === 'stalledDL' ? 'En attente de sources' : `qBittorrent ${rawProgress}%`);
+          const qbitStatus = isQbitError ? 'error' : (isDone ? 'completed' : (t.state === 'stalledDL' ? 'warning' : (t.state || 'downloading')));
+          const qbitStatusText = isQbitError ? 'Erreur' : (isDone ? 'Téléchargement terminé 🍿' : (t.state === 'stalledDL' ? 'En attente de sources' : `qBittorrent ${rawProgress}%`));
 
-          const existing = items.find(it => it.releaseTitle && (it.releaseTitle.toLowerCase() === t.name.toLowerCase() || t.name.toLowerCase().includes(it.releaseTitle.toLowerCase()) || it.releaseTitle.toLowerCase().includes(t.name.toLowerCase())));
+          const normTName = (t.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const existing = items.find(it => {
+            if (!it.releaseTitle && !it.title) return false;
+            const normRel = (it.releaseTitle || it.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            return normRel && normTName && (normRel === normTName || normRel.includes(normTName) || normTName.includes(normRel));
+          });
 
           if (existing) {
-            if (speed > 0) {
-              existing.speedBytesPerSec = speed;
-              existing.speedFormatted = formatSpeed(speed);
-            }
-            if (etaSec > 0 && etaSec < 86400 * 7) {
-              existing.timeleftSeconds = etaSec;
-              existing.timeleft = formatSecondsToETA(etaSec);
-            }
-            existing.progress = rawProgress;
-            existing.sizeleft = Math.round((t.size || 0) * (1 - (t.progress || 0)));
-            if (isQbitError) {
-              existing.status = 'error';
-              existing.statusText = 'Erreur';
-              existing.errorMessage = qbitErrorMsg;
+            if (isDone) {
+              existing.progress = 100;
+              existing.status = 'completed';
+              existing.statusText = 'Téléchargement terminé 🍿';
+              existing.sizeleft = 0;
+              existing.speedBytesPerSec = 0;
+              existing.speedFormatted = '';
+              existing.timeleft = '';
+              existing.timeleftSeconds = 0;
+            } else {
+              existing.progress = Math.max(existing.progress || 0, rawProgress);
+              existing.sizeleft = Math.round((t.size || 0) * (1 - (t.progress || 0)));
+              if (speed > 0) {
+                existing.speedBytesPerSec = speed;
+                existing.speedFormatted = formatSpeed(speed);
+              }
+              if (etaSec > 0 && etaSec < 86400 * 7) {
+                existing.timeleftSeconds = etaSec;
+                existing.timeleft = formatSecondsToETA(etaSec);
+              }
+              if (isQbitError) {
+                existing.status = 'error';
+                existing.statusText = 'Erreur';
+                existing.errorMessage = qbitErrorMsg;
+              }
             }
           } else {
-            items.push({
-              id: `qbit_${t.hash || t.name}`,
-              mediaType: isTv ? 'tv' : 'movie',
-              title: t.name,
-              size: t.size || 0,
-              sizeleft: Math.round((t.size || 0) * (1 - (t.progress || 0))),
-              progress: rawProgress,
-              timeleft: formatSecondsToETA(etaSec),
-              timeleftSeconds: etaSec,
-              speedBytesPerSec: speed,
-              speedFormatted: formatSpeed(speed),
-              status: qbitStatus,
-              statusText: qbitStatusText,
-              errorMessage: qbitErrorMsg,
-              downloadClient: 'qBittorrent',
-              releaseTitle: t.name
-            });
+            // Pour qBittorrent direct sans correspondance Radarr/Sonarr, n'ajouter les complétés que si non terminés ou récents
+            if (!isDone || (rawProgress >= 100 && (t.completion_on > 0 && Date.now()/1000 - t.completion_on < 86400 * 2))) {
+              items.push({
+                id: `qbit_${t.hash || t.name}`,
+                mediaType: isTv ? 'tv' : 'movie',
+                title: t.name,
+                size: t.size || 0,
+                sizeleft: isDone ? 0 : Math.round((t.size || 0) * (1 - (t.progress || 0))),
+                progress: rawProgress,
+                timeleft: isDone ? '' : formatSecondsToETA(etaSec),
+                timeleftSeconds: isDone ? 0 : etaSec,
+                speedBytesPerSec: isDone ? 0 : speed,
+                speedFormatted: isDone ? '' : formatSpeed(speed),
+                status: qbitStatus,
+                statusText: qbitStatusText,
+                errorMessage: qbitErrorMsg,
+                downloadClient: 'qBittorrent',
+                releaseTitle: t.name
+              });
+            }
           }
         }
       }
