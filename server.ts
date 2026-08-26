@@ -1005,13 +1005,22 @@ async function startServer() {
         return res.status(400).json({ error: 'targetUrl requis' });
       }
 
+      // Si c'est une adresse IP locale privée (192.168.x.x, 10.x.x.x, 172.16-31.x.x, localhost, 127.0.0.1)
+      const isLocalIp = /^(https?:\/\/)?(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})(:|\/|$)/i.test(targetUrl);
+      if (isLocalIp) {
+        return res.status(400).json({
+          error: 'IP_LOCALE_INACCESSIBLE',
+          message: 'L\'adresse IP locale ne peut pas être contactée par le serveur Cloud. Utilisez un tunnel HTTPS (ngrok, Cloudflare Tunnel, DuckDNS) pour tester sur le Web ou utilisez l\'APK Android connecté à votre Wi-Fi.'
+        });
+      }
+
       const fetchOptions: any = {
         method,
         headers: {
           ...headers,
           'User-Agent': 'SeenIt-Proxy/1.0'
         },
-        signal: AbortSignal.timeout(8000)
+        signal: AbortSignal.timeout(6000)
       };
 
       if (method !== 'GET' && method !== 'HEAD' && body) {
@@ -1034,7 +1043,12 @@ async function startServer() {
         data
       });
     } catch (err: any) {
-      console.error('[Service Proxy Error]', err);
+      if (err?.name === 'TimeoutError' || err?.message?.includes('aborted') || err?.message?.includes('timeout')) {
+        return res.status(504).json({
+          error: 'TIMEOUT',
+          message: 'Délai d\'attente dépassé (timeout) pour joindre le service cible.'
+        });
+      }
       res.status(500).json({
         error: 'PROXY_FETCH_ERROR',
         message: err?.message || 'Erreur lors de la requête proxy'

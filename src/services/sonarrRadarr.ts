@@ -24,6 +24,23 @@ export function cleanUrl(url: string): string {
 }
 
 /**
+ * Détecte si une URL cible pointe vers une IP ou un hôte de réseau local privé
+ */
+export function isLocalNetworkUrl(url: string): boolean {
+  const u = (url || '').toLowerCase();
+  return (
+    u.includes('192.168.') ||
+    u.includes('10.') ||
+    u.includes('172.16.') || u.includes('172.17.') || u.includes('172.18.') || u.includes('172.19.') ||
+    u.includes('172.20.') || u.includes('172.21.') || u.includes('172.22.') || u.includes('172.23.') ||
+    u.includes('172.24.') || u.includes('172.25.') || u.includes('172.26.') || u.includes('172.27.') ||
+    u.includes('172.28.') || u.includes('172.29.') || u.includes('172.30.') || u.includes('172.31.') ||
+    u.includes('localhost') ||
+    u.includes('127.0.0.1')
+  );
+}
+
+/**
  * Exécute une requête GET multiplateforme (Natif CapacitorHttp / Proxy / Fetch direct)
  */
 export async function executeGet(url: string, headers: Record<string, string> = {}): Promise<any> {
@@ -64,33 +81,56 @@ export async function executeGet(url: string, headers: Record<string, string> = 
       throw new Error(err?.message || 'Serveur injoignable sur le réseau local');
     }
   } else {
-    // Mode Navigateur Web (PC ou dev) : Tentative via proxy backend puis direct fetch
-    try {
-      const res = await fetch('/api/service-proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          targetUrl: url,
-          method: 'GET',
-          headers
-        }),
-        signal: AbortSignal.timeout(8000)
-      });
+    // Mode PWA / Navigateur Web
+    const isLocal = isLocalNetworkUrl(url);
 
-      const json = await res.json();
-      if (res.ok && !json.error) {
-        return json.data;
-      }
-      throw new Error(json.message || json.error || `Erreur proxy ${res.status}`);
-    } catch (proxyErr: any) {
-      // Tentative de fetch direct depuis le navigateur si sur le même réseau
+    if (isLocal) {
+      // Sur le même réseau local (PC connecté au Wi-Fi) : Tentative directe du client
       try {
-        const directRes = await fetch(url, { headers, signal: AbortSignal.timeout(4000) });
+        const directRes = await fetch(url, { headers, signal: AbortSignal.timeout(3000) });
         if (directRes.ok) {
-          return await directRes.json();
+          const text = await directRes.text();
+          try { return JSON.parse(text); } catch { return text; }
         }
-      } catch {}
-      throw new Error(proxyErr?.message || 'Impossible de joindre le service');
+        if (directRes.status === 401 || directRes.status === 403) {
+          throw new Error(`Accès refusé (${directRes.status}) : Clé API incorrecte`);
+        }
+        throw new Error(`Erreur HTTP ${directRes.status}`);
+      } catch (directErr: any) {
+        if (directErr?.message?.includes('Accès refusé')) throw directErr;
+        throw new Error(
+          "PWA Web : L'accès aux IP locales (192.168.x.x) est restreint par le navigateur (Mixed-Content HTTPS). Utilisez l'APK Android sur votre Wi-Fi ou une URL HTTPS (Cloudflare Tunnel, ngrok, DuckDNS) pour la PWA."
+        );
+      }
+    } else {
+      // URL publique ou domaine HTTPS : passer par le proxy backend pour éviter les soucis CORS
+      try {
+        const res = await fetch('/api/service-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            targetUrl: url,
+            method: 'GET',
+            headers
+          }),
+          signal: AbortSignal.timeout(6000)
+        });
+
+        const json = await res.json();
+        if (res.ok && !json.error) {
+          return json.data;
+        }
+        throw new Error(json.message || json.error || `Erreur proxy ${res.status}`);
+      } catch (proxyErr: any) {
+        // Fallback fetch direct si le proxy échoue
+        try {
+          const directRes = await fetch(url, { headers, signal: AbortSignal.timeout(4000) });
+          if (directRes.ok) {
+            return await directRes.json();
+          }
+        } catch {}
+        throw new Error(proxyErr?.message || 'Impossible de joindre le service');
+      }
     }
   }
 }
@@ -134,27 +174,10 @@ async function executePost(url: string, body: any, headers: Record<string, strin
       throw new Error(err?.message || 'Serveur injoignable sur le réseau local');
     }
   } else {
-    // Mode Navigateur Web
-    try {
-      const res = await fetch('/api/service-proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          targetUrl: url,
-          method: 'POST',
-          headers,
-          body
-        }),
-        signal: AbortSignal.timeout(12000)
-      });
+    // Mode PWA / Navigateur Web
+    const isLocal = isLocalNetworkUrl(url);
 
-      const json = await res.json();
-      if (!res.ok || json.error) {
-        throw new Error(json.message || json.error || `Erreur proxy ${res.status}`);
-      }
-      return json.data;
-    } catch (proxyErr: any) {
-      // Tentative direct fetch si proxy échoue
+    if (isLocal) {
       try {
         const directRes = await fetch(url, {
           method: 'POST',
@@ -163,14 +186,56 @@ async function executePost(url: string, body: any, headers: Record<string, strin
             'Content-Type': headers['Content-Type'] || (typeof body === 'string' ? 'application/x-www-form-urlencoded' : 'application/json')
           },
           body: typeof body === 'string' ? body : JSON.stringify(body),
-          signal: AbortSignal.timeout(8000)
+          signal: AbortSignal.timeout(5000)
         });
         if (directRes.ok) {
           const text = await directRes.text();
           try { return JSON.parse(text); } catch { return text || { success: true }; }
         }
-      } catch {}
-      throw new Error(proxyErr?.message || 'Erreur réseau');
+        throw new Error(`Erreur HTTP ${directRes.status}`);
+      } catch (directErr: any) {
+        throw new Error(
+          "PWA Web : L'accès aux IP locales (192.168.x.x) est restreint par le navigateur. Utilisez l'APK Android ou une URL HTTPS."
+        );
+      }
+    } else {
+      try {
+        const res = await fetch('/api/service-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            targetUrl: url,
+            method: 'POST',
+            headers,
+            body
+          }),
+          signal: AbortSignal.timeout(10000)
+        });
+
+        const json = await res.json();
+        if (!res.ok || json.error) {
+          throw new Error(json.message || json.error || `Erreur proxy ${res.status}`);
+        }
+        return json.data;
+      } catch (proxyErr: any) {
+        // Tentative direct fetch si proxy échoue
+        try {
+          const directRes = await fetch(url, {
+            method: 'POST',
+            headers: {
+              ...headers,
+              'Content-Type': headers['Content-Type'] || (typeof body === 'string' ? 'application/x-www-form-urlencoded' : 'application/json')
+            },
+            body: typeof body === 'string' ? body : JSON.stringify(body),
+            signal: AbortSignal.timeout(6000)
+          });
+          if (directRes.ok) {
+            const text = await directRes.text();
+            try { return JSON.parse(text); } catch { return text || { success: true }; }
+          }
+        } catch {}
+        throw new Error(proxyErr?.message || 'Erreur réseau');
+      }
     }
   }
 }
@@ -213,27 +278,50 @@ async function executePut(url: string, body: any, headers: Record<string, string
       throw new Error(err?.message || 'Serveur injoignable sur le réseau local');
     }
   } else {
-    // Mode Navigateur Web
-    try {
-      const res = await fetch('/api/service-proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          targetUrl: url,
-          method: 'PUT',
-          headers,
-          body
-        }),
-        signal: AbortSignal.timeout(12000)
-      });
+    // Mode PWA / Navigateur Web
+    const isLocal = isLocalNetworkUrl(url);
 
-      const json = await res.json();
-      if (!res.ok || json.error) {
-        throw new Error(json.message || json.error || `Erreur proxy ${res.status}`);
+    if (isLocal) {
+      try {
+        const directRes = await fetch(url, {
+          method: 'PUT',
+          headers: {
+            ...headers,
+            'Content-Type': headers['Content-Type'] || (typeof body === 'string' ? 'application/x-www-form-urlencoded' : 'application/json')
+          },
+          body: typeof body === 'string' ? body : JSON.stringify(body),
+          signal: AbortSignal.timeout(5000)
+        });
+        if (directRes.ok) {
+          const text = await directRes.text();
+          try { return JSON.parse(text); } catch { return text || { success: true }; }
+        }
+        throw new Error(`Erreur HTTP ${directRes.status}`);
+      } catch {
+        throw new Error("PWA Web : L'accès aux IP locales est restreint par le navigateur.");
       }
-      return json.data;
-    } catch (err: any) {
-      throw new Error(err?.message || 'Erreur réseau');
+    } else {
+      try {
+        const res = await fetch('/api/service-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            targetUrl: url,
+            method: 'PUT',
+            headers,
+            body
+          }),
+          signal: AbortSignal.timeout(10000)
+        });
+
+        const json = await res.json();
+        if (!res.ok || json.error) {
+          throw new Error(json.message || json.error || `Erreur proxy ${res.status}`);
+        }
+        return json.data;
+      } catch (err: any) {
+        throw new Error(err?.message || 'Erreur réseau');
+      }
     }
   }
 }
@@ -258,26 +346,38 @@ export async function executeDelete(url: string, headers: Record<string, string>
       throw new Error(err?.message || 'Serveur injoignable sur le réseau local');
     }
   } else {
-    // Mode Web
-    try {
-      const res = await fetch('/api/service-proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          targetUrl: url,
-          method: 'DELETE',
-          headers
-        }),
-        signal: AbortSignal.timeout(10000)
-      });
+    // Mode PWA / Web
+    const isLocal = isLocalNetworkUrl(url);
 
-      const json = await res.json();
-      if (!res.ok || json.error) {
-        throw new Error(json.message || json.error || `Erreur proxy ${res.status}`);
+    if (isLocal) {
+      try {
+        const directRes = await fetch(url, { method: 'DELETE', headers, signal: AbortSignal.timeout(4000) });
+        if (directRes.ok) return { success: true };
+        throw new Error(`Erreur HTTP ${directRes.status}`);
+      } catch {
+        throw new Error("PWA Web : L'accès aux IP locales est restreint.");
       }
-      return json.data;
-    } catch (err: any) {
-      throw new Error(err?.message || 'Erreur réseau');
+    } else {
+      try {
+        const res = await fetch('/api/service-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            targetUrl: url,
+            method: 'DELETE',
+            headers
+          }),
+          signal: AbortSignal.timeout(8000)
+        });
+
+        const json = await res.json();
+        if (!res.ok || json.error) {
+          throw new Error(json.message || json.error || `Erreur proxy ${res.status}`);
+        }
+        return json.data;
+      } catch (err: any) {
+        throw new Error(err?.message || 'Erreur réseau');
+      }
     }
   }
 }
@@ -399,32 +499,59 @@ export async function loginQBittorrent(
       };
     }
   } else {
-    // Mode Navigateur Web
-    try {
-      const res = await fetch('/api/service-proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          targetUrl: `${base}/api/v2/auth/login`,
+    // Mode PWA / Navigateur Web
+    const isLocal = isLocalNetworkUrl(base);
+
+    if (isLocal) {
+      try {
+        const directRes = await fetch(`${base}/api/v2/auth/login`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
             'Referer': base,
             'Origin': base
           },
-          body: `username=${encodeURIComponent(username || '')}&password=${encodeURIComponent(password || '')}`
-        }),
-        signal: AbortSignal.timeout(10000)
-      });
-
-      const json = await res.json();
-      const bodyStr = typeof json.data === 'string' ? json.data : JSON.stringify(json.data || '');
-      if (bodyStr.trim() === 'Fails.') {
-        return { success: false, message: 'Identifiants qBittorrent incorrects' };
+          body: `username=${encodeURIComponent(username || '')}&password=${encodeURIComponent(password || '')}`,
+          signal: AbortSignal.timeout(5000)
+        });
+        const bodyStr = await directRes.text();
+        if (bodyStr.trim() === 'Fails.' || directRes.status === 401 || directRes.status === 403) {
+          return { success: false, message: 'Identifiants qBittorrent incorrects' };
+        }
+        return { success: true };
+      } catch {
+        return {
+          success: false,
+          message: "PWA Web : Connexion locale bloquée par le navigateur (Mixed-Content). Utilisez l'APK Android."
+        };
       }
-      return { success: true };
-    } catch (err: any) {
-      return { success: false, message: err?.message || 'Erreur réseau' };
+    } else {
+      try {
+        const res = await fetch('/api/service-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            targetUrl: `${base}/api/v2/auth/login`,
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Referer': base,
+              'Origin': base
+            },
+            body: `username=${encodeURIComponent(username || '')}&password=${encodeURIComponent(password || '')}`
+          }),
+          signal: AbortSignal.timeout(8000)
+        });
+
+        const json = await res.json();
+        const bodyStr = typeof json.data === 'string' ? json.data : JSON.stringify(json.data || '');
+        if (bodyStr.trim() === 'Fails.') {
+          return { success: false, message: 'Identifiants qBittorrent incorrects' };
+        }
+        return { success: true };
+      } catch (err: any) {
+        return { success: false, message: err?.message || 'Erreur réseau' };
+      }
     }
   }
 }
