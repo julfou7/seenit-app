@@ -315,16 +315,48 @@ class TMDBClient {
       const combined = Array.from(map.values());
 
       if (combined.length > 1) {
-        // Tri chronologique par date de sortie / 1re diffusion
-        combined.sort((a, b) => {
-          const dateA = new Date(a.release_date || a.first_air_date || 0).getTime();
-          const dateB = new Date(b.release_date || b.first_air_date || 0).getTime();
-          return dateA - dateB;
-        });
-
-        // Pas de sagaOrder pour l'univers étendu
         universe = combined;
       }
+    }
+
+    // C. Homonymes et correspondances exactes TMDB (Suites directes, reboots, cross-media)
+    // Permet de forcer la liaison entre œuvres de même nom (ex: The Punisher série -> film, Daredevil Netflix -> Disney+)
+    // sans dépendre uniquement des listes communautaires TVDB parfois incomplètes.
+    let cleanTitle = (mediaTitle || '').split(':')[0].split('-')[0].replace(/^(Marvel's |DC's )/i, '').trim();
+    if (cleanTitle && cleanTitle.length > 2) {
+      const searchRes = await this.searchMulti(cleanTitle);
+      if (searchRes.ok && searchRes.value?.results) {
+        const exactMatches = searchRes.value.results.filter((res: any) => {
+          if (isAdultOrParodyMedia(res)) return false;
+          const resTitle = res.title || res.name || res.original_title || res.original_name;
+          if (!resTitle) return false;
+          
+          let titleLower = resTitle.toLowerCase().replace(/^(marvel's |dc's )/i, '');
+          const cleanTitleLower = cleanTitle.toLowerCase();
+          
+          // On accepte si le titre commence par le nom (ex: "Daredevil: Born Again") ou contient strictement le nom avec des espaces/ponctuations
+          return titleLower.startsWith(cleanTitleLower) || titleLower === cleanTitleLower || titleLower.includes(` ${cleanTitleLower} `) || titleLower.includes(`${cleanTitleLower}:`);
+        });
+
+        const currentUniverseIds = new Set(universe.map(u => `${u.media_type || (u.title ? 'movie' : 'tv')}_${u.id}`));
+        exactMatches.forEach((match: any) => {
+          const type = match.media_type || (match.title ? 'movie' : 'tv');
+          const key = `${type}_${match.id}`;
+          if (!currentUniverseIds.has(key)) {
+            universe.push({ ...match, media_type: type });
+            currentUniverseIds.add(key);
+          }
+        });
+      }
+    }
+
+    // Tri chronologique final de l'univers
+    if (universe.length > 0) {
+      universe.sort((a, b) => {
+        const dateA = new Date(a.release_date || a.first_air_date || 0).getTime();
+        const dateB = new Date(b.release_date || b.first_air_date || 0).getTime();
+        return dateA - dateB;
+      });
     }
     
     // Fallback: Si l'univers trouvé est identique à la collection (mêmes IDs), ne garder que l'un ou l'autre pour ne pas polluer l'UI.
