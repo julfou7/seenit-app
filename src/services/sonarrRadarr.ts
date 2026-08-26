@@ -1450,8 +1450,10 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           releaseTitle: rec.title
         });
       }
-    } catch (e) {
-      console.warn('[LiveQueue] Erreur Sonarr queue:', e);
+    } catch (e: any) {
+      if (!e?.message?.includes('PWA Web')) {
+        console.warn('[LiveQueue] Erreur Sonarr queue:', e);
+      }
     }
   }
 
@@ -1499,8 +1501,10 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           releaseTitle: rec.title
         });
       }
-    } catch (e) {
-      console.warn('[LiveQueue] Erreur Radarr queue:', e);
+    } catch (e: any) {
+      if (!e?.message?.includes('PWA Web')) {
+        console.warn('[LiveQueue] Erreur Radarr queue:', e);
+      }
     }
   }
 
@@ -1575,8 +1579,10 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           }
         }
       }
-    } catch (e) {
-      console.warn('[LiveQueue] Erreur qBittorrent queue:', e);
+    } catch (e: any) {
+      if (!e?.message?.includes('PWA Web')) {
+        console.warn('[LiveQueue] Erreur qBittorrent queue:', e);
+      }
     }
   }
 
