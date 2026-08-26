@@ -975,14 +975,17 @@ async function startServer() {
 
   app.get('/api/update', async (req, res) => {
     try {
-      const token = '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';
+      const token = process.env.GITHUB_PAT || '';
       const repo = 'julfou7/seenit-app';
+      const headers: Record<string, string> = {
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'SeenIt-Backend'
+      };
+      if (token) {
+        headers['Authorization'] = `token ${token}`;
+      }
       const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'Authorization': `token ${token}`,
-          'User-Agent': 'SeenIt-Backend'
-        }
+        headers
       });
 
       if (!response.ok) {

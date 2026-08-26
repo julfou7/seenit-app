@@ -3,9 +3,9 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Capacitor } from '@capacitor/core';
 
-export const CURRENT_APP_VERSION = '1.3.70';
+export const CURRENT_APP_VERSION = '1.3.71';
 export const GITHUB_REPO = 'julfou7/seenit-app';
-export const GITHUB_PAT = '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';
+export const GITHUB_PAT = ''; // Plus de jeton d'accès privé codé en dur pour éviter les révocations de sécurité. Rendre le dépôt public est recommandé et gratuit !
 
 export interface AppReleaseInfo {
   version: string;
@@ -76,12 +76,13 @@ export const useUpdateStore = create<UpdateState>()(
           // 1. Direct GitHub Releases API fetch (use URL cache-busting param to avoid CORS preflight errors with custom headers)
           try {
             const ghUrl = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest?_ts=${Date.now()}`;
-            const ghRes = await fetch(ghUrl, {
-              headers: {
-                'Accept': 'application/vnd.github.v3+json',
-                'Authorization': `Bearer ${GITHUB_PAT}`
-              }
-            });
+            const headers: Record<string, string> = {
+              'Accept': 'application/vnd.github.v3+json'
+            };
+            if (GITHUB_PAT) {
+              headers['Authorization'] = `Bearer ${GITHUB_PAT}`;
+            }
+            const ghRes = await fetch(ghUrl, { headers });
             const contentType = ghRes.headers.get('content-type') || '';
             if (ghRes.ok && contentType.includes('application/json')) {
               data = await ghRes.json();
