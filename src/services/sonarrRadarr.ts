@@ -57,14 +57,20 @@ export function invalidateQbitCache() {
 export async function executeGet(url: string, headers: Record<string, string> = {}): Promise<any> {
   if (Capacitor.isNativePlatform()) {
     try {
+      const normHeaders = { ...headers };
+      if (headers['X-Api-Key']) normHeaders['x-api-key'] = headers['X-Api-Key'];
       const response = await CapacitorHttp.get({
         url,
-        headers,
-        connectTimeout: 4000,
-        readTimeout: 4000
+        headers: normHeaders,
+        connectTimeout: 8000,
+        readTimeout: 8000
       });
       if (response.status >= 200 && response.status < 300) {
-        return response.data;
+        let data = response.data;
+        if (typeof data === 'string') {
+          try { data = JSON.parse(data); } catch {}
+        }
+        return data;
       }
       if (response.status === 401 || response.status === 403) {
         throw new Error(`Accès refusé (${response.status}) : Clé API ou identifiants incorrects`);
@@ -73,12 +79,26 @@ export async function executeGet(url: string, headers: Record<string, string> = 
     } catch (err: any) {
       if (err?.message?.includes('Accès refusé')) throw err;
       try {
-        const directRes = await fetch(url, { headers, signal: AbortSignal.timeout(4000) });
+        const directRes = await fetch(url, { headers, signal: AbortSignal.timeout(6000) });
         if (directRes.ok) {
           const text = await directRes.text();
           try { return JSON.parse(text); } catch { return text; }
         }
       } catch {}
+      if (!isLocalNetworkUrl(url)) {
+        try {
+          const proxyRes = await fetch('/api/service-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ targetUrl: url, method: 'GET', headers }),
+            signal: AbortSignal.timeout(10000)
+          });
+          const rawText = await proxyRes.text();
+          let json: any = {};
+          try { json = JSON.parse(rawText); } catch {}
+          if (json.ok && !json.error) return json.data;
+        } catch {}
+      }
       throw new Error(err?.message || 'Serveur injoignable sur le réseau local');
     }
   } else {
@@ -1394,6 +1414,86 @@ function parseTimeStringToSeconds(timeStr?: string): number {
     return mins * 60 + secs;
   }
   return 0;
+}
+
+/**
+ * Nettoie le nom brut d'un torrent/release et extrait le titre propre de la série/film et le numéro d'épisode
+ */
+export function formatCleanMediaInfo(item: LiveDownloadItem): {
+  cleanTitle: string;
+  subTitle?: string;
+  isTv: boolean;
+} {
+  // 1. Si c'est un item Sonarr/Radarr structuré
+  if (item.seriesTitle) {
+    const sStr = item.seasonNumber ? `S${String(item.seasonNumber).padStart(2, '0')}` : '';
+    const eStr = item.episodeNumber ? `E${String(item.episodeNumber).padStart(2, '0')}` : '';
+    const epCode = sStr && eStr ? `${sStr} | ${eStr}` : (sStr || eStr);
+    return {
+      cleanTitle: item.seriesTitle,
+      subTitle: epCode || undefined,
+      isTv: true
+    };
+  }
+
+  if (item.movieTitle) {
+    return {
+      cleanTitle: item.movieTitle,
+      isTv: false
+    };
+  }
+
+  const raw = (item.title || item.releaseTitle || '').trim();
+
+  // Détection épisode S01E02, S1E2, S01.E02 ou 1x02
+  const tvMatch = raw.match(/s(\d{1,2})[e._-]?(\d{1,2})/i) || raw.match(/(\d{1,2})x(\d{1,2})/i);
+  let isTv = item.mediaType === 'tv' || Boolean(tvMatch);
+  let seasonNumber = item.seasonNumber;
+  let episodeNumber = item.episodeNumber;
+
+  if (tvMatch && (!seasonNumber || !episodeNumber)) {
+    seasonNumber = parseInt(tvMatch[1], 10);
+    episodeNumber = parseInt(tvMatch[2], 10);
+  }
+
+  // Nettoyage du titre (enlever la qualité, codec, release group, etc.)
+  let cleanName = raw;
+  if (tvMatch && tvMatch.index !== undefined && tvMatch.index > 0) {
+    cleanName = raw.substring(0, tvMatch.index);
+  } else {
+    // Chercher l'année (ex: 2026, 2024) ou premier tag de qualité (2160p, 1080p, MULTI, etc.)
+    const tagMatch = raw.match(/(19\d\d|20\d\d|2160p|1080p|720p|4k|hdr|bluray|web-dl|webrip|h264|hevc|x264|x265|multi|vf\d*|vostfr)/i);
+    if (tagMatch && tagMatch.index !== undefined && tagMatch.index > 2) {
+      cleanName = raw.substring(0, tagMatch.index);
+    }
+  }
+
+  // Remplacement des séparateurs
+  cleanName = cleanName.replace(/[._]/g, ' ').trim();
+  cleanName = cleanName.replace(/^[-–—\s]+|[-–—\s]+$/g, '').trim();
+
+  // Extension de fichier (.mkv, .mp4, etc.)
+  cleanName = cleanName.replace(/\.(mkv|mp4|avi|iso)$/i, '').trim();
+
+  if (!cleanName || cleanName.length < 2) {
+    cleanName = raw;
+  }
+
+  // Capitalisation élégante des mots
+  cleanName = cleanName.replace(/\b[a-z]/g, (char) => char.toUpperCase());
+
+  let subTitle: string | undefined = undefined;
+  if (isTv && (seasonNumber || episodeNumber)) {
+    const sStr = seasonNumber ? `S${String(seasonNumber).padStart(2, '0')}` : 'S01';
+    const eStr = episodeNumber ? `E${String(episodeNumber).padStart(2, '0')}` : '';
+    subTitle = eStr ? `${sStr} | ${eStr}` : sStr;
+  }
+
+  return {
+    cleanTitle: cleanName,
+    subTitle,
+    isTv
+  };
 }
 
 export function matchShowDownload(

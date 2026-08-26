@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
-import { formatBytes, formatSpeed, formatSecondsToETA, LiveDownloadItem } from '../services/sonarrRadarr';
+import { formatBytes, formatSpeed, formatSecondsToETA, formatCleanMediaInfo, LiveDownloadItem } from '../services/sonarrRadarr';
 import { useToastStore } from '../store/toastStore';
 import { FreeDownloadScreen } from './FreeDownloadScreen';
 import { SeenItLogo } from '../components/SeenItLogo';
@@ -175,12 +175,13 @@ export function DownloadsScreen({ onShowClick, onOpenSettings }: Props) {
             </button>
           </div>
         ) : (
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             {downloads.map((item) => {
               const isDeleting = deletingId === item.id;
               const isDone = item.progress >= 100;
               const isError = item.status === 'error' || Boolean(item.errorMessage);
               const isWarning = item.status === 'warning';
+              const { cleanTitle, subTitle, isTv } = formatCleanMediaInfo(item);
 
               return (
                 <div
@@ -191,164 +192,173 @@ export function DownloadsScreen({ onShowClick, onOpenSettings }: Props) {
                     }
                   }}
                   className={cn(
-                    "p-3.5 rounded-2xl border transition-all backdrop-blur-sm relative overflow-hidden group",
+                    "rounded-2xl border transition-all backdrop-blur-md relative overflow-hidden group flex items-stretch min-h-[115px]",
                     isError
-                      ? "bg-gradient-to-r from-red-950/30 via-zinc-900 to-zinc-900 border-red-500/40"
+                      ? "bg-gradient-to-r from-red-950/40 via-zinc-900 to-zinc-900 border-red-500/40"
                       : isWarning
-                      ? "bg-gradient-to-r from-amber-950/30 via-zinc-900 to-zinc-900 border-amber-500/40"
-                      : "bg-zinc-900/80 border-white/10 hover:border-white/20",
+                      ? "bg-gradient-to-r from-amber-950/40 via-zinc-900 to-zinc-900 border-amber-500/40"
+                      : "bg-zinc-900/90 border-white/10 hover:border-white/20",
                     item.tmdbId && onShowClick ? "cursor-pointer" : ""
                   )}
                 >
                   {/* Background progress tint */}
                   <div 
                     className={cn(
-                      "absolute inset-y-0 left-0 transition-all duration-300 pointer-events-none",
+                      "absolute inset-y-0 left-0 transition-all duration-300 pointer-events-none opacity-20",
                       isError
-                        ? "bg-red-500/10"
+                        ? "bg-red-500"
                         : isWarning
-                        ? "bg-amber-500/10"
-                        : "bg-gradient-to-r from-blue-500/10 to-cyan-500/5"
+                        ? "bg-amber-500"
+                        : "bg-gradient-to-r from-blue-500 to-emerald-500"
                     )}
                     style={{ width: `${Math.min(100, item.progress)}%` }}
                   />
 
-                  <div className="relative z-10 flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 min-w-0 flex-1">
-                      {/* Image Affiche Poster (si disponible) ou Icône Type */}
-                      {item.posterPath ? (
-                        <div className="w-12 h-16 rounded-xl overflow-hidden border border-white/15 shadow-md shrink-0 bg-zinc-950 relative">
-                          <img 
-                            src={`https://image.tmdb.org/t/p/w185${item.posterPath}`} 
-                            alt={item.title}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                            onError={(e) => {
-                              // Fallback si l'image ne charge pas
-                              (e.target as HTMLElement).style.display = 'none';
-                            }}
-                          />
+                  {/* Image Affiche Poster à gauche (Flush left) */}
+                  <div className="w-20 sm:w-24 shrink-0 relative bg-zinc-950 flex flex-col items-center justify-center overflow-hidden border-r border-white/10">
+                    {item.posterPath ? (
+                      <img 
+                        src={`https://image.tmdb.org/t/p/w185${item.posterPath}`} 
+                        alt={cleanTitle}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <div className={cn(
+                        "w-full h-full flex flex-col items-center justify-center gap-1.5 p-2 text-center",
+                        isError
+                          ? "bg-red-950/40 text-red-400"
+                          : isWarning
+                          ? "bg-amber-950/40 text-amber-400"
+                          : isTv
+                          ? "bg-gradient-to-b from-purple-950/50 to-zinc-950 text-purple-400"
+                          : "bg-gradient-to-b from-amber-950/40 to-zinc-950 text-[#E5A93D]"
+                      )}>
+                        {isError ? (
+                          <AlertCircle size={22} />
+                        ) : isTv ? (
+                          <Tv size={24} className="text-purple-400" />
+                        ) : (
+                          <Film size={24} className="text-[#E5A93D]" />
+                        )}
+                        <span className="text-[9px] font-black uppercase text-zinc-400 tracking-wider">
+                          {isTv ? 'Série' : 'Film'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Contenu de droite */}
+                  <div className="flex-1 p-3 sm:p-3.5 flex flex-col justify-between min-w-0 relative z-10">
+                    <div>
+                      {/* Ligne 1 : Titre propre & Badge Client / Pourcentage & Delete */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h3 className="font-extrabold text-sm sm:text-base text-[#E5A93D] tracking-wide uppercase truncate leading-snug">
+                              {cleanTitle}
+                            </h3>
+                            <span className={cn(
+                              "px-1.5 py-0.2 rounded text-[8px] sm:text-[9px] font-black uppercase shrink-0 border",
+                              item.downloadClient === 'Sonarr' ? "bg-sky-500/20 text-sky-300 border-sky-500/30" :
+                              item.downloadClient === 'Radarr' ? "bg-amber-500/20 text-amber-300 border-amber-500/30" :
+                              "bg-indigo-500/20 text-indigo-300 border-indigo-500/30"
+                            )}>
+                              {item.downloadClient || 'QBittorrent'}
+                            </span>
+                          </div>
+
+                          {/* Ligne 2 : Numéro d'épisode si série (ex: S02 | E01) */}
+                          {subTitle ? (
+                            <p className="text-xs sm:text-sm font-bold text-white tracking-wide mt-0.5">
+                              {subTitle}
+                            </p>
+                          ) : null}
                         </div>
-                      ) : (
-                        <div className={cn(
-                          "w-12 h-16 rounded-xl flex items-center justify-center shrink-0 border shadow-md",
-                          isError
-                            ? "bg-red-500/15 border-red-500/30 text-red-400"
-                            : isWarning
-                            ? "bg-amber-500/15 border-amber-500/30 text-amber-400"
-                            : item.mediaType === 'tv'
-                            ? "bg-purple-500/10 border-purple-500/20 text-purple-400"
-                            : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                        )}>
-                          {isError ? (
-                            <AlertCircle size={20} />
-                          ) : item.mediaType === 'tv' ? (
-                            <Tv size={20} />
-                          ) : (
-                            <Film size={20} />
-                          )}
+
+                        {/* Pourcentage & Bouton Supprimer à droite */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className={cn(
+                            "text-xs sm:text-sm font-extrabold",
+                            isError ? "text-red-400" : isDone ? "text-emerald-400" : "text-cyan-400"
+                          )}>
+                            {isError ? 'Erreur' : `${item.progress}%`}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={(e) => handleRemoveItem(e, item)}
+                            disabled={isDeleting}
+                            className="p-1 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                            title="Annuler / Retirer"
+                          >
+                            <X size={15} className={cn(isDeleting && "animate-spin")} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Erreur détaillée si présente */}
+                      {item.errorMessage && (
+                        <div className="mt-1.5 p-1.5 px-2 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-[11px] font-bold flex items-center gap-1.5">
+                          <AlertTriangle size={13} className="shrink-0 text-red-400" />
+                          <span className="leading-tight">{item.errorMessage}</span>
                         </div>
                       )}
+                    </div>
 
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                          <span className="font-extrabold text-sm text-white leading-snug break-words">
-                            {item.title}
-                          </span>
-                          <span className={cn(
-                            "px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase shrink-0",
-                            item.downloadClient === 'Sonarr' ? "bg-sky-500/20 text-sky-300 border border-sky-500/30" :
-                            item.downloadClient === 'Radarr' ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" :
-                            "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
-                          )}>
-                            {item.downloadClient || 'Client'}
-                          </span>
-                        </div>
-
-                        {item.releaseTitle && item.releaseTitle !== item.title && (
-                          <p className="text-[10px] sm:text-[11px] text-zinc-400 font-mono break-all leading-relaxed mb-1 bg-black/30 p-1 rounded border border-white/5">
-                            {item.releaseTitle}
-                          </p>
-                        )}
-
-                        {/* Error Message Details if present (e.g. disk space full) */}
-                        {item.errorMessage && (
-                          <div className="my-1.5 p-1.5 px-2 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-[11px] font-bold flex items-center gap-1.5">
-                            <AlertTriangle size={13} className="shrink-0 text-red-400" />
-                            <span className="leading-tight">{item.errorMessage}</span>
-                          </div>
-                        )}
-
-                        {/* Stats Bar */}
-                        <div className="flex items-center gap-2.5 text-[11px] font-semibold text-zinc-400 flex-wrap mt-1">
-                          {item.speedFormatted && !isError ? (
-                            <span className="text-cyan-300 font-bold flex items-center gap-1">
-                              <Zap size={11} className="fill-cyan-300" />
-                              {item.speedFormatted}
-                            </span>
-                          ) : null}
-
-                          {item.timeleft && item.timeleft !== '--' && !isError ? (
-                            <span className="flex items-center gap-1 text-zinc-400">
-                              <Clock size={11} />
-                              {item.timeleft}
-                            </span>
-                          ) : null}
-
+                    {/* Ligne du bas : Stats de téléchargement & Barre de progression */}
+                    <div className="mt-2 space-y-1.5">
+                      <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-semibold text-zinc-400 flex-wrap gap-x-2 gap-y-0.5">
+                        <div className="flex items-center gap-2">
                           {item.size > 0 && (
-                            <span className="text-zinc-400">
+                            <span>
                               {formatBytes(item.size - item.sizeleft)} / {formatBytes(item.size)}
                             </span>
                           )}
+                          {isDone && (
+                            <span className="text-emerald-400 font-bold flex items-center gap-1">
+                              • TÉLÉCHARGEMENT TERMINÉ 🍿
+                            </span>
+                          )}
+                        </div>
 
-                          {item.statusText && (
-                            <span className={cn(
-                              "text-[10px] font-bold uppercase",
-                              isError ? "text-red-400" : isWarning ? "text-amber-400" : "text-zinc-500"
-                            )}>
-                              • {item.statusText}
+                        <div className="flex items-center gap-2">
+                          {item.speedFormatted && !isError && !isDone && (
+                            <span className="text-cyan-300 font-bold flex items-center gap-0.5">
+                              <Zap size={10} className="fill-cyan-300" />
+                              {item.speedFormatted}
+                            </span>
+                          )}
+
+                          {item.timeleft && item.timeleft !== '--' && !isError && !isDone && (
+                            <span className="flex items-center gap-0.5 text-zinc-300 font-medium">
+                              <Clock size={10} />
+                              {item.timeleft}
                             </span>
                           )}
                         </div>
                       </div>
+
+                      {/* Progress Bar */}
+                      <div className="relative w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                        <div 
+                          className={cn(
+                            "h-full rounded-full transition-all duration-300",
+                            isError
+                              ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"
+                              : isWarning
+                              ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
+                              : isDone
+                              ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                              : "bg-gradient-to-r from-blue-600 via-cyan-400 to-emerald-400"
+                          )}
+                          style={{ width: `${Math.max(2, Math.min(100, item.progress))}%` }}
+                        />
+                      </div>
                     </div>
-
-                    {/* Right side status & remove */}
-                    <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={(e) => handleRemoveItem(e, item)}
-                        disabled={isDeleting}
-                        className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
-                        title="Annuler / Retirer"
-                      >
-                        <X size={15} className={cn(isDeleting && "animate-spin")} />
-                      </button>
-
-                      <span className={cn(
-                        "text-xs font-black",
-                        isError ? "text-red-400" : isDone ? "text-emerald-400" : "text-cyan-400"
-                      )}>
-                        {isError ? 'Erreur' : `${item.progress}%`}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Linear Progress Bar */}
-                  <div className="relative w-full h-1.5 bg-zinc-800 rounded-full mt-2.5 overflow-hidden">
-                    <div 
-                      className={cn(
-                        "h-full rounded-full transition-all duration-300",
-                        isError
-                          ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"
-                          : isWarning
-                          ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
-                          : isDone
-                          ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
-                          : "bg-gradient-to-r from-blue-600 via-cyan-400 to-emerald-400"
-                      )}
-                      style={{ width: `${Math.max(2, Math.min(100, item.progress))}%` }}
-                    />
                   </div>
                 </div>
               );
