@@ -240,28 +240,30 @@ export function SeenItGlyph({
       {/* 8. 'download' : Download Arrow in Cinema TV Screen */}
       {symbol === 'download' && (
         <g>
-          {/* Vertical Arrow stem */}
-          <path
-            d="M 50 28 L 50 48"
-            stroke={symbolFill}
-            strokeWidth={size <= 28 ? "5" : "4.2"}
-            strokeLinecap="round"
+          {/* Solid Downward Arrow Stem */}
+          <rect
+            x="46.5"
+            y="26"
+            width="7"
+            height="18"
+            rx="3.5"
+            fill={symbolFill}
           />
-          {/* Arrow Head */}
+          {/* Solid Arrow Head */}
           <path
-            d="M 41 41 L 50 50 L 59 41"
-            fill="none"
+            d="M 36 41 L 50 54 L 64 41 Z"
+            fill={symbolFill}
             stroke={symbolFill}
-            strokeWidth={size <= 28 ? "5" : "4.2"}
-            strokeLinecap="round"
+            strokeWidth="2.5"
             strokeLinejoin="round"
+            strokeLinecap="round"
           />
-          {/* Tray base */}
+          {/* Crisp Tray base */}
           <path
-            d="M 36 53 L 36 57 C 36 59 38 60 40 60 L 60 60 C 62 60 64 59 64 57 L 64 53"
+            d="M 33 53 L 33 58 C 33 61 35.5 63 38.5 63 L 61.5 63 C 64.5 63 67 61 67 58 L 67 53"
             fill="none"
             stroke={symbolFill}
-            strokeWidth={size <= 28 ? "4" : "3.5"}
+            strokeWidth={size <= 28 ? "4.5" : "3.8"}
             strokeLinecap="round"
             strokeLinejoin="round"
           />
@@ -270,7 +272,7 @@ export function SeenItGlyph({
 
       {/* TV Screen Stand Neck */}
       <path
-        d="M 50 69 L 50 78.5"
+        d="M 50 67 L 50 78.5"
         stroke={frameStroke}
         strokeWidth={strokeW}
         strokeLinecap="round"
@@ -278,7 +280,7 @@ export function SeenItGlyph({
 
       {/* TV Screen Stand Base */}
       <path
-        d="M 32 79 C 32 79 41 78 50 78 C 59 78 68 79 68 79"
+        d="M 30 79 C 30 79 40 78 50 78 C 60 78 70 79 70 79"
         stroke={frameStroke}
         strokeWidth={strokeW}
         strokeLinecap="round"

@@ -1005,22 +1005,13 @@ async function startServer() {
         return res.status(400).json({ error: 'targetUrl requis' });
       }
 
-      // Si c'est une adresse IP privée locale directe, le serveur cloud Google ne peut pas y accéder
-      const isLocalIp = targetUrl.includes('192.168.') || targetUrl.includes('10.') || targetUrl.includes('172.16.') || targetUrl.includes('127.0.0.1') || targetUrl.includes('localhost');
-      if (isLocalIp) {
-        return res.status(400).json({
-          error: 'IP_LOCALE_INACCESSIBLE_SERVEUR_CLOUD',
-          message: 'L\'adresse IP 192.168.x.x est sur votre réseau privé local chez vous. Le serveur cloud AI Studio ne peut pas joindre votre box directement. Utilisez un tunnel HTTPS (ngrok, etc.) pour tester en Web ou testez directement sur l\'APK Android connecté à votre Wi-Fi.'
-        });
-      }
-
       const fetchOptions: any = {
         method,
         headers: {
           ...headers,
           'User-Agent': 'SeenIt-Proxy/1.0'
         },
-        signal: AbortSignal.timeout(10000)
+        signal: AbortSignal.timeout(8000)
       };
 
       if (method !== 'GET' && method !== 'HEAD' && body) {

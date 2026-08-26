@@ -25,8 +25,8 @@ export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveT
     { id: 'watchlist', label: 'À Voir', symbol: 'watch' },
     { id: 'library', label: 'Ma Liste', symbol: 'library' },
     { id: 'discover', label: 'Explorer', symbol: 'discover' },
-    { id: 'downloads', label: 'Téléchargements', symbol: 'download' },
     { id: 'profile', label: 'Profil', symbol: 'profile' },
+    { id: 'downloads', label: 'Téléchargements', symbol: 'download' },
   ] as const;
 
   const handleTabClick = (e: React.MouseEvent, tabId: string) => {
