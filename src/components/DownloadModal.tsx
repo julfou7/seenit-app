@@ -104,6 +104,25 @@ export function DownloadModal({
   const [selectedSeason, setSelectedSeason] = useState<number>(initialSeason || 1);
   const [selectedEpisode, setSelectedEpisode] = useState<number>(initialEpisode || 1);
 
+  // Synchroniser le mode de portée à l'ouverture de la modal
+  useEffect(() => {
+    if (isOpen) {
+      if (initialEpisode && initialSeason) {
+        setScopeMode('episode');
+        setSelectedSeason(initialSeason);
+        setSelectedEpisode(initialEpisode);
+      } else if (initialSeason) {
+        setScopeMode('season');
+        setSelectedSeason(initialSeason);
+        setSelectedEpisode(1);
+      } else {
+        setScopeMode('all');
+        setSelectedSeason(1);
+        setSelectedEpisode(1);
+      }
+    }
+  }, [isOpen, initialSeason, initialEpisode]);
+
   // Masquer la liste des torrents par défaut (l'utilisateur utilise Sonarr/Radarr)
   const [showTorrentList, setShowTorrentList] = useState<boolean>(false);
 

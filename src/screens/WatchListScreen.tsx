@@ -988,10 +988,8 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
         <div className="absolute top-0 left-0 w-72 h-40 bg-[#E5A93D]/15 blur-[120px] -z-10 rounded-full mix-blend-screen pointer-events-none" />
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 shrink-0">
-            <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3 whitespace-nowrap">
-              <SeenItLogo size={34} symbol="watch" animated />
-              <span>À Voir</span>
-            </h1>
+            <SeenItLogo variant="horizontal" size={32} symbol="watch" animated />
+            <span className="text-[10px] font-extrabold text-zinc-400 bg-white/5 border border-white/10 px-2.5 py-0.5 rounded-full uppercase tracking-wider">À Voir</span>
             <span className="relative flex h-2.5 w-2.5 shrink-0" title="En direct / Instant présent">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#E5A93D] opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#E5A93D]"></span>

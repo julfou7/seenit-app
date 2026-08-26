@@ -751,10 +751,12 @@ export async function searchAndDownloadInSonarr(params: {
       }
 
       // Recherche par épisode spécifique
-      if (params.season && params.episode) {
+      if (params.season !== undefined && params.episode !== undefined && params.season !== null && params.episode !== null) {
         try {
           const episodes: any[] = await executeGet(`${base}/api/v3/episode?seriesId=${seriesId}`, headers);
-          const targetEp = Array.isArray(episodes) ? episodes.find((ep: any) => ep.seasonNumber === params.season && ep.episodeNumber === params.episode) : null;
+          const targetEp = Array.isArray(episodes) ? episodes.find((ep: any) => 
+            Number(ep.seasonNumber) === Number(params.season) && Number(ep.episodeNumber) === Number(params.episode)
+          ) : null;
           
           if (targetEp && targetEp.id) {
             await executePost(`${base}/api/v3/command`, {
@@ -765,14 +767,24 @@ export async function searchAndDownloadInSonarr(params: {
               success: true,
               message: `Recherche lancée dans Sonarr pour « ${params.title} » S${String(params.season).padStart(2, '0')}E${String(params.episode).padStart(2, '0')} (${params.qualityPreference === '4k' ? '4K' : '1080p'}) !`
             };
+          } else {
+            console.warn(`[Sonarr] Épisode S${params.season}E${params.episode} non trouvé dans la liste d'épisodes de Sonarr.`);
+            return {
+              success: false,
+              message: `Épisode S${String(params.season).padStart(2, '0')}E${String(params.episode).padStart(2, '0')} introuvable dans Sonarr.`
+            };
           }
-        } catch (epErr) {
+        } catch (epErr: any) {
           console.warn('[Sonarr Episode Search Error]', epErr);
+          return {
+            success: false,
+            message: `Erreur recherche épisode Sonarr : ${epErr?.message || 'Erreur réseau'}`
+          };
         }
       }
 
       // Recherche par saison entière
-      if (params.season) {
+      if (params.season !== undefined && params.season !== null) {
         await executePost(`${base}/api/v3/command`, {
           name: 'SeasonSearch',
           seriesId: seriesId,
@@ -858,7 +870,10 @@ export async function searchAndDownloadInSonarr(params: {
       };
     }
 
-    // Ajouter la série dans Sonarr avec recherche automatique immédiate et profil de qualité choisi
+    const isEpisodeSearch = params.season !== undefined && params.episode !== undefined && params.season !== null && params.episode !== null;
+    const isSeasonSearch = !isEpisodeSearch && params.season !== undefined && params.season !== null;
+
+    // Ajouter la série dans Sonarr avec recherche ciblée
     const addPayload: any = {
       title: lookupResult.title,
       seasons: Array.isArray(lookupResult.seasons) ? lookupResult.seasons : [],
@@ -871,8 +886,9 @@ export async function searchAndDownloadInSonarr(params: {
       titleSlug: lookupResult.titleSlug,
       images: lookupResult.images || [],
       addOptions: {
-        searchForMissingEpisodes: true,
-        monitor: params.season ? 'all' : 'all'
+        // Empêche la recherche globale de toute la série si un épisode ou une saison est spécifié
+        searchForMissingEpisodes: !isEpisodeSearch && !isSeasonSearch,
+        monitor: 'all'
       }
     };
     if (lookupResult.seriesType) addPayload.seriesType = lookupResult.seriesType;
@@ -880,13 +896,38 @@ export async function searchAndDownloadInSonarr(params: {
 
     const created = await executePost(`${base}/api/v3/series`, addPayload, headers);
     
-    // Si on ciblait une saison en particulier, lancer la recherche de cette saison
-    if (params.season && created && created.id) {
-      await executePost(`${base}/api/v3/command`, {
-        name: 'SeasonSearch',
-        seriesId: created.id,
-        seasonNumber: params.season
-      }, headers).catch(() => {});
+    if (created && created.id) {
+      if (isEpisodeSearch) {
+        try {
+          const episodes: any[] = await executeGet(`${base}/api/v3/episode?seriesId=${created.id}`, headers);
+          const targetEp = Array.isArray(episodes) ? episodes.find((ep: any) => 
+            Number(ep.seasonNumber) === Number(params.season) && Number(ep.episodeNumber) === Number(params.episode)
+          ) : null;
+          
+          if (targetEp && targetEp.id) {
+            await executePost(`${base}/api/v3/command`, {
+              name: 'EpisodeSearch',
+              episodeIds: [targetEp.id]
+            }, headers);
+            return {
+              success: true,
+              message: `« ${params.title} » ajoutée à Sonarr ! Recherche de l'épisode S${String(params.season).padStart(2, '0')}E${String(params.episode).padStart(2, '0')} lancée.`
+            };
+          }
+        } catch (epErr) {
+          console.warn('[Sonarr Episode Search Error after Add]', epErr);
+        }
+      } else if (isSeasonSearch) {
+        await executePost(`${base}/api/v3/command`, {
+          name: 'SeasonSearch',
+          seriesId: created.id,
+          seasonNumber: params.season
+        }, headers).catch(() => {});
+        return {
+          success: true,
+          message: `« ${params.title} » ajoutée à Sonarr ! Recherche de la Saison ${params.season} lancée.`
+        };
+      }
     }
 
     return {

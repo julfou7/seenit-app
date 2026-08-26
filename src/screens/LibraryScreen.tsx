@@ -241,10 +241,10 @@ export function LibraryScreen({ onShowClick }: Props) {
     <div className="flex-1 overflow-y-auto bg-transparent text-white pb-nav">
       <div className="px-4 sm:px-6 pt-6 pb-4 relative">
         <div className="absolute top-0 left-0 w-72 h-40 bg-[#E5A93D]/15 blur-[120px] -z-10 rounded-full mix-blend-screen pointer-events-none" />
-        <h1 className="text-3xl font-black tracking-tight text-white mb-1 flex items-center gap-3">
-          <SeenItLogo size={34} symbol="library" animated />
-          <span>Ma Liste</span>
-        </h1>
+        <div className="flex items-center gap-2.5 mb-2">
+          <SeenItLogo variant="horizontal" size={32} symbol="library" animated />
+          <span className="text-[10px] font-extrabold text-zinc-400 bg-white/5 border border-white/10 px-2.5 py-0.5 rounded-full uppercase tracking-wider">Ma Liste</span>
+        </div>
         <p className="text-xs text-zinc-400 font-medium">Toutes vos œuvres sauvegardées au même endroit.</p>
       </div>
 

@@ -24,6 +24,7 @@ import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { formatBytes, formatSpeed, formatSecondsToETA, LiveDownloadItem } from '../services/sonarrRadarr';
 import { useToastStore } from '../store/toastStore';
 import { FreeDownloadScreen } from './FreeDownloadScreen';
+import { SeenItLogo } from '../components/SeenItLogo';
 import { cn } from '../lib/utils';
 
 interface Props {
@@ -92,16 +93,15 @@ export function DownloadsScreen({ onShowClick, onOpenSettings }: Props) {
       <div className="shrink-0 px-4 sm:px-6 pt-4 pb-3 border-b border-white/5 bg-zinc-950/60 backdrop-blur-xl flex items-center justify-between z-10">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
-              Téléchargements
-            </h1>
+            <SeenItLogo variant="horizontal" size={28} symbol="download" animated />
+            <span className="text-[10px] font-extrabold text-zinc-400 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full uppercase tracking-wider">Téléchargements</span>
             {downloads.length > 0 && (
               <span className="px-2 py-0.5 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-400 text-xs font-bold animate-pulse">
                 {downloads.length}
               </span>
             )}
           </div>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <p className="text-xs text-zinc-400 mt-1">
             Suivi en temps réel Sonarr, Radarr & qBittorrent
           </p>
         </div>
