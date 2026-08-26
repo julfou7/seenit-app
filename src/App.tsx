@@ -21,6 +21,7 @@ import { ProfileScreen } from './screens/ProfileScreen';
 import { ShowDetailScreen } from './screens/ShowDetailScreen';
 import { WatchListScreen } from './screens/WatchListScreen';
 import { DiscoverScreen } from './screens/DiscoverScreen';
+import { DownloadsScreen } from './screens/DownloadsScreen';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { AppUpdateBanner } from './components/AppUpdateBanner';
 import { useNavigation } from './features/navigation/useNavigation';
@@ -374,6 +375,13 @@ function MainApp() {
 
             <div className={cn("flex-1 min-h-0 flex flex-col", currentTab !== 'discover' && "hidden")}>
               <DiscoverScreen onShowClick={(id, mediaType) => openShow(id, 'tmdb', mediaType)} />
+            </div>
+
+            <div className={cn("flex-1 min-h-0 flex flex-col", currentTab !== 'downloads' && "hidden")}>
+              <DownloadsScreen 
+                onShowClick={(id, mediaType) => openShow(id, 'tmdb', mediaType)}
+                onOpenSettings={() => changeTab('settings')}
+              />
             </div>
 
             <div className={cn("flex-1 min-h-0 flex flex-col", (currentTab !== 'profile' && currentTab !== 'settings') && "hidden")}>

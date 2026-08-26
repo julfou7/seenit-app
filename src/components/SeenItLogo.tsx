@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from '../lib/utils';
 
-export type SeenItSymbolType = 'check' | 'play' | 'watch' | 'library' | 'discover' | 'vip' | 'cinema' | 'profile';
+export type SeenItSymbolType = 'check' | 'play' | 'watch' | 'library' | 'discover' | 'vip' | 'cinema' | 'profile' | 'download';
 
 export interface SeenItLogoProps {
   className?: string;
@@ -234,6 +234,37 @@ export function SeenItGlyph({
           <circle cx="39" cy="51" r="2" fill="#0B0B0F" />
           <circle cx="50" cy="51" r="2" fill="#0B0B0F" />
           <circle cx="61" cy="51" r="2" fill="#0B0B0F" />
+        </g>
+      )}
+
+      {/* 8. 'download' : Download Arrow in Cinema TV Screen */}
+      {symbol === 'download' && (
+        <g>
+          {/* Vertical Arrow stem */}
+          <path
+            d="M 50 28 L 50 48"
+            stroke={symbolFill}
+            strokeWidth={size <= 28 ? "5" : "4.2"}
+            strokeLinecap="round"
+          />
+          {/* Arrow Head */}
+          <path
+            d="M 41 41 L 50 50 L 59 41"
+            fill="none"
+            stroke={symbolFill}
+            strokeWidth={size <= 28 ? "5" : "4.2"}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          {/* Tray base */}
+          <path
+            d="M 36 53 L 36 57 C 36 59 38 60 40 60 L 60 60 C 62 60 64 59 64 57 L 64 53"
+            fill="none"
+            stroke={symbolFill}
+            strokeWidth={size <= 28 ? "4" : "3.5"}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </g>
       )}
 

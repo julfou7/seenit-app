@@ -833,7 +833,7 @@ async function startServer() {
       });
       
       if (tokens.length > 0) {
-        await adminMessaging.sendEachForMulticast({
+        await getMessaging().sendEachForMulticast({
           tokens,
           notification: { title, body }
         });
@@ -1048,6 +1048,61 @@ async function startServer() {
         error: 'PROXY_FETCH_ERROR',
         message: err?.message || 'Erreur lors de la requête proxy'
       });
+    }
+  });
+
+  // Webhooks Sonarr & Radarr pour notifications instantanées
+  app.post(['/api/webhook/sonarr', '/api/webhook/radarr'], async (req, res) => {
+    try {
+      const payload = req.body || {};
+      const eventType = payload.eventType || payload.event_type || 'Unknown';
+      console.log(`[Webhook ${req.path}] Event received:`, eventType, payload);
+
+      if (eventType === 'Test') {
+        return res.json({ success: true, message: 'Test webhook reçu avec succès par SeenIt !' });
+      }
+
+      let title = 'Notification Téléchargement';
+      let body = 'Un événement de téléchargement a eu lieu.';
+
+      if (eventType === 'Grab') {
+        const mediaTitle = payload.series?.title || payload.movie?.title || payload.release?.releaseTitle || 'Média';
+        title = 'Téléchargement démarré 🚀';
+        body = `"${mediaTitle}" a été envoyé au client de téléchargement.`;
+      } else if (eventType === 'Download') {
+        const mediaTitle = payload.series?.title || payload.movie?.title || 'Média';
+        const epInfo = payload.episodes?.[0] ? ` (S${payload.episodes[0].seasonNumber}E${payload.episodes[0].episodeNumber})` : '';
+        title = 'Téléchargement terminé 🍿';
+        body = `"${mediaTitle}${epInfo}" est prêt et disponible !`;
+      }
+
+      // Diffusion FCM push si Firebase Admin est configuré
+      try {
+        const db = adminDb;
+        const usersSnap = await db.collection('users').get();
+        const messaging = getMessaging();
+        
+        for (const userDoc of usersSnap.docs) {
+          const userData = userDoc.data();
+          if (userData.fcmToken) {
+            try {
+              await messaging.send({
+                notification: { title, body },
+                token: userData.fcmToken,
+              });
+            } catch (fcmErr) {
+              console.warn('[Webhook] FCM send error for user:', userDoc.id, fcmErr);
+            }
+          }
+        }
+      } catch (dbErr) {
+        console.warn('[Webhook] Error fetching users for push notifications:', dbErr);
+      }
+
+      return res.json({ success: true, eventType, message: 'Notification traitée avec succès' });
+    } catch (err: any) {
+      console.error('[Webhook Error]', err);
+      res.status(500).json({ error: err.message });
     }
   });
 

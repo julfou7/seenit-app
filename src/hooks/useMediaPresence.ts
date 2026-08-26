@@ -35,6 +35,7 @@ export function useMediaPresence(params: {
     loading: true,
     hasFile: false,
     seasonsHasFile: {},
-    episodesHasFile: {}
+    episodesHasFile: {},
+    lastChecked: 0
   };
 }

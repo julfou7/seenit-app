@@ -37,7 +37,7 @@ export function useNavigation() {
   };
 
   const initialState = getInitialState();
-  const [currentTab, setCurrentTab] = useState<'watchlist' | 'library' | 'discover' | 'settings' | 'profile'>(initialState.tab);
+  const [currentTab, setCurrentTab] = useState<'watchlist' | 'library' | 'discover' | 'downloads' | 'settings' | 'profile'>(initialState.tab);
   const [selectedShow, setSelectedShow] = useState<{ id: any, type: 'local' | 'tmdb', mediaType?: 'tv' | 'movie', tmdbId?: number, initialSeason?: number, initialEpisode?: number } | null>(initialState.selectedShow);
 
   useEffect(() => {
@@ -65,7 +65,7 @@ export function useNavigation() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const changeTab = useCallback((tab: 'watchlist' | 'library' | 'discover' | 'settings' | 'profile') => {
+  const changeTab = useCallback((tab: 'watchlist' | 'library' | 'discover' | 'downloads' | 'settings' | 'profile') => {
     window.dispatchEvent(new CustomEvent('app-close-modals'));
     setCurrentTab(tab);
     setSelectedShow(null);

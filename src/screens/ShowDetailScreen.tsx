@@ -22,6 +22,8 @@ import { useMediaPresence } from '../hooks/useMediaPresence';
 import { RedditSection } from '../components/community/RedditSection';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { LiveDownloadBanner } from '../components/LiveDownloadBanner';
+import { useDownloadConfigStore } from '../store/downloadConfigStore';
+import { searchAndDownloadInSonarr, searchAndDownloadInRadarr } from '../services/sonarrRadarr';
 
 
 interface ShowDetailScreenProps {
@@ -287,6 +289,129 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const [logoError, setLogoError] = useState(false);
   const [posterError, setPosterError] = useState(false);
   const [isSyncingSingle, setIsSyncingSingle] = useState(false);
+  const [isDownloadMode, setIsDownloadMode] = useState(false);
+  const [is1ClickDownloading, setIs1ClickDownloading] = useState<Record<string, boolean>>({});
+
+  const handle1ClickDownloadEpisode = async (e: React.MouseEvent, seasonNumber: number, episodeNumber: number) => {
+    e.stopPropagation();
+    const config = useDownloadConfigStore.getState();
+    if (!config.sonarrUrl || !config.sonarrApiKey) {
+      showToast("Configurez Sonarr dans les paramètres pour le téléchargement 1-clic", "error");
+      setDownloadTargetSeason(seasonNumber);
+      setDownloadTargetEpisode(episodeNumber);
+      setIsDownloadModalOpen(true);
+      return;
+    }
+
+    const epKey = `S${seasonNumber}E${episodeNumber}`;
+    setIs1ClickDownloading(prev => ({ ...prev, [epKey]: true }));
+
+    try {
+      const showTitle = show?.title || tmdbDetails?.name || tmdbDetails?.original_name;
+      const tvdbId = tmdbDetails?.external_ids?.tvdb_id || (show as any)?.tvdbId;
+      const res = await searchAndDownloadInSonarr({
+        url: config.sonarrUrl,
+        apiKey: config.sonarrApiKey,
+        title: showTitle,
+        tmdbId: effectiveTmdbId,
+        tvdbId,
+        season: seasonNumber,
+        episode: episodeNumber,
+        qualityPreference: '1080p'
+      });
+
+      if (res.success) {
+        showToast(`Téléchargement de S${seasonNumber}E${episodeNumber} lancé dans Sonarr !`, 'success');
+        useLiveDownloadStore.getState().startPolling(2000);
+        useLiveDownloadStore.getState().fetchDownloads();
+      } else {
+        showToast(res.message || "Erreur lors du lancement dans Sonarr", "error");
+      }
+    } catch (err: any) {
+      showToast(err?.message || "Erreur réseau Sonarr", "error");
+    } finally {
+      setIs1ClickDownloading(prev => ({ ...prev, [epKey]: false }));
+    }
+  };
+
+  const handle1ClickDownloadSeason = async (e: React.MouseEvent, seasonNumber: number) => {
+    e.stopPropagation();
+    const config = useDownloadConfigStore.getState();
+    if (!config.sonarrUrl || !config.sonarrApiKey) {
+      showToast("Configurez Sonarr dans les paramètres pour le téléchargement 1-clic", "error");
+      setDownloadTargetSeason(seasonNumber);
+      setDownloadTargetEpisode(undefined);
+      setIsDownloadModalOpen(true);
+      return;
+    }
+
+    const seasonKey = `S${seasonNumber}`;
+    setIs1ClickDownloading(prev => ({ ...prev, [seasonKey]: true }));
+
+    try {
+      const showTitle = show?.title || tmdbDetails?.name || tmdbDetails?.original_name;
+      const tvdbId = tmdbDetails?.external_ids?.tvdb_id || (show as any)?.tvdbId;
+      const res = await searchAndDownloadInSonarr({
+        url: config.sonarrUrl,
+        apiKey: config.sonarrApiKey,
+        title: showTitle,
+        tmdbId: effectiveTmdbId,
+        tvdbId,
+        season: seasonNumber,
+        qualityPreference: '1080p'
+      });
+
+      if (res.success) {
+        showToast(`Téléchargement de la Saison ${seasonNumber} lancé dans Sonarr !`, 'success');
+        useLiveDownloadStore.getState().startPolling(2000);
+        useLiveDownloadStore.getState().fetchDownloads();
+      } else {
+        showToast(res.message || "Erreur lors du lancement de la saison", "error");
+      }
+    } catch (err: any) {
+      showToast(err?.message || "Erreur réseau Sonarr", "error");
+    } finally {
+      setIs1ClickDownloading(prev => ({ ...prev, [seasonKey]: false }));
+    }
+  };
+
+  const handle1ClickDownloadMovie = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const config = useDownloadConfigStore.getState();
+    if (!config.radarrUrl || !config.radarrApiKey) {
+      showToast("Configurez Radarr dans les paramètres pour le téléchargement 1-clic", "error");
+      setIsDownloadModalOpen(true);
+      return;
+    }
+
+    setIs1ClickDownloading(prev => ({ ...prev, movie: true }));
+    try {
+      const movieTitle = show?.title || tmdbDetails?.title || tmdbDetails?.original_title;
+      const movieYear = releaseYear ? parseInt(releaseYear, 10) : undefined;
+      const imdbId = tmdbDetails?.external_ids?.imdb_id;
+      const res = await searchAndDownloadInRadarr({
+        url: config.radarrUrl,
+        apiKey: config.radarrApiKey,
+        title: movieTitle,
+        tmdbId: effectiveTmdbId,
+        year: movieYear,
+        imdbId,
+        qualityPreference: '1080p'
+      });
+
+      if (res.success) {
+        showToast(`Téléchargement de « ${movieTitle} » lancé dans Radarr !`, 'success');
+        useLiveDownloadStore.getState().startPolling(2000);
+        useLiveDownloadStore.getState().fetchDownloads();
+      } else {
+        showToast(res.message || "Erreur lors du lancement dans Radarr", "error");
+      }
+    } catch (err: any) {
+      showToast(err?.message || "Erreur réseau Radarr", "error");
+    } finally {
+      setIs1ClickDownloading(prev => ({ ...prev, movie: false }));
+    }
+  };
 
   const handleSyncSingle = async () => {
     if (!show?.id) {
@@ -1918,63 +2043,21 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                   }} 
                 />
                 <div className="absolute right-0 top-12 w-56 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col py-1 animate-in fade-in duration-150">
-                  {/* Action Télécharger / Statut Présence */}
-                  {presence.hasFile || presence.plexInfo?.available ? (
-                    <>
-                      <div className="w-full px-4 py-2.5 flex items-center gap-3 text-sm font-semibold text-emerald-400 bg-emerald-500/10">
-                        <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
-                        <span>{presence.plexInfo?.available ? "Disponible sur Plex" : "Téléchargé"}</span>
-                      </div>
-                      {presence.plexInfo?.available && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowMenu(false);
-                            openExternalUrl(presence.plexInfo?.plexUrl || 'https://app.plex.tv/desktop');
-                          }}
-                          className="w-full px-4 py-2.5 text-left text-sm text-amber-400 hover:bg-zinc-800 transition-colors flex items-center gap-3 font-semibold cursor-pointer active:bg-zinc-800"
-                        >
-                          <Play size={16} className="text-amber-400 fill-amber-400 shrink-0" />
-                          <span>Ouvrir dans Plex</span>
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowMenu(false);
-                          setDownloadTargetSeason(undefined);
-                          setDownloadTargetEpisode(undefined);
-                          setIsDownloadModalOpen(true);
-                        }}
-                        className="w-full px-4 py-2.5 text-left text-sm text-blue-400 hover:bg-zinc-800 transition-colors flex items-center gap-3 font-semibold cursor-pointer active:bg-zinc-800"
-                      >
-                        <Download size={16} className="text-blue-400 shrink-0" />
-                        <span>Forcer le téléchargement</span>
-                      </button>
-                    </>
-                  ) : isUnreleased ? (
-                    <div className="w-full px-4 py-3 text-left text-sm text-zinc-500 italic flex items-center gap-3 font-semibold">
-                      <Clock size={16} className="text-zinc-500" />
-                      <span>Bientôt disponible</span>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowMenu(false);
-                        setDownloadTargetSeason(undefined);
-                        setDownloadTargetEpisode(undefined);
-                        setIsDownloadModalOpen(true);
-                      }}
-                      className="w-full px-4 py-3 text-left text-sm text-blue-400 hover:bg-zinc-800 transition-colors flex items-center gap-3 font-semibold cursor-pointer active:bg-zinc-800"
-                    >
-                      <Download size={16} className="text-blue-400" />
-                      <span>Télécharger {isSeries ? 'la série' : 'le film'}</span>
-                    </button>
-                  )}
+                  {/* Action Téléchargement */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowMenu(false);
+                      setDownloadTargetSeason(undefined);
+                      setDownloadTargetEpisode(undefined);
+                      setIsDownloadModalOpen(true);
+                    }}
+                    className="w-full px-4 py-3 text-left text-sm text-blue-400 hover:bg-zinc-800 transition-colors flex items-center gap-3 font-semibold cursor-pointer active:bg-zinc-800"
+                  >
+                    <Download size={16} className="text-blue-400 shrink-0" />
+                    <span>Téléchargement</span>
+                  </button>
 
                   <div className="h-px bg-white/5 my-0.5" />
 
@@ -2716,20 +2799,30 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                         <span>Bientôt disponible</span>
                       </p>
                     ) : (
-                      <>
-                        <p className="text-xs text-zinc-500 italic">
-                          Non disponible en streaming actuellement
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => setIsDownloadModalOpen(true)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-500/40 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 active:scale-95 text-xs font-bold transition-all cursor-pointer shadow-[0_0_12px_rgba(59,130,246,0.2)]"
-                          title="Rechercher et télécharger sur C411"
-                        >
-                          <Download size={14} className="shrink-0" />
-                          <span>Télécharger</span>
-                        </button>
-                      </>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {!isSeries ? (
+                          <button
+                            type="button"
+                            onClick={(e) => handle1ClickDownloadMovie(e)}
+                            disabled={is1ClickDownloading.movie}
+                            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-blue-500/40 bg-blue-500/15 hover:bg-blue-500/25 active:scale-95 text-xs font-bold text-blue-300 transition-all cursor-pointer shadow-[0_0_15px_rgba(59,130,246,0.25)]"
+                            title="Télécharger le film en 1 clic dans Radarr"
+                          >
+                            <Download size={14} className={cn("text-blue-300 stroke-[2.5]", is1ClickDownloading.movie && "animate-spin")} />
+                            <span>{is1ClickDownloading.movie ? "Lancement Radarr..." : "Télécharger le film (1 Clic)"}</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setIsDownloadModalOpen(true)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-500/40 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 active:scale-95 text-xs font-bold transition-all cursor-pointer shadow-[0_0_12px_rgba(59,130,246,0.2)]"
+                            title="Rechercher et télécharger sur Sonarr / C411"
+                          >
+                            <Download size={14} className="shrink-0" />
+                            <span>Télécharger</span>
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 );
@@ -2817,7 +2910,23 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
 
         {isSeries && (
           <div id="section-episodes" className="scroll-mt-40 mt-12 space-y-4 animate-in fade-in duration-200">
-            <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-2">Épisodes</h3>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider">Épisodes</h3>
+              <button
+                type="button"
+                onClick={() => setIsDownloadMode(!isDownloadMode)}
+                className={cn(
+                  "px-2.5 py-1 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer",
+                  isDownloadMode 
+                    ? "bg-blue-500/20 border-blue-500/40 text-blue-300 shadow-[0_0_12px_rgba(59,130,246,0.25)]" 
+                    : "bg-zinc-800/80 border-white/10 text-zinc-400 hover:text-white"
+                )}
+                title="Activer le mode téléchargement 1-clic direct vers Sonarr"
+              >
+                <Download size={12} className={cn(isDownloadMode && "text-blue-400 animate-pulse")} />
+                <span>{isDownloadMode ? "Mode Téléchargement (Actif)" : "Téléchargement 1-Clic"}</span>
+              </button>
+            </div>
             {tmdbDetails?.seasons?.filter((s: any) => s.season_number > 0).slice(0, visibleSeasons).map((season: any, idx: number) => {
               const seasonNum = season.season_number;
               const seasonEpCount = season.episode_count || 0;
@@ -2879,38 +2988,19 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                     </button>
                   )}
 
-                  {/* Bouton Télécharger la saison ou Badge de Disponibilité */}
-                  {(() => {
-                    if (isFutureSeason) return null;
-                    const isSeasonAvailable = presence.seasonsHasFile[seasonNum] || (presence.hasFile && (presence.plexInfo?.available || presence.sonarrHasFile));
-                    if (isSeasonAvailable) {
-                      return (
-                        <div
-                          className="px-2.5 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-[10px] font-bold flex items-center gap-1 shrink-0"
-                          title={`Saison ${seasonNum} disponible sur le serveur`}
-                        >
-                          <CheckCircle2 size={12} className="text-emerald-400" />
-                          <span className="hidden sm:inline">Disponible</span>
-                        </div>
-                      );
-                    }
-                    return (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDownloadTargetSeason(seasonNum);
-                          setDownloadTargetEpisode(undefined);
-                          setIsDownloadModalOpen(true);
-                        }}
-                        className="p-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 text-[10px] font-bold flex items-center gap-1 transition-colors active:scale-95 touch-manipulation uppercase tracking-wider shrink-0 cursor-pointer"
-                        title={`Télécharger la saison ${seasonNum} (Sonarr / C411)`}
-                      >
-                        <Download size={12} className="text-blue-400" />
-                        <span className="hidden sm:inline">S{seasonNum}</span>
-                      </button>
-                    );
-                  })()}
+                  {/* Bouton Télécharger la saison 1-clic */}
+                  {!isFutureSeason && (
+                    <button
+                      type="button"
+                      onClick={(e) => handle1ClickDownloadSeason(e, seasonNum)}
+                      disabled={is1ClickDownloading[`S${seasonNum}`]}
+                      className="p-1.5 px-2.5 rounded-full border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 text-[10px] font-bold flex items-center gap-1 transition-colors active:scale-95 touch-manipulation uppercase tracking-wider shrink-0 cursor-pointer disabled:opacity-50"
+                      title={`Télécharger la saison ${seasonNum} en 1 clic dans Sonarr`}
+                    >
+                      <Download size={12} className={cn("text-blue-400", is1ClickDownloading[`S${seasonNum}`] && "animate-spin")} />
+                      <span className="hidden sm:inline">S{seasonNum}</span>
+                    </button>
+                  )}
                   
                   <button onClick={() => loadSeason(seasonNum)} className="text-zinc-500 hover:text-white transition-colors shrink-0 px-2">
                     {expandedSeason === season.season_number ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -2964,7 +3054,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                             const isSeen = show?.seenEpisodes?.includes(epKey);
                             const isFutureEp = ep.air_date ? ep.air_date > todayStr : false;
                             const epDownload = getEpisodeDownload(effectiveTmdbId, tmdbDetails?.external_ids?.tvdb_id || (show as any)?.tvdbId, season.season_number, ep.episode_number);
-                            const epHasFile = presence.episodesHasFile[`S${season.season_number}E${ep.episode_number}`] || presence.seasonsHasFile[season.season_number] || (presence.hasFile && (presence.plexInfo?.available || presence.sonarrHasFile));
+                            const isDownloadingThis = is1ClickDownloading[`S${season.season_number}E${ep.episode_number}`];
 
                             return (
                               <div 
@@ -2991,12 +3081,6 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                                          </span>
                                        );
                                      })()}
-
-                                     {epHasFile && (
-                                       <span className="inline-block bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold uppercase px-2 py-0.5 rounded-md mb-1 w-max">
-                                         Téléchargé
-                                       </span>
-                                     )}
                                    </div>
                                    <p className={cn("text-[14px] font-bold truncate leading-tight", isSeen ? "text-zinc-500 line-through" : "text-zinc-200")}>{ep.name}</p>
                                    <p className="text-[12px] font-semibold text-zinc-500 mt-1">
@@ -3009,35 +3093,47 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                                     <div className="scale-[0.85] origin-right" onClick={(e) => e.stopPropagation()}>
                                       <LiveDownloadBanner items={[epDownload]} compact={true} />
                                     </div>
-                                  ) : !isFutureEp && !epHasFile ? (
+                                  ) : isDownloadMode ? (
+                                    /* Mode Téléchargement : la coche est remplacée par le bouton Télécharger 1-clic direct */
                                     <button
                                       type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setDownloadTargetSeason(season.season_number);
-                                        setDownloadTargetEpisode(ep.episode_number);
-                                        setIsDownloadModalOpen(true);
-                                      }}
-                                      className="p-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 transition-colors active:scale-95 touch-manipulation cursor-pointer"
-                                      title="Télécharger l'épisode"
+                                      onClick={(e) => handle1ClickDownloadEpisode(e, season.season_number, ep.episode_number)}
+                                      disabled={isDownloadingThis}
+                                      className="p-2.5 rounded-xl border border-blue-500/40 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 transition-all active:scale-90 touch-manipulation cursor-pointer shadow-[0_0_12px_rgba(59,130,246,0.3)] disabled:opacity-50"
+                                      title="Télécharger l'épisode en 1 clic dans Sonarr"
                                     >
-                                      <Download size={14} className="text-blue-400" />
+                                      <Download size={16} className={cn("text-blue-300 stroke-[2.5]", isDownloadingThis && "animate-spin")} />
                                     </button>
-                                  ) : null}
-
-                                  {!isFutureEp && (
-                                    <button 
-                                      onClick={(e) => toggleEpisodeSeen(e, season.season_number, ep.episode_number)}
-                                      className="p-1.5 touch-manipulation active:scale-90 transition-transform"
-                                    >
-                                      {isSeen ? (
-                                        <div className="w-5 h-5 rounded-full border border-emerald-500 flex items-center justify-center bg-emerald-500/15">
-                                          <Check size={12} className="text-emerald-400 stroke-[3]" />
-                                        </div>
-                                      ) : (
-                                        <div className="w-5 h-5 rounded-full border border-zinc-700" />
+                                  ) : (
+                                    /* Mode Standard : bouton 1-clic discret + coche Vu */
+                                    <div className="flex items-center gap-1">
+                                      {!isFutureEp && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => handle1ClickDownloadEpisode(e, season.season_number, ep.episode_number)}
+                                          disabled={isDownloadingThis}
+                                          className="p-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 transition-colors active:scale-95 touch-manipulation cursor-pointer disabled:opacity-50"
+                                          title="Télécharger en 1 clic dans Sonarr"
+                                        >
+                                          <Download size={13} className={cn("text-blue-400", isDownloadingThis && "animate-spin")} />
+                                        </button>
                                       )}
-                                    </button>
+
+                                      {!isFutureEp && (
+                                        <button 
+                                          onClick={(e) => toggleEpisodeSeen(e, season.season_number, ep.episode_number)}
+                                          className="p-1.5 touch-manipulation active:scale-90 transition-transform"
+                                        >
+                                          {isSeen ? (
+                                            <div className="w-5 h-5 rounded-full border border-emerald-500 flex items-center justify-center bg-emerald-500/15">
+                                              <Check size={12} className="text-emerald-400 stroke-[3]" />
+                                            </div>
+                                          ) : (
+                                            <div className="w-5 h-5 rounded-full border border-zinc-700" />
+                                          )}
+                                        </button>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
                               </div>

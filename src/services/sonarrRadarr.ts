@@ -225,6 +225,56 @@ async function executePut(url: string, body: any, headers: Record<string, string
 }
 
 /**
+ * Exécute une requête DELETE multiplateforme
+ */
+export async function executeDelete(url: string, headers: Record<string, string> = {}): Promise<any> {
+  const isLocalIp = url.includes('192.168.') || url.includes('localhost') || url.includes('127.0.0.1') || url.includes('10.') || url.includes('172.16.') || url.includes('172.17.') || url.includes('172.18.') || url.includes('172.19.') || url.includes('172.20.') || url.includes('172.21.') || url.includes('172.22.') || url.includes('172.23.') || url.includes('172.24.') || url.includes('172.25.') || url.includes('172.26.') || url.includes('172.27.') || url.includes('172.28.') || url.includes('172.29.') || url.includes('172.30.') || url.includes('172.31.');
+
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const res = await CapacitorHttp.delete({
+        url,
+        headers,
+        connectTimeout: 8000,
+        readTimeout: 8000
+      });
+      if (res.status >= 200 && res.status < 300) {
+        return res.data || { success: true };
+      }
+      throw new Error(`Erreur HTTP ${res.status}`);
+    } catch (err: any) {
+      throw new Error(err?.message || 'Serveur injoignable sur le réseau local');
+    }
+  } else {
+    // Mode Web
+    if (isLocalIp) {
+      throw new Error(`Navigateur Web : Les adresses locales privées sont protégées.`);
+    }
+
+    try {
+      const res = await fetch('/api/service-proxy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetUrl: url,
+          method: 'DELETE',
+          headers
+        }),
+        signal: AbortSignal.timeout(10000)
+      });
+
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        throw new Error(json.message || json.error || `Erreur proxy ${res.status}`);
+      }
+      return json.data;
+    } catch (err: any) {
+      throw new Error(err?.message || 'Erreur réseau');
+    }
+  }
+}
+
+/**
  * Utilitaires de résolution des profils de qualité Sonarr / Radarr (1080p vs 4K)
  */
 export function resolveQualityProfileId(
@@ -691,6 +741,7 @@ export async function searchAndDownloadInRadarr(params: {
   apiKey: string;
   title: string;
   tmdbId?: number | string;
+  imdbId?: string;
   year?: number | string;
   qualityProfileId?: number;
   qualityPreference?: '1080p' | '4k';
@@ -1335,3 +1386,65 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
 
   return items;
 }
+
+/**
+ * Supprime ou annule un téléchargement de la file d'attente Sonarr / Radarr / qBittorrent
+ */
+export async function deleteLiveDownloadItem(
+  item: LiveDownloadItem, 
+  config: SonarrRadarrConfig,
+  removeFromClient: boolean = true
+): Promise<{ success: boolean; message: string }> {
+  try {
+    // 1. Sonarr Queue Item
+    if (item.id.startsWith('sonarr_') && config.sonarrUrl && config.sonarrApiKey) {
+      const queueId = item.id.replace('sonarr_', '');
+      const sonarrBase = cleanUrl(config.sonarrUrl);
+      const url = `${sonarrBase}/api/v3/queue/${queueId}?removeFromClient=${removeFromClient}&blocklist=false`;
+      await executeDelete(url, {
+        'X-Api-Key': config.sonarrApiKey,
+        'Accept': 'application/json'
+      });
+      return { success: true, message: 'Téléchargement retiré de Sonarr' };
+    }
+
+    // 2. Radarr Queue Item
+    if (item.id.startsWith('radarr_') && config.radarrUrl && config.radarrApiKey) {
+      const queueId = item.id.replace('radarr_', '');
+      const radarrBase = cleanUrl(config.radarrUrl);
+      const url = `${radarrBase}/api/v3/queue/${queueId}?removeFromClient=${removeFromClient}&blocklist=false`;
+      await executeDelete(url, {
+        'X-Api-Key': config.radarrApiKey,
+        'Accept': 'application/json'
+      });
+      return { success: true, message: 'Téléchargement retiré de Radarr' };
+    }
+
+    // 3. qBittorrent Item
+    if (item.id.startsWith('qbit_') && config.qbittorrentUrl) {
+      const qbitBase = cleanUrl(config.qbittorrentUrl);
+      const hash = item.id.replace('qbit_', '');
+      let cookieHeader = '';
+      if (config.qbittorrentUsername || config.qbittorrentPassword) {
+        const loginRes = await loginQBittorrent(qbitBase, config.qbittorrentUsername, config.qbittorrentPassword);
+        if (loginRes.success && loginRes.cookie) cookieHeader = loginRes.cookie;
+      }
+      const qHeaders: Record<string, string> = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Referer': qbitBase,
+        'Origin': qbitBase
+      };
+      if (cookieHeader) qHeaders['Cookie'] = cookieHeader;
+
+      const url = `${qbitBase}/api/v2/torrents/delete`;
+      await executePost(url, `hashes=${encodeURIComponent(hash)}&deleteFiles=false`, qHeaders);
+      return { success: true, message: 'Torrent supprimé de qBittorrent' };
+    }
+
+    return { success: true, message: 'Élément retiré de la liste' };
+  } catch (err: any) {
+    console.warn('[deleteLiveDownloadItem error]', err);
+    return { success: false, message: err?.message || 'Erreur lors de la suppression' };
+  }
+}
+
