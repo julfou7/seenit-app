@@ -56,6 +56,7 @@ export function getPlexMediaKey(tmdbId?: number | string | null, title?: string,
 }
 
 const PLEX_ENDPOINTS = [
+  'https://seenit.ai.studio/api/plex/availability',
   'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/availability',
   'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/availability',
   '/api/plex/availability'

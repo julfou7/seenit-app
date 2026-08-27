@@ -175,6 +175,7 @@ const findShowInLocalLibrary = (
 };
 
 const PLEX_BACKEND_ENDPOINTS = [
+  'https://seenit.ai.studio/api/plex/history',
   'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/history',
   'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/history'
 ];

@@ -34,61 +34,6 @@ const STREAMING_PLATFORMS = [
   { id: 239, name: 'Arte' }
 ];
 
-function PlexLogSection() {
-  const [showLogs, setShowLogs] = useState(false);
-  const plexStatus = useSyncStore(state => state.plexSyncStatus);
-  const logs = useLogStore(state => state.logs);
-  const plexLogs = logs.filter(l => l.category === 'plex').slice(0, 30);
-
-  return (
-    <div className="mt-1.5 flex flex-col gap-2">
-      {plexStatus?.message && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-2.5 flex items-center gap-2 text-xs text-amber-300 font-medium animate-pulse">
-          <Loader2 size={13} className="animate-spin text-amber-400 shrink-0" />
-          <span>{plexStatus.message}</span>
-        </div>
-      )}
-
-      <button
-        onClick={() => setShowLogs(!showLogs)}
-        className="flex items-center justify-between text-[11px] text-zinc-400 hover:text-zinc-200 bg-zinc-900/80 p-2 rounded-lg border border-white/5 font-mono cursor-pointer"
-      >
-        <span className="flex items-center gap-1.5">
-          <Terminal size={12} className="text-amber-400 shrink-0" />
-          Journaux de synchro Plex ({plexLogs.length})
-        </span>
-        {showLogs ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-      </button>
-
-      {showLogs && (
-        <div className="bg-black/90 border border-zinc-800 rounded-xl p-2.5 max-h-48 overflow-y-auto font-mono text-[10px] space-y-1.5 shadow-inner">
-          {plexLogs.length === 0 ? (
-            <p className="text-zinc-600 italic">Aucun journal Plex pour le moment. Lancez une synchro.</p>
-          ) : (
-            plexLogs.map(log => {
-              const timeStr = new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-              return (
-                <div key={log.id} className="flex gap-2 items-start leading-tight">
-                  <span className="text-zinc-600 shrink-0">[{timeStr}]</span>
-                  <span className={cn(
-                    "break-all",
-                    log.level === 'error' && "text-red-400 font-semibold",
-                    log.level === 'warn' && "text-amber-400",
-                    log.level === 'success' && "text-emerald-400 font-semibold",
-                    log.level === 'info' && "text-zinc-300"
-                  )}>
-                    {log.message}
-                  </span>
-                </div>
-              );
-            })
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function SettingsScreen() {
   const { showToast } = useToastStore();
   const syncStatus = useSyncStore(state => state.syncStatus);
@@ -816,7 +761,6 @@ export function SettingsScreen() {
                       Complète
                     </button>
                   </div>
-                  <PlexLogSection />
                   <button onClick={handlePlexLogout} className="text-[10px] text-zinc-500 font-medium hover:text-zinc-300 underline text-center mt-1">
                     Déconnecter Plex
                   </button>

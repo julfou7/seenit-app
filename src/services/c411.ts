@@ -166,6 +166,7 @@ export async function searchC411Torrents(params: C411SearchParams): Promise<C411
     queryParams.set('apiKey', apiKey);
 
     const endpoints = [
+      'https://seenit.ai.studio/api/c411/search',
       'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/c411/search',
       'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/c411/search',
       '/api/c411/search'
@@ -231,6 +232,7 @@ export async function triggerRemoteDownload(payload: {
 }): Promise<{ success: boolean; message: string }> {
   try {
     const endpoints = [
+      'https://seenit.ai.studio/api/downloads/push',
       'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/downloads/push',
       'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/downloads/push',
       '/api/downloads/push'
