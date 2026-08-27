@@ -588,7 +588,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const sortedProviders = useMemo(() => {
     const list: any[] = [...uniqueProviders];
     if (plexMediaInfo?.available) {
-      const fallbackWatchUrl = buildPlexWatchUrl(title, year, isSeries ? 'show' : 'movie');
+      const fallbackWatchUrl = buildPlexWatchUrl(title, releaseYear || (show as any)?.year, isSeries ? 'show' : 'movie');
       const watchUrl = plexMediaInfo.watchUrl || fallbackWatchUrl;
       const serverPlexUrl = plexMediaInfo.plexUrl || 'https://app.plex.tv/desktop';
       list.push({
@@ -2822,7 +2822,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                             type="button"
                             onClick={() => {
                               const targetPlexUrl = Capacitor.isNativePlatform()
-                                ? (presence.plexInfo?.watchUrl || presence.plexInfo?.plexUrl || buildPlexWatchUrl(title, year, isSeries ? 'show' : 'movie'))
+                                ? (presence.plexInfo?.watchUrl || presence.plexInfo?.plexUrl || buildPlexWatchUrl(title, releaseYear || (show as any)?.year, isSeries ? 'show' : 'movie'))
                                 : (presence.plexInfo?.plexUrl || presence.plexInfo?.watchUrl || 'https://app.plex.tv/desktop');
                               openExternalUrl(targetPlexUrl);
                             }}

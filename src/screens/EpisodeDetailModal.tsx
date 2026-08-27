@@ -988,7 +988,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                               type="button"
                               onClick={() => {
                                 const targetPlexUrl = Capacitor.isNativePlatform()
-                                  ? (presence.plexInfo?.watchUrl || presence.plexInfo?.plexUrl || buildPlexWatchUrl(show.title, show.year, 'show'))
+                                  ? (presence.plexInfo?.watchUrl || presence.plexInfo?.plexUrl || buildPlexWatchUrl(show.title, (show as any)?.year || show.firstAirDate?.slice(0, 4), 'show'))
                                   : (presence.plexInfo?.plexUrl || presence.plexInfo?.watchUrl || 'https://app.plex.tv/desktop');
                                 openExternalUrl(targetPlexUrl);
                               }}
