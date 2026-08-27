@@ -126,7 +126,7 @@ function deduplicateAndMergeShows(rawShows: Show[], currentLocalShows: Show[] = 
     } else {
       const isExistingNewer = (existing.updatedAt || 0) > (show.updatedAt || 0);
       const olderId = isExistingNewer ? show.id : existing.id;
-      if (olderId && olderId !== show.id && olderId !== existing.id) {
+      if (olderId && show.id !== existing.id) {
         duplicateDocIds.push(olderId);
       }
       deduplicatedMap.set(key, isExistingNewer ? mergeBasedOnTime(show, existing) : mergeBasedOnTime(existing, show));
