@@ -1128,11 +1128,85 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 }
 
 /**
- * Ouvre la fiche d'un média dans l'application Plex via Deep Link Universel Plex Discover (https://watch.plex.tv)
- * 1. Génère l'URL watch.plex.tv en utilisant impérativement le titre ORIGINAL TMDB (original_title ou original_name).
- * 2. Si besoin, fait une recherche API sur Plex Discover (https://discover.provider.plex.tv/library/search?query=<title>&limit=1 avec X-Plex-Token) pour récupérer le champ slug officiel exact.
- * 3. Effectue window.location.href = https://watch.plex.tv/${type}/${slug} pour l'interception Android.
+ * Ouvre un média dans l'application Plex :
+ * 1. Média sur serveur local (ratingKey & serverId) -> Deep Link Intent Android
+ * 2. Média hors serveur -> Recherche API Discover obligatoire pour obtenir le type ("show" ou "movie") et le slug officiel exact
+ * 3. Fallback uniquement si l'API échoue
  */
+export const openPlexMedia = async (title: string, ratingKey?: string, serverId?: string): Promise<void> => {
+  // 1. Priorité absolue : Média sur le serveur local
+  if (ratingKey && serverId) {
+    appLogger.info('plex', `[Plex Open] Lancement Intent serveur local (${serverId}, ${ratingKey})`);
+    if (Capacitor.isNativePlatform()) {
+      window.location.href = `intent://preplay?metadataKey=%2Flibrary%2Fmetadata%2F${ratingKey}&server=${serverId}#Intent;scheme=plex;package=com.plexapp.android;end`;
+    } else {
+      window.open(`https://app.plex.tv/desktop/#!/server/${serverId}/details?key=%2Flibrary%2Fmetadata%2F${ratingKey}`, '_blank');
+    }
+    return;
+  }
+
+  // 2. Média hors serveur : Appel obligatoire à l'API Discover
+  try {
+    const PLEX_TOKEN = localStorage.getItem('plex_auth_token') || localStorage.getItem('plex_token') || '';
+    const searchUrl = `https://discover.provider.plex.tv/library/search?query=${encodeURIComponent(title)}&limit=1`;
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+      'X-Plex-Client-Identifier': 'seenit-app'
+    };
+    if (PLEX_TOKEN) {
+      headers['X-Plex-Token'] = PLEX_TOKEN;
+    }
+
+    let data: any = null;
+    if (Capacitor.isNativePlatform()) {
+      const nativeRes = await CapacitorHttp.get({
+        url: searchUrl,
+        headers,
+        connectTimeout: 4000,
+        readTimeout: 4000
+      });
+      if (nativeRes.status >= 200 && nativeRes.status < 300) {
+        data = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
+      }
+    } else {
+      const res = await fetch(searchUrl, { headers, signal: AbortSignal.timeout(4000) });
+      if (res.ok) {
+        data = await res.json();
+      }
+    }
+
+    const searchResults = data?.SearchResults || data?.MediaContainer?.SearchResults;
+    const match = searchResults?.[0]?.SearchResult?.[0] || data?.MediaContainer?.Metadata?.[0] || data?.SearchResults?.[0]?.SearchResult?.[0];
+    const item = match?.Metadata || match;
+
+    if (item?.slug && item?.type) {
+      // type renvoie "movie", "show", "series", etc.
+      const mediaType = (item.type === 'show' || item.type === 'series') ? 'show' : 'movie';
+      const targetUrl = `https://watch.plex.tv/${mediaType}/${item.slug}`;
+      appLogger.info('plex', `[Plex Discover API] Slug officiel résolu : ${targetUrl}`);
+      if (Capacitor.isNativePlatform()) {
+        window.location.href = targetUrl;
+      } else {
+        window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      }
+      return;
+    }
+  } catch (e: any) {
+    console.error("Erreur API Discover", e);
+    appLogger.warn('plex', `[Plex Discover API] Erreur : ${e?.message || String(e)}`);
+  }
+
+  // Fallback uniquement si l'API échoue
+  const fallbackSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const fallbackUrl = `https://watch.plex.tv/movie/${fallbackSlug}`;
+  appLogger.info('plex', `[Plex Discover Fallback] Redirection : ${fallbackUrl}`);
+  if (Capacitor.isNativePlatform()) {
+    window.location.href = fallbackUrl;
+  } else {
+    window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+  }
+};
+
 export async function openPlexWatchUrl(params: {
   title?: string;
   originalTitle?: string;
@@ -1140,99 +1214,13 @@ export async function openPlexWatchUrl(params: {
   mediaType?: 'tv' | 'movie' | 'show' | 'series' | string;
   tmdbId?: number | string;
   imdbId?: string;
+  ratingKey?: string;
+  serverId?: string;
 }): Promise<void> {
-  const { title, originalTitle, year, mediaType = 'movie', tmdbId, imdbId } = params;
-  const type = (mediaType === 'tv' || mediaType === 'show' || mediaType === 'series') ? 'show' : 'movie';
-
-  let officialSlug: string | null = null;
-
-  // 1. Titre original TMDB impératif s'il est disponible
-  const targetOriginalTitle = (originalTitle && originalTitle.trim().length > 0) ? originalTitle.trim() : null;
-  const searchQuery = targetOriginalTitle || title || '';
-
-  // 2. Recherche API sur Plex Discover pour récupérer le champ slug officiel exact
-  if (searchQuery) {
-    try {
-      const token = localStorage.getItem('plex_auth_token') || localStorage.getItem('plex_token') || '';
-      const searchUrl = `https://discover.provider.plex.tv/library/search?query=${encodeURIComponent(searchQuery)}&limit=1`;
-      const headers: Record<string, string> = {
-        'Accept': 'application/json',
-        'X-Plex-Client-Identifier': 'seenit-app'
-      };
-      if (token) {
-        headers['X-Plex-Token'] = token;
-      }
-
-      let resData: any = null;
-      if (Capacitor.isNativePlatform()) {
-        const nativeRes = await CapacitorHttp.get({
-          url: searchUrl,
-          headers,
-          connectTimeout: 4000,
-          readTimeout: 4000
-        });
-        if (nativeRes.status >= 200 && nativeRes.status < 300) {
-          resData = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
-        }
-      } else {
-        const fetchRes = await fetch(searchUrl, { headers, signal: AbortSignal.timeout(4000) });
-        if (fetchRes.ok) {
-          resData = await fetchRes.json();
-        }
-      }
-
-      if (resData?.MediaContainer) {
-        let items: any[] = [];
-        if (Array.isArray(resData.MediaContainer.SearchResults)) {
-          for (const section of resData.MediaContainer.SearchResults) {
-            if (Array.isArray(section.SearchResult)) {
-              for (const sr of section.SearchResult) {
-                if (sr.Metadata) items.push(sr.Metadata);
-              }
-            }
-          }
-        } else if (Array.isArray(resData.MediaContainer.Metadata)) {
-          items = resData.MediaContainer.Metadata;
-        }
-
-        const firstMatch = items.find((item: any) => {
-          const itType = (item.type || '').toLowerCase();
-          if (type === 'movie' && itType && itType !== 'movie') return false;
-          if (type === 'show' && itType && itType !== 'show' && itType !== 'series') return false;
-          return true;
-        }) || items[0];
-
-        if (firstMatch && firstMatch.slug) {
-          officialSlug = firstMatch.slug;
-          appLogger.info('plex', `[Plex Discover API] Slug officiel résolu : ${officialSlug}`);
-        }
-      }
-    } catch (err: any) {
-      appLogger.warn('plex', `[Plex Discover API] Erreur recherche slug : ${err?.message || String(err)}`);
-    }
-  }
-
-  // Fallback si l'API n'a pas retourné de slug : formater le slug depuis le titre original (SANS l'année)
-  if (!officialSlug) {
-    const titleForSlug = targetOriginalTitle || title || '';
-    officialSlug = titleForSlug
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-    appLogger.info('plex', `[Plex Discover Fallback] Slug généré depuis titre original : ${officialSlug}`);
-  }
-
-  const watchUrl = `https://watch.plex.tv/${type}/${officialSlug}`;
-  appLogger.info('plex', `[Plex Discover] Redirection vers ${watchUrl}`);
-
-  // 3. Simple window.location.href pour que l'application Android Plex intercepte le lien
-  if (Capacitor.isNativePlatform()) {
-    window.location.href = watchUrl;
-  } else {
-    window.open(watchUrl, '_blank', 'noopener,noreferrer');
-  }
+  const { title, originalTitle, ratingKey, serverId } = params;
+  const searchTitle = (originalTitle && originalTitle.trim().length > 0) ? originalTitle.trim() : (title || '');
+  return openPlexMedia(searchTitle, ratingKey, serverId);
 }
+
 
 

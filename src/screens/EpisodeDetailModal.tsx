@@ -994,7 +994,9 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                                   originalTitle,
                                   year: (show as any)?.year || show.firstAirDate?.slice(0, 4),
                                   mediaType: 'tv',
-                                  tmdbId: show.tmdbId
+                                  tmdbId: show.tmdbId,
+                                  ratingKey: presence.plexInfo?.ratingKey,
+                                  serverId: presence.plexInfo?.serverId
                                 });
                               }}
                               className="w-full py-2.5 px-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 font-bold text-xs cursor-pointer shadow-sm"
