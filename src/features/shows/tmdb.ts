@@ -158,6 +158,7 @@ class TMDBClient {
     const url = new URL(`${this.baseUrl}${endpoint}`);
     url.searchParams.append('api_key', apiKey);
     url.searchParams.append('query', query);
+    url.searchParams.append('language', 'fr-FR');
     url.searchParams.append('page', page.toString());
     if (year && type) {
        url.searchParams.append(type === 'movie' ? 'primary_release_year' : 'first_air_date_year', year);
@@ -179,13 +180,121 @@ class TMDBClient {
     const data = await tryCatch(response.json() as Promise<SearchResponse>);
     if (!data.ok) return err((data as any).error);
 
-    if (data.value.results.length === 0) {
+    const rawResults = data.value.results || [];
+    if (rawResults.length === 0) {
       return err(new Error('Show not found'));
     }
 
-    // Algorithme de matching: On prend le premier résultat pertinent
-    // Dans une V2 on pourrait implémenter un Levenshtein distance
-    return ok(data.value.results[0]);
+    const normalize = (t?: string) =>
+      (t || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const targetNorm = normalize(query);
+    const targetYearNum = year ? parseInt(year, 10) : undefined;
+
+    let bestCandidate: TMDBMedia = rawResults[0];
+    let bestScore = -99999;
+
+    for (const candidate of rawResults) {
+      if (isAdultOrParodyMedia(candidate)) continue;
+
+      let score = 0;
+      const candTitle = normalize(candidate.title || candidate.name);
+      const candOriginal = normalize(candidate.original_title || candidate.original_name);
+      const candDate = candidate.release_date || candidate.first_air_date || '';
+      const candYear = candDate ? parseInt(candDate.slice(0, 4), 10) : undefined;
+      const pop = candidate.popularity || 0;
+      const votes = candidate.vote_count || 0;
+
+      // 1. Title matching score
+      if (candTitle === targetNorm || candOriginal === targetNorm) {
+        score += 100;
+      } else if (
+        candTitle.startsWith(targetNorm) ||
+        candOriginal.startsWith(targetNorm) ||
+        targetNorm.startsWith(candTitle) ||
+        targetNorm.startsWith(candOriginal)
+      ) {
+        score += 60;
+      } else if (candTitle.includes(targetNorm) || candOriginal.includes(targetNorm)) {
+        score += 30;
+      }
+
+      // 2. Year matching score (Crucial for remakes/adaptations like Cendrillon 2015 vs 1899)
+      if (targetYearNum && candYear && !isNaN(targetYearNum) && !isNaN(candYear)) {
+        const diff = Math.abs(candYear - targetYearNum);
+        if (diff === 0) {
+          score += 150;
+        } else if (diff === 1) {
+          score += 70;
+        } else if (diff <= 3) {
+          score += 15;
+        } else if (diff > 5) {
+          score -= 200; // Severe penalty for year discrepancy when target year is explicitly known
+        }
+      }
+
+      // 3. Credibility & popularity weight (Logarithmic to avoid obscure 0-vote entries)
+      score += Math.min(Math.log10(votes + 1) * 15, 60);
+      score += Math.min(pop * 0.5, 20);
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestCandidate = candidate;
+      }
+    }
+
+    return ok(bestCandidate);
+  }
+
+  async findByExternalId(
+    externalId: string,
+    externalSource: 'imdb_id' | 'tvdb_id' | 'freebase_mid' | 'freebase_id' | 'tvrage_id',
+    type?: 'movie' | 'tv'
+  ): Promise<Result<TMDBMedia>> {
+    const apiKey = this.getApiKey();
+    if (!apiKey) return err(new Error('Missing TMDB API Key'));
+
+    const now = Date.now();
+    const timeSinceLast = now - this.lastRequestTime;
+    if (timeSinceLast < this.MIN_MS_BETWEEN_REQUESTS) {
+      await new Promise(res => setTimeout(res, this.MIN_MS_BETWEEN_REQUESTS - timeSinceLast));
+    }
+    this.lastRequestTime = Date.now();
+
+    const cleanId = encodeURIComponent(externalId.trim());
+    const url = new URL(`${this.baseUrl}/find/${cleanId}?api_key=${apiKey}&external_source=${externalSource}&language=fr-FR`);
+
+    const result = await tryCatch(fetch(url.toString()));
+    if (!result.ok) return err((result as any).error);
+    if (!result.value.ok) return err(new Error(`TMDB Error: ${result.value.status}`));
+
+    const data = await tryCatch(result.value.json() as Promise<any>);
+    if (!data.ok) return err((data as any).error);
+
+    const val = data.value || {};
+    const movieResults: TMDBMedia[] = val.movie_results || [];
+    const tvResults: TMDBMedia[] = val.tv_results || [];
+
+    if (type === 'movie' && movieResults.length > 0) {
+      return ok({ ...movieResults[0], media_type: 'movie' });
+    }
+    if (type === 'tv' && tvResults.length > 0) {
+      return ok({ ...tvResults[0], media_type: 'tv' });
+    }
+    if (movieResults.length > 0) {
+      return ok({ ...movieResults[0], media_type: 'movie' });
+    }
+    if (tvResults.length > 0) {
+      return ok({ ...tvResults[0], media_type: 'tv' });
+    }
+
+    return err(new Error(`No media found on TMDB for external ID ${externalId}`));
   }
   private detailsCache = new Map<string, any>();
 

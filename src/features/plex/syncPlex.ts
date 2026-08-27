@@ -29,30 +29,61 @@ const normalizeTitle = (t?: string) => {
     .trim();
 };
 
-const extractTmdbIdFromPlex = (item: any): number | null => {
-  if (!item) return null;
+const extractExternalIdsFromPlex = (item: any): { tmdbId: number | null; imdbId: string | null; tvdbId: number | null } => {
+  let tmdbId: number | null = null;
+  let imdbId: string | null = null;
+  let tvdbId: number | null = null;
+
+  if (!item) return { tmdbId, imdbId, tvdbId };
+
   if (Array.isArray(item.Guid)) {
     for (const g of item.Guid) {
       if (typeof g?.id === 'string') {
-        const match = g.id.match(/^tmdb:\/\/(\d+)/i);
-        if (match) return Number(match[1]);
+        const tmdbMatch = g.id.match(/^tmdb:\/\/(\d+)/i) || g.id.match(/^themoviedb:\/\/(\d+)/i);
+        if (tmdbMatch && !tmdbId) tmdbId = Number(tmdbMatch[1]);
+
+        const imdbMatch = g.id.match(/^imdb:\/\/(tt\d+)/i);
+        if (imdbMatch && !imdbId) imdbId = imdbMatch[1].toLowerCase();
+
+        const tvdbMatch = g.id.match(/^tvdb:\/\/(\d+)/i);
+        if (tvdbMatch && !tvdbId) tvdbId = Number(tvdbMatch[1]);
       }
     }
   }
+
   for (const field of [item.guid, item.grandparentGuid, item.parentGuid]) {
     if (typeof field === 'string') {
-      const match = field.match(/themoviedb:\/\/(\d+)|tmdb:\/\/(\d+)/i);
-      if (match) return Number(match[1] || match[2]);
+      const tmdbMatch = field.match(/themoviedb:\/\/(\d+)|tmdb:\/\/(\d+)|com\.plexapp\.agents\.themoviedb:\/\/(\d+)/i);
+      if (tmdbMatch && !tmdbId) tmdbId = Number(tmdbMatch[1] || tmdbMatch[2] || tmdbMatch[3]);
+
+      const imdbMatch = field.match(/imdb:\/\/(tt\d+)|com\.plexapp\.agents\.imdb:\/\/(tt\d+)/i);
+      if (imdbMatch && !imdbId) imdbId = (imdbMatch[1] || imdbMatch[2]).toLowerCase();
+
+      const tvdbMatch = field.match(/tvdb:\/\/(\d+)|thetvdb:\/\/(\d+)|com\.plexapp\.agents\.thetvdb:\/\/(\d+)/i);
+      if (tvdbMatch && !tvdbId) tvdbId = Number(tvdbMatch[1] || tvdbMatch[2] || tvdbMatch[3]);
     }
   }
-  return null;
+
+  return { tmdbId, imdbId, tvdbId };
+};
+
+const extractTmdbIdFromPlex = (item: any): number | null => {
+  return extractExternalIdsFromPlex(item).tmdbId;
 };
 
 // Persistent title -> TMDB resolution cache in localStorage
 const getResolutionCache = (): Record<string, any> => {
   try {
     const raw = localStorage.getItem('plex_resolution_cache');
-    return raw ? JSON.parse(raw) : {};
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    // Automatic cleanup of legacy incorrect Cinderella (1899) cache mappings
+    Object.keys(parsed).forEach(k => {
+      if (parsed[k]?.id === 114108 && !k.includes('1899')) {
+        delete parsed[k];
+      }
+    });
+    return parsed;
   } catch {
     return {};
   }
@@ -75,26 +106,42 @@ const findShowInLocalLibrary = (
   showsList: Array<Show & { normTitle: string; normOriginalTitle: string }>,
   normTitle: string,
   tmdbId: number | null,
-  mediaType: 'tv' | 'movie'
+  mediaType: 'tv' | 'movie',
+  targetYear?: number | string
 ): (Show & { normTitle: string; normOriginalTitle: string }) | undefined => {
-  // 1. By exact TMDB ID
+  // 1. By exact TMDB ID (always 100% authoritative)
   if (tmdbId) {
-    const byId = showsList.find(s => Number(s.tmdbId) === Number(tmdbId) && (mediaType === 'tv' ? (s.mediaType === 'tv' || !s.mediaType) : s.mediaType === 'movie'));
+    const byId = showsList.find(
+      s => Number(s.tmdbId) === Number(tmdbId) && (mediaType === 'tv' ? (s.mediaType === 'tv' || !s.mediaType) : s.mediaType === 'movie')
+    );
     if (byId) return byId;
   }
 
-  // 2. By exact normalized title or original title
-  const exact = showsList.find(s =>
-    (mediaType === 'tv' ? (s.mediaType === 'tv' || !s.mediaType) : s.mediaType === 'movie') &&
-    (s.normTitle === normTitle || (s.normOriginalTitle && s.normOriginalTitle === normTitle))
+  const numericTargetYear = targetYear ? Number(targetYear) : undefined;
+  const isYearCompatible = (show: Show): boolean => {
+    if (!numericTargetYear || isNaN(numericTargetYear)) return true;
+    const showDate = show.firstAirDate || (show as any).releaseDate || (show as any).release_date;
+    if (!showDate) return true;
+    const showYear = parseInt(String(showDate).slice(0, 4), 10);
+    if (isNaN(showYear)) return true;
+    return Math.abs(showYear - numericTargetYear) <= 1;
+  };
+
+  // 2. Exact normalized title or original title with compatible year
+  const exact = showsList.find(
+    s =>
+      (mediaType === 'tv' ? (s.mediaType === 'tv' || !s.mediaType) : s.mediaType === 'movie') &&
+      (s.normTitle === normTitle || (s.normOriginalTitle && s.normOriginalTitle === normTitle)) &&
+      isYearCompatible(s)
   );
   if (exact) return exact;
 
-  // 3. By smart prefix or substring inclusion
+  // 3. Smart prefix or substring inclusion with compatible year
   // e.g. "the handmaids tale la servante ecarlate" vs "the handmaids tale"
   if (normTitle && normTitle.length >= 4) {
     const fuzzy = showsList.find(s => {
       if (mediaType === 'tv' ? s.mediaType === 'movie' : (s.mediaType !== 'movie' && s.mediaType)) return false;
+      if (!isYearCompatible(s)) return false;
       const st = s.normTitle;
       const sot = s.normOriginalTitle;
       if (st) {
@@ -307,7 +354,13 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         const type = item.type;
         const rawViewed = item.viewedAt;
         const viewedTimestamp = rawViewed ? (Number(rawViewed) < 10000000000 ? Number(rawViewed) * 1000 : Number(rawViewed)) : Date.now();
-        const guidTmdbId = extractTmdbIdFromPlex(item);
+        const { tmdbId: guidTmdbId, imdbId, tvdbId } = extractExternalIdsFromPlex(item);
+
+        let itemYear = item.year ? Number(item.year) : undefined;
+        if (!itemYear) {
+          const matchYear = (item.title || item.grandparentTitle || '').match(/\((\d{4})\)/);
+          if (matchYear) itemYear = Number(matchYear[1]);
+        }
 
         if (type === 'episode') {
           const seasonNum = item.parentIndex;
@@ -318,10 +371,10 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           const epKey = `${seasonNum}x${episodeNum}`;
           const cleanShowTitle = showTitle.replace(/\(\d{4}\)/g, '').trim();
           const normPlexTitle = normalizeTitle(cleanShowTitle);
-          const cacheKey = `tv:${normPlexTitle}`;
+          const cacheKey = itemYear ? `tv:${normPlexTitle}:${itemYear}` : `tv:${normPlexTitle}`;
 
-          // 1. Check in local library by TMDB ID, title, original title, or smart inclusion
-          let matchedShow = findShowInLocalLibrary(showsList, normPlexTitle, guidTmdbId, 'tv');
+          // 1. Check in local library by TMDB ID, title, original title, or smart inclusion (with year check)
+          let matchedShow = findShowInLocalLibrary(showsList, normPlexTitle, guidTmdbId, 'tv', itemYear);
 
           // Fast skip check: if already in library and episode is already seen, skip immediately
           if (matchedShow) {
@@ -346,14 +399,36 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             }
           }
 
-          // 3. If still not resolved, query TMDB (only for genuinely unseen/unresolved titles)
+          // 3. If still not resolved, query external IDs or TMDB
           if (!matchedShow && !tmdbData) {
-            let searchRes = await tmdb.searchMedia(cleanShowTitle, item.year ? String(item.year) : undefined, 'tv');
-            if (!searchRes.ok || !searchRes.value) {
-              searchRes = await tmdb.searchMedia(cleanShowTitle, undefined, 'tv');
+            if (guidTmdbId) {
+              const detailsRes = await tmdb.getMediaDetails(guidTmdbId, 'tv');
+              if (detailsRes.ok && detailsRes.value) {
+                tmdbData = detailsRes.value;
+              }
+            } else if (imdbId) {
+              const findRes = await tmdb.findByExternalId(imdbId, 'imdb_id', 'tv');
+              if (findRes.ok && findRes.value) {
+                tmdbData = findRes.value;
+              }
+            } else if (tvdbId) {
+              const findRes = await tmdb.findByExternalId(String(tvdbId), 'tvdb_id', 'tv');
+              if (findRes.ok && findRes.value) {
+                tmdbData = findRes.value;
+              }
             }
-            if (searchRes.ok && searchRes.value) {
-              tmdbData = searchRes.value;
+
+            if (!tmdbData) {
+              let searchRes = await tmdb.searchMedia(cleanShowTitle, itemYear ? String(itemYear) : undefined, 'tv');
+              if (!searchRes.ok || !searchRes.value) {
+                searchRes = await tmdb.searchMedia(cleanShowTitle, undefined, 'tv');
+              }
+              if (searchRes.ok && searchRes.value) {
+                tmdbData = searchRes.value;
+              }
+            }
+
+            if (tmdbData) {
               resolutionCache[cacheKey] = tmdbData;
               cacheModified = true;
 
@@ -408,8 +483,6 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
                 mediaType: 'tv',
                 show: showData
               });
-
-              
             }
           } else if (tmdbData && tmdbData.id) {
             // Genuinely new show discovered from Plex!
@@ -465,8 +538,6 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               mediaType: 'tv',
               show: newShowData
             });
-
-            
           }
         } else if (type === 'movie') {
           const movieTitle = item.title;
@@ -474,10 +545,10 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
           const cleanMovieTitle = movieTitle.replace(/\(\d{4}\)/g, '').trim();
           const normMovieTitle = normalizeTitle(cleanMovieTitle);
-          const cacheKey = `movie:${normMovieTitle}`;
+          const cacheKey = itemYear ? `movie:${normMovieTitle}:${itemYear}` : `movie:${normMovieTitle}`;
 
-          // 1. Check in local library
-          let matchedMovie = findShowInLocalLibrary(showsList, normMovieTitle, guidTmdbId, 'movie');
+          // 1. Check in local library (with year verification)
+          let matchedMovie = findShowInLocalLibrary(showsList, normMovieTitle, guidTmdbId, 'movie', itemYear);
 
           // Fast skip check: if already in library and movie is already marked as seen, skip immediately
           if (matchedMovie) {
@@ -508,14 +579,36 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             }
           }
 
-          // 3. If still not resolved, query TMDB (only for genuinely unseen/unresolved titles)
+          // 3. If still not resolved, query external IDs or TMDB
           if (!matchedMovie && !tmdbData) {
-            let searchRes = await tmdb.searchMedia(cleanMovieTitle, item.year ? String(item.year) : undefined, 'movie');
-            if (!searchRes.ok || !searchRes.value) {
-              searchRes = await tmdb.searchMedia(cleanMovieTitle, undefined, 'movie');
+            if (guidTmdbId) {
+              const detailsRes = await tmdb.getMediaDetails(guidTmdbId, 'movie');
+              if (detailsRes.ok && detailsRes.value) {
+                tmdbData = detailsRes.value;
+              }
+            } else if (imdbId) {
+              const findRes = await tmdb.findByExternalId(imdbId, 'imdb_id', 'movie');
+              if (findRes.ok && findRes.value) {
+                tmdbData = findRes.value;
+              }
+            } else if (tvdbId) {
+              const findRes = await tmdb.findByExternalId(String(tvdbId), 'tvdb_id', 'movie');
+              if (findRes.ok && findRes.value) {
+                tmdbData = findRes.value;
+              }
             }
-            if (searchRes.ok && searchRes.value) {
-              tmdbData = searchRes.value;
+
+            if (!tmdbData) {
+              let searchRes = await tmdb.searchMedia(cleanMovieTitle, itemYear ? String(itemYear) : undefined, 'movie');
+              if (!searchRes.ok || !searchRes.value) {
+                searchRes = await tmdb.searchMedia(cleanMovieTitle, undefined, 'movie');
+              }
+              if (searchRes.ok && searchRes.value) {
+                tmdbData = searchRes.value;
+              }
+            }
+
+            if (tmdbData) {
               resolutionCache[cacheKey] = tmdbData;
               cacheModified = true;
 
@@ -532,6 +625,19 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
                   continue; // Found via TMDB search and already seen! Skip!
                 }
               }
+            }
+          }
+
+          // Auto-cleanup false-positive Cinderella 1899 (TMDB 114108) if Cinderella 2015 is being processed
+          const targetTmdbId = matchedMovie?.tmdbId || tmdbData?.id;
+          if (targetTmdbId === 150689) {
+            const bad1899 = showsList.find(s => Number(s.tmdbId) === 114108);
+            if (bad1899) {
+              const badRef = doc(db, `users/${user.uid}/shows`, bad1899.id);
+              batch.delete(badRef);
+              const idx = showsList.findIndex(s => s.id === bad1899.id);
+              if (idx >= 0) showsList.splice(idx, 1);
+              delete mutatedShows[bad1899.id];
             }
           }
 
@@ -568,8 +674,6 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
                 mediaType: 'movie',
                 show: showData
               });
-
-              
             }
           } else if (tmdbData && tmdbData.id) {
             // Genuinely new movie discovered from Plex!
@@ -621,8 +725,6 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               mediaType: 'movie',
               show: newShowData
             });
-
-            
           }
         }
       }
@@ -634,13 +736,19 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           const rawTitle = wlItem.title || '';
           if (!rawTitle) continue;
 
+          let wlYear = wlItem.year ? Number(wlItem.year) : undefined;
+          if (!wlYear) {
+            const matchYear = rawTitle.match(/\((\d{4})\)/);
+            if (matchYear) wlYear = Number(matchYear[1]);
+          }
+
           const cleanTitle = rawTitle.replace(/\(\d{4}\)/g, '').trim();
           const normTitle = normalizeTitle(cleanTitle);
-          const guidTmdbId = extractTmdbIdFromPlex(wlItem);
-          const cacheKey = `wl:${mediaType}:${normTitle}`;
+          const { tmdbId: guidTmdbId, imdbId, tvdbId } = extractExternalIdsFromPlex(wlItem);
+          const cacheKey = wlYear ? `wl:${mediaType}:${normTitle}:${wlYear}` : `wl:${mediaType}:${normTitle}`;
 
           // 1. Check if already in user's local library
-          let matchedShow = findShowInLocalLibrary(showsList, normTitle, guidTmdbId, mediaType);
+          let matchedShow = findShowInLocalLibrary(showsList, normTitle, guidTmdbId, mediaType, wlYear);
           if (matchedShow) {
             continue;
           }
@@ -655,14 +763,36 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             if (matchedShow) continue;
           }
 
-          // 3. Search TMDB if not in resolution cache
+          // 3. Search external IDs or TMDB if not in resolution cache
           if (!tmdbData) {
-            let searchRes = await tmdb.searchMedia(cleanTitle, wlItem.year ? String(wlItem.year) : undefined, mediaType);
-            if (!searchRes.ok || !searchRes.value) {
-              searchRes = await tmdb.searchMedia(cleanTitle, undefined, mediaType);
+            if (guidTmdbId) {
+              const detailsRes = await tmdb.getMediaDetails(guidTmdbId, mediaType);
+              if (detailsRes.ok && detailsRes.value) {
+                tmdbData = detailsRes.value;
+              }
+            } else if (imdbId) {
+              const findRes = await tmdb.findByExternalId(imdbId, 'imdb_id', mediaType);
+              if (findRes.ok && findRes.value) {
+                tmdbData = findRes.value;
+              }
+            } else if (tvdbId) {
+              const findRes = await tmdb.findByExternalId(String(tvdbId), 'tvdb_id', mediaType);
+              if (findRes.ok && findRes.value) {
+                tmdbData = findRes.value;
+              }
             }
-            if (searchRes.ok && searchRes.value) {
-              tmdbData = searchRes.value;
+
+            if (!tmdbData) {
+              let searchRes = await tmdb.searchMedia(cleanTitle, wlYear ? String(wlYear) : undefined, mediaType);
+              if (!searchRes.ok || !searchRes.value) {
+                searchRes = await tmdb.searchMedia(cleanTitle, undefined, mediaType);
+              }
+              if (searchRes.ok && searchRes.value) {
+                tmdbData = searchRes.value;
+              }
+            }
+
+            if (tmdbData) {
               resolutionCache[cacheKey] = tmdbData;
               cacheModified = true;
 
@@ -723,8 +853,6 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               mediaType,
               show: newShowData
             });
-
-            
           }
         }
       }

@@ -658,6 +658,13 @@ async function startServer() {
 
         if (!title && !grandparentTitle) continue;
 
+        // Extract item year (also check title string like 'Cinderella (2015)' if year property missing)
+        let itemYear = meta.year || raw.year || meta.parentYear || meta.grandparentYear ? Number(meta.year || raw.year || meta.parentYear || meta.grandparentYear) : undefined;
+        if (!itemYear) {
+          const matchYear = (title || '').match(/\((\d{4})\)/);
+          if (matchYear) itemYear = Number(matchYear[1]);
+        }
+
         // Create deduplication key
         let dedupeKey = '';
         if (type === 'episode') {
@@ -665,7 +672,7 @@ async function startServer() {
           const eNum = index !== undefined ? index : 0;
           dedupeKey = `ep:${normalizeStr(grandparentTitle || title)}:${sNum}:${eNum}`;
         } else {
-          dedupeKey = `mov:${normalizeStr(title)}`;
+          dedupeKey = `mov:${normalizeStr(title)}:${itemYear || ''}`;
         }
 
         const existing = itemMap.get(dedupeKey);
@@ -677,7 +684,9 @@ async function startServer() {
             parentIndex: parentIndex !== undefined ? Number(parentIndex) : undefined,
             index: index !== undefined ? Number(index) : undefined,
             viewedAt: viewedTimestamp,
-            year: meta.year || raw.year ? Number(meta.year || raw.year) : undefined,
+            year: itemYear,
+            guid: meta.guid || raw.guid || meta.grandparentGuid || raw.grandparentGuid,
+            Guid: meta.Guid || raw.Guid || meta.guids || raw.guids,
             source
           });
         }
@@ -694,12 +703,18 @@ async function startServer() {
         const title = meta.title || rawItem.title || meta.name || '';
         if (!title) continue;
 
-        const dedupeKey = `wl:${type}:${normalizeStr(title)}`;
+        let wlYear = meta.year || rawItem.year ? Number(meta.year || rawItem.year) : undefined;
+        if (!wlYear) {
+          const matchYear = title.match(/\((\d{4})\)/);
+          if (matchYear) wlYear = Number(matchYear[1]);
+        }
+
+        const dedupeKey = `wl:${type}:${normalizeStr(title)}:${wlYear || ''}`;
         if (!watchlistMap.has(dedupeKey)) {
           watchlistMap.set(dedupeKey, {
             type,
             title,
-            year: meta.year || rawItem.year ? Number(meta.year || rawItem.year) : undefined,
+            year: wlYear,
             guid: meta.guid || rawItem.guid || meta.grandparentGuid,
             Guid: meta.Guid || rawItem.Guid || meta.guids || rawItem.guids,
             addedAt: meta.addedAt || rawItem.addedAt || Date.now()
