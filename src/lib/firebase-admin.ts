@@ -11,5 +11,5 @@ if (!getApps().length) {
 }
 
 export const adminAuth = getAuth();
-export const adminDb = getFirestore();
+export const adminDb = getFirestore('default');
 export const adminMessaging = getMessaging();
