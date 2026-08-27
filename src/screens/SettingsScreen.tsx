@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Cloud, LogIn, LogOut, FileText, CheckCircle2, MonitorPlay, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronDown, ChevronUp, ChevronRight, Check, AlertCircle, Info, Bug, Sparkles, Download, X } from 'lucide-react';
+import { Cloud, LogIn, LogOut, FileText, CheckCircle2, MonitorPlay, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronDown, ChevronUp, ChevronRight, Check, AlertCircle, Info, Bug, Sparkles, Download, X, UploadCloud, DownloadCloud } from 'lucide-react';
 import { auth, db, googleAuthProvider, requestNotificationPermission, sendNativeNotification } from '../lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
@@ -56,13 +56,20 @@ export function SettingsScreen() {
     };
   });
 
-  const handleToggleNotif = (key, value) => {
+  const handleToggleNotif = async (key: string, value: boolean) => {
     const newPrefs = { ...notificationPrefs, [key]: value };
     setNotificationPrefs(newPrefs);
     localStorage.setItem('user_notifications', JSON.stringify(newPrefs));
+    if (auth.currentUser) {
+      try {
+        const notifRef = doc(db, 'users', auth.currentUser.uid, 'settings', 'notifications');
+        await setDoc(notifRef, newPrefs, { merge: true });
+      } catch (e) {
+        console.error('[Settings] Error saving notification prefs to Firestore', e);
+      }
+    }
   };
 
-  
   // Plex Auth State
   const [plexPin, setPlexPin] = useState<any>(null);
   const [plexToken, setPlexToken] = useState<string | null>(
@@ -189,7 +196,21 @@ export function SettingsScreen() {
             await setDoc(prefRef, { platforms: localPlatforms }, { merge: true });
           }
 
-          // 2. Configuration Plex synchronisée
+          // 2. Préférences de notifications
+          const notifRef = doc(db, 'users', currentUser.uid, 'settings', 'notifications');
+          const snapNotif = await getDoc(notifRef);
+          const localNotifStr = localStorage.getItem('user_notifications');
+          const localNotifs = localNotifStr ? JSON.parse(localNotifStr) : null;
+
+          if (snapNotif.exists()) {
+            const cloudNotifs = snapNotif.data();
+            setNotificationPrefs(cloudNotifs);
+            localStorage.setItem('user_notifications', JSON.stringify(cloudNotifs));
+          } else if (localNotifs) {
+            await setDoc(notifRef, localNotifs, { merge: true });
+          }
+
+          // 3. Configuration Plex synchronisée
           const plexRef = doc(db, 'users', currentUser.uid, 'settings', 'plex');
           const snapPlex = await getDoc(plexRef);
           const localPlexToken = localStorage.getItem('plex_auth_token') || localStorage.getItem('plex_token');
@@ -227,6 +248,80 @@ export function SettingsScreen() {
       unsubscribe();
     };
   }, []);
+
+  const handleBackupToCloud = async () => {
+    if (!user) {
+      showToast("Veuillez vous connecter pour sauvegarder vos données.", "error");
+      return;
+    }
+    showToast("Sauvegarde de votre bibliothèque sur le Cloud...", "info");
+    try {
+      const res = await useShowsStore.getState().uploadAllToCloud();
+      if (res.success) {
+        // Sauvegarder également les plateformes, notifications et plex
+        const prefRef = doc(db, 'users', user.uid, 'settings', 'preferences');
+        await setDoc(prefRef, { platforms: userPlatforms }, { merge: true });
+        
+        const notifRef = doc(db, 'users', user.uid, 'settings', 'notifications');
+        await setDoc(notifRef, notificationPrefs, { merge: true });
+
+        const plexTokenLocal = localStorage.getItem('plex_auth_token') || localStorage.getItem('plex_token');
+        if (plexTokenLocal) {
+          const plexRef = doc(db, 'users', user.uid, 'settings', 'plex');
+          await setDoc(plexRef, { authToken: plexTokenLocal, username: localStorage.getItem('plex_username') || '' }, { merge: true });
+        }
+
+        showToast(`✅ ${res.count} série(s) & vos réglages synchronisés avec le Cloud !`, "success");
+      } else {
+        showToast(`Erreur : ${res.error || 'Erreur inconnue'}`, "error");
+      }
+    } catch (e: any) {
+      showToast(`Erreur : ${e?.message || e}`, "error");
+    }
+  };
+
+  const handleRestoreFromCloud = async () => {
+    if (!user) {
+      showToast("Veuillez vous connecter pour synchroniser depuis le Cloud.", "error");
+      return;
+    }
+    showToast("Récupération des données depuis le Cloud...", "info");
+    try {
+      await useShowsStore.getState().fetchShows();
+      
+      // Recharger plateformes
+      const prefRef = doc(db, 'users', user.uid, 'settings', 'preferences');
+      const snap = await getDoc(prefRef);
+      if (snap.exists() && Array.isArray(snap.data()?.platforms)) {
+        setUserPlatforms(snap.data().platforms);
+        localStorage.setItem('user_platforms', JSON.stringify(snap.data().platforms));
+      }
+
+      // Recharger notifications
+      const notifRef = doc(db, 'users', user.uid, 'settings', 'notifications');
+      const snapNotif = await getDoc(notifRef);
+      if (snapNotif.exists()) {
+        setNotificationPrefs(snapNotif.data());
+        localStorage.setItem('user_notifications', JSON.stringify(snapNotif.data()));
+      }
+
+      // Recharger Plex
+      const plexRef = doc(db, 'users', user.uid, 'settings', 'plex');
+      const snapPlex = await getDoc(plexRef);
+      if (snapPlex.exists() && snapPlex.data()?.authToken) {
+        setPlexToken(snapPlex.data().authToken);
+        localStorage.setItem('plex_auth_token', snapPlex.data().authToken);
+        localStorage.setItem('plex_token', snapPlex.data().authToken);
+        if (snapPlex.data()?.username) {
+          localStorage.setItem('plex_username', snapPlex.data().username);
+        }
+      }
+
+      showToast("✅ Données Cloud rechargées avec succès !", "success");
+    } catch (e: any) {
+      showToast(`Erreur : ${e?.message || e}`, "error");
+    }
+  };
 
   const handleForceSync = async () => {
     if (syncStatus) {
@@ -438,6 +533,38 @@ export function SettingsScreen() {
                 <div className="flex flex-col min-w-0 bg-zinc-950/50 p-2.5 rounded-xl border border-white/5">
                   <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Connecté avec</span>
                   <span className="font-bold text-xs text-white truncate">{user.email}</span>
+                </div>
+
+                {/* Multi-appareils & Synchronisation Cloud */}
+                <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-indigo-300 flex items-center gap-1.5">
+                      <Cloud size={14} className="text-indigo-400" />
+                      Synchronisation Cloud
+                    </span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 bg-indigo-500/20 text-indigo-200 rounded-full">
+                      {shows.length} série(s) en mémoire
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-zinc-400 leading-relaxed">
+                    Sauvegardez vos séries et réglages sur le Cloud pour y accéder instantanément sur votre téléphone ou votre ordinateur.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 mt-1">
+                    <button
+                      onClick={handleBackupToCloud}
+                      className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold py-2 px-2.5 rounded-lg text-[11px] transition-all cursor-pointer shadow"
+                    >
+                      <UploadCloud size={14} />
+                      Sauvegarder
+                    </button>
+                    <button
+                      onClick={handleRestoreFromCloud}
+                      className="flex items-center justify-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-200 font-bold py-2 px-2.5 rounded-lg text-[11px] border border-white/10 transition-all cursor-pointer"
+                    >
+                      <DownloadCloud size={14} />
+                      Recharger
+                    </button>
+                  </div>
                 </div>
                 
                 <button

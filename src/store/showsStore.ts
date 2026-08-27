@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { db, auth } from '../lib/firebase';
-import { collection, query, getDocs, getDocsFromCache, getDocsFromServer } from 'firebase/firestore';
+import { collection, query, getDocs, getDocsFromCache, getDocsFromServer, doc, writeBatch } from 'firebase/firestore';
 import { type Show } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/firebaseErrors';
 import { useSyncStore } from './syncStore';
@@ -18,6 +18,7 @@ interface ShowsState {
   removeShowOptimistic: (id: string) => void;
   addShowOptimistic: (show: Show) => void;
   fetchShows: () => Promise<void>;
+  uploadAllToCloud: () => Promise<{ success: boolean; count: number; error?: string }>;
 }
 
 const getInitialCache = (): { shows: Show[]; loading: boolean } => {
@@ -42,6 +43,51 @@ const saveToLocalStorage = (shows: Show[]) => {
     localStorage.setItem('cached_shows_v1', JSON.stringify(shows));
   } catch (e) {}
 };
+
+/**
+ * Envoie une liste de séries vers Firestore par lots (batches de 300 docs)
+ */
+export async function uploadShowsToFirestore(userId: string, shows: Show[]): Promise<{ success: boolean; count: number; error?: string }> {
+  if (!shows || shows.length === 0) return { success: true, count: 0 };
+  try {
+    appLogger.info('sync', `[showsStore] Sauvegarde Cloud Firestore : envoi de ${shows.length} série(s)...`);
+    const BATCH_SIZE = 250;
+    let totalUploaded = 0;
+
+    for (let i = 0; i < shows.length; i += BATCH_SIZE) {
+      const chunk = shows.slice(i, i + BATCH_SIZE);
+      const batch = writeBatch(db);
+
+      for (const show of chunk) {
+        const showId = show.id || `${show.mediaType || 'tv'}_${show.tmdbId}`;
+        const docRef = doc(db, 'users', userId, 'shows', String(showId));
+        
+        // Nettoyer les propriétés undefined pour Firestore
+        const cleanData: any = {};
+        Object.entries(show).forEach(([k, v]) => {
+          if (v !== undefined) {
+            cleanData[k] = v;
+          }
+        });
+        cleanData.id = String(showId);
+        cleanData.userId = userId;
+        cleanData.updatedAt = cleanData.updatedAt || Date.now();
+
+        batch.set(docRef, cleanData, { merge: true });
+      }
+
+      await batch.commit();
+      totalUploaded += chunk.length;
+    }
+
+    appLogger.success('sync', `[showsStore] ✅ ${totalUploaded} série(s) synchronisée(s) vers le Cloud Firestore avec succès !`);
+    return { success: true, count: totalUploaded };
+  } catch (err: any) {
+    const errMsg = err?.message || String(err);
+    appLogger.error('sync', `[showsStore] ❌ Erreur sauvegarde Cloud Firestore: ${errMsg}`, err);
+    return { success: false, count: 0, error: errMsg };
+  }
+}
 
 /**
  * Fusionne et déduplique intelligemment les séries (en combinant seenEpisodes et records)
@@ -256,12 +302,28 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
         rawLoadedShows.push({ ...doc.data(), id: String(doc.id) } as Show);
       });
 
-      appLogger.info('sync', `[showsStore] Fusion de ${rawLoadedShows.length} séries Firestore avec les données locales (${get().shows.length} séries actuellement)`);
-      const loadedShows = deduplicateAndMergeShows(rawLoadedShows, get().shows);
+      const localShowsBeforeMerge = get().shows;
+      appLogger.info('sync', `[showsStore] Fusion de ${rawLoadedShows.length} séries Firestore avec les données locales (${localShowsBeforeMerge.length} séries actuellement)`);
+      const loadedShows = deduplicateAndMergeShows(rawLoadedShows, localShowsBeforeMerge);
 
       saveToLocalStorage(loadedShows);
       set({ shows: loadedShows, loading: false, initialized: true });
       appLogger.success('sync', `[showsStore] Chargement et fusion terminés. Total : ${loadedShows.length} séries en mémoire.`);
+
+      // Si le cache local contient des séries qui ne sont pas sur le Cloud (ex: créées/importées sur la PWA),
+      // on les synchronise automatiquement vers Firestore pour que l'APK mobile et tous les appareils y accèdent !
+      if (loadedShows.length > rawLoadedShows.length) {
+        const missingOnCloud = loadedShows.filter(localS => 
+          !rawLoadedShows.some(remoteS => 
+            remoteS.id === localS.id || 
+            (remoteS.tmdbId && localS.tmdbId && Number(remoteS.tmdbId) === Number(localS.tmdbId) && (remoteS.mediaType || 'tv') === (localS.mediaType || 'tv'))
+          )
+        );
+        if (missingOnCloud.length > 0) {
+          appLogger.info('sync', `[showsStore] Détection de ${missingOnCloud.length} série(s) locale(s) à téléverser vers Firestore...`);
+          uploadShowsToFirestore(user.uid, missingOnCloud);
+        }
+      }
     } catch (err: any) {
       const errStr = err?.message || String(err);
       appLogger.error('sync', `[showsStore] Erreur fatale lors de fetchShows : ${errStr}`, err);
@@ -281,6 +343,18 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
       }
       set({ loading: false });
     }
+  },
+
+  uploadAllToCloud: async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      return { success: false, count: 0, error: 'Utilisateur non connecté' };
+    }
+    const currentShows = get().shows;
+    if (currentShows.length === 0) {
+      return { success: true, count: 0 };
+    }
+    return await uploadShowsToFirestore(user.uid, currentShows);
   }
 }));
 
