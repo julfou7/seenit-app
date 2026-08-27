@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Capacitor } from '@capacitor/core';
 
-export const CURRENT_APP_VERSION = '1.3.75';
+export const CURRENT_APP_VERSION = '1.3.76';
 export const GITHUB_REPO = 'julfou7/seenit-app';
 export const GITHUB_PAT = ''; // Plus de jeton d'accès privé codé en dur pour éviter les révocations de sécurité. Rendre le dépôt public est recommandé et gratuit !
 
@@ -117,15 +117,17 @@ export const useUpdateStore = create<UpdateState>()(
               data.assets.find((a: any) => a.name && a.name.toLowerCase().endsWith('.apk'))
             : null;
 
+          const browserUrl = apkAsset?.browser_download_url || `https://github.com/${GITHUB_REPO}/releases/download/${tagName}/SeenIt-${tagName}.apk`;
+
           const releaseInfo: AppReleaseInfo = {
             version: remoteVersion,
             tagName: tagName,
             name: data.name || tagName,
             releaseNotes: data.body || '',
             publishedAt: data.published_at || new Date().toISOString(),
-            // Prefer authenticated API url for private repo native download
-            apkDownloadUrl: apkAsset ? (apkAsset.url || apkAsset.browser_download_url) : `https://github.com/${GITHUB_REPO}/releases/download/${tagName}/SeenIt-${tagName}.apk`,
-            browserDownloadUrl: apkAsset?.browser_download_url || `https://github.com/${GITHUB_REPO}/releases/download/${tagName}/SeenIt-${tagName}.apk`,
+            // Toujours utiliser le lien direct public d'asset binaire APK
+            apkDownloadUrl: browserUrl,
+            browserDownloadUrl: browserUrl,
             htmlUrl: data.html_url || `https://github.com/${GITHUB_REPO}/releases`
           };
 

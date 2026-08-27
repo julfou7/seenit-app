@@ -11,15 +11,22 @@ export interface UpdateProgress {
 }
 
 /**
- * Downloads APK directly inside the app using Capacitor's native Filesystem downloadFile
- * with GitHub PAT authentication to support private repositories, and launches Android Package Installer.
+ * Downloads APK directly inside the app using Capacitor's native Filesystem downloadFile,
+ * verifies the file integrity/size, and launches Android Package Installer.
  */
 export async function downloadAndInstallApk(
-  apkUrl: string,
+  rawApkUrl: string,
   onProgress?: (progress: UpdateProgress) => void
 ): Promise<{ success: boolean; error?: string }> {
-  if (!apkUrl) {
+  if (!rawApkUrl) {
     return { success: false, error: 'URL de téléchargement introuvable.' };
+  }
+
+  // Normalisation de l'URL : s'assurer qu'on utilise le binaire direct et pas l'API REST metadata JSON
+  let apkUrl = rawApkUrl;
+  if (apkUrl.includes('api.github.com/repos/') && apkUrl.includes('/releases/assets/')) {
+    // Remplacer par l'URL publique de téléchargement direct
+    apkUrl = apkUrl.replace('api.github.com/repos/', 'github.com/').replace('/releases/assets/', '/releases/download/');
   }
 
   // If running on web / preview
@@ -36,17 +43,17 @@ export async function downloadAndInstallApk(
 
     const fileName = 'SeenIt-update.apk';
 
-    // 1. Delete previous cache file if existing
+    // 1. Supprimer le fichier de cache précédent s'il existe
     try {
       await Filesystem.deleteFile({
         path: fileName,
         directory: Directory.Cache
       });
     } catch {
-      // Ignored if file does not exist
+      // Ignoré si le fichier n'existe pas encore
     }
 
-    // 2. Attach native download progress listener
+    // 2. Écouter la progression du téléchargement natif
     try {
       progressListener = await Filesystem.addListener('progress', (progress: any) => {
         if (progress.bytes && progress.contentLength) {
@@ -67,20 +74,11 @@ export async function downloadAndInstallApk(
 
     onProgress?.({ percent: 15, status: 'downloading', message: 'Téléchargement de la mise à jour...' });
 
-    // Prepare auth headers for GitHub (supports private repo release asset endpoints)
-    const isGitHub = apkUrl.includes('github.com');
-    const headers: Record<string, string> = {};
-    if (isGitHub && GITHUB_PAT) {
-      headers['Authorization'] = `Bearer ${GITHUB_PAT}`;
-      headers['Accept'] = 'application/octet-stream';
-    }
-
-    // 3. Native Android HTTP download (executes in Java, bypasses browser CORS completely)
+    // 3. Téléchargement HTTP natif Android (exécuté en Java, sans restrictions CORS de WebView)
     const downloadRes = await Filesystem.downloadFile({
       url: apkUrl,
       path: fileName,
       directory: Directory.Cache,
-      headers: Object.keys(headers).length > 0 ? headers : undefined,
       progress: true,
       recursive: true
     });
@@ -92,9 +90,19 @@ export async function downloadAndInstallApk(
       progressListener = null;
     }
 
+    // 4. Vérification de l'intégrité et de la taille du fichier téléchargé
+    const stat = await Filesystem.stat({
+      path: fileName,
+      directory: Directory.Cache
+    });
+
+    if (!stat || stat.size < 1024 * 500) {
+      throw new Error(`Le fichier téléchargé est invalide ou incomplet (${Math.round((stat?.size || 0) / 1024)} Ko). Veuillez réessayer.`);
+    }
+
     onProgress?.({ percent: 99, status: 'installing', message: 'Ouverture de l\'installeur Android...' });
 
-    // 4. Get file URI
+    // 5. Récupérer l'URI du fichier
     const fileUri = await Filesystem.getUri({
       path: fileName,
       directory: Directory.Cache
@@ -102,7 +110,7 @@ export async function downloadAndInstallApk(
 
     const targetPath = downloadRes.path || fileUri.uri;
 
-    // 5. Open with Android package installer
+    // 6. Ouvrir l'archive APK avec le Package Installer natif d'Android
     await FileOpener.open({
       filePath: targetPath,
       contentType: 'application/vnd.android.package-archive',
