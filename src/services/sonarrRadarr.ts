@@ -907,7 +907,10 @@ export async function searchAndDownloadInSonarr(params: {
     // Ajouter la série dans Sonarr avec recherche ciblée
     const addPayload: any = {
       title: lookupResult.title,
-      seasons: Array.isArray(lookupResult.seasons) ? lookupResult.seasons : [],
+      seasons: Array.isArray(lookupResult.seasons) ? lookupResult.seasons.map((s: any) => ({
+        ...s,
+        monitored: (!isEpisodeSearch && !isSeasonSearch) || (isSeasonSearch && Number(s.seasonNumber) === Number(params.season)) || (isEpisodeSearch && Number(s.seasonNumber) === Number(params.season))
+      })) : [],
       rootFolderPath,
       qualityProfileId: targetQualityProfileId,
       monitored: true,
@@ -919,7 +922,7 @@ export async function searchAndDownloadInSonarr(params: {
       addOptions: {
         // Empêche la recherche globale de toute la série si un épisode ou une saison est spécifié
         searchForMissingEpisodes: !isEpisodeSearch && !isSeasonSearch,
-        monitor: 'all'
+        monitor: (!isEpisodeSearch && !isSeasonSearch) ? 'all' : 'none'
       }
     };
     if (lookupResult.seriesType) addPayload.seriesType = lookupResult.seriesType;

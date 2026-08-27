@@ -257,7 +257,35 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             if (removedSet.has(oldItem.id)) continue;
             if (oldItem.isOptimistic) continue;
 
-            const existsOnServer = serverItems.some(si => si.id === oldItem.id);
+            // Vérifier si un élément pour ce même média exact existe déjà sur le serveur
+            const existsOnServer = serverItems.some(si => {
+              if (si.id === oldItem.id) return true;
+              
+              if (oldItem.tmdbId && si.tmdbId && Number(oldItem.tmdbId) === Number(si.tmdbId)) {
+                if (oldItem.mediaType === 'tv' && si.mediaType === 'tv') {
+                  if (oldItem.seasonNumber != null && si.seasonNumber != null) {
+                    return oldItem.seasonNumber === si.seasonNumber && oldItem.episodeNumber === si.episodeNumber;
+                  }
+                }
+                return true;
+              }
+              if (oldItem.tvdbId && si.tvdbId && Number(oldItem.tvdbId) === Number(si.tvdbId)) {
+                 if (oldItem.mediaType === 'tv' && si.mediaType === 'tv') {
+                  if (oldItem.seasonNumber != null && si.seasonNumber != null) {
+                    return oldItem.seasonNumber === si.seasonNumber && oldItem.episodeNumber === si.episodeNumber;
+                  }
+                }
+                return true;
+              }
+              
+              const normOld = normalizeTitleForMatch(oldItem.title || oldItem.movieTitle || oldItem.seriesTitle);
+              const normSi = normalizeTitleForMatch(si.title || si.movieTitle || si.seriesTitle || si.releaseTitle);
+              if (normOld && normSi && (normOld === normSi || normOld.includes(normSi) || normSi.includes(normOld))) {
+                return true;
+              }
+              return false;
+            });
+            
             if (!existsOnServer) {
               preservedCompletedItems.push({
                 ...oldItem,
@@ -420,9 +448,19 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
         const showItems = get().getShowDownloads(tmdbId, tvdbId);
         if (!showItems.length) return null;
         if (season !== undefined && episode !== undefined) {
-          return showItems.find(it => it.seasonNumber === season && it.episodeNumber === episode) || showItems[0] || null;
+          // Si on a les deux, chercher spécifiquement l'épisode, SINON la saison entière, SINON le show entier
+          return showItems.find(it => it.seasonNumber === season && it.episodeNumber === episode)
+              || showItems.find(it => it.seasonNumber === season && it.episodeNumber === undefined)
+              || showItems.find(it => it.seasonNumber === undefined)
+              || null;
         }
-        return showItems[0] || null;
+        if (season !== undefined) {
+          // Si on a que la saison, chercher la saison entière, SINON le show entier
+          return showItems.find(it => it.seasonNumber === season && it.episodeNumber === undefined)
+              || showItems.find(it => it.seasonNumber === undefined)
+              || null;
+        }
+        return showItems.find(it => it.seasonNumber === undefined) || null;
       }
     }),
     {

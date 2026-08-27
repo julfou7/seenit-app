@@ -2478,20 +2478,18 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                   <Clapperboard size={20} className="stroke-[2]" />
                 </button>
               )}
-              {!isSeries && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDownloadTargetSeason(undefined);
-                    setDownloadTargetEpisode(undefined);
-                    setIsDownloadModalOpen(true);
-                  }}
-                  className="w-12 h-12 bg-blue-500/15 border border-blue-500/40 rounded-2xl flex items-center justify-center text-blue-400 hover:text-blue-300 hover:bg-blue-500/25 hover:border-blue-400/60 hover:shadow-[0_0_20px_rgba(59,130,246,0.25)] shrink-0 active:scale-95 transition-all cursor-pointer backdrop-blur-md"
-                  title="Télécharger le film (1080p / 4K)"
-                >
-                  <Download size={20} className="stroke-[2.2]" />
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setDownloadTargetSeason(undefined);
+                  setDownloadTargetEpisode(undefined);
+                  setIsDownloadModalOpen(true);
+                }}
+                className="w-12 h-12 bg-blue-500/15 border border-blue-500/40 rounded-2xl flex items-center justify-center text-blue-400 hover:text-blue-300 hover:bg-blue-500/25 hover:border-blue-400/60 hover:shadow-[0_0_20px_rgba(59,130,246,0.25)] shrink-0 active:scale-95 transition-all cursor-pointer backdrop-blur-md"
+                title={isSeries ? "Télécharger la série (1080p / 4K)" : "Télécharger le film (1080p / 4K)"}
+              >
+                <Download size={20} className="stroke-[2.2]" />
+              </button>
               {hasSeenMedia && (
                 <button 
                   type="button"

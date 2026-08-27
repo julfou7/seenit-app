@@ -382,24 +382,7 @@ export function DownloadModal({
           qualityPreference
         });
 
-        // Fallback automatique 1080p si 4K est choisi et qu'aucun téléchargement n'a démarré au bout de 12 secondes
-        if (res.success && qualityPreference === '4k') {
-          setTimeout(async () => {
-            const currentDownloads = useLiveDownloadStore.getState().downloads;
-            const hasStartedOnServer = currentDownloads.some(d => !d.isOptimistic && d.mediaType === 'movie' && (d.tmdbId === Number(tmdbId) || d.title.toLowerCase().includes(title.toLowerCase())));
-            if (!hasStartedOnServer && radarrUrl && radarrApiKey) {
-              if (onSuccessToast) onSuccessToast(`4K indisponible actuellement. Recherche 1080p lancée en fallback !`);
-              await searchAndDownloadInRadarr({
-                url: radarrUrl,
-                apiKey: radarrApiKey,
-                title,
-                tmdbId,
-                year,
-                qualityPreference: '1080p'
-              }).catch(() => {});
-            }
-          }, 12000);
-        } else if (!res.success && onSuccessToast) {
+        if (!res.success && onSuccessToast) {
           onSuccessToast(`Radarr : ${res.message}`);
         }
       }
