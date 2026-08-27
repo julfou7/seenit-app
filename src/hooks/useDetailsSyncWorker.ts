@@ -267,6 +267,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
               showId: showId,
               showTitle: showToSync.title,
               message: 'La série a été officiellement annulée.',
+              description: `La production a officiellement arrêté « ${showToSync.title} ». Il n'y aura malheureusement pas de nouveaux épisodes.`,
               createdAt: Date.now()
             });
           } catch (newsErr) {
@@ -308,16 +309,27 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
                 : `La Saison ${nextEpisodeToAir.season_number} arrive le ${nextEpisodeToAir.air_date}.`;
               const desc = isFinal 
                 ? `Il a été officiellement confirmé que la Saison ${nextEpisodeToAir.season_number} sera l'ultime chapitre qui conclura « ${showToSync.title} ».`
-                : undefined;
+                : (nextEpisodeToAir.episode_number === 1
+                    ? `Une nouvelle saison arrive prochainement pour « ${showToSync.title} ». Le premier épisode est prévu pour le ${nextEpisodeToAir.air_date}.`
+                    : `La diffusion se poursuit avec l'épisode ${nextEpisodeToAir.episode_number} de la saison ${nextEpisodeToAir.season_number} prévu le ${nextEpisodeToAir.air_date}.`);
 
-              await addDoc(collection(db, 'users', userUid, 'news'), {
+              const docData: Record<string, any> = {
                 type: newsType,
                 showId: showId,
                 showTitle: showToSync.title,
                 message: msg,
                 description: desc,
                 createdAt: Date.now()
+              };
+
+              // Firestore n'accepte pas de champs undefined, nettoyer tout champ indéfini par sécurité
+              Object.keys(docData).forEach(key => {
+                if (docData[key] === undefined) {
+                  delete docData[key];
+                }
               });
+
+              await addDoc(collection(db, 'users', userUid, 'news'), docData);
             } catch (newsErr) {
               console.error('[SyncWorker] Error adding DATE_ANNOUNCED/NEW_SEASON/FINAL_SEASON news:', newsErr);
             }
