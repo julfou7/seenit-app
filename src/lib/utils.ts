@@ -33,29 +33,40 @@ export async function openExternalUrl(url: string) {
       }
 
       const candidatePlexUrls: string[] = [];
+
       if (serverId && ratingKey) {
+        // Formats Android Intent explicites ciblant l'application native com.plexapp.android
+        candidatePlexUrls.push(`intent://server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}#Intent;package=com.plexapp.android;scheme=plex;end`);
+        candidatePlexUrls.push(`intent://preplay/?metadataKey=${encodeURIComponent(`/library/metadata/${ratingKey}`)}&server=${serverId}#Intent;package=com.plexapp.android;scheme=plex;end`);
+        candidatePlexUrls.push(`intent://app.plex.tv/desktop/#!/server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}#Intent;package=com.plexapp.android;scheme=https;end`);
+        
+        // Schemes personnalisés standard Plex
+        candidatePlexUrls.push(`plex://server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`);
         candidatePlexUrls.push(`plex://preplay/?metadataKey=${encodeURIComponent(`/library/metadata/${ratingKey}`)}&server=${serverId}`);
         candidatePlexUrls.push(`plex://preplay?metadataKey=${encodeURIComponent(`/library/metadata/${ratingKey}`)}&server=${serverId}`);
         candidatePlexUrls.push(`plex://play/?metadataKey=${encodeURIComponent(`/library/metadata/${ratingKey}`)}&server=${serverId}`);
         candidatePlexUrls.push(`plex://server/${serverId}/library/metadata/${ratingKey}`);
-        candidatePlexUrls.push(`plex://server/${serverId}/com.plexapp.plugins.library/library/metadata/${ratingKey}`);
-        candidatePlexUrls.push(`plex://server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`);
       }
       
-      const cleanWebPlexUrl = (serverId && ratingKey)
-        ? `https://app.plex.tv/desktop/#!/server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`
-        : url.replace(/watch\.plex\.tv/g, 'app.plex.tv');
-
-      candidatePlexUrls.push(cleanWebPlexUrl);
+      // Fallbacks pour ouvrir l'application Android Plex directement (Intent de lancement de package)
+      candidatePlexUrls.push(`intent://launch#Intent;package=com.plexapp.android;end`);
+      candidatePlexUrls.push(`plex://`);
 
       for (const pUrl of candidatePlexUrls) {
         try {
-          await AppLauncher.openUrl({ url: pUrl });
-          return;
+          const res = await AppLauncher.openUrl({ url: pUrl });
+          if (res && res.completed) {
+            return;
+          }
         } catch (err) {
           console.warn('AppLauncher openUrl failed for Plex URL:', pUrl, err);
         }
       }
+
+      // Si aucune tentative native n'a fonctionné (ex: l'application Plex n'est pas installée)
+      const cleanWebPlexUrl = (serverId && ratingKey)
+        ? `https://app.plex.tv/desktop/#!/server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`
+        : url.replace(/watch\.plex\.tv/g, 'app.plex.tv');
 
       try {
         await Browser.open({ url: cleanWebPlexUrl, windowName: '_system' });
@@ -71,11 +82,17 @@ export async function openExternalUrl(url: string) {
         ? url
         : url.replace(/^https?:\/\/(www\.)?reddit\.com\//i, 'reddit://');
 
-      const candidateRedditUrls = [url, redditSchemeUrl];
+      const candidateRedditUrls = [
+        `intent://${url.replace(/^https?:\/\//i, '')}#Intent;package=com.reddit.frontpage;scheme=https;end`,
+        redditSchemeUrl,
+        url
+      ];
       for (const rUrl of candidateRedditUrls) {
         try {
-          await AppLauncher.openUrl({ url: rUrl });
-          return;
+          const res = await AppLauncher.openUrl({ url: rUrl });
+          if (res && res.completed) {
+            return;
+          }
         } catch (err) {
           console.warn('AppLauncher openUrl failed for Reddit URL:', rUrl, err);
         }
@@ -91,8 +108,10 @@ export async function openExternalUrl(url: string) {
 
     // 3. Autres liens externes : essai préalable AppLauncher pour déclencher les applications natives
     try {
-      await AppLauncher.openUrl({ url });
-      return;
+      const res = await AppLauncher.openUrl({ url });
+      if (res && res.completed) {
+        return;
+      }
     } catch (err) {
       // Fallback Chrome Custom Tabs si pas d'application associée
     }
