@@ -1354,6 +1354,8 @@ export interface LiveDownloadItem {
   title: string;
   seriesTitle?: string;
   movieTitle?: string;
+  episodeTitle?: string;
+  quality?: string;
   tmdbId?: number;
   tvdbId?: number;
   imdbId?: string;
@@ -1374,6 +1376,51 @@ export interface LiveDownloadItem {
   downloadClient?: string;
   releaseTitle?: string;
   isOptimistic?: boolean;
+}
+
+export function extractQualityFromTitle(rawTitle?: string, fallbackQuality?: string): string | undefined {
+  if (fallbackQuality && fallbackQuality.trim() && fallbackQuality !== 'Unknown') {
+    const cleanFallback = fallbackQuality
+      .replace(/WEBDL/i, 'WEB-DL')
+      .replace(/WEBRip/i, 'WEB-DL')
+      .replace(/Bluray/i, 'BluRay')
+      .trim();
+    if (cleanFallback) return cleanFallback;
+  }
+  if (!rawTitle) return undefined;
+  const raw = rawTitle.toUpperCase();
+  const tokens: string[] = [];
+
+  if (raw.includes('2160P') || raw.includes('4K') || raw.includes('UHD')) {
+    tokens.push('4K');
+  } else if (raw.includes('1080P') || raw.includes('FHD')) {
+    tokens.push('1080p');
+  } else if (raw.includes('720P') || raw.includes('HD')) {
+    tokens.push('720p');
+  }
+
+  if (raw.includes('REMUX')) {
+    tokens.push('REMUX');
+  } else if (raw.includes('BLURAY') || raw.includes('BLU-RAY') || raw.includes('BDRIP')) {
+    tokens.push('BluRay');
+  } else if (raw.includes('WEB-DL') || raw.includes('WEBDL') || raw.includes('WEBRIP')) {
+    tokens.push('WEB-DL');
+  } else if (raw.includes('HDTV')) {
+    tokens.push('HDTV');
+  } else if (raw.includes('DVDRIP') || raw.includes('DVD')) {
+    tokens.push('DVD');
+  }
+
+  if (raw.includes('HDR10+') || raw.includes('HDR10') || raw.includes('HDR')) {
+    tokens.push('HDR');
+  } else if (raw.includes('DV') || raw.includes('DOVI') || raw.includes('DOLBY VISION')) {
+    tokens.push('DV');
+  }
+
+  if (tokens.length > 0) {
+    return tokens.join(' ');
+  }
+  return undefined;
 }
 
 export function formatBytes(bytes: number, decimals = 1): string {
@@ -1622,6 +1669,11 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
         const seasonNum = rec.seasonNumber ?? rec.episode?.seasonNumber ?? 1;
         const epNum = rec.episode?.episodeNumber ?? rec.episodeNumber;
         const epTitle = epNum ? `S${seasonNum}E${epNum}` : `Saison ${seasonNum}`;
+        const epName = rec.episode?.title || undefined;
+
+        const posterImg = rec.series?.images?.find((i: any) => i.coverType === 'poster');
+        const posterUrl = posterImg?.remoteUrl || (posterImg?.url ? `${sonarrBase}${posterImg.url}` : undefined);
+        const qualityName = extractQualityFromTitle(rec.title, rec.quality?.quality?.name);
 
         const statusInfo = parseQueueRecordStatus(rec);
 
@@ -1630,6 +1682,9 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           mediaType: 'tv',
           title: `${seriesTitle} (${epTitle})`,
           seriesTitle: seriesTitle,
+          episodeTitle: epName,
+          quality: qualityName,
+          posterPath: posterUrl,
           tmdbId: rec.series?.tmdbId,
           tvdbId: rec.series?.tvdbId,
           imdbId: rec.series?.imdbId,
@@ -1677,6 +1732,9 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
         const timeleftStr = timeleftSeconds > 0 ? formatSecondsToETA(timeleftSeconds) : (rec.timeleft || '');
 
         const movieTitle = rec.movie?.title || rec.title || 'Film';
+        const posterImg = rec.movie?.images?.find((i: any) => i.coverType === 'poster');
+        const posterUrl = posterImg?.remoteUrl || (posterImg?.url ? `${radarrBase}${posterImg.url}` : undefined);
+        const qualityName = extractQualityFromTitle(rec.title, rec.quality?.quality?.name);
         const statusInfo = parseQueueRecordStatus(rec);
 
         items.push({
@@ -1684,6 +1742,8 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           mediaType: 'movie',
           title: movieTitle,
           movieTitle: movieTitle,
+          quality: qualityName,
+          posterPath: posterUrl,
           tmdbId: rec.movie?.tmdbId,
           imdbId: rec.movie?.imdbId,
           size: totalSize,
@@ -1784,6 +1844,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
                 id: `qbit_${t.hash || t.name}`,
                 mediaType: isTv ? 'tv' : 'movie',
                 title: t.name,
+                quality: extractQualityFromTitle(t.name),
                 size: t.size || 0,
                 sizeleft: isDone ? 0 : Math.round((t.size || 0) * (1 - (t.progress || 0))),
                 progress: rawProgress,

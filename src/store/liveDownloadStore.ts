@@ -1,11 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useDownloadConfigStore } from './downloadConfigStore';
-import { fetchLiveDownloadsQueue, LiveDownloadItem, matchShowDownload, matchMovieDownload, deleteLiveDownloadItem } from '../services/sonarrRadarr';
+import { fetchLiveDownloadsQueue, LiveDownloadItem, matchShowDownload, matchMovieDownload, deleteLiveDownloadItem, extractQualityFromTitle } from '../services/sonarrRadarr';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
 import { useToastStore } from './toastStore';
+import { useShowsStore } from './showsStore';
 
 interface LiveDownloadState {
   downloads: LiveDownloadItem[];
@@ -182,6 +183,8 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           const serverItems = rawServerItems.filter(si => !removedSet.has(si.id));
 
           // Conserver les affiches, métadonnées et la progression maximale
+          const localShows = useShowsStore.getState().shows || [];
+
           serverItems.forEach(si => {
             const match = currentDownloads.find(d => {
               if (d.id === si.id) return true;
@@ -197,6 +200,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               if (!si.tmdbId && match.tmdbId) si.tmdbId = match.tmdbId;
               if (!si.tvdbId && match.tvdbId) si.tvdbId = match.tvdbId;
               if (!si.backdropPath && match.backdropPath) si.backdropPath = match.backdropPath;
+              if (!si.quality && match.quality) si.quality = match.quality;
 
               // Protection contre les baisses de progression (ex: 99% -> 77% pendant l'import)
               if (match.progress >= 98 && si.progress < 98 && si.status !== 'completed' && si.status !== 'error') {
@@ -211,6 +215,26 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
                 si.statusText = 'Téléchargement terminé 🍿';
                 si.sizeleft = 0;
               }
+            }
+
+            // Recherche du poster dans la bibliothèque SeenIt locale
+            if (!si.posterPath && localShows.length > 0) {
+              const matchedShow = localShows.find(s => {
+                if (si.tmdbId && Number(s.tmdbId) === Number(si.tmdbId)) return true;
+                const normShow = normalizeTitleForMatch(s.title);
+                const normSi = normalizeTitleForMatch(si.title || si.seriesTitle || si.movieTitle || si.releaseTitle);
+                return Boolean(normShow && normSi && (normShow === normSi || normShow.includes(normSi) || normSi.includes(normShow)));
+              });
+
+              if (matchedShow) {
+                if (matchedShow.posterPath) si.posterPath = matchedShow.posterPath;
+                if (matchedShow.backdropPath && !si.backdropPath) si.backdropPath = matchedShow.backdropPath;
+                if (matchedShow.tmdbId && !si.tmdbId) si.tmdbId = Number(matchedShow.tmdbId);
+              }
+            }
+
+            if (!si.quality) {
+              si.quality = extractQualityFromTitle(si.releaseTitle || si.title);
             }
           });
 
