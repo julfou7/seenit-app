@@ -148,22 +148,29 @@ async function startServer() {
   const upload = multer();
 
   app.get('/api/plex/resolve-slug', async (req, res) => {
+    console.log(`[Plex Resolve Backend] --- DÉBUT DE LA RÉSOLUTION ---`);
     try {
       const { tmdbId, imdbId, type, token, clientId } = req.query || {};
+      console.log(`[Plex Resolve Backend] Paramètres reçus: tmdbId=${tmdbId}, imdbId=${imdbId}, type=${type}, token=${token ? 'PRÉSENT' : 'ABSENT'}, clientId=${clientId}`);
+
       const targetType = type === 'show' || type === 'series' ? 'show' : 'movie';
       const plexType = targetType === 'show' ? 2 : 1;
       const plexAgent = targetType === 'show' ? 'tv.plex.agents.series' : 'tv.plex.agents.movie';
       const matchQuery = tmdbId ? `tmdb-${tmdbId}` : (imdbId ? `imdb-${imdbId}` : '');
 
+      console.log(`[Plex Resolve Backend] Mappe vers: targetType=${targetType}, plexType=${plexType}, plexAgent=${plexAgent}, matchQuery=${matchQuery}`);
+
       if (!matchQuery) {
+        console.warn(`[Plex Resolve Backend] Aucun ID externe fourni (tmdbId ou imdbId)`);
         return res.status(400).json({ error: 'tmdbId ou imdbId requis' });
       }
 
       const matchesUrl = `https://metadata.provider.plex.tv/library/metadata/matches?manual=1&title=${encodeURIComponent(matchQuery)}&type=${plexType}&agent=${encodeURIComponent(plexAgent)}`;
+      console.log(`[Plex Resolve Backend] Appel de l'URL Plex: ${matchesUrl}`);
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.01',
+        'X-Plex-Version': '1.4.03',
         'X-Plex-Client-Identifier': (clientId as string) || 'seenit-app-server',
         'Accept': 'application/json'
       };
@@ -171,10 +178,20 @@ async function startServer() {
         headers['X-Plex-Token'] = token as string;
       }
 
+      console.log(`[Plex Resolve Backend] En-têtes envoyés à Plex:`, {
+        'X-Plex-Product': headers['X-Plex-Product'],
+        'X-Plex-Version': headers['X-Plex-Version'],
+        'X-Plex-Client-Identifier': headers['X-Plex-Client-Identifier'],
+        'Accept': headers['Accept'],
+        'X-Plex-Token': headers['X-Plex-Token'] ? 'PRÉSENT (Masqué)' : 'ABSENT'
+      });
+
       const response = await fetch(matchesUrl, {
         headers,
         signal: AbortSignal.timeout(5000)
       });
+
+      console.log(`[Plex Resolve Backend] Statut de la réponse Plex: ${response.status} ${response.statusText}`);
 
       if (!response.ok) {
         console.error(`[Plex Resolve Backend] Échec de l'API Plex: ${response.status} ${response.statusText}`);
@@ -182,38 +199,70 @@ async function startServer() {
       }
 
       const data = await response.json();
+      console.log(`[Plex Resolve Backend] Données reçues de Plex pour TMDB:`, JSON.stringify(data, null, 2));
+
       const searchResults = data?.MediaContainer?.SearchResult || data?.MediaContainer?.Metadata || data?.SearchResult;
       const match = Array.isArray(searchResults) && searchResults.length > 0 ? searchResults[0] : null;
 
-      if (match && match.slug) {
-        const resType = match.type || targetType;
-        const mediaTypeStr = (resType === 'show' || resType === 'series' || resType === 2 || targetType === 'show') ? 'show' : 'movie';
-        return res.json({ slug: match.slug, type: mediaTypeStr });
+      if (match) {
+        console.log(`[Plex Resolve Backend] Match trouvé pour TMDB ! Titre: "${match.title}", Année: "${match.year}", Slug: "${match.slug}", Type: "${match.type}"`);
+        if (match.slug) {
+          const resType = match.type || targetType;
+          const mediaTypeStr = (resType === 'show' || resType === 'series' || resType === 2 || targetType === 'show') ? 'show' : 'movie';
+          console.log(`[Plex Resolve Backend] ✅ Résolution TMDB réussie! Renvoi du slug: ${match.slug}, type: ${mediaTypeStr}`);
+          return res.json({ slug: match.slug, type: mediaTypeStr });
+        } else {
+          console.warn(`[Plex Resolve Backend] Le match TMDB n'a pas de champ 'slug' !`);
+        }
+      } else {
+        console.warn(`[Plex Resolve Backend] Aucun match trouvé dans la liste pour TMDB.`);
       }
 
       // Si tmdbId a échoué et que imdbId est fourni, faire un fallback automatique côté serveur
-      if (tmdbId && imdbId) {
+      if (imdbId) {
+        console.log(`[Plex Resolve Backend] Déclenchement du fallback IMDb car TMDB n'a rien renvoyé. IMDb ID: imdb-${imdbId}`);
         const matchesUrlImdb = `https://metadata.provider.plex.tv/library/metadata/matches?manual=1&title=imdb-${imdbId}&type=${plexType}&agent=${encodeURIComponent(plexAgent)}`;
+        console.log(`[Plex Resolve Backend] Appel de l'URL de fallback IMDb Plex: ${matchesUrlImdb}`);
+
         const responseImdb = await fetch(matchesUrlImdb, {
           headers,
           signal: AbortSignal.timeout(5000)
         });
+
+        console.log(`[Plex Resolve Backend] Statut de la réponse de fallback IMDb Plex: ${responseImdb.status} ${responseImdb.statusText}`);
+
         if (responseImdb.ok) {
           const dataImdb = await responseImdb.json();
+          console.log(`[Plex Resolve Backend] Données reçues de Plex pour IMDb fallback:`, JSON.stringify(dataImdb, null, 2));
+
           const searchResultsImdb = dataImdb?.MediaContainer?.SearchResult || dataImdb?.MediaContainer?.Metadata || dataImdb?.SearchResult;
           const matchImdb = Array.isArray(searchResultsImdb) && searchResultsImdb.length > 0 ? searchResultsImdb[0] : null;
-          if (matchImdb && matchImdb.slug) {
-            const resType = matchImdb.type || targetType;
-            const mediaTypeStr = (resType === 'show' || resType === 'series' || resType === 2 || targetType === 'show') ? 'show' : 'movie';
-            return res.json({ slug: matchImdb.slug, type: mediaTypeStr });
+
+          if (matchImdb) {
+            console.log(`[Plex Resolve Backend] Match trouvé pour IMDb fallback ! Titre: "${matchImdb.title}", Année: "${matchImdb.year}", Slug: "${matchImdb.slug}", Type: "${matchImdb.type}"`);
+            if (matchImdb.slug) {
+              const resType = matchImdb.type || targetType;
+              const mediaTypeStr = (resType === 'show' || resType === 'series' || resType === 2 || targetType === 'show') ? 'show' : 'movie';
+              console.log(`[Plex Resolve Backend] ✅ Résolution IMDb de fallback réussie! Renvoi du slug: ${matchImdb.slug}, type: ${mediaTypeStr}`);
+              return res.json({ slug: matchImdb.slug, type: mediaTypeStr });
+            } else {
+              console.warn(`[Plex Resolve Backend] Le match IMDb de fallback n'a pas de champ 'slug' !`);
+            }
+          } else {
+            console.warn(`[Plex Resolve Backend] Aucun match trouvé dans la liste pour IMDb de fallback.`);
           }
+        } else {
+          console.error(`[Plex Resolve Backend] Échec de l'appel de fallback IMDb Plex: ${responseImdb.status}`);
         }
       }
 
+      console.error(`[Plex Resolve Backend] ❌ Impossible de résoudre le média sur Plex Discover (ni par TMDB, ni par IMDb).`);
       return res.status(404).json({ error: 'Média non trouvé sur Plex Discover' });
     } catch (error: any) {
-      console.error('[Plex Resolve Backend] Erreur:', error);
+      console.error('[Plex Resolve Backend] Erreur critique rencontrée:', error);
       return res.status(500).json({ error: error?.message || 'Erreur de résolution de slug Plex' });
+    } finally {
+      console.log(`[Plex Resolve Backend] --- FIN DE LA RÉSOLUTION ---`);
     }
   });
 

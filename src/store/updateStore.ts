@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Capacitor } from '@capacitor/core';
 
-export const CURRENT_APP_VERSION = '1.4.03';
+export const CURRENT_APP_VERSION = '1.4.04';
 export const GITHUB_REPO = 'julfou7/seenit-app';
 export const GITHUB_PAT = ''; // Plus de jeton d'accès privé codé en dur pour éviter les révocations de sécurité. Rendre le dépôt public est recommandé et gratuit !
 
