@@ -1212,17 +1212,15 @@ export async function openPlexWatchUrl(params: {
     }
   }
 
-  // Fallback si l'API n'a pas retourné de slug : formater le slug depuis le titre original
+  // Fallback si l'API n'a pas retourné de slug : formater le slug depuis le titre original (SANS l'année)
   if (!officialSlug) {
     const titleForSlug = targetOriginalTitle || title || '';
-    const cleanTitle = titleForSlug
+    officialSlug = titleForSlug
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .trim()
-      .replace(/\s+/g, '-');
-    officialSlug = year ? `${cleanTitle}-${year}` : cleanTitle;
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
     appLogger.info('plex', `[Plex Discover Fallback] Slug généré depuis titre original : ${officialSlug}`);
   }
 

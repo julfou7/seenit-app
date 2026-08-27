@@ -11,17 +11,15 @@ export function cn(...inputs: ClassValue[]) {
 
 import { CapacitorHttp } from '@capacitor/core';
 
-export function buildPlexSlug(title?: string, year?: number | string, originalTitle?: string): string {
+export function buildPlexSlug(title?: string, _year?: number | string, originalTitle?: string): string {
   const primaryTitle = (originalTitle && originalTitle.trim().length > 0) ? originalTitle : title;
   if (!primaryTitle) return '';
-  const clean = primaryTitle
+  return primaryTitle
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .trim()
-    .replace(/\s+/g, '-');
-  return year ? `${clean}-${year}` : clean;
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 export function buildPlexWatchUrl(title?: string, year?: number | string, mediaType?: string, originalTitle?: string): string {

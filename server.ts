@@ -365,14 +365,12 @@ async function startServer() {
                       watchUrl = `https://watch.plex.tv/${isShow ? 'show' : 'movie'}/${it.slug}`;
                     } else {
                       const targetTitleForSlug = it.originalTitle || originalTitle || itemTitle;
-                      const cleanTitleSlug = (targetTitleForSlug || '')
+                      const slug = (targetTitleForSlug || '')
                         .normalize('NFD')
                         .replace(/[\u0300-\u036f]/g, '')
                         .toLowerCase()
-                        .replace(/[^a-z0-9\s-]/g, '')
-                        .trim()
-                        .replace(/\s+/g, '-');
-                      const slug = itemYear ? `${cleanTitleSlug}-${itemYear}` : cleanTitleSlug;
+                        .replace(/[^a-z0-9]+/g, '-')
+                        .replace(/^-+|-+$/g, '');
                       watchUrl = `https://watch.plex.tv/${isShow ? 'show' : 'movie'}/${slug}`;
                     }
 
