@@ -1242,29 +1242,6 @@ export const openPlexMediaByExternalId = async (
   return false;
 };
 
-/**
- * Ouvre un média dans l'application Plex (uniquement pour les médias sur serveur local)
- */
-export const openPlexMedia = async (title: string, ratingKey?: string, serverId?: string): Promise<void> => {
-  if (ratingKey && serverId) {
-    appLogger.info('plex', `[Plex Open] Lancement Intent serveur local (${serverId}, ${ratingKey})`);
-    if (Capacitor.isNativePlatform()) {
-      window.location.href = `intent://preplay?metadataKey=%2Flibrary%2Fmetadata%2F${ratingKey}&server=${serverId}#Intent;scheme=plex;package=com.plexapp.android;end`;
-    } else {
-      window.open(`https://app.plex.tv/desktop/#!/server/${serverId}/details?key=%2Flibrary%2Fmetadata%2F${ratingKey}`, '_blank');
-    }
-    return;
-  }
-
-  appLogger.warn('plex', `[Plex Open] Média non local, redirection vers l'accueil Plex`);
-  const fallbackUrl = 'https://watch.plex.tv';
-  if (Capacitor.isNativePlatform()) {
-    window.location.href = fallbackUrl;
-  } else {
-    window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
-  }
-};
-
 export async function openPlexWatchUrl(params: {
   title?: string;
   originalTitle?: string;
@@ -1275,16 +1252,11 @@ export async function openPlexWatchUrl(params: {
   ratingKey?: string;
   serverId?: string;
 }): Promise<void> {
-  const { title, originalTitle, mediaType = 'movie', tmdbId, imdbId, ratingKey, serverId } = params;
-
-  // 1. Priorité absolue : Média sur le serveur local
-  if (ratingKey && serverId) {
-    return openPlexMedia(title || originalTitle || '', ratingKey, serverId);
-  }
+  const { mediaType = 'movie', tmdbId, imdbId } = params;
 
   const normalizedType: 'movie' | 'show' = (mediaType === 'tv' || mediaType === 'show' || mediaType === 'series') ? 'show' : 'movie';
 
-  // 2. Résolution prioritaire par ID externe (TMDB / IMDb) via le backend SeenIt
+  // Résolution unique par ID externe (TMDB / IMDb) via le backend SeenIt
   if (tmdbId || imdbId) {
     const success = await openPlexMediaByExternalId(tmdbId ? String(tmdbId) : '', normalizedType, imdbId);
     if (success) {
@@ -1292,7 +1264,7 @@ export async function openPlexWatchUrl(params: {
     }
   }
 
-  // 3. Fallback strict : redirection directe vers l'accueil Plex sans deviner de slug
+  // Redirection de secours si le backend échoue ou ne trouve rien
   appLogger.warn('plex', `[Plex Open] Résolution impossible, redirection vers l'accueil Plex`);
   const fallbackUrl = 'https://watch.plex.tv';
   if (Capacitor.isNativePlatform()) {
