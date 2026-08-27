@@ -71,6 +71,20 @@ const extractTmdbIdFromPlex = (item: any): number | null => {
   return extractExternalIdsFromPlex(item).tmdbId;
 };
 
+// Helper to sanitize show object for Firestore (strip undefined, internal norm fields)
+function cleanShowForFirestore(show: any, userId: string): Record<string, any> {
+  const clean: Record<string, any> = {};
+  for (const [k, v] of Object.entries(show)) {
+    if (v === undefined || k === 'normTitle' || k === 'normOriginalTitle') {
+      continue;
+    }
+    clean[k] = v;
+  }
+  clean.userId = userId;
+  clean.updatedAt = clean.updatedAt || Date.now();
+  return clean;
+}
+
 // Persistent title -> TMDB resolution cache in localStorage
 const getResolutionCache = (): Record<string, any> => {
   try {
@@ -79,7 +93,7 @@ const getResolutionCache = (): Record<string, any> => {
     const parsed = JSON.parse(raw);
     // Automatic cleanup of legacy incorrect Cinderella (1899) cache mappings
     Object.keys(parsed).forEach(k => {
-      if (parsed[k]?.id === 114108 && !k.includes('1899')) {
+      if (parsed[k]?.id === 114108 || (k.includes('cinderella') && parsed[k]?.id !== 150689) || (k.includes('cendrillon') && parsed[k]?.id !== 150689)) {
         delete parsed[k];
       }
     });
@@ -323,11 +337,13 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
       // Load fresh shows from Firestore or current store
       const localShows = useShowsStore.getState().shows;
-      const showsList: Array<Show & { normTitle: string; normOriginalTitle: string }> = localShows.map((s) => ({
-        ...s,
-        normTitle: normalizeTitle(s.title),
-        normOriginalTitle: normalizeTitle(s.originalTitle || (s as any).original_name || (s as any).original_title)
-      }));
+      const showsList: Array<Show & { normTitle: string; normOriginalTitle: string }> = localShows
+        .filter(s => Number(s.tmdbId) !== 114108) // Filter out obsolete Cinderella 1899
+        .map((s) => ({
+          ...s,
+          normTitle: normalizeTitle(s.title),
+          normOriginalTitle: normalizeTitle(s.originalTitle || (s as any).original_name || (s as any).original_title)
+        }));
 
       const resolutionCache = getResolutionCache();
       let cacheModified = false;
@@ -337,7 +353,14 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       let episodesCount = 0;
       const syncedItems: PlexSyncResult['syncedItems'] = [];
 
-      const batch = writeBatch(db);
+      const deleteDocIds: string[] = [];
+      // Purge bad 1899 Cinderella from Firestore if present
+      for (const s of localShows) {
+        if (Number(s.tmdbId) === 114108 && s.id) {
+          deleteDocIds.push(s.id);
+        }
+      }
+
       const mutatedShows: Record<string, Show> = {};
 
       const totalItems = history.length;
@@ -632,9 +655,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           const targetTmdbId = matchedMovie?.tmdbId || tmdbData?.id;
           if (targetTmdbId === 150689) {
             const bad1899 = showsList.find(s => Number(s.tmdbId) === 114108);
-            if (bad1899) {
-              const badRef = doc(db, `users/${user.uid}/shows`, bad1899.id);
-              batch.delete(badRef);
+            if (bad1899 && bad1899.id) {
+              deleteDocIds.push(bad1899.id);
               const idx = showsList.findIndex(s => s.id === bad1899.id);
               if (idx >= 0) showsList.splice(idx, 1);
               delete mutatedShows[bad1899.id];
@@ -861,23 +883,43 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         saveResolutionCache(resolutionCache);
       }
 
-      if (syncCount > 0) {
-        // Save all mutated and new shows to Firestore
-        for (const [id, data] of Object.entries(mutatedShows)) {
-          const ref = doc(db, `users/${user.uid}/shows`, id);
-          batch.set(ref, data, { merge: true });
+      // 1. Execute deletions if any bad entries were flagged
+      if (deleteDocIds.length > 0) {
+        try {
+          const delBatch = writeBatch(db);
+          for (const delId of deleteDocIds) {
+            delBatch.delete(doc(db, `users/${user.uid}/shows`, delId));
+          }
+          await delBatch.commit();
+        } catch (delErr) {
+          console.warn('[Plex Sync] Warning deleting bad items:', delErr);
+        }
+      }
+
+      if (syncCount > 0 || Object.keys(mutatedShows).length > 0) {
+        // 2. Save all mutated and new shows to Firestore in safe chunks of 250
+        const showEntries = Object.entries(mutatedShows);
+        const BATCH_SIZE = 250;
+        for (let i = 0; i < showEntries.length; i += BATCH_SIZE) {
+          const chunk = showEntries.slice(i, i + BATCH_SIZE);
+          const chunkBatch = writeBatch(db);
+          for (const [id, data] of chunk) {
+            const ref = doc(db, `users/${user.uid}/shows`, id);
+            const cleanData = cleanShowForFirestore(data, user.uid);
+            chunkBatch.set(ref, cleanData, { merge: true });
+          }
+          await chunkBatch.commit();
         }
 
-        await batch.commit();
         // appLogger.success('plex', `Batch Firestore validé avec succès (${syncCount} élément(s) mis à jour)`);
         localStorage.setItem('plex_last_sync_timestamp', String(Date.now()));
 
-        // Optimistically update the store
+        // 3. Optimistically update the store
         const currentShows = useShowsStore.getState().shows;
-        const mergedShows = [...currentShows];
+        const mergedShows = currentShows.filter(s => Number(s.tmdbId) !== 114108 && !deleteDocIds.includes(s.id));
         Object.keys(mutatedShows).forEach((showId) => {
-          const mut = mutatedShows[showId];
-          const idx = mergedShows.findIndex((s) => s.id === showId);
+          const mut = cleanShowForFirestore(mutatedShows[showId], user.uid) as Show;
+          const idx = mergedShows.findIndex((s) => s.id === showId || (s.tmdbId && mut.tmdbId && Number(s.tmdbId) === Number(mut.tmdbId) && s.mediaType === mut.mediaType));
           if (idx >= 0) {
             mergedShows[idx] = { ...mergedShows[idx], ...mut };
           } else {
@@ -908,6 +950,11 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
         clearPlexSyncStatusDelayed(`Synchro terminée (${syncCount} nouveau(x))`, 3500);
       } else {
+        // Clean local store of bad entries if any were deleted
+        if (deleteDocIds.length > 0) {
+          const currentShows = useShowsStore.getState().shows.filter(s => Number(s.tmdbId) !== 114108 && !deleteDocIds.includes(s.id));
+          useShowsStore.getState().setShows(currentShows);
+        }
         // // appLogger.info('plex', 'Synchronisation terminée : 0 nouveau média (votre bibliothèque est déjà à jour)');
         clearPlexSyncStatusDelayed('Sync Plex terminée (à jour)', 3500);
       }

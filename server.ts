@@ -658,8 +658,13 @@ async function startServer() {
 
         if (!title && !grandparentTitle) continue;
 
-        // Extract item year (also check title string like 'Cinderella (2015)' if year property missing)
+        // Extract item year (also check originallyAvailableAt or title string like 'Cinderella (2015)' if year property missing)
         let itemYear = meta.year || raw.year || meta.parentYear || meta.grandparentYear ? Number(meta.year || raw.year || meta.parentYear || meta.grandparentYear) : undefined;
+        if (!itemYear && (meta.originallyAvailableAt || raw.originallyAvailableAt || meta.premiered || raw.premiered)) {
+          const dateStr = String(meta.originallyAvailableAt || raw.originallyAvailableAt || meta.premiered || raw.premiered);
+          const m = dateStr.match(/^(\d{4})/);
+          if (m) itemYear = Number(m[1]);
+        }
         if (!itemYear) {
           const matchYear = (title || '').match(/\((\d{4})\)/);
           if (matchYear) itemYear = Number(matchYear[1]);

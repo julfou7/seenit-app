@@ -132,7 +132,7 @@ function deduplicateAndMergeShows(rawShows: Show[], currentLocalShows: Show[] = 
   for (const localShow of currentLocalShows) {
     const tmdbIdNum = Number(localShow.tmdbId);
     const mType = localShow.mediaType || 'tv';
-    if (!tmdbIdNum || isNaN(tmdbIdNum)) continue;
+    if (!tmdbIdNum || isNaN(tmdbIdNum) || tmdbIdNum === 114108) continue; // Purge Cinderella 1899
 
     const key = `${mType}_${tmdbIdNum}`;
     const remoteShow = deduplicatedMap.get(key);
@@ -142,9 +142,16 @@ function deduplicateAndMergeShows(rawShows: Show[], currentLocalShows: Show[] = 
       if (isLocalNewer) {
         deduplicatedMap.set(key, mergeBasedOnTime(remoteShow, localShow));
       }
-    } else {
-      // Si la série n'existe pas ou n'est pas encore chargée de Firestore, on préserve l'élément local
+    } else if (rawShows.length === 0) {
+      // Si Firestore est complètement vide au premier démarrage, on préserve l'élément local
       deduplicatedMap.set(key, { ...localShow });
+    } else {
+      // Si Firestore contient déjà des données mais que cet élément n'y est pas,
+      // on ne le conserve que s'il s'agit d'un ajout local très récent (< 10 min) pour éviter de ressusciter un élément supprimé ailleurs
+      const isVeryRecentLocal = localShow.createdAt && (Date.now() - localShow.createdAt < 10 * 60 * 1000);
+      if (isVeryRecentLocal) {
+        deduplicatedMap.set(key, { ...localShow });
+      }
     }
   }
 
