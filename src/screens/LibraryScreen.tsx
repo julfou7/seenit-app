@@ -8,12 +8,14 @@ import { useShowsStore } from '../store/showsStore';
 import { useToastStore } from '../store/toastStore';
 import { Show } from '../types';
 import { SeenItLogo } from '../components/SeenItLogo';
+import { cn } from '../lib/utils';
 
 interface Props {
   onShowClick: (id: string, mediaType?: 'tv' | 'movie') => void;
+  isEmbedded?: boolean;
 }
 
-export function LibraryScreen({ onShowClick }: Props) {
+export function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
   const { shows, addShow, deleteShow } = useShows();
   const updateShow = useShowsStore(state => state.updateShowOptimistic);
   const showToast = useToastStore(state => state.showToast);
@@ -238,18 +240,20 @@ export function LibraryScreen({ onShowClick }: Props) {
   }, [shows]);
 
   return (
-    <div className="flex-1 overflow-y-auto bg-transparent text-white pb-nav">
-      <div className="px-4 sm:px-6 pt-6 pb-4 relative">
-        <div className="absolute top-0 left-0 w-72 h-40 bg-[#E5A93D]/15 blur-[120px] -z-10 rounded-full mix-blend-screen pointer-events-none" />
-        <h1 className="text-3xl font-black tracking-tight text-white mb-1 flex items-center gap-3">
-          <SeenItLogo size={34} symbol="library" animated />
-          <span>Ma Liste</span>
-        </h1>
-        <p className="text-xs text-zinc-400 font-medium">Toutes vos œuvres sauvegardées au même endroit.</p>
-      </div>
+    <div className={cn("flex-1 text-white", !isEmbedded && "overflow-y-auto bg-transparent pb-nav")}>
+      {!isEmbedded && (
+        <div className="px-4 sm:px-6 pt-6 pb-4 relative">
+          <div className="absolute top-0 left-0 w-72 h-40 bg-[#E5A93D]/15 blur-[120px] -z-10 rounded-full mix-blend-screen pointer-events-none" />
+          <h1 className="text-3xl font-black tracking-tight text-white mb-1 flex items-center gap-3">
+            <SeenItLogo size={34} symbol="library" animated />
+            <span>Ma Liste</span>
+          </h1>
+          <p className="text-xs text-zinc-400 font-medium">Toutes vos œuvres sauvegardées au même endroit.</p>
+        </div>
+      )}
 
       {sections.length === 0 ? (
-        <div className="flex flex-col items-center justify-center pt-20 px-6 text-center space-y-4">
+        <div className={cn("flex flex-col items-center justify-center px-6 text-center space-y-4", !isEmbedded && "pt-20")}>
           <div className="w-20 h-20 rounded-full bg-zinc-900 flex items-center justify-center border border-white/5">
             <Inbox size={32} className="text-zinc-600" />
           </div>

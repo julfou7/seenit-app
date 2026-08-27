@@ -11,7 +11,7 @@ interface Props {
 }
 
 interface TabItem {
-  id: 'watchlist' | 'library' | 'discover' | 'downloads' | 'profile';
+  id: 'watchlist' | 'discover' | 'downloads' | 'profile';
   label: string;
   symbol: SeenItSymbolType;
 }
@@ -23,10 +23,9 @@ export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveT
 
   const tabs: readonly TabItem[] = [
     { id: 'watchlist', label: 'À Voir', symbol: 'watch' },
-    { id: 'library', label: 'Ma Liste', symbol: 'library' },
-    { id: 'discover', label: 'Explorer', symbol: 'discover' },
     { id: 'profile', label: 'Profil', symbol: 'profile' },
-    { id: 'downloads', label: 'Téléchargements', symbol: 'download' },
+    { id: 'discover', label: 'Explorer', symbol: 'discover' },
+    { id: 'downloads', label: 'Télécharger', symbol: 'download' },
   ] as const;
 
   const handleTabClick = (e: React.MouseEvent, tabId: string) => {

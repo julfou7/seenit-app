@@ -8,6 +8,7 @@ import { cn } from '../lib/utils';
 import { useShows } from '../hooks/useShows';
 import { ProAnalyticsDashboard } from '../components/ProAnalyticsDashboard';
 import { SeenItLogo } from '../components/SeenItLogo';
+import { LibraryScreen } from './LibraryScreen';
 
 export function ProfileScreen({ 
   initialShowSettings = false,
@@ -20,6 +21,7 @@ export function ProfileScreen({
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState<'stats' | 'library'>('stats');
 
   const [isExitingSettings, setIsExitingSettings] = useState(false);
   const [dragXSettings, setDragXSettings] = useState(0);
@@ -196,10 +198,34 @@ export function ProfileScreen({
         </div>
       </div>
 
-      {/* 2. BENTO & STATS DASHBOARD */}
-      <div className="px-4 pb-2">
-        <ProAnalyticsDashboard shows={shows} onPersonClick={openPersonModal} />
+      {/* 2. TAB SELECTOR */}
+      <div className="px-4 pb-4">
+        <div className="flex bg-zinc-900/80 rounded-xl p-1 border border-white/5">
+           <button 
+             onClick={() => setActiveTab('stats')}
+             className={cn("flex-1 text-sm font-bold py-2 rounded-lg transition-colors cursor-pointer", activeTab === 'stats' ? "bg-zinc-800 text-white shadow-sm" : "text-zinc-500")}
+           >
+             Statistiques
+           </button>
+           <button 
+             onClick={() => setActiveTab('library')}
+             className={cn("flex-1 text-sm font-bold py-2 rounded-lg transition-colors cursor-pointer", activeTab === 'library' ? "bg-zinc-800 text-white shadow-sm" : "text-zinc-500")}
+           >
+             Ma Liste
+           </button>
+        </div>
       </div>
+
+      {/* 3. CONTENT */}
+      {activeTab === 'stats' ? (
+        <div className="px-4 pb-2">
+          <ProAnalyticsDashboard shows={shows} onPersonClick={openPersonModal} />
+        </div>
+      ) : (
+        <div className="flex-1 pb-2 flex flex-col">
+          <LibraryScreen onShowClick={(id, mediaType) => onShowClick && onShowClick(id, mediaType)} isEmbedded={true} />
+        </div>
+      )}
 
       {/* MODAL DÉTAILS PERSONNE (ACTEUR / RÉALISATEUR) */}
       {selectedPersonId && (

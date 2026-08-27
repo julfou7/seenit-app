@@ -369,8 +369,11 @@ function MainApp() {
               <WatchListScreen onShowClick={(id, mediaType) => openShow(id, 'local', mediaType)} />
             </div>
 
-            <div className={cn("flex-1 min-h-0 flex flex-col", currentTab !== 'library' && "hidden")}>
-              <LibraryScreen onShowClick={(id, mediaType) => openShow(id, 'local', mediaType)} />
+            <div className={cn("flex-1 min-h-0 flex flex-col", (currentTab !== 'profile' && currentTab !== 'settings') && "hidden")}>
+              <ProfileScreen 
+                initialShowSettings={currentTab === 'settings'} 
+                onShowClick={(id, mediaType) => openShow(id, 'tmdb', mediaType)}
+              />
             </div>
 
             <div className={cn("flex-1 min-h-0 flex flex-col", currentTab !== 'discover' && "hidden")}>
@@ -381,13 +384,6 @@ function MainApp() {
               <DownloadsScreen 
                 onShowClick={(id, mediaType) => openShow(id, 'tmdb', mediaType)}
                 onOpenSettings={() => changeTab('settings')}
-              />
-            </div>
-
-            <div className={cn("flex-1 min-h-0 flex flex-col", (currentTab !== 'profile' && currentTab !== 'settings') && "hidden")}>
-              <ProfileScreen 
-                initialShowSettings={currentTab === 'settings'} 
-                onShowClick={(id, mediaType) => openShow(id, 'tmdb', mediaType)}
               />
             </div>
           </div>
