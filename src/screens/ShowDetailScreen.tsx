@@ -2824,16 +2824,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                             type="button"
                             onClick={() => {
                               const originalTitle = tmdbDetails?.original_title || tmdbDetails?.original_name || (show as any)?.originalTitle || (show as any)?.original_title || (show as any)?.original_name;
-                              openPlexWatchUrl({
-                                title,
-                                originalTitle,
-                                year: releaseYear || (show as any)?.year,
-                                mediaType: isSeries ? 'tv' : 'movie',
-                                tmdbId: effectiveTmdbId,
-                                imdbId: resolvedImdbId || undefined,
-                                ratingKey: presence.plexInfo?.ratingKey,
-                                serverId: presence.plexInfo?.serverId
-                              });
+                              openPlexMedia(String(effectiveTmdbId), isSeries ? 'show' : 'movie');
                             }}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 active:scale-95 text-xs font-bold transition-all cursor-pointer shadow-sm"
                             title="Ouvrir dans l'application Plex"

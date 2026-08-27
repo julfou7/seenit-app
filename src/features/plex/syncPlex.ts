@@ -1269,44 +1269,22 @@ export const openPlexMediaByExternalId = async (
   return false;
 };
 
-export async function openPlexWatchUrl(params: {
-  title?: string;
-  originalTitle?: string;
-  year?: number | string;
-  mediaType?: 'tv' | 'movie' | 'show' | 'series' | string;
-  tmdbId?: number | string;
-  imdbId?: string;
-  ratingKey?: string;
-  serverId?: string;
-}): Promise<void> {
-  const { mediaType = 'movie', tmdbId, imdbId, title, originalTitle } = params;
-  appLogger.info('plex', `[Plex Open] Appel de openPlexWatchUrl avec params: title="${title || ''}", tmdbId="${tmdbId || ''}", imdbId="${imdbId || ''}", mediaType="${mediaType}"`);
+export const openPlexMedia = async (tmdbId: string, type: 'movie' | 'show') => {
+  try {
+    const response = await fetch(`https://seenit.ai.studio/api/plex/resolve-slug?tmdbId=${tmdbId}&type=${type}`);
+    const data = await response.json();
 
-  const normalizedType: 'movie' | 'show' = (mediaType === 'tv' || mediaType === 'show' || mediaType === 'series') ? 'show' : 'movie';
-  appLogger.info('plex', `[Plex Open] Type normalisé : "${normalizedType}" (original: "${mediaType}")`);
-
-  // Résolution unique par ID externe (TMDB / IMDb) via le backend SeenIt
-  if (tmdbId || imdbId) {
-    appLogger.info('plex', `[Plex Open] Lancement de la résolution par ID externe...`);
-    const success = await openPlexMediaByExternalId(tmdbId ? String(tmdbId) : '', normalizedType, imdbId);
-    if (success) {
-      appLogger.success('plex', `[Plex Open] Résolution par ID externe réussie.`);
+    if (data?.slug) {
+      window.location.href = `https://watch.plex.tv/${type}/${data.slug}`;
       return;
     }
-  } else {
-    appLogger.warn('plex', `[Plex Open] Aucun ID externe (tmdbId ou imdbId) fourni dans les paramètres.`);
+  } catch (error) {
+    console.error("Échec résolution backend Plex", error);
   }
 
-  // Redirection de secours si le backend échoue ou ne trouve rien
-  appLogger.warn('plex', `[Plex Open] ⚠️ Échec de résolution du slug officiel. Redirection forcée de secours vers l'accueil Plex`);
-  const fallbackUrl = 'https://watch.plex.tv';
-  appLogger.warn('plex', `[Plex Open] URL de secours : ${fallbackUrl}`);
-  if (Capacitor.isNativePlatform()) {
-    window.location.href = fallbackUrl;
-  } else {
-    window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
-  }
-}
+  // Si pas de slug ou erreur API -> Redirection d'accueil uniquement
+  window.location.href = `https://watch.plex.tv`;
+};
 
 
 
