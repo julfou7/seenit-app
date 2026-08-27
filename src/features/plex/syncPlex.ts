@@ -186,12 +186,15 @@ async function fetchPlexHistoryData(token: string, clientId: string, delta: bool
     : ['/api/plex/history', ...PLEX_BACKEND_ENDPOINTS];
 
   for (const url of urlsToTry) {
+    // Skip relative path on native platform as it resolves to localhost
+    if (isNative && url === '/api/plex/history') continue;
+
     try {
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, clientId, delta, since }),
-        signal: AbortSignal.timeout(12000)
+        signal: AbortSignal.timeout(18000)
       });
 
       const contentType = res.headers.get('content-type') || '';
@@ -206,12 +209,25 @@ async function fetchPlexHistoryData(token: string, clientId: string, delta: bool
     }
   }
 
-  // Fallback: Fetch directly from official Plex Cloud APIs on native device
+  // Fallback: Fetch directly from official Plex Cloud APIs on native device / fallback
   return fetchPlexDirectlyFromClient(token, clientId);
 }
 
 async function fetchPlexDirectlyFromClient(token: string, clientId: string) {
   const rawWatchlistItems: any[] = [];
+  const rawHistoryItems: any[] = [];
+
+  const extractItems = (data: any): any[] => {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.activities)) return data.activities;
+    if (data.MediaContainer && Array.isArray(data.MediaContainer.Metadata)) return data.MediaContainer.Metadata;
+    if (Array.isArray(data.Metadata)) return data.Metadata;
+    if (Array.isArray(data.items)) return data.items;
+    return [];
+  };
+
+  // 1. Fetch Watchlist
   const watchlistEndpoints = [
     'https://discover.provider.plex.tv/library/sections/watchlist/all?includeUserState=1',
     'https://metadata.provider.plex.tv/library/sections/watchlist/all?includeUserState=1'
@@ -232,22 +248,56 @@ async function fetchPlexDirectlyFromClient(token: string, clientId: string) {
         const contentType = res.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {
           const data = await res.json();
-          const items = data?.MediaContainer?.Metadata || data?.Metadata || data?.items || [];
-          if (Array.isArray(items) && items.length > 0) {
+          const items = extractItems(data);
+          if (items.length > 0) {
             rawWatchlistItems.push(...items);
             break;
           }
         }
       }
     } catch (err) {
-      console.warn('[Plex Sync] Direct client fetch from Plex Cloud failed:', err);
+      console.warn('[Plex Sync] Direct client watchlist fetch failed:', err);
+    }
+  }
+
+  // 2. Fetch Watched Activity & History directly from Plex Cloud
+  const historyEndpoints = [
+    'https://discover.provider.plex.tv/activities?includeUserState=1&limit=100',
+    'https://metadata.provider.plex.tv/library/metadata/userState?state=watched&limit=100'
+  ];
+
+  for (const endpoint of historyEndpoints) {
+    try {
+      const res = await fetch(endpoint, {
+        headers: {
+          'X-Plex-Token': token,
+          'Accept': 'application/json',
+          'X-Plex-Client-Identifier': clientId,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        },
+        signal: AbortSignal.timeout(8000)
+      });
+      if (res.ok) {
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await res.json();
+          const items = extractItems(data);
+          if (items.length > 0) {
+            for (const it of items) {
+              rawHistoryItems.push({ raw: it, source: 'Plex Cloud Direct' });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Plex Sync] Direct client history fetch failed:', err);
     }
   }
 
   return {
-    history: [],
+    history: rawHistoryItems,
     watchlist: rawWatchlistItems,
-    visitedSources: ['Plex Cloud (Direct)']
+    visitedSources: ['Plex Cloud Direct']
   };
 }
 

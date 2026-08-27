@@ -132,6 +132,17 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // CORS Middleware for native mobile app requests (APK) and web
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   const upload = multer();
@@ -503,10 +514,44 @@ async function startServer() {
         const connections = server.connections || [];
         let serverItemCount = 0;
 
+        // Sort connections: prioritize remote HTTPS / plex.direct connections over unreachable LAN IPs
+        const sortedConnections = [...connections].sort((a: any, b: any) => {
+          const aIsRemote = !a.local && (a.uri || '').startsWith('https://');
+          const bIsRemote = !b.local && (b.uri || '').startsWith('https://');
+          if (aIsRemote && !bIsRemote) return -1;
+          if (!aIsRemote && bIsRemote) return 1;
+          return 0;
+        });
+
+        const isPrivateOrLocalUri = (uriStr: string): boolean => {
+          try {
+            const url = new URL(uriStr);
+            const host = url.hostname;
+            if (host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.') || host.startsWith('10.')) return true;
+            if (host.startsWith('172.')) {
+              const parts = host.split('.');
+              if (parts.length >= 2) {
+                const second = parseInt(parts[1], 10);
+                if (second >= 16 && second <= 31) return true;
+              }
+            }
+            return false;
+          } catch {
+            return false;
+          }
+        };
+
+        const hasRemoteConnection = sortedConnections.some((c: any) => c.uri && !isPrivateOrLocalUri(c.uri));
+
         // Try reachable connections for this server
-        for (const conn of connections) {
+        for (const conn of sortedConnections) {
           const uri = conn.uri;
           if (!uri) continue;
+
+          // Skip LAN IPs if running on Cloud Run server when a public remote connection exists
+          if (isPrivateOrLocalUri(uri) && hasRemoteConnection) {
+            continue;
+          }
 
           let connectionSuccess = false;
 
