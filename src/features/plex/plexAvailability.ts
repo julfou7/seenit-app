@@ -1,4 +1,4 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { getPlexClientId } from '../../services/plex';
@@ -105,25 +105,50 @@ export async function checkPlexAvailability(params: {
 
   // 1. Try via Cloud / Express API proxy
   for (const url of urlsToTry) {
+    if (isNative && url === '/api/plex/availability') continue;
     try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          token: plexToken,
-          clientId,
-          tmdbId: tmdbId ? Number(tmdbId) : undefined,
-          imdbId,
-          title,
-          originalTitle,
-          year: year ? Number(year) : undefined,
-          mediaType
-        }),
-        signal: AbortSignal.timeout(6000)
-      });
+      let data: any = null;
+      let isOk = false;
+      const payload = {
+        token: plexToken,
+        clientId,
+        tmdbId: tmdbId ? Number(tmdbId) : undefined,
+        imdbId,
+        title,
+        originalTitle,
+        year: year ? Number(year) : undefined,
+        mediaType
+      };
 
-      if (res.ok) {
-        const data = await res.json();
+      if (isNative) {
+        const nativeRes = await CapacitorHttp.post({
+          url,
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          data: payload,
+          connectTimeout: 8000,
+          readTimeout: 8000
+        });
+        isOk = nativeRes.status >= 200 && nativeRes.status < 300;
+        if (isOk) {
+          data = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
+        }
+      } else {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 8000);
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+        clearTimeout(timer);
+        isOk = res.ok;
+        if (isOk) {
+          data = await res.json();
+        }
+      }
+
+      if (isOk && data) {
         const isAvailable = !!data.available;
         if (isAvailable) {
           const info: PlexMediaInfo = {
@@ -137,7 +162,6 @@ export async function checkPlexAvailability(params: {
           };
 
           store.setMediaAvailability(key, info);
-          // appLogger.info('plex', `Média disponible sur Plex : « ${title || data.title} » (${data.serverName || 'Serveur'})`);
           return info;
         }
       }

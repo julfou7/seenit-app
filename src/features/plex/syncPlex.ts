@@ -1,4 +1,4 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { db, auth } from '../../lib/firebase';
 import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
 import { tmdb } from '../shows/tmdb';
@@ -193,24 +193,48 @@ async function fetchPlexHistoryData(token: string, clientId: string, delta: bool
 
     try {
       appLogger.info('plex', `Interrogation endpoint Backend : ${url}`);
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, clientId, delta, since }),
-        signal: AbortSignal.timeout(18000)
-      });
+      let isOk = false;
+      let status = 0;
+      let data: any = null;
 
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('application/json')) {
-        const data = await res.json();
-        if (data && (Array.isArray(data.history) || Array.isArray(data.watchlist))) {
-          const histLen = Array.isArray(data.history) ? data.history.length : 0;
-          const watchLen = Array.isArray(data.watchlist) ? data.watchlist.length : 0;
-          appLogger.success('plex', `Données Plex reçues de ${url} : ${histLen} visionnage(s), ${watchLen} watchlist`);
-          return data;
+      if (isNative) {
+        const nativeRes = await CapacitorHttp.post({
+          url,
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          data: { token, clientId, delta, since },
+          connectTimeout: 20000,
+          readTimeout: 20000
+        });
+        status = nativeRes.status;
+        isOk = status >= 200 && status < 300;
+        if (isOk) {
+          data = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
         }
       } else {
-        appLogger.warn('plex', `Endpoint ${url} a répondu avec statut ${res.status}`);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 20000);
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ token, clientId, delta, since }),
+          signal: controller.signal
+        });
+        clearTimeout(timer);
+        status = res.status;
+        isOk = res.ok;
+        const contentType = res.headers.get('content-type') || '';
+        if (isOk && contentType.includes('application/json')) {
+          data = await res.json();
+        }
+      }
+
+      if (isOk && data && (Array.isArray(data.history) || Array.isArray(data.watchlist))) {
+        const histLen = Array.isArray(data.history) ? data.history.length : 0;
+        const watchLen = Array.isArray(data.watchlist) ? data.watchlist.length : 0;
+        appLogger.success('plex', `Données Plex reçues de ${url} : ${histLen} visionnage(s), ${watchLen} watchlist`);
+        return data;
+      } else {
+        appLogger.warn('plex', `Endpoint ${url} a répondu avec statut ${status}`);
       }
     } catch (e: any) {
       appLogger.warn('plex', `Échec connexion endpoint ${url} : ${e?.message || e}`);
@@ -237,6 +261,8 @@ async function fetchPlexDirectlyFromClient(token: string, clientId: string) {
     return [];
   };
 
+  const isNative = Capacitor.isNativePlatform();
+
   // 1. Fetch Watchlist
   const watchlistEndpoints = [
     'https://discover.provider.plex.tv/library/sections/watchlist/all?includeUserState=1',
@@ -246,25 +272,50 @@ async function fetchPlexDirectlyFromClient(token: string, clientId: string) {
   for (const endpoint of watchlistEndpoints) {
     try {
       appLogger.info('plex', `Lecture Watchlist Plex Cloud direct (${endpoint.split('/')[2]})...`);
-      const res = await fetch(endpoint, {
-        headers: {
-          'X-Plex-Token': token,
-          'Accept': 'application/json',
-          'X-Plex-Client-Identifier': clientId,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        },
-        signal: AbortSignal.timeout(8000)
-      });
-      if (res.ok) {
-        const contentType = res.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
-          const data = await res.json();
-          const items = extractItems(data);
-          if (items.length > 0) {
-            rawWatchlistItems.push(...items);
-            appLogger.success('plex', `Plex Cloud Watchlist direct : ${items.length} éléments récupérés`);
-            break;
-          }
+      let data: any = null;
+      let isOk = false;
+
+      if (isNative) {
+        const nativeRes = await CapacitorHttp.get({
+          url: endpoint,
+          headers: {
+            'X-Plex-Token': token,
+            'Accept': 'application/json',
+            'X-Plex-Client-Identifier': clientId,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          },
+          connectTimeout: 10000,
+          readTimeout: 10000
+        });
+        isOk = nativeRes.status >= 200 && nativeRes.status < 300;
+        if (isOk) {
+          data = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
+        }
+      } else {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 10000);
+        const res = await fetch(endpoint, {
+          headers: {
+            'X-Plex-Token': token,
+            'Accept': 'application/json',
+            'X-Plex-Client-Identifier': clientId,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          },
+          signal: controller.signal
+        });
+        clearTimeout(timer);
+        isOk = res.ok;
+        if (isOk && (res.headers.get('content-type') || '').includes('application/json')) {
+          data = await res.json();
+        }
+      }
+
+      if (isOk && data) {
+        const items = extractItems(data);
+        if (items.length > 0) {
+          rawWatchlistItems.push(...items);
+          appLogger.success('plex', `Plex Cloud Watchlist direct : ${items.length} éléments récupérés`);
+          break;
         }
       }
     } catch (err: any) {
@@ -282,26 +333,51 @@ async function fetchPlexDirectlyFromClient(token: string, clientId: string) {
   for (const endpoint of historyEndpoints) {
     try {
       appLogger.info('plex', `Lecture Historique Plex Cloud direct (${endpoint.split('/')[2]})...`);
-      const res = await fetch(endpoint, {
-        headers: {
-          'X-Plex-Token': token,
-          'Accept': 'application/json',
-          'X-Plex-Client-Identifier': clientId,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        },
-        signal: AbortSignal.timeout(8000)
-      });
-      if (res.ok) {
-        const contentType = res.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
-          const data = await res.json();
-          const items = extractItems(data);
-          if (items.length > 0) {
-            for (const it of items) {
-              rawHistoryItems.push({ raw: it, source: 'Plex Cloud Direct' });
-            }
-            appLogger.success('plex', `Plex Cloud Historique direct : ${items.length} éléments vus trouvés`);
+      let data: any = null;
+      let isOk = false;
+
+      if (isNative) {
+        const nativeRes = await CapacitorHttp.get({
+          url: endpoint,
+          headers: {
+            'X-Plex-Token': token,
+            'Accept': 'application/json',
+            'X-Plex-Client-Identifier': clientId,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          },
+          connectTimeout: 10000,
+          readTimeout: 10000
+        });
+        isOk = nativeRes.status >= 200 && nativeRes.status < 300;
+        if (isOk) {
+          data = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
+        }
+      } else {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 10000);
+        const res = await fetch(endpoint, {
+          headers: {
+            'X-Plex-Token': token,
+            'Accept': 'application/json',
+            'X-Plex-Client-Identifier': clientId,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          },
+          signal: controller.signal
+        });
+        clearTimeout(timer);
+        isOk = res.ok;
+        if (isOk && (res.headers.get('content-type') || '').includes('application/json')) {
+          data = await res.json();
+        }
+      }
+
+      if (isOk && data) {
+        const items = extractItems(data);
+        if (items.length > 0) {
+          for (const it of items) {
+            rawHistoryItems.push({ raw: it, source: 'Plex Cloud Direct' });
           }
+          appLogger.success('plex', `Plex Cloud Historique direct : ${items.length} éléments vus trouvés`);
         }
       }
     } catch (err: any) {
