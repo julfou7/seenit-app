@@ -107,84 +107,13 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
 
   const getShowDetails = (newsItem: ShowNews) => {
     // 1. Find matched show
-    let show = shows.find(s => s.id === newsItem.showId || s.tmdbId.toString() === newsItem.showId);
+    let show = shows.find(s => s.id === newsItem.showId || s.tmdbId?.toString() === newsItem.showId);
     
-    // 2. Fallbacks for demo news
     if (!show) {
-      if (newsItem.id === 'demo1') {
-        return {
-          tmdbId: 1899,
-          title: '1899',
-          posterPath: '/g8v1z99vQnK7f0E4g20y6h7e0E4.jpg',
-          statusText: 'Non suivie',
-          status: null,
-          seenCount: 0,
-          total: 8,
-          progressPercent: 0,
-          totalSeasons: 1,
-          networks: [{ name: 'Netflix', logo_path: '/wwemzKWzjKYJFfCeiREv9g7fhwh.png' }]
-        };
-      }
-      if (newsItem.id === 'demo2') {
-        return {
-          tmdbId: 130971,
-          title: 'The Night Agent',
-          posterPath: '/9zA80D26p66AonS28K9Z8YgWf5T.jpg',
-          statusText: 'En cours',
-          status: 'watching',
-          seenCount: 8,
-          total: 10,
-          progressPercent: 80,
-          totalSeasons: 3,
-          networks: [{ name: 'Netflix', logo_path: '/wwemzKWzjKYJFfCeiREv9g7fhwh.png' }]
-        };
-      }
-      if (newsItem.id === 'demo3') {
-        return {
-          tmdbId: 91363,
-          title: 'Mobland',
-          posterPath: '/o6p7vshN5N0a09bTj3A0T6p9BAt.jpg',
-          statusText: 'Non suivie',
-          status: null,
-          seenCount: 0,
-          total: 0,
-          progressPercent: 0,
-          totalSeasons: 2,
-          networks: []
-        };
-      }
-      if (newsItem.id === 'demo4') {
-        return {
-          tmdbId: 58514,
-          title: 'Falco',
-          posterPath: '/qoflFInrKqC3XG96w3u6uW9E6p6.jpg',
-          statusText: 'Terminée',
-          status: 'completed',
-          seenCount: 30,
-          total: 30,
-          progressPercent: 100,
-          totalSeasons: 4,
-          networks: [{ name: 'TF1', logo_path: null }]
-        };
-      }
-      if (newsItem.id === 'demo5') {
-        return {
-          tmdbId: 66732,
-          title: 'Stranger Things',
-          posterPath: '/49WJfeN0mhmg696XgGQv83g6v6V.jpg',
-          statusText: 'En cours',
-          status: 'watching',
-          seenCount: 34,
-          total: 42,
-          progressPercent: 80,
-          totalSeasons: 5,
-          networks: [{ name: 'Netflix', logo_path: '/wwemzKWzjKYJFfCeiREv9g7fhwh.png' }]
-        };
-      }
       return null;
     }
 
-    // 3. For actual local shows
+    // 2. For actual local shows
     const total = show.totalEpisodes || show.totalAiredEpisodes || 0;
     const seenCount = show.seenEpisodes?.length || 0;
     const progressPercent = total > 0 ? Math.round((seenCount / total) * 100) : 0;
@@ -283,60 +212,16 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
     });
   }, [currentUser]);
 
-  const demoNews: ShowNews[] = [
-    {
-      id: 'demo4',
-      type: 'ENDED',
-      showId: 'falco',
-      showTitle: 'Falco',
-      message: 'La série s\'est officiellement achevée après 4 saisons.',
-      description: 'Falco s\'est officiellement terminée sur TF1 après quatre saisons intenses, marquant la conclusion des enquêtes du lieutenant Alexandre Falco.',
-      createdAt: Date.now() - 600000
-    },
-    {
-      id: 'demo5',
-      type: 'FINAL_SEASON',
-      showId: 'stranger-things',
-      showTitle: 'Stranger Things',
-      message: 'La Saison 5 sera la dernière de la série !',
-      description: 'Netflix et les créateurs de Stranger Things ont officiellement annoncé que la saison 5 sera l\'ultime saison et conclura l\'histoire d\'Eleven et du Monde à l\'Envers.',
-      createdAt: Date.now() - 1200000
-    },
-    {
-      id: 'demo1',
-      type: 'CANCELED',
-      showId: '1899',
-      showTitle: '1899',
-      message: 'La série est officiellement annulée par Netflix après une saison.',
-      description: 'Netflix a officiellement décidé d’annuler la série 1899 créée par Baran bo Odar et Jantje Friese. Il n’y aura malheureusement pas de saison 2.',
-      createdAt: Date.now() - 1800000
-    },
-    {
-      id: 'demo2',
-      type: 'NEW_SEASON',
-      showId: '1',
-      showTitle: 'The Night Agent',
-      message: 'Saison 3 confirmée par Netflix !',
-      description: 'La troisième saison de The Night Agent est déjà en préparation et a reçu le feu vert officiel.',
-      createdAt: Date.now() - 2400000
-    },
-    {
-      id: 'demo3',
-      type: 'DATE_ANNOUNCED',
-      showId: '2',
-      showTitle: 'Mobland',
-      message: 'La Saison 2 arrive le 18 septembre.',
-      description: 'Rendez-vous le 18 septembre pour la suite des épisodes.',
-      createdAt: Date.now() - 3000000
-    }
-  ];
+  // Si l'utilisateur n'est pas connecté ou que les données ne sont pas chargées, ne rien afficher
+  if (!currentUser || !hasLoaded) return null;
 
-  // Si l'utilisateur n'est pas connecté, ne rien afficher pour respecter la confidentialité des données
-  if (!currentUser) return null;
-
-  // Afficher les démos tant que ce n'est pas chargé, ou s'il n'y a pas de vraies news
-  const rawNews = hasLoaded ? (news.length === 0 ? demoNews : news) : demoNews;
-  const displayNews = rawNews.filter(n => !readNewsIds.includes(n.id));
+  // Filtrer les actualités non lues qui correspondent à des séries existantes dans la bibliothèque
+  const displayNews = news
+    .filter(n => !readNewsIds.includes(n.id))
+    .filter(n => {
+      const show = shows.find(s => s.id === n.showId || s.tmdbId?.toString() === n.showId);
+      return Boolean(show);
+    });
 
   if (displayNews.length === 0) return null;
 

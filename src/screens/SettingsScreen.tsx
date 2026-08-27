@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Cloud, LogIn, LogOut, FileText, CheckCircle2, MonitorPlay, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronDown, ChevronUp, ChevronRight, Check, AlertCircle, Info, Bug, Sparkles, Download, X } from 'lucide-react';
 import { auth, db, googleAuthProvider, requestNotificationPermission, sendNativeNotification } from '../lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged, User } from 'firebase/auth';
@@ -85,10 +85,23 @@ export function SettingsScreen() {
             setPlexToken(res.authToken);
             localStorage.setItem('plex_auth_token', res.authToken);
             localStorage.setItem('plex_token', res.authToken);
+            if (res.username) {
+              localStorage.setItem('plex_username', res.username);
+            }
+            if (user) {
+              try {
+                const plexRef = doc(db, 'users', user.uid, 'settings', 'plex');
+                await setDoc(plexRef, { authToken: res.authToken, username: res.username || '' }, { merge: true });
+              } catch (err) {
+                console.error('[Settings] Erreur sauvegarde Plex dans Firestore:', err);
+              }
+            }
             setPlexPin(null);
             showToast("Compte Plex connecté !", "success");
             appLogger.success('plex', 'Compte Plex authentifié avec succès');
             clearInterval(interval);
+            // Déclencher automatiquement une synchronisation complète pour peupler la bibliothèque
+            performPlexSync({ delta: false, silent: false, ignoreCooldown: true });
           }
         } catch (e: any) {
           console.error(e);
@@ -97,7 +110,7 @@ export function SettingsScreen() {
       }, 3000);
     }
     return () => clearInterval(interval);
-  }, [plexPin, plexToken, showToast]);
+  }, [plexPin, plexToken, user, showToast]);
 
   const handlePlexLogin = async () => {
     try {
@@ -123,10 +136,19 @@ export function SettingsScreen() {
     }
   };
 
-  const handlePlexLogout = () => {
+  const handlePlexLogout = async () => {
     setPlexToken(null);
     localStorage.removeItem('plex_auth_token');
     localStorage.removeItem('plex_token');
+    localStorage.removeItem('plex_username');
+    if (user) {
+      try {
+        const plexRef = doc(db, 'users', user.uid, 'settings', 'plex');
+        await deleteDoc(plexRef);
+      } catch (err) {
+        console.error('[Settings] Erreur suppression Plex Firestore:', err);
+      }
+    }
     showToast("Compte Plex déconnecté.", "info");
     appLogger.info('plex', 'Compte Plex déconnecté');
   };
@@ -153,6 +175,7 @@ export function SettingsScreen() {
       setUser(currentUser);
       if (currentUser) {
         try {
+          // 1. Plateformes de streaming
           const prefRef = doc(db, 'users', currentUser.uid, 'settings', 'preferences');
           const snap = await getDoc(prefRef);
           const localStr = localStorage.getItem('user_platforms');
@@ -165,15 +188,35 @@ export function SettingsScreen() {
           } else if (localPlatforms.length > 0) {
             await setDoc(prefRef, { platforms: localPlatforms }, { merge: true });
           }
+
+          // 2. Configuration Plex synchronisée
+          const plexRef = doc(db, 'users', currentUser.uid, 'settings', 'plex');
+          const snapPlex = await getDoc(plexRef);
+          const localPlexToken = localStorage.getItem('plex_auth_token') || localStorage.getItem('plex_token');
+
+          if (snapPlex.exists() && snapPlex.data()?.authToken) {
+            const cloudPlexToken = snapPlex.data().authToken;
+            setPlexToken(cloudPlexToken);
+            localStorage.setItem('plex_auth_token', cloudPlexToken);
+            localStorage.setItem('plex_token', cloudPlexToken);
+            if (snapPlex.data()?.username) {
+              localStorage.setItem('plex_username', snapPlex.data().username);
+            }
+          } else if (localPlexToken) {
+            await setDoc(plexRef, { 
+              authToken: localPlexToken, 
+              username: localStorage.getItem('plex_username') || '' 
+            }, { merge: true });
+          }
         } catch (e: any) {
           const errorMessage = e?.message || String(e);
           const isOffline = !navigator.onLine || 
                             errorMessage.toLowerCase().includes('offline') || 
                             e?.code === 'unavailable';
           if (isOffline) {
-            console.warn('[Settings] Client is offline, using local cached streaming platforms:', errorMessage);
+            console.warn('[Settings] Client is offline, using local cached settings:', errorMessage);
           } else {
-            console.error('[Settings] Error syncing cloud streaming platforms', e);
+            console.error('[Settings] Error syncing cloud settings', e);
           }
         }
       }
