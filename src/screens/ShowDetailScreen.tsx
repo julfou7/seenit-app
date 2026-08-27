@@ -19,6 +19,7 @@ import { useShowsStore } from '../store/showsStore';
 import { getSeriesImdbData } from '../features/shows/omdbService';
 import { getFormattedProviderLogo, PLEX_LOGO_SVG } from '../utils/providerLogos';
 import { checkPlexAvailability, PlexMediaInfo } from '../features/plex/plexAvailability';
+import { openPlexWatchUrl } from '../features/plex/syncPlex';
 import { useMediaPresence } from '../hooks/useMediaPresence';
 import { RedditSection } from '../components/community/RedditSection';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
@@ -2823,11 +2824,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                             type="button"
                             onClick={() => {
                               const originalTitle = tmdbDetails?.original_title || tmdbDetails?.original_name || (show as any)?.originalTitle || (show as any)?.original_title || (show as any)?.original_name;
-                              const fallbackUrl = buildPlexWatchUrl(title, releaseYear || (show as any)?.year, isSeries ? 'show' : 'movie', originalTitle);
-                              const targetPlexUrl = Capacitor.isNativePlatform()
-                                ? (presence.plexInfo?.watchUrl || presence.plexInfo?.plexUrl || fallbackUrl)
-                                : (presence.plexInfo?.plexUrl || presence.plexInfo?.watchUrl || 'https://app.plex.tv/desktop');
-                              openExternalUrl(targetPlexUrl, {
+                              openPlexWatchUrl({
                                 title,
                                 originalTitle,
                                 year: releaseYear || (show as any)?.year,

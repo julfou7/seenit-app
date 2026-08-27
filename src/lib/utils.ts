@@ -173,75 +173,11 @@ export async function openExternalUrl(
   });
 
   if (Capacitor.isNativePlatform()) {
-    // 1. Gestion Plex : extraction du serveur, du slug et de la clé de média pour deep linking natif
+    // 1. Gestion Plex : Deep Link Universel (watch.plex.tv) via redirection directe window.location.href
     if ((targetUrl.includes('plex.tv') || targetUrl.startsWith('plex://')) && !targetUrl.includes('/auth')) {
-      const candidatePlexUrls: string[] = [];
-
-      // Si l'URL est un lien universel watch.plex.tv (ex: https://watch.plex.tv/movie/sword-art-online-ordinal-scale-2017)
-      if (targetUrl.includes('watch.plex.tv/')) {
-        const watchPath = targetUrl.replace(/^https?:\/\/(www\.)?watch\.plex\.tv\//i, '');
-        // Lien Universel HTTPS officiel pour l'application Plex Android / iOS
-        candidatePlexUrls.push(targetUrl);
-        candidatePlexUrls.push(`plex://${watchPath}`);
-      }
-
-      const serverMatch = targetUrl.match(/\/server\/([a-zA-Z0-9_-]+)/i) || targetUrl.match(/server=([a-zA-Z0-9_-]+)/i);
-      const serverId = serverMatch ? serverMatch[1] : '';
-
-      const keyMatch = targetUrl.match(/[?&]key=([^&#]+)/i);
-      let ratingKey = '';
-      if (keyMatch) {
-        const decodedKey = decodeURIComponent(keyMatch[1]);
-        const ratingKeyMatch = decodedKey.match(/\/metadata\/(\d+)/i) || decodedKey.match(/^(\d+)$/);
-        if (ratingKeyMatch) {
-          ratingKey = ratingKeyMatch[1];
-        }
-      }
-
-      if (serverId && ratingKey) {
-        // Schemes personnalisés standard Plex
-        candidatePlexUrls.push(`plex://server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`);
-        candidatePlexUrls.push(`plex://preplay/?metadataKey=${encodeURIComponent(`/library/metadata/${ratingKey}`)}&server=${serverId}`);
-      }
-      
-      // Fallbacks pour ouvrir l'application Android Plex directement
-      candidatePlexUrls.push(`intent://launch#Intent;package=com.plexapp.android;end`);
-      candidatePlexUrls.push(`plex://`);
-
-      appLogger.info('plex', `[Plex DeepLink] Candidate URLs générées (${candidatePlexUrls.length})`, {
-        originalUrl: targetUrl,
-        serverId,
-        ratingKey,
-        candidates: candidatePlexUrls
-      });
-
-      for (const pUrl of candidatePlexUrls) {
-        try {
-          appLogger.info('plex', `[Plex DeepLink] Essai AppLauncher.openUrl : ${pUrl}`);
-          const res = await AppLauncher.openUrl({ url: pUrl });
-          if (res && res.completed) {
-            appLogger.success('plex', `[Plex DeepLink] ✅ AppLauncher réussi avec URL : ${pUrl}`);
-            return;
-          } else {
-            appLogger.warn('plex', `[Plex DeepLink] ⚠️ AppLauncher non complété (completed=false) pour : ${pUrl}`, res);
-          }
-        } catch (err: any) {
-          appLogger.warn('plex', `[Plex DeepLink] ❌ Échec AppLauncher pour : ${pUrl}`, err?.message || String(err));
-        }
-      }
-
-      // Si aucune tentative native n'a fonctionné (ex: l'application Plex n'est pas installée)
-      const cleanWebPlexUrl = targetUrl.includes('watch.plex.tv') ? targetUrl : ((serverId && ratingKey)
-        ? `https://app.plex.tv/desktop/#!/server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`
-        : targetUrl.replace(/watch\.plex\.tv/g, 'app.plex.tv'));
-
-      try {
-        appLogger.info('plex', `[Plex DeepLink] Fallback Browser.open avec : ${cleanWebPlexUrl}`);
-        await Browser.open({ url: cleanWebPlexUrl, windowName: '_system' });
-        return;
-      } catch (e: any) {
-        appLogger.error('plex', `[Plex DeepLink] Erreur Browser.open : ${e?.message || String(e)}`);
-      }
+      appLogger.info('plex', `[Plex DeepLink] Redirection directe via window.location.href : ${targetUrl}`);
+      window.location.href = targetUrl;
+      return;
     }
 
     // 2. Gestion Reddit : ouverture via l'application native Reddit (Intent Android)

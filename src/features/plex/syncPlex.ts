@@ -1127,3 +1127,114 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
   return activePlexSyncPromise;
 }
 
+/**
+ * Ouvre la fiche d'un média dans l'application Plex via Deep Link Universel Plex Discover (https://watch.plex.tv)
+ * 1. Génère l'URL watch.plex.tv en utilisant impérativement le titre ORIGINAL TMDB (original_title ou original_name).
+ * 2. Si besoin, fait une recherche API sur Plex Discover (https://discover.provider.plex.tv/library/search?query=<title>&limit=1 avec X-Plex-Token) pour récupérer le champ slug officiel exact.
+ * 3. Effectue window.location.href = https://watch.plex.tv/${type}/${slug} pour l'interception Android.
+ */
+export async function openPlexWatchUrl(params: {
+  title?: string;
+  originalTitle?: string;
+  year?: number | string;
+  mediaType?: 'tv' | 'movie' | 'show' | 'series' | string;
+  tmdbId?: number | string;
+  imdbId?: string;
+}): Promise<void> {
+  const { title, originalTitle, year, mediaType = 'movie', tmdbId, imdbId } = params;
+  const type = (mediaType === 'tv' || mediaType === 'show' || mediaType === 'series') ? 'show' : 'movie';
+
+  let officialSlug: string | null = null;
+
+  // 1. Titre original TMDB impératif s'il est disponible
+  const targetOriginalTitle = (originalTitle && originalTitle.trim().length > 0) ? originalTitle.trim() : null;
+  const searchQuery = targetOriginalTitle || title || '';
+
+  // 2. Recherche API sur Plex Discover pour récupérer le champ slug officiel exact
+  if (searchQuery) {
+    try {
+      const token = localStorage.getItem('plex_auth_token') || localStorage.getItem('plex_token') || '';
+      const searchUrl = `https://discover.provider.plex.tv/library/search?query=${encodeURIComponent(searchQuery)}&limit=1`;
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'X-Plex-Client-Identifier': 'seenit-app'
+      };
+      if (token) {
+        headers['X-Plex-Token'] = token;
+      }
+
+      let resData: any = null;
+      if (Capacitor.isNativePlatform()) {
+        const nativeRes = await CapacitorHttp.get({
+          url: searchUrl,
+          headers,
+          connectTimeout: 4000,
+          readTimeout: 4000
+        });
+        if (nativeRes.status >= 200 && nativeRes.status < 300) {
+          resData = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
+        }
+      } else {
+        const fetchRes = await fetch(searchUrl, { headers, signal: AbortSignal.timeout(4000) });
+        if (fetchRes.ok) {
+          resData = await fetchRes.json();
+        }
+      }
+
+      if (resData?.MediaContainer) {
+        let items: any[] = [];
+        if (Array.isArray(resData.MediaContainer.SearchResults)) {
+          for (const section of resData.MediaContainer.SearchResults) {
+            if (Array.isArray(section.SearchResult)) {
+              for (const sr of section.SearchResult) {
+                if (sr.Metadata) items.push(sr.Metadata);
+              }
+            }
+          }
+        } else if (Array.isArray(resData.MediaContainer.Metadata)) {
+          items = resData.MediaContainer.Metadata;
+        }
+
+        const firstMatch = items.find((item: any) => {
+          const itType = (item.type || '').toLowerCase();
+          if (type === 'movie' && itType && itType !== 'movie') return false;
+          if (type === 'show' && itType && itType !== 'show' && itType !== 'series') return false;
+          return true;
+        }) || items[0];
+
+        if (firstMatch && firstMatch.slug) {
+          officialSlug = firstMatch.slug;
+          appLogger.info('plex', `[Plex Discover API] Slug officiel résolu : ${officialSlug}`);
+        }
+      }
+    } catch (err: any) {
+      appLogger.warn('plex', `[Plex Discover API] Erreur recherche slug : ${err?.message || String(err)}`);
+    }
+  }
+
+  // Fallback si l'API n'a pas retourné de slug : formater le slug depuis le titre original
+  if (!officialSlug) {
+    const titleForSlug = targetOriginalTitle || title || '';
+    const cleanTitle = titleForSlug
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-');
+    officialSlug = year ? `${cleanTitle}-${year}` : cleanTitle;
+    appLogger.info('plex', `[Plex Discover Fallback] Slug généré depuis titre original : ${officialSlug}`);
+  }
+
+  const watchUrl = `https://watch.plex.tv/${type}/${officialSlug}`;
+  appLogger.info('plex', `[Plex Discover] Redirection vers ${watchUrl}`);
+
+  // 3. Simple window.location.href pour que l'application Android Plex intercepte le lien
+  if (Capacitor.isNativePlatform()) {
+    window.location.href = watchUrl;
+  } else {
+    window.open(watchUrl, '_blank', 'noopener,noreferrer');
+  }
+}
+
+

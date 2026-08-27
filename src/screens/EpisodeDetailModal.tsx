@@ -14,6 +14,7 @@ import { DownloadModal } from '../components/DownloadModal';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { LiveDownloadBanner } from '../components/LiveDownloadBanner';
 import { useMediaPresence } from '../hooks/useMediaPresence';
+import { openPlexWatchUrl } from '../features/plex/syncPlex';
 
 interface EpisodeDetailModalProps {
   show?: Show;
@@ -988,11 +989,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                               type="button"
                               onClick={() => {
                                 const originalTitle = (show as any)?.originalTitle || (show as any)?.original_title || (show as any)?.original_name;
-                                const fallbackUrl = buildPlexWatchUrl(show.title, (show as any)?.year || show.firstAirDate?.slice(0, 4), 'show', originalTitle);
-                                const targetPlexUrl = Capacitor.isNativePlatform()
-                                  ? (presence.plexInfo?.watchUrl || presence.plexInfo?.plexUrl || fallbackUrl)
-                                  : (presence.plexInfo?.plexUrl || presence.plexInfo?.watchUrl || 'https://app.plex.tv/desktop');
-                                openExternalUrl(targetPlexUrl, {
+                                openPlexWatchUrl({
                                   title: show.title,
                                   originalTitle,
                                   year: (show as any)?.year || show.firstAirDate?.slice(0, 4),
