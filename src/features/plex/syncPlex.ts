@@ -181,6 +181,12 @@ const PLEX_BACKEND_ENDPOINTS = [
   'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/history'
 ];
 
+const PLEX_RESOLVE_ENDPOINTS = [
+  'https://seenit.ai.studio/api/plex/resolve-slug',
+  'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug',
+  'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug'
+];
+
 async function fetchPlexHistoryData(token: string, clientId: string, delta: boolean, since?: number) {
   const isNative = Capacitor.isNativePlatform();
   const urlsToTry = isNative 
@@ -1169,73 +1175,70 @@ export function getPlexHeaders(): Record<string, string> {
 }
 
 /**
- * Résout la fiche Plex d'un média par ID externe (TMDB ou IMDb) via l'API Cloud Fix Match de Plex
- * URL : https://metadata.provider.plex.tv/library/metadata/matches
- * Query params : manual=1&title=tmdb-<id>&type=1|2&agent=tv.plex.agents.movie|series
+ * Résout la fiche Plex d'un média par ID externe (TMDB ou IMDb) via l'API Cloud Fix Match déportée sur le backend SeenIt
  */
 export const openPlexMediaByExternalId = async (
   tmdbId: string | number,
   type: 'movie' | 'show',
   imdbId?: string
 ): Promise<boolean> => {
-  try {
-    const headers = getPlexHeaders();
-    const plexType = type === 'show' ? 2 : 1;
-    const plexAgent = type === 'show' ? 'tv.plex.agents.series' : 'tv.plex.agents.movie';
-    const matchQuery = tmdbId ? `tmdb-${tmdbId}` : (imdbId ? `imdb-${imdbId}` : '');
+  const isNative = Capacitor.isNativePlatform();
+  const urlsToTry = isNative 
+    ? [...PLEX_RESOLVE_ENDPOINTS, '/api/plex/resolve-slug'] 
+    : ['/api/plex/resolve-slug', ...PLEX_RESOLVE_ENDPOINTS];
 
-    if (!matchQuery) {
-      appLogger.warn('plex', '[Plex Fix Match] Aucun ID externe fourni (tmdbId ou imdbId)');
-      return false;
-    }
+  const token = localStorage.getItem('plex_auth_token') || localStorage.getItem('plex_token') || '';
+  const clientId = getPlexClientIdentifier();
 
-    const matchesUrl = `https://metadata.provider.plex.tv/library/metadata/matches?manual=1&title=${encodeURIComponent(matchQuery)}&type=${plexType}&agent=${encodeURIComponent(plexAgent)}`;
+  appLogger.info('plex', `[Plex Fix Match] Résolution du slug via le Backend SeenIt (${isNative ? 'APK Natif' : 'PWA Web'})`);
 
-    appLogger.info('plex', `[Plex Fix Match] Requête API Cloud Fix Match pour : ${matchQuery}`);
+  for (const baseUrl of urlsToTry) {
+    if (isNative && baseUrl === '/api/plex/resolve-slug') continue;
 
-    let data: any = null;
-    if (Capacitor.isNativePlatform()) {
-      const nativeRes = await CapacitorHttp.get({
-        url: matchesUrl,
-        headers,
-        connectTimeout: 5000,
-        readTimeout: 5000
-      });
-      if (nativeRes.status >= 200 && nativeRes.status < 300) {
-        data = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
-      }
-    } else {
-      const res = await fetch(matchesUrl, { headers, signal: AbortSignal.timeout(5000) });
-      if (res.ok) {
-        data = await res.json();
-      }
-    }
+    try {
+      const urlWithParams = `${baseUrl}?tmdbId=${encodeURIComponent(tmdbId ? String(tmdbId) : '')}&imdbId=${encodeURIComponent(imdbId || '')}&type=${type}&token=${encodeURIComponent(token)}&clientId=${encodeURIComponent(clientId)}`;
+      appLogger.info('plex', `[Plex Fix Match] Tentative sur le backend : ${baseUrl}`);
 
-    const searchResults = data?.MediaContainer?.SearchResult || data?.MediaContainer?.Metadata || data?.SearchResult;
-    const match = Array.isArray(searchResults) && searchResults.length > 0 ? searchResults[0] : null;
+      let data: any = null;
+      let isOk = false;
 
-    if (match && match.slug) {
-      const resType = match.type || type;
-      const mediaTypeStr = (resType === 'show' || resType === 'series' || resType === 2 || type === 'show') ? 'show' : 'movie';
-      const watchUrl = `https://watch.plex.tv/${mediaTypeStr}/${match.slug}`;
-      appLogger.success('plex', `[Plex Fix Match] ✅ Slug officiel résolu via Fix Match (${matchQuery}) : ${watchUrl}`);
-
-      if (Capacitor.isNativePlatform()) {
-        window.location.href = watchUrl;
+      if (isNative) {
+        const nativeRes = await CapacitorHttp.get({
+          url: urlWithParams,
+          connectTimeout: 6000,
+          readTimeout: 6000
+        });
+        isOk = nativeRes.status >= 200 && nativeRes.status < 300;
+        if (isOk) {
+          data = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
+        }
       } else {
-        window.open(watchUrl, '_blank', 'noopener,noreferrer');
+        const res = await fetch(urlWithParams, { signal: AbortSignal.timeout(6000) });
+        isOk = res.ok;
+        if (isOk) {
+          data = await res.json();
+        }
       }
-      return true;
-    } else if (tmdbId && imdbId && !matchQuery.startsWith('imdb-')) {
-      appLogger.info('plex', `[Plex Fix Match] Tentative secondaire avec IMDb ID : imdb-${imdbId}`);
-      return openPlexMediaByExternalId('', type, imdbId);
-    } else {
-      appLogger.warn('plex', `[Plex Fix Match] ⚠️ Aucun slug renvoyé par l'API Fix Match pour : ${matchQuery}`);
+
+      if (isOk && data && data.slug) {
+        const resType = data.type || type;
+        const mediaTypeStr = (resType === 'show' || resType === 'series' || resType === 2 || type === 'show') ? 'show' : 'movie';
+        const watchUrl = `https://watch.plex.tv/${mediaTypeStr}/${data.slug}`;
+        appLogger.success('plex', `[Plex Fix Match] ✅ Slug officiel résolu avec succès : ${watchUrl}`);
+
+        if (Capacitor.isNativePlatform()) {
+          window.location.href = watchUrl;
+        } else {
+          window.open(watchUrl, '_blank', 'noopener,noreferrer');
+        }
+        return true;
+      }
+    } catch (err: any) {
+      appLogger.warn('plex', `[Plex Fix Match] Échec de l'appel backend ${baseUrl} : ${err?.message || String(err)}`);
     }
-  } catch (err: any) {
-    appLogger.warn('plex', `[Plex Fix Match] ❌ Erreur lors de l'appel Fix Match : ${err?.message || String(err)}`);
   }
 
+  appLogger.error('plex', `[Plex Fix Match] ❌ Résolution impossible sur le serveur pour TMDB:${tmdbId} / IMDb:${imdbId}`);
   return false;
 };
 
@@ -1243,7 +1246,6 @@ export const openPlexMediaByExternalId = async (
  * Ouvre un média dans l'application Plex :
  * 1. Média sur serveur local (ratingKey & serverId) -> Deep Link Intent Android
  * 2. Média hors serveur -> Recherche API Discover obligatoire pour obtenir le type ("show" ou "movie") et le slug officiel exact
- * 3. Fallback uniquement si l'API échoue
  */
 export const openPlexMedia = async (title: string, ratingKey?: string, serverId?: string): Promise<void> => {
   // 1. Priorité absolue : Média sur le serveur local
@@ -1300,15 +1302,9 @@ export const openPlexMedia = async (title: string, ratingKey?: string, serverId?
     appLogger.warn('plex', `[Plex Discover API] Erreur : ${e?.message || String(e)}`);
   }
 
-  // Fallback uniquement si l'API échoue
-  const fallbackSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-  const fallbackUrl = `https://watch.plex.tv/movie/${fallbackSlug}`;
-  appLogger.warn('plex', `[Plex Discover Fallback] Redirection de secours : ${fallbackUrl}`);
-  if (Capacitor.isNativePlatform()) {
-    window.location.href = fallbackUrl;
-  } else {
-    window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
-  }
+  // Suppression du fallback local par regex pour éviter d'ouvrir des URLs cassées
+  appLogger.error('plex', `[Plex Discover] ❌ Aucune fiche Plex correspondante n'a été trouvée pour "${title}". L'ouverture de Plex a été annulée.`);
+  alert(`Aucune fiche Plex trouvée pour "${title}".`);
 };
 
 export async function openPlexWatchUrl(params: {
