@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { type Show } from '../types';
 import { tmdb, isAdultOrParodyMedia, isMovieAtCinema, isMovieUpcoming } from '../features/shows/tmdb';
 import { ChevronLeft, Star, Heart, CheckCircle2, Circle, Tv, Zap, X, EyeOff, Archive, Trash2, MoreVertical, Plus, Check, Share, Share2, Play, Calendar, ChevronUp, ChevronDown, ArchiveRestore, Ban, RotateCcw, MonitorPlay, Ticket, Youtube, Clapperboard, ExternalLink, Clock, RefreshCw, Download } from 'lucide-react';
-import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getBestLogoPath, getTodayStr, getCalendarDaysDiff, getEpisodeRelativeAirDate, scrollAllCarouselsToStart, openExternalUrl, checkIsUpToDate } from '../lib/utils';
+import { Capacitor } from '@capacitor/core';
+import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getBestLogoPath, getTodayStr, getCalendarDaysDiff, getEpisodeRelativeAirDate, scrollAllCarouselsToStart, openExternalUrl, checkIsUpToDate, buildPlexWatchUrl } from '../lib/utils';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
 import { PersonDetailModal } from './PersonDetailModal';
 import { TimelineMediaCard } from '../components/cards/TimelineMediaCard';
@@ -587,13 +588,18 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const sortedProviders = useMemo(() => {
     const list: any[] = [...uniqueProviders];
     if (plexMediaInfo?.available) {
+      const fallbackWatchUrl = buildPlexWatchUrl(title, year, isSeries ? 'show' : 'movie');
+      const watchUrl = plexMediaInfo.watchUrl || fallbackWatchUrl;
+      const serverPlexUrl = plexMediaInfo.plexUrl || 'https://app.plex.tv/desktop';
       list.push({
         provider_id: 999999,
         provider_name: plexMediaInfo.serverName ? `Plex (${plexMediaInfo.serverName})` : 'Plex',
         logo_path: 'PLEX_CUSTOM_SVG',
         isPlex: true,
         serverName: plexMediaInfo.serverName,
-        plexUrl: plexMediaInfo.plexUrl || 'https://app.plex.tv/desktop'
+        plexUrl: Capacitor.isNativePlatform() ? watchUrl : serverPlexUrl,
+        watchUrl: watchUrl,
+        serverPlexUrl: serverPlexUrl
       });
     }
     return list.sort((a: any, b: any) => {
@@ -2814,7 +2820,12 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                         {presence.plexInfo?.available && (
                           <button
                             type="button"
-                            onClick={() => openExternalUrl(presence.plexInfo?.plexUrl || 'https://app.plex.tv/desktop')}
+                            onClick={() => {
+                              const targetPlexUrl = Capacitor.isNativePlatform()
+                                ? (presence.plexInfo?.watchUrl || presence.plexInfo?.plexUrl || buildPlexWatchUrl(title, year, isSeries ? 'show' : 'movie'))
+                                : (presence.plexInfo?.plexUrl || presence.plexInfo?.watchUrl || 'https://app.plex.tv/desktop');
+                              openExternalUrl(targetPlexUrl);
+                            }}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 active:scale-95 text-xs font-bold transition-all cursor-pointer shadow-sm"
                             title="Ouvrir dans l'application Plex"
                           >

@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'motion/react';
 import { type Show } from '../types';
 import { X, Check, Star, ChevronLeft, ChevronRight, Clock, ArrowLeft, Sparkles, Download, CheckCircle2, Play } from 'lucide-react';
-import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getTodayStr, getCalendarDaysDiff, scrollAllCarouselsToStart, openExternalUrl } from '../lib/utils';
+import { Capacitor } from '@capacitor/core';
+import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getTodayStr, getCalendarDaysDiff, scrollAllCarouselsToStart, openExternalUrl, buildPlexWatchUrl } from '../lib/utils';
 import { useShows } from '../hooks/useShows';
 import { useToastStore } from '../store/toastStore';
 import { tmdb } from '../features/shows/tmdb';
@@ -985,7 +986,12 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                           {presence.plexInfo?.available && (
                             <button
                               type="button"
-                              onClick={() => openExternalUrl(presence.plexInfo?.plexUrl || 'https://app.plex.tv/desktop')}
+                              onClick={() => {
+                                const targetPlexUrl = Capacitor.isNativePlatform()
+                                  ? (presence.plexInfo?.watchUrl || presence.plexInfo?.plexUrl || buildPlexWatchUrl(show.title, show.year, 'show'))
+                                  : (presence.plexInfo?.plexUrl || presence.plexInfo?.watchUrl || 'https://app.plex.tv/desktop');
+                                openExternalUrl(targetPlexUrl);
+                              }}
                               className="w-full py-2.5 px-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 font-bold text-xs cursor-pointer shadow-sm"
                             >
                               <Play size={16} className="text-amber-400 fill-amber-400 shrink-0" />

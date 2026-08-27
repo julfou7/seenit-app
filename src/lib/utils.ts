@@ -8,6 +8,25 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function buildPlexSlug(title?: string, year?: number | string): string {
+  if (!title) return '';
+  const clean = title
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-');
+  return year ? `${clean}-${year}` : clean;
+}
+
+export function buildPlexWatchUrl(title?: string, year?: number | string, mediaType?: string): string {
+  if (!title) return 'https://watch.plex.tv';
+  const typeSlug = (mediaType === 'show' || mediaType === 'tv' || mediaType === 'series') ? 'show' : 'movie';
+  const slug = buildPlexSlug(title, year);
+  return `https://watch.plex.tv/${typeSlug}/${slug}`;
+}
+
 /**
  * Opens external URLs safely on both Web and Native Android/iOS Capacitor apps.
  * For deep-link schemes like plex://, it attempts to launch the native app via AppLauncher.
@@ -17,8 +36,18 @@ export async function openExternalUrl(url: string) {
   if (!url) return;
   
   if (Capacitor.isNativePlatform()) {
-    // 1. Gestion Plex : extraction du serveur et de la clé de média pour deep linking natif
+    // 1. Gestion Plex : extraction du serveur, du slug et de la clé de média pour deep linking natif
     if ((url.includes('plex.tv') || url.startsWith('plex://')) && !url.includes('/auth')) {
+      const candidatePlexUrls: string[] = [];
+
+      // Si l'URL est un lien universel watch.plex.tv (ex: https://watch.plex.tv/movie/dune-2020)
+      if (url.includes('watch.plex.tv/')) {
+        const watchPath = url.replace(/^https?:\/\/(www\.)?watch\.plex\.tv\//i, '');
+        candidatePlexUrls.push(`intent://watch.plex.tv/${watchPath}#Intent;package=com.plexapp.android;scheme=https;end`);
+        candidatePlexUrls.push(url);
+        candidatePlexUrls.push(`plex://${watchPath}`);
+      }
+
       const serverMatch = url.match(/\/server\/([a-zA-Z0-9_-]+)/i) || url.match(/server=([a-zA-Z0-9_-]+)/i);
       const serverId = serverMatch ? serverMatch[1] : '';
 
@@ -32,8 +61,6 @@ export async function openExternalUrl(url: string) {
         }
       }
 
-      const candidatePlexUrls: string[] = [];
-
       if (serverId && ratingKey) {
         // Formats Android Intent explicites ciblant l'application native com.plexapp.android
         candidatePlexUrls.push(`intent://server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}#Intent;package=com.plexapp.android;scheme=plex;end`);
@@ -43,9 +70,6 @@ export async function openExternalUrl(url: string) {
         // Schemes personnalisés standard Plex
         candidatePlexUrls.push(`plex://server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`);
         candidatePlexUrls.push(`plex://preplay/?metadataKey=${encodeURIComponent(`/library/metadata/${ratingKey}`)}&server=${serverId}`);
-        candidatePlexUrls.push(`plex://preplay?metadataKey=${encodeURIComponent(`/library/metadata/${ratingKey}`)}&server=${serverId}`);
-        candidatePlexUrls.push(`plex://play/?metadataKey=${encodeURIComponent(`/library/metadata/${ratingKey}`)}&server=${serverId}`);
-        candidatePlexUrls.push(`plex://server/${serverId}/library/metadata/${ratingKey}`);
       }
       
       // Fallbacks pour ouvrir l'application Android Plex directement (Intent de lancement de package)
@@ -64,9 +88,9 @@ export async function openExternalUrl(url: string) {
       }
 
       // Si aucune tentative native n'a fonctionné (ex: l'application Plex n'est pas installée)
-      const cleanWebPlexUrl = (serverId && ratingKey)
+      const cleanWebPlexUrl = url.includes('watch.plex.tv') ? url : ((serverId && ratingKey)
         ? `https://app.plex.tv/desktop/#!/server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`
-        : url.replace(/watch\.plex\.tv/g, 'app.plex.tv');
+        : url.replace(/watch\.plex\.tv/g, 'app.plex.tv'));
 
       try {
         await Browser.open({ url: cleanWebPlexUrl, windowName: '_system' });

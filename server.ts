@@ -356,19 +356,33 @@ async function startServer() {
 
                 for (const it of items) {
                   if (isMatch(it)) {
+                    const itemTitle = it.title || title;
+                    const itemYear = it.year || year;
+                    const isShow = (it.type === 'show' || it.type === 'series' || mediaType === 'tv');
+                    const cleanTitleSlug = (itemTitle || '')
+                      .normalize('NFD')
+                      .replace(/[\u0300-\u036f]/g, '')
+                      .toLowerCase()
+                      .replace(/[^a-z0-9\s-]/g, '')
+                      .trim()
+                      .replace(/\s+/g, '-');
+                    const slug = itemYear ? `${cleanTitleSlug}-${itemYear}` : cleanTitleSlug;
+                    const watchUrl = `https://watch.plex.tv/${isShow ? 'show' : 'movie'}/${slug}`;
+
                     const directPlexUrl = (server.clientIdentifier && it.ratingKey)
                       ? `https://app.plex.tv/desktop/#!/server/${server.clientIdentifier}/details?key=${encodeURIComponent(`/library/metadata/${it.ratingKey}`)}`
                       : 'https://app.plex.tv/desktop';
 
-                    console.log(`[Plex Availability] MATCH FOUND: "${it.title}" (${it.year}) on server "${serverName}"`);
+                    console.log(`[Plex Availability] MATCH FOUND: "${itemTitle}" (${itemYear}) on server "${serverName}"`);
                     return {
                       available: true,
                       serverName,
                       serverId: server.clientIdentifier,
-                      title: it.title,
-                      year: it.year,
+                      title: itemTitle,
+                      year: itemYear,
                       ratingKey: it.ratingKey,
-                      plexUrl: directPlexUrl
+                      plexUrl: directPlexUrl,
+                      watchUrl: watchUrl
                     };
                   }
                 }

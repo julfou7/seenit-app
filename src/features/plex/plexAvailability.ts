@@ -2,6 +2,7 @@ import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { getPlexClientId } from '../../services/plex';
+import { buildPlexWatchUrl } from '../../lib/utils';
 
 import { appLogger } from '../../store/logStore';
 
@@ -9,7 +10,9 @@ export interface PlexMediaInfo {
   available: boolean;
   serverName?: string;
   serverId?: string;
+  ratingKey?: string;
   plexUrl?: string;
+  watchUrl?: string;
   title?: string;
   year?: number;
   lastChecked: number;
@@ -152,13 +155,17 @@ export async function checkPlexAvailability(params: {
       if (isOk && data) {
         const isAvailable = !!data.available;
         if (isAvailable) {
+          const itemTitle = data.title || title;
+          const itemYear = data.year || year;
           const info: PlexMediaInfo = {
             available: true,
             serverName: data.serverName,
             serverId: data.serverId,
+            ratingKey: data.ratingKey,
             plexUrl: data.plexUrl,
-            title: data.title,
-            year: data.year,
+            watchUrl: data.watchUrl || buildPlexWatchUrl(itemTitle, itemYear, mediaType),
+            title: itemTitle,
+            year: itemYear,
             lastChecked: now
           };
 
@@ -389,6 +396,8 @@ async function checkPlexDirectFromDevice(params: {
               }
               for (const it of items) {
                 if (isMatch(it)) {
+                  const itemTitle = it.title || title;
+                  const itemYear = it.year || year;
                   const directPlexUrl = (server.clientIdentifier && it.ratingKey)
                     ? `https://app.plex.tv/desktop/#!/server/${server.clientIdentifier}/details?key=${encodeURIComponent(`/library/metadata/${it.ratingKey}`)}`
                     : 'https://app.plex.tv/desktop';
@@ -396,10 +405,11 @@ async function checkPlexDirectFromDevice(params: {
                     available: true,
                     serverName,
                     serverId: server.clientIdentifier,
-                    title: it.title,
-                    year: it.year,
+                    title: itemTitle,
+                    year: itemYear,
                     ratingKey: it.ratingKey,
                     plexUrl: directPlexUrl,
+                    watchUrl: buildPlexWatchUrl(itemTitle, itemYear, mediaType),
                     lastChecked: Date.now()
                   };
                 }
