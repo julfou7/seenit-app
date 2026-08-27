@@ -13,7 +13,7 @@ const config: CapacitorConfig = {
   overrideUserAgent: "Mozilla/5.0 (Linux; Android 14; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
   plugins: {
     CapacitorHttp: {
-      enabled: true
+      enabled: false
     },
     StatusBar: {
       overlaysWebView: false,

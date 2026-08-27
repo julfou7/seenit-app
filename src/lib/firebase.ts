@@ -19,22 +19,38 @@ googleAuthProvider.setCustomParameters({
 
 const isNative = Capacitor.isNativePlatform();
 
-export const db = initializeFirestore(
-  app,
-  { 
-    localCache: isNative 
-      ? persistentLocalCache({ tabManager: persistentSingleTabManager({}) }) 
-      : persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-    experimentalForceLongPolling: isNative
-  },
-  'default'
-);
+const customDbId = (firebaseConfig as any).firestoreDatabaseId && 
+                   (firebaseConfig as any).firestoreDatabaseId !== 'default' && 
+                   (firebaseConfig as any).firestoreDatabaseId !== '(default)'
+  ? (firebaseConfig as any).firestoreDatabaseId
+  : undefined;
+
+export const db = customDbId
+  ? initializeFirestore(
+      app,
+      { 
+        localCache: isNative 
+          ? persistentLocalCache({ tabManager: persistentSingleTabManager({}) }) 
+          : persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+        experimentalForceLongPolling: isNative
+      },
+      customDbId
+    )
+  : initializeFirestore(
+      app,
+      { 
+        localCache: isNative 
+          ? persistentLocalCache({ tabManager: persistentSingleTabManager({}) }) 
+          : persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+        experimentalForceLongPolling: isNative
+      }
+    );
 
 // Log diagnostic for Firestore initialization
 try {
   const cacheType = isNative ? 'PERSISTANT (Mono-onglet natif)' : 'PERSISTANT (Multi-onglets PWA)';
   setTimeout(() => {
-    useLogStore.getState().addLog(`[Système] Firestore initialisé avec cache ${cacheType} sur base 'default'`, 'info');
+    useLogStore.getState().addLog(`[Système] Firestore initialisé avec cache ${cacheType} sur base '${customDbId || '(default)'}'`, 'info');
   }, 1000);
 } catch (e) {}
 
