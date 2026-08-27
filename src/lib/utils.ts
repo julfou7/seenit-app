@@ -3,6 +3,7 @@ import { twMerge } from 'tailwind-merge';
 import { Browser } from '@capacitor/browser';
 import { AppLauncher } from '@capacitor/app-launcher';
 import { Capacitor } from '@capacitor/core';
+import { appLogger } from '../store/logStore';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -35,6 +36,11 @@ export function buildPlexWatchUrl(title?: string, year?: number | string, mediaT
 export async function openExternalUrl(url: string) {
   if (!url) return;
   
+  appLogger.info('plex', `[openExternalUrl] Ouverture demandée pour : ${url}`, {
+    isNative: Capacitor.isNativePlatform(),
+    platform: Capacitor.getPlatform()
+  });
+
   if (Capacitor.isNativePlatform()) {
     // 1. Gestion Plex : extraction du serveur, du slug et de la clé de média pour deep linking natif
     if ((url.includes('plex.tv') || url.startsWith('plex://')) && !url.includes('/auth')) {
@@ -76,14 +82,25 @@ export async function openExternalUrl(url: string) {
       candidatePlexUrls.push(`intent://launch#Intent;package=com.plexapp.android;end`);
       candidatePlexUrls.push(`plex://`);
 
+      appLogger.info('plex', `[Plex DeepLink] Candidate URLs générées (${candidatePlexUrls.length})`, {
+        originalUrl: url,
+        serverId,
+        ratingKey,
+        candidates: candidatePlexUrls
+      });
+
       for (const pUrl of candidatePlexUrls) {
         try {
+          appLogger.info('plex', `[Plex DeepLink] Essai AppLauncher.openUrl : ${pUrl}`);
           const res = await AppLauncher.openUrl({ url: pUrl });
           if (res && res.completed) {
+            appLogger.success('plex', `[Plex DeepLink] ✅ AppLauncher réussi avec URL : ${pUrl}`);
             return;
+          } else {
+            appLogger.warn('plex', `[Plex DeepLink] ⚠️ AppLauncher non complété (completed=false) pour : ${pUrl}`, res);
           }
-        } catch (err) {
-          console.warn('AppLauncher openUrl failed for Plex URL:', pUrl, err);
+        } catch (err: any) {
+          appLogger.warn('plex', `[Plex DeepLink] ❌ Échec AppLauncher pour : ${pUrl}`, err?.message || String(err));
         }
       }
 
@@ -93,10 +110,11 @@ export async function openExternalUrl(url: string) {
         : url.replace(/watch\.plex\.tv/g, 'app.plex.tv'));
 
       try {
+        appLogger.info('plex', `[Plex DeepLink] Fallback Browser.open avec : ${cleanWebPlexUrl}`);
         await Browser.open({ url: cleanWebPlexUrl, windowName: '_system' });
         return;
-      } catch (e) {
-        console.warn('Browser.open failed for Plex URL', e);
+      } catch (e: any) {
+        appLogger.error('plex', `[Plex DeepLink] Erreur Browser.open : ${e?.message || String(e)}`);
       }
     }
 
