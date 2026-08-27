@@ -588,7 +588,8 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const sortedProviders = useMemo(() => {
     const list: any[] = [...uniqueProviders];
     if (plexMediaInfo?.available) {
-      const fallbackWatchUrl = buildPlexWatchUrl(title, releaseYear || (show as any)?.year, isSeries ? 'show' : 'movie');
+      const originalTitle = tmdbDetails?.original_title || tmdbDetails?.original_name || (show as any)?.originalTitle || (show as any)?.original_title || (show as any)?.original_name;
+      const fallbackWatchUrl = buildPlexWatchUrl(title, releaseYear || (show as any)?.year, isSeries ? 'show' : 'movie', originalTitle);
       const watchUrl = plexMediaInfo.watchUrl || fallbackWatchUrl;
       const serverPlexUrl = plexMediaInfo.plexUrl || 'https://app.plex.tv/desktop';
       list.push({
@@ -2821,10 +2822,19 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                           <button
                             type="button"
                             onClick={() => {
+                              const originalTitle = tmdbDetails?.original_title || tmdbDetails?.original_name || (show as any)?.originalTitle || (show as any)?.original_title || (show as any)?.original_name;
+                              const fallbackUrl = buildPlexWatchUrl(title, releaseYear || (show as any)?.year, isSeries ? 'show' : 'movie', originalTitle);
                               const targetPlexUrl = Capacitor.isNativePlatform()
-                                ? (presence.plexInfo?.watchUrl || presence.plexInfo?.plexUrl || buildPlexWatchUrl(title, releaseYear || (show as any)?.year, isSeries ? 'show' : 'movie'))
+                                ? (presence.plexInfo?.watchUrl || presence.plexInfo?.plexUrl || fallbackUrl)
                                 : (presence.plexInfo?.plexUrl || presence.plexInfo?.watchUrl || 'https://app.plex.tv/desktop');
-                              openExternalUrl(targetPlexUrl);
+                              openExternalUrl(targetPlexUrl, {
+                                title,
+                                originalTitle,
+                                year: releaseYear || (show as any)?.year,
+                                mediaType: isSeries ? 'tv' : 'movie',
+                                tmdbId: effectiveTmdbId,
+                                imdbId: resolvedImdbId || undefined
+                              });
                             }}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 active:scale-95 text-xs font-bold transition-all cursor-pointer shadow-sm"
                             title="Ouvrir dans l'application Plex"

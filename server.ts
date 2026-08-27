@@ -359,26 +359,34 @@ async function startServer() {
                     const itemTitle = it.title || title;
                     const itemYear = it.year || year;
                     const isShow = (it.type === 'show' || it.type === 'series' || mediaType === 'tv');
-                    const cleanTitleSlug = (itemTitle || '')
-                      .normalize('NFD')
-                      .replace(/[\u0300-\u036f]/g, '')
-                      .toLowerCase()
-                      .replace(/[^a-z0-9\s-]/g, '')
-                      .trim()
-                      .replace(/\s+/g, '-');
-                    const slug = itemYear ? `${cleanTitleSlug}-${itemYear}` : cleanTitleSlug;
-                    const watchUrl = `https://watch.plex.tv/${isShow ? 'show' : 'movie'}/${slug}`;
+                    
+                    let watchUrl = '';
+                    if (it.slug) {
+                      watchUrl = `https://watch.plex.tv/${isShow ? 'show' : 'movie'}/${it.slug}`;
+                    } else {
+                      const targetTitleForSlug = it.originalTitle || originalTitle || itemTitle;
+                      const cleanTitleSlug = (targetTitleForSlug || '')
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .toLowerCase()
+                        .replace(/[^a-z0-9\s-]/g, '')
+                        .trim()
+                        .replace(/\s+/g, '-');
+                      const slug = itemYear ? `${cleanTitleSlug}-${itemYear}` : cleanTitleSlug;
+                      watchUrl = `https://watch.plex.tv/${isShow ? 'show' : 'movie'}/${slug}`;
+                    }
 
                     const directPlexUrl = (server.clientIdentifier && it.ratingKey)
                       ? `https://app.plex.tv/desktop/#!/server/${server.clientIdentifier}/details?key=${encodeURIComponent(`/library/metadata/${it.ratingKey}`)}`
                       : 'https://app.plex.tv/desktop';
 
-                    console.log(`[Plex Availability] MATCH FOUND: "${itemTitle}" (${itemYear}) on server "${serverName}"`);
+                    console.log(`[Plex Availability] MATCH FOUND: "${itemTitle}" (${itemYear}) on server "${serverName}" -> WatchUrl: ${watchUrl}`);
                     return {
                       available: true,
                       serverName,
                       serverId: server.clientIdentifier,
                       title: itemTitle,
+                      originalTitle: it.originalTitle || originalTitle,
                       year: itemYear,
                       ratingKey: it.ratingKey,
                       plexUrl: directPlexUrl,

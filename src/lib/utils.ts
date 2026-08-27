@@ -9,9 +9,12 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function buildPlexSlug(title?: string, year?: number | string): string {
-  if (!title) return '';
-  const clean = title
+import { CapacitorHttp } from '@capacitor/core';
+
+export function buildPlexSlug(title?: string, year?: number | string, originalTitle?: string): string {
+  const primaryTitle = (originalTitle && originalTitle.trim().length > 0) ? originalTitle : title;
+  if (!primaryTitle) return '';
+  const clean = primaryTitle
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
@@ -21,11 +24,107 @@ export function buildPlexSlug(title?: string, year?: number | string): string {
   return year ? `${clean}-${year}` : clean;
 }
 
-export function buildPlexWatchUrl(title?: string, year?: number | string, mediaType?: string): string {
-  if (!title) return 'https://watch.plex.tv';
+export function buildPlexWatchUrl(title?: string, year?: number | string, mediaType?: string, originalTitle?: string): string {
+  const primaryTitle = (originalTitle && originalTitle.trim().length > 0) ? originalTitle : title;
+  if (!primaryTitle) return 'https://watch.plex.tv';
   const typeSlug = (mediaType === 'show' || mediaType === 'tv' || mediaType === 'series') ? 'show' : 'movie';
-  const slug = buildPlexSlug(title, year);
+  const slug = buildPlexSlug(primaryTitle, year);
   return `https://watch.plex.tv/${typeSlug}/${slug}`;
+}
+
+/**
+ * Interroge l'API Plex Discover pour récupérer le slug exact du contenu (Plex Discover Public Page)
+ */
+export async function resolvePlexDiscoverSlug(params: {
+  title?: string;
+  originalTitle?: string;
+  year?: number | string;
+  mediaType?: string;
+  tmdbId?: number | string;
+  imdbId?: string;
+}): Promise<string | null> {
+  const { title, originalTitle, year, mediaType = 'movie', tmdbId, imdbId } = params;
+  const token = localStorage.getItem('plex_auth_token') || localStorage.getItem('plex_token');
+  const searchType = (mediaType === 'tv' || mediaType === 'show' || mediaType === 'series') ? 'show' : 'movie';
+
+  const queryCandidates = new Set<string>();
+  if (originalTitle && originalTitle.trim()) queryCandidates.add(originalTitle.trim());
+  if (title && title.trim()) queryCandidates.add(title.trim());
+
+  if (queryCandidates.size === 0) return null;
+
+  for (const q of queryCandidates) {
+    try {
+      const searchUrl = `https://discover.provider.plex.tv/library/search?query=${encodeURIComponent(q)}&limit=10&searchTypes=movies,tv`;
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'X-Plex-Client-Identifier': 'seenit-app'
+      };
+      if (token) headers['X-Plex-Token'] = token;
+
+      let res: any = null;
+      if (Capacitor.isNativePlatform()) {
+        const nativeRes = await CapacitorHttp.get({
+          url: searchUrl,
+          headers,
+          connectTimeout: 4000,
+          readTimeout: 4000
+        });
+        if (nativeRes.status >= 200 && nativeRes.status < 300) {
+          res = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
+        }
+      } else {
+        const fetchRes = await fetch(searchUrl, { headers, signal: AbortSignal.timeout(4000) });
+        if (fetchRes.ok) {
+          res = await fetchRes.json();
+        }
+      }
+
+      if (res?.MediaContainer) {
+        let items: any[] = [];
+        if (Array.isArray(res.MediaContainer.SearchResults)) {
+          for (const section of res.MediaContainer.SearchResults) {
+            if (Array.isArray(section.SearchResult)) {
+              for (const sr of section.SearchResult) {
+                if (sr.Metadata) items.push(sr.Metadata);
+              }
+            }
+          }
+        } else if (Array.isArray(res.MediaContainer.Metadata)) {
+          items = res.MediaContainer.Metadata;
+        }
+
+        for (const item of items) {
+          const itType = (item.type || '').toLowerCase();
+          if (searchType === 'movie' && itType && itType !== 'movie') continue;
+          if (searchType === 'show' && itType && itType !== 'show' && itType !== 'series') continue;
+
+          let matched = false;
+          const guids = Array.isArray(item.Guid) ? item.Guid.map((g: any) => g.id || '') : [];
+          if (tmdbId && guids.some((g: string) => g.includes(`tmdb://${tmdbId}`) || g.includes(`themoviedb://${tmdbId}`))) {
+            matched = true;
+          }
+          if (imdbId && !matched && guids.some((g: string) => g.toLowerCase().includes(`imdb://${String(imdbId).toLowerCase()}`))) {
+            matched = true;
+          }
+          if (!matched && year && item.year && Math.abs(Number(item.year) - Number(year)) <= 1) {
+            matched = true;
+          } else if (!matched && !tmdbId && !imdbId) {
+            matched = true;
+          }
+
+          if (matched && item.slug) {
+            appLogger.info('plex', `[Plex Discover] Slug résolu via API : ${item.slug}`);
+            return `https://watch.plex.tv/${searchType}/${item.slug}`;
+          }
+        }
+      }
+    } catch (err: any) {
+      appLogger.warn('plex', `[Plex Discover] Erreur résolution slug API : ${err?.message || String(err)}`);
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -33,31 +132,63 @@ export function buildPlexWatchUrl(title?: string, year?: number | string, mediaT
  * For deep-link schemes like plex://, it attempts to launch the native app via AppLauncher.
  * If the app is not installed, it gracefully falls back to Chrome Custom Tabs/Safari View Controller.
  */
-export async function openExternalUrl(url: string) {
+export async function openExternalUrl(
+  url: string,
+  mediaOptions?: {
+    title?: string;
+    originalTitle?: string;
+    year?: number | string;
+    mediaType?: string;
+    tmdbId?: number | string;
+    imdbId?: string;
+  }
+) {
   if (!url) return;
   
-  appLogger.info('plex', `[openExternalUrl] Ouverture demandée pour : ${url}`, {
+  let targetUrl = url;
+
+  // Résolution intelligente du slug Plex Discover si les informations du média sont fournies
+  if (targetUrl.includes('watch.plex.tv/')) {
+    if (mediaOptions?.title || mediaOptions?.originalTitle) {
+      const discoverWatchUrl = await resolvePlexDiscoverSlug({
+        title: mediaOptions.title,
+        originalTitle: mediaOptions.originalTitle,
+        year: mediaOptions.year,
+        mediaType: mediaOptions.mediaType,
+        tmdbId: mediaOptions.tmdbId,
+        imdbId: mediaOptions.imdbId
+      });
+
+      if (discoverWatchUrl) {
+        targetUrl = discoverWatchUrl;
+      } else if (mediaOptions.originalTitle) {
+        targetUrl = buildPlexWatchUrl(mediaOptions.title, mediaOptions.year, mediaOptions.mediaType, mediaOptions.originalTitle);
+      }
+    }
+  }
+
+  appLogger.info('plex', `[openExternalUrl] Ouverture demandée pour : ${targetUrl}`, {
     isNative: Capacitor.isNativePlatform(),
     platform: Capacitor.getPlatform()
   });
 
   if (Capacitor.isNativePlatform()) {
     // 1. Gestion Plex : extraction du serveur, du slug et de la clé de média pour deep linking natif
-    if ((url.includes('plex.tv') || url.startsWith('plex://')) && !url.includes('/auth')) {
+    if ((targetUrl.includes('plex.tv') || targetUrl.startsWith('plex://')) && !targetUrl.includes('/auth')) {
       const candidatePlexUrls: string[] = [];
 
-      // Si l'URL est un lien universel watch.plex.tv (ex: https://watch.plex.tv/movie/dune-2020)
-      if (url.includes('watch.plex.tv/')) {
-        const watchPath = url.replace(/^https?:\/\/(www\.)?watch\.plex\.tv\//i, '');
-        candidatePlexUrls.push(`intent://${watchPath}#Intent;package=com.plexapp.android;scheme=https;host=watch.plex.tv;action=android.intent.action.VIEW;end`);
-        candidatePlexUrls.push(url);
+      // Si l'URL est un lien universel watch.plex.tv (ex: https://watch.plex.tv/movie/sword-art-online-ordinal-scale-2017)
+      if (targetUrl.includes('watch.plex.tv/')) {
+        const watchPath = targetUrl.replace(/^https?:\/\/(www\.)?watch\.plex\.tv\//i, '');
+        // Lien Universel HTTPS officiel pour l'application Plex Android / iOS
+        candidatePlexUrls.push(targetUrl);
         candidatePlexUrls.push(`plex://${watchPath}`);
       }
 
-      const serverMatch = url.match(/\/server\/([a-zA-Z0-9_-]+)/i) || url.match(/server=([a-zA-Z0-9_-]+)/i);
+      const serverMatch = targetUrl.match(/\/server\/([a-zA-Z0-9_-]+)/i) || targetUrl.match(/server=([a-zA-Z0-9_-]+)/i);
       const serverId = serverMatch ? serverMatch[1] : '';
 
-      const keyMatch = url.match(/[?&]key=([^&#]+)/i);
+      const keyMatch = targetUrl.match(/[?&]key=([^&#]+)/i);
       let ratingKey = '';
       if (keyMatch) {
         const decodedKey = decodeURIComponent(keyMatch[1]);
@@ -68,22 +199,17 @@ export async function openExternalUrl(url: string) {
       }
 
       if (serverId && ratingKey) {
-        // Formats Android Intent explicites ciblant l'application native com.plexapp.android
-        candidatePlexUrls.push(`intent://server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}#Intent;package=com.plexapp.android;scheme=plex;end`);
-        candidatePlexUrls.push(`intent://preplay/?metadataKey=${encodeURIComponent(`/library/metadata/${ratingKey}`)}&server=${serverId}#Intent;package=com.plexapp.android;scheme=plex;end`);
-        candidatePlexUrls.push(`intent://app.plex.tv/desktop/#!/server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}#Intent;package=com.plexapp.android;scheme=https;end`);
-        
         // Schemes personnalisés standard Plex
         candidatePlexUrls.push(`plex://server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`);
         candidatePlexUrls.push(`plex://preplay/?metadataKey=${encodeURIComponent(`/library/metadata/${ratingKey}`)}&server=${serverId}`);
       }
       
-      // Fallbacks pour ouvrir l'application Android Plex directement (Intent de lancement de package)
+      // Fallbacks pour ouvrir l'application Android Plex directement
       candidatePlexUrls.push(`intent://launch#Intent;package=com.plexapp.android;end`);
       candidatePlexUrls.push(`plex://`);
 
       appLogger.info('plex', `[Plex DeepLink] Candidate URLs générées (${candidatePlexUrls.length})`, {
-        originalUrl: url,
+        originalUrl: targetUrl,
         serverId,
         ratingKey,
         candidates: candidatePlexUrls
@@ -105,9 +231,9 @@ export async function openExternalUrl(url: string) {
       }
 
       // Si aucune tentative native n'a fonctionné (ex: l'application Plex n'est pas installée)
-      const cleanWebPlexUrl = url.includes('watch.plex.tv') ? url : ((serverId && ratingKey)
+      const cleanWebPlexUrl = targetUrl.includes('watch.plex.tv') ? targetUrl : ((serverId && ratingKey)
         ? `https://app.plex.tv/desktop/#!/server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`
-        : url.replace(/watch\.plex\.tv/g, 'app.plex.tv'));
+        : targetUrl.replace(/watch\.plex\.tv/g, 'app.plex.tv'));
 
       try {
         appLogger.info('plex', `[Plex DeepLink] Fallback Browser.open avec : ${cleanWebPlexUrl}`);

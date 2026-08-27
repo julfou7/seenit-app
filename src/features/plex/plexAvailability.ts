@@ -163,7 +163,7 @@ export async function checkPlexAvailability(params: {
             serverId: data.serverId,
             ratingKey: data.ratingKey,
             plexUrl: data.plexUrl,
-            watchUrl: data.watchUrl || buildPlexWatchUrl(itemTitle, itemYear, mediaType),
+            watchUrl: data.watchUrl || buildPlexWatchUrl(itemTitle, itemYear, mediaType, data.originalTitle || originalTitle),
             title: itemTitle,
             year: itemYear,
             lastChecked: now
@@ -401,6 +401,11 @@ async function checkPlexDirectFromDevice(params: {
                   const directPlexUrl = (server.clientIdentifier && it.ratingKey)
                     ? `https://app.plex.tv/desktop/#!/server/${server.clientIdentifier}/details?key=${encodeURIComponent(`/library/metadata/${it.ratingKey}`)}`
                     : 'https://app.plex.tv/desktop';
+                  const isShowType = mediaType === 'tv';
+                  const itemWatchUrl = it.slug
+                    ? `https://watch.plex.tv/${isShowType ? 'show' : 'movie'}/${it.slug}`
+                    : buildPlexWatchUrl(itemTitle, itemYear, mediaType, it.originalTitle || originalTitle);
+
                   return {
                     available: true,
                     serverName,
@@ -409,7 +414,7 @@ async function checkPlexDirectFromDevice(params: {
                     year: itemYear,
                     ratingKey: it.ratingKey,
                     plexUrl: directPlexUrl,
-                    watchUrl: buildPlexWatchUrl(itemTitle, itemYear, mediaType),
+                    watchUrl: itemWatchUrl,
                     lastChecked: Date.now()
                   };
                 }
