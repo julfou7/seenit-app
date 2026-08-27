@@ -49,7 +49,7 @@ export async function openExternalUrl(url: string) {
       // Si l'URL est un lien universel watch.plex.tv (ex: https://watch.plex.tv/movie/dune-2020)
       if (url.includes('watch.plex.tv/')) {
         const watchPath = url.replace(/^https?:\/\/(www\.)?watch\.plex\.tv\//i, '');
-        candidatePlexUrls.push(`intent://watch.plex.tv/${watchPath}#Intent;package=com.plexapp.android;scheme=https;end`);
+        candidatePlexUrls.push(`intent://${watchPath}#Intent;package=com.plexapp.android;scheme=https;host=watch.plex.tv;action=android.intent.action.VIEW;end`);
         candidatePlexUrls.push(url);
         candidatePlexUrls.push(`plex://${watchPath}`);
       }
