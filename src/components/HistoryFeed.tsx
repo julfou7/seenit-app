@@ -190,9 +190,8 @@ export function HistoryFeed({
         // Un film est considéré vu s'il possède la clé 'movie' dans seenEpisodes OU un horodatage dans episodeRecords['movie']
         const hasSeenFlag = Array.isArray(show.seenEpisodes) && show.seenEpisodes.includes('movie');
         const hasRecord = !!(show.episodeRecords && show.episodeRecords['movie']?.watchedAt);
-        const isCompleted = show.status === 'completed';
         
-        const isSeen = hasSeenFlag || hasRecord || (isCompleted && (!show.seenEpisodes || show.seenEpisodes.length === 0 || hasSeenFlag));
+        const isSeen = hasSeenFlag || hasRecord;
         if (isSeen) {
           const rawWatchedAt = (show.episodeRecords && show.episodeRecords['movie']?.watchedAt) ||
                             show.lastWatchedAt ||

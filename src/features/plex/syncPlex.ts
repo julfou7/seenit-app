@@ -185,11 +185,14 @@ async function fetchPlexHistoryData(token: string, clientId: string, delta: bool
     ? [...PLEX_BACKEND_ENDPOINTS, '/api/plex/history'] 
     : ['/api/plex/history', ...PLEX_BACKEND_ENDPOINTS];
 
+  appLogger.info('plex', `Début requête Plex (${isNative ? 'APK Natif' : 'PWA Web'}, Mode: ${delta ? 'Rapide' : 'Complet'})`);
+
   for (const url of urlsToTry) {
     // Skip relative path on native platform as it resolves to localhost
     if (isNative && url === '/api/plex/history') continue;
 
     try {
+      appLogger.info('plex', `Interrogation endpoint Backend : ${url}`);
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -201,14 +204,21 @@ async function fetchPlexHistoryData(token: string, clientId: string, delta: bool
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
         if (data && (Array.isArray(data.history) || Array.isArray(data.watchlist))) {
+          const histLen = Array.isArray(data.history) ? data.history.length : 0;
+          const watchLen = Array.isArray(data.watchlist) ? data.watchlist.length : 0;
+          appLogger.success('plex', `Données Plex reçues de ${url} : ${histLen} visionnage(s), ${watchLen} watchlist`);
           return data;
         }
+      } else {
+        appLogger.warn('plex', `Endpoint ${url} a répondu avec statut ${res.status}`);
       }
-    } catch (e) {
+    } catch (e: any) {
+      appLogger.warn('plex', `Échec connexion endpoint ${url} : ${e?.message || e}`);
       console.warn(`[Plex Sync] Call to ${url} failed, trying next fallback...`, e);
     }
   }
 
+  appLogger.warn('plex', 'Tous les backends ont échoué ou ont expiré. Tentative d\'accès direct aux API Plex Cloud...');
   // Fallback: Fetch directly from official Plex Cloud APIs on native device / fallback
   return fetchPlexDirectlyFromClient(token, clientId);
 }
@@ -235,6 +245,7 @@ async function fetchPlexDirectlyFromClient(token: string, clientId: string) {
 
   for (const endpoint of watchlistEndpoints) {
     try {
+      appLogger.info('plex', `Lecture Watchlist Plex Cloud direct (${endpoint.split('/')[2]})...`);
       const res = await fetch(endpoint, {
         headers: {
           'X-Plex-Token': token,
@@ -251,11 +262,13 @@ async function fetchPlexDirectlyFromClient(token: string, clientId: string) {
           const items = extractItems(data);
           if (items.length > 0) {
             rawWatchlistItems.push(...items);
+            appLogger.success('plex', `Plex Cloud Watchlist direct : ${items.length} éléments récupérés`);
             break;
           }
         }
       }
-    } catch (err) {
+    } catch (err: any) {
+      appLogger.warn('plex', `Échec lecture Watchlist Plex Cloud direct: ${err?.message || err}`);
       console.warn('[Plex Sync] Direct client watchlist fetch failed:', err);
     }
   }
@@ -268,6 +281,7 @@ async function fetchPlexDirectlyFromClient(token: string, clientId: string) {
 
   for (const endpoint of historyEndpoints) {
     try {
+      appLogger.info('plex', `Lecture Historique Plex Cloud direct (${endpoint.split('/')[2]})...`);
       const res = await fetch(endpoint, {
         headers: {
           'X-Plex-Token': token,
@@ -286,10 +300,12 @@ async function fetchPlexDirectlyFromClient(token: string, clientId: string) {
             for (const it of items) {
               rawHistoryItems.push({ raw: it, source: 'Plex Cloud Direct' });
             }
+            appLogger.success('plex', `Plex Cloud Historique direct : ${items.length} éléments vus trouvés`);
           }
         }
       }
-    } catch (err) {
+    } catch (err: any) {
+      appLogger.warn('plex', `Échec lecture Historique Plex Cloud direct: ${err?.message || err}`);
       console.warn('[Plex Sync] Direct client history fetch failed:', err);
     }
   }

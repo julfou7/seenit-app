@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { db, auth } from '../lib/firebase';
-import { collection, query, getDocs, getDocsFromCache, getDocsFromServer, doc, writeBatch } from 'firebase/firestore';
+import { collection, query, getDocs, getDocsFromCache, getDocsFromServer, doc, writeBatch, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { type Show } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/firebaseErrors';
 import { useSyncStore } from './syncStore';
@@ -45,7 +45,7 @@ const saveToLocalStorage = (shows: Show[]) => {
 };
 
 /**
- * Envoie une liste de séries vers Firestore par lots (batches de 300 docs)
+ * Envoie une liste de séries vers Firestore par lots (batches de 250 docs)
  */
 export async function uploadShowsToFirestore(userId: string, shows: Show[]): Promise<{ success: boolean; count: number; error?: string }> {
   if (!shows || shows.length === 0) return { success: true, count: 0 };
@@ -92,8 +92,9 @@ export async function uploadShowsToFirestore(userId: string, shows: Show[]): Pro
 /**
  * Fusionne et déduplique intelligemment les séries (en combinant seenEpisodes et records)
  */
-function deduplicateAndMergeShows(rawShows: Show[], currentLocalShows: Show[] = []): Show[] {
+function deduplicateAndMergeShows(rawShows: Show[], currentLocalShows: Show[] = []): { mergedShows: Show[]; duplicateDocIds: string[] } {
   const deduplicatedMap = new Map<string, Show>();
+  const duplicateDocIds: string[] = [];
 
   // Fonction utilitaire pour conserver la version la plus récente (règle le bug du "non vu")
   const mergeBasedOnTime = (older: Show, newer: Show): Show => {
@@ -124,6 +125,10 @@ function deduplicateAndMergeShows(rawShows: Show[], currentLocalShows: Show[] = 
       deduplicatedMap.set(key, { ...show });
     } else {
       const isExistingNewer = (existing.updatedAt || 0) > (show.updatedAt || 0);
+      const olderId = isExistingNewer ? show.id : existing.id;
+      if (olderId && olderId !== show.id && olderId !== existing.id) {
+        duplicateDocIds.push(olderId);
+      }
       deduplicatedMap.set(key, isExistingNewer ? mergeBasedOnTime(show, existing) : mergeBasedOnTime(existing, show));
     }
   }
@@ -209,7 +214,33 @@ function deduplicateAndMergeShows(rawShows: Show[], currentLocalShows: Show[] = 
     });
   }
 
-  return finalShows;
+  return { mergedShows: finalShows, duplicateDocIds };
+}
+
+let unsubscribeRealtimeListener: (() => void) | null = null;
+
+export function setupRealtimeShowsListener(userId: string) {
+  if (unsubscribeRealtimeListener) {
+    unsubscribeRealtimeListener();
+    unsubscribeRealtimeListener = null;
+  }
+  try {
+    const showsRef = collection(db, 'users', userId, 'shows');
+    unsubscribeRealtimeListener = onSnapshot(showsRef, (snapshot) => {
+      const remoteShows: Show[] = [];
+      snapshot.forEach((docSnap) => {
+        remoteShows.push({ ...docSnap.data(), id: String(docSnap.id) } as Show);
+      });
+      const currentLocal = useShowsStore.getState().shows;
+      const { mergedShows } = deduplicateAndMergeShows(remoteShows, currentLocal);
+      saveToLocalStorage(mergedShows);
+      useShowsStore.setState({ shows: mergedShows, loading: false, initialized: true });
+    }, (err) => {
+      console.warn('[showsStore] Realtime listener error:', err);
+    });
+  } catch (err) {
+    console.warn('[showsStore] Failed to setup realtime listener:', err);
+  }
 }
 
 export const useShowsStore = create<ShowsState>((set, get) => ({
@@ -274,34 +305,26 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
 
       // 1. Tenter de lire depuis le cache local Firestore pour un affichage instantané
       try {
-        appLogger.info('sync', `[showsStore] Tentative de lecture depuis le cache Firestore local...`);
         const cachedSnapshot = await getDocsFromCache(q);
         if (!cachedSnapshot.empty) {
           const cachedShows: Show[] = [];
           cachedSnapshot.forEach((doc) => {
             cachedShows.push({ ...doc.data(), id: String(doc.id) } as Show);
           });
-          appLogger.success('sync', `[showsStore] Cache Firestore local lu avec succès : ${cachedSnapshot.size} séries trouvées`);
-          const merged = deduplicateAndMergeShows(cachedShows, get().shows);
-          saveToLocalStorage(merged);
-          set({ shows: merged, loading: false, initialized: true });
-        } else {
-          appLogger.info('sync', `[showsStore] Cache Firestore local vide ou indisponible`);
+          const { mergedShows } = deduplicateAndMergeShows(cachedShows, get().shows);
+          saveToLocalStorage(mergedShows);
+          set({ shows: mergedShows, loading: false, initialized: true });
         }
       } catch (cacheErr: any) {
-        appLogger.info('sync', `[showsStore] Cache local non disponible : ${cacheErr?.message || cacheErr}`);
+        // Cache optionnel
       }
 
       // 2. Fetch depuis le réseau (FORCÉ DEPUIS LE SERVEUR pour casser le cache PWA)
       let snapshot;
       try {
-        appLogger.info('sync', `[showsStore] Récupération forcée depuis le serveur Firestore (getDocsFromServer)...`);
         snapshot = await getDocsFromServer(q);
-        appLogger.success('sync', `[showsStore] Récupération serveur réussie : ${snapshot.size} documents chargés`);
       } catch (e: any) {
-        appLogger.warn('sync', `[showsStore] Échec de getDocsFromServer : ${e?.message || e}. Tentative de getDocs standard...`);
         snapshot = await getDocs(q);
-        appLogger.success('sync', `[showsStore] Récupération getDocs standard réussie : ${snapshot.size} documents chargés`);
       }
       
       const rawLoadedShows: Show[] = [];
@@ -310,17 +333,35 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
       });
 
       const localShowsBeforeMerge = get().shows;
-      appLogger.info('sync', `[showsStore] Fusion de ${rawLoadedShows.length} séries Firestore avec les données locales (${localShowsBeforeMerge.length} séries actuellement)`);
-      const loadedShows = deduplicateAndMergeShows(rawLoadedShows, localShowsBeforeMerge);
+      const { mergedShows, duplicateDocIds } = deduplicateAndMergeShows(rawLoadedShows, localShowsBeforeMerge);
 
-      saveToLocalStorage(loadedShows);
-      set({ shows: loadedShows, loading: false, initialized: true });
-      appLogger.success('sync', `[showsStore] Chargement et fusion terminés. Total : ${loadedShows.length} séries en mémoire.`);
+      if (rawLoadedShows.length !== mergedShows.length) {
+        appLogger.info('sync', `[showsStore] ${rawLoadedShows.length} documents Firestore reçus -> ${mergedShows.length} médias uniques en mémoire (${rawLoadedShows.length - mergedShows.length} doublons dédupliqués).`);
+      } else {
+        appLogger.info('sync', `[showsStore] Chargement terminé : ${mergedShows.length} médias parfaitement synchronisés.`);
+      }
+
+      // Nettoyage en arrière-plan des doublons obsolètes dans Firestore
+      if (duplicateDocIds.length > 0) {
+        appLogger.info('sync', `[showsStore] Nettoyage en arrière-plan de ${duplicateDocIds.length} document(s) doublon(s) dans Firestore...`);
+        try {
+          const delBatch = writeBatch(db);
+          for (const dupId of duplicateDocIds) {
+            delBatch.delete(doc(db, 'users', user.uid, 'shows', dupId));
+          }
+          await delBatch.commit();
+        } catch (delErr) {
+          console.warn('[showsStore] Non-critical error cleaning duplicates:', delErr);
+        }
+      }
+
+      saveToLocalStorage(mergedShows);
+      set({ shows: mergedShows, loading: false, initialized: true });
 
       // Si le cache local contient des séries qui ne sont pas sur le Cloud (ex: créées/importées sur la PWA),
       // on les synchronise automatiquement vers Firestore pour que l'APK mobile et tous les appareils y accèdent !
-      if (loadedShows.length > rawLoadedShows.length) {
-        const missingOnCloud = loadedShows.filter(localS => 
+      if (mergedShows.length > rawLoadedShows.length) {
+        const missingOnCloud = mergedShows.filter(localS => 
           !rawLoadedShows.some(remoteS => 
             remoteS.id === localS.id || 
             (remoteS.tmdbId && localS.tmdbId && Number(remoteS.tmdbId) === Number(localS.tmdbId) && (remoteS.mediaType || 'tv') === (localS.mediaType || 'tv'))
@@ -376,7 +417,12 @@ auth.onAuthStateChanged(user => {
     }
     localStorage.setItem('last_active_uid', user.uid);
     useShowsStore.getState().fetchShows();
+    setupRealtimeShowsListener(user.uid);
   } else {
+    if (unsubscribeRealtimeListener) {
+      unsubscribeRealtimeListener();
+      unsubscribeRealtimeListener = null;
+    }
     const explicitLogout = localStorage.getItem('explicit_logout') === 'true';
     if (explicitLogout) {
       useShowsStore.getState().setShows([]);
