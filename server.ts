@@ -148,121 +148,349 @@ async function startServer() {
   const upload = multer();
 
   app.get('/api/plex/resolve-slug', async (req, res) => {
-    console.log(`[Plex Resolve Backend] --- DÉBUT DE LA RÉSOLUTION ---`);
+    console.log('[Plex Resolve Backend] --- DÉBUT DE LA RÉSOLUTION ---');
+
     try {
-      const { tmdbId, imdbId, type, token, clientId } = req.query || {};
-      console.log(`[Plex Resolve Backend] Paramètres reçus: tmdbId=${tmdbId}, imdbId=${imdbId}, type=${type}, token=${token ? 'PRÉSENT' : 'ABSENT'}, clientId=${clientId}`);
+      const {
+        tmdbId,
+        imdbId,
+        type,
+        clientId
+      } = req.query || {};
 
-      const targetType = type === 'show' || type === 'series' ? 'show' : 'movie';
+      const normalizedTmdbId =
+        tmdbId && /^\d+$/.test(String(tmdbId))
+          ? Number(tmdbId)
+          : null;
+
+      const normalizedImdbId =
+        imdbId && /^tt\d+$/i.test(String(imdbId))
+          ? String(imdbId).toLowerCase()
+          : null;
+
+      const targetType =
+        type === 'show' ||
+        type === 'series' ||
+        type === 'tv'
+          ? 'show'
+          : 'movie';
+
       const plexType = targetType === 'show' ? 2 : 1;
-      const plexAgent = targetType === 'show' ? 'tv.plex.agents.series' : 'tv.plex.agents.movie';
-      const guidQuery = tmdbId ? `tmdb://${tmdbId}` : (imdbId ? `imdb://${imdbId}` : '');
 
-      console.log(`[Plex Resolve Backend] Mappe vers: targetType=${targetType}, plexType=${plexType}, plexAgent=${plexAgent}, guidQuery=${guidQuery}`);
+      const plexAgent =
+        targetType === 'show'
+          ? 'tv.plex.agents.series'
+          : 'tv.plex.agents.movie';
 
-      if (!guidQuery) {
-        console.warn(`[Plex Resolve Backend] Aucun ID externe fourni (tmdbId ou imdbId)`);
-        return res.json({ slug: null });
+      const plexClientId =
+        typeof clientId === 'string' && clientId.trim()
+          ? clientId
+          : 'seenit-app-server';
+
+      console.log(
+        `[Plex Resolve Backend] ` +
+        `tmdbId=${normalizedTmdbId ?? 'ABSENT'}, ` +
+        `imdbId=${normalizedImdbId ?? 'ABSENT'}, ` +
+        `type=${targetType}`
+      );
+
+      if (!normalizedTmdbId && !normalizedImdbId) {
+        console.warn(
+          '[Plex Resolve Backend] Aucun identifiant TMDB/IMDb valide.'
+        );
+
+        return res.status(400).json({
+          success: false,
+          slug: null,
+          error: 'TMDB ou IMDb requis'
+        });
       }
-
-      const matchesUrl = `https://metadata.provider.plex.tv/library/metadata/matches?manual=1&guid=${encodeURIComponent(guidQuery)}&type=${plexType}&agent=${encodeURIComponent(plexAgent)}`;
-      console.log(`[Plex Resolve Backend] Appel de l'URL Plex: ${matchesUrl}`);
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
         'X-Plex-Version': '1.4.03',
-        'X-Plex-Client-Identifier': (clientId as string) || 'seenit-app-server',
+        'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
-      if (token) {
-        headers['X-Plex-Token'] = token as string;
-      }
 
-      console.log(`[Plex Resolve Backend] En-têtes envoyés à Plex:`, {
-        'X-Plex-Product': headers['X-Plex-Product'],
-        'X-Plex-Version': headers['X-Plex-Version'],
-        'X-Plex-Client-Identifier': headers['X-Plex-Client-Identifier'],
-        'Accept': headers['Accept'],
-        'X-Plex-Token': headers['X-Plex-Token'] ? 'PRÉSENT (Masqué)' : 'ABSENT'
-      });
+      /**
+       * Extrait les résultats Plex quel que soit le format retourné.
+       */
+      const extractResults = (data: any): any[] => {
+        const results =
+          data?.MediaContainer?.SearchResult ||
+          data?.MediaContainer?.Metadata ||
+          data?.SearchResult ||
+          data?.Metadata;
 
-      const response = await fetch(matchesUrl, {
-        headers,
-        signal: AbortSignal.timeout(5000)
-      });
+        return Array.isArray(results) ? results : [];
+      };
 
-      console.log(`[Plex Resolve Backend] Statut de la réponse Plex: ${response.status} ${response.statusText}`);
+      /**
+       * Extrait les GUID externes d'un résultat Plex.
+       */
+      const extractGuids = (item: any) => {
+        const tmdbIds = new Set<number>();
+        const imdbIds = new Set<string>();
+        const tvdbIds = new Set<number>();
 
-      if (!response.ok) {
-        console.error(`[Plex Resolve Backend] Échec de l'API Plex: ${response.status} ${response.statusText}`);
-        return res.json({ slug: null });
-      }
+        const addGuid = (raw?: string) => {
+          if (typeof raw !== 'string') return;
 
-      const data = await response.json();
-      console.log(`[Plex Resolve Backend] Données reçues de Plex pour TMDB:`, JSON.stringify(data, null, 2));
+          const tmdbMatch =
+            raw.match(/^tmdb:\/\/(\d+)$/i) ||
+            raw.match(/^themoviedb:\/\/(\d+)$/i) ||
+            raw.match(/^com\.plexapp\.agents\.themoviedb:\/\/(\d+)$/i);
 
-      const searchResults = data?.MediaContainer?.SearchResult || data?.MediaContainer?.Metadata || data?.SearchResult;
-      const match = Array.isArray(searchResults) && searchResults.length > 0 ? searchResults[0] : null;
-
-      if (match) {
-        console.log(`[Plex Resolve Backend] Match trouvé pour TMDB ! Titre: "${match.title}", Année: "${match.year}", Slug: "${match.slug}", Type: "${match.type}"`);
-        if (match.slug) {
-          const resType = match.type || targetType;
-          const mediaTypeStr = (resType === 'show' || resType === 'series' || resType === 2 || targetType === 'show') ? 'show' : 'movie';
-          console.log(`[Plex Resolve Backend] ✅ Résolution TMDB réussie! Renvoi du slug: ${match.slug}, type: ${mediaTypeStr}`);
-          return res.json({ slug: match.slug, type: mediaTypeStr });
-        } else {
-          console.warn(`[Plex Resolve Backend] Le match TMDB n'a pas de champ 'slug' !`);
-        }
-      } else {
-        console.warn(`[Plex Resolve Backend] Aucun match trouvé dans la liste pour TMDB.`);
-      }
-
-      // Si tmdbId a échoué et que imdbId est fourni, faire un fallback automatique côté serveur
-      if (imdbId) {
-        console.log(`[Plex Resolve Backend] Déclenchement du fallback IMDb car TMDB n'a rien renvoyé. IMDb ID: imdb://${imdbId}`);
-        const matchesUrlImdb = `https://metadata.provider.plex.tv/library/metadata/matches?manual=1&guid=${encodeURIComponent(`imdb://${imdbId}`)}&type=${plexType}&agent=${encodeURIComponent(plexAgent)}`;
-        console.log(`[Plex Resolve Backend] Appel de l'URL de fallback IMDb Plex: ${matchesUrlImdb}`);
-
-        const responseImdb = await fetch(matchesUrlImdb, {
-          headers,
-          signal: AbortSignal.timeout(5000)
-        });
-
-        console.log(`[Plex Resolve Backend] Statut de la réponse de fallback IMDb Plex: ${responseImdb.status} ${responseImdb.statusText}`);
-
-        if (responseImdb.ok) {
-          const dataImdb = await responseImdb.json();
-          console.log(`[Plex Resolve Backend] Données reçues de Plex pour IMDb fallback:`, JSON.stringify(dataImdb, null, 2));
-
-          const searchResultsImdb = dataImdb?.MediaContainer?.SearchResult || dataImdb?.MediaContainer?.Metadata || dataImdb?.SearchResult;
-          const matchImdb = Array.isArray(searchResultsImdb) && searchResultsImdb.length > 0 ? searchResultsImdb[0] : null;
-
-          if (matchImdb) {
-            console.log(`[Plex Resolve Backend] Match trouvé pour IMDb fallback ! Titre: "${matchImdb.title}", Année: "${matchImdb.year}", Slug: "${matchImdb.slug}", Type: "${matchImdb.type}"`);
-            if (matchImdb.slug) {
-              const resType = matchImdb.type || targetType;
-              const mediaTypeStr = (resType === 'show' || resType === 'series' || resType === 2 || targetType === 'show') ? 'show' : 'movie';
-              console.log(`[Plex Resolve Backend] ✅ Résolution IMDb de fallback réussie! Renvoi du slug: ${matchImdb.slug}, type: ${mediaTypeStr}`);
-              return res.json({ slug: matchImdb.slug, type: mediaTypeStr });
-            } else {
-              console.warn(`[Plex Resolve Backend] Le match IMDb de fallback n'a pas de champ 'slug' !`);
-            }
-          } else {
-            console.warn(`[Plex Resolve Backend] Aucun match trouvé dans la liste pour IMDb de fallback.`);
+          if (tmdbMatch) {
+            tmdbIds.add(Number(tmdbMatch[1]));
           }
-        } else {
-          console.error(`[Plex Resolve Backend] Échec de l'appel de fallback IMDb Plex: ${responseImdb.status}`);
+
+          const imdbMatch =
+            raw.match(/^imdb:\/\/(tt\d+)$/i) ||
+            raw.match(/^com\.plexapp\.agents\.imdb:\/\/(tt\d+)$/i);
+
+          if (imdbMatch) {
+            imdbIds.add(imdbMatch[1].toLowerCase());
+          }
+
+          const tvdbMatch =
+            raw.match(/^tvdb:\/\/(\d+)$/i) ||
+            raw.match(/^thetvdb:\/\/(\d+)$/i) ||
+            raw.match(/^com\.plexapp\.agents\.thetvdb:\/\/(\d+)$/i);
+
+          if (tvdbMatch) {
+            tvdbIds.add(Number(tvdbMatch[1]));
+          }
+        };
+
+        if (Array.isArray(item?.Guid)) {
+          for (const guid of item.Guid) {
+            addGuid(guid?.id);
+          }
+        }
+
+        addGuid(item?.guid);
+        addGuid(item?.grandparentGuid);
+        addGuid(item?.parentGuid);
+
+        return {
+          tmdbIds,
+          imdbIds,
+          tvdbIds
+        };
+      };
+
+      /**
+       * Vérifie qu'un résultat Plex correspond réellement
+       * à l'identifiant demandé.
+       *
+       * IMPORTANT :
+       * On ne prend JAMAIS SearchResult[0] aveuglément.
+       */
+      const isExactMatch = (item: any, requestedGuid: string): boolean => {
+        if (!item) return false;
+
+        const itemType = String(item.type || '').toLowerCase();
+
+        if (targetType === 'movie' && itemType && itemType !== 'movie') {
+          return false;
+        }
+
+        if (
+          targetType === 'show' &&
+          itemType &&
+          itemType !== 'show' &&
+          itemType !== 'series'
+        ) {
+          return false;
+        }
+
+        const guids = extractGuids(item);
+
+        if (requestedGuid.startsWith('tmdb://')) {
+          const id = Number(
+            requestedGuid.replace(/^tmdb:\/\//i, '')
+          );
+
+          return guids.tmdbIds.has(id);
+        }
+
+        if (requestedGuid.startsWith('imdb://')) {
+          const id = requestedGuid
+            .replace(/^imdb:\/\//i, '')
+            .toLowerCase();
+
+          return guids.imdbIds.has(id);
+        }
+
+        return false;
+      };
+
+      /**
+       * Appelle Plex Metadata Provider avec un GUID exact.
+       */
+      const resolveGuid = async (guid: string): Promise<any | null> => {
+        const matchesUrl =
+          'https://metadata.provider.plex.tv/library/metadata/matches' +
+          `?manual=1` +
+          `&guid=${encodeURIComponent(guid)}` +
+          `&type=${plexType}` +
+          `&agent=${encodeURIComponent(plexAgent)}`;
+
+        console.log(
+          `[Plex Resolve Backend] Recherche exacte : ${guid}`
+        );
+
+        try {
+          const response = await fetch(matchesUrl, {
+            headers,
+            signal: AbortSignal.timeout(7000)
+          });
+
+          console.log(
+            `[Plex Resolve Backend] ${guid} → ` +
+            `${response.status} ${response.statusText}`
+          );
+
+          if (!response.ok) {
+            return null;
+          }
+
+          const data = await response.json();
+          const results = extractResults(data);
+
+          if (results.length === 0) {
+            console.warn(
+              `[Plex Resolve Backend] Aucun résultat pour ${guid}`
+            );
+            return null;
+          }
+
+          /**
+           * CRITIQUE :
+           * on cherche le résultat dont le GUID correspond réellement.
+           */
+          const exactMatch = results.find(
+            item => isExactMatch(item, guid)
+          );
+
+          if (!exactMatch) {
+            console.warn(
+              `[Plex Resolve Backend] ` +
+              `Résultats reçus pour ${guid}, mais aucun ` +
+              `ne contient exactement ce GUID.`
+            );
+
+            return null;
+          }
+
+          if (!exactMatch.slug) {
+            console.warn(
+              `[Plex Resolve Backend] Match exact sans slug :`,
+              exactMatch
+            );
+
+            return null;
+          }
+
+          const guids = extractGuids(exactMatch);
+
+          return {
+            slug: exactMatch.slug,
+            guid: exactMatch.guid || null,
+            type: targetType,
+            title: exactMatch.title || null,
+            year: exactMatch.year || null,
+            tmdbId:
+              guids.tmdbIds.size > 0
+                ? [...guids.tmdbIds][0]
+                : normalizedTmdbId,
+            imdbId:
+              guids.imdbIds.size > 0
+                ? [...guids.imdbIds][0]
+                : normalizedImdbId,
+            resolvedFrom: guid
+          };
+        } catch (error: any) {
+          console.error(
+            `[Plex Resolve Backend] Erreur pour ${guid}:`,
+            error?.message || error
+          );
+
+          return null;
+        }
+      };
+
+      /**
+       * PRIORITÉ 1 : TMDB
+       */
+      if (normalizedTmdbId) {
+        const result = await resolveGuid(
+          `tmdb://${normalizedTmdbId}`
+        );
+
+        if (result) {
+          console.log(
+            `[Plex Resolve Backend] ✅ TMDB → ${result.slug}`
+          );
+
+          return res.json({
+            success: true,
+            ...result
+          });
         }
       }
 
-      console.error(`[Plex Resolve Backend] ❌ Impossible de résoudre le média sur Plex Discover (ni par TMDB, ni par IMDb).`);
-      return res.json({ slug: null });
+      /**
+       * PRIORITÉ 2 : IMDb
+       *
+       * On ne l'utilise que si TMDB n'a pas permis de résoudre.
+       */
+      if (normalizedImdbId) {
+        const result = await resolveGuid(
+          `imdb://${normalizedImdbId}`
+        );
+
+        if (result) {
+          console.log(
+            `[Plex Resolve Backend] ✅ IMDb → ${result.slug}`
+          );
+
+          return res.json({
+            success: true,
+            ...result
+          });
+        }
+      }
+
+      console.warn(
+        '[Plex Resolve Backend] ❌ Aucun match Plex exact.'
+      );
+
+      return res.json({
+        success: false,
+        slug: null,
+        type: targetType,
+        tmdbId: normalizedTmdbId,
+        imdbId: normalizedImdbId
+      });
+
     } catch (error: any) {
-      console.error('[Plex Resolve Backend] Erreur critique rencontrée:', error);
-      return res.json({ slug: null });
+      console.error(
+        '[Plex Resolve Backend] Erreur critique:',
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        slug: null,
+        error: 'Erreur interne'
+      });
     } finally {
-      console.log(`[Plex Resolve Backend] --- FIN DE LA RÉSOLUTION ---`);
+      console.log(
+        '[Plex Resolve Backend] --- FIN DE LA RÉSOLUTION ---'
+      );
     }
   });
 
@@ -405,7 +633,7 @@ async function startServer() {
 
           // Run all query variations in parallel for this connection
           const searchTasks = queriesArray.map(async (q: string) => {
-            const ep = `${uri}/hubs/search?query=${encodeURIComponent(q)}&limit=20limit=20&X-Plex-TokenincludeGuids=1limit=20&X-Plex-TokenX-Plex-Token=${serverAccessToken}`;
+            const ep = `${uri}/hubs/search?query=${encodeURIComponent(q)}&limit=20&includeGuids=1`;
             try {
               const searchRes = await fetch(ep, {
                 headers: { 

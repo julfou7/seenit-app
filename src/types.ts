@@ -13,6 +13,7 @@ export interface Show {
   userId: string;
   tmdbId: number;
   imdbId?: string;
+  tvdbId?: number | string;
   title: string;
   originalTitle?: string;
   mediaType: 'tv' | 'movie';
@@ -28,6 +29,8 @@ export interface Show {
   episodeRecords: Record<string, { rating?: number; emotion?: string; watchedAt?: number; [key: string]: any }>;
   detailsSyncedAt?: number;
   plexSlug?: string;
+  plexGuid?: string;
+  plexResolvedFrom?: string;
   isSynced?: boolean;
   lastSyncedAt?: number;
   lastWatchedAt?: number;
