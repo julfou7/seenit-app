@@ -1179,16 +1179,18 @@ export function getPlexHeaders(): Record<string, string> {
  * Résout la fiche Plex d'un média par ID externe (TMDB ou IMDb) via l'API Cloud Fix Match déportée sur le backend SeenIt
  */
 export const openPlexWatchUrl = async (show: any) => {
-  const tmdbId = show.tmdbId;
-  const type = show.mediaType === 'tv' ? 'show' : 'movie';
-  const showId = show.id;
+  const tmdbId = show?.tmdbId;
+  const type = (show?.mediaType === 'tv' || show?.mediaType === 'show' || show?.type === 'show') ? 'show' : 'movie';
+  const showId = show?.id;
   const userId = auth.currentUser?.uid;
   
-  if (show.plexSlug) {
-    // 1. Slug was already saved in DB -> reliable -> open directly
+  if (show?.plexSlug) {
+    appLogger.info('plex', `[Plex Official] Slug BDD trouvé : "${show.plexSlug}" -> https://watch.plex.tv/${type}/${show.plexSlug}`);
     openExternalUrl(`https://watch.plex.tv/${type}/${show.plexSlug}`);
     return;
   }
+
+  appLogger.info('plex', `[Plex Official] Résolution du slug via API pour TMDB ${tmdbId} (${type})...`);
 
   // 2. Fetch from backend
   const RESOLVE_ENDPOINTS = [
@@ -1217,6 +1219,7 @@ export const openPlexWatchUrl = async (show: any) => {
   }
 
   if (resolvedSlug) {
+    appLogger.info('plex', `[Plex Official] ✅ Slug résolu : "${resolvedSlug}". Sauvegarde en BDD et ouverture.`);
     // 3. Save to DB so we don't have to fetch again
     if (showId && userId) {
       try {
@@ -1238,6 +1241,7 @@ export const openPlexWatchUrl = async (show: any) => {
     return;
   }
 
+  appLogger.warn('plex', `[Plex Official] ❌ Impossible de résoudre le slug officiel pour TMDB ${tmdbId}`);
   // 4. Fallback if resolution fails
   openExternalUrl(`https://watch.plex.tv`);
 };

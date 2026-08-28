@@ -434,19 +434,11 @@ async function startServer() {
                     const itemYear = it.year || year;
                     const isShow = (it.type === 'show' || it.type === 'series' || mediaType === 'tv');
                     
-                    let watchUrl = 'https://watch.plex.tv';
-                    const plexGuidMatch = typeof it.guid === 'string' ? it.guid.match(/plex:\/\/(movie|show)\/([a-f0-9]+)/i) : null;
-                    const hash = plexGuidMatch ? plexGuidMatch[2] : null;
-                    const slugOrHash = it.slug || hash;
-                    if (slugOrHash) {
-                      watchUrl = `https://watch.plex.tv/${isShow ? 'show' : 'movie'}/${slugOrHash}`;
-                    }
-
                     const directPlexUrl = (server.clientIdentifier && it.ratingKey)
                       ? `https://app.plex.tv/desktop/#!/server/${server.clientIdentifier}/details?key=${encodeURIComponent(`/library/metadata/${it.ratingKey}`)}`
                       : 'https://app.plex.tv/desktop';
 
-                    console.log(`[Plex Availability] MATCH FOUND: "${itemTitle}" (${itemYear}) on server "${serverName}" -> WatchUrl: ${watchUrl}`);
+                    console.log(`[Plex Availability] MATCH FOUND: "${itemTitle}" (${itemYear}) on server "${serverName}"`);
                     return {
                       available: true,
                       serverName,
@@ -455,8 +447,7 @@ async function startServer() {
                       originalTitle: it.originalTitle || originalTitle,
                       year: itemYear,
                       ratingKey: it.ratingKey,
-                      plexUrl: directPlexUrl,
-                      watchUrl: watchUrl
+                      plexUrl: directPlexUrl
                     };
                   }
                 }

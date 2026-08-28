@@ -2718,14 +2718,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                               key={`plex-provider-item-${idx}`}
                               onClick={(e) => {
                                 e.preventDefault();
-                                if (provider && (provider.plexUrl || provider.watchUrl)) {
-                                  const urlToOpen = Capacitor.isNativePlatform() && provider.watchUrl && provider.watchUrl.includes('/slug') === false
-                                    ? provider.watchUrl 
-                                    : (provider.plexUrl || provider.watchUrl);
-                                  openExternalUrl(urlToOpen);
-                                } else {
-                                  openPlexWatchUrl(show || { tmdbId: effectiveTmdbId, mediaType: isSeries ? 'tv' : 'movie' });
-                                }
+                                openPlexWatchUrl(show || { id: show?.id, tmdbId: effectiveTmdbId, mediaType: isSeries ? 'tv' : 'movie' });
                               }}
                               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#E5A93D]/40 bg-[#E5A93D]/10 text-[#E5A93D] hover:bg-[#E5A93D]/20 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-[0_0_12px_rgba(229,169,61,0.2)]"
                               title={`Disponible sur Plex : ${provider.serverName || 'Serveur'}`}

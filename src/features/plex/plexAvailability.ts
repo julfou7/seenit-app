@@ -400,14 +400,6 @@ async function checkPlexDirectFromDevice(params: {
                   const directPlexUrl = (server.clientIdentifier && it.ratingKey)
                     ? `https://app.plex.tv/desktop/#!/server/${server.clientIdentifier}/details?key=${encodeURIComponent(`/library/metadata/${it.ratingKey}`)}`
                     : 'https://app.plex.tv/desktop';
-                  const isShowType = mediaType === 'tv';
-                  const plexGuidMatch = typeof it.guid === 'string' ? it.guid.match(/plex:\/\/(movie|show)\/([a-f0-9]+)/i) : null;
-                  const hash = plexGuidMatch ? plexGuidMatch[2] : null;
-                  const slugOrHash = it.slug || hash;
-                  const itemWatchUrl = slugOrHash
-                    ? `https://watch.plex.tv/${isShowType ? 'show' : 'movie'}/${slugOrHash}`
-                    : 'https://watch.plex.tv';
-
                   return {
                     available: true,
                     serverName,
@@ -416,7 +408,6 @@ async function checkPlexDirectFromDevice(params: {
                     year: itemYear,
                     ratingKey: it.ratingKey,
                     plexUrl: directPlexUrl,
-                    watchUrl: itemWatchUrl,
                     lastChecked: Date.now()
                   };
                 }
