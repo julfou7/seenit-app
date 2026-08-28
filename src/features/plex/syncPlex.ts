@@ -85,24 +85,59 @@ async function resolveTmdbDataForPlexItem(
   mediaType: 'tv' | 'movie',
   plexToken?: string
 ): Promise<any | null> {
+  const rawTitle = item.title || item.grandparentTitle || item.parentTitle || 'Titre inconnu';
+  const guidStr = item.guid || item.grandparentGuid || item.parentGuid || '';
+  const origTitle = item.originalTitle || '';
+  const year = item.year || item.originallyAvailableAt?.substring(0, 4) || '';
+
+  appLogger.info(
+    'plex',
+    `[Plex Resolve] 🔍 Résolution TMDB pour "${rawTitle}" (${mediaType}) | guid="${guidStr}" | origTitle="${origTitle}" | year=${year} | ratingKey=${item.ratingKey || item.key || ''}`
+  );
+
   const { tmdbId, imdbId, tvdbId, plexGuid } = extractExternalIdsFromPlex(item);
+  appLogger.info(
+    'plex',
+    `[Plex Resolve] IDs extraits pour "${rawTitle}": tmdbId=${tmdbId || 'aucun'}, imdbId=${imdbId || 'aucun'}, tvdbId=${tvdbId || 'aucun'}, plexGuid=${plexGuid || 'aucun'}`
+  );
 
   // 1. Direct TMDB ID
   if (tmdbId) {
+    appLogger.info('plex', `[Plex Resolve] Tentative TMDB ID direct (${tmdbId})...`);
     const detailsRes = await tmdb.getMediaDetails(tmdbId, mediaType);
-    if (detailsRes.ok && detailsRes.value) return detailsRes.value;
+    if (detailsRes.ok && detailsRes.value) {
+      appLogger.info('plex', `[Plex Resolve] ✅ TMDB ID direct (${tmdbId}) trouvé: "${detailsRes.value.title || detailsRes.value.name}"`);
+      return detailsRes.value;
+    } else {
+      const errorMsg = !detailsRes.ok ? String((detailsRes as any).error?.message || (detailsRes as any).error) : 'Données non reçues';
+      appLogger.warn('plex', `[Plex Resolve] ⚠️ Échec TMDB ID direct (${tmdbId}): ${errorMsg}`);
+    }
   }
 
   // 2. IMDb ID
   if (imdbId) {
+    appLogger.info('plex', `[Plex Resolve] Tentative IMDb ID (${imdbId})...`);
     const findRes = await tmdb.findByExternalId(imdbId, 'imdb_id', mediaType);
-    if (findRes.ok && findRes.value) return findRes.value;
+    if (findRes.ok && findRes.value) {
+      appLogger.info('plex', `[Plex Resolve] ✅ IMDb ID (${imdbId}) résolu -> TMDB ID ${findRes.value.id} ("${findRes.value.title || findRes.value.name}")`);
+      return findRes.value;
+    } else {
+      const errorMsg = !findRes.ok ? String((findRes as any).error?.message || (findRes as any).error) : 'Données non reçues';
+      appLogger.warn('plex', `[Plex Resolve] ⚠️ Échec IMDb ID (${imdbId}): ${errorMsg}`);
+    }
   }
 
   // 3. TVDb ID
   if (tvdbId) {
+    appLogger.info('plex', `[Plex Resolve] Tentative TVDb ID (${tvdbId})...`);
     const findRes = await tmdb.findByExternalId(String(tvdbId), 'tvdb_id', mediaType);
-    if (findRes.ok && findRes.value) return findRes.value;
+    if (findRes.ok && findRes.value) {
+      appLogger.info('plex', `[Plex Resolve] ✅ TVDb ID (${tvdbId}) résolu -> TMDB ID ${findRes.value.id} ("${findRes.value.title || findRes.value.name}")`);
+      return findRes.value;
+    } else {
+      const errorMsg = !findRes.ok ? String((findRes as any).error?.message || (findRes as any).error) : 'Données non reçues';
+      appLogger.warn('plex', `[Plex Resolve] ⚠️ Échec TVDb ID (${tvdbId}): ${errorMsg}`);
+    }
   }
 
   // 4. Plex Discover metadata API lookup for plex:// GUIDs
@@ -111,40 +146,88 @@ async function resolveTmdbDataForPlexItem(
     try {
       const cleanKey = String(pKey).replace('/library/metadata/', '');
       const plexMetaUrl = `https://discover.provider.plex.tv/library/metadata/${cleanKey}?X-Plex-Token=${plexToken}`;
+      appLogger.info('plex', `[Plex Resolve] Appel API Plex Discover: ${plexMetaUrl}`);
       const res = await fetch(plexMetaUrl, { headers: { 'Accept': 'application/json' } });
       if (res.ok) {
         const data = await res.json();
         const metaItem = data?.MediaContainer?.Metadata?.[0];
         if (metaItem) {
+          appLogger.info('plex', `[Plex Resolve] Discover API pour "${cleanKey}": guid="${metaItem.guid}", Guids=${JSON.stringify(metaItem.Guid || [])}`);
           const fetchedIds = extractExternalIdsFromPlex(metaItem);
           if (fetchedIds.tmdbId) {
             const detailsRes = await tmdb.getMediaDetails(fetchedIds.tmdbId, mediaType);
-            if (detailsRes.ok && detailsRes.value) return detailsRes.value;
+            if (detailsRes.ok && detailsRes.value) {
+              appLogger.info('plex', `[Plex Resolve] ✅ Discover Plex -> TMDB ID ${fetchedIds.tmdbId}`);
+              return detailsRes.value;
+            }
           }
           if (fetchedIds.imdbId) {
             const findRes = await tmdb.findByExternalId(fetchedIds.imdbId, 'imdb_id', mediaType);
-            if (findRes.ok && findRes.value) return findRes.value;
+            if (findRes.ok && findRes.value) {
+              appLogger.info('plex', `[Plex Resolve] ✅ Discover Plex -> IMDb (${fetchedIds.imdbId}) -> TMDB ID ${findRes.value.id}`);
+              return findRes.value;
+            }
           }
           if (fetchedIds.tvdbId) {
             const findRes = await tmdb.findByExternalId(String(fetchedIds.tvdbId), 'tvdb_id', mediaType);
-            if (findRes.ok && findRes.value) return findRes.value;
+            if (findRes.ok && findRes.value) {
+              appLogger.info('plex', `[Plex Resolve] ✅ Discover Plex -> TVDb (${fetchedIds.tvdbId}) -> TMDB ID ${findRes.value.id}`);
+              return findRes.value;
+            }
           }
+        } else {
+          appLogger.warn('plex', `[Plex Resolve] Discover Plex Metadata vide pour la clé ${cleanKey}`);
         }
+      } else {
+        appLogger.warn('plex', `[Plex Resolve] API Plex Discover HTTP code ${res.status}`);
       }
-    } catch (err) {
-      // ignore
+    } catch (err: any) {
+      appLogger.warn('plex', `[Plex Resolve] Exception API Plex Discover: ${err?.message || err}`);
     }
   }
 
   // 5. Fallback TMDB search by title & year
-  const rawTitle = item.title || item.grandparentTitle;
+  const titlesToTry: string[] = [];
   if (rawTitle) {
     const cleanTitle = rawTitle.replace(/\(\d{4}\)/g, '').trim();
-    const itemYear = item.year || item.originallyAvailableAt?.substring(0, 4);
-    const searchRes = await tmdb.searchMedia(cleanTitle, itemYear ? String(itemYear) : undefined, mediaType);
-    if (searchRes.ok && searchRes.value) return searchRes.value;
+    if (cleanTitle) titlesToTry.push(cleanTitle);
+    if (cleanTitle.includes(':')) {
+      const mainPart = cleanTitle.split(':')[0].trim();
+      if (mainPart && !titlesToTry.includes(mainPart)) titlesToTry.push(mainPart);
+    }
+    if (cleanTitle.includes(' - ')) {
+      const mainPart = cleanTitle.split(' - ')[0].trim();
+      if (mainPart && !titlesToTry.includes(mainPart)) titlesToTry.push(mainPart);
+    }
+  }
+  if (origTitle && typeof origTitle === 'string') {
+    const cleanOrig = origTitle.replace(/\(\d{4}\)/g, '').trim();
+    if (cleanOrig && !titlesToTry.includes(cleanOrig)) titlesToTry.push(cleanOrig);
   }
 
+  for (const tQuery of titlesToTry) {
+    appLogger.info('plex', `[Plex Resolve] Recherche fallback TMDB pour "${tQuery}" (année: ${year || 'aucune'})...`);
+    if (year) {
+      const searchRes = await tmdb.searchMedia(tQuery, String(year), mediaType);
+      if (searchRes.ok && searchRes.value) {
+        appLogger.info('plex', `[Plex Resolve] ✅ TMDB Fallback Search ("${tQuery}", ${year}) -> TMDB ID ${searchRes.value.id}`);
+        return searchRes.value;
+      } else {
+        const errorMsg = !searchRes.ok ? String((searchRes as any).error?.message || (searchRes as any).error) : '0 résultat';
+        appLogger.warn('plex', `[Plex Resolve] Fallback Search ("${tQuery}", ${year}): ${errorMsg}`);
+      }
+    }
+    const searchNoYearRes = await tmdb.searchMedia(tQuery, undefined, mediaType);
+    if (searchNoYearRes.ok && searchNoYearRes.value) {
+      appLogger.info('plex', `[Plex Resolve] ✅ TMDB Fallback Search ("${tQuery}", sans année) -> TMDB ID ${searchNoYearRes.value.id}`);
+      return searchNoYearRes.value;
+    } else {
+      const errorMsg = !searchNoYearRes.ok ? String((searchNoYearRes as any).error?.message || (searchNoYearRes as any).error) : '0 résultat';
+      appLogger.warn('plex', `[Plex Resolve] Fallback Search ("${tQuery}", sans année): ${errorMsg}`);
+    }
+  }
+
+  appLogger.error('plex', `[Plex Resolve] ❌ ÉCHEC FINAL pour "${rawTitle}" (${mediaType}). PayLoad brute: ${JSON.stringify({ title: item.title, grandparentTitle: item.grandparentTitle, originalTitle: item.originalTitle, guid: item.guid, Guid: item.Guid, year: item.year, ratingKey: item.ratingKey })}`);
   return null;
 }
 
