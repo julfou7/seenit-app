@@ -417,16 +417,11 @@ async function startServer() {
         };
       };
 
-      // --- ÉTAPE 1 : METADATA PROVIDER MATCHES (GUID exact) ---
+      // --- ÉTAPE 1 : METADATA PROVIDER MATCHES (GUID exact - Implémentation officielle Plex) ---
       const queryMatchesEndpoint = async (guid: string): Promise<any | null> => {
-        const matchesUrl =
-          'https://metadata.provider.plex.tv/library/metadata/matches' +
-          `?manual=1` +
-          `&guid=${encodeURIComponent(guid)}` +
-          `&type=${plexType}` +
-          `&agent=${encodeURIComponent(plexAgent)}`;
+        const matchesUrl = `https://metadata.provider.plex.tv/library/metadata/matches?guid=${encodeURIComponent(guid)}&type=${plexType}`;
 
-        console.log(`[Plex Resolve Backend] [Étape 1] Recherche matches : ${guid}`);
+        console.log(`[Plex Resolve Backend] [Étape 1] Recherche matches officielle : ${guid}`);
 
         try {
           const response = await fetch(matchesUrl, {
@@ -446,8 +441,8 @@ async function startServer() {
             return null;
           }
 
-          const match = results.find(item => isItemStrictMatch(item) && item.slug);
-          if (match) {
+          const match = results.find(item => isItemStrictMatch(item) && item.slug) || (results[0]?.slug ? results[0] : null);
+          if (match && match.slug) {
             return formatResponseItem(match, guid.replace('://', ':'));
           }
           return null;
