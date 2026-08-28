@@ -31,24 +31,14 @@ const normalizeTitle = (t?: string) => {
     .trim();
 };
 
-const extractExternalIdsFromPlex = (item: any): { tmdbId: number | null; imdbId: string | null; tvdbId: number | null } => {
-  let tmdbId: number | null = null;
-  let imdbId: string | null = null;
-  let tvdbId: number | null = null;
-
-  if (!item) return { tmdbId, imdbId, tvdbId };
+const extractTmdbIdFromPlex = (item: any): number | null => {
+  if (!item) return null;
 
   if (Array.isArray(item.Guid)) {
     for (const g of item.Guid) {
       if (typeof g?.id === 'string') {
         const tmdbMatch = g.id.match(/^tmdb:\/\/(\d+)/i) || g.id.match(/^themoviedb:\/\/(\d+)/i);
-        if (tmdbMatch && !tmdbId) tmdbId = Number(tmdbMatch[1]);
-
-        const imdbMatch = g.id.match(/^imdb:\/\/(tt\d+)/i);
-        if (imdbMatch && !imdbId) imdbId = imdbMatch[1].toLowerCase();
-
-        const tvdbMatch = g.id.match(/^tvdb:\/\/(\d+)/i);
-        if (tvdbMatch && !tvdbId) tvdbId = Number(tvdbMatch[1]);
+        if (tmdbMatch) return Number(tmdbMatch[1]);
       }
     }
   }
@@ -56,21 +46,11 @@ const extractExternalIdsFromPlex = (item: any): { tmdbId: number | null; imdbId:
   for (const field of [item.guid, item.grandparentGuid, item.parentGuid]) {
     if (typeof field === 'string') {
       const tmdbMatch = field.match(/themoviedb:\/\/(\d+)|tmdb:\/\/(\d+)|com\.plexapp\.agents\.themoviedb:\/\/(\d+)/i);
-      if (tmdbMatch && !tmdbId) tmdbId = Number(tmdbMatch[1] || tmdbMatch[2] || tmdbMatch[3]);
-
-      const imdbMatch = field.match(/imdb:\/\/(tt\d+)|com\.plexapp\.agents\.imdb:\/\/(tt\d+)/i);
-      if (imdbMatch && !imdbId) imdbId = (imdbMatch[1] || imdbMatch[2]).toLowerCase();
-
-      const tvdbMatch = field.match(/tvdb:\/\/(\d+)|thetvdb:\/\/(\d+)|com\.plexapp\.agents\.thetvdb:\/\/(\d+)/i);
-      if (tvdbMatch && !tvdbId) tvdbId = Number(tvdbMatch[1] || tvdbMatch[2] || tvdbMatch[3]);
+      if (tmdbMatch) return Number(tmdbMatch[1] || tmdbMatch[2] || tmdbMatch[3]);
     }
   }
 
-  return { tmdbId, imdbId, tvdbId };
-};
-
-const extractTmdbIdFromPlex = (item: any): number | null => {
-  return extractExternalIdsFromPlex(item).tmdbId;
+  return null;
 };
 
 // Helper to sanitize show object for Firestore (strip undefined, internal norm fields)
@@ -93,7 +73,6 @@ const getResolutionCache = (): Record<string, any> => {
     const raw = localStorage.getItem('plex_resolution_cache');
     if (!raw) return {};
     const parsed = JSON.parse(raw);
-    // Automatic cleanup of legacy incorrect Cinderella (1899) cache mappings
     Object.keys(parsed).forEach(k => {
       if (parsed[k]?.id === 114108 || (k.includes('cinderella') && parsed[k]?.id !== 150689) || (k.includes('cendrillon') && parsed[k]?.id !== 150689)) {
         delete parsed[k];
@@ -107,7 +86,6 @@ const getResolutionCache = (): Record<string, any> => {
 
 const saveResolutionCache = (cache: Record<string, any>) => {
   try {
-    // Keep max 500 entries to keep it light
     const keys = Object.keys(cache);
     if (keys.length > 500) {
       const trimmed = Object.fromEntries(keys.slice(-400).map(k => [k, cache[k]]));
@@ -120,22 +98,11 @@ const saveResolutionCache = (cache: Record<string, any>) => {
 
 const buildPlexResolutionCacheKey = (
   mediaType: 'tv' | 'movie',
-  tmdbId?: number | null,
-  imdbId?: string | null,
-  tvdbId?: number | null
+  tmdbId?: number | null
 ): string | null => {
   if (tmdbId) {
     return `${mediaType}:tmdb:${Number(tmdbId)}`;
   }
-
-  if (imdbId) {
-    return `${mediaType}:imdb:${String(imdbId).toLowerCase()}`;
-  }
-
-  if (tvdbId) {
-    return `${mediaType}:tvdb:${Number(tvdbId)}`;
-  }
-
   return null;
 };
 
@@ -144,198 +111,24 @@ const findShowInLocalLibrary = (
     normTitle: string;
     normOriginalTitle: string;
   }>,
-  normTitle: string,
   tmdbId: number | null,
-  mediaType: 'tv' | 'movie',
-  targetYear?: number | string,
-  imdbId?: string | null,
-  tvdbId?: number | null
+  mediaType: 'tv' | 'movie'
 ): (Show & {
   normTitle: string;
   normOriginalTitle: string;
 }) | undefined => {
+  if (!tmdbId) return undefined;
 
   const isCorrectMediaType = (show: Show): boolean => {
     if (mediaType === 'tv') {
       return show.mediaType === 'tv' || !show.mediaType;
     }
-
     return show.mediaType === 'movie';
   };
 
-  /**
-   * 1. TMDB ID
-   * C'est l'identifiant prioritaire.
-   */
-  if (tmdbId) {
-    const byTmdb = showsList.find(
-      s =>
-        isCorrectMediaType(s) &&
-        Number(s.tmdbId) === Number(tmdbId)
-    );
-
-    if (byTmdb) {
-      return byTmdb;
-    }
-  }
-
-  /**
-   * 2. IMDb ID
-   */
-  if (imdbId) {
-    const normalizedImdb = String(imdbId).toLowerCase();
-
-    const byImdb = showsList.find(
-      s =>
-        isCorrectMediaType(s) &&
-        s.imdbId &&
-        String(s.imdbId).toLowerCase() === normalizedImdb
-    );
-
-    if (byImdb) {
-      return byImdb;
-    }
-  }
-
-  /**
-   * 3. TVDB ID
-   */
-  if (tvdbId) {
-    const byTvdb = showsList.find(
-      s =>
-        isCorrectMediaType(s) &&
-        s.tvdbId &&
-        Number(s.tvdbId) === Number(tvdbId)
-    );
-
-    if (byTvdb) {
-      return byTvdb;
-    }
-  }
-
-  /**
-   * À partir d'ici seulement, on accepte le titre.
-   *
-   * Le titre n'est PAS une identité.
-   * C'est uniquement un fallback pour les vieux médias Plex
-   * dépourvus d'identifiants externes.
-   */
-
-  const numericTargetYear =
-    targetYear !== undefined &&
-    targetYear !== null &&
-    String(targetYear).trim() !== ''
-      ? Number(targetYear)
-      : undefined;
-
-  const isYearCompatible = (show: Show): boolean => {
-    // Pour les séries TV, la date de diffusion d'un épisode varie d'une saison à l'autre.
-    // L'année de l'épisode ne correspond pas à la date de première diffusion de la série (firstAirDate).
-    if (mediaType === 'tv') {
-      return true;
-    }
-
-    if (
-      !numericTargetYear ||
-      Number.isNaN(numericTargetYear)
-    ) {
-      return true;
-    }
-
-    const showDate =
-      show.firstAirDate ||
-      (show as any).releaseDate ||
-      (show as any).release_date;
-
-    if (!showDate) {
-      return true;
-    }
-
-    const showYear = parseInt(
-      String(showDate).slice(0, 4),
-      10
-    );
-
-    if (Number.isNaN(showYear)) {
-      return true;
-    }
-
-    return Math.abs(showYear - numericTargetYear) <= 1;
-  };
-
-  /**
-   * 4. Titre exact + année
-   */
-  const exact = showsList.find(
-    s =>
-      isCorrectMediaType(s) &&
-      isYearCompatible(s) &&
-      (
-        s.normTitle === normTitle ||
-        (
-          s.normOriginalTitle &&
-          s.normOriginalTitle === normTitle
-        )
-      )
+  return showsList.find(
+    s => isCorrectMediaType(s) && Number(s.tmdbId) === Number(tmdbId)
   );
-
-  if (exact) {
-    return exact;
-  }
-
-  /**
-   * 5. Fuzzy / inclusion
-   *
-   * Dernier recours uniquement.
-   */
-  if (normTitle && normTitle.length >= 4) {
-    const fuzzy = showsList.find(s => {
-      if (!isCorrectMediaType(s)) {
-        return false;
-      }
-
-      if (!isYearCompatible(s)) {
-        return false;
-      }
-
-      const candidates = [
-        s.normTitle,
-        s.normOriginalTitle
-      ].filter(Boolean);
-
-      return candidates.some(candidate => {
-        if (candidate === normTitle) {
-          return true;
-        }
-
-        if (
-          candidate.startsWith(normTitle) ||
-          normTitle.startsWith(candidate)
-        ) {
-          return true;
-        }
-
-        if (
-          normTitle.length >= 6 &&
-          candidate.length >= 6 &&
-          (
-            candidate.includes(normTitle) ||
-            normTitle.includes(candidate)
-          )
-        ) {
-          return true;
-        }
-
-        return false;
-      });
-    });
-
-    if (fuzzy) {
-      return fuzzy;
-    }
-  }
-
-  return undefined;
 };
 
 const PLEX_BACKEND_ENDPOINTS = [
@@ -690,13 +483,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         const type = item.type;
         const rawViewed = item.viewedAt;
         const viewedTimestamp = rawViewed ? (Number(rawViewed) < 10000000000 ? Number(rawViewed) * 1000 : Number(rawViewed)) : Date.now();
-        const { tmdbId: guidTmdbId, imdbId, tvdbId } = extractExternalIdsFromPlex(item);
-
-        let itemYear = item.year ? Number(item.year) : undefined;
-        if (!itemYear) {
-          const matchYear = (item.title || item.grandparentTitle || '').match(/\((\d{4})\)/);
-          if (matchYear) itemYear = Number(matchYear[1]);
-        }
+        const guidTmdbId = extractTmdbIdFromPlex(item);
 
         if (type === 'episode') {
           const seasonNum = item.parentIndex;
@@ -706,11 +493,10 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
           const epKey = `${seasonNum}x${episodeNum}`;
           const cleanShowTitle = showTitle.replace(/\(\d{4}\)/g, '').trim();
-          const normPlexTitle = normalizeTitle(cleanShowTitle);
-          const cacheKey = buildPlexResolutionCacheKey('tv', guidTmdbId, imdbId, tvdbId);
+          const cacheKey = buildPlexResolutionCacheKey('tv', guidTmdbId);
 
-          // 1. Check in local library by TMDB ID, IMDb ID, TVDB ID, or title fallback (with year check)
-          let matchedShow = findShowInLocalLibrary(showsList, normPlexTitle, guidTmdbId, 'tv', itemYear, imdbId, tvdbId);
+          // 1. Check in local library by TMDB ID
+          let matchedShow = findShowInLocalLibrary(showsList, guidTmdbId, 'tv');
 
           // Fast skip check: if already in library and episode is already seen, skip immediately
           if (matchedShow) {
@@ -735,27 +521,17 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             }
           }
 
-          // 3. If still not resolved, query external IDs or TMDB
+          // 3. If still not resolved, query TMDB details if GUID exists
           if (!matchedShow && !tmdbData) {
             if (guidTmdbId) {
               const detailsRes = await tmdb.getMediaDetails(guidTmdbId, 'tv');
               if (detailsRes.ok && detailsRes.value) {
                 tmdbData = detailsRes.value;
               }
-            } else if (imdbId) {
-              const findRes = await tmdb.findByExternalId(imdbId, 'imdb_id', 'tv');
-              if (findRes.ok && findRes.value) {
-                tmdbData = findRes.value;
-              }
-            } else if (tvdbId) {
-              const findRes = await tmdb.findByExternalId(String(tvdbId), 'tvdb_id', 'tv');
-              if (findRes.ok && findRes.value) {
-                tmdbData = findRes.value;
-              }
             }
 
             if (!tmdbData) {
-              appLogger.info('plex', `[Plex Sync] Fiche "${cleanShowTitle}" ignorée (aucun GUID TMDB/IMDb/TVDb dans la fiche Plex).`);
+              appLogger.info('plex', `[Plex Sync] Fiche "${cleanShowTitle}" ignorée (aucun GUID TMDB dans la fiche Plex).`);
               continue;
             }
 
@@ -875,11 +651,10 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           if (!movieTitle) continue;
 
           const cleanMovieTitle = movieTitle.replace(/\(\d{4}\)/g, '').trim();
-          const normMovieTitle = normalizeTitle(cleanMovieTitle);
-          const cacheKey = buildPlexResolutionCacheKey('movie', guidTmdbId, imdbId, tvdbId);
+          const cacheKey = buildPlexResolutionCacheKey('movie', guidTmdbId);
 
-          // 1. Check in local library (with year verification)
-          let matchedMovie = findShowInLocalLibrary(showsList, normMovieTitle, guidTmdbId, 'movie', itemYear, imdbId, tvdbId);
+          // 1. Check in local library by TMDB ID
+          let matchedMovie = findShowInLocalLibrary(showsList, guidTmdbId, 'movie');
 
           // Fast skip check: if already in library and movie is already marked as seen, skip immediately
           if (matchedMovie) {
@@ -910,27 +685,17 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             }
           }
 
-          // 3. If still not resolved, query external IDs or TMDB
+          // 3. If still not resolved, query TMDB details if GUID exists
           if (!matchedMovie && !tmdbData) {
             if (guidTmdbId) {
               const detailsRes = await tmdb.getMediaDetails(guidTmdbId, 'movie');
               if (detailsRes.ok && detailsRes.value) {
                 tmdbData = detailsRes.value;
               }
-            } else if (imdbId) {
-              const findRes = await tmdb.findByExternalId(imdbId, 'imdb_id', 'movie');
-              if (findRes.ok && findRes.value) {
-                tmdbData = findRes.value;
-              }
-            } else if (tvdbId) {
-              const findRes = await tmdb.findByExternalId(String(tvdbId), 'tvdb_id', 'movie');
-              if (findRes.ok && findRes.value) {
-                tmdbData = findRes.value;
-              }
             }
 
             if (!tmdbData) {
-              appLogger.info('plex', `[Plex Sync] Fiche film "${cleanMovieTitle}" ignorée (aucun GUID TMDB/IMDb/TVDb dans la fiche Plex).`);
+              appLogger.info('plex', `[Plex Sync] Fiche film "${cleanMovieTitle}" ignorée (aucun GUID TMDB dans la fiche Plex).`);
               continue;
             }
 
@@ -1061,19 +826,12 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           const rawTitle = wlItem.title || '';
           if (!rawTitle) continue;
 
-          let wlYear = wlItem.year ? Number(wlItem.year) : undefined;
-          if (!wlYear) {
-            const matchYear = rawTitle.match(/\((\d{4})\)/);
-            if (matchYear) wlYear = Number(matchYear[1]);
-          }
-
           const cleanTitle = rawTitle.replace(/\(\d{4}\)/g, '').trim();
-          const normTitle = normalizeTitle(cleanTitle);
-          const { tmdbId: guidTmdbId, imdbId, tvdbId } = extractExternalIdsFromPlex(wlItem);
-          const cacheKey = buildPlexResolutionCacheKey(mediaType, guidTmdbId, imdbId, tvdbId);
+          const guidTmdbId = extractTmdbIdFromPlex(wlItem);
+          const cacheKey = buildPlexResolutionCacheKey(mediaType, guidTmdbId);
 
-          // 1. Check if already in user's local library
-          let matchedShow = findShowInLocalLibrary(showsList, normTitle, guidTmdbId, mediaType, wlYear, imdbId, tvdbId);
+          // 1. Check if already in user's local library by TMDB ID
+          let matchedShow = findShowInLocalLibrary(showsList, guidTmdbId, mediaType);
           if (matchedShow) {
             continue;
           }
@@ -1088,34 +846,18 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             if (matchedShow) continue;
           }
 
-          // 3. Search external IDs or TMDB if not in resolution cache
+          // 3. Search TMDB if GUID exists
           if (!tmdbData) {
             if (guidTmdbId) {
               const detailsRes = await tmdb.getMediaDetails(guidTmdbId, mediaType);
               if (detailsRes.ok && detailsRes.value) {
                 tmdbData = detailsRes.value;
               }
-            } else if (imdbId) {
-              const findRes = await tmdb.findByExternalId(imdbId, 'imdb_id', mediaType);
-              if (findRes.ok && findRes.value) {
-                tmdbData = findRes.value;
-              }
-            } else if (tvdbId) {
-              const findRes = await tmdb.findByExternalId(String(tvdbId), 'tvdb_id', mediaType);
-              if (findRes.ok && findRes.value) {
-                tmdbData = findRes.value;
-              }
             }
 
             if (!tmdbData) {
-              appLogger.warn('plex', `[Plex Sync] ⚠️ Aucun GUID externe pour "${cleanTitle}". Fallback TMDB par titre.`);
-              let searchRes = await tmdb.searchMedia(cleanTitle, wlYear ? String(wlYear) : undefined, mediaType);
-              if (!searchRes.ok || !searchRes.value) {
-                searchRes = await tmdb.searchMedia(cleanTitle, undefined, mediaType);
-              }
-              if (searchRes.ok && searchRes.value) {
-                tmdbData = searchRes.value;
-              }
+              appLogger.info('plex', `[Plex Sync] Item Watchlist "${cleanTitle}" ignoré (aucun GUID TMDB).`);
+              continue;
             }
 
             if (tmdbData && cacheKey) {

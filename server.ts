@@ -631,9 +631,9 @@ async function startServer() {
 
   app.post('/api/plex/availability', async (req, res) => {
     try {
-      const { token, clientId, tmdbId, imdbId, title, originalTitle, year, mediaType = 'movie' } = req.body || {};
-      if (!token || (!title && !tmdbId)) {
-        return res.status(400).json({ error: 'Paramètres manquants' });
+      const { token, clientId, tmdbId, title, originalTitle, year, mediaType = 'movie' } = req.body || {};
+      if (!token || !tmdbId) {
+        return res.json({ available: false });
       }
 
       const plexClientIdentifier = clientId || 'tv-time-ai-studio';
@@ -662,25 +662,6 @@ async function startServer() {
         return null;
       };
 
-      const extractImdbId = (item: any): string | null => {
-        if (!item) return null;
-        if (Array.isArray(item.Guid)) {
-          for (const g of item.Guid) {
-            if (typeof g?.id === 'string') {
-              const match = g.id.match(/^imdb:\/\/(tt\d+)/i);
-              if (match) return match[1].toLowerCase();
-            }
-          }
-        }
-        for (const field of [item.guid, item.grandparentGuid, item.parentGuid]) {
-          if (typeof field === 'string') {
-            const match = field.match(/imdb:\/\/(tt\d+)|com\.plexapp\.agents\.imdb:\/\/(tt\d+)/i);
-            if (match) return (match[1] || match[2]).toLowerCase();
-          }
-        }
-        return null;
-      };
-
       const isMatch = (item: any): boolean => {
         if (!item) return false;
 
@@ -689,15 +670,8 @@ async function startServer() {
         if (mediaType === 'movie' && itType && itType !== 'movie') return false;
         if (mediaType === 'tv' && itType && itType !== 'show' && itType !== 'series') return false;
 
-        // 1. Direct TMDB ID match
         const itTmdbId = extractTmdbId(item);
         if (tmdbId && itTmdbId && Number(itTmdbId) === Number(tmdbId)) {
-          return true;
-        }
-
-        // 2. Direct IMDB ID match
-        const itImdbId = extractImdbId(item);
-        if (imdbId && itImdbId && itImdbId === String(imdbId).toLowerCase()) {
           return true;
         }
 
@@ -721,7 +695,7 @@ async function startServer() {
         return items;
       };
 
-      // Search all servers in parallel with fast direct GUID lookup
+      // Search all servers in parallel with fast direct GUID lookup only
       const serverSearchPromises = servers.map(async (server: any) => {
         const serverName = server.name || 'Serveur Plex';
         const serverAccessToken = server.accessToken || token;
@@ -747,55 +721,14 @@ async function startServer() {
           ? sortedConnections.filter((c: any) => !c.local || c.relay)
           : sortedConnections;
 
-        // Execute queries for a single connection
+        // Execute queries for a single connection (STRICT TMDB GUID LOOKUP ONLY)
         const queryConnection = async (uri: string): Promise<any | null> => {
-          // 1. Instant TMDB GUID lookup
-          if (tmdbId) {
-            const guidEndpoints = [
-              `${uri}/library/all?guid=${encodeURIComponent(`tmdb://${tmdbId}`)}&includeGuids=1`,
-              `${uri}/hubs/search?query=${encodeURIComponent(`tmdb://${tmdbId}`)}&limit=5&includeGuids=1`
-            ];
+          const guidEndpoints = [
+            `${uri}/library/all?guid=${encodeURIComponent(`tmdb://${tmdbId}`)}&includeGuids=1`,
+            `${uri}/hubs/search?query=${encodeURIComponent(`tmdb://${tmdbId}`)}&limit=5&includeGuids=1`
+          ];
 
-            for (const ep of guidEndpoints) {
-              try {
-                const searchRes = await fetch(ep, {
-                  headers: { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
-                  signal: AbortSignal.timeout(1500)
-                });
-                if (searchRes.ok) {
-                  const searchData = await searchRes.json();
-                  const items = extractItems(searchData);
-                  for (const it of items) {
-                    if (isMatch(it)) {
-                      const itemTitle = it.title || title;
-                      const itemYear = it.year || year;
-                      const directPlexUrl = (server.clientIdentifier && it.ratingKey)
-                        ? `https://app.plex.tv/desktop/#!/server/${server.clientIdentifier}/details?key=${encodeURIComponent(`/library/metadata/${it.ratingKey}`)}`
-                        : 'https://app.plex.tv/desktop';
-
-                      console.log(`[Plex Availability] FAST GUID MATCH: "${itemTitle}" (${itemYear}) on server "${serverName}"`);
-                      return {
-                        available: true,
-                        serverName,
-                        serverId: server.clientIdentifier,
-                        title: itemTitle,
-                        originalTitle: it.originalTitle || originalTitle,
-                        year: itemYear,
-                        ratingKey: it.ratingKey,
-                        plexUrl: directPlexUrl
-                      };
-                    }
-                  }
-                }
-              } catch (e) {
-                // Ignore timeout
-              }
-            }
-          }
-
-          // 2. Fallback to title query if GUID endpoint didn't return
-          if (title) {
-            const ep = `${uri}/hubs/search?query=${encodeURIComponent(title)}&limit=10&includeGuids=1`;
+          for (const ep of guidEndpoints) {
             try {
               const searchRes = await fetch(ep, {
                 headers: { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
@@ -812,7 +745,7 @@ async function startServer() {
                       ? `https://app.plex.tv/desktop/#!/server/${server.clientIdentifier}/details?key=${encodeURIComponent(`/library/metadata/${it.ratingKey}`)}`
                       : 'https://app.plex.tv/desktop';
 
-                    console.log(`[Plex Availability] TITLE MATCH: "${itemTitle}" (${itemYear}) on server "${serverName}"`);
+                    console.log(`[Plex Availability] STRICT TMDB GUID MATCH: tmdb://${tmdbId} ("${itemTitle}") on server "${serverName}"`);
                     return {
                       available: true,
                       serverName,
@@ -827,7 +760,7 @@ async function startServer() {
                 }
               }
             } catch (e) {
-              // Ignore
+              // Ignore timeout
             }
           }
 
