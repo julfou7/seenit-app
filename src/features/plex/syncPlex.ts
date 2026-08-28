@@ -229,6 +229,12 @@ const findShowInLocalLibrary = (
       : undefined;
 
   const isYearCompatible = (show: Show): boolean => {
+    // Pour les séries TV, la date de diffusion d'un épisode varie d'une saison à l'autre.
+    // L'année de l'épisode ne correspond pas à la date de première diffusion de la série (firstAirDate).
+    if (mediaType === 'tv') {
+      return true;
+    }
+
     if (
       !numericTargetYear ||
       Number.isNaN(numericTargetYear)
@@ -749,7 +755,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             }
 
             if (!tmdbData) {
-              appLogger.warn('plex', `[Plex Sync] ⚠️ Aucun GUID externe pour "${cleanShowTitle}". Fallback TMDB par titre.`);
+              appLogger.info('plex', `[Plex Sync] Recherche TMDB par titre pour "${cleanShowTitle}"...`);
               let searchRes = await tmdb.searchMedia(cleanShowTitle, itemYear ? String(itemYear) : undefined, 'tv');
               if (!searchRes.ok || !searchRes.value) {
                 searchRes = await tmdb.searchMedia(cleanShowTitle, undefined, 'tv');
@@ -930,7 +936,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             }
 
             if (!tmdbData) {
-              appLogger.warn('plex', `[Plex Sync] ⚠️ Aucun GUID externe pour "${cleanMovieTitle}". Fallback TMDB par titre.`);
+              appLogger.info('plex', `[Plex Sync] Recherche TMDB par titre pour "${cleanMovieTitle}"...`);
               let searchRes = await tmdb.searchMedia(cleanMovieTitle, itemYear ? String(itemYear) : undefined, 'movie');
               if (!searchRes.ok || !searchRes.value) {
                 searchRes = await tmdb.searchMedia(cleanMovieTitle, undefined, 'movie');
