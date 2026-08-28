@@ -1340,6 +1340,10 @@ export function getPlexHeaders(): Record<string, string> {
 export const openPlexWatchUrl = async (show: any) => {
   const tmdbId = show?.tmdbId;
   const imdbId = show?.imdbId;
+  const tvdbId = show?.tvdbId;
+  const title = show?.title || show?.name || '';
+  const originalTitle = show?.originalTitle || show?.original_title || show?.original_name || '';
+  const year = show?.year || (show?.releaseDate ? show.releaseDate.substring(0, 4) : undefined) || (show?.firstAirDate ? show.firstAirDate.substring(0, 4) : undefined);
   const type = (show?.mediaType === 'tv' || show?.mediaType === 'show' || show?.type === 'show') ? 'show' : 'movie';
   const showId = show?.id;
   const userId = auth.currentUser?.uid;
@@ -1360,7 +1364,7 @@ export const openPlexWatchUrl = async (show: any) => {
     return;
   }
 
-  appLogger.info('plex', `[Plex Official] Résolution du slug via API backend pour TMDB: ${tmdbId || 'N/A'}, IMDb: ${imdbId || 'N/A'} (${type})...`);
+  appLogger.info('plex', `[Plex Official] Résolution du slug via API backend pour "${title || 'N/A'}" (TMDB: ${tmdbId || 'N/A'}, IMDb: ${imdbId || 'N/A'}, ${type})...`);
 
   // 2. Fetch from backend
   const isNative = Capacitor.isNativePlatform();
@@ -1387,6 +1391,10 @@ export const openPlexWatchUrl = async (show: any) => {
   const queryParams = new URLSearchParams();
   if (tmdbId) queryParams.set('tmdbId', String(tmdbId));
   if (imdbId) queryParams.set('imdbId', String(imdbId));
+  if (tvdbId) queryParams.set('tvdbId', String(tvdbId));
+  if (title) queryParams.set('title', title);
+  if (originalTitle) queryParams.set('originalTitle', originalTitle);
+  if (year) queryParams.set('year', String(year));
   queryParams.set('type', type);
   if (token) queryParams.set('token', token);
   if (clientId) queryParams.set('clientId', clientId);
@@ -1462,9 +1470,8 @@ export const openPlexWatchUrl = async (show: any) => {
     return;
   }
 
-  appLogger.warn('plex', `[Plex Official] ❌ Impossible de résoudre le slug officiel pour TMDB: ${tmdbId || 'N/A'}, IMDb: ${imdbId || 'N/A'}`);
-  // 4. Fallback if resolution fails
-  openExternalUrl(`https://watch.plex.tv`);
+  // 4. En cas d'échec de résolution du slug : NE PAS rediriger vers l'accueil watch.plex.tv !
+  appLogger.error('plex', `[Plex Official] ❌ Impossible de résoudre la fiche Plex pour "${title || 'Média'}" (TMDB: ${tmdbId || 'N/A'}, IMDb: ${imdbId || 'N/A'}). Redirection annulée pour éviter l'accueil.`);
 };
 
 /**

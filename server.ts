@@ -148,7 +148,7 @@ async function startServer() {
   const upload = multer();
 
   const handleResolveSlug = async (req: express.Request, res: express.Response) => {
-    console.log('[Plex Resolve Backend] --- DÉBUT DE LA RÉSOLUTION ---');
+    console.log('[Plex Resolve Backend] --- DÉBUT DE LA RÉSOLUTION DU SLUG PLEX ---');
 
     try {
       const queryParams = req.query || {};
@@ -158,6 +158,10 @@ async function startServer() {
       const {
         tmdbId,
         imdbId,
+        tvdbId,
+        title,
+        originalTitle,
+        year,
         type,
         clientId,
         token,
@@ -173,6 +177,15 @@ async function startServer() {
         imdbId && /^tt\d+$/i.test(String(imdbId))
           ? String(imdbId).toLowerCase()
           : null;
+
+      const normalizedTvdbId =
+        tvdbId && /^\d+$/.test(String(tvdbId))
+          ? Number(tvdbId)
+          : null;
+
+      const cleanTitle = typeof title === 'string' ? title.trim() : '';
+      const cleanOriginalTitle = typeof originalTitle === 'string' ? originalTitle.trim() : '';
+      const cleanYear = year ? Number(year) : null;
 
       const targetType =
         type === 'show' ||
@@ -205,25 +218,28 @@ async function startServer() {
         `[Plex Resolve Backend] ` +
         `tmdbId=${normalizedTmdbId ?? 'ABSENT'}, ` +
         `imdbId=${normalizedImdbId ?? 'ABSENT'}, ` +
+        `tvdbId=${normalizedTvdbId ?? 'ABSENT'}, ` +
+        `title="${cleanTitle || cleanOriginalTitle || 'ABSENT'}", ` +
+        `year=${cleanYear ?? 'ABSENT'}, ` +
         `type=${targetType}, ` +
         `token=${resolvedToken ? `PRÉSENT (${resolvedToken.substring(0, 4)}...)` : 'ABSENT'}`
       );
 
-      if (!normalizedTmdbId && !normalizedImdbId) {
+      if (!normalizedTmdbId && !normalizedImdbId && !cleanTitle && !cleanOriginalTitle) {
         console.warn(
-          '[Plex Resolve Backend] Aucun identifiant TMDB/IMDb valide.'
+          '[Plex Resolve Backend] Aucun identifiant ni titre valide fourni.'
         );
 
         return res.status(400).json({
           success: false,
           slug: null,
-          error: 'TMDB ou IMDb requis'
+          error: 'TMDB, IMDb ou Titre requis'
         });
       }
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.15',
+        'X-Plex-Version': '1.4.16',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
@@ -239,6 +255,7 @@ async function startServer() {
         const results =
           data?.MediaContainer?.SearchResult ||
           data?.MediaContainer?.Metadata ||
+          data?.MediaContainer?.Hub?.flatMap((h: any) => h.Metadata || []) ||
           data?.SearchResult ||
           data?.Metadata;
 
@@ -301,21 +318,15 @@ async function startServer() {
       };
 
       /**
-       * Vérifie qu'un résultat Plex correspond réellement
-       * à l'identifiant demandé.
-       *
-       * IMPORTANT :
-       * On ne prend JAMAIS SearchResult[0] aveuglément.
+       * Vérifie avec rigueur qu'un item Plex correspond au média recherché
        */
-      const isExactMatch = (item: any, requestedGuid: string): boolean => {
+      const isItemStrictMatch = (item: any): boolean => {
         if (!item) return false;
 
         const itemType = String(item.type || '').toLowerCase();
-
         if (targetType === 'movie' && itemType && itemType !== 'movie') {
           return false;
         }
-
         if (
           targetType === 'show' &&
           itemType &&
@@ -327,29 +338,74 @@ async function startServer() {
 
         const guids = extractGuids(item);
 
-        if (requestedGuid.startsWith('tmdb://')) {
-          const id = Number(
-            requestedGuid.replace(/^tmdb:\/\//i, '')
-          );
-
-          return guids.tmdbIds.has(id);
+        // 1. Match par TMDB ID
+        if (normalizedTmdbId && guids.tmdbIds.has(normalizedTmdbId)) {
+          return true;
         }
 
-        if (requestedGuid.startsWith('imdb://')) {
-          const id = requestedGuid
-            .replace(/^imdb:\/\//i, '')
-            .toLowerCase();
+        // 2. Match par IMDb ID
+        if (normalizedImdbId && guids.imdbIds.has(normalizedImdbId)) {
+          return true;
+        }
 
-          return guids.imdbIds.has(id);
+        // 3. Match par TVDB ID
+        if (normalizedTvdbId && guids.tvdbIds.has(normalizedTvdbId)) {
+          return true;
+        }
+
+        // 4. Match par Titre + Année (si fourni)
+        const normalizeStr = (s: string) =>
+          s
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]/g, '');
+
+        const itemTitleNorm = normalizeStr(item.title || '');
+        const itemOrigTitleNorm = normalizeStr(item.originalTitle || '');
+        const searchTitleNorm = cleanTitle ? normalizeStr(cleanTitle) : '';
+        const searchOrigTitleNorm = cleanOriginalTitle ? normalizeStr(cleanOriginalTitle) : '';
+
+        const titleMatches =
+          (searchTitleNorm && (itemTitleNorm === searchTitleNorm || itemOrigTitleNorm === searchTitleNorm)) ||
+          (searchOrigTitleNorm && (itemTitleNorm === searchOrigTitleNorm || itemOrigTitleNorm === searchOrigTitleNorm));
+
+        if (titleMatches) {
+          if (cleanYear && item.year) {
+            const yearDiff = Math.abs(Number(item.year) - Number(cleanYear));
+            if (yearDiff <= 1) {
+              return true;
+            }
+          } else if (!cleanYear) {
+            return true;
+          }
         }
 
         return false;
       };
 
-      /**
-       * Appelle Plex Metadata Provider avec un GUID exact.
-       */
-      const resolveGuid = async (guid: string): Promise<any | null> => {
+      const formatResponseItem = (item: any, sourceDesc: string) => {
+        const guids = extractGuids(item);
+        return {
+          slug: item.slug,
+          guid: item.guid || null,
+          type: targetType,
+          title: item.title || null,
+          year: item.year || null,
+          tmdbId:
+            guids.tmdbIds.size > 0
+              ? [...guids.tmdbIds][0]
+              : normalizedTmdbId,
+          imdbId:
+            guids.imdbIds.size > 0
+              ? [...guids.imdbIds][0]
+              : normalizedImdbId,
+          resolvedFrom: sourceDesc
+        };
+      };
+
+      // --- ÉTAPE 1 : METADATA PROVIDER MATCHES (GUID exact) ---
+      const queryMatchesEndpoint = async (guid: string): Promise<any | null> => {
         const matchesUrl =
           'https://metadata.provider.plex.tv/library/metadata/matches' +
           `?manual=1` +
@@ -357,134 +413,157 @@ async function startServer() {
           `&type=${plexType}` +
           `&agent=${encodeURIComponent(plexAgent)}`;
 
-        console.log(
-          `[Plex Resolve Backend] Recherche exacte : ${guid}`
-        );
+        console.log(`[Plex Resolve Backend] [Étape 1] Recherche matches : ${guid}`);
 
         try {
           const response = await fetch(matchesUrl, {
             headers,
-            signal: AbortSignal.timeout(7000)
+            signal: AbortSignal.timeout(6000)
           });
 
-          console.log(
-            `[Plex Resolve Backend] ${guid} → ` +
-            `${response.status} ${response.statusText}`
-          );
+          console.log(`[Plex Resolve Backend] [Étape 1] ${guid} → ${response.status} ${response.statusText}`);
 
-          if (!response.ok) {
-            return null;
-          }
+          if (!response.ok) return null;
 
           const data = await response.json();
           const results = extractResults(data);
 
           if (results.length === 0) {
-            console.warn(
-              `[Plex Resolve Backend] Aucun résultat pour ${guid}`
-            );
+            console.log(`[Plex Resolve Backend] [Étape 1] Aucun résultat pour ${guid}`);
             return null;
           }
 
-          /**
-           * CRITIQUE :
-           * on cherche le résultat dont le GUID correspond réellement.
-           */
-          const exactMatch = results.find(
-            item => isExactMatch(item, guid)
-          );
-
-          if (!exactMatch) {
-            console.warn(
-              `[Plex Resolve Backend] ` +
-              `Résultats reçus pour ${guid}, mais aucun ` +
-              `ne contient exactement ce GUID.`
-            );
-
-            return null;
+          const match = results.find(item => isItemStrictMatch(item) && item.slug);
+          if (match) {
+            return formatResponseItem(match, guid);
           }
-
-          if (!exactMatch.slug) {
-            console.warn(
-              `[Plex Resolve Backend] Match exact sans slug :`,
-              exactMatch
-            );
-
-            return null;
-          }
-
-          const guids = extractGuids(exactMatch);
-
-          return {
-            slug: exactMatch.slug,
-            guid: exactMatch.guid || null,
-            type: targetType,
-            title: exactMatch.title || null,
-            year: exactMatch.year || null,
-            tmdbId:
-              guids.tmdbIds.size > 0
-                ? [...guids.tmdbIds][0]
-                : normalizedTmdbId,
-            imdbId:
-              guids.imdbIds.size > 0
-                ? [...guids.imdbIds][0]
-                : normalizedImdbId,
-            resolvedFrom: guid
-          };
+          return null;
         } catch (error: any) {
-          console.error(
-            `[Plex Resolve Backend] Erreur pour ${guid}:`,
-            error?.message || error
-          );
-
+          console.warn(`[Plex Resolve Backend] [Étape 1] Erreur ${guid}:`, error?.message || error);
           return null;
         }
       };
 
-      /**
-       * PRIORITÉ 1 : TMDB
-       */
+      // 1.A : TMDB ID
       if (normalizedTmdbId) {
-        const result = await resolveGuid(
-          `tmdb://${normalizedTmdbId}`
-        );
-
-        if (result) {
-          console.log(
-            `[Plex Resolve Backend] ✅ TMDB → ${result.slug}`
-          );
-
-          return res.json({
-            success: true,
-            ...result
-          });
+        const resMatches = await queryMatchesEndpoint(`tmdb://${normalizedTmdbId}`);
+        if (resMatches) {
+          console.log(`[Plex Resolve Backend] ✅ [Étape 1] TMDB matches → ${resMatches.slug}`);
+          return res.json({ success: true, ...resMatches });
         }
       }
 
-      /**
-       * PRIORITÉ 2 : IMDb
-       *
-       * On ne l'utilise que si TMDB n'a pas permis de résoudre.
-       */
+      // 1.B : IMDb ID
       if (normalizedImdbId) {
-        const result = await resolveGuid(
-          `imdb://${normalizedImdbId}`
-        );
+        const resMatches = await queryMatchesEndpoint(`imdb://${normalizedImdbId}`);
+        if (resMatches) {
+          console.log(`[Plex Resolve Backend] ✅ [Étape 1] IMDb matches → ${resMatches.slug}`);
+          return res.json({ success: true, ...resMatches });
+        }
+      }
 
-        if (result) {
-          console.log(
-            `[Plex Resolve Backend] ✅ IMDb → ${result.slug}`
-          );
+      // --- ÉTAPE 2 : DISCOVER SEARCH GLOBALE (discover.provider.plex.tv) ---
+      const queryDiscoverSearch = async (queryText: string): Promise<any | null> => {
+        if (!queryText) return null;
 
-          return res.json({
-            success: true,
-            ...result
+        const searchUrl =
+          'https://discover.provider.plex.tv/library/search' +
+          `?query=${encodeURIComponent(queryText)}` +
+          `&searchTypes=${plexType === 1 ? 'movies' : 'tv'}` +
+          `&includeGuids=1` +
+          `&includeMeta=1` +
+          `&limit=15`;
+
+        console.log(`[Plex Resolve Backend] [Étape 2] Recherche discover.provider.plex.tv : "${queryText}"`);
+
+        try {
+          const response = await fetch(searchUrl, {
+            headers,
+            signal: AbortSignal.timeout(6000)
           });
+
+          console.log(`[Plex Resolve Backend] [Étape 2] "${queryText}" → ${response.status} ${response.statusText}`);
+
+          if (!response.ok) return null;
+
+          const data = await response.json();
+          const results = extractResults(data);
+
+          if (results.length === 0) return null;
+
+          const match = results.find(item => isItemStrictMatch(item) && item.slug);
+          if (match) {
+            return formatResponseItem(match, `discover:${queryText}`);
+          }
+          return null;
+        } catch (error: any) {
+          console.warn(`[Plex Resolve Backend] [Étape 2] Erreur "${queryText}":`, error?.message || error);
+          return null;
+        }
+      };
+
+      // 2.A : Recherche Discover par Titre / Titre original
+      const discoverQueries = new Set<string>();
+      if (cleanTitle) discoverQueries.add(cleanTitle);
+      if (cleanOriginalTitle) discoverQueries.add(cleanOriginalTitle);
+
+      for (const q of discoverQueries) {
+        const resDiscover = await queryDiscoverSearch(q);
+        if (resDiscover) {
+          console.log(`[Plex Resolve Backend] ✅ [Étape 2] Discover "${q}" → ${resDiscover.slug}`);
+          return res.json({ success: true, ...resDiscover });
+        }
+      }
+
+      // --- ÉTAPE 3 : METADATA SEARCH HUBS (metadata.provider.plex.tv/library/search) ---
+      const queryMetadataHubs = async (queryText: string): Promise<any | null> => {
+        if (!queryText) return null;
+
+        const hubsUrl =
+          'https://metadata.provider.plex.tv/library/search' +
+          `?query=${encodeURIComponent(queryText)}` +
+          `&searchTypes=${plexType === 1 ? 'movies' : 'tv'}` +
+          `&includeGuids=1` +
+          `&limit=15`;
+
+        console.log(`[Plex Resolve Backend] [Étape 3] Recherche metadata.provider.plex.tv/library/search : "${queryText}"`);
+
+        try {
+          const response = await fetch(hubsUrl, {
+            headers,
+            signal: AbortSignal.timeout(6000)
+          });
+
+          console.log(`[Plex Resolve Backend] [Étape 3] "${queryText}" → ${response.status} ${response.statusText}`);
+
+          if (!response.ok) return null;
+
+          const data = await response.json();
+          const results = extractResults(data);
+
+          if (results.length === 0) return null;
+
+          const match = results.find(item => isItemStrictMatch(item) && item.slug);
+          if (match) {
+            return formatResponseItem(match, `metadata-search:${queryText}`);
+          }
+          return null;
+        } catch (error: any) {
+          console.warn(`[Plex Resolve Backend] [Étape 3] Erreur "${queryText}":`, error?.message || error);
+          return null;
+        }
+      };
+
+      for (const q of discoverQueries) {
+        const resHubs = await queryMetadataHubs(q);
+        if (resHubs) {
+          console.log(`[Plex Resolve Backend] ✅ [Étape 3] Metadata Hubs "${q}" → ${resHubs.slug}`);
+          return res.json({ success: true, ...resHubs });
         }
       }
 
       console.warn(
-        '[Plex Resolve Backend] ❌ Aucun match Plex exact.'
+        '[Plex Resolve Backend] ❌ Aucun match Plex exact trouvé après toutes les étapes.'
       );
 
       return res.json({
@@ -508,7 +587,7 @@ async function startServer() {
       });
     } finally {
       console.log(
-        '[Plex Resolve Backend] --- FIN DE LA RÉSOLUTION ---'
+        '[Plex Resolve Backend] --- FIN DE LA RÉSOLUTION DU SLUG PLEX ---'
       );
     }
   };
