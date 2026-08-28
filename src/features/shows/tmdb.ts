@@ -155,34 +155,35 @@ class TMDBClient {
     this.lastRequestTime = Date.now();
 
     const endpoint = type === 'movie' ? '/search/movie' : (type === 'tv' ? '/search/tv' : '/search/multi');
-    const url = new URL(`${this.baseUrl}${endpoint}`);
-    url.searchParams.append('api_key', apiKey);
-    url.searchParams.append('query', query);
-    url.searchParams.append('language', 'fr-FR');
-    url.searchParams.append('page', page.toString());
-    if (year && type) {
-       url.searchParams.append(type === 'movie' ? 'primary_release_year' : 'first_air_date_year', year);
+
+    const fetchResultsForYear = async (searchYear?: string): Promise<TMDBMedia[]> => {
+      const url = new URL(`${this.baseUrl}${endpoint}`);
+      url.searchParams.append('api_key', apiKey);
+      url.searchParams.append('query', query);
+      url.searchParams.append('language', 'fr-FR');
+      url.searchParams.append('page', page.toString());
+      // Ne jamais imposer first_air_date_year pour les séries car l'année de l'épisode/saison peut différer de l'année de démarrage de la série.
+      if (searchYear && type === 'movie') {
+        url.searchParams.append('primary_release_year', searchYear);
+      }
+
+      const res = await tryCatch(fetch(url.toString()));
+      if (!res.ok || !res.value.ok) return [];
+      const data = await tryCatch(res.value.json() as Promise<SearchResponse>);
+      if (!data.ok) return [];
+      return data.value.results || [];
+    };
+
+    // Tentative 1 avec année (pour les films)
+    let rawResults = await fetchResultsForYear(year);
+
+    // Tentative 2 sans année si la recherche avec année n'a retourné aucun résultat
+    if (rawResults.length === 0 && year) {
+      rawResults = await fetchResultsForYear(undefined);
     }
 
-    const result = await tryCatch(fetch(url.toString()));
-    
-    if (!result.ok) return err((result as any).error);
-    
-    const response = result.value;
-    if (response.status === 429) {
-      return err(new Error('HTTP 429: Rate limit exceeded.'));
-    }
-    
-    if (!response.ok) {
-      return err(new Error(`TMDB Error: ${response.status} ${response.statusText}`));
-    }
-
-    const data = await tryCatch(response.json() as Promise<SearchResponse>);
-    if (!data.ok) return err((data as any).error);
-
-    const rawResults = data.value.results || [];
     if (rawResults.length === 0) {
-      return err(new Error('Show not found'));
+      return err(new Error('Media not found'));
     }
 
     const normalize = (t?: string) =>
@@ -194,8 +195,13 @@ class TMDBClient {
         .replace(/\s+/g, ' ')
         .trim();
 
+    const removeArticles = (t: string) =>
+      t.replace(/^(le|la|les|l|un|une|des|the|a|an)\s+/i, '').trim();
+
     const targetNorm = normalize(query);
+    const targetNoArticle = removeArticles(targetNorm);
     const targetYearNum = year ? parseInt(year, 10) : undefined;
+    const targetTokens = targetNorm.split(' ').filter(w => w.length >= 2);
 
     let bestCandidate: TMDBMedia = rawResults[0];
     let bestScore = -99999;
@@ -206,42 +212,74 @@ class TMDBClient {
       let score = 0;
       const candTitle = normalize(candidate.title || candidate.name);
       const candOriginal = normalize(candidate.original_title || candidate.original_name);
+      const candTitleNoArticle = removeArticles(candTitle);
+      const candOriginalNoArticle = removeArticles(candOriginal);
+
       const candDate = candidate.release_date || candidate.first_air_date || '';
       const candYear = candDate ? parseInt(candDate.slice(0, 4), 10) : undefined;
       const pop = candidate.popularity || 0;
       const votes = candidate.vote_count || 0;
 
-      // 1. Title matching score
-      if (candTitle === targetNorm || candOriginal === targetNorm) {
-        score += 100;
+      // 1. Matching très tolérant des titres (français, original, avec/sans articles)
+      if (
+        candTitle === targetNorm ||
+        candOriginal === targetNorm ||
+        candTitleNoArticle === targetNoArticle ||
+        candOriginalNoArticle === targetNoArticle
+      ) {
+        score += 150;
       } else if (
         candTitle.startsWith(targetNorm) ||
         candOriginal.startsWith(targetNorm) ||
         targetNorm.startsWith(candTitle) ||
-        targetNorm.startsWith(candOriginal)
+        targetNorm.startsWith(candOriginal) ||
+        candTitleNoArticle.startsWith(targetNoArticle) ||
+        candOriginalNoArticle.startsWith(targetNoArticle)
+      ) {
+        score += 90;
+      } else if (
+        candTitle.includes(targetNorm) ||
+        candOriginal.includes(targetNorm) ||
+        targetNorm.includes(candTitle) ||
+        targetNorm.includes(candOriginal)
       ) {
         score += 60;
-      } else if (candTitle.includes(targetNorm) || candOriginal.includes(targetNorm)) {
-        score += 30;
-      }
-
-      // 2. Year matching score (Crucial for remakes/adaptations like Cendrillon 2015 vs 1899)
-      if (targetYearNum && candYear && !isNaN(targetYearNum) && !isNaN(candYear)) {
-        const diff = Math.abs(candYear - targetYearNum);
-        if (diff === 0) {
-          score += 150;
-        } else if (diff === 1) {
-          score += 70;
-        } else if (diff <= 3) {
-          score += 15;
-        } else if (diff > 5) {
-          score -= 200; // Severe penalty for year discrepancy when target year is explicitly known
+      } else if (targetTokens.length > 0) {
+        // Matching par mots-clés (pour titres composés, sous-titres, etc.)
+        const candTokens = `${candTitle} ${candOriginal}`.split(' ');
+        const matchedTokens = targetTokens.filter(t => candTokens.includes(t));
+        const tokenRatio = matchedTokens.length / targetTokens.length;
+        if (tokenRatio >= 0.5) {
+          score += Math.round(tokenRatio * 50);
         }
       }
 
-      // 3. Credibility & popularity weight (Logarithmic to avoid obscure 0-vote entries)
-      score += Math.min(Math.log10(votes + 1) * 15, 60);
-      score += Math.min(pop * 0.5, 20);
+      // 2. Score basé sur l'année (adapté différemment pour TV vs Movie)
+      if (targetYearNum && candYear && !isNaN(targetYearNum) && !isNaN(candYear)) {
+        if (type === 'tv') {
+          // Pour les séries, l'année du premier épisode (first_air_date) est <= l'année de l'élément Plex
+          if (candYear <= targetYearNum) {
+            const diff = targetYearNum - candYear;
+            if (diff === 0) score += 100;
+            else if (diff <= 10) score += 40; // Très tolérant pour les séries longues
+          } else {
+            const diff = candYear - targetYearNum;
+            if (diff <= 1) score += 20;
+            else score -= 30; // Petite pénalité si la série est répertoriée dans le futur
+          }
+        } else {
+          // Pour les films
+          const diff = Math.abs(candYear - targetYearNum);
+          if (diff === 0) score += 120;
+          else if (diff === 1) score += 70;
+          else if (diff <= 3) score += 30;
+          else score -= 30; // Pénalité très modérée pour ne pas rejeter les matchs de titre exacts
+        }
+      }
+
+      // 3. Poids de crédibilité et popularité
+      score += Math.min(Math.log10(votes + 1) * 10, 40);
+      score += Math.min(pop * 0.3, 15);
 
       if (score > bestScore) {
         bestScore = score;

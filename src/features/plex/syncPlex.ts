@@ -238,10 +238,14 @@ export async function resolveMovieToTmdb(item: any, plexToken?: string) {
     }
   }
 
-  // 5. Recherche TMDB par titre film + année
+  // 5. Recherche TMDB par titre film (+ fallback sans année)
   if (cleanMovieTitle) {
     appLogger.info('plex', `[Plex Resolve] Recherche TMDB par titre film : "${cleanMovieTitle}" (${year || 'sans année'})`);
-    const searchRes = await tmdb.searchMedia(cleanMovieTitle, year ? String(year) : undefined, 'movie');
+    let searchRes = await tmdb.searchMedia(cleanMovieTitle, year ? String(year) : undefined, 'movie');
+    if ((!searchRes.ok || !searchRes.value) && year) {
+      appLogger.info('plex', `[Plex Resolve] Seconde tentative recherche TMDB film sans année : "${cleanMovieTitle}"`);
+      searchRes = await tmdb.searchMedia(cleanMovieTitle, undefined, 'movie');
+    }
     if (searchRes.ok && searchRes.value && searchRes.value.id) {
       const detailsRes = await tmdb.getMediaDetails(searchRes.value.id, 'movie');
       if (detailsRes.ok && detailsRes.value) {
@@ -359,10 +363,14 @@ export async function resolveShowToTmdb(item: any, plexToken?: string) {
     }
   }
 
-  // 5. Recherche TMDB par titre série
+  // 5. Recherche TMDB par titre série (+ fallback sans année)
   if (cleanShowTitle && cleanShowTitle !== 'Série inconnue') {
     appLogger.info('plex', `[Plex Resolve] Recherche TMDB par titre série : "${cleanShowTitle}" (${year || 'sans année'})`);
-    const searchRes = await tmdb.searchMedia(cleanShowTitle, year ? String(year) : undefined, 'tv');
+    let searchRes = await tmdb.searchMedia(cleanShowTitle, year ? String(year) : undefined, 'tv');
+    if ((!searchRes.ok || !searchRes.value) && year) {
+      appLogger.info('plex', `[Plex Resolve] Seconde tentative recherche TMDB série sans année : "${cleanShowTitle}"`);
+      searchRes = await tmdb.searchMedia(cleanShowTitle, undefined, 'tv');
+    }
     if (searchRes.ok && searchRes.value && searchRes.value.id) {
       const detailsRes = await tmdb.getMediaDetails(searchRes.value.id, 'tv');
       if (detailsRes.ok && detailsRes.value) {
