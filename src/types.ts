@@ -27,6 +27,7 @@ export interface Show {
   seenEpisodes: string[];
   episodeRecords: Record<string, { rating?: number; emotion?: string; watchedAt?: number; [key: string]: any }>;
   detailsSyncedAt?: number;
+  plexSlug?: string;
   isSynced?: boolean;
   lastSyncedAt?: number;
   lastWatchedAt?: number;

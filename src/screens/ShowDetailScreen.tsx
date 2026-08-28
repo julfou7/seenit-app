@@ -2724,7 +2724,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                                     : (provider.plexUrl || provider.watchUrl);
                                   openExternalUrl(urlToOpen);
                                 } else {
-                                  openPlexWatchUrl(String(effectiveTmdbId), isSeries ? 'show' : 'movie');
+                                  openPlexWatchUrl(show || { tmdbId: effectiveTmdbId, mediaType: isSeries ? 'tv' : 'movie' });
                                 }
                               }}
                               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#E5A93D]/40 bg-[#E5A93D]/10 text-[#E5A93D] hover:bg-[#E5A93D]/20 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-[0_0_12px_rgba(229,169,61,0.2)]"
