@@ -119,7 +119,7 @@ export const extractExternalIdsFromPlex = (rawItem: any) => {
     if (tvdbMatch && !tvdbId) {
       tvdbId = Number(tvdbMatch[1] || tvdbMatch[2]);
     }
-    const plexMatch = str.match(/plex:\/\/(movie|show)\/([a-f0-9]+)/i);
+    const plexMatch = str.match(/plex:\/\/(movie|show|season|episode)\/([a-f0-9]+)/i);
     if (plexMatch && !plexGuid) {
       plexGuid = plexMatch[2];
     }
@@ -152,11 +152,228 @@ const extractTmdbIdFromPlex = (item: any): number | null => {
 };
 
 export async function resolveMovieToTmdb(item: any, plexToken?: string) {
-  return resolveTmdbDataForPlexItem(item, 'movie', plexToken);
+  const unwrapped = item?.raw ? { ...item.raw, ...item } : item;
+  const movieTitle = unwrapped.title || 'Film inconnu';
+  const cleanMovieTitle = movieTitle.replace(/\(\d{4}\)/g, '').trim();
+  const year = unwrapped.year || (unwrapped.originallyAvailableAt ? Number(unwrapped.originallyAvailableAt.slice(0, 4)) : undefined);
+  const pGuid = getPlexGuid(unwrapped);
+  const { tmdbId, imdbId, tvdbId, plexGuid } = extractExternalIdsFromPlex(unwrapped);
+
+  appLogger.info('plex', `[Plex Resolve] Film Plex détecté : "${movieTitle}"`);
+  appLogger.info('plex', `[Plex Resolve] plexGuid=${plexGuid || pGuid || 'aucun'}`);
+
+  // 1. TMDB ID direct
+  if (tmdbId) {
+    appLogger.info('plex', `[Plex Resolve] Tentative TMDB ID direct (${tmdbId})...`);
+    const detailsRes = await tmdb.getMediaDetails(tmdbId, 'movie');
+    if (detailsRes.ok && detailsRes.value) {
+      appLogger.info('plex', `[Plex Resolve] TMDB ID=${detailsRes.value.id}`);
+      appLogger.info('plex', `[Plex Resolve] ✅ Résolution film réussie : "${detailsRes.value.title}"`);
+      return detailsRes.value;
+    }
+  }
+
+  // 2. IMDb ID
+  if (imdbId) {
+    appLogger.info('plex', `[Plex Resolve] Tentative IMDb ID (${imdbId})...`);
+    const findRes = await tmdb.findByExternalId(imdbId, 'imdb_id', 'movie');
+    if (findRes.ok && findRes.value) {
+      appLogger.info('plex', `[Plex Resolve] TMDB ID=${findRes.value.id}`);
+      appLogger.info('plex', `[Plex Resolve] ✅ Résolution film réussie : "${findRes.value.title}"`);
+      return findRes.value;
+    }
+  }
+
+  // 3. TVDb ID
+  if (tvdbId) {
+    appLogger.info('plex', `[Plex Resolve] Tentative TVDb ID (${tvdbId})...`);
+    const findRes = await tmdb.findByExternalId(String(tvdbId), 'tvdb_id', 'movie');
+    if (findRes.ok && findRes.value) {
+      appLogger.info('plex', `[Plex Resolve] TMDB ID=${findRes.value.id}`);
+      appLogger.info('plex', `[Plex Resolve] ✅ Résolution film réussie : "${findRes.value.title}"`);
+      return findRes.value;
+    }
+  }
+
+  // 4. Plex Discover API
+  const cleanHash = plexGuid || (pGuid ? pGuid.replace(/^plex:\/\/(movie|show|season|episode)\//i, '').replace(/^\/library\/metadata\//i, '').trim() : null);
+  if (cleanHash && plexToken) {
+    try {
+      appLogger.info('plex', `[Plex Resolve] Appel Plex Discover (${cleanHash})`);
+      const plexMetaUrl = `https://discover.provider.plex.tv/library/metadata/${cleanHash}?X-Plex-Token=${plexToken}`;
+      const res = await fetch(plexMetaUrl, { headers: { 'Accept': 'application/json' } });
+      if (res.ok) {
+        const data = await res.json();
+        const metaItem = data?.MediaContainer?.Metadata?.[0];
+        if (metaItem) {
+          const fetchedIds = extractExternalIdsFromPlex(metaItem);
+          if (fetchedIds.tmdbId) {
+            const detailsRes = await tmdb.getMediaDetails(fetchedIds.tmdbId, 'movie');
+            if (detailsRes.ok && detailsRes.value) {
+              appLogger.info('plex', `[Plex Resolve] TMDB ID=${detailsRes.value.id}`);
+              appLogger.info('plex', `[Plex Resolve] ✅ Résolution film réussie (via Plex Discover) : "${detailsRes.value.title}"`);
+              return detailsRes.value;
+            }
+          }
+          if (fetchedIds.imdbId) {
+            const findRes = await tmdb.findByExternalId(fetchedIds.imdbId, 'imdb_id', 'movie');
+            if (findRes.ok && findRes.value) {
+              appLogger.info('plex', `[Plex Resolve] TMDB ID=${findRes.value.id}`);
+              appLogger.info('plex', `[Plex Resolve] ✅ Résolution film réussie (via Discover IMDb) : "${findRes.value.title}"`);
+              return findRes.value;
+            }
+          }
+          if (fetchedIds.tvdbId) {
+            const findRes = await tmdb.findByExternalId(String(fetchedIds.tvdbId), 'tvdb_id', 'movie');
+            if (findRes.ok && findRes.value) {
+              appLogger.info('plex', `[Plex Resolve] TMDB ID=${findRes.value.id}`);
+              appLogger.info('plex', `[Plex Resolve] ✅ Résolution film réussie (via Discover TVDb) : "${findRes.value.title}"`);
+              return findRes.value;
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      appLogger.warn('plex', `[Plex Resolve] Exception API Plex Discover: ${err?.message || err}`);
+    }
+  }
+
+  // 5. Recherche TMDB par titre film + année
+  if (cleanMovieTitle) {
+    appLogger.info('plex', `[Plex Resolve] Recherche TMDB par titre film : "${cleanMovieTitle}" (${year || 'sans année'})`);
+    const searchRes = await tmdb.searchMedia(cleanMovieTitle, year ? String(year) : undefined, 'movie');
+    if (searchRes.ok && searchRes.value && searchRes.value.id) {
+      const detailsRes = await tmdb.getMediaDetails(searchRes.value.id, 'movie');
+      if (detailsRes.ok && detailsRes.value) {
+        appLogger.info('plex', `[Plex Resolve] TMDB ID=${detailsRes.value.id}`);
+        appLogger.info('plex', `[Plex Resolve] ✅ Résolution film réussie (via recherche TMDB) : "${detailsRes.value.title}"`);
+        return detailsRes.value;
+      }
+    }
+  }
+
+  appLogger.error('plex', `[Plex Resolve] ❌ ÉCHEC FINAL film pour "${movieTitle}" : Aucun ID TMDB/IMDb/TVDb/Discover/Search valide.`);
+  return null;
 }
 
 export async function resolveShowToTmdb(item: any, plexToken?: string) {
-  return resolveTmdbDataForPlexItem(item, 'tv', plexToken);
+  const unwrapped = item?.raw ? { ...item.raw, ...item } : item;
+  const rawShowTitle = unwrapped.grandparentTitle || unwrapped.parentTitle || unwrapped.title || 'Série inconnue';
+  const cleanShowTitle = rawShowTitle.replace(/\(\d{4}\)/g, '').trim();
+  const year = unwrapped.year || (unwrapped.originallyAvailableAt ? Number(unwrapped.originallyAvailableAt.slice(0, 4)) : undefined);
+  const pGuid = getPlexGuid(unwrapped);
+  const { tmdbId, imdbId, tvdbId, plexGuid } = extractExternalIdsFromPlex(unwrapped);
+
+  // 1. TMDB ID direct
+  if (tmdbId) {
+    appLogger.info('plex', `[Plex Resolve] Tentative TMDB ID direct série (${tmdbId})...`);
+    const detailsRes = await tmdb.getMediaDetails(tmdbId, 'tv');
+    if (detailsRes.ok && detailsRes.value) {
+      appLogger.info('plex', `[Plex Resolve] ✅ TMDB ID série (${tmdbId}) trouvé : "${detailsRes.value.name}"`);
+      return detailsRes.value;
+    }
+  }
+
+  // 2. IMDb ID
+  if (imdbId) {
+    appLogger.info('plex', `[Plex Resolve] Tentative IMDb ID série (${imdbId})...`);
+    const findRes = await tmdb.findByExternalId(imdbId, 'imdb_id', 'tv');
+    if (findRes.ok && findRes.value) {
+      appLogger.info('plex', `[Plex Resolve] ✅ IMDb ID série (${imdbId}) résolu -> TMDB ID ${findRes.value.id} ("${findRes.value.name}")`);
+      return findRes.value;
+    }
+  }
+
+  // 3. TVDb ID
+  if (tvdbId) {
+    appLogger.info('plex', `[Plex Resolve] Tentative TVDb ID série (${tvdbId})...`);
+    const findRes = await tmdb.findByExternalId(String(tvdbId), 'tvdb_id', 'tv');
+    if (findRes.ok && findRes.value) {
+      appLogger.info('plex', `[Plex Resolve] ✅ TVDb ID série (${tvdbId}) résolu -> TMDB ID ${findRes.value.id} ("${findRes.value.name}")`);
+      return findRes.value;
+    }
+  }
+
+  // 4. Plex Discover API
+  const targetGuidStr = unwrapped.grandparentGuid || unwrapped.parentGuid || unwrapped.guid || pGuid;
+  let cleanHash: string | null = null;
+  if (targetGuidStr && typeof targetGuidStr === 'string') {
+    const match = targetGuidStr.match(/plex:\/\/(movie|show|season|episode)\/([a-f0-9]+)/i);
+    if (match) {
+      cleanHash = match[2];
+    } else {
+      cleanHash = targetGuidStr.replace(/^plex:\/\/(movie|show|season|episode)\//i, '').replace(/^\/library\/metadata\//i, '').trim();
+    }
+  }
+
+  if (cleanHash && plexToken) {
+    try {
+      appLogger.info('plex', `[Plex Resolve] Appel Plex Discover série (${cleanHash})`);
+      const plexMetaUrl = `https://discover.provider.plex.tv/library/metadata/${cleanHash}?X-Plex-Token=${plexToken}`;
+      const res = await fetch(plexMetaUrl, { headers: { 'Accept': 'application/json' } });
+      if (res.ok) {
+        const data = await res.json();
+        const metaItem = data?.MediaContainer?.Metadata?.[0];
+        if (metaItem) {
+          let showMetaItem = metaItem;
+          if ((metaItem.type === 'episode' || metaItem.type === 'season') && metaItem.grandparentGuid) {
+            const gpMatch = metaItem.grandparentGuid.match(/plex:\/\/(show|movie)\/([a-f0-9]+)/i);
+            if (gpMatch) {
+              const gpHash = gpMatch[2];
+              const gpRes = await fetch(`https://discover.provider.plex.tv/library/metadata/${gpHash}?X-Plex-Token=${plexToken}`, { headers: { 'Accept': 'application/json' } });
+              if (gpRes.ok) {
+                const gpData = await gpRes.json();
+                if (gpData?.MediaContainer?.Metadata?.[0]) {
+                  showMetaItem = gpData.MediaContainer.Metadata[0];
+                }
+              }
+            }
+          }
+
+          const fetchedIds = extractExternalIdsFromPlex(showMetaItem);
+          if (fetchedIds.tmdbId) {
+            const detailsRes = await tmdb.getMediaDetails(fetchedIds.tmdbId, 'tv');
+            if (detailsRes.ok && detailsRes.value) {
+              appLogger.info('plex', `[Plex Resolve] ✅ Discover Plex série -> TMDB ID ${fetchedIds.tmdbId} ("${detailsRes.value.name}")`);
+              return detailsRes.value;
+            }
+          }
+          if (fetchedIds.imdbId) {
+            const findRes = await tmdb.findByExternalId(fetchedIds.imdbId, 'imdb_id', 'tv');
+            if (findRes.ok && findRes.value) {
+              appLogger.info('plex', `[Plex Resolve] ✅ Discover Plex série -> IMDb (${fetchedIds.imdbId}) -> TMDB ID ${findRes.value.id}`);
+              return findRes.value;
+            }
+          }
+          if (fetchedIds.tvdbId) {
+            const findRes = await tmdb.findByExternalId(String(fetchedIds.tvdbId), 'tvdb_id', 'tv');
+            if (findRes.ok && findRes.value) {
+              appLogger.info('plex', `[Plex Resolve] ✅ Discover Plex série -> TVDb (${fetchedIds.tvdbId}) -> TMDB ID ${findRes.value.id}`);
+              return findRes.value;
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      appLogger.warn('plex', `[Plex Resolve] Exception API Plex Discover série: ${err?.message || err}`);
+    }
+  }
+
+  // 5. Recherche TMDB par titre série
+  if (cleanShowTitle && cleanShowTitle !== 'Série inconnue') {
+    appLogger.info('plex', `[Plex Resolve] Recherche TMDB par titre série : "${cleanShowTitle}" (${year || 'sans année'})`);
+    const searchRes = await tmdb.searchMedia(cleanShowTitle, year ? String(year) : undefined, 'tv');
+    if (searchRes.ok && searchRes.value && searchRes.value.id) {
+      const detailsRes = await tmdb.getMediaDetails(searchRes.value.id, 'tv');
+      if (detailsRes.ok && detailsRes.value) {
+        appLogger.info('plex', `[Plex Resolve] ✅ TMDB ID série=${detailsRes.value.id} (via recherche TMDB "${cleanShowTitle}")`);
+        return detailsRes.value;
+      }
+    }
+  }
+
+  appLogger.error('plex', `[Plex Resolve] ❌ ÉCHEC FINAL série pour "${rawShowTitle}" : Aucun ID TMDB/IMDb/TVDb/Discover/Search valide.`);
+  return null;
 }
 
 export async function resolveSeasonShowToTmdb(item: any, plexToken?: string) {
@@ -167,193 +384,75 @@ export async function resolveSeasonShowToTmdb(item: any, plexToken?: string) {
     guid: showGuid,
     type: 'show'
   };
-  return resolveTmdbDataForPlexItem(showItem, 'tv', plexToken);
+  return resolveShowToTmdb(showItem, plexToken);
 }
 
 export async function resolveEpisodeShowToTmdb(item: any, plexToken?: string) {
   const unwrapped = item?.raw ? { ...item.raw, ...item } : item;
-  const showGuid = unwrapped?.grandparentGuid || unwrapped?.parentGuid || getPlexGuid(unwrapped);
+
+  // IMPORTANT: Toujours utiliser grandparentTitle / parentTitle pour la série parent, JAMAIS le titre de l'épisode !
+  const parentShowTitle = unwrapped.grandparentTitle || unwrapped.parentTitle || (unwrapped.type !== 'episode' ? unwrapped.title : 'Série inconnue');
+  const seasonNum = unwrapped.parentIndex !== undefined ? Number(unwrapped.parentIndex) : 1;
+  const episodeNum = unwrapped.index !== undefined ? Number(unwrapped.index) : 1;
+
+  const pGuid = getPlexGuid(unwrapped);
+  const { tmdbId, imdbId, tvdbId, plexGuid } = extractExternalIdsFromPlex(unwrapped);
+
+  appLogger.info('plex', `[Plex Resolve] Episode Plex détecté`);
+  appLogger.info('plex', `[Plex Resolve] plexGuid=${plexGuid || pGuid || 'aucun'}`);
+  appLogger.info('plex', `[Plex Resolve] Série parent="${parentShowTitle}"`);
+  appLogger.info('plex', `[Plex Resolve] Saison=${seasonNum}`);
+  appLogger.info('plex', `[Plex Resolve] Épisode=${episodeNum}`);
+
   const showItem = {
     ...unwrapped,
-    guid: showGuid,
+    title: parentShowTitle,
+    grandparentTitle: parentShowTitle,
+    guid: unwrapped.grandparentGuid || unwrapped.parentGuid || unwrapped.guid || pGuid,
     type: 'show'
   };
-  return resolveTmdbDataForPlexItem(showItem, 'tv', plexToken);
+
+  const tmdbShowData = await resolveShowToTmdb(showItem, plexToken);
+
+  if (tmdbShowData && tmdbShowData.id) {
+    appLogger.info('plex', `[Plex Resolve] TMDB show ID=${tmdbShowData.id}`);
+    appLogger.info('plex', `[Plex Resolve] TMDB episode ID=N/A`);
+    appLogger.info('plex', `[Plex Resolve] ✅ Résolution épisode réussie : "${parentShowTitle}" S${seasonNum}E${episodeNum}`);
+    return tmdbShowData;
+  }
+
+  appLogger.error('plex', `[Plex Resolve] ❌ ÉCHEC FINAL épisode pour "${parentShowTitle}" S${seasonNum}E${episodeNum}`);
+  return null;
 }
 
 export async function resolvePlexItem(item: any, plexToken?: string) {
   if (!item) return null;
   const unwrapped = item.raw ? { ...item.raw, ...item } : item;
   const type = unwrapped.type;
+  const pGuidStr = getPlexGuid(unwrapped) || '';
 
-  switch (type) {
-    case 'movie':
-      return resolveMovieToTmdb(unwrapped, plexToken);
-    case 'show':
-      return resolveShowToTmdb(unwrapped, plexToken);
-    case 'season':
-      return resolveSeasonShowToTmdb(unwrapped, plexToken);
-    case 'episode':
-      return resolveEpisodeShowToTmdb(unwrapped, plexToken);
-    default:
-      return resolveTmdbDataForPlexItem(
-        unwrapped,
-        unwrapped.grandparentTitle ? 'tv' : 'movie',
-        plexToken
-      );
-  }
-}
-
-async function resolveTmdbDataForPlexItem(
-  rawItem: any,
-  mediaType: 'tv' | 'movie',
-  plexToken?: string
-): Promise<any | null> {
-  if (!rawItem) return null;
-  const item = rawItem.raw ? { ...rawItem.raw, ...rawItem } : rawItem;
-
-  const rawTitle = item.title || item.grandparentTitle || item.parentTitle || 'Titre inconnu';
-  const itemType = item.type;
-  const isTv = mediaType === 'tv' || itemType === 'episode' || itemType === 'season' || itemType === 'show';
-
-  const { tmdbId, imdbId, tvdbId, plexGuid } = extractExternalIdsFromPlex(item);
-  const pGuid = getPlexGuid(item);
-
-  // Check if item has any GUID available
-  const hasAnyGuid = Boolean(
-    tmdbId || imdbId || tvdbId || plexGuid || pGuid ||
-    (item.guid && typeof item.guid === 'string' && item.guid.trim() !== '') ||
-    (item.grandparentGuid && typeof item.grandparentGuid === 'string' && item.grandparentGuid.trim() !== '') ||
-    (item.parentGuid && typeof item.parentGuid === 'string' && item.parentGuid.trim() !== '') ||
-    (Array.isArray(item.Guid) && item.Guid.length > 0) ||
-    (Array.isArray(item.guids) && item.guids.length > 0)
-  );
-
-  if (!hasAnyGuid) {
-    appLogger.info('plex', `[Plex Sync] Item ignoré (aucun GUID disponible) pour "${rawTitle}"`);
+  // 4. Ignorer explicitement les saisons
+  if (type === 'season' || pGuidStr.includes('/season/')) {
+    appLogger.info(
+      'plex',
+      `[Plex Resolve] Saison Plex détectée (${unwrapped.title || 'Saison'}) - ignorée pour la synchronisation des contenus vus.`
+    );
     return null;
   }
 
-  appLogger.info(
-    'plex',
-    `[Plex Resolve] 🔍 Résolution TMDB pour "${rawTitle}" (${mediaType}) | type="${itemType || ''}" | pGuid="${pGuid || ''}" | guid="${item.guid || ''}" | grandparentGuid="${item.grandparentGuid || ''}" | ratingKey=${item.ratingKey || item.key || ''}`
-  );
-
-  appLogger.info(
-    'plex',
-    `[Plex Resolve] IDs extraits pour "${rawTitle}": tmdbId=${tmdbId || 'aucun'}, imdbId=${imdbId || 'aucun'}, tvdbId=${tvdbId || 'aucun'}, plexGuid=${plexGuid || 'aucun'}`
-  );
-
-  // 1. Direct TMDB ID
-  if (tmdbId) {
-    appLogger.info('plex', `[Plex Resolve] Tentative TMDB ID direct (${tmdbId})...`);
-    const detailsRes = await tmdb.getMediaDetails(tmdbId, mediaType);
-    if (detailsRes.ok && detailsRes.value) {
-      appLogger.info('plex', `[Plex Resolve] ✅ TMDB ID direct (${tmdbId}) trouvé: "${detailsRes.value.title || detailsRes.value.name}"`);
-      return detailsRes.value;
-    } else {
-      const errorMsg = !detailsRes.ok ? String((detailsRes as any).error?.message || (detailsRes as any).error) : 'Données non reçues';
-      appLogger.warn('plex', `[Plex Resolve] ⚠️ Échec TMDB ID direct (${tmdbId}): ${errorMsg}`);
-    }
+  if (type === 'movie' || (!type && !unwrapped.grandparentTitle && !unwrapped.parentTitle && !pGuidStr.includes('/show/') && !pGuidStr.includes('/episode/'))) {
+    return resolveMovieToTmdb(unwrapped, plexToken);
   }
 
-  // 2. IMDb ID
-  if (imdbId) {
-    appLogger.info('plex', `[Plex Resolve] Tentative IMDb ID (${imdbId})...`);
-    const findRes = await tmdb.findByExternalId(imdbId, 'imdb_id', mediaType);
-    if (findRes.ok && findRes.value) {
-      appLogger.info('plex', `[Plex Resolve] ✅ IMDb ID (${imdbId}) résolu -> TMDB ID ${findRes.value.id} ("${findRes.value.title || findRes.value.name}")`);
-      return findRes.value;
-    } else {
-      const errorMsg = !findRes.ok ? String((findRes as any).error?.message || (findRes as any).error) : 'Données non reçues';
-      appLogger.warn('plex', `[Plex Resolve] ⚠️ Échec IMDb ID (${imdbId}): ${errorMsg}`);
-    }
+  if (type === 'episode' || unwrapped.grandparentTitle || unwrapped.parentTitle || pGuidStr.includes('/episode/')) {
+    return resolveEpisodeShowToTmdb(unwrapped, plexToken);
   }
 
-  // 3. TVDb ID
-  if (tvdbId) {
-    appLogger.info('plex', `[Plex Resolve] Tentative TVDb ID (${tvdbId})...`);
-    const findRes = await tmdb.findByExternalId(String(tvdbId), 'tvdb_id', mediaType);
-    if (findRes.ok && findRes.value) {
-      appLogger.info('plex', `[Plex Resolve] ✅ TVDb ID (${tvdbId}) résolu -> TMDB ID ${findRes.value.id} ("${findRes.value.title || findRes.value.name}")`);
-      return findRes.value;
-    } else {
-      const errorMsg = !findRes.ok ? String((findRes as any).error?.message || (findRes as any).error) : 'Données non reçues';
-      appLogger.warn('plex', `[Plex Resolve] ⚠️ Échec TVDb ID (${tvdbId}): ${errorMsg}`);
-    }
+  if (type === 'show' || pGuidStr.includes('/show/')) {
+    return resolveShowToTmdb(unwrapped, plexToken);
   }
 
-  // 4. Plex Discover metadata API lookup for plex:// GUIDs
-  let targetPlexGuidStr: string | null = null;
-  if (isTv) {
-    targetPlexGuidStr = item.grandparentGuid || item.parentGuid || item.guid || pGuid || null;
-    if (targetPlexGuidStr && targetPlexGuidStr.includes('/episode/')) {
-      targetPlexGuidStr = item.grandparentGuid || item.parentGuid || null;
-    }
-  } else {
-    targetPlexGuidStr = item.guid || pGuid || null;
-  }
-
-  let cleanHash: string | null = null;
-  if (plexGuid) {
-    cleanHash = plexGuid;
-  } else if (targetPlexGuidStr && typeof targetPlexGuidStr === 'string') {
-    const match = targetPlexGuidStr.match(/plex:\/\/(movie|show)\/([a-f0-9]+)/i);
-    if (match) {
-      cleanHash = match[2];
-    } else if (!targetPlexGuidStr.includes('/episode/') && !targetPlexGuidStr.includes('/season/')) {
-      cleanHash = targetPlexGuidStr
-        .replace(/^plex:\/\/(movie|show|episode|season)\//i, '')
-        .replace(/^\/library\/metadata\//i, '')
-        .trim();
-    }
-  }
-
-  if (cleanHash && plexToken) {
-    try {
-      const plexMetaUrl = `https://discover.provider.plex.tv/library/metadata/${cleanHash}?X-Plex-Token=${plexToken}`;
-      appLogger.info('plex', `[Plex Resolve] Appel API Plex Discover: ${plexMetaUrl}`);
-      const res = await fetch(plexMetaUrl, { headers: { 'Accept': 'application/json' } });
-      if (res.ok) {
-        const data = await res.json();
-        const metaItem = data?.MediaContainer?.Metadata?.[0];
-        if (metaItem) {
-          appLogger.info('plex', `[Plex Resolve] Discover API pour "${cleanHash}": guid="${metaItem.guid}", Guids=${JSON.stringify(metaItem.Guid || [])}`);
-          const fetchedIds = extractExternalIdsFromPlex(metaItem);
-          if (fetchedIds.tmdbId) {
-            const detailsRes = await tmdb.getMediaDetails(fetchedIds.tmdbId, mediaType);
-            if (detailsRes.ok && detailsRes.value) {
-              appLogger.info('plex', `[Plex Resolve] ✅ Discover Plex -> TMDB ID ${fetchedIds.tmdbId}`);
-              return detailsRes.value;
-            }
-          }
-          if (fetchedIds.imdbId) {
-            const findRes = await tmdb.findByExternalId(fetchedIds.imdbId, 'imdb_id', mediaType);
-            if (findRes.ok && findRes.value) {
-              appLogger.info('plex', `[Plex Resolve] ✅ Discover Plex -> IMDb (${fetchedIds.imdbId}) -> TMDB ID ${findRes.value.id}`);
-              return findRes.value;
-            }
-          }
-          if (fetchedIds.tvdbId) {
-            const findRes = await tmdb.findByExternalId(String(fetchedIds.tvdbId), 'tvdb_id', mediaType);
-            if (findRes.ok && findRes.value) {
-              appLogger.info('plex', `[Plex Resolve] ✅ Discover Plex -> TVDb (${fetchedIds.tvdbId}) -> TMDB ID ${findRes.value.id}`);
-              return findRes.value;
-            }
-          }
-        } else {
-          appLogger.warn('plex', `[Plex Resolve] Discover Plex Metadata vide pour la clé ${cleanHash}`);
-        }
-      } else {
-        appLogger.warn('plex', `[Plex Resolve] API Plex Discover HTTP code ${res.status}`);
-      }
-    } catch (err: any) {
-      appLogger.warn('plex', `[Plex Resolve] Exception API Plex Discover: ${err?.message || err}`);
-    }
-  }
-
-  appLogger.error('plex', `[Plex Resolve] ❌ ÉCHEC FINAL pour "${rawTitle}" (${mediaType}) : Aucun ID TMDB/IMDb/TVDb/Plex valide trouvé. PayLoad brute: ${JSON.stringify({ title: item.title, grandparentTitle: item.grandparentTitle, originalTitle: item.originalTitle, guid: item.guid, grandparentGuid: item.grandparentGuid, Guid: item.Guid, year: item.year, ratingKey: item.ratingKey })}`);
-  return null;
+  return resolveShowToTmdb(unwrapped, plexToken);
 }
 
 // Helper to sanitize show object for Firestore (strip undefined, internal norm fields)
@@ -785,15 +884,22 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         }
 
         const type = item.type;
+        const pGuidStr = getPlexGuid(item) || '';
         const rawViewed = item.viewedAt;
         const viewedTimestamp = rawViewed ? (Number(rawViewed) < 10000000000 ? Number(rawViewed) * 1000 : Number(rawViewed)) : Date.now();
         const guidTmdbId = extractTmdbIdFromPlex(item);
 
-        if (type === 'episode') {
-          const seasonNum = item.parentIndex;
-          const episodeNum = item.index;
+        // 4. Ignorer explicitement les objets de type saison
+        if (type === 'season' || pGuidStr.includes('/season/')) {
+          appLogger.info('plex', `[Plex Sync] Saison "${item.title || 'Saison'}" ignorée (conteneur uniquement).`);
+          continue;
+        }
+
+        if (type === 'episode' || item.grandparentTitle || item.parentTitle || pGuidStr.includes('/episode/')) {
+          const seasonNum = item.parentIndex !== undefined ? Number(item.parentIndex) : 1;
+          const episodeNum = item.index !== undefined ? Number(item.index) : 1;
           const showTitle = item.grandparentTitle || item.parentTitle || item.title;
-          if (!showTitle || seasonNum === undefined || episodeNum === undefined) continue;
+          if (!showTitle) continue;
 
           const epKey = `${seasonNum}x${episodeNum}`;
           const cleanShowTitle = showTitle.replace(/\(\d{4}\)/g, '').trim();
