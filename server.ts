@@ -162,7 +162,7 @@ async function startServer() {
 
       if (!matchQuery) {
         console.warn(`[Plex Resolve Backend] Aucun ID externe fourni (tmdbId ou imdbId)`);
-        return res.status(400).json({ error: 'tmdbId ou imdbId requis' });
+        return res.json({ slug: null });
       }
 
       const matchesUrl = `https://metadata.provider.plex.tv/library/metadata/matches?manual=1&title=${encodeURIComponent(matchQuery)}&type=${plexType}&agent=${encodeURIComponent(plexAgent)}`;
@@ -195,7 +195,7 @@ async function startServer() {
 
       if (!response.ok) {
         console.error(`[Plex Resolve Backend] Échec de l'API Plex: ${response.status} ${response.statusText}`);
-        return res.status(response.status).json({ error: `Plex API returned status ${response.status}` });
+        return res.json({ slug: null });
       }
 
       const data = await response.json();
@@ -257,10 +257,10 @@ async function startServer() {
       }
 
       console.error(`[Plex Resolve Backend] ❌ Impossible de résoudre le média sur Plex Discover (ni par TMDB, ni par IMDb).`);
-      return res.status(404).json({ error: 'Média non trouvé sur Plex Discover' });
+      return res.json({ slug: null });
     } catch (error: any) {
       console.error('[Plex Resolve Backend] Erreur critique rencontrée:', error);
-      return res.status(500).json({ error: error?.message || 'Erreur de résolution de slug Plex' });
+      return res.json({ slug: null });
     } finally {
       console.log(`[Plex Resolve Backend] --- FIN DE LA RÉSOLUTION ---`);
     }
@@ -342,18 +342,11 @@ async function startServer() {
       const isMatch = (item: any): boolean => {
         if (!item) return false;
 
-        // 0. Vérification stricte du type de média (Film vs Série)
+        // Si le client précise 'movie' ou 'tv', on peut ignorer les autres types
         const itType = (item.type || '').toLowerCase();
-        if (mediaType === 'movie') {
-          // Pour un film, ignorer absolument les épisodes, séries, saisons
-          if (itType && itType !== 'movie') return false;
-        } else if (mediaType === 'tv') {
-          // Pour une série, accepter uniquement 'show' ou 'series'
-          if (itType && itType !== 'show' && itType !== 'series') return false;
-        } else {
-          // Si mediaType non spécifié, ignorer au moins les épisodes et saisons
-          if (itType === 'episode' || itType === 'season' || itType === 'track') return false;
-        }
+        if (itType === 'episode' || itType === 'season' || itType === 'track') return false;
+        if (mediaType === 'movie' && itType && itType !== 'movie') return false;
+        if (mediaType === 'tv' && itType && itType !== 'show' && itType !== 'series') return false;
 
         // 1. Direct TMDB ID match
         const itTmdbId = extractTmdbId(item);
@@ -367,56 +360,18 @@ async function startServer() {
           return true;
         }
 
-        // Helper pour vérifier la concordance de l'année
-        const isYearCompatible = (): boolean => {
-          if (!year || !item.year) return true;
-          return Math.abs(Number(year) - Number(item.year)) <= 1;
-        };
-
-        // 3. Title match (Exact, substring or tokenized)
-        const itTitle = normalizeStr(item.title);
-        const itOriginal = normalizeStr(item.originalTitle);
-
-        if (normTitle && (itTitle === normTitle || itOriginal === normTitle)) {
-          if (!isYearCompatible()) return false;
-          return true;
-        }
-
-        if (normOriginal && (itTitle === normOriginal || itOriginal === normOriginal)) {
-          if (!isYearCompatible()) return false;
-          return true;
-        }
-
-        if (normTitle.length >= 4 && (itTitle.includes(normTitle) || normTitle.includes(itTitle))) {
-          if (!isYearCompatible()) return false;
-          return true;
-        }
-
-        // 4. Tokenized significant words overlap
-        if (targetWords.length > 0) {
-          const itemWords = new Set([...itTitle.split(' '), ...itOriginal.split(' ')]);
-          const allFound = targetWords.every(tw => itemWords.has(tw) || Array.from(itemWords).some(iw => iw.includes(tw) || tw.includes(iw)));
-          if (allFound) {
-            if (!isYearCompatible()) return false;
-            return true;
-          }
-        }
-
+        // NO TITLE MATCHING. STRICT ID MATCHING ONLY.
         return false;
       };
 
-      // Prepare search queries: full title, original, clean, and main keyword
-      const searchQueries = new Set<string>();
-      if (title && title.trim()) searchQueries.add(title.trim());
-      if (originalTitle && originalTitle.trim() && originalTitle !== title) searchQueries.add(originalTitle.trim());
-      if (normTitle && normTitle.length >= 3 && normTitle !== title) searchQueries.add(normTitle);
       
-      // If multi-word title, also search first significant word (e.g. "Manon" from "Manon des sources")
-      if (targetWords.length > 0 && targetWords[0].length >= 4) {
-        searchQueries.add(targetWords[0]);
-      }
-
+      const searchQueries = new Set<string>();
+      if (title) searchQueries.add(title);
+      if (originalTitle) searchQueries.add(originalTitle);
+      
       const queriesArray = Array.from(searchQueries);
+
+
 
       // Search all servers in parallel
       const serverSearchPromises = servers.map(async (server: any) => {
@@ -449,8 +404,8 @@ async function startServer() {
           if (!uri) continue;
 
           // Run all query variations in parallel for this connection
-          const searchTasks = queriesArray.map(async (q) => {
-            const ep = `${uri}/hubs/search?query=${encodeURIComponent(q)}&limit=20&X-Plex-Token=${serverAccessToken}`;
+          const searchTasks = queriesArray.map(async (q: string) => {
+            const ep = `${uri}/hubs/search?query=${encodeURIComponent(q)}&limit=20limit=20&X-Plex-TokenincludeGuids=1limit=20&X-Plex-TokenX-Plex-Token=${serverAccessToken}`;
             try {
               const searchRes = await fetch(ep, {
                 headers: { 

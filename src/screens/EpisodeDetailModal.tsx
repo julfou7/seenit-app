@@ -3,7 +3,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform, animate } from '
 import { type Show } from '../types';
 import { X, Check, Star, ChevronLeft, ChevronRight, Clock, ArrowLeft, Sparkles, Download, CheckCircle2, Play } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
-import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getTodayStr, getCalendarDaysDiff, scrollAllCarouselsToStart, openExternalUrl, buildPlexWatchUrl } from '../lib/utils';
+import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getTodayStr, getCalendarDaysDiff, scrollAllCarouselsToStart, openExternalUrl } from '../lib/utils';
 import { useShows } from '../hooks/useShows';
 import { useToastStore } from '../store/toastStore';
 import { tmdb } from '../features/shows/tmdb';
@@ -989,7 +989,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                               type="button"
                               onClick={() => {
                                 const originalTitle = (show as any)?.originalTitle || (show as any)?.original_title || (show as any)?.original_name;
-                                openPlexMedia(String(show.tmdbId), 'show');
+                                openPlexWatchUrl(String(show.tmdbId), 'show');
                               }}
                               className="w-full py-2.5 px-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 font-bold text-xs cursor-pointer shadow-sm"
                             >

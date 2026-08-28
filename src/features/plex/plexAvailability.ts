@@ -2,7 +2,6 @@ import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { getPlexClientId } from '../../services/plex';
-import { buildPlexWatchUrl } from '../../lib/utils';
 
 import { appLogger } from '../../store/logStore';
 
@@ -163,7 +162,7 @@ export async function checkPlexAvailability(params: {
             serverId: data.serverId,
             ratingKey: data.ratingKey,
             plexUrl: data.plexUrl,
-            watchUrl: data.watchUrl || buildPlexWatchUrl(itemTitle, itemYear, mediaType, data.originalTitle || originalTitle),
+            watchUrl: data.watchUrl || 'https://watch.plex.tv',
             title: itemTitle,
             year: itemYear,
             lastChecked: now
@@ -217,7 +216,7 @@ async function checkPlexDirectFromDevice(params: {
   mediaType?: 'movie' | 'tv';
 }): Promise<PlexMediaInfo | null> {
   try {
-    const { token, clientId, tmdbId, imdbId, title = '', originalTitle, year } = params;
+    const { token, clientId, tmdbId, imdbId, title = '', originalTitle, year, mediaType = 'movie' } = params;
     const resourcesRes = await fetch('https://plex.tv/api/v2/resources?includeHttps=1&includeRelay=1', {
       headers: {
         'X-Plex-Token': token,
@@ -293,7 +292,7 @@ async function checkPlexDirectFromDevice(params: {
 
       // 0. Vérification stricte du type de média (Film vs Série)
       const itType = (item.type || '').toLowerCase();
-      if (params.mediaType === 'movie') {
+      if (mediaType === 'movie') {
         // Pour un film, ignorer absolument les épisodes, séries, saisons
         if (itType && itType !== 'movie') return false;
       } else if (params.mediaType === 'tv') {
@@ -404,7 +403,7 @@ async function checkPlexDirectFromDevice(params: {
                   const isShowType = mediaType === 'tv';
                   const itemWatchUrl = it.slug
                     ? `https://watch.plex.tv/${isShowType ? 'show' : 'movie'}/${it.slug}`
-                    : buildPlexWatchUrl(itemTitle, itemYear, mediaType, it.originalTitle || originalTitle);
+                    : 'https://watch.plex.tv';
 
                   return {
                     available: true,

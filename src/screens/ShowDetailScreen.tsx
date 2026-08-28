@@ -3,7 +3,7 @@ import { type Show } from '../types';
 import { tmdb, isAdultOrParodyMedia, isMovieAtCinema, isMovieUpcoming } from '../features/shows/tmdb';
 import { ChevronLeft, Star, Heart, CheckCircle2, Circle, Tv, Zap, X, EyeOff, Archive, Trash2, MoreVertical, Plus, Check, Share, Share2, Play, Calendar, ChevronUp, ChevronDown, ArchiveRestore, Ban, RotateCcw, MonitorPlay, Ticket, Youtube, Clapperboard, ExternalLink, Clock, RefreshCw, Download } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
-import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getBestLogoPath, getTodayStr, getCalendarDaysDiff, getEpisodeRelativeAirDate, scrollAllCarouselsToStart, openExternalUrl, checkIsUpToDate, buildPlexWatchUrl } from '../lib/utils';
+import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getBestLogoPath, getTodayStr, getCalendarDaysDiff, getEpisodeRelativeAirDate, scrollAllCarouselsToStart, openExternalUrl, checkIsUpToDate } from '../lib/utils';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
 import { PersonDetailModal } from './PersonDetailModal';
 import { TimelineMediaCard } from '../components/cards/TimelineMediaCard';
@@ -589,19 +589,12 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const sortedProviders = useMemo(() => {
     const list: any[] = [...uniqueProviders];
     if (plexMediaInfo?.available) {
-      const originalTitle = tmdbDetails?.original_title || tmdbDetails?.original_name || (show as any)?.originalTitle || (show as any)?.original_title || (show as any)?.original_name;
-      const fallbackWatchUrl = buildPlexWatchUrl(title, releaseYear || (show as any)?.year, isSeries ? 'show' : 'movie', originalTitle);
-      const watchUrl = plexMediaInfo.watchUrl || fallbackWatchUrl;
-      const serverPlexUrl = plexMediaInfo.plexUrl || 'https://app.plex.tv/desktop';
       list.push({
         provider_id: 999999,
         provider_name: plexMediaInfo.serverName ? `Plex (${plexMediaInfo.serverName})` : 'Plex',
         logo_path: 'PLEX_CUSTOM_SVG',
         isPlex: true,
         serverName: plexMediaInfo.serverName,
-        plexUrl: Capacitor.isNativePlatform() ? watchUrl : serverPlexUrl,
-        watchUrl: watchUrl,
-        serverPlexUrl: serverPlexUrl
       });
     }
     return list.sort((a: any, b: any) => {
@@ -2718,14 +2711,12 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                       {sortedProviders.map((provider: any, idx: number) => {
                         if (provider.isPlex) {
                           return (
-                            <a
+                            <button
+                              type="button"
                               key={`plex-provider-item-${idx}`}
-                              href={provider.plexUrl || "https://app.plex.tv/desktop"}
-                              target="_blank"
-                              rel="noopener noreferrer"
                               onClick={(e) => {
                                 e.preventDefault();
-                                openExternalUrl(provider.plexUrl || "https://app.plex.tv/desktop");
+                                openPlexWatchUrl(String(effectiveTmdbId), isSeries ? 'show' : 'movie');
                               }}
                               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#E5A93D]/40 bg-[#E5A93D]/10 text-[#E5A93D] hover:bg-[#E5A93D]/20 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-[0_0_12px_rgba(229,169,61,0.2)]"
                               title={`Disponible sur Plex : ${provider.serverName || 'Serveur'}`}
@@ -2736,7 +2727,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                                 className="w-4 h-4 object-contain rounded shrink-0"
                               />
                               <span>Disponible sur Plex {provider.serverName ? `(${provider.serverName})` : ''}</span>
-                            </a>
+                            </button>
                           );
                         }
 
@@ -2813,26 +2804,12 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                 // 3. Si les deux ont terminé et rien n'a été trouvé
                 return (
                   <div className="flex items-center gap-3 flex-wrap">
-                    {presence.hasFile || presence.plexInfo?.available ? (
+                    {presence.hasFile ? (
                       <div className="flex items-center gap-2 flex-wrap">
                         <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 text-xs font-bold shadow-sm">
                           <CheckCircle2 size={14} className="shrink-0 text-emerald-400" />
-                          <span>{presence.plexInfo?.available ? "Sur Plex" : "Téléchargé"}</span>
+                          <span>Téléchargé</span>
                         </div>
-                        {presence.plexInfo?.available && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const originalTitle = tmdbDetails?.original_title || tmdbDetails?.original_name || (show as any)?.originalTitle || (show as any)?.original_title || (show as any)?.original_name;
-                              openPlexMedia(String(effectiveTmdbId), isSeries ? 'show' : 'movie');
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 active:scale-95 text-xs font-bold transition-all cursor-pointer shadow-sm"
-                            title="Ouvrir dans l'application Plex"
-                          >
-                            <Play size={14} className="shrink-0 text-amber-400 fill-amber-400" />
-                            <span>Ouvrir dans Plex</span>
-                          </button>
-                        )}
                       </div>
                     ) : isUnreleased ? (
                       <p className="text-xs text-zinc-500 italic font-medium flex items-center gap-1.5">
