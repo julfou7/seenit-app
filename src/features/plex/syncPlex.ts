@@ -1,6 +1,6 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { db, auth } from '../../lib/firebase';
-import { collection, doc, writeBatch, getDocs, updateDoc } from 'firebase/firestore';
+import { collection, doc, writeBatch, getDocs, updateDoc, deleteField } from 'firebase/firestore';
 import { tmdb } from '../shows/tmdb';
 import { useShowsStore } from '../../store/showsStore';
 import { useSyncStore } from '../../store/syncStore';
@@ -1245,3 +1245,63 @@ export const openPlexWatchUrl = async (show: any) => {
   // 4. Fallback if resolution fails
   openExternalUrl(`https://watch.plex.tv`);
 };
+
+/**
+ * Purge tous les slugs Plex en cache / en BDD pour éliminer les faux slugs passés
+ */
+export const purgeAllPlexSlugsInDb = async (): Promise<number> => {
+  const userId = auth.currentUser?.uid;
+  if (!userId) return 0;
+
+  try {
+    appLogger.info('plex', `[Plex Purge] Début de la purge des anciens slugs Plex...`);
+    const showsSnapshot = await getDocs(collection(db, `users/${userId}/shows`));
+    const batch = writeBatch(db);
+    let count = 0;
+
+    showsSnapshot.forEach((d) => {
+      const data = d.data();
+      if (data && data.plexSlug) {
+        batch.update(d.ref, { plexSlug: deleteField() });
+        count++;
+      }
+    });
+
+    if (count > 0) {
+      await batch.commit();
+      appLogger.info('plex', `[Plex Purge] ✅ ${count} slugs Plex purgés avec succès en BDD Firestore.`);
+    } else {
+      appLogger.info('plex', `[Plex Purge] Aucun slug Plex à purger en BDD.`);
+    }
+
+    // Mise à jour de l'état local Zustand
+    const currentShows = useShowsStore.getState().shows;
+    const cleanedShows = currentShows.map(s => {
+      if (s.plexSlug) {
+        const copy = { ...s };
+        delete copy.plexSlug;
+        return copy;
+      }
+      return s;
+    });
+    useShowsStore.getState().setShows(cleanedShows);
+
+    return count;
+  } catch (err: any) {
+    appLogger.error('plex', `[Plex Purge] Erreur lors de la purge des slugs Plex: ${err?.message || err}`);
+    return 0;
+  }
+};
+
+// Auto-purge unique pour nettoyer les anciens slugs corrompus des versions précédentes
+if (typeof window !== 'undefined') {
+  const PURGE_KEY = 'seenit_plex_slugs_purged_v1.4.13';
+  setTimeout(() => {
+    if (localStorage.getItem(PURGE_KEY) !== 'true' && auth.currentUser?.uid) {
+      purgeAllPlexSlugsInDb().then(() => {
+        localStorage.setItem(PURGE_KEY, 'true');
+      }).catch(() => {});
+    }
+  }, 3000);
+}
+

@@ -16,7 +16,7 @@ import { useLogStore, appLogger, LogCategory } from '../store/logStore';
 import { useUpdateStore, CURRENT_APP_VERSION } from '../store/updateStore';
 import { performDetailsSync } from '../hooks/useDetailsSyncWorker';
 import { getPlexPin, checkPlexPin } from '../services/plex';
-import { performPlexSync } from '../features/plex/syncPlex';
+import { performPlexSync, purgeAllPlexSlugsInDb } from '../features/plex/syncPlex';
 import { SeenItLogo } from '../components/SeenItLogo';
 import { ChangelogViewer } from '../components/ChangelogViewer';
 import { DownloadConfigSection } from '../components/DownloadConfigSection';
@@ -761,9 +761,20 @@ export function SettingsScreen() {
                       Complète
                     </button>
                   </div>
-                  <button onClick={handlePlexLogout} className="text-[10px] text-zinc-500 font-medium hover:text-zinc-300 underline text-center mt-1">
-                    Déconnecter Plex
-                  </button>
+                  <div className="flex items-center justify-between mt-1 px-1">
+                    <button 
+                      onClick={async () => {
+                        const count = await purgeAllPlexSlugsInDb();
+                        showToast(`🧹 ${count} slug(s) Plex nettoyé(s) avec succès !`, "success");
+                      }} 
+                      className="text-[10px] text-amber-500/80 font-medium hover:text-amber-400 underline text-left"
+                    >
+                      Purger les slugs Plex en cache
+                    </button>
+                    <button onClick={handlePlexLogout} className="text-[10px] text-zinc-500 font-medium hover:text-zinc-300 underline text-right">
+                      Déconnecter Plex
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

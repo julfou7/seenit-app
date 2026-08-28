@@ -156,16 +156,16 @@ async function startServer() {
       const targetType = type === 'show' || type === 'series' ? 'show' : 'movie';
       const plexType = targetType === 'show' ? 2 : 1;
       const plexAgent = targetType === 'show' ? 'tv.plex.agents.series' : 'tv.plex.agents.movie';
-      const matchQuery = tmdbId ? `tmdb-${tmdbId}` : (imdbId ? `imdb-${imdbId}` : '');
+      const guidQuery = tmdbId ? `tmdb://${tmdbId}` : (imdbId ? `imdb://${imdbId}` : '');
 
-      console.log(`[Plex Resolve Backend] Mappe vers: targetType=${targetType}, plexType=${plexType}, plexAgent=${plexAgent}, matchQuery=${matchQuery}`);
+      console.log(`[Plex Resolve Backend] Mappe vers: targetType=${targetType}, plexType=${plexType}, plexAgent=${plexAgent}, guidQuery=${guidQuery}`);
 
-      if (!matchQuery) {
+      if (!guidQuery) {
         console.warn(`[Plex Resolve Backend] Aucun ID externe fourni (tmdbId ou imdbId)`);
         return res.json({ slug: null });
       }
 
-      const matchesUrl = `https://metadata.provider.plex.tv/library/metadata/matches?manual=1&title=${encodeURIComponent(matchQuery)}&type=${plexType}&agent=${encodeURIComponent(plexAgent)}`;
+      const matchesUrl = `https://metadata.provider.plex.tv/library/metadata/matches?manual=1&guid=${encodeURIComponent(guidQuery)}&type=${plexType}&agent=${encodeURIComponent(plexAgent)}`;
       console.log(`[Plex Resolve Backend] Appel de l'URL Plex: ${matchesUrl}`);
 
       const headers: Record<string, string> = {
@@ -220,8 +220,8 @@ async function startServer() {
 
       // Si tmdbId a échoué et que imdbId est fourni, faire un fallback automatique côté serveur
       if (imdbId) {
-        console.log(`[Plex Resolve Backend] Déclenchement du fallback IMDb car TMDB n'a rien renvoyé. IMDb ID: imdb-${imdbId}`);
-        const matchesUrlImdb = `https://metadata.provider.plex.tv/library/metadata/matches?manual=1&title=imdb-${imdbId}&type=${plexType}&agent=${encodeURIComponent(plexAgent)}`;
+        console.log(`[Plex Resolve Backend] Déclenchement du fallback IMDb car TMDB n'a rien renvoyé. IMDb ID: imdb://${imdbId}`);
+        const matchesUrlImdb = `https://metadata.provider.plex.tv/library/metadata/matches?manual=1&guid=${encodeURIComponent(`imdb://${imdbId}`)}&type=${plexType}&agent=${encodeURIComponent(plexAgent)}`;
         console.log(`[Plex Resolve Backend] Appel de l'URL de fallback IMDb Plex: ${matchesUrlImdb}`);
 
         const responseImdb = await fetch(matchesUrlImdb, {
