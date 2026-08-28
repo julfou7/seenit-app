@@ -31,13 +31,79 @@ const normalizeTitle = (t?: string) => {
     .trim();
 };
 
-export const extractExternalIdsFromPlex = (item: any) => {
+export function getPlexGuid(rawItem: any): string | null {
+  if (!rawItem) return null;
+  const item = rawItem.raw ? { ...rawItem.raw, ...rawItem } : rawItem;
+
+  // 1. Direct string guid
+  if (typeof item.guid === 'string' && item.guid.trim() !== '') {
+    return item.guid.trim();
+  }
+
+  // 2. Direct string Guid
+  if (typeof item.Guid === 'string' && item.Guid.trim() !== '') {
+    return item.Guid.trim();
+  }
+
+  // 3. Guid array containing objects { id: 'plex://...' } or strings
+  if (Array.isArray(item.Guid)) {
+    const plexObj = item.Guid.find(
+      (g: any) => typeof g?.id === 'string' && g.id.startsWith('plex://')
+    );
+    if (plexObj?.id) return plexObj.id.trim();
+
+    const anyObj = item.Guid.find(
+      (g: any) => typeof g?.id === 'string' && g.id.trim() !== ''
+    );
+    if (anyObj?.id) return anyObj.id.trim();
+
+    const strObj = item.Guid.find(
+      (g: any) => typeof g === 'string' && g.trim() !== ''
+    );
+    if (strObj) return strObj.trim();
+  }
+
+  // 4. guids array
+  if (Array.isArray(item.guids)) {
+    const plexObj = item.guids.find(
+      (g: any) => typeof g?.id === 'string' && g.id.startsWith('plex://')
+    );
+    if (plexObj?.id) return plexObj.id.trim();
+
+    const anyObj = item.guids.find(
+      (g: any) => typeof g?.id === 'string' && g.id.trim() !== ''
+    );
+    if (anyObj?.id) return anyObj.id.trim();
+  }
+
+  // 5. grandparentGuid
+  if (typeof item.grandparentGuid === 'string' && item.grandparentGuid.trim() !== '') {
+    return item.grandparentGuid.trim();
+  }
+
+  // 6. parentGuid
+  if (typeof item.parentGuid === 'string' && item.parentGuid.trim() !== '') {
+    return item.parentGuid.trim();
+  }
+
+  // 7. ratingKey / key (e.g. "/library/metadata/12345" or "12345")
+  const key = item.ratingKey || item.key;
+  if (key) {
+    const keyStr = String(key).trim();
+    if (keyStr) return keyStr;
+  }
+
+  return null;
+}
+
+export const extractExternalIdsFromPlex = (rawItem: any) => {
   let tmdbId: number | null = null;
   let imdbId: string | null = null;
   let tvdbId: number | null = null;
   let plexGuid: string | null = null;
 
-  if (!item) return { tmdbId, imdbId, tvdbId, plexGuid };
+  if (!rawItem) return { tmdbId, imdbId, tvdbId, plexGuid };
+  const item = rawItem.raw ? { ...rawItem.raw, ...rawItem } : rawItem;
 
   const processGuidStr = (str: string) => {
     if (!str || typeof str !== 'string') return;
@@ -59,11 +125,15 @@ export const extractExternalIdsFromPlex = (item: any) => {
     }
   };
 
-  if (Array.isArray(item.Guid)) {
-    for (const g of item.Guid) {
-      if (typeof g?.id === 'string') {
-        processGuidStr(g.id);
-      }
+  const guidList = Array.isArray(item.Guid)
+    ? item.Guid
+    : (Array.isArray(item.guids) ? item.guids : []);
+
+  for (const g of guidList) {
+    if (typeof g?.id === 'string') {
+      processGuidStr(g.id);
+    } else if (typeof g === 'string') {
+      processGuidStr(g);
     }
   }
 
@@ -81,23 +151,82 @@ const extractTmdbIdFromPlex = (item: any): number | null => {
   return extractExternalIdsFromPlex(item).tmdbId;
 };
 
+export async function resolveMovieToTmdb(item: any, plexToken?: string) {
+  return resolveTmdbDataForPlexItem(item, 'movie', plexToken);
+}
+
+export async function resolveShowToTmdb(item: any, plexToken?: string) {
+  return resolveTmdbDataForPlexItem(item, 'tv', plexToken);
+}
+
+export async function resolveSeasonShowToTmdb(item: any, plexToken?: string) {
+  const unwrapped = item?.raw ? { ...item.raw, ...item } : item;
+  const showGuid = unwrapped?.parentGuid || getPlexGuid(unwrapped);
+  const showItem = {
+    ...unwrapped,
+    guid: showGuid,
+    type: 'show'
+  };
+  return resolveTmdbDataForPlexItem(showItem, 'tv', plexToken);
+}
+
+export async function resolveEpisodeShowToTmdb(item: any, plexToken?: string) {
+  const unwrapped = item?.raw ? { ...item.raw, ...item } : item;
+  const showGuid = unwrapped?.grandparentGuid || unwrapped?.parentGuid || getPlexGuid(unwrapped);
+  const showItem = {
+    ...unwrapped,
+    guid: showGuid,
+    type: 'show'
+  };
+  return resolveTmdbDataForPlexItem(showItem, 'tv', plexToken);
+}
+
+export async function resolvePlexItem(item: any, plexToken?: string) {
+  if (!item) return null;
+  const unwrapped = item.raw ? { ...item.raw, ...item } : item;
+  const type = unwrapped.type;
+
+  switch (type) {
+    case 'movie':
+      return resolveMovieToTmdb(unwrapped, plexToken);
+    case 'show':
+      return resolveShowToTmdb(unwrapped, plexToken);
+    case 'season':
+      return resolveSeasonShowToTmdb(unwrapped, plexToken);
+    case 'episode':
+      return resolveEpisodeShowToTmdb(unwrapped, plexToken);
+    default:
+      return resolveTmdbDataForPlexItem(
+        unwrapped,
+        unwrapped.grandparentTitle ? 'tv' : 'movie',
+        plexToken
+      );
+  }
+}
+
 async function resolveTmdbDataForPlexItem(
-  item: any,
+  rawItem: any,
   mediaType: 'tv' | 'movie',
   plexToken?: string
 ): Promise<any | null> {
+  if (!rawItem) return null;
+  const item = rawItem.raw ? { ...rawItem.raw, ...rawItem } : rawItem;
+
   const rawTitle = item.title || item.grandparentTitle || item.parentTitle || 'Titre inconnu';
   const itemType = item.type;
   const isTv = mediaType === 'tv' || itemType === 'episode' || itemType === 'season' || itemType === 'show';
 
   const { tmdbId, imdbId, tvdbId, plexGuid } = extractExternalIdsFromPlex(item);
+  const pGuid = getPlexGuid(item);
 
   // Check if item has any GUID available
   const hasAnyGuid = Boolean(
-    tmdbId || imdbId || tvdbId || plexGuid ||
+    tmdbId || imdbId || tvdbId || plexGuid || pGuid ||
     (item.guid && typeof item.guid === 'string' && item.guid.trim() !== '') ||
     (item.grandparentGuid && typeof item.grandparentGuid === 'string' && item.grandparentGuid.trim() !== '') ||
-    (Array.isArray(item.Guid) && item.Guid.length > 0)
+    (item.parentGuid && typeof item.parentGuid === 'string' && item.parentGuid.trim() !== '') ||
+    (Array.isArray(item.Guid) && item.Guid.length > 0) ||
+    (Array.isArray(item.guids) && item.guids.length > 0)
   );
 
   if (!hasAnyGuid) {
@@ -107,7 +236,7 @@ async function resolveTmdbDataForPlexItem(
 
   appLogger.info(
     'plex',
-    `[Plex Resolve] 🔍 Résolution TMDB pour "${rawTitle}" (${mediaType}) | guid="${item.guid || ''}" | grandparentGuid="${item.grandparentGuid || ''}" | ratingKey=${item.ratingKey || item.key || ''}`
+    `[Plex Resolve] 🔍 Résolution TMDB pour "${rawTitle}" (${mediaType}) | type="${itemType || ''}" | pGuid="${pGuid || ''}" | guid="${item.guid || ''}" | grandparentGuid="${item.grandparentGuid || ''}" | ratingKey=${item.ratingKey || item.key || ''}`
   );
 
   appLogger.info(
@@ -157,12 +286,12 @@ async function resolveTmdbDataForPlexItem(
   // 4. Plex Discover metadata API lookup for plex:// GUIDs
   let targetPlexGuidStr: string | null = null;
   if (isTv) {
-    targetPlexGuidStr = item.grandparentGuid || item.parentGuid || item.guid || null;
+    targetPlexGuidStr = item.grandparentGuid || item.parentGuid || item.guid || pGuid || null;
     if (targetPlexGuidStr && targetPlexGuidStr.includes('/episode/')) {
-      targetPlexGuidStr = null;
+      targetPlexGuidStr = item.grandparentGuid || item.parentGuid || null;
     }
   } else {
-    targetPlexGuidStr = item.guid || null;
+    targetPlexGuidStr = item.guid || pGuid || null;
   }
 
   let cleanHash: string | null = null;
@@ -646,7 +775,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       const totalItems = history.length;
       let processedCount = 0;
 
-      for (const item of history) {
+      for (const rawItem of history) {
+        const item = rawItem.raw ? { ...rawItem.raw, ...rawItem } : rawItem;
         processedCount++;
         if (!silent && processedCount % 15 === 0 && processedCount < totalItems) {
           useSyncStore.getState().setPlexSyncStatus({
@@ -662,7 +792,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         if (type === 'episode') {
           const seasonNum = item.parentIndex;
           const episodeNum = item.index;
-          const showTitle = item.grandparentTitle || item.title;
+          const showTitle = item.grandparentTitle || item.parentTitle || item.title;
           if (!showTitle || seasonNum === undefined || episodeNum === undefined) continue;
 
           const epKey = `${seasonNum}x${episodeNum}`;
@@ -695,9 +825,9 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             }
           }
 
-          // 3. If still not resolved, query TMDB via helper (handles TMDB GUID, IMDb ID, TVDb ID, Plex Discover metadata, and fallback search)
+          // 3. If still not resolved, query TMDB via helper
           if (!matchedShow && !tmdbData) {
-            tmdbData = await resolveTmdbDataForPlexItem(item, 'tv', plexToken);
+            tmdbData = await resolvePlexItem(item, plexToken);
 
             if (!tmdbData) {
               appLogger.info('plex', `[Plex Sync] Fiche "${cleanShowTitle}" ignorée (impossible de résoudre l'ID TMDB).`);
@@ -856,7 +986,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
           // 3. If still not resolved, query TMDB via helper
           if (!matchedMovie && !tmdbData) {
-            tmdbData = await resolveTmdbDataForPlexItem(item, 'movie', plexToken);
+            tmdbData = await resolvePlexItem(item, plexToken);
 
             if (!tmdbData) {
               appLogger.info('plex', `[Plex Sync] Fiche film "${cleanMovieTitle}" ignorée (impossible de résoudre l'ID TMDB).`);
@@ -985,9 +1115,10 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
       // Process Plex Watchlist items (auto-import to "À Voir" / "Ma Liste")
       if (hasWatchlist) {
-        for (const wlItem of watchlist) {
-          const mediaType: 'tv' | 'movie' = wlItem.type === 'show' ? 'tv' : 'movie';
-          const rawTitle = wlItem.title || '';
+        for (const rawWlItem of watchlist) {
+          const wlItem = rawWlItem.raw ? { ...rawWlItem.raw, ...rawWlItem } : rawWlItem;
+          const mediaType: 'tv' | 'movie' = wlItem.type === 'show' || wlItem.type === 'series' || wlItem.type === 'tv' ? 'tv' : 'movie';
+          const rawTitle = wlItem.title || wlItem.grandparentTitle || '';
           if (!rawTitle) continue;
 
           const cleanTitle = rawTitle.replace(/\(\d{4}\)/g, '').trim();
@@ -1012,7 +1143,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
           // 3. Resolve TMDB data for Watchlist item
           if (!tmdbData) {
-            tmdbData = await resolveTmdbDataForPlexItem(wlItem, mediaType, plexToken);
+            tmdbData = await resolvePlexItem(wlItem, plexToken);
 
             if (!tmdbData) {
               appLogger.info('plex', `[Plex Sync] Item Watchlist "${cleanTitle}" ignoré (impossible de résoudre l'ID TMDB).`);
