@@ -103,9 +103,8 @@ export async function openExternalUrl(
     }
   }
 
-  // Sur le Web, remplacer watch.plex.tv par le domaine officiel de l'application Web Plex app.plex.tv
-  const cleanUrl = url.includes('plex.tv') ? url.replace(/watch\.plex\.tv/g, 'app.plex.tv') : url;
-  window.open(cleanUrl, '_blank', 'noopener,noreferrer');
+  // Sur le Web, ouvrir l'URL officielle directement (watch.plex.tv supporte les slugs de médias)
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 /**

@@ -1335,12 +1335,10 @@ export function getPlexHeaders(): Record<string, string> {
 }
 
 /**
- * Résout la fiche Plex d'un média par ID externe (TMDB ou IMDb) via l'API Cloud Fix Match déportée sur le backend SeenIt
+ * Résout la fiche Plex d'un média par ID TMDB officiel via matches Plex (sans redirection accueil si échec)
  */
 export const openPlexWatchUrl = async (show: any) => {
   const tmdbId = show?.tmdbId;
-  const imdbId = show?.imdbId;
-  const tvdbId = show?.tvdbId;
   const title = show?.title || show?.name || '';
   const originalTitle = show?.originalTitle || show?.original_title || show?.original_name || '';
   const year = show?.year || (show?.releaseDate ? show.releaseDate.substring(0, 4) : undefined) || (show?.firstAirDate ? show.firstAirDate.substring(0, 4) : undefined);
@@ -1348,17 +1346,15 @@ export const openPlexWatchUrl = async (show: any) => {
   const showId = show?.id;
   const userId = auth.currentUser?.uid;
 
-  const expectedResolvedFrom = tmdbId
-    ? `tmdb:${tmdbId}`
-    : imdbId
-      ? `imdb:${String(imdbId).toLowerCase()}`
-      : tvdbId
-        ? `tvdb:${tvdbId}`
-        : undefined;
+  if (!tmdbId) {
+    appLogger.warn('plex', `[Plex Official] Aucun identifiant TMDB disponible pour "${title || 'Média'}". Résolution annulée.`);
+    return;
+  }
+
+  const expectedResolvedFrom = `tmdb:${tmdbId}`;
   
   if (
     show?.plexSlug &&
-    expectedResolvedFrom &&
     show?.plexResolvedFrom === expectedResolvedFrom
   ) {
     appLogger.info('plex', `[Plex Official] Slug BDD validé : "${show.plexSlug}" (${show.plexResolvedFrom}) -> https://watch.plex.tv/${type}/${show.plexSlug}`);
@@ -1366,7 +1362,7 @@ export const openPlexWatchUrl = async (show: any) => {
     return;
   }
 
-  appLogger.info('plex', `[Plex Official] Résolution du slug pour "${title || 'N/A'}" (TMDB: ${tmdbId || 'N/A'}, IMDb: ${imdbId || 'N/A'}, ${type})...`);
+  appLogger.info('plex', `[Plex Official] Résolution du slug pour "${title || 'N/A'}" (TMDB: ${tmdbId}, ${type})...`);
 
   const isNative = Capacitor.isNativePlatform();
   const plexType = type === 'show' ? 2 : 1;
@@ -1376,53 +1372,45 @@ export const openPlexWatchUrl = async (show: any) => {
   let resolvedGuid: string | null = null;
   let resolvedFrom: string | null = null;
 
-  // 2.A. TENTATIVE DIRECTE OFFICIELLE PLEX (Ultra-rapide, sans dépendance backend)
-  const guidsToTry: Array<{ guid: string; from: string }> = [];
-  if (tmdbId) guidsToTry.push({ guid: `tmdb://${tmdbId}`, from: `tmdb:${tmdbId}` });
-  if (imdbId) guidsToTry.push({ guid: `imdb://${imdbId}`, from: `imdb:${String(imdbId).toLowerCase()}` });
-  if (tvdbId) guidsToTry.push({ guid: `tvdb://${tvdbId}`, from: `tvdb:${tvdbId}` });
+  // 1. TENTATIVE DIRECTE OFFICIELLE PLEX (TMDB guid)
+  try {
+    const matchesUrl = `https://metadata.provider.plex.tv/library/metadata/matches?guid=${encodeURIComponent(`tmdb://${tmdbId}`)}&type=${plexType}`;
+    let data: any = null;
 
-  for (const { guid, from } of guidsToTry) {
-    try {
-      const matchesUrl = `https://metadata.provider.plex.tv/library/metadata/matches?guid=${encodeURIComponent(guid)}&type=${plexType}`;
-      let data: any = null;
-
-      if (isNative) {
-        const nativeRes = await CapacitorHttp.get({
-          url: matchesUrl,
-          headers: plexHeaders,
-          connectTimeout: 5000,
-          readTimeout: 5000
-        });
-        if (nativeRes.status >= 200 && nativeRes.status < 300) {
-          data = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
-        }
-      } else {
-        const response = await fetch(matchesUrl, {
-          headers: plexHeaders,
-          signal: AbortSignal.timeout(5000)
-        });
-        if (response.ok) {
-          data = await response.json();
-        }
+    if (isNative) {
+      const nativeRes = await CapacitorHttp.get({
+        url: matchesUrl,
+        headers: plexHeaders,
+        connectTimeout: 5000,
+        readTimeout: 5000
+      });
+      if (nativeRes.status >= 200 && nativeRes.status < 300) {
+        data = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
       }
-
-      const results = data?.MediaContainer?.Metadata || data?.MediaContainer?.SearchResult;
-      const match = Array.isArray(results) && results.length > 0 ? results[0] : null;
-
-      if (match && match.slug) {
-        resolvedSlug = match.slug;
-        resolvedGuid = match.guid || null;
-        resolvedFrom = from;
-        appLogger.info('plex', `[Plex Official] ✅ Slug résolu en direct Plex : "${resolvedSlug}" (${from})`);
-        break;
+    } else {
+      const response = await fetch(matchesUrl, {
+        headers: plexHeaders,
+        signal: AbortSignal.timeout(5000)
+      });
+      if (response.ok) {
+        data = await response.json();
       }
-    } catch (err: any) {
-      // Ignorer et essayer le suivant ou le backend
     }
+
+    const results = data?.MediaContainer?.Metadata || data?.MediaContainer?.SearchResult;
+    const match = Array.isArray(results) && results.length > 0 ? results[0] : null;
+
+    if (match && match.slug) {
+      resolvedSlug = match.slug;
+      resolvedGuid = match.guid || null;
+      resolvedFrom = expectedResolvedFrom;
+      appLogger.info('plex', `[Plex Official] ✅ Slug résolu en direct Plex : "${resolvedSlug}" (TMDB: ${tmdbId})`);
+    }
+  } catch (err: any) {
+    // En cas d'erreur réseau directe, tenter le backend
   }
 
-  // 2.B. FALLBACK VIA BACKEND SI NÉCESSAIRE
+  // 2. FALLBACK VIA BACKEND SI NÉCESSAIRE
   if (!resolvedSlug) {
     const RESOLVE_ENDPOINTS = isNative
       ? [
@@ -1437,9 +1425,7 @@ export const openPlexWatchUrl = async (show: any) => {
 
     const clientId = getPlexClientIdentifier();
     const queryParams = new URLSearchParams();
-    if (tmdbId) queryParams.set('tmdbId', String(tmdbId));
-    if (imdbId) queryParams.set('imdbId', String(imdbId));
-    if (tvdbId) queryParams.set('tvdbId', String(tvdbId));
+    queryParams.set('tmdbId', String(tmdbId));
     if (title) queryParams.set('title', title);
     if (originalTitle) queryParams.set('originalTitle', originalTitle);
     if (year) queryParams.set('year', String(year));
@@ -1473,7 +1459,6 @@ export const openPlexWatchUrl = async (show: any) => {
         if (
           data?.slug &&
           data?.resolvedFrom &&
-          expectedResolvedFrom &&
           data.resolvedFrom === expectedResolvedFrom
         ) {
           resolvedSlug = data.slug;
@@ -1524,7 +1509,7 @@ export const openPlexWatchUrl = async (show: any) => {
   }
 
   // 4. En cas d'échec de résolution du slug : NE PAS rediriger vers l'accueil watch.plex.tv !
-  appLogger.error('plex', `[Plex Official] ❌ Impossible de résoudre la fiche Plex pour "${title || 'Média'}" (TMDB: ${tmdbId || 'N/A'}, IMDb: ${imdbId || 'N/A'}). Redirection annulée pour éviter l'accueil.`);
+  appLogger.error('plex', `[Plex Official] ❌ Impossible de résoudre la fiche Plex pour "${title || 'Média'}" (TMDB: ${tmdbId || 'N/A'}). Redirection annulée pour éviter l'accueil.`);
 };
 
 /**
