@@ -67,7 +67,8 @@ export const extractExternalIdsFromPlex = (item: any) => {
     }
   }
 
-  for (const field of [item.guid, item.grandparentGuid, item.parentGuid]) {
+  // Prioritize grandparentGuid (show GUID) over parentGuid and item.guid
+  for (const field of [item.grandparentGuid, item.parentGuid, item.guid]) {
     if (typeof field === 'string') {
       processGuidStr(field);
     }
@@ -86,16 +87,29 @@ async function resolveTmdbDataForPlexItem(
   plexToken?: string
 ): Promise<any | null> {
   const rawTitle = item.title || item.grandparentTitle || item.parentTitle || 'Titre inconnu';
-  const guidStr = item.guid || item.grandparentGuid || item.parentGuid || '';
-  const origTitle = item.originalTitle || '';
-  const year = item.year || item.originallyAvailableAt?.substring(0, 4) || '';
+  const itemType = item.type;
+  const isTv = mediaType === 'tv' || itemType === 'episode' || itemType === 'season' || itemType === 'show';
+
+  const { tmdbId, imdbId, tvdbId, plexGuid } = extractExternalIdsFromPlex(item);
+
+  // Check if item has any GUID available
+  const hasAnyGuid = Boolean(
+    tmdbId || imdbId || tvdbId || plexGuid ||
+    (item.guid && typeof item.guid === 'string' && item.guid.trim() !== '') ||
+    (item.grandparentGuid && typeof item.grandparentGuid === 'string' && item.grandparentGuid.trim() !== '') ||
+    (Array.isArray(item.Guid) && item.Guid.length > 0)
+  );
+
+  if (!hasAnyGuid) {
+    appLogger.info('plex', `[Plex Sync] Item ignoré (aucun GUID disponible) pour "${rawTitle}"`);
+    return null;
+  }
 
   appLogger.info(
     'plex',
-    `[Plex Resolve] 🔍 Résolution TMDB pour "${rawTitle}" (${mediaType}) | guid="${guidStr}" | origTitle="${origTitle}" | year=${year} | ratingKey=${item.ratingKey || item.key || ''}`
+    `[Plex Resolve] 🔍 Résolution TMDB pour "${rawTitle}" (${mediaType}) | guid="${item.guid || ''}" | grandparentGuid="${item.grandparentGuid || ''}" | ratingKey=${item.ratingKey || item.key || ''}`
   );
 
-  const { tmdbId, imdbId, tvdbId, plexGuid } = extractExternalIdsFromPlex(item);
   appLogger.info(
     'plex',
     `[Plex Resolve] IDs extraits pour "${rawTitle}": tmdbId=${tmdbId || 'aucun'}, imdbId=${imdbId || 'aucun'}, tvdbId=${tvdbId || 'aucun'}, plexGuid=${plexGuid || 'aucun'}`
@@ -141,18 +155,41 @@ async function resolveTmdbDataForPlexItem(
   }
 
   // 4. Plex Discover metadata API lookup for plex:// GUIDs
-  const pKey = plexGuid || (typeof item.guid === 'string' && item.guid.startsWith('plex://') ? item.guid.replace(/^plex:\/\/(movie|show)\//, '') : null) || item.ratingKey || item.key;
-  if (pKey && plexToken) {
+  let targetPlexGuidStr: string | null = null;
+  if (isTv) {
+    targetPlexGuidStr = item.grandparentGuid || item.parentGuid || item.guid || null;
+    if (targetPlexGuidStr && targetPlexGuidStr.includes('/episode/')) {
+      targetPlexGuidStr = null;
+    }
+  } else {
+    targetPlexGuidStr = item.guid || null;
+  }
+
+  let cleanHash: string | null = null;
+  if (plexGuid) {
+    cleanHash = plexGuid;
+  } else if (targetPlexGuidStr && typeof targetPlexGuidStr === 'string') {
+    const match = targetPlexGuidStr.match(/plex:\/\/(movie|show)\/([a-f0-9]+)/i);
+    if (match) {
+      cleanHash = match[2];
+    } else if (!targetPlexGuidStr.includes('/episode/') && !targetPlexGuidStr.includes('/season/')) {
+      cleanHash = targetPlexGuidStr
+        .replace(/^plex:\/\/(movie|show|episode|season)\//i, '')
+        .replace(/^\/library\/metadata\//i, '')
+        .trim();
+    }
+  }
+
+  if (cleanHash && plexToken) {
     try {
-      const cleanKey = String(pKey).replace('/library/metadata/', '');
-      const plexMetaUrl = `https://discover.provider.plex.tv/library/metadata/${cleanKey}?X-Plex-Token=${plexToken}`;
+      const plexMetaUrl = `https://discover.provider.plex.tv/library/metadata/${cleanHash}?X-Plex-Token=${plexToken}`;
       appLogger.info('plex', `[Plex Resolve] Appel API Plex Discover: ${plexMetaUrl}`);
       const res = await fetch(plexMetaUrl, { headers: { 'Accept': 'application/json' } });
       if (res.ok) {
         const data = await res.json();
         const metaItem = data?.MediaContainer?.Metadata?.[0];
         if (metaItem) {
-          appLogger.info('plex', `[Plex Resolve] Discover API pour "${cleanKey}": guid="${metaItem.guid}", Guids=${JSON.stringify(metaItem.Guid || [])}`);
+          appLogger.info('plex', `[Plex Resolve] Discover API pour "${cleanHash}": guid="${metaItem.guid}", Guids=${JSON.stringify(metaItem.Guid || [])}`);
           const fetchedIds = extractExternalIdsFromPlex(metaItem);
           if (fetchedIds.tmdbId) {
             const detailsRes = await tmdb.getMediaDetails(fetchedIds.tmdbId, mediaType);
@@ -176,7 +213,7 @@ async function resolveTmdbDataForPlexItem(
             }
           }
         } else {
-          appLogger.warn('plex', `[Plex Resolve] Discover Plex Metadata vide pour la clé ${cleanKey}`);
+          appLogger.warn('plex', `[Plex Resolve] Discover Plex Metadata vide pour la clé ${cleanHash}`);
         }
       } else {
         appLogger.warn('plex', `[Plex Resolve] API Plex Discover HTTP code ${res.status}`);
@@ -186,7 +223,7 @@ async function resolveTmdbDataForPlexItem(
     }
   }
 
-  appLogger.error('plex', `[Plex Resolve] ❌ ÉCHEC FINAL pour "${rawTitle}" (${mediaType}) : Aucun ID TMDB/IMDb/TVDb/Plex valide trouvé. PayLoad brute: ${JSON.stringify({ title: item.title, grandparentTitle: item.grandparentTitle, originalTitle: item.originalTitle, guid: item.guid, Guid: item.Guid, year: item.year, ratingKey: item.ratingKey })}`);
+  appLogger.error('plex', `[Plex Resolve] ❌ ÉCHEC FINAL pour "${rawTitle}" (${mediaType}) : Aucun ID TMDB/IMDb/TVDb/Plex valide trouvé. PayLoad brute: ${JSON.stringify({ title: item.title, grandparentTitle: item.grandparentTitle, originalTitle: item.originalTitle, guid: item.guid, grandparentGuid: item.grandparentGuid, Guid: item.Guid, year: item.year, ratingKey: item.ratingKey })}`);
   return null;
 }
 
