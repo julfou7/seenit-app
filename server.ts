@@ -183,6 +183,11 @@ async function startServer() {
           ? Number(tvdbId)
           : null;
 
+      const hasExternalId =
+        !!normalizedTmdbId ||
+        !!normalizedImdbId ||
+        !!normalizedTvdbId;
+
       const cleanTitle = typeof title === 'string' ? title.trim() : '';
       const cleanOriginalTitle = typeof originalTitle === 'string' ? originalTitle.trim() : '';
       const cleanYear = year ? Number(year) : null;
@@ -219,13 +224,14 @@ async function startServer() {
         `tmdbId=${normalizedTmdbId ?? 'ABSENT'}, ` +
         `imdbId=${normalizedImdbId ?? 'ABSENT'}, ` +
         `tvdbId=${normalizedTvdbId ?? 'ABSENT'}, ` +
+        `hasExternalId=${hasExternalId}, ` +
         `title="${cleanTitle || cleanOriginalTitle || 'ABSENT'}", ` +
         `year=${cleanYear ?? 'ABSENT'}, ` +
         `type=${targetType}, ` +
         `token=${resolvedToken ? `PRÉSENT (${resolvedToken.substring(0, 4)}...)` : 'ABSENT'}`
       );
 
-      if (!normalizedTmdbId && !normalizedImdbId && !cleanTitle && !cleanOriginalTitle) {
+      if (!hasExternalId && !cleanTitle && !cleanOriginalTitle) {
         console.warn(
           '[Plex Resolve Backend] Aucun identifiant ni titre valide fourni.'
         );
@@ -233,13 +239,13 @@ async function startServer() {
         return res.status(400).json({
           success: false,
           slug: null,
-          error: 'TMDB, IMDb ou Titre requis'
+          error: 'TMDB, IMDb, TVDB ou Titre requis'
         });
       }
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.16',
+        'X-Plex-Version': '1.4.17',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
@@ -353,31 +359,33 @@ async function startServer() {
           return true;
         }
 
-        // 4. Match par Titre + Année (si fourni)
-        const normalizeStr = (s: string) =>
-          s
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/[^a-z0-9]/g, '');
+        // 4. Match par Titre + Année (uniquement si aucun ID externe n'est fourni)
+        if (!hasExternalId) {
+          const normalizeStr = (s: string) =>
+            s
+              .toLowerCase()
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .replace(/[^a-z0-9]/g, '');
 
-        const itemTitleNorm = normalizeStr(item.title || '');
-        const itemOrigTitleNorm = normalizeStr(item.originalTitle || '');
-        const searchTitleNorm = cleanTitle ? normalizeStr(cleanTitle) : '';
-        const searchOrigTitleNorm = cleanOriginalTitle ? normalizeStr(cleanOriginalTitle) : '';
+          const itemTitleNorm = normalizeStr(item.title || '');
+          const itemOrigTitleNorm = normalizeStr(item.originalTitle || '');
+          const searchTitleNorm = cleanTitle ? normalizeStr(cleanTitle) : '';
+          const searchOrigTitleNorm = cleanOriginalTitle ? normalizeStr(cleanOriginalTitle) : '';
 
-        const titleMatches =
-          (searchTitleNorm && (itemTitleNorm === searchTitleNorm || itemOrigTitleNorm === searchTitleNorm)) ||
-          (searchOrigTitleNorm && (itemTitleNorm === searchOrigTitleNorm || itemOrigTitleNorm === searchOrigTitleNorm));
+          const titleMatches =
+            (searchTitleNorm && (itemTitleNorm === searchTitleNorm || itemOrigTitleNorm === searchTitleNorm)) ||
+            (searchOrigTitleNorm && (itemTitleNorm === searchOrigTitleNorm || itemOrigTitleNorm === searchOrigTitleNorm));
 
-        if (titleMatches) {
-          if (cleanYear && item.year) {
-            const yearDiff = Math.abs(Number(item.year) - Number(cleanYear));
-            if (yearDiff <= 1) {
+          if (titleMatches) {
+            if (cleanYear && item.year) {
+              const yearDiff = Math.abs(Number(item.year) - Number(cleanYear));
+              if (yearDiff <= 1) {
+                return true;
+              }
+            } else if (!cleanYear) {
               return true;
             }
-          } else if (!cleanYear) {
-            return true;
           }
         }
 
@@ -388,6 +396,7 @@ async function startServer() {
         const guids = extractGuids(item);
         return {
           slug: item.slug,
+          plexGuid: item.guid || null,
           guid: item.guid || null,
           type: targetType,
           title: item.title || null,
@@ -400,6 +409,10 @@ async function startServer() {
             guids.imdbIds.size > 0
               ? [...guids.imdbIds][0]
               : normalizedImdbId,
+          tvdbId:
+            guids.tvdbIds.size > 0
+              ? [...guids.tvdbIds][0]
+              : normalizedTvdbId,
           resolvedFrom: sourceDesc
         };
       };
@@ -435,7 +448,7 @@ async function startServer() {
 
           const match = results.find(item => isItemStrictMatch(item) && item.slug);
           if (match) {
-            return formatResponseItem(match, guid);
+            return formatResponseItem(match, guid.replace('://', ':'));
           }
           return null;
         } catch (error: any) {
@@ -462,7 +475,33 @@ async function startServer() {
         }
       }
 
-      // --- ÉTAPE 2 : DISCOVER SEARCH GLOBALE (discover.provider.plex.tv) ---
+      // 1.C : TVDB ID
+      if (normalizedTvdbId) {
+        const resMatches = await queryMatchesEndpoint(`tvdb://${normalizedTvdbId}`);
+        if (resMatches) {
+          console.log(`[Plex Resolve Backend] ✅ [Étape 1] TVDB matches → ${resMatches.slug}`);
+          return res.json({ success: true, ...resMatches });
+        }
+      }
+
+      // SI DES IDENTIFIANTS EXTERNES ÉTAIENT FOURNIS, ON NE TENTE SURTOUT PAS DE FALLBACK PAR TITRE
+      if (hasExternalId) {
+        console.warn(
+          `[Plex Resolve Backend] ❌ Échec de la résolution par identifiants externes (${[
+            normalizedTmdbId ? `tmdb:${normalizedTmdbId}` : '',
+            normalizedImdbId ? `imdb:${normalizedImdbId}` : '',
+            normalizedTvdbId ? `tvdb:${normalizedTvdbId}` : ''
+          ].filter(Boolean).join(', ')}). Fallback titre désactivé pour empêcher tout faux positif.`
+        );
+
+        return res.json({
+          success: false,
+          slug: null,
+          error: 'Aucun match Plex exact pour les identifiants fournis'
+        });
+      }
+
+      // --- ÉTAPE 2 : DISCOVER SEARCH GLOBALE (discover.provider.plex.tv) - UNIQUEMENT SI SANS IDENTIFIANT EXTERNE ---
       const queryDiscoverSearch = async (queryText: string): Promise<any | null> => {
         if (!queryText) return null;
 

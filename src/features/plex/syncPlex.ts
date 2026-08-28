@@ -1352,7 +1352,9 @@ export const openPlexWatchUrl = async (show: any) => {
     ? `tmdb:${tmdbId}`
     : imdbId
       ? `imdb:${String(imdbId).toLowerCase()}`
-      : undefined;
+      : tvdbId
+        ? `tvdb:${tvdbId}`
+        : undefined;
   
   if (
     show?.plexSlug &&
@@ -1384,7 +1386,6 @@ export const openPlexWatchUrl = async (show: any) => {
   let resolvedSlug: string | null = null;
   let resolvedGuid: string | null = null;
   let resolvedFrom: string | null = null;
-  const token = localStorage.getItem('plex_auth_token') || localStorage.getItem('plex_token') || '';
   const clientId = getPlexClientIdentifier();
   const plexHeaders = getPlexHeaders();
 
@@ -1396,7 +1397,6 @@ export const openPlexWatchUrl = async (show: any) => {
   if (originalTitle) queryParams.set('originalTitle', originalTitle);
   if (year) queryParams.set('year', String(year));
   queryParams.set('type', type);
-  if (token) queryParams.set('token', token);
   if (clientId) queryParams.set('clientId', clientId);
 
   for (const ep of RESOLVE_ENDPOINTS) {
@@ -1423,10 +1423,15 @@ export const openPlexWatchUrl = async (show: any) => {
         }
       }
 
-      if (data?.slug) {
+      if (
+        data?.slug &&
+        data?.resolvedFrom &&
+        expectedResolvedFrom &&
+        data.resolvedFrom === expectedResolvedFrom
+      ) {
         resolvedSlug = data.slug;
-        resolvedGuid = data.plexGuid || null;
-        resolvedFrom = data.resolvedFrom || expectedResolvedFrom || null;
+        resolvedGuid = data.plexGuid || data.guid || null;
+        resolvedFrom = data.resolvedFrom;
         break;
       }
     } catch (error) {
@@ -1529,13 +1534,13 @@ export const purgeAllPlexSlugsInDb = async (): Promise<number> => {
 
 // Auto-purge unique pour nettoyer les anciens slugs corrompus des versions précédentes
 if (typeof window !== 'undefined') {
-  const PURGE_KEY = 'seenit_plex_slugs_purged_v1.4.14';
-  setTimeout(() => {
-    if (localStorage.getItem(PURGE_KEY) !== 'true' && auth.currentUser?.uid) {
+  const PURGE_KEY = 'seenit_plex_slugs_purged_v1.4.17';
+  auth.onAuthStateChanged((user) => {
+    if (user?.uid && localStorage.getItem(PURGE_KEY) !== 'true') {
       purgeAllPlexSlugsInDb().then(() => {
         localStorage.setItem(PURGE_KEY, 'true');
       }).catch(() => {});
     }
-  }, 3000);
+  });
 }
 
