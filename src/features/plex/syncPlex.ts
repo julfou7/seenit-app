@@ -186,48 +186,7 @@ async function resolveTmdbDataForPlexItem(
     }
   }
 
-  // 5. Fallback TMDB search by title & year
-  const titlesToTry: string[] = [];
-  if (rawTitle) {
-    const cleanTitle = rawTitle.replace(/\(\d{4}\)/g, '').trim();
-    if (cleanTitle) titlesToTry.push(cleanTitle);
-    if (cleanTitle.includes(':')) {
-      const mainPart = cleanTitle.split(':')[0].trim();
-      if (mainPart && !titlesToTry.includes(mainPart)) titlesToTry.push(mainPart);
-    }
-    if (cleanTitle.includes(' - ')) {
-      const mainPart = cleanTitle.split(' - ')[0].trim();
-      if (mainPart && !titlesToTry.includes(mainPart)) titlesToTry.push(mainPart);
-    }
-  }
-  if (origTitle && typeof origTitle === 'string') {
-    const cleanOrig = origTitle.replace(/\(\d{4}\)/g, '').trim();
-    if (cleanOrig && !titlesToTry.includes(cleanOrig)) titlesToTry.push(cleanOrig);
-  }
-
-  for (const tQuery of titlesToTry) {
-    appLogger.info('plex', `[Plex Resolve] Recherche fallback TMDB pour "${tQuery}" (année: ${year || 'aucune'})...`);
-    if (year) {
-      const searchRes = await tmdb.searchMedia(tQuery, String(year), mediaType);
-      if (searchRes.ok && searchRes.value) {
-        appLogger.info('plex', `[Plex Resolve] ✅ TMDB Fallback Search ("${tQuery}", ${year}) -> TMDB ID ${searchRes.value.id}`);
-        return searchRes.value;
-      } else {
-        const errorMsg = !searchRes.ok ? String((searchRes as any).error?.message || (searchRes as any).error) : '0 résultat';
-        appLogger.warn('plex', `[Plex Resolve] Fallback Search ("${tQuery}", ${year}): ${errorMsg}`);
-      }
-    }
-    const searchNoYearRes = await tmdb.searchMedia(tQuery, undefined, mediaType);
-    if (searchNoYearRes.ok && searchNoYearRes.value) {
-      appLogger.info('plex', `[Plex Resolve] ✅ TMDB Fallback Search ("${tQuery}", sans année) -> TMDB ID ${searchNoYearRes.value.id}`);
-      return searchNoYearRes.value;
-    } else {
-      const errorMsg = !searchNoYearRes.ok ? String((searchNoYearRes as any).error?.message || (searchNoYearRes as any).error) : '0 résultat';
-      appLogger.warn('plex', `[Plex Resolve] Fallback Search ("${tQuery}", sans année): ${errorMsg}`);
-    }
-  }
-
-  appLogger.error('plex', `[Plex Resolve] ❌ ÉCHEC FINAL pour "${rawTitle}" (${mediaType}). PayLoad brute: ${JSON.stringify({ title: item.title, grandparentTitle: item.grandparentTitle, originalTitle: item.originalTitle, guid: item.guid, Guid: item.Guid, year: item.year, ratingKey: item.ratingKey })}`);
+  appLogger.error('plex', `[Plex Resolve] ❌ ÉCHEC FINAL pour "${rawTitle}" (${mediaType}) : Aucun ID TMDB/IMDb/TVDb/Plex valide trouvé. PayLoad brute: ${JSON.stringify({ title: item.title, grandparentTitle: item.grandparentTitle, originalTitle: item.originalTitle, guid: item.guid, Guid: item.Guid, year: item.year, ratingKey: item.ratingKey })}`);
   return null;
 }
 
