@@ -53,8 +53,8 @@ const normalizeTitle = (t?: string) => {
 };
 
 export function getPlexMediaKey(tmdbId?: number | string | null, title?: string, mediaType: 'movie' | 'tv' = 'movie'): string {
-  if (tmdbId) return `${mediaType}:${tmdbId}`;
-  return `${mediaType}:${normalizeTitle(title)}`;
+  if (tmdbId) return `v2:${mediaType}:${tmdbId}`;
+  return `v2:${mediaType}:${normalizeTitle(title)}`;
 }
 
 const PLEX_ENDPOINTS = [

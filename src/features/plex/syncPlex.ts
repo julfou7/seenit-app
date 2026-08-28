@@ -1178,16 +1178,32 @@ export function getPlexHeaders(): Record<string, string> {
  * Résout la fiche Plex d'un média par ID externe (TMDB ou IMDb) via l'API Cloud Fix Match déportée sur le backend SeenIt
  */
 export const openPlexWatchUrl = async (tmdbId: string, type: 'movie' | 'show') => {
-  try {
-    const response = await fetch(`https://seenit.ai.studio/api/plex/resolve-slug?tmdbId=${tmdbId}&type=${type}`);
-    const data = await response.json();
+  const RESOLVE_ENDPOINTS = [
+    'https://seenit.ai.studio/api/plex/resolve-slug',
+    'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug',
+    'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug',
+    '/api/plex/resolve-slug'
+  ];
 
-    if (data?.slug) {
-      window.location.href = `https://watch.plex.tv/${type}/${data.slug}`;
-      return;
+  let resolvedSlug = null;
+  for (const ep of RESOLVE_ENDPOINTS) {
+    try {
+      const response = await fetch(`${ep}?tmdbId=${tmdbId}&type=${type}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data?.slug) {
+          resolvedSlug = data.slug;
+          break;
+        }
+      }
+    } catch (error) {
+      // Ignorer l'erreur et essayer le suivant
     }
-  } catch (error) {
-    console.error("Échec résolution backend Plex", error);
+  }
+
+  if (resolvedSlug) {
+    window.location.href = `https://watch.plex.tv/${type}/${resolvedSlug}`;
+    return;
   }
 
   // Si pas de slug ou erreur API -> Redirection d'accueil uniquement
