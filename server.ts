@@ -637,32 +637,11 @@ async function startServer() {
       }
 
       const plexClientIdentifier = clientId || 'tv-time-ai-studio';
-      const servers = await getPlexServers(token, plexClientIdentifier, 7000);
+      const servers = await getPlexServers(token, plexClientIdentifier, 5000);
 
       if (servers.length === 0) {
         return res.json({ available: false });
       }
-
-      const normalizeStr = (s?: string) => 
-        (s || '')
-          .toLowerCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .replace(/[^a-z0-9]/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-
-      const STOP_WORDS = new Set(['de', 'des', 'du', 'la', 'le', 'les', 'un', 'une', 'et', 'en', 'a', 'au', 'aux', 'the', 'of', 'in', 'and', 'for', 'to', 'a', 'an']);
-
-      const getSignificantWords = (s?: string): string[] => {
-        return normalizeStr(s)
-          .split(' ')
-          .filter(w => w.length >= 3 && !STOP_WORDS.has(w));
-      };
-
-      const normTitle = normalizeStr(title);
-      const normOriginal = originalTitle ? normalizeStr(originalTitle) : '';
-      const targetWords = Array.from(new Set([...getSignificantWords(title), ...getSignificantWords(originalTitle)]));
 
       const extractTmdbId = (item: any): number | null => {
         if (!item) return null;
@@ -705,7 +684,6 @@ async function startServer() {
       const isMatch = (item: any): boolean => {
         if (!item) return false;
 
-        // Si le client précise 'movie' ou 'tv', on peut ignorer les autres types
         const itType = (item.type || '').toLowerCase();
         if (itType === 'episode' || itType === 'season' || itType === 'track') return false;
         if (mediaType === 'movie' && itType && itType !== 'movie') return false;
@@ -723,20 +701,27 @@ async function startServer() {
           return true;
         }
 
-        // NO TITLE MATCHING. STRICT ID MATCHING ONLY.
         return false;
       };
 
-      
-      const searchQueries = new Set<string>();
-      if (title) searchQueries.add(title);
-      if (originalTitle) searchQueries.add(originalTitle);
-      
-      const queriesArray = Array.from(searchQueries);
+      const extractItems = (data: any): any[] => {
+        if (!data) return [];
+        let items: any[] = [];
+        if (data.MediaContainer?.Hub) {
+          for (const hub of data.MediaContainer.Hub) {
+            if (Array.isArray(hub.Metadata)) {
+              items.push(...hub.Metadata);
+            }
+          }
+        } else if (Array.isArray(data.MediaContainer?.Metadata)) {
+          items = data.MediaContainer.Metadata;
+        } else if (Array.isArray(data.Metadata)) {
+          items = data.Metadata;
+        }
+        return items;
+      };
 
-
-
-      // Search all servers in parallel
+      // Search all servers in parallel with fast direct GUID lookup
       const serverSearchPromises = servers.map(async (server: any) => {
         const serverName = server.name || 'Serveur Plex';
         const serverAccessToken = server.accessToken || token;
@@ -762,46 +747,72 @@ async function startServer() {
           ? sortedConnections.filter((c: any) => !c.local || c.relay)
           : sortedConnections;
 
-        for (const conn of candidateConnections) {
-          const uri = conn.uri;
-          if (!uri) continue;
+        // Execute queries for a single connection
+        const queryConnection = async (uri: string): Promise<any | null> => {
+          // 1. Instant TMDB GUID lookup
+          if (tmdbId) {
+            const guidEndpoints = [
+              `${uri}/library/all?guid=${encodeURIComponent(`tmdb://${tmdbId}`)}&includeGuids=1`,
+              `${uri}/hubs/search?query=${encodeURIComponent(`tmdb://${tmdbId}`)}&limit=5&includeGuids=1`
+            ];
 
-          // Run all query variations in parallel for this connection
-          const searchTasks = queriesArray.map(async (q: string) => {
-            const ep = `${uri}/hubs/search?query=${encodeURIComponent(q)}&limit=20&includeGuids=1`;
-            try {
-              const searchRes = await fetch(ep, {
-                headers: { 
-                  'Accept': 'application/json',
-                  'X-Plex-Token': serverAccessToken 
-                },
-                signal: AbortSignal.timeout(2500)
-              });
+            for (const ep of guidEndpoints) {
+              try {
+                const searchRes = await fetch(ep, {
+                  headers: { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
+                  signal: AbortSignal.timeout(1500)
+                });
+                if (searchRes.ok) {
+                  const searchData = await searchRes.json();
+                  const items = extractItems(searchData);
+                  for (const it of items) {
+                    if (isMatch(it)) {
+                      const itemTitle = it.title || title;
+                      const itemYear = it.year || year;
+                      const directPlexUrl = (server.clientIdentifier && it.ratingKey)
+                        ? `https://app.plex.tv/desktop/#!/server/${server.clientIdentifier}/details?key=${encodeURIComponent(`/library/metadata/${it.ratingKey}`)}`
+                        : 'https://app.plex.tv/desktop';
 
-              if (searchRes.ok) {
-                const searchData = await searchRes.json();
-                let items: any[] = [];
-                if (searchData.MediaContainer?.Hub) {
-                  for (const hub of searchData.MediaContainer.Hub) {
-                    if (Array.isArray(hub.Metadata)) {
-                      items.push(...hub.Metadata);
+                      console.log(`[Plex Availability] FAST GUID MATCH: "${itemTitle}" (${itemYear}) on server "${serverName}"`);
+                      return {
+                        available: true,
+                        serverName,
+                        serverId: server.clientIdentifier,
+                        title: itemTitle,
+                        originalTitle: it.originalTitle || originalTitle,
+                        year: itemYear,
+                        ratingKey: it.ratingKey,
+                        plexUrl: directPlexUrl
+                      };
                     }
                   }
-                } else if (Array.isArray(searchData.MediaContainer?.Metadata)) {
-                  items = searchData.MediaContainer.Metadata;
                 }
+              } catch (e) {
+                // Ignore timeout
+              }
+            }
+          }
 
+          // 2. Fallback to title query if GUID endpoint didn't return
+          if (title) {
+            const ep = `${uri}/hubs/search?query=${encodeURIComponent(title)}&limit=10&includeGuids=1`;
+            try {
+              const searchRes = await fetch(ep, {
+                headers: { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
+                signal: AbortSignal.timeout(1500)
+              });
+              if (searchRes.ok) {
+                const searchData = await searchRes.json();
+                const items = extractItems(searchData);
                 for (const it of items) {
                   if (isMatch(it)) {
                     const itemTitle = it.title || title;
                     const itemYear = it.year || year;
-                    const isShow = (it.type === 'show' || it.type === 'series' || mediaType === 'tv');
-                    
                     const directPlexUrl = (server.clientIdentifier && it.ratingKey)
                       ? `https://app.plex.tv/desktop/#!/server/${server.clientIdentifier}/details?key=${encodeURIComponent(`/library/metadata/${it.ratingKey}`)}`
                       : 'https://app.plex.tv/desktop';
 
-                    console.log(`[Plex Availability] MATCH FOUND: "${itemTitle}" (${itemYear}) on server "${serverName}"`);
+                    console.log(`[Plex Availability] TITLE MATCH: "${itemTitle}" (${itemYear}) on server "${serverName}"`);
                     return {
                       available: true,
                       serverName,
@@ -816,17 +827,17 @@ async function startServer() {
                 }
               }
             } catch (e) {
-              // Ignore single query error
+              // Ignore
             }
-            return null;
-          });
+          }
 
-          const results = await Promise.all(searchTasks);
-          const match = results.find(r => r && r.available);
-          if (match) return match;
-        }
+          return null;
+        };
 
-        return null;
+        // Run connections in parallel for this server
+        const connPromises = candidateConnections.slice(0, 3).map(c => c.uri ? queryConnection(c.uri) : Promise.resolve(null));
+        const connResults = await Promise.all(connPromises);
+        return connResults.find(r => r && r.available) || null;
       });
 
       const results = await Promise.all(serverSearchPromises);

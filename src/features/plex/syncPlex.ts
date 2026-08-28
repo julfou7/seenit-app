@@ -755,14 +755,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             }
 
             if (!tmdbData) {
-              appLogger.info('plex', `[Plex Sync] Recherche TMDB par titre pour "${cleanShowTitle}"...`);
-              let searchRes = await tmdb.searchMedia(cleanShowTitle, itemYear ? String(itemYear) : undefined, 'tv');
-              if (!searchRes.ok || !searchRes.value) {
-                searchRes = await tmdb.searchMedia(cleanShowTitle, undefined, 'tv');
-              }
-              if (searchRes.ok && searchRes.value) {
-                tmdbData = searchRes.value;
-              }
+              appLogger.info('plex', `[Plex Sync] Fiche "${cleanShowTitle}" ignorée (aucun GUID TMDB/IMDb/TVDb dans la fiche Plex).`);
+              continue;
             }
 
             if (tmdbData && cacheKey) {
@@ -936,14 +930,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             }
 
             if (!tmdbData) {
-              appLogger.info('plex', `[Plex Sync] Recherche TMDB par titre pour "${cleanMovieTitle}"...`);
-              let searchRes = await tmdb.searchMedia(cleanMovieTitle, itemYear ? String(itemYear) : undefined, 'movie');
-              if (!searchRes.ok || !searchRes.value) {
-                searchRes = await tmdb.searchMedia(cleanMovieTitle, undefined, 'movie');
-              }
-              if (searchRes.ok && searchRes.value) {
-                tmdbData = searchRes.value;
-              }
+              appLogger.info('plex', `[Plex Sync] Fiche film "${cleanMovieTitle}" ignorée (aucun GUID TMDB/IMDb/TVDb dans la fiche Plex).`);
+              continue;
             }
 
             if (tmdbData && cacheKey) {
