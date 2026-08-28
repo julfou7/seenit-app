@@ -136,7 +136,7 @@ async function startServer() {
   app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Plex-Token, X-Plex-Client-Identifier, X-Plex-Product, X-Plex-Version');
     if (req.method === 'OPTIONS') {
       return res.sendStatus(200);
     }
@@ -147,16 +147,22 @@ async function startServer() {
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   const upload = multer();
 
-  app.get('/api/plex/resolve-slug', async (req, res) => {
+  const handleResolveSlug = async (req: express.Request, res: express.Response) => {
     console.log('[Plex Resolve Backend] --- DÉBUT DE LA RÉSOLUTION ---');
 
     try {
+      const queryParams = req.query || {};
+      const bodyParams = req.body || {};
+      const params = { ...queryParams, ...bodyParams };
+
       const {
         tmdbId,
         imdbId,
         type,
-        clientId
-      } = req.query || {};
+        clientId,
+        token,
+        plexToken: paramPlexToken
+      } = params;
 
       const normalizedTmdbId =
         tmdbId && /^\d+$/.test(String(tmdbId))
@@ -185,13 +191,22 @@ async function startServer() {
       const plexClientId =
         typeof clientId === 'string' && clientId.trim()
           ? clientId
-          : 'seenit-app-server';
+          : (typeof req.headers['x-plex-client-identifier'] === 'string' ? req.headers['x-plex-client-identifier'] : 'seenit-app-server');
+
+      const resolvedToken =
+        (typeof req.headers['x-plex-token'] === 'string' && req.headers['x-plex-token']) ||
+        (typeof token === 'string' && token) ||
+        (typeof paramPlexToken === 'string' && paramPlexToken) ||
+        process.env.PLEX_TOKEN ||
+        process.env.PLEX_AUTH_TOKEN ||
+        '';
 
       console.log(
         `[Plex Resolve Backend] ` +
         `tmdbId=${normalizedTmdbId ?? 'ABSENT'}, ` +
         `imdbId=${normalizedImdbId ?? 'ABSENT'}, ` +
-        `type=${targetType}`
+        `type=${targetType}, ` +
+        `token=${resolvedToken ? `PRÉSENT (${resolvedToken.substring(0, 4)}...)` : 'ABSENT'}`
       );
 
       if (!normalizedTmdbId && !normalizedImdbId) {
@@ -208,10 +223,14 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.03',
+        'X-Plex-Version': '1.4.15',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
+
+      if (resolvedToken) {
+        headers['X-Plex-Token'] = resolvedToken;
+      }
 
       /**
        * Extrait les résultats Plex quel que soit le format retourné.
@@ -492,7 +511,10 @@ async function startServer() {
         '[Plex Resolve Backend] --- FIN DE LA RÉSOLUTION ---'
       );
     }
-  });
+  };
+
+  app.get('/api/plex/resolve-slug', handleResolveSlug);
+  app.post('/api/plex/resolve-slug', handleResolveSlug);
 
   app.post('/api/plex/availability', async (req, res) => {
     try {

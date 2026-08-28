@@ -1363,37 +1363,63 @@ export const openPlexWatchUrl = async (show: any) => {
   appLogger.info('plex', `[Plex Official] Résolution du slug via API backend pour TMDB: ${tmdbId || 'N/A'}, IMDb: ${imdbId || 'N/A'} (${type})...`);
 
   // 2. Fetch from backend
-  const RESOLVE_ENDPOINTS = [
-    'https://seenit.ai.studio/api/plex/resolve-slug',
-    'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug',
-    'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug',
-    '/api/plex/resolve-slug'
-  ];
+  const isNative = Capacitor.isNativePlatform();
+  const RESOLVE_ENDPOINTS = isNative
+    ? [
+        'https://seenit.ai.studio/api/plex/resolve-slug',
+        'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug',
+        'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug'
+      ]
+    : [
+        '/api/plex/resolve-slug',
+        'https://seenit.ai.studio/api/plex/resolve-slug',
+        'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug',
+        'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug'
+      ];
 
   let resolvedSlug: string | null = null;
   let resolvedGuid: string | null = null;
   let resolvedFrom: string | null = null;
   const token = localStorage.getItem('plex_auth_token') || localStorage.getItem('plex_token') || '';
+  const clientId = getPlexClientIdentifier();
+  const plexHeaders = getPlexHeaders();
 
   const queryParams = new URLSearchParams();
   if (tmdbId) queryParams.set('tmdbId', String(tmdbId));
   if (imdbId) queryParams.set('imdbId', String(imdbId));
   queryParams.set('type', type);
   if (token) queryParams.set('token', token);
+  if (clientId) queryParams.set('clientId', clientId);
 
   for (const ep of RESOLVE_ENDPOINTS) {
     try {
-      const response = await fetch(`${ep}?${queryParams.toString()}`, {
-        headers: getPlexHeaders()
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data?.slug) {
-          resolvedSlug = data.slug;
-          resolvedGuid = data.plexGuid || null;
-          resolvedFrom = data.resolvedFrom || expectedResolvedFrom || null;
-          break;
+      let data: any = null;
+      const fullUrl = `${ep}?${queryParams.toString()}`;
+
+      if (isNative) {
+        const nativeRes = await CapacitorHttp.get({
+          url: fullUrl,
+          headers: plexHeaders,
+          connectTimeout: 8000,
+          readTimeout: 8000
+        });
+        if (nativeRes.status >= 200 && nativeRes.status < 300) {
+          data = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
         }
+      } else {
+        const response = await fetch(fullUrl, {
+          headers: plexHeaders
+        });
+        if (response.ok) {
+          data = await response.json();
+        }
+      }
+
+      if (data?.slug) {
+        resolvedSlug = data.slug;
+        resolvedGuid = data.plexGuid || null;
+        resolvedFrom = data.resolvedFrom || expectedResolvedFrom || null;
+        break;
       }
     } catch (error) {
       // Ignorer l'erreur et essayer le suivant
