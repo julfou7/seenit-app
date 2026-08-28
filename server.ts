@@ -721,18 +721,24 @@ async function startServer() {
           ? sortedConnections.filter((c: any) => !c.local || c.relay)
           : sortedConnections;
 
-        // Execute queries for a single connection (STRICT TMDB GUID LOOKUP ONLY)
+        // Execute queries for a single connection (STRICT TMDB GUID MATCHING ONLY)
         const queryConnection = async (uri: string): Promise<any | null> => {
-          const guidEndpoints = [
+          const endpointsToTry = [
             `${uri}/library/all?guid=${encodeURIComponent(`tmdb://${tmdbId}`)}&includeGuids=1`,
             `${uri}/hubs/search?query=${encodeURIComponent(`tmdb://${tmdbId}`)}&limit=5&includeGuids=1`
           ];
+          if (title && title.trim()) {
+            endpointsToTry.push(`${uri}/hubs/search?query=${encodeURIComponent(title.trim())}&limit=10&includeGuids=1`);
+          }
+          if (originalTitle && originalTitle.trim() && originalTitle.trim() !== title?.trim()) {
+            endpointsToTry.push(`${uri}/hubs/search?query=${encodeURIComponent(originalTitle.trim())}&limit=10&includeGuids=1`);
+          }
 
-          for (const ep of guidEndpoints) {
+          for (const ep of endpointsToTry) {
             try {
               const searchRes = await fetch(ep, {
                 headers: { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
-                signal: AbortSignal.timeout(1500)
+                signal: AbortSignal.timeout(1200)
               });
               if (searchRes.ok) {
                 const searchData = await searchRes.json();

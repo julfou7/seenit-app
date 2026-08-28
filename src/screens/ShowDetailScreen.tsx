@@ -2811,17 +2811,10 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                   );
                 }
 
-                // 3. Si les deux ont terminé et rien n'a été trouvé
+                // 3. Si rien n'est disponible sur Plex, afficher systématiquement le bouton bleu de téléchargement
                 return (
                   <div className="flex items-center gap-3 flex-wrap">
-                    {presence.hasFile ? (
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-400 text-xs font-bold shadow-sm">
-                          <CheckCircle2 size={14} className="shrink-0 text-emerald-400" />
-                          <span>Téléchargé</span>
-                        </div>
-                      </div>
-                    ) : isUnreleased ? (
+                    {isUnreleased ? (
                       <p className="text-xs text-zinc-500 italic font-medium flex items-center gap-1.5">
                         <Clock size={14} />
                         <span>Bientôt disponible</span>

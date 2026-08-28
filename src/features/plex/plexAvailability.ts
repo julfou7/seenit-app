@@ -73,7 +73,7 @@ export async function checkPlexAvailability(params: {
   mediaType?: 'movie' | 'tv';
   forceRefresh?: boolean;
 }): Promise<PlexMediaInfo> {
-  const { tmdbId, mediaType = 'movie', forceRefresh = false } = params;
+  const { tmdbId, title, originalTitle, mediaType = 'movie', forceRefresh = false } = params;
 
   if (!tmdbId) {
     return { available: false, lastChecked: Date.now() };
@@ -102,12 +102,11 @@ export async function checkPlexAvailability(params: {
   const clientId = getPlexClientId();
   const isNative = Capacitor.isNativePlatform();
   const urlsToTry = isNative 
-    ? [...PLEX_ENDPOINTS] 
-    : ['/api/plex/availability', ...PLEX_ENDPOINTS];
+    ? ['https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/availability'] 
+    : ['/api/plex/availability'];
 
-  // 1. Try via Cloud / Express API proxy
+  // 1. Try via Cloud / Express API proxy with fast 2.5s timeout
   for (const url of urlsToTry) {
-    if (isNative && url === '/api/plex/availability') continue;
     try {
       let data: any = null;
       let isOk = false;
@@ -115,6 +114,8 @@ export async function checkPlexAvailability(params: {
         token: plexToken,
         clientId,
         tmdbId: Number(tmdbId),
+        title,
+        originalTitle,
         mediaType
       };
 
@@ -123,8 +124,8 @@ export async function checkPlexAvailability(params: {
           url,
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
           data: payload,
-          connectTimeout: 8000,
-          readTimeout: 8000
+          connectTimeout: 2500,
+          readTimeout: 2500
         });
         isOk = nativeRes.status >= 200 && nativeRes.status < 300;
         if (isOk) {
@@ -132,7 +133,7 @@ export async function checkPlexAvailability(params: {
         }
       } else {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 8000);
+        const timer = setTimeout(() => controller.abort(), 2500);
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -176,6 +177,8 @@ export async function checkPlexAvailability(params: {
       token: plexToken,
       clientId,
       tmdbId: Number(tmdbId),
+      title,
+      originalTitle,
       mediaType
     });
 
@@ -197,17 +200,19 @@ async function checkPlexDirectFromDevice(params: {
   token: string;
   clientId: string;
   tmdbId: number;
+  title?: string;
+  originalTitle?: string;
   mediaType?: 'movie' | 'tv';
 }): Promise<PlexMediaInfo | null> {
   try {
-    const { token, clientId, tmdbId, mediaType = 'movie' } = params;
+    const { token, clientId, tmdbId, title, originalTitle, mediaType = 'movie' } = params;
     const resourcesRes = await fetch('https://plex.tv/api/v2/resources?includeHttps=1&includeRelay=1', {
       headers: {
         'X-Plex-Token': token,
         'Accept': 'application/json',
         'X-Plex-Client-Identifier': clientId
       },
-      signal: AbortSignal.timeout(5000)
+      signal: AbortSignal.timeout(3000)
     });
 
     if (!resourcesRes.ok) return null;
@@ -252,10 +257,16 @@ async function checkPlexDirectFromDevice(params: {
       return !!(tmdbId && itTmdbId && Number(itTmdbId) === Number(tmdbId));
     };
 
-    const guidEndpoints = [
+    const guidEndpoints: ((uri: string) => string)[] = [
       (uri: string) => `${uri}/library/all?guid=${encodeURIComponent(`tmdb://${tmdbId}`)}&includeGuids=1&X-Plex-Token=`,
       (uri: string) => `${uri}/hubs/search?query=${encodeURIComponent(`tmdb://${tmdbId}`)}&limit=5&includeGuids=1&X-Plex-Token=`
     ];
+    if (title && title.trim()) {
+      guidEndpoints.push((uri: string) => `${uri}/hubs/search?query=${encodeURIComponent(title.trim())}&limit=10&includeGuids=1&X-Plex-Token=`);
+    }
+    if (originalTitle && originalTitle.trim() && originalTitle.trim() !== title?.trim()) {
+      guidEndpoints.push((uri: string) => `${uri}/hubs/search?query=${encodeURIComponent(originalTitle.trim())}&limit=10&includeGuids=1&X-Plex-Token=`);
+    }
 
     const searchPromises = servers.map(async (server: any) => {
       const serverName = server.name || 'Serveur Plex';
@@ -281,7 +292,7 @@ async function checkPlexDirectFromDevice(params: {
           try {
             const searchRes = await fetch(ep, {
               headers: { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
-              signal: AbortSignal.timeout(2000)
+              signal: AbortSignal.timeout(1200)
             });
             if (searchRes.ok) {
               const searchData = await searchRes.json();
