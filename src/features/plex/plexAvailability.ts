@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware';
 import { getPlexClientId } from '../../services/plex';
 
 import { appLogger } from '../../store/logStore';
+import { authenticatedFetch, getAuthenticatedHeaders } from '../../lib/apiAuth';
 
 export interface PlexMediaInfo {
   available: boolean;
@@ -122,7 +123,7 @@ export async function checkPlexAvailability(params: {
       if (isNative) {
         const nativeRes = await CapacitorHttp.post({
           url,
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          headers: await getAuthenticatedHeaders({ 'Content-Type': 'application/json', 'Accept': 'application/json' }),
           data: payload,
           connectTimeout: 2500,
           readTimeout: 2500
@@ -134,7 +135,7 @@ export async function checkPlexAvailability(params: {
       } else {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 2500);
-        const res = await fetch(url, {
+        const res = await authenticatedFetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
           body: JSON.stringify(payload),

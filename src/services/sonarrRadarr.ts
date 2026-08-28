@@ -1,5 +1,6 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { C411Torrent } from './c411';
+import { authenticatedFetch } from '../lib/apiAuth';
 
 export interface SonarrRadarrConfig {
   sonarrUrl?: string;
@@ -87,7 +88,7 @@ export async function executeGet(url: string, headers: Record<string, string> = 
       } catch {}
       if (!isLocalNetworkUrl(url)) {
         try {
-          const proxyRes = await fetch('/api/service-proxy', {
+          const proxyRes = await authenticatedFetch('/api/service-proxy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ targetUrl: url, method: 'GET', headers }),
@@ -124,7 +125,7 @@ export async function executeGet(url: string, headers: Record<string, string> = 
       }
     } else {
       try {
-        const res = await fetch('/api/service-proxy', {
+        const res = await authenticatedFetch('/api/service-proxy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -224,7 +225,7 @@ async function executePost(url: string, body: any, headers: Record<string, strin
       }
     } else {
       try {
-        const res = await fetch('/api/service-proxy', {
+        const res = await authenticatedFetch('/api/service-proxy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -322,7 +323,7 @@ async function executePut(url: string, body: any, headers: Record<string, string
       }
     } else {
       try {
-        const res = await fetch('/api/service-proxy', {
+        const res = await authenticatedFetch('/api/service-proxy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -391,7 +392,7 @@ export async function executeDelete(url: string, headers: Record<string, string>
       }
     } else {
       try {
-        const res = await fetch('/api/service-proxy', {
+        const res = await authenticatedFetch('/api/service-proxy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -573,7 +574,7 @@ export async function loginQBittorrent(
       }
     } else {
       try {
-        const res = await fetch('/api/service-proxy', {
+        const res = await authenticatedFetch('/api/service-proxy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1932,4 +1933,3 @@ export async function deleteLiveDownloadItem(
     return { success: false, message: err?.message || 'Erreur lors de la suppression' };
   }
 }
-

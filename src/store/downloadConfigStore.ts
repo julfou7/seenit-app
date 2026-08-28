@@ -24,7 +24,7 @@ interface DownloadConfigState extends DownloadClientConfig {
 }
 
 const DEFAULT_CONFIG: DownloadClientConfig = {
-  c411ApiKey: '2d4baaf4fdd1dacd26f8dc96b1ab6aa06fc95140a7509456b25c8c0b9b5ac55a',
+  c411ApiKey: '',
   sonarrUrl: '',
   sonarrApiKey: '',
   radarrUrl: '',
@@ -78,7 +78,7 @@ export const useDownloadConfigStore = create<DownloadConfigState>()(
           const docRef = doc(db, 'users', user.uid, 'settings', 'downloadConfig');
           const current = get();
           const dataToSave: DownloadClientConfig = {
-            c411ApiKey: current.c411ApiKey || DEFAULT_CONFIG.c411ApiKey,
+            c411ApiKey: current.c411ApiKey || '',
             sonarrUrl: current.sonarrUrl || '',
             sonarrApiKey: current.sonarrApiKey || '',
             radarrUrl: current.radarrUrl || '',

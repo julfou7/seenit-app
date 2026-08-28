@@ -1,4 +1,5 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
+import { authenticatedFetch, getAuthenticatedHeaders } from '../lib/apiAuth';
 
 export interface C411Torrent {
   id: number;
@@ -105,11 +106,12 @@ export async function searchC411Torrents(params: C411SearchParams): Promise<C411
   const query = (params.query || '').trim();
   if (!query) return [];
 
-  const apiKey = params.apiKey || '2d4baaf4fdd1dacd26f8dc96b1ab6aa06fc95140a7509456b25c8c0b9b5ac55a';
+  const apiKey = params.apiKey?.trim() || '';
 
   // 1. Appel direct vers l'API C411 (CapacitorHttp sur Android/iOS pour contourner le CORS, fetch sur Web)
-  try {
-    const cleanQuery = query.replace(/[:’']/g, ' ').replace(/\s+/g, ' ').trim();
+  if (apiKey) {
+    try {
+      const cleanQuery = query.replace(/[:’']/g, ' ').replace(/\s+/g, ' ').trim();
     const searchParams = new URLSearchParams();
     searchParams.set('name', cleanQuery);
     searchParams.set('category', '1');
@@ -147,23 +149,25 @@ export async function searchC411Torrents(params: C411SearchParams): Promise<C411
       }
     }
 
-    if (torrents.length > 0) {
-      return torrents.map((t: C411Torrent) => ({
-        ...t,
-        magnetUri: t.infoHash ? buildMagnetLink(t.infoHash, t.name) : undefined
-      }));
+      if (torrents.length > 0) {
+        return torrents.map((t: C411Torrent) => ({
+          ...t,
+          magnetUri: t.infoHash ? buildMagnetLink(t.infoHash, t.name) : undefined
+        }));
+      }
+    } catch (directErr) {
+      console.warn('[C411 Direct Request Error, trying backend fallback]', directErr);
     }
-  } catch (directErr) {
-    console.warn('[C411 Direct Request Error, trying backend fallback]', directErr);
   }
 
   // 2. Fallback via le backend proxy SeenIt si l'appel direct échoue
   try {
-    const queryParams = new URLSearchParams();
-    queryParams.set('query', query);
-    if (params.mediaType) queryParams.set('mediaType', params.mediaType);
-    if (params.year) queryParams.set('year', String(params.year));
-    queryParams.set('apiKey', apiKey);
+    const payload = {
+      query,
+      mediaType: params.mediaType,
+      year: params.year ? String(params.year) : undefined,
+      apiKey: apiKey || undefined
+    };
 
     const endpoints = [
       'https://seenit.ai.studio/api/c411/search',
@@ -174,13 +178,16 @@ export async function searchC411Torrents(params: C411SearchParams): Promise<C411
 
     for (const ep of endpoints) {
       try {
-        const url = `${ep}?${queryParams.toString()}`;
         let resData: any = null;
 
         if (Capacitor.isNativePlatform()) {
-          const nativeRes = await CapacitorHttp.get({
-            url,
-            headers: { 'Accept': 'application/json' },
+          const nativeRes = await CapacitorHttp.post({
+            url: ep,
+            headers: await getAuthenticatedHeaders({
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            }),
+            data: payload,
             connectTimeout: 8000,
             readTimeout: 8000
           });
@@ -188,8 +195,13 @@ export async function searchC411Torrents(params: C411SearchParams): Promise<C411
             resData = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
           }
         } else {
-          const res = await fetch(url, {
-            headers: { 'Accept': 'application/json' },
+          const res = await authenticatedFetch(ep, {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload),
             signal: AbortSignal.timeout(8000)
           });
           if (res.ok) {
@@ -240,7 +252,7 @@ export async function triggerRemoteDownload(payload: {
 
     for (const ep of endpoints) {
       try {
-        const res = await fetch(ep, {
+        const res = await authenticatedFetch(ep, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

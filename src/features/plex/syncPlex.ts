@@ -10,6 +10,7 @@ import { appLogger } from '../../store/logStore';
 import { getPlexClientId } from '../../services/plex';
 import { Show } from '../../types';
 import { CURRENT_APP_VERSION } from '../../store/updateStore';
+import { authenticatedFetch, getAuthenticatedHeaders } from '../../lib/apiAuth';
 
 export interface PlexSyncResult {
   success: boolean;
@@ -574,7 +575,7 @@ async function fetchPlexHistoryData(token: string, clientId: string, delta: bool
       if (isNative) {
         const nativeRes = await CapacitorHttp.post({
           url,
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          headers: await getAuthenticatedHeaders({ 'Content-Type': 'application/json', 'Accept': 'application/json' }),
           data: { token, clientId, delta, since },
           connectTimeout: 20000,
           readTimeout: 20000
@@ -587,7 +588,7 @@ async function fetchPlexHistoryData(token: string, clientId: string, delta: bool
       } else {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 20000);
-        const res = await fetch(url, {
+        const res = await authenticatedFetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
           body: JSON.stringify({ token, clientId, delta, since }),
@@ -1580,7 +1581,7 @@ export const openPlexWatchUrl = async (show: any) => {
         if (isNative) {
           const nativeRes = await CapacitorHttp.get({
             url: fullUrl,
-            headers: plexHeaders,
+            headers: await getAuthenticatedHeaders(plexHeaders),
             connectTimeout: 8000,
             readTimeout: 8000
           });
@@ -1588,7 +1589,7 @@ export const openPlexWatchUrl = async (show: any) => {
             data = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
           }
         } else {
-          const response = await fetch(fullUrl, {
+          const response = await authenticatedFetch(fullUrl, {
             headers: plexHeaders
           });
           if (response.ok) {
@@ -1716,4 +1717,3 @@ if (typeof window !== 'undefined') {
     }
   });
 }
-

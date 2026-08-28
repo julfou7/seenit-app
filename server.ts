@@ -7,6 +7,9 @@ import { getMessaging } from "firebase-admin/messaging";
 import { adminAuth, adminDb } from "./src/lib/firebase-admin.ts";
 import { DecodedIdToken } from "firebase-admin/auth";
 import multer from "multer";
+import dns from "node:dns/promises";
+import net from "node:net";
+import { timingSafeEqual } from "node:crypto";
 
 export interface AuthRequest extends Request {
   user?: DecodedIdToken;
@@ -29,6 +32,161 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
     return res.status(401).json({ error: "Unauthorized: Invalid token" });
   }
 };
+
+const WEBHOOK_SECRET_HEADER = 'x-seenit-webhook-secret';
+
+const requireWebhookSecret = (req: Request, res: Response, next: NextFunction) => {
+  const expectedSecret = process.env.WEBHOOK_SECRET?.trim();
+  if (!expectedSecret) {
+    console.error('[Webhook] WEBHOOK_SECRET absent : webhook refuse par securite.');
+    return res.status(503).json({ error: 'Webhook non configure' });
+  }
+
+  const headerSecret = req.headers[WEBHOOK_SECRET_HEADER];
+  const providedSecret = (
+    (typeof headerSecret === 'string' ? headerSecret : '') ||
+    (typeof req.query.secret === 'string' ? req.query.secret : '')
+  ).trim();
+
+  const expectedBuffer = Buffer.from(expectedSecret);
+  const providedBuffer = Buffer.from(providedSecret);
+  const isValid =
+    expectedBuffer.length === providedBuffer.length &&
+    timingSafeEqual(expectedBuffer, providedBuffer);
+
+  if (!isValid) {
+    return res.status(401).json({ error: 'Secret de webhook invalide' });
+  }
+
+  next();
+};
+
+function isPrivateOrReservedAddress(address: string): boolean {
+  const cleanAddress = address.toLowerCase().split('%')[0];
+
+  if (net.isIPv4(cleanAddress)) {
+    const [a, b, c] = cleanAddress.split('.').map(Number);
+    return (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 0 && c === 0) ||
+      (a === 192 && b === 0 && c === 2) ||
+      (a === 192 && b === 88 && c === 99) ||
+      (a === 192 && b === 168) ||
+      (a === 198 && (b === 18 || b === 19)) ||
+      (a === 198 && b === 51 && c === 100) ||
+      (a === 203 && b === 0 && c === 113) ||
+      a >= 224
+    );
+  }
+
+  if (net.isIPv6(cleanAddress)) {
+    if (cleanAddress.startsWith('::ffff:')) {
+      return isPrivateOrReservedAddress(cleanAddress.slice('::ffff:'.length));
+    }
+    return (
+      cleanAddress === '::' ||
+      cleanAddress === '::1' ||
+      cleanAddress.startsWith('fc') ||
+      cleanAddress.startsWith('fd') ||
+      /^fe[89ab]/.test(cleanAddress) ||
+      cleanAddress.startsWith('ff') ||
+      cleanAddress.startsWith('2001:db8:')
+    );
+  }
+
+  return true;
+}
+
+async function validateOutboundUrl(rawUrl: unknown): Promise<URL> {
+  if (typeof rawUrl !== 'string' || rawUrl.length > 2048) {
+    throw new Error('URL cible invalide');
+  }
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(rawUrl);
+  } catch {
+    throw new Error('URL cible invalide');
+  }
+
+  if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+    throw new Error('Seuls les protocoles HTTP et HTTPS sont autorises');
+  }
+  if (parsedUrl.username || parsedUrl.password) {
+    throw new Error('Les identifiants dans l URL sont interdits');
+  }
+
+  const hostname = parsedUrl.hostname.toLowerCase().replace(/\.$/, '');
+  const forbiddenHostname =
+    hostname === 'localhost' ||
+    hostname === 'metadata.google.internal' ||
+    hostname.endsWith('.localhost') ||
+    hostname.endsWith('.local') ||
+    hostname.endsWith('.internal') ||
+    hostname.endsWith('.lan');
+
+  if (forbiddenHostname) {
+    throw new Error('Hote local ou interne interdit depuis le serveur');
+  }
+
+  const addresses = net.isIP(hostname)
+    ? [{ address: hostname }]
+    : await dns.lookup(hostname, { all: true, verbatim: true });
+
+  if (addresses.length === 0 || addresses.some(({ address }) => isPrivateOrReservedAddress(address))) {
+    throw new Error('Adresse IP privee ou reservee interdite depuis le serveur');
+  }
+
+  return parsedUrl;
+}
+
+const BLOCKED_PROXY_HEADERS = new Set([
+  'connection',
+  'content-length',
+  'forwarded',
+  'host',
+  'metadata-flavor',
+  'proxy-authorization',
+  'proxy-connection',
+  'transfer-encoding',
+  'upgrade',
+  'x-forwarded-for',
+  'x-forwarded-host',
+  'x-forwarded-proto',
+  'x-real-ip'
+]);
+
+function sanitizeProxyHeaders(input: unknown): Record<string, string> {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+
+  const safeHeaders: Record<string, string> = {};
+  for (const [key, value] of Object.entries(input)) {
+    const normalizedKey = key.toLowerCase();
+    if (
+      BLOCKED_PROXY_HEADERS.has(normalizedKey) ||
+      normalizedKey.startsWith('x-goog-') ||
+      typeof value !== 'string' ||
+      value.length > 8192
+    ) {
+      continue;
+    }
+    safeHeaders[key] = value;
+  }
+  return safeHeaders;
+}
+
+async function secureServerFetch(rawUrl: string, init: RequestInit = {}): Promise<globalThis.Response> {
+  const validatedUrl = await validateOutboundUrl(rawUrl);
+  return fetch(validatedUrl, {
+    ...init,
+    redirect: 'error'
+  });
+}
 
 function startCronJobs() {
   // CRON disabled in preview environment due to missing Service Account credentials
@@ -626,10 +784,10 @@ async function startServer() {
     }
   };
 
-  app.get('/api/plex/resolve-slug', handleResolveSlug);
-  app.post('/api/plex/resolve-slug', handleResolveSlug);
+  app.get('/api/plex/resolve-slug', requireAuth, handleResolveSlug);
+  app.post('/api/plex/resolve-slug', requireAuth, handleResolveSlug);
 
-  app.post('/api/plex/availability', async (req, res) => {
+  app.post('/api/plex/availability', requireAuth, async (req, res) => {
     try {
       const { token, clientId, tmdbId, title, originalTitle, year, mediaType = 'movie' } = req.body || {};
       if (!token || !tmdbId) {
@@ -788,7 +946,7 @@ async function startServer() {
     }
   });
 
-  app.post(['/api/plex/history', '/api/plex-sync'], async (req, res) => {
+  app.post(['/api/plex/history', '/api/plex-sync'], requireAuth, async (req, res) => {
     try {
       const { token, clientId, delta = false, since } = req.body || {};
 
@@ -1175,15 +1333,21 @@ async function startServer() {
   });
 
   // C411 Tracker API proxy
-  app.get('/api/c411/search', async (req, res) => {
+  app.post('/api/c411/search', requireAuth, async (req, res) => {
     try {
-      const query = (req.query.query as string || '').trim();
-      const mediaType = req.query.mediaType as string || 'movie';
-      const year = req.query.year as string;
-      const apiKey = (req.query.apiKey as string) || '2d4baaf4fdd1dacd26f8dc96b1ab6aa06fc95140a7509456b25c8c0b9b5ac55a';
+      const query = (typeof req.body?.query === 'string' ? req.body.query : '').trim();
+      const mediaType = typeof req.body?.mediaType === 'string' ? req.body.mediaType : 'movie';
+      const year = typeof req.body?.year === 'string' ? req.body.year : undefined;
+      const apiKey = process.env.C411_API_KEY || (typeof req.body?.apiKey === 'string' ? req.body.apiKey : '');
 
       if (!query) {
         return res.json({ torrents: [] });
+      }
+      if (!apiKey) {
+        return res.status(503).json({
+          error: 'Cle API C411 non configuree',
+          torrents: []
+        });
       }
 
       // Nettoyage de la recherche pour C411
@@ -1255,52 +1419,8 @@ async function startServer() {
     }
   });
 
-
-  // Sonarr Webhook (Advanced)
-  app.post('/api/webhook/sonarr', express.json(), async (req, res) => {
-    try {
-      const payload = req.body;
-      console.log("[Sonarr Webhook] Received:", payload.eventType);
-      
-      let title = "Téléchargement Sonarr";
-      let body = "Un téléchargement a été mis à jour.";
-      
-      if (payload.eventType === 'Grab') {
-        title = "Téléchargement lancé";
-        body = `${payload.series?.title || 'Une série'} a commencé le téléchargement.`;
-      } else if (payload.eventType === 'Download') {
-        title = "Épisode importé";
-        body = `${payload.series?.title || 'Série'} S${payload.episodes?.[0]?.seasonNumber || 'X'}E${payload.episodes?.[0]?.episodeNumber || 'X'} est disponible !`;
-      } else {
-        return res.status(200).send("Ignored event type");
-      }
-      
-      const usersSnapshot = await adminDb.collection('users').get();
-      const tokens = [];
-      usersSnapshot.forEach(doc => {
-        const data = doc.data();
-        if (data.fcmToken) {
-          tokens.push(data.fcmToken);
-        }
-      });
-      
-      if (tokens.length > 0) {
-        await getMessaging().sendEachForMulticast({
-          tokens,
-          notification: { title, body }
-        });
-        console.log("[Sonarr Webhook] Sent FCM to", tokens.length, "users");
-      }
-      
-      return res.status(200).send("OK");
-    } catch(e) {
-      console.error("[Sonarr Webhook Error]", e);
-      return res.status(500).send(e.toString());
-    }
-  });
-
   // Remote Download Dispatcher (Sonarr / Radarr / qBittorrent)
-  app.post('/api/downloads/push', express.json(), async (req, res) => {
+  app.post('/api/downloads/push', requireAuth, express.json(), async (req, res) => {
     try {
       const {
         service,
@@ -1331,7 +1451,7 @@ async function startServer() {
           publishDate: torrent.createdAt || new Date().toISOString()
         };
 
-        const sonarrRes = await fetch(sonarrEndpoint, {
+        const sonarrRes = await secureServerFetch(sonarrEndpoint, {
           method: 'POST',
           headers: {
             'X-Api-Key': apiKey,
@@ -1358,7 +1478,7 @@ async function startServer() {
           publishDate: torrent.createdAt || new Date().toISOString()
         };
 
-        const radarrRes = await fetch(radarrEndpoint, {
+        const radarrRes = await secureServerFetch(radarrEndpoint, {
           method: 'POST',
           headers: {
             'X-Api-Key': apiKey,
@@ -1380,7 +1500,7 @@ async function startServer() {
         // Authentification session qBittorrent si username/password
         let cookieHeader = '';
         if (username || password) {
-          const loginRes = await fetch(`${cleanUrl}/api/v2/auth/login`, {
+          const loginRes = await secureServerFetch(`${cleanUrl}/api/v2/auth/login`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/x-www-form-urlencoded'
@@ -1397,7 +1517,7 @@ async function startServer() {
         formData.append('urls', torrent.magnetUri);
         formData.append('category', mediaType === 'tv' ? 'tv' : 'movies');
 
-        const addRes = await fetch(`${cleanUrl}/api/v2/torrents/add`, {
+        const addRes = await secureServerFetch(`${cleanUrl}/api/v2/torrents/add`, {
           method: 'POST',
           headers: {
             'Cookie': cookieHeader,
@@ -1453,25 +1573,25 @@ async function startServer() {
   });
 
   // Proxy pour les requêtes vers les services tiers (Sonarr, Radarr, qBittorrent, etc.) en mode Web
-  app.post('/api/service-proxy', async (req, res) => {
+  app.post('/api/service-proxy', requireAuth, async (req, res) => {
     try {
       const { targetUrl, method = 'GET', headers = {}, body } = req.body;
       if (!targetUrl) {
         return res.status(400).json({ error: 'targetUrl requis' });
       }
 
-      // Si c'est une adresse IP locale privée (192.168.x.x, 10.x.x.x, 172.16-31.x.x, localhost, 127.0.0.1)
-      const isLocalIp = /^(https?:\/\/)?(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})(:|\/|$)/i.test(targetUrl);
-      if (isLocalIp) {
-        return res.status(400).json({
-          error: 'IP_LOCALE_INACCESSIBLE',
-          message: 'L\'adresse IP locale ne peut pas être contactée par le serveur Cloud. Utilisez un tunnel HTTPS (ngrok, Cloudflare Tunnel, DuckDNS) pour tester sur le Web ou utilisez l\'APK Android connecté à votre Wi-Fi.'
-        });
+      const normalizedMethod = String(method).toUpperCase();
+      const allowedMethods = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']);
+      if (!allowedMethods.has(normalizedMethod)) {
+        return res.status(400).json({ error: 'Methode HTTP non autorisee' });
       }
 
+      await validateOutboundUrl(targetUrl);
+
       // Dériver Origin et Referer automatiquement pour qBittorrent et autres services avec vérification CSRF / Host
-      let origin = headers['Origin'] || headers['origin'];
-      let referer = headers['Referer'] || headers['referer'];
+      const sanitizedHeaders = sanitizeProxyHeaders(headers);
+      let origin = sanitizedHeaders['Origin'] || sanitizedHeaders['origin'];
+      let referer = sanitizedHeaders['Referer'] || sanitizedHeaders['referer'];
       try {
         const parsedUrl = new URL(targetUrl);
         if (!origin) origin = parsedUrl.origin;
@@ -1480,25 +1600,25 @@ async function startServer() {
 
       const cleanHeaders: Record<string, string> = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 SeenIt/1.0',
-        ...headers
+        ...sanitizedHeaders
       };
       if (origin && !cleanHeaders['Origin'] && !cleanHeaders['origin']) cleanHeaders['Origin'] = origin;
       if (referer && !cleanHeaders['Referer'] && !cleanHeaders['referer']) cleanHeaders['Referer'] = referer;
 
       const fetchOptions: any = {
-        method,
+        method: normalizedMethod,
         headers: cleanHeaders,
         signal: AbortSignal.timeout(10000)
       };
 
-      if (method !== 'GET' && method !== 'HEAD' && body !== undefined && body !== null) {
+      if (normalizedMethod !== 'GET' && normalizedMethod !== 'HEAD' && body !== undefined && body !== null) {
         fetchOptions.body = typeof body === 'string' ? body : JSON.stringify(body);
         if (!fetchOptions.headers['Content-Type'] && !fetchOptions.headers['content-type'] && typeof body !== 'string') {
           fetchOptions.headers['Content-Type'] = 'application/json';
         }
       }
 
-      const response = await fetch(targetUrl, fetchOptions);
+      const response = await secureServerFetch(targetUrl, fetchOptions);
       const text = await response.text();
       let data: any = text;
       try {
@@ -1537,7 +1657,7 @@ async function startServer() {
   });
 
   // Webhooks Sonarr & Radarr pour notifications instantanées
-  app.post(['/api/webhook/sonarr', '/api/webhook/radarr'], async (req, res) => {
+  app.post(['/api/webhook/sonarr', '/api/webhook/radarr'], requireWebhookSecret, async (req, res) => {
     try {
       const payload = req.body || {};
       const eventType = payload.eventType || payload.event_type || 'Unknown';
