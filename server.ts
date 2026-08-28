@@ -725,14 +725,9 @@ async function startServer() {
         const queryConnection = async (uri: string): Promise<any | null> => {
           const endpointsToTry = [
             `${uri}/library/all?guid=${encodeURIComponent(`tmdb://${tmdbId}`)}&includeGuids=1`,
-            `${uri}/hubs/search?query=${encodeURIComponent(`tmdb://${tmdbId}`)}&limit=5&includeGuids=1`
+            `${uri}/hubs/search?query=${encodeURIComponent(`tmdb://${tmdbId}`)}&limit=5&includeGuids=1`,
+            `${uri}/library/all?guid=${encodeURIComponent(`com.plexapp.agents.themoviedb://${tmdbId}`)}&includeGuids=1`
           ];
-          if (title && title.trim()) {
-            endpointsToTry.push(`${uri}/hubs/search?query=${encodeURIComponent(title.trim())}&limit=10&includeGuids=1`);
-          }
-          if (originalTitle && originalTitle.trim() && originalTitle.trim() !== title?.trim()) {
-            endpointsToTry.push(`${uri}/hubs/search?query=${encodeURIComponent(originalTitle.trim())}&limit=10&includeGuids=1`);
-          }
 
           for (const ep of endpointsToTry) {
             try {
