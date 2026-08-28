@@ -5,6 +5,7 @@ import { tmdb } from '../shows/tmdb';
 import { useShowsStore } from '../../store/showsStore';
 import { useSyncStore } from '../../store/syncStore';
 import { useToastStore } from '../../store/toastStore';
+import { openExternalUrl } from '../../lib/utils';
 import { appLogger } from '../../store/logStore';
 import { getPlexClientId } from '../../services/plex';
 import { Show } from '../../types';
@@ -1202,10 +1203,10 @@ export const openPlexWatchUrl = async (tmdbId: string, type: 'movie' | 'show') =
   }
 
   if (resolvedSlug) {
-    window.location.href = `https://watch.plex.tv/${type}/${resolvedSlug}`;
+    openExternalUrl(`https://watch.plex.tv/${type}/${resolvedSlug}`);
     return;
   }
 
   // Si pas de slug ou erreur API -> Redirection d'accueil uniquement
-  window.location.href = `https://watch.plex.tv`;
+  openExternalUrl(`https://watch.plex.tv`);
 };

@@ -595,6 +595,8 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         logo_path: 'PLEX_CUSTOM_SVG',
         isPlex: true,
         serverName: plexMediaInfo.serverName,
+        plexUrl: plexMediaInfo.plexUrl,
+        watchUrl: plexMediaInfo.watchUrl,
       });
     }
     return list.sort((a: any, b: any) => {
@@ -2716,7 +2718,11 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                               key={`plex-provider-item-${idx}`}
                               onClick={(e) => {
                                 e.preventDefault();
-                                openPlexWatchUrl(String(effectiveTmdbId), isSeries ? 'show' : 'movie');
+                                if (provider && provider.plexUrl) {
+                                  openExternalUrl(provider.plexUrl);
+                                } else {
+                                  openPlexWatchUrl(String(effectiveTmdbId), isSeries ? 'show' : 'movie');
+                                }
                               }}
                               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#E5A93D]/40 bg-[#E5A93D]/10 text-[#E5A93D] hover:bg-[#E5A93D]/20 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-[0_0_12px_rgba(229,169,61,0.2)]"
                               title={`Disponible sur Plex : ${provider.serverName || 'Serveur'}`}

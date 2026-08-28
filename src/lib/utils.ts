@@ -36,12 +36,24 @@ export async function openExternalUrl(
   });
 
   if (Capacitor.isNativePlatform()) {
-    // 1. Gestion Plex : Deep Link Universel (watch.plex.tv) via redirection directe window.location.href
+    // 1. Gestion Plex : Deep Link Universel via AppLauncher / Browser au lieu de location.href
     if ((targetUrl.includes('plex.tv') || targetUrl.startsWith('plex://')) && !targetUrl.includes('/auth')) {
-      appLogger.info('plex', `[Plex DeepLink] Redirection directe via window.location.href : ${targetUrl}`);
-      window.location.href = targetUrl;
+      appLogger.info('plex', `[Plex DeepLink] Redirection via intent système : ${targetUrl}`);
+      try {
+        const res = await AppLauncher.openUrl({ url: targetUrl });
+        if (res && res.completed) return;
+      } catch (err) {
+        // Fallback
+      }
+      try {
+        await Browser.open({ url: targetUrl, windowName: '_system' });
+        return;
+      } catch (e) {
+        window.location.href = targetUrl;
+      }
       return;
     }
+
 
     // 2. Gestion Reddit : ouverture via l'application native Reddit (Intent Android)
     if (url.includes('reddit.com') || url.startsWith('reddit://')) {
