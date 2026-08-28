@@ -31,27 +31,122 @@ const normalizeTitle = (t?: string) => {
     .trim();
 };
 
-const extractTmdbIdFromPlex = (item: any): number | null => {
-  if (!item) return null;
+export const extractExternalIdsFromPlex = (item: any) => {
+  let tmdbId: number | null = null;
+  let imdbId: string | null = null;
+  let tvdbId: number | null = null;
+  let plexGuid: string | null = null;
+
+  if (!item) return { tmdbId, imdbId, tvdbId, plexGuid };
+
+  const processGuidStr = (str: string) => {
+    if (!str || typeof str !== 'string') return;
+    const tmdbMatch = str.match(/themoviedb:\/\/(\d+)|tmdb:\/\/(\d+)|com\.plexapp\.agents\.themoviedb:\/\/(\d+)/i);
+    if (tmdbMatch && !tmdbId) {
+      tmdbId = Number(tmdbMatch[1] || tmdbMatch[2] || tmdbMatch[3]);
+    }
+    const imdbMatch = str.match(/imdb:\/\/(tt\d+)|com\.plexapp\.agents\.imdb:\/\/(tt\d+)/i);
+    if (imdbMatch && !imdbId) {
+      imdbId = (imdbMatch[1] || imdbMatch[2]).toLowerCase();
+    }
+    const tvdbMatch = str.match(/tvdb:\/\/(\d+)|com\.plexapp\.agents\.thetvdb:\/\/(\d+)/i);
+    if (tvdbMatch && !tvdbId) {
+      tvdbId = Number(tvdbMatch[1] || tvdbMatch[2]);
+    }
+    const plexMatch = str.match(/plex:\/\/(movie|show)\/([a-f0-9]+)/i);
+    if (plexMatch && !plexGuid) {
+      plexGuid = plexMatch[2];
+    }
+  };
 
   if (Array.isArray(item.Guid)) {
     for (const g of item.Guid) {
       if (typeof g?.id === 'string') {
-        const tmdbMatch = g.id.match(/^tmdb:\/\/(\d+)/i) || g.id.match(/^themoviedb:\/\/(\d+)/i);
-        if (tmdbMatch) return Number(tmdbMatch[1]);
+        processGuidStr(g.id);
       }
     }
   }
 
   for (const field of [item.guid, item.grandparentGuid, item.parentGuid]) {
     if (typeof field === 'string') {
-      const tmdbMatch = field.match(/themoviedb:\/\/(\d+)|tmdb:\/\/(\d+)|com\.plexapp\.agents\.themoviedb:\/\/(\d+)/i);
-      if (tmdbMatch) return Number(tmdbMatch[1] || tmdbMatch[2] || tmdbMatch[3]);
+      processGuidStr(field);
     }
   }
 
-  return null;
+  return { tmdbId, imdbId, tvdbId, plexGuid };
 };
+
+const extractTmdbIdFromPlex = (item: any): number | null => {
+  return extractExternalIdsFromPlex(item).tmdbId;
+};
+
+async function resolveTmdbDataForPlexItem(
+  item: any,
+  mediaType: 'tv' | 'movie',
+  plexToken?: string
+): Promise<any | null> {
+  const { tmdbId, imdbId, tvdbId, plexGuid } = extractExternalIdsFromPlex(item);
+
+  // 1. Direct TMDB ID
+  if (tmdbId) {
+    const detailsRes = await tmdb.getMediaDetails(tmdbId, mediaType);
+    if (detailsRes.ok && detailsRes.value) return detailsRes.value;
+  }
+
+  // 2. IMDb ID
+  if (imdbId) {
+    const findRes = await tmdb.findByExternalId(imdbId, 'imdb_id', mediaType);
+    if (findRes.ok && findRes.value) return findRes.value;
+  }
+
+  // 3. TVDb ID
+  if (tvdbId) {
+    const findRes = await tmdb.findByExternalId(String(tvdbId), 'tvdb_id', mediaType);
+    if (findRes.ok && findRes.value) return findRes.value;
+  }
+
+  // 4. Plex Discover metadata API lookup for plex:// GUIDs
+  const pKey = plexGuid || (typeof item.guid === 'string' && item.guid.startsWith('plex://') ? item.guid.replace(/^plex:\/\/(movie|show)\//, '') : null) || item.ratingKey || item.key;
+  if (pKey && plexToken) {
+    try {
+      const cleanKey = String(pKey).replace('/library/metadata/', '');
+      const plexMetaUrl = `https://discover.provider.plex.tv/library/metadata/${cleanKey}?X-Plex-Token=${plexToken}`;
+      const res = await fetch(plexMetaUrl, { headers: { 'Accept': 'application/json' } });
+      if (res.ok) {
+        const data = await res.json();
+        const metaItem = data?.MediaContainer?.Metadata?.[0];
+        if (metaItem) {
+          const fetchedIds = extractExternalIdsFromPlex(metaItem);
+          if (fetchedIds.tmdbId) {
+            const detailsRes = await tmdb.getMediaDetails(fetchedIds.tmdbId, mediaType);
+            if (detailsRes.ok && detailsRes.value) return detailsRes.value;
+          }
+          if (fetchedIds.imdbId) {
+            const findRes = await tmdb.findByExternalId(fetchedIds.imdbId, 'imdb_id', mediaType);
+            if (findRes.ok && findRes.value) return findRes.value;
+          }
+          if (fetchedIds.tvdbId) {
+            const findRes = await tmdb.findByExternalId(String(fetchedIds.tvdbId), 'tvdb_id', mediaType);
+            if (findRes.ok && findRes.value) return findRes.value;
+          }
+        }
+      }
+    } catch (err) {
+      // ignore
+    }
+  }
+
+  // 5. Fallback TMDB search by title & year
+  const rawTitle = item.title || item.grandparentTitle;
+  if (rawTitle) {
+    const cleanTitle = rawTitle.replace(/\(\d{4}\)/g, '').trim();
+    const itemYear = item.year || item.originallyAvailableAt?.substring(0, 4);
+    const searchRes = await tmdb.searchMedia(cleanTitle, itemYear ? String(itemYear) : undefined, mediaType);
+    if (searchRes.ok && searchRes.value) return searchRes.value;
+  }
+
+  return null;
+}
 
 // Helper to sanitize show object for Firestore (strip undefined, internal norm fields)
 function cleanShowForFirestore(show: any, userId: string): Record<string, any> {
@@ -521,17 +616,12 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             }
           }
 
-          // 3. If still not resolved, query TMDB details if GUID exists
+          // 3. If still not resolved, query TMDB via helper (handles TMDB GUID, IMDb ID, TVDb ID, Plex Discover metadata, and fallback search)
           if (!matchedShow && !tmdbData) {
-            if (guidTmdbId) {
-              const detailsRes = await tmdb.getMediaDetails(guidTmdbId, 'tv');
-              if (detailsRes.ok && detailsRes.value) {
-                tmdbData = detailsRes.value;
-              }
-            }
+            tmdbData = await resolveTmdbDataForPlexItem(item, 'tv', plexToken);
 
             if (!tmdbData) {
-              appLogger.info('plex', `[Plex Sync] Fiche "${cleanShowTitle}" ignorée (aucun GUID TMDB dans la fiche Plex).`);
+              appLogger.info('plex', `[Plex Sync] Fiche "${cleanShowTitle}" ignorée (impossible de résoudre l'ID TMDB).`);
               continue;
             }
 
@@ -685,17 +775,12 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             }
           }
 
-          // 3. If still not resolved, query TMDB details if GUID exists
+          // 3. If still not resolved, query TMDB via helper
           if (!matchedMovie && !tmdbData) {
-            if (guidTmdbId) {
-              const detailsRes = await tmdb.getMediaDetails(guidTmdbId, 'movie');
-              if (detailsRes.ok && detailsRes.value) {
-                tmdbData = detailsRes.value;
-              }
-            }
+            tmdbData = await resolveTmdbDataForPlexItem(item, 'movie', plexToken);
 
             if (!tmdbData) {
-              appLogger.info('plex', `[Plex Sync] Fiche film "${cleanMovieTitle}" ignorée (aucun GUID TMDB dans la fiche Plex).`);
+              appLogger.info('plex', `[Plex Sync] Fiche film "${cleanMovieTitle}" ignorée (impossible de résoudre l'ID TMDB).`);
               continue;
             }
 
@@ -846,17 +931,12 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             if (matchedShow) continue;
           }
 
-          // 3. Search TMDB if GUID exists
+          // 3. Resolve TMDB data for Watchlist item
           if (!tmdbData) {
-            if (guidTmdbId) {
-              const detailsRes = await tmdb.getMediaDetails(guidTmdbId, mediaType);
-              if (detailsRes.ok && detailsRes.value) {
-                tmdbData = detailsRes.value;
-              }
-            }
+            tmdbData = await resolveTmdbDataForPlexItem(wlItem, mediaType, plexToken);
 
             if (!tmdbData) {
-              appLogger.info('plex', `[Plex Sync] Item Watchlist "${cleanTitle}" ignoré (aucun GUID TMDB).`);
+              appLogger.info('plex', `[Plex Sync] Item Watchlist "${cleanTitle}" ignoré (impossible de résoudre l'ID TMDB).`);
               continue;
             }
 
