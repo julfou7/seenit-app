@@ -1366,76 +1366,124 @@ export const openPlexWatchUrl = async (show: any) => {
     return;
   }
 
-  appLogger.info('plex', `[Plex Official] Résolution du slug via API backend pour "${title || 'N/A'}" (TMDB: ${tmdbId || 'N/A'}, IMDb: ${imdbId || 'N/A'}, ${type})...`);
+  appLogger.info('plex', `[Plex Official] Résolution du slug pour "${title || 'N/A'}" (TMDB: ${tmdbId || 'N/A'}, IMDb: ${imdbId || 'N/A'}, ${type})...`);
 
-  // 2. Fetch from backend
   const isNative = Capacitor.isNativePlatform();
-  const RESOLVE_ENDPOINTS = isNative
-    ? [
-        'https://seenit.ai.studio/api/plex/resolve-slug',
-        'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug',
-        'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug'
-      ]
-    : [
-        '/api/plex/resolve-slug',
-        'https://seenit.ai.studio/api/plex/resolve-slug',
-        'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug',
-        'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug'
-      ];
+  const plexType = type === 'show' ? 2 : 1;
+  const plexHeaders = getPlexHeaders();
 
   let resolvedSlug: string | null = null;
   let resolvedGuid: string | null = null;
   let resolvedFrom: string | null = null;
-  const clientId = getPlexClientIdentifier();
-  const plexHeaders = getPlexHeaders();
 
-  const queryParams = new URLSearchParams();
-  if (tmdbId) queryParams.set('tmdbId', String(tmdbId));
-  if (imdbId) queryParams.set('imdbId', String(imdbId));
-  if (tvdbId) queryParams.set('tvdbId', String(tvdbId));
-  if (title) queryParams.set('title', title);
-  if (originalTitle) queryParams.set('originalTitle', originalTitle);
-  if (year) queryParams.set('year', String(year));
-  queryParams.set('type', type);
-  if (clientId) queryParams.set('clientId', clientId);
+  // 2.A. TENTATIVE DIRECTE OFFICIELLE PLEX (Ultra-rapide, sans dépendance backend)
+  const guidsToTry: Array<{ guid: string; from: string }> = [];
+  if (tmdbId) guidsToTry.push({ guid: `tmdb://${tmdbId}`, from: `tmdb:${tmdbId}` });
+  if (imdbId) guidsToTry.push({ guid: `imdb://${imdbId}`, from: `imdb:${String(imdbId).toLowerCase()}` });
+  if (tvdbId) guidsToTry.push({ guid: `tvdb://${tvdbId}`, from: `tvdb:${tvdbId}` });
 
-  for (const ep of RESOLVE_ENDPOINTS) {
+  for (const { guid, from } of guidsToTry) {
     try {
+      const matchesUrl = `https://metadata.provider.plex.tv/library/metadata/matches?guid=${encodeURIComponent(guid)}&type=${plexType}`;
       let data: any = null;
-      const fullUrl = `${ep}?${queryParams.toString()}`;
 
       if (isNative) {
         const nativeRes = await CapacitorHttp.get({
-          url: fullUrl,
+          url: matchesUrl,
           headers: plexHeaders,
-          connectTimeout: 8000,
-          readTimeout: 8000
+          connectTimeout: 5000,
+          readTimeout: 5000
         });
         if (nativeRes.status >= 200 && nativeRes.status < 300) {
           data = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
         }
       } else {
-        const response = await fetch(fullUrl, {
-          headers: plexHeaders
+        const response = await fetch(matchesUrl, {
+          headers: plexHeaders,
+          signal: AbortSignal.timeout(5000)
         });
         if (response.ok) {
           data = await response.json();
         }
       }
 
-      if (
-        data?.slug &&
-        data?.resolvedFrom &&
-        expectedResolvedFrom &&
-        data.resolvedFrom === expectedResolvedFrom
-      ) {
-        resolvedSlug = data.slug;
-        resolvedGuid = data.plexGuid || data.guid || null;
-        resolvedFrom = data.resolvedFrom;
+      const results = data?.MediaContainer?.Metadata || data?.MediaContainer?.SearchResult;
+      const match = Array.isArray(results) && results.length > 0 ? results[0] : null;
+
+      if (match && match.slug) {
+        resolvedSlug = match.slug;
+        resolvedGuid = match.guid || null;
+        resolvedFrom = from;
+        appLogger.info('plex', `[Plex Official] ✅ Slug résolu en direct Plex : "${resolvedSlug}" (${from})`);
         break;
       }
-    } catch (error) {
-      // Ignorer l'erreur et essayer le suivant
+    } catch (err: any) {
+      // Ignorer et essayer le suivant ou le backend
+    }
+  }
+
+  // 2.B. FALLBACK VIA BACKEND SI NÉCESSAIRE
+  if (!resolvedSlug) {
+    const RESOLVE_ENDPOINTS = isNative
+      ? [
+          'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug',
+          'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug'
+        ]
+      : [
+          '/api/plex/resolve-slug',
+          'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug',
+          'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug'
+        ];
+
+    const clientId = getPlexClientIdentifier();
+    const queryParams = new URLSearchParams();
+    if (tmdbId) queryParams.set('tmdbId', String(tmdbId));
+    if (imdbId) queryParams.set('imdbId', String(imdbId));
+    if (tvdbId) queryParams.set('tvdbId', String(tvdbId));
+    if (title) queryParams.set('title', title);
+    if (originalTitle) queryParams.set('originalTitle', originalTitle);
+    if (year) queryParams.set('year', String(year));
+    queryParams.set('type', type);
+    if (clientId) queryParams.set('clientId', clientId);
+
+    for (const ep of RESOLVE_ENDPOINTS) {
+      try {
+        let data: any = null;
+        const fullUrl = `${ep}?${queryParams.toString()}`;
+
+        if (isNative) {
+          const nativeRes = await CapacitorHttp.get({
+            url: fullUrl,
+            headers: plexHeaders,
+            connectTimeout: 8000,
+            readTimeout: 8000
+          });
+          if (nativeRes.status >= 200 && nativeRes.status < 300) {
+            data = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
+          }
+        } else {
+          const response = await fetch(fullUrl, {
+            headers: plexHeaders
+          });
+          if (response.ok) {
+            data = await response.json();
+          }
+        }
+
+        if (
+          data?.slug &&
+          data?.resolvedFrom &&
+          expectedResolvedFrom &&
+          data.resolvedFrom === expectedResolvedFrom
+        ) {
+          resolvedSlug = data.slug;
+          resolvedGuid = data.plexGuid || data.guid || null;
+          resolvedFrom = data.resolvedFrom;
+          break;
+        }
+      } catch (error) {
+        // Ignorer l'erreur et essayer le suivant
+      }
     }
   }
 
