@@ -2718,8 +2718,11 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                               key={`plex-provider-item-${idx}`}
                               onClick={(e) => {
                                 e.preventDefault();
-                                if (provider && provider.plexUrl) {
-                                  openExternalUrl(provider.plexUrl);
+                                if (provider && (provider.plexUrl || provider.watchUrl)) {
+                                  const urlToOpen = Capacitor.isNativePlatform() && provider.watchUrl && provider.watchUrl.includes('/slug') === false
+                                    ? provider.watchUrl 
+                                    : (provider.plexUrl || provider.watchUrl);
+                                  openExternalUrl(urlToOpen);
                                 } else {
                                   openPlexWatchUrl(String(effectiveTmdbId), isSeries ? 'show' : 'movie');
                                 }

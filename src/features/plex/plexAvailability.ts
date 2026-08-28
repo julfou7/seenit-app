@@ -401,8 +401,11 @@ async function checkPlexDirectFromDevice(params: {
                     ? `https://app.plex.tv/desktop/#!/server/${server.clientIdentifier}/details?key=${encodeURIComponent(`/library/metadata/${it.ratingKey}`)}`
                     : 'https://app.plex.tv/desktop';
                   const isShowType = mediaType === 'tv';
-                  const itemWatchUrl = it.slug
-                    ? `https://watch.plex.tv/${isShowType ? 'show' : 'movie'}/${it.slug}`
+                  const plexGuidMatch = typeof it.guid === 'string' ? it.guid.match(/plex:\/\/(movie|show)\/([a-f0-9]+)/i) : null;
+                  const hash = plexGuidMatch ? plexGuidMatch[2] : null;
+                  const slugOrHash = it.slug || hash;
+                  const itemWatchUrl = slugOrHash
+                    ? `https://watch.plex.tv/${isShowType ? 'show' : 'movie'}/${slugOrHash}`
                     : 'https://watch.plex.tv';
 
                   return {

@@ -434,18 +434,12 @@ async function startServer() {
                     const itemYear = it.year || year;
                     const isShow = (it.type === 'show' || it.type === 'series' || mediaType === 'tv');
                     
-                    let watchUrl = '';
-                    if (it.slug) {
-                      watchUrl = `https://watch.plex.tv/${isShow ? 'show' : 'movie'}/${it.slug}`;
-                    } else {
-                      const targetTitleForSlug = it.originalTitle || originalTitle || itemTitle;
-                      const slug = (targetTitleForSlug || '')
-                        .normalize('NFD')
-                        .replace(/[\u0300-\u036f]/g, '')
-                        .toLowerCase()
-                        .replace(/[^a-z0-9]+/g, '-')
-                        .replace(/^-+|-+$/g, '');
-                      watchUrl = `https://watch.plex.tv/${isShow ? 'show' : 'movie'}/${slug}`;
+                    let watchUrl = 'https://watch.plex.tv';
+                    const plexGuidMatch = typeof it.guid === 'string' ? it.guid.match(/plex:\/\/(movie|show)\/([a-f0-9]+)/i) : null;
+                    const hash = plexGuidMatch ? plexGuidMatch[2] : null;
+                    const slugOrHash = it.slug || hash;
+                    if (slugOrHash) {
+                      watchUrl = `https://watch.plex.tv/${isShow ? 'show' : 'movie'}/${slugOrHash}`;
                     }
 
                     const directPlexUrl = (server.clientIdentifier && it.ratingKey)
