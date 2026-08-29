@@ -153,6 +153,9 @@ export function DownloadConfigSection({ defaultOpen = false, hideToggle = false 
                 Tester la connexion
               </button>
             </div>
+            <p className="text-[10px] text-zinc-400 mb-1.5">
+              Trouvable dans votre profil C411. Elle est enregistrée uniquement dans les paramètres de votre compte SeenIt.
+            </p>
             <input
               type="password"
               value={c411Key}
@@ -160,12 +163,7 @@ export function DownloadConfigSection({ defaultOpen = false, hideToggle = false 
               placeholder="Clé API de votre compte C411"
               className="w-full bg-zinc-900 border border-zinc-700/80 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-blue-500"
             />
-            <p className="text-[10px] text-zinc-500 mt-1">
-              Trouvable dans votre profil C411. Elle est enregistrée uniquement dans les paramètres de votre compte SeenIt.
-            </p>
           </div>
-
-          <div className="h-px bg-zinc-800/60" />
 
           {/* Sonarr (Séries) */}
           <div className="space-y-1.5">

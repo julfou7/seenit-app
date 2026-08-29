@@ -30,7 +30,7 @@ export function SeenItGlyph({
   glow = true,
   active = true,
   idPrefix = 'seenit',
-  color = 'gold'
+  color
 }: { 
   size?: number; 
   className?: string; 
@@ -40,7 +40,7 @@ export function SeenItGlyph({
   idPrefix?: string;
   color?: 'gold' | 'blue';
 }) {
-  const isBlue = color === 'blue' || symbol === 'download';
+  const isBlue = color === 'blue' || (color === undefined && symbol === 'download');
   const gradientId = isBlue ? `${idPrefix}-blue-grad` : `${idPrefix}-gold-grad`;
   const playGradId = isBlue ? `${idPrefix}-blue-symbol-grad` : `${idPrefix}-play-grad`;
   const glassId = `${idPrefix}-glass-grad`;
