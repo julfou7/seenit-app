@@ -38,8 +38,10 @@ function looksLikePlexMediaObject(value: any): boolean {
   const type = String(value.type || '').toLowerCase();
   return ['movie', 'show', 'series', 'season', 'episode', 'video'].includes(type) ||
     !!(value.guid || value.Guid || value.guids || value.ratingKey || value.key ||
+      value.metadataItemID || value.metadataItemId || value.historyKey ||
       value.grandparentGuid || value.parentGuid || value.grandparentRatingKey ||
-      value.parentRatingKey || value.grandparentTitle || value.parentIndex);
+      value.parentRatingKey || value.grandparentKey || value.grandparentThumb ||
+      value.grandparentTitle || value.parentIndex);
 }
 
 export function parsePlexGuid(raw: unknown): ParsedPlexGuid | null {
@@ -93,40 +95,73 @@ export function unwrapPlexMediaItem(rawItem: any): any {
   return Object.assign({}, root, ...mediaLayers);
 }
 
+/**
+ * Extrait un ratingKey LOCAL PMS depuis les différentes formes techniques que Plex
+ * peut laisser dans un objet d'historique. Les anciennes lignes d'historique peuvent
+ * perdre `ratingKey`/`key` mais conserver `thumb`, `art`, `grandparentThumb`, etc.
+ *
+ * Important : un `plex://...` est un GUID provider global, pas un ratingKey PMS local.
+ * On ne le convertit donc jamais ici en `/library/metadata/{ratingKey}` local.
+ */
+export function extractPlexLocalMetadataId(rawValue: unknown): string | null {
+  if (rawValue === null || rawValue === undefined) return null;
+  const value = String(rawValue).trim();
+  if (!value) return null;
+
+  if (/^[A-Za-z0-9_-]+$/.test(value)) return value;
+
+  const pathMatch = value.match(/\/library\/metadata\/([A-Za-z0-9_-]+)(?:[/?#]|$)/i);
+  if (pathMatch) return pathMatch[1];
+
+  return null;
+}
+
+function findPlexMetadataLookupValue(values: unknown[]): string | null {
+  for (const rawValue of values) {
+    const metadataId = extractPlexLocalMetadataId(rawValue);
+    if (metadataId) return metadataId;
+  }
+  return null;
+}
+
 export function getPlexMetadataLookupKey(rawItem: any): string | null {
   const item = unwrapPlexMediaItem(rawItem);
   if (!item) return null;
 
-  for (const rawValue of [
+  return findPlexMetadataLookupValue([
     item.ratingKey,
+    item.metadataItemID,
+    item.metadataItemId,
+    item.metadataItemId,
+    item.metadata_id,
+    item.metadataID,
     item.key,
     item.metadataKey,
     item.metadata_key,
     item.metadataUri,
-    item.metadataURI
-  ]) {
-    if (rawValue === null || rawValue === undefined) continue;
-    const value = String(rawValue).trim();
-    if (!value) continue;
+    item.metadataURI,
+    // Les objets d'historique orphelins peuvent encore conserver le ratingKey
+    // dans une URL d'image alors que `ratingKey` et `key` ont disparu.
+    item.thumb,
+    item.art
+  ]);
+}
 
-    if (/^[a-zA-Z0-9_-]+$/.test(value) ||
-        /^\/library\/metadata\/[a-zA-Z0-9_-]+(?:[/?#].*)?$/.test(value) ||
-        parsePlexGuid(value)) {
-      return value;
-    }
+/**
+ * Retourne exclusivement le ratingKey LOCAL de la SERIE parente d'un épisode.
+ * C'est volontairement séparé de getPlexMetadataLookupKey : parentKey pointe vers
+ * la saison, tandis que grandparentKey/grandparentThumb pointent vers le show.
+ */
+export function getPlexParentShowMetadataLookupKey(rawItem: any): string | null {
+  const item = unwrapPlexMediaItem(rawItem);
+  if (!item) return null;
 
-    try {
-      const url = new URL(value);
-      if (['metadata.provider.plex.tv', 'discover.provider.plex.tv'].includes(url.hostname) &&
-          /^\/library\/metadata\/[a-zA-Z0-9_-]+/.test(url.pathname)) {
-        return url.pathname;
-      }
-    } catch {
-      // Ce champ n'est simplement pas une URL absolue.
-    }
-  }
-
-  return null;
+  return findPlexMetadataLookupValue([
+    item.grandparentRatingKey,
+    item.grandparentKey,
+    item.grandparentThumb,
+    item.grandparentArt
+  ]);
 }
 
 export function extractPlexExternalIds(rawItem: any): PlexExternalIds {
@@ -309,7 +344,7 @@ export function buildPlexParentShowIdentityItem(rawItem: any): any {
     guids: showGuids,
     serverId: item?.serverId,
     ratingKey: isEpisode
-      ? (item?.grandparentRatingKey || null)
+      ? (getPlexParentShowMetadataLookupKey(item) || null)
       : (item?.parentRatingKey || item?.ratingKey || null),
     sourceIdentity: item?.sourceIdentity || null
   };
