@@ -4,7 +4,9 @@ import {
   buildPlexParentShowIdentityItem,
   buildResolvedPlexIdentity,
   extractPlexExternalIds,
+  extractPlexLocalMetadataId,
   getPlexMetadataLookupKey,
+  getPlexParentShowMetadataLookupKey,
   getStrongPlexSourceIdentity,
   isPlexEpisodeAlreadyWatched,
   isPlexMovieAlreadyWatched,
@@ -74,7 +76,45 @@ test('déplie une réponse Plex MediaContainer contenant un seul média', () => 
   };
 
   assert.equal(extractPlexExternalIds(response).plexGuid, 'movie-hash');
-  assert.equal(getPlexMetadataLookupKey(response), '/library/metadata/movie-hash');
+  assert.equal(getPlexMetadataLookupKey(response), 'movie-hash');
+});
+
+test("récupère un ratingKey local caché dans les champs techniques d'historique Plex", () => {
+  assert.equal(extractPlexLocalMetadataId('/library/metadata/218860/thumb/-1'), '218860');
+  assert.equal(extractPlexLocalMetadataId('https://example.test/library/metadata/movie_12/art/123'), 'movie_12');
+  assert.equal(getPlexMetadataLookupKey({ type: 'movie', metadataItemID: 4242 }), '4242');
+  assert.equal(getPlexMetadataLookupKey({ type: 'movie', thumb: '/library/metadata/218860/thumb/-1' }), '218860');
+  assert.equal(getPlexMetadataLookupKey({ type: 'movie', art: '/library/metadata/abc-12_def/art/99' }), 'abc-12_def');
+});
+
+test("ne confond jamais un GUID provider Plex avec un ratingKey local PMS", () => {
+  assert.equal(extractPlexLocalMetadataId('plex://movie/5d7768244de0ee001fcc7fed'), null);
+  assert.equal(getPlexMetadataLookupKey({ type: 'movie', metadataKey: 'plex://movie/provider-id' }), null);
+});
+
+test("récupère directement le ratingKey local de la série depuis grandparentKey ou grandparentThumb", () => {
+  assert.equal(
+    getPlexParentShowMetadataLookupKey({
+      type: 'episode',
+      grandparentKey: '/library/metadata/871'
+    }),
+    '871'
+  );
+  assert.equal(
+    getPlexParentShowMetadataLookupKey({
+      type: 'episode',
+      grandparentThumb: '/library/metadata/show_parent/thumb/1234'
+    }),
+    'show_parent'
+  );
+  // La clé du show parent ne doit pas être prise pour la clé de l'épisode lui-même.
+  assert.equal(
+    getPlexMetadataLookupKey({
+      type: 'episode',
+      grandparentThumb: '/library/metadata/show_parent/thumb/1234'
+    }),
+    null
+  );
 });
 
 test('refuse un premier résultat Plex sans identifiant strictement égal', () => {
@@ -140,6 +180,7 @@ test("préfère le GUID épisode au grandparentKey quand le grandparentGuid manq
   });
 
   assert.equal(parentIdentity.guid, 'plex://episode/EP_01-test');
+  assert.equal(parentIdentity.ratingKey, 'show-parent');
   assert.equal(extractPlexExternalIds(parentIdentity).plexGuid, 'EP_01-test');
 });
 
@@ -151,6 +192,17 @@ test("utilise le grandparentKey uniquement en dernier recours", () => {
   });
 
   assert.equal(parentIdentity.guid, '/library/metadata/show-parent');
+  assert.equal(parentIdentity.ratingKey, 'show-parent');
+});
+
+test("conserve le ratingKey parent trouvé dans grandparentThumb même sans grandparentKey", () => {
+  const parentIdentity = buildPlexParentShowIdentityItem({
+    type: 'episode',
+    grandparentThumb: '/library/metadata/60715/thumb/123',
+    grandparentTitle: 'Bref.'
+  });
+
+  assert.equal(parentIdentity.ratingKey, '60715');
 });
 
 test("ignore l'identifiant TMDB d'un épisode si la série parente est inconnue", () => {
