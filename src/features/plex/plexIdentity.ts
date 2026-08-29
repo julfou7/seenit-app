@@ -38,11 +38,16 @@ export function extractPlexExternalIds(rawItem: any): PlexExternalIds {
     const tvdbMatch = value.match(/(?:tvdb|thetvdb|com\.plexapp\.agents\.thetvdb):\/\/(\d+)/i);
     if (tvdbMatch && !tvdbId) tvdbId = Number(tvdbMatch[1]);
 
-    const plexMatch = value.match(/plex:\/\/(?:movie|show|season|episode)\/([a-z0-9]+)/i);
+    const plexMatch = value.match(/plex:\/\/(?:movie|show|season|episode)\/([a-z0-9_-]+)/i);
     if (plexMatch && !plexGuid) plexGuid = plexMatch[1];
   };
 
-  for (const list of [item.Guid, item.guids]) {
+  for (const list of [
+    item.Guid,
+    item.guids,
+    item.grandparentGuids,
+    item.parentGuids
+  ]) {
     if (!Array.isArray(list)) continue;
     for (const guid of list) {
       processGuid(typeof guid === 'string' ? guid : guid?.id);
@@ -53,10 +58,19 @@ export function extractPlexExternalIds(rawItem: any): PlexExternalIds {
     item.guid,
     item.grandparentGuid,
     item.parentGuid,
+    item.metadataGuid,
+    item.metadataKey,
+    item.grandparentKey,
+    item.parentKey,
     item.ratingKey,
     item.key
   ]) {
     processGuid(field);
+  }
+
+  if (!plexGuid && typeof item.sourceIdentity === 'string') {
+    const sourcePlexMatch = item.sourceIdentity.trim().match(/^plex:([a-z0-9_-]+)$/i);
+    if (sourcePlexMatch) plexGuid = sourcePlexMatch[1];
   }
 
   return { tmdbId, imdbId, tvdbId, plexGuid };
@@ -151,14 +165,31 @@ export function getStrongPlexSourceIdentity(item: any): string | null {
 
 export function buildPlexParentShowIdentityItem(rawItem: any): any {
   const item = unwrapPlexItem(rawItem);
-  const parentGuid = item?.grandparentGuid || item?.parentGuid || null;
-  const parentGuids = item?.grandparentGuids || [];
+  const rawType = String(item?.type || '').toLowerCase();
+  const isEpisode = rawType === 'episode' || !!item?.grandparentTitle ||
+    (item?.parentIndex !== undefined && item?.index !== undefined);
+
+  // Un épisode appartient à une saison via parentGuid, mais à la série via grandparentGuid.
+  // Ne jamais promouvoir parentGuid (season) au rang d'identité show.
+  // Si grandparentGuid n'est pas disponible, conserver le GUID de l'épisode :
+  // Plex Discover pourra charger cet épisode puis remonter vers son grandparentGuid.
+  const showGuid = isEpisode
+    ? (item?.grandparentGuid || item?.guid || null)
+    : (item?.parentGuid || item?.guid || null);
+
+  const showGuids = isEpisode
+    ? (item?.grandparentGuids || [])
+    : (item?.parentGuids || item?.Guid || item?.guids || []);
+
   return {
     type: 'show',
-    guid: parentGuid,
-    Guid: parentGuids,
-    guids: parentGuids,
+    guid: showGuid,
+    Guid: showGuids,
+    guids: showGuids,
     serverId: item?.serverId,
-    ratingKey: item?.grandparentRatingKey || null
+    ratingKey: isEpisode
+      ? (item?.grandparentRatingKey || null)
+      : (item?.parentRatingKey || item?.ratingKey || null),
+    sourceIdentity: item?.sourceIdentity || null
   };
 }
