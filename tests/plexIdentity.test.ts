@@ -57,6 +57,28 @@ test("résout un épisode uniquement depuis l'identité de sa série parente", (
   assert.equal(extractPlexExternalIds(parentIdentity).plexGuid, null);
 });
 
+test("ne promeut jamais le parentGuid saison d'un épisode en identité de série", () => {
+  const parentIdentity = buildPlexParentShowIdentityItem({
+    type: 'episode',
+    guid: 'plex://episode/episode-hash',
+    parentGuid: 'plex://season/season-hash'
+  });
+
+  assert.equal(parentIdentity.guid, 'plex://episode/episode-hash');
+  assert.equal(extractPlexExternalIds(parentIdentity).plexGuid, 'episode-hash');
+});
+
+test("conserve le GUID épisode comme fallback quand grandparentGuid manque", () => {
+  const parentIdentity = buildPlexParentShowIdentityItem({
+    type: 'episode',
+    guid: 'plex://episode/67adf81ed10fdd1250401f3e',
+    grandparentTitle: "The Handmaid's Tale"
+  });
+
+  assert.equal(parentIdentity.guid, 'plex://episode/67adf81ed10fdd1250401f3e');
+  assert.equal(extractPlexExternalIds(parentIdentity).plexGuid, '67adf81ed10fdd1250401f3e');
+});
+
 test("ignore l'identifiant TMDB d'un épisode si la série parente est inconnue", () => {
   const parentIdentity = buildPlexParentShowIdentityItem({
     type: 'episode',
