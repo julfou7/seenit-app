@@ -9,6 +9,7 @@ import {
   isPlexEpisodeAlreadyWatched,
   isPlexMovieAlreadyWatched,
   isStrictPlexIdentityMatch,
+  parsePlexGuid,
   unwrapPlexMediaItem
 } from '../src/features/plex/plexIdentity.ts';
 
@@ -25,6 +26,19 @@ test('extrait les identifiants externes des différentes formes Plex', () => {
     tvdbId: 99,
     plexGuid: 'abc123'
   });
+});
+
+test('accepte tout le jeu de caractères documenté pour un ratingKey provider Plex', () => {
+  assert.deepEqual(parsePlexGuid('plex://show/AbC-123_def'), {
+    type: 'show',
+    id: 'AbC-123_def'
+  });
+  assert.deepEqual(parsePlexGuid('plex://episode/EP_01-test'), {
+    type: 'episode',
+    id: 'EP_01-test'
+  });
+  assert.equal(parsePlexGuid('plex://show/abc/def'), null);
+  assert.equal(extractPlexExternalIds({ guid: 'plex://show/AbC-123_def' }).plexGuid, 'AbC-123_def');
 });
 
 test("déplie les métadonnées imbriquées d'une activité Plex sans utiliser son titre", () => {
@@ -115,6 +129,28 @@ test("conserve le GUID épisode comme fallback quand grandparentGuid manque", ()
 
   assert.equal(parentIdentity.guid, 'plex://episode/67adf81ed10fdd1250401f3e');
   assert.equal(extractPlexExternalIds(parentIdentity).plexGuid, '67adf81ed10fdd1250401f3e');
+});
+
+test("préfère le GUID épisode au grandparentKey quand le grandparentGuid manque", () => {
+  const parentIdentity = buildPlexParentShowIdentityItem({
+    type: 'episode',
+    guid: 'plex://episode/EP_01-test',
+    grandparentKey: '/library/metadata/show-parent',
+    grandparentTitle: 'Série de test'
+  });
+
+  assert.equal(parentIdentity.guid, 'plex://episode/EP_01-test');
+  assert.equal(extractPlexExternalIds(parentIdentity).plexGuid, 'EP_01-test');
+});
+
+test("utilise le grandparentKey uniquement en dernier recours", () => {
+  const parentIdentity = buildPlexParentShowIdentityItem({
+    type: 'episode',
+    grandparentKey: '/library/metadata/show-parent',
+    grandparentTitle: 'Série de test'
+  });
+
+  assert.equal(parentIdentity.guid, '/library/metadata/show-parent');
 });
 
 test("ignore l'identifiant TMDB d'un épisode si la série parente est inconnue", () => {
