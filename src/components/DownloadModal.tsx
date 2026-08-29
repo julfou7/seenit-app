@@ -273,7 +273,10 @@ export function DownloadModal({
             imdbId,
             season: scopeMode === 'all' ? undefined : selectedSeason,
             episode: scopeMode === 'episode' ? selectedEpisode : undefined,
-            qualityPreference
+            qualityPreference,
+            qualityProfileId: qualityPreference === '4k'
+              ? (config.sonarr4kProfileId ?? undefined)
+              : (config.sonarr1080pProfileId ?? undefined)
           })
         : await searchAndDownloadInRadarr({
             url: config.radarrUrl,
@@ -281,7 +284,10 @@ export function DownloadModal({
             title,
             tmdbId,
             year,
-            qualityPreference
+            qualityPreference,
+            qualityProfileId: qualityPreference === '4k'
+              ? (config.radarr4kProfileId ?? undefined)
+              : (config.radarr1080pProfileId ?? undefined)
           });
 
       if (result.success) {

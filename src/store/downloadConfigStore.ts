@@ -7,8 +7,12 @@ export interface DownloadClientConfig {
   c411ApiKey: string;
   sonarrUrl: string;
   sonarrApiKey: string;
+  sonarr1080pProfileId: number | null;
+  sonarr4kProfileId: number | null;
   radarrUrl: string;
   radarrApiKey: string;
+  radarr1080pProfileId: number | null;
+  radarr4kProfileId: number | null;
   qbittorrentUrl: string;
   qbittorrentUsername: string;
   qbittorrentPassword: string;
@@ -30,8 +34,12 @@ const DEFAULT_CONFIG: DownloadClientConfig = {
   c411ApiKey: '',
   sonarrUrl: '',
   sonarrApiKey: '',
+  sonarr1080pProfileId: null,
+  sonarr4kProfileId: null,
   radarrUrl: '',
   radarrApiKey: '',
+  radarr1080pProfileId: null,
+  radarr4kProfileId: null,
   qbittorrentUrl: '',
   qbittorrentUsername: '',
   qbittorrentPassword: '',
@@ -114,8 +122,12 @@ export const useDownloadConfigStore = create<DownloadConfigState>()((set, get) =
         c411ApiKey: current.c411ApiKey || '',
         sonarrUrl: current.sonarrUrl || '',
         sonarrApiKey: current.sonarrApiKey || '',
+        sonarr1080pProfileId: current.sonarr1080pProfileId ?? null,
+        sonarr4kProfileId: current.sonarr4kProfileId ?? null,
         radarrUrl: current.radarrUrl || '',
         radarrApiKey: current.radarrApiKey || '',
+        radarr1080pProfileId: current.radarr1080pProfileId ?? null,
+        radarr4kProfileId: current.radarr4kProfileId ?? null,
         qbittorrentUrl: current.qbittorrentUrl || '',
         qbittorrentUsername: current.qbittorrentUsername || '',
         qbittorrentPassword: current.qbittorrentPassword || '',
