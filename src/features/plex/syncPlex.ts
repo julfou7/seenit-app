@@ -629,12 +629,14 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         const typeLabel = mediaType === 'movie' ? 'Film' : mediaType === 'episode' ? 'Épisode' : 'Watchlist';
         const ids = extractPlexExternalIds(item);
         const lookupKey = getPlexMetadataLookupKey(item);
+        const historyKey = typeof item.historyKey === 'string' ? item.historyKey.trim() : '';
         const reference = item.sourceIdentity ||
           (ids.tmdbId ? `tmdb:${ids.tmdbId}` : null) ||
           (ids.imdbId ? `imdb:${ids.imdbId}` : null) ||
           (ids.tvdbId ? `tvdb:${ids.tvdbId}` : null) ||
           (ids.plexGuid ? `plex:${ids.plexGuid}` : null) ||
           (lookupKey ? `metadata:${lookupKey}` : null) ||
+          (historyKey ? `history:${historyKey}` : null) ||
           'aucune';
 
         unresolvedItems.push({

@@ -16,6 +16,7 @@ import {
   buildPlexParentShowIdentityItem,
   extractPlexExternalIds,
   getPlexMetadataLookupKey,
+  getPlexParentShowMetadataLookupKey,
   getStrongPlexSourceIdentity,
   unwrapPlexMediaItem
 } from "./src/features/plex/plexIdentity.ts";
@@ -1152,28 +1153,78 @@ async function startServer() {
         const parentIds = extractPlexExternalIds(buildPlexParentShowIdentityItem(meta));
         const hasExternalIdentity = !!(currentIds.tmdbId || currentIds.imdbId || currentIds.tvdbId);
         const hasParentIdentity = !!(parentIds.tmdbId || parentIds.imdbId || parentIds.tvdbId || parentIds.plexGuid);
-        if ((!isEpisode && hasExternalIdentity) || (isEpisode && hasParentIdentity)) return entry;
 
+        if (!entry.serverUri || !entry.serverToken) return entry;
+        if (!isEpisode && hasExternalIdentity) return entry;
+        if (isEpisode && hasParentIdentity) return entry;
+
+        // Un épisode d'historique peut perdre son propre ratingKey tout en conservant
+        // grandparentKey/grandparentThumb. On résout alors DIRECTEMENT le show parent
+        // sur le PMS, sans jamais utiliser le titre de la série.
+        let parentMetadata: any | null = null;
+        if (isEpisode) {
+          const parentLookupKey =
+            getPlexParentShowMetadataLookupKey(meta) ||
+            getPlexParentShowMetadataLookupKey(raw);
+
+          if (parentLookupKey) {
+            parentMetadata = await fetchServerMetadata(entry, parentLookupKey);
+            if (parentMetadata) {
+              const resolvedParentIds = extractPlexExternalIds(parentMetadata);
+              if (resolvedParentIds.tmdbId || resolvedParentIds.imdbId || resolvedParentIds.tvdbId || resolvedParentIds.plexGuid) {
+                return {
+                  ...entry,
+                  raw: {
+                    ...raw,
+                    grandparentGuid: meta.grandparentGuid || raw.grandparentGuid || parentMetadata.guid,
+                    grandparentGuids: meta.grandparentGuids || raw.grandparentGuids || parentMetadata.Guid || parentMetadata.guids,
+                    grandparentRatingKey: meta.grandparentRatingKey || raw.grandparentRatingKey || parentMetadata.ratingKey || parentLookupKey,
+                    grandparentKey: meta.grandparentKey || raw.grandparentKey || parentMetadata.key,
+                    grandparentThumb: meta.grandparentThumb || raw.grandparentThumb || parentMetadata.thumb,
+                    grandparentArt: meta.grandparentArt || raw.grandparentArt || parentMetadata.art
+                  }
+                };
+              }
+            }
+          }
+        }
+
+        // Sinon, tenter de retrouver l'objet lui-même. getPlexMetadataLookupKey sait
+        // désormais extraire le ratingKey depuis metadataItemID, thumb ou art.
         const ratingKey = getPlexMetadataLookupKey(meta) || getPlexMetadataLookupKey(raw);
-        if (!ratingKey || !entry.serverUri || !entry.serverToken) return entry;
+        if (!ratingKey) return entry;
 
         const enriched = await fetchServerMetadata(entry, ratingKey);
         if (!enriched) return entry;
         if (!isEpisode) return { ...entry, raw: { ...raw, ...enriched } };
 
-        const grandparentRatingKey = enriched.grandparentRatingKey || meta.grandparentRatingKey || raw.grandparentRatingKey;
-        const parentMetadata = grandparentRatingKey
-          ? await fetchServerMetadata(entry, grandparentRatingKey)
-          : null;
+        const parentLookupKey =
+          enriched.grandparentRatingKey ||
+          getPlexParentShowMetadataLookupKey(enriched) ||
+          getPlexParentShowMetadataLookupKey(meta) ||
+          getPlexParentShowMetadataLookupKey(raw);
+
+        if (!parentMetadata && parentLookupKey) {
+          parentMetadata = await fetchServerMetadata(entry, parentLookupKey);
+        }
 
         return {
           ...entry,
           raw: {
             ...raw,
             ...enriched,
-            grandparentGuid: enriched.grandparentGuid || meta.grandparentGuid || parentMetadata?.guid,
-            grandparentGuids: enriched.grandparentGuids || meta.grandparentGuids || parentMetadata?.Guid || parentMetadata?.guids,
-            grandparentRatingKey
+            // Toujours préserver l'identité structurelle de l'épisode d'historique.
+            type: meta.type || raw.type || enriched.type,
+            title: meta.title || raw.title || enriched.title,
+            grandparentTitle: meta.grandparentTitle || raw.grandparentTitle || enriched.grandparentTitle || parentMetadata?.title,
+            parentIndex: meta.parentIndex ?? raw.parentIndex ?? enriched.parentIndex,
+            index: meta.index ?? raw.index ?? enriched.index,
+            grandparentGuid: enriched.grandparentGuid || meta.grandparentGuid || raw.grandparentGuid || parentMetadata?.guid,
+            grandparentGuids: enriched.grandparentGuids || meta.grandparentGuids || raw.grandparentGuids || parentMetadata?.Guid || parentMetadata?.guids,
+            grandparentRatingKey: enriched.grandparentRatingKey || meta.grandparentRatingKey || raw.grandparentRatingKey || parentMetadata?.ratingKey || parentLookupKey,
+            grandparentKey: enriched.grandparentKey || meta.grandparentKey || raw.grandparentKey || parentMetadata?.key,
+            grandparentThumb: enriched.grandparentThumb || meta.grandparentThumb || raw.grandparentThumb || parentMetadata?.thumb,
+            grandparentArt: enriched.grandparentArt || meta.grandparentArt || raw.grandparentArt || parentMetadata?.art
           }
         };
       };
@@ -1246,6 +1297,13 @@ async function startServer() {
           ratingKey: meta.ratingKey || raw.ratingKey,
           key: meta.key || raw.key,
           metadataKey: meta.metadataKey || meta.metadata_key || raw.metadataKey || raw.metadata_key,
+          metadataItemID: meta.metadataItemID || meta.metadataItemId || raw.metadataItemID || raw.metadataItemId,
+          historyKey: meta.historyKey || raw.historyKey,
+          librarySectionID: meta.librarySectionID || raw.librarySectionID,
+          thumb: meta.thumb || raw.thumb,
+          art: meta.art || raw.art,
+          grandparentThumb: meta.grandparentThumb || raw.grandparentThumb,
+          grandparentArt: meta.grandparentArt || raw.grandparentArt,
           serverId: entry.serverId,
           sourceIdentity,
           source
