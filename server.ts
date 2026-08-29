@@ -12,7 +12,13 @@ import multer from "multer";
 import dns from "node:dns/promises";
 import net from "node:net";
 import { timingSafeEqual } from "node:crypto";
-import { buildPlexParentShowIdentityItem, extractPlexExternalIds, getStrongPlexSourceIdentity } from "./src/features/plex/plexIdentity.ts";
+import {
+  buildPlexParentShowIdentityItem,
+  extractPlexExternalIds,
+  getPlexMetadataLookupKey,
+  getStrongPlexSourceIdentity,
+  unwrapPlexMediaItem
+} from "./src/features/plex/plexIdentity.ts";
 
 export interface AuthRequest extends Request {
   user?: DecodedIdToken;
@@ -395,7 +401,7 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.40',
+        'X-Plex-Version': '1.4.48',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
@@ -815,7 +821,9 @@ async function startServer() {
         if (Array.isArray(data)) return data;
         if (Array.isArray(data.activities)) return data.activities;
         if (data.MediaContainer && Array.isArray(data.MediaContainer.Metadata)) return data.MediaContainer.Metadata;
+        if (data.mediaContainer && Array.isArray(data.mediaContainer.metadata)) return data.mediaContainer.metadata;
         if (Array.isArray(data.Metadata)) return data.Metadata;
+        if (Array.isArray(data.metadata)) return data.metadata;
         if (Array.isArray(data.items)) return data.items;
         return [];
       };
@@ -1136,7 +1144,7 @@ async function startServer() {
 
       const enrichEntry = async (entry: any): Promise<any> => {
         const raw = entry.raw || {};
-        const meta = raw.Metadata || raw.media || raw.item || raw;
+        const meta = unwrapPlexMediaItem(raw);
         const rawType = String(meta.type || raw.type || '').toLowerCase();
         const isEpisode = rawType === 'episode' || !!meta.grandparentTitle ||
           (meta.parentIndex !== undefined && meta.index !== undefined);
@@ -1146,7 +1154,7 @@ async function startServer() {
         const hasParentIdentity = !!(parentIds.tmdbId || parentIds.imdbId || parentIds.tvdbId || parentIds.plexGuid);
         if ((!isEpisode && hasExternalIdentity) || (isEpisode && hasParentIdentity)) return entry;
 
-        const ratingKey = meta.ratingKey || raw.ratingKey || meta.key || raw.key;
+        const ratingKey = getPlexMetadataLookupKey(meta) || getPlexMetadataLookupKey(raw);
         if (!ratingKey || !entry.serverUri || !entry.serverToken) return entry;
 
         const enriched = await fetchServerMetadata(entry, ratingKey);
@@ -1184,7 +1192,7 @@ async function startServer() {
 
       for (const entry of enrichedEntries) {
         const raw = entry.raw || {};
-        const meta = raw.Metadata || raw.media || raw.item || raw;
+        const meta = unwrapPlexMediaItem(raw);
         const source = entry.source;
 
         const rawType = (meta.type || raw.type || raw.activityType || '').toLowerCase();
@@ -1230,11 +1238,14 @@ async function startServer() {
           grandparentGuid: meta.grandparentGuid || raw.grandparentGuid,
           grandparentGuids: meta.grandparentGuids || raw.grandparentGuids,
           parentGuid: meta.parentGuid || raw.parentGuid,
+          grandparentKey: meta.grandparentKey || raw.grandparentKey,
+          parentKey: meta.parentKey || raw.parentKey,
           grandparentRatingKey: meta.grandparentRatingKey || raw.grandparentRatingKey,
           Guid: meta.Guid || raw.Guid,
           guids: meta.guids || raw.guids,
           ratingKey: meta.ratingKey || raw.ratingKey,
           key: meta.key || raw.key,
+          metadataKey: meta.metadataKey || meta.metadata_key || raw.metadataKey || raw.metadata_key,
           serverId: entry.serverId,
           sourceIdentity,
           source
@@ -1246,7 +1257,7 @@ async function startServer() {
       // Normaliser la Watchlist sans fusion par titre/année.
       const normalizedWatchlist: any[] = [];
       for (const rawItem of rawWatchlistItems) {
-        const meta = rawItem.Metadata || rawItem.media || rawItem.item || rawItem;
+        const meta = unwrapPlexMediaItem(rawItem);
         const rawType = (meta.type || rawItem.type || '').toLowerCase();
         const type = (rawType === 'show' || rawType === 'series' || rawType === 'tv') ? 'show' : 'movie';
         const title = meta.title || rawItem.title || meta.name || '';
@@ -1270,6 +1281,7 @@ async function startServer() {
           guids: meta.guids || rawItem.guids,
           ratingKey: meta.ratingKey || rawItem.ratingKey,
           key: meta.key || rawItem.key,
+          metadataKey: meta.metadataKey || meta.metadata_key || rawItem.metadataKey || rawItem.metadata_key,
           addedAt: meta.addedAt || rawItem.addedAt || null,
           sourceIdentity
         });

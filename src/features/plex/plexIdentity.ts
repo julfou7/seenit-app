@@ -12,8 +12,98 @@ export interface ExpectedPlexIdentity {
   mediaType?: 'movie' | 'tv' | 'show';
 }
 
-function unwrapPlexItem(rawItem: any): any {
-  return rawItem?.raw ? { ...rawItem.raw, ...rawItem } : rawItem;
+const PLEX_MEDIA_WRAPPER_KEYS = [
+  'Metadata',
+  'metadata',
+  'media',
+  'item',
+  'metadataItem',
+  'object',
+  'target',
+  'content',
+  'video',
+  'MediaContainer',
+  'mediaContainer'
+] as const;
+
+function looksLikePlexMediaObject(value: any): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const type = String(value.type || '').toLowerCase();
+  return ['movie', 'show', 'series', 'season', 'episode', 'video'].includes(type) ||
+    !!(value.guid || value.Guid || value.guids || value.ratingKey || value.key ||
+      value.grandparentGuid || value.parentGuid || value.grandparentRatingKey ||
+      value.parentRatingKey || value.grandparentTitle || value.parentIndex);
+}
+
+export function unwrapPlexMediaItem(rawItem: any): any {
+  if (!rawItem) return rawItem;
+
+  const root = rawItem?.raw ? { ...rawItem.raw, ...rawItem } : rawItem;
+  if (typeof root !== 'object' || Array.isArray(root)) return root;
+
+  const queue: Array<{ value: any; depth: number }> = [{ value: root, depth: 0 }];
+  const visited = new Set<any>();
+  const mediaLayers: any[] = [];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (!current.value || typeof current.value !== 'object' || visited.has(current.value)) continue;
+    visited.add(current.value);
+
+    if (current.value !== root && looksLikePlexMediaObject(current.value)) {
+      mediaLayers.push(current.value);
+    }
+    if (current.depth >= 6) continue;
+
+    for (const key of PLEX_MEDIA_WRAPPER_KEYS) {
+      const nested = current.value[key];
+      if (Array.isArray(nested)) {
+        if (nested.length === 1 && nested[0] && typeof nested[0] === 'object') {
+          queue.push({ value: nested[0], depth: current.depth + 1 });
+        }
+      } else if (nested && typeof nested === 'object') {
+        queue.push({ value: nested, depth: current.depth + 1 });
+      }
+    }
+  }
+
+  return Object.assign({}, root, ...mediaLayers);
+}
+
+export function getPlexMetadataLookupKey(rawItem: any): string | null {
+  const item = unwrapPlexMediaItem(rawItem);
+  if (!item) return null;
+
+  for (const rawValue of [
+    item.ratingKey,
+    item.key,
+    item.metadataKey,
+    item.metadata_key,
+    item.metadataUri,
+    item.metadataURI
+  ]) {
+    if (rawValue === null || rawValue === undefined) continue;
+    const value = String(rawValue).trim();
+    if (!value) continue;
+
+    if (/^[a-zA-Z0-9_-]+$/.test(value) ||
+        /^\/library\/metadata\/[a-zA-Z0-9_-]+(?:[/?#].*)?$/.test(value) ||
+        /^plex:\/(?:\/)?(?:movie|show|season|episode)\/[a-zA-Z0-9_-]+$/i.test(value)) {
+      return value;
+    }
+
+    try {
+      const url = new URL(value);
+      if (['metadata.provider.plex.tv', 'discover.provider.plex.tv'].includes(url.hostname) &&
+          /^\/library\/metadata\/[a-zA-Z0-9_-]+/.test(url.pathname)) {
+        return url.pathname;
+      }
+    } catch {
+      // Ce champ n'est simplement pas une URL absolue.
+    }
+  }
+
+  return null;
 }
 
 export function extractPlexExternalIds(rawItem: any): PlexExternalIds {
@@ -22,7 +112,7 @@ export function extractPlexExternalIds(rawItem: any): PlexExternalIds {
   let tvdbId: number | null = null;
   let plexGuid: string | null = null;
 
-  const item = unwrapPlexItem(rawItem);
+  const item = unwrapPlexMediaItem(rawItem);
   if (!item) return { tmdbId, imdbId, tvdbId, plexGuid };
 
   const processGuid = (raw: unknown) => {
@@ -150,7 +240,7 @@ export function isPlexMovieAlreadyWatched(
 }
 
 export function getStrongPlexSourceIdentity(item: any): string | null {
-  const unwrapped = unwrapPlexItem(item);
+  const unwrapped = unwrapPlexMediaItem(item);
   const ids = extractPlexExternalIds(unwrapped);
   if (ids.tmdbId) return `tmdb:${ids.tmdbId}`;
   if (ids.imdbId) return `imdb:${ids.imdbId}`;
@@ -158,13 +248,13 @@ export function getStrongPlexSourceIdentity(item: any): string | null {
   if (ids.plexGuid) return `plex:${ids.plexGuid}`;
 
   const serverId = unwrapped?.serverId || unwrapped?.serverIdentifier;
-  const ratingKey = unwrapped?.ratingKey || unwrapped?.key;
+  const ratingKey = getPlexMetadataLookupKey(unwrapped);
   if (serverId && ratingKey) return `server:${serverId}:rating:${ratingKey}`;
   return null;
 }
 
 export function buildPlexParentShowIdentityItem(rawItem: any): any {
-  const item = unwrapPlexItem(rawItem);
+  const item = unwrapPlexMediaItem(rawItem);
   const rawType = String(item?.type || '').toLowerCase();
   const isEpisode = rawType === 'episode' || !!item?.grandparentTitle ||
     (item?.parentIndex !== undefined && item?.index !== undefined);
@@ -173,8 +263,16 @@ export function buildPlexParentShowIdentityItem(rawItem: any): any {
   // Ne jamais promouvoir parentGuid (season) au rang d'identité show.
   // Si grandparentGuid n'est pas disponible, conserver le GUID de l'épisode :
   // Plex Discover pourra charger cet épisode puis remonter vers son grandparentGuid.
+  const episodePlexGuid = [
+    item?.guid,
+    ...(Array.isArray(item?.Guid) ? item.Guid.map((guid: any) => typeof guid === 'string' ? guid : guid?.id) : []),
+    ...(Array.isArray(item?.guids) ? item.guids.map((guid: any) => typeof guid === 'string' ? guid : guid?.id) : [])
+  ].find(
+    (guid) => typeof guid === 'string' && /^plex:\/\/episode\/[a-zA-Z0-9_-]+$/i.test(guid.trim())
+  ) || null;
+
   const showGuid = isEpisode
-    ? (item?.grandparentGuid || item?.guid || null)
+    ? (item?.grandparentGuid || item?.grandparentKey || episodePlexGuid)
     : (item?.parentGuid || item?.guid || null);
 
   const showGuids = isEpisode

@@ -4,10 +4,12 @@ import {
   buildPlexParentShowIdentityItem,
   buildResolvedPlexIdentity,
   extractPlexExternalIds,
+  getPlexMetadataLookupKey,
   getStrongPlexSourceIdentity,
   isPlexEpisodeAlreadyWatched,
   isPlexMovieAlreadyWatched,
-  isStrictPlexIdentityMatch
+  isStrictPlexIdentityMatch,
+  unwrapPlexMediaItem
 } from '../src/features/plex/plexIdentity.ts';
 
 test('extrait les identifiants externes des différentes formes Plex', () => {
@@ -23,6 +25,42 @@ test('extrait les identifiants externes des différentes formes Plex', () => {
     tvdbId: 99,
     plexGuid: 'abc123'
   });
+});
+
+test("déplie les métadonnées imbriquées d'une activité Plex sans utiliser son titre", () => {
+  const activity = {
+    type: 'watched',
+    title: 'Libellé de notification',
+    metadata: {
+      type: 'movie',
+      title: 'Titre du média',
+      ratingKey: '5d7768244de0ee001fcc7fed',
+      key: '/library/metadata/5d7768244de0ee001fcc7fed',
+      guid: 'plex://movie/5d7768244de0ee001fcc7fed',
+      Guid: [{ id: 'tmdb://105' }]
+    }
+  };
+
+  const media = unwrapPlexMediaItem(activity);
+  assert.equal(media.type, 'movie');
+  assert.equal(media.ratingKey, '5d7768244de0ee001fcc7fed');
+  assert.equal(extractPlexExternalIds(activity).tmdbId, 105);
+  assert.equal(getPlexMetadataLookupKey(activity), '5d7768244de0ee001fcc7fed');
+});
+
+test('déplie une réponse Plex MediaContainer contenant un seul média', () => {
+  const response = {
+    MediaContainer: {
+      Metadata: [{
+        type: 'movie',
+        guid: 'plex://movie/movie-hash',
+        key: '/library/metadata/movie-hash'
+      }]
+    }
+  };
+
+  assert.equal(extractPlexExternalIds(response).plexGuid, 'movie-hash');
+  assert.equal(getPlexMetadataLookupKey(response), '/library/metadata/movie-hash');
 });
 
 test('refuse un premier résultat Plex sans identifiant strictement égal', () => {
@@ -86,6 +124,18 @@ test("ignore l'identifiant TMDB d'un épisode si la série parente est inconnue"
   });
 
   assert.equal(extractPlexExternalIds(parentIdentity).tmdbId, null);
+});
+
+test("conserve le GUID Plex propre d'un épisode pour remonter ensuite à sa série", () => {
+  const parentIdentity = buildPlexParentShowIdentityItem({
+    type: 'episode',
+    guid: 'plex://episode/episode-hash',
+    Guid: [{ id: 'tmdb://999999' }]
+  });
+
+  assert.equal(parentIdentity.guid, 'plex://episode/episode-hash');
+  assert.equal(extractPlexExternalIds(parentIdentity).tmdbId, null);
+  assert.equal(extractPlexExternalIds(parentIdentity).plexGuid, 'episode-hash');
 });
 
 test("utilise les GUID enrichis de la série parente sans reprendre ceux de l'épisode", () => {

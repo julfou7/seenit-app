@@ -15,10 +15,12 @@ import {
   buildPlexParentShowIdentityItem,
   buildResolvedPlexIdentity,
   extractPlexExternalIds,
+  getPlexMetadataLookupKey,
   getStrongPlexSourceIdentity,
   isPlexEpisodeAlreadyWatched,
   isPlexMovieAlreadyWatched,
-  isStrictPlexIdentityMatch
+  isStrictPlexIdentityMatch,
+  unwrapPlexMediaItem
 } from './plexIdentity';
 import {
   getPlexLastSyncTimestamp,
@@ -39,9 +41,15 @@ export interface PlexSyncResult {
   error?: string;
 }
 
+interface PlexUnresolvedLogItem {
+  label: string;
+  source: string;
+  reference: string;
+}
+
 export function getPlexGuid(rawItem: any): string | null {
   if (!rawItem) return null;
-  const item = rawItem.raw ? { ...rawItem.raw, ...rawItem } : rawItem;
+  const item = unwrapPlexMediaItem(rawItem);
 
   // 1. Direct string guid
   if (typeof item.guid === 'string' && item.guid.trim() !== '') {
@@ -95,7 +103,7 @@ export function getPlexGuid(rawItem: any): string | null {
   }
 
   // 7. ratingKey / key (e.g. "/library/metadata/12345" or "12345")
-  const key = item.ratingKey || item.key;
+  const key = getPlexMetadataLookupKey(item);
   if (key) {
     const keyStr = String(key).trim();
     if (keyStr) return keyStr;
@@ -111,7 +119,7 @@ const extractTmdbIdFromPlex = (item: any): number | null => {
 };
 
 export async function resolveMovieToTmdb(item: any, plexToken?: string) {
-  const unwrapped = item?.raw ? { ...item.raw, ...item } : item;
+  const unwrapped = unwrapPlexMediaItem(item);
   const movieTitle = unwrapped.title || 'Film inconnu';
   const pGuid = getPlexGuid(unwrapped);
   const { tmdbId, imdbId, tvdbId, plexGuid } = extractExternalIdsFromPlex(unwrapped);
@@ -200,7 +208,7 @@ export async function resolveMovieToTmdb(item: any, plexToken?: string) {
 }
 
 export async function resolveShowToTmdb(item: any, plexToken?: string) {
-  const unwrapped = item?.raw ? { ...item.raw, ...item } : item;
+  const unwrapped = unwrapPlexMediaItem(item);
   const rawShowTitle = unwrapped.grandparentTitle || unwrapped.parentTitle || unwrapped.title || 'Série inconnue';
   const pGuid = getPlexGuid(unwrapped);
   const { tmdbId, imdbId, tvdbId, plexGuid } = extractExternalIdsFromPlex(unwrapped);
@@ -305,13 +313,13 @@ export async function resolveShowToTmdb(item: any, plexToken?: string) {
 }
 
 export async function resolveSeasonShowToTmdb(item: any, plexToken?: string) {
-  const unwrapped = item?.raw ? { ...item.raw, ...item } : item;
+  const unwrapped = unwrapPlexMediaItem(item);
   const showItem = buildPlexParentShowIdentityItem(unwrapped);
   return resolveShowToTmdb(showItem, plexToken);
 }
 
 export async function resolveEpisodeShowToTmdb(item: any, plexToken?: string) {
-  const unwrapped = item?.raw ? { ...item.raw, ...item } : item;
+  const unwrapped = unwrapPlexMediaItem(item);
 
   // IMPORTANT: Toujours utiliser grandparentTitle / parentTitle pour la série parent, JAMAIS le titre de l'épisode !
   const parentShowTitle = unwrapped.grandparentTitle || unwrapped.parentTitle || (unwrapped.type !== 'episode' ? unwrapped.title : 'Série inconnue');
@@ -349,7 +357,7 @@ export async function resolveEpisodeShowToTmdb(item: any, plexToken?: string) {
 
 export async function resolvePlexItem(item: any, plexToken?: string) {
   if (!item) return null;
-  const unwrapped = item.raw ? { ...item.raw, ...item } : item;
+  const unwrapped = unwrapPlexMediaItem(item);
   const type = unwrapped.type;
   const pGuidStr = getPlexGuid(unwrapped) || '';
 
@@ -581,6 +589,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       let unresolvedCount = 0;
       let repairedCount = 0;
       const syncedItems: PlexSyncResult['syncedItems'] = [];
+      const unresolvedItems: PlexUnresolvedLogItem[] = [];
       const syncedIdentityKeys = new Set<string>();
 
       const mutatedShows: Record<string, Show> = {};
@@ -592,6 +601,34 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         if (syncedIdentityKeys.has(identity)) return;
         syncedIdentityKeys.add(identity);
         syncedItems.push(syncedItem);
+      };
+
+      const recordUnresolvedItem = (item: any, mediaType: 'movie' | 'episode' | 'watchlist') => {
+        const seasonNumber = item.parentIndex !== undefined ? Number(item.parentIndex) : undefined;
+        const episodeNumber = item.index !== undefined ? Number(item.index) : undefined;
+        const title = mediaType === 'episode'
+          ? item.grandparentTitle || item.parentTitle || item.title || 'Série inconnue'
+          : item.title || item.grandparentTitle || 'Média inconnu';
+        const episodeSuffix = mediaType === 'episode' && seasonNumber !== undefined && episodeNumber !== undefined
+          ? ` S${seasonNumber}E${episodeNumber}`
+          : '';
+        const yearSuffix = item.year ? ` (${item.year})` : '';
+        const typeLabel = mediaType === 'movie' ? 'Film' : mediaType === 'episode' ? 'Épisode' : 'Watchlist';
+        const ids = extractPlexExternalIds(item);
+        const lookupKey = getPlexMetadataLookupKey(item);
+        const reference = item.sourceIdentity ||
+          (ids.tmdbId ? `tmdb:${ids.tmdbId}` : null) ||
+          (ids.imdbId ? `imdb:${ids.imdbId}` : null) ||
+          (ids.tvdbId ? `tvdb:${ids.tvdbId}` : null) ||
+          (ids.plexGuid ? `plex:${ids.plexGuid}` : null) ||
+          (lookupKey ? `metadata:${lookupKey}` : null) ||
+          'aucune';
+
+        unresolvedItems.push({
+          label: `${typeLabel} « ${title}${episodeSuffix}${yearSuffix} »`,
+          source: item.source || 'source inconnue',
+          reference
+        });
       };
 
       const skipAlreadyWatchedEpisode = (
@@ -637,7 +674,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       let processedCount = 0;
 
       for (const rawItem of history) {
-        const item = rawItem.raw ? { ...rawItem.raw, ...rawItem } : rawItem;
+        const item = unwrapPlexMediaItem(rawItem);
         processedCount++;
         if (!silent && processedCount % 15 === 0 && processedCount < totalItems) {
           useSyncStore.getState().setPlexSyncStatus({
@@ -694,6 +731,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
             if (!tmdbData) {
               unresolvedCount++;
+              recordUnresolvedItem(item, 'episode');
               appLogger.info('plex', `[Plex Sync] Fiche "${cleanShowTitle}" ignorée (impossible de résoudre l'ID TMDB).`);
               continue;
             }
@@ -834,6 +872,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
             if (!tmdbData) {
               unresolvedCount++;
+              recordUnresolvedItem(item, 'movie');
               appLogger.info('plex', `[Plex Sync] Fiche film "${cleanMovieTitle}" ignorée (impossible de résoudre l'ID TMDB).`);
               continue;
             }
@@ -939,7 +978,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       // Process Plex Watchlist items (auto-import to "À Voir" / "Ma Liste")
       if (hasWatchlist) {
         for (const rawWlItem of watchlist) {
-          const wlItem = rawWlItem.raw ? { ...rawWlItem.raw, ...rawWlItem } : rawWlItem;
+          const wlItem = unwrapPlexMediaItem(rawWlItem);
           const mediaType: 'tv' | 'movie' = wlItem.type === 'show' || wlItem.type === 'series' || wlItem.type === 'tv' ? 'tv' : 'movie';
           const rawTitle = wlItem.title || wlItem.grandparentTitle || 'Média inconnu';
 
@@ -969,6 +1008,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
             if (!tmdbData) {
               unresolvedCount++;
+              recordUnresolvedItem(wlItem, 'watchlist');
               appLogger.info('plex', `[Plex Sync] Item Watchlist "${cleanTitle}" ignoré (impossible de résoudre l'ID TMDB).`);
               continue;
             }
@@ -1098,6 +1138,18 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         'plex',
         `[Plex Sync] Bilan : ${syncCount} nouveau(x), ${alreadyWatchedCount} déjà vu(s) ignoré(s), ${unresolvedCount} non résolu(s), ${repairedCount} index vu(s) réparé(s) sans notification.`
       );
+      if (unresolvedItems.length > 0) {
+        appLogger.warn(
+          'plex',
+          `[Plex Sync] Liste des ${unresolvedItems.length} non résolu(s) — ajout manuel possible dans SeenIt, aucune correspondance automatique par titre.`
+        );
+        unresolvedItems.forEach((unresolvedItem, index) => {
+          appLogger.warn(
+            'plex',
+            `[Plex Sync] Non résolu ${index + 1}/${unresolvedItems.length} • ${unresolvedItem.label} • source=${unresolvedItem.source} • référence=${unresolvedItem.reference}`
+          );
+        });
+      }
 
       setPlexLastSyncTimestamp(user.uid, nextSyncCursor);
 
