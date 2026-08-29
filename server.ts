@@ -1332,6 +1332,77 @@ async function startServer() {
     }
   });
 
+  // Test de connexion C411 pour l'utilisateur authentifié
+  app.post('/api/c411/test', requireAuth, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user?.uid;
+      if (!userId) {
+        return res.status(401).json({ success: false, error: 'Utilisateur non authentifie' });
+      }
+
+      const submittedApiKey =
+        typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
+      if (submittedApiKey.length > 512) {
+        return res.status(400).json({ success: false, error: 'Cle API C411 invalide' });
+      }
+
+      let apiKey = submittedApiKey;
+      if (!apiKey) {
+        const configSnapshot = await adminDb
+          .doc(`users/${userId}/settings/downloadConfig`)
+          .get();
+        const storedApiKey = configSnapshot.get('c411ApiKey');
+        apiKey = typeof storedApiKey === 'string' ? storedApiKey.trim() : '';
+      }
+
+      if (!apiKey) {
+        return res.status(400).json({
+          success: false,
+          error: 'Cle API C411 non configuree pour cet utilisateur'
+        });
+      }
+
+      const response = await fetch(
+        'https://c411.org/api/torrents?name=matrix&category=1',
+        {
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Accept': 'application/json',
+            'User-Agent': 'SeenIt-App'
+          },
+          signal: AbortSignal.timeout(8000)
+        }
+      );
+
+      if (response.status === 401 || response.status === 403) {
+        return res.status(401).json({
+          success: false,
+          error: 'Cle API C411 refusee'
+        });
+      }
+
+      if (!response.ok) {
+        return res.status(502).json({
+          success: false,
+          error: `C411 a retourne le statut ${response.status}`
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: 'Connexion C411 reussie !'
+      });
+    } catch (error: any) {
+      console.error('[C411 Test Error]', error);
+      return res.status(502).json({
+        success: false,
+        error: error?.name === 'TimeoutError'
+          ? 'C411 ne repond pas dans le delai imparti'
+          : 'Impossible de tester la connexion C411'
+      });
+    }
+  });
+
   // C411 Tracker API proxy
   app.post('/api/c411/search', requireAuth, async (req: AuthRequest, res) => {
     try {

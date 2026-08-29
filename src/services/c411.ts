@@ -139,6 +139,82 @@ export async function searchC411Torrents(params: C411SearchParams): Promise<C411
 }
 
 /**
+ * Vérifie une clé C411 via le backend SeenIt authentifié.
+ * Le transport est adapté à la PWA et à l'APK Capacitor.
+ */
+export async function testC411Connection(apiKey: string): Promise<{ success: boolean; message: string }> {
+  const normalizedApiKey = apiKey.trim();
+  if (!normalizedApiKey) {
+    return { success: false, message: 'Clé API C411 manquante.' };
+  }
+
+  const endpoints = [
+    'https://seenit.ai.studio/api/c411/test',
+    'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/c411/test',
+    'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/c411/test',
+    '/api/c411/test'
+  ];
+
+  let lastMessage = 'Impossible de joindre le serveur SeenIt.';
+
+  for (const endpoint of endpoints) {
+    try {
+      let status = 0;
+      let data: any = null;
+
+      if (Capacitor.isNativePlatform()) {
+        const response = await CapacitorHttp.post({
+          url: endpoint,
+          headers: await getAuthenticatedHeaders({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }),
+          data: { apiKey: normalizedApiKey },
+          connectTimeout: 8000,
+          readTimeout: 8000
+        });
+        status = response.status;
+        data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+      } else {
+        const response = await authenticatedFetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ apiKey: normalizedApiKey }),
+          signal: AbortSignal.timeout(8000)
+        });
+        status = response.status;
+        data = await response.json().catch(() => null);
+      }
+
+      if (status >= 200 && status < 300 && data?.success) {
+        return {
+          success: true,
+          message: data.message || 'Connexion C411 réussie !'
+        };
+      }
+
+      if (status === 400 || status === 401 || status === 403) {
+        return {
+          success: false,
+          message: data?.error || 'Clé API C411 refusée.'
+        };
+      }
+
+      if (status !== 404) {
+        lastMessage = data?.error || `Serveur C411 indisponible (${status}).`;
+      }
+    } catch (error: any) {
+      lastMessage = error?.message || lastMessage;
+    }
+  }
+
+  return { success: false, message: lastMessage };
+}
+
+/**
  * Déclenchement d'un téléchargement vers Sonarr / Radarr / qBittorrent via l'API backend
  */
 export async function triggerRemoteDownload(payload: {

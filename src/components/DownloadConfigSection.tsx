@@ -3,6 +3,7 @@ import { Download, Server, Key, Globe, Check, AlertCircle, Save, Sliders, HardDr
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useToastStore } from '../store/toastStore';
 import { testServiceConnection } from '../services/sonarrRadarr';
+import { testC411Connection } from '../services/c411';
 
 interface DownloadConfigSectionProps {
   defaultOpen?: boolean;
@@ -46,6 +47,19 @@ export function DownloadConfigSection({ defaultOpen = false, hideToggle = false 
 
   const [testingService, setTestingService] = useState<string | null>(null);
 
+  const handleC411Test = async () => {
+    const apiKey = c411Key.trim();
+    if (!apiKey) {
+      showToast('Veuillez renseigner votre clé API C411', 'error');
+      return;
+    }
+
+    setTestingService('c411');
+    const result = await testC411Connection(apiKey);
+    setTestingService(null);
+    showToast(result.message, result.success ? 'success' : 'error');
+  };
+
   const handleTest = async (service: 'sonarr' | 'radarr' | 'qbittorrent') => {
     setTestingService(service);
     let url = service === 'sonarr' ? sonarrUrl : service === 'radarr' ? radarrUrl : qbitUrl;
@@ -80,7 +94,9 @@ export function DownloadConfigSection({ defaultOpen = false, hideToggle = false 
       qbittorrentPassword: qbitPass.trim(),
     });
     showToast('Configuration des téléchargements sauvegardée !', 'success');
-    setIsOpen(false);
+    if (!hideToggle) {
+      setIsOpen(false);
+    }
   };
 
   return (
@@ -122,10 +138,21 @@ export function DownloadConfigSection({ defaultOpen = false, hideToggle = false 
 
           {/* C411 API Key */}
           <div>
-            <label className="block text-[11px] font-bold text-zinc-300 mb-1 flex items-center gap-1.5">
-              <Key size={12} className="text-blue-400" />
-              Clé API C411 (Tracker)
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5">
+                <Key size={12} className="text-blue-400" />
+                Clé API C411 (Tracker)
+              </label>
+              <button
+                type="button"
+                onClick={handleC411Test}
+                disabled={testingService === 'c411'}
+                className="text-[10px] font-bold text-blue-400 hover:text-blue-300 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
+              >
+                {testingService === 'c411' ? <Loader2 size={10} className="animate-spin" /> : <Wifi size={10} />}
+                Tester la connexion
+              </button>
+            </div>
             <input
               type="password"
               value={c411Key}
