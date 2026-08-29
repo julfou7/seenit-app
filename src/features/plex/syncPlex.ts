@@ -20,6 +20,7 @@ import {
   isPlexEpisodeAlreadyWatched,
   isPlexMovieAlreadyWatched,
   isStrictPlexIdentityMatch,
+  parsePlexGuid,
   unwrapPlexMediaItem
 } from './plexIdentity';
 import {
@@ -211,7 +212,7 @@ export async function resolveShowToTmdb(item: any, plexToken?: string) {
   const unwrapped = unwrapPlexMediaItem(item);
   const rawShowTitle = unwrapped.grandparentTitle || unwrapped.parentTitle || unwrapped.title || 'Série inconnue';
   const pGuid = getPlexGuid(unwrapped);
-  const { tmdbId, imdbId, tvdbId, plexGuid } = extractExternalIdsFromPlex(unwrapped);
+  const { tmdbId, imdbId, tvdbId } = extractExternalIdsFromPlex(unwrapped);
 
   // 1. TMDB ID direct
   if (tmdbId) {
@@ -247,9 +248,9 @@ export async function resolveShowToTmdb(item: any, plexToken?: string) {
   const targetGuidStr = unwrapped.grandparentGuid || unwrapped.parentGuid || unwrapped.guid || pGuid;
   let cleanHash: string | null = null;
   if (targetGuidStr && typeof targetGuidStr === 'string') {
-    const match = targetGuidStr.match(/plex:\/\/(movie|show|season|episode)\/([a-f0-9]+)/i);
-    if (match) {
-      cleanHash = match[2];
+    const parsedTargetGuid = parsePlexGuid(targetGuidStr);
+    if (parsedTargetGuid) {
+      cleanHash = parsedTargetGuid.id;
     } else {
       cleanHash = targetGuidStr.replace(/^plex:\/\/(movie|show|season|episode)\//i, '').replace(/^\/library\/metadata\//i, '').trim();
     }
@@ -265,15 +266,27 @@ export async function resolveShowToTmdb(item: any, plexToken?: string) {
         const metaItem = data?.MediaContainer?.Metadata?.[0];
         if (metaItem) {
           let showMetaItem = metaItem;
-          if ((metaItem.type === 'episode' || metaItem.type === 'season') && metaItem.grandparentGuid) {
-            const gpMatch = metaItem.grandparentGuid.match(/plex:\/\/(show|movie)\/([a-f0-9]+)/i);
-            if (gpMatch) {
-              const gpHash = gpMatch[2];
+          if (metaItem.type === 'episode' && metaItem.grandparentGuid) {
+            const parsedGrandparentGuid = parsePlexGuid(metaItem.grandparentGuid);
+            if (parsedGrandparentGuid?.type === 'show') {
+              const gpHash = parsedGrandparentGuid.id;
               const gpRes = await fetch(`https://discover.provider.plex.tv/library/metadata/${gpHash}`, { headers: { 'Accept': 'application/json', 'X-Plex-Token': plexToken } });
               if (gpRes.ok) {
                 const gpData = await gpRes.json();
                 if (gpData?.MediaContainer?.Metadata?.[0]) {
                   showMetaItem = gpData.MediaContainer.Metadata[0];
+                }
+              }
+            }
+          } else if (metaItem.type === 'season' && metaItem.parentGuid) {
+            const parsedParentGuid = parsePlexGuid(metaItem.parentGuid);
+            if (parsedParentGuid?.type === 'show') {
+              const parentHash = parsedParentGuid.id;
+              const parentRes = await fetch(`https://discover.provider.plex.tv/library/metadata/${parentHash}`, { headers: { 'Accept': 'application/json', 'X-Plex-Token': plexToken } });
+              if (parentRes.ok) {
+                const parentData = await parentRes.json();
+                if (parentData?.MediaContainer?.Metadata?.[0]) {
+                  showMetaItem = parentData.MediaContainer.Metadata[0];
                 }
               }
             }
