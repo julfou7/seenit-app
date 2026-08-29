@@ -1,5 +1,9 @@
 import { type LiveDownloadItem } from '../../services/sonarrRadarr';
 import { useLiveDownloadStore } from '../../store/liveDownloadStore';
+import {
+  scheduleResumeDownloadCompletionWatchers,
+  startDownloadCompletionWatcher
+} from './downloadCompletionWatcher';
 
 export interface BeginDownloadRequestInput {
   title: string;
@@ -15,6 +19,8 @@ export interface BeginDownloadRequestInput {
   statusText?: string;
   releaseTitle?: string;
 }
+
+scheduleResumeDownloadCompletionWatchers();
 
 export function beginDownloadRequest(input: BeginDownloadRequestInput): string {
   return useLiveDownloadStore.getState().addOptimisticDownload({
@@ -48,6 +54,11 @@ export function acceptDownloadRequest(
     errorMessage: undefined,
     isOptimistic: true
   });
+
+  const requestItem = useLiveDownloadStore.getState().downloads.find(item => item.id === id);
+  if (requestItem) {
+    startDownloadCompletionWatcher(requestItem);
+  }
 
   useLiveDownloadStore.getState().fetchDownloads();
 }
