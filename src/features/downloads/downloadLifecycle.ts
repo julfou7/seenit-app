@@ -4,6 +4,7 @@ import {
   scheduleResumeDownloadCompletionWatchers,
   startDownloadCompletionWatcher
 } from './downloadCompletionWatcher';
+import { ensureQbitRealtimeMonitor } from './qbitRealtimeMonitor';
 
 export interface BeginDownloadRequestInput {
   title: string;
@@ -21,6 +22,7 @@ export interface BeginDownloadRequestInput {
 }
 
 scheduleResumeDownloadCompletionWatchers();
+ensureQbitRealtimeMonitor();
 
 export function beginDownloadRequest(input: BeginDownloadRequestInput): string {
   return useLiveDownloadStore.getState().addOptimisticDownload({
