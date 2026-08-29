@@ -129,23 +129,42 @@ async function fetchNativeTorrents(base: string, username: string, password: str
   return request(false);
 }
 
+async function webLogin(base: string, username: string, password: string): Promise<void> {
+  const form = new URLSearchParams({ username, password });
+  const login = await fetch(`${base}/api/v2/auth/login`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: form.toString(),
+    signal: AbortSignal.timeout(3000)
+  });
+  if (!login.ok) throw new Error(`qBittorrent login HTTP ${login.status}`);
+
+  const body = (await login.text()).trim();
+  if (body && body !== 'Ok.') throw new Error('Authentification qBittorrent refusée');
+  sessionValidUntil = Date.now() + SESSION_TTL_MS;
+}
+
 async function fetchWebTorrents(base: string, username: string, password: string): Promise<any[]> {
-  if (username || password) {
-    const form = new URLSearchParams({ username, password });
-    const login = await fetch(`${base}/api/v2/auth/login`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: form.toString(),
-      signal: AbortSignal.timeout(3000)
-    });
-    if (!login.ok) throw new Error(`qBittorrent login HTTP ${login.status}`);
+  resetSessionIfConfigChanged(base, username);
+
+  const hasCredentials = Boolean(username || password);
+  if (hasCredentials && Date.now() >= sessionValidUntil) {
+    await webLogin(base, username, password);
   }
 
-  const response = await fetch(`${base}/api/v2/torrents/info?filter=all&sort=added_on&reverse=true&limit=100`, {
+  const requestInfo = () => fetch(`${base}/api/v2/torrents/info?filter=all&sort=added_on&reverse=true&limit=100`, {
     credentials: 'include',
     signal: AbortSignal.timeout(3000)
   });
+
+  let response = await requestInfo();
+  if ((response.status === 401 || response.status === 403) && hasCredentials) {
+    sessionValidUntil = 0;
+    await webLogin(base, username, password);
+    response = await requestInfo();
+  }
+
   if (!response.ok) throw new Error(`qBittorrent HTTP ${response.status}`);
   const data = await response.json();
   return Array.isArray(data) ? data : [];
@@ -153,6 +172,7 @@ async function fetchWebTorrents(base: string, username: string, password: string
 
 function formatProgress(progress: number): string {
   if (progress >= 100) return '100';
+  if (progress < 1) return progress.toFixed(3);
   if (progress < 10) return progress.toFixed(2);
   return progress.toFixed(1);
 }
