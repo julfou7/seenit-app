@@ -12,6 +12,13 @@ export interface ExpectedPlexIdentity {
   mediaType?: 'movie' | 'tv' | 'show';
 }
 
+export type PlexMetadataType = 'movie' | 'show' | 'season' | 'episode';
+
+export interface ParsedPlexGuid {
+  type: PlexMetadataType;
+  id: string;
+}
+
 const PLEX_MEDIA_WRAPPER_KEYS = [
   'Metadata',
   'metadata',
@@ -33,6 +40,22 @@ function looksLikePlexMediaObject(value: any): boolean {
     !!(value.guid || value.Guid || value.guids || value.ratingKey || value.key ||
       value.grandparentGuid || value.parentGuid || value.grandparentRatingKey ||
       value.parentRatingKey || value.grandparentTitle || value.parentIndex);
+}
+
+export function parsePlexGuid(raw: unknown): ParsedPlexGuid | null {
+  if (typeof raw !== 'string') return null;
+  const value = raw.trim();
+  if (!value) return null;
+
+  // Plex Metadata.md : {scheme}://{metadataType}/{ratingKey}
+  // ratingKey provider = lettres ASCII, chiffres, tiret et underscore.
+  const match = value.match(/^plex:\/\/(movie|show|season|episode)\/([A-Za-z0-9_-]+)$/i);
+  if (!match) return null;
+
+  return {
+    type: match[1].toLowerCase() as PlexMetadataType,
+    id: match[2]
+  };
 }
 
 export function unwrapPlexMediaItem(rawItem: any): any {
@@ -88,7 +111,7 @@ export function getPlexMetadataLookupKey(rawItem: any): string | null {
 
     if (/^[a-zA-Z0-9_-]+$/.test(value) ||
         /^\/library\/metadata\/[a-zA-Z0-9_-]+(?:[/?#].*)?$/.test(value) ||
-        /^plex:\/(?:\/)?(?:movie|show|season|episode)\/[a-zA-Z0-9_-]+$/i.test(value)) {
+        parsePlexGuid(value)) {
       return value;
     }
 
@@ -128,8 +151,8 @@ export function extractPlexExternalIds(rawItem: any): PlexExternalIds {
     const tvdbMatch = value.match(/(?:tvdb|thetvdb|com\.plexapp\.agents\.thetvdb):\/\/(\d+)/i);
     if (tvdbMatch && !tvdbId) tvdbId = Number(tvdbMatch[1]);
 
-    const plexMatch = value.match(/plex:\/\/(?:movie|show|season|episode)\/([a-z0-9_-]+)/i);
-    if (plexMatch && !plexGuid) plexGuid = plexMatch[1];
+    const parsedPlexGuid = parsePlexGuid(value);
+    if (parsedPlexGuid && !plexGuid) plexGuid = parsedPlexGuid.id;
   };
 
   for (const list of [
@@ -268,11 +291,11 @@ export function buildPlexParentShowIdentityItem(rawItem: any): any {
     ...(Array.isArray(item?.Guid) ? item.Guid.map((guid: any) => typeof guid === 'string' ? guid : guid?.id) : []),
     ...(Array.isArray(item?.guids) ? item.guids.map((guid: any) => typeof guid === 'string' ? guid : guid?.id) : [])
   ].find(
-    (guid) => typeof guid === 'string' && /^plex:\/\/episode\/[a-zA-Z0-9_-]+$/i.test(guid.trim())
+    (guid) => parsePlexGuid(guid)?.type === 'episode'
   ) || null;
 
   const showGuid = isEpisode
-    ? (item?.grandparentGuid || item?.grandparentKey || episodePlexGuid)
+    ? (item?.grandparentGuid || episodePlexGuid || item?.grandparentKey || null)
     : (item?.parentGuid || item?.guid || null);
 
   const showGuids = isEpisode
