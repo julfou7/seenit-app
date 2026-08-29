@@ -42,7 +42,6 @@ let pollingTimer: ReturnType<typeof setTimeout> | null = null;
 let pollingIntervalMs = 1000;
 let isFetchingInProgress = false;
 let lastFetchTime = 0;
-let activeScopedUid: string | null = null;
 
 const optimisticTimestamps: Record<string, number> = {};
 const missingSince: Record<string, number> = {};
@@ -75,29 +74,32 @@ function normalizeTitleForMatch(str?: string): string {
     .trim();
 }
 
-function sameDownloadIdentity(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
-  if (a.id === b.id) return true;
+function sameCanonicalMedia(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
   if (a.mediaType !== b.mediaType) return false;
-
-  if (a.tmdbId && b.tmdbId && Number(a.tmdbId) === Number(b.tmdbId)) {
-    if (a.mediaType === 'tv') {
-      if (a.seasonNumber != null && b.seasonNumber != null && a.seasonNumber !== b.seasonNumber) return false;
-      if (a.episodeNumber != null && b.episodeNumber != null && a.episodeNumber !== b.episodeNumber) return false;
-    }
-    return true;
-  }
-
-  if (a.tvdbId && b.tvdbId && Number(a.tvdbId) === Number(b.tvdbId)) {
-    if (a.mediaType === 'tv') {
-      if (a.seasonNumber != null && b.seasonNumber != null && a.seasonNumber !== b.seasonNumber) return false;
-      if (a.episodeNumber != null && b.episodeNumber != null && a.episodeNumber !== b.episodeNumber) return false;
-    }
-    return true;
-  }
+  if (a.tmdbId && b.tmdbId && Number(a.tmdbId) === Number(b.tmdbId)) return true;
+  if (a.tvdbId && b.tvdbId && Number(a.tvdbId) === Number(b.tvdbId)) return true;
 
   const aTitle = normalizeTitleForMatch(a.title || a.seriesTitle || a.movieTitle || a.releaseTitle);
   const bTitle = normalizeTitleForMatch(b.title || b.seriesTitle || b.movieTitle || b.releaseTitle);
   return Boolean(aTitle && bTitle && aTitle === bTitle);
+}
+
+function sameRequestScope(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
+  if (!sameCanonicalMedia(a, b)) return false;
+  if (a.mediaType !== 'tv') return true;
+  return (a.seasonNumber ?? null) === (b.seasonNumber ?? null)
+    && (a.episodeNumber ?? null) === (b.episodeNumber ?? null);
+}
+
+function sameDownloadIdentity(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
+  if (a.id === b.id) return true;
+  if (!sameCanonicalMedia(a, b)) return false;
+
+  if (a.mediaType === 'tv') {
+    if (a.seasonNumber != null && b.seasonNumber != null && a.seasonNumber !== b.seasonNumber) return false;
+    if (a.episodeNumber != null && b.episodeNumber != null && a.episodeNumber !== b.episodeNumber) return false;
+  }
+  return true;
 }
 
 function sendLocalNotification(title: string, body: string, isSuccess = false) {
@@ -106,15 +108,13 @@ function sendLocalNotification(title: string, body: string, isSuccess = false) {
   } catch {}
 
   if (!Capacitor.isNativePlatform()) {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      if (Notification.permission === 'granted') {
-        try { new Notification(title, { body }); } catch {}
-      }
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      try { new Notification(title, { body }); } catch {}
     }
     return;
   }
 
-  checkAndRequestNotificationPermission().then((granted) => {
+  checkAndRequestNotificationPermission().then(granted => {
     if (!granted) return;
     try {
       LocalNotifications.schedule({
@@ -151,7 +151,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
       error: null,
       isPolling: false,
 
-      addOptimisticDownload: (item) => {
+      addOptimisticDownload: item => {
         const candidate: LiveDownloadItem = {
           id: item.id || `opt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
           mediaType: item.mediaType,
@@ -177,9 +177,9 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
         };
 
         const existing = get().downloads.find(download =>
-          download.status !== 'completed' &&
-          download.status !== 'error' &&
-          sameDownloadIdentity(download, candidate)
+          download.status !== 'completed'
+          && download.status !== 'error'
+          && sameRequestScope(download, candidate)
         );
 
         if (existing) {
@@ -229,9 +229,9 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
 
         const config = useDownloadConfigStore.getState();
         const hasAnyClient = Boolean(
-          (config.sonarrUrl && config.sonarrApiKey) ||
-          (config.radarrUrl && config.radarrApiKey) ||
-          config.qbittorrentUrl
+          (config.sonarrUrl && config.sonarrApiKey)
+          || (config.radarrUrl && config.radarrApiKey)
+          || config.qbittorrentUrl
         );
 
         if (!hasAnyClient) {
@@ -254,7 +254,6 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             qbittorrentPassword: config.qbittorrentPassword
           });
 
-          // Un ID supprimé n'est masqué que tant qu'il existe encore réellement côté client.
           const rawIds = new Set(rawServerItems.map(item => item.id));
           const prunedRemovedIds = (get().removedIds || []).filter(id => rawIds.has(id));
           const removedSet = new Set(prunedRemovedIds);
@@ -323,8 +322,6 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             }
           }
 
-          // Une disparition de queue n'est plus assimilée à un succès.
-          // On conserve l'état connu et on passe en avertissement si l'absence dure.
           const preservedItems: LiveDownloadItem[] = [];
           for (const oldItem of currentDownloads) {
             if (oldItem.isOptimistic || removedSet.has(oldItem.id)) continue;
@@ -366,7 +363,6 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           }
           const finalItems = Array.from(itemMap.values());
 
-          // Notification uniquement sur une confirmation explicite à 100 %, jamais sur une disparition.
           for (const serverItem of serverItems) {
             const previous = currentDownloads.find(oldItem => sameDownloadIdentity(oldItem, serverItem));
             if (serverItem.progress >= 100 && previous && previous.progress < 100 && previous.status !== 'completed') {
@@ -398,7 +394,6 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
       startPolling: (intervalMs = 1000) => {
         pollingIntervalMs = Math.max(1000, Math.min(pollingIntervalMs, intervalMs));
 
-        // Le polling est global à la session. Les écrans peuvent le demander sans se voler le timer.
         if (get().isPolling) {
           void get().fetchDownloads();
           return;
@@ -431,15 +426,13 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
       },
 
       stopPolling: () => {
-        // Tant qu'un utilisateur est connecté, le moniteur reste globalement actif.
-        // Cela évite qu'une modale ou un écran secondaire coupe le suivi des autres vues.
         if (auth.currentUser) return;
         clearPollingTimer();
         pollingIntervalMs = 1000;
         set({ isPolling: false });
       },
 
-      removeDownload: async (item) => {
+      removeDownload: async item => {
         const newRemovedIds = Array.from(new Set([...(get().removedIds || []), item.id]));
         const config = useDownloadConfigStore.getState();
 
@@ -549,18 +542,20 @@ if (typeof window !== 'undefined') {
   onAuthStateChanged(auth, user => {
     const nextUid = user?.uid || null;
     const scopeKey = 'seenit_live_downloads_scope_v3';
-    const previousUid = localStorage.getItem(scopeKey) || null;
+    const previousRaw = localStorage.getItem(scopeKey);
+    const previousUid = previousRaw && previousRaw.trim() ? previousRaw : null;
+    const accountChanged = previousUid !== null && previousUid !== nextUid;
 
-    if (previousUid !== nextUid || activeScopedUid !== nextUid) {
-      activeScopedUid = nextUid;
+    if (accountChanged) {
       useLiveDownloadStore.setState({
         downloads: [],
         removedIds: [],
         error: null,
         lastUpdated: null
       });
-      localStorage.setItem(scopeKey, nextUid || '');
     }
+
+    localStorage.setItem(scopeKey, nextUid || '');
 
     if (user) {
       useLiveDownloadStore.getState().startPolling(1000);
