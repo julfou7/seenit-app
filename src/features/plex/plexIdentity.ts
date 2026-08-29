@@ -96,6 +96,45 @@ export function buildResolvedPlexIdentity(
   return `${mediaType}:${tmdbId}`;
 }
 
+export function normalizePlexEpisodeKey(rawKey: unknown): string | null {
+  if (typeof rawKey !== 'string') return null;
+
+  const match = rawKey.trim().match(/^(?:s\s*)?(\d+)\s*(?:x|e)\s*(\d+)$/i);
+  if (!match) return null;
+
+  return `${Number(match[1])}x${Number(match[2])}`;
+}
+
+export function isPlexEpisodeAlreadyWatched(
+  show: { seenEpisodes?: string[]; episodeRecords?: Record<string, unknown> } | null | undefined,
+  seasonNumber: number,
+  episodeNumber: number
+): boolean {
+  if (!show) return false;
+
+  const expectedKey = `${Number(seasonNumber)}x${Number(episodeNumber)}`;
+  const seenEpisodeKeys = Array.isArray(show.seenEpisodes) ? show.seenEpisodes : [];
+  const recordKeys = show.episodeRecords ? Object.keys(show.episodeRecords) : [];
+
+  return [...seenEpisodeKeys, ...recordKeys].some(
+    (key) => normalizePlexEpisodeKey(key) === expectedKey
+  );
+}
+
+export function isPlexMovieAlreadyWatched(
+  show: {
+    seenEpisodes?: string[];
+    episodeRecords?: Record<string, unknown>;
+    status?: string;
+  } | null | undefined
+): boolean {
+  if (!show) return false;
+
+  return show.seenEpisodes?.includes('movie') === true ||
+    show.status === 'completed' ||
+    Object.prototype.hasOwnProperty.call(show.episodeRecords || {}, 'movie');
+}
+
 export function getStrongPlexSourceIdentity(item: any): string | null {
   const unwrapped = unwrapPlexItem(item);
   const ids = extractPlexExternalIds(unwrapped);
@@ -113,9 +152,12 @@ export function getStrongPlexSourceIdentity(item: any): string | null {
 export function buildPlexParentShowIdentityItem(rawItem: any): any {
   const item = unwrapPlexItem(rawItem);
   const parentGuid = item?.grandparentGuid || item?.parentGuid || null;
+  const parentGuids = item?.grandparentGuids || [];
   return {
     type: 'show',
     guid: parentGuid,
+    Guid: parentGuids,
+    guids: parentGuids,
     serverId: item?.serverId,
     ratingKey: item?.grandparentRatingKey || null
   };

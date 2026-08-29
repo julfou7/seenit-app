@@ -5,6 +5,8 @@ import {
   buildResolvedPlexIdentity,
   extractPlexExternalIds,
   getStrongPlexSourceIdentity,
+  isPlexEpisodeAlreadyWatched,
+  isPlexMovieAlreadyWatched,
   isStrictPlexIdentityMatch
 } from '../src/features/plex/plexIdentity.ts';
 
@@ -62,6 +64,34 @@ test("ignore l'identifiant TMDB d'un épisode si la série parente est inconnue"
   });
 
   assert.equal(extractPlexExternalIds(parentIdentity).tmdbId, null);
+});
+
+test("utilise les GUID enrichis de la série parente sans reprendre ceux de l'épisode", () => {
+  const parentIdentity = buildPlexParentShowIdentityItem({
+    type: 'episode',
+    Guid: [{ id: 'tmdb://999999' }],
+    grandparentGuids: [{ id: 'tmdb://1399' }, { id: 'tvdb://121361' }]
+  });
+
+  assert.deepEqual(extractPlexExternalIds(parentIdentity), {
+    tmdbId: 1399,
+    imdbId: null,
+    tvdbId: 121361,
+    plexGuid: null
+  });
+});
+
+test("reconnaît un épisode déjà vu depuis seenEpisodes ou episodeRecords", () => {
+  assert.equal(isPlexEpisodeAlreadyWatched({ seenEpisodes: ['1x4'] }, 1, 4), true);
+  assert.equal(isPlexEpisodeAlreadyWatched({ episodeRecords: { '1x4': { watchedAt: 123 } } }, 1, 4), true);
+  assert.equal(isPlexEpisodeAlreadyWatched({ episodeRecords: { S01E04: { watchedAt: 123 } } }, 1, 4), true);
+  assert.equal(isPlexEpisodeAlreadyWatched({ seenEpisodes: ['1x5'] }, 1, 4), false);
+});
+
+test("reconnaît un film déjà vu même si l'index seenEpisodes est absent", () => {
+  assert.equal(isPlexMovieAlreadyWatched({ episodeRecords: { movie: { watchedAt: 123 } } }), true);
+  assert.equal(isPlexMovieAlreadyWatched({ status: 'completed' }), true);
+  assert.equal(isPlexMovieAlreadyWatched({ status: 'watching' }), false);
 });
 
 test('ne fabrique aucune identité forte depuis un titre ou une année', () => {

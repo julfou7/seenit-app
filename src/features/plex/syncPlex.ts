@@ -13,8 +13,11 @@ import { CURRENT_APP_VERSION } from '../../store/updateStore';
 import { authenticatedFetch, getAuthenticatedHeaders } from '../../lib/apiAuth';
 import {
   buildPlexParentShowIdentityItem,
+  buildResolvedPlexIdentity,
   extractPlexExternalIds,
   getStrongPlexSourceIdentity,
+  isPlexEpisodeAlreadyWatched,
+  isPlexMovieAlreadyWatched,
   isStrictPlexIdentityMatch
 } from './plexIdentity';
 import {
@@ -192,7 +195,7 @@ export async function resolveMovieToTmdb(item: any, plexToken?: string) {
     }
   }
 
-  appLogger.error('plex', `[Plex Resolve] ❌ Film non résolu pour "${movieTitle}" : aucune chaîne d'identifiants TMDB/IMDb/TVDB/Plex vérifiable.`);
+  appLogger.warn('plex', `[Plex Resolve] Film ignoré pour "${movieTitle}" : aucune chaîne d'identifiants TMDB/IMDb/TVDB/Plex vérifiable.`);
   return null;
 }
 
@@ -297,7 +300,7 @@ export async function resolveShowToTmdb(item: any, plexToken?: string) {
     }
   }
 
-  appLogger.error('plex', `[Plex Resolve] ❌ Série non résolue pour "${rawShowTitle}" : aucune chaîne d'identifiants TMDB/IMDb/TVDB/Plex vérifiable.`);
+  appLogger.warn('plex', `[Plex Resolve] Série ignorée pour "${rawShowTitle}" : aucune chaîne d'identifiants TMDB/IMDb/TVDB/Plex vérifiable.`);
   return null;
 }
 
@@ -340,7 +343,7 @@ export async function resolveEpisodeShowToTmdb(item: any, plexToken?: string) {
     return tmdbShowData;
   }
 
-  appLogger.error('plex', `[Plex Resolve] ❌ ÉCHEC FINAL épisode pour "${parentShowTitle}" S${seasonNum}E${episodeNum}`);
+  appLogger.warn('plex', `[Plex Resolve] Épisode ignoré pour "${parentShowTitle}" S${seasonNum}E${episodeNum} : série parente non résolue.`);
   return null;
 }
 
@@ -574,9 +577,61 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       let syncCount = 0;
       let moviesCount = 0;
       let episodesCount = 0;
+      let alreadyWatchedCount = 0;
+      let unresolvedCount = 0;
+      let repairedCount = 0;
       const syncedItems: PlexSyncResult['syncedItems'] = [];
+      const syncedIdentityKeys = new Set<string>();
 
       const mutatedShows: Record<string, Show> = {};
+
+      const queueSyncedItem = (
+        identity: string,
+        syncedItem: PlexSyncResult['syncedItems'][number]
+      ) => {
+        if (syncedIdentityKeys.has(identity)) return;
+        syncedIdentityKeys.add(identity);
+        syncedItems.push(syncedItem);
+      };
+
+      const skipAlreadyWatchedEpisode = (
+        candidate: Show | undefined,
+        seasonNumber: number,
+        episodeNumber: number
+      ): boolean => {
+        if (!candidate) return false;
+
+        const current = mutatedShows[candidate.id] || candidate;
+        if (!isPlexEpisodeAlreadyWatched(current, seasonNumber, episodeNumber)) return false;
+
+        alreadyWatchedCount++;
+        const canonicalKey = `${seasonNumber}x${episodeNumber}`;
+        if (!current.seenEpisodes?.includes(canonicalKey)) {
+          const repairedShow: Show = mutatedShows[candidate.id] || { ...current };
+          repairedShow.seenEpisodes = [...new Set([...(repairedShow.seenEpisodes || []), canonicalKey])];
+          repairedShow.updatedAt = Date.now();
+          mutatedShows[candidate.id] = repairedShow;
+          repairedCount++;
+        }
+        return true;
+      };
+
+      const skipAlreadyWatchedMovie = (candidate: Show | undefined): boolean => {
+        if (!candidate) return false;
+
+        const current = mutatedShows[candidate.id] || candidate;
+        if (!isPlexMovieAlreadyWatched(current)) return false;
+
+        alreadyWatchedCount++;
+        if (!current.seenEpisodes?.includes('movie')) {
+          const repairedMovie: Show = mutatedShows[candidate.id] || { ...current };
+          repairedMovie.seenEpisodes = [...new Set([...(repairedMovie.seenEpisodes || []), 'movie'])];
+          repairedMovie.updatedAt = Date.now();
+          mutatedShows[candidate.id] = repairedMovie;
+          repairedCount++;
+        }
+        return true;
+      };
 
       const totalItems = history.length;
       let processedCount = 0;
@@ -617,11 +672,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           let matchedShow = findShowInLocalLibrary(showsList, guidTmdbId, 'tv');
 
           // Fast skip check: if already in library and episode is already seen, skip immediately
-          if (matchedShow) {
-            const currentMutated = mutatedShows[matchedShow.id] || matchedShow;
-            if (currentMutated.seenEpisodes?.includes(epKey)) {
-              continue; // Already processed & seen! Skip in 0ms without any TMDB request or UI message
-            }
+          if (skipAlreadyWatchedEpisode(matchedShow, seasonNum, episodeNum)) {
+            continue; // Déjà vu dans seenEpisodes ou episodeRecords : aucune notification.
           }
 
           // 2. If not found locally, check resolution cache
@@ -631,11 +683,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             matchedShow = showsList.find(
               (s) => Number(s.tmdbId) === Number(tmdbData.id) && (s.mediaType === 'tv' || !s.mediaType)
             );
-            if (matchedShow) {
-              const currentMutated = mutatedShows[matchedShow.id] || matchedShow;
-              if (currentMutated.seenEpisodes?.includes(epKey)) {
-                continue; // Already in library via cached TMDB ID and already seen! Skip!
-              }
+            if (skipAlreadyWatchedEpisode(matchedShow, seasonNum, episodeNum)) {
+              continue;
             }
           }
 
@@ -644,6 +693,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             tmdbData = await resolvePlexItem(item, plexToken);
 
             if (!tmdbData) {
+              unresolvedCount++;
               appLogger.info('plex', `[Plex Sync] Fiche "${cleanShowTitle}" ignorée (impossible de résoudre l'ID TMDB).`);
               continue;
             }
@@ -657,11 +707,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             matchedShow = showsList.find(
               (s) => Number(s.tmdbId) === Number(tmdbData.id) && (s.mediaType === 'tv' || !s.mediaType)
             );
-            if (matchedShow) {
-              const currentMutated = mutatedShows[matchedShow.id] || matchedShow;
-              if (currentMutated.seenEpisodes?.includes(epKey)) {
-                continue;
-              }
+            if (skipAlreadyWatchedEpisode(matchedShow, seasonNum, episodeNum)) {
+              continue;
             }
           }
 
@@ -674,7 +721,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             const seenEpisodes = [...(showData.seenEpisodes || [])];
 
             // Check if already seen
-            if (!seenEpisodes.includes(epKey)) {
+            if (!isPlexEpisodeAlreadyWatched(showData, seasonNum, episodeNum)) {
               seenEpisodes.push(epKey);
               const episodeRecords = { ...(showData.episodeRecords || {}) };
               episodeRecords[epKey] = {
@@ -696,7 +743,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               const ePad = String(episodeNum).padStart(2, '0');
               const subtitle = `S${sPad} | E${ePad}`;
 
-              syncedItems.push({
+              queueSyncedItem(buildResolvedPlexIdentity('tv', showData.tmdbId, seasonNum, episodeNum), {
                 title: showData.title || showTitle,
                 subtitle,
                 posterPath: showData.posterPath,
@@ -747,7 +794,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             const ePad = String(episodeNum).padStart(2, '0');
             const subtitle = `S${sPad} | E${ePad}`;
 
-            syncedItems.push({
+            queueSyncedItem(buildResolvedPlexIdentity('tv', newShowData.tmdbId, seasonNum, episodeNum), {
               title: newShowData.title,
               subtitle,
               posterPath: newShowData.posterPath,
@@ -765,14 +812,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           let matchedMovie = findShowInLocalLibrary(showsList, guidTmdbId, 'movie');
 
           // Fast skip check: if already in library and movie is already marked as seen, skip immediately
-          if (matchedMovie) {
-            const currentMutated = mutatedShows[matchedMovie.id] || matchedMovie;
-            const isSeen = currentMutated.seenEpisodes?.includes('movie') ||
-                           currentMutated.status === 'completed' ||
-                           !!currentMutated.episodeRecords?.['movie']?.watchedAt;
-            if (isSeen) {
-              continue; // Already processed & seen! Skip in 0ms without any TMDB request or UI message
-            }
+          if (skipAlreadyWatchedMovie(matchedMovie)) {
+            continue;
           }
 
           // 2. If not found locally, check resolution cache
@@ -782,14 +823,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             matchedMovie = showsList.find(
               (s) => Number(s.tmdbId) === Number(tmdbData.id) && s.mediaType === 'movie'
             );
-            if (matchedMovie) {
-              const currentMutated = mutatedShows[matchedMovie.id] || matchedMovie;
-              const isSeen = currentMutated.seenEpisodes?.includes('movie') ||
-                             currentMutated.status === 'completed' ||
-                             !!currentMutated.episodeRecords?.['movie']?.watchedAt;
-              if (isSeen) {
-                continue; // Already in library via cached TMDB ID and already seen! Skip!
-              }
+            if (skipAlreadyWatchedMovie(matchedMovie)) {
+              continue;
             }
           }
 
@@ -798,6 +833,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             tmdbData = await resolvePlexItem(item, plexToken);
 
             if (!tmdbData) {
+              unresolvedCount++;
               appLogger.info('plex', `[Plex Sync] Fiche film "${cleanMovieTitle}" ignorée (impossible de résoudre l'ID TMDB).`);
               continue;
             }
@@ -811,14 +847,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             matchedMovie = showsList.find(
               (s) => Number(s.tmdbId) === Number(tmdbData.id) && s.mediaType === 'movie'
             );
-            if (matchedMovie) {
-              const currentMutated = mutatedShows[matchedMovie.id] || matchedMovie;
-              const isSeen = currentMutated.seenEpisodes?.includes('movie') ||
-                             currentMutated.status === 'completed' ||
-                             !!currentMutated.episodeRecords?.['movie']?.watchedAt;
-              if (isSeen) {
-                continue;
-              }
+            if (skipAlreadyWatchedMovie(matchedMovie)) {
+              continue;
             }
           }
 
@@ -831,7 +861,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             const seenEpisodes = [...(showData.seenEpisodes || [])];
 
             // Check if already seen
-            if (!seenEpisodes.includes('movie')) {
+            if (!isPlexMovieAlreadyWatched(showData)) {
               seenEpisodes.push('movie');
               const episodeRecords = { ...(showData.episodeRecords || {}) };
               episodeRecords['movie'] = {
@@ -848,7 +878,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               syncCount++;
               moviesCount++;
 
-              syncedItems.push({
+              queueSyncedItem(buildResolvedPlexIdentity('movie', showData.tmdbId), {
                 title: showData.title || movieTitle,
                 subtitle: 'Film',
                 posterPath: showData.posterPath,
@@ -895,7 +925,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             syncCount++;
             moviesCount++;
 
-            syncedItems.push({
+            queueSyncedItem(buildResolvedPlexIdentity('movie', newShowData.tmdbId), {
               title: newShowData.title,
               subtitle: 'Film',
               posterPath: newShowData.posterPath,
@@ -938,6 +968,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             tmdbData = await resolvePlexItem(wlItem, plexToken);
 
             if (!tmdbData) {
+              unresolvedCount++;
               appLogger.info('plex', `[Plex Sync] Item Watchlist "${cleanTitle}" ignoré (impossible de résoudre l'ID TMDB).`);
               continue;
             }
@@ -991,7 +1022,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             syncCount++;
             if (mediaType === 'movie') moviesCount++;
 
-            syncedItems.push({
+            queueSyncedItem(`watchlist:${buildResolvedPlexIdentity(mediaType, newShowData.tmdbId)}`, {
               title: newShowData.title,
               subtitle: mediaType === 'movie' ? 'Film' : 'Série',
               isWatchlist: true,
@@ -1062,6 +1093,11 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         // // appLogger.info('plex', 'Synchronisation terminée : 0 nouveau média (votre bibliothèque est déjà à jour)');
         clearPlexSyncStatusDelayed('Sync Plex terminée (à jour)', 3500);
       }
+
+      appLogger.success(
+        'plex',
+        `[Plex Sync] Bilan : ${syncCount} nouveau(x), ${alreadyWatchedCount} déjà vu(s) ignoré(s), ${unresolvedCount} non résolu(s), ${repairedCount} index vu(s) réparé(s) sans notification.`
+      );
 
       setPlexLastSyncTimestamp(user.uid, nextSyncCursor);
 

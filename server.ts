@@ -12,7 +12,7 @@ import multer from "multer";
 import dns from "node:dns/promises";
 import net from "node:net";
 import { timingSafeEqual } from "node:crypto";
-import { extractPlexExternalIds, getStrongPlexSourceIdentity } from "./src/features/plex/plexIdentity.ts";
+import { buildPlexParentShowIdentityItem, extractPlexExternalIds, getStrongPlexSourceIdentity } from "./src/features/plex/plexIdentity.ts";
 
 export interface AuthRequest extends Request {
   user?: DecodedIdToken;
@@ -395,7 +395,7 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.38',
+        'X-Plex-Version': '1.4.40',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
@@ -1104,39 +1104,70 @@ async function startServer() {
       console.log(`[Plex Sync] Collected a total of ${allRawItems.length} raw history records across all sources.`);
 
       // 4. Enrichir les entrées dépourvues d'identifiant externe via leur ratingKey serveur.
+      // Pour un épisode, les GUID de l'épisode ne suffisent pas : on récupère aussi
+      // explicitement les identifiants de la série parente.
       // Le jeton reste exclusivement dans l'en-tête et n'est jamais renvoyé au client.
       const metadataCache = new Map<string, any>();
-      const enrichEntry = async (entry: any): Promise<any> => {
-        const raw = entry.raw || {};
-        const meta = raw.Metadata || raw.media || raw.item || raw;
-        const currentIds = extractPlexExternalIds(meta);
-        if (currentIds.tmdbId || currentIds.imdbId || currentIds.tvdbId) return entry;
 
-        const ratingKey = meta.ratingKey || raw.ratingKey || meta.key || raw.key;
-        if (!ratingKey || !entry.serverUri || !entry.serverToken) return entry;
+      const fetchServerMetadata = async (entry: any, ratingKey: unknown): Promise<any | null> => {
+        if (!ratingKey || !entry.serverUri || !entry.serverToken) return null;
 
-        const cacheKey = `${entry.serverId || entry.serverUri}:${ratingKey}`;
-        if (metadataCache.has(cacheKey)) {
-          return { ...entry, raw: { ...raw, ...metadataCache.get(cacheKey) } };
-        }
+        const ratingKeyValue = String(ratingKey);
+        const metadataKey = ratingKeyValue.match(/\/library\/metadata\/([^/?]+)/)?.[1] || ratingKeyValue;
+        const cacheKey = `${entry.serverId || entry.serverUri}:${metadataKey}`;
+        if (metadataCache.has(cacheKey)) return metadataCache.get(cacheKey);
 
         try {
-          const ratingKeyValue = String(ratingKey);
-          const metadataKey = ratingKeyValue.match(/\/library\/metadata\/([^/?]+)/)?.[1] || ratingKeyValue;
           const metadataUrl = `${entry.serverUri}/library/metadata/${encodeURIComponent(metadataKey)}?includeGuids=1`;
           const metadataResponse = await fetch(metadataUrl, {
             headers: { 'Accept': 'application/json', 'X-Plex-Token': entry.serverToken },
             signal: AbortSignal.timeout(2500)
           });
-          if (!metadataResponse.ok) return entry;
+          if (!metadataResponse.ok) return null;
+
           const metadataData = await metadataResponse.json();
-          const enriched = extractItems(metadataData)[0];
-          if (!enriched) return entry;
-          metadataCache.set(cacheKey, enriched);
-          return { ...entry, raw: { ...raw, ...enriched } };
+          const metadata = extractItems(metadataData)[0] || null;
+          if (metadata) metadataCache.set(cacheKey, metadata);
+          return metadata;
         } catch {
-          return entry;
+          return null;
         }
+      };
+
+      const enrichEntry = async (entry: any): Promise<any> => {
+        const raw = entry.raw || {};
+        const meta = raw.Metadata || raw.media || raw.item || raw;
+        const rawType = String(meta.type || raw.type || '').toLowerCase();
+        const isEpisode = rawType === 'episode' || !!meta.grandparentTitle ||
+          (meta.parentIndex !== undefined && meta.index !== undefined);
+        const currentIds = extractPlexExternalIds(meta);
+        const parentIds = extractPlexExternalIds(buildPlexParentShowIdentityItem(meta));
+        const hasExternalIdentity = !!(currentIds.tmdbId || currentIds.imdbId || currentIds.tvdbId);
+        const hasParentIdentity = !!(parentIds.tmdbId || parentIds.imdbId || parentIds.tvdbId || parentIds.plexGuid);
+        if ((!isEpisode && hasExternalIdentity) || (isEpisode && hasParentIdentity)) return entry;
+
+        const ratingKey = meta.ratingKey || raw.ratingKey || meta.key || raw.key;
+        if (!ratingKey || !entry.serverUri || !entry.serverToken) return entry;
+
+        const enriched = await fetchServerMetadata(entry, ratingKey);
+        if (!enriched) return entry;
+        if (!isEpisode) return { ...entry, raw: { ...raw, ...enriched } };
+
+        const grandparentRatingKey = enriched.grandparentRatingKey || meta.grandparentRatingKey || raw.grandparentRatingKey;
+        const parentMetadata = grandparentRatingKey
+          ? await fetchServerMetadata(entry, grandparentRatingKey)
+          : null;
+
+        return {
+          ...entry,
+          raw: {
+            ...raw,
+            ...enriched,
+            grandparentGuid: enriched.grandparentGuid || meta.grandparentGuid || parentMetadata?.guid,
+            grandparentGuids: enriched.grandparentGuids || meta.grandparentGuids || parentMetadata?.Guid || parentMetadata?.guids,
+            grandparentRatingKey
+          }
+        };
       };
 
       const enrichedEntries: any[] = [];
@@ -1197,6 +1228,7 @@ async function startServer() {
           year: itemYear,
           guid: meta.guid || raw.guid,
           grandparentGuid: meta.grandparentGuid || raw.grandparentGuid,
+          grandparentGuids: meta.grandparentGuids || raw.grandparentGuids,
           parentGuid: meta.parentGuid || raw.parentGuid,
           grandparentRatingKey: meta.grandparentRatingKey || raw.grandparentRatingKey,
           Guid: meta.Guid || raw.Guid,
