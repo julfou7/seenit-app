@@ -383,7 +383,6 @@ function MainApp() {
             <div className={cn("flex-1 min-h-0 flex flex-col", currentTab !== 'downloads' && "hidden")}>
               <DownloadsScreen 
                 onShowClick={(id, mediaType) => openShow(id, 'tmdb', mediaType)}
-                onOpenSettings={() => changeTab('settings')}
               />
             </div>
           </div>

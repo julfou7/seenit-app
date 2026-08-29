@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { db, auth } from '../lib/firebase';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -36,8 +35,7 @@ const DEFAULT_CONFIG: DownloadClientConfig = {
 };
 
 export const useDownloadConfigStore = create<DownloadConfigState>()(
-  persist(
-    (set, get) => ({
+  (set, get) => ({
       ...DEFAULT_CONFIG,
       setConfig: (newConfig, saveToCloud = true) => {
         set((state) => ({ ...state, ...newConfig }));
@@ -93,15 +91,16 @@ export const useDownloadConfigStore = create<DownloadConfigState>()(
           console.warn('[DownloadConfig] Erreur saveToCloud:', e);
         }
       }
-    }),
-    {
-      name: 'seenit_download_config',
-    }
-  )
+    })
 );
 
 // Listener automatique d'authentification pour synchroniser Firestore en temps réel
 if (typeof window !== 'undefined') {
+  // Supprime l'ancien cache global qui pouvait mélanger les identifiants entre deux comptes.
+  try {
+    localStorage.removeItem('seenit_download_config');
+  } catch {}
+
   let unsubscribeSnapshot: (() => void) | null = null;
 
   onAuthStateChanged(auth, (user) => {
@@ -109,6 +108,9 @@ if (typeof window !== 'undefined') {
       unsubscribeSnapshot();
       unsubscribeSnapshot = null;
     }
+
+    // Toujours vider les identifiants en mémoire avant de charger le compte courant.
+    useDownloadConfigStore.setState(DEFAULT_CONFIG);
 
     if (user) {
       // 1. Synchronisation initiale

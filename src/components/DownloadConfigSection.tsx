@@ -4,10 +4,15 @@ import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useToastStore } from '../store/toastStore';
 import { testServiceConnection } from '../services/sonarrRadarr';
 
-export function DownloadConfigSection() {
+interface DownloadConfigSectionProps {
+  defaultOpen?: boolean;
+  hideToggle?: boolean;
+}
+
+export function DownloadConfigSection({ defaultOpen = false, hideToggle = false }: DownloadConfigSectionProps) {
   const { showToast } = useToastStore();
   const config = useDownloadConfigStore();
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(defaultOpen);
 
   const [c411Key, setC411Key] = useState(config.c411ApiKey);
   const [sonarrUrl, setSonarrUrl] = useState(config.sonarrUrl);
@@ -85,13 +90,15 @@ export function DownloadConfigSection() {
           <Download className="text-blue-400" size={14} />
           <h3 className="font-bold text-xs text-zinc-200">Téléchargement & Tracker (C411 / Sonarr)</h3>
         </div>
-        <button
-          type="button"
-          onClick={() => setIsOpen(!isOpen)}
-          className="text-[11px] font-bold text-blue-400 hover:text-blue-300 bg-blue-500/10 px-2 py-1 rounded-lg border border-blue-500/20 cursor-pointer transition-colors"
-        >
-          {isOpen ? 'Masquer' : 'Configurer'}
-        </button>
+        {!hideToggle && (
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            className="text-[11px] font-bold text-blue-400 hover:text-blue-300 bg-blue-500/10 px-2 py-1 rounded-lg border border-blue-500/20 cursor-pointer transition-colors"
+          >
+            {isOpen ? 'Masquer' : 'Configurer'}
+          </button>
+        )}
       </div>
 
       <p className="text-[11px] text-zinc-400 mb-3 leading-relaxed font-medium">

@@ -17,7 +17,8 @@ import {
   Loader2,
   Check,
   Copy,
-  ArrowDown
+  ArrowDown,
+  ArrowLeft
 } from 'lucide-react';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
@@ -26,10 +27,10 @@ import { C411Torrent, searchC411Torrents, formatTorrentSize } from '../services/
 import { useToastStore } from '../store/toastStore';
 import { SeenItLogo } from '../components/SeenItLogo';
 import { cn } from '../lib/utils';
+import { DownloadConfigSection } from '../components/DownloadConfigSection';
 
 interface Props {
   onShowClick?: (id: any, mediaType?: 'tv' | 'movie') => void;
-  onOpenSettings?: () => void;
 }
 
 interface SwipeableItemProps {
@@ -291,7 +292,7 @@ function SwipeableItem({ item, onShowClick, onRemove, isDeleting }: SwipeableIte
   );
 }
 
-export function DownloadsScreen({ onShowClick, onOpenSettings }: Props) {
+export function DownloadsScreen({ onShowClick }: Props) {
   const { downloads, lastUpdated, startPolling, stopPolling, removeDownload, clearAllDownloads } = useLiveDownloadStore();
   const { 
     sonarrUrl, 
@@ -314,6 +315,7 @@ export function DownloadsScreen({ onShowClick, onOpenSettings }: Props) {
   const [downloadingTorrentId, setDownloadingTorrentId] = useState<number | null>(null);
   const [isClearing, setIsClearing] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showConfiguration, setShowConfiguration] = useState(false);
 
   const isConfigured = Boolean(sonarrUrl || radarrUrl || qbittorrentUrl);
 
@@ -485,6 +487,35 @@ export function DownloadsScreen({ onShowClick, onOpenSettings }: Props) {
   const hasActiveDownloads = downloads.length > 0;
   const isSearchActive = searchQuery.trim().length > 0;
 
+  if (showConfiguration) {
+    return (
+      <div className="flex-1 flex flex-col min-h-0 bg-premium-ambient text-white overflow-hidden">
+        <div className="shrink-0 px-4 sm:px-6 pt-4 pb-3 border-b border-white/5 bg-zinc-950/70 backdrop-blur-xl flex items-center gap-3 z-10">
+          <button
+            type="button"
+            onClick={() => setShowConfiguration(false)}
+            className="w-9 h-9 rounded-xl bg-zinc-900/80 border border-white/10 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center justify-center transition-colors active:scale-95 cursor-pointer"
+            title="Retour aux téléchargements"
+          >
+            <ArrowLeft size={17} />
+          </button>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              Réglages des téléchargements
+            </h1>
+            <p className="text-[11px] sm:text-xs text-zinc-400">
+              Configuration privée synchronisée avec votre compte SeenIt
+            </p>
+          </div>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-4 sm:px-6 py-4">
+          <DownloadConfigSection defaultOpen hideToggle />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-premium-ambient text-white overflow-hidden select-none">
       {/* 1. Header épuré sans boutons encombrants */}
@@ -503,16 +534,14 @@ export function DownloadsScreen({ onShowClick, onOpenSettings }: Props) {
           </div>
         </div>
 
-        {onOpenSettings && (
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            className="w-9 h-9 rounded-xl bg-zinc-900/80 border border-white/10 hover:bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center transition-colors active:scale-95 cursor-pointer"
-            title="Paramètres des serveurs de téléchargement"
-          >
-            <Settings size={16} />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setShowConfiguration(true)}
+          className="w-9 h-9 rounded-xl bg-zinc-900/80 border border-white/10 hover:bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center transition-colors active:scale-95 cursor-pointer"
+          title="Paramètres des serveurs de téléchargement"
+        >
+          <Settings size={16} />
+        </button>
       </div>
 
       {/* 2. Barre de recherche libre intégrée (comme dans Explorer) */}
