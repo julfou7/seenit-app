@@ -39,17 +39,15 @@ const DEFAULT_CONFIG: DownloadClientConfig = {
 };
 
 function normalizeConfig(input: Partial<DownloadClientConfig>): Partial<DownloadClientConfig> {
-  return {
-    ...input,
-    c411ApiKey: input.c411ApiKey?.trim(),
-    sonarrUrl: input.sonarrUrl?.trim(),
-    sonarrApiKey: input.sonarrApiKey?.trim(),
-    radarrUrl: input.radarrUrl?.trim(),
-    radarrApiKey: input.radarrApiKey?.trim(),
-    qbittorrentUrl: input.qbittorrentUrl?.trim(),
-    qbittorrentUsername: input.qbittorrentUsername?.trim(),
-    qbittorrentPassword: input.qbittorrentPassword?.trim()
-  };
+  const output: Partial<DownloadClientConfig> = {};
+
+  for (const [rawKey, rawValue] of Object.entries(input)) {
+    if (rawValue === undefined) continue;
+    const key = rawKey as keyof DownloadClientConfig;
+    (output as any)[key] = typeof rawValue === 'string' ? rawValue.trim() : rawValue;
+  }
+
+  return output;
 }
 
 export const useDownloadConfigStore = create<DownloadConfigState>()((set, get) => ({
@@ -60,9 +58,7 @@ export const useDownloadConfigStore = create<DownloadConfigState>()((set, get) =
 
   setConfig: (newConfig, shouldSave = true) => {
     set({ ...normalizeConfig(newConfig), saveError: null });
-    if (shouldSave) {
-      void get().saveToCloud();
-    }
+    if (shouldSave) void get().saveToCloud();
   },
 
   saveConfig: async newConfig => {
@@ -106,10 +102,7 @@ export const useDownloadConfigStore = create<DownloadConfigState>()((set, get) =
   saveToCloud: async () => {
     const user = auth.currentUser;
     if (!user) {
-      set({
-        isSaving: false,
-        saveError: 'Utilisateur non connecté.'
-      });
+      set({ isSaving: false, saveError: 'Utilisateur non connecté.' });
       return false;
     }
 
