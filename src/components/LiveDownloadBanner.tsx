@@ -1,177 +1,143 @@
 import React from 'react';
-import { Download, Zap, Clock, HardDrive, CheckCircle2, ArrowDownCircle, AlertTriangle, AlertCircle } from 'lucide-react';
-import { LiveDownloadItem, formatBytes } from '../services/sonarrRadarr';
+import {
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  Download,
+  Loader2,
+  Search
+} from 'lucide-react';
+import { type LiveDownloadItem, formatBytes } from '../services/sonarrRadarr';
 
 interface LiveDownloadBannerProps {
   items: LiveDownloadItem[];
   compact?: boolean;
 }
 
-export const LiveDownloadBanner: React.FC<LiveDownloadBannerProps> = ({ items, compact = false }) => {
-  if (!items || items.length === 0) return null;
+function getPhase(item: LiveDownloadItem) {
+  const status = String(item.status || '').toLowerCase();
+  const isError = status === 'error' || Boolean(item.errorMessage);
+  const isWarning = status === 'warning';
+  const isCompleted = status === 'completed' || item.progress >= 100;
+  const isSubmitting = status === 'submitting';
+  const isSearching = status === 'searching';
+  const isQueued = status === 'queued' || status === 'paused';
+  const isTransfer = !isError && !isWarning && !isCompleted && !isSubmitting && !isSearching && item.progress > 0;
 
-  // Si compact (par exemple dans une carte d'épisode ou en badge)
+  if (isError) return { kind: 'error' as const, label: item.statusText || 'Erreur' };
+  if (isWarning) return { kind: 'warning' as const, label: item.statusText || 'Vérification en cours' };
+  if (isCompleted) return { kind: 'completed' as const, label: 'Téléchargement terminé 🍿' };
+  if (isSubmitting) return { kind: 'submitting' as const, label: item.statusText || 'Demande prise en compte…' };
+  if (isSearching) return { kind: 'searching' as const, label: item.statusText || 'Recherche de release en cours…' };
+  if (isQueued) return { kind: 'queued' as const, label: item.statusText || 'En file d’attente' };
+  if (isTransfer) return { kind: 'downloading' as const, label: item.statusText || 'Téléchargement en cours' };
+  return { kind: 'queued' as const, label: item.statusText || 'Préparation du téléchargement…' };
+}
+
+function PhaseIcon({ kind }: { kind: ReturnType<typeof getPhase>['kind'] }) {
+  if (kind === 'error') return <AlertCircle size={14} className="text-red-400" />;
+  if (kind === 'warning') return <AlertTriangle size={14} className="text-amber-400" />;
+  if (kind === 'completed') return <CheckCircle2 size={14} className="text-emerald-400" />;
+  if (kind === 'submitting') return <Loader2 size={14} className="text-blue-400 animate-spin" />;
+  if (kind === 'searching') return <Search size={14} className="text-cyan-400" />;
+  if (kind === 'queued') return <Clock size={14} className="text-zinc-300" />;
+  return <Download size={14} className="text-cyan-400" />;
+}
+
+export const LiveDownloadBanner: React.FC<LiveDownloadBannerProps> = ({ items, compact = false }) => {
+  if (!items?.length) return null;
+
   if (compact) {
     const item = items[0];
-    const isError = item.status === 'error' || Boolean(item.errorMessage);
-    const isWarning = item.status === 'warning';
+    const phase = getPhase(item);
+    const showProgress = phase.kind === 'downloading' || phase.kind === 'completed';
 
     return (
-      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold shadow-md backdrop-blur-sm ${
-        isError 
-          ? 'bg-red-950/80 border border-red-500/60 text-red-200' 
-          : isWarning
-          ? 'bg-amber-950/80 border border-amber-500/60 text-amber-200'
-          : 'bg-blue-950/80 border border-blue-500/50 text-blue-200 animate-pulse'
-      }`}>
-        {isError ? (
-          <AlertCircle size={13} className="text-red-400 shrink-0" />
-        ) : isWarning ? (
-          <AlertTriangle size={13} className="text-amber-400 shrink-0" />
-        ) : (
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400"></span>
-          </span>
-        )}
-        <span className="text-white font-extrabold">{isError ? 'Erreur' : `${item.progress}%`}</span>
-        {item.speedFormatted && !isError && (
-          <span className="text-cyan-300 font-semibold border-l border-blue-700/60 pl-1.5">{item.speedFormatted}</span>
-        )}
-        {item.timeleft && item.timeleft !== '--' && !isError && (
-          <span className="text-zinc-300 text-[10px] border-l border-blue-700/60 pl-1.5">{item.timeleft}</span>
+      <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/10 bg-zinc-900/90 px-2.5 py-1 text-[10px] font-bold text-zinc-200 shadow-sm">
+        <PhaseIcon kind={phase.kind} />
+        <span className="truncate">{phase.label}</span>
+        {showProgress && (
+          <span className="shrink-0 text-white">{Math.min(100, Math.max(0, Math.round(item.progress || 0)))}%</span>
         )}
       </div>
     );
   }
 
   return (
-    <div className="space-y-2.5 my-3">
-      {items.map((item) => {
-        const isError = item.status === 'error' || Boolean(item.errorMessage);
-        const isWarning = item.status === 'warning';
+    <div className="space-y-2.5">
+      {items.map(item => {
+        const phase = getPhase(item);
+        const progress = Math.min(100, Math.max(0, Number(item.progress || 0)));
+        const showNumericProgress = phase.kind === 'downloading' || phase.kind === 'completed';
+        const showIndeterminate = phase.kind === 'submitting' || phase.kind === 'searching' || phase.kind === 'queued';
         const downloadedBytes = item.size > 0 ? Math.max(0, item.size - item.sizeleft) : 0;
-        const totalSizeFormatted = item.size > 0 ? formatBytes(item.size) : '';
-        const downloadedFormatted = item.size > 0 ? formatBytes(downloadedBytes) : '';
+
+        const tone = phase.kind === 'error'
+          ? 'border-red-500/30 bg-red-950/20'
+          : phase.kind === 'warning'
+            ? 'border-amber-500/30 bg-amber-950/20'
+            : phase.kind === 'completed'
+              ? 'border-emerald-500/25 bg-emerald-950/15'
+              : 'border-white/10 bg-zinc-900/85';
 
         return (
-          <div
-            key={item.id}
-            className={`relative overflow-hidden border rounded-2xl p-3.5 sm:p-4 shadow-xl backdrop-blur-md transition-all animate-in fade-in duration-200 ${
-              isError
-                ? 'bg-gradient-to-r from-red-950/40 via-zinc-900 to-red-950/30 border-red-500/50'
-                : isWarning
-                ? 'bg-gradient-to-r from-amber-950/40 via-zinc-900 to-amber-950/30 border-amber-500/50'
-                : 'bg-gradient-to-r from-zinc-900 via-blue-950/40 to-zinc-900 border-blue-500/40'
-            }`}
-          >
-            {/* Ligne d'animation lumineuse au sommet */}
-            <div className={`absolute top-0 left-0 right-0 h-[2px] ${
-              isError
-                ? 'bg-gradient-to-r from-red-600 via-red-400 to-rose-600'
-                : isWarning
-                ? 'bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600'
-                : 'bg-gradient-to-r from-blue-500 via-cyan-400 to-indigo-500 animate-pulse'
-            }`} />
-
-            {/* En-tête : Badge d'état + Client / Vitesse */}
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <div className="flex items-center gap-2">
-                {isError ? (
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
-                  </span>
-                ) : isWarning ? (
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-400"></span>
-                  </span>
-                ) : (
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-400"></span>
-                  </span>
-                )}
-                
-                <span className={`text-[11px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border flex items-center gap-1 ${
-                  isError
-                    ? 'text-red-300 bg-red-950/80 border-red-500/40'
-                    : isWarning
-                    ? 'text-amber-300 bg-amber-950/80 border-amber-500/40'
-                    : 'text-cyan-300 bg-blue-950/80 border-blue-500/30'
-                }`}>
-                  {isError ? (
-                    <AlertCircle size={12} className="text-red-400" />
-                  ) : isWarning ? (
-                    <AlertTriangle size={12} className="text-amber-400" />
-                  ) : (
-                    <ArrowDownCircle size={12} className="text-cyan-400" />
+          <div key={item.id} className={`rounded-2xl border p-3.5 shadow-sm ${tone}`}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-extrabold text-white break-words leading-snug">
+                  {item.releaseTitle || item.title}
+                </p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-zinc-400">
+                  {item.downloadClient && <span className="font-bold text-zinc-300">{item.downloadClient}</span>}
+                  {item.quality && <span>{item.quality}</span>}
+                  {item.speedFormatted && phase.kind === 'downloading' && <span className="text-cyan-300">{item.speedFormatted}</span>}
+                  {item.timeleft && item.timeleft !== '--' && phase.kind === 'downloading' && <span>{item.timeleft} restantes</span>}
+                  {item.size > 0 && showNumericProgress && (
+                    <span>{formatBytes(downloadedBytes)} / {formatBytes(item.size)}</span>
                   )}
-                  {item.statusText || (isError ? 'Erreur' : 'Téléchargement')}
-                </span>
-
-                {item.downloadClient && (
-                  <span className="hidden sm:inline-block text-[10px] font-bold text-zinc-400 bg-zinc-800/80 px-2 py-0.5 rounded-md border border-zinc-700/50">
-                    via {item.downloadClient}
-                  </span>
-                )}
+                </div>
               </div>
 
-              {item.speedFormatted && !isError && (
-                <div className="flex items-center gap-1 text-xs font-black text-cyan-300 bg-cyan-950/60 border border-cyan-500/30 px-2.5 py-0.5 rounded-full shadow-sm">
-                  <Zap size={13} className="text-cyan-400 animate-bounce" />
-                  <span>{item.speedFormatted}</span>
-                </div>
+              {showNumericProgress && (
+                <span className={`shrink-0 text-sm font-black ${
+                  phase.kind === 'completed' ? 'text-emerald-400' : 'text-cyan-300'
+                }`}>
+                  {Math.round(progress)}%
+                </span>
               )}
             </div>
 
-            {/* Message d'erreur détaillé si présent (ex: Disque plein) */}
+            <div className="mt-2.5 flex items-start gap-2 text-[11px] font-semibold text-zinc-300">
+              <span className="mt-0.5 shrink-0"><PhaseIcon kind={phase.kind} /></span>
+              <span className={phase.kind === 'error' ? 'text-red-300' : phase.kind === 'warning' ? 'text-amber-300' : ''}>
+                {phase.label}
+              </span>
+            </div>
+
             {item.errorMessage && (
-              <div className="mb-2.5 p-2 rounded-xl bg-red-500/15 border border-red-500/30 flex items-center gap-2 text-xs font-bold text-red-300">
-                <AlertTriangle size={14} className="shrink-0 text-red-400" />
-                <span className="leading-snug">{item.errorMessage}</span>
+              <div className="mt-2 rounded-xl border border-red-500/20 bg-red-500/10 px-2.5 py-2 text-[10px] font-semibold text-red-300">
+                {item.errorMessage}
               </div>
             )}
 
-            {/* Titre de la release ou épisode */}
-            <div className="text-xs sm:text-sm font-bold text-white line-clamp-1 mb-2.5 flex items-center gap-1.5">
-              <span className={isError ? "text-red-400 shrink-0" : "text-blue-400 shrink-0"}>❖</span>
-              <span className="truncate">{item.releaseTitle || item.title}</span>
-            </div>
-
-            {/* Barre de progression avec effet néon */}
-            <div className="space-y-1.5">
-              <div className="relative w-full h-3 bg-zinc-950/80 rounded-full overflow-hidden p-0.5 border border-zinc-700/60 shadow-inner">
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-800">
+              {showIndeterminate ? (
+                <div className="h-full w-1/3 rounded-full bg-blue-500/70 animate-pulse" />
+              ) : (
                 <div
-                  className={`h-full rounded-full transition-all duration-500 ${
-                    isError
-                      ? 'bg-gradient-to-r from-red-600 to-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.6)]'
-                      : isWarning
-                      ? 'bg-gradient-to-r from-amber-600 to-yellow-400 shadow-[0_0_12px_rgba(251,191,36,0.6)]'
-                      : 'bg-gradient-to-r from-blue-600 via-cyan-400 to-emerald-400 shadow-[0_0_12px_rgba(34,211,238,0.7)]'
+                  className={`h-full rounded-full transition-[width] duration-300 ${
+                    phase.kind === 'error'
+                      ? 'bg-red-500'
+                      : phase.kind === 'warning'
+                        ? 'bg-amber-500'
+                        : phase.kind === 'completed'
+                          ? 'bg-emerald-500'
+                          : 'bg-cyan-500'
                   }`}
-                  style={{ width: `${Math.max(2, Math.min(100, item.progress))}%` }}
+                  style={{ width: `${progress}%` }}
                 />
-              </div>
-
-              {/* Détails : Pourcentage, Taille téléchargée, Temps restant */}
-              <div className="flex items-center justify-between text-[11px] sm:text-xs font-bold text-zinc-300 pt-0.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-white font-black text-xs sm:text-sm">{item.progress}%</span>
-                  {totalSizeFormatted && (
-                    <span className="text-zinc-400 font-medium text-[10px] sm:text-[11px] flex items-center gap-1">
-                      <HardDrive size={12} className="text-zinc-500" />
-                      {downloadedFormatted} / {totalSizeFormatted}
-                    </span>
-                  )}
-                </div>
-
-                {item.timeleft && item.timeleft !== '--' && !isError && (
-                  <div className="flex items-center gap-1 text-cyan-200 font-bold bg-zinc-900/90 px-2 py-0.5 rounded-md border border-zinc-800">
-                    <Clock size={12} className="text-blue-400" />
-                    <span>Restant : {item.timeleft}</span>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           </div>
         );

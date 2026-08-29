@@ -1,38 +1,36 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Download, 
-  X, 
-  Search, 
-  HardDrive, 
-  Radio, 
-  ExternalLink, 
-  Check, 
-  Copy, 
-  Loader2, 
-  AlertCircle, 
-  Sliders, 
-  Sparkles,
-  Server,
-  Film,
-  Tv,
-  Layers,
-  PlaySquare,
-  Zap,
-  RefreshCw,
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  AlertCircle,
+  Check,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Copy,
+  Download,
+  HardDrive,
+  Layers,
+  Loader2,
+  PlaySquare,
+  Radio,
+  Search,
+  Tv,
+  X
 } from 'lucide-react';
-import { C411Torrent, searchC411Torrents, formatTorrentSize } from '../services/c411';
+import { type C411Torrent, formatTorrentSize, searchC411Torrents } from '../services/c411';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
+import { useToastStore } from '../store/toastStore';
 import { LiveDownloadBanner } from './LiveDownloadBanner';
-import { 
-  searchAndDownloadInSonarr, 
-  searchAndDownloadInRadarr, 
+import {
   pushReleaseDirectly,
-  testServiceConnection
+  searchAndDownloadInRadarr,
+  searchAndDownloadInSonarr
 } from '../services/sonarrRadarr';
 import { tmdb } from '../features/shows/tmdb';
+import {
+  acceptDownloadRequest,
+  beginDownloadRequest,
+  failDownloadRequest
+} from '../features/downloads/downloadLifecycle';
 
 export interface SeasonInfo {
   season_number: number;
@@ -57,11 +55,12 @@ export interface DownloadModalProps {
   onSuccessToast?: (msg: string) => void;
 }
 
+type ScopeMode = 'all' | 'season' | 'episode';
+
 export function DownloadModal({
   isOpen,
   onClose,
   title,
-  originalTitle,
   year,
   mediaType,
   tmdbId,
@@ -73,862 +72,767 @@ export function DownloadModal({
   seasonsData,
   onSuccessToast
 }: DownloadModalProps) {
-  const {
-    sonarrUrl,
-    sonarrApiKey,
-    radarrUrl,
-    radarrApiKey,
-    qbittorrentUrl,
-    qbittorrentUsername,
-    qbittorrentPassword,
-  } = useDownloadConfigStore();
+  const config = useDownloadConfigStore();
+  const showToast = useToastStore(state => state.showToast);
+  const downloads = useLiveDownloadStore(state => state.downloads);
 
-  const { startPolling, stopPolling, getShowDownloads, getMovieDownload } = useLiveDownloadStore();
-
-  useEffect(() => {
-    if (isOpen) {
-      startPolling(4000);
-      return () => {
-        stopPolling();
-      };
-    }
-  }, [isOpen, startPolling, stopPolling]);
-
-  const activeDownloads = mediaType === 'tv'
-    ? getShowDownloads(tmdbId, undefined, title)
-    : (getMovieDownload(tmdbId, title) ? [getMovieDownload(tmdbId, title)!] : []);
-
-  // Mode de portée (Scope) : 'all' (Série entière / Film), 'season' (Saison X), 'episode' (S01E01)
-  const [scopeMode, setScopeMode] = useState<'all' | 'season' | 'episode'>(
-    initialEpisode && initialSeason ? 'episode' : initialSeason ? 'season' : 'all'
-  );
-  const [selectedSeason, setSelectedSeason] = useState<number>(initialSeason || 1);
-  const [selectedEpisode, setSelectedEpisode] = useState<number>(initialEpisode || 1);
-
-  // Synchroniser le mode de portée à l'ouverture de la modal
-  useEffect(() => {
-    if (isOpen) {
-      if (initialEpisode && initialSeason) {
-        setScopeMode('episode');
-        setSelectedSeason(initialSeason);
-        setSelectedEpisode(initialEpisode);
-      } else if (initialSeason) {
-        setScopeMode('season');
-        setSelectedSeason(initialSeason);
-        setSelectedEpisode(1);
-      } else {
-        setScopeMode('all');
-        setSelectedSeason(1);
-        setSelectedEpisode(1);
-      }
-    }
-  }, [isOpen, initialSeason, initialEpisode]);
-
-  // Masquer la liste des torrents par défaut (l'utilisateur utilise Sonarr/Radarr)
-  const [showTorrentList, setShowTorrentList] = useState<boolean>(false);
-
-  // Saisons et Épisodes réels
+  const [scopeMode, setScopeMode] = useState<ScopeMode>('all');
+  const [selectedSeason, setSelectedSeason] = useState(1);
+  const [selectedEpisode, setSelectedEpisode] = useState(1);
   const [availableSeasons, setAvailableSeasons] = useState<SeasonInfo[]>([]);
-  const [isSeasonPickerOpen, setIsSeasonPickerOpen] = useState<boolean>(false);
-  const [isEpisodePickerOpen, setIsEpisodePickerOpen] = useState<boolean>(false);
+  const [isSeasonPickerOpen, setIsSeasonPickerOpen] = useState(false);
+  const [isEpisodePickerOpen, setIsEpisodePickerOpen] = useState(false);
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [torrents, setTorrents] = useState<C411Torrent[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
-  const [copiedHash, setCopiedHash] = useState<string | null>(null);
-  
-  // États d'action Sonarr / Radarr
   const [isTriggeringAuto, setIsTriggeringAuto] = useState(false);
-  const [showQualityModal, setShowQualityModal] = useState(false);
-  const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [actionMessage, setActionMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  // Filtres
-  const [selectedQuality, setSelectedQuality] = useState<string>('all');
+  const [manualOpen, setManualOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [torrents, setTorrents] = useState<C411Torrent[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [selectedQuality, setSelectedQuality] = useState<'all' | '2160p' | '1080p' | '720p'>('all');
   const [sortBy, setSortBy] = useState<'seeders' | 'size' | 'date'>('seeders');
+  const [sendingTorrentId, setSendingTorrentId] = useState<number | null>(null);
+  const [copiedHash, setCopiedHash] = useState<string | null>(null);
 
-  // Charger les saisons réelles depuis les props ou TMDB
+  const getGeneratedQuery = (mode: ScopeMode, season: number, episode: number) => {
+    const base = title.trim();
+    if (mediaType === 'movie') return year ? `${base} ${year}` : base;
+    if (mode === 'episode') {
+      return `${base} S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
+    }
+    if (mode === 'season') {
+      return `${base} S${String(season).padStart(2, '0')}`;
+    }
+    return base;
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const initialMode: ScopeMode = initialEpisode && initialSeason
+      ? 'episode'
+      : initialSeason
+        ? 'season'
+        : 'all';
+    const season = initialSeason || 1;
+    const episode = initialEpisode || 1;
+
+    setScopeMode(initialMode);
+    setSelectedSeason(season);
+    setSelectedEpisode(episode);
+    setSearchQuery(getGeneratedQuery(initialMode, season, episode));
+    setActionMessage(null);
+    setManualOpen(false);
+    setTorrents([]);
+    setHasSearched(false);
+    setIsTriggeringAuto(false);
+  }, [isOpen, title, year, initialSeason, initialEpisode]);
+
   useEffect(() => {
     if (!isOpen || mediaType !== 'tv') return;
 
-    if (seasonsData && seasonsData.length > 0) {
-      const filtered = seasonsData.filter(s => s.season_number > 0);
-      setAvailableSeasons(filtered);
+    if (seasonsData?.length) {
+      setAvailableSeasons(seasonsData.filter(season => season.season_number > 0));
       return;
     }
 
-    if (tmdbId) {
-      tmdb.getShowDetails(Number(tmdbId)).then((res) => {
-        if (res.ok && res.value && Array.isArray(res.value.seasons)) {
-          const valid = res.value.seasons
-            .filter((s: any) => s.season_number > 0)
-            .map((s: any) => ({
-              season_number: s.season_number,
-              episode_count: s.episode_count || 10,
-              name: s.name || `Saison ${s.season_number}`
-            }));
-          if (valid.length > 0) {
-            setAvailableSeasons(valid);
-            return;
-          }
-        }
-        // Fallback simple
-        const fallbackCount = Math.max(totalSeasons, 1);
-        setAvailableSeasons(
-          Array.from({ length: fallbackCount }, (_, i) => ({
-            season_number: i + 1,
-            episode_count: 24,
-            name: `Saison ${i + 1}`
-          }))
-        );
-      }).catch(() => {
-        const fallbackCount = Math.max(totalSeasons, 1);
-        setAvailableSeasons(
-          Array.from({ length: fallbackCount }, (_, i) => ({
-            season_number: i + 1,
-            episode_count: 24,
-            name: `Saison ${i + 1}`
-          }))
-        );
-      });
-    } else {
-      const fallbackCount = Math.max(totalSeasons, 1);
+    if (!tmdbId) {
       setAvailableSeasons(
-        Array.from({ length: fallbackCount }, (_, i) => ({
-          season_number: i + 1,
+        Array.from({ length: Math.max(totalSeasons, 1) }, (_, index) => ({
+          season_number: index + 1,
           episode_count: 24,
-          name: `Saison ${i + 1}`
+          name: `Saison ${index + 1}`
         }))
       );
+      return;
     }
+
+    tmdb.getShowDetails(Number(tmdbId)).then(result => {
+      if (result.ok && result.value && Array.isArray(result.value.seasons)) {
+        const seasons = result.value.seasons
+          .filter((season: any) => season.season_number > 0)
+          .map((season: any) => ({
+            season_number: season.season_number,
+            episode_count: season.episode_count || 1,
+            name: season.name || `Saison ${season.season_number}`
+          }));
+        if (seasons.length) {
+          setAvailableSeasons(seasons);
+          return;
+        }
+      }
+
+      setAvailableSeasons(
+        Array.from({ length: Math.max(totalSeasons, 1) }, (_, index) => ({
+          season_number: index + 1,
+          episode_count: 24,
+          name: `Saison ${index + 1}`
+        }))
+      );
+    }).catch(() => {
+      setAvailableSeasons(
+        Array.from({ length: Math.max(totalSeasons, 1) }, (_, index) => ({
+          season_number: index + 1,
+          episode_count: 24,
+          name: `Saison ${index + 1}`
+        }))
+      );
+    });
   }, [isOpen, mediaType, tmdbId, seasonsData, totalSeasons]);
 
-  // Récupérer le nombre exact d'épisodes pour la saison sélectionnée
-  const currentSeasonData = useMemo(() => {
-    return availableSeasons.find(s => s.season_number === selectedSeason) || availableSeasons[0] || {
-      season_number: selectedSeason,
-      episode_count: 24,
-      name: `Saison ${selectedSeason}`
-    };
-  }, [availableSeasons, selectedSeason]);
+  const currentSeason = useMemo(
+    () => availableSeasons.find(season => season.season_number === selectedSeason)
+      || availableSeasons[0]
+      || { season_number: selectedSeason, episode_count: 24, name: `Saison ${selectedSeason}` },
+    [availableSeasons, selectedSeason]
+  );
 
-  const maxEpisodesForCurrentSeason = Math.max(currentSeasonData.episode_count || 1, 1);
+  const maxEpisodes = Math.max(currentSeason.episode_count || 1, 1);
 
-  // Génère la requête de recherche idéale selon la portée
-  const generateQuery = (mode: 'all' | 'season' | 'episode', sNum: number, eNum: number) => {
-    const baseTitle = (title || '').trim();
-    if (mediaType === 'movie') {
-      return year ? `${baseTitle} ${year}` : baseTitle;
+  const activeDownloads = useMemo(() => {
+    if (mediaType === 'tv') {
+      return useLiveDownloadStore.getState().getShowDownloads(tmdbId, undefined, title);
     }
+    const movie = useLiveDownloadStore.getState().getMovieDownload(tmdbId, title);
+    return movie ? [movie] : [];
+  }, [downloads, mediaType, tmdbId, title]);
 
-    if (mode === 'episode') {
-      const sStr = String(sNum).padStart(2, '0');
-      const eStr = String(eNum).padStart(2, '0');
-      return `${baseTitle} S${sStr}E${eStr}`;
-    }
+  const hasAutomationClient = mediaType === 'tv'
+    ? Boolean(config.sonarrUrl && config.sonarrApiKey)
+    : Boolean(config.radarrUrl && config.radarrApiKey);
 
-    if (mode === 'season') {
-      const sStr = String(sNum).padStart(2, '0');
-      return `${baseTitle} S${sStr}`;
-    }
+  const automationClientName = mediaType === 'tv' ? 'Sonarr' : 'Radarr';
 
-    return baseTitle;
-  };
+  const handleScopeChange = (mode: ScopeMode, season = selectedSeason, episode = selectedEpisode) => {
+    const targetSeason = availableSeasons.find(item => item.season_number === season);
+    const episodeMax = Math.max(targetSeason?.episode_count || 24, 1);
+    const adjustedEpisode = Math.min(episode, episodeMax);
 
-  useEffect(() => {
-    if (isOpen) {
-      const initialMode = initialEpisode && initialSeason ? 'episode' : initialSeason ? 'season' : 'all';
-      setScopeMode(initialMode);
-      const sVal = initialSeason || 1;
-      const eVal = initialEpisode || 1;
-      setSelectedSeason(sVal);
-      setSelectedEpisode(eVal);
-
-      const q = generateQuery(initialMode, sVal, eVal);
-      setSearchQuery(q);
-
-      // Par défaut on réinitialise l'affichage de la liste et les résultats
-      setShowTorrentList(false);
-      setTorrents([]);
-      setHasSearched(false);
-      setActionMessage(null);
-      setIsTriggeringAuto(false);
-    } else {
-      setTorrents([]);
-      setHasSearched(false);
-      setActionMessage(null);
-      setIsTriggeringAuto(false);
-      setShowTorrentList(false);
-    }
-  }, [isOpen, title, initialSeason, initialEpisode]);
-
-  const handleScopeChange = (newMode: 'all' | 'season' | 'episode', sNum = selectedSeason, eNum = selectedEpisode) => {
-    setScopeMode(newMode);
-    setSelectedSeason(sNum);
-
-    // Ajuster l'épisode si la saison change et qu'elle contient moins d'épisodes
-    const targetSeasonObj = availableSeasons.find(s => s.season_number === sNum);
-    const maxEp = targetSeasonObj ? Math.max(targetSeasonObj.episode_count, 1) : 24;
-    const adjustedEpisode = Math.min(eNum, maxEp);
+    setScopeMode(mode);
+    setSelectedSeason(season);
     setSelectedEpisode(adjustedEpisode);
+    setSearchQuery(getGeneratedQuery(mode, season, adjustedEpisode));
+    setTorrents([]);
+    setHasSearched(false);
+  };
 
-    const newQ = generateQuery(newMode, sNum, adjustedEpisode);
-    setSearchQuery(newQ);
-    if (showTorrentList) {
-      performSearch(newQ);
+  const handleAutoSearchClient = async (qualityPreference: '1080p' | '4k') => {
+    if (isTriggeringAuto) return;
+
+    const isTv = mediaType === 'tv';
+    const client = isTv ? 'Sonarr' : 'Radarr';
+    const hasClient = isTv
+      ? Boolean(config.sonarrUrl && config.sonarrApiKey)
+      : Boolean(config.radarrUrl && config.radarrApiKey);
+
+    if (!hasClient) {
+      const message = `${client} n'est pas configuré pour ce média.`;
+      setActionMessage({ text: message, type: 'error' });
+      showToast(message, 'error');
+      return;
+    }
+
+    setIsTriggeringAuto(true);
+    setActionMessage(null);
+
+    const qualityLabel = qualityPreference === '4k' ? '4K' : '1080p';
+    const targetLabel = isTv
+      ? scopeMode === 'all'
+        ? 'Toute la série'
+        : scopeMode === 'season'
+          ? `Saison ${selectedSeason}`
+          : `S${String(selectedSeason).padStart(2, '0')}E${String(selectedEpisode).padStart(2, '0')}`
+      : 'Film';
+    const displayTitle = isTv ? `${title} (${targetLabel})` : title;
+
+    const requestId = beginDownloadRequest({
+      title: displayTitle,
+      mediaType,
+      tmdbId,
+      imdbId,
+      seasonNumber: isTv && scopeMode !== 'all' ? selectedSeason : undefined,
+      episodeNumber: isTv && scopeMode === 'episode' ? selectedEpisode : undefined,
+      posterPath,
+      downloadClient: client,
+      statusText: `Demande prise en compte • envoi à ${client}…`,
+      releaseTitle: `${displayTitle} • ${qualityLabel}`
+    });
+
+    showToast(`Demande prise en compte • ${client} prépare ${qualityLabel}.`, 'download');
+    onClose();
+
+    try {
+      const result = isTv
+        ? await searchAndDownloadInSonarr({
+            url: config.sonarrUrl,
+            apiKey: config.sonarrApiKey,
+            title,
+            tmdbId,
+            imdbId,
+            season: scopeMode === 'all' ? undefined : selectedSeason,
+            episode: scopeMode === 'episode' ? selectedEpisode : undefined,
+            qualityPreference
+          })
+        : await searchAndDownloadInRadarr({
+            url: config.radarrUrl,
+            apiKey: config.radarrApiKey,
+            title,
+            tmdbId,
+            year,
+            qualityPreference
+          });
+
+      if (result.success) {
+        acceptDownloadRequest(
+          requestId,
+          `${client} a accepté la demande • recherche ${qualityLabel} en cours`,
+          'searching'
+        );
+      } else {
+        failDownloadRequest(requestId, result.message);
+        showToast(`${client} : ${result.message}`, 'error');
+      }
+    } catch (error: any) {
+      const message = error?.message || `Impossible de joindre ${client}.`;
+      failDownloadRequest(requestId, message);
+      showToast(`${client} : ${message}`, 'error');
+    } finally {
+      setIsTriggeringAuto(false);
     }
   };
 
-  const handleToggleTorrentList = () => {
-    const nextState = !showTorrentList;
-    setShowTorrentList(nextState);
-    if (nextState && !hasSearched) {
-      performSearch(searchQuery);
-    }
-  };
+  const performSearch = async () => {
+    const query = searchQuery.trim();
+    if (!query || isSearching) return;
 
-  const handleSeasonSelect = (newSeasonNum: number) => {
-    handleScopeChange(scopeMode, newSeasonNum, selectedEpisode);
-  };
-
-  const handleEpisodeSelect = (newEpisodeNum: number) => {
-    handleScopeChange('episode', selectedSeason, newEpisodeNum);
-  };
-
-  const performSearch = async (queryText: string) => {
-    if (!queryText.trim()) return;
-    setLoading(true);
+    setIsSearching(true);
     setActionMessage(null);
     try {
       const results = await searchC411Torrents({
-        query: queryText.trim(),
+        query,
         mediaType,
         year: mediaType === 'movie' ? year : undefined
       });
       setTorrents(results);
       setHasSearched(true);
-    } catch (e) {
-      console.error(e);
+    } catch (error: any) {
+      const message = error?.message || 'C411 est momentanément indisponible.';
       setTorrents([]);
       setHasSearched(true);
+      setActionMessage({ text: message, type: 'error' });
+      showToast(message, 'error');
     } finally {
-      setLoading(false);
+      setIsSearching(false);
     }
   };
 
-  // 1. Déclenchement automatique intelligent via Sonarr / Radarr avec retour immédiat et UI optimiste
-  const handleAutoSearchClient = async (qualityPreference?: '1080p' | '4k') => {
-    setIsTriggeringAuto(true);
-    setActionMessage(null);
-
-    const isTv = mediaType === 'tv';
-    const qualName = qualityPreference === '4k' ? '4K' : '1080p';
-    const targetDesc = isTv 
-      ? scopeMode === 'all' 
-        ? 'Toute la série' 
-        : scopeMode === 'season' 
-        ? `Saison ${selectedSeason}` 
-        : `S${String(selectedSeason).padStart(2, '0')}E${String(selectedEpisode).padStart(2, '0')}`
-      : 'Film';
-
-    const displayTitle = isTv ? `${title} (${targetDesc})` : title;
-
-    // ⚡ A. AJOUT OPTIMISTE INSTANTANÉ (Apparaît immédiatement dans "Téléchargements" et la bannière)
-    useLiveDownloadStore.getState().addOptimisticDownload({
-      title: displayTitle,
-      mediaType: isTv ? 'tv' : 'movie',
-      tmdbId: tmdbId ? Number(tmdbId) : undefined,
-      seasonNumber: isTv && scopeMode !== 'all' ? selectedSeason : undefined,
-      episodeNumber: isTv && scopeMode === 'episode' ? selectedEpisode : undefined,
-      posterPath: posterPath,
-      releaseTitle: `${displayTitle} • Recherche ${qualName} dans ${isTv ? 'Sonarr' : 'Radarr'}...`,
-      statusText: `Lancement ${qualName} en cours...`,
-      downloadClient: isTv ? 'Sonarr' : 'Radarr'
-    });
-
-    const toastMsg = `« ${title} » • Recherche ${qualName} lancée !`;
-    if (onSuccessToast) onSuccessToast(toastMsg);
-
-    // Fermeture de la modale immédiatement pour offrir une réactivité parfaite (UX 1-clic)
-    onClose();
-
-    // ⚡ B. EXÉCUTION DE LA REQUÊTE EN ARRIÈRE-PLAN
+  const handleCopyMagnet = async (torrent: C411Torrent) => {
+    if (!torrent.magnetUri) return;
     try {
-      if (isTv && sonarrUrl && sonarrApiKey) {
-        const res = await searchAndDownloadInSonarr({
-          url: sonarrUrl,
-          apiKey: sonarrApiKey,
-          title,
-          tmdbId,
-          imdbId,
-          season: scopeMode === 'all' ? undefined : selectedSeason,
-          episode: scopeMode === 'episode' ? selectedEpisode : undefined,
-          qualityPreference
-        });
-
-        if (!res.success && onSuccessToast) {
-          onSuccessToast(`Sonarr : ${res.message}`);
-        }
-      } else if (!isTv && radarrUrl && radarrApiKey) {
-        const res = await searchAndDownloadInRadarr({
-          url: radarrUrl,
-          apiKey: radarrApiKey,
-          title,
-          tmdbId,
-          year,
-          qualityPreference
-        });
-
-        if (!res.success && onSuccessToast) {
-          onSuccessToast(`Radarr : ${res.message}`);
-        }
-      }
-    } catch (err: any) {
-      console.warn('[AutoSearch Client Error]', err);
-    } finally {
-      setIsTriggeringAuto(false);
-    }
-  };
-
-  // 2. Copier le lien Magnet
-  const handleCopyMagnet = (torrent: C411Torrent) => {
-    if (torrent.magnetUri) {
-      navigator.clipboard.writeText(torrent.magnetUri);
+      await navigator.clipboard.writeText(torrent.magnetUri);
       setCopiedHash(torrent.infoHash);
-      setTimeout(() => setCopiedHash(null), 2000);
-      if (onSuccessToast) onSuccessToast('Lien Magnet copié dans le presse-papier !');
+      window.setTimeout(() => setCopiedHash(null), 1800);
+      showToast('Lien Magnet copié.', 'success');
+    } catch {
+      showToast('Impossible de copier le lien Magnet.', 'error');
     }
   };
 
-  // 3. Envoyer une release spécifique à Sonarr / Radarr / qBittorrent
   const handleSendToClient = async (torrent: C411Torrent) => {
-    setDownloadingId(torrent.id);
-    setActionMessage(null);
+    if (sendingTorrentId) return;
 
-    let clientToUse: 'sonarr' | 'radarr' | 'qbittorrent' | null = null;
+    let service: 'sonarr' | 'radarr' | 'qbittorrent' | null = null;
     let url = '';
     let apiKey = '';
     let username = '';
     let password = '';
 
-    if (mediaType === 'tv' && sonarrUrl && sonarrApiKey) {
-      clientToUse = 'sonarr';
-      url = sonarrUrl;
-      apiKey = sonarrApiKey;
-    } else if (mediaType === 'movie' && radarrUrl && radarrApiKey) {
-      clientToUse = 'radarr';
-      url = radarrUrl;
-      apiKey = radarrApiKey;
-    } else if (qbittorrentUrl) {
-      clientToUse = 'qbittorrent';
-      url = qbittorrentUrl;
-      username = qbittorrentUsername;
-      password = qbittorrentPassword;
+    if (mediaType === 'tv' && config.sonarrUrl && config.sonarrApiKey) {
+      service = 'sonarr';
+      url = config.sonarrUrl;
+      apiKey = config.sonarrApiKey;
+    } else if (mediaType === 'movie' && config.radarrUrl && config.radarrApiKey) {
+      service = 'radarr';
+      url = config.radarrUrl;
+      apiKey = config.radarrApiKey;
+    } else if (config.qbittorrentUrl) {
+      service = 'qbittorrent';
+      url = config.qbittorrentUrl;
+      username = config.qbittorrentUsername;
+      password = config.qbittorrentPassword;
     }
 
-    if (!clientToUse) {
-      // Aucun client distant configuré -> ouvrir le lien magnet directement
+    if (!service) {
       if (torrent.magnetUri) {
         window.location.href = torrent.magnetUri;
-        if (onSuccessToast) onSuccessToast('Ouverture du client BitTorrent local...');
+        showToast('Ouverture du client BitTorrent local…', 'info');
+      } else {
+        showToast('Aucun client de téléchargement disponible.', 'error');
       }
-      setDownloadingId(null);
       return;
     }
 
-    const result = await pushReleaseDirectly({
-      service: clientToUse,
-      url,
-      apiKey,
-      username,
-      password,
-      torrent,
+    setSendingTorrentId(torrent.id);
+    const clientLabel = service === 'sonarr' ? 'Sonarr' : service === 'radarr' ? 'Radarr' : 'qBittorrent';
+    const requestId = beginDownloadRequest({
+      title,
       mediaType,
-      mediaInfo: {
-        title,
-        tmdbId,
-        imdbId,
-        year,
-        season: selectedSeason,
-        episode: selectedEpisode
-      }
+      tmdbId,
+      imdbId,
+      seasonNumber: mediaType === 'tv' && scopeMode !== 'all' ? selectedSeason : undefined,
+      episodeNumber: mediaType === 'tv' && scopeMode === 'episode' ? selectedEpisode : undefined,
+      posterPath,
+      downloadClient: clientLabel,
+      statusText: `Demande prise en compte • envoi de la release à ${clientLabel}…`,
+      releaseTitle: torrent.name
     });
 
-    setDownloadingId(null);
-    if (result.success) {
-      setActionMessage({ text: result.message, type: 'success' });
-      if (onSuccessToast) onSuccessToast(result.message);
-    } else {
-      setActionMessage({ text: result.message, type: 'error' });
+    showToast(`Demande prise en compte • envoi à ${clientLabel}.`, 'download');
+
+    try {
+      const result = await pushReleaseDirectly({
+        service,
+        url,
+        apiKey,
+        username,
+        password,
+        torrent,
+        mediaType,
+        mediaInfo: {
+          title,
+          tmdbId,
+          imdbId,
+          year,
+          season: mediaType === 'tv' && scopeMode !== 'all' ? selectedSeason : undefined,
+          episode: mediaType === 'tv' && scopeMode === 'episode' ? selectedEpisode : undefined
+        }
+      });
+
+      if (result.success) {
+        acceptDownloadRequest(
+          requestId,
+          `${clientLabel} a accepté la release • mise en file d'attente`,
+          'queued'
+        );
+        setActionMessage({ text: result.message, type: 'success' });
+        if (onSuccessToast) onSuccessToast(result.message);
+        else showToast(result.message, 'success');
+      } else {
+        failDownloadRequest(requestId, result.message);
+        setActionMessage({ text: result.message, type: 'error' });
+        showToast(result.message, 'error');
+      }
+    } catch (error: any) {
+      const message = error?.message || "Erreur lors de l'envoi de la release.";
+      failDownloadRequest(requestId, message);
+      setActionMessage({ text: message, type: 'error' });
+      showToast(message, 'error');
+    } finally {
+      setSendingTorrentId(null);
     }
   };
 
-  // Filtrage et Tri
   const filteredTorrents = useMemo(() => {
     let list = [...torrents];
 
     if (selectedQuality !== 'all') {
-      list = list.filter(t => {
-        const q = (t.quality || '').toLowerCase();
-        const n = t.name.toLowerCase();
-        if (selectedQuality === '2160p' || selectedQuality === '4k') {
-          return q.includes('2160') || q.includes('4k') || n.includes('2160p') || n.includes('4k') || n.includes('uhd');
-        }
-        if (selectedQuality === '1080p') {
-          return q.includes('1080') || n.includes('1080p') || n.includes('1080i');
-        }
-        if (selectedQuality === '720p') {
-          return q.includes('720') || n.includes('720p');
-        }
-        return true;
+      list = list.filter(torrent => {
+        const haystack = `${torrent.quality || ''} ${torrent.name}`.toLowerCase();
+        if (selectedQuality === '2160p') return /2160|4k|uhd/.test(haystack);
+        if (selectedQuality === '1080p') return /1080p|1080i/.test(haystack);
+        return /720p/.test(haystack);
       });
     }
 
     list.sort((a, b) => {
-      if (sortBy === 'seeders') return (b.seeders || 0) - (a.seeders || 0);
       if (sortBy === 'size') return (b.size || 0) - (a.size || 0);
-      if (sortBy === 'date') return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-      return 0;
+      if (sortBy === 'date') {
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      }
+      return (b.seeders || 0) - (a.seeders || 0);
     });
 
     return list;
   }, [torrents, selectedQuality, sortBy]);
 
-  const hasConfiguredClient = Boolean(
-    (mediaType === 'tv' && sonarrUrl && sonarrApiKey) ||
-    (mediaType === 'movie' && radarrUrl && radarrApiKey) ||
-    qbittorrentUrl
-  );
-
-  const clientName = mediaType === 'tv' && sonarrUrl ? 'Sonarr' : mediaType === 'movie' && radarrUrl ? 'Radarr' : 'qBittorrent';
-
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 sm:p-4 pt-10 sm:pt-4 pb-20 sm:pb-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] my-auto">
-        
-        {/* Header avec Photo / Poster du Film */}
-        <div className="p-4 border-b border-zinc-800/80 flex items-center justify-between bg-zinc-900/90 shrink-0">
-          <div className="flex items-center gap-3.5 min-w-0 flex-1 mr-2">
-            {posterPath ? (
-              <div className="w-11 h-16 rounded-xl overflow-hidden border border-white/15 shadow-md shrink-0 bg-zinc-950">
-                <img 
-                  src={`https://image.tmdb.org/t/p/w185${posterPath}`} 
-                  alt={title}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = 'none';
-                  }}
-                />
-              </div>
-            ) : (
-              <div className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
-                <Download size={20} />
-              </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <h3 className="font-extrabold text-base text-white truncate leading-snug">
-                {title}
-              </h3>
-              <p className="text-xs text-zinc-400 truncate mt-0.5 font-medium">
-                Téléchargement {year ? `(${year})` : ''}
-              </p>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 pt-10 pb-20 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
+      <div className="relative w-full max-w-md max-h-[88vh] overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-900 shadow-2xl flex flex-col">
+        <div className="shrink-0 p-4 border-b border-zinc-800 flex items-center gap-3 bg-zinc-900/95">
+          {posterPath ? (
+            <img
+              src={`https://image.tmdb.org/t/p/w185${posterPath}`}
+              alt={title}
+              className="w-11 h-16 object-cover rounded-xl border border-white/10 bg-zinc-950"
+            />
+          ) : (
+            <div className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+              <Download size={20} />
             </div>
+          )}
+
+          <div className="flex-1 min-w-0">
+            <h3 className="font-extrabold text-base text-white truncate">{title}</h3>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              {mediaType === 'tv' ? 'Série' : 'Film'}{year ? ` • ${year}` : ''}
+            </p>
           </div>
+
           <button
+            type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-zinc-800/80 hover:bg-zinc-700 active:scale-95 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            className="w-9 h-9 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
+            aria-label="Fermer"
           >
             <X size={18} />
           </button>
         </div>
 
-        {/* Scope Selector for Series (Série entière vs Saison vs Épisode) */}
-        {mediaType === 'tv' && (
-          <div className="p-3 bg-zinc-950/80 border-b border-zinc-800 space-y-2.5 shrink-0">
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="font-bold uppercase text-zinc-400 tracking-wider flex items-center gap-1.5">
-                <Layers size={13} className="text-blue-400" />
-                Portée :
-              </span>
-              <span className="text-zinc-400 font-semibold truncate max-w-[200px]">
-                {scopeMode === 'all' ? 'Toute la série' : scopeMode === 'season' ? `Saison ${selectedSeason}` : `S${String(selectedSeason).padStart(2, '0')}E${String(selectedEpisode).padStart(2, '0')}`}
-              </span>
-            </div>
+        <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5">
+          {mediaType === 'tv' && (
+            <section className="rounded-2xl border border-white/8 bg-zinc-950/60 p-3 space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-black uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                  <Layers size={13} className="text-blue-400" />
+                  Cible
+                </span>
+                <span className="text-[11px] font-bold text-zinc-300">
+                  {scopeMode === 'all'
+                    ? 'Toute la série'
+                    : scopeMode === 'season'
+                      ? `Saison ${selectedSeason}`
+                      : `S${String(selectedSeason).padStart(2, '0')}E${String(selectedEpisode).padStart(2, '0')}`}
+                </span>
+              </div>
 
-            <div className="grid grid-cols-3 gap-1.5 bg-zinc-900/90 p-1 rounded-xl border border-white/5">
-              <button
-                type="button"
-                onClick={() => handleScopeChange('all')}
-                className={`py-1.5 px-1 rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer ${
-                  scopeMode === 'all' ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-400 hover:text-white'
-                }`}
-              >
-                <Tv size={12} className="shrink-0" />
-                <span className="truncate">Série</span>
-              </button>
+              <div className="grid grid-cols-3 gap-1 p-1 bg-zinc-900 rounded-xl">
+                {[
+                  { id: 'all' as ScopeMode, label: 'Série', icon: Tv },
+                  { id: 'season' as ScopeMode, label: 'Saison', icon: Layers },
+                  { id: 'episode' as ScopeMode, label: 'Épisode', icon: PlaySquare }
+                ].map(option => {
+                  const Icon = option.icon;
+                  const selected = scopeMode === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => handleScopeChange(option.id)}
+                      className={`py-2 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 transition-colors ${
+                        selected ? 'bg-blue-600 text-white' : 'text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      <Icon size={12} />
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
 
-              <button
-                type="button"
-                onClick={() => handleScopeChange('season')}
-                className={`py-1.5 px-1 rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer ${
-                  scopeMode === 'season' ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-400 hover:text-white'
-                }`}
-              >
-                <Layers size={12} className="shrink-0" />
-                <span className="truncate">Saison</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleScopeChange('episode')}
-                className={`py-1.5 px-1 rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer ${
-                  scopeMode === 'episode' ? 'bg-blue-600 text-white shadow-sm' : 'text-zinc-400 hover:text-white'
-                }`}
-              >
-                <PlaySquare size={12} className="shrink-0" />
-                <span className="truncate">Épisode</span>
-              </button>
-            </div>
-
-            {/* Sélecteurs intelligents et réels de Saison et d'Épisode */}
-            {scopeMode !== 'all' && (
-              <div className="flex flex-wrap items-center gap-2.5 pt-1 animate-in fade-in duration-150">
-                {/* Sélecteur de Saison */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-bold text-zinc-400">Saison :</span>
+              {scopeMode !== 'all' && (
+                <div className="flex flex-wrap gap-2 pt-1">
                   <button
                     type="button"
                     onClick={() => setIsSeasonPickerOpen(true)}
-                    className="bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 text-white border border-zinc-700 rounded-lg px-2.5 py-1 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                    className="px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-xs font-bold text-white flex items-center gap-2"
                   >
-                    <span className="truncate max-w-[170px]">
-                      {currentSeasonData.name || `Saison ${selectedSeason}`} {currentSeasonData.episode_count ? `(${currentSeasonData.episode_count} ép.)` : ''}
-                    </span>
-                    <ChevronDown size={13} className="text-zinc-400 shrink-0" />
+                    {currentSeason.name || `Saison ${selectedSeason}`}
+                    <ChevronDown size={13} className="text-zinc-400" />
                   </button>
-                </div>
 
-                {/* Sélecteur d'Épisode */}
-                {scopeMode === 'episode' && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] font-bold text-zinc-400">Épisode :</span>
+                  {scopeMode === 'episode' && (
                     <button
                       type="button"
                       onClick={() => setIsEpisodePickerOpen(true)}
-                      className="bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 text-white border border-zinc-700 rounded-lg px-2.5 py-1 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                      className="px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-xs font-bold text-white flex items-center gap-2"
                     >
-                      <span>Épisode {selectedEpisode}</span>
-                      <ChevronDown size={13} className="text-zinc-400 shrink-0" />
+                      Épisode {selectedEpisode}
+                      <ChevronDown size={13} className="text-zinc-400" />
                     </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Choix Épuré de Qualité */}
-        {hasConfiguredClient && (sonarrUrl || radarrUrl) && (
-          <div className="p-4 space-y-3 shrink-0 bg-zinc-900/60">
-            <div className="grid grid-cols-2 gap-3">
-              {/* Option 1: HD 1080p */}
-              <button
-                type="button"
-                onClick={() => handleAutoSearchClient('1080p')}
-                disabled={isTriggeringAuto}
-                className="group p-3 rounded-2xl bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-blue-500/60 transition-all active:scale-95 text-left cursor-pointer flex flex-col justify-between shadow-sm disabled:opacity-50"
-              >
-                <div className="flex items-center justify-between w-full mb-1.5">
-                  <span className="px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 text-xs font-black border border-blue-500/30">
-                    HD 1080p
-                  </span>
-                  <ChevronRight size={15} className="text-zinc-500 group-hover:text-blue-400 transition-colors" />
+                  )}
                 </div>
-                <p className="text-[11px] text-zinc-400 leading-tight">
-                  Profil HD (2 - 5 Go) • Rapide
-                </p>
-              </button>
-
-              {/* Option 2: Ultra-HD / 4K */}
-              <button
-                type="button"
-                onClick={() => handleAutoSearchClient('4k')}
-                disabled={isTriggeringAuto}
-                className="group p-3 rounded-2xl bg-zinc-950/80 hover:bg-zinc-800 border border-zinc-800 hover:border-amber-500/60 transition-all active:scale-95 text-left cursor-pointer flex flex-col justify-between shadow-sm disabled:opacity-50"
-              >
-                <div className="flex items-center justify-between w-full mb-1.5">
-                  <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-xs font-black border border-amber-500/30">
-                    Ultra-HD 4K
-                  </span>
-                  <ChevronRight size={15} className="text-zinc-500 group-hover:text-amber-400 transition-colors" />
-                </div>
-                <p className="text-[11px] text-zinc-400 leading-tight">
-                  Profil 4K 2160p (HDR / Atmos)
-                </p>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Action Message Alert */}
-        {actionMessage && (
-          <div className={`px-3.5 py-2 text-xs flex items-center gap-2 shrink-0 ${
-            actionMessage.type === 'success' 
-              ? 'bg-emerald-950/90 text-emerald-300 border-b border-emerald-800' 
-              : 'bg-red-950/90 text-red-300 border-b border-red-800'
-          }`}>
-            {actionMessage.type === 'success' ? <Check size={14} className="shrink-0 text-emerald-400" /> : <AlertCircle size={14} className="shrink-0 text-red-400" />}
-            <span className="leading-snug text-[11px]">{actionMessage.text}</span>
-          </div>
-        )}
-
-        {/* Live Downloads Progress Banner */}
-        {activeDownloads.length > 0 && (
-          <div className="p-3 bg-zinc-900/90 border-t border-zinc-800">
-            <LiveDownloadBanner items={activeDownloads} />
-          </div>
-        )}
-
-      </div>
-
-      {/* Custom Season Picker Modal (Garantit 100% de lisibilité sur Android APK, iOS et Web) */}
-      {isSeasonPickerOpen && (
-        <div 
-          className="fixed inset-0 z-[220] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150"
-          onClick={() => setIsSeasonPickerOpen(false)}
-        >
-          <div 
-            className="bg-zinc-900 border border-zinc-700/80 rounded-2xl w-full max-w-sm p-4 space-y-3 shadow-2xl animate-in zoom-in-95 duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800">
-              <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
-                <Layers size={16} className="text-blue-400" />
-                <span>Sélectionner une saison</span>
-              </h4>
-              <button 
-                type="button"
-                onClick={() => setIsSeasonPickerOpen(false)}
-                className="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="max-h-72 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
-              {availableSeasons.length > 0 ? (
-                availableSeasons.map((s) => {
-                  const isSelected = s.season_number === selectedSeason;
-                  return (
-                    <button
-                      key={`s_pick_${s.season_number}`}
-                      type="button"
-                      onClick={() => {
-                        handleSeasonSelect(s.season_number);
-                        setIsSeasonPickerOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-left cursor-pointer ${
-                        isSelected
-                          ? "bg-blue-600 text-white font-black shadow-lg shadow-blue-600/30 border border-blue-400/40"
-                          : "bg-zinc-800/80 hover:bg-zinc-800 text-zinc-100 border border-zinc-700/50"
-                      }`}
-                    >
-                      <div>
-                        <div className="text-xs font-bold text-white">{s.name || `Saison ${s.season_number}`}</div>
-                        {s.episode_count && <div className="text-[10px] text-zinc-300 font-medium">{s.episode_count} épisode{s.episode_count > 1 ? 's' : ''}</div>}
-                      </div>
-                      {isSelected && <Check size={16} className="text-white shrink-0" />}
-                    </button>
-                  );
-                })
-              ) : (
-                Array.from({ length: Math.max(totalSeasons, 1) }, (_, i) => i + 1).map((s) => {
-                  const isSelected = s === selectedSeason;
-                  return (
-                    <button
-                      key={`s_pick_fb_${s}`}
-                      type="button"
-                      onClick={() => {
-                        handleSeasonSelect(s);
-                        setIsSeasonPickerOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all text-left cursor-pointer ${
-                        isSelected
-                          ? "bg-blue-600 text-white font-black shadow-lg shadow-blue-600/30 border border-blue-400/40"
-                          : "bg-zinc-800/80 hover:bg-zinc-800 text-zinc-100 border border-zinc-700/50"
-                      }`}
-                    >
-                      <span className="text-white font-bold">Saison {s}</span>
-                      {isSelected && <Check size={16} className="text-white shrink-0" />}
-                    </button>
-                  );
-                })
               )}
-            </div>
-          </div>
-        </div>
-      )}
+            </section>
+          )}
 
-      {/* Custom Episode Picker Modal (Garantit 100% de lisibilité sur Android APK, iOS et Web) */}
-      {isEpisodePickerOpen && (
-        <div 
-          className="fixed inset-0 z-[220] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150"
-          onClick={() => setIsEpisodePickerOpen(false)}
-        >
-          <div 
-            className="bg-zinc-900 border border-zinc-700/80 rounded-2xl w-full max-w-sm p-4 space-y-3 shadow-2xl animate-in zoom-in-95 duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800">
-              <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
-                <PlaySquare size={16} className="text-blue-400" />
-                <span>Sélectionner un épisode</span>
-              </h4>
-              <button 
-                type="button"
-                onClick={() => setIsEpisodePickerOpen(false)}
-                className="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="max-h-72 overflow-y-auto grid grid-cols-2 gap-2 pr-1 custom-scrollbar">
-              {Array.from({ length: maxEpisodesForCurrentSeason }, (_, i) => i + 1).map((ep) => {
-                const isSelected = ep === selectedEpisode;
-                return (
-                  <button
-                    key={`ep_pick_${ep}`}
-                    type="button"
-                    onClick={() => {
-                      handleEpisodeSelect(ep);
-                      setIsEpisodePickerOpen(false);
-                    }}
-                    className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all text-left cursor-pointer ${
-                      isSelected
-                        ? "bg-blue-600 text-white font-black shadow-lg shadow-blue-600/30 border border-blue-400/40"
-                        : "bg-zinc-800/80 hover:bg-zinc-800 text-zinc-100 border border-zinc-700/50"
-                    }`}
-                  >
-                    <span className="text-white font-bold">Épisode {ep}</span>
-                    {isSelected && <Check size={14} className="text-white shrink-0" />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODALE DE CHOIX DE QUALITÉ AVANT TÉLÉCHARGEMENT RADARR / SONARR */}
-      {showQualityModal && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 pt-10 sm:pt-4 pb-20 sm:pb-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
-          <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl p-4 sm:p-5 flex flex-col gap-4 animate-in zoom-in-95 duration-150 max-h-[82vh] sm:max-h-[85vh] overflow-y-auto my-auto">
-            
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-zinc-800/80 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
-                  <Zap size={18} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white">Choisir la qualité</h3>
-                  <p className="text-[11px] text-zinc-400 truncate max-w-[220px] sm:max-w-[260px]">
-                    Profil {clientName} pour « {title} »
-                  </p>
-                </div>
+          <section className="rounded-2xl border border-white/8 bg-zinc-950/60 p-3.5 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h4 className="text-sm font-extrabold text-white">Téléchargement automatique</h4>
+                <p className="text-[11px] text-zinc-400 mt-0.5">
+                  SeenIt transmet la demande à {automationClientName}, puis suit réellement son état.
+                </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowQualityModal(false)}
-                className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Description du ciblage */}
-            <div className="px-3 py-2 bg-zinc-950/70 border border-zinc-800/80 rounded-xl flex items-center justify-between text-xs">
-              <span className="text-zinc-400 font-medium text-[11px]">Cible :</span>
-              <span className="font-bold text-blue-400 text-[11px]">
-                {mediaType === 'tv'
-                  ? scopeMode === 'all'
-                    ? 'Toute la série'
-                    : scopeMode === 'season'
-                    ? `Saison ${selectedSeason}`
-                    : `S${String(selectedSeason).padStart(2, '0')}E${String(selectedEpisode).padStart(2, '0')}`
-                  : 'Film complet'}
+              <span className={`text-[10px] font-bold px-2 py-1 rounded-full border ${
+                hasAutomationClient
+                  ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20'
+                  : 'text-amber-300 bg-amber-500/10 border-amber-500/20'
+              }`}>
+                {hasAutomationClient ? 'Prêt' : 'À configurer'}
               </span>
             </div>
 
-            {/* Options de Qualité */}
-            <div className="grid grid-cols-1 gap-2.5">
-              {/* Option 1: HD 1080p */}
-              <button
-                type="button"
-                onClick={() => {
-                  setShowQualityModal(false);
-                  handleAutoSearchClient('1080p');
-                }}
-                className="group relative p-3.5 rounded-xl bg-zinc-950 hover:bg-zinc-800/90 border border-zinc-800 hover:border-blue-500/60 flex items-center justify-between transition-all active:scale-98 text-left cursor-pointer shadow-sm"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-600/10 group-hover:bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-black text-xs shrink-0">
-                    1080p
+            {hasAutomationClient ? (
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  disabled={isTriggeringAuto}
+                  onClick={() => handleAutoSearchClient('1080p')}
+                  className="p-3 rounded-2xl border border-blue-500/25 bg-blue-500/8 hover:bg-blue-500/15 text-left transition-colors disabled:opacity-50"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-blue-300">1080p</span>
+                    {isTriggeringAuto ? <Loader2 size={14} className="animate-spin text-blue-300" /> : <ChevronRight size={14} className="text-blue-400" />}
                   </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-white group-hover:text-blue-300 transition-colors flex items-center flex-wrap gap-1.5">
-                      HD 1080p
-                      <span className="px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-400 text-[9px] font-bold border border-blue-500/20 shrink-0">Profil HD-1080p</span>
-                    </h4>
-                    <p className="text-[11px] text-zinc-400 mt-0.5 leading-snug">
-                      Fichiers optimisés (2 Go à 5 Go, téléchargement rapide)
-                    </p>
-                  </div>
-                </div>
-                <ChevronRight size={16} className="text-zinc-500 group-hover:text-blue-400 transition-colors shrink-0 ml-2" />
-              </button>
+                  <p className="text-[10px] text-zinc-400 mt-1">Préférence HD</p>
+                </button>
 
-              {/* Option 2: Ultra-HD / 4K */}
-              <button
-                type="button"
-                onClick={() => {
-                  setShowQualityModal(false);
-                  handleAutoSearchClient('4k');
-                }}
-                className="group relative p-3.5 rounded-xl bg-zinc-950 hover:bg-zinc-800/90 border border-zinc-800 hover:border-amber-500/60 flex items-center justify-between transition-all active:scale-98 text-left cursor-pointer shadow-sm"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 group-hover:bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 font-black text-xs shrink-0">
-                    4K
+                <button
+                  type="button"
+                  disabled={isTriggeringAuto}
+                  onClick={() => handleAutoSearchClient('4k')}
+                  className="p-3 rounded-2xl border border-amber-500/25 bg-amber-500/8 hover:bg-amber-500/15 text-left transition-colors disabled:opacity-50"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-amber-300">4K / 2160p</span>
+                    {isTriggeringAuto ? <Loader2 size={14} className="animate-spin text-amber-300" /> : <ChevronRight size={14} className="text-amber-400" />}
                   </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-white group-hover:text-amber-300 transition-colors flex items-center flex-wrap gap-1.5">
-                      Ultra-HD / 4K
-                      <span className="px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-300 text-[9px] font-bold border border-amber-500/20 shrink-0">Profil Ultra-HD</span>
-                    </h4>
-                    <p className="text-[11px] text-zinc-400 mt-0.5 leading-snug">
-                      Qualité maximale 2160p (HDR / Atmos, fichiers volumineux)
-                    </p>
-                  </div>
-                </div>
-                <ChevronRight size={16} className="text-zinc-500 group-hover:text-amber-400 transition-colors shrink-0 ml-2" />
-              </button>
-            </div>
+                  <p className="text-[10px] text-zinc-400 mt-1">Préférence Ultra-HD</p>
+                </button>
+              </div>
+            ) : (
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-200 flex gap-2">
+                <AlertCircle size={15} className="shrink-0 mt-0.5" />
+                <span>
+                  Configure {automationClientName} dans Téléchargements → Réglages pour activer le mode 1-clic.
+                </span>
+              </div>
+            )}
+          </section>
 
-            {/* Footer / Cancel */}
+          <section className="rounded-2xl border border-white/8 bg-zinc-950/60 overflow-hidden">
             <button
               type="button"
-              onClick={() => setShowQualityModal(false)}
-              className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer mt-1"
+              onClick={() => setManualOpen(value => !value)}
+              className="w-full p-3.5 flex items-center justify-between text-left"
             >
-              Annuler
+              <div className="flex items-center gap-2.5">
+                <Radio size={16} className="text-zinc-400" />
+                <div>
+                  <h4 className="text-xs font-extrabold text-white">Choisir une release manuellement</h4>
+                  <p className="text-[10px] text-zinc-500 mt-0.5">Recherche C411 avancée</p>
+                </div>
+              </div>
+              <ChevronDown size={15} className={`text-zinc-500 transition-transform ${manualOpen ? 'rotate-180' : ''}`} />
             </button>
 
+            {manualOpen && (
+              <div className="border-t border-zinc-800 p-3 space-y-3">
+                <form
+                  onSubmit={event => {
+                    event.preventDefault();
+                    void performSearch();
+                  }}
+                  className="flex gap-2"
+                >
+                  <div className="relative flex-1">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                    <input
+                      value={searchQuery}
+                      onChange={event => setSearchQuery(event.target.value)}
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 text-xs text-white outline-none focus:border-blue-500"
+                      placeholder="Titre, S02, S02E05…"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isSearching || !searchQuery.trim()}
+                    className="px-3 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold disabled:opacity-50"
+                  >
+                    {isSearching ? <Loader2 size={15} className="animate-spin" /> : 'Chercher'}
+                  </button>
+                </form>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {(['all', '2160p', '1080p', '720p'] as const).map(quality => (
+                    <button
+                      key={quality}
+                      type="button"
+                      onClick={() => setSelectedQuality(quality)}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${
+                        selectedQuality === quality
+                          ? 'bg-blue-600 text-white border-blue-500'
+                          : 'bg-zinc-900 text-zinc-400 border-zinc-800'
+                      }`}
+                    >
+                      {quality === 'all' ? 'Toutes' : quality === '2160p' ? '4K' : quality}
+                    </button>
+                  ))}
+
+                  <span className="w-px h-4 bg-zinc-800 mx-0.5" />
+
+                  {(['seeders', 'size', 'date'] as const).map(sort => (
+                    <button
+                      key={sort}
+                      type="button"
+                      onClick={() => setSortBy(sort)}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${
+                        sortBy === sort
+                          ? 'bg-zinc-700 text-white border-zinc-600'
+                          : 'bg-zinc-900 text-zinc-500 border-zinc-800'
+                      }`}
+                    >
+                      {sort === 'seeders' ? 'Seeders' : sort === 'size' ? 'Taille' : 'Date'}
+                    </button>
+                  ))}
+                </div>
+
+                {isSearching ? (
+                  <div className="py-8 flex items-center justify-center gap-2 text-xs text-zinc-400">
+                    <Loader2 size={18} className="animate-spin text-blue-400" />
+                    Recherche C411…
+                  </div>
+                ) : filteredTorrents.length > 0 ? (
+                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    {filteredTorrents.map(torrent => (
+                      <div key={torrent.id} className="p-3 rounded-xl bg-zinc-900 border border-zinc-800 space-y-2">
+                        <p className="text-[11px] font-bold text-white break-words leading-snug">{torrent.name}</p>
+                        <div className="flex flex-wrap gap-1.5 text-[9px] font-bold text-zinc-400">
+                          {torrent.quality && <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300">{torrent.quality}</span>}
+                          {torrent.language && <span>{torrent.language}</span>}
+                          <span>{formatTorrentSize(torrent.size)}</span>
+                          <span className="text-emerald-400">↑ {torrent.seeders || 0}</span>
+                          <span>↓ {torrent.leechers || 0}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={sendingTorrentId === torrent.id}
+                            onClick={() => void handleSendToClient(torrent)}
+                            className="flex-1 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-black flex items-center justify-center gap-1.5 disabled:opacity-50"
+                          >
+                            {sendingTorrentId === torrent.id ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                            Envoyer
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleCopyMagnet(torrent)}
+                            className="px-3 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-[10px] font-bold flex items-center gap-1.5"
+                          >
+                            {copiedHash === torrent.infoHash ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                            Magnet
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : hasSearched ? (
+                  <div className="py-7 text-center text-xs text-zinc-500">Aucune release trouvée pour cette recherche.</div>
+                ) : null}
+              </div>
+            )}
+          </section>
+
+          {actionMessage && (
+            <div className={`p-3 rounded-xl border text-[11px] flex items-start gap-2 ${
+              actionMessage.type === 'error'
+                ? 'bg-red-500/10 border-red-500/20 text-red-300'
+                : actionMessage.type === 'success'
+                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+                  : 'bg-blue-500/10 border-blue-500/20 text-blue-300'
+            }`}>
+              {actionMessage.type === 'error' ? <AlertCircle size={14} /> : <Check size={14} />}
+              <span>{actionMessage.text}</span>
+            </div>
+          )}
+
+          {activeDownloads.length > 0 && (
+            <section>
+              <LiveDownloadBanner items={activeDownloads} />
+            </section>
+          )}
+        </div>
+      </div>
+
+      {isSeasonPickerOpen && (
+        <div
+          className="fixed inset-0 z-[220] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+          onClick={() => setIsSeasonPickerOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm max-h-[70vh] overflow-y-auto rounded-2xl bg-zinc-900 border border-zinc-700 p-3 space-y-1.5"
+            onClick={event => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-1 pb-2 mb-1 border-b border-zinc-800">
+              <span className="text-sm font-extrabold text-white">Choisir la saison</span>
+              <button type="button" onClick={() => setIsSeasonPickerOpen(false)} className="p-1 text-zinc-400">
+                <X size={17} />
+              </button>
+            </div>
+            {availableSeasons.map(season => (
+              <button
+                key={season.season_number}
+                type="button"
+                onClick={() => {
+                  handleScopeChange(scopeMode, season.season_number, selectedEpisode);
+                  setIsSeasonPickerOpen(false);
+                }}
+                className={`w-full px-3 py-2.5 rounded-xl text-left flex items-center justify-between ${
+                  selectedSeason === season.season_number
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-zinc-800/70 text-zinc-200'
+                }`}
+              >
+                <span>
+                  <span className="block text-xs font-bold">{season.name || `Saison ${season.season_number}`}</span>
+                  <span className="block text-[10px] opacity-70">{season.episode_count || 0} épisodes</span>
+                </span>
+                {selectedSeason === season.season_number && <Check size={15} />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {isEpisodePickerOpen && (
+        <div
+          className="fixed inset-0 z-[220] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+          onClick={() => setIsEpisodePickerOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm max-h-[70vh] overflow-y-auto rounded-2xl bg-zinc-900 border border-zinc-700 p-3"
+            onClick={event => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-1 pb-2 mb-2 border-b border-zinc-800">
+              <span className="text-sm font-extrabold text-white">Choisir l'épisode</span>
+              <button type="button" onClick={() => setIsEpisodePickerOpen(false)} className="p-1 text-zinc-400">
+                <X size={17} />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {Array.from({ length: maxEpisodes }, (_, index) => index + 1).map(episode => (
+                <button
+                  key={episode}
+                  type="button"
+                  onClick={() => {
+                    handleScopeChange('episode', selectedSeason, episode);
+                    setIsEpisodePickerOpen(false);
+                  }}
+                  className={`px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between ${
+                    selectedEpisode === episode
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-zinc-800/70 text-zinc-200'
+                  }`}
+                >
+                  Épisode {episode}
+                  {selectedEpisode === episode && <Check size={14} />}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}

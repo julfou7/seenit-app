@@ -1,6 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { Download, Server, Key, Globe, Check, AlertCircle, Save, Sliders, HardDrive, Loader2, Wifi, Cloud } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  Cloud,
+  Download,
+  HardDrive,
+  Key,
+  Loader2,
+  Save,
+  Server,
+  Wifi
+} from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
+import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { useToastStore } from '../store/toastStore';
 import { testServiceConnection } from '../services/sonarrRadarr';
 import { testC411Connection } from '../services/c411';
@@ -10,22 +23,27 @@ interface DownloadConfigSectionProps {
   hideToggle?: boolean;
 }
 
+type TestKey = 'c411' | 'sonarr' | 'radarr' | 'qbittorrent';
+
 export function DownloadConfigSection({ defaultOpen = false, hideToggle = false }: DownloadConfigSectionProps) {
-  const { showToast } = useToastStore();
   const config = useDownloadConfigStore();
+  const showToast = useToastStore(state => state.showToast);
+  const fetchDownloads = useLiveDownloadStore(state => state.fetchDownloads);
   const [isOpen, setIsOpen] = useState(defaultOpen);
+  const [testingService, setTestingService] = useState<TestKey | null>(null);
+  const [testResults, setTestResults] = useState<Partial<Record<TestKey, boolean>>>({});
 
-  const [c411Key, setC411Key] = useState(config.c411ApiKey);
-  const [sonarrUrl, setSonarrUrl] = useState(config.sonarrUrl);
-  const [sonarrKey, setSonarrKey] = useState(config.sonarrApiKey);
-  const [radarrUrl, setRadarrUrl] = useState(config.radarrUrl);
-  const [radarrKey, setRadarrKey] = useState(config.radarrApiKey);
-  const [qbitUrl, setQbitUrl] = useState(config.qbittorrentUrl);
-  const [qbitUser, setQbitUser] = useState(config.qbittorrentUsername);
-  const [qbitPass, setQbitPass] = useState(config.qbittorrentPassword);
+  const [c411Key, setC411Key] = useState('');
+  const [sonarrUrl, setSonarrUrl] = useState('');
+  const [sonarrKey, setSonarrKey] = useState('');
+  const [radarrUrl, setRadarrUrl] = useState('');
+  const [radarrKey, setRadarrKey] = useState('');
+  const [qbitUrl, setQbitUrl] = useState('');
+  const [qbitUser, setQbitUser] = useState('');
+  const [qbitPass, setQbitPass] = useState('');
 
-  // Synchroniser les champs du formulaire si la config du store est mise à jour depuis le cloud
   useEffect(() => {
+    if (!config.isHydrated) return;
     setC411Key(config.c411ApiKey);
     setSonarrUrl(config.sonarrUrl);
     setSonarrKey(config.sonarrApiKey);
@@ -35,6 +53,7 @@ export function DownloadConfigSection({ defaultOpen = false, hideToggle = false 
     setQbitUser(config.qbittorrentUsername);
     setQbitPass(config.qbittorrentPassword);
   }, [
+    config.isHydrated,
     config.c411ApiKey,
     config.sonarrUrl,
     config.sonarrApiKey,
@@ -45,263 +64,265 @@ export function DownloadConfigSection({ defaultOpen = false, hideToggle = false 
     config.qbittorrentPassword
   ]);
 
-  const [testingService, setTestingService] = useState<string | null>(null);
+  const setTestResult = (key: TestKey, success: boolean) => {
+    setTestResults(previous => ({ ...previous, [key]: success }));
+  };
 
   const handleC411Test = async () => {
     const apiKey = c411Key.trim();
     if (!apiKey) {
-      showToast('Veuillez renseigner votre clé API C411', 'error');
+      showToast('Renseigne la clé API C411.', 'error');
       return;
     }
 
     setTestingService('c411');
-    const result = await testC411Connection(apiKey);
-    setTestingService(null);
-    showToast(result.message, result.success ? 'success' : 'error');
+    try {
+      const result = await testC411Connection(apiKey);
+      setTestResult('c411', result.success);
+      showToast(result.message, result.success ? 'success' : 'error');
+    } finally {
+      setTestingService(null);
+    }
   };
 
-  const handleTest = async (service: 'sonarr' | 'radarr' | 'qbittorrent') => {
-    setTestingService(service);
-    let url = service === 'sonarr' ? sonarrUrl : service === 'radarr' ? radarrUrl : qbitUrl;
-    let apiKey = service === 'sonarr' ? sonarrKey : service === 'radarr' ? radarrKey : undefined;
-    let username = service === 'qbittorrent' ? qbitUser : undefined;
-    let password = service === 'qbittorrent' ? qbitPass : undefined;
+  const handleServiceTest = async (service: 'sonarr' | 'radarr' | 'qbittorrent') => {
+    const url = service === 'sonarr' ? sonarrUrl : service === 'radarr' ? radarrUrl : qbitUrl;
+    const apiKey = service === 'sonarr' ? sonarrKey : service === 'radarr' ? radarrKey : undefined;
+    const username = service === 'qbittorrent' ? qbitUser : undefined;
+    const password = service === 'qbittorrent' ? qbitPass : undefined;
 
-    if (!url) {
-      showToast(`Veuillez renseigner l'URL de ${service}`, 'error');
-      setTestingService(null);
+    if (!url.trim()) {
+      showToast(`Renseigne l’URL de ${service}.`, 'error');
       return;
     }
 
-    const res = await testServiceConnection(service, url, apiKey, username, password);
-    setTestingService(null);
-    if (res.success) {
-      showToast(res.message, 'success');
-    } else {
-      showToast(res.message, 'error');
+    setTestingService(service);
+    try {
+      const result = await testServiceConnection(service, url.trim(), apiKey?.trim(), username?.trim(), password?.trim());
+      setTestResult(service, result.success);
+      showToast(result.message, result.success ? 'success' : 'error');
+    } finally {
+      setTestingService(null);
     }
   };
 
-  const handleSave = () => {
-    config.setConfig({
-      c411ApiKey: c411Key.trim(),
-      sonarrUrl: sonarrUrl.trim(),
-      sonarrApiKey: sonarrKey.trim(),
-      radarrUrl: radarrUrl.trim(),
-      radarrApiKey: radarrKey.trim(),
-      qbittorrentUrl: qbitUrl.trim(),
-      qbittorrentUsername: qbitUser.trim(),
-      qbittorrentPassword: qbitPass.trim(),
+  const handleSave = async () => {
+    const success = await config.saveConfig({
+      c411ApiKey: c411Key,
+      sonarrUrl,
+      sonarrApiKey: sonarrKey,
+      radarrUrl,
+      radarrApiKey: radarrKey,
+      qbittorrentUrl: qbitUrl,
+      qbittorrentUsername: qbitUser,
+      qbittorrentPassword: qbitPass
     });
-    showToast('Configuration des téléchargements sauvegardée !', 'success');
-    if (!hideToggle) {
-      setIsOpen(false);
+
+    if (success) {
+      showToast('Configuration téléchargements sauvegardée et synchronisée.', 'success');
+      void fetchDownloads();
+      if (!hideToggle) setIsOpen(false);
+    } else {
+      showToast(config.saveError || 'Impossible de sauvegarder la configuration.', 'error');
     }
   };
+
+  const native = Capacitor.isNativePlatform();
 
   return (
     <div className="mb-4">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <Download className="text-blue-400" size={14} />
-          <h3 className="font-bold text-xs text-zinc-200">Téléchargement & Tracker (C411 / Sonarr)</h3>
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Download className="text-blue-400 shrink-0" size={15} />
+          <h3 className="font-bold text-xs text-zinc-200 truncate">Téléchargements & clients</h3>
         </div>
         {!hideToggle && (
           <button
             type="button"
-            onClick={() => setIsOpen(!isOpen)}
-            className="text-[11px] font-bold text-blue-400 hover:text-blue-300 bg-blue-500/10 px-2 py-1 rounded-lg border border-blue-500/20 cursor-pointer transition-colors"
+            onClick={() => setIsOpen(value => !value)}
+            className="text-[10px] font-bold text-blue-300 bg-blue-500/10 px-2.5 py-1.5 rounded-lg border border-blue-500/20"
           >
             {isOpen ? 'Masquer' : 'Configurer'}
           </button>
         )}
       </div>
 
-      <p className="text-[11px] text-zinc-400 mb-3 leading-relaxed font-medium">
-        Recherche sur C411 et envoi automatique à Sonarr, Radarr ou qBittorrent sur votre PC/NAS local.
-      </p>
-
-      {isOpen && (
-        <div className="bg-zinc-950/80 border border-zinc-800 rounded-xl p-3.5 space-y-3.5 mt-2 animate-in fade-in duration-150">
-          {/* Info intro */}
-          <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-[11px] text-blue-300 space-y-1">
-            <p className="font-bold flex items-center gap-1.5 text-blue-200">
-              <Sliders size={13} />
-              Comment connecter Sonarr / Radarr depuis votre téléphone :
-            </p>
-            <p className="text-zinc-400 text-[10px] leading-relaxed">
-              • Utilisez l'<strong>adresse IP locale de votre PC</strong> (ex: <code>http://192.168.1.50:8989</code>) et non <code>localhost</code>.<br />
-              • Votre téléphone et votre PC doivent être sur le <strong>même réseau Wi-Fi</strong>.<br />
-              • La clé API se trouve dans Sonarr : <em>Settings → General → Security → API Key</em>.
-            </p>
+      {!isOpen ? (
+        <p className="text-[11px] text-zinc-500">C411, Sonarr, Radarr et qBittorrent.</p>
+      ) : !config.isHydrated ? (
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-6 flex items-center justify-center gap-2 text-xs text-zinc-400">
+          <Loader2 size={16} className="animate-spin text-blue-400" />
+          Chargement de la configuration…
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-950/75 p-3.5 space-y-4">
+          <div className={`rounded-xl border p-3 text-[10px] leading-relaxed ${
+            native
+              ? 'bg-emerald-500/8 border-emerald-500/20 text-emerald-200'
+              : 'bg-amber-500/8 border-amber-500/20 text-amber-200'
+          }`}>
+            <div className="font-bold flex items-center gap-1.5 mb-1">
+              <Wifi size={13} />
+              {native ? 'APK Android : accès réseau local direct' : 'Web/PWA : attention aux adresses locales'}
+            </div>
+            {native
+              ? 'Tu peux utiliser directement les IP locales de ton PC/NAS, par exemple 192.168.1.50.'
+              : 'Les navigateurs peuvent bloquer l’accès aux IP locales. Pour un NAS/PC local, l’APK Android est le chemin le plus fiable.'}
           </div>
 
-          {/* C411 API Key */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5">
-                <Key size={12} className="text-blue-400" />
-                Clé API C411 (Tracker)
-              </label>
-              <button
-                type="button"
-                onClick={handleC411Test}
-                disabled={testingService === 'c411'}
-                className="text-[10px] font-bold text-blue-400 hover:text-blue-300 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
-              >
-                {testingService === 'c411' ? <Loader2 size={10} className="animate-spin" /> : <Wifi size={10} />}
-                Tester la connexion
-              </button>
-            </div>
-            <p className="text-[10px] text-zinc-400 mb-1.5">
-              Trouvable dans votre profil C411. Elle est enregistrée uniquement dans les paramètres de votre compte SeenIt.
-            </p>
+          <ServiceHeader
+            icon={<Key size={13} className="text-blue-400" />}
+            title="C411"
+            testing={testingService === 'c411'}
+            result={testResults.c411}
+            onTest={() => void handleC411Test()}
+          />
+          <input
+            type="password"
+            value={c411Key}
+            onChange={event => setC411Key(event.target.value)}
+            placeholder="Clé API C411"
+            className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-xs text-white outline-none focus:border-blue-500"
+          />
+
+          <div className="h-px bg-zinc-800" />
+
+          <ServiceHeader
+            icon={<Server size={13} className="text-cyan-400" />}
+            title="Sonarr • séries"
+            testing={testingService === 'sonarr'}
+            result={testResults.sonarr}
+            onTest={() => void handleServiceTest('sonarr')}
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <input
+              value={sonarrUrl}
+              onChange={event => setSonarrUrl(event.target.value)}
+              placeholder="http://192.168.1.50:8989"
+              className="rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-xs text-white outline-none focus:border-cyan-500"
+            />
             <input
               type="password"
-              value={c411Key}
-              onChange={(e) => setC411Key(e.target.value)}
-              placeholder="Clé API de votre compte C411"
-              className="w-full bg-zinc-900 border border-zinc-700/80 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-blue-500"
+              value={sonarrKey}
+              onChange={event => setSonarrKey(event.target.value)}
+              placeholder="Clé API Sonarr"
+              className="rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-xs text-white outline-none focus:border-cyan-500"
             />
           </div>
 
-          {/* Sonarr (Séries) */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5">
-                <Server size={12} className="text-cyan-400" />
-                Sonarr (Séries TV)
-              </span>
-              <button
-                type="button"
-                onClick={() => handleTest('sonarr')}
-                disabled={testingService === 'sonarr'}
-                className="text-[10px] font-bold text-cyan-400 hover:text-cyan-300 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
-              >
-                {testingService === 'sonarr' ? <Loader2 size={10} className="animate-spin" /> : <Wifi size={10} />}
-                Tester la connexion
-              </button>
-            </div>
-            <p className="text-[10px] text-zinc-400">
-              IP locale de votre PC + Clé API (ex: <code>http://192.168.1.XX:8989</code>)
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
-              <input
-                type="text"
-                value={sonarrUrl}
-                onChange={(e) => setSonarrUrl(e.target.value)}
-                placeholder="http://192.168.1.50:8989"
-                className="w-full bg-zinc-900 border border-zinc-700/80 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-cyan-500"
-              />
-              <input
-                type="password"
-                value={sonarrKey}
-                onChange={(e) => setSonarrKey(e.target.value)}
-                placeholder="Clé API Sonarr"
-                className="w-full bg-zinc-900 border border-zinc-700/80 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-cyan-500"
-              />
-            </div>
+          <div className="h-px bg-zinc-800" />
+
+          <ServiceHeader
+            icon={<Server size={13} className="text-amber-400" />}
+            title="Radarr • films"
+            testing={testingService === 'radarr'}
+            result={testResults.radarr}
+            onTest={() => void handleServiceTest('radarr')}
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <input
+              value={radarrUrl}
+              onChange={event => setRadarrUrl(event.target.value)}
+              placeholder="http://192.168.1.50:7878"
+              className="rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-xs text-white outline-none focus:border-amber-500"
+            />
+            <input
+              type="password"
+              value={radarrKey}
+              onChange={event => setRadarrKey(event.target.value)}
+              placeholder="Clé API Radarr"
+              className="rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-xs text-white outline-none focus:border-amber-500"
+            />
           </div>
 
-          {/* Radarr (Films) */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5">
-                <Server size={12} className="text-amber-400" />
-                Radarr (Films)
-              </span>
-              <button
-                type="button"
-                onClick={() => handleTest('radarr')}
-                disabled={testingService === 'radarr'}
-                className="text-[10px] font-bold text-amber-400 hover:text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
-              >
-                {testingService === 'radarr' ? <Loader2 size={10} className="animate-spin" /> : <Wifi size={10} />}
-                Tester la connexion
-              </button>
-            </div>
-            <p className="text-[10px] text-zinc-400">
-              IP locale de votre PC + Clé API (ex: <code>http://192.168.1.XX:7878</code>)
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
-              <input
-                type="text"
-                value={radarrUrl}
-                onChange={(e) => setRadarrUrl(e.target.value)}
-                placeholder="http://192.168.1.50:7878"
-                className="w-full bg-zinc-900 border border-zinc-700/80 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-amber-500"
-              />
-              <input
-                type="password"
-                value={radarrKey}
-                onChange={(e) => setRadarrKey(e.target.value)}
-                placeholder="Clé API Radarr"
-                className="w-full bg-zinc-900 border border-zinc-700/80 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-amber-500"
-              />
-            </div>
+          <div className="h-px bg-zinc-800" />
+
+          <ServiceHeader
+            icon={<HardDrive size={13} className="text-emerald-400" />}
+            title="qBittorrent"
+            testing={testingService === 'qbittorrent'}
+            result={testResults.qbittorrent}
+            onTest={() => void handleServiceTest('qbittorrent')}
+          />
+          <input
+            value={qbitUrl}
+            onChange={event => setQbitUrl(event.target.value)}
+            placeholder="http://192.168.1.50:8080"
+            className="w-full rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-xs text-white outline-none focus:border-emerald-500"
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              value={qbitUser}
+              onChange={event => setQbitUser(event.target.value)}
+              placeholder="Utilisateur"
+              className="rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-xs text-white outline-none focus:border-emerald-500"
+            />
+            <input
+              type="password"
+              value={qbitPass}
+              onChange={event => setQbitPass(event.target.value)}
+              placeholder="Mot de passe"
+              className="rounded-xl bg-zinc-900 border border-zinc-700 px-3 py-2 text-xs text-white outline-none focus:border-emerald-500"
+            />
           </div>
 
-          {/* qBittorrent */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5">
-                <HardDrive size={12} className="text-emerald-400" />
-                qBittorrent (Web UI)
-              </span>
-              <button
-                type="button"
-                onClick={() => handleTest('qbittorrent')}
-                disabled={testingService === 'qbittorrent'}
-                className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50"
-              >
-                {testingService === 'qbittorrent' ? <Loader2 size={10} className="animate-spin" /> : <Wifi size={10} />}
-                Tester la connexion
-              </button>
+          {config.saveError && (
+            <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-2.5 text-[10px] text-red-300 flex gap-2">
+              <AlertCircle size={13} className="shrink-0" />
+              {config.saveError}
             </div>
-            <p className="text-[10px] text-zinc-400">
-              URL de l'interface Web qBittorrent (ex: <code>http://192.168.1.50:8080</code>)
-            </p>
-            <div className="space-y-2 pt-0.5">
-              <input
-                type="text"
-                value={qbitUrl}
-                onChange={(e) => setQbitUrl(e.target.value)}
-                placeholder="http://192.168.1.50:8080"
-                className="w-full bg-zinc-900 border border-zinc-700/80 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500"
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="text"
-                  value={qbitUser}
-                  onChange={(e) => setQbitUser(e.target.value)}
-                  placeholder="Utilisateur (ex: admin)"
-                  className="w-full bg-zinc-900 border border-zinc-700/80 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500"
-                />
-                <input
-                  type="password"
-                  value={qbitPass}
-                  onChange={(e) => setQbitPass(e.target.value)}
-                  placeholder="Mot de passe"
-                  className="w-full bg-zinc-900 border border-zinc-700/80 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-            </div>
-          </div>
+          )}
 
           <button
             type="button"
-            onClick={handleSave}
-            className="w-full mt-2 py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-98 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md shadow-blue-500/20"
+            disabled={config.isSaving}
+            onClick={() => void handleSave()}
+            className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            <Save size={14} />
-            <span>Enregistrer et synchroniser avec mon compte</span>
+            {config.isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {config.isSaving ? 'Enregistrement…' : 'Enregistrer et synchroniser'}
           </button>
-          <div className="flex items-center justify-center gap-1.5 text-[10px] text-zinc-500 pt-1">
+
+          <div className="flex items-center justify-center gap-1.5 text-[9px] text-zinc-500">
             <Cloud size={11} className="text-blue-400" />
-            <span>Vos paramètres sont automatiquement synchronisés sur tous vos appareils (PC & Mobile)</span>
+            Réglages synchronisés avec ton compte SeenIt
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ServiceHeader({
+  icon,
+  title,
+  testing,
+  result,
+  onTest
+}: {
+  icon: React.ReactNode;
+  title: string;
+  testing: boolean;
+  result?: boolean;
+  onTest: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-1.5 text-[11px] font-bold text-zinc-300">
+        {icon}
+        {title}
+        {result === true && <CheckCircle2 size={12} className="text-emerald-400" />}
+        {result === false && <AlertCircle size={12} className="text-red-400" />}
+      </div>
+      <button
+        type="button"
+        disabled={testing}
+        onClick={onTest}
+        className="px-2 py-1 rounded-lg border border-zinc-700 bg-zinc-900 text-[9px] font-bold text-zinc-300 flex items-center gap-1 disabled:opacity-50"
+      >
+        {testing ? <Loader2 size={10} className="animate-spin" /> : <Wifi size={10} />}
+        Tester
+      </button>
     </div>
   );
 }

@@ -38,19 +38,43 @@ export interface C411SearchParams {
   year?: string | number;
 }
 
+const SEENIT_API_ORIGIN = 'https://seenit.ai.studio';
+
+function getBackendEndpoints(path: string): string[] {
+  if (Capacitor.isNativePlatform()) {
+    return [`${SEENIT_API_ORIGIN}${path}`];
+  }
+
+  if (typeof window !== 'undefined' && window.location.origin === SEENIT_API_ORIGIN) {
+    return [path];
+  }
+
+  // En preview/dev Web : backend courant en priorité, production SeenIt en secours.
+  return [path, `${SEENIT_API_ORIGIN}${path}`];
+}
+
+function parseResponseData(raw: unknown): any {
+  if (typeof raw !== 'string') return raw;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+}
+
 /**
- * Normalise la taille en Mo / Go
+ * Normalise la taille en Mo / Go.
  */
 export function formatTorrentSize(bytes: number): string {
   if (!bytes || bytes === 0) return '0 Mo';
   const k = 1024;
   const sizes = ['Octets', 'Ko', 'Mo', 'Go', 'To'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
 
 /**
- * Crée un lien Magnet à partir du hash et du nom
+ * Crée un lien Magnet à partir du hash et du nom.
  */
 export function buildMagnetLink(infoHash: string, name: string): string {
   const trackers = [
@@ -66,98 +90,23 @@ export function buildMagnetLink(infoHash: string, name: string): string {
 }
 
 /**
- * Recherche des torrents sur C411 via le backend authentifié.
- * La clé est lue dans Firestore pour l'utilisateur connecté.
+ * Recherche des torrents C411 via un backend SeenIt authentifié.
+ * Une réponse valide vide retourne []; une panne réseau lève une erreur pour ne plus
+ * confondre "aucun résultat" et "tracker indisponible".
  */
 export async function searchC411Torrents(params: C411SearchParams): Promise<C411Torrent[]> {
   const query = (params.query || '').trim();
   if (!query) return [];
 
-  try {
-    const payload = {
-      query,
-      mediaType: params.mediaType,
-      year: params.year ? String(params.year) : undefined
-    };
+  const payload = {
+    query,
+    mediaType: params.mediaType,
+    year: params.year ? String(params.year) : undefined
+  };
 
-    const endpoints = [
-      'https://seenit.ai.studio/api/c411/search',
-      'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/c411/search',
-      'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/c411/search',
-      '/api/c411/search'
-    ];
+  let lastError: Error | null = null;
 
-    for (const ep of endpoints) {
-      try {
-        let resData: any = null;
-
-        if (Capacitor.isNativePlatform()) {
-          const nativeRes = await CapacitorHttp.post({
-            url: ep,
-            headers: await getAuthenticatedHeaders({
-              'Accept': 'application/json',
-              'Content-Type': 'application/json'
-            }),
-            data: payload,
-            connectTimeout: 8000,
-            readTimeout: 8000
-          });
-          if (nativeRes.status >= 200 && nativeRes.status < 300) {
-            resData = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
-          }
-        } else {
-          const res = await authenticatedFetch(ep, {
-            method: 'POST',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload),
-            signal: AbortSignal.timeout(8000)
-          });
-          if (res.ok) {
-            resData = await res.json();
-          }
-        }
-
-        if (resData && (resData.torrents || resData.data)) {
-          const list = resData.torrents || resData.data || [];
-          return list.map((t: C411Torrent) => ({
-            ...t,
-            magnetUri: t.infoHash ? buildMagnetLink(t.infoHash, t.name) : undefined
-          }));
-        }
-      } catch (err: any) {
-        // next endpoint
-      }
-    }
-    return [];
-  } catch (err) {
-    console.error('[C411] Search failed:', err);
-    return [];
-  }
-}
-
-/**
- * Vérifie une clé C411 via le backend SeenIt authentifié.
- * Le transport est adapté à la PWA et à l'APK Capacitor.
- */
-export async function testC411Connection(apiKey: string): Promise<{ success: boolean; message: string }> {
-  const normalizedApiKey = apiKey.trim();
-  if (!normalizedApiKey) {
-    return { success: false, message: 'Clé API C411 manquante.' };
-  }
-
-  const endpoints = [
-    'https://seenit.ai.studio/api/c411/test',
-    'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/c411/test',
-    'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/c411/test',
-    '/api/c411/test'
-  ];
-
-  let lastMessage = 'Impossible de joindre le serveur SeenIt.';
-
-  for (const endpoint of endpoints) {
+  for (const endpoint of getBackendEndpoints('/api/c411/search')) {
     try {
       let status = 0;
       let data: any = null;
@@ -166,24 +115,101 @@ export async function testC411Connection(apiKey: string): Promise<{ success: boo
         const response = await CapacitorHttp.post({
           url: endpoint,
           headers: await getAuthenticatedHeaders({
-            'Accept': 'application/json',
+            Accept: 'application/json',
             'Content-Type': 'application/json'
           }),
-          data: { apiKey: normalizedApiKey },
-          connectTimeout: 8000,
-          readTimeout: 8000
+          data: payload,
+          connectTimeout: 6000,
+          readTimeout: 6000
         });
         status = response.status;
-        data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+        data = parseResponseData(response.data);
       } else {
         const response = await authenticatedFetch(endpoint, {
           method: 'POST',
           headers: {
-            'Accept': 'application/json',
+            Accept: 'application/json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(6000)
+        });
+        status = response.status;
+        data = await response.json().catch(() => null);
+      }
+
+      if (status >= 200 && status < 300) {
+        const list = Array.isArray(data?.torrents)
+          ? data.torrents
+          : Array.isArray(data?.data)
+            ? data.data
+            : null;
+
+        if (list) {
+          return list.map((torrent: C411Torrent) => ({
+            ...torrent,
+            magnetUri: torrent.infoHash
+              ? buildMagnetLink(torrent.infoHash, torrent.name)
+              : undefined
+          }));
+        }
+
+        throw new Error('Réponse C411 invalide.');
+      }
+
+      const message = data?.error || data?.message || `C411 indisponible (${status}).`;
+      if ([400, 401, 403].includes(status)) {
+        throw new Error(message);
+      }
+
+      lastError = new Error(message);
+    } catch (error: any) {
+      lastError = new Error(error?.message || 'Impossible de joindre C411.');
+    }
+  }
+
+  console.warn('[C411] Recherche indisponible:', lastError?.message);
+  throw lastError || new Error('Impossible de joindre C411.');
+}
+
+/**
+ * Vérifie une clé C411 via le backend SeenIt authentifié.
+ */
+export async function testC411Connection(apiKey: string): Promise<{ success: boolean; message: string }> {
+  const normalizedApiKey = apiKey.trim();
+  if (!normalizedApiKey) {
+    return { success: false, message: 'Clé API C411 manquante.' };
+  }
+
+  let lastMessage = 'Impossible de joindre le serveur SeenIt.';
+
+  for (const endpoint of getBackendEndpoints('/api/c411/test')) {
+    try {
+      let status = 0;
+      let data: any = null;
+
+      if (Capacitor.isNativePlatform()) {
+        const response = await CapacitorHttp.post({
+          url: endpoint,
+          headers: await getAuthenticatedHeaders({
+            Accept: 'application/json',
+            'Content-Type': 'application/json'
+          }),
+          data: { apiKey: normalizedApiKey },
+          connectTimeout: 6000,
+          readTimeout: 6000
+        });
+        status = response.status;
+        data = parseResponseData(response.data);
+      } else {
+        const response = await authenticatedFetch(endpoint, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({ apiKey: normalizedApiKey }),
-          signal: AbortSignal.timeout(8000)
+          signal: AbortSignal.timeout(6000)
         });
         status = response.status;
         data = await response.json().catch(() => null);
@@ -196,16 +222,14 @@ export async function testC411Connection(apiKey: string): Promise<{ success: boo
         };
       }
 
-      if (status === 400 || status === 401 || status === 403) {
+      if ([400, 401, 403].includes(status)) {
         return {
           success: false,
           message: data?.error || 'Clé API C411 refusée.'
         };
       }
 
-      if (status !== 404) {
-        lastMessage = data?.error || `Serveur C411 indisponible (${status}).`;
-      }
+      lastMessage = data?.error || data?.message || `Serveur C411 indisponible (${status}).`;
     } catch (error: any) {
       lastMessage = error?.message || lastMessage;
     }
@@ -215,7 +239,7 @@ export async function testC411Connection(apiKey: string): Promise<{ success: boo
 }
 
 /**
- * Déclenchement d'un téléchargement vers Sonarr / Radarr / qBittorrent via l'API backend
+ * Déclenchement d'un téléchargement via le dispatcher SeenIt.
  */
 export async function triggerRemoteDownload(payload: {
   service: 'sonarr' | 'radarr' | 'qbittorrent';
@@ -229,40 +253,36 @@ export async function triggerRemoteDownload(payload: {
   title: string;
   year?: number | string;
 }): Promise<{ success: boolean; message: string }> {
-  try {
-    const endpoints = [
-      'https://seenit.ai.studio/api/downloads/push',
-      'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/downloads/push',
-      'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/downloads/push',
-      '/api/downloads/push'
-    ];
+  let lastMessage = 'Impossible de joindre le serveur SeenIt.';
 
-    for (const ep of endpoints) {
-      try {
-        const res = await authenticatedFetch(ep, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(15000)
-        });
-        if (res.ok) {
-          const data = await res.json();
-          return { success: true, message: data.message || 'Téléchargement envoyé avec succès !' };
-        }
-        const errorData = await res.json().catch(() => ({}));
+  for (const endpoint of getBackendEndpoints('/api/downloads/push')) {
+    try {
+      const response = await authenticatedFetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(12000)
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) {
         return {
-          success: false,
-          message: errorData.error || `Erreur serveur (${res.status})`
+          success: true,
+          message: data.message || 'Téléchargement envoyé avec succès !'
         };
-      } catch (e) {
-        // Try next
       }
+
+      lastMessage = data.error || data.message || `Erreur serveur (${response.status})`;
+      if ([400, 401, 403].includes(response.status)) {
+        return { success: false, message: lastMessage };
+      }
+    } catch (error: any) {
+      lastMessage = error?.message || lastMessage;
     }
-    return { success: false, message: 'Impossible de joindre le serveur' };
-  } catch (err: any) {
-    return { success: false, message: err?.message || 'Erreur inconnue' };
   }
+
+  return { success: false, message: lastMessage };
 }

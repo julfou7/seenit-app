@@ -1,12 +1,21 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { useDownloadConfigStore } from './downloadConfigStore';
-import { fetchLiveDownloadsQueue, LiveDownloadItem, matchShowDownload, matchMovieDownload, deleteLiveDownloadItem, extractQualityFromTitle } from '../services/sonarrRadarr';
+import { onAuthStateChanged } from 'firebase/auth';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
+import { useDownloadConfigStore } from './downloadConfigStore';
+import {
+  fetchLiveDownloadsQueue,
+  type LiveDownloadItem,
+  matchShowDownload,
+  matchMovieDownload,
+  deleteLiveDownloadItem,
+  extractQualityFromTitle
+} from '../services/sonarrRadarr';
 import { useToastStore } from './toastStore';
 import { useShowsStore } from './showsStore';
+import { auth } from '../lib/firebase';
 
 interface LiveDownloadState {
   downloads: LiveDownloadItem[];
@@ -15,11 +24,12 @@ interface LiveDownloadState {
   lastUpdated: number | null;
   error: string | null;
   isPolling: boolean;
-  
+
   fetchDownloads: () => Promise<void>;
   startPolling: (intervalMs?: number) => void;
   stopPolling: () => void;
   addOptimisticDownload: (item: Partial<LiveDownloadItem> & { title: string; mediaType: 'tv' | 'movie' }) => string;
+  updateDownloadRequest: (id: string, patch: Partial<LiveDownloadItem>) => void;
   removeDownload: (item: LiveDownloadItem) => Promise<boolean>;
   clearAllDownloads: () => Promise<void>;
 
@@ -28,10 +38,17 @@ interface LiveDownloadState {
   getEpisodeDownload: (tmdbId?: number | string, tvdbId?: number | string, season?: number, episode?: number) => LiveDownloadItem | null;
 }
 
-let pollingTimer: any = null;
+let pollingTimer: ReturnType<typeof setTimeout> | null = null;
+let pollingIntervalMs = 1000;
 let isFetchingInProgress = false;
 let lastFetchTime = 0;
+let activeScopedUid: string | null = null;
+
 const optimisticTimestamps: Record<string, number> = {};
+const missingSince: Record<string, number> = {};
+const OPTIMISTIC_TTL_MS = 120_000;
+const OPTIMISTIC_ERROR_TTL_MS = 60_000;
+const MISSING_WARNING_DELAY_MS = 30_000;
 
 async function checkAndRequestNotificationPermission() {
   if (!Capacitor.isNativePlatform()) return false;
@@ -41,7 +58,7 @@ async function checkAndRequestNotificationPermission() {
       permStatus = await LocalNotifications.requestPermissions();
     }
     return permStatus.display === 'granted';
-  } catch (e) {
+  } catch {
     return false;
   }
 }
@@ -50,56 +67,78 @@ function normalizeTitleForMatch(str?: string): string {
   if (!str) return '';
   return str
     .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/\(\d{4}\)/g, '')
     .replace(/s\d{1,2}e\d{1,2}.*/gi, '')
-    .split(':')[0]
     .replace(/[^a-z0-9]/g, '')
     .trim();
 }
 
-function sendLocalNotification(title: string, body: string, isSuccess: boolean = false) {
-  // Always trigger in-app toast for instantaneous feedback
+function sameDownloadIdentity(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
+  if (a.id === b.id) return true;
+  if (a.mediaType !== b.mediaType) return false;
+
+  if (a.tmdbId && b.tmdbId && Number(a.tmdbId) === Number(b.tmdbId)) {
+    if (a.mediaType === 'tv') {
+      if (a.seasonNumber != null && b.seasonNumber != null && a.seasonNumber !== b.seasonNumber) return false;
+      if (a.episodeNumber != null && b.episodeNumber != null && a.episodeNumber !== b.episodeNumber) return false;
+    }
+    return true;
+  }
+
+  if (a.tvdbId && b.tvdbId && Number(a.tvdbId) === Number(b.tvdbId)) {
+    if (a.mediaType === 'tv') {
+      if (a.seasonNumber != null && b.seasonNumber != null && a.seasonNumber !== b.seasonNumber) return false;
+      if (a.episodeNumber != null && b.episodeNumber != null && a.episodeNumber !== b.episodeNumber) return false;
+    }
+    return true;
+  }
+
+  const aTitle = normalizeTitleForMatch(a.title || a.seriesTitle || a.movieTitle || a.releaseTitle);
+  const bTitle = normalizeTitleForMatch(b.title || b.seriesTitle || b.movieTitle || b.releaseTitle);
+  return Boolean(aTitle && bTitle && aTitle === bTitle);
+}
+
+function sendLocalNotification(title: string, body: string, isSuccess = false) {
   try {
     useToastStore.getState().showToast(`${title}: ${body}`, isSuccess ? 'success' : 'download');
-  } catch (e) {}
+  } catch {}
 
   if (!Capacitor.isNativePlatform()) {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       if (Notification.permission === 'granted') {
-        try { new Notification(title, { body }); } catch (e) {}
-      } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission().then(permission => {
-          if (permission === 'granted') {
-            try { new Notification(title, { body }); } catch (e) {}
-          }
-        });
+        try { new Notification(title, { body }); } catch {}
       }
     }
     return;
   }
 
   checkAndRequestNotificationPermission().then((granted) => {
-    if (granted) {
-      try {
-        const notificationId = Math.floor(Math.random() * 2000000000) + 1;
-        LocalNotifications.schedule({
-          notifications: [
-            {
-              title: title,
-              body: body,
-              id: notificationId,
-              schedule: { at: new Date(Date.now() + 200) },
-              sound: undefined,
-              actionTypeId: '',
-              extra: null
-            }
-          ]
-        });
-      } catch (err) {
-        console.warn('[Notifications] Error scheduling local notification:', err);
-      }
+    if (!granted) return;
+    try {
+      LocalNotifications.schedule({
+        notifications: [{
+          title,
+          body,
+          id: Math.floor(Math.random() * 2_000_000_000) + 1,
+          schedule: { at: new Date(Date.now() + 200) },
+          sound: undefined,
+          actionTypeId: '',
+          extra: null
+        }]
+      });
+    } catch (error) {
+      console.warn('[Notifications] Impossible de planifier la notification:', error);
     }
   });
+}
+
+function clearPollingTimer() {
+  if (pollingTimer) {
+    clearTimeout(pollingTimer);
+    pollingTimer = null;
+  }
 }
 
 export const useLiveDownloadStore = create<LiveDownloadState>()(
@@ -113,11 +152,8 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
       isPolling: false,
 
       addOptimisticDownload: (item) => {
-        const id = item.id || `opt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        optimisticTimestamps[id] = Date.now();
-
-        const newItem: LiveDownloadItem = {
-          id,
+        const candidate: LiveDownloadItem = {
+          id: item.id || `opt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
           mediaType: item.mediaType,
           title: item.title,
           seriesTitle: item.seriesTitle,
@@ -131,34 +167,75 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           episodeNumber: item.episodeNumber,
           size: item.size || 0,
           sizeleft: item.sizeleft || 0,
-          progress: item.progress ?? 1,
-          status: 'downloading',
-          statusText: item.statusText || 'Lancement du téléchargement...',
+          progress: item.progress ?? 0,
+          status: item.status || 'submitting',
+          statusText: item.statusText || 'Demande prise en compte…',
+          errorMessage: item.errorMessage,
           downloadClient: item.downloadClient || (item.mediaType === 'tv' ? 'Sonarr' : 'Radarr'),
           releaseTitle: item.releaseTitle || item.title,
           isOptimistic: true
         };
 
-        set((state) => {
-          const exists = state.downloads.some(d => d.id === id || (d.tmdbId && d.tmdbId === newItem.tmdbId && d.seasonNumber === newItem.seasonNumber && d.episodeNumber === newItem.episodeNumber));
-          if (exists) return state;
-          return {
-            downloads: [newItem, ...state.downloads]
-          };
-        });
+        const existing = get().downloads.find(download =>
+          download.status !== 'completed' &&
+          download.status !== 'error' &&
+          sameDownloadIdentity(download, candidate)
+        );
 
-        get().startPolling(1000);
-        return id;
+        if (existing) {
+          optimisticTimestamps[existing.id] = Date.now();
+          set(state => ({
+            downloads: state.downloads.map(download =>
+              download.id === existing.id
+                ? {
+                    ...download,
+                    ...candidate,
+                    id: existing.id,
+                    posterPath: candidate.posterPath || download.posterPath,
+                    isOptimistic: true
+                  }
+                : download
+            )
+          }));
+          if (!get().isPolling) get().startPolling(1000);
+          else void get().fetchDownloads();
+          return existing.id;
+        }
+
+        optimisticTimestamps[candidate.id] = Date.now();
+        set(state => ({ downloads: [candidate, ...state.downloads] }));
+
+        if (!get().isPolling) get().startPolling(1000);
+        else void get().fetchDownloads();
+        return candidate.id;
+      },
+
+      updateDownloadRequest: (id, patch) => {
+        const existing = get().downloads.find(download => download.id === id);
+        if (existing?.isOptimistic || patch.isOptimistic) {
+          optimisticTimestamps[id] = Date.now();
+        }
+
+        set(state => ({
+          downloads: state.downloads.map(download =>
+            download.id === id ? { ...download, ...patch, id: download.id } : download
+          )
+        }));
       },
 
       fetchDownloads: async () => {
         const nowTime = Date.now();
-        if (isFetchingInProgress && (nowTime - lastFetchTime < 7000)) {
-          return;
-        }
+        if (isFetchingInProgress && nowTime - lastFetchTime < 7000) return;
+
         const config = useDownloadConfigStore.getState();
-        if (!config.sonarrUrl && !config.radarrUrl && !config.qbittorrentUrl) {
-          set({ isLoading: false });
+        const hasAnyClient = Boolean(
+          (config.sonarrUrl && config.sonarrApiKey) ||
+          (config.radarrUrl && config.radarrApiKey) ||
+          config.qbittorrentUrl
+        );
+
+        if (!hasAnyClient) {
+          set({ isLoading: false, error: null });
           return;
         }
 
@@ -167,8 +244,6 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
 
         try {
           const currentDownloads = get().downloads || [];
-          const removedSet = new Set(get().removedIds || []);
-
           const rawServerItems = await fetchLiveDownloadsQueue({
             sonarrUrl: config.sonarrUrl,
             sonarrApiKey: config.sonarrApiKey,
@@ -176,218 +251,175 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             radarrApiKey: config.radarrApiKey,
             qbittorrentUrl: config.qbittorrentUrl,
             qbittorrentUsername: config.qbittorrentUsername,
-            qbittorrentPassword: config.qbittorrentPassword,
+            qbittorrentPassword: config.qbittorrentPassword
           });
 
-          // Filtrer les éléments supprimés manuellement par l'utilisateur
-          const serverItems = rawServerItems.filter(si => !removedSet.has(si.id));
-
-          // Conserver les affiches, métadonnées et la progression maximale
+          // Un ID supprimé n'est masqué que tant qu'il existe encore réellement côté client.
+          const rawIds = new Set(rawServerItems.map(item => item.id));
+          const prunedRemovedIds = (get().removedIds || []).filter(id => rawIds.has(id));
+          const removedSet = new Set(prunedRemovedIds);
+          const serverItems = rawServerItems.filter(item => !removedSet.has(item.id));
           const localShows = useShowsStore.getState().shows || [];
 
-          serverItems.forEach(si => {
-            const match = currentDownloads.find(d => {
-              if (d.id === si.id) return true;
-              if (d.tmdbId && si.tmdbId && Number(d.tmdbId) === Number(si.tmdbId)) return true;
-              if (d.tvdbId && si.tvdbId && Number(d.tvdbId) === Number(si.tvdbId)) return true;
-              const normD = normalizeTitleForMatch(d.title || d.seriesTitle || d.movieTitle);
-              const normSi = normalizeTitleForMatch(si.title || si.seriesTitle || si.movieTitle || si.releaseTitle);
-              return Boolean(normD && normSi && (normD === normSi || normD.includes(normSi) || normSi.includes(normD)));
-            });
+          serverItems.forEach(serverItem => {
+            delete missingSince[serverItem.id];
 
-            if (match) {
-              if (!si.posterPath && match.posterPath) si.posterPath = match.posterPath;
-              if (!si.tmdbId && match.tmdbId) si.tmdbId = match.tmdbId;
-              if (!si.tvdbId && match.tvdbId) si.tvdbId = match.tvdbId;
-              if (!si.backdropPath && match.backdropPath) si.backdropPath = match.backdropPath;
-              if (!si.quality && match.quality) si.quality = match.quality;
-
-              // Protection contre les baisses de progression (ex: 99% -> 77% pendant l'import)
-              if (match.progress >= 98 && si.progress < 98 && si.status !== 'completed' && si.status !== 'error') {
-                si.progress = match.progress;
-              } else if (match.progress > si.progress && si.status !== 'completed' && si.status !== 'error') {
-                si.progress = Math.max(match.progress, si.progress);
-              }
-
-              if (match.status === 'completed' || si.progress >= 100) {
-                si.progress = 100;
-                si.status = 'completed';
-                si.statusText = 'Téléchargement terminé 🍿';
-                si.sizeleft = 0;
-              }
+            const localMatch = currentDownloads.find(current => sameDownloadIdentity(current, serverItem));
+            if (localMatch) {
+              if (!serverItem.posterPath && localMatch.posterPath) serverItem.posterPath = localMatch.posterPath;
+              if (!serverItem.backdropPath && localMatch.backdropPath) serverItem.backdropPath = localMatch.backdropPath;
+              if (!serverItem.tmdbId && localMatch.tmdbId) serverItem.tmdbId = localMatch.tmdbId;
+              if (!serverItem.tvdbId && localMatch.tvdbId) serverItem.tvdbId = localMatch.tvdbId;
+              if (!serverItem.quality && localMatch.quality) serverItem.quality = localMatch.quality;
             }
 
-            // Recherche du poster dans la bibliothèque SeenIt locale
-            if (!si.posterPath && localShows.length > 0) {
-              const matchedShow = localShows.find(s => {
-                if (si.tmdbId && Number(s.tmdbId) === Number(si.tmdbId)) return true;
-                const normShow = normalizeTitleForMatch(s.title);
-                const normSi = normalizeTitleForMatch(si.title || si.seriesTitle || si.movieTitle || si.releaseTitle);
-                return Boolean(normShow && normSi && (normShow === normSi || normShow.includes(normSi) || normSi.includes(normShow)));
+            if (!serverItem.posterPath && localShows.length > 0) {
+              const matchedShow = localShows.find(show => {
+                if (serverItem.tmdbId && Number(show.tmdbId) === Number(serverItem.tmdbId)) return true;
+                const showTitle = normalizeTitleForMatch(show.title);
+                const downloadTitle = normalizeTitleForMatch(
+                  serverItem.title || serverItem.seriesTitle || serverItem.movieTitle || serverItem.releaseTitle
+                );
+                return Boolean(showTitle && downloadTitle && showTitle === downloadTitle);
               });
 
               if (matchedShow) {
-                if (matchedShow.posterPath) si.posterPath = matchedShow.posterPath;
-                if (matchedShow.backdropPath && !si.backdropPath) si.backdropPath = matchedShow.backdropPath;
-                if (matchedShow.tmdbId && !si.tmdbId) si.tmdbId = Number(matchedShow.tmdbId);
+                serverItem.posterPath = matchedShow.posterPath || serverItem.posterPath;
+                serverItem.backdropPath = matchedShow.backdropPath || serverItem.backdropPath;
+                if (!serverItem.tmdbId && matchedShow.tmdbId) serverItem.tmdbId = Number(matchedShow.tmdbId);
               }
             }
 
-            if (!si.quality) {
-              si.quality = extractQualityFromTitle(si.releaseTitle || si.title);
+            if (!serverItem.quality) {
+              serverItem.quality = extractQualityFromTitle(serverItem.releaseTitle || serverItem.title);
+            }
+
+            if (serverItem.progress >= 100 || serverItem.status === 'completed') {
+              serverItem.progress = 100;
+              serverItem.status = 'completed';
+              serverItem.statusText = 'Téléchargement terminé 🍿';
+              serverItem.sizeleft = 0;
             }
           });
 
-          // 1. Nettoyer les items optimistes
           const now = Date.now();
-          const currentOptimistic = currentDownloads.filter(d => d.isOptimistic && !removedSet.has(d.id));
-          const validOptimistic: LiveDownloadItem[] = [];
+          const pendingOptimistic: LiveDownloadItem[] = [];
 
-          for (const opt of currentOptimistic) {
-            const age = now - (optimisticTimestamps[opt.id] || 0);
-            const normOpt = normalizeTitleForMatch(opt.title || opt.movieTitle || opt.seriesTitle);
+          for (const optimistic of currentDownloads.filter(item => item.isOptimistic && !removedSet.has(item.id))) {
+            const serverMatch = serverItems.some(serverItem => sameDownloadIdentity(optimistic, serverItem));
+            if (serverMatch) {
+              delete optimisticTimestamps[optimistic.id];
+              continue;
+            }
 
-            const matchedOnServer = serverItems.some(si => {
-              if (opt.mediaType === 'tv' && si.mediaType === 'tv') {
-                if (opt.tmdbId && si.tmdbId && Number(opt.tmdbId) === Number(si.tmdbId)) {
-                  if (opt.seasonNumber != null && si.seasonNumber != null) {
-                    return opt.seasonNumber === si.seasonNumber && (opt.episodeNumber == null || opt.episodeNumber === si.episodeNumber);
-                  }
-                  return true;
-                }
-              }
-              if (opt.mediaType === 'movie' && si.mediaType === 'movie') {
-                if (opt.tmdbId && si.tmdbId && Number(opt.tmdbId) === Number(si.tmdbId)) return true;
-              }
-              if (opt.tvdbId && si.tvdbId && Number(opt.tvdbId) === Number(si.tvdbId)) return true;
-              
-              const normSi = normalizeTitleForMatch(si.title || si.seriesTitle || si.movieTitle || si.releaseTitle);
-              if (normOpt && normSi && (normOpt === normSi || normOpt.includes(normSi) || normSi.includes(normOpt))) {
-                return true;
-              }
-              return false;
-            });
+            if (!optimisticTimestamps[optimistic.id]) optimisticTimestamps[optimistic.id] = now;
+            const age = now - optimisticTimestamps[optimistic.id];
+            const ttl = optimistic.status === 'error' ? OPTIMISTIC_ERROR_TTL_MS : OPTIMISTIC_TTL_MS;
 
-            if (!matchedOnServer && age < 15000) {
-              validOptimistic.push(opt);
+            if (age < ttl) {
+              pendingOptimistic.push(optimistic);
             } else {
-              delete optimisticTimestamps[opt.id];
+              delete optimisticTimestamps[optimistic.id];
             }
           }
 
-          // 2. Conserver les téléchargements terminés ou précédemment enregistrés
-          const preservedCompletedItems: LiveDownloadItem[] = [];
+          // Une disparition de queue n'est plus assimilée à un succès.
+          // On conserve l'état connu et on passe en avertissement si l'absence dure.
+          const preservedItems: LiveDownloadItem[] = [];
           for (const oldItem of currentDownloads) {
-            if (removedSet.has(oldItem.id)) continue;
-            if (oldItem.isOptimistic) continue;
+            if (oldItem.isOptimistic || removedSet.has(oldItem.id)) continue;
+            if (serverItems.some(serverItem => sameDownloadIdentity(oldItem, serverItem))) continue;
 
-            // Vérifier si un élément pour ce même média exact existe déjà sur le serveur
-            const existsOnServer = serverItems.some(si => {
-              if (si.id === oldItem.id) return true;
-              
-              if (oldItem.tmdbId && si.tmdbId && Number(oldItem.tmdbId) === Number(si.tmdbId)) {
-                if (oldItem.mediaType === 'tv' && si.mediaType === 'tv') {
-                  if (oldItem.seasonNumber != null && si.seasonNumber != null) {
-                    return oldItem.seasonNumber === si.seasonNumber && oldItem.episodeNumber === si.episodeNumber;
-                  }
-                }
-                return true;
-              }
-              if (oldItem.tvdbId && si.tvdbId && Number(oldItem.tvdbId) === Number(si.tvdbId)) {
-                 if (oldItem.mediaType === 'tv' && si.mediaType === 'tv') {
-                  if (oldItem.seasonNumber != null && si.seasonNumber != null) {
-                    return oldItem.seasonNumber === si.seasonNumber && oldItem.episodeNumber === si.episodeNumber;
-                  }
-                }
-                return true;
-              }
-              
-              const normOld = normalizeTitleForMatch(oldItem.title || oldItem.movieTitle || oldItem.seriesTitle);
-              const normSi = normalizeTitleForMatch(si.title || si.movieTitle || si.seriesTitle || si.releaseTitle);
-              if (normOld && normSi && (normOld === normSi || normOld.includes(normSi) || normSi.includes(normOld))) {
-                return true;
-              }
-              return false;
-            });
-            
-            if (!existsOnServer) {
-              preservedCompletedItems.push({
+            if (oldItem.status === 'completed' || oldItem.progress >= 100) {
+              preservedItems.push({
                 ...oldItem,
                 progress: 100,
-                sizeleft: 0,
                 status: 'completed',
                 statusText: 'Téléchargement terminé 🍿',
+                sizeleft: 0,
                 speedBytesPerSec: 0,
                 speedFormatted: '',
                 timeleft: '',
                 timeleftSeconds: 0
               });
+              continue;
             }
+
+            if (!missingSince[oldItem.id]) missingSince[oldItem.id] = now;
+            const missingFor = now - missingSince[oldItem.id];
+            preservedItems.push({
+              ...oldItem,
+              status: missingFor >= MISSING_WARNING_DELAY_MS ? 'warning' : oldItem.status,
+              statusText: missingFor >= MISSING_WARNING_DELAY_MS
+                ? 'Source temporairement introuvable • vérification en cours'
+                : 'Synchronisation du téléchargement…',
+              speedBytesPerSec: 0,
+              speedFormatted: '',
+              timeleft: '',
+              timeleftSeconds: 0
+            });
           }
 
-          // Fusionner items serveur + terminés conservés + optimistes
           const itemMap = new Map<string, LiveDownloadItem>();
-          for (const item of [...serverItems, ...preservedCompletedItems, ...validOptimistic]) {
-            if (!removedSet.has(item.id)) {
-              itemMap.set(item.id, item);
-            }
+          for (const item of [...serverItems, ...pendingOptimistic, ...preservedItems]) {
+            if (!removedSet.has(item.id)) itemMap.set(item.id, item);
           }
           const finalItems = Array.from(itemMap.values());
 
-          // Notifications
-          if (currentDownloads.length > 0) {
-            serverItems.forEach(newItem => {
-              const wasPresent = currentDownloads.find(oldItem => oldItem.id === newItem.id);
-              if (!wasPresent && newItem.progress < 100 && !newItem.isOptimistic) {
-                sendLocalNotification('Nouveau téléchargement', `Le téléchargement de "${newItem.title}" a démarré.`, false);
-              }
-            });
-
-            currentDownloads.forEach(oldItem => {
-              if (oldItem.isOptimistic) return;
-              const newItem = serverItems.find(it => it.id === oldItem.id);
-              if (!newItem && oldItem.progress > 80 && oldItem.status !== 'completed') {
-                sendLocalNotification('Téléchargement terminé 🍿', `Le téléchargement de "${oldItem.title}" est terminé !`, true);
-              } else if (newItem && newItem.progress === 100 && oldItem.progress < 100) {
-                sendLocalNotification('Téléchargement terminé 🍿', `Le téléchargement de "${newItem.title}" est terminé !`, true);
-              }
-            });
+          // Notification uniquement sur une confirmation explicite à 100 %, jamais sur une disparition.
+          for (const serverItem of serverItems) {
+            const previous = currentDownloads.find(oldItem => sameDownloadIdentity(oldItem, serverItem));
+            if (serverItem.progress >= 100 && previous && previous.progress < 100 && previous.status !== 'completed') {
+              sendLocalNotification(
+                'Téléchargement terminé 🍿',
+                `Le téléchargement de "${serverItem.title}" est terminé !`,
+                true
+              );
+            }
           }
 
           set({
             downloads: finalItems,
+            removedIds: prunedRemovedIds,
             isLoading: false,
             lastUpdated: Date.now(),
-            error: null,
+            error: null
           });
-        } catch (e: any) {
-          set({ error: e?.message || 'Erreur réseau', isLoading: false });
+        } catch (error: any) {
+          set({
+            error: error?.message || 'Erreur réseau',
+            isLoading: false
+          });
         } finally {
           isFetchingInProgress = false;
         }
       },
 
-      startPolling: (intervalMs) => {
-        if (pollingTimer) {
-          clearTimeout(pollingTimer);
-          pollingTimer = null;
+      startPolling: (intervalMs = 1000) => {
+        pollingIntervalMs = Math.max(1000, Math.min(pollingIntervalMs, intervalMs));
+
+        // Le polling est global à la session. Les écrans peuvent le demander sans se voler le timer.
+        if (get().isPolling) {
+          void get().fetchDownloads();
+          return;
         }
 
+        clearPollingTimer();
         set({ isPolling: true });
-        get().fetchDownloads();
 
         const scheduleNext = () => {
           if (!get().isPolling) return;
           const downloads = get().downloads || [];
-          const hasActive = downloads.some(d => d.progress < 100 && d.status !== 'completed' && d.status !== 'error');
-          const hasError = get().error !== null;
+          const hasActive = downloads.some(item =>
+            item.status !== 'completed' && item.status !== 'error' && item.progress < 100
+          );
+          const hasError = Boolean(get().error);
 
-          let delay = 8000;
-          if (hasError) {
-            delay = 15000;
-          } else if (hasActive) {
-            delay = intervalMs || 1000;
-          }
+          const delay = hasError
+            ? 15_000
+            : hasActive
+              ? pollingIntervalMs
+              : 8_000;
 
           pollingTimer = setTimeout(async () => {
             await get().fetchDownloads();
@@ -395,55 +427,62 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           }, delay);
         };
 
-        scheduleNext();
+        void get().fetchDownloads().finally(scheduleNext);
       },
 
       stopPolling: () => {
-        if (pollingTimer) {
-          clearTimeout(pollingTimer);
-          pollingTimer = null;
-        }
+        // Tant qu'un utilisateur est connecté, le moniteur reste globalement actif.
+        // Cela évite qu'une modale ou un écran secondaire coupe le suivi des autres vues.
+        if (auth.currentUser) return;
+        clearPollingTimer();
+        pollingIntervalMs = 1000;
         set({ isPolling: false });
       },
 
-      removeDownload: async (item: LiveDownloadItem) => {
-        const currentRemoved = get().removedIds || [];
-        const newRemoved = Array.from(new Set([...currentRemoved, item.id]));
+      removeDownload: async (item) => {
+        const newRemovedIds = Array.from(new Set([...(get().removedIds || []), item.id]));
         const config = useDownloadConfigStore.getState();
 
         set({
-          removedIds: newRemoved,
-          downloads: (get().downloads || []).filter(d => d.id !== item.id)
+          removedIds: newRemovedIds,
+          downloads: (get().downloads || []).filter(download => download.id !== item.id)
         });
-        
+
+        delete optimisticTimestamps[item.id];
+        delete missingSince[item.id];
+
+        if (item.isOptimistic || item.id.startsWith('opt_')) return true;
+
         try {
-          const res = await deleteLiveDownloadItem(item, {
+          const result = await deleteLiveDownloadItem(item, {
             sonarrUrl: config.sonarrUrl,
             sonarrApiKey: config.sonarrApiKey,
             radarrUrl: config.radarrUrl,
             radarrApiKey: config.radarrApiKey,
             qbittorrentUrl: config.qbittorrentUrl,
             qbittorrentUsername: config.qbittorrentUsername,
-            qbittorrentPassword: config.qbittorrentPassword,
+            qbittorrentPassword: config.qbittorrentPassword
           });
-          return res.success;
-        } catch (e) {
+          return result.success;
+        } catch {
           return false;
         }
       },
 
       clearAllDownloads: async () => {
         const current = get().downloads || [];
-        const currentRemoved = get().removedIds || [];
-        const newRemoved = Array.from(new Set([...currentRemoved, ...current.map(item => item.id)]));
+        const newRemovedIds = Array.from(new Set([
+          ...(get().removedIds || []),
+          ...current.map(item => item.id)
+        ]));
         const config = useDownloadConfigStore.getState();
 
-        set({
-          removedIds: newRemoved,
-          downloads: []
-        });
+        set({ removedIds: newRemovedIds, downloads: [] });
 
         for (const item of current) {
+          delete optimisticTimestamps[item.id];
+          delete missingSince[item.id];
+          if (item.isOptimistic || item.id.startsWith('opt_')) continue;
           try {
             await deleteLiveDownloadItem(item, {
               sonarrUrl: config.sonarrUrl,
@@ -452,44 +491,47 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               radarrApiKey: config.radarrApiKey,
               qbittorrentUrl: config.qbittorrentUrl,
               qbittorrentUsername: config.qbittorrentUsername,
-              qbittorrentPassword: config.qbittorrentPassword,
+              qbittorrentPassword: config.qbittorrentPassword
             });
           } catch {}
         }
       },
 
       getShowDownloads: (tmdbId, tvdbId, showTitle) => {
-        const all = get().downloads || [];
-        return all.filter(item => matchShowDownload(item, tmdbId, tvdbId, showTitle));
+        return (get().downloads || []).filter(item =>
+          matchShowDownload(item, tmdbId, tvdbId, showTitle)
+        );
       },
 
       getMovieDownload: (tmdbId, movieTitle) => {
-        const all = get().downloads || [];
-        return all.find(item => matchMovieDownload(item, tmdbId, movieTitle)) || null;
+        return (get().downloads || []).find(item =>
+          matchMovieDownload(item, tmdbId, movieTitle)
+        ) || null;
       },
 
       getEpisodeDownload: (tmdbId, tvdbId, season, episode) => {
         const showItems = get().getShowDownloads(tmdbId, tvdbId);
         if (!showItems.length) return null;
+
         if (season !== undefined && episode !== undefined) {
-          // Si on a les deux, chercher spécifiquement l'épisode, SINON la saison entière, SINON le show entier
-          return showItems.find(it => it.seasonNumber === season && it.episodeNumber === episode)
-              || showItems.find(it => it.seasonNumber === season && it.episodeNumber === undefined)
-              || showItems.find(it => it.seasonNumber === undefined)
-              || null;
+          return showItems.find(item => item.seasonNumber === season && item.episodeNumber === episode)
+            || showItems.find(item => item.seasonNumber === season && item.episodeNumber === undefined)
+            || showItems.find(item => item.seasonNumber === undefined)
+            || null;
         }
+
         if (season !== undefined) {
-          // Si on a que la saison, chercher la saison entière, SINON le show entier
-          return showItems.find(it => it.seasonNumber === season && it.episodeNumber === undefined)
-              || showItems.find(it => it.seasonNumber === undefined)
-              || null;
+          return showItems.find(item => item.seasonNumber === season && item.episodeNumber === undefined)
+            || showItems.find(item => item.seasonNumber === undefined)
+            || null;
         }
-        return showItems.find(it => it.seasonNumber === undefined) || null;
+
+        return showItems.find(item => item.seasonNumber === undefined) || null;
       }
     }),
     {
-      name: 'seenit_live_downloads_v2',
-      partialize: (state) => ({
+      name: 'seenit_live_downloads_v3',
+      partialize: state => ({
         downloads: state.downloads,
         removedIds: state.removedIds
       })
@@ -497,10 +539,38 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
   )
 );
 
-// Écouteurs de reprise au premier plan (Foreground resume)
+function forceStopGlobalPolling() {
+  clearPollingTimer();
+  pollingIntervalMs = 1000;
+  useLiveDownloadStore.setState({ isPolling: false });
+}
+
 if (typeof window !== 'undefined') {
+  onAuthStateChanged(auth, user => {
+    const nextUid = user?.uid || null;
+    const scopeKey = 'seenit_live_downloads_scope_v3';
+    const previousUid = localStorage.getItem(scopeKey) || null;
+
+    if (previousUid !== nextUid || activeScopedUid !== nextUid) {
+      activeScopedUid = nextUid;
+      useLiveDownloadStore.setState({
+        downloads: [],
+        removedIds: [],
+        error: null,
+        lastUpdated: null
+      });
+      localStorage.setItem(scopeKey, nextUid || '');
+    }
+
+    if (user) {
+      useLiveDownloadStore.getState().startPolling(1000);
+    } else {
+      forceStopGlobalPolling();
+    }
+  });
+
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
+    if (document.visibilityState === 'visible' && auth.currentUser) {
       useLiveDownloadStore.getState().startPolling(1000);
     }
   });
@@ -509,10 +579,9 @@ if (typeof window !== 'undefined') {
 if (Capacitor.isNativePlatform()) {
   try {
     CapApp.addListener('appStateChange', ({ isActive }) => {
-      if (isActive) {
+      if (isActive && auth.currentUser) {
         useLiveDownloadStore.getState().startPolling(1000);
       }
     });
-  } catch (e) {}
+  } catch {}
 }
-

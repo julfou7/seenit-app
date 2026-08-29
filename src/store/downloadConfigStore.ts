@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import { db, auth } from '../lib/firebase';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
+import { auth, db } from '../lib/firebase';
 
 export interface DownloadClientConfig {
   c411ApiKey: string;
@@ -16,10 +16,14 @@ export interface DownloadClientConfig {
 }
 
 interface DownloadConfigState extends DownloadClientConfig {
+  isHydrated: boolean;
+  isSaving: boolean;
+  saveError: string | null;
   setConfig: (config: Partial<DownloadClientConfig>, saveToCloud?: boolean) => void;
+  saveConfig: (config: Partial<DownloadClientConfig>) => Promise<boolean>;
   resetConfig: () => void;
   syncFromCloud: () => Promise<void>;
-  saveToCloud: () => Promise<void>;
+  saveToCloud: () => Promise<boolean>;
 }
 
 const DEFAULT_CONFIG: DownloadClientConfig = {
@@ -31,109 +35,168 @@ const DEFAULT_CONFIG: DownloadClientConfig = {
   qbittorrentUrl: '',
   qbittorrentUsername: '',
   qbittorrentPassword: '',
-  autoSendToDownloader: true,
+  autoSendToDownloader: true
 };
 
-export const useDownloadConfigStore = create<DownloadConfigState>()(
-  (set, get) => ({
-      ...DEFAULT_CONFIG,
-      setConfig: (newConfig, saveToCloud = true) => {
-        set((state) => ({ ...state, ...newConfig }));
-        if (saveToCloud) {
-          get().saveToCloud().catch((err) => {
-            console.warn('[DownloadConfig] Impossible de sauvegarder dans Firestore:', err);
-          });
-        }
-      },
-      resetConfig: () => {
-        set(DEFAULT_CONFIG);
-        get().saveToCloud().catch(() => {});
-      },
-      syncFromCloud: async () => {
-        const user = auth.currentUser;
-        if (!user) return;
-        try {
-          const docRef = doc(db, 'users', user.uid, 'settings', 'downloadConfig');
-          const snap = await getDoc(docRef);
-          if (snap.exists()) {
-            const data = snap.data() as Partial<DownloadClientConfig>;
-            set((state) => ({ ...state, ...data }));
-          } else {
-            // Si rien dans le cloud mais qu'on a une config locale renseignée, on l'envoie au cloud
-            const current = get();
-            if (current.sonarrUrl || current.radarrUrl || current.qbittorrentUrl || (current.c411ApiKey && current.c411ApiKey !== DEFAULT_CONFIG.c411ApiKey)) {
-              await get().saveToCloud();
-            }
-          }
-        } catch (e) {
-          console.warn('[DownloadConfig] Erreur syncFromCloud:', e);
-        }
-      },
-      saveToCloud: async () => {
-        const user = auth.currentUser;
-        if (!user) return;
-        try {
-          const docRef = doc(db, 'users', user.uid, 'settings', 'downloadConfig');
-          const current = get();
-          const dataToSave: DownloadClientConfig = {
-            c411ApiKey: current.c411ApiKey || '',
-            sonarrUrl: current.sonarrUrl || '',
-            sonarrApiKey: current.sonarrApiKey || '',
-            radarrUrl: current.radarrUrl || '',
-            radarrApiKey: current.radarrApiKey || '',
-            qbittorrentUrl: current.qbittorrentUrl || '',
-            qbittorrentUsername: current.qbittorrentUsername || '',
-            qbittorrentPassword: current.qbittorrentPassword || '',
-            autoSendToDownloader: current.autoSendToDownloader ?? true,
-          };
-          await setDoc(docRef, dataToSave, { merge: true });
-        } catch (e) {
-          console.warn('[DownloadConfig] Erreur saveToCloud:', e);
-        }
-      }
-    })
-);
+function normalizeConfig(input: Partial<DownloadClientConfig>): Partial<DownloadClientConfig> {
+  return {
+    ...input,
+    c411ApiKey: input.c411ApiKey?.trim(),
+    sonarrUrl: input.sonarrUrl?.trim(),
+    sonarrApiKey: input.sonarrApiKey?.trim(),
+    radarrUrl: input.radarrUrl?.trim(),
+    radarrApiKey: input.radarrApiKey?.trim(),
+    qbittorrentUrl: input.qbittorrentUrl?.trim(),
+    qbittorrentUsername: input.qbittorrentUsername?.trim(),
+    qbittorrentPassword: input.qbittorrentPassword?.trim()
+  };
+}
 
-// Listener automatique d'authentification pour synchroniser Firestore en temps réel
+export const useDownloadConfigStore = create<DownloadConfigState>()((set, get) => ({
+  ...DEFAULT_CONFIG,
+  isHydrated: false,
+  isSaving: false,
+  saveError: null,
+
+  setConfig: (newConfig, shouldSave = true) => {
+    set({ ...normalizeConfig(newConfig), saveError: null });
+    if (shouldSave) {
+      void get().saveToCloud();
+    }
+  },
+
+  saveConfig: async newConfig => {
+    set({ ...normalizeConfig(newConfig), saveError: null });
+    return get().saveToCloud();
+  },
+
+  resetConfig: () => {
+    set({ ...DEFAULT_CONFIG, saveError: null });
+    void get().saveToCloud();
+  },
+
+  syncFromCloud: async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      set({ isHydrated: true });
+      return;
+    }
+
+    try {
+      const docRef = doc(db, 'users', user.uid, 'settings', 'downloadConfig');
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        set({
+          ...(snap.data() as Partial<DownloadClientConfig>),
+          isHydrated: true,
+          saveError: null
+        });
+      } else {
+        set({ isHydrated: true, saveError: null });
+      }
+    } catch (error: any) {
+      console.warn('[DownloadConfig] Erreur syncFromCloud:', error);
+      set({
+        isHydrated: true,
+        saveError: error?.message || 'Impossible de charger la configuration.'
+      });
+    }
+  },
+
+  saveToCloud: async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      set({
+        isSaving: false,
+        saveError: 'Utilisateur non connecté.'
+      });
+      return false;
+    }
+
+    set({ isSaving: true, saveError: null });
+
+    try {
+      const current = get();
+      const dataToSave: DownloadClientConfig = {
+        c411ApiKey: current.c411ApiKey || '',
+        sonarrUrl: current.sonarrUrl || '',
+        sonarrApiKey: current.sonarrApiKey || '',
+        radarrUrl: current.radarrUrl || '',
+        radarrApiKey: current.radarrApiKey || '',
+        qbittorrentUrl: current.qbittorrentUrl || '',
+        qbittorrentUsername: current.qbittorrentUsername || '',
+        qbittorrentPassword: current.qbittorrentPassword || '',
+        autoSendToDownloader: current.autoSendToDownloader ?? true
+      };
+
+      const docRef = doc(db, 'users', user.uid, 'settings', 'downloadConfig');
+      await setDoc(docRef, dataToSave, { merge: true });
+      set({ isSaving: false, saveError: null, isHydrated: true });
+      return true;
+    } catch (error: any) {
+      console.warn('[DownloadConfig] Erreur saveToCloud:', error);
+      set({
+        isSaving: false,
+        saveError: error?.message || 'Impossible de sauvegarder la configuration.'
+      });
+      return false;
+    }
+  }
+}));
+
 if (typeof window !== 'undefined') {
-  // Supprime l'ancien cache global qui pouvait mélanger les identifiants entre deux comptes.
   try {
     localStorage.removeItem('seenit_download_config');
   } catch {}
 
   let unsubscribeSnapshot: (() => void) | null = null;
 
-  onAuthStateChanged(auth, (user) => {
+  onAuthStateChanged(auth, user => {
     if (unsubscribeSnapshot) {
       unsubscribeSnapshot();
       unsubscribeSnapshot = null;
     }
 
-    // Toujours vider les identifiants en mémoire avant de charger le compte courant.
-    useDownloadConfigStore.setState(DEFAULT_CONFIG);
+    useDownloadConfigStore.setState({
+      ...DEFAULT_CONFIG,
+      isHydrated: false,
+      isSaving: false,
+      saveError: null
+    });
 
-    if (user) {
-      // 1. Synchronisation initiale
-      useDownloadConfigStore.getState().syncFromCloud();
+    if (!user) {
+      useDownloadConfigStore.setState({ isHydrated: true });
+      return;
+    }
 
-      // 2. Écoute temps réel des modifications faites depuis un autre appareil (Web <-> APK)
-      try {
-        const docRef = doc(db, 'users', user.uid, 'settings', 'downloadConfig');
-        unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
-          if (docSnap.exists()) {
-            const remoteData = docSnap.data() as Partial<DownloadClientConfig>;
-            // Ne pas écraser si les données sont identiques pour éviter les boucles
-            useDownloadConfigStore.setState((prev) => ({
-              ...prev,
-              ...remoteData
-            }));
+    void useDownloadConfigStore.getState().syncFromCloud();
+
+    try {
+      const docRef = doc(db, 'users', user.uid, 'settings', 'downloadConfig');
+      unsubscribeSnapshot = onSnapshot(
+        docRef,
+        snapshot => {
+          if (snapshot.exists()) {
+            useDownloadConfigStore.setState({
+              ...(snapshot.data() as Partial<DownloadClientConfig>),
+              isHydrated: true,
+              saveError: null
+            });
+          } else {
+            useDownloadConfigStore.setState({ isHydrated: true });
           }
-        }, (error) => {
+        },
+        error => {
           console.warn('[DownloadConfig] Firestore snapshot warning:', error);
-        });
-      } catch (e) {
-        console.warn('[DownloadConfig] Impossible d\'établir le snapshot Firestore:', e);
-      }
+          useDownloadConfigStore.setState({
+            isHydrated: true,
+            saveError: error?.message || 'Synchronisation des réglages indisponible.'
+          });
+        }
+      );
+    } catch (error) {
+      console.warn('[DownloadConfig] Impossible d’établir le snapshot Firestore:', error);
+      useDownloadConfigStore.setState({ isHydrated: true });
     }
   });
 }

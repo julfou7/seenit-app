@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Capacitor } from '@capacitor/core';
 
-export const CURRENT_APP_VERSION = '1.4.41';
+export const CURRENT_APP_VERSION = '1.4.42';
 export const GITHUB_REPO = 'julfou7/seenit-app';
 export const GITHUB_PAT = ''; // Plus de jeton d'accès privé codé en dur pour éviter les révocations de sécurité. Rendre le dépôt public est recommandé et gratuit !
 
@@ -32,7 +32,6 @@ interface UpdateState {
   resetDismissed: () => void;
 }
 
-// Semver compare: returns 1 if v1 > v2, -1 if v1 < v2, 0 if equal
 function compareVersions(v1: string, v2: string): number {
   const p1 = v1.replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
   const p2 = v2.replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
@@ -61,7 +60,6 @@ export const useUpdateStore = create<UpdateState>()(
         const now = Date.now();
         const { lastChecked, isChecking } = get();
 
-        // Avoid polling too frequently unless forced (min 1 min cache)
         if (!force && lastChecked && now - lastChecked < 60 * 1000) {
           return get().hasUpdate;
         }
@@ -73,7 +71,6 @@ export const useUpdateStore = create<UpdateState>()(
         try {
           let data: any = null;
 
-          // 1. Direct GitHub Releases API fetch (use URL cache-busting param to avoid CORS preflight errors with custom headers)
           try {
             const ghUrl = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest?_ts=${Date.now()}`;
             const headers: Record<string, string> = {
@@ -91,7 +88,6 @@ export const useUpdateStore = create<UpdateState>()(
             console.warn('[UpdateCheck] Direct GitHub API fetch failed:', e);
           }
 
-          // 2. Fallback to backend /api/update (ONLY on web preview, NEVER on native Capacitor app where relative fetch hits local SPA index.html)
           if (!data && !Capacitor.isNativePlatform() && typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
             try {
               const proxyRes = await fetch('/api/update');
@@ -110,9 +106,8 @@ export const useUpdateStore = create<UpdateState>()(
 
           const tagName = data.tag_name || '';
           const remoteVersion = tagName.replace(/^v/i, '');
-          
-          // Find APK asset
-          const apkAsset = Array.isArray(data.assets) 
+
+          const apkAsset = Array.isArray(data.assets)
             ? data.assets.find((a: any) => a.name && a.name.toLowerCase().endsWith('.apk') && a.name.startsWith('SeenIt-')) ||
               data.assets.find((a: any) => a.name && a.name.toLowerCase().endsWith('.apk'))
             : null;
@@ -121,11 +116,10 @@ export const useUpdateStore = create<UpdateState>()(
 
           const releaseInfo: AppReleaseInfo = {
             version: remoteVersion,
-            tagName: tagName,
+            tagName,
             name: data.name || tagName,
             releaseNotes: data.body || '',
             publishedAt: data.published_at || new Date().toISOString(),
-            // Toujours utiliser le lien direct public d'asset binaire APK
             apkDownloadUrl: browserUrl,
             browserDownloadUrl: browserUrl,
             htmlUrl: data.html_url || `https://github.com/${GITHUB_REPO}/releases`
@@ -133,7 +127,6 @@ export const useUpdateStore = create<UpdateState>()(
 
           const isNewer = compareVersions(remoteVersion, CURRENT_APP_VERSION) > 0 && (force || !get().dismissedVersions.includes(remoteVersion));
 
-          // If forced check and there is a newer version, clean it from dismissedVersions so the banner shows up
           if (force && compareVersions(remoteVersion, CURRENT_APP_VERSION) > 0) {
             set(state => ({
               dismissedVersions: state.dismissedVersions.filter(v => v !== remoteVersion)
@@ -152,9 +145,9 @@ export const useUpdateStore = create<UpdateState>()(
         } catch (err: any) {
           console.error('[UpdateCheck] Error checking for updates:', err);
           appLogger.error('system', `Erreur lors de la recherche de mise à jour: ${err.message || String(err)}`, err);
-          set({ 
-            isChecking: false, 
-            error: err?.message || 'Erreur de vérification des mises à jour' 
+          set({
+            isChecking: false,
+            error: err?.message || 'Erreur de vérification des mises à jour'
           });
           return false;
         }
@@ -173,7 +166,7 @@ export const useUpdateStore = create<UpdateState>()(
     }),
     {
       name: 'seenit-app-updates',
-      partialize: (state) => ({
+      partialize: state => ({
         dismissedVersions: state.dismissedVersions,
         lastChecked: state.lastChecked
       })

@@ -1,290 +1,153 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { 
-  Download, 
-  Trash2, 
-  Search, 
-  CheckCircle2, 
-  Clock, 
-  Zap, 
-  Settings, 
-  Film, 
-  Tv, 
-  RefreshCw, 
-  X,
+import React, { useEffect, useMemo, useState } from 'react';
+import {
   AlertCircle,
-  AlertTriangle,
-  SlidersHorizontal,
-  Loader2,
+  ArrowLeft,
   Check,
   Copy,
-  ArrowDown,
-  ArrowLeft
+  Download,
+  Film,
+  Loader2,
+  RefreshCw,
+  Search,
+  Settings,
+  Trash2,
+  Tv,
+  X
 } from 'lucide-react';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
-import { formatBytes, formatSpeed, formatSecondsToETA, formatCleanMediaInfo, LiveDownloadItem, pushReleaseDirectly } from '../services/sonarrRadarr';
-import { C411Torrent, searchC411Torrents, formatTorrentSize } from '../services/c411';
+import {
+  type LiveDownloadItem,
+  formatBytes,
+  formatCleanMediaInfo,
+  pushReleaseDirectly
+} from '../services/sonarrRadarr';
+import { type C411Torrent, formatTorrentSize, searchC411Torrents } from '../services/c411';
 import { useToastStore } from '../store/toastStore';
-import { SeenItLogo } from '../components/SeenItLogo';
-import { cn } from '../lib/utils';
 import { DownloadConfigSection } from '../components/DownloadConfigSection';
+import {
+  acceptDownloadRequest,
+  beginDownloadRequest,
+  failDownloadRequest
+} from '../features/downloads/downloadLifecycle';
 
 interface Props {
   onShowClick?: (id: any, mediaType?: 'tv' | 'movie') => void;
 }
 
-interface SwipeableItemProps {
+type ViewMode = 'downloads' | 'search';
+type SearchMediaType = 'all' | 'movie' | 'tv';
+
+function DownloadItemCard({
+  item,
+  onShowClick,
+  onRemove,
+  isRemoving
+}: {
   item: LiveDownloadItem;
-  onShowClick?: (id: any, mediaType?: 'tv' | 'movie') => void;
+  onShowClick?: Props['onShowClick'];
   onRemove: (item: LiveDownloadItem) => void;
-  isDeleting: boolean;
-}
-
-function SwipeableItem({ item, onShowClick, onRemove, isDeleting }: SwipeableItemProps) {
-  const [dragX, setDragX] = useState(0);
-  const [isSwiping, setIsSwiping] = useState(false);
-  const touchStartX = useRef(0);
-  const touchStartY = useRef(0);
-  const isHorizontalSwipe = useRef(false);
-
-  const isDone = item.progress >= 100;
-  const isError = item.status === 'error' || Boolean(item.errorMessage);
-  const isWarning = item.status === 'warning';
+  isRemoving: boolean;
+}) {
   const { cleanTitle, subTitle, isTv } = formatCleanMediaInfo(item);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-    isHorizontalSwipe.current = false;
-    setIsSwiping(true);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    const currentX = e.touches[0].clientX;
-    const currentY = e.touches[0].clientY;
-    const deltaX = currentX - touchStartX.current;
-    const deltaY = currentY - touchStartY.current;
-
-    if (!isHorizontalSwipe.current) {
-      if (Math.abs(deltaX) > 8 && Math.abs(deltaX) > Math.abs(deltaY)) {
-        isHorizontalSwipe.current = true;
-      } else if (Math.abs(deltaY) > 8) {
-        setIsSwiping(false);
-        return;
-      }
-    }
-
-    if (isHorizontalSwipe.current) {
-      // Autoriser le glissement vers la droite
-      if (deltaX > 0) {
-        setDragX(Math.min(160, deltaX));
-      } else {
-        setDragX(0);
-      }
-    }
-  };
-
-  const handleTouchEnd = () => {
-    setIsSwiping(false);
-    if (dragX > 90) {
-      // Seuil de suppression atteint
-      setDragX(200);
-      setTimeout(() => {
-        onRemove(item);
-      }, 150);
-    } else {
-      setDragX(0);
-    }
-  };
-
+  const status = String(item.status || '').toLowerCase();
+  const isCompleted = status === 'completed' || item.progress >= 100;
+  const isError = status === 'error' || Boolean(item.errorMessage);
+  const isWarning = status === 'warning';
+  const isPending = status === 'submitting' || status === 'searching' || status === 'queued';
+  const progress = Math.min(100, Math.max(0, Number(item.progress || 0)));
   const posterSrc = item.posterPath
-    ? (item.posterPath.startsWith('http') ? item.posterPath : `https://image.tmdb.org/t/p/w185${item.posterPath}`)
+    ? item.posterPath.startsWith('http')
+      ? item.posterPath
+      : `https://image.tmdb.org/t/p/w185${item.posterPath}`
     : null;
 
+  const statusTone = isError
+    ? 'text-red-300'
+    : isWarning
+      ? 'text-amber-300'
+      : isCompleted
+        ? 'text-emerald-300'
+        : 'text-cyan-300';
+
   return (
-    <div className="relative overflow-hidden rounded-2xl select-none">
-      {/* Fond rouge révélé lors du swipe vers la droite */}
-      <div 
-        className={cn(
-          "absolute inset-0 bg-red-600 rounded-2xl flex items-center justify-start pl-6 gap-2 text-white font-black text-xs transition-opacity",
-          dragX > 20 ? "opacity-100" : "opacity-0"
-        )}
-      >
-        <Trash2 size={20} className={cn(dragX > 90 ? "scale-125" : "scale-100", "transition-transform")} />
-        <span>Supprimer</span>
-      </div>
-
-      {/* Carte principale */}
-      <div
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onClick={() => {
-          if (dragX === 0 && item.tmdbId && onShowClick) {
-            onShowClick(item.tmdbId, item.mediaType);
-          }
-        }}
-        style={{
-          transform: `translateX(${dragX}px)`,
-          transition: isSwiping ? 'none' : 'transform 0.25s ease-out'
-        }}
-        className={cn(
-          "rounded-2xl border transition-colors backdrop-blur-md relative overflow-hidden flex items-stretch min-h-[105px] sm:min-h-[115px] p-2.5 sm:p-3 gap-3",
-          isError
-            ? "bg-gradient-to-r from-red-950/40 via-zinc-900/90 to-zinc-900/90 border-red-500/40"
-            : isWarning
-            ? "bg-gradient-to-r from-amber-950/40 via-zinc-900/90 to-zinc-900/90 border-amber-500/40"
-            : "bg-[#121214] border-white/10 hover:border-white/20",
-          item.tmdbId && onShowClick ? "cursor-pointer" : ""
-        )}
-      >
-        {/* Progress tint de fond subtil */}
-        <div 
-          className={cn(
-            "absolute inset-y-0 left-0 transition-all duration-300 pointer-events-none opacity-15",
-            isError
-              ? "bg-red-500"
-              : isWarning
-              ? "bg-amber-500"
-              : isDone
-              ? "bg-emerald-500"
-              : "bg-gradient-to-r from-cyan-500 to-blue-500"
-          )}
-          style={{ width: `${Math.min(100, item.progress)}%` }}
-        />
-
-        {/* 1. Image Affiche Poster à gauche (Format arrondi cinéma 2:3) */}
-        <div className="w-14 sm:w-16 h-20 sm:h-22 shrink-0 rounded-xl overflow-hidden bg-zinc-950 border border-white/10 shadow-md relative flex items-center justify-center">
+    <div
+      className={`rounded-2xl border p-3 bg-zinc-900/85 ${
+        isError
+          ? 'border-red-500/30'
+          : isWarning
+            ? 'border-amber-500/25'
+            : isCompleted
+              ? 'border-emerald-500/20'
+              : 'border-white/10'
+      }`}
+    >
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={() => item.tmdbId && onShowClick?.(item.tmdbId, item.mediaType)}
+          className="w-14 h-20 shrink-0 rounded-xl overflow-hidden bg-zinc-950 border border-white/10 flex items-center justify-center"
+        >
           {posterSrc ? (
-            <img 
-              src={posterSrc} 
-              alt={cleanTitle}
-              className="w-full h-full object-cover"
-              loading="lazy"
-              onError={(e) => {
-                e.currentTarget.onerror = null;
-                e.currentTarget.style.display = 'none';
-              }}
-            />
+            <img src={posterSrc} alt={cleanTitle} className="w-full h-full object-cover" loading="lazy" />
+          ) : isTv ? (
+            <Tv size={20} className="text-purple-400" />
           ) : (
-            <div className={cn(
-              "w-full h-full flex flex-col items-center justify-center gap-1 p-1 text-center",
-              isTv
-                ? "bg-gradient-to-b from-purple-950/50 to-zinc-950 text-purple-400"
-                : "bg-gradient-to-b from-amber-950/40 to-zinc-950 text-[#E5A93D]"
-            )}>
-              {isTv ? <Tv size={20} /> : <Film size={20} />}
-              <span className="text-[8px] font-black uppercase text-zinc-400 tracking-wider">
-                {isTv ? 'Série' : 'Film'}
-              </span>
-            </div>
+            <Film size={20} className="text-amber-400" />
           )}
-        </div>
+        </button>
 
-        {/* 2. Centre : Titre EN ENTIER, Sous-titre, Qualité, Stats */}
-        <div className="flex-1 flex flex-col justify-between min-w-0 py-0.5">
-          <div>
-            {/* Ligne 1 : Titre complet en or/jaune SeenIt sans truncate brutal */}
-            <div className="flex items-start justify-between gap-2">
-              <h3 className="font-extrabold text-sm sm:text-base text-[#E5A93D] tracking-wide uppercase leading-tight line-clamp-2 break-words">
-                {cleanTitle}
-              </h3>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => item.tmdbId && onShowClick?.(item.tmdbId, item.mediaType)}
+              className="min-w-0 text-left"
+            >
+              <h3 className="text-sm font-extrabold text-white line-clamp-2 leading-snug">{cleanTitle}</h3>
+              {subTitle && <p className="text-[11px] font-bold text-zinc-300 mt-0.5">{subTitle}</p>}
+            </button>
 
-              {/* Statut ou Pourcentage en haut à droite */}
-              <div className="flex items-center gap-1.5 shrink-0">
-                <span className={cn(
-                  "text-xs sm:text-sm font-black",
-                  isError ? "text-red-400" : isDone ? "text-emerald-400" : "text-cyan-400"
-                )}>
-                  {isError ? 'Erreur' : isDone ? '100%' : `${item.progress}%`}
-                </span>
+            <button
+              type="button"
+              disabled={isRemoving}
+              onClick={() => onRemove(item)}
+              className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+              aria-label="Supprimer"
+            >
+              {isRemoving ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+            </button>
+          </div>
 
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemove(item);
-                  }}
-                  disabled={isDeleting}
-                  className="p-1 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
-                  title="Supprimer le téléchargement"
-                >
-                  <X size={15} className={cn(isDeleting && "animate-spin")} />
-                </button>
-              </div>
-            </div>
-
-            {/* Ligne 2 : Sous-titre (ex: S03 | E09 ou Titre de l'épisode) */}
-            {subTitle && (
-              <p className="text-xs sm:text-sm font-bold text-white tracking-wide mt-0.5">
-                {subTitle} {item.episodeTitle ? `• ${item.episodeTitle}` : ''}
-              </p>
-            )}
-
-            {/* Ligne 3 : Badges Qualité + Vitesse / ETA / Taille */}
-            <div className="flex items-center gap-2 flex-wrap mt-1.5 text-[10px] sm:text-[11px] font-semibold text-zinc-400">
-              {/* Badge Qualité */}
-              {item.quality && (
-                <span className="px-1.5 py-0.5 rounded bg-zinc-800/90 border border-white/10 text-zinc-200 font-extrabold text-[10px] uppercase shrink-0">
-                  {item.quality}
-                </span>
-              )}
-
-              {/* Taille */}
-              {item.size > 0 && (
-                <span>
-                  {formatBytes(item.size - item.sizeleft)} / {formatBytes(item.size)}
-                </span>
-              )}
-
-              {/* Vitesse */}
-              {item.speedFormatted && !isError && !isDone && (
-                <span className="text-cyan-300 font-bold flex items-center gap-0.5">
-                  <Zap size={10} className="fill-cyan-300 text-cyan-300" />
-                  {item.speedFormatted}
-                </span>
-              )}
-
-              {/* Temps restant */}
-              {item.timeleft && item.timeleft !== '--' && !isError && !isDone && (
-                <span className="flex items-center gap-0.5 text-zinc-300">
-                  <Clock size={10} />
-                  {item.timeleft}
-                </span>
-              )}
-
-              {/* Téléchargement terminé */}
-              {isDone && (
-                <span className="text-emerald-400 font-bold flex items-center gap-1">
-                  • TÉLÉCHARGEMENT TERMINÉ 🍿
-                </span>
-              )}
-            </div>
-
-            {/* Message d'erreur clair si applicable */}
-            {item.errorMessage && (
-              <div className="mt-1.5 p-1.5 px-2 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-[11px] font-bold flex items-center gap-1.5">
-                <AlertTriangle size={13} className="shrink-0 text-red-400" />
-                <span className="leading-tight">{item.errorMessage}</span>
-              </div>
+          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-zinc-400">
+            {item.downloadClient && <span className="font-bold text-zinc-300">{item.downloadClient}</span>}
+            {item.quality && <span>{item.quality}</span>}
+            {item.speedFormatted && !isCompleted && !isError && <span className="text-cyan-300">{item.speedFormatted}</span>}
+            {item.timeleft && item.timeleft !== '--' && !isCompleted && !isError && <span>{item.timeleft}</span>}
+            {item.size > 0 && !isPending && (
+              <span>{formatBytes(Math.max(0, item.size - item.sizeleft))} / {formatBytes(item.size)}</span>
             )}
           </div>
 
-          {/* Barre de progression fine et nette en bas */}
-          <div className="relative w-full h-1.5 bg-zinc-800/80 rounded-full overflow-hidden mt-2">
-            <div 
-              className={cn(
-                "h-full rounded-full transition-all duration-300",
-                isError
-                  ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"
-                  : isWarning
-                  ? "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
-                  : isDone
-                  ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
-                  : "bg-gradient-to-r from-blue-600 via-cyan-400 to-emerald-400"
-              )}
-              style={{ width: `${Math.max(2, Math.min(100, item.progress))}%` }}
-            />
+          <p className={`mt-2 text-[10px] font-bold ${statusTone}`}>
+            {item.statusText || (isCompleted ? 'Téléchargement terminé 🍿' : 'Téléchargement en cours')}
+          </p>
+
+          {item.errorMessage && (
+            <p className="mt-1.5 text-[10px] text-red-300 leading-snug">{item.errorMessage}</p>
+          )}
+
+          <div className="mt-2.5 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+            {isPending ? (
+              <div className="h-full w-1/3 bg-blue-500/70 rounded-full animate-pulse" />
+            ) : (
+              <div
+                className={`h-full rounded-full transition-[width] duration-300 ${
+                  isError ? 'bg-red-500' : isWarning ? 'bg-amber-500' : isCompleted ? 'bg-emerald-500' : 'bg-cyan-500'
+                }`}
+                style={{ width: `${progress}%` }}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -293,164 +156,72 @@ function SwipeableItem({ item, onShowClick, onRemove, isDeleting }: SwipeableIte
 }
 
 export function DownloadsScreen({ onShowClick }: Props) {
-  const { downloads, lastUpdated, startPolling, stopPolling, removeDownload, clearAllDownloads } = useLiveDownloadStore();
-  const { 
-    sonarrUrl, 
-    sonarrApiKey, 
-    radarrUrl, 
-    radarrApiKey, 
-    qbittorrentUrl,
-    qbittorrentUsername,
-    qbittorrentPassword
-  } = useDownloadConfigStore();
-  const showToast = useToastStore(s => s.showToast);
+  const {
+    downloads,
+    lastUpdated,
+    startPolling,
+    stopPolling,
+    fetchDownloads,
+    removeDownload,
+    clearAllDownloads
+  } = useLiveDownloadStore();
+  const config = useDownloadConfigStore();
+  const showToast = useToastStore(state => state.showToast);
+
+  const [viewMode, setViewMode] = useState<ViewMode>('downloads');
+  const [showConfiguration, setShowConfiguration] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [isClearing, setIsClearing] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMediaType, setSelectedMediaType] = useState<'all' | 'movie' | 'tv'>('all');
-  const [selectedQuality, setSelectedQuality] = useState<string>('all');
+  const [selectedMediaType, setSelectedMediaType] = useState<SearchMediaType>('all');
+  const [selectedQuality, setSelectedQuality] = useState<'all' | '2160p' | '1080p' | '720p'>('all');
   const [sortBy, setSortBy] = useState<'seeders' | 'size' | 'date'>('seeders');
   const [torrents, setTorrents] = useState<C411Torrent[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
-  const [downloadingTorrentId, setDownloadingTorrentId] = useState<number | null>(null);
-  const [isClearing, setIsClearing] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [showConfiguration, setShowConfiguration] = useState(false);
-
-  const isConfigured = Boolean(sonarrUrl || radarrUrl || qbittorrentUrl);
+  const [sendingTorrentId, setSendingTorrentId] = useState<number | null>(null);
+  const [copiedHash, setCopiedHash] = useState<string | null>(null);
 
   useEffect(() => {
+    // DownloadsScreen reste monté dans MainApp : il sert de vue du moniteur global.
     startPolling(1000);
-    return () => {
-      stopPolling();
-    };
+    return () => stopPolling();
   }, [startPolling, stopPolling]);
 
-  // Recherche libre C411
-  const performSearch = async (queryText: string) => {
-    if (!queryText.trim()) {
-      setTorrents([]);
-      setHasSearched(false);
-      return;
-    }
+  const isConfigured = Boolean(
+    (config.sonarrUrl && config.sonarrApiKey) ||
+    (config.radarrUrl && config.radarrApiKey) ||
+    config.qbittorrentUrl
+  );
+
+  const activeDownloads = useMemo(
+    () => downloads.filter(item => item.status !== 'completed' && item.progress < 100),
+    [downloads]
+  );
+  const completedDownloads = useMemo(
+    () => downloads.filter(item => item.status === 'completed' || item.progress >= 100),
+    [downloads]
+  );
+
+  const performSearch = async () => {
+    const query = searchQuery.trim();
+    if (!query || isSearching) return;
+
     setIsSearching(true);
     try {
       const results = await searchC411Torrents({
-        query: queryText.trim(),
+        query,
         mediaType: selectedMediaType === 'all' ? undefined : selectedMediaType
       });
       setTorrents(results);
       setHasSearched(true);
-    } catch (e) {
-      console.error(e);
+    } catch (error: any) {
       setTorrents([]);
       setHasSearched(true);
-      showToast('Erreur lors de la recherche de torrents', 'error');
+      showToast(error?.message || 'C411 est momentanément indisponible.', 'error');
     } finally {
       setIsSearching(false);
-    }
-  };
-
-  const handleSendTorrentToClient = async (torrent: C411Torrent) => {
-    setDownloadingTorrentId(torrent.id);
-
-    let clientToUse: 'sonarr' | 'radarr' | 'qbittorrent' | null = null;
-    let url = '';
-    let apiKey = '';
-    let username = '';
-    let password = '';
-
-    const isTv = selectedMediaType === 'tv' || /(s\d+|saison|season|e\d+)/i.test(torrent.name);
-    
-    if (isTv && sonarrUrl && sonarrApiKey) {
-      clientToUse = 'sonarr';
-      url = sonarrUrl;
-      apiKey = sonarrApiKey;
-    } else if (!isTv && radarrUrl && radarrApiKey) {
-      clientToUse = 'radarr';
-      url = radarrUrl;
-      apiKey = radarrApiKey;
-    } else if (qbittorrentUrl) {
-      clientToUse = 'qbittorrent';
-      url = qbittorrentUrl;
-      username = qbittorrentUsername;
-      password = qbittorrentPassword;
-    }
-
-    if (!clientToUse) {
-      if (torrent.magnetUri) {
-        window.location.href = torrent.magnetUri;
-        showToast('Ouverture du client BitTorrent local...', 'info');
-      } else {
-        showToast('Aucun client de téléchargement configuré.', 'error');
-      }
-      setDownloadingTorrentId(null);
-      return;
-    }
-
-    // Ajout optimiste
-    useLiveDownloadStore.getState().addOptimisticDownload({
-      mediaType: isTv ? 'tv' : 'movie',
-      title: torrent.name,
-      releaseTitle: torrent.name,
-      downloadClient: clientToUse === 'sonarr' ? 'Sonarr' : clientToUse === 'radarr' ? 'Radarr' : 'qBittorrent',
-      statusText: `Envoi à ${clientToUse}...`
-    });
-
-    try {
-      const result = await pushReleaseDirectly({
-        service: clientToUse,
-        url,
-        apiKey,
-        username,
-        password,
-        torrent,
-        mediaType: isTv ? 'tv' : 'movie',
-        mediaInfo: {
-          title: torrent.name
-        }
-      });
-
-      if (result.success) {
-        showToast(result.message, 'success');
-        setSearchQuery('');
-        setTorrents([]);
-        useLiveDownloadStore.getState().startPolling(1000);
-        useLiveDownloadStore.getState().fetchDownloads();
-      } else {
-        showToast(result.message, 'error');
-      }
-    } catch (err: any) {
-      showToast(err?.message || "Erreur lors de l'envoi au client", 'error');
-    } finally {
-      setDownloadingTorrentId(null);
-    }
-  };
-
-  const handleRemoveItem = async (item: LiveDownloadItem) => {
-    setDeletingId(item.id);
-    try {
-      const success = await removeDownload(item);
-      if (success) {
-        showToast(`Téléchargement « ${item.title} » retiré`, 'info');
-      }
-    } catch {
-      showToast('Erreur lors de la suppression', 'error');
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
-  const handleClearAll = async () => {
-    if (downloads.length === 0) return;
-    setIsClearing(true);
-    try {
-      await clearAllDownloads();
-      showToast('Historique des téléchargements nettoyé', 'success');
-    } catch {
-      showToast('Erreur lors du nettoyage', 'error');
-    } finally {
-      setIsClearing(false);
     }
   };
 
@@ -458,58 +229,155 @@ export function DownloadsScreen({ onShowClick }: Props) {
     let list = [...torrents];
 
     if (selectedQuality !== 'all') {
-      list = list.filter(t => {
-        const q = (t.quality || '').toLowerCase();
-        const n = t.name.toLowerCase();
-        if (selectedQuality === '2160p' || selectedQuality === '4k') {
-          return q.includes('2160') || q.includes('4k') || n.includes('2160p') || n.includes('4k') || n.includes('uhd');
-        }
-        if (selectedQuality === '1080p') {
-          return q.includes('1080') || n.includes('1080p') || n.includes('1080i');
-        }
-        if (selectedQuality === '720p') {
-          return q.includes('720') || n.includes('720p');
-        }
-        return true;
+      list = list.filter(torrent => {
+        const haystack = `${torrent.quality || ''} ${torrent.name}`.toLowerCase();
+        if (selectedQuality === '2160p') return /2160|4k|uhd/.test(haystack);
+        if (selectedQuality === '1080p') return /1080p|1080i/.test(haystack);
+        return /720p/.test(haystack);
       });
     }
 
     list.sort((a, b) => {
-      if (sortBy === 'seeders') return (b.seeders || 0) - (a.seeders || 0);
       if (sortBy === 'size') return (b.size || 0) - (a.size || 0);
-      if (sortBy === 'date') return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-      return 0;
+      if (sortBy === 'date') {
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      }
+      return (b.seeders || 0) - (a.seeders || 0);
     });
 
     return list;
   }, [torrents, selectedQuality, sortBy]);
 
-  const hasActiveDownloads = downloads.length > 0;
-  const isSearchActive = searchQuery.trim().length > 0;
+  const handleRemove = async (item: LiveDownloadItem) => {
+    setRemovingId(item.id);
+    const success = await removeDownload(item);
+    setRemovingId(null);
+    showToast(
+      success ? 'Téléchargement retiré.' : 'Retiré de SeenIt, mais le client distant n’a pas confirmé la suppression.',
+      success ? 'success' : 'info'
+    );
+  };
+
+  const handleClearAll = async () => {
+    if (!downloads.length || isClearing) return;
+    setIsClearing(true);
+    await clearAllDownloads();
+    setIsClearing(false);
+    showToast('Liste des téléchargements vidée.', 'success');
+  };
+
+  const resolveSearchMediaType = (torrent: C411Torrent): 'movie' | 'tv' | null => {
+    if (selectedMediaType === 'movie' || selectedMediaType === 'tv') return selectedMediaType;
+    if (/\bS\d{1,2}(?:E\d{1,3})?\b|\bseason\b|\bsaison\b/i.test(torrent.name)) return 'tv';
+    return null;
+  };
+
+  const handleSendTorrent = async (torrent: C411Torrent) => {
+    const mediaType = resolveSearchMediaType(torrent);
+    if (!mediaType) {
+      showToast('Choisis “Film” ou “Série” avant d’envoyer cette release.', 'error');
+      return;
+    }
+
+    let service: 'sonarr' | 'radarr' | 'qbittorrent' | null = null;
+    let url = '';
+    let apiKey = '';
+    let username = '';
+    let password = '';
+
+    if (mediaType === 'tv' && config.sonarrUrl && config.sonarrApiKey) {
+      service = 'sonarr';
+      url = config.sonarrUrl;
+      apiKey = config.sonarrApiKey;
+    } else if (mediaType === 'movie' && config.radarrUrl && config.radarrApiKey) {
+      service = 'radarr';
+      url = config.radarrUrl;
+      apiKey = config.radarrApiKey;
+    } else if (config.qbittorrentUrl) {
+      service = 'qbittorrent';
+      url = config.qbittorrentUrl;
+      username = config.qbittorrentUsername;
+      password = config.qbittorrentPassword;
+    }
+
+    if (!service) {
+      if (torrent.magnetUri) {
+        window.location.href = torrent.magnetUri;
+        showToast('Ouverture du client BitTorrent local…', 'info');
+      } else {
+        showToast('Aucun client de téléchargement configuré.', 'error');
+      }
+      return;
+    }
+
+    setSendingTorrentId(torrent.id);
+    const clientLabel = service === 'sonarr' ? 'Sonarr' : service === 'radarr' ? 'Radarr' : 'qBittorrent';
+    const requestId = beginDownloadRequest({
+      title: torrent.name,
+      mediaType,
+      downloadClient: clientLabel,
+      statusText: `Demande prise en compte • envoi à ${clientLabel}…`,
+      releaseTitle: torrent.name
+    });
+    showToast(`Demande prise en compte • envoi à ${clientLabel}.`, 'download');
+
+    try {
+      const result = await pushReleaseDirectly({
+        service,
+        url,
+        apiKey,
+        username,
+        password,
+        torrent,
+        mediaType,
+        mediaInfo: { title: torrent.name }
+      });
+
+      if (result.success) {
+        acceptDownloadRequest(requestId, `${clientLabel} a accepté la release • mise en file d’attente`, 'queued');
+        showToast(result.message, 'success');
+      } else {
+        failDownloadRequest(requestId, result.message);
+        showToast(result.message, 'error');
+      }
+    } catch (error: any) {
+      const message = error?.message || "Erreur lors de l'envoi au client.";
+      failDownloadRequest(requestId, message);
+      showToast(message, 'error');
+    } finally {
+      setSendingTorrentId(null);
+    }
+  };
+
+  const copyMagnet = async (torrent: C411Torrent) => {
+    if (!torrent.magnetUri) return;
+    try {
+      await navigator.clipboard.writeText(torrent.magnetUri);
+      setCopiedHash(torrent.infoHash);
+      window.setTimeout(() => setCopiedHash(null), 1800);
+      showToast('Lien Magnet copié.', 'success');
+    } catch {
+      showToast('Impossible de copier le lien Magnet.', 'error');
+    }
+  };
 
   if (showConfiguration) {
     return (
-      <div className="flex-1 flex flex-col min-h-0 bg-premium-ambient text-white overflow-hidden">
-        <div className="shrink-0 px-4 sm:px-6 pt-4 pb-3 border-b border-white/5 bg-zinc-950/70 backdrop-blur-xl flex items-center gap-3 z-10">
+      <div className="flex-1 min-h-0 flex flex-col bg-premium-ambient text-white overflow-hidden">
+        <div className="shrink-0 px-4 pt-4 pb-3 border-b border-white/5 bg-zinc-950/70 backdrop-blur-xl flex items-center gap-3">
           <button
             type="button"
             onClick={() => setShowConfiguration(false)}
-            className="w-9 h-9 rounded-xl bg-zinc-900/80 border border-white/10 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center justify-center transition-colors active:scale-95 cursor-pointer"
-            title="Retour aux téléchargements"
+            className="w-9 h-9 rounded-xl bg-zinc-900 border border-white/10 flex items-center justify-center text-zinc-300"
           >
-            <ArrowLeft size={17} />
+            <ArrowLeft size={18} />
           </button>
           <div>
-            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-              Réglages des téléchargements
-            </h1>
-            <p className="text-[11px] sm:text-xs text-zinc-400">
-              Configuration privée synchronisée avec votre compte SeenIt
-            </p>
+            <h1 className="text-lg font-black">Configuration téléchargements</h1>
+            <p className="text-[11px] text-zinc-400">C411 • Sonarr • Radarr • qBittorrent</p>
           </div>
         </div>
-
-        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-4 sm:px-6 pt-4 pb-nav">
+        <div className="flex-1 overflow-y-auto px-4 py-4 pb-28">
           <DownloadConfigSection defaultOpen hideToggle />
         </div>
       </div>
@@ -517,292 +385,267 @@ export function DownloadsScreen({ onShowClick }: Props) {
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-premium-ambient text-white overflow-hidden select-none">
-      {/* 1. Header épuré sans boutons encombrants */}
-      <div className="shrink-0 px-4 sm:px-6 pt-4 pb-3 border-b border-white/5 bg-zinc-950/70 backdrop-blur-xl flex items-center justify-between z-10">
-        <div className="flex items-center gap-3">
-          <SeenItLogo className="w-8 h-8" />
+    <div className="flex-1 min-h-0 flex flex-col bg-premium-ambient text-white overflow-hidden">
+      <div className="shrink-0 px-4 pt-4 pb-3 border-b border-white/5 bg-zinc-950/70 backdrop-blur-xl space-y-3">
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-              Télécharger
-            </h1>
-            <p className="text-[11px] sm:text-xs text-zinc-400">
-              {isSearchActive 
-                ? 'Recherche libre de torrents' 
-                : 'Suivi en temps réel Sonarr, Radarr & qBittorrent'}
+            <h1 className="text-xl font-black tracking-tight">Téléchargements</h1>
+            <p className="text-[11px] text-zinc-400">
+              {viewMode === 'downloads' ? 'Suivi en temps réel' : 'Recherche manuelle C411'}
             </p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => void fetchDownloads()}
+              className="w-9 h-9 rounded-xl bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white flex items-center justify-center"
+              title="Actualiser"
+            >
+              <RefreshCw size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowConfiguration(true)}
+              className="w-9 h-9 rounded-xl bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white flex items-center justify-center"
+              title="Réglages"
+            >
+              <Settings size={16} />
+            </button>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setShowConfiguration(true)}
-          className="w-9 h-9 rounded-xl bg-zinc-900/80 border border-white/10 hover:bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center transition-colors active:scale-95 cursor-pointer"
-          title="Paramètres des serveurs de téléchargement"
-        >
-          <Settings size={16} />
-        </button>
+        <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-zinc-900/90 border border-white/5">
+          <button
+            type="button"
+            onClick={() => setViewMode('downloads')}
+            className={`py-2 rounded-lg text-xs font-bold ${viewMode === 'downloads' ? 'bg-zinc-700 text-white' : 'text-zinc-400'}`}
+          >
+            Mes téléchargements
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('search')}
+            className={`py-2 rounded-lg text-xs font-bold ${viewMode === 'search' ? 'bg-zinc-700 text-white' : 'text-zinc-400'}`}
+          >
+            Recherche C411
+          </button>
+        </div>
       </div>
 
-      {/* 2. Barre de recherche libre intégrée (comme dans Explorer) */}
-      <div className="px-4 sm:px-6 py-3 bg-zinc-950/40 border-b border-white/5 shrink-0 space-y-2.5">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            performSearch(searchQuery);
-          }}
-          className="flex gap-2"
-        >
-          <div className="relative flex-1">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                if (e.target.value.trim().length >= 3) {
-                  performSearch(e.target.value);
-                }
-              }}
-              placeholder="Rechercher un torrent libre, film, série (ex: Dexter S04, Dune)..."
-              className="w-full pl-10 pr-9 py-2.5 bg-zinc-900/90 border border-white/10 focus:border-[#E5A93D] rounded-xl text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none transition-colors"
-            />
-            {searchQuery && (
+      <div className="flex-1 overflow-y-auto px-3.5 py-4 pb-28">
+        {viewMode === 'downloads' ? (
+          <div className="space-y-4">
+            {!isConfigured && (
               <button
                 type="button"
-                onClick={() => {
-                  setSearchQuery('');
-                  setTorrents([]);
-                  setHasSearched(false);
-                }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 p-0.5"
+                onClick={() => setShowConfiguration(true)}
+                className="w-full p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-left flex items-start gap-2.5"
               >
-                <X size={15} />
+                <AlertCircle size={17} className="text-amber-400 shrink-0 mt-0.5" />
+                <span>
+                  <span className="block text-xs font-bold text-amber-200">Clients de téléchargement à configurer</span>
+                  <span className="block text-[10px] text-amber-300/80 mt-0.5">Ajoute Sonarr, Radarr ou qBittorrent pour activer le suivi.</span>
+                </span>
               </button>
             )}
+
+            {activeDownloads.length > 0 && (
+              <section className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xs font-black uppercase tracking-wider text-zinc-400">En cours • {activeDownloads.length}</h2>
+                  {lastUpdated && (
+                    <span className="text-[9px] text-zinc-600">
+                      {new Date(lastUpdated).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </span>
+                  )}
+                </div>
+                {activeDownloads.map(item => (
+                  <DownloadItemCard
+                    key={item.id}
+                    item={item}
+                    onShowClick={onShowClick}
+                    onRemove={handleRemove}
+                    isRemoving={removingId === item.id}
+                  />
+                ))}
+              </section>
+            )}
+
+            {completedDownloads.length > 0 && (
+              <section className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xs font-black uppercase tracking-wider text-zinc-500">Terminés • {completedDownloads.length}</h2>
+                  <button
+                    type="button"
+                    disabled={isClearing}
+                    onClick={() => void handleClearAll()}
+                    className="text-[10px] font-bold text-zinc-500 hover:text-red-400 flex items-center gap-1 disabled:opacity-50"
+                  >
+                    {isClearing ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                    Vider
+                  </button>
+                </div>
+                {completedDownloads.map(item => (
+                  <DownloadItemCard
+                    key={item.id}
+                    item={item}
+                    onShowClick={onShowClick}
+                    onRemove={handleRemove}
+                    isRemoving={removingId === item.id}
+                  />
+                ))}
+              </section>
+            )}
+
+            {!downloads.length && (
+              <div className="py-16 flex flex-col items-center text-center gap-3 text-zinc-500">
+                <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-white/5 flex items-center justify-center">
+                  <Download size={24} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-zinc-300">Aucun téléchargement suivi</p>
+                  <p className="text-[11px] mt-1 max-w-[270px]">Depuis une fiche, choisis 1080p ou 4K : la demande apparaîtra ici immédiatement.</p>
+                </div>
+              </div>
+            )}
           </div>
-
-          <button
-            type="submit"
-            disabled={isSearching || !searchQuery.trim()}
-            className="px-4 py-2.5 bg-[#E5A93D] hover:bg-[#d4972e] disabled:opacity-50 text-zinc-950 font-black text-xs sm:text-sm rounded-xl flex items-center gap-1.5 transition-all active:scale-95 shrink-0 cursor-pointer shadow-md shadow-[#E5A93D]/10"
-          >
-            {isSearching ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
-            <span className="hidden sm:inline">Chercher</span>
-          </button>
-        </form>
-
-        {/* Filtres contextuels de recherche si recherche active */}
-        {isSearchActive && (
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
-            {/* Média */}
-            <div className="flex bg-zinc-900/80 p-0.5 rounded-lg border border-white/10 shrink-0">
+        ) : (
+          <div className="space-y-3.5">
+            <form
+              onSubmit={event => {
+                event.preventDefault();
+                void performSearch();
+              }}
+              className="flex gap-2"
+            >
+              <div className="relative flex-1">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                <input
+                  value={searchQuery}
+                  onChange={event => setSearchQuery(event.target.value)}
+                  placeholder="Film, série, S02E05…"
+                  className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 text-xs text-white outline-none focus:border-[#E5A93D]"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
               <button
-                type="button"
-                onClick={() => setSelectedMediaType('all')}
-                className={cn("px-2.5 py-1 rounded-md font-bold transition-colors text-[11px]", selectedMediaType === 'all' ? "bg-[#E5A93D] text-zinc-950" : "text-zinc-400 hover:text-white")}
+                type="submit"
+                disabled={isSearching || !searchQuery.trim()}
+                className="px-3.5 py-2.5 rounded-xl bg-[#E5A93D] text-black text-xs font-black disabled:opacity-50"
               >
-                Tout
+                {isSearching ? <Loader2 size={15} className="animate-spin" /> : 'Chercher'}
               </button>
-              <button
-                type="button"
-                onClick={() => setSelectedMediaType('movie')}
-                className={cn("px-2.5 py-1 rounded-md font-bold transition-colors text-[11px]", selectedMediaType === 'movie' ? "bg-[#E5A93D] text-zinc-950" : "text-zinc-400 hover:text-white")}
-              >
-                Films
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedMediaType('tv')}
-                className={cn("px-2.5 py-1 rounded-md font-bold transition-colors text-[11px]", selectedMediaType === 'tv' ? "bg-[#E5A93D] text-zinc-950" : "text-zinc-400 hover:text-white")}
-              >
-                Séries
-              </button>
-            </div>
+            </form>
 
-            {/* Qualité */}
-            <div className="flex bg-zinc-900/80 p-0.5 rounded-lg border border-white/10 shrink-0">
-              {['all', '1080p', '4k', '720p'].map(q => (
+            <div className="flex items-center gap-1 overflow-x-auto pb-1">
+              {([
+                { id: 'all' as const, label: 'Tous' },
+                { id: 'movie' as const, label: 'Films' },
+                { id: 'tv' as const, label: 'Séries' }
+              ]).map(option => (
                 <button
-                  key={q}
+                  key={option.id}
                   type="button"
-                  onClick={() => setSelectedQuality(q)}
-                  className={cn("px-2 py-1 rounded-md font-bold transition-colors text-[11px] uppercase", selectedQuality === q ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-white")}
+                  onClick={() => setSelectedMediaType(option.id)}
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border shrink-0 ${
+                    selectedMediaType === option.id
+                      ? 'bg-zinc-700 text-white border-zinc-600'
+                      : 'bg-zinc-900 text-zinc-400 border-zinc-800'
+                  }`}
                 >
-                  {q === 'all' ? 'Toutes' : q}
+                  {option.label}
+                </button>
+              ))}
+
+              <span className="w-px h-5 bg-zinc-800 mx-1 shrink-0" />
+
+              {(['all', '2160p', '1080p', '720p'] as const).map(quality => (
+                <button
+                  key={quality}
+                  type="button"
+                  onClick={() => setSelectedQuality(quality)}
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border shrink-0 ${
+                    selectedQuality === quality
+                      ? 'bg-blue-600 text-white border-blue-500'
+                      : 'bg-zinc-900 text-zinc-400 border-zinc-800'
+                  }`}
+                >
+                  {quality === 'all' ? 'Toutes qualités' : quality === '2160p' ? '4K' : quality}
                 </button>
               ))}
             </div>
 
-            {/* Tri */}
-            <div className="flex bg-zinc-900/80 p-0.5 rounded-lg border border-white/10 shrink-0 ml-auto">
-              <button
-                type="button"
-                onClick={() => setSortBy('seeders')}
-                className={cn("px-2 py-1 rounded-md font-bold transition-colors text-[11px]", sortBy === 'seeders' ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-white")}
-              >
-                Seeds
-              </button>
-              <button
-                type="button"
-                onClick={() => setSortBy('size')}
-                className={cn("px-2 py-1 rounded-md font-bold transition-colors text-[11px]", sortBy === 'size' ? "bg-zinc-700 text-white" : "text-zinc-400 hover:text-white")}
-              >
-                Taille
-              </button>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] uppercase font-black text-zinc-600">Tri</span>
+              {(['seeders', 'size', 'date'] as const).map(sort => (
+                <button
+                  key={sort}
+                  type="button"
+                  onClick={() => setSortBy(sort)}
+                  className={`px-2 py-1 rounded-lg text-[9px] font-bold border ${
+                    sortBy === sort
+                      ? 'bg-zinc-700 text-white border-zinc-600'
+                      : 'bg-zinc-900 text-zinc-500 border-zinc-800'
+                  }`}
+                >
+                  {sort === 'seeders' ? 'Seeders' : sort === 'size' ? 'Taille' : 'Date'}
+                </button>
+              ))}
             </div>
-          </div>
-        )}
-      </div>
 
-      {/* 3. Corps principal : Liste de recherche OU Liste des Téléchargements */}
-      <div className="flex-1 overflow-y-auto px-3.5 sm:px-6 py-4 space-y-3 pb-28">
-        {!isConfigured && (
-          <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-start gap-3 mb-3">
-            <AlertCircle size={18} className="shrink-0 mt-0.5 text-amber-400" />
-            <div className="flex-1">
-              <p className="font-bold text-amber-200">Serveurs de téléchargement non configurés</p>
-              <p className="mt-0.5 text-amber-300/80 leading-relaxed">
-                Renseignez vos identifiants Sonarr, Radarr ou qBittorrent dans les réglages de cet onglet pour activer les téléchargements 1-clic.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowConfiguration(true)}
-              className="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-200 font-bold hover:bg-amber-500/30 transition-colors shrink-0"
-            >
-              Configurer
-            </button>
-          </div>
-        )}
-
-        {/* SI RECHERCHE ACTIVE : RÉSULTATS TORRENTS C411 */}
-        {isSearchActive ? (
-          <div>
             {isSearching ? (
-              <div className="py-16 flex flex-col items-center justify-center gap-3 text-zinc-400">
-                <Loader2 size={32} className="animate-spin text-[#E5A93D]" />
-                <p className="text-xs font-bold">Recherche de torrents en cours...</p>
+              <div className="py-16 flex flex-col items-center gap-2 text-zinc-400">
+                <Loader2 size={28} className="animate-spin text-[#E5A93D]" />
+                <span className="text-xs font-bold">Recherche C411…</span>
               </div>
             ) : filteredTorrents.length > 0 ? (
               <div className="space-y-2.5">
-                <p className="text-xs font-bold text-zinc-400 px-1">
-                  {filteredTorrents.length} torrent(s) trouvé(s) pour « {searchQuery} »
-                </p>
-                {filteredTorrents.map((torrent) => {
-                  const isDownloading = downloadingTorrentId === torrent.id;
-                  const isTv = selectedMediaType === 'tv' || /(s\d+|saison|season|e\d+)/i.test(torrent.name);
-
-                  return (
-                    <div
-                      key={torrent.id}
-                      className="p-3 sm:p-3.5 rounded-2xl bg-[#121214] border border-white/10 hover:border-white/20 transition-all flex items-center justify-between gap-3"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={cn(
-                            "px-1.5 py-0.5 rounded text-[9px] font-black uppercase shrink-0 border",
-                            isTv ? "bg-purple-500/20 text-purple-300 border-purple-500/30" : "bg-amber-500/20 text-amber-300 border-amber-500/30"
-                          )}>
-                            {isTv ? 'Série' : 'Film'}
-                          </span>
-
-                          {torrent.quality && (
-                            <span className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[9px] font-extrabold border border-white/10 uppercase shrink-0">
-                              {torrent.quality}
-                            </span>
-                          )}
-
-                          <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
-                            <ArrowDown size={11} /> {torrent.seeders || 0} seeds
-                          </span>
-
-                          <span className="text-[11px] font-medium text-zinc-400">
-                            {formatTorrentSize(torrent.size)}
-                          </span>
-                        </div>
-
-                        <h4 className="font-extrabold text-xs sm:text-sm text-white mt-1 leading-snug break-words">
-                          {torrent.name}
-                        </h4>
-                      </div>
-
+                {filteredTorrents.map(torrent => (
+                  <div key={torrent.id} className="rounded-2xl bg-zinc-900/85 border border-white/10 p-3.5 space-y-2.5">
+                    <h3 className="text-xs font-bold text-white break-words leading-snug">{torrent.name}</h3>
+                    <div className="flex flex-wrap items-center gap-2 text-[10px] text-zinc-400">
+                      {torrent.quality && <span className="font-bold text-blue-300">{torrent.quality}</span>}
+                      {torrent.language && <span>{torrent.language}</span>}
+                      <span>{formatTorrentSize(torrent.size)}</span>
+                      <span className="text-emerald-400 font-bold">↑ {torrent.seeders || 0}</span>
+                      <span>↓ {torrent.leechers || 0}</span>
+                    </div>
+                    <div className="flex gap-2">
                       <button
                         type="button"
-                        onClick={() => handleSendTorrentToClient(torrent)}
-                        disabled={isDownloading}
-                        className="px-3 py-2 rounded-xl bg-[#E5A93D] hover:bg-[#d4972e] text-zinc-950 font-black text-xs flex items-center gap-1.5 transition-all active:scale-95 shrink-0 cursor-pointer shadow-md shadow-[#E5A93D]/10 disabled:opacity-50"
+                        disabled={sendingTorrentId === torrent.id}
+                        onClick={() => void handleSendTorrent(torrent)}
+                        className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-black flex items-center justify-center gap-1.5 disabled:opacity-50"
                       >
-                        {isDownloading ? (
-                          <Loader2 size={14} className="animate-spin" />
-                        ) : (
-                          <Download size={14} />
-                        )}
-                        <span className="hidden sm:inline">Télécharger</span>
+                        {sendingTorrentId === torrent.id ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                        Envoyer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void copyMagnet(torrent)}
+                        className="px-3 py-2.5 rounded-xl bg-zinc-800 text-zinc-300 text-[10px] font-bold flex items-center gap-1.5"
+                      >
+                        {copiedHash === torrent.infoHash ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                        Magnet
                       </button>
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             ) : hasSearched ? (
-              <div className="py-16 flex flex-col items-center justify-center text-center p-6 text-zinc-400">
-                <Search size={32} className="text-zinc-600 mb-2" />
-                <p className="text-sm font-bold text-white mb-1">Aucun torrent trouvé</p>
-                <p className="text-xs text-zinc-500 max-w-xs">
-                  Vérifiez l'orthographe ou essayez avec un titre plus court.
-                </p>
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          /* SI PAS DE RECHERCHE : LISTE DES TÉLÉCHARGEMENTS EN DIRECT */
-          <div className="space-y-3">
-            {downloads.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center p-6 my-auto min-h-[320px]">
-                <div className="w-16 h-16 rounded-3xl bg-zinc-900 border border-white/10 flex items-center justify-center text-zinc-500 mb-4 shadow-xl">
-                  <Download size={28} className="text-zinc-500" />
-                </div>
-                <h3 className="text-base font-bold text-white mb-1">Aucun téléchargement en cours</h3>
-                <p className="text-xs text-zinc-400 max-w-xs mb-5 leading-relaxed">
-                  Lancez un téléchargement 1-clic depuis une fiche film ou épisode, ou utilisez la barre de recherche ci-dessus.
-                </p>
-              </div>
+              <div className="py-14 text-center text-xs text-zinc-500">Aucune release trouvée.</div>
             ) : (
-              <>
-                <div className="flex items-center justify-between px-1 mb-1 text-xs text-zinc-400">
-                  <span className="font-bold">
-                    {downloads.length} élément{downloads.length > 1 ? 's' : ''} en file d'attente
-                  </span>
-                  <span className="text-[11px] text-zinc-500">
-                    Glisser vers la droite pour supprimer
-                  </span>
-                </div>
-
-                <div className="space-y-3">
-                  {downloads.map((item) => (
-                    <SwipeableItem
-                      key={item.id}
-                      item={item}
-                      onShowClick={onShowClick}
-                      onRemove={handleRemoveItem}
-                      isDeleting={deletingId === item.id}
-                    />
-                  ))}
-                </div>
-
-                {/* Bouton Nettoyer placé discrètement sous la liste */}
-                <div className="pt-4 flex justify-center">
-                  <button
-                    type="button"
-                    onClick={handleClearAll}
-                    disabled={isClearing}
-                    className="px-4 py-2 rounded-xl border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs font-bold flex items-center gap-2 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
-                  >
-                    <Trash2 size={13} className={cn(isClearing && "animate-spin text-red-400")} />
-                    <span>Nettoyer l'historique des téléchargements</span>
-                  </button>
-                </div>
-              </>
+              <div className="py-14 text-center text-[11px] text-zinc-500 max-w-[300px] mx-auto">
+                La recherche manuelle est séparée du suivi : taper ici ne masque plus tes téléchargements en cours.
+              </div>
             )}
           </div>
         )}
