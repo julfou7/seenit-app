@@ -10,7 +10,8 @@
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test:plex": "node --test tests/*.test.ts"
   },
   "dependencies": {
     "@capacitor-community/file-opener": "^8.0.1",

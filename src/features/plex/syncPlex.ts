@@ -11,6 +11,21 @@ import { getPlexClientId } from '../../services/plex';
 import { Show } from '../../types';
 import { CURRENT_APP_VERSION } from '../../store/updateStore';
 import { authenticatedFetch, getAuthenticatedHeaders } from '../../lib/apiAuth';
+import {
+  buildPlexParentShowIdentityItem,
+  extractPlexExternalIds,
+  getStrongPlexSourceIdentity,
+  isStrictPlexIdentityMatch
+} from './plexIdentity';
+import {
+  getPlexLastSyncTimestamp,
+  getPlexResolutionCache,
+  getStoredPlexToken,
+  getPlexUserStorageKey,
+  setPlexLastSyncTimestamp,
+  setPlexResolutionCache
+} from './plexStorage';
+import { getPlexMediaKey, usePlexAvailabilityStore } from './plexAvailability';
 
 export interface PlexSyncResult {
   success: boolean;
@@ -20,17 +35,6 @@ export interface PlexSyncResult {
   syncedItems: Array<{ title: string; subtitle?: string; isWatchlist?: boolean; posterPath?: string | null; mediaType: 'tv' | 'movie'; show: Show }>;
   error?: string;
 }
-
-const normalizeTitle = (t?: string) => {
-  if (!t) return '';
-  return t
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-};
 
 export function getPlexGuid(rawItem: any): string | null {
   if (!rawItem) return null;
@@ -97,56 +101,7 @@ export function getPlexGuid(rawItem: any): string | null {
   return null;
 }
 
-export const extractExternalIdsFromPlex = (rawItem: any) => {
-  let tmdbId: number | null = null;
-  let imdbId: string | null = null;
-  let tvdbId: number | null = null;
-  let plexGuid: string | null = null;
-
-  if (!rawItem) return { tmdbId, imdbId, tvdbId, plexGuid };
-  const item = rawItem.raw ? { ...rawItem.raw, ...rawItem } : rawItem;
-
-  const processGuidStr = (str: string) => {
-    if (!str || typeof str !== 'string') return;
-    const tmdbMatch = str.match(/themoviedb:\/\/(\d+)|tmdb:\/\/(\d+)|com\.plexapp\.agents\.themoviedb:\/\/(\d+)/i);
-    if (tmdbMatch && !tmdbId) {
-      tmdbId = Number(tmdbMatch[1] || tmdbMatch[2] || tmdbMatch[3]);
-    }
-    const imdbMatch = str.match(/imdb:\/\/(tt\d+)|com\.plexapp\.agents\.imdb:\/\/(tt\d+)/i);
-    if (imdbMatch && !imdbId) {
-      imdbId = (imdbMatch[1] || imdbMatch[2]).toLowerCase();
-    }
-    const tvdbMatch = str.match(/tvdb:\/\/(\d+)|com\.plexapp\.agents\.thetvdb:\/\/(\d+)/i);
-    if (tvdbMatch && !tvdbId) {
-      tvdbId = Number(tvdbMatch[1] || tvdbMatch[2]);
-    }
-    const plexMatch = str.match(/plex:\/\/(movie|show|season|episode)\/([a-f0-9]+)/i);
-    if (plexMatch && !plexGuid) {
-      plexGuid = plexMatch[2];
-    }
-  };
-
-  const guidList = Array.isArray(item.Guid)
-    ? item.Guid
-    : (Array.isArray(item.guids) ? item.guids : []);
-
-  for (const g of guidList) {
-    if (typeof g?.id === 'string') {
-      processGuidStr(g.id);
-    } else if (typeof g === 'string') {
-      processGuidStr(g);
-    }
-  }
-
-  // Prioritize grandparentGuid (show GUID) over parentGuid and item.guid
-  for (const field of [item.grandparentGuid, item.parentGuid, item.guid]) {
-    if (typeof field === 'string') {
-      processGuidStr(field);
-    }
-  }
-
-  return { tmdbId, imdbId, tvdbId, plexGuid };
-};
+export const extractExternalIdsFromPlex = extractPlexExternalIds;
 
 const extractTmdbIdFromPlex = (item: any): number | null => {
   return extractExternalIdsFromPlex(item).tmdbId;
@@ -155,8 +110,6 @@ const extractTmdbIdFromPlex = (item: any): number | null => {
 export async function resolveMovieToTmdb(item: any, plexToken?: string) {
   const unwrapped = item?.raw ? { ...item.raw, ...item } : item;
   const movieTitle = unwrapped.title || 'Film inconnu';
-  const cleanMovieTitle = movieTitle.replace(/\(\d{4}\)/g, '').trim();
-  const year = unwrapped.year || (unwrapped.originallyAvailableAt ? Number(unwrapped.originallyAvailableAt.slice(0, 4)) : undefined);
   const pGuid = getPlexGuid(unwrapped);
   const { tmdbId, imdbId, tvdbId, plexGuid } = extractExternalIdsFromPlex(unwrapped);
 
@@ -201,8 +154,8 @@ export async function resolveMovieToTmdb(item: any, plexToken?: string) {
   if (cleanHash && plexToken) {
     try {
       appLogger.info('plex', `[Plex Resolve] Appel Plex Discover (${cleanHash})`);
-      const plexMetaUrl = `https://discover.provider.plex.tv/library/metadata/${cleanHash}?X-Plex-Token=${plexToken}`;
-      const res = await fetch(plexMetaUrl, { headers: { 'Accept': 'application/json' } });
+      const plexMetaUrl = `https://discover.provider.plex.tv/library/metadata/${cleanHash}`;
+      const res = await fetch(plexMetaUrl, { headers: { 'Accept': 'application/json', 'X-Plex-Token': plexToken } });
       if (res.ok) {
         const data = await res.json();
         const metaItem = data?.MediaContainer?.Metadata?.[0];
@@ -239,33 +192,13 @@ export async function resolveMovieToTmdb(item: any, plexToken?: string) {
     }
   }
 
-  // 5. Recherche TMDB par titre film (+ fallback sans année)
-  if (cleanMovieTitle) {
-    appLogger.info('plex', `[Plex Resolve] Recherche TMDB par titre film : "${cleanMovieTitle}" (${year || 'sans année'})`);
-    let searchRes = await tmdb.searchMedia(cleanMovieTitle, year ? String(year) : undefined, 'movie');
-    if ((!searchRes.ok || !searchRes.value) && year) {
-      appLogger.info('plex', `[Plex Resolve] Seconde tentative recherche TMDB film sans année : "${cleanMovieTitle}"`);
-      searchRes = await tmdb.searchMedia(cleanMovieTitle, undefined, 'movie');
-    }
-    if (searchRes.ok && searchRes.value && searchRes.value.id) {
-      const detailsRes = await tmdb.getMediaDetails(searchRes.value.id, 'movie');
-      if (detailsRes.ok && detailsRes.value) {
-        appLogger.info('plex', `[Plex Resolve] TMDB ID=${detailsRes.value.id}`);
-        appLogger.info('plex', `[Plex Resolve] ✅ Résolution film réussie (via recherche TMDB) : "${detailsRes.value.title}"`);
-        return detailsRes.value;
-      }
-    }
-  }
-
-  appLogger.error('plex', `[Plex Resolve] ❌ ÉCHEC FINAL film pour "${movieTitle}" : Aucun ID TMDB/IMDb/TVDb/Discover/Search valide.`);
+  appLogger.error('plex', `[Plex Resolve] ❌ Film non résolu pour "${movieTitle}" : aucune chaîne d'identifiants TMDB/IMDb/TVDB/Plex vérifiable.`);
   return null;
 }
 
 export async function resolveShowToTmdb(item: any, plexToken?: string) {
   const unwrapped = item?.raw ? { ...item.raw, ...item } : item;
   const rawShowTitle = unwrapped.grandparentTitle || unwrapped.parentTitle || unwrapped.title || 'Série inconnue';
-  const cleanShowTitle = rawShowTitle.replace(/\(\d{4}\)/g, '').trim();
-  const year = unwrapped.year || (unwrapped.originallyAvailableAt ? Number(unwrapped.originallyAvailableAt.slice(0, 4)) : undefined);
   const pGuid = getPlexGuid(unwrapped);
   const { tmdbId, imdbId, tvdbId, plexGuid } = extractExternalIdsFromPlex(unwrapped);
 
@@ -314,8 +247,8 @@ export async function resolveShowToTmdb(item: any, plexToken?: string) {
   if (cleanHash && plexToken) {
     try {
       appLogger.info('plex', `[Plex Resolve] Appel Plex Discover série (${cleanHash})`);
-      const plexMetaUrl = `https://discover.provider.plex.tv/library/metadata/${cleanHash}?X-Plex-Token=${plexToken}`;
-      const res = await fetch(plexMetaUrl, { headers: { 'Accept': 'application/json' } });
+      const plexMetaUrl = `https://discover.provider.plex.tv/library/metadata/${cleanHash}`;
+      const res = await fetch(plexMetaUrl, { headers: { 'Accept': 'application/json', 'X-Plex-Token': plexToken } });
       if (res.ok) {
         const data = await res.json();
         const metaItem = data?.MediaContainer?.Metadata?.[0];
@@ -325,7 +258,7 @@ export async function resolveShowToTmdb(item: any, plexToken?: string) {
             const gpMatch = metaItem.grandparentGuid.match(/plex:\/\/(show|movie)\/([a-f0-9]+)/i);
             if (gpMatch) {
               const gpHash = gpMatch[2];
-              const gpRes = await fetch(`https://discover.provider.plex.tv/library/metadata/${gpHash}?X-Plex-Token=${plexToken}`, { headers: { 'Accept': 'application/json' } });
+              const gpRes = await fetch(`https://discover.provider.plex.tv/library/metadata/${gpHash}`, { headers: { 'Accept': 'application/json', 'X-Plex-Token': plexToken } });
               if (gpRes.ok) {
                 const gpData = await gpRes.json();
                 if (gpData?.MediaContainer?.Metadata?.[0]) {
@@ -364,35 +297,13 @@ export async function resolveShowToTmdb(item: any, plexToken?: string) {
     }
   }
 
-  // 5. Recherche TMDB par titre série (+ fallback sans année)
-  if (cleanShowTitle && cleanShowTitle !== 'Série inconnue') {
-    appLogger.info('plex', `[Plex Resolve] Recherche TMDB par titre série : "${cleanShowTitle}" (${year || 'sans année'})`);
-    let searchRes = await tmdb.searchMedia(cleanShowTitle, year ? String(year) : undefined, 'tv');
-    if ((!searchRes.ok || !searchRes.value) && year) {
-      appLogger.info('plex', `[Plex Resolve] Seconde tentative recherche TMDB série sans année : "${cleanShowTitle}"`);
-      searchRes = await tmdb.searchMedia(cleanShowTitle, undefined, 'tv');
-    }
-    if (searchRes.ok && searchRes.value && searchRes.value.id) {
-      const detailsRes = await tmdb.getMediaDetails(searchRes.value.id, 'tv');
-      if (detailsRes.ok && detailsRes.value) {
-        appLogger.info('plex', `[Plex Resolve] ✅ TMDB ID série=${detailsRes.value.id} (via recherche TMDB "${cleanShowTitle}")`);
-        return detailsRes.value;
-      }
-    }
-  }
-
-  appLogger.error('plex', `[Plex Resolve] ❌ ÉCHEC FINAL série pour "${rawShowTitle}" : Aucun ID TMDB/IMDb/TVDb/Discover/Search valide.`);
+  appLogger.error('plex', `[Plex Resolve] ❌ Série non résolue pour "${rawShowTitle}" : aucune chaîne d'identifiants TMDB/IMDb/TVDB/Plex vérifiable.`);
   return null;
 }
 
 export async function resolveSeasonShowToTmdb(item: any, plexToken?: string) {
   const unwrapped = item?.raw ? { ...item.raw, ...item } : item;
-  const showGuid = unwrapped?.parentGuid || getPlexGuid(unwrapped);
-  const showItem = {
-    ...unwrapped,
-    guid: showGuid,
-    type: 'show'
-  };
+  const showItem = buildPlexParentShowIdentityItem(unwrapped);
   return resolveShowToTmdb(showItem, plexToken);
 }
 
@@ -404,20 +315,19 @@ export async function resolveEpisodeShowToTmdb(item: any, plexToken?: string) {
   const seasonNum = unwrapped.parentIndex !== undefined ? Number(unwrapped.parentIndex) : 1;
   const episodeNum = unwrapped.index !== undefined ? Number(unwrapped.index) : 1;
 
-  const pGuid = getPlexGuid(unwrapped);
-  const { tmdbId, imdbId, tvdbId, plexGuid } = extractExternalIdsFromPlex(unwrapped);
+  const parentIdentity = buildPlexParentShowIdentityItem(unwrapped);
+  const { plexGuid } = extractExternalIdsFromPlex(parentIdentity);
 
   appLogger.info('plex', `[Plex Resolve] Episode Plex détecté`);
-  appLogger.info('plex', `[Plex Resolve] plexGuid=${plexGuid || pGuid || 'aucun'}`);
+  appLogger.info('plex', `[Plex Resolve] plexGuid parent=${plexGuid || parentIdentity.guid || 'aucun'}`);
   appLogger.info('plex', `[Plex Resolve] Série parent="${parentShowTitle}"`);
   appLogger.info('plex', `[Plex Resolve] Saison=${seasonNum}`);
   appLogger.info('plex', `[Plex Resolve] Épisode=${episodeNum}`);
 
   const showItem = {
-    ...unwrapped,
+    ...parentIdentity,
     title: parentShowTitle,
     grandparentTitle: parentShowTitle,
-    guid: unwrapped.grandparentGuid || unwrapped.parentGuid || unwrapped.guid || pGuid,
     type: 'show'
   };
 
@@ -478,56 +388,19 @@ function cleanShowForFirestore(show: any, userId: string): Record<string, any> {
   return clean;
 }
 
-// Persistent title -> TMDB resolution cache in localStorage
-const getResolutionCache = (): Record<string, any> => {
-  try {
-    const raw = localStorage.getItem('plex_resolution_cache');
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    Object.keys(parsed).forEach(k => {
-      if (parsed[k]?.id === 114108 || (k.includes('cinderella') && parsed[k]?.id !== 150689) || (k.includes('cendrillon') && parsed[k]?.id !== 150689)) {
-        delete parsed[k];
-      }
-    });
-    return parsed;
-  } catch {
-    return {};
-  }
-};
-
-const saveResolutionCache = (cache: Record<string, any>) => {
-  try {
-    const keys = Object.keys(cache);
-    if (keys.length > 500) {
-      const trimmed = Object.fromEntries(keys.slice(-400).map(k => [k, cache[k]]));
-      localStorage.setItem('plex_resolution_cache', JSON.stringify(trimmed));
-    } else {
-      localStorage.setItem('plex_resolution_cache', JSON.stringify(cache));
-    }
-  } catch {}
-};
-
 const buildPlexResolutionCacheKey = (
   mediaType: 'tv' | 'movie',
-  tmdbId?: number | null
+  item: any
 ): string | null => {
-  if (tmdbId) {
-    return `${mediaType}:tmdb:${Number(tmdbId)}`;
-  }
-  return null;
+  const sourceIdentity = getStrongPlexSourceIdentity(item);
+  return sourceIdentity ? `${mediaType}:${sourceIdentity}` : null;
 };
 
 const findShowInLocalLibrary = (
-  showsList: Array<Show & {
-    normTitle: string;
-    normOriginalTitle: string;
-  }>,
+  showsList: Show[],
   tmdbId: number | null,
   mediaType: 'tv' | 'movie'
-): (Show & {
-  normTitle: string;
-  normOriginalTitle: string;
-}) | undefined => {
+): Show | undefined => {
   if (!tmdbId) return undefined;
 
   const isCorrectMediaType = (show: Show): boolean => {
@@ -542,241 +415,81 @@ const findShowInLocalLibrary = (
   );
 };
 
-const PLEX_BACKEND_ENDPOINTS = [
-  'https://seenit.ai.studio/api/plex/history',
-  'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/history',
-  'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/history'
-];
+const PLEX_PRODUCTION_ORIGIN = 'https://seenit.ai.studio';
 
-const PLEX_RESOLVE_ENDPOINTS = [
-  'https://seenit.ai.studio/api/plex/resolve-slug',
-  'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug',
-  'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug'
-];
+function getPlexBackendUrl(pathname: string): string {
+  return Capacitor.isNativePlatform() ? `${PLEX_PRODUCTION_ORIGIN}${pathname}` : pathname;
+}
 
 async function fetchPlexHistoryData(token: string, clientId: string, delta: boolean, since?: number) {
   const isNative = Capacitor.isNativePlatform();
-  const urlsToTry = isNative 
-    ? [...PLEX_BACKEND_ENDPOINTS, '/api/plex/history'] 
-    : ['/api/plex/history', ...PLEX_BACKEND_ENDPOINTS];
+  const url = getPlexBackendUrl('/api/plex/history');
+  const timeoutMs = delta ? 45000 : 120000;
 
   appLogger.info('plex', `Début requête Plex (${isNative ? 'APK Natif' : 'PWA Web'}, Mode: ${delta ? 'Rapide' : 'Complet'})`);
 
-  for (const url of urlsToTry) {
-    // Skip relative path on native platform as it resolves to localhost
-    if (isNative && url === '/api/plex/history') continue;
+  try {
+    appLogger.info('plex', `Interrogation du backend Plex unique : ${url}`);
+    let isOk = false;
+    let status = 0;
+    let data: any = null;
 
-    try {
-      appLogger.info('plex', `Interrogation endpoint Backend : ${url}`);
-      let isOk = false;
-      let status = 0;
-      let data: any = null;
-
-      if (isNative) {
-        const nativeRes = await CapacitorHttp.post({
-          url,
-          headers: await getAuthenticatedHeaders({ 'Content-Type': 'application/json', 'Accept': 'application/json' }),
-          data: { token, clientId, delta, since },
-          connectTimeout: 20000,
-          readTimeout: 20000
-        });
-        status = nativeRes.status;
-        isOk = status >= 200 && status < 300;
-        if (isOk) {
-          data = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
-        }
-      } else {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 20000);
-        const res = await authenticatedFetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({ token, clientId, delta, since }),
-          signal: controller.signal
-        });
-        clearTimeout(timer);
-        status = res.status;
-        isOk = res.ok;
-        const contentType = res.headers.get('content-type') || '';
-        if (isOk && contentType.includes('application/json')) {
-          data = await res.json();
-        }
+    if (isNative) {
+      const nativeRes = await CapacitorHttp.post({
+        url,
+        headers: await getAuthenticatedHeaders({
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Plex-Token': token
+        }),
+        data: { clientId, delta, since },
+        connectTimeout: timeoutMs,
+        readTimeout: timeoutMs
+      });
+      status = nativeRes.status;
+      isOk = status >= 200 && status < 300;
+      if (isOk) {
+        data = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
       }
-
-      if (isOk && data && (Array.isArray(data.history) || Array.isArray(data.watchlist))) {
-        const histLen = Array.isArray(data.history) ? data.history.length : 0;
-        const watchLen = Array.isArray(data.watchlist) ? data.watchlist.length : 0;
-        appLogger.success('plex', `Données Plex reçues de ${url} : ${histLen} visionnage(s), ${watchLen} watchlist`);
-        return data;
-      } else {
-        appLogger.warn('plex', `Endpoint ${url} a répondu avec statut ${status}`);
+    } else {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const res = await authenticatedFetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Plex-Token': token
+        },
+        body: JSON.stringify({ clientId, delta, since }),
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+      status = res.status;
+      isOk = res.ok;
+      const contentType = res.headers.get('content-type') || '';
+      if (isOk && contentType.includes('application/json')) {
+        data = await res.json();
       }
-    } catch (e: any) {
-      appLogger.warn('plex', `Échec connexion endpoint ${url} : ${e?.message || e}`);
-      console.warn(`[Plex Sync] Call to ${url} failed, trying next fallback...`, e);
     }
-  }
 
-  appLogger.warn('plex', 'Tous les backends ont échoué ou ont expiré. Tentative d\'accès direct aux API Plex Cloud...');
-  // Fallback: Fetch directly from official Plex Cloud APIs on native device / fallback
-  return fetchPlexDirectlyFromClient(token, clientId);
+    if (isOk && data && (Array.isArray(data.history) || Array.isArray(data.watchlist))) {
+      const histLen = Array.isArray(data.history) ? data.history.length : 0;
+      const watchLen = Array.isArray(data.watchlist) ? data.watchlist.length : 0;
+      appLogger.success('plex', `Données Plex reçues : ${histLen} visionnage(s), ${watchLen} watchlist`);
+      return data;
+    }
+    throw new Error(`Backend Plex indisponible (HTTP ${status})`);
+  } catch (error: any) {
+    appLogger.error('plex', `Échec du backend Plex unique : ${error?.message || error}`);
+    throw error;
+  }
 }
 
-async function fetchPlexDirectlyFromClient(token: string, clientId: string) {
-  const rawWatchlistItems: any[] = [];
-  const rawHistoryItems: any[] = [];
-
-  const extractItems = (data: any): any[] => {
-    if (!data) return [];
-    if (Array.isArray(data)) return data;
-    if (Array.isArray(data.activities)) return data.activities;
-    if (data.MediaContainer && Array.isArray(data.MediaContainer.Metadata)) return data.MediaContainer.Metadata;
-    if (Array.isArray(data.Metadata)) return data.Metadata;
-    if (Array.isArray(data.items)) return data.items;
-    return [];
-  };
-
-  const isNative = Capacitor.isNativePlatform();
-
-  // 1. Fetch Watchlist
-  const watchlistEndpoints = [
-    'https://discover.provider.plex.tv/library/sections/watchlist/all?includeUserState=1',
-    'https://metadata.provider.plex.tv/library/sections/watchlist/all?includeUserState=1'
-  ];
-
-  for (const endpoint of watchlistEndpoints) {
-    try {
-      appLogger.info('plex', `Lecture Watchlist Plex Cloud direct (${endpoint.split('/')[2]})...`);
-      let data: any = null;
-      let isOk = false;
-
-      if (isNative) {
-        const nativeRes = await CapacitorHttp.get({
-          url: endpoint,
-          headers: {
-            'X-Plex-Token': token,
-            'Accept': 'application/json',
-            'X-Plex-Client-Identifier': clientId,
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          },
-          connectTimeout: 10000,
-          readTimeout: 10000
-        });
-        isOk = nativeRes.status >= 200 && nativeRes.status < 300;
-        if (isOk) {
-          data = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
-        }
-      } else {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 10000);
-        const res = await fetch(endpoint, {
-          headers: {
-            'X-Plex-Token': token,
-            'Accept': 'application/json',
-            'X-Plex-Client-Identifier': clientId,
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          },
-          signal: controller.signal
-        });
-        clearTimeout(timer);
-        isOk = res.ok;
-        if (isOk && (res.headers.get('content-type') || '').includes('application/json')) {
-          data = await res.json();
-        }
-      }
-
-      if (isOk && data) {
-        const items = extractItems(data);
-        if (items.length > 0) {
-          rawWatchlistItems.push(...items);
-          appLogger.success('plex', `Plex Cloud Watchlist direct : ${items.length} éléments récupérés`);
-          break;
-        }
-      }
-    } catch (err: any) {
-      appLogger.warn('plex', `Échec lecture Watchlist Plex Cloud direct: ${err?.message || err}`);
-      console.warn('[Plex Sync] Direct client watchlist fetch failed:', err);
-    }
-  }
-
-  // 2. Fetch Watched Activity & History directly from Plex Cloud
-  const historyEndpoints = [
-    'https://discover.provider.plex.tv/activities?includeUserState=1&limit=100',
-    'https://metadata.provider.plex.tv/library/metadata/userState?state=watched&limit=100'
-  ];
-
-  for (const endpoint of historyEndpoints) {
-    try {
-      appLogger.info('plex', `Lecture Historique Plex Cloud direct (${endpoint.split('/')[2]})...`);
-      let data: any = null;
-      let isOk = false;
-
-      if (isNative) {
-        const nativeRes = await CapacitorHttp.get({
-          url: endpoint,
-          headers: {
-            'X-Plex-Token': token,
-            'Accept': 'application/json',
-            'X-Plex-Client-Identifier': clientId,
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          },
-          connectTimeout: 10000,
-          readTimeout: 10000
-        });
-        isOk = nativeRes.status >= 200 && nativeRes.status < 300;
-        if (isOk) {
-          data = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
-        }
-      } else {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 10000);
-        const res = await fetch(endpoint, {
-          headers: {
-            'X-Plex-Token': token,
-            'Accept': 'application/json',
-            'X-Plex-Client-Identifier': clientId,
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          },
-          signal: controller.signal
-        });
-        clearTimeout(timer);
-        isOk = res.ok;
-        if (isOk && (res.headers.get('content-type') || '').includes('application/json')) {
-          data = await res.json();
-        }
-      }
-
-      if (isOk && data) {
-        const items = extractItems(data);
-        if (items.length > 0) {
-          for (const it of items) {
-            rawHistoryItems.push({ raw: it, source: 'Plex Cloud Direct' });
-          }
-          appLogger.success('plex', `Plex Cloud Historique direct : ${items.length} éléments vus trouvés`);
-        }
-      }
-    } catch (err: any) {
-      appLogger.warn('plex', `Échec lecture Historique Plex Cloud direct: ${err?.message || err}`);
-      console.warn('[Plex Sync] Direct client history fetch failed:', err);
-    }
-  }
-
-  return {
-    history: rawHistoryItems,
-    watchlist: rawWatchlistItems,
-    visitedSources: ['Plex Cloud Direct']
-  };
-}
-
-let activePlexSyncPromise: Promise<PlexSyncResult> | null = null;
+const activePlexSyncPromises = new Map<string, Promise<PlexSyncResult>>();
 
 export async function performPlexSync(options: { delta?: boolean; silent?: boolean; ignoreCooldown?: boolean } = {}): Promise<PlexSyncResult> {
   const { delta = true, silent = false, ignoreCooldown = false } = options;
-
-  if (activePlexSyncPromise) {
-    // // appLogger.info('plex', 'Une synchronisation Plex est déjà en cours, réutilisation de la requête existante...');
-    return activePlexSyncPromise;
-  }
 
   const syncExecution = async (): Promise<PlexSyncResult> => {
     const user = auth.currentUser;
@@ -785,10 +498,9 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       return { success: false, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [], error: 'Utilisateur non connecté' };
     }
 
-    const plexToken = localStorage.getItem('plex_auth_token') || localStorage.getItem('plex_token');
+    const plexToken = getStoredPlexToken(user.uid);
     const clientId = getPlexClientId();
-    const lastSyncTimestampStr = localStorage.getItem('plex_last_sync_timestamp');
-    const lastSyncTimestamp = lastSyncTimestampStr ? Number(lastSyncTimestampStr) : undefined;
+    const lastSyncTimestamp = getPlexLastSyncTimestamp(user.uid);
 
     if (!plexToken) {
       if (!silent) {
@@ -831,14 +543,14 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
     try {
       const plexData = await fetchPlexHistoryData(plexToken, clientId, delta, delta ? lastSyncTimestamp : undefined);
       const { history = [], watchlist = [], visitedSources = [] } = plexData || {};
-      localStorage.setItem('plex_last_sync_timestamp', String(Date.now()));
+      const nextSyncCursor = Number(plexData?.cursor) || Date.now();
       const hasHistory = Array.isArray(history) && history.length > 0;
       const hasWatchlist = Array.isArray(watchlist) && watchlist.length > 0;
 
       if (!hasHistory && !hasWatchlist) {
         const sourcesMsg = visitedSources && visitedSources.length > 0 ? ` (${visitedSources.join(', ')})` : '';
         // // appLogger.info('plex', `Plex vérifié : aucun nouveau média ni watchlist${sourcesMsg}`);
-        localStorage.setItem('plex_last_sync_timestamp', String(Date.now()));
+        setPlexLastSyncTimestamp(user.uid, nextSyncCursor);
         clearPlexSyncStatusDelayed('Sync Plex terminée (à jour)', 3500);
         return { success: true, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [] };
       }
@@ -854,29 +566,15 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
       // Load fresh shows from Firestore or current store
       const localShows = useShowsStore.getState().shows;
-      const showsList: Array<Show & { normTitle: string; normOriginalTitle: string }> = localShows
-        .filter(s => Number(s.tmdbId) !== 114108) // Filter out obsolete Cinderella 1899
-        .map((s) => ({
-          ...s,
-          normTitle: normalizeTitle(s.title),
-          normOriginalTitle: normalizeTitle(s.originalTitle || (s as any).original_name || (s as any).original_title)
-        }));
+      const showsList: Show[] = localShows.map((show) => ({ ...show }));
 
-      const resolutionCache = getResolutionCache();
+      const resolutionCache = getPlexResolutionCache(user.uid);
       let cacheModified = false;
 
       let syncCount = 0;
       let moviesCount = 0;
       let episodesCount = 0;
       const syncedItems: PlexSyncResult['syncedItems'] = [];
-
-      const deleteDocIds: string[] = [];
-      // Purge bad 1899 Cinderella from Firestore if present
-      for (const s of localShows) {
-        if (Number(s.tmdbId) === 114108 && s.id) {
-          deleteDocIds.push(s.id);
-        }
-      }
 
       const mutatedShows: Record<string, Show> = {};
 
@@ -896,7 +594,9 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         const pGuidStr = getPlexGuid(item) || '';
         const rawViewed = item.viewedAt;
         const viewedTimestamp = rawViewed ? (Number(rawViewed) < 10000000000 ? Number(rawViewed) * 1000 : Number(rawViewed)) : Date.now();
-        const guidTmdbId = extractTmdbIdFromPlex(item);
+        const isEpisode = type === 'episode' || !!item.grandparentTitle || !!item.parentTitle || pGuidStr.includes('/episode/');
+        const resolutionIdentityItem = isEpisode ? buildPlexParentShowIdentityItem(item) : item;
+        const guidTmdbId = extractTmdbIdFromPlex(resolutionIdentityItem);
 
         // 4. Ignorer explicitement les objets de type saison
         if (type === 'season' || pGuidStr.includes('/season/')) {
@@ -904,15 +604,14 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           continue;
         }
 
-        if (type === 'episode' || item.grandparentTitle || item.parentTitle || pGuidStr.includes('/episode/')) {
+        if (isEpisode) {
           const seasonNum = item.parentIndex !== undefined ? Number(item.parentIndex) : 1;
           const episodeNum = item.index !== undefined ? Number(item.index) : 1;
-          const showTitle = item.grandparentTitle || item.parentTitle || item.title;
-          if (!showTitle) continue;
+          const showTitle = item.grandparentTitle || item.parentTitle || item.title || 'Série inconnue';
 
           const epKey = `${seasonNum}x${episodeNum}`;
           const cleanShowTitle = showTitle.replace(/\(\d{4}\)/g, '').trim();
-          const cacheKey = buildPlexResolutionCacheKey('tv', guidTmdbId);
+          const cacheKey = buildPlexResolutionCacheKey('tv', resolutionIdentityItem);
 
           // 1. Check in local library by TMDB ID
           let matchedShow = findShowInLocalLibrary(showsList, guidTmdbId, 'tv');
@@ -949,19 +648,19 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               continue;
             }
 
-            if (tmdbData && cacheKey) {
+            if (cacheKey) {
               resolutionCache[cacheKey] = tmdbData;
               cacheModified = true;
+            }
 
-              // Check if we already have this TMDB ID in our library
-              matchedShow = showsList.find(
-                (s) => Number(s.tmdbId) === Number(tmdbData.id) && (s.mediaType === 'tv' || !s.mediaType)
-              );
-              if (matchedShow) {
-                const currentMutated = mutatedShows[matchedShow.id] || matchedShow;
-                if (currentMutated.seenEpisodes?.includes(epKey)) {
-                  continue; // Found via TMDB search and already seen! Skip!
-                }
+            // Déduplication uniquement après obtention du TMDB ID vérifié.
+            matchedShow = showsList.find(
+              (s) => Number(s.tmdbId) === Number(tmdbData.id) && (s.mediaType === 'tv' || !s.mediaType)
+            );
+            if (matchedShow) {
+              const currentMutated = mutatedShows[matchedShow.id] || matchedShow;
+              if (currentMutated.seenEpisodes?.includes(epKey)) {
+                continue;
               }
             }
           }
@@ -1039,11 +738,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             };
 
             mutatedShows[showId] = newShowData;
-            showsList.push({
-              ...newShowData,
-              normTitle: normalizeTitle(newShowData.title),
-              normOriginalTitle: normalizeTitle(newShowData.originalTitle)
-            });
+            showsList.push(newShowData);
 
             syncCount++;
             episodesCount++;
@@ -1061,11 +756,10 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             });
           }
         } else if (type === 'movie') {
-          const movieTitle = item.title;
-          if (!movieTitle) continue;
+          const movieTitle = item.title || 'Film inconnu';
 
           const cleanMovieTitle = movieTitle.replace(/\(\d{4}\)/g, '').trim();
-          const cacheKey = buildPlexResolutionCacheKey('movie', guidTmdbId);
+          const cacheKey = buildPlexResolutionCacheKey('movie', item);
 
           // 1. Check in local library by TMDB ID
           let matchedMovie = findShowInLocalLibrary(showsList, guidTmdbId, 'movie');
@@ -1108,35 +802,23 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               continue;
             }
 
-            if (tmdbData && cacheKey) {
+            if (cacheKey) {
               resolutionCache[cacheKey] = tmdbData;
               cacheModified = true;
-
-              // Check if we already have this TMDB ID in our library
-              matchedMovie = showsList.find(
-                (s) => Number(s.tmdbId) === Number(tmdbData.id) && s.mediaType === 'movie'
-              );
-              if (matchedMovie) {
-                const currentMutated = mutatedShows[matchedMovie.id] || matchedMovie;
-                const isSeen = currentMutated.seenEpisodes?.includes('movie') ||
-                               currentMutated.status === 'completed' ||
-                               !!currentMutated.episodeRecords?.['movie']?.watchedAt;
-                if (isSeen) {
-                  continue; // Found via TMDB search and already seen! Skip!
-                }
-              }
             }
-          }
 
-          // Auto-cleanup false-positive Cinderella 1899 (TMDB 114108) if Cinderella 2015 is being processed
-          const targetTmdbId = matchedMovie?.tmdbId || tmdbData?.id;
-          if (targetTmdbId === 150689) {
-            const bad1899 = showsList.find(s => Number(s.tmdbId) === 114108);
-            if (bad1899 && bad1899.id) {
-              deleteDocIds.push(bad1899.id);
-              const idx = showsList.findIndex(s => s.id === bad1899.id);
-              if (idx >= 0) showsList.splice(idx, 1);
-              delete mutatedShows[bad1899.id];
+            // Déduplication uniquement après obtention du TMDB ID vérifié.
+            matchedMovie = showsList.find(
+              (s) => Number(s.tmdbId) === Number(tmdbData.id) && s.mediaType === 'movie'
+            );
+            if (matchedMovie) {
+              const currentMutated = mutatedShows[matchedMovie.id] || matchedMovie;
+              const isSeen = currentMutated.seenEpisodes?.includes('movie') ||
+                             currentMutated.status === 'completed' ||
+                             !!currentMutated.episodeRecords?.['movie']?.watchedAt;
+              if (isSeen) {
+                continue;
+              }
             }
           }
 
@@ -1208,11 +890,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             };
 
             mutatedShows[showId] = newShowData;
-            showsList.push({
-              ...newShowData,
-              normTitle: normalizeTitle(newShowData.title),
-              normOriginalTitle: normalizeTitle(newShowData.originalTitle)
-            });
+            showsList.push(newShowData);
 
             syncCount++;
             moviesCount++;
@@ -1233,12 +911,11 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         for (const rawWlItem of watchlist) {
           const wlItem = rawWlItem.raw ? { ...rawWlItem.raw, ...rawWlItem } : rawWlItem;
           const mediaType: 'tv' | 'movie' = wlItem.type === 'show' || wlItem.type === 'series' || wlItem.type === 'tv' ? 'tv' : 'movie';
-          const rawTitle = wlItem.title || wlItem.grandparentTitle || '';
-          if (!rawTitle) continue;
+          const rawTitle = wlItem.title || wlItem.grandparentTitle || 'Média inconnu';
 
           const cleanTitle = rawTitle.replace(/\(\d{4}\)/g, '').trim();
           const guidTmdbId = extractTmdbIdFromPlex(wlItem);
-          const cacheKey = buildPlexResolutionCacheKey(mediaType, guidTmdbId);
+          const cacheKey = buildPlexResolutionCacheKey(mediaType, wlItem);
 
           // 1. Check if already in user's local library by TMDB ID
           let matchedShow = findShowInLocalLibrary(showsList, guidTmdbId, mediaType);
@@ -1265,15 +942,15 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               continue;
             }
 
-            if (tmdbData && cacheKey) {
+            if (cacheKey) {
               resolutionCache[cacheKey] = tmdbData;
               cacheModified = true;
-
-              matchedShow = showsList.find(
-                (s) => Number(s.tmdbId) === Number(tmdbData.id) && (s.mediaType === mediaType || (mediaType === 'tv' && !s.mediaType))
-              );
-              if (matchedShow) continue;
             }
+
+            matchedShow = showsList.find(
+              (s) => Number(s.tmdbId) === Number(tmdbData.id) && (s.mediaType === mediaType || (mediaType === 'tv' && !s.mediaType))
+            );
+            if (matchedShow) continue;
           }
 
           // 4. Create new show in 'plan_to_watch' status ("À Voir" / "Ma Liste")
@@ -1309,11 +986,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             };
 
             mutatedShows[showId] = newShowData;
-            showsList.push({
-              ...newShowData,
-              normTitle: normalizeTitle(newShowData.title),
-              normOriginalTitle: normalizeTitle(newShowData.originalTitle)
-            });
+            showsList.push(newShowData);
 
             syncCount++;
             if (mediaType === 'movie') moviesCount++;
@@ -1331,20 +1004,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       }
 
       if (cacheModified) {
-        saveResolutionCache(resolutionCache);
-      }
-
-      // 1. Execute deletions if any bad entries were flagged
-      if (deleteDocIds.length > 0) {
-        try {
-          const delBatch = writeBatch(db);
-          for (const delId of deleteDocIds) {
-            delBatch.delete(doc(db, `users/${user.uid}/shows`, delId));
-          }
-          await delBatch.commit();
-        } catch (delErr) {
-          console.warn('[Plex Sync] Warning deleting bad items:', delErr);
-        }
+        setPlexResolutionCache(user.uid, resolutionCache);
       }
 
       if (syncCount > 0 || Object.keys(mutatedShows).length > 0) {
@@ -1363,11 +1023,9 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         }
 
         // appLogger.success('plex', `Batch Firestore validé avec succès (${syncCount} élément(s) mis à jour)`);
-        localStorage.setItem('plex_last_sync_timestamp', String(Date.now()));
-
         // 3. Optimistically update the store
         const currentShows = useShowsStore.getState().shows;
-        const mergedShows = currentShows.filter(s => Number(s.tmdbId) !== 114108 && !deleteDocIds.includes(s.id));
+        const mergedShows = [...currentShows];
         Object.keys(mutatedShows).forEach((showId) => {
           const mut = cleanShowForFirestore(mutatedShows[showId], user.uid) as Show;
           const idx = mergedShows.findIndex((s) => s.id === showId || (s.tmdbId && mut.tmdbId && Number(s.tmdbId) === Number(mut.tmdbId) && s.mediaType === mut.mediaType));
@@ -1401,14 +1059,11 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
         clearPlexSyncStatusDelayed(`Synchro terminée (${syncCount} nouveau(x))`, 3500);
       } else {
-        // Clean local store of bad entries if any were deleted
-        if (deleteDocIds.length > 0) {
-          const currentShows = useShowsStore.getState().shows.filter(s => Number(s.tmdbId) !== 114108 && !deleteDocIds.includes(s.id));
-          useShowsStore.getState().setShows(currentShows);
-        }
         // // appLogger.info('plex', 'Synchronisation terminée : 0 nouveau média (votre bibliothèque est déjà à jour)');
         clearPlexSyncStatusDelayed('Sync Plex terminée (à jour)', 3500);
       }
+
+      setPlexLastSyncTimestamp(user.uid, nextSyncCursor);
 
       return {
         success: true,
@@ -1428,11 +1083,18 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
     }
   };
 
-  activePlexSyncPromise = syncExecution().finally(() => {
-    activePlexSyncPromise = null;
-  });
+  const currentUserId = auth.currentUser?.uid;
+  if (!currentUserId) {
+    return syncExecution();
+  }
+  const active = activePlexSyncPromises.get(currentUserId);
+  if (active) return active;
 
-  return activePlexSyncPromise;
+  const promise = syncExecution().finally(() => {
+    activePlexSyncPromises.delete(currentUserId);
+  });
+  activePlexSyncPromises.set(currentUserId, promise);
+  return promise;
 }
 
 /**
@@ -1462,7 +1124,7 @@ export function getPlexClientIdentifier(): string {
  * Génère les en-têtes HTTP authentifiés officiels requis pour toutes les requêtes vers l'API Plex
  */
 export function getPlexHeaders(): Record<string, string> {
-  const token = localStorage.getItem('plex_auth_token') || localStorage.getItem('plex_token') || '';
+  const token = getStoredPlexToken(auth.currentUser?.uid) || '';
   const headers: Record<string, string> = {
     'X-Plex-Product': 'SeenIt',
     'X-Plex-Version': CURRENT_APP_VERSION || '1.4.0',
@@ -1481,8 +1143,6 @@ export function getPlexHeaders(): Record<string, string> {
 export const openPlexWatchUrl = async (show: any) => {
   const tmdbId = show?.tmdbId;
   const title = show?.title || show?.name || '';
-  const originalTitle = show?.originalTitle || show?.original_title || show?.original_name || '';
-  const year = show?.year || (show?.releaseDate ? show.releaseDate.substring(0, 4) : undefined) || (show?.firstAirDate ? show.firstAirDate.substring(0, 4) : undefined);
   const type = (show?.mediaType === 'tv' || show?.mediaType === 'show' || show?.type === 'show') ? 'show' : 'movie';
   const showId = show?.id;
   const userId = auth.currentUser?.uid;
@@ -1493,13 +1153,36 @@ export const openPlexWatchUrl = async (show: any) => {
   }
 
   const expectedResolvedFrom = `tmdb:${tmdbId}`;
+
+  const verifiedAvailability = userId
+    ? usePlexAvailabilityStore.getState().getMediaAvailability(
+        getPlexMediaKey(tmdbId, type === 'show' ? 'tv' : 'movie', userId)
+      )
+    : undefined;
+
+  if (
+    verifiedAvailability?.available &&
+    verifiedAvailability.serverId &&
+    verifiedAvailability.ratingKey &&
+    verifiedAvailability.plexUrl
+  ) {
+    appLogger.info('plex', `[Plex Official] Ouverture de l'élément personnel vérifié (${verifiedAvailability.serverId}/${verifiedAvailability.ratingKey}).`);
+    const opened = await openExternalUrl(verifiedAvailability.plexUrl);
+    if (!opened) {
+      useToastStore.getState().showToast(`Impossible d'ouvrir Plex sur cet appareil.`, 'error');
+    }
+    return;
+  }
   
   if (
     show?.plexSlug &&
     show?.plexResolvedFrom === expectedResolvedFrom
   ) {
     appLogger.info('plex', `[Plex Official] Slug BDD validé : "${show.plexSlug}" (${show.plexResolvedFrom}) -> https://watch.plex.tv/${type}/${show.plexSlug}`);
-    openExternalUrl(`https://watch.plex.tv/${type}/${show.plexSlug}`);
+    const opened = await openExternalUrl(`https://watch.plex.tv/${type}/${show.plexSlug}`);
+    if (!opened) {
+      useToastStore.getState().showToast(`Impossible d'ouvrir Plex sur cet appareil.`, 'error');
+    }
     return;
   }
 
@@ -1539,7 +1222,11 @@ export const openPlexWatchUrl = async (show: any) => {
     }
 
     const results = data?.MediaContainer?.Metadata || data?.MediaContainer?.SearchResult;
-    const match = Array.isArray(results) && results.length > 0 ? results[0] : null;
+    const match = Array.isArray(results)
+      ? results.find((item: any) =>
+          item?.slug && isStrictPlexIdentityMatch(item, { tmdbId, mediaType: type })
+        )
+      : null;
 
     if (match && match.slug) {
       resolvedSlug = match.slug;
@@ -1553,63 +1240,44 @@ export const openPlexWatchUrl = async (show: any) => {
 
   // 2. FALLBACK VIA BACKEND SI NÉCESSAIRE
   if (!resolvedSlug) {
-    const RESOLVE_ENDPOINTS = isNative
-      ? [
-          'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug',
-          'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug'
-        ]
-      : [
-          '/api/plex/resolve-slug',
-          'https://ais-pre-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug',
-          'https://ais-dev-mooctibtw2amkshvkzlqij-700628279309.europe-west2.run.app/api/plex/resolve-slug'
-        ];
+    const resolveEndpoint = getPlexBackendUrl('/api/plex/resolve-slug');
 
     const clientId = getPlexClientIdentifier();
     const queryParams = new URLSearchParams();
     queryParams.set('tmdbId', String(tmdbId));
-    if (title) queryParams.set('title', title);
-    if (originalTitle) queryParams.set('originalTitle', originalTitle);
-    if (year) queryParams.set('year', String(year));
     queryParams.set('type', type);
     if (clientId) queryParams.set('clientId', clientId);
 
-    for (const ep of RESOLVE_ENDPOINTS) {
-      try {
-        let data: any = null;
-        const fullUrl = `${ep}?${queryParams.toString()}`;
+    try {
+      let data: any = null;
+      const fullUrl = `${resolveEndpoint}?${queryParams.toString()}`;
 
-        if (isNative) {
-          const nativeRes = await CapacitorHttp.get({
-            url: fullUrl,
-            headers: await getAuthenticatedHeaders(plexHeaders),
-            connectTimeout: 8000,
-            readTimeout: 8000
-          });
-          if (nativeRes.status >= 200 && nativeRes.status < 300) {
-            data = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
-          }
-        } else {
-          const response = await authenticatedFetch(fullUrl, {
-            headers: plexHeaders
-          });
-          if (response.ok) {
-            data = await response.json();
-          }
+      if (isNative) {
+        const nativeRes = await CapacitorHttp.get({
+          url: fullUrl,
+          headers: await getAuthenticatedHeaders(plexHeaders),
+          connectTimeout: 8000,
+          readTimeout: 8000
+        });
+        if (nativeRes.status >= 200 && nativeRes.status < 300) {
+          data = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
         }
-
-        if (
-          data?.slug &&
-          data?.resolvedFrom &&
-          data.resolvedFrom === expectedResolvedFrom
-        ) {
-          resolvedSlug = data.slug;
-          resolvedGuid = data.plexGuid || data.guid || null;
-          resolvedFrom = data.resolvedFrom;
-          break;
+      } else {
+        const response = await authenticatedFetch(fullUrl, {
+          headers: plexHeaders
+        });
+        if (response.ok) {
+          data = await response.json();
         }
-      } catch (error) {
-        // Ignorer l'erreur et essayer le suivant
       }
+
+      if (data?.slug && data?.resolvedFrom === expectedResolvedFrom) {
+        resolvedSlug = data.slug;
+        resolvedGuid = data.plexGuid || data.guid || null;
+        resolvedFrom = data.resolvedFrom;
+      }
+    } catch (error) {
+      appLogger.warn('plex', `[Plex Official] Backend de résolution indisponible.`);
     }
   }
 
@@ -1645,12 +1313,19 @@ export const openPlexWatchUrl = async (show: any) => {
         console.warn('Failed to save plexSlug to DB', err);
       }
     }
-    openExternalUrl(`https://watch.plex.tv/${type}/${resolvedSlug}`);
+    const opened = await openExternalUrl(`https://watch.plex.tv/${type}/${resolvedSlug}`);
+    if (!opened) {
+      useToastStore.getState().showToast(`Impossible d'ouvrir Plex sur cet appareil.`, 'error');
+    }
     return;
   }
 
   // 4. En cas d'échec de résolution du slug : NE PAS rediriger vers l'accueil watch.plex.tv !
   appLogger.error('plex', `[Plex Official] ❌ Impossible de résoudre la fiche Plex pour "${title || 'Média'}" (TMDB: ${tmdbId || 'N/A'}). Redirection annulée pour éviter l'accueil.`);
+  useToastStore.getState().showToast(
+    `Impossible d'ouvrir ce média dans Plex : aucun identifiant Plex vérifié.`,
+    'error'
+  );
 };
 
 /**
@@ -1708,11 +1383,12 @@ export const purgeAllPlexSlugsInDb = async (): Promise<number> => {
 
 // Auto-purge unique pour nettoyer les anciens slugs corrompus des versions précédentes
 if (typeof window !== 'undefined') {
-  const PURGE_KEY = 'seenit_plex_slugs_purged_v1.4.17';
   auth.onAuthStateChanged((user) => {
-    if (user?.uid && localStorage.getItem(PURGE_KEY) !== 'true') {
+    if (!user?.uid) return;
+    const purgeKey = getPlexUserStorageKey(user.uid, 'slugPurgeVersion');
+    if (localStorage.getItem(purgeKey) !== '1.4.38') {
       purgeAllPlexSlugsInDb().then(() => {
-        localStorage.setItem(PURGE_KEY, 'true');
+        localStorage.setItem(purgeKey, '1.4.38');
       }).catch(() => {});
     }
   });

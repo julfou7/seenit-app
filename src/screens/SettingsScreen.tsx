@@ -20,6 +20,14 @@ import { performPlexSync, purgeAllPlexSlugsInDb } from '../features/plex/syncPle
 import { SeenItLogo } from '../components/SeenItLogo';
 import { ChangelogViewer } from '../components/ChangelogViewer';
 import { downloadAndInstallApk, UpdateProgress } from '../services/appUpdater';
+import {
+  activatePlexUserScope,
+  clearPlexCredentials,
+  getStoredPlexToken,
+  getStoredPlexUsername,
+  storePlexCredentials
+} from '../features/plex/plexStorage';
+import { usePlexAvailabilityStore } from '../features/plex/plexAvailability';
 
 const STREAMING_PLATFORMS = [
   { id: 8, name: 'Netflix' },
@@ -72,7 +80,7 @@ export function SettingsScreen() {
   // Plex Auth State
   const [plexPin, setPlexPin] = useState<any>(null);
   const [plexToken, setPlexToken] = useState<string | null>(
-    localStorage.getItem('plex_auth_token') || localStorage.getItem('plex_token') || null
+    getStoredPlexToken(auth.currentUser?.uid)
   );
   const [plexSyncMode, setPlexSyncMode] = useState<'delta' | 'full' | null>(null);
 
@@ -88,19 +96,16 @@ export function SettingsScreen() {
         try {
           const res = await checkPlexPin(plexPin.id);
           if (res.authToken) {
-            setPlexToken(res.authToken);
-            localStorage.setItem('plex_auth_token', res.authToken);
-            localStorage.setItem('plex_token', res.authToken);
-            if (res.username) {
-              localStorage.setItem('plex_username', res.username);
+            if (!user?.uid) {
+              throw new Error('Utilisateur SeenIt non connecté');
             }
-            if (user) {
-              try {
-                const plexRef = doc(db, 'users', user.uid, 'settings', 'plex');
-                await setDoc(plexRef, { authToken: res.authToken, username: res.username || '' }, { merge: true });
-              } catch (err) {
-                console.error('[Settings] Erreur sauvegarde Plex dans Firestore:', err);
-              }
+            setPlexToken(res.authToken);
+            storePlexCredentials(user.uid, res.authToken, res.username || '');
+            try {
+              const plexRef = doc(db, 'users', user.uid, 'settings', 'plex');
+              await setDoc(plexRef, { authToken: res.authToken, username: res.username || '' }, { merge: true });
+            } catch (err) {
+              console.error('[Settings] Erreur sauvegarde Plex dans Firestore:', err);
             }
             setPlexPin(null);
             showToast("Compte Plex connecté !", "success");
@@ -144,9 +149,8 @@ export function SettingsScreen() {
 
   const handlePlexLogout = async () => {
     setPlexToken(null);
-    localStorage.removeItem('plex_auth_token');
-    localStorage.removeItem('plex_token');
-    localStorage.removeItem('plex_username');
+    clearPlexCredentials(user?.uid);
+    usePlexAvailabilityStore.getState().clearCache();
     if (user) {
       try {
         const plexRef = doc(db, 'users', user.uid, 'settings', 'plex');
@@ -178,6 +182,9 @@ export function SettingsScreen() {
     window.addEventListener('storage', handleStorage);
         
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      const scopeChanged = activatePlexUserScope(currentUser?.uid);
+      if (scopeChanged) usePlexAvailabilityStore.getState().clearCache();
+      setPlexToken(getStoredPlexToken(currentUser?.uid));
       setUser(currentUser);
       if (currentUser) {
         try {
@@ -212,21 +219,14 @@ export function SettingsScreen() {
           // 3. Configuration Plex synchronisée
           const plexRef = doc(db, 'users', currentUser.uid, 'settings', 'plex');
           const snapPlex = await getDoc(plexRef);
-          const localPlexToken = localStorage.getItem('plex_auth_token') || localStorage.getItem('plex_token');
 
           if (snapPlex.exists() && snapPlex.data()?.authToken) {
             const cloudPlexToken = snapPlex.data().authToken;
             setPlexToken(cloudPlexToken);
-            localStorage.setItem('plex_auth_token', cloudPlexToken);
-            localStorage.setItem('plex_token', cloudPlexToken);
-            if (snapPlex.data()?.username) {
-              localStorage.setItem('plex_username', snapPlex.data().username);
-            }
-          } else if (localPlexToken) {
-            await setDoc(plexRef, { 
-              authToken: localPlexToken, 
-              username: localStorage.getItem('plex_username') || '' 
-            }, { merge: true });
+            storePlexCredentials(currentUser.uid, cloudPlexToken, snapPlex.data()?.username || '');
+          } else {
+            setPlexToken(null);
+            clearPlexCredentials(currentUser.uid);
           }
         } catch (e: any) {
           const errorMessage = e?.message || String(e);
@@ -239,6 +239,8 @@ export function SettingsScreen() {
             console.error('[Settings] Error syncing cloud settings', e);
           }
         }
+      } else {
+        setPlexToken(null);
       }
     });
 
@@ -264,10 +266,10 @@ export function SettingsScreen() {
         const notifRef = doc(db, 'users', user.uid, 'settings', 'notifications');
         await setDoc(notifRef, notificationPrefs, { merge: true });
 
-        const plexTokenLocal = localStorage.getItem('plex_auth_token') || localStorage.getItem('plex_token');
+        const plexTokenLocal = getStoredPlexToken(user.uid);
         if (plexTokenLocal) {
           const plexRef = doc(db, 'users', user.uid, 'settings', 'plex');
-          await setDoc(plexRef, { authToken: plexTokenLocal, username: localStorage.getItem('plex_username') || '' }, { merge: true });
+          await setDoc(plexRef, { authToken: plexTokenLocal, username: getStoredPlexUsername(user.uid) }, { merge: true });
         }
 
         showToast(`✅ ${res.count} série(s) & vos réglages synchronisés avec le Cloud !`, "success");
@@ -309,11 +311,7 @@ export function SettingsScreen() {
       const snapPlex = await getDoc(plexRef);
       if (snapPlex.exists() && snapPlex.data()?.authToken) {
         setPlexToken(snapPlex.data().authToken);
-        localStorage.setItem('plex_auth_token', snapPlex.data().authToken);
-        localStorage.setItem('plex_token', snapPlex.data().authToken);
-        if (snapPlex.data()?.username) {
-          localStorage.setItem('plex_username', snapPlex.data().username);
-        }
+        storePlexCredentials(user.uid, snapPlex.data().authToken, snapPlex.data()?.username || '');
       }
 
       showToast("✅ Données Cloud rechargées avec succès !", "success");
@@ -400,6 +398,8 @@ export function SettingsScreen() {
 
   const handleLogout = async () => {
     localStorage.setItem('explicit_logout', 'true');
+    clearPlexCredentials(auth.currentUser?.uid);
+    usePlexAvailabilityStore.getState().clearCache();
     await signOut(auth);
   };
 

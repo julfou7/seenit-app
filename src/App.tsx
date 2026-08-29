@@ -35,6 +35,8 @@ import { markEpisodeWatched } from './features/shows/markEpisodeWatched';
 import { cn } from './lib/utils';
 import { cleanOldCache } from './db/dexie';
 import './store/showsStore';
+import { activatePlexUserScope } from './features/plex/plexStorage';
+import { usePlexAvailabilityStore } from './features/plex/plexAvailability';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null | undefined>(undefined);
@@ -51,6 +53,9 @@ export default function App() {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
+      if (activatePlexUserScope(user?.uid)) {
+        usePlexAvailabilityStore.getState().clearCache();
+      }
       setCurrentUser(user);
       if (user) {
         try {

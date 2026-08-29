@@ -743,24 +743,6 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       }
     });
 
-    if (show?.title && show.title !== 'Chargement...') {
-      checkPlexAvailability({
-        tmdbId: effectiveTmdbId,
-        title: show.title,
-        originalTitle: (show as any)?.originalTitle || (show as any)?.original_title,
-        year: (show?.firstAirDate)?.slice(0, 4),
-        mediaType: targetMediaType === 'tv' ? 'tv' : 'movie'
-      }).then(info => {
-        if (isMounted) {
-          setPlexMediaInfo(info);
-        }
-      }).catch(() => {
-        if (isMounted) {
-          setPlexMediaInfo({ available: false, lastChecked: Date.now() });
-        }
-      });
-    }
-
     // Récupération et Nettoyage des thèmes profonds (keywords)
     tmdb.getMediaKeywords(effectiveTmdbId, targetMediaType).then(res => {
       if (res.ok && isMounted) {

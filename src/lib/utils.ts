@@ -25,8 +25,8 @@ export async function openExternalUrl(
     tmdbId?: number | string;
     imdbId?: string;
   }
-) {
-  if (!url) return;
+): Promise<boolean> {
+  if (!url) return false;
   
   let targetUrl = url;
 
@@ -41,17 +41,21 @@ export async function openExternalUrl(
       appLogger.info('plex', `[Plex DeepLink] Redirection via intent système : ${targetUrl}`);
       try {
         const res = await AppLauncher.openUrl({ url: targetUrl });
-        if (res && res.completed) return;
+        if (res && res.completed) return true;
       } catch (err) {
         // Fallback
       }
       try {
         await Browser.open({ url: targetUrl, windowName: '_system' });
-        return;
+        return true;
       } catch (e) {
-        window.location.href = targetUrl;
+        try {
+          window.location.href = targetUrl;
+          return true;
+        } catch {
+          return false;
+        }
       }
-      return;
     }
 
 
@@ -70,7 +74,7 @@ export async function openExternalUrl(
         try {
           const res = await AppLauncher.openUrl({ url: rUrl });
           if (res && res.completed) {
-            return;
+            return true;
           }
         } catch (err) {
           console.warn('AppLauncher openUrl failed for Reddit URL:', rUrl, err);
@@ -79,7 +83,7 @@ export async function openExternalUrl(
 
       try {
         await Browser.open({ url, windowName: '_system' });
-        return;
+        return true;
       } catch (e) {
         console.warn('Browser.open failed for Reddit URL', e);
       }
@@ -89,7 +93,7 @@ export async function openExternalUrl(
     try {
       const res = await AppLauncher.openUrl({ url });
       if (res && res.completed) {
-        return;
+        return true;
       }
     } catch (err) {
       // Fallback Chrome Custom Tabs si pas d'application associée
@@ -97,14 +101,14 @@ export async function openExternalUrl(
 
     try {
       await Browser.open({ url, windowName: '_system' });
-      return;
+      return true;
     } catch (e) {
       console.warn('Browser.open failed, falling back to window.open', e);
     }
   }
 
   // Sur le Web, ouvrir l'URL officielle directement (watch.plex.tv supporte les slugs de médias)
-  window.open(url, '_blank', 'noopener,noreferrer');
+  return window.open(url, '_blank', 'noopener,noreferrer') !== null;
 }
 
 /**
@@ -475,6 +479,5 @@ export function scrollAllCarouselsToStart() {
   setTimeout(scroll, 250);
   setTimeout(scroll, 500);
 }
-
 
 

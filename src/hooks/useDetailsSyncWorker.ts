@@ -6,6 +6,7 @@ import { getNextEpisodeNumber, computeAutoArchiveStatus, getTodayStr } from '../
 import { useSyncStore } from '../store/syncStore';
 import { useShowsStore } from '../store/showsStore';
 import { performPlexSync } from '../features/plex/syncPlex';
+import { getPlexLastSyncTimestamp, getStoredPlexToken } from '../features/plex/plexStorage';
 
 export async function performDetailsSync(forceAll = false): Promise<{ success: boolean; syncedCount: number; error?: string }> {
   const setSyncStatus = useSyncStore.getState().setSyncStatus;
@@ -484,19 +485,17 @@ export function useDetailsSyncWorker() {
     const runPlexSync = () => {
       const now = Date.now();
       // Verifier si une synchronisation Plex a eu lieu lors des 30 dernieres minutes (persiste dans localStorage)
-      const lastSyncTimestampStr = localStorage.getItem('plex_last_sync_timestamp');
-      if (lastSyncTimestampStr) {
-        const lastSyncTimestamp = Number(lastSyncTimestampStr);
-        if (!isNaN(lastSyncTimestamp) && now - lastSyncTimestamp < 30 * 60 * 1000) {
-          return;
-        }
+      const currentUser = auth.currentUser;
+      const lastSyncTimestamp = getPlexLastSyncTimestamp(currentUser?.uid);
+      if (lastSyncTimestamp && now - lastSyncTimestamp < 30 * 60 * 1000) {
+        return;
       }
 
       if (now - lastPlexRunRef.current < 15 * 60 * 1000) return;
       lastPlexRunRef.current = now;
 
-      const hasPlexToken = localStorage.getItem('plex_auth_token') || localStorage.getItem('plex_token');
-      if (auth.currentUser && hasPlexToken) {
+      const hasPlexToken = getStoredPlexToken(currentUser?.uid);
+      if (currentUser && hasPlexToken) {
         performPlexSync({ delta: true, silent: false }).catch(console.error);
       }
     };
@@ -525,8 +524,9 @@ export function useDetailsSyncWorker() {
 
     // Periodic check every 15 minutes in the background
     const plexInterval = setInterval(() => {
-      const hasPlexToken = localStorage.getItem('plex_auth_token') || localStorage.getItem('plex_token');
-      if (auth.currentUser && hasPlexToken) {
+      const currentUser = auth.currentUser;
+      const hasPlexToken = getStoredPlexToken(currentUser?.uid);
+      if (currentUser && hasPlexToken) {
         runPlexSync();
       }
     }, 15 * 60 * 1000);
@@ -746,4 +746,3 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
     return { success: false, error: err?.message || String(err) };
   }
 }
-

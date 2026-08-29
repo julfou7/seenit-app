@@ -10,6 +10,7 @@ import multer from "multer";
 import dns from "node:dns/promises";
 import net from "node:net";
 import { timingSafeEqual } from "node:crypto";
+import { extractPlexExternalIds, getStrongPlexSourceIdentity } from "./src/features/plex/plexIdentity.ts";
 
 export interface AuthRequest extends Request {
   user?: DecodedIdToken;
@@ -317,13 +318,8 @@ async function startServer() {
         tmdbId,
         imdbId,
         tvdbId,
-        title,
-        originalTitle,
-        year,
         type,
-        clientId,
-        token,
-        plexToken: paramPlexToken
+        clientId
       } = params;
 
       const normalizedTmdbId =
@@ -346,10 +342,6 @@ async function startServer() {
         !!normalizedImdbId ||
         !!normalizedTvdbId;
 
-      const cleanTitle = typeof title === 'string' ? title.trim() : '';
-      const cleanOriginalTitle = typeof originalTitle === 'string' ? originalTitle.trim() : '';
-      const cleanYear = year ? Number(year) : null;
-
       const targetType =
         type === 'show' ||
         type === 'series' ||
@@ -371,10 +363,6 @@ async function startServer() {
 
       const resolvedToken =
         (typeof req.headers['x-plex-token'] === 'string' && req.headers['x-plex-token']) ||
-        (typeof token === 'string' && token) ||
-        (typeof paramPlexToken === 'string' && paramPlexToken) ||
-        process.env.PLEX_TOKEN ||
-        process.env.PLEX_AUTH_TOKEN ||
         '';
 
       console.log(
@@ -383,27 +371,29 @@ async function startServer() {
         `imdbId=${normalizedImdbId ?? 'ABSENT'}, ` +
         `tvdbId=${normalizedTvdbId ?? 'ABSENT'}, ` +
         `hasExternalId=${hasExternalId}, ` +
-        `title="${cleanTitle || cleanOriginalTitle || 'ABSENT'}", ` +
-        `year=${cleanYear ?? 'ABSENT'}, ` +
         `type=${targetType}, ` +
-        `token=${resolvedToken ? `PRÉSENT (${resolvedToken.substring(0, 4)}...)` : 'ABSENT'}`
+        `token=${resolvedToken ? 'PRÉSENT' : 'ABSENT'}`
       );
 
-      if (!hasExternalId && !cleanTitle && !cleanOriginalTitle) {
+      if (!hasExternalId) {
         console.warn(
-          '[Plex Resolve Backend] Aucun identifiant ni titre valide fourni.'
+          '[Plex Resolve Backend] Aucun identifiant externe vérifiable fourni.'
         );
 
         return res.status(400).json({
           success: false,
           slug: null,
-          error: 'TMDB, IMDb, TVDB ou Titre requis'
+          error: 'Identifiant TMDB, IMDb ou TVDB requis'
         });
+      }
+
+      if (!resolvedToken) {
+        return res.status(400).json({ success: false, slug: null, error: 'Jeton Plex manquant' });
       }
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.17',
+        'X-Plex-Version': '1.4.38',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
@@ -464,9 +454,10 @@ async function startServer() {
           }
         };
 
-        if (Array.isArray(item?.Guid)) {
-          for (const guid of item.Guid) {
-            addGuid(guid?.id);
+        for (const guidList of [item?.Guid, item?.guids]) {
+          if (!Array.isArray(guidList)) continue;
+          for (const guid of guidList) {
+            addGuid(typeof guid === 'string' ? guid : guid?.id);
           }
         }
 
@@ -515,36 +506,6 @@ async function startServer() {
         // 3. Match par TVDB ID
         if (normalizedTvdbId && guids.tvdbIds.has(normalizedTvdbId)) {
           return true;
-        }
-
-        // 4. Match par Titre + Année (uniquement si aucun ID externe n'est fourni)
-        if (!hasExternalId) {
-          const normalizeStr = (s: string) =>
-            s
-              .toLowerCase()
-              .normalize('NFD')
-              .replace(/[\u0300-\u036f]/g, '')
-              .replace(/[^a-z0-9]/g, '');
-
-          const itemTitleNorm = normalizeStr(item.title || '');
-          const itemOrigTitleNorm = normalizeStr(item.originalTitle || '');
-          const searchTitleNorm = cleanTitle ? normalizeStr(cleanTitle) : '';
-          const searchOrigTitleNorm = cleanOriginalTitle ? normalizeStr(cleanOriginalTitle) : '';
-
-          const titleMatches =
-            (searchTitleNorm && (itemTitleNorm === searchTitleNorm || itemOrigTitleNorm === searchTitleNorm)) ||
-            (searchOrigTitleNorm && (itemTitleNorm === searchOrigTitleNorm || itemOrigTitleNorm === searchOrigTitleNorm));
-
-          if (titleMatches) {
-            if (cleanYear && item.year) {
-              const yearDiff = Math.abs(Number(item.year) - Number(cleanYear));
-              if (yearDiff <= 1) {
-                return true;
-              }
-            } else if (!cleanYear) {
-              return true;
-            }
-          }
         }
 
         return false;
@@ -599,7 +560,7 @@ async function startServer() {
             return null;
           }
 
-          const match = results.find(item => isItemStrictMatch(item) && item.slug) || (results[0]?.slug ? results[0] : null);
+          const match = results.find(item => isItemStrictMatch(item) && item.slug);
           if (match && match.slug) {
             return formatResponseItem(match, guid.replace('://', ':'));
           }
@@ -637,125 +598,8 @@ async function startServer() {
         }
       }
 
-      // SI DES IDENTIFIANTS EXTERNES ÉTAIENT FOURNIS, ON NE TENTE SURTOUT PAS DE FALLBACK PAR TITRE
-      if (hasExternalId) {
-        console.warn(
-          `[Plex Resolve Backend] ❌ Échec de la résolution par identifiants externes (${[
-            normalizedTmdbId ? `tmdb:${normalizedTmdbId}` : '',
-            normalizedImdbId ? `imdb:${normalizedImdbId}` : '',
-            normalizedTvdbId ? `tvdb:${normalizedTvdbId}` : ''
-          ].filter(Boolean).join(', ')}). Fallback titre désactivé pour empêcher tout faux positif.`
-        );
-
-        return res.json({
-          success: false,
-          slug: null,
-          error: 'Aucun match Plex exact pour les identifiants fournis'
-        });
-      }
-
-      // --- ÉTAPE 2 : DISCOVER SEARCH GLOBALE (discover.provider.plex.tv) - UNIQUEMENT SI SANS IDENTIFIANT EXTERNE ---
-      const queryDiscoverSearch = async (queryText: string): Promise<any | null> => {
-        if (!queryText) return null;
-
-        const searchUrl =
-          'https://discover.provider.plex.tv/library/search' +
-          `?query=${encodeURIComponent(queryText)}` +
-          `&searchTypes=${plexType === 1 ? 'movies' : 'tv'}` +
-          `&includeGuids=1` +
-          `&includeMeta=1` +
-          `&limit=15`;
-
-        console.log(`[Plex Resolve Backend] [Étape 2] Recherche discover.provider.plex.tv : "${queryText}"`);
-
-        try {
-          const response = await fetch(searchUrl, {
-            headers,
-            signal: AbortSignal.timeout(6000)
-          });
-
-          console.log(`[Plex Resolve Backend] [Étape 2] "${queryText}" → ${response.status} ${response.statusText}`);
-
-          if (!response.ok) return null;
-
-          const data = await response.json();
-          const results = extractResults(data);
-
-          if (results.length === 0) return null;
-
-          const match = results.find(item => isItemStrictMatch(item) && item.slug);
-          if (match) {
-            return formatResponseItem(match, `discover:${queryText}`);
-          }
-          return null;
-        } catch (error: any) {
-          console.warn(`[Plex Resolve Backend] [Étape 2] Erreur "${queryText}":`, error?.message || error);
-          return null;
-        }
-      };
-
-      // 2.A : Recherche Discover par Titre / Titre original
-      const discoverQueries = new Set<string>();
-      if (cleanTitle) discoverQueries.add(cleanTitle);
-      if (cleanOriginalTitle) discoverQueries.add(cleanOriginalTitle);
-
-      for (const q of discoverQueries) {
-        const resDiscover = await queryDiscoverSearch(q);
-        if (resDiscover) {
-          console.log(`[Plex Resolve Backend] ✅ [Étape 2] Discover "${q}" → ${resDiscover.slug}`);
-          return res.json({ success: true, ...resDiscover });
-        }
-      }
-
-      // --- ÉTAPE 3 : METADATA SEARCH HUBS (metadata.provider.plex.tv/library/search) ---
-      const queryMetadataHubs = async (queryText: string): Promise<any | null> => {
-        if (!queryText) return null;
-
-        const hubsUrl =
-          'https://metadata.provider.plex.tv/library/search' +
-          `?query=${encodeURIComponent(queryText)}` +
-          `&searchTypes=${plexType === 1 ? 'movies' : 'tv'}` +
-          `&includeGuids=1` +
-          `&limit=15`;
-
-        console.log(`[Plex Resolve Backend] [Étape 3] Recherche metadata.provider.plex.tv/library/search : "${queryText}"`);
-
-        try {
-          const response = await fetch(hubsUrl, {
-            headers,
-            signal: AbortSignal.timeout(6000)
-          });
-
-          console.log(`[Plex Resolve Backend] [Étape 3] "${queryText}" → ${response.status} ${response.statusText}`);
-
-          if (!response.ok) return null;
-
-          const data = await response.json();
-          const results = extractResults(data);
-
-          if (results.length === 0) return null;
-
-          const match = results.find(item => isItemStrictMatch(item) && item.slug);
-          if (match) {
-            return formatResponseItem(match, `metadata-search:${queryText}`);
-          }
-          return null;
-        } catch (error: any) {
-          console.warn(`[Plex Resolve Backend] [Étape 3] Erreur "${queryText}":`, error?.message || error);
-          return null;
-        }
-      };
-
-      for (const q of discoverQueries) {
-        const resHubs = await queryMetadataHubs(q);
-        if (resHubs) {
-          console.log(`[Plex Resolve Backend] ✅ [Étape 3] Metadata Hubs "${q}" → ${resHubs.slug}`);
-          return res.json({ success: true, ...resHubs });
-        }
-      }
-
       console.warn(
-        '[Plex Resolve Backend] ❌ Aucun match Plex exact trouvé après toutes les étapes.'
+        '[Plex Resolve Backend] ❌ Aucun match Plex exact trouvé pour les identifiants fournis.'
       );
 
       return res.json({
@@ -789,7 +633,8 @@ async function startServer() {
 
   app.post('/api/plex/availability', requireAuth, async (req, res) => {
     try {
-      const { token, clientId, tmdbId, title, originalTitle, year, mediaType = 'movie' } = req.body || {};
+      const { clientId, tmdbId, mediaType = 'movie' } = req.body || {};
+      const token = typeof req.headers['x-plex-token'] === 'string' ? req.headers['x-plex-token'] : '';
       if (!token || !tmdbId) {
         return res.json({ available: false });
       }
@@ -898,8 +743,8 @@ async function startServer() {
                 const items = extractItems(searchData);
                 for (const it of items) {
                   if (isMatch(it)) {
-                    const itemTitle = it.title || title;
-                    const itemYear = it.year || year;
+                    const itemTitle = it.title || null;
+                    const itemYear = it.year || null;
                     const directPlexUrl = (server.clientIdentifier && it.ratingKey)
                       ? `https://app.plex.tv/desktop/#!/server/${server.clientIdentifier}/details?key=${encodeURIComponent(`/library/metadata/${it.ratingKey}`)}`
                       : 'https://app.plex.tv/desktop';
@@ -910,7 +755,7 @@ async function startServer() {
                       serverName,
                       serverId: server.clientIdentifier,
                       title: itemTitle,
-                      originalTitle: it.originalTitle || originalTitle,
+                      originalTitle: it.originalTitle || null,
                       year: itemYear,
                       ratingKey: it.ratingKey,
                       plexUrl: directPlexUrl
@@ -948,13 +793,15 @@ async function startServer() {
 
   app.post(['/api/plex/history', '/api/plex-sync'], requireAuth, async (req, res) => {
     try {
-      const { token, clientId, delta = false, since } = req.body || {};
+      const { clientId, delta = false, since } = req.body || {};
+      const token = typeof req.headers['x-plex-token'] === 'string' ? req.headers['x-plex-token'] : '';
 
       if (!token) {
         return res.status(400).json({ error: 'Jeton Plex (token) manquant. Veuillez reconnecter votre compte Plex.' });
       }
 
       const plexClientIdentifier = clientId || 'tv-time-ai-studio';
+      const syncCursor = Date.now();
       console.log(`[Plex Sync] Starting sync for user (${delta ? 'DELTA MODE' : 'FULL SCAN'})...`);
 
       const allRawItems: any[] = [];
@@ -971,6 +818,62 @@ async function startServer() {
         return [];
       };
 
+      const fetchPlexPages = async (
+        endpoint: string,
+        headers: Record<string, string>,
+        timeoutMs: number,
+        maxPages: number,
+        stopAtTimestamp?: number
+      ): Promise<any[]> => {
+        const pageSize = 100;
+        const collected: any[] = [];
+        let previousFingerprint = '';
+
+        for (let page = 0; page < maxPages; page++) {
+          const pageUrl = new URL(endpoint);
+          pageUrl.searchParams.set('X-Plex-Container-Start', String(page * pageSize));
+          pageUrl.searchParams.set('X-Plex-Container-Size', String(pageSize));
+          pageUrl.searchParams.set('includeGuids', '1');
+
+          const response = await fetch(pageUrl, {
+            headers,
+            signal: AbortSignal.timeout(timeoutMs)
+          });
+          if (!response.ok) break;
+
+          const data = await response.json();
+          const items = extractItems(data);
+          if (items.length === 0) break;
+
+          const fingerprint = items
+            .slice(0, 5)
+            .map((item: any) => item.ratingKey || item.key || item.guid || item.title)
+            .join('|');
+          if (page > 0 && fingerprint && fingerprint === previousFingerprint) break;
+          previousFingerprint = fingerprint;
+          collected.push(...items);
+
+          if (stopAtTimestamp) {
+            const reachedCursor = items.some((item: any) => {
+              const rawTimestamp = item.lastViewedAt || item.viewedAt || item.date || item.createdAt || item.updatedAt;
+              if (!rawTimestamp) return false;
+              const timestamp = Number(rawTimestamp) < 10000000000
+                ? Number(rawTimestamp) * 1000
+                : Number(rawTimestamp);
+              return Number.isFinite(timestamp) && timestamp <= stopAtTimestamp;
+            });
+            if (reachedCursor) break;
+          }
+
+          const container = data?.MediaContainer || {};
+          const totalSize = Number(container.totalSize ?? container.total_size);
+          const nextStart = (page + 1) * pageSize;
+          if (items.length < pageSize || (Number.isFinite(totalSize) && nextStart >= totalSize)) break;
+        }
+
+        return collected;
+      };
+
       // 1. Fetch from Plex Cloud Activity Feeds & Official Plex Watchlist
       const rawWatchlistItems: any[] = [];
       const watchlistEndpoints = [
@@ -981,26 +884,17 @@ async function startServer() {
 
       for (const wlEndpoint of watchlistEndpoints) {
         try {
-          const wlRes = await fetch(wlEndpoint, {
-            headers: {
-              'X-Plex-Token': token,
-              'Accept': 'application/json',
-              'X-Plex-Client-Identifier': plexClientIdentifier,
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            },
-            signal: AbortSignal.timeout(delta ? 4000 : 7000)
-          });
-          if (wlRes.ok) {
-            const wlData = await wlRes.json();
-            const items = extractItems(wlData);
-            if (items.length > 0) {
-              console.log(`[Plex Sync] Fetched ${items.length} watchlist items from Plex Watchlist endpoint: ${wlEndpoint}`);
-              for (const it of items) {
-                rawWatchlistItems.push(it);
-              }
-              visitedSources.push(`Watchlist Plex (${items.length} éléments)`);
-              break; // Watchlist successfully retrieved from primary endpoint
-            }
+          const items = await fetchPlexPages(wlEndpoint, {
+            'X-Plex-Token': token,
+            'Accept': 'application/json',
+            'X-Plex-Client-Identifier': plexClientIdentifier,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }, delta ? 4000 : 7000, 50);
+          if (items.length > 0) {
+            console.log(`[Plex Sync] Fetched ${items.length} watchlist items from Plex Watchlist endpoint: ${wlEndpoint}`);
+            rawWatchlistItems.push(...items);
+            visitedSources.push(`Watchlist Plex (${items.length} éléments)`);
+            break;
           }
         } catch (e: any) {
           console.log(`[Plex Sync] Watchlist endpoint skipped (${wlEndpoint}): ${e?.message || e}`);
@@ -1009,34 +903,27 @@ async function startServer() {
 
       const cloudEndpoints = delta
         ? [
-            'https://discover.provider.plex.tv/activities?includeUserState=1&limit=25'
+            'https://discover.provider.plex.tv/activities?includeUserState=1'
           ]
         : [
-            'https://discover.provider.plex.tv/activities?includeUserState=1&limit=100',
-            'https://discover.provider.plex.tv/library/metadata/userState?state=watched&limit=100'
+            'https://discover.provider.plex.tv/activities?includeUserState=1',
+            'https://discover.provider.plex.tv/library/metadata/userState?state=watched'
           ];
 
       for (const endpoint of cloudEndpoints) {
         try {
-          const cloudRes = await fetch(endpoint, {
-            headers: {
-              'X-Plex-Token': token,
-              'Accept': 'application/json',
-              'X-Plex-Client-Identifier': plexClientIdentifier,
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            },
-            signal: AbortSignal.timeout(delta ? 4000 : 7000)
-          });
-          if (cloudRes.ok) {
-            const cloudData = await cloudRes.json();
-            const items = extractItems(cloudData);
-            if (items.length > 0) {
-              console.log(`[Plex Sync] Fetched ${items.length} items from Plex Cloud endpoint: ${endpoint}`);
-              for (const it of items) {
-                allRawItems.push({ raw: it, source: 'Plex Cloud Activity' });
-              }
-              visitedSources.push(`Plex Cloud (${items.length} éléments)`);
+          const items = await fetchPlexPages(endpoint, {
+            'X-Plex-Token': token,
+            'Accept': 'application/json',
+            'X-Plex-Client-Identifier': plexClientIdentifier,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }, delta ? 4000 : 7000, 50, delta ? Number(since) || undefined : undefined);
+          if (items.length > 0) {
+            console.log(`[Plex Sync] Fetched ${items.length} items from Plex Cloud endpoint: ${endpoint}`);
+            for (const it of items) {
+              allRawItems.push({ raw: it, source: 'Plex Cloud Activity' });
             }
+            visitedSources.push(`Plex Cloud (${items.length} éléments)`);
           }
         } catch (e: any) {
           // Non-blocking cloud fetch fallback
@@ -1051,7 +938,6 @@ async function startServer() {
 
       // 3. Query EACH server (do NOT stop at the first server!)
       const serverTimeout = delta ? 2000 : 3500;
-      const historyLimit = delta ? 25 : 100;
 
       for (const server of servers) {
         const serverName = server.name || 'Serveur Plex';
@@ -1102,20 +988,19 @@ async function startServer() {
 
           // A. Try session history (admin / owner endpoint)
           try {
-            const histRes = await fetch(`${uri}/status/sessions/history/all?X-Plex-Token=${serverAccessToken}&sort=viewedAt:desc&limit=${historyLimit}`, {
-              headers: { 'Accept': 'application/json' },
-              signal: AbortSignal.timeout(serverTimeout)
-            });
-            if (histRes.ok) {
-              const histData = await histRes.json();
-              const items = extractItems(histData);
-              if (items.length > 0) {
-                for (const it of items) {
-                  allRawItems.push({ raw: it, source: serverName });
-                }
-                serverItemCount += items.length;
-                connectionSuccess = true;
+            const items = await fetchPlexPages(
+              `${uri}/status/sessions/history/all?sort=viewedAt:desc&includeGuids=1`,
+              { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
+              serverTimeout,
+              50,
+              delta ? Number(since) || undefined : undefined
+            );
+            if (items.length > 0) {
+              for (const it of items) {
+                allRawItems.push({ raw: it, source: serverName, serverId: server.clientIdentifier, serverUri: uri, serverToken: serverAccessToken });
               }
+              serverItemCount += items.length;
+              connectionSuccess = true;
             }
           } catch (e) {
             // Proceed to other endpoints
@@ -1123,20 +1008,19 @@ async function startServer() {
 
           // B. Try recently viewed endpoint (works for shared/friend users too)
           try {
-            const recentRes = await fetch(`${uri}/library/recentlyViewed?X-Plex-Token=${serverAccessToken}&limit=${historyLimit}`, {
-              headers: { 'Accept': 'application/json' },
-              signal: AbortSignal.timeout(serverTimeout)
-            });
-            if (recentRes.ok) {
-              const recentData = await recentRes.json();
-              const items = extractItems(recentData);
-              if (items.length > 0) {
-                for (const it of items) {
-                  allRawItems.push({ raw: it, source: serverName });
-                }
-                serverItemCount += items.length;
-                connectionSuccess = true;
+            const items = await fetchPlexPages(
+              `${uri}/library/recentlyViewed?includeGuids=1`,
+              { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
+              serverTimeout,
+              50,
+              delta ? Number(since) || undefined : undefined
+            );
+            if (items.length > 0) {
+              for (const it of items) {
+                allRawItems.push({ raw: it, source: serverName, serverId: server.clientIdentifier, serverUri: uri, serverToken: serverAccessToken });
               }
+              serverItemCount += items.length;
+              connectionSuccess = true;
             }
           } catch (e) {}
 
@@ -1144,27 +1028,25 @@ async function startServer() {
           if (!delta) {
             // C. Try library all watched items
             try {
-              const allWatchedRes = await fetch(`${uri}/library/all?viewCount>=1&sort=lastViewedAt:desc&limit=100&X-Plex-Token=${serverAccessToken}`, {
-                headers: { 'Accept': 'application/json' },
-                signal: AbortSignal.timeout(serverTimeout)
-              });
-              if (allWatchedRes.ok) {
-                const allWatchedData = await allWatchedRes.json();
-                const items = extractItems(allWatchedData);
-                if (items.length > 0) {
-                  for (const it of items) {
-                    allRawItems.push({ raw: it, source: serverName });
-                  }
-                  serverItemCount += items.length;
-                  connectionSuccess = true;
+              const items = await fetchPlexPages(
+                `${uri}/library/all?viewCount>=1&sort=lastViewedAt:desc&includeGuids=1`,
+                { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
+                serverTimeout,
+                50
+              );
+              if (items.length > 0) {
+                for (const it of items) {
+                  allRawItems.push({ raw: it, source: serverName, serverId: server.clientIdentifier, serverUri: uri, serverToken: serverAccessToken });
                 }
+                serverItemCount += items.length;
+                connectionSuccess = true;
               }
             } catch (e) {}
 
             // D. Query library sections (movies & TV shows) on this server
             try {
-              const sectionsRes = await fetch(`${uri}/library/sections?X-Plex-Token=${serverAccessToken}`, {
-                headers: { 'Accept': 'application/json' },
+              const sectionsRes = await fetch(`${uri}/library/sections`, {
+                headers: { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
                 signal: AbortSignal.timeout(serverTimeout)
               });
               if (sectionsRes.ok) {
@@ -1177,36 +1059,32 @@ async function startServer() {
                   
                   // Fetch recently viewed in this specific section
                   try {
-                    const secRecentRes = await fetch(`${uri}/library/sections/${secKey}/recentlyViewed?X-Plex-Token=${serverAccessToken}&limit=50`, {
-                      headers: { 'Accept': 'application/json' },
-                      signal: AbortSignal.timeout(2500)
-                    });
-                    if (secRecentRes.ok) {
-                      const secRecentData = await secRecentRes.json();
-                      const items = extractItems(secRecentData);
-                      for (const it of items) {
-                        allRawItems.push({ raw: it, source: `${serverName} - ${sec.title || 'Section'}` });
-                      }
-                      serverItemCount += items.length;
-                      connectionSuccess = true;
+                    const items = await fetchPlexPages(
+                      `${uri}/library/sections/${secKey}/recentlyViewed?includeGuids=1`,
+                      { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
+                      2500,
+                      50
+                    );
+                    for (const it of items) {
+                      allRawItems.push({ raw: it, source: `${serverName} - ${sec.title || 'Section'}`, serverId: server.clientIdentifier, serverUri: uri, serverToken: serverAccessToken });
                     }
+                    serverItemCount += items.length;
+                    connectionSuccess = connectionSuccess || items.length > 0;
                   } catch (e) {}
 
                   // Fetch all watched in this section
                   try {
-                    const secWatchedRes = await fetch(`${uri}/library/sections/${secKey}/all?viewCount>=1&sort=lastViewedAt:desc&limit=50&X-Plex-Token=${serverAccessToken}`, {
-                      headers: { 'Accept': 'application/json' },
-                      signal: AbortSignal.timeout(2500)
-                    });
-                    if (secWatchedRes.ok) {
-                      const secWatchedData = await secWatchedRes.json();
-                      const items = extractItems(secWatchedData);
-                      for (const it of items) {
-                        allRawItems.push({ raw: it, source: `${serverName} - ${sec.title || 'Section'}` });
-                      }
-                      serverItemCount += items.length;
-                      connectionSuccess = true;
+                    const items = await fetchPlexPages(
+                      `${uri}/library/sections/${secKey}/all?viewCount>=1&sort=lastViewedAt:desc&includeGuids=1`,
+                      { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
+                      2500,
+                      50
+                    );
+                    for (const it of items) {
+                      allRawItems.push({ raw: it, source: `${serverName} - ${sec.title || 'Section'}`, serverId: server.clientIdentifier, serverUri: uri, serverToken: serverAccessToken });
                     }
+                    serverItemCount += items.length;
+                    connectionSuccess = connectionSuccess || items.length > 0;
                   } catch (e) {}
                 }
               }
@@ -1223,12 +1101,55 @@ async function startServer() {
 
       console.log(`[Plex Sync] Collected a total of ${allRawItems.length} raw history records across all sources.`);
 
-      // 4. Normalize & Deduplicate all history items
-      const normalizeStr = (s?: string) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+      // 4. Enrichir les entrées dépourvues d'identifiant externe via leur ratingKey serveur.
+      // Le jeton reste exclusivement dans l'en-tête et n'est jamais renvoyé au client.
+      const metadataCache = new Map<string, any>();
+      const enrichEntry = async (entry: any): Promise<any> => {
+        const raw = entry.raw || {};
+        const meta = raw.Metadata || raw.media || raw.item || raw;
+        const currentIds = extractPlexExternalIds(meta);
+        if (currentIds.tmdbId || currentIds.imdbId || currentIds.tvdbId) return entry;
 
-      const itemMap = new Map<string, any>();
+        const ratingKey = meta.ratingKey || raw.ratingKey || meta.key || raw.key;
+        if (!ratingKey || !entry.serverUri || !entry.serverToken) return entry;
 
-      for (const entry of allRawItems) {
+        const cacheKey = `${entry.serverId || entry.serverUri}:${ratingKey}`;
+        if (metadataCache.has(cacheKey)) {
+          return { ...entry, raw: { ...raw, ...metadataCache.get(cacheKey) } };
+        }
+
+        try {
+          const ratingKeyValue = String(ratingKey);
+          const metadataKey = ratingKeyValue.match(/\/library\/metadata\/([^/?]+)/)?.[1] || ratingKeyValue;
+          const metadataUrl = `${entry.serverUri}/library/metadata/${encodeURIComponent(metadataKey)}?includeGuids=1`;
+          const metadataResponse = await fetch(metadataUrl, {
+            headers: { 'Accept': 'application/json', 'X-Plex-Token': entry.serverToken },
+            signal: AbortSignal.timeout(2500)
+          });
+          if (!metadataResponse.ok) return entry;
+          const metadataData = await metadataResponse.json();
+          const enriched = extractItems(metadataData)[0];
+          if (!enriched) return entry;
+          metadataCache.set(cacheKey, enriched);
+          return { ...entry, raw: { ...raw, ...enriched } };
+        } catch {
+          return entry;
+        }
+      };
+
+      const enrichedEntries: any[] = [];
+      const ENRICH_CONCURRENCY = 6;
+      for (let index = 0; index < allRawItems.length; index += ENRICH_CONCURRENCY) {
+        const chunk = allRawItems.slice(index, index + ENRICH_CONCURRENCY);
+        enrichedEntries.push(...await Promise.all(chunk.map(enrichEntry)));
+      }
+
+      // 5. Normaliser sans aucune déduplication par titre ou année.
+      // La déduplication fiable a lieu côté client après résolution du TMDB ID.
+      const normalizedHistory: any[] = [];
+      const normalizedSince = Number.isFinite(Number(since)) ? Number(since) : undefined;
+
+      for (const entry of enrichedEntries) {
         const raw = entry.raw || {};
         const meta = raw.Metadata || raw.media || raw.item || raw;
         const source = entry.source;
@@ -1245,8 +1166,9 @@ async function startServer() {
 
         const rawViewed = meta.lastViewedAt || meta.viewedAt || raw.viewedAt || raw.lastViewedAt || raw.date || raw.createdAt || raw.updatedAt || meta.updatedAt || meta.addedAt || Date.now();
         const viewedTimestamp = rawViewed ? (Number(rawViewed) < 10000000000 ? Number(rawViewed) * 1000 : Number(rawViewed)) : Date.now();
+        const sourceIdentity = getStrongPlexSourceIdentity({ ...meta, serverId: entry.serverId });
 
-        if (!title && !grandparentTitle) continue;
+        if (!title && !grandparentTitle && !sourceIdentity) continue;
 
         // Extract item year (also check originallyAvailableAt or title string like 'Cinderella (2015)' if year property missing)
         let itemYear = meta.year || raw.year || meta.parentYear || meta.grandparentYear ? Number(meta.year || raw.year || meta.parentYear || meta.grandparentYear) : undefined;
@@ -1260,43 +1182,42 @@ async function startServer() {
           if (matchYear) itemYear = Number(matchYear[1]);
         }
 
-        // Create deduplication key
-        let dedupeKey = '';
-        if (type === 'episode') {
-          const sNum = parentIndex !== undefined ? parentIndex : 0;
-          const eNum = index !== undefined ? index : 0;
-          dedupeKey = `ep:${normalizeStr(grandparentTitle || title)}:${sNum}:${eNum}`;
-        } else {
-          dedupeKey = `mov:${normalizeStr(title)}:${itemYear || ''}`;
-        }
+        if (delta && normalizedSince && viewedTimestamp <= normalizedSince) continue;
 
-        const existing = itemMap.get(dedupeKey);
-        if (!existing || viewedTimestamp > existing.viewedAt) {
-          itemMap.set(dedupeKey, {
-            type,
-            title,
-            grandparentTitle,
-            parentIndex: parentIndex !== undefined ? Number(parentIndex) : undefined,
-            index: index !== undefined ? Number(index) : undefined,
-            viewedAt: viewedTimestamp,
-            year: itemYear,
-            guid: meta.guid || raw.guid || meta.grandparentGuid || raw.grandparentGuid,
-            Guid: meta.Guid || raw.Guid || meta.guids || raw.guids,
-            source
-          });
-        }
+        normalizedHistory.push({
+          type,
+          title,
+          grandparentTitle,
+          parentTitle: meta.parentTitle || raw.parentTitle,
+          parentIndex: parentIndex !== undefined ? Number(parentIndex) : undefined,
+          index: index !== undefined ? Number(index) : undefined,
+          viewedAt: viewedTimestamp,
+          year: itemYear,
+          guid: meta.guid || raw.guid,
+          grandparentGuid: meta.grandparentGuid || raw.grandparentGuid,
+          parentGuid: meta.parentGuid || raw.parentGuid,
+          grandparentRatingKey: meta.grandparentRatingKey || raw.grandparentRatingKey,
+          Guid: meta.Guid || raw.Guid,
+          guids: meta.guids || raw.guids,
+          ratingKey: meta.ratingKey || raw.ratingKey,
+          key: meta.key || raw.key,
+          serverId: entry.serverId,
+          sourceIdentity,
+          source
+        });
       }
 
-      const deduplicatedHistory = Array.from(itemMap.values()).sort((a, b) => b.viewedAt - a.viewedAt);
+      normalizedHistory.sort((a, b) => b.viewedAt - a.viewedAt);
 
-      // Normalize & Deduplicate Watchlist items
-      const watchlistMap = new Map<string, any>();
+      // Normaliser la Watchlist sans fusion par titre/année.
+      const normalizedWatchlist: any[] = [];
       for (const rawItem of rawWatchlistItems) {
         const meta = rawItem.Metadata || rawItem.media || rawItem.item || rawItem;
         const rawType = (meta.type || rawItem.type || '').toLowerCase();
         const type = (rawType === 'show' || rawType === 'series' || rawType === 'tv') ? 'show' : 'movie';
         const title = meta.title || rawItem.title || meta.name || '';
-        if (!title) continue;
+        const sourceIdentity = getStrongPlexSourceIdentity(meta);
+        if (!title && !sourceIdentity) continue;
 
         let wlYear = meta.year || rawItem.year ? Number(meta.year || rawItem.year) : undefined;
         if (!wlYear) {
@@ -1304,27 +1225,30 @@ async function startServer() {
           if (matchYear) wlYear = Number(matchYear[1]);
         }
 
-        const dedupeKey = `wl:${type}:${normalizeStr(title)}:${wlYear || ''}`;
-        if (!watchlistMap.has(dedupeKey)) {
-          watchlistMap.set(dedupeKey, {
-            type,
-            title,
-            year: wlYear,
-            guid: meta.guid || rawItem.guid || meta.grandparentGuid,
-            Guid: meta.Guid || rawItem.Guid || meta.guids || rawItem.guids,
-            addedAt: meta.addedAt || rawItem.addedAt || Date.now()
-          });
-        }
+        normalizedWatchlist.push({
+          type,
+          title,
+          year: wlYear,
+          guid: meta.guid || rawItem.guid,
+          grandparentGuid: meta.grandparentGuid || rawItem.grandparentGuid,
+          parentGuid: meta.parentGuid || rawItem.parentGuid,
+          Guid: meta.Guid || rawItem.Guid,
+          guids: meta.guids || rawItem.guids,
+          ratingKey: meta.ratingKey || rawItem.ratingKey,
+          key: meta.key || rawItem.key,
+          addedAt: meta.addedAt || rawItem.addedAt || null,
+          sourceIdentity
+        });
       }
 
-      const deduplicatedWatchlist = Array.from(watchlistMap.values());
-      console.log(`[Plex Sync] Returning ${deduplicatedHistory.length} history items and ${deduplicatedWatchlist.length} watchlist items.`);
+      console.log(`[Plex Sync] Returning ${normalizedHistory.length} history items and ${normalizedWatchlist.length} watchlist items.`);
 
       return res.status(200).json({ 
-        history: deduplicatedHistory,
-        watchlist: deduplicatedWatchlist,
+        history: normalizedHistory,
+        watchlist: normalizedWatchlist,
         visitedSources,
-        totalFound: deduplicatedHistory.length + deduplicatedWatchlist.length
+        totalFound: normalizedHistory.length + normalizedWatchlist.length,
+        cursor: syncCursor
       });
     } catch (err: any) {
       console.error('[Plex Sync Error]', err);

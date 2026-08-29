@@ -42,6 +42,9 @@ jobs:
       - name: Type Check
         run: npm run lint
 
+      - name: Plex Integrity Tests
+        run: npm run test:plex
+
       - name: Build Web Assets & Sync Capacitor
         run: |
           npm run build
