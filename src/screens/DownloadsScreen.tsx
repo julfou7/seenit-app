@@ -663,18 +663,16 @@ export function DownloadsScreen({ onShowClick }: Props) {
             <div className="flex-1">
               <p className="font-bold text-amber-200">Serveurs de téléchargement non configurés</p>
               <p className="mt-0.5 text-amber-300/80 leading-relaxed">
-                Renseignez vos identifiants Sonarr, Radarr ou qBittorrent dans les Paramètres pour activer les téléchargements 1-clic.
+                Renseignez vos identifiants Sonarr, Radarr ou qBittorrent dans les réglages de cet onglet pour activer les téléchargements 1-clic.
               </p>
             </div>
-            {onOpenSettings && (
-              <button
-                type="button"
-                onClick={onOpenSettings}
-                className="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-200 font-bold hover:bg-amber-500/30 transition-colors shrink-0"
-              >
-                Configurer
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setShowConfiguration(true)}
+              className="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-200 font-bold hover:bg-amber-500/30 transition-colors shrink-0"
+            >
+              Configurer
+            </button>
           </div>
         )}
 
