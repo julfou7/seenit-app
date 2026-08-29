@@ -33,7 +33,6 @@ interface FreeDownloadScreenProps {
 
 export function FreeDownloadScreen({ onBack, onShowClick }: FreeDownloadScreenProps) {
   const {
-    c411ApiKey,
     sonarrUrl,
     sonarrApiKey,
     radarrUrl,
@@ -69,8 +68,7 @@ export function FreeDownloadScreen({ onBack, onShowClick }: FreeDownloadScreenPr
     try {
       const results = await searchC411Torrents({
         query: queryText.trim(),
-        mediaType: selectedMediaType === 'all' ? undefined : selectedMediaType,
-        apiKey: c411ApiKey
+        mediaType: selectedMediaType === 'all' ? undefined : selectedMediaType
       });
       setTorrents(results);
       setHasSearched(true);

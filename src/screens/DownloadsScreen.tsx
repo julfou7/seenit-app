@@ -294,7 +294,6 @@ function SwipeableItem({ item, onShowClick, onRemove, isDeleting }: SwipeableIte
 export function DownloadsScreen({ onShowClick, onOpenSettings }: Props) {
   const { downloads, lastUpdated, startPolling, stopPolling, removeDownload, clearAllDownloads } = useLiveDownloadStore();
   const { 
-    c411ApiKey,
     sonarrUrl, 
     sonarrApiKey, 
     radarrUrl, 
@@ -336,8 +335,7 @@ export function DownloadsScreen({ onShowClick, onOpenSettings }: Props) {
     try {
       const results = await searchC411Torrents({
         query: queryText.trim(),
-        mediaType: selectedMediaType === 'all' ? undefined : selectedMediaType,
-        apiKey: c411ApiKey
+        mediaType: selectedMediaType === 'all' ? undefined : selectedMediaType
       });
       setTorrents(results);
       setHasSearched(true);

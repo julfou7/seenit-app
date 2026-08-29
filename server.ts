@@ -1333,19 +1333,28 @@ async function startServer() {
   });
 
   // C411 Tracker API proxy
-  app.post('/api/c411/search', requireAuth, async (req, res) => {
+  app.post('/api/c411/search', requireAuth, async (req: AuthRequest, res) => {
     try {
       const query = (typeof req.body?.query === 'string' ? req.body.query : '').trim();
       const mediaType = typeof req.body?.mediaType === 'string' ? req.body.mediaType : 'movie';
       const year = typeof req.body?.year === 'string' ? req.body.year : undefined;
-      const apiKey = process.env.C411_API_KEY || (typeof req.body?.apiKey === 'string' ? req.body.apiKey : '');
+      const userId = req.user?.uid;
+      if (!userId) {
+        return res.status(401).json({ error: 'Utilisateur non authentifie', torrents: [] });
+      }
+
+      const configSnapshot = await adminDb
+        .doc(`users/${userId}/settings/downloadConfig`)
+        .get();
+      const storedApiKey = configSnapshot.get('c411ApiKey');
+      const apiKey = typeof storedApiKey === 'string' ? storedApiKey.trim() : '';
 
       if (!query) {
         return res.json({ torrents: [] });
       }
       if (!apiKey) {
-        return res.status(503).json({
-          error: 'Cle API C411 non configuree',
+        return res.status(400).json({
+          error: 'Cle API C411 non configuree pour cet utilisateur',
           torrents: []
         });
       }

@@ -74,7 +74,6 @@ export function DownloadModal({
   onSuccessToast
 }: DownloadModalProps) {
   const {
-    c411ApiKey,
     sonarrUrl,
     sonarrApiKey,
     radarrUrl,
@@ -305,8 +304,7 @@ export function DownloadModal({
       const results = await searchC411Torrents({
         query: queryText.trim(),
         mediaType,
-        year: mediaType === 'movie' ? year : undefined,
-        apiKey: c411ApiKey
+        year: mediaType === 'movie' ? year : undefined
       });
       setTorrents(results);
       setHasSearched(true);

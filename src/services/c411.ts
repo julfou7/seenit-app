@@ -36,7 +36,6 @@ export interface C411SearchParams {
   query: string;
   mediaType?: 'movie' | 'tv';
   year?: string | number;
-  apiKey?: string;
 }
 
 /**
@@ -67,106 +66,18 @@ export function buildMagnetLink(infoHash: string, name: string): string {
 }
 
 /**
- * Helper HTTP multiplateforme (Natif via CapacitorHttp pour contourner CORS / Web via fetch standard)
- */
-async function performC411Get(url: string, apiKey: string): Promise<any> {
-  const headers = {
-    'Authorization': `Bearer ${apiKey}`,
-    'Accept': 'application/json',
-    'User-Agent': 'SeenIt-App'
-  };
-
-  if (Capacitor.isNativePlatform()) {
-    const res = await CapacitorHttp.get({
-      url,
-      headers,
-      connectTimeout: 8000,
-      readTimeout: 8000
-    });
-    if (res.status >= 200 && res.status < 300) {
-      return typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
-    }
-    return null;
-  } else {
-    const res = await fetch(url, {
-      headers,
-      signal: AbortSignal.timeout(8000)
-    });
-    if (res.ok) {
-      return await res.json();
-    }
-    return null;
-  }
-}
-
-/**
- * Recherche des torrents sur C411 via l'API officielle (avec CapacitorHttp natif sur mobile) ou fallback proxy
+ * Recherche des torrents sur C411 via le backend authentifié.
+ * La clé est lue dans Firestore pour l'utilisateur connecté.
  */
 export async function searchC411Torrents(params: C411SearchParams): Promise<C411Torrent[]> {
   const query = (params.query || '').trim();
   if (!query) return [];
 
-  const apiKey = params.apiKey?.trim() || '';
-
-  // 1. Appel direct vers l'API C411 (CapacitorHttp sur Android/iOS pour contourner le CORS, fetch sur Web)
-  if (apiKey) {
-    try {
-      const cleanQuery = query.replace(/[:’']/g, ' ').replace(/\s+/g, ' ').trim();
-    const searchParams = new URLSearchParams();
-    searchParams.set('name', cleanQuery);
-    searchParams.set('category', '1');
-    if (params.mediaType === 'tv') searchParams.set('subcategory', '7');
-    if (params.mediaType === 'movie') searchParams.set('subcategory', '6');
-
-    let data = await performC411Get(`https://c411.org/api/torrents?${searchParams.toString()}`, apiKey);
-    let torrents: C411Torrent[] = data?.data || [];
-
-    // Fallback 1 : recherche large (sans sous-catégorie) si aucun résultat
-    if (torrents.length === 0) {
-      data = await performC411Get(`https://c411.org/api/torrents?name=${encodeURIComponent(cleanQuery)}&category=1`, apiKey);
-      torrents = data?.data || [];
-    }
-
-    // Fallback 2 : Si la recherche ciblait un épisode (ex: "Reacher S01E01" ou "Reacher S01") et ne donne rien, chercher la saison ou le titre de base
-    if (torrents.length === 0 && params.mediaType === 'tv') {
-      const episodeMatch = cleanQuery.match(/(.+?)\s+S(\d+)E\d+/i);
-      const seasonMatch = cleanQuery.match(/(.+?)\s+S(\d+)/i);
-
-      if (episodeMatch) {
-        // Essayer "Titre S01"
-        const fallbackSeasonQuery = `${episodeMatch[1]} S${episodeMatch[2]}`;
-        data = await performC411Get(`https://c411.org/api/torrents?name=${encodeURIComponent(fallbackSeasonQuery)}&category=1`, apiKey);
-        torrents = data?.data || [];
-      }
-
-      if (torrents.length === 0 && (episodeMatch || seasonMatch)) {
-        // Essayer simplement le titre de la série
-        const showTitle = episodeMatch ? episodeMatch[1] : (seasonMatch ? seasonMatch[1] : cleanQuery);
-        if (showTitle && showTitle.length >= 3) {
-          data = await performC411Get(`https://c411.org/api/torrents?name=${encodeURIComponent(showTitle)}&category=1`, apiKey);
-          torrents = data?.data || [];
-        }
-      }
-    }
-
-      if (torrents.length > 0) {
-        return torrents.map((t: C411Torrent) => ({
-          ...t,
-          magnetUri: t.infoHash ? buildMagnetLink(t.infoHash, t.name) : undefined
-        }));
-      }
-    } catch (directErr) {
-      console.warn('[C411 Direct Request Error, trying backend fallback]', directErr);
-    }
-  }
-
-  // 2. Fallback via le backend proxy SeenIt si l'appel direct échoue
   try {
     const payload = {
       query,
       mediaType: params.mediaType,
-      year: params.year ? String(params.year) : undefined,
-      apiKey: apiKey || undefined
+      year: params.year ? String(params.year) : undefined
     };
 
     const endpoints = [

@@ -127,7 +127,7 @@ export function DownloadConfigSection() {
               className="w-full bg-zinc-900 border border-zinc-700/80 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-blue-500"
             />
             <p className="text-[10px] text-zinc-500 mt-1">
-              Trouvable dans votre profil C411. Une clé par défaut est déjà configurée.
+              Trouvable dans votre profil C411. Elle est enregistrée uniquement dans les paramètres de votre compte SeenIt.
             </p>
           </div>
 
