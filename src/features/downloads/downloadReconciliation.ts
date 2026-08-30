@@ -40,12 +40,17 @@ export function findUniqueRecentOptimisticAttachments(
 /**
  * Fusionne les métadonnées d'une demande SeenIt avec un snapshot distant déjà
  * identifié. La télémétrie distante reste l'unique source de vérité, tandis que
- * le titre d'affichage SeenIt reste prioritaire une fois l'identité établie.
+ * le titre d'affichage et le scope exact demandé dans SeenIt restent prioritaires
+ * une fois l'identité établie.
  */
 export function mergeLateOptimisticMetadata(
   remote: LiveDownloadItem,
   optimistic: LiveDownloadItem
 ): LiveDownloadItem {
+  const hasExactTvScope = optimistic.mediaType === 'tv'
+    && optimistic.seasonNumber != null
+    && optimistic.episodeNumber != null;
+
   return {
     ...remote,
     requestId: remote.requestId || optimistic.requestId || optimistic.id,
@@ -60,8 +65,8 @@ export function mergeLateOptimisticMetadata(
     seriesTitle: remote.mediaType === 'tv'
       ? (optimistic.seriesTitle || optimistic.title || remote.seriesTitle)
       : remote.seriesTitle,
-    seasonNumber: remote.seasonNumber ?? optimistic.seasonNumber,
-    episodeNumber: remote.episodeNumber ?? optimistic.episodeNumber,
+    seasonNumber: hasExactTvScope ? optimistic.seasonNumber : (remote.seasonNumber ?? optimistic.seasonNumber),
+    episodeNumber: hasExactTvScope ? optimistic.episodeNumber : (remote.episodeNumber ?? optimistic.episodeNumber),
     addedAt: remote.addedAt || optimistic.addedAt,
     downloadIdAliases: mergeDownloadIdAliases(remote, optimistic),
     isOptimistic: false,
