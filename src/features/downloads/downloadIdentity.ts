@@ -7,6 +7,13 @@ export interface DownloadIdentityLike {
   size?: number | null;
   mediaType?: string | null;
   transferPath?: string | null;
+  addedAt?: number | null;
+  tmdbId?: number | string | null;
+  tvdbId?: number | string | null;
+  seasonNumber?: number | null;
+  episodeNumber?: number | null;
+  quality?: string | null;
+  isOptimistic?: boolean | null;
 }
 
 export function normalizeDownloadClientId(value: unknown): string | null {
@@ -148,6 +155,55 @@ export function sameTransferPath(
   const bSize = Number(b.size || 0);
   if (aSize <= 0 || bSize <= 0) return false;
   return Math.abs(aSize - bSize) / Math.max(aSize, bSize) <= 0.03;
+}
+
+
+function identityResolutionBucket(item?: DownloadIdentityLike | null): '4k' | '1080p' | '720p' | null {
+  const value = `${item?.quality || ''} ${item?.releaseTitle || ''}`.toLowerCase();
+  if (/2160|4k|uhd/.test(value)) return '4k';
+  if (/1080/.test(value)) return '1080p';
+  if (/720/.test(value)) return '720p';
+  return null;
+}
+
+/**
+ * Rattache temporairement une demande SeenIt au transfert qui vient juste
+ * d'apparaître avant que *Arr/qBittorrent ne partagent un hash commun.
+ * Aucun titre n'est utilisé : uniquement temps, type, IDs canoniques s'ils
+ * existent, scope épisode/saison et résolution.
+ */
+export function canAttachRecentOptimisticRequest(
+  request?: DownloadIdentityLike | null,
+  remote?: DownloadIdentityLike | null,
+  now = Date.now(),
+  windowMs = 60_000
+): boolean {
+  if (!request?.isOptimistic || !remote) return false;
+  if (request.mediaType && remote.mediaType && request.mediaType !== remote.mediaType) return false;
+
+  const requestedAt = Number(request.addedAt || 0);
+  const remoteAddedAt = Number(remote.addedAt || 0);
+  if (!requestedAt || !remoteAddedAt) return false;
+  if (requestedAt > now + 5_000 || remoteAddedAt > now + 5_000) return false;
+
+  const delta = remoteAddedAt - requestedAt;
+  if (delta < -5_000 || delta > windowMs) return false;
+
+  if (request.tmdbId && remote.tmdbId && Number(request.tmdbId) !== Number(remote.tmdbId)) return false;
+  if (request.tvdbId && remote.tvdbId && Number(request.tvdbId) !== Number(remote.tvdbId)) return false;
+
+  if (request.mediaType === 'tv') {
+    if (request.seasonNumber != null && remote.seasonNumber != null
+        && Number(request.seasonNumber) !== Number(remote.seasonNumber)) return false;
+    if (request.episodeNumber != null && remote.episodeNumber != null
+        && Number(request.episodeNumber) !== Number(remote.episodeNumber)) return false;
+  }
+
+  const requestResolution = identityResolutionBucket(request);
+  const remoteResolution = identityResolutionBucket(remote);
+  if (requestResolution && remoteResolution && requestResolution !== remoteResolution) return false;
+
+  return true;
 }
 
 export function normalizeDownloadRelease(value: unknown): string {

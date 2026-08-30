@@ -4,6 +4,7 @@ import {
   getPhysicalDownloadId,
   getPhysicalDownloadIds,
   hasConflictingStrongPhysicalIds,
+  canAttachRecentOptimisticRequest,
   mergeDownloadIdAliases,
   normalizeDownloadClientId,
   normalizeQualityLabel,
@@ -153,4 +154,32 @@ test('le fallback release accepte un identifiant Arr temporaire non-hash', () =>
     { downloadId: 'radarr-temporary-id', mediaType: 'movie', releaseTitle: 'Normal.2026.1080p.BluRay', size: 10_000_000_000 },
     { mediaType: 'movie', releaseTitle: 'Normal 2026 1080p BluRay x265', size: 10_005_000_000 }
   ), true);
+});
+
+
+test('rattache le titre localisé à l’unique torrent apparu juste après la demande sans utiliser le nom', () => {
+  const now = 1_700_000_020_000;
+  assert.equal(canAttachRecentOptimisticRequest(
+    { isOptimistic: true, mediaType: 'movie', tmdbId: 123, title: 'Le Virtuose', quality: '1080p', addedAt: now - 15_000 },
+    { mediaType: 'movie', title: 'Tuner', releaseTitle: 'Tuner.2026.1080p.WEB-DL', quality: '1080p WEB-DL', addedAt: now - 8_000 },
+    now
+  ), true);
+});
+
+test('ne rattache jamais un vieux torrent à une nouvelle demande', () => {
+  const now = 1_700_000_120_000;
+  assert.equal(canAttachRecentOptimisticRequest(
+    { isOptimistic: true, mediaType: 'movie', tmdbId: 123, quality: '1080p', addedAt: now - 5_000 },
+    { mediaType: 'movie', quality: '1080p', addedAt: now - 120_000 },
+    now
+  ), false);
+});
+
+test('ne rattache pas une autre résolution pendant la fenêtre transitoire', () => {
+  const now = 1_700_000_220_000;
+  assert.equal(canAttachRecentOptimisticRequest(
+    { isOptimistic: true, mediaType: 'movie', tmdbId: 123, quality: '1080p', addedAt: now - 5_000 },
+    { mediaType: 'movie', quality: '4K WEB-DL', addedAt: now - 2_000 },
+    now
+  ), false);
 });

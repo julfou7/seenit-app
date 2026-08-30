@@ -205,6 +205,17 @@ export function DownloadModal({
 
   const automationClientName = mediaType === 'tv' ? 'Sonarr' : 'Radarr';
 
+  const showMediaDownloadToast = (action: string, toastType: 'download' | 'success' | 'error' | 'info' = 'download') => {
+    const subtitle = mediaType === 'tv'
+      ? scopeMode === 'episode'
+        ? `S${String(selectedSeason).padStart(2, '0')}E${String(selectedEpisode).padStart(2, '0')}`
+        : scopeMode === 'season'
+          ? `Saison ${selectedSeason}`
+          : undefined
+      : undefined;
+    showToast({ title, subtitle, action, posterPath }, toastType);
+  };
+
   const handleScopeChange = (mode: ScopeMode, season = selectedSeason, episode = selectedEpisode) => {
     const targetSeason = availableSeasons.find(item => item.season_number === season);
     const episodeMax = Math.max(targetSeason?.episode_count || 24, 1);
@@ -230,7 +241,7 @@ export function DownloadModal({
     if (!hasClient) {
       const message = `${client} n'est pas configuré pour ce média.`;
       setActionMessage({ text: message, type: 'error' });
-      showToast(message, 'error');
+      showMediaDownloadToast(message, 'error');
       return;
     }
 
@@ -260,7 +271,7 @@ export function DownloadModal({
       releaseTitle: `${displayTitle} • ${qualityLabel}`
     });
 
-    showToast(`Demande prise en compte • recherche ${qualityLabel}…`, 'download');
+    showMediaDownloadToast(`Recherche ${qualityLabel} en cours…`, 'download');
     onClose();
 
     try {
@@ -298,12 +309,12 @@ export function DownloadModal({
         );
       } else {
         failDownloadRequest(requestId, result.message);
-        showToast(`${client} : ${result.message}`, 'error');
+        showMediaDownloadToast(result.message, 'error');
       }
     } catch (error: any) {
       const message = error?.message || `Impossible de joindre ${client}.`;
       failDownloadRequest(requestId, message);
-      showToast(`${client} : ${message}`, 'error');
+      showMediaDownloadToast(message, 'error');
     } finally {
       setIsTriggeringAuto(false);
     }
@@ -395,7 +406,7 @@ export function DownloadModal({
       releaseTitle: torrent.name
     });
 
-    showToast('Demande prise en compte • préparation du téléchargement…', 'download');
+    showMediaDownloadToast('Préparation du téléchargement…', 'download');
 
     try {
       const result = await pushReleaseDirectly({
@@ -425,17 +436,17 @@ export function DownloadModal({
         const successMessage = 'Téléchargement lancé.';
         setActionMessage({ text: successMessage, type: 'success' });
         if (onSuccessToast) onSuccessToast(successMessage);
-        else showToast(successMessage, 'success');
+        else showMediaDownloadToast(successMessage, 'success');
       } else {
         failDownloadRequest(requestId, result.message);
         setActionMessage({ text: result.message, type: 'error' });
-        showToast(result.message, 'error');
+        showMediaDownloadToast(result.message, 'error');
       }
     } catch (error: any) {
       const message = error?.message || "Erreur lors de l'envoi de la release.";
       failDownloadRequest(requestId, message);
       setActionMessage({ text: message, type: 'error' });
-      showToast(message, 'error');
+      showMediaDownloadToast(message, 'error');
     } finally {
       setSendingTorrentId(null);
     }
