@@ -2,6 +2,7 @@ import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { C411Torrent } from './c411';
 import { authenticatedFetch } from '../lib/apiAuth';
 import { buildFreshGetUrl, buildNoCacheHeaders } from '../features/downloads/downloadNetwork';
+import { extractQbitSessionCookie, isQbitAuthError } from '../features/downloads/qbitNativeSession';
 import { getPhysicalDownloadId, isStrongTorrentHash, mergeDownloadIdAliases, normalizeDownloadClientId, normalizeQualityLabel, sameLegacyPhysicalTransfer, samePhysicalDownload, sameTransferPath } from '../features/downloads/downloadIdentity';
 
 export interface SonarrRadarrConfig {
@@ -523,30 +524,36 @@ export async function loginQBittorrent(
 
   if (Capacitor.isNativePlatform()) {
     try {
-      const res = await fetch(`${base}/api/v2/auth/login`, {
-        method: 'POST',
+      // IMPORTANT : le polling qBittorrent Android utilise CapacitorHttp. Le login
+      // doit utiliser exactement la même pile HTTP ; un login fetch() stocke le SID
+      // dans le cookie jar de la WebView, invisible pour CapacitorHttp.
+      const form = `username=${encodeURIComponent(username || '')}&password=${encodeURIComponent(password || '')}`;
+      const res = await CapacitorHttp.post({
+        url: `${base}/api/v2/auth/login`,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
-          'Referer': base,
-          'Origin': base
+          Referer: base,
+          Origin: base
         },
-        body: `username=${encodeURIComponent(username || '')}&password=${encodeURIComponent(password || '')}`,
-        signal: AbortSignal.timeout(6000)
+        data: form,
+        connectTimeout: 6000,
+        readTimeout: 6000
       });
 
-      const bodyStr = await res.text();
-      if (bodyStr.trim() === 'Fails.' || res.status === 403 || res.status === 401) {
-        invalidateQbitCache();
-        return {
-          success: false,
-          message: 'Identifiants qBittorrent incorrects'
-        };
+      const bodyStr = String(res.data ?? '').trim();
+      if (bodyStr === 'Fails.' || res.status === 403 || res.status === 401) {
+        cachedQbitCookie = '';
+        cachedQbitCookieTime = 0;
+        return { success: false, message: 'Identifiants qBittorrent incorrects' };
+      }
+      if (res.status < 200 || res.status >= 300) {
+        throw new Error(`qBittorrent login HTTP ${res.status}`);
       }
 
-      cachedQbitCookie = '';
+      cachedQbitCookie = extractQbitSessionCookie(res.headers as Record<string, unknown> | undefined);
       cachedQbitCookieTime = Date.now();
       qbittorrentOfflineUntil = 0;
-      return { success: true, cookie: '' };
+      return { success: true, cookie: cachedQbitCookie };
     } catch (err: any) {
       qbittorrentOfflineUntil = Date.now() + 20000;
       return {
@@ -2013,22 +2020,46 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
   if (config.qbittorrentUrl) {
     const qbitBase = cleanUrl(config.qbittorrentUrl);
     try {
-      let cookieHeader = '';
-      if (config.qbittorrentUsername || config.qbittorrentPassword) {
-        const loginRes = await loginQBittorrent(qbitBase, config.qbittorrentUsername, config.qbittorrentPassword);
-        if (loginRes.success && loginRes.cookie) {
-          cookieHeader = loginRes.cookie;
+      const fetchQbitInfo = async (forceRelogin = false): Promise<any> => {
+        if (forceRelogin) {
+          cachedQbitCookie = '';
+          cachedQbitCookieTime = 0;
+          qbittorrentOfflineUntil = 0;
         }
+
+        let cookieHeader = '';
+        if (config.qbittorrentUsername || config.qbittorrentPassword) {
+          const loginRes = await loginQBittorrent(qbitBase, config.qbittorrentUsername, config.qbittorrentPassword);
+          if (!loginRes.success) {
+            throw new Error(loginRes.message || 'Authentification qBittorrent impossible');
+          }
+          cookieHeader = loginRes.cookie || '';
+        }
+
+        const qHeaders: Record<string, string> = {
+          Accept: 'application/json',
+          Referer: qbitBase,
+          Origin: qbitBase
+        };
+        if (cookieHeader) qHeaders.Cookie = cookieHeader;
+
+        return executeGet(
+          `${qbitBase}/api/v2/torrents/info?filter=all&sort=added_on&reverse=true&limit=50`,
+          qHeaders
+        );
+      };
+
+      let res: any;
+      try {
+        res = await fetchQbitInfo(false);
+      } catch (firstError: any) {
+        if (!isQbitAuthError(firstError) || !(config.qbittorrentUsername || config.qbittorrentPassword)) {
+          throw firstError;
+        }
+        // SID expiré : une seule reconnexion explicite, puis on laisse remonter l'erreur.
+        res = await fetchQbitInfo(true);
       }
 
-      const qHeaders: Record<string, string> = {
-        'Accept': 'application/json',
-        'Referer': qbitBase,
-        'Origin': qbitBase
-      };
-      if (cookieHeader) qHeaders['Cookie'] = cookieHeader;
-
-      const res = await executeGet(`${qbitBase}/api/v2/torrents/info?filter=all&sort=added_on&reverse=true&limit=50`, qHeaders);
       sourceHealth.qbittorrent = { configured: true, ok: true, checkedAt: Date.now() };
       if (Array.isArray(res)) {
         for (const t of res) {
