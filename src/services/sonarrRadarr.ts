@@ -935,6 +935,14 @@ export async function searchAndDownloadInSonarr(params: {
     }
     const targetQualityProfileId = resolveQualityProfileId(qualityProfiles, params.qualityPreference, params.qualityProfileId);
 
+    const ensureEpisodeMonitored = async (episode: any) => {
+      if (!episode?.id || episode.monitored === true) return;
+      await executePut(`${base}/api/v3/episode/${episode.id}`, {
+        ...episode,
+        monitored: true
+      }, headers);
+    };
+
     // 1. Vérifier si la série est déjà présente dans la bibliothèque Sonarr
     let seriesList: any[] = [];
     try {
@@ -984,6 +992,7 @@ export async function searchAndDownloadInSonarr(params: {
           ) : null;
           
           if (targetEp && targetEp.id) {
+            await ensureEpisodeMonitored(targetEp);
             if (targetEp.hasFile) {
               return await forceGrabExistingEpisode(base, headers, targetEp.id, params.qualityPreference);
             }
@@ -1161,6 +1170,7 @@ export async function searchAndDownloadInSonarr(params: {
           ) : null;
           
           if (targetEp && targetEp.id) {
+            await ensureEpisodeMonitored(targetEp);
             await executePost(`${base}/api/v3/command`, {
               name: 'EpisodeSearch',
               episodeIds: [targetEp.id]
@@ -1718,6 +1728,10 @@ export function formatCleanMediaInfo(item: LiveDownloadItem): {
   // Remplacement des séparateurs
   cleanName = cleanName.replace(/[._]/g, ' ').trim();
   cleanName = cleanName.replace(/^[-–—\s]+|[-–—\s]+$/g, '').trim();
+  // Les releases TV utilisent souvent "Titre.(2022).S01E01". Une coupe avant
+  // l'épisode ne doit pas laisser "(2022)" ou une parenthèse orpheline à l'écran.
+  cleanName = cleanName.replace(/\s*\((?:19|20)\d{2}\)\s*$/i, '').trim();
+  cleanName = cleanName.replace(/[([{]+\s*$/g, '').trim();
 
   // Extension de fichier (.mkv, .mp4, etc.)
   cleanName = cleanName.replace(/\.(mkv|mp4|avi|iso)$/i, '').trim();
@@ -1916,7 +1930,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
         items.push({
           id: `sonarr_${rec.id}`,
           mediaType: 'tv',
-          title: `${seriesTitle} (${epTitle})`,
+          title: `${seriesTitle} ${epTitle}` ,
           seriesTitle: seriesTitle,
           episodeTitle: epName,
           quality: qualityName,
