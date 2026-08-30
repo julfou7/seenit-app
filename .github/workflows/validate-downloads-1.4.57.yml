@@ -1,0 +1,55 @@
+name: Validate Downloads 1.4.57
+
+on:
+  push:
+    branches:
+      - fix/downloads-sync-1.4.57
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/downloads-sync-1.4.57
+          fetch-depth: 0
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Apply patch
+        run: node scripts/patch-downloads-1.4.57.cjs
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run lint
+
+      - name: Tests
+        run: npm test
+
+      - name: Build Web and server
+        run: npm run build
+
+      - name: Check diff
+        run: git diff --check
+
+      - name: Commit validated fix
+        run: |
+          git config user.name "julfou7"
+          git config user.email "julianfouillade@gmail.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Aucune modification à committer"
+            exit 0
+          fi
+          git commit -m "fix(downloads): fiabiliser la synchronisation après import" -m $'- supprime les moniteurs qBittorrent et de complétion concurrents\n- unifie la réconciliation Radarr, Sonarr et qBittorrent dans un seul store\n- détecte les imports terminés via l’historique Arr au lieu de ressusciter un ancien pourcentage\n- rend la progression monotone et empêche un téléchargement terminé de régresser\n- stabilise la qualité entre les représentations Radarr et qBittorrent\n- utilise aussi le chemin de transfert pour rattacher le même torrent\n- réhydrate les téléchargements actifs comme états à resynchroniser, jamais comme vérité locale\n- publie SeenIt 1.4.57'
+          git push origin HEAD:fix/downloads-sync-1.4.57
