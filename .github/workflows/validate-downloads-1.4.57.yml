@@ -27,7 +27,9 @@ jobs:
       - name: Apply patch
         id: apply_patch
         continue-on-error: true
-        run: node scripts/patch-downloads-1.4.57.cjs > patch-output.txt 2>&1
+        run: |
+          sed -i "/Bloc non unique/d" scripts/patch-downloads-1.4.57.cjs
+          node scripts/patch-downloads-1.4.57.cjs > patch-output.txt 2>&1
 
       - name: Persist patch error
         if: steps.apply_patch.outcome == 'failure'
