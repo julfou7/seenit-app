@@ -319,7 +319,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       seasonNumber,
       episodeNumber,
       downloadClient: 'Sonarr',
-      statusText: 'Lancement dans Sonarr...'
+      statusText: 'Préparation du téléchargement…'
     });
 
     try {
@@ -373,7 +373,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       tvdbId,
       seasonNumber,
       downloadClient: 'Sonarr',
-      statusText: 'Lancement de la saison dans Sonarr...'
+      statusText: 'Préparation du téléchargement…'
     });
 
     try {
@@ -423,7 +423,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       movieTitle: movieTitle,
       tmdbId: effectiveTmdbId,
       downloadClient: 'Radarr',
-      statusText: 'Lancement dans Radarr...'
+      statusText: 'Préparation du téléchargement…'
     });
 
     try {

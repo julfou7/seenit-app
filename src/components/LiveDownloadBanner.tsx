@@ -89,7 +89,6 @@ export const LiveDownloadBanner: React.FC<LiveDownloadBannerProps> = ({ items, c
                   {item.releaseTitle || item.title}
                 </p>
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-zinc-400">
-                  {item.downloadClient && <span className="font-bold text-zinc-300">{item.downloadClient}</span>}
                   {item.quality && <span>{item.quality}</span>}
                   {item.speedFormatted && phase.kind === 'downloading' && <span className="text-cyan-300">{item.speedFormatted}</span>}
                   {item.timeleft && item.timeleft !== '--' && phase.kind === 'downloading' && <span>{item.timeleft} restantes</span>}

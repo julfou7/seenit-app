@@ -256,11 +256,11 @@ export function DownloadModal({
       episodeNumber: isTv && scopeMode === 'episode' ? selectedEpisode : undefined,
       posterPath,
       downloadClient: client,
-      statusText: `Demande prise en compte • envoi à ${client}…`,
+      statusText: 'Demande prise en compte • préparation du téléchargement…',
       releaseTitle: `${displayTitle} • ${qualityLabel}`
     });
 
-    showToast(`Demande prise en compte • ${client} prépare ${qualityLabel}.`, 'download');
+    showToast(`Demande prise en compte • recherche ${qualityLabel}…`, 'download');
     onClose();
 
     try {
@@ -293,7 +293,7 @@ export function DownloadModal({
       if (result.success) {
         acceptDownloadRequest(
           requestId,
-          `${client} a accepté la demande • recherche ${qualityLabel} en cours`,
+          `Demande acceptée • recherche ${qualityLabel} en cours`,
           'searching'
         );
       } else {
@@ -391,11 +391,11 @@ export function DownloadModal({
       episodeNumber: mediaType === 'tv' && scopeMode === 'episode' ? selectedEpisode : undefined,
       posterPath,
       downloadClient: clientLabel,
-      statusText: `Demande prise en compte • envoi de la release à ${clientLabel}…`,
+      statusText: 'Demande prise en compte • préparation du téléchargement…',
       releaseTitle: torrent.name
     });
 
-    showToast(`Demande prise en compte • envoi à ${clientLabel}.`, 'download');
+    showToast('Demande prise en compte • préparation du téléchargement…', 'download');
 
     try {
       const result = await pushReleaseDirectly({
@@ -419,7 +419,7 @@ export function DownloadModal({
       if (result.success) {
         acceptDownloadRequest(
           requestId,
-          `${clientLabel} a accepté la release • mise en file d'attente`,
+          `Téléchargement accepté • mise en file d'attente`,
           'queued'
         );
         setActionMessage({ text: result.message, type: 'success' });

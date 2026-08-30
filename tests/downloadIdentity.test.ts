@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   getPhysicalDownloadId,
   normalizeDownloadClientId,
+  sameLegacyPhysicalTransfer,
   samePhysicalDownload
 } from '../src/features/downloads/downloadIdentity.ts';
 
@@ -31,6 +32,34 @@ test('deux hashes différents restent deux téléchargements physiques distincts
     samePhysicalDownload(
       { downloadId: 'aaaaaaaa' },
       { id: 'qbit_bbbbbbbb' }
+    ),
+    false
+  );
+});
+
+
+test('rattache un ancien doublon sans hash grâce à la release et la taille', () => {
+  const arr = {
+    mediaType: 'movie',
+    title: 'Disclosure Day',
+    releaseTitle: 'Disclosure.Day.2026.1080p.BluRay',
+    size: 4_400_000_000
+  };
+  const persistedQbit = {
+    mediaType: 'movie',
+    title: 'Disclosure.Day.2026.1080p.BluRay-GROUP',
+    releaseTitle: 'Disclosure.Day.2026.1080p.BluRay-GROUP',
+    size: 4_410_000_000
+  };
+
+  assert.equal(sameLegacyPhysicalTransfer(arr, persistedQbit), true);
+});
+
+test('ne fusionne pas deux releases de tailles différentes', () => {
+  assert.equal(
+    sameLegacyPhysicalTransfer(
+      { mediaType: 'movie', releaseTitle: 'Film.1080p', size: 4_000_000_000 },
+      { mediaType: 'movie', releaseTitle: 'Film.1080p', size: 8_000_000_000 }
     ),
     false
   );

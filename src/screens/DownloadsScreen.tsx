@@ -120,7 +120,6 @@ function DownloadItemCard({
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-zinc-400">
-            {item.downloadClient && <span className="font-bold text-zinc-300">{item.downloadClient}</span>}
             {item.quality && <span>{item.quality}</span>}
             {item.speedFormatted && !isCompleted && !isError && <span className="text-cyan-300">{item.speedFormatted}</span>}
             {item.timeleft && item.timeleft !== '--' && !isCompleted && !isError && <span>{item.timeleft}</span>}
@@ -316,10 +315,10 @@ export function DownloadsScreen({ onShowClick }: Props) {
       title: torrent.name,
       mediaType,
       downloadClient: clientLabel,
-      statusText: `Demande prise en compte • envoi à ${clientLabel}…`,
+      statusText: 'Demande prise en compte • préparation du téléchargement…',
       releaseTitle: torrent.name
     });
-    showToast(`Demande prise en compte • envoi à ${clientLabel}.`, 'download');
+    showToast('Demande prise en compte • préparation du téléchargement…', 'download');
 
     try {
       const result = await pushReleaseDirectly({
@@ -334,7 +333,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
       });
 
       if (result.success) {
-        acceptDownloadRequest(requestId, `${clientLabel} a accepté la release • mise en file d’attente`, 'queued');
+        acceptDownloadRequest(requestId, 'Téléchargement accepté • mise en file d’attente', 'queued');
         showToast(result.message, 'success');
       } else {
         failDownloadRequest(requestId, result.message);

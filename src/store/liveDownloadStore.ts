@@ -16,7 +16,7 @@ import {
 import { useToastStore } from './toastStore';
 import { useShowsStore } from './showsStore';
 import { auth } from '../lib/firebase';
-import { getPhysicalDownloadId, samePhysicalDownload } from '../features/downloads/downloadIdentity';
+import { getPhysicalDownloadId, sameLegacyPhysicalTransfer, samePhysicalDownload } from '../features/downloads/downloadIdentity';
 
 interface LiveDownloadState {
   downloads: LiveDownloadItem[];
@@ -101,6 +101,11 @@ function sameDownloadIdentity(a: LiveDownloadItem, b: LiveDownloadItem): boolean
   // Deux hashes explicites différents = deux téléchargements physiques différents,
   // même si TMDB/titre sont identiques (ex. 1080p et 4K en parallèle).
   if (aPhysicalId && bPhysicalId) return false;
+
+  // Compatibilité avec les doublons persistés avant l'introduction du hash :
+  // même release + même taille, tant qu'au moins une des deux représentations
+  // ne possède pas encore d'identité physique.
+  if (sameLegacyPhysicalTransfer(a, b)) return true;
 
   if (!sameCanonicalMedia(a, b)) return false;
 
