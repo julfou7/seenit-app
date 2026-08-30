@@ -21,7 +21,7 @@ jobs:
           cache: npm
 
       - name: Installer les dépendances
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Vérifier TypeScript
         run: npm run lint
