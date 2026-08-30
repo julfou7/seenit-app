@@ -25,6 +25,7 @@ interface PlexAvailabilityState {
   setMediaAvailability: (key: string, info: PlexMediaInfo) => void;
   getMediaAvailability: (key: string) => PlexMediaInfo | undefined;
   clearCache: () => void;
+  clearUserCache: (uid: string) => void;
 }
 
 export const usePlexAvailabilityStore = create<PlexAvailabilityState>()(
@@ -36,7 +37,16 @@ export const usePlexAvailabilityStore = create<PlexAvailabilityState>()(
           cache: { ...state.cache, [key]: info }
         })),
       getMediaAvailability: (key) => get().cache[key],
-      clearCache: () => set({ cache: {} })
+      clearCache: () => set({ cache: {} }),
+      clearUserCache: (uid) =>
+        set((state) => {
+          const prefix = `v3:${uid}:`;
+          return {
+            cache: Object.fromEntries(
+              Object.entries(state.cache).filter(([key]) => !key.startsWith(prefix))
+            )
+          };
+        })
     }),
     {
       name: 'seenit_plex_availability_cache'
@@ -101,7 +111,9 @@ async function performPlexAvailabilityCheck(params: {
   const cached = store.getMediaAvailability(key);
   const now = Date.now();
 
-  // Cache policy: Positive cache = 24h, Negative cache = 30s
+  // Cache policy: Positive cache = 24h, Negative cache = 30s.
+  // Un full scan reconstruit les entrées positives connues, donc une fiche peut
+  // généralement répondre ici sans requête réseau supplémentaire.
   if (!forceRefresh && cached) {
     const isPositiveValid = cached.available && (now - cached.lastChecked < 24 * 60 * 60 * 1000);
     const isNegativeValid = !cached.available && (now - cached.lastChecked < 30 * 1000);
