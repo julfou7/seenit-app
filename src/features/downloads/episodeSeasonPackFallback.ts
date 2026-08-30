@@ -8,6 +8,7 @@ import {
   loginQBittorrent,
   searchAndDownloadInSonarr
 } from '../../services/sonarrRadarr';
+import { tmdb } from '../shows/tmdb';
 import { normalizeDownloadClientId } from './downloadIdentity';
 import {
   extractReleaseTorrentHash,
@@ -54,6 +55,24 @@ interface TransferCandidate {
 }
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function enrichExactExternalIds(
+  params: EpisodeDownloadWithFallbackParams
+): Promise<EpisodeDownloadWithFallbackParams> {
+  if (!params.tmdbId || (params.tvdbId && params.imdbId)) return params;
+  try {
+    const details = await tmdb.getShowDetails(Number(params.tmdbId));
+    if (!details.ok || !details.value) return params;
+    const external = details.value.external_ids || {};
+    return {
+      ...params,
+      tvdbId: params.tvdbId || external.tvdb_id || undefined,
+      imdbId: params.imdbId || external.imdb_id || undefined
+    };
+  } catch {
+    return params;
+  }
+}
 
 async function interactiveGet(url: string, headers: Record<string, string>): Promise<any> {
   if (!Capacitor.isNativePlatform()) return executeGet(url, headers);
@@ -229,6 +248,21 @@ async function tryQbitAction(
   return false;
 }
 
+async function removeExactQbitTorrent(
+  params: EpisodeDownloadWithFallbackParams,
+  headers: Record<string, string>,
+  downloadId: string
+): Promise<void> {
+  try {
+    await qbitAction(
+      params,
+      headers,
+      'delete',
+      `hashes=${encodeURIComponent(downloadId)}&deleteFiles=false`
+    );
+  } catch {}
+}
+
 async function removeSonarrTransfer(
   base: string,
   headers: Record<string, string>,
@@ -275,7 +309,7 @@ async function waitForPackTransfer(
   release: any
 ): Promise<{ downloadId: string; queueIds: number[] } | null> {
   const releaseHash = extractReleaseTorrentHash(release);
-  for (let attempt = 0; attempt < 24; attempt += 1) {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
     const [queue, torrents] = await Promise.all([
       fetchSonarrQueue(base, sonarrHeaders).catch(() => []),
       fetchQbitTorrents(params, qHeaders).catch(() => [])
@@ -307,40 +341,52 @@ async function waitForPackTransfer(
   return null;
 }
 
+async function fetchQbitFiles(
+  params: EpisodeDownloadWithFallbackParams,
+  headers: Record<string, string>,
+  downloadId: string
+): Promise<TorrentFileLike[]> {
+  const base = cleanUrl(params.qbittorrentUrl || '');
+  const response = await executeGet(
+    `${base}/api/v2/torrents/files?hash=${encodeURIComponent(downloadId)}`,
+    headers
+  ).catch(() => []);
+  if (!Array.isArray(response)) return [];
+  return response.map(file => ({
+    index: Number(file.index),
+    name: String(file.name || ''),
+    size: Number(file.size || 0),
+    priority: Number(file.priority || 0)
+  }));
+}
+
 async function selectOnlyEpisodeInQbit(
   params: EpisodeDownloadWithFallbackParams,
   qHeaders: Record<string, string>,
   downloadId: string
 ): Promise<{ success: boolean; selectedFile?: string; error?: string }> {
-  const base = cleanUrl(params.qbittorrentUrl || '');
-  const body = `hashes=${encodeURIComponent(downloadId)}`;
-  const paused = await tryQbitAction(params, qHeaders, ['stop', 'pause'], body);
+  const pauseBody = `hashes=${encodeURIComponent(downloadId)}`;
+  const paused = await tryQbitAction(params, qHeaders, ['stop', 'pause'], pauseBody);
+  if (!paused) {
+    return { success: false, error: 'SeenIt n’a pas pu mettre le pack en pause avant la sélection des fichiers.' };
+  }
 
   let files: TorrentFileLike[] = [];
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    const response = await executeGet(
-      `${base}/api/v2/torrents/files?hash=${encodeURIComponent(downloadId)}`,
-      qHeaders
-    ).catch(() => []);
-    if (Array.isArray(response) && response.length > 0) {
-      files = response.map(file => ({
-        index: Number(file.index),
-        name: String(file.name || ''),
-        size: Number(file.size || 0),
-        priority: Number(file.priority || 0)
-      }));
-      break;
-    }
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    files = await fetchQbitFiles(params, qHeaders, downloadId);
+    if (files.length > 0) break;
     await delay(500);
   }
 
   const selection = selectEpisodeFiles(files, Number(params.season), Number(params.episode));
-  if (selection.targetIndexes.length !== 1 || selection.ambiguous) {
+  if (selection.targetIndexes.length !== 1 || selection.ambiguous || selection.extraEpisodeNumbers.length > 0) {
     return {
       success: false,
       error: selection.ambiguous
         ? 'Plusieurs fichiers du pack correspondent à l’épisode demandé.'
-        : 'Le fichier exact de l’épisode est introuvable dans le pack.'
+        : selection.extraEpisodeNumbers.length > 0
+          ? 'Le seul fichier trouvé contient plusieurs épisodes et ne peut pas être découpé sans télécharger les épisodes voisins.'
+          : 'Le fichier exact de l’épisode est introuvable dans le pack.'
     };
   }
 
@@ -361,19 +407,25 @@ async function selectOnlyEpisodeInQbit(
     `hash=${encodeURIComponent(downloadId)}&id=${targetIndex}&priority=1`
   );
 
-  if (paused) {
-    const resumed = await tryQbitAction(params, qHeaders, ['start', 'resume'], body);
-    if (!resumed) {
-      return { success: false, selectedFile: selection.targetNames[0], error: 'Épisode sélectionné mais reprise qBittorrent impossible.' };
-    }
+  const verifiedFiles = await fetchQbitFiles(params, qHeaders, downloadId);
+  const targetVerified = verifiedFiles.some(file => file.index === targetIndex && Number(file.priority || 0) > 0);
+  const unwantedStillEnabled = verifiedFiles.some(file => file.index !== targetIndex && Number(file.priority || 0) > 0);
+  if (!targetVerified || unwantedStillEnabled) {
+    return { success: false, selectedFile: selection.targetNames[0], error: 'qBittorrent n’a pas confirmé la sélection exclusive de l’épisode.' };
+  }
+
+  const resumed = await tryQbitAction(params, qHeaders, ['start', 'resume'], pauseBody);
+  if (!resumed) {
+    return { success: false, selectedFile: selection.targetNames[0], error: 'Épisode sélectionné mais reprise qBittorrent impossible.' };
   }
 
   return { success: true, selectedFile: selection.targetNames[0] };
 }
 
 export async function downloadEpisodeWithSeasonPackFallback(
-  params: EpisodeDownloadWithFallbackParams
+  initialParams: EpisodeDownloadWithFallbackParams
 ): Promise<EpisodeDownloadWithFallbackResult> {
+  const params = await enrichExactExternalIds(initialParams);
   const base = cleanUrl(params.url);
   const sonarrHeaders = {
     'X-Api-Key': params.apiKey,
@@ -390,9 +442,8 @@ export async function downloadEpisodeWithSeasonPackFallback(
     target = await resolveExactTarget(base, sonarrHeaders, params, 1);
   } catch {}
 
-  let normalResult: { success: boolean; message: string } | null = null;
   if (!target) {
-    normalResult = await searchAndDownloadInSonarr({
+    const normalResult = await searchAndDownloadInSonarr({
       url: params.url,
       apiKey: params.apiKey,
       title: params.title,
@@ -404,11 +455,10 @@ export async function downloadEpisodeWithSeasonPackFallback(
       qualityProfileId: params.qualityProfileId,
       qualityPreference: params.qualityPreference
     });
-    if (!normalResult.success) return normalResult;
-    try {
-      target = await resolveExactTarget(base, sonarrHeaders, params, 5);
-    } catch {}
-    if (!target) return normalResult;
+    return {
+      ...normalResult,
+      status: normalResult.success ? 'searching' : undefined
+    };
   }
 
   let episodeReleases: any[];
@@ -423,21 +473,22 @@ export async function downloadEpisodeWithSeasonPackFallback(
   }
 
   if (hasCompatibleIndividualEpisodeRelease(episodeReleases, params.qualityPreference)) {
-    if (!normalResult) {
-      normalResult = await searchAndDownloadInSonarr({
-        url: params.url,
-        apiKey: params.apiKey,
-        title: params.title,
-        tmdbId: params.tmdbId,
-        tvdbId: params.tvdbId,
-        imdbId: params.imdbId,
-        season: params.season,
-        episode: params.episode,
-        qualityProfileId: params.qualityProfileId,
-        qualityPreference: params.qualityPreference
-      });
-    }
-    return { ...normalResult, status: normalResult.success ? 'searching' : undefined };
+    const normalResult = await searchAndDownloadInSonarr({
+      url: params.url,
+      apiKey: params.apiKey,
+      title: params.title,
+      tmdbId: params.tmdbId,
+      tvdbId: params.tvdbId,
+      imdbId: params.imdbId,
+      season: params.season,
+      episode: params.episode,
+      qualityProfileId: params.qualityProfileId,
+      qualityPreference: params.qualityPreference
+    });
+    return {
+      ...normalResult,
+      status: normalResult.success ? 'searching' : undefined
+    };
   }
 
   let seasonReleases: any[];
@@ -507,16 +558,17 @@ export async function downloadEpisodeWithSeasonPackFallback(
     await removeSonarrTransfer(base, sonarrHeaders, newTransfers.flatMap(item => item.queueIds));
     return {
       success: false,
-      message: 'Le pack a été lancé mais SeenIt n’a pas pu corréler son torrent qBittorrent de façon certaine. Il a été annulé par sécurité.'
+      message: 'Le pack a été lancé mais SeenIt n’a pas pu corréler son torrent qBittorrent de façon certaine. Les transferts Sonarr identifiés ont été annulés par sécurité.'
     };
   }
 
   const selection = await selectOnlyEpisodeInQbit(params, qHeaders, transfer.downloadId);
   if (!selection.success) {
     await removeSonarrTransfer(base, sonarrHeaders, transfer.queueIds);
+    await removeExactQbitTorrent(params, qHeaders, transfer.downloadId);
     return {
       success: false,
-      message: `${selection.error || 'Impossible de sélectionner l’épisode dans le pack'} Le pack a été annulé par sécurité.`
+      message: `${selection.error || 'Impossible de sélectionner l’épisode dans le pack'} Le pack exact a été annulé par sécurité.`
     };
   }
 
