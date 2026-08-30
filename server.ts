@@ -968,13 +968,9 @@ async function startServer() {
               const normalized = normalizePlexAccountHistoryNode(node);
               if (!normalized?.guid || typeof normalized.guid !== 'string') continue;
 
-              // Un épisode doit conserver ses coordonnées S/E. Le fallback GraphQL minimal
-              // peut résoudre les films mais ne doit jamais inventer S1E1.
-              if (normalized.type === 'episode' &&
-                  (!Number.isFinite(normalized.parentIndex) || !Number.isFinite(normalized.index))) {
-                continue;
-              }
-
+              // Le Watch History du compte ne sert ici qu'à retrouver le GUID global.
+              // Si les coordonnées S/E manquent, elles seront hydratées plus bas depuis
+              // le véritable objet Metadata du provider Plex.
               const identity = normalized.guid.trim();
               if (!identity || seenGuids.has(identity)) continue;
               seenGuids.add(identity);
@@ -1338,6 +1334,33 @@ async function startServer() {
       // explicitement les identifiants de la série parente.
       // Le jeton reste exclusivement dans l'en-tête et n'est jamais renvoyé au client.
       const metadataCache = new Map<string, any>();
+      const providerMetadataCache = new Map<string, any>();
+
+      const fetchProviderMetadata = async (rawGuid: unknown): Promise<any | null> => {
+        if (typeof rawGuid !== 'string' || !rawGuid.trim()) return null;
+        const plexId = extractPlexExternalIds({ guid: rawGuid }).plexGuid;
+        if (!plexId) return null;
+        if (providerMetadataCache.has(plexId)) return providerMetadataCache.get(plexId);
+
+        try {
+          const response = await fetch(`https://discover.provider.plex.tv/library/metadata/${encodeURIComponent(plexId)}?includeGuids=1`, {
+            headers: {
+              'Accept': 'application/json',
+              'X-Plex-Token': token,
+              'X-Plex-Client-Identifier': plexClientIdentifier,
+              'X-Plex-Product': 'SeenIt'
+            },
+            signal: AbortSignal.timeout(6000)
+          });
+          if (!response.ok) return null;
+          const payload = await response.json();
+          const metadata = extractItems(payload)[0] || null;
+          if (metadata) providerMetadataCache.set(plexId, metadata);
+          return metadata;
+        } catch {
+          return null;
+        }
+      };
 
       const fetchServerMetadata = async (entry: any, ratingKey: unknown): Promise<any | null> => {
         if (!ratingKey || !entry.serverUri || !entry.serverToken) return null;
@@ -1365,8 +1388,30 @@ async function startServer() {
       };
 
       const enrichEntry = async (entry: any): Promise<any> => {
-        const raw = entry.raw || {};
-        const meta = unwrapPlexMediaItem(raw);
+        const originalRaw = entry.raw || {};
+        let raw = originalRaw;
+        let meta = unwrapPlexMediaItem(raw);
+
+        // Le Watch History compte fournit un GUID global. On l'utilise immédiatement
+        // pour charger l'objet Metadata documenté par Plex : ratingKey/key/guid et,
+        // pour les épisodes, parentIndex/index/grandparentGuid deviennent disponibles.
+        if (entry.sourceKind === 'account-history' && typeof meta?.guid === 'string') {
+          const providerMetadata = await fetchProviderMetadata(meta.guid);
+          if (providerMetadata) {
+            raw = {
+              ...originalRaw,
+              ...providerMetadata,
+              historyKey: originalRaw.historyKey,
+              accountHistoryId: originalRaw.accountHistoryId,
+              accountMetadataId: originalRaw.accountMetadataId,
+              parentAccountMetadataId: originalRaw.parentAccountMetadataId,
+              grandparentAccountMetadataId: originalRaw.grandparentAccountMetadataId
+            };
+            entry = { ...entry, raw };
+            meta = unwrapPlexMediaItem(raw);
+          }
+        }
+
         const rawType = String(meta.type || raw.type || '').toLowerCase();
         const isEpisode = rawType === 'episode' || !!meta.grandparentTitle ||
           (meta.parentIndex !== undefined && meta.index !== undefined);
