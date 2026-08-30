@@ -20,6 +20,12 @@ import {
   getStrongPlexSourceIdentity,
   unwrapPlexMediaItem
 } from "./src/features/plex/plexIdentity.ts";
+import {
+  isPlexLibraryItemWatched,
+  normalizePlexAccountHistoryNode,
+  PLEX_ACCOUNT_HISTORY_MINIMAL_QUERY,
+  PLEX_ACCOUNT_HISTORY_QUERY
+} from "./src/features/plex/plexAccountHistory.ts";
 
 export interface AuthRequest extends Request {
   user?: DecodedIdToken;
@@ -885,6 +891,117 @@ async function startServer() {
         return collected;
       };
 
+      const sourceStats = {
+        cloudItems: 0,
+        plexAccountHistoryItems: 0,
+        plexAccountHistoryRetained: 0,
+        pmsHistoryItems: 0,
+        libraryWatchedItems: 0,
+        libraryInventoryItems: 0,
+        libraryInventoryScanSucceeded: false
+      };
+      const libraryAvailabilityItems: any[] = [];
+      const currentLibraryGuids = new Set<string>();
+
+      const getPlexAccountUuid = async (): Promise<string | null> => {
+        try {
+          const response = await fetch('https://plex.tv/api/v2/user', {
+            headers: {
+              'Accept': 'application/json',
+              'X-Plex-Token': token,
+              'X-Plex-Client-Identifier': plexClientIdentifier,
+              'X-Plex-Product': 'SeenIt'
+            },
+            signal: AbortSignal.timeout(7000)
+          });
+          if (!response.ok) return null;
+          const userData = await response.json();
+          return typeof userData?.uuid === 'string' && userData.uuid.trim()
+            ? userData.uuid.trim()
+            : null;
+        } catch (error: any) {
+          console.log(`[Plex Sync] Plex account UUID unavailable: ${error?.message || error}`);
+          return null;
+        }
+      };
+
+      const fetchPlexAccountWatchHistory = async (): Promise<{ available: boolean; items: any[]; queryMode: string }> => {
+        const uuid = await getPlexAccountUuid();
+        if (!uuid) return { available: false, items: [], queryMode: 'none' };
+
+        const runQuery = async (query: string, queryMode: string) => {
+          const collected: any[] = [];
+          const seenGuids = new Set<string>();
+          let after: string | null = null;
+
+          for (let page = 0; page < 50; page++) {
+            const response = await fetch('https://community.plex.tv/api', {
+              method: 'POST',
+              headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-Plex-Token': token,
+                'X-Plex-Client-Identifier': plexClientIdentifier,
+                'X-Plex-Product': 'SeenIt'
+              },
+              body: JSON.stringify({
+                query,
+                operationName: 'GetWatchHistoryHub',
+                variables: { uuid, first: 100, ...(after ? { after } : {}) }
+              }),
+              signal: AbortSignal.timeout(10000)
+            });
+
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}`);
+            }
+
+            const payload = await response.json();
+            if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
+              throw new Error(payload.errors.map((error: any) => error?.message || 'GraphQL error').join(' | '));
+            }
+
+            const history = payload?.data?.user?.watchHistory;
+            const nodes = Array.isArray(history?.nodes) ? history.nodes : [];
+
+            for (const node of nodes) {
+              const normalized = normalizePlexAccountHistoryNode(node);
+              if (!normalized?.guid || typeof normalized.guid !== 'string') continue;
+
+              // Un épisode doit conserver ses coordonnées S/E. Le fallback GraphQL minimal
+              // peut résoudre les films mais ne doit jamais inventer S1E1.
+              if (normalized.type === 'episode' &&
+                  (!Number.isFinite(normalized.parentIndex) || !Number.isFinite(normalized.index))) {
+                continue;
+              }
+
+              const identity = normalized.guid.trim();
+              if (!identity || seenGuids.has(identity)) continue;
+              seenGuids.add(identity);
+              collected.push(normalized);
+            }
+
+            const pageInfo = history?.pageInfo || {};
+            if (!pageInfo.hasNextPage || !pageInfo.endCursor || nodes.length === 0) break;
+            after = String(pageInfo.endCursor);
+          }
+
+          return { available: true, items: collected, queryMode };
+        };
+
+        try {
+          return await runQuery(PLEX_ACCOUNT_HISTORY_QUERY, 'rich');
+        } catch (richError: any) {
+          console.log(`[Plex Sync] Watch History GraphQL rich query unavailable, fallback minimal: ${richError?.message || richError}`);
+          try {
+            return await runQuery(PLEX_ACCOUNT_HISTORY_MINIMAL_QUERY, 'minimal');
+          } catch (minimalError: any) {
+            console.log(`[Plex Sync] Watch History Plex Account unavailable: ${minimalError?.message || minimalError}`);
+            return { available: false, items: [], queryMode: 'none' };
+          }
+        }
+      };
+
       // 1. Fetch from Plex Cloud Activity Feeds & Official Plex Watchlist
       const rawWatchlistItems: any[] = [];
       const watchlistEndpoints = [
@@ -932,8 +1049,9 @@ async function startServer() {
           if (items.length > 0) {
             console.log(`[Plex Sync] Fetched ${items.length} items from Plex Cloud endpoint: ${endpoint}`);
             for (const it of items) {
-              allRawItems.push({ raw: it, source: 'Plex Cloud Activity' });
+              allRawItems.push({ raw: it, source: 'Plex Cloud Activity', sourceKind: 'cloud' });
             }
+            sourceStats.cloudItems += items.length;
             visitedSources.push(`Plex Cloud (${items.length} éléments)`);
           }
         } catch (e: any) {
@@ -942,21 +1060,42 @@ async function startServer() {
         }
       }
 
+      // En scan complet, récupérer l'historique lié au COMPTE Plex. Contrairement
+      // au PMS /status/sessions/history, metadataItem.guid est une identité globale Plex.
+      if (!delta) {
+        const accountHistory = await fetchPlexAccountWatchHistory();
+        if (accountHistory.available && accountHistory.items.length > 0) {
+          for (const item of accountHistory.items) {
+            allRawItems.push({
+              raw: item,
+              source: 'Plex Account Watch History',
+              sourceKind: 'account-history'
+            });
+          }
+          sourceStats.plexAccountHistoryItems = accountHistory.items.length;
+          visitedSources.push(`Plex Account History (${accountHistory.items.length} GUID, mode ${accountHistory.queryMode})`);
+          console.log(`[Plex Sync] Plex Account Watch History: ${accountHistory.items.length} identité(s) globale(s) récupérée(s) (${accountHistory.queryMode}).`);
+        }
+      }
+
       // 2. Fetch user's servers from Plex.tv (Both owned servers & shared servers from friends)
       const servers = await getPlexServers(token, plexClientIdentifier, delta ? 6000 : 9000);
 
       console.log(`[Plex Sync] Found ${servers.length} Plex server(s) (personal & shared)`);
 
-      // 3. Query EACH server (do NOT stop at the first server!)
-      const serverTimeout = delta ? 2000 : 3500;
+      // 3. Interroger chaque serveur. En FULL, la bibliothèque actuelle est la source
+      // de vérité pour l'état watched et pour la disponibilité. L'historique PMS n'est
+      // qu'un fallback si le Watch History du compte Plex n'a fourni aucun GUID.
+      const serverTimeout = delta ? 2500 : 5000;
+      const usePmsHistoryInFull = !delta && sourceStats.plexAccountHistoryItems === 0;
 
       for (const server of servers) {
         const serverName = server.name || 'Serveur Plex';
         const serverAccessToken = server.accessToken || token;
         const connections = server.connections || [];
         let serverItemCount = 0;
+        let serverInventoryCount = 0;
 
-        // Sort connections: prioritize remote HTTPS / plex.direct connections over unreachable LAN IPs
         const sortedConnections = [...connections].sort((a: any, b: any) => {
           const aIsRemote = !a.local && (a.uri || '').startsWith('https://');
           const bIsRemote = !b.local && (b.uri || '').startsWith('https://');
@@ -985,130 +1124,212 @@ async function startServer() {
 
         const hasRemoteConnection = sortedConnections.some((c: any) => c.uri && !isPrivateOrLocalUri(c.uri));
 
-        // Try reachable connections for this server
         for (const conn of sortedConnections) {
           const uri = conn.uri;
           if (!uri) continue;
-
-          // Skip LAN IPs if running on Cloud Run server when a public remote connection exists
-          if (isPrivateOrLocalUri(uri) && hasRemoteConnection) {
-            continue;
-          }
+          if (isPrivateOrLocalUri(uri) && hasRemoteConnection) continue;
 
           let connectionSuccess = false;
+          let historyFoundOnConnection = 0;
 
-          // A. Try session history (admin / owner endpoint)
-          try {
-            const items = await fetchPlexPages(
-              `${uri}/status/sessions/history/all?sort=viewedAt:desc&includeGuids=1`,
-              { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
-              serverTimeout,
-              50,
-              delta ? Number(since) || undefined : undefined
-            );
-            if (items.length > 0) {
-              for (const it of items) {
-                allRawItems.push({ raw: it, source: serverName, serverId: server.clientIdentifier, serverUri: uri, serverToken: serverAccessToken });
-              }
-              serverItemCount += items.length;
-              connectionSuccess = true;
-            }
-          } catch (e) {
-            // Proceed to other endpoints
-          }
-
-          // B. Try recently viewed endpoint (works for shared/friend users too)
-          try {
-            const items = await fetchPlexPages(
-              `${uri}/library/recentlyViewed?includeGuids=1`,
-              { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
-              serverTimeout,
-              50,
-              delta ? Number(since) || undefined : undefined
-            );
-            if (items.length > 0) {
-              for (const it of items) {
-                allRawItems.push({ raw: it, source: serverName, serverId: server.clientIdentifier, serverUri: uri, serverToken: serverAccessToken });
-              }
-              serverItemCount += items.length;
-              connectionSuccess = true;
-            }
-          } catch (e) {}
-
-          // In Full Scan mode only: try library all & section scans
-          if (!delta) {
-            // C. Try library all watched items
+          if (delta || usePmsHistoryInFull) {
             try {
               const items = await fetchPlexPages(
-                `${uri}/library/all?viewCount>=1&sort=lastViewedAt:desc&includeGuids=1`,
+                `${uri}/status/sessions/history/all?sort=viewedAt:desc`,
                 { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
                 serverTimeout,
-                50
+                50,
+                delta ? Number(since) || undefined : undefined
               );
               if (items.length > 0) {
                 for (const it of items) {
-                  allRawItems.push({ raw: it, source: serverName, serverId: server.clientIdentifier, serverUri: uri, serverToken: serverAccessToken });
+                  allRawItems.push({
+                    raw: it,
+                    source: serverName,
+                    sourceKind: 'pms-history',
+                    serverName,
+                    serverId: server.clientIdentifier,
+                    serverUri: uri,
+                    serverToken: serverAccessToken
+                  });
+                }
+                historyFoundOnConnection = items.length;
+                sourceStats.pmsHistoryItems += items.length;
+                serverItemCount += items.length;
+                connectionSuccess = true;
+              }
+            } catch {}
+          }
+
+          // Le recentlyViewed n'est qu'un fallback du delta si l'historique PMS n'est
+          // pas accessible (cas de certains serveurs partagés). Il ne sert plus au FULL.
+          if (delta && historyFoundOnConnection === 0) {
+            try {
+              const items = await fetchPlexPages(
+                `${uri}/library/recentlyViewed?includeGuids=1`,
+                { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
+                serverTimeout,
+                10,
+                Number(since) || undefined
+              );
+              if (items.length > 0) {
+                for (const it of items) {
+                  allRawItems.push({
+                    raw: it,
+                    source: serverName,
+                    sourceKind: 'pms-recent-fallback',
+                    serverName,
+                    serverId: server.clientIdentifier,
+                    serverUri: uri,
+                    serverToken: serverAccessToken
+                  });
                 }
                 serverItemCount += items.length;
                 connectionSuccess = true;
               }
-            } catch (e) {}
+            } catch {}
+          }
 
-            // D. Query library sections (movies & TV shows) on this server
+          if (!delta) {
             try {
               const sectionsRes = await fetch(`${uri}/library/sections`, {
                 headers: { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
                 signal: AbortSignal.timeout(serverTimeout)
               });
+
               if (sectionsRes.ok) {
+                connectionSuccess = true;
+                sourceStats.libraryInventoryScanSucceeded = true;
                 const sectionsData = await sectionsRes.json();
                 const sections = (sectionsData.MediaContainer && sectionsData.MediaContainer.Directory) || [];
-                
+
                 for (const sec of sections) {
                   const secKey = sec.key;
-                  if (!secKey) continue;
-                  
-                  // Fetch recently viewed in this specific section
-                  try {
-                    const items = await fetchPlexPages(
-                      `${uri}/library/sections/${secKey}/recentlyViewed?includeGuids=1`,
-                      { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
-                      2500,
-                      50
-                    );
-                    for (const it of items) {
-                      allRawItems.push({ raw: it, source: `${serverName} - ${sec.title || 'Section'}`, serverId: server.clientIdentifier, serverUri: uri, serverToken: serverAccessToken });
-                    }
-                    serverItemCount += items.length;
-                    connectionSuccess = connectionSuccess || items.length > 0;
-                  } catch (e) {}
+                  const secType = String(sec.type || '').toLowerCase();
+                  if (!secKey || !['movie', 'show'].includes(secType)) continue;
+                  const sourceName = `${serverName} - ${sec.title || 'Section'}`;
 
-                  // Fetch all watched in this section
-                  try {
-                    const items = await fetchPlexPages(
-                      `${uri}/library/sections/${secKey}/all?viewCount>=1&sort=lastViewedAt:desc&includeGuids=1`,
-                      { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
-                      2500,
-                      50
-                    );
-                    for (const it of items) {
-                      allRawItems.push({ raw: it, source: `${serverName} - ${sec.title || 'Section'}`, serverId: server.clientIdentifier, serverUri: uri, serverToken: serverAccessToken });
+                  if (secType === 'movie') {
+                    try {
+                      const movies = await fetchPlexPages(
+                        `${uri}/library/sections/${secKey}/all?sort=lastViewedAt:desc&includeGuids=1`,
+                        { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
+                        serverTimeout,
+                        100
+                      );
+
+                      for (const movie of movies) {
+                        if (typeof movie?.guid === 'string' && movie.guid) currentLibraryGuids.add(movie.guid);
+                        libraryAvailabilityItems.push({ raw: movie, serverName, serverId: server.clientIdentifier });
+                      }
+                      sourceStats.libraryInventoryItems += movies.length;
+                      serverInventoryCount += movies.length;
+
+                      const watchedMovies = movies.filter(isPlexLibraryItemWatched);
+                      for (const movie of watchedMovies) {
+                        allRawItems.push({
+                          raw: movie,
+                          source: sourceName,
+                          sourceKind: 'library-watched',
+                          availableOnServer: true,
+                          serverName,
+                          serverId: server.clientIdentifier,
+                          serverUri: uri,
+                          serverToken: serverAccessToken
+                        });
+                      }
+                      sourceStats.libraryWatchedItems += watchedMovies.length;
+                      serverItemCount += watchedMovies.length;
+                    } catch (error: any) {
+                      console.log(`[Plex Sync] Movie section ${secKey} skipped on ${serverName}: ${error?.message || error}`);
                     }
-                    serverItemCount += items.length;
-                    connectionSuccess = connectionSuccess || items.length > 0;
-                  } catch (e) {}
+                  }
+
+                  if (secType === 'show') {
+                    // 1) Liste des séries = index de disponibilité Plex pour les fiches SeenIt.
+                    try {
+                      const shows = await fetchPlexPages(
+                        `${uri}/library/sections/${secKey}/all?includeGuids=1`,
+                        { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
+                        serverTimeout,
+                        100
+                      );
+                      for (const show of shows) {
+                        if (typeof show?.guid === 'string' && show.guid) currentLibraryGuids.add(show.guid);
+                        libraryAvailabilityItems.push({ raw: show, serverName, serverId: server.clientIdentifier });
+                      }
+                      sourceStats.libraryInventoryItems += shows.length;
+                      serverInventoryCount += shows.length;
+                    } catch (error: any) {
+                      console.log(`[Plex Sync] Show inventory section ${secKey} skipped on ${serverName}: ${error?.message || error}`);
+                    }
+
+                    // 2) allLeaves = TOUS les épisodes. On filtre viewCount côté SeenIt,
+                    // sans dépendre d'une syntaxe de filtre URL non garantie.
+                    try {
+                      const episodes = await fetchPlexPages(
+                        `${uri}/library/sections/${secKey}/allLeaves?sort=lastViewedAt:desc&includeGuids=1`,
+                        { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
+                        serverTimeout,
+                        200
+                      );
+                      for (const episode of episodes) {
+                        if (typeof episode?.guid === 'string' && episode.guid) currentLibraryGuids.add(episode.guid);
+                      }
+
+                      const watchedEpisodes = episodes.filter(isPlexLibraryItemWatched);
+                      for (const episode of watchedEpisodes) {
+                        allRawItems.push({
+                          raw: episode,
+                          source: sourceName,
+                          sourceKind: 'library-watched',
+                          availableOnServer: true,
+                          serverName,
+                          serverId: server.clientIdentifier,
+                          serverUri: uri,
+                          serverToken: serverAccessToken
+                        });
+                      }
+                      sourceStats.libraryWatchedItems += watchedEpisodes.length;
+                      serverItemCount += watchedEpisodes.length;
+                    } catch (error: any) {
+                      console.log(`[Plex Sync] Episode inventory section ${secKey} skipped on ${serverName}: ${error?.message || error}`);
+                    }
+                  }
                 }
               }
-            } catch (e) {}
+            } catch {}
           }
 
-          // If this connection worked for this server, we don't need to re-query redundant relay connections
-          if (connectionSuccess && serverItemCount > 0) {
-            visitedSources.push(`${serverName} (${serverItemCount} éléments)`);
+          if (connectionSuccess) {
+            visitedSources.push(`${serverName} (${serverItemCount} vu(s), ${serverInventoryCount} média(s) indexé(s))`);
             break;
           }
         }
       }
+
+      // Les médias toujours présents dans une bibliothèque actuelle sont gouvernés par
+      // leur viewCount actuel. On retire donc leurs anciens événements Account History
+      // par GUID exact. Les événements orphelins (GUID absent des bibliothèques) restent.
+      let removedAccountDuplicates = 0;
+      if (!delta && currentLibraryGuids.size > 0) {
+        for (let index = allRawItems.length - 1; index >= 0; index--) {
+          const entry = allRawItems[index];
+          if (entry?.sourceKind !== 'account-history') continue;
+          const guid = typeof entry?.raw?.guid === 'string' ? entry.raw.guid : '';
+          if (guid && currentLibraryGuids.has(guid)) {
+            allRawItems.splice(index, 1);
+            removedAccountDuplicates++;
+          }
+        }
+      }
+      sourceStats.plexAccountHistoryRetained = Math.max(0, sourceStats.plexAccountHistoryItems - removedAccountDuplicates);
+
+      console.log(
+        `[Plex Sync] Sources FULL/DELTA: account=${sourceStats.plexAccountHistoryItems} ` +
+        `(retained=${sourceStats.plexAccountHistoryRetained}), libraryWatched=${sourceStats.libraryWatchedItems}, ` +
+        `libraryInventory=${sourceStats.libraryInventoryItems}, pmsHistory=${sourceStats.pmsHistoryItems}, cloud=${sourceStats.cloudItems}.`
+      );
 
       console.log(`[Plex Sync] Collected a total of ${allRawItems.length} raw history records across all sources.`);
 
@@ -1305,6 +1526,9 @@ async function startServer() {
           grandparentThumb: meta.grandparentThumb || raw.grandparentThumb,
           grandparentArt: meta.grandparentArt || raw.grandparentArt,
           serverId: entry.serverId,
+          serverName: entry.serverName || source,
+          sourceKind: entry.sourceKind || 'unknown',
+          availableOnServer: entry.availableOnServer === true,
           sourceIdentity,
           source
         });
@@ -1345,11 +1569,51 @@ async function startServer() {
         });
       }
 
-      console.log(`[Plex Sync] Returning ${normalizedHistory.length} history items and ${normalizedWatchlist.length} watchlist items.`);
+      const normalizedLibraryAvailability: any[] = [];
+      const availabilitySeen = new Set<string>();
+      for (const entry of libraryAvailabilityItems) {
+        const meta = unwrapPlexMediaItem(entry.raw || {});
+        const rawType = String(meta.type || '').toLowerCase();
+        const mediaType = rawType === 'show' || rawType === 'series' ? 'tv' : rawType === 'movie' ? 'movie' : null;
+        if (!mediaType) continue;
+
+        const ids = extractPlexExternalIds(meta);
+        if (!ids.tmdbId) continue;
+        const ratingKey = getPlexMetadataLookupKey(meta);
+        if (!ratingKey || !entry.serverId) continue;
+
+        const availabilityKey = `${entry.serverId}:${mediaType}:${ids.tmdbId}`;
+        if (availabilitySeen.has(availabilityKey)) continue;
+        availabilitySeen.add(availabilityKey);
+
+        const plexUrl = `https://app.plex.tv/desktop/#!/server/${entry.serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`;
+        normalizedLibraryAvailability.push({
+          tmdbId: ids.tmdbId,
+          mediaType,
+          serverName: entry.serverName || 'Plex',
+          serverId: entry.serverId,
+          ratingKey,
+          plexUrl,
+          watchUrl: plexUrl,
+          title: meta.title || null,
+          year: meta.year ? Number(meta.year) : undefined
+        });
+      }
+
+      const stats = {
+        ...sourceStats,
+        rawItems: allRawItems.length,
+        normalizedHistoryItems: normalizedHistory.length,
+        availabilitySeedItems: normalizedLibraryAvailability.length
+      };
+
+      console.log(`[Plex Sync] Returning ${normalizedHistory.length} history items, ${normalizedWatchlist.length} watchlist items and ${normalizedLibraryAvailability.length} availability item(s).`);
 
       return res.status(200).json({ 
         history: normalizedHistory,
         watchlist: normalizedWatchlist,
+        libraryAvailability: normalizedLibraryAvailability,
+        stats,
         visitedSources,
         totalFound: normalizedHistory.length + normalizedWatchlist.length,
         cursor: syncCursor

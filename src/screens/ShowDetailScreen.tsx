@@ -18,7 +18,6 @@ import { DownloadModal } from '../components/DownloadModal';
 import { useShowsStore } from '../store/showsStore';
 import { getSeriesImdbData } from '../features/shows/omdbService';
 import { getFormattedProviderLogo, PLEX_LOGO_SVG } from '../utils/providerLogos';
-import { checkPlexAvailability, PlexMediaInfo } from '../features/plex/plexAvailability';
 import { openPlexWatchUrl } from '../features/plex/syncPlex';
 import { useMediaPresence } from '../hooks/useMediaPresence';
 import { RedditSection } from '../components/community/RedditSection';
@@ -511,6 +510,8 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     mediaType: isSeries ? 'tv' : 'movie'
   });
 
+  const plexMediaInfo = presence.plexInfo || null;
+
   const openEpisodeModal = (seasonNum: number, ep: any) => {
     setSelectedEpisode({ season: seasonNum, episode: ep });
     const currentState = window.history.state || {};
@@ -554,7 +555,6 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const [dragX, setDragX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [userPlatforms, setUserPlatforms] = useState<number[]>([]);
-  const [plexMediaInfo, setPlexMediaInfo] = useState<PlexMediaInfo | null>(null);
 
   useEffect(() => {
     const handleStorage = () => {
@@ -659,7 +659,6 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     setCollectionLoading(true);
     setImdbData(null);
     setProviders(null);
-    setPlexMediaInfo(null);
     setKeywords([]);
     setSeasonsCache({});
     setExpandedSeason(null);
@@ -703,24 +702,8 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         const realYear = (res.value.release_date || res.value.first_air_date)?.slice(0, 4);
         const realImdbId = res.value.imdb_id || res.value.external_ids?.imdb_id;
 
-        // Fetch / update Plex availability with the verified TMDB details
-        checkPlexAvailability({
-          tmdbId: effectiveTmdbId,
-          imdbId: realImdbId,
-          title: realTitle,
-          originalTitle: realOriginal,
-          year: realYear,
-          mediaType: realMediaType,
-          forceRefresh: true
-        }).then(info => {
-          if (isMounted) {
-            setPlexMediaInfo(info);
-          }
-        }).catch(() => {
-          if (isMounted) {
-            setPlexMediaInfo({ available: false, lastChecked: Date.now() });
-          }
-        });
+        // La disponibilité Plex est gérée une seule fois par useMediaPresence, qui
+        // réutilise le cache persisté et préchauffé par le full scan.
 
         tmdb.getUniverseAndCollection(res.value).then(({ collection, universe }) => {
           if (isMounted) setCollectionLoading(false);

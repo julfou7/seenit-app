@@ -103,13 +103,8 @@ export function getPlexGuid(rawItem: any): string | null {
     return item.parentGuid.trim();
   }
 
-  // 7. ratingKey / key (e.g. "/library/metadata/12345" or "12345")
-  const key = getPlexMetadataLookupKey(item);
-  if (key) {
-    const keyStr = String(key).trim();
-    if (keyStr) return keyStr;
-  }
-
+  // Un ratingKey/key PMS local n'est PAS un GUID provider global.
+  // S'il n'existe aucun guid, la résolution serveur doit enrichir l'objet avant Discover.
   return null;
 }
 
@@ -501,6 +496,13 @@ async function fetchPlexHistoryData(token: string, clientId: string, delta: bool
       const histLen = Array.isArray(data.history) ? data.history.length : 0;
       const watchLen = Array.isArray(data.watchlist) ? data.watchlist.length : 0;
       appLogger.success('plex', `Données Plex reçues : ${histLen} visionnage(s), ${watchLen} watchlist`);
+      if (data.stats) {
+        appLogger.info('plex',
+          `[Plex Sync] Sources : bibliothèque=${data.stats.libraryWatchedItems || 0} vu(s) / ${data.stats.libraryInventoryItems || 0} indexé(s), ` +
+          `compte Plex=${data.stats.plexAccountHistoryItems || 0} (retenus=${data.stats.plexAccountHistoryRetained || 0}), ` +
+          `historique PMS=${data.stats.pmsHistoryItems || 0}, cloud=${data.stats.cloudItems || 0}.`
+        );
+      }
       return data;
     }
     throw new Error(`Backend Plex indisponible (HTTP ${status})`);
@@ -566,8 +568,39 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
     try {
       const plexData = await fetchPlexHistoryData(plexToken, clientId, delta, delta ? lastSyncTimestamp : undefined);
-      const { history = [], watchlist = [], visitedSources = [] } = plexData || {};
+      const { history = [], watchlist = [], libraryAvailability = [], visitedSources = [] } = plexData || {};
       const nextSyncCursor = Number(plexData?.cursor) || Date.now();
+
+      if (!delta && plexData?.stats?.libraryInventoryScanSucceeded) {
+        const availabilityStore = usePlexAvailabilityStore.getState();
+        availabilityStore.clearUserCache(user.uid);
+        let seededAvailability = 0;
+        const seededKeys = new Set<string>();
+
+        for (const entry of libraryAvailability) {
+          const tmdbId = Number(entry?.tmdbId);
+          const mediaType: 'movie' | 'tv' | null = entry?.mediaType === 'tv' ? 'tv' : entry?.mediaType === 'movie' ? 'movie' : null;
+          if (!Number.isFinite(tmdbId) || !mediaType || !entry?.serverId || !entry?.ratingKey) continue;
+
+          const key = getPlexMediaKey(tmdbId, mediaType, user.uid);
+          if (seededKeys.has(key)) continue;
+          seededKeys.add(key);
+          availabilityStore.setMediaAvailability(key, {
+            available: true,
+            serverName: entry.serverName,
+            serverId: entry.serverId,
+            ratingKey: String(entry.ratingKey),
+            plexUrl: entry.plexUrl,
+            watchUrl: entry.watchUrl || entry.plexUrl,
+            title: entry.title || undefined,
+            year: entry.year ? Number(entry.year) : undefined,
+            lastChecked: Date.now()
+          });
+          seededAvailability++;
+        }
+
+        appLogger.info('plex', `[Plex Availability] Cache reconstruit depuis le full scan : ${seededAvailability} média(s) disponible(s).`);
+      }
       const hasHistory = Array.isArray(history) && history.length > 0;
       const hasWatchlist = Array.isArray(watchlist) && watchlist.length > 0;
 
@@ -712,8 +745,14 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         }
 
         if (isEpisode) {
-          const seasonNum = item.parentIndex !== undefined ? Number(item.parentIndex) : 1;
-          const episodeNum = item.index !== undefined ? Number(item.index) : 1;
+          const seasonNum = item.parentIndex !== undefined ? Number(item.parentIndex) : NaN;
+          const episodeNum = item.index !== undefined ? Number(item.index) : NaN;
+          if (!Number.isFinite(seasonNum) || !Number.isFinite(episodeNum)) {
+            unresolvedCount++;
+            recordUnresolvedItem(item, 'episode');
+            appLogger.warn('plex', '[Plex Sync] Épisode ignoré : coordonnées saison/épisode absentes, aucun S1E1 inventé.');
+            continue;
+          }
           const showTitle = item.grandparentTitle || item.parentTitle || item.title || 'Série inconnue';
 
           const epKey = `${seasonNum}x${episodeNum}`;
