@@ -61,6 +61,14 @@ export interface DownloadModalProps {
 
 type ScopeMode = 'all' | 'season' | 'episode';
 
+type DownloadActionResult = {
+  success: boolean;
+  message: string;
+  status?: 'searching' | 'queued';
+  fallbackUsed?: boolean;
+  downloadId?: string;
+};
+
 export function DownloadModal({
   isOpen,
   onClose,
@@ -291,7 +299,7 @@ export function DownloadModal({
         effectiveProfileId = resolveEffectiveQualityProfileId(profiles, qualityPreference);
       }
 
-      const result = isTv
+      const result: DownloadActionResult = isTv
         ? scopeMode === 'episode'
           ? await downloadEpisodeWithSeasonPackFallback({
               url: config.sonarrUrl,
@@ -328,11 +336,11 @@ export function DownloadModal({
           });
 
       if (result.success) {
-        const nextStatus = 'status' in result && result.status ? result.status : 'searching';
+        const nextStatus = result.status || 'searching';
         const statusText = result.message || `Demande acceptée • recherche ${qualityLabel} en cours`;
         acceptDownloadRequest(requestId, statusText, nextStatus);
 
-        if ('downloadId' in result && result.downloadId) {
+        if (result.downloadId) {
           updateDownloadRequest(requestId, {
             downloadId: result.downloadId,
             downloadIdAliases: [result.downloadId],
@@ -340,7 +348,7 @@ export function DownloadModal({
           });
         }
 
-        if ('fallbackUsed' in result && result.fallbackUsed) {
+        if (result.fallbackUsed) {
           showMediaDownloadToast(statusText, 'download');
         }
       } else {
