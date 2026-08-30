@@ -236,3 +236,21 @@ test('une mutation optimiste tardive ne peut jamais figer la télémétrie dista
   assert.equal(merged.posterPath, '/poster.jpg');
   assert.equal(merged.isOptimistic, false);
 });
+
+
+test('les GET Android de suivi sont uniques et explicitement non cachables', async () => {
+  const { buildFreshGetUrl, buildNoCacheHeaders } = await import('../src/features/downloads/downloadNetwork.ts');
+  assert.equal(
+    buildFreshGetUrl('https://example.test/api/v3/queue?page=1', 12345),
+    'https://example.test/api/v3/queue?page=1&_seenitFresh=12345'
+  );
+  assert.equal(
+    buildFreshGetUrl('https://example.test/api/v2/torrents/info', 67890),
+    'https://example.test/api/v2/torrents/info?_seenitFresh=67890'
+  );
+  const headers = buildNoCacheHeaders({ 'X-Api-Key': 'abc', 'cache-control': 'public, max-age=3600' });
+  assert.equal(headers['X-Api-Key'], 'abc');
+  assert.equal(headers['Cache-Control'], 'no-cache, no-store, max-age=0');
+  assert.equal(headers.Pragma, 'no-cache');
+  assert.equal(headers.Expires, '0');
+});

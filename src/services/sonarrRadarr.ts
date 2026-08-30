@@ -1,6 +1,7 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { C411Torrent } from './c411';
 import { authenticatedFetch } from '../lib/apiAuth';
+import { buildFreshGetUrl, buildNoCacheHeaders } from '../features/downloads/downloadNetwork';
 import { getPhysicalDownloadId, isStrongTorrentHash, mergeDownloadIdAliases, normalizeDownloadClientId, normalizeQualityLabel, sameLegacyPhysicalTransfer, samePhysicalDownload, sameTransferPath } from '../features/downloads/downloadIdentity';
 
 export interface SonarrRadarrConfig {
@@ -58,11 +59,16 @@ export function invalidateQbitCache() {
  */
 export async function executeGet(url: string, headers: Record<string, string> = {}): Promise<any> {
   if (Capacitor.isNativePlatform()) {
+    // Android interroge directement Sonarr/Radarr/qBittorrent. Contrairement au
+    // proxy Web (appelé en POST), ces GET peuvent être servis depuis un cache HTTP
+    // natif/intermédiaire. Chaque poll doit donc être physiquement unique.
+    const freshUrl = buildFreshGetUrl(url);
+    const normHeaders = buildNoCacheHeaders(headers);
+    if (headers['X-Api-Key']) normHeaders['x-api-key'] = headers['X-Api-Key'];
+
     try {
-      const normHeaders = { ...headers };
-      if (headers['X-Api-Key']) normHeaders['x-api-key'] = headers['X-Api-Key'];
       const response = await CapacitorHttp.get({
-        url,
+        url: freshUrl,
         headers: normHeaders,
         connectTimeout: 8000,
         readTimeout: 8000
@@ -78,10 +84,15 @@ export async function executeGet(url: string, headers: Record<string, string> = 
         throw new Error(`Accès refusé (${response.status}) : Clé API ou identifiants incorrects`);
       }
       throw new Error(`Erreur HTTP ${response.status}`);
-    } catch (err: any) {
-      if (err?.message?.includes('Accès refusé')) throw err;
+    } catch (err) {
+      const nativeError = err;
+      if (nativeError?.message?.includes('Accès refusé')) throw nativeError;
       try {
-        const directRes = await fetch(url, { headers, signal: AbortSignal.timeout(6000) });
+        const directRes = await fetch(freshUrl, {
+          headers: normHeaders,
+          cache: 'no-store',
+          signal: AbortSignal.timeout(6000)
+        });
         if (directRes.ok) {
           const text = await directRes.text();
           try { return JSON.parse(text); } catch { return text; }
@@ -92,7 +103,8 @@ export async function executeGet(url: string, headers: Record<string, string> = 
           const proxyRes = await authenticatedFetch('/api/service-proxy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ targetUrl: url, method: 'GET', headers }),
+            body: JSON.stringify({ targetUrl: freshUrl, method: 'GET', headers: normHeaders }),
+            cache: 'no-store',
             signal: AbortSignal.timeout(10000)
           });
           const rawText = await proxyRes.text();
@@ -101,7 +113,7 @@ export async function executeGet(url: string, headers: Record<string, string> = 
           if (json.ok && !json.error) return json.data;
         } catch {}
       }
-      throw new Error(err?.message || 'Serveur injoignable sur le réseau local');
+      throw new Error(nativeError?.message || 'Serveur injoignable sur le réseau local');
     }
   } else {
     // Mode PWA / Navigateur Web
