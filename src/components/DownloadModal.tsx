@@ -30,9 +30,11 @@ import { tmdb } from '../features/shows/tmdb';
 import {
   acceptDownloadRequest,
   beginDownloadRequest,
-  failDownloadRequest
+  failDownloadRequest,
+  updateDownloadRequest
 } from '../features/downloads/downloadLifecycle';
 import { resolveEffectiveQualityProfileId } from '../features/downloads/qualityProfileSelection';
+import { downloadEpisodeWithSeasonPackFallback } from '../features/downloads/episodeSeasonPackFallback';
 
 export interface SeasonInfo {
   season_number: number;
@@ -290,17 +292,31 @@ export function DownloadModal({
       }
 
       const result = isTv
-        ? await searchAndDownloadInSonarr({
-            url: config.sonarrUrl,
-            apiKey: config.sonarrApiKey,
-            title,
-            tmdbId,
-            imdbId,
-            season: scopeMode === 'all' ? undefined : selectedSeason,
-            episode: scopeMode === 'episode' ? selectedEpisode : undefined,
-            qualityPreference,
-            qualityProfileId: effectiveProfileId
-          })
+        ? scopeMode === 'episode'
+          ? await downloadEpisodeWithSeasonPackFallback({
+              url: config.sonarrUrl,
+              apiKey: config.sonarrApiKey,
+              title,
+              tmdbId,
+              imdbId,
+              season: selectedSeason,
+              episode: selectedEpisode,
+              qualityPreference,
+              qualityProfileId: effectiveProfileId,
+              qbittorrentUrl: config.qbittorrentUrl,
+              qbittorrentUsername: config.qbittorrentUsername,
+              qbittorrentPassword: config.qbittorrentPassword
+            })
+          : await searchAndDownloadInSonarr({
+              url: config.sonarrUrl,
+              apiKey: config.sonarrApiKey,
+              title,
+              tmdbId,
+              imdbId,
+              season: scopeMode === 'all' ? undefined : selectedSeason,
+              qualityPreference,
+              qualityProfileId: effectiveProfileId
+            })
         : await searchAndDownloadInRadarr({
             url: config.radarrUrl,
             apiKey: config.radarrApiKey,
@@ -312,11 +328,21 @@ export function DownloadModal({
           });
 
       if (result.success) {
-        acceptDownloadRequest(
-          requestId,
-          `Demande acceptée • recherche ${qualityLabel} en cours`,
-          'searching'
-        );
+        const nextStatus = 'status' in result && result.status ? result.status : 'searching';
+        const statusText = result.message || `Demande acceptée • recherche ${qualityLabel} en cours`;
+        acceptDownloadRequest(requestId, statusText, nextStatus);
+
+        if ('downloadId' in result && result.downloadId) {
+          updateDownloadRequest(requestId, {
+            downloadId: result.downloadId,
+            downloadIdAliases: [result.downloadId],
+            statusText
+          });
+        }
+
+        if ('fallbackUsed' in result && result.fallbackUsed) {
+          showMediaDownloadToast(statusText, 'download');
+        }
       } else {
         failDownloadRequest(requestId, result.message);
         showMediaDownloadToast(result.message, 'error');
