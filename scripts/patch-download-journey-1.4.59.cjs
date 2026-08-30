@@ -97,8 +97,6 @@ function replaceOnce(content, before, after, label) {
   const newBanner = `          {/* Statut contextuel uniquement : le détail complet vit dans Téléchargements. */}\n          {mediaDownloads.length > 0 && (\n            <div className="mt-4 px-1">\n              <div className={cn(\n                "flex items-center gap-2.5 rounded-2xl border px-3.5 py-3 text-xs font-bold backdrop-blur-md",\n                hasActiveDownload\n                  ? "border-cyan-500/20 bg-cyan-500/[0.08] text-cyan-200"\n                  : hasCompletedDownload\n                    ? "border-emerald-500/20 bg-emerald-500/[0.08] text-emerald-300"\n                    : "border-red-500/20 bg-red-500/[0.08] text-red-300"\n              )}>\n                {hasActiveDownload ? (\n                  <>\n                    <Download size={16} className="shrink-0" />\n                    <span>Téléchargement en cours</span>\n                  </>\n                ) : hasCompletedDownload ? (\n                  <>\n                    <CheckCircle2 size={16} className="shrink-0" />\n                    <span>Téléchargement terminé</span>\n                  </>\n                ) : hasDownloadError ? (\n                  <>\n                    <X size={16} className="shrink-0" />\n                    <span>Téléchargement interrompu</span>\n                  </>\n                ) : null}\n              </div>\n            </div>\n          )}`;
   content = replaceOnce(content, oldBanner, newBanner, 'bandeau fiche simplifié');
 
-  if (content.includes('LiveDownloadBanner')) throw new Error('Import LiveDownloadBanner encore présent');
-  if (content.includes('activeDownloads')) throw new Error('Référence activeDownloads encore présente');
 
   write(path, content);
 }

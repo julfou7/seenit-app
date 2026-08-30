@@ -86,6 +86,11 @@ function DownloadItemCard({
       ? item.posterPath
       : `https://image.tmdb.org/t/p/w185${item.posterPath}`
     : null;
+  const canOpenDetails = Boolean(item.tmdbId && onShowClick);
+  const openDetails = () => {
+    if (!item.tmdbId || !onShowClick) return;
+    onShowClick(item.tmdbId, item.mediaType);
+  };
 
   const accent = isError
     ? 'text-red-300'
@@ -115,7 +120,8 @@ function DownloadItemCard({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-[22px] border bg-gradient-to-br from-zinc-900/95 to-zinc-950/90 p-3.5 shadow-[0_10px_30px_rgba(0,0,0,0.18)] ${
+      onClick={canOpenDetails ? openDetails : undefined}
+      className={`relative overflow-hidden rounded-[22px] border bg-gradient-to-br from-zinc-900/95 to-zinc-950/90 p-3.5 shadow-[0_10px_30px_rgba(0,0,0,0.18)] ${canOpenDetails ? 'cursor-pointer transition-transform active:scale-[0.995]' : ''} ${
         isError
           ? 'border-red-500/25'
           : isWarning
@@ -128,7 +134,10 @@ function DownloadItemCard({
       <div className="flex gap-3.5">
         <button
           type="button"
-          onClick={() => item.tmdbId && onShowClick?.(item.tmdbId, item.mediaType)}
+          onClick={(event) => {
+            event.stopPropagation();
+            openDetails();
+          }}
           className="relative w-16 aspect-[2/3] shrink-0 self-start overflow-hidden rounded-[14px] border border-white/10 bg-zinc-950 shadow-md flex items-center justify-center"
         >
           {posterSrc ? (
@@ -136,7 +145,7 @@ function DownloadItemCard({
               src={posterSrc}
               alt={cleanTitle}
               className="absolute inset-0 block h-full w-full object-cover object-center"
-              loading="lazy"
+              loading={isCompleted ? 'lazy' : 'eager'}
             />
           ) : isTv ? (
             <Tv size={22} className="text-purple-400" />
@@ -149,7 +158,10 @@ function DownloadItemCard({
           <div className="flex items-start gap-2">
             <button
               type="button"
-              onClick={() => item.tmdbId && onShowClick?.(item.tmdbId, item.mediaType)}
+              onClick={(event) => {
+                event.stopPropagation();
+                openDetails();
+              }}
               className="min-w-0 flex-1 text-left"
             >
               <h3 className="text-[15px] font-black leading-tight text-white line-clamp-2">{cleanTitle}</h3>
@@ -159,7 +171,10 @@ function DownloadItemCard({
             <button
               type="button"
               disabled={isRemoving}
-              onClick={() => onRemove(item)}
+              onClick={(event) => {
+                event.stopPropagation();
+                onRemove(item);
+              }}
               className="-mr-1 -mt-1 rounded-full p-2 text-zinc-600 transition-colors hover:bg-white/5 hover:text-red-400 disabled:opacity-50"
               aria-label="Supprimer"
             >

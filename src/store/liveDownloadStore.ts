@@ -642,6 +642,62 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             finalItems.push(item);
           }
 
+          // Un poll peut avoir capturé currentDownloads juste AVANT qu'une nouvelle
+          // demande optimiste soit créée/acceptée. Sans cette seconde lecture, le set()
+          // final réécrit alors un snapshot périmé et la carte disparaît quelques secondes.
+          // On réconcilie uniquement les demandes optimistes réellement modifiées pendant
+          // le fetch ; une représentation distante garde son identité physique, mais hérite
+          // immédiatement du TMDB/poster/titre SeenIt.
+          const latestDownloadsAfterFetch = get().downloads || [];
+          const latestOptimisticRequests = latestDownloadsAfterFetch.filter(item =>
+            item.isOptimistic && !removedSet.has(item.id)
+          );
+
+          for (const latestOptimistic of latestOptimisticRequests) {
+            const snapshotOptimistic = currentDownloads.find(item => item.id === latestOptimistic.id);
+            if (snapshotOptimistic === latestOptimistic) continue;
+
+            const existingIndex = finalItems.findIndex(existing => sameDownloadIdentity(existing, latestOptimistic));
+            if (existingIndex < 0) {
+              finalItems.unshift(latestOptimistic);
+              continue;
+            }
+
+            const existing = finalItems[existingIndex];
+            if (existing.id === latestOptimistic.id || existing.isOptimistic) {
+              finalItems[existingIndex] = {
+                ...existing,
+                ...latestOptimistic,
+                id: existing.id,
+                downloadId: existing.downloadId || latestOptimistic.downloadId,
+                downloadIdAliases: mergeDownloadIdAliases(existing, latestOptimistic),
+                transferPath: existing.transferPath || latestOptimistic.transferPath,
+                posterPath: latestOptimistic.posterPath || existing.posterPath,
+                backdropPath: latestOptimistic.backdropPath || existing.backdropPath
+              };
+              continue;
+            }
+
+            finalItems[existingIndex] = {
+              ...existing,
+              tmdbId: existing.tmdbId || latestOptimistic.tmdbId,
+              tvdbId: existing.tvdbId || latestOptimistic.tvdbId,
+              imdbId: existing.imdbId || latestOptimistic.imdbId,
+              posterPath: existing.posterPath || latestOptimistic.posterPath,
+              backdropPath: existing.backdropPath || latestOptimistic.backdropPath,
+              movieTitle: existing.movieTitle || (existing.mediaType === 'movie'
+                ? (latestOptimistic.movieTitle || latestOptimistic.title)
+                : undefined),
+              seriesTitle: existing.seriesTitle || (existing.mediaType === 'tv'
+                ? (latestOptimistic.seriesTitle || latestOptimistic.title)
+                : undefined),
+              seasonNumber: existing.seasonNumber ?? latestOptimistic.seasonNumber,
+              episodeNumber: existing.episodeNumber ?? latestOptimistic.episodeNumber,
+              addedAt: existing.addedAt || latestOptimistic.addedAt,
+              downloadIdAliases: mergeDownloadIdAliases(existing, latestOptimistic)
+            };
+          }
+
           for (const finalItem of finalItems) {
             if (!isTerminalDownload(finalItem)) continue;
             const previous = currentDownloads.find(oldItem => sameDownloadIdentity(oldItem, finalItem));
