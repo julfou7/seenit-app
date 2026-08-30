@@ -29,6 +29,7 @@ jobs:
           sed -i "/if (content.includes('LiveDownloadBanner'))/d" scripts/patch-download-journey-1.4.59.cjs
           sed -i "/if (content.includes('activeDownloads'))/d" scripts/patch-download-journey-1.4.59.cjs
           node scripts/patch-download-journey-1.4.59.cjs
+          sed -i "/import { useDownloadConfigStore } from '..\/store\/downloadConfigStore';/i import { LiveDownloadBanner } from '../components/LiveDownloadBanner';" src/screens/ShowDetailScreen.tsx
 
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
@@ -54,5 +55,5 @@ jobs:
             echo "Aucune modification à committer"
             exit 0
           fi
-          git commit -m "fix(downloads): fluidifier le parcours jusqu’à Plex" -m $'- empêche un poll en vol d’écraser une nouvelle demande optimiste\n- conserve immédiatement le poster et l’identité TMDB pendant le démarrage\n- rend toute la carte Téléchargements ouvrable vers la fiche\n- simplifie la fiche en statut en cours / terminé sans dupliquer le monitoring\n- force quelques rafraîchissements Plex après import pour éviter un cache négatif périmé\n- publie SeenIt 1.4.59'
+          git commit -m "fix(downloads): fluidifier le parcours jusqu’à Plex" -m $'- empêche un poll en vol d’écraser une nouvelle demande optimiste\n- conserve immédiatement le poster et l’identité TMDB pendant le démarrage\n- rend toute la carte Téléchargements ouvrable vers la fiche\n- simplifie la fiche en statut en cours / terminé sans dupliquer le monitoring\n- force quelques rafraîchissements Plex après import pour éviter un cache négatif périmé\n- conserve le statut compact par épisode\n- publie SeenIt 1.4.59'
           git push origin HEAD:fix/download-journey-1.4.59
