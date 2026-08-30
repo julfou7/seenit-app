@@ -1,0 +1,55 @@
+name: Validate qBittorrent Native Session 1.4.63
+
+on:
+  push:
+    branches:
+      - fix/qbit-native-session-1.4.63
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/qbit-native-session-1.4.63
+          fetch-depth: 0
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Apply qBittorrent native session patch
+        run: node scripts/patch-qbit-native-session-1.4.63.cjs
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Type check
+        run: npm run lint
+
+      - name: Tests
+        run: npm run test:plex
+
+      - name: Build Web and server
+        run: npm run build
+
+      - name: Check diff
+        run: git diff --check
+
+      - name: Commit validated fix
+        run: |
+          git config user.name "julfou7"
+          git config user.email "julianfouillade@gmail.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Aucune modification à committer"
+            exit 0
+          fi
+          git commit -m "fix(downloads): restaurer le suivi qBittorrent Android" -m $'- authentifie qBittorrent avec la même pile native que le polling\n- conserve explicitement le SID de session et le renvoie sur les GET\n- renouvelle la session une fois sur 401/403\n- garde le moteur de téléchargement unique et évite le retour des doublons\n- laisse la PWA inchangée\n- publie SeenIt 1.4.63'
+          git push origin HEAD:fix/qbit-native-session-1.4.63
