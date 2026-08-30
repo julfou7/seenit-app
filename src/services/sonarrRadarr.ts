@@ -1,7 +1,7 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { C411Torrent } from './c411';
 import { authenticatedFetch } from '../lib/apiAuth';
-import { getPhysicalDownloadId, normalizeDownloadClientId, sameLegacyPhysicalTransfer, samePhysicalDownload } from '../features/downloads/downloadIdentity';
+import { getPhysicalDownloadId, isStrongTorrentHash, mergeDownloadIdAliases, normalizeDownloadClientId, sameLegacyPhysicalTransfer, samePhysicalDownload } from '../features/downloads/downloadIdentity';
 
 export interface SonarrRadarrConfig {
   sonarrUrl?: string;
@@ -706,6 +706,179 @@ export async function testServiceConnection(
   }
 }
 
+
+async function executeArrInteractiveGet(url: string, headers: Record<string, string>): Promise<any> {
+  if (!Capacitor.isNativePlatform()) return executeGet(url, headers);
+  try {
+    const normHeaders = { ...headers };
+    if (headers['X-Api-Key']) normHeaders['x-api-key'] = headers['X-Api-Key'];
+    const response = await CapacitorHttp.get({
+      url,
+      headers: normHeaders,
+      connectTimeout: 10000,
+      readTimeout: 30000
+    });
+    if (response.status >= 200 && response.status < 300) {
+      let data = response.data;
+      if (typeof data === 'string') {
+        try { data = JSON.parse(data); } catch {}
+      }
+      return data;
+    }
+    throw new Error(`Erreur HTTP ${response.status}`);
+  } catch (error: any) {
+    throw new Error(error?.message || 'Recherche interactive impossible');
+  }
+}
+
+async function executeArrInteractivePost(url: string, body: any, headers: Record<string, string>): Promise<any> {
+  if (!Capacitor.isNativePlatform()) return executePost(url, body, headers);
+  try {
+    const response = await CapacitorHttp.post({
+      url,
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      data: body,
+      connectTimeout: 10000,
+      readTimeout: 30000
+    });
+    if (response.status >= 200 && response.status < 300) return response.data || { success: true };
+    throw new Error(`Erreur HTTP ${response.status}`);
+  } catch (error: any) {
+    throw new Error(error?.message || 'Grab de la release impossible');
+  }
+}
+
+function releaseMatchesQualityPreference(release: any, preference?: '1080p' | '4k'): boolean {
+  if (!preference) return true;
+  const qualityName = release?.quality?.quality?.name || release?.quality?.name || '';
+  const resolution = release?.quality?.quality?.resolution || release?.quality?.resolution || '';
+  const haystack = `${qualityName} ${resolution} ${release?.title || ''}`.toLowerCase();
+  if (preference === '4k') return /2160|4k|uhd/.test(haystack);
+  return /1080/.test(haystack) && !/2160|4k|uhd/.test(haystack);
+}
+
+function hasOnlyExistingMediaRejections(release: any): boolean {
+  const rejections = Array.isArray(release?.rejections) ? release.rejections.filter(Boolean) : [];
+  if (!rejections.length) return true;
+  return rejections.every((reason: any) => /existing file/i.test(String(reason)));
+}
+
+function rankInteractiveReleases(releases: any[], preference?: '1080p' | '4k', preferSeasonPack = false): any[] {
+  return releases
+    .filter(release => releaseMatchesQualityPreference(release, preference))
+    .filter(release => release?.approved === true || hasOnlyExistingMediaRejections(release))
+    .sort((a, b) => {
+      if (preferSeasonPack && Boolean(a.fullSeason) !== Boolean(b.fullSeason)) return a.fullSeason ? -1 : 1;
+      if (Boolean(a.approved) !== Boolean(b.approved)) return a.approved ? -1 : 1;
+      const weightA = Number(a.releaseWeight ?? Number.MAX_SAFE_INTEGER);
+      const weightB = Number(b.releaseWeight ?? Number.MAX_SAFE_INTEGER);
+      if (weightA !== weightB) return weightA - weightB;
+      const cfA = Number(a.customFormatScore || 0);
+      const cfB = Number(b.customFormatScore || 0);
+      if (cfA !== cfB) return cfB - cfA;
+      return Number(b.seeders || 0) - Number(a.seeders || 0);
+    });
+}
+
+async function grabFirstWorkingRelease(
+  base: string,
+  headers: Record<string, string>,
+  releases: any[],
+  contextPatch: Record<string, any> = {}
+): Promise<{ success: boolean; release?: any; error?: string }> {
+  let lastError = '';
+  for (const release of releases.slice(0, 8)) {
+    try {
+      await executeArrInteractivePost(`${base}/api/v3/release`, { ...release, ...contextPatch }, headers);
+      return { success: true, release };
+    } catch (error: any) {
+      lastError = error?.message || String(error);
+      // Une release peut être refusée par qBittorrent car elle est déjà présente :
+      // on essaie alors la release suivante plutôt que d'abandonner tout le flux.
+    }
+  }
+  return { success: false, error: lastError || 'Aucune release compatible n’a pu être lancée.' };
+}
+
+async function forceGrabExistingEpisode(
+  base: string,
+  headers: Record<string, string>,
+  episodeId: number,
+  preference?: '1080p' | '4k'
+): Promise<{ success: boolean; message: string }> {
+  const releases = await executeArrInteractiveGet(`${base}/api/v3/release?episodeId=${episodeId}`, headers);
+  const ranked = rankInteractiveReleases(Array.isArray(releases) ? releases : [], preference);
+  if (!ranked.length) return { success: false, message: 'Le fichier existe déjà et aucune nouvelle release compatible n’a été trouvée.' };
+  const grabbed = await grabFirstWorkingRelease(base, headers, ranked, { episodeId });
+  return grabbed.success
+    ? { success: true, message: 'Le fichier existe déjà : une nouvelle release a été forcée.' }
+    : { success: false, message: grabbed.error || 'Impossible de relancer cet épisode.' };
+}
+
+async function forceGrabExistingSeason(
+  base: string,
+  headers: Record<string, string>,
+  seriesId: number,
+  seasonNumber: number,
+  preference?: '1080p' | '4k'
+): Promise<{ success: boolean; message: string }> {
+  const releases = await executeArrInteractiveGet(
+    `${base}/api/v3/release?seriesId=${seriesId}&seasonNumber=${seasonNumber}`,
+    headers
+  );
+  const ranked = rankInteractiveReleases(Array.isArray(releases) ? releases : [], preference, true);
+  if (!ranked.length) return { success: false, message: 'La saison existe déjà et aucune nouvelle release compatible n’a été trouvée.' };
+
+  const seasonPack = ranked.filter(release => release.fullSeason);
+  if (seasonPack.length) {
+    const grabbed = await grabFirstWorkingRelease(base, headers, seasonPack, { seriesId });
+    if (grabbed.success) return { success: true, message: 'La saison existe déjà : un nouveau pack a été forcé.' };
+  }
+
+  // Pas de pack : on force au maximum une release par épisode depuis le résultat
+  // interactif déjà récupéré, sans relancer une recherche indexer pour chaque épisode.
+  const episodeNumbers = new Set<number>();
+  for (const release of ranked) {
+    const mapped = Array.isArray(release.mappedEpisodeNumbers)
+      ? release.mappedEpisodeNumbers
+      : (Array.isArray(release.episodeNumbers) ? release.episodeNumbers : []);
+    mapped.forEach((n: any) => Number.isFinite(Number(n)) && episodeNumbers.add(Number(n)));
+  }
+
+  let grabbedCount = 0;
+  for (const episodeNumber of Array.from(episodeNumbers).sort((a, b) => a - b)) {
+    const candidates = ranked.filter(release => {
+      if (release.fullSeason) return false;
+      const mapped = Array.isArray(release.mappedEpisodeNumbers)
+        ? release.mappedEpisodeNumbers
+        : (Array.isArray(release.episodeNumbers) ? release.episodeNumbers : []);
+      return mapped.some((n: any) => Number(n) === episodeNumber);
+    });
+    if (!candidates.length) continue;
+    const grabbed = await grabFirstWorkingRelease(base, headers, candidates, { seriesId });
+    if (grabbed.success) grabbedCount++;
+  }
+
+  return grabbedCount > 0
+    ? { success: true, message: `La saison existe déjà : ${grabbedCount} téléchargement(s) ont été forcés.` }
+    : { success: false, message: 'La saison existe déjà mais aucune release n’a pu être relancée.' };
+}
+
+async function forceGrabExistingMovie(
+  base: string,
+  headers: Record<string, string>,
+  movieId: number,
+  preference?: '1080p' | '4k'
+): Promise<{ success: boolean; message: string }> {
+  const releases = await executeArrInteractiveGet(`${base}/api/v3/release?movieId=${movieId}`, headers);
+  const ranked = rankInteractiveReleases(Array.isArray(releases) ? releases : [], preference);
+  if (!ranked.length) return { success: false, message: 'Le film existe déjà et aucune nouvelle release compatible n’a été trouvée.' };
+  const grabbed = await grabFirstWorkingRelease(base, headers, ranked, { movieId });
+  return grabbed.success
+    ? { success: true, message: 'Le film existe déjà : une nouvelle release a été forcée.' }
+    : { success: false, message: grabbed.error || 'Impossible de relancer ce film.' };
+}
+
 /**
  * Déclenche une recherche et un ajout automatique de Série dans Sonarr
  */
@@ -792,6 +965,9 @@ export async function searchAndDownloadInSonarr(params: {
           ) : null;
           
           if (targetEp && targetEp.id) {
+            if (targetEp.hasFile) {
+              return await forceGrabExistingEpisode(base, headers, targetEp.id, params.qualityPreference);
+            }
             await executePost(`${base}/api/v3/command`, {
               name: 'EpisodeSearch',
               episodeIds: [targetEp.id]
@@ -818,6 +994,18 @@ export async function searchAndDownloadInSonarr(params: {
 
       // Recherche par saison entière
       if (params.season !== undefined && params.season !== null) {
+        try {
+          const seasonEpisodes: any[] = await executeGet(`${base}/api/v3/episode?seriesId=${seriesId}`, headers);
+          const scopedEpisodes = Array.isArray(seasonEpisodes)
+            ? seasonEpisodes.filter(ep => Number(ep.seasonNumber) === Number(params.season))
+            : [];
+          if (scopedEpisodes.length > 0 && scopedEpisodes.every(ep => Boolean(ep.hasFile))) {
+            return await forceGrabExistingSeason(base, headers, seriesId, Number(params.season), params.qualityPreference);
+          }
+        } catch (presenceErr) {
+          console.warn('[Sonarr] Impossible de vérifier la présence des fichiers de saison:', presenceErr);
+        }
+
         await executePost(`${base}/api/v3/command`, {
           name: 'SeasonSearch',
           seriesId: seriesId,
@@ -830,6 +1018,19 @@ export async function searchAndDownloadInSonarr(params: {
       }
 
       // Recherche de toute la série
+      try {
+        const allEpisodes: any[] = await executeGet(`${base}/api/v3/episode?seriesId=${seriesId}`, headers);
+        const regularEpisodes = Array.isArray(allEpisodes)
+          ? allEpisodes.filter(ep => Number(ep.seasonNumber) > 0 && ep.airDateUtc)
+          : [];
+        if (regularEpisodes.length > 0 && regularEpisodes.every(ep => Boolean(ep.hasFile))) {
+          return {
+            success: false,
+            message: 'La série est déjà complète. Choisis une saison ou un épisode pour forcer un nouveau téléchargement.'
+          };
+        }
+      } catch {}
+
       await executePost(`${base}/api/v3/command`, {
         name: 'SeriesSearch',
         seriesId: seriesId
@@ -1037,6 +1238,10 @@ export async function searchAndDownloadInRadarr(params: {
         } catch (uErr) {
           console.warn('[Radarr] Impossible de mettre à jour le profil de qualité du film:', uErr);
         }
+      }
+
+      if (existingMovie.hasFile) {
+        return await forceGrabExistingMovie(base, headers, existingMovie.id, params.qualityPreference);
       }
 
       await executePost(`${base}/api/v3/command`, {
@@ -1377,8 +1582,10 @@ export interface LiveDownloadItem {
   errorMessage?: string;
   downloadClient?: string;
   releaseTitle?: string;
-  /** Identifiant physique du client de téléchargement (hash torrent qBittorrent / downloadId *Arr). */
+  /** Identifiant principal du transfert. */
   downloadId?: string;
+  /** Tous les identifiants connus du même torrent (hash qBit, infohash v1/v2, alias *Arr). */
+  downloadIdAliases?: string[];
   isOptimistic?: boolean;
 }
 
@@ -1706,6 +1913,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           errorMessage: statusInfo.errorMessage,
           downloadClient: rec.downloadClient || 'Sonarr',
           downloadId: normalizeDownloadClientId(rec.downloadId) || undefined,
+          downloadIdAliases: normalizeDownloadClientId(rec.downloadId) ? [normalizeDownloadClientId(rec.downloadId)!] : undefined,
           releaseTitle: rec.title
         });
       }
@@ -1763,6 +1971,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           errorMessage: statusInfo.errorMessage,
           downloadClient: rec.downloadClient || 'Radarr',
           downloadId: normalizeDownloadClientId(rec.downloadId) || undefined,
+          downloadIdAliases: normalizeDownloadClientId(rec.downloadId) ? [normalizeDownloadClientId(rec.downloadId)!] : undefined,
           releaseTitle: rec.title
         });
       }
@@ -1808,6 +2017,12 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           const etaSec = t.eta || 0;
           const isTv = t.category === 'tv' || /s\d{1,2}e\d{1,2}/i.test(t.name);
           const qbitDownloadId = normalizeDownloadClientId(t.hash);
+          const qbitDownloadIdAliases = Array.from(new Set([
+            normalizeDownloadClientId(t.hash),
+            normalizeDownloadClientId(t.infohash_v1),
+            normalizeDownloadClientId(t.infohash_v2),
+            normalizeDownloadClientId(t.magnet_uri)
+          ].filter(Boolean) as string[]));
 
           const isQbitError = t.state === 'error' || t.state === 'missingFiles';
           const qbitErrorMsg = isQbitError ? 'Erreur de téléchargement (espace disque insuffisant ou fichier manquant)' : undefined;
@@ -1826,6 +2041,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           const qbitProbe: LiveDownloadItem = {
             id: `qbit_${t.hash || t.name}`,
             downloadId: qbitDownloadId || undefined,
+            downloadIdAliases: qbitDownloadIdAliases,
             mediaType: isTv ? 'tv' : 'movie',
             title: t.name,
             releaseTitle: t.name,
@@ -1882,7 +2098,12 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
 
           if (existing) {
             // Métadonnées *Arr (TMDB, titre, poster) + télémétrie qBittorrent (source de vérité live).
-            if (qbitDownloadId && !existing.downloadId) existing.downloadId = qbitDownloadId;
+            existing.downloadIdAliases = mergeDownloadIdAliases(existing, qbitProbe);
+            // Le hash qBittorrent devient l'identifiant principal uniquement lorsque
+            // *Arr n'en fournit pas un vrai. Les alias v1/v2 restent tous conservés.
+            if (qbitDownloadId && (!existing.downloadId || !isStrongTorrentHash(existing.downloadId))) {
+              existing.downloadId = qbitDownloadId;
+            }
             if (Number(t.size) > 0) existing.size = Number(t.size);
             existing.progress = rawProgress;
             existing.sizeleft = isDone
@@ -1913,6 +2134,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
               items.push({
                 id: `qbit_${t.hash || t.name}`,
                 downloadId: qbitDownloadId || undefined,
+                downloadIdAliases: qbitDownloadIdAliases,
                 mediaType: isTv ? 'tv' : 'movie',
                 title: t.name,
                 quality: extractQualityFromTitle(t.name),

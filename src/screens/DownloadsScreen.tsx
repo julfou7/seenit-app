@@ -6,6 +6,8 @@ import {
   Copy,
   Download,
   Film,
+  HardDrive,
+  Clock3,
   Loader2,
   RefreshCw,
   Search,
@@ -38,6 +40,26 @@ interface Props {
 type ViewMode = 'downloads' | 'search';
 type SearchMediaType = 'all' | 'movie' | 'tv';
 
+function getQualityBadges(quality?: string) {
+  if (!quality) return [] as string[];
+  const q = quality.toUpperCase();
+  const badges: string[] = [];
+
+  if (/2160|4K|UHD/.test(q)) badges.push('4K');
+  else if (/1080/.test(q)) badges.push('1080p');
+  else if (/720/.test(q)) badges.push('720p');
+
+  if (/REMUX/.test(q)) badges.push('REMUX');
+  else if (/BLU.?RAY|BDRIP/.test(q)) badges.push('BluRay');
+  else if (/WEB.?DL|WEBDL|WEBRIP/.test(q)) badges.push('WEB-DL');
+  else if (/HDTV/.test(q)) badges.push('HDTV');
+
+  if (/HDR/.test(q)) badges.push('HDR');
+  else if (/DOLBY.?VISION|DOVI|\bDV\b/.test(q)) badges.push('DV');
+
+  return Array.from(new Set(badges)).slice(0, 3);
+}
+
 function DownloadItemCard({
   item,
   onShowClick,
@@ -56,13 +78,16 @@ function DownloadItemCard({
   const isWarning = status === 'warning';
   const isPending = status === 'submitting' || status === 'searching' || status === 'queued';
   const progress = Math.min(100, Math.max(0, Number(item.progress || 0)));
+  const qualityBadges = getQualityBadges(item.quality);
+  const downloadedBytes = item.size > 0 ? Math.max(0, item.size - item.sizeleft) : 0;
+  const progressLabel = isCompleted ? '100%' : progress > 0 ? `${progress.toFixed(1).replace(/\.0$/, '')}%` : '0%';
   const posterSrc = item.posterPath
     ? item.posterPath.startsWith('http')
       ? item.posterPath
       : `https://image.tmdb.org/t/p/w185${item.posterPath}`
     : null;
 
-  const statusTone = isError
+  const accent = isError
     ? 'text-red-300'
     : isWarning
       ? 'text-amber-300'
@@ -70,84 +95,149 @@ function DownloadItemCard({
         ? 'text-emerald-300'
         : 'text-cyan-300';
 
+  const progressBar = isError
+    ? 'bg-red-500'
+    : isWarning
+      ? 'bg-amber-400'
+      : isCompleted
+        ? 'bg-gradient-to-r from-emerald-500 to-emerald-300'
+        : 'bg-gradient-to-r from-cyan-500 via-sky-400 to-cyan-300';
+
+  const statusLabel = isError
+    ? 'Erreur'
+    : isWarning
+      ? (item.statusText || 'En attente')
+      : isCompleted
+        ? 'Terminé'
+        : isPending
+          ? (status === 'searching' ? 'Recherche' : 'Préparation')
+          : 'Téléchargement';
+
   return (
     <div
-      className={`rounded-2xl border p-3 bg-zinc-900/85 ${
+      className={`relative overflow-hidden rounded-[22px] border bg-gradient-to-br from-zinc-900/95 to-zinc-950/90 p-3.5 shadow-[0_10px_30px_rgba(0,0,0,0.18)] ${
         isError
-          ? 'border-red-500/30'
+          ? 'border-red-500/25'
           : isWarning
-            ? 'border-amber-500/25'
+            ? 'border-amber-500/20'
             : isCompleted
               ? 'border-emerald-500/20'
-              : 'border-white/10'
+              : 'border-white/[0.08]'
       }`}
     >
-      <div className="flex gap-3">
+      <div className="flex gap-3.5">
         <button
           type="button"
           onClick={() => item.tmdbId && onShowClick?.(item.tmdbId, item.mediaType)}
-          className="w-14 h-20 shrink-0 rounded-xl overflow-hidden bg-zinc-950 border border-white/10 flex items-center justify-center"
+          className="relative w-16 aspect-[2/3] shrink-0 self-start overflow-hidden rounded-[14px] border border-white/10 bg-zinc-950 shadow-md flex items-center justify-center"
         >
           {posterSrc ? (
-            <img src={posterSrc} alt={cleanTitle} className="w-full h-full object-cover" loading="lazy" />
+            <img
+              src={posterSrc}
+              alt={cleanTitle}
+              className="absolute inset-0 block h-full w-full object-cover object-center"
+              loading="lazy"
+            />
           ) : isTv ? (
-            <Tv size={20} className="text-purple-400" />
+            <Tv size={22} className="text-purple-400" />
           ) : (
-            <Film size={20} className="text-amber-400" />
+            <Film size={22} className="text-amber-400" />
           )}
         </button>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-2">
             <button
               type="button"
               onClick={() => item.tmdbId && onShowClick?.(item.tmdbId, item.mediaType)}
-              className="min-w-0 text-left"
+              className="min-w-0 flex-1 text-left"
             >
-              <h3 className="text-sm font-extrabold text-white line-clamp-2 leading-snug">{cleanTitle}</h3>
-              {subTitle && <p className="text-[11px] font-bold text-zinc-300 mt-0.5">{subTitle}</p>}
+              <h3 className="text-[15px] font-black leading-tight text-white line-clamp-2">{cleanTitle}</h3>
+              {subTitle && <p className="mt-1 text-[11px] font-semibold text-zinc-400">{subTitle}</p>}
             </button>
 
             <button
               type="button"
               disabled={isRemoving}
               onClick={() => onRemove(item)}
-              className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+              className="-mr-1 -mt-1 rounded-full p-2 text-zinc-600 transition-colors hover:bg-white/5 hover:text-red-400 disabled:opacity-50"
               aria-label="Supprimer"
             >
-              {isRemoving ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+              {isRemoving ? <Loader2 size={14} className="animate-spin" /> : <X size={15} />}
             </button>
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-zinc-400">
-            {item.quality && <span>{item.quality}</span>}
-            {item.speedFormatted && !isCompleted && !isError && <span className="text-cyan-300">{item.speedFormatted}</span>}
-            {item.timeleft && item.timeleft !== '--' && !isCompleted && !isError && <span>{item.timeleft}</span>}
-            {item.size > 0 && !isPending && (
-              <span>{formatBytes(Math.max(0, item.size - item.sizeleft))} / {formatBytes(item.size)}</span>
-            )}
-          </div>
-
-          <p className={`mt-2 text-[10px] font-bold ${statusTone}`}>
-            {item.statusText || (isCompleted ? 'Téléchargement terminé 🍿' : 'Téléchargement en cours')}
-          </p>
-
-          {item.errorMessage && (
-            <p className="mt-1.5 text-[10px] text-red-300 leading-snug">{item.errorMessage}</p>
+          {qualityBadges.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {qualityBadges.map((badge, index) => (
+                <span
+                  key={badge}
+                  className={`rounded-md border px-1.5 py-0.5 text-[9px] font-black tracking-wide ${
+                    index === 0
+                      ? 'border-cyan-400/25 bg-cyan-400/10 text-cyan-200'
+                      : 'border-white/10 bg-white/[0.04] text-zinc-300'
+                  }`}
+                >
+                  {badge}
+                </span>
+              ))}
+            </div>
           )}
 
-          <div className="mt-2.5 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-            {isPending ? (
-              <div className="h-full w-1/3 bg-blue-500/70 rounded-full animate-pulse" />
+          <div className="mt-3 flex items-end justify-between gap-3">
+            <div className={`flex min-w-0 items-center gap-1.5 text-[11px] font-bold ${accent}`}>
+              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isCompleted ? 'bg-emerald-400' : isError ? 'bg-red-400' : isWarning ? 'bg-amber-400' : 'bg-cyan-400'}`} />
+              <span className="truncate">{statusLabel}</span>
+            </div>
+            <span className={`shrink-0 text-sm font-black tabular-nums ${accent}`}>{progressLabel}</span>
+          </div>
+
+          <div className="relative mt-2 h-2 overflow-hidden rounded-full bg-white/[0.07] ring-1 ring-white/[0.03]">
+            {isPending && progress <= 0 ? (
+              <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-cyan-500/30 via-cyan-300/80 to-cyan-500/30 animate-pulse" />
             ) : (
               <div
-                className={`h-full rounded-full transition-[width] duration-300 ${
-                  isError ? 'bg-red-500' : isWarning ? 'bg-amber-500' : isCompleted ? 'bg-emerald-500' : 'bg-cyan-500'
-                }`}
+                className={`relative h-full rounded-full transition-[width] duration-500 ease-out ${progressBar} ${!isCompleted && !isError ? 'shadow-[0_0_12px_rgba(34,211,238,0.28)]' : ''}`}
                 style={{ width: `${progress}%` }}
-              />
+              >
+                {!isCompleted && progress > 4 && <div className="absolute inset-0 bg-white/[0.08]" />}
+              </div>
             )}
           </div>
+
+          <div className="mt-2 flex items-center justify-between gap-3 text-[10px] text-zinc-400">
+            <div className="flex min-w-0 items-center gap-1.5 tabular-nums">
+              <HardDrive size={11} className="shrink-0 text-zinc-500" />
+              {item.size > 0 && !isPending ? (
+                <span className="truncate">{formatBytes(downloadedBytes)} / {formatBytes(item.size)}</span>
+              ) : (
+                <span className="truncate">{item.statusText || statusLabel}</span>
+              )}
+            </div>
+
+            {!isCompleted && !isError && !isPending && (
+              <div className="flex shrink-0 items-center gap-2.5 tabular-nums">
+                {item.speedFormatted && (
+                  <span className="flex items-center gap-1 font-semibold text-zinc-300">
+                    <Download size={11} className="text-cyan-400" />
+                    {item.speedFormatted}
+                  </span>
+                )}
+                {item.timeleft && item.timeleft !== '--' && (
+                  <span className="flex items-center gap-1 text-zinc-400">
+                    <Clock3 size={11} />
+                    {item.timeleft}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {item.errorMessage && (
+            <p className="mt-2 rounded-xl border border-red-500/15 bg-red-500/[0.07] px-2.5 py-2 text-[10px] leading-snug text-red-300">
+              {item.errorMessage}
+            </p>
+          )}
         </div>
       </div>
     </div>

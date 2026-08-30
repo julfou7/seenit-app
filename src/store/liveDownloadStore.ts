@@ -16,7 +16,7 @@ import {
 import { useToastStore } from './toastStore';
 import { useShowsStore } from './showsStore';
 import { auth } from '../lib/firebase';
-import { getPhysicalDownloadId, sameLegacyPhysicalTransfer, samePhysicalDownload } from '../features/downloads/downloadIdentity';
+import { getPhysicalDownloadId, getStrongPhysicalDownloadIds, hasConflictingStrongPhysicalIds, mergeDownloadIdAliases, sameLegacyPhysicalTransfer, samePhysicalDownload } from '../features/downloads/downloadIdentity';
 
 interface LiveDownloadState {
   downloads: LiveDownloadItem[];
@@ -85,6 +85,14 @@ function sameCanonicalMedia(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
   return Boolean(aTitle && bTitle && aTitle === bTitle);
 }
 
+function resolutionBucket(item: LiveDownloadItem): '4k' | '1080p' | '720p' | null {
+  const value = `${item.quality || ''} ${item.releaseTitle || ''}`.toLowerCase();
+  if (/2160|4k|uhd/.test(value)) return '4k';
+  if (/1080/.test(value)) return '1080p';
+  if (/720/.test(value)) return '720p';
+  return null;
+}
+
 function sameRequestScope(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
   if (!sameCanonicalMedia(a, b)) return false;
   if (a.mediaType !== 'tv') return true;
@@ -95,12 +103,14 @@ function sameRequestScope(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
 function sameDownloadIdentity(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
   if (a.id === b.id) return true;
 
-  const aPhysicalId = getPhysicalDownloadId(a);
-  const bPhysicalId = getPhysicalDownloadId(b);
   if (samePhysicalDownload(a, b)) return true;
-  // Deux hashes explicites différents = deux téléchargements physiques différents,
-  // même si TMDB/titre sont identiques (ex. 1080p et 4K en parallèle).
-  if (aPhysicalId && bPhysicalId) return false;
+  // Deux vrais infohash incompatibles = deux torrents différents. Un identifiant
+  // temporaire/non-hash de *Arr ne doit en revanche pas bloquer les autres signaux.
+  if (hasConflictingStrongPhysicalIds(a, b)) return false;
+
+  const aResolution = resolutionBucket(a);
+  const bResolution = resolutionBucket(b);
+  if (aResolution && bResolution && aResolution !== bResolution) return false;
 
   // Compatibilité avec les doublons persistés avant l'introduction du hash :
   // même release + même taille, tant qu'au moins une des deux représentations
@@ -188,6 +198,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           downloadClient: item.downloadClient || (item.mediaType === 'tv' ? 'Sonarr' : 'Radarr'),
           releaseTitle: item.releaseTitle || item.title,
           downloadId: item.downloadId,
+          downloadIdAliases: item.downloadIdAliases,
           isOptimistic: true
         };
 
@@ -285,6 +296,10 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               if (!serverItem.tmdbId && localMatch.tmdbId) serverItem.tmdbId = localMatch.tmdbId;
               if (!serverItem.tvdbId && localMatch.tvdbId) serverItem.tvdbId = localMatch.tvdbId;
               if (!serverItem.quality && localMatch.quality) serverItem.quality = localMatch.quality;
+              // Une même entrée *Arr peut temporairement changer/perdre son downloadId.
+              // On garde l'historique des alias appris sur les polls précédents afin que
+              // le torrent qBittorrent reste rattaché sans clignotement 1 → 2 → 1.
+              serverItem.downloadIdAliases = mergeDownloadIdAliases(serverItem, localMatch);
               if (!serverItem.downloadId && localMatch.downloadId) serverItem.downloadId = localMatch.downloadId;
 
               // Si qBittorrent est momentanément indisponible, ne jamais faire reculer
@@ -391,18 +406,60 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             });
           }
 
-          const itemMap = new Map<string, LiveDownloadItem>();
-          const seenPhysicalIds = new Set<string>();
+          const metadataScore = (item: LiveDownloadItem) =>
+            (item.posterPath ? 20 : 0)
+            + (item.tmdbId ? 20 : 0)
+            + (item.tvdbId ? 8 : 0)
+            + (item.movieTitle || item.seriesTitle ? 8 : 0)
+            + (item.imdbId ? 4 : 0)
+            + (item.quality ? 2 : 0);
+
+          const liveScore = (item: LiveDownloadItem) =>
+            (item.id.startsWith('qbit_') ? 50 : 0)
+            + (Number(item.speedBytesPerSec || 0) > 0 ? 10 : 0)
+            + (Number(item.timeleftSeconds || 0) > 0 ? 5 : 0)
+            + (Number(item.progress || 0) % 1 !== 0 ? 2 : 0);
+
+          const mergeRepresentations = (a: LiveDownloadItem, b: LiveDownloadItem): LiveDownloadItem => {
+            const meta = metadataScore(a) >= metadataScore(b) ? a : b;
+            const live = liveScore(a) >= liveScore(b) ? a : b;
+            const hasError = a.status === 'error' || b.status === 'error' || a.errorMessage || b.errorMessage;
+            const errorSource = a.status === 'error' || a.errorMessage ? a : b;
+            const aliases = mergeDownloadIdAliases(a, b);
+            const strongIds = [...getStrongPhysicalDownloadIds(a), ...getStrongPhysicalDownloadIds(b)];
+
+            return {
+              ...meta,
+              id: meta.id,
+              downloadId: strongIds[0] || getPhysicalDownloadId(live) || getPhysicalDownloadId(meta) || undefined,
+              downloadIdAliases: aliases,
+              releaseTitle: meta.releaseTitle || live.releaseTitle,
+              quality: meta.quality || live.quality,
+              size: live.size > 0 ? live.size : meta.size,
+              sizeleft: live.sizeleft,
+              progress: live.progress,
+              speedBytesPerSec: live.speedBytesPerSec,
+              speedFormatted: live.speedFormatted,
+              timeleft: live.timeleft,
+              timeleftSeconds: live.timeleftSeconds,
+              status: hasError ? errorSource.status : live.status,
+              statusText: hasError ? errorSource.statusText : live.statusText,
+              errorMessage: hasError ? errorSource.errorMessage : undefined,
+              isOptimistic: Boolean(a.isOptimistic && b.isOptimistic)
+            };
+          };
+
+          const finalItems: LiveDownloadItem[] = [];
           for (const item of [...serverItems, ...pendingOptimistic, ...preservedItems]) {
             if (removedSet.has(item.id)) continue;
 
-            const physicalId = getPhysicalDownloadId(item);
-            if (physicalId && seenPhysicalIds.has(physicalId)) continue;
-            if (physicalId) seenPhysicalIds.add(physicalId);
-
-            itemMap.set(item.id, item);
+            const existingIndex = finalItems.findIndex(existing => sameDownloadIdentity(existing, item));
+            if (existingIndex >= 0) {
+              finalItems[existingIndex] = mergeRepresentations(finalItems[existingIndex], item);
+              continue;
+            }
+            finalItems.push(item);
           }
-          const finalItems = Array.from(itemMap.values());
 
           for (const serverItem of serverItems) {
             const previous = currentDownloads.find(oldItem => sameDownloadIdentity(oldItem, serverItem));
