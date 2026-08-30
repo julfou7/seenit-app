@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { auth } from '../lib/firebase';
+import { purgeLegacyUnscopedUserData, readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
 
 export interface Person {
   id: number;
@@ -15,21 +16,27 @@ interface FavoritePeopleState {
   isFavorite: (id: number) => boolean;
 }
 
-export const useFavoritePeopleStore = create<FavoritePeopleState>()(
-  persist(
-    (set, get) => ({
-      people: [],
-      addPerson: (person) => set((state) => {
-        if (state.people.some(p => p.id === person.id)) return state;
-        return { people: [...state.people, person] };
-      }),
-      removePerson: (id) => set((state) => ({
-        people: state.people.filter(p => p.id !== id)
-      })),
-      isFavorite: (id) => get().people.some(p => p.id === id)
-    }),
-    {
-      name: 'favorite-people-storage'
-    }
-  )
-);
+const FAVORITE_PEOPLE_FIELD = 'favorite_people';
+
+export const useFavoritePeopleStore = create<FavoritePeopleState>((set, get) => ({
+  people: [],
+  addPerson: (person) => set((state) => {
+    if (state.people.some(p => p.id === person.id)) return state;
+    const people = [...state.people, person];
+    writeUserScopedJson(auth.currentUser?.uid, FAVORITE_PEOPLE_FIELD, people);
+    return { people };
+  }),
+  removePerson: (id) => set((state) => {
+    const people = state.people.filter(p => p.id !== id);
+    writeUserScopedJson(auth.currentUser?.uid, FAVORITE_PEOPLE_FIELD, people);
+    return { people };
+  }),
+  isFavorite: (id) => get().people.some(p => p.id === id)
+}));
+
+auth.onAuthStateChanged((user) => {
+  purgeLegacyUnscopedUserData(user?.uid);
+  useFavoritePeopleStore.setState({
+    people: readUserScopedJson<Person[]>(user?.uid, FAVORITE_PEOPLE_FIELD, [])
+  });
+});

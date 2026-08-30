@@ -1,8 +1,8 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { db, auth } from '../../lib/firebase';
-import { collection, doc, writeBatch, getDocs, updateDoc, deleteField } from 'firebase/firestore';
+import { collection, doc, writeBatch, getDocs, getDocFromServer, runTransaction, setDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { tmdb } from '../shows/tmdb';
-import { useShowsStore } from '../../store/showsStore';
+import { fetchAuthoritativeShowsForUser, useShowsStore } from '../../store/showsStore';
 import { useSyncStore } from '../../store/syncStore';
 import { useToastStore } from '../../store/toastStore';
 import { openExternalUrl } from '../../lib/utils';
@@ -28,7 +28,11 @@ import {
   getPlexLastSyncTimestamp,
   getPlexResolutionCache,
   getStoredPlexToken,
+  getStoredPlexUsername,
   getPlexUserStorageKey,
+  compactPlexResolutionCache,
+  mergePlexResolutionCaches,
+  storePlexCredentials,
   setPlexLastSyncTimestamp,
   setPlexResolutionCache
 } from './plexStorage';
@@ -42,6 +46,7 @@ import {
   shouldCommitPlexCursor,
   shouldReplacePlexAvailabilityCache
 } from './plexSyncIntegrity';
+import { buildLibraryStateSignature } from '../../lib/userIsolation';
 
 export interface PlexSyncResult {
   success: boolean;
@@ -637,6 +642,38 @@ async function fetchPlexHistoryData(token: string, clientId: string, delta: bool
 
 const activePlexSyncPromises = new Map<string, Promise<PlexSyncResult>>();
 
+async function loadPlexCloudState(userId: string): Promise<Record<string, any>> {
+  const snapshot = await getDocFromServer(doc(db, 'users', userId, 'settings', 'plex'));
+  return snapshot.exists() ? snapshot.data() : {};
+}
+
+async function persistPlexCloudState(
+  userId: string,
+  values: { lastSyncTimestamp?: number; resolutionCache?: Record<string, any> }
+): Promise<void> {
+  const plexRef = doc(db, 'users', userId, 'settings', 'plex');
+  await runTransaction(db, async (transaction) => {
+    const currentSnapshot = await transaction.get(plexRef);
+    const current = currentSnapshot.exists() ? currentSnapshot.data() : {};
+    const next: Record<string, any> = {};
+
+    if (values.lastSyncTimestamp !== undefined) {
+      next.lastSyncTimestamp = Math.max(
+        Number(current.lastSyncTimestamp) || 0,
+        values.lastSyncTimestamp
+      );
+    }
+    if (values.resolutionCache) {
+      next.resolutionCache = mergePlexResolutionCaches(
+        current.resolutionCache || {},
+        values.resolutionCache
+      );
+    }
+
+    transaction.set(plexRef, next, { merge: true });
+  });
+}
+
 export async function performPlexSync(options: { delta?: boolean; silent?: boolean; ignoreCooldown?: boolean } = {}): Promise<PlexSyncResult> {
   const { delta = true, silent = false, ignoreCooldown = false } = options;
   const requestedUser = auth.currentUser;
@@ -648,9 +685,46 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       return { success: false, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [], error: 'Utilisateur non connecté' };
     }
 
-    const plexToken = getStoredPlexToken(user.uid);
+    let cloudPlexState: Record<string, any>;
+    try {
+      cloudPlexState = await loadPlexCloudState(user.uid);
+    } catch (error: any) {
+      const message = `Impossible de charger l’état Plex autoritatif du compte : ${error?.message || error}`;
+      appLogger.error('plex', message);
+      if (!silent) useToastStore.getState().showToast(message, 'error');
+      return { success: false, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [], error: message };
+    }
+    if (auth.currentUser?.uid !== user.uid) {
+      return { success: false, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [], error: 'Compte SeenIt modifié pendant la synchronisation' };
+    }
+    const plexToken = getStoredPlexToken(user.uid) || cloudPlexState.authToken || null;
+    if (plexToken && !getStoredPlexToken(user.uid)) {
+      storePlexCredentials(user.uid, plexToken, cloudPlexState.username || '');
+    }
+    if (plexToken && !cloudPlexState.authToken) {
+      try {
+        await setDoc(doc(db, 'users', user.uid, 'settings', 'plex'), {
+          authToken: plexToken,
+          username: getStoredPlexUsername(user.uid) || cloudPlexState.username || ''
+        }, { merge: true });
+      } catch (error: any) {
+        const message = `Impossible de sécuriser les réglages Plex du compte : ${error?.message || error}`;
+        appLogger.error('plex', message);
+        return { success: false, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [], error: message };
+      }
+    }
     const clientId = getPlexClientId();
-    const lastSyncTimestamp = getPlexLastSyncTimestamp(user.uid);
+    const localLastSyncTimestamp = getPlexLastSyncTimestamp(user.uid);
+    const cloudLastSyncTimestamp = Number(cloudPlexState.lastSyncTimestamp);
+    const lastSyncTimestamp = Math.max(
+      localLastSyncTimestamp || 0,
+      Number.isFinite(cloudLastSyncTimestamp) ? cloudLastSyncTimestamp : 0
+    ) || undefined;
+    const sharedResolutionCache = mergePlexResolutionCaches(
+      getPlexResolutionCache(user.uid),
+      cloudPlexState.resolutionCache || {}
+    );
+    setPlexResolutionCache(user.uid, sharedResolutionCache);
 
     if (!plexToken) {
       if (!silent) {
@@ -748,6 +822,10 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           return { success: false, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [], error: reason };
         }
         setPlexLastSyncTimestamp(user.uid, nextSyncCursor);
+        await persistPlexCloudState(user.uid, {
+          lastSyncTimestamp: nextSyncCursor,
+          resolutionCache: compactPlexResolutionCache(sharedResolutionCache)
+        });
         clearPlexSyncStatusDelayed(`${completedServerStatus} • à jour`, 5000);
         if (!silent && serverSyncSummary) {
           useToastStore.getState().showToast(
@@ -770,11 +848,21 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         });
       }
 
-      // Load fresh shows from Firestore or current store
-      const localShows = useShowsStore.getState().shows;
-      const showsList: Show[] = localShows.map((show) => ({ ...show }));
+      // Firestore est l'unique source de décision. Le store Zustand et le cache
+      // WebView/PWA ne doivent jamais faire varier le bilan entre deux appareils.
+      const authoritativeShows = await fetchAuthoritativeShowsForUser(user.uid);
+      if (auth.currentUser?.uid !== user.uid) {
+        throw new Error('Compte SeenIt modifié pendant le chargement de la bibliothèque');
+      }
+      const authoritySignature = buildLibraryStateSignature(authoritativeShows as Array<Record<string, any>>);
+      appLogger.info(
+        'plex',
+        `[Plex Sync] Bibliothèque Firestore autoritative : ${authoritativeShows.length} média(s), empreinte ${authoritySignature}.`
+      );
+      useShowsStore.getState().setShows(authoritativeShows);
+      const showsList: Show[] = authoritativeShows.map((show) => ({ ...show }));
 
-      const resolutionCache = getPlexResolutionCache(user.uid);
+      const resolutionCache = sharedResolutionCache;
       let cacheModified = false;
       const sessionResolutionPromises = new Map<string, Promise<any>>();
 
@@ -1330,6 +1418,9 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
       if (cacheModified) {
         setPlexResolutionCache(user.uid, resolutionCache);
+        await persistPlexCloudState(user.uid, {
+          resolutionCache: compactPlexResolutionCache(resolutionCache)
+        });
       }
 
       if (syncCount > 0 || Object.keys(mutatedShows).length > 0) {
@@ -1347,20 +1438,9 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           await chunkBatch.commit();
         }
 
-        // appLogger.success('plex', `Batch Firestore validé avec succès (${syncCount} élément(s) mis à jour)`);
-        // 3. Optimistically update the store
-        const currentShows = useShowsStore.getState().shows;
-        const mergedShows = [...currentShows];
-        Object.keys(mutatedShows).forEach((showId) => {
-          const mut = cleanShowForFirestore(mutatedShows[showId], user.uid) as Show;
-          const idx = mergedShows.findIndex((s) => s.id === showId || (s.tmdbId && mut.tmdbId && Number(s.tmdbId) === Number(mut.tmdbId) && s.mediaType === mut.mediaType));
-          if (idx >= 0) {
-            mergedShows[idx] = { ...mergedShows[idx], ...mut };
-          } else {
-            mergedShows.push({ ...mut, id: showId });
-          }
-        });
-        useShowsStore.getState().setShows(mergedShows);
+        // 3. Relire le serveur après les commits : le même UID obtient ainsi le
+        // même état final sur PWA et APK, sans fusion locale implicite.
+        await useShowsStore.getState().fetchShows();
 
         // Queue sequential toasts for each synced item (5s each)
         syncedItems.forEach((item) => {
@@ -1412,6 +1492,10 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       });
       if (canCommitCursor) {
         setPlexLastSyncTimestamp(user.uid, nextSyncCursor);
+        await persistPlexCloudState(user.uid, {
+          lastSyncTimestamp: nextSyncCursor,
+          resolutionCache: compactPlexResolutionCache(resolutionCache)
+        });
         clearPlexSyncStatusDelayed(completedServerStatus, 5000);
         if (!silent && serverSyncSummary) {
           useToastStore.getState().showToast(

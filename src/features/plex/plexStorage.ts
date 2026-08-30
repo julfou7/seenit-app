@@ -66,11 +66,43 @@ export function getPlexResolutionCache(uid: string): Record<string, any> {
   }
 }
 
-export function setPlexResolutionCache(uid: string, cache: Record<string, any>): void {
+const PLEX_RESOLUTION_CACHE_MAX_ITEMS = 400;
+const PLEX_RESOLUTION_FIELDS = [
+  'id',
+  'title',
+  'name',
+  'original_title',
+  'original_name',
+  'poster_path',
+  'backdrop_path',
+  'release_date',
+  'first_air_date'
+] as const;
+
+export function compactPlexResolutionCache(cache: Record<string, any>): Record<string, any> {
   const keys = Object.keys(cache);
-  const value = keys.length > 500
-    ? Object.fromEntries(keys.slice(-400).map(key => [key, cache[key]]))
-    : cache;
+  const retainedKeys = keys.slice(-PLEX_RESOLUTION_CACHE_MAX_ITEMS);
+  return Object.fromEntries(retainedKeys.flatMap((key) => {
+    const source = cache[key];
+    if (!source || !Number.isFinite(Number(source.id))) return [];
+    const compact = Object.fromEntries(
+      PLEX_RESOLUTION_FIELDS
+        .filter((field) => source[field] !== undefined && source[field] !== null)
+        .map((field) => [field, source[field]])
+    );
+    return [[key, compact]];
+  }));
+}
+
+export function mergePlexResolutionCaches(
+  localCache: Record<string, any>,
+  cloudCache: Record<string, any>
+): Record<string, any> {
+  return compactPlexResolutionCache({ ...localCache, ...cloudCache });
+}
+
+export function setPlexResolutionCache(uid: string, cache: Record<string, any>): void {
+  const value = compactPlexResolutionCache(cache);
   localStorage.setItem(getPlexUserStorageKey(uid, 'resolutionCache'), JSON.stringify(value));
 }
 

@@ -37,6 +37,7 @@ import { cleanOldCache } from './db/dexie';
 import './store/showsStore';
 import { activatePlexUserScope } from './features/plex/plexStorage';
 import { usePlexAvailabilityStore } from './features/plex/plexAvailability';
+import { readUserScopedJson, writeUserScopedJson } from './lib/userIsolation';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null | undefined>(undefined);
@@ -61,12 +62,11 @@ export default function App() {
         try {
           const prefRef = doc(db, 'users', user.uid, 'settings', 'preferences');
           const snap = await getDoc(prefRef);
-          const localStr = localStorage.getItem('user_platforms');
-          const localPlatforms = localStr ? JSON.parse(localStr) : [];
+          const localPlatforms = readUserScopedJson<number[]>(user.uid, 'platforms', []);
 
           if (snap.exists() && Array.isArray(snap.data()?.platforms)) {
             const cloudPlatforms: number[] = snap.data().platforms;
-            localStorage.setItem('user_platforms', JSON.stringify(cloudPlatforms));
+            writeUserScopedJson(user.uid, 'platforms', cloudPlatforms);
             window.dispatchEvent(new Event('storage'));
           } else if (localPlatforms.length > 0) {
             await setDoc(prefRef, { platforms: localPlatforms }, { merge: true });

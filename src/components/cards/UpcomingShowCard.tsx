@@ -9,6 +9,7 @@ import { cn, getTodayStr, getCalendarDaysDiff, formatAirDateSafe, getEpisodeRela
 import { tmdb } from '../../features/shows/tmdb';
 import { getFormattedProviderLogo, extractOfficialStreamingProvider, PLEX_LOGO_SVG } from '../../utils/providerLogos';
 import { checkPlexAvailability } from '../../features/plex/plexAvailability';
+import { readUserScopedJson, removeUserScopedValue, writeUserScopedJson } from '../../lib/userIsolation';
 
 export interface UpcomingEpisodeInfo {
   season_number: number;
@@ -95,14 +96,10 @@ export const UpcomingShowCard = React.memo(function UpcomingShowCard({ show, onS
   const ep = getUpcomingEpisodeInfo(show);
   if (!ep) return null;
 
-  const storageKey = `reminder_${show.id}_S${ep.season_number}E${ep.episode_number}`;
+  const storageField = `reminder_${show.id}_S${ep.season_number}E${ep.episode_number}`;
   const [isReminderSet, setIsReminderSet] = useState<boolean>(() => {
-    try {
-      if (show.notificationsEnabled) return true;
-      return localStorage.getItem(storageKey) === 'true';
-    } catch {
-      return false;
-    }
+    if (show.notificationsEnabled) return true;
+    return readUserScopedJson(auth.currentUser?.uid, storageField, false);
   });
   const [loadingReminder, setLoadingReminder] = useState(false);
   const { showToast } = useToastStore();
@@ -128,11 +125,7 @@ export const UpcomingShowCard = React.memo(function UpcomingShowCard({ show, onS
       }
 
       setIsReminderSet(true);
-      try {
-        localStorage.setItem(storageKey, 'true');
-      } catch (err) {
-        console.error(err);
-      }
+      writeUserScopedJson(auth.currentUser?.uid, storageField, true);
 
       if (show.id && !show.notificationsEnabled) { updateShow(show.id, { notificationsEnabled: true }); }
       showToast(`« ${show.title} » S${sNumStr}E${eNumStr} • Rappel activé`, 'reminder', show);
@@ -188,11 +181,7 @@ export const UpcomingShowCard = React.memo(function UpcomingShowCard({ show, onS
     } else {
       setLoadingReminder(true);
       setIsReminderSet(false);
-      try {
-        localStorage.removeItem(storageKey);
-      } catch (err) {
-        console.error(err);
-      }
+      removeUserScopedValue(auth.currentUser?.uid, storageField);
 
       if (show.id && show.notificationsEnabled) { updateShow(show.id, { notificationsEnabled: false }); }
       showToast(`« ${show.title} » S${sNumStr}E${eNumStr} • Rappel désactivé`, 'reminder', show);

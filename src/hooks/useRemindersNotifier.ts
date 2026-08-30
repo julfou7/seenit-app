@@ -2,8 +2,9 @@ import { useEffect } from 'react';
 import { useShowsStore } from '../store/showsStore';
 import { useToastStore } from '../store/toastStore';
 import { getUpcomingEpisodeInfo } from '../components/cards/UpcomingShowCard';
-import { sendNativeNotification } from '../lib/firebase';
+import { auth, sendNativeNotification } from '../lib/firebase';
 import { getTodayStr } from '../lib/utils';
+import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
 
 export function useRemindersNotifier() {
   const shows = useShowsStore(state => state.shows);
@@ -15,13 +16,14 @@ export function useRemindersNotifier() {
     const todayStr = getTodayStr();
     const now = new Date();
 
-    const savedNotifs = localStorage.getItem('user_notifications');
-    const userPrefs = savedNotifs ? JSON.parse(savedNotifs) : {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    const userPrefs = readUserScopedJson(uid, 'notifications', {
       release_today_tv: true,
       season_d7: true,
       movie_theater: true,
       movie_dvd_vod: true
-    };
+    });
 
         const processReminders = async () => {
       // Delay execution to avoid hanging the app during startup
@@ -31,7 +33,7 @@ export function useRemindersNotifier() {
         await new Promise(r => setTimeout(r, 50));
       if (s.isArchived || s.status === 'dropped') return;
 
-      const isShowNotification = s.notificationsEnabled === true || localStorage.getItem(`reminder_${s.id}`) === 'true';
+      const isShowNotification = s.notificationsEnabled === true || readUserScopedJson(uid, `reminder_${s.id}`, false);
       if (!isShowNotification && s.notificationsEnabled === false) return;
 
       const title = s.title;
@@ -76,14 +78,14 @@ export function useRemindersNotifier() {
 
           if (targetDate.getTime() > now.getTime()) {
             const scheduleKey = `scheduled_9am_${s.id}_${tag}_${targetStr}`;
-            if (!localStorage.getItem(scheduleKey)) {
-              try { localStorage.setItem(scheduleKey, 'true'); } catch {}
+            if (!readUserScopedJson(uid, scheduleKey, false)) {
+              writeUserScopedJson(uid, scheduleKey, true);
               await sendNativeNotification(msgTitle, { ...notificationPayload, scheduleDate: targetDate } as any);
             }
           } else if (targetStr === todayStr) {
             const notifiedKey = `notified_today_${s.id}_${tag}_${todayStr}`;
-            if (!localStorage.getItem(notifiedKey)) {
-              try { localStorage.setItem(notifiedKey, 'true'); } catch {}
+            if (!readUserScopedJson(uid, notifiedKey, false)) {
+              writeUserScopedJson(uid, notifiedKey, true);
               showToast(`🍿 ${msgBody}`, 'info', s);
               await sendNativeNotification(msgTitle, { ...notificationPayload, scheduleDate: undefined } as any);
             }
@@ -106,7 +108,7 @@ export function useRemindersNotifier() {
       const sNum = String(upcoming.season_number).padStart(2, '0');
       const eNum = String(upcoming.episode_number).padStart(2, '0');
 
-      const isSpecificReminder = localStorage.getItem(`reminder_${s.id}_S${upcoming.season_number}E${upcoming.episode_number}`) === 'true';
+      const isSpecificReminder = readUserScopedJson(uid, `reminder_${s.id}_S${upcoming.season_number}E${upcoming.episode_number}`, false);
       if (!isSpecificReminder && !isShowNotification && s.notificationsEnabled === false) return;
 
       const [year, month, day] = upcoming.air_date.split('-').map(Number);
@@ -152,14 +154,14 @@ export function useRemindersNotifier() {
 
         if (targetDate.getTime() > now.getTime()) {
           const scheduleKey = `scheduled_9am_${s.id}_${tagPrefix}_S${sNum}E${eNum}_${targetStr}`;
-          if (!localStorage.getItem(scheduleKey)) {
-            try { localStorage.setItem(scheduleKey, 'true'); } catch {}
+          if (!readUserScopedJson(uid, scheduleKey, false)) {
+            writeUserScopedJson(uid, scheduleKey, true);
             await sendNativeNotification(title, { ...fullPayload, scheduleDate: targetDate } as any);
           }
         } else if (targetStr === todayStr) {
           const notifiedKey = `notified_today_${s.id}_${tagPrefix}_S${sNum}E${eNum}_${todayStr}`;
-          if (!localStorage.getItem(notifiedKey)) {
-            try { localStorage.setItem(notifiedKey, 'true'); } catch {}
+          if (!readUserScopedJson(uid, notifiedKey, false)) {
+            writeUserScopedJson(uid, notifiedKey, true);
             showToast(`🎉 ${msgBody}`, 'info', s);
             await sendNativeNotification(title, { ...fullPayload, scheduleDate: undefined } as any);
           }

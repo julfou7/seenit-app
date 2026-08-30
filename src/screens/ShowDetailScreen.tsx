@@ -26,6 +26,7 @@ import { LiveDownloadBanner } from '../components/LiveDownloadBanner';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useMediaPresenceStore } from '../store/mediaPresenceStore';
 import { searchAndDownloadInSonarr, searchAndDownloadInRadarr } from '../services/sonarrRadarr';
+import { readUserScopedJson } from '../lib/userIsolation';
 
 
 interface ShowDetailScreenProps {
@@ -625,10 +626,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
 
   useEffect(() => {
     const handleStorage = () => {
-      const saved = localStorage.getItem('user_platforms');
-      if (saved) {
-        try { setUserPlatforms(JSON.parse(saved)); } catch (e) {}
-      }
+      setUserPlatforms(readUserScopedJson<number[]>(auth.currentUser?.uid, 'platforms', []));
     };
     handleStorage(); // init
     window.addEventListener('storage', handleStorage);

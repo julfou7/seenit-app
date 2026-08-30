@@ -1,11 +1,17 @@
 import { create } from 'zustand';
 import { db, auth } from '../lib/firebase';
-import { collection, query, getDocs, getDocsFromCache, getDocsFromServer, doc, writeBatch, onSnapshot, deleteDoc } from 'firebase/firestore';
+import { collection, query, getDocs, getDocsFromCache, getDocsFromServer, doc, writeBatch, onSnapshot } from 'firebase/firestore';
 import { type Show } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/firebaseErrors';
 import { useSyncStore } from './syncStore';
 import { appLogger } from './logStore';
 import { getNextEpisodeNumber, checkIsUpToDate } from '../lib/utils';
+import {
+  buildLibraryStateSignature,
+  purgeLegacyUnscopedUserData,
+  readUserScopedJson,
+  writeUserScopedJson
+} from '../lib/userIsolation';
 
 interface ShowsState {
   shows: Show[];
@@ -21,27 +27,15 @@ interface ShowsState {
   uploadAllToCloud: () => Promise<{ success: boolean; count: number; error?: string }>;
 }
 
-const getInitialCache = (): { shows: Show[]; loading: boolean } => {
-  try {
-    const stored = localStorage.getItem('cached_shows_v1');
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return { shows: parsed, loading: false };
-      }
-    }
-  } catch (e) {
-    console.warn('Failed to parse cached_shows_v1 from localStorage', e);
-  }
-  return { shows: [], loading: true };
+const SHOWS_CACHE_FIELD = 'shows_v2';
+
+const loadUserCache = (uid: string): Show[] => {
+  const cached = readUserScopedJson<Show[]>(uid, SHOWS_CACHE_FIELD, []);
+  return Array.isArray(cached) ? cached : [];
 };
 
-const initialCache = getInitialCache();
-
-const saveToLocalStorage = (shows: Show[]) => {
-  try {
-    localStorage.setItem('cached_shows_v1', JSON.stringify(shows));
-  } catch (e) {}
+const saveToLocalStorage = (uid: string | null | undefined, shows: Show[]) => {
+  writeUserScopedJson(uid, SHOWS_CACHE_FIELD, shows);
 };
 
 /**
@@ -217,6 +211,20 @@ function deduplicateAndMergeShows(rawShows: Show[], currentLocalShows: Show[] = 
   return { mergedShows: finalShows, duplicateDocIds };
 }
 
+/**
+ * Lecture stricte utilisée par les traitements qui modifient les données.
+ * Aucun cache WebView/PWA ni store Zustand ne peut influencer le résultat.
+ */
+export async function fetchAuthoritativeShowsForUser(userId: string): Promise<Show[]> {
+  const showsRef = collection(db, 'users', userId, 'shows');
+  const snapshot = await getDocsFromServer(query(showsRef));
+  const remoteShows: Show[] = [];
+  snapshot.forEach((docSnap) => {
+    remoteShows.push({ ...docSnap.data(), id: String(docSnap.id) } as Show);
+  });
+  return deduplicateAndMergeShows(remoteShows).mergedShows;
+}
+
 let unsubscribeRealtimeListener: (() => void) | null = null;
 
 export function setupRealtimeShowsListener(userId: string) {
@@ -227,13 +235,13 @@ export function setupRealtimeShowsListener(userId: string) {
   try {
     const showsRef = collection(db, 'users', userId, 'shows');
     unsubscribeRealtimeListener = onSnapshot(showsRef, (snapshot) => {
+      if (auth.currentUser?.uid !== userId) return;
       const remoteShows: Show[] = [];
       snapshot.forEach((docSnap) => {
         remoteShows.push({ ...docSnap.data(), id: String(docSnap.id) } as Show);
       });
-      const currentLocal = useShowsStore.getState().shows;
-      const { mergedShows } = deduplicateAndMergeShows(remoteShows, currentLocal);
-      saveToLocalStorage(mergedShows);
+      const { mergedShows } = deduplicateAndMergeShows(remoteShows);
+      saveToLocalStorage(userId, mergedShows);
       useShowsStore.setState({ shows: mergedShows, loading: false, initialized: true });
     }, (err) => {
       console.warn('[showsStore] Realtime listener error:', err);
@@ -244,11 +252,11 @@ export function setupRealtimeShowsListener(userId: string) {
 }
 
 export const useShowsStore = create<ShowsState>((set, get) => ({
-  shows: initialCache.shows,
-  loading: initialCache.loading,
-  initialized: initialCache.shows.length > 0,
+  shows: [],
+  loading: true,
+  initialized: false,
   setShows: (shows) => {
-    saveToLocalStorage(shows);
+    saveToLocalStorage(auth.currentUser?.uid, shows);
     set({ shows });
   },
   setLoading: (loading) => set({ loading }),
@@ -259,7 +267,7 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
       const updatedShows = state.shows.map(show => 
         show.id === id ? { ...show, ...updates } : show
       );
-      saveToLocalStorage(updatedShows);
+      saveToLocalStorage(auth.currentUser?.uid, updatedShows);
       return { shows: updatedShows };
     });
   },
@@ -267,7 +275,7 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
   removeShowOptimistic: (id) => {
     set(state => {
       const updatedShows = state.shows.filter(show => show.id !== id);
-      saveToLocalStorage(updatedShows);
+      saveToLocalStorage(auth.currentUser?.uid, updatedShows);
       return { shows: updatedShows };
     });
   },
@@ -281,7 +289,7 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
       } else {
         updatedShows = [...state.shows, show];
       }
-      saveToLocalStorage(updatedShows);
+      saveToLocalStorage(auth.currentUser?.uid, updatedShows);
       return { shows: updatedShows };
     });
   },
@@ -311,9 +319,11 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
           cachedSnapshot.forEach((doc) => {
             cachedShows.push({ ...doc.data(), id: String(doc.id) } as Show);
           });
-          const { mergedShows } = deduplicateAndMergeShows(cachedShows, get().shows);
-          saveToLocalStorage(mergedShows);
-          set({ shows: mergedShows, loading: false, initialized: true });
+          if (auth.currentUser?.uid === user.uid) {
+            const { mergedShows } = deduplicateAndMergeShows(cachedShows, get().shows);
+            saveToLocalStorage(user.uid, mergedShows);
+            set({ shows: mergedShows, loading: false, initialized: true });
+          }
         }
       } catch (cacheErr: any) {
         // Cache optionnel
@@ -332,13 +342,17 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
         rawLoadedShows.push({ ...doc.data(), id: String(doc.id) } as Show);
       });
 
-      const localShowsBeforeMerge = get().shows;
-      const { mergedShows, duplicateDocIds } = deduplicateAndMergeShows(rawLoadedShows, localShowsBeforeMerge);
+      if (auth.currentUser?.uid !== user.uid) return;
+
+      // Le serveur gagne toujours après le rendu rapide depuis le cache. Un cache
+      // local ne doit jamais ressusciter ni téléverser un média absent du Cloud.
+      const { mergedShows, duplicateDocIds } = deduplicateAndMergeShows(rawLoadedShows);
+      const signature = buildLibraryStateSignature(mergedShows as Array<Record<string, any>>);
 
       if (rawLoadedShows.length !== mergedShows.length) {
-        appLogger.info('sync', `[showsStore] ${rawLoadedShows.length} documents Firestore reçus -> ${mergedShows.length} médias uniques en mémoire (${rawLoadedShows.length - mergedShows.length} doublons dédupliqués).`);
+        appLogger.info('sync', `[showsStore] ${rawLoadedShows.length} documents Firestore reçus -> ${mergedShows.length} médias uniques en mémoire (${rawLoadedShows.length - mergedShows.length} doublons dédupliqués, empreinte ${signature}).`);
       } else {
-        appLogger.info('sync', `[showsStore] Chargement terminé : ${mergedShows.length} médias parfaitement synchronisés.`);
+        appLogger.info('sync', `[showsStore] Chargement terminé : ${mergedShows.length} médias parfaitement synchronisés (empreinte ${signature}).`);
       }
 
       // Nettoyage en arrière-plan des doublons obsolètes dans Firestore
@@ -355,24 +369,11 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
         }
       }
 
-      saveToLocalStorage(mergedShows);
+      if (auth.currentUser?.uid !== user.uid) return;
+      saveToLocalStorage(user.uid, mergedShows);
       set({ shows: mergedShows, loading: false, initialized: true });
-
-      // Si le cache local contient des séries qui ne sont pas sur le Cloud (ex: créées/importées sur la PWA),
-      // on les synchronise automatiquement vers Firestore pour que l'APK mobile et tous les appareils y accèdent !
-      if (mergedShows.length > rawLoadedShows.length) {
-        const missingOnCloud = mergedShows.filter(localS => 
-          !rawLoadedShows.some(remoteS => 
-            remoteS.id === localS.id || 
-            (remoteS.tmdbId && localS.tmdbId && Number(remoteS.tmdbId) === Number(localS.tmdbId) && (remoteS.mediaType || 'tv') === (localS.mediaType || 'tv'))
-          )
-        );
-        if (missingOnCloud.length > 0) {
-          appLogger.info('sync', `[showsStore] Détection de ${missingOnCloud.length} série(s) locale(s) à téléverser vers Firestore...`);
-          uploadShowsToFirestore(user.uid, missingOnCloud);
-        }
-      }
     } catch (err: any) {
+      if (auth.currentUser?.uid !== user.uid) return;
       const errStr = err?.message || String(err);
       appLogger.error('sync', `[showsStore] Erreur fatale lors de fetchShows : ${errStr}`, err);
       
@@ -407,26 +408,25 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
 }));
 
 auth.onAuthStateChanged(user => {
+  purgeLegacyUnscopedUserData(user?.uid);
+  if (unsubscribeRealtimeListener) {
+    unsubscribeRealtimeListener();
+    unsubscribeRealtimeListener = null;
+  }
+  useShowsStore.setState({ shows: [], loading: Boolean(user), initialized: false });
+
   if (user) {
     localStorage.removeItem('explicit_logout');
-    const prevUid = localStorage.getItem('last_active_uid');
-    if (prevUid && prevUid !== user.uid) {
-      // Un utilisateur différent s'est connecté, on vide le cache précédent pour sécurité
-      useShowsStore.getState().setShows([]);
-      useShowsStore.getState().setInitialized(false);
+    const scopedCache = loadUserCache(user.uid);
+    if (scopedCache.length > 0) {
+      useShowsStore.setState({ shows: scopedCache, loading: false, initialized: true });
     }
     localStorage.setItem('last_active_uid', user.uid);
-    useShowsStore.getState().fetchShows();
+    void useShowsStore.getState().fetchShows();
     setupRealtimeShowsListener(user.uid);
   } else {
-    if (unsubscribeRealtimeListener) {
-      unsubscribeRealtimeListener();
-      unsubscribeRealtimeListener = null;
-    }
     const explicitLogout = localStorage.getItem('explicit_logout') === 'true';
     if (explicitLogout) {
-      useShowsStore.getState().setShows([]);
-      useShowsStore.getState().setInitialized(false);
       localStorage.removeItem('last_active_uid');
       localStorage.removeItem('explicit_logout');
     }

@@ -28,6 +28,14 @@ import {
   storePlexCredentials
 } from '../features/plex/plexStorage';
 import { usePlexAvailabilityStore } from '../features/plex/plexAvailability';
+import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
+
+const DEFAULT_NOTIFICATION_PREFS = {
+  release_today_tv: true,
+  season_d7: true,
+  movie_theater: true,
+  movie_dvd_vod: true
+};
 
 const STREAMING_PLATFORMS = [
   { id: 8, name: 'Netflix' },
@@ -53,20 +61,14 @@ export function SettingsScreen() {
   const [userPlatforms, setUserPlatforms] = useState<number[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   
-  const [notificationPrefs, setNotificationPrefs] = useState(() => {
-    const saved = localStorage.getItem('user_notifications');
-    return saved ? JSON.parse(saved) : {
-      release_today_tv: true,
-      season_d7: true,
-      movie_theater: true,
-      movie_dvd_vod: true
-    };
-  });
+  const [notificationPrefs, setNotificationPrefs] = useState(() =>
+    readUserScopedJson(auth.currentUser?.uid, 'notifications', DEFAULT_NOTIFICATION_PREFS)
+  );
 
   const handleToggleNotif = async (key: string, value: boolean) => {
     const newPrefs = { ...notificationPrefs, [key]: value };
     setNotificationPrefs(newPrefs);
-    localStorage.setItem('user_notifications', JSON.stringify(newPrefs));
+    writeUserScopedJson(auth.currentUser?.uid, 'notifications', newPrefs);
     if (auth.currentUser) {
       try {
         const notifRef = doc(db, 'users', auth.currentUser.uid, 'settings', 'notifications');
@@ -237,20 +239,10 @@ export function SettingsScreen() {
   };
 
   useEffect(() => {
-    const savedPlatforms = localStorage.getItem('user_platforms');
-    if (savedPlatforms) {
-      try {
-        setUserPlatforms(JSON.parse(savedPlatforms));
-      } catch (e) {}
-    }
+    setUserPlatforms(readUserScopedJson<number[]>(auth.currentUser?.uid, 'platforms', []));
     
     const handleStorage = () => {
-      const platforms = localStorage.getItem('user_platforms');
-      if (platforms) {
-        try {
-          setUserPlatforms(JSON.parse(platforms));
-        } catch (e) {}
-      }
+      setUserPlatforms(readUserScopedJson<number[]>(auth.currentUser?.uid, 'platforms', []));
     };
     window.addEventListener('storage', handleStorage);
         
@@ -260,17 +252,20 @@ export function SettingsScreen() {
       setPlexToken(getStoredPlexToken(currentUser?.uid));
       setUser(currentUser);
       if (currentUser) {
+        // Réinitialiser immédiatement l'UI dans le périmètre du nouveau compte,
+        // avant même que les lectures Firestore asynchrones ne se terminent.
+        setUserPlatforms(readUserScopedJson<number[]>(currentUser.uid, 'platforms', []));
+        setNotificationPrefs(readUserScopedJson(currentUser.uid, 'notifications', DEFAULT_NOTIFICATION_PREFS));
         try {
           // 1. Plateformes de streaming
           const prefRef = doc(db, 'users', currentUser.uid, 'settings', 'preferences');
           const snap = await getDoc(prefRef);
-          const localStr = localStorage.getItem('user_platforms');
-          const localPlatforms = localStr ? JSON.parse(localStr) : [];
+          const localPlatforms = readUserScopedJson<number[]>(currentUser.uid, 'platforms', []);
 
           if (snap.exists() && Array.isArray(snap.data()?.platforms)) {
             const cloudPlatforms: number[] = snap.data().platforms;
             setUserPlatforms(cloudPlatforms);
-            localStorage.setItem('user_platforms', JSON.stringify(cloudPlatforms));
+            writeUserScopedJson(currentUser.uid, 'platforms', cloudPlatforms);
           } else if (localPlatforms.length > 0) {
             await setDoc(prefRef, { platforms: localPlatforms }, { merge: true });
           }
@@ -278,13 +273,12 @@ export function SettingsScreen() {
           // 2. Préférences de notifications
           const notifRef = doc(db, 'users', currentUser.uid, 'settings', 'notifications');
           const snapNotif = await getDoc(notifRef);
-          const localNotifStr = localStorage.getItem('user_notifications');
-          const localNotifs = localNotifStr ? JSON.parse(localNotifStr) : null;
+          const localNotifs = readUserScopedJson<Record<string, boolean> | null>(currentUser.uid, 'notifications', null);
 
           if (snapNotif.exists()) {
-            const cloudNotifs = snapNotif.data();
+            const cloudNotifs = { ...DEFAULT_NOTIFICATION_PREFS, ...snapNotif.data() };
             setNotificationPrefs(cloudNotifs);
-            localStorage.setItem('user_notifications', JSON.stringify(cloudNotifs));
+            writeUserScopedJson(currentUser.uid, 'notifications', cloudNotifs);
           } else if (localNotifs) {
             await setDoc(notifRef, localNotifs, { merge: true });
           }
@@ -314,6 +308,8 @@ export function SettingsScreen() {
         }
       } else {
         setPlexToken(null);
+        setUserPlatforms([]);
+        setNotificationPrefs(DEFAULT_NOTIFICATION_PREFS);
       }
     });
 
@@ -368,15 +364,16 @@ export function SettingsScreen() {
       const snap = await getDoc(prefRef);
       if (snap.exists() && Array.isArray(snap.data()?.platforms)) {
         setUserPlatforms(snap.data().platforms);
-        localStorage.setItem('user_platforms', JSON.stringify(snap.data().platforms));
+        writeUserScopedJson(user.uid, 'platforms', snap.data().platforms);
       }
 
       // Recharger notifications
       const notifRef = doc(db, 'users', user.uid, 'settings', 'notifications');
       const snapNotif = await getDoc(notifRef);
       if (snapNotif.exists()) {
-        setNotificationPrefs(snapNotif.data());
-        localStorage.setItem('user_notifications', JSON.stringify(snapNotif.data()));
+        const cloudNotifs = { ...DEFAULT_NOTIFICATION_PREFS, ...snapNotif.data() };
+        setNotificationPrefs(cloudNotifs);
+        writeUserScopedJson(user.uid, 'notifications', cloudNotifs);
       }
 
       // Recharger Plex
@@ -432,7 +429,7 @@ export function SettingsScreen() {
       : [...userPlatforms, id];
     
     setUserPlatforms(newPlatforms);
-    localStorage.setItem('user_platforms', JSON.stringify(newPlatforms));
+    writeUserScopedJson(auth.currentUser?.uid, 'platforms', newPlatforms);
     window.dispatchEvent(new Event('storage'));
 
     if (auth.currentUser) {

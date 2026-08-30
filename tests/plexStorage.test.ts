@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   activatePlexUserScope,
+  compactPlexResolutionCache,
   getPlexLastSyncTimestamp,
   getStoredPlexToken,
+  mergePlexResolutionCaches,
   setPlexLastSyncTimestamp,
   storePlexCredentials
 } from '../src/features/plex/plexStorage.ts';
@@ -30,6 +32,23 @@ class MemoryStorage {
 
 test.beforeEach(() => {
   (globalThis as any).localStorage = new MemoryStorage();
+});
+
+test('compacte et fusionne le cache de résolution Plex partagé sans champs lourds', () => {
+  const local = {
+    'tv:plex:one': { id: 1, name: 'Série', overview: 'très long', poster_path: '/one.jpg' }
+  };
+  const cloud = {
+    'movie:plex:two': { id: 2, title: 'Film', videos: { results: [1, 2, 3] } }
+  };
+
+  assert.deepEqual(compactPlexResolutionCache(local), {
+    'tv:plex:one': { id: 1, name: 'Série', poster_path: '/one.jpg' }
+  });
+  assert.deepEqual(mergePlexResolutionCaches(local, cloud), {
+    'tv:plex:one': { id: 1, name: 'Série', poster_path: '/one.jpg' },
+    'movie:plex:two': { id: 2, title: 'Film' }
+  });
 });
 
 test('isole le jeton et le curseur Plex par UID SeenIt', () => {

@@ -5,6 +5,7 @@ import { X, Ban, CheckCircle, Sparkles, Calendar, Tv, Eye, Layers, Flag, Play, C
 import { useShowsStore } from '../store/showsStore';
 import { tmdb } from '../features/shows/tmdb';
 import { TrailerModal } from './TrailerModal';
+import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
 
 export interface ShowNews {
   id: string;
@@ -26,14 +27,9 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
   const [news, setNews] = useState<ShowNews[]>([]);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
-  const [readNewsIds, setReadNewsIds] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('read_news_ids') || localStorage.getItem('dismissed_news');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [readNewsIds, setReadNewsIds] = useState<string[]>(() =>
+    readUserScopedJson<string[]>(auth.currentUser?.uid, 'read_news_ids', [])
+  );
 
   const [selectedNews, setSelectedNews] = useState<ShowNews | null>(null);
   const [newsTrailerVideos, setNewsTrailerVideos] = useState<any[] | null>(null);
@@ -41,7 +37,10 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
 
   // Sync auth state
   useEffect(() => {
-    const unsub = auth.onAuthStateChanged((u) => setCurrentUser(u));
+    const unsub = auth.onAuthStateChanged((u) => {
+      setCurrentUser(u);
+      setReadNewsIds(readUserScopedJson<string[]>(u?.uid, 'read_news_ids', []));
+    });
     return () => unsub();
   }, []);
 
@@ -55,10 +54,7 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
         if (Array.isArray(firestoreReadIds)) {
           setReadNewsIds((prev) => {
             const merged = Array.from(new Set([...prev, ...firestoreReadIds]));
-            try {
-              localStorage.setItem('read_news_ids', JSON.stringify(merged));
-              localStorage.setItem('dismissed_news', JSON.stringify(merged));
-            } catch {}
+            writeUserScopedJson(currentUser.uid, 'read_news_ids', merged);
             return merged;
           });
         }
@@ -164,12 +160,7 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
   const markNewsAsRead = async (newsId: string) => {
     const updated = Array.from(new Set([...readNewsIds, newsId]));
     setReadNewsIds(updated);
-    try {
-      localStorage.setItem('read_news_ids', JSON.stringify(updated));
-      localStorage.setItem('dismissed_news', JSON.stringify(updated));
-    } catch (e) {
-      console.error(e);
-    }
+    writeUserScopedJson(currentUser?.uid, 'read_news_ids', updated);
     setSelectedNews(null);
 
     if (currentUser) {
