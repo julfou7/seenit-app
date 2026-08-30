@@ -27,8 +27,18 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Apply patch
-        run: node scripts/patch-download-physical-dedupe.cjs
+      - name: Preserve qBittorrent status during transient misses
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = 'src/store/liveDownloadStore.ts';
+          let content = fs.readFileSync(path, 'utf8');
+          const before = `                if (localMatch.timeleftSeconds) serverItem.timeleftSeconds = localMatch.timeleftSeconds;\n                if (localMatch.timeleft) serverItem.timeleft = localMatch.timeleft;\n              }`;
+          const after = `                if (localMatch.timeleftSeconds) serverItem.timeleftSeconds = localMatch.timeleftSeconds;\n                if (localMatch.timeleft) serverItem.timeleft = localMatch.timeleft;\n                if (serverItem.status !== 'error' && localMatch.status !== 'error') {\n                  serverItem.status = localMatch.status;\n                  serverItem.statusText = localMatch.statusText;\n                  serverItem.downloadClient = localMatch.downloadClient || serverItem.downloadClient;\n                }\n              }`;
+          if (!content.includes(before)) throw new Error('Bloc de préservation introuvable');
+          content = content.replace(before, after);
+          fs.writeFileSync(path, content);
+          NODE
 
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
@@ -49,16 +59,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            src/services/sonarrRadarr.ts \
-            src/store/liveDownloadStore.ts \
-            src/features/downloads/downloadIdentity.ts \
-            tests/downloadIdentity.test.ts \
-            src/store/updateStore.ts \
-            android/app/build.gradle
+          git add src/store/liveDownloadStore.ts
           if git diff --cached --quiet; then
             echo "No generated changes"
             exit 0
           fi
-          git commit -m "fix(downloads): dédupliquer Radarr et qBittorrent par hash" -m "- utilise downloadId/hash comme identité physique du torrent\n- conserve les métadonnées Radarr et la télémétrie qBittorrent\n- évite le double affichage sur les titres localisés\n- empêche la progression de reculer si qBittorrent répond temporairement mal\n- publie SeenIt 1.4.54"
+          git commit -m "fix(downloads): stabiliser l’état qBittorrent entre deux polls" -m "Conserve progression, statut et client connus lorsqu’un poll qBittorrent est momentanément manquant."
           git push origin HEAD:fix/download-physical-dedupe-1.4.54
