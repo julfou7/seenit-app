@@ -1,7 +1,46 @@
+export interface PlexServerSyncEntry {
+  id?: string;
+  name: string;
+  watchedItems?: number;
+  inventoryItems?: number;
+  reason?: string;
+}
+
 export interface PlexCollectionIntegrity {
   collectionComplete?: boolean;
+  libraryInventoryScanSucceeded?: boolean;
   libraryInventoryScanComplete?: boolean;
   incompleteSources?: string[];
+  syncedServers?: PlexServerSyncEntry[];
+  skippedServers?: PlexServerSyncEntry[];
+}
+
+export function evaluatePlexSourceCompletion(params: {
+  delta: boolean;
+  serverCount: number;
+  completeInventoryServers: number;
+  completeHistoryServers: number;
+  accountHistoryAvailable: boolean;
+  cloudCollectionSucceeded: boolean;
+}): {
+  libraryInventoryScanSucceeded: boolean;
+  libraryInventoryScanComplete: boolean;
+  historyCollectionComplete: boolean;
+} {
+  const libraryInventoryScanComplete = !params.delta &&
+    params.completeInventoryServers === params.serverCount;
+  const libraryInventoryScanSucceeded = !params.delta &&
+    (params.completeInventoryServers > 0 || params.serverCount === 0);
+  const pmsHistoryFallbackSucceeded = params.completeHistoryServers > 0;
+  const historyCollectionComplete = params.delta
+    ? params.cloudCollectionSucceeded || pmsHistoryFallbackSucceeded
+    : params.accountHistoryAvailable || pmsHistoryFallbackSucceeded;
+
+  return {
+    libraryInventoryScanSucceeded,
+    libraryInventoryScanComplete,
+    historyCollectionComplete
+  };
 }
 
 export function isPermanentPlexResolutionMiss(error: unknown): boolean {
@@ -17,7 +56,39 @@ export function shouldReplacePlexAvailabilityCache(
   delta: boolean,
   integrity?: PlexCollectionIntegrity | null
 ): boolean {
-  return !delta && integrity?.libraryInventoryScanComplete === true;
+  return !delta && integrity?.libraryInventoryScanSucceeded === true;
+}
+
+export function describePlexServerSync(
+  integrity?: PlexCollectionIntegrity | null
+): string {
+  const syncedServers = Array.isArray(integrity?.syncedServers)
+    ? integrity.syncedServers.filter((server) => server?.name)
+    : [];
+  const skippedServers = Array.isArray(integrity?.skippedServers)
+    ? integrity.skippedServers.filter((server) => server?.name)
+    : [];
+  const parts: string[] = [];
+
+  if (syncedServers.length > 0) {
+    parts.push(`Synchronisés : ${syncedServers.map((server) => server.name).join(', ')}`);
+  }
+  if (skippedServers.length > 0) {
+    parts.push(`Ignorés : ${skippedServers.map((server) => (
+      server.reason ? `${server.name} (${server.reason})` : server.name
+    )).join(', ')}`);
+  }
+
+  return parts.join(' • ');
+}
+
+export function getPlexServerSyncCounts(
+  integrity?: PlexCollectionIntegrity | null
+): { synced: number; skipped: number } {
+  return {
+    synced: Array.isArray(integrity?.syncedServers) ? integrity.syncedServers.length : 0,
+    skipped: Array.isArray(integrity?.skippedServers) ? integrity.skippedServers.length : 0
+  };
 }
 
 export function shouldCommitPlexCursor(params: {

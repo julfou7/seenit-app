@@ -34,6 +34,8 @@ import {
 import { getPlexMediaKey, usePlexAvailabilityStore } from './plexAvailability';
 import {
   describeIncompletePlexSync,
+  describePlexServerSync,
+  getPlexServerSyncCounts,
   isPermanentPlexResolutionMiss,
   shouldCommitPlexCursor,
   shouldReplacePlexAvailabilityCache
@@ -647,6 +649,11 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       }
       const { history = [], watchlist = [], libraryAvailability = [], visitedSources = [] } = plexData || {};
       const nextSyncCursor = Number(plexData?.cursor) || Date.now();
+      const serverSyncSummary = describePlexServerSync(plexData?.integrity);
+      const serverSyncCounts = getPlexServerSyncCounts(plexData?.integrity);
+      const completedServerStatus = serverSyncCounts.synced > 0 || serverSyncCounts.skipped > 0
+        ? `Sync Plex terminée • ${serverSyncCounts.synced} serveur(s), ${serverSyncCounts.skipped} ignoré(s)`
+        : 'Sync Plex terminée';
 
       if (shouldReplacePlexAvailabilityCache(delta, plexData?.integrity)) {
         const availabilityStore = usePlexAvailabilityStore.getState();
@@ -699,7 +706,16 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           return { success: false, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [], error: reason };
         }
         setPlexLastSyncTimestamp(user.uid, nextSyncCursor);
-        clearPlexSyncStatusDelayed('Sync Plex terminée (à jour)', 3500);
+        clearPlexSyncStatusDelayed(`${completedServerStatus} • à jour`, 5000);
+        if (!silent && serverSyncSummary) {
+          useToastStore.getState().showToast(
+            `Synchronisation Plex terminée • ${serverSyncSummary}`,
+            'success',
+            undefined,
+            undefined,
+            7000
+          );
+        }
         return { success: true, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [] };
       }
 
@@ -1354,6 +1370,16 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       });
       if (canCommitCursor) {
         setPlexLastSyncTimestamp(user.uid, nextSyncCursor);
+        clearPlexSyncStatusDelayed(completedServerStatus, 5000);
+        if (!silent && serverSyncSummary) {
+          useToastStore.getState().showToast(
+            `Synchronisation Plex terminée • ${serverSyncSummary}`,
+            'success',
+            undefined,
+            undefined,
+            7000
+          );
+        }
       } else {
         const reason = describeIncompletePlexSync(plexData?.integrity, retryableUnresolvedCount);
         appLogger.warn('plex', `[Plex Sync] Curseur conservé pour permettre un nouvel essai : ${reason}.`);

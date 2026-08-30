@@ -26,6 +26,7 @@ import {
   PLEX_ACCOUNT_HISTORY_MINIMAL_QUERY,
   PLEX_ACCOUNT_HISTORY_QUERY
 } from "./src/features/plex/plexAccountHistory.ts";
+import { evaluatePlexSourceCompletion } from "./src/features/plex/plexSyncIntegrity.ts";
 
 export interface AuthRequest extends Request {
   user?: DecodedIdToken;
@@ -446,7 +447,7 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.61',
+        'X-Plex-Version': '1.4.63',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
@@ -1138,15 +1139,25 @@ async function startServer() {
       const usePmsHistoryInFull = !delta && !accountHistoryAvailable;
       let completeInventoryServers = 0;
       let completeHistoryServers = 0;
+      const syncedServers: Array<{ id: string; name: string; watchedItems: number; inventoryItems: number }> = [];
+      const skippedServers: Array<{ id: string; name: string; reason: string }> = [];
+
+      const describeServerFailure = (message: unknown): string => {
+        const normalized = String(message || '').toLowerCase();
+        if (/abort|timeout|timed out|délai/.test(normalized)) return 'hors ligne ou délai dépassé';
+        return 'inaccessible';
+      };
 
       for (const server of servers) {
         const serverName = server.name || 'Serveur Plex';
+        const serverId = String(server.clientIdentifier || serverName);
         const serverAccessToken = server.accessToken || token;
         const connections = server.connections || [];
         let serverItemCount = 0;
         let serverInventoryCount = 0;
-        let serverHistoryComplete = !delta && !usePmsHistoryInFull;
-        let serverInventoryComplete = delta;
+        let serverHistoryComplete = false;
+        let serverInventoryComplete = false;
+        let lastFailure: unknown = 'aucune connexion disponible';
 
         const sortedConnections = [...connections].sort((a: any, b: any) => {
           const aIsRemote = !a.local && (a.uri || '').startsWith('https://');
@@ -1181,7 +1192,12 @@ async function startServer() {
           if (!uri) continue;
           if (isPrivateOrLocalUri(uri) && hasRemoteConnection) continue;
 
-          let connectionSuccess = false;
+          const connectionRawItems: any[] = [];
+          const connectionAvailabilityItems: any[] = [];
+          const connectionLibraryGuids = new Set<string>();
+          let connectionHistoryComplete = !delta && !usePmsHistoryInFull;
+          let connectionInventoryComplete = delta;
+          let connectionInventoryCount = 0;
           let historyFoundOnConnection = 0;
 
           if (delta || usePmsHistoryInFull) {
@@ -1193,25 +1209,23 @@ async function startServer() {
                 50,
                 delta ? Number(since) || undefined : undefined
               );
-              serverHistoryComplete = true;
-              connectionSuccess = true;
+              connectionHistoryComplete = true;
               if (items.length > 0) {
                 for (const it of items) {
-                  allRawItems.push({
+                  connectionRawItems.push({
                     raw: it,
                     source: serverName,
                     sourceKind: 'pms-history',
                     serverName,
-                    serverId: server.clientIdentifier,
+                    serverId,
                     serverUri: uri,
                     serverToken: serverAccessToken
                   });
                 }
                 historyFoundOnConnection = items.length;
-                sourceStats.pmsHistoryItems += items.length;
-                serverItemCount += items.length;
               }
             } catch (error: any) {
+              lastFailure = error?.message || error;
               console.log(`[Plex Sync] Historique PMS inaccessible sur ${serverName}: ${error?.message || error}`);
             }
           }
@@ -1227,29 +1241,28 @@ async function startServer() {
                 10,
                 Number(since) || undefined
               );
-              serverHistoryComplete = true;
-              connectionSuccess = true;
+              connectionHistoryComplete = true;
               if (items.length > 0) {
                 for (const it of items) {
-                  allRawItems.push({
+                  connectionRawItems.push({
                     raw: it,
                     source: serverName,
                     sourceKind: 'pms-recent-fallback',
                     serverName,
-                    serverId: server.clientIdentifier,
+                    serverId,
                     serverUri: uri,
                     serverToken: serverAccessToken
                   });
                 }
-                serverItemCount += items.length;
               }
             } catch (error: any) {
+              lastFailure = error?.message || error;
               console.log(`[Plex Sync] Recently viewed inaccessible sur ${serverName}: ${error?.message || error}`);
             }
           }
 
           if (!delta) {
-            let connectionInventoryComplete = true;
+            connectionInventoryComplete = true;
             try {
               const sectionsRes = await fetch(`${uri}/library/sections`, {
                 headers: { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
@@ -1280,29 +1293,27 @@ async function startServer() {
                       );
 
                       for (const movie of movies) {
-                        if (typeof movie?.guid === 'string' && movie.guid) currentLibraryGuids.add(movie.guid);
-                        libraryAvailabilityItems.push({ raw: movie, serverName, serverId: server.clientIdentifier });
+                        if (typeof movie?.guid === 'string' && movie.guid) connectionLibraryGuids.add(movie.guid);
+                        connectionAvailabilityItems.push({ raw: movie, serverName, serverId });
                       }
-                      sourceStats.libraryInventoryItems += movies.length;
-                      serverInventoryCount += movies.length;
+                      connectionInventoryCount += movies.length;
 
                       const watchedMovies = movies.filter(isPlexLibraryItemWatched);
                       for (const movie of watchedMovies) {
-                        allRawItems.push({
+                        connectionRawItems.push({
                           raw: movie,
                           source: sourceName,
                           sourceKind: 'library-watched',
                           availableOnServer: true,
                           serverName,
-                          serverId: server.clientIdentifier,
+                          serverId,
                           serverUri: uri,
                           serverToken: serverAccessToken
                         });
                       }
-                      sourceStats.libraryWatchedItems += watchedMovies.length;
-                      serverItemCount += watchedMovies.length;
                     } catch (error: any) {
                       connectionInventoryComplete = false;
+                      lastFailure = error?.message || error;
                       console.log(`[Plex Sync] Movie section ${secKey} skipped on ${serverName}: ${error?.message || error}`);
                     }
                   }
@@ -1317,13 +1328,13 @@ async function startServer() {
                         100
                       );
                       for (const show of shows) {
-                        if (typeof show?.guid === 'string' && show.guid) currentLibraryGuids.add(show.guid);
-                        libraryAvailabilityItems.push({ raw: show, serverName, serverId: server.clientIdentifier });
+                        if (typeof show?.guid === 'string' && show.guid) connectionLibraryGuids.add(show.guid);
+                        connectionAvailabilityItems.push({ raw: show, serverName, serverId });
                       }
-                      sourceStats.libraryInventoryItems += shows.length;
-                      serverInventoryCount += shows.length;
+                      connectionInventoryCount += shows.length;
                     } catch (error: any) {
                       connectionInventoryComplete = false;
+                      lastFailure = error?.message || error;
                       console.log(`[Plex Sync] Show inventory section ${secKey} skipped on ${serverName}: ${error?.message || error}`);
                     }
 
@@ -1337,69 +1348,104 @@ async function startServer() {
                         200
                       );
                       for (const episode of episodes) {
-                        if (typeof episode?.guid === 'string' && episode.guid) currentLibraryGuids.add(episode.guid);
+                        if (typeof episode?.guid === 'string' && episode.guid) connectionLibraryGuids.add(episode.guid);
                       }
 
                       const watchedEpisodes = episodes.filter(isPlexLibraryItemWatched);
                       for (const episode of watchedEpisodes) {
-                        allRawItems.push({
+                        connectionRawItems.push({
                           raw: episode,
                           source: sourceName,
                           sourceKind: 'library-watched',
                           availableOnServer: true,
                           serverName,
-                          serverId: server.clientIdentifier,
+                          serverId,
                           serverUri: uri,
                           serverToken: serverAccessToken
                         });
                       }
-                      sourceStats.libraryWatchedItems += watchedEpisodes.length;
-                      serverItemCount += watchedEpisodes.length;
                     } catch (error: any) {
                       connectionInventoryComplete = false;
+                      lastFailure = error?.message || error;
                       console.log(`[Plex Sync] Episode inventory section ${secKey} skipped on ${serverName}: ${error?.message || error}`);
                     }
                   }
                 }
 
                 if (connectionInventoryComplete) {
-                  serverInventoryComplete = true;
-                  connectionSuccess = true;
+                  connectionInventoryComplete = true;
                 }
               }
             } catch (error: any) {
               connectionInventoryComplete = false;
+              lastFailure = error?.message || error;
               console.log(`[Plex Sync] Inventaire inaccessible sur ${serverName}: ${error?.message || error}`);
             }
           }
 
           const requiredConnectionComplete = delta
-            ? serverHistoryComplete
-            : serverInventoryComplete && serverHistoryComplete;
-          if (connectionSuccess && requiredConnectionComplete) {
+            ? connectionHistoryComplete
+            : connectionInventoryComplete && connectionHistoryComplete;
+          if (requiredConnectionComplete) {
+            serverHistoryComplete = connectionHistoryComplete;
+            serverInventoryComplete = connectionInventoryComplete;
+            const historyItems = connectionRawItems.filter((entry) => (
+              entry.sourceKind === 'pms-history' || entry.sourceKind === 'pms-recent-fallback'
+            ));
+            const libraryItems = connectionRawItems.filter((entry) => entry.sourceKind === 'library-watched');
+
+            allRawItems.push(...historyItems);
+            sourceStats.pmsHistoryItems += historyItems.filter((entry) => entry.sourceKind === 'pms-history').length;
+
+            if (!delta) {
+              allRawItems.push(...libraryItems);
+              libraryAvailabilityItems.push(...connectionAvailabilityItems);
+              connectionLibraryGuids.forEach((guid) => currentLibraryGuids.add(guid));
+              sourceStats.libraryInventoryItems += connectionInventoryCount;
+              sourceStats.libraryWatchedItems += libraryItems.length;
+            }
+
+            serverItemCount = historyItems.length + libraryItems.length;
+            serverInventoryCount = connectionInventoryCount;
             visitedSources.push(`${serverName} (${serverItemCount} vu(s), ${serverInventoryCount} média(s) indexé(s))`);
             break;
           }
         }
 
         if (serverHistoryComplete) completeHistoryServers++;
-        if (!delta && !serverInventoryComplete) {
-          incompleteSources.add(`inventaire serveur ${serverName}`);
-        }
         if (!delta && serverInventoryComplete) {
           completeInventoryServers++;
         }
+
+        const serverSucceeded = delta ? serverHistoryComplete : serverInventoryComplete && serverHistoryComplete;
+        if (serverSucceeded) {
+          syncedServers.push({
+            id: serverId,
+            name: serverName,
+            watchedItems: serverItemCount,
+            inventoryItems: serverInventoryCount
+          });
+        } else {
+          skippedServers.push({
+            id: serverId,
+            name: serverName,
+            reason: describeServerFailure(lastFailure)
+          });
+        }
       }
 
-      sourceStats.libraryInventoryScanComplete = !delta && completeInventoryServers === servers.length;
-      sourceStats.libraryInventoryScanSucceeded = sourceStats.libraryInventoryScanComplete;
-
-      const pmsHistoryFallbackComplete = servers.length > 0 && completeHistoryServers === servers.length;
-      const historyCollectionComplete = delta
-        ? (cloudCollectionSucceeded || pmsHistoryFallbackComplete)
-        : (accountHistoryAvailable || pmsHistoryFallbackComplete);
-      sourceStats.historyCollectionComplete = historyCollectionComplete;
-      if (!historyCollectionComplete) {
+      const sourceCompletion = evaluatePlexSourceCompletion({
+        delta,
+        serverCount: servers.length,
+        completeInventoryServers,
+        completeHistoryServers,
+        accountHistoryAvailable,
+        cloudCollectionSucceeded
+      });
+      sourceStats.libraryInventoryScanComplete = sourceCompletion.libraryInventoryScanComplete;
+      sourceStats.libraryInventoryScanSucceeded = sourceCompletion.libraryInventoryScanSucceeded;
+      sourceStats.historyCollectionComplete = sourceCompletion.historyCollectionComplete;
+      if (!sourceCompletion.historyCollectionComplete) {
         incompleteSources.add(delta ? 'historique récent Plex' : 'historique complet Plex');
       }
 
@@ -1752,11 +1798,18 @@ async function startServer() {
       };
       const integrity = {
         collectionComplete: incompleteSources.size === 0,
+        libraryInventoryScanSucceeded: sourceStats.libraryInventoryScanSucceeded,
         libraryInventoryScanComplete: sourceStats.libraryInventoryScanComplete,
-        incompleteSources: [...incompleteSources]
+        incompleteSources: [...incompleteSources],
+        syncedServers,
+        skippedServers
       };
 
       console.log(`[Plex Sync] Returning ${normalizedHistory.length} history items, ${normalizedWatchlist.length} watchlist items and ${normalizedLibraryAvailability.length} availability item(s).`);
+      console.log(
+        `[Plex Sync] Serveurs synchronisés: ${syncedServers.map((server) => server.name).join(', ') || 'aucun'}; ` +
+        `ignorés: ${skippedServers.map((server) => `${server.name} (${server.reason})`).join(', ') || 'aucun'}.`
+      );
       if (!integrity.collectionComplete) {
         console.warn(`[Plex Sync] Collecte incomplète, curseur non validable : ${integrity.incompleteSources.join(', ')}`);
       }
