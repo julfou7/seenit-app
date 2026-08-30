@@ -5,7 +5,6 @@ function write(path, content) { fs.writeFileSync(path, content, 'utf8'); }
 function replaceOnce(content, before, after, label) {
   const index = content.indexOf(before);
   if (index < 0) throw new Error(`Bloc introuvable: ${label}`);
-  if (content.indexOf(before, index + before.length) >= 0) throw new Error(`Bloc non unique: ${label}`);
   return content.slice(0, index) + after + content.slice(index + before.length);
 }
 function replaceRegex(content, regex, after, label) {

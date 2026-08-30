@@ -7,6 +7,7 @@ import { App as CapApp } from '@capacitor/app';
 import { useDownloadConfigStore } from './downloadConfigStore';
 import {
   fetchLiveDownloadsQueue,
+  getLastLiveDownloadSourceHealth,
   type LiveDownloadItem,
   matchShowDownload,
   matchMovieDownload,
@@ -16,7 +17,8 @@ import {
 import { useToastStore } from './toastStore';
 import { useShowsStore } from './showsStore';
 import { auth } from '../lib/firebase';
-import { getPhysicalDownloadId, getStrongPhysicalDownloadIds, hasConflictingStrongPhysicalIds, mergeDownloadIdAliases, sameLegacyPhysicalTransfer, samePhysicalDownload } from '../features/downloads/downloadIdentity';
+import { getPhysicalDownloadId, getStrongPhysicalDownloadIds, hasConflictingStrongPhysicalIds, mergeDownloadIdAliases, sameLegacyPhysicalTransfer, samePhysicalDownload, sameTransferPath } from '../features/downloads/downloadIdentity';
+import { fetchRecentDownloadHistory, resolveDownloadHistoryOutcome } from '../features/downloads/downloadHistory';
 
 interface LiveDownloadState {
   downloads: LiveDownloadItem[];
@@ -48,7 +50,8 @@ const optimisticTimestamps: Record<string, number> = {};
 const missingSince: Record<string, number> = {};
 const OPTIMISTIC_TTL_MS = 120_000;
 const OPTIMISTIC_ERROR_TTL_MS = 60_000;
-const MISSING_WARNING_DELAY_MS = 30_000;
+const MISSING_GRACE_MS = 10_000;
+const MISSING_WARNING_DELAY_MS = 20_000;
 
 async function checkAndRequestNotificationPermission() {
   if (!Capacitor.isNativePlatform()) return false;
@@ -100,30 +103,38 @@ function sameRequestScope(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
     && (a.episodeNumber ?? null) === (b.episodeNumber ?? null);
 }
 
+function isTerminalDownload(item: LiveDownloadItem): boolean {
+  return item.status === 'completed' || Number(item.progress || 0) >= 100;
+}
+
 function sameDownloadIdentity(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
   if (a.id === b.id) return true;
-
   if (samePhysicalDownload(a, b)) return true;
-  // Deux vrais infohash incompatibles = deux torrents différents. Un identifiant
-  // temporaire/non-hash de *Arr ne doit en revanche pas bloquer les autres signaux.
+
+  // Deux vrais torrents différents restent distincts, même s'ils concernent le même film.
   if (hasConflictingStrongPhysicalIds(a, b)) return false;
+  if (sameTransferPath(a, b)) return true;
 
   const aResolution = resolutionBucket(a);
   const bResolution = resolutionBucket(b);
   if (aResolution && bResolution && aResolution !== bResolution) return false;
 
-  // Compatibilité avec les doublons persistés avant l'introduction du hash :
-  // même release + même taille, tant qu'au moins une des deux représentations
-  // ne possède pas encore d'identité physique.
   if (sameLegacyPhysicalTransfer(a, b)) return true;
 
+  // Un transfert terminé ne doit jamais absorber un nouveau re-téléchargement du
+  // même média simplement parce que le TMDB est identique.
+  if (isTerminalDownload(a) !== isTerminalDownload(b)) return false;
   if (!sameCanonicalMedia(a, b)) return false;
 
   if (a.mediaType === 'tv') {
     if (a.seasonNumber != null && b.seasonNumber != null && a.seasonNumber !== b.seasonNumber) return false;
     if (a.episodeNumber != null && b.episodeNumber != null && a.episodeNumber !== b.episodeNumber) return false;
   }
-  return true;
+
+  // Le fallback canonique sert uniquement à raccrocher une intention SeenIt ou un
+  // état réhydraté. Deux snapshots distants sans identité physique commune ne sont
+  // jamais fusionnés sur le seul titre/TMDB.
+  return Boolean(a.isOptimistic || b.isOptimistic || a.isRestored || b.isRestored);
 }
 
 function sendLocalNotification(title: string, body: string, isSuccess = false) {
@@ -199,6 +210,9 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           releaseTitle: item.releaseTitle || item.title,
           downloadId: item.downloadId,
           downloadIdAliases: item.downloadIdAliases,
+          transferPath: item.transferPath,
+          addedAt: item.addedAt || Date.now(),
+          isRestored: false,
           isOptimistic: true
         };
 
@@ -280,6 +294,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             qbittorrentPassword: config.qbittorrentPassword
           });
 
+          const sourceHealth = getLastLiveDownloadSourceHealth();
           const rawIds = new Set(rawServerItems.map(item => item.id));
           const prunedRemovedIds = (get().removedIds || []).filter(id => rawIds.has(id));
           const removedSet = new Set(prunedRemovedIds);
@@ -296,6 +311,9 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               if (!serverItem.tmdbId && localMatch.tmdbId) serverItem.tmdbId = localMatch.tmdbId;
               if (!serverItem.tvdbId && localMatch.tvdbId) serverItem.tvdbId = localMatch.tvdbId;
               if (!serverItem.quality && localMatch.quality) serverItem.quality = localMatch.quality;
+              if (!serverItem.transferPath && localMatch.transferPath) serverItem.transferPath = localMatch.transferPath;
+              if (!serverItem.addedAt && localMatch.addedAt) serverItem.addedAt = localMatch.addedAt;
+              serverItem.isRestored = false;
               // Une même entrée *Arr peut temporairement changer/perdre son downloadId.
               // On garde l'historique des alias appris sur les polls précédents afin que
               // le torrent qBittorrent reste rattaché sans clignotement 1 → 2 → 1.
@@ -304,7 +322,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
 
               // Si qBittorrent est momentanément indisponible, ne jamais faire reculer
               // la progression physique connue au poll précédent.
-              if (samePhysicalDownload(localMatch, serverItem)
+              if ((samePhysicalDownload(localMatch, serverItem) || sameTransferPath(localMatch, serverItem) || sameLegacyPhysicalTransfer(localMatch, serverItem))
                   && Number(localMatch.progress || 0) > Number(serverItem.progress || 0)) {
                 serverItem.progress = localMatch.progress;
                 if (localMatch.size > 0) serverItem.size = localMatch.size;
@@ -371,12 +389,30 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             }
           }
 
+          const missingActiveItems = currentDownloads.filter(oldItem =>
+            !oldItem.isOptimistic
+            && !removedSet.has(oldItem.id)
+            && !isTerminalDownload(oldItem)
+            && !serverItems.some(serverItem => sameDownloadIdentity(oldItem, serverItem))
+          );
+          const historySnapshot = missingActiveItems.length > 0
+            ? await fetchRecentDownloadHistory({
+                sonarrUrl: config.sonarrUrl,
+                sonarrApiKey: config.sonarrApiKey,
+                radarrUrl: config.radarrUrl,
+                radarrApiKey: config.radarrApiKey,
+                qbittorrentUrl: config.qbittorrentUrl,
+                qbittorrentUsername: config.qbittorrentUsername,
+                qbittorrentPassword: config.qbittorrentPassword
+              })
+            : null;
+
           const preservedItems: LiveDownloadItem[] = [];
           for (const oldItem of currentDownloads) {
             if (oldItem.isOptimistic || removedSet.has(oldItem.id)) continue;
             if (serverItems.some(serverItem => sameDownloadIdentity(oldItem, serverItem))) continue;
 
-            if (oldItem.status === 'completed' || oldItem.progress >= 100) {
+            if (isTerminalDownload(oldItem)) {
               preservedItems.push({
                 ...oldItem,
                 progress: 100,
@@ -386,19 +422,73 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
                 speedBytesPerSec: 0,
                 speedFormatted: '',
                 timeleft: '',
-                timeleftSeconds: 0
+                timeleftSeconds: 0,
+                isRestored: false
+              });
+              continue;
+            }
+
+            const historyOutcome = historySnapshot
+              ? resolveDownloadHistoryOutcome(oldItem, historySnapshot)
+              : { state: 'unknown' as const };
+
+            if (historyOutcome.state === 'completed') {
+              delete missingSince[oldItem.id];
+              preservedItems.push({
+                ...oldItem,
+                quality: historyOutcome.quality || oldItem.quality,
+                progress: 100,
+                status: 'completed',
+                statusText: 'Téléchargement terminé 🍿',
+                errorMessage: undefined,
+                sizeleft: 0,
+                speedBytesPerSec: 0,
+                speedFormatted: '',
+                timeleft: '',
+                timeleftSeconds: 0,
+                isRestored: false
+              });
+              continue;
+            }
+
+            if (historyOutcome.state === 'failed') {
+              delete missingSince[oldItem.id];
+              preservedItems.push({
+                ...oldItem,
+                status: 'error',
+                statusText: 'Téléchargement échoué',
+                errorMessage: historyOutcome.message || 'Le téléchargement a échoué.',
+                speedBytesPerSec: 0,
+                speedFormatted: '',
+                timeleft: '',
+                timeleftSeconds: 0,
+                isRestored: false
               });
               continue;
             }
 
             if (!missingSince[oldItem.id]) missingSince[oldItem.id] = now;
             const missingFor = now - missingSince[oldItem.id];
+            const arrHealth = oldItem.mediaType === 'movie' ? sourceHealth.radarr : sourceHealth.sonarr;
+            const qbitHealth = sourceHealth.qbittorrent;
+            const arrHealthy = !arrHealth.configured || arrHealth.ok;
+            const qbitHealthy = !qbitHealth.configured || qbitHealth.ok;
+            const sourcesHealthy = arrHealthy && qbitHealthy;
+
+            // Si toutes les sources configurées répondent et que l'item n'existe ni
+            // dans les files ni dans l'historique d'import, l'état local est périmé.
+            // On le retire au lieu de ressusciter éternellement un ancien pourcentage.
+            if (sourcesHealthy && missingFor >= MISSING_GRACE_MS) {
+              delete missingSince[oldItem.id];
+              continue;
+            }
+
             preservedItems.push({
               ...oldItem,
-              status: missingFor >= MISSING_WARNING_DELAY_MS ? 'warning' : oldItem.status,
+              status: missingFor >= MISSING_WARNING_DELAY_MS ? 'warning' : 'searching',
               statusText: missingFor >= MISSING_WARNING_DELAY_MS
-                ? 'Source temporairement introuvable • vérification en cours'
-                : 'Synchronisation du téléchargement…',
+                ? 'Connexion au téléchargement interrompue • nouvelle tentative…'
+                : 'Vérification de la fin du téléchargement…',
               speedBytesPerSec: 0,
               speedFormatted: '',
               timeleft: '',
@@ -423,29 +513,37 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           const mergeRepresentations = (a: LiveDownloadItem, b: LiveDownloadItem): LiveDownloadItem => {
             const meta = metadataScore(a) >= metadataScore(b) ? a : b;
             const live = liveScore(a) >= liveScore(b) ? a : b;
-            const hasError = a.status === 'error' || b.status === 'error' || a.errorMessage || b.errorMessage;
-            const errorSource = a.status === 'error' || a.errorMessage ? a : b;
             const aliases = mergeDownloadIdAliases(a, b);
             const strongIds = [...getStrongPhysicalDownloadIds(a), ...getStrongPhysicalDownloadIds(b)];
+            const completed = isTerminalDownload(a) || isTerminalDownload(b);
+            const hasError = !completed && (a.status === 'error' || b.status === 'error' || Boolean(a.errorMessage) || Boolean(b.errorMessage));
+            const errorSource = a.status === 'error' || a.errorMessage ? a : b;
+            const progress = completed ? 100 : Math.max(Number(a.progress || 0), Number(b.progress || 0));
+            const liveWithBestProgress = Number(a.progress || 0) > Number(b.progress || 0) ? a : live;
 
             return {
               ...meta,
               id: meta.id,
               downloadId: strongIds[0] || getPhysicalDownloadId(live) || getPhysicalDownloadId(meta) || undefined,
               downloadIdAliases: aliases,
+              transferPath: meta.transferPath || live.transferPath,
+              addedAt: [a.addedAt, b.addedAt].filter(Boolean).length
+                ? Math.min(...([a.addedAt, b.addedAt].filter(Boolean) as number[]))
+                : undefined,
               releaseTitle: meta.releaseTitle || live.releaseTitle,
-              quality: meta.quality || live.quality,
-              size: live.size > 0 ? live.size : meta.size,
-              sizeleft: live.sizeleft,
-              progress: live.progress,
-              speedBytesPerSec: live.speedBytesPerSec,
-              speedFormatted: live.speedFormatted,
-              timeleft: live.timeleft,
-              timeleftSeconds: live.timeleftSeconds,
-              status: hasError ? errorSource.status : live.status,
-              statusText: hasError ? errorSource.statusText : live.statusText,
-              errorMessage: hasError ? errorSource.errorMessage : undefined,
-              isOptimistic: Boolean(a.isOptimistic && b.isOptimistic)
+              quality: extractQualityFromTitle(meta.releaseTitle || live.releaseTitle, meta.quality || live.quality),
+              size: liveWithBestProgress.size > 0 ? liveWithBestProgress.size : meta.size,
+              sizeleft: completed ? 0 : liveWithBestProgress.sizeleft,
+              progress,
+              speedBytesPerSec: completed ? 0 : live.speedBytesPerSec,
+              speedFormatted: completed ? '' : live.speedFormatted,
+              timeleft: completed ? '' : live.timeleft,
+              timeleftSeconds: completed ? 0 : live.timeleftSeconds,
+              status: completed ? 'completed' : hasError ? errorSource.status : live.status,
+              statusText: completed ? 'Téléchargement terminé 🍿' : hasError ? errorSource.statusText : live.statusText,
+              errorMessage: completed ? undefined : hasError ? errorSource.errorMessage : undefined,
+              isOptimistic: Boolean(a.isOptimistic && b.isOptimistic),
+              isRestored: false
             };
           };
 
@@ -461,12 +559,13 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             finalItems.push(item);
           }
 
-          for (const serverItem of serverItems) {
-            const previous = currentDownloads.find(oldItem => sameDownloadIdentity(oldItem, serverItem));
-            if (serverItem.progress >= 100 && previous && previous.progress < 100 && previous.status !== 'completed') {
+          for (const finalItem of finalItems) {
+            if (!isTerminalDownload(finalItem)) continue;
+            const previous = currentDownloads.find(oldItem => sameDownloadIdentity(oldItem, finalItem));
+            if (previous && !isTerminalDownload(previous)) {
               sendLocalNotification(
                 'Téléchargement terminé 🍿',
-                `Le téléchargement de "${serverItem.title}" est terminé !`,
+                `Le téléchargement de "${finalItem.title}" est terminé !`,
                 true
               );
             }
@@ -595,9 +694,22 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
       },
 
       getMovieDownload: (tmdbId, movieTitle) => {
-        return (get().downloads || []).find(item =>
+        const matches = (get().downloads || []).filter(item =>
           matchMovieDownload(item, tmdbId, movieTitle)
-        ) || null;
+        );
+        if (!matches.length) return null;
+
+        const score = (item: LiveDownloadItem) => {
+          const active = !isTerminalDownload(item) && item.status !== 'error';
+          const exactTmdb = tmdbId && item.tmdbId && Number(tmdbId) === Number(item.tmdbId);
+          return (active ? 10_000 : 0)
+            + (exactTmdb ? 2_000 : 0)
+            + (item.status === 'downloading' ? 500 : 0)
+            + (item.status === 'warning' ? -200 : 0)
+            + Math.min(100, Number(item.progress || 0));
+        };
+
+        return [...matches].sort((a, b) => score(b) - score(a) || a.id.localeCompare(b.id))[0] || null;
       },
 
       getEpisodeDownload: (tmdbId, tvdbId, season, episode) => {
@@ -623,7 +735,24 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
     {
       name: 'seenit_live_downloads_v3',
       partialize: state => ({
-        downloads: state.downloads,
+        // Un état actif local n'est jamais une vérité après redémarrage. On conserve
+        // son identité/métadonnées mais pas son ancien pourcentage : le prochain poll
+        // le rattache à la file actuelle ou à l'historique d'import.
+        downloads: state.downloads.map(item => isTerminalDownload(item)
+          ? { ...item, isRestored: false }
+          : {
+              ...item,
+              progress: 0,
+              sizeleft: item.size > 0 ? item.size : 0,
+              speedBytesPerSec: 0,
+              speedFormatted: '',
+              timeleft: '',
+              timeleftSeconds: 0,
+              status: 'searching',
+              statusText: 'Synchronisation du téléchargement…',
+              isOptimistic: false,
+              isRestored: true
+            }),
         removedIds: state.removedIds
       })
     }
