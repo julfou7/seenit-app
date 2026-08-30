@@ -25,7 +25,10 @@ jobs:
           cache: npm
 
       - name: Apply patch
-        run: node scripts/patch-download-tracking-cancel-1.4.60.cjs
+        run: |
+          node scripts/patch-download-tracking-cancel-1.4.60.cjs
+          sed -i "/const remote = {/,/};/ s/mediaType: 'movie'/mediaType: 'movie' as const/" tests/downloadIdentity.test.ts
+          sed -i "/const lateOptimistic = {/,/};/ s/mediaType: 'movie'/mediaType: 'movie' as const/" tests/downloadIdentity.test.ts
 
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
