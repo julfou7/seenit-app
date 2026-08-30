@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   ArrowLeft,
@@ -33,6 +33,10 @@ import {
   failDownloadRequest
 } from '../features/downloads/downloadLifecycle';
 import { truncateDownloadProgressPercent } from '../features/downloads/downloadPresentation';
+import {
+  getStableDownloadRenderKey,
+  selectStableDownloadPosterPath
+} from '../features/downloads/downloadPosterStability';
 
 interface Props {
   onShowClick?: (id: any, mediaType?: 'tv' | 'movie') => void;
@@ -88,10 +92,20 @@ function DownloadItemCard({
     : isCompleted
       ? '100%'
       : `${progressPercent}%`;
-  const posterSrc = item.posterPath
-    ? item.posterPath.startsWith('http')
-      ? item.posterPath
-      : `https://image.tmdb.org/t/p/w185${item.posterPath}`
+
+  // La carte garde le poster qu'elle a reçu lors de la demande SeenIt. Grâce à la
+  // clé requestId stable, ce ref survit au remplacement opt_* -> radarr/qbit et le
+  // navigateur n'a plus à démonter/recharger l'image au début du transfert.
+  const lockedPosterPathRef = useRef<string | undefined>(undefined);
+  lockedPosterPathRef.current = selectStableDownloadPosterPath(
+    lockedPosterPathRef.current,
+    item.posterPath
+  );
+  const stablePosterPath = lockedPosterPathRef.current;
+  const posterSrc = stablePosterPath
+    ? stablePosterPath.startsWith('http')
+      ? stablePosterPath
+      : `https://image.tmdb.org/t/p/w185${stablePosterPath}`
     : null;
   const canOpenDetails = Boolean(item.tmdbId && onShowClick);
   const openDetails = () => {
@@ -591,7 +605,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
                 </div>
                 {activeDownloads.map(item => (
                   <DownloadItemCard
-                    key={item.id}
+                    key={getStableDownloadRenderKey(item)}
                     item={item}
                     onShowClick={onShowClick}
                     onRemove={handleRemove}
@@ -617,7 +631,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
                 </div>
                 {completedDownloads.map(item => (
                   <DownloadItemCard
-                    key={item.id}
+                    key={getStableDownloadRenderKey(item)}
                     item={item}
                     onShowClick={onShowClick}
                     onRemove={handleRemove}
