@@ -42,7 +42,7 @@ query GetWatchHistoryHub($uuid: ID = "", $first: PaginationInt!, $after: String)
 }`;
 
 // Fallback volontairement minimal si Plex fait évoluer son schéma GraphQL.
-// Les champs d'identité restent suffisants pour résoudre films/séries par GUID.
+// Les GUID globaux restent suffisants pour résoudre films et séries sans titre.
 export const PLEX_ACCOUNT_HISTORY_MINIMAL_QUERY = `
 query GetWatchHistoryHub($uuid: ID = "", $first: PaginationInt!, $after: String) {
   user(id: $uuid) {
@@ -90,7 +90,6 @@ export function normalizePlexAccountHistoryNode(node: PlexAccountHistoryNode): a
   const grandparent = metadata.grandparent && typeof metadata.grandparent === 'object'
     ? metadata.grandparent
     : null;
-
   const historyId = node?.id ? String(node.id) : null;
 
   return {
@@ -98,17 +97,19 @@ export function normalizePlexAccountHistoryNode(node: PlexAccountHistoryNode): a
     title: metadata.title || '',
     guid: metadata.guid || null,
     key: metadata.key || null,
-    ratingKey: metadata.id || null,
+    // metadataItem.id est un ID GraphQL du compte Plex : ne jamais le confondre
+    // avec un ratingKey LOCAL d'un Plex Media Server.
+    accountMetadataId: metadata.id ? String(metadata.id) : null,
     index: metadata.index !== undefined && metadata.index !== null ? Number(metadata.index) : undefined,
     parentIndex: parent?.index !== undefined && parent?.index !== null ? Number(parent.index) : undefined,
     parentTitle: parent?.title || null,
     parentGuid: parent?.guid || null,
     parentKey: parent?.key || null,
-    parentRatingKey: parent?.id || null,
+    parentAccountMetadataId: parent?.id ? String(parent.id) : null,
     grandparentTitle: grandparent?.title || null,
     grandparentGuid: grandparent?.guid || null,
     grandparentKey: grandparent?.key || null,
-    grandparentRatingKey: grandparent?.id || null,
+    grandparentAccountMetadataId: grandparent?.id ? String(grandparent.id) : null,
     historyKey: historyId ? `community:${historyId}` : null,
     accountHistoryId: historyId
   };
