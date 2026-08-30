@@ -9,7 +9,7 @@ test('normalise un film du Watch History Plex sans utiliser son titre comme iden
   const item = normalizePlexAccountHistoryNode({
     id: 'watch-1',
     metadataItem: {
-      id: 'provider_movie_1',
+      id: 'graphql_movie_1',
       guid: 'plex://movie/provider_movie_1',
       key: '/library/metadata/provider_movie_1',
       type: 'movie',
@@ -18,7 +18,8 @@ test('normalise un film du Watch History Plex sans utiliser son titre comme iden
   });
 
   assert.equal(item?.guid, 'plex://movie/provider_movie_1');
-  assert.equal(item?.ratingKey, 'provider_movie_1');
+  assert.equal(item?.accountMetadataId, 'graphql_movie_1');
+  assert.equal(item?.ratingKey, undefined);
   assert.equal(item?.historyKey, 'community:watch-1');
 });
 
@@ -53,7 +54,8 @@ test('normalise un épisode avec la saison et la série parentes', () => {
   assert.equal(item?.index, 6);
   assert.equal(item?.parentIndex, 1);
   assert.equal(item?.grandparentGuid, 'plex://show/show_1');
-  assert.equal(item?.grandparentRatingKey, 'show_1');
+  assert.equal(item?.grandparentAccountMetadataId, 'show_1');
+  assert.equal(item?.grandparentRatingKey, undefined);
 });
 
 test('le full scan ne retient comme vus que les items dont viewCount est positif', () => {
