@@ -24,6 +24,7 @@ import { RedditSection } from '../components/community/RedditSection';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { LiveDownloadBanner } from '../components/LiveDownloadBanner';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
+import { useMediaPresenceStore } from '../store/mediaPresenceStore';
 import { searchAndDownloadInSonarr, searchAndDownloadInRadarr } from '../services/sonarrRadarr';
 
 
@@ -495,9 +496,21 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     };
   }, [startPolling, stopPolling]);
 
-  const activeDownloads = isSeries
+  const mediaDownloads = isSeries
     ? getShowDownloads(effectiveTmdbId, tmdbDetails?.external_ids?.tvdb_id || (show as any)?.tvdbId, tmdbDetails?.name || show?.title)
     : (getMovieDownload(effectiveTmdbId, tmdbDetails?.title || show?.title) ? [getMovieDownload(effectiveTmdbId, tmdbDetails?.title || show?.title)!] : []);
+
+  const hasActiveDownload = mediaDownloads.some(item =>
+    item.status !== 'completed'
+    && item.status !== 'error'
+    && Number(item.progress || 0) < 100
+  );
+  const hasCompletedDownload = mediaDownloads.some(item =>
+    item.status === 'completed' || Number(item.progress || 0) >= 100
+  );
+  const hasDownloadError = !hasActiveDownload
+    && !hasCompletedDownload
+    && mediaDownloads.some(item => item.status === 'error' || Boolean(item.errorMessage));
 
   // Vérification présence locale (Sonarr / Radarr / Plex)
   const presence = useMediaPresence({
@@ -511,6 +524,55 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   });
 
   const plexMediaInfo = presence.plexInfo || null;
+
+  // Après un import terminé, le cache négatif Plex de 30 s est trop long pour le
+  // parcours principal de SeenIt. Tant que la fiche est ouverte, on force quelques
+  // vérifications rapprochées afin que "Disponible sur Plex" apparaisse dès que le
+  // serveur a indexé le fichier, sans attendre un full scan ou l'expiration du cache.
+  useEffect(() => {
+    if (!hasCompletedDownload || hasActiveDownload || !effectiveTmdbId || plexMediaInfo?.available) return;
+
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
+
+    const refreshPresenceAfterImport = async () => {
+      attempts += 1;
+      const refreshed = await useMediaPresenceStore.getState().checkPresence({
+        tmdbId: effectiveTmdbId,
+        tvdbId: tmdbDetails?.external_ids?.tvdb_id || (show as any)?.tvdbId,
+        imdbId: tmdbDetails?.external_ids?.imdb_id || (show as any)?.imdbId,
+        title,
+        originalTitle: tmdbDetails?.original_title || tmdbDetails?.original_name || (show as any)?.originalTitle,
+        year: releaseYear ? parseInt(releaseYear) : undefined,
+        mediaType: isSeries ? 'tv' : 'movie',
+        forceRefresh: true
+      });
+
+      if (!cancelled && !refreshed.plexInfo?.available && attempts < 4) {
+        retryTimer = setTimeout(() => void refreshPresenceAfterImport(), 4000);
+      }
+    };
+
+    void refreshPresenceAfterImport();
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [
+    hasCompletedDownload,
+    hasActiveDownload,
+    effectiveTmdbId,
+    isSeries,
+    title,
+    releaseYear,
+    tmdbDetails?.external_ids?.tvdb_id,
+    tmdbDetails?.external_ids?.imdb_id,
+    tmdbDetails?.original_title,
+    tmdbDetails?.original_name,
+    show,
+    plexMediaInfo?.available
+  ]);
 
   const openEpisodeModal = (seasonNum: number, ep: any) => {
     setSelectedEpisode({ season: seasonNum, episode: ep });
@@ -2476,10 +2538,34 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
             </div>
           </div>
 
-          {/* Bandeau de téléchargement en direct (Sonarr/Radarr/qBittorrent) */}
-          {activeDownloads.length > 0 && (
+          {/* Statut contextuel uniquement : le détail complet vit dans Téléchargements. */}
+          {mediaDownloads.length > 0 && (
             <div className="mt-4 px-1">
-              <LiveDownloadBanner items={activeDownloads} />
+              <div className={cn(
+                "flex items-center gap-2.5 rounded-2xl border px-3.5 py-3 text-xs font-bold backdrop-blur-md",
+                hasActiveDownload
+                  ? "border-cyan-500/20 bg-cyan-500/[0.08] text-cyan-200"
+                  : hasCompletedDownload
+                    ? "border-emerald-500/20 bg-emerald-500/[0.08] text-emerald-300"
+                    : "border-red-500/20 bg-red-500/[0.08] text-red-300"
+              )}>
+                {hasActiveDownload ? (
+                  <>
+                    <Download size={16} className="shrink-0" />
+                    <span>Téléchargement en cours</span>
+                  </>
+                ) : hasCompletedDownload ? (
+                  <>
+                    <CheckCircle2 size={16} className="shrink-0" />
+                    <span>Téléchargement terminé</span>
+                  </>
+                ) : hasDownloadError ? (
+                  <>
+                    <X size={16} className="shrink-0" />
+                    <span>Téléchargement interrompu</span>
+                  </>
+                ) : null}
+              </div>
             </div>
           )}
         </div>
