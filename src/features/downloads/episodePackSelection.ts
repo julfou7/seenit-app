@@ -135,6 +135,38 @@ export function findExactNewTorrentIds(
   return Array.from(exact);
 }
 
+/**
+ * Choisit l'unique identifiant qu'un nettoyage de sécurité est autorisé à toucher.
+ * La frontière est absolue : tout hash présent avant la demande est exclu, quelle
+ * que soit la preuve Sonarr apparue ensuite.
+ */
+export function chooseExactCleanupTorrentId(
+  exactNewTorrentIds: Array<string | null | undefined>,
+  corroboratedSonarrIds: Array<string | null | undefined>,
+  beforeQbitHashes: Array<string | null | undefined>,
+  releaseHash?: string | null
+): string | null {
+  const before = new Set(
+    (beforeQbitHashes || []).map(normalizeTorrentCorrelationId).filter(Boolean)
+  );
+  const release = normalizeTorrentCorrelationId(releaseHash);
+  if (release && !before.has(release)) return release;
+
+  const exact = Array.from(new Set(
+    (exactNewTorrentIds || [])
+      .map(normalizeTorrentCorrelationId)
+      .filter(id => id && !before.has(id))
+  ));
+  if (exact.length === 1) return exact[0];
+
+  const corroborated = Array.from(new Set(
+    (corroboratedSonarrIds || [])
+      .map(normalizeTorrentCorrelationId)
+      .filter(id => id && !before.has(id))
+  ));
+  return corroborated.length === 1 ? corroborated[0] : null;
+}
+
 function releaseMatchesQuality(release: any, preference?: '1080p' | '4k'): boolean {
   if (!preference) return true;
   const qualityName = release?.quality?.quality?.name || release?.quality?.name || '';

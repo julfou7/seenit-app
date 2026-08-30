@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  chooseExactCleanupTorrentId,
   extractEpisodeRefsFromFileName,
   extractReleaseTorrentHash,
   findExactNewTorrentIds,
@@ -113,4 +114,25 @@ test('laisse l’ambiguïté visible si plusieurs nouveaux IDs exacts existent',
     [],
     null
   )), new Set([first, second]));
+});
+
+
+test('le nettoyage refuse aussi un hash ancien corroboré après coup par Sonarr', () => {
+  const oldHash = '1'.repeat(40);
+  assert.equal(chooseExactCleanupTorrentId(
+    [],
+    [oldHash],
+    [oldHash],
+    oldHash
+  ), null);
+});
+
+test('le nettoyage peut cibler un infohash exact qui n’existait pas avant la demande', () => {
+  const newHash = '2'.repeat(40);
+  assert.equal(chooseExactCleanupTorrentId(
+    [],
+    [],
+    [],
+    newHash
+  ), newHash);
 });

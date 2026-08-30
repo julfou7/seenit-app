@@ -11,6 +11,7 @@ import {
 import { tmdb } from '../shows/tmdb';
 import { normalizeDownloadClientId } from './downloadIdentity';
 import {
+  chooseExactCleanupTorrentId,
   extractReleaseTorrentHash,
   findExactNewTorrentIds,
   hasCompatibleIndividualEpisodeRelease,
@@ -623,13 +624,12 @@ export async function downloadEpisodeWithSeasonPackFallback(
         .map(item => item.downloadId)
         .filter(id => historyDownloadIds.includes(id))
     ));
-    const exactCleanupId = exactNewIds.length === 1
-      ? exactNewIds[0]
-      : corroboratedSonarrIds.length === 1
-        ? corroboratedSonarrIds[0]
-        : releaseHash && !beforeQbitHashes.has(releaseHash)
-          ? releaseHash
-          : null;
+    const exactCleanupId = chooseExactCleanupTorrentId(
+      exactNewIds,
+      corroboratedSonarrIds,
+      Array.from(beforeQbitHashes),
+      releaseHash
+    );
 
     if (exactCleanupId) {
       const exactQueueIds = newTransfers
