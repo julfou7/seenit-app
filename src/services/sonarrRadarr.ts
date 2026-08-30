@@ -1593,6 +1593,8 @@ export interface LiveDownloadItem {
   /** Item réhydraté du stockage local en attente de confirmation serveur. */
   isRestored?: boolean;
   isOptimistic?: boolean;
+  /** Demande SeenIt d'origine, utilisée pour corréler *Arr et qBittorrent sans le nom. */
+  requestId?: string;
 }
 
 export function extractQualityFromTitle(rawTitle?: string, fallbackQuality?: string): string | undefined {

@@ -74,13 +74,20 @@ function DownloadItemCard({
   const { cleanTitle, subTitle, isTv } = formatCleanMediaInfo(item);
   const status = String(item.status || '').toLowerCase();
   const isCompleted = status === 'completed' || item.progress >= 100;
-  const isError = status === 'error' || Boolean(item.errorMessage);
-  const isWarning = status === 'warning';
+  const isCancelled = status === 'cancelled';
+  const isError = !isCancelled && (status === 'error' || Boolean(item.errorMessage));
+  const isWarning = !isCancelled && status === 'warning';
   const isPending = status === 'submitting' || status === 'searching' || status === 'queued';
   const progress = Math.min(100, Math.max(0, Number(item.progress || 0)));
   const qualityBadges = getQualityBadges(item.quality);
   const downloadedBytes = item.size > 0 ? Math.max(0, item.size - item.sizeleft) : 0;
-  const progressLabel = isCompleted ? '100%' : progress > 0 ? `${progress.toFixed(1).replace(/\.0$/, '')}%` : '0%';
+  const progressLabel = isCancelled
+    ? (progress > 0 ? `${progress.toFixed(1).replace(/\.0$/, '')}%` : '—')
+    : isCompleted
+      ? '100%'
+      : progress > 0
+        ? `${progress.toFixed(1).replace(/\.0$/, '')}%`
+        : '0%';
   const posterSrc = item.posterPath
     ? item.posterPath.startsWith('http')
       ? item.posterPath
@@ -92,7 +99,9 @@ function DownloadItemCard({
     onShowClick(item.tmdbId, item.mediaType);
   };
 
-  const accent = isError
+  const accent = isCancelled
+    ? 'text-zinc-400'
+    : isError
     ? 'text-red-300'
     : isWarning
       ? 'text-amber-300'
@@ -100,7 +109,9 @@ function DownloadItemCard({
         ? 'text-emerald-300'
         : 'text-cyan-300';
 
-  const progressBar = isError
+  const progressBar = isCancelled
+    ? 'bg-zinc-600'
+    : isError
     ? 'bg-red-500'
     : isWarning
       ? 'bg-amber-400'
@@ -108,7 +119,9 @@ function DownloadItemCard({
         ? 'bg-gradient-to-r from-emerald-500 to-emerald-300'
         : 'bg-gradient-to-r from-cyan-500 via-sky-400 to-cyan-300';
 
-  const statusLabel = isError
+  const statusLabel = isCancelled
+    ? 'Annulé'
+    : isError
     ? 'Erreur'
     : isWarning
       ? (item.statusText || 'En attente')
@@ -122,7 +135,9 @@ function DownloadItemCard({
     <div
       onClick={canOpenDetails ? openDetails : undefined}
       className={`relative overflow-hidden rounded-[22px] border bg-gradient-to-br from-zinc-900/95 to-zinc-950/90 p-3.5 shadow-[0_10px_30px_rgba(0,0,0,0.18)] ${canOpenDetails ? 'cursor-pointer transition-transform active:scale-[0.995]' : ''} ${
-        isError
+        isCancelled
+          ? 'border-zinc-600/30'
+          : isError
           ? 'border-red-500/25'
           : isWarning
             ? 'border-amber-500/20'
@@ -201,7 +216,7 @@ function DownloadItemCard({
 
           <div className="mt-3 flex items-end justify-between gap-3">
             <div className={`flex min-w-0 items-center gap-1.5 text-[11px] font-bold ${accent}`}>
-              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isCompleted ? 'bg-emerald-400' : isError ? 'bg-red-400' : isWarning ? 'bg-amber-400' : 'bg-cyan-400'}`} />
+              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isCancelled ? 'bg-zinc-500' : isCompleted ? 'bg-emerald-400' : isError ? 'bg-red-400' : isWarning ? 'bg-amber-400' : 'bg-cyan-400'}`} />
               <span className="truncate">{statusLabel}</span>
             </div>
             <span className={`shrink-0 text-sm font-black tabular-nums ${accent}`}>{progressLabel}</span>
@@ -216,7 +231,7 @@ function DownloadItemCard({
           ) : (
             <div className="relative mt-2 h-2 overflow-hidden rounded-full bg-white/[0.07] ring-1 ring-white/[0.03]">
               <div
-                className={`relative h-full rounded-full transition-[width] duration-500 ease-out ${progressBar} ${!isCompleted && !isError ? 'shadow-[0_0_12px_rgba(34,211,238,0.28)]' : ''}`}
+                className={`relative h-full rounded-full transition-[width] duration-500 ease-out ${progressBar} ${!isCompleted && !isCancelled && !isError ? 'shadow-[0_0_12px_rgba(34,211,238,0.28)]' : ''}`}
                 style={{ width: `${progress}%` }}
               >
                 {!isCompleted && progress > 4 && <div className="absolute inset-0 bg-white/[0.08]" />}
@@ -234,7 +249,7 @@ function DownloadItemCard({
               )}
             </div>
 
-            {!isCompleted && !isError && !isPending && (
+            {!isCompleted && !isCancelled && !isError && !isPending && (
               <div className="flex shrink-0 items-center gap-2.5 tabular-nums">
                 {item.speedFormatted && (
                   <span className="flex items-center gap-1 font-semibold text-zinc-300">
@@ -304,11 +319,11 @@ export function DownloadsScreen({ onShowClick }: Props) {
   );
 
   const activeDownloads = useMemo(
-    () => downloads.filter(item => item.status !== 'completed' && item.progress < 100),
+    () => downloads.filter(item => item.status !== 'completed' && item.status !== 'cancelled' && item.progress < 100),
     [downloads]
   );
   const completedDownloads = useMemo(
-    () => downloads.filter(item => item.status === 'completed' || item.progress >= 100),
+    () => downloads.filter(item => item.status === 'completed' || item.status === 'cancelled' || item.progress >= 100),
     [downloads]
   );
 
@@ -357,14 +372,20 @@ export function DownloadsScreen({ onShowClick }: Props) {
   }, [torrents, selectedQuality, sortBy]);
 
   const handleRemove = async (item: LiveDownloadItem) => {
+    const status = String(item.status || '').toLowerCase();
+    const wasActive = status !== 'completed'
+      && status !== 'cancelled'
+      && status !== 'error'
+      && Number(item.progress || 0) < 100;
+
     setRemovingId(item.id);
     const success = await removeDownload(item);
     setRemovingId(null);
     showToast({
       title: item.movieTitle || item.seriesTitle || item.title,
       action: success
-        ? 'Retiré de la liste'
-        : 'Retiré de la liste • arrêt non confirmé',
+        ? (wasActive ? 'Téléchargement annulé' : 'Retiré de la liste')
+        : (wasActive ? 'Annulation non confirmée' : 'Retrait non confirmé'),
       posterPath: item.posterPath
     }, success ? 'success' : 'info');
   };

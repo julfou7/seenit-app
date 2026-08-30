@@ -17,7 +17,8 @@ import {
 import { useToastStore } from './toastStore';
 import { useShowsStore } from './showsStore';
 import { auth } from '../lib/firebase';
-import { canAttachRecentOptimisticRequest, getPhysicalDownloadId, getStrongPhysicalDownloadIds, hasConflictingStrongPhysicalIds, mergeDownloadIdAliases, sameLegacyPhysicalTransfer, samePhysicalDownload, sameTransferPath } from '../features/downloads/downloadIdentity';
+import { canAttachRecentOptimisticRequest, getPhysicalDownloadId, getStrongPhysicalDownloadIds, hasConflictingStrongPhysicalIds, mergeDownloadIdAliases, sameDownloadRequest, sameLegacyPhysicalTransfer, samePhysicalDownload, sameTransferPath } from '../features/downloads/downloadIdentity';
+import { mergeLateOptimisticMetadata } from '../features/downloads/downloadReconciliation';
 import { fetchRecentDownloadHistory, resolveDownloadHistoryOutcome } from '../features/downloads/downloadHistory';
 
 interface LiveDownloadState {
@@ -49,6 +50,13 @@ let lastFetchTime = 0;
 const optimisticTimestamps: Record<string, number> = {};
 const missingSince: Record<string, number> = {};
 const completionNotificationEligibility = new Set<string>();
+let localMutationRevision = 0;
+const localItemMutationRevision: Record<string, number> = {};
+
+function markLocalItemMutation(id: string) {
+  localMutationRevision += 1;
+  localItemMutationRevision[id] = localMutationRevision;
+}
 const OPTIMISTIC_TTL_MS = 120_000;
 const OPTIMISTIC_ERROR_TTL_MS = 60_000;
 const MISSING_GRACE_MS = 10_000;
@@ -133,12 +141,17 @@ function sameRequestScope(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
     && (a.episodeNumber ?? null) === (b.episodeNumber ?? null);
 }
 
+function isCancelledDownload(item: LiveDownloadItem): boolean {
+  return String(item.status || '').toLowerCase() === 'cancelled';
+}
+
 function isTerminalDownload(item: LiveDownloadItem): boolean {
-  return item.status === 'completed' || Number(item.progress || 0) >= 100;
+  return isCancelledDownload(item) || item.status === 'completed' || Number(item.progress || 0) >= 100;
 }
 
 function sameDownloadIdentity(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
   if (a.id === b.id) return true;
+  if (sameDownloadRequest(a, b)) return true;
   if (samePhysicalDownload(a, b)) return true;
 
   // Deux vrais torrents différents restent distincts, même s'ils concernent le même film.
@@ -165,6 +178,38 @@ function sameDownloadIdentity(a: LiveDownloadItem, b: LiveDownloadItem): boolean
   // état réhydraté. Deux snapshots distants sans identité physique commune ne sont
   // jamais fusionnés sur le seul titre/TMDB.
   return Boolean(a.isOptimistic || b.isOptimistic || a.isRestored || b.isRestored);
+}
+
+function sameCancellationIdentity(cancelled: LiveDownloadItem, remote: LiveDownloadItem, now = Date.now()): boolean {
+  if (sameDownloadIdentity(cancelled, remote)) return true;
+  if (cancelled.mediaType !== remote.mediaType) return false;
+
+  const sameCanonical = Boolean(
+    cancelled.tmdbId && remote.tmdbId && Number(cancelled.tmdbId) === Number(remote.tmdbId)
+  ) || Boolean(
+    cancelled.tvdbId && remote.tvdbId && Number(cancelled.tvdbId) === Number(remote.tvdbId)
+  );
+
+  if (sameCanonical) {
+    if (cancelled.mediaType === 'tv') {
+      if (cancelled.seasonNumber != null && remote.seasonNumber != null
+          && Number(cancelled.seasonNumber) !== Number(remote.seasonNumber)) return false;
+      if (cancelled.episodeNumber != null && remote.episodeNumber != null
+          && Number(cancelled.episodeNumber) !== Number(remote.episodeNumber)) return false;
+    }
+    const cancelledResolution = resolutionBucket(cancelled);
+    const remoteResolution = resolutionBucket(remote);
+    return !(cancelledResolution && remoteResolution && cancelledResolution !== remoteResolution);
+  }
+
+  // Pour une recherche manuelle sans ID canonique, la fenêtre temporelle + type +
+  // scope + résolution suffit, toujours sans utiliser le titre comme identité.
+  return canAttachRecentOptimisticRequest(
+    { ...cancelled, isOptimistic: true },
+    remote,
+    now,
+    5 * 60_000
+  );
 }
 
 function sendLocalNotification(title: string, body: string, isSuccess = false, item?: LiveDownloadItem) {
@@ -232,8 +277,10 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
       isPolling: false,
 
       addOptimisticDownload: item => {
+        const candidateId = item.id || `opt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const candidate: LiveDownloadItem = {
-          id: item.id || `opt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          id: candidateId,
+          requestId: item.requestId || candidateId,
           mediaType: item.mediaType,
           title: item.title,
           seriesTitle: item.seriesTitle,
@@ -271,6 +318,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
 
         if (existing) {
           optimisticTimestamps[existing.id] = Date.now();
+          markLocalItemMutation(existing.id);
           set(state => ({
             downloads: state.downloads.map(download =>
               download.id === existing.id
@@ -290,6 +338,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
         }
 
         optimisticTimestamps[candidate.id] = Date.now();
+        markLocalItemMutation(candidate.id);
         set(state => ({ downloads: [candidate, ...state.downloads] }));
 
         if (!get().isPolling) get().startPolling(1000);
@@ -299,6 +348,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
 
       updateDownloadRequest: (id, patch) => {
         const existing = get().downloads.find(download => download.id === id);
+        markLocalItemMutation(id);
         if (existing?.isOptimistic || patch.isOptimistic) {
           optimisticTimestamps[id] = Date.now();
         }
@@ -330,6 +380,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
         lastFetchTime = nowTime;
 
         try {
+          const fetchStartedMutationRevision = localMutationRevision;
           const currentDownloads = get().downloads || [];
           const rawServerItems = await fetchLiveDownloadsQueue({
             sonarrUrl: config.sonarrUrl,
@@ -345,7 +396,11 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           const rawIds = new Set(rawServerItems.map(item => item.id));
           const prunedRemovedIds = (get().removedIds || []).filter(id => rawIds.has(id));
           const removedSet = new Set(prunedRemovedIds);
-          const serverItems = rawServerItems.filter(item => !removedSet.has(item.id));
+          const cancelledLocals = currentDownloads.filter(isCancelledDownload);
+          const serverItems = rawServerItems.filter(item =>
+            !removedSet.has(item.id)
+            && !cancelledLocals.some(cancelled => sameCancellationIdentity(cancelled, item))
+          );
           const localShows = useShowsStore.getState().shows || [];
 
           serverItems.forEach(serverItem => {
@@ -360,6 +415,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               if (!serverItem.quality && localMatch.quality) serverItem.quality = localMatch.quality;
               if (!serverItem.transferPath && localMatch.transferPath) serverItem.transferPath = localMatch.transferPath;
               if (!serverItem.addedAt && localMatch.addedAt) serverItem.addedAt = localMatch.addedAt;
+              if (!serverItem.requestId && localMatch.requestId) serverItem.requestId = localMatch.requestId;
               serverItem.isRestored = false;
               // Une même entrée *Arr peut temporairement changer/perdre son downloadId.
               // On garde l'historique des alias appris sur les polls précédents afin que
@@ -367,21 +423,16 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               serverItem.downloadIdAliases = mergeDownloadIdAliases(serverItem, localMatch);
               if (!serverItem.downloadId && localMatch.downloadId) serverItem.downloadId = localMatch.downloadId;
 
-              // Si qBittorrent est momentanément indisponible, ne jamais faire reculer
-              // la progression physique connue au poll précédent.
-              if ((samePhysicalDownload(localMatch, serverItem) || sameTransferPath(localMatch, serverItem) || sameLegacyPhysicalTransfer(localMatch, serverItem))
+              // La progression ne recule pas sur une micro-coupure de source, mais la
+              // télémétrie live (débit/ETA/status) n'est JAMAIS recopiée depuis l'ancien
+              // snapshot. C'est ce recyclage qui figeait visuellement 1 % jusqu'à 100 %.
+              if ((samePhysicalDownload(localMatch, serverItem) || sameTransferPath(localMatch, serverItem) || sameLegacyPhysicalTransfer(localMatch, serverItem) || sameDownloadRequest(localMatch, serverItem))
                   && Number(localMatch.progress || 0) > Number(serverItem.progress || 0)) {
                 serverItem.progress = localMatch.progress;
                 if (localMatch.size > 0) serverItem.size = localMatch.size;
-                serverItem.sizeleft = localMatch.sizeleft;
-                if (localMatch.speedBytesPerSec) serverItem.speedBytesPerSec = localMatch.speedBytesPerSec;
-                if (localMatch.speedFormatted) serverItem.speedFormatted = localMatch.speedFormatted;
-                if (localMatch.timeleftSeconds) serverItem.timeleftSeconds = localMatch.timeleftSeconds;
-                if (localMatch.timeleft) serverItem.timeleft = localMatch.timeleft;
-                if (serverItem.status !== 'error' && localMatch.status !== 'error') {
-                  serverItem.status = localMatch.status;
-                  serverItem.statusText = localMatch.statusText;
-                  serverItem.downloadClient = localMatch.downloadClient || serverItem.downloadClient;
+                if (serverItem.size > 0 && Number(localMatch.sizeleft || 0) >= 0) {
+                  const remoteLeft = Number(serverItem.sizeleft || serverItem.size);
+                  serverItem.sizeleft = Math.min(remoteLeft, Number(localMatch.sizeleft || remoteLeft));
                 }
               }
             }
@@ -435,6 +486,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             if (contenders.length !== 1) continue;
 
             const optimistic = entry.optimistic;
+            serverItem.requestId = serverItem.requestId || optimistic.requestId || optimistic.id;
             if (!serverItem.tmdbId && optimistic.tmdbId) serverItem.tmdbId = optimistic.tmdbId;
             if (!serverItem.tvdbId && optimistic.tvdbId) serverItem.tvdbId = optimistic.tvdbId;
             if (!serverItem.imdbId && optimistic.imdbId) serverItem.imdbId = optimistic.imdbId;
@@ -596,6 +648,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           const mergeRepresentations = (a: LiveDownloadItem, b: LiveDownloadItem): LiveDownloadItem => {
             const meta = metadataScore(a) >= metadataScore(b) ? a : b;
             const live = liveScore(a) >= liveScore(b) ? a : b;
+            const identitySource = !a.isOptimistic ? a : !b.isOptimistic ? b : meta;
             const aliases = mergeDownloadIdAliases(a, b);
             const strongIds = [...getStrongPhysicalDownloadIds(a), ...getStrongPhysicalDownloadIds(b)];
             const completed = isTerminalDownload(a) || isTerminalDownload(b);
@@ -606,7 +659,8 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
 
             return {
               ...meta,
-              id: meta.id,
+              id: identitySource.id,
+              requestId: a.requestId || b.requestId,
               downloadId: strongIds[0] || getPhysicalDownloadId(live) || getPhysicalDownloadId(meta) || undefined,
               downloadIdAliases: aliases,
               transferPath: meta.transferPath || live.transferPath,
@@ -642,60 +696,50 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             finalItems.push(item);
           }
 
-          // Un poll peut avoir capturé currentDownloads juste AVANT qu'une nouvelle
-          // demande optimiste soit créée/acceptée. Sans cette seconde lecture, le set()
-          // final réécrit alors un snapshot périmé et la carte disparaît quelques secondes.
-          // On réconcilie uniquement les demandes optimistes réellement modifiées pendant
-          // le fetch ; une représentation distante garde son identité physique, mais hérite
-          // immédiatement du TMDB/poster/titre SeenIt.
-          const latestDownloadsAfterFetch = get().downloads || [];
-          const latestOptimisticRequests = latestDownloadsAfterFetch.filter(item =>
-            item.isOptimistic && !removedSet.has(item.id)
+          // Réconcilie uniquement les mutations locales réellement survenues pendant
+          // ce poll. Une intention optimiste peut apporter identité/poster, jamais écraser
+          // progress/status/débit/ETA d'un snapshot distant déjà observé. Une annulation
+          // locale, elle, gagne toujours afin d'empêcher toute résurrection transitoire.
+          const latestLocalMutations = (get().downloads || []).filter(item =>
+            (localItemMutationRevision[item.id] || 0) > fetchStartedMutationRevision
           );
 
-          for (const latestOptimistic of latestOptimisticRequests) {
-            const snapshotOptimistic = currentDownloads.find(item => item.id === latestOptimistic.id);
-            if (snapshotOptimistic === latestOptimistic) continue;
+          for (const latestLocal of latestLocalMutations) {
+            if (isCancelledDownload(latestLocal)) {
+              for (let index = finalItems.length - 1; index >= 0; index -= 1) {
+                if (sameCancellationIdentity(latestLocal, finalItems[index])) {
+                  finalItems.splice(index, 1);
+                }
+              }
+              finalItems.unshift(latestLocal);
+              continue;
+            }
 
-            const existingIndex = finalItems.findIndex(existing => sameDownloadIdentity(existing, latestOptimistic));
+            if (!latestLocal.isOptimistic || removedSet.has(latestLocal.id)) continue;
+
+            const existingIndex = finalItems.findIndex(existing => sameDownloadIdentity(existing, latestLocal));
             if (existingIndex < 0) {
-              finalItems.unshift(latestOptimistic);
+              finalItems.unshift(latestLocal);
               continue;
             }
 
             const existing = finalItems[existingIndex];
-            if (existing.id === latestOptimistic.id || existing.isOptimistic) {
+            if (existing.isOptimistic) {
               finalItems[existingIndex] = {
                 ...existing,
-                ...latestOptimistic,
+                ...latestLocal,
                 id: existing.id,
-                downloadId: existing.downloadId || latestOptimistic.downloadId,
-                downloadIdAliases: mergeDownloadIdAliases(existing, latestOptimistic),
-                transferPath: existing.transferPath || latestOptimistic.transferPath,
-                posterPath: latestOptimistic.posterPath || existing.posterPath,
-                backdropPath: latestOptimistic.backdropPath || existing.backdropPath
+                requestId: existing.requestId || latestLocal.requestId || latestLocal.id,
+                downloadId: existing.downloadId || latestLocal.downloadId,
+                downloadIdAliases: mergeDownloadIdAliases(existing, latestLocal),
+                transferPath: existing.transferPath || latestLocal.transferPath,
+                posterPath: latestLocal.posterPath || existing.posterPath,
+                backdropPath: latestLocal.backdropPath || existing.backdropPath
               };
               continue;
             }
 
-            finalItems[existingIndex] = {
-              ...existing,
-              tmdbId: existing.tmdbId || latestOptimistic.tmdbId,
-              tvdbId: existing.tvdbId || latestOptimistic.tvdbId,
-              imdbId: existing.imdbId || latestOptimistic.imdbId,
-              posterPath: existing.posterPath || latestOptimistic.posterPath,
-              backdropPath: existing.backdropPath || latestOptimistic.backdropPath,
-              movieTitle: existing.movieTitle || (existing.mediaType === 'movie'
-                ? (latestOptimistic.movieTitle || latestOptimistic.title)
-                : undefined),
-              seriesTitle: existing.seriesTitle || (existing.mediaType === 'tv'
-                ? (latestOptimistic.seriesTitle || latestOptimistic.title)
-                : undefined),
-              seasonNumber: existing.seasonNumber ?? latestOptimistic.seasonNumber,
-              episodeNumber: existing.episodeNumber ?? latestOptimistic.episodeNumber,
-              addedAt: existing.addedAt || latestOptimistic.addedAt,
-              downloadIdAliases: mergeDownloadIdAliases(existing, latestOptimistic)
-            };
+            finalItems[existingIndex] = mergeLateOptimisticMetadata(existing, latestLocal);
           }
 
           for (const finalItem of finalItems) {
@@ -770,18 +814,44 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
       },
 
       removeDownload: async item => {
-        const newRemovedIds = Array.from(new Set([...(get().removedIds || []), item.id]));
         const config = useDownloadConfigStore.getState();
+        const status = String(item.status || '').toLowerCase();
+        const shouldCancelRemote = !isTerminalDownload(item) && status !== 'error';
 
-        set({
-          removedIds: newRemovedIds,
-          downloads: (get().downloads || []).filter(download => download.id !== item.id)
-        });
+        // Une seconde action sur un état terminal ne touche plus au client distant :
+        // elle nettoie simplement l'historique SeenIt.
+        if (!shouldCancelRemote) {
+          const newRemovedIds = Array.from(new Set([...(get().removedIds || []), item.id]));
+          set({
+            removedIds: newRemovedIds,
+            downloads: (get().downloads || []).filter(download => download.id !== item.id)
+          });
+          delete optimisticTimestamps[item.id];
+          delete missingSince[item.id];
+          return true;
+        }
 
+        const cancelledItem: LiveDownloadItem = {
+          ...item,
+          status: 'cancelled',
+          statusText: 'Téléchargement annulé',
+          errorMessage: undefined,
+          speedBytesPerSec: 0,
+          speedFormatted: '',
+          timeleft: '',
+          timeleftSeconds: 0,
+          isOptimistic: false,
+          isRestored: false
+        };
+
+        markLocalItemMutation(item.id);
+        set(state => ({
+          downloads: state.downloads.map(download =>
+            download.id === item.id ? cancelledItem : download
+          )
+        }));
         delete optimisticTimestamps[item.id];
         delete missingSince[item.id];
-
-        if (item.isOptimistic || item.id.startsWith('opt_')) return true;
 
         try {
           const result = await deleteLiveDownloadItem(item, {
@@ -793,8 +863,37 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             qbittorrentUsername: config.qbittorrentUsername,
             qbittorrentPassword: config.qbittorrentPassword
           });
+
+          if (!result.success) {
+            markLocalItemMutation(item.id);
+            set(state => ({
+              downloads: state.downloads.map(download =>
+                download.id === item.id
+                  ? {
+                      ...download,
+                      status: 'warning',
+                      statusText: 'Annulation non confirmée • réessaie',
+                      errorMessage: result.message || 'Le client distant n’a pas confirmé l’annulation.'
+                    }
+                  : download
+              )
+            }));
+          }
           return result.success;
         } catch {
+          markLocalItemMutation(item.id);
+          set(state => ({
+            downloads: state.downloads.map(download =>
+              download.id === item.id
+                ? {
+                    ...download,
+                    status: 'warning',
+                    statusText: 'Annulation non confirmée • réessaie',
+                    errorMessage: 'Le client distant n’a pas confirmé l’annulation.'
+                  }
+                : download
+            )
+          }));
           return false;
         }
       },
