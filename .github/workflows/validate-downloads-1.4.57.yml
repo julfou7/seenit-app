@@ -25,7 +25,23 @@ jobs:
           cache: npm
 
       - name: Apply patch
-        run: node scripts/patch-downloads-1.4.57.cjs
+        id: apply_patch
+        continue-on-error: true
+        run: node scripts/patch-downloads-1.4.57.cjs > patch-output.txt 2>&1
+
+      - name: Persist patch error
+        if: steps.apply_patch.outcome == 'failure'
+        run: |
+          cat patch-output.txt
+          git config user.name "julfou7"
+          git config user.email "julianfouillade@gmail.com"
+          cp patch-output.txt PATCH_ERROR_1.4.57.txt
+          git add PATCH_ERROR_1.4.57.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: journaliser l’échec du patch 1.4.57"
+            git push origin HEAD:fix/downloads-sync-1.4.57
+          fi
+          exit 1
 
       - name: Install dependencies
         run: npm ci
@@ -46,6 +62,7 @@ jobs:
         run: |
           git config user.name "julfou7"
           git config user.email "julianfouillade@gmail.com"
+          git rm -f PATCH_ERROR_1.4.57.txt 2>/dev/null || true
           git add -A
           if git diff --cached --quiet; then
             echo "Aucune modification à committer"
