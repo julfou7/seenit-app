@@ -25,7 +25,10 @@ jobs:
           cache: npm
 
       - name: Apply patch
-        run: node scripts/patch-download-journey-1.4.59.cjs
+        run: |
+          sed -i "/if (content.includes('LiveDownloadBanner'))/d" scripts/patch-download-journey-1.4.59.cjs
+          sed -i "/if (content.includes('activeDownloads'))/d" scripts/patch-download-journey-1.4.59.cjs
+          node scripts/patch-download-journey-1.4.59.cjs
 
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
