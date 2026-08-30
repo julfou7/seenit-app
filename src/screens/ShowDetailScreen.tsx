@@ -26,6 +26,8 @@ import { LiveDownloadBanner } from '../components/LiveDownloadBanner';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useMediaPresenceStore } from '../store/mediaPresenceStore';
 import { searchAndDownloadInSonarr, searchAndDownloadInRadarr } from '../services/sonarrRadarr';
+import { downloadEpisodeWithSeasonPackFallback } from '../features/downloads/episodeSeasonPackFallback';
+import { acceptDownloadRequest, beginDownloadRequest, failDownloadRequest, updateDownloadRequest } from '../features/downloads/downloadLifecycle';
 import { readUserScopedJson } from '../lib/userIsolation';
 
 
@@ -310,41 +312,64 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     setIs1ClickDownloading(prev => ({ ...prev, [epKey]: true }));
     const showTitle = show?.title || tmdbDetails?.name || tmdbDetails?.original_name || 'Série';
     const tvdbId = tmdbDetails?.external_ids?.tvdb_id || (show as any)?.tvdbId;
+    const imdbId = tmdbDetails?.external_ids?.imdb_id || (show as any)?.imdbId;
+    const posterForDownload = tmdbDetails?.poster_path || show?.posterPath || undefined;
+    const backdropForDownload = tmdbDetails?.backdrop_path || show?.backdropPath || undefined;
+    const code = `S${String(seasonNumber).padStart(2, '0')}E${String(episodeNumber).padStart(2, '0')}`;
 
-    // Ajout optimiste immédiat pour affichage instantané du badge "1" et de la barre
-    useLiveDownloadStore.getState().addOptimisticDownload({
+    const requestId = beginDownloadRequest({
+      title: `${showTitle} (${code})`,
       mediaType: 'tv',
-      title: `${showTitle} (S${seasonNumber}E${episodeNumber})`,
-      seriesTitle: showTitle,
       tmdbId: effectiveTmdbId,
       tvdbId,
+      imdbId,
       seasonNumber,
       episodeNumber,
+      posterPath: posterForDownload,
+      backdropPath: backdropForDownload,
       downloadClient: 'Sonarr',
-      statusText: 'Préparation du téléchargement…'
+      statusText: 'Préparation du téléchargement…',
+      releaseTitle: `${showTitle} • ${code} • 1080p`
     });
 
     try {
-      const res = await searchAndDownloadInSonarr({
+      const res = await downloadEpisodeWithSeasonPackFallback({
         url: config.sonarrUrl,
         apiKey: config.sonarrApiKey,
         title: showTitle,
         tmdbId: effectiveTmdbId,
         tvdbId,
+        imdbId,
         season: seasonNumber,
         episode: episodeNumber,
-        qualityPreference: '1080p'
+        qualityPreference: '1080p',
+        qbittorrentUrl: config.qbittorrentUrl,
+        qbittorrentUsername: config.qbittorrentUsername,
+        qbittorrentPassword: config.qbittorrentPassword
       });
 
       if (res.success) {
-        showToast(`Téléchargement de S${seasonNumber}E${episodeNumber} lancé dans Sonarr !`, 'success');
+        const nextStatus = res.status || 'searching';
+        const statusText = res.message || `${code} envoyé à Sonarr`;
+        acceptDownloadRequest(requestId, statusText, nextStatus);
+        if (res.downloadId) {
+          updateDownloadRequest(requestId, {
+            downloadId: res.downloadId,
+            downloadIdAliases: [res.downloadId],
+            statusText
+          });
+        }
+        showToast(res.fallbackUsed ? statusText : `Téléchargement de ${code} lancé dans Sonarr !`, 'success');
         useLiveDownloadStore.getState().startPolling(1000);
-        useLiveDownloadStore.getState().fetchDownloads();
+        void useLiveDownloadStore.getState().fetchDownloads();
       } else {
+        failDownloadRequest(requestId, res.message);
         showToast(res.message || "Erreur lors du lancement dans Sonarr", "error");
       }
     } catch (err: any) {
-      showToast(err?.message || "Erreur réseau Sonarr", "error");
+      const message = err?.message || "Erreur réseau Sonarr";
+      failDownloadRequest(requestId, message);
+      showToast(message, "error");
     } finally {
       setIs1ClickDownloading(prev => ({ ...prev, [epKey]: false }));
     }
@@ -517,6 +542,10 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     && !hasCompletedDownload
     && !hasCancelledDownload
     && mediaDownloads.some(item => item.status === 'error' || Boolean(item.errorMessage));
+  const showDownloadSummary = hasActiveDownload
+    || hasCancelledDownload
+    || hasDownloadError
+    || (!isSeries && hasCompletedDownload);
 
   // Vérification présence locale (Sonarr / Radarr / Plex)
   const presence = useMediaPresence({
@@ -2542,7 +2571,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
           </div>
 
           {/* Statut contextuel uniquement : le détail complet vit dans Téléchargements. */}
-          {mediaDownloads.length > 0 && (
+          {showDownloadSummary && (
             <div className="mt-4 px-1">
               <div className={cn(
                 "flex items-center gap-2.5 rounded-2xl border px-3.5 py-3 text-xs font-bold backdrop-blur-md",

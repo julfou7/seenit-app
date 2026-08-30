@@ -12,6 +12,7 @@ import { tmdb } from '../shows/tmdb';
 import { normalizeDownloadClientId } from './downloadIdentity';
 import {
   extractReleaseTorrentHash,
+  findExactNewTorrentIds,
   hasCompatibleIndividualEpisodeRelease,
   rankSeasonPackReleases,
   selectEpisodeFiles,
@@ -174,6 +175,35 @@ async function fetchSonarrQueue(base: string, headers: Record<string, string>): 
   return Array.isArray(response) ? response : (Array.isArray(response?.records) ? response.records : []);
 }
 
+async function fetchSonarrHistory(base: string, headers: Record<string, string>): Promise<any[]> {
+  const response = await executeGet(
+    `${base}/api/v3/history?page=1&pageSize=100&sortKey=date&sortDirection=descending&includeSeries=true&includeEpisode=true`,
+    headers
+  );
+  return Array.isArray(response) ? response : (Array.isArray(response?.records) ? response.records : []);
+}
+
+function collectSeasonHistoryDownloadIds(
+  records: any[],
+  seriesId: number,
+  season: number,
+  excludedHistoryIds: Set<string>
+): string[] {
+  const ids = new Set<string>();
+  for (const record of Array.isArray(records) ? records : []) {
+    const historyId = String(record?.id ?? record?.historyId ?? '').trim();
+    if (!historyId || excludedHistoryIds.has(historyId)) continue;
+    const eventType = String(record?.eventType || '').toLowerCase();
+    if (eventType && eventType !== 'grabbed') continue;
+    const recordSeriesId = Number(record?.series?.id ?? record?.seriesId);
+    const recordSeason = Number(record?.episode?.seasonNumber ?? record?.seasonNumber);
+    if (recordSeriesId !== Number(seriesId) || recordSeason !== Number(season)) continue;
+    const downloadId = normalizeDownloadClientId(record?.downloadId ?? record?.data?.downloadId);
+    if (downloadId) ids.add(downloadId);
+  }
+  return Array.from(ids);
+}
+
 function collectSeasonTransfers(
   records: any[],
   seriesId: number,
@@ -306,12 +336,14 @@ async function waitForPackTransfer(
   seriesId: number,
   beforeQueueIds: Set<string>,
   beforeQbitHashes: Set<string>,
+  beforeHistoryIds: Set<string>,
   release: any
 ): Promise<{ downloadId: string; queueIds: number[] } | null> {
   const releaseHash = extractReleaseTorrentHash(release);
   for (let attempt = 0; attempt < 40; attempt += 1) {
-    const [queue, torrents] = await Promise.all([
+    const [queue, history, torrents] = await Promise.all([
       fetchSonarrQueue(base, sonarrHeaders).catch(() => []),
+      fetchSonarrHistory(base, sonarrHeaders).catch(() => []),
       fetchQbitTorrents(params, qHeaders).catch(() => [])
     ]);
     const qbitHashes = new Set(
@@ -319,21 +351,24 @@ async function waitForPackTransfer(
         .map(torrent => normalizeDownloadClientId(torrent?.hash))
         .filter(Boolean) as string[]
     );
-    const newQbitHashes = Array.from(qbitHashes).filter(hash => !beforeQbitHashes.has(hash));
     const candidates = collectSeasonTransfers(queue, seriesId, params.season, beforeQueueIds);
+    const historyDownloadIds = collectSeasonHistoryDownloadIds(
+      history,
+      seriesId,
+      params.season,
+      beforeHistoryIds
+    );
+    const exactNewTorrentIds = findExactNewTorrentIds(
+      [...candidates.map(candidate => candidate.downloadId), ...historyDownloadIds],
+      Array.from(qbitHashes),
+      Array.from(beforeQbitHashes),
+      releaseHash
+    );
 
-    if (releaseHash && qbitHashes.has(releaseHash)) {
-      const exactQueue = candidates.find(candidate => candidate.downloadId === releaseHash);
-      return { downloadId: releaseHash, queueIds: exactQueue?.queueIds || [] };
-    }
-
-    const intersected = candidates.filter(candidate => qbitHashes.has(candidate.downloadId));
-    if (intersected.length === 1) {
-      return { downloadId: intersected[0].downloadId, queueIds: intersected[0].queueIds };
-    }
-
-    if (candidates.length === 1 && newQbitHashes.length === 1 && candidates[0].downloadId === newQbitHashes[0]) {
-      return { downloadId: candidates[0].downloadId, queueIds: candidates[0].queueIds };
+    if (exactNewTorrentIds.length === 1) {
+      const downloadId = exactNewTorrentIds[0];
+      const exactQueue = candidates.find(candidate => candidate.downloadId === downloadId);
+      return { downloadId, queueIds: exactQueue?.queueIds || [] };
     }
 
     await delay(650);
@@ -535,6 +570,12 @@ export async function downloadEpisodeWithSeasonPackFallback(
       .map(torrent => normalizeDownloadClientId(torrent?.hash))
       .filter(Boolean) as string[]
   );
+  const beforeHistory = await fetchSonarrHistory(base, sonarrHeaders).catch(() => []);
+  const beforeHistoryIds = new Set(
+    beforeHistory
+      .map(record => String(record?.id ?? record?.historyId ?? '').trim())
+      .filter(Boolean)
+  );
 
   const grabbedRelease = await grabSeasonPack(base, sonarrHeaders, seasonReleases, Number(target.series.id));
   if (!grabbedRelease) {
@@ -549,16 +590,66 @@ export async function downloadEpisodeWithSeasonPackFallback(
     Number(target.series.id),
     beforeQueueIds,
     beforeQbitHashes,
+    beforeHistoryIds,
     grabbedRelease
   );
 
   if (!transfer) {
-    const queue = await fetchSonarrQueue(base, sonarrHeaders).catch(() => []);
+    const [queue, history, torrents] = await Promise.all([
+      fetchSonarrQueue(base, sonarrHeaders).catch(() => []),
+      fetchSonarrHistory(base, sonarrHeaders).catch(() => []),
+      fetchQbitTorrents(params, qHeaders).catch(() => [])
+    ]);
     const newTransfers = collectSeasonTransfers(queue, Number(target.series.id), Number(params.season), beforeQueueIds);
-    await removeSonarrTransfer(base, sonarrHeaders, newTransfers.flatMap(item => item.queueIds));
+    const historyDownloadIds = collectSeasonHistoryDownloadIds(
+      history,
+      Number(target.series.id),
+      Number(params.season),
+      beforeHistoryIds
+    );
+    const currentQbitHashes = torrents
+      .map(torrent => normalizeDownloadClientId(torrent?.hash))
+      .filter(Boolean) as string[];
+    const releaseHash = extractReleaseTorrentHash(grabbedRelease);
+    const exactNewIds = findExactNewTorrentIds(
+      [...newTransfers.map(item => item.downloadId), ...historyDownloadIds],
+      currentQbitHashes,
+      Array.from(beforeQbitHashes),
+      releaseHash
+    );
+
+    const corroboratedSonarrIds = Array.from(new Set(
+      newTransfers
+        .map(item => item.downloadId)
+        .filter(id => historyDownloadIds.includes(id))
+    ));
+    const exactCleanupId = exactNewIds.length === 1
+      ? exactNewIds[0]
+      : corroboratedSonarrIds.length === 1
+        ? corroboratedSonarrIds[0]
+        : releaseHash && !beforeQbitHashes.has(releaseHash)
+          ? releaseHash
+          : null;
+
+    if (exactCleanupId) {
+      const exactQueueIds = newTransfers
+        .filter(item => item.downloadId === exactCleanupId)
+        .flatMap(item => item.queueIds);
+      await removeSonarrTransfer(base, sonarrHeaders, exactQueueIds);
+      if (/^[a-f0-9]{40}$|^[a-f0-9]{64}$/i.test(exactCleanupId)) {
+        await removeExactQbitTorrent(params, qHeaders, exactCleanupId);
+        await delay(700);
+        await removeExactQbitTorrent(params, qHeaders, exactCleanupId);
+      }
+      return {
+        success: false,
+        message: 'Le pack a été lancé mais sa corrélation n’a pas été confirmée à temps. Le transfert exact identifié a été annulé dans Sonarr et qBittorrent par sécurité.'
+      };
+    }
+
     return {
       success: false,
-      message: 'Le pack a été lancé mais SeenIt n’a pas pu corréler son torrent qBittorrent de façon certaine. Les transferts Sonarr identifiés ont été annulés par sécurité.'
+      message: 'Le pack a été lancé mais aucun identifiant technique unique ne permet de le corréler sans risque. SeenIt n’a modifié aucun torrent préexistant ; vérifie qBittorrent avant de relancer.'
     };
   }
 

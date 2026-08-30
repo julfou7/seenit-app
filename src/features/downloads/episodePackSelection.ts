@@ -97,6 +97,44 @@ export function selectEpisodeFiles(
   };
 }
 
+function normalizeTorrentCorrelationId(value: unknown): string {
+  return String(value || '').trim().toLowerCase();
+}
+
+/**
+ * Retourne uniquement les torrents qBittorrent apparus après le snapshot initial
+ * et prouvés par un identifiant exact Sonarr ou par l'infohash exact de la release.
+ * Un hash déjà présent avant la demande n'est jamais éligible, même s'il correspond
+ * à la release choisie : SeenIt ne doit jamais modifier un torrent préexistant.
+ */
+export function findExactNewTorrentIds(
+  candidateDownloadIds: Array<string | null | undefined>,
+  currentQbitHashes: Array<string | null | undefined>,
+  beforeQbitHashes: Array<string | null | undefined>,
+  releaseHash?: string | null
+): string[] {
+  const before = new Set(
+    (beforeQbitHashes || []).map(normalizeTorrentCorrelationId).filter(Boolean)
+  );
+  const current = new Set(
+    (currentQbitHashes || []).map(normalizeTorrentCorrelationId).filter(Boolean)
+  );
+  const newlySeen = new Set(Array.from(current).filter(hash => !before.has(hash)));
+  const exact = new Set<string>();
+
+  for (const candidate of candidateDownloadIds || []) {
+    const id = normalizeTorrentCorrelationId(candidate);
+    if (id && newlySeen.has(id)) exact.add(id);
+  }
+
+  const normalizedReleaseHash = normalizeTorrentCorrelationId(releaseHash);
+  if (normalizedReleaseHash && newlySeen.has(normalizedReleaseHash)) {
+    exact.add(normalizedReleaseHash);
+  }
+
+  return Array.from(exact);
+}
+
 function releaseMatchesQuality(release: any, preference?: '1080p' | '4k'): boolean {
   if (!preference) return true;
   const qualityName = release?.quality?.quality?.name || release?.quality?.name || '';

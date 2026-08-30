@@ -53,14 +53,26 @@ export const LiveDownloadBanner: React.FC<LiveDownloadBannerProps> = ({ items, c
     const item = items[0];
     const phase = getPhase(item);
     const showProgress = phase.kind === 'downloading' || phase.kind === 'completed';
+    const isActivityOnly = phase.kind === 'submitting' || phase.kind === 'searching' || phase.kind === 'queued';
+    const shortLabel = phase.kind === 'error'
+      ? 'Erreur'
+      : phase.kind === 'warning'
+        ? 'À vérifier'
+        : phase.kind === 'completed'
+          ? '100%'
+          : phase.kind === 'downloading'
+            ? `${truncateDownloadProgressPercent(item.progress)}%`
+            : '';
 
     return (
-      <div className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/10 bg-zinc-900/90 px-2.5 py-1 text-[10px] font-bold text-zinc-200 shadow-sm">
+      <div
+        className={`inline-flex shrink-0 items-center justify-center rounded-full border border-white/10 bg-zinc-900/90 text-[10px] font-bold text-zinc-200 shadow-sm ${isActivityOnly ? 'h-8 w-8 p-0' : 'min-h-8 gap-1.5 px-2.5 py-1'}`}
+        title={phase.label}
+        aria-label={phase.label}
+      >
         <PhaseIcon kind={phase.kind} />
-        <span className="truncate">{phase.label}</span>
-        {showProgress && (
-          <span className="shrink-0 text-white">{truncateDownloadProgressPercent(item.progress)}%</span>
-        )}
+        {!isActivityOnly && showProgress && <span className="shrink-0 text-white">{shortLabel}</span>}
+        {!isActivityOnly && !showProgress && <span className="shrink-0">{shortLabel}</span>}
       </div>
     );
   }

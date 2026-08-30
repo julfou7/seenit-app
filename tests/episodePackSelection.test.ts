@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   extractEpisodeRefsFromFileName,
   extractReleaseTorrentHash,
+  findExactNewTorrentIds,
   hasCompatibleIndividualEpisodeRelease,
   rankSeasonPackReleases,
   selectEpisodeFiles
@@ -69,4 +70,47 @@ test('extrait un infohash exact depuis un champ dédié ou un magnet', () => {
   assert.equal(extractReleaseTorrentHash({ infoHash: hash.toUpperCase() }), hash);
   assert.equal(extractReleaseTorrentHash({ magnetUrl: `magnet:?xt=urn:btih:${hash}&dn=ted` }), hash);
   assert.equal(extractReleaseTorrentHash({ downloadUrl: 'https://prowlarr/release/123' }), null);
+});
+
+
+test('ne manipule jamais un hash qBittorrent déjà présent avant la demande', () => {
+  const oldHash = 'a'.repeat(40);
+  assert.deepEqual(findExactNewTorrentIds(
+    [oldHash],
+    [oldHash],
+    [oldHash],
+    oldHash
+  ), []);
+});
+
+test('accepte l’infohash exact de la release uniquement lorsqu’il vient d’apparaître', () => {
+  const newHash = 'b'.repeat(40);
+  assert.deepEqual(findExactNewTorrentIds(
+    [],
+    [newHash],
+    [],
+    newHash
+  ), [newHash]);
+});
+
+test('ignore un torrent concurrent sans identifiant Sonarr exact', () => {
+  const wanted = 'c'.repeat(40);
+  const unrelated = 'd'.repeat(40);
+  assert.deepEqual(findExactNewTorrentIds(
+    [wanted],
+    [wanted, unrelated],
+    [],
+    null
+  ), [wanted]);
+});
+
+test('laisse l’ambiguïté visible si plusieurs nouveaux IDs exacts existent', () => {
+  const first = 'e'.repeat(40);
+  const second = 'f'.repeat(40);
+  assert.deepEqual(new Set(findExactNewTorrentIds(
+    [first, second],
+    [first, second],
+    [],
+    null
+  )), new Set([first, second]));
 });

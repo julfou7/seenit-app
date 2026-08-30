@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
+import { useShowsStore } from '../store/showsStore';
 import {
   type LiveDownloadItem,
   formatBytes,
@@ -77,6 +78,13 @@ function DownloadItemCard({
   isRemoving: boolean;
 }) {
   const { cleanTitle, subTitle, isTv } = formatCleanMediaInfo(item);
+  const libraryPosterPath = useShowsStore(state => {
+    if (!item.tmdbId) return undefined;
+    return state.shows.find(show =>
+      show.mediaType === item.mediaType
+      && Number(show.tmdbId) === Number(item.tmdbId)
+    )?.posterPath || undefined;
+  });
   const status = String(item.status || '').toLowerCase();
   const isCompleted = status === 'completed' || item.progress >= 100;
   const isCancelled = status === 'cancelled';
@@ -87,11 +95,13 @@ function DownloadItemCard({
   const progressPercent = truncateDownloadProgressPercent(progress);
   const qualityBadges = getQualityBadges(item.quality);
   const downloadedBytes = item.size > 0 ? Math.max(0, item.size - item.sizeleft) : 0;
-  const progressLabel = isCancelled
-    ? (progress > 0 ? `${progressPercent}%` : '—')
-    : isCompleted
-      ? '100%'
-      : `${progressPercent}%`;
+  const progressLabel = isPending
+    ? null
+    : isCancelled
+      ? (progress > 0 ? `${progressPercent}%` : '—')
+      : isCompleted
+        ? '100%'
+        : `${progressPercent}%`;
 
   // La carte garde le poster qu'elle a reçu lors de la demande SeenIt. Grâce à la
   // clé requestId stable, ce ref survit au remplacement opt_* -> radarr/qbit et le
@@ -99,7 +109,7 @@ function DownloadItemCard({
   const lockedPosterPathRef = useRef<string | undefined>(undefined);
   lockedPosterPathRef.current = selectStableDownloadPosterPath(
     lockedPosterPathRef.current,
-    item.posterPath
+    item.posterPath || libraryPosterPath
   );
   const stablePosterPath = lockedPosterPathRef.current;
   const posterSrc = stablePosterPath
@@ -161,27 +171,33 @@ function DownloadItemCard({
       }`}
     >
       <div className="flex gap-3">
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            openDetails();
-          }}
-          className="relative w-16 aspect-[2/3] shrink-0 self-center overflow-hidden rounded-[14px] border border-white/10 bg-zinc-950 shadow-md flex items-center justify-center"
-        >
-          {posterSrc ? (
-            <img
-              src={posterSrc}
-              alt={cleanTitle}
-              className="absolute inset-0 block h-full w-full object-cover object-center"
-              loading={isCompleted ? 'lazy' : 'eager'}
-            />
-          ) : isTv ? (
-            <Tv size={22} className="text-purple-400" />
-          ) : (
-            <Film size={22} className="text-amber-400" />
-          )}
-        </button>
+        <div className="w-16 shrink-0 self-center overflow-hidden rounded-[14px] border border-white/10 bg-zinc-950 shadow-md">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              openDetails();
+            }}
+            className="relative flex w-full aspect-[2/3] items-center justify-center overflow-hidden bg-zinc-950"
+          >
+            {posterSrc ? (
+              <img
+                src={posterSrc}
+                alt={cleanTitle}
+                className="absolute inset-0 block h-full w-full object-cover object-center"
+                loading={isCompleted ? 'lazy' : 'eager'}
+              />
+            ) : isTv ? (
+              <Tv size={22} className="text-purple-400" />
+            ) : (
+              <Film size={22} className="text-amber-400" />
+            )}
+          </button>
+          <div className="flex items-center justify-center gap-1 border-t border-white/10 bg-white/[0.04] py-1 text-[8px] font-extrabold uppercase tracking-wide text-[#E5A93D]">
+            {isTv ? <Tv size={9} /> : <Film size={9} />}
+            <span>{isTv ? 'Série' : 'Film'}</span>
+          </div>
+        </div>
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-2">
@@ -233,12 +249,16 @@ function DownloadItemCard({
               <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isCancelled ? 'bg-zinc-500' : isCompleted ? 'bg-emerald-400' : isError ? 'bg-red-400' : isWarning ? 'bg-amber-400' : 'bg-cyan-400'}`} />
               <span className="truncate">{statusLabel}</span>
             </div>
-            <span className={`shrink-0 text-sm font-black tabular-nums ${accent}`}>{progressLabel}</span>
+            {progressLabel && (
+              <span className={`shrink-0 text-sm font-black tabular-nums ${accent}`}>{progressLabel}</span>
+            )}
           </div>
 
           {isPending && progress <= 0 ? (
-            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/[0.05]" aria-label="Activité en cours">
-              <div className="h-full w-1/3 rounded-full bg-cyan-400/35 animate-pulse" />
+            <div className="mt-2 flex h-2 items-center gap-1.5" aria-label="Préparation en cours">
+              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400/90 animate-pulse" />
+              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400/60 animate-pulse [animation-delay:160ms]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400/30 animate-pulse [animation-delay:320ms]" />
             </div>
           ) : (
             <div className="relative mt-1.5 h-2 overflow-hidden rounded-full bg-white/[0.07] ring-1 ring-white/[0.03]">
