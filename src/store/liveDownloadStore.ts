@@ -21,6 +21,7 @@ import { auth, db } from '../lib/firebase';
 import { canAttachRecentOptimisticRequest, getPhysicalDownloadId, getStrongPhysicalDownloadIds, hasConflictingStrongPhysicalIds, mergeDownloadIdAliases, sameDownloadRequest, sameLegacyPhysicalTransfer, samePhysicalDownload, sameTransferPath } from '../features/downloads/downloadIdentity';
 import { findUniqueRecentOptimisticAttachments, mergeLateOptimisticMetadata } from '../features/downloads/downloadReconciliation';
 import { fetchRecentDownloadHistory, resolveDownloadHistoryOutcome } from '../features/downloads/downloadHistory';
+import { preferSeenItImagePath } from '../features/downloads/downloadPosterStability';
 
 interface LiveDownloadState {
   downloads: LiveDownloadItem[];
@@ -607,8 +608,16 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
 
             const localMatch = currentDownloads.find(current => sameDownloadIdentity(current, serverItem));
             if (localMatch) {
-              if (!serverItem.posterPath && localMatch.posterPath) serverItem.posterPath = localMatch.posterPath;
-              if (!serverItem.backdropPath && localMatch.backdropPath) serverItem.backdropPath = localMatch.backdropPath;
+              // Dès qu'un transfert est lié à une demande SeenIt, le poster/backdrop
+              // transmis par la fiche est l'identité visuelle de référence. Les images
+              // des clients distants ne peuvent plus le remplacer pendant un poll.
+              if (localMatch.requestId) {
+                serverItem.posterPath = preferSeenItImagePath(serverItem.posterPath, localMatch.posterPath);
+                serverItem.backdropPath = preferSeenItImagePath(serverItem.backdropPath, localMatch.backdropPath);
+              } else {
+                if (!serverItem.posterPath && localMatch.posterPath) serverItem.posterPath = localMatch.posterPath;
+                if (!serverItem.backdropPath && localMatch.backdropPath) serverItem.backdropPath = localMatch.backdropPath;
+              }
               if (!serverItem.tmdbId && localMatch.tmdbId) serverItem.tmdbId = localMatch.tmdbId;
               if (!serverItem.tvdbId && localMatch.tvdbId) serverItem.tvdbId = localMatch.tvdbId;
               if (!serverItem.quality && localMatch.quality) serverItem.quality = localMatch.quality;
@@ -703,8 +712,8 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             if (!serverItem.tmdbId && optimistic.tmdbId) serverItem.tmdbId = optimistic.tmdbId;
             if (!serverItem.tvdbId && optimistic.tvdbId) serverItem.tvdbId = optimistic.tvdbId;
             if (!serverItem.imdbId && optimistic.imdbId) serverItem.imdbId = optimistic.imdbId;
-            if (!serverItem.posterPath && optimistic.posterPath) serverItem.posterPath = optimistic.posterPath;
-            if (!serverItem.backdropPath && optimistic.backdropPath) serverItem.backdropPath = optimistic.backdropPath;
+            serverItem.posterPath = preferSeenItImagePath(serverItem.posterPath, optimistic.posterPath);
+            serverItem.backdropPath = preferSeenItImagePath(serverItem.backdropPath, optimistic.backdropPath);
             if (serverItem.seasonNumber == null && optimistic.seasonNumber != null) serverItem.seasonNumber = optimistic.seasonNumber;
             if (serverItem.episodeNumber == null && optimistic.episodeNumber != null) serverItem.episodeNumber = optimistic.episodeNumber;
             if (serverItem.mediaType === 'movie') {
@@ -899,6 +908,8 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               ...meta,
               id: identitySource.id,
               requestId: a.requestId || b.requestId || seenItRequest?.id,
+              posterPath: preferSeenItImagePath(meta.posterPath || live.posterPath, seenItRequest?.posterPath),
+              backdropPath: preferSeenItImagePath(meta.backdropPath || live.backdropPath, seenItRequest?.backdropPath),
               movieTitle: meta.mediaType === 'movie'
                 ? (seenItRequest?.movieTitle || seenItRequest?.title || meta.movieTitle || live.movieTitle)
                 : meta.movieTitle,
