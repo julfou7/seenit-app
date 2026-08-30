@@ -7,6 +7,7 @@ import { auth } from '../../lib/firebase';
 import { appLogger } from '../../store/logStore';
 import { authenticatedFetch, getAuthenticatedHeaders } from '../../lib/apiAuth';
 import { getStoredPlexToken } from './plexStorage';
+import { buildPlexMediaUrl, replacePlexUserCache } from './plexAvailabilityCache';
 
 export interface PlexMediaInfo {
   available: boolean;
@@ -23,6 +24,7 @@ export interface PlexMediaInfo {
 interface PlexAvailabilityState {
   cache: Record<string, PlexMediaInfo>;
   setMediaAvailability: (key: string, info: PlexMediaInfo) => void;
+  replaceUserCache: (uid: string, cache: Record<string, PlexMediaInfo>) => void;
   getMediaAvailability: (key: string) => PlexMediaInfo | undefined;
   clearCache: () => void;
   clearUserCache: (uid: string) => void;
@@ -36,17 +38,21 @@ export const usePlexAvailabilityStore = create<PlexAvailabilityState>()(
         set((state) => ({
           cache: { ...state.cache, [key]: info }
         })),
-      getMediaAvailability: (key) => get().cache[key],
+      replaceUserCache: (uid, cache) =>
+        set((state) => ({
+          cache: replacePlexUserCache(state.cache, uid, cache)
+        })),
+      getMediaAvailability: (key) => {
+        const info = get().cache[key];
+        if (!info || info.plexUrl || !info.serverId || !info.ratingKey) return info;
+        const plexUrl = buildPlexMediaUrl(info.serverId, info.ratingKey);
+        return { ...info, plexUrl, watchUrl: info.watchUrl || plexUrl };
+      },
       clearCache: () => set({ cache: {} }),
       clearUserCache: (uid) =>
-        set((state) => {
-          const prefix = `v3:${uid}:`;
-          return {
-            cache: Object.fromEntries(
-              Object.entries(state.cache).filter(([key]) => !key.startsWith(prefix))
-            )
-          };
-        })
+        set((state) => ({
+          cache: replacePlexUserCache(state.cache, uid, {})
+        }))
     }),
     {
       name: 'seenit_plex_availability_cache'

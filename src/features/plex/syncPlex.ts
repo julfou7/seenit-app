@@ -32,6 +32,7 @@ import {
   setPlexResolutionCache
 } from './plexStorage';
 import { getPlexMediaKey, usePlexAvailabilityStore } from './plexAvailability';
+import type { PlexMediaInfo } from './plexAvailability';
 import {
   describeIncompletePlexSync,
   describePlexServerSync,
@@ -657,9 +658,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
       if (shouldReplacePlexAvailabilityCache(delta, plexData?.integrity)) {
         const availabilityStore = usePlexAvailabilityStore.getState();
-        availabilityStore.clearUserCache(user.uid);
-        let seededAvailability = 0;
-        const seededKeys = new Set<string>();
+        const replacementCache: Record<string, PlexMediaInfo> = {};
+        const cacheTimestamp = Date.now();
 
         for (const entry of libraryAvailability) {
           const tmdbId = Number(entry?.tmdbId);
@@ -667,23 +667,18 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           if (!Number.isFinite(tmdbId) || !mediaType || !entry?.serverId || !entry?.ratingKey) continue;
 
           const key = getPlexMediaKey(tmdbId, mediaType, user.uid);
-          if (seededKeys.has(key)) continue;
-          seededKeys.add(key);
-          availabilityStore.setMediaAvailability(key, {
+          if (replacementCache[key]) continue;
+          replacementCache[key] = {
             available: true,
             serverName: entry.serverName,
             serverId: entry.serverId,
             ratingKey: String(entry.ratingKey),
-            plexUrl: entry.plexUrl,
-            watchUrl: entry.watchUrl || entry.plexUrl,
-            title: entry.title || undefined,
-            year: entry.year ? Number(entry.year) : undefined,
-            lastChecked: Date.now()
-          });
-          seededAvailability++;
+            lastChecked: cacheTimestamp
+          };
         }
 
-        appLogger.info('plex', `[Plex Availability] Cache reconstruit depuis le full scan : ${seededAvailability} média(s) disponible(s).`);
+        availabilityStore.replaceUserCache(user.uid, replacementCache);
+        appLogger.info('plex', `[Plex Availability] Cache reconstruit en une écriture atomique : ${Object.keys(replacementCache).length} média(s) disponible(s).`);
       }
       const hasHistory = Array.isArray(history) && history.length > 0;
       const hasWatchlist = Array.isArray(watchlist) && watchlist.length > 0;

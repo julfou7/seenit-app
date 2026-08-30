@@ -447,7 +447,7 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.63',
+        'X-Plex-Version': '1.4.65',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
@@ -1772,21 +1772,19 @@ async function startServer() {
         const ratingKey = getPlexMetadataLookupKey(meta);
         if (!ratingKey || !entry.serverId) continue;
 
-        const availabilityKey = `${entry.serverId}:${mediaType}:${ids.tmdbId}`;
+        // Le client ne conserve qu'une destination Plex par média TMDB. Éviter de
+        // renvoyer le même média une fois par serveur réduit fortement le payload
+        // des bibliothèques partagées sans introduire de rapprochement par titre.
+        const availabilityKey = `${mediaType}:${ids.tmdbId}`;
         if (availabilitySeen.has(availabilityKey)) continue;
         availabilitySeen.add(availabilityKey);
 
-        const plexUrl = `https://app.plex.tv/desktop/#!/server/${entry.serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`;
         normalizedLibraryAvailability.push({
           tmdbId: ids.tmdbId,
           mediaType,
           serverName: entry.serverName || 'Plex',
           serverId: entry.serverId,
-          ratingKey,
-          plexUrl,
-          watchUrl: plexUrl,
-          title: meta.title || null,
-          year: meta.year ? Number(meta.year) : undefined
+          ratingKey
         });
       }
 
