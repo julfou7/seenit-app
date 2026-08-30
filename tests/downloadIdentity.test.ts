@@ -205,7 +205,8 @@ test('la synchro partagée rattache un titre français à l’unique torrent ang
     size: 0,
     sizeleft: 0,
     progress: 0,
-    status: 'searching'
+    status: 'searching',
+    statusText: 'Recherche en cours'
   }];
   const remotes = [{
     id: 'qbit_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -217,7 +218,8 @@ test('la synchro partagée rattache un titre français à l’unique torrent ang
     size: 2_300_000_000,
     sizeleft: 2_300_000_000,
     progress: 0,
-    status: 'downloading'
+    status: 'downloading',
+    statusText: 'Téléchargement en cours'
   }];
 
   assert.deepEqual(
@@ -239,7 +241,8 @@ test('la synchro partagée refuse le rattachement transitoire dès que deux torr
     size: 0,
     sizeleft: 0,
     progress: 0,
-    status: 'searching'
+    status: 'searching',
+    statusText: 'Recherche en cours'
   };
   const remotes = ['a', 'b'].map((suffix, index) => ({
     id: `qbit_${suffix.repeat(40)}`,
@@ -250,7 +253,8 @@ test('la synchro partagée refuse le rattachement transitoire dès que deux torr
     size: 2_300_000_000,
     sizeleft: 2_300_000_000,
     progress: 0,
-    status: 'downloading'
+    status: 'downloading',
+    statusText: 'Téléchargement en cours'
   }));
 
   assert.deepEqual(findUniqueRecentOptimisticAttachments([request], remotes, now), []);
@@ -334,6 +338,7 @@ test('la fusion conserve le titre SeenIt localisé tout en gardant la télémét
     sizeleft: 0,
     progress: 0,
     status: 'searching',
+    statusText: 'Recherche en cours',
     isOptimistic: true
   };
 
