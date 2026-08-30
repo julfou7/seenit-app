@@ -6,6 +6,7 @@ import { auth } from '../../lib/firebase';
 
 import { appLogger } from '../../store/logStore';
 import { authenticatedFetch, getAuthenticatedHeaders } from '../../lib/apiAuth';
+import { executeBackendAttempts } from '../../lib/nativeBackendRetry';
 import { getStoredPlexToken } from './plexStorage';
 import { buildPlexMediaUrl, replacePlexUserCache } from './plexAvailabilityCache';
 
@@ -151,20 +152,54 @@ async function performPlexAvailabilityCheck(params: {
     };
 
     if (isNative) {
-      const nativeRes = await CapacitorHttp.post({
-        url,
-        headers: await getAuthenticatedHeaders({
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Plex-Token': plexToken
-        }),
-        data: payload,
-        connectTimeout: 5000,
-        readTimeout: 5000
+      const nativeRequest = async () => {
+        const nativeRes = await CapacitorHttp.post({
+          url,
+          headers: await getAuthenticatedHeaders({
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Plex-Token': plexToken
+          }),
+          data: payload,
+          connectTimeout: 5000,
+          readTimeout: 5000
+        });
+        return {
+          status: nativeRes.status,
+          data: typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data
+        };
+      };
+      const webViewRequest = async () => {
+        const response = await authenticatedFetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Plex-Token': plexToken
+          },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(5000)
+        });
+        const contentType = response.headers.get('content-type') || '';
+        return {
+          status: response.status,
+          data: contentType.includes('application/json') ? await response.json() : null
+        };
+      };
+      const response = await executeBackendAttempts({
+        attempts: [
+          { transport: 'natif Android', request: nativeRequest },
+          { transport: 'WebView', request: webViewRequest },
+          { transport: 'natif Android', request: nativeRequest }
+        ],
+        delaysMs: [250, 600],
+        onRetry: ({ nextTransport }) => {
+          appLogger.warn('plex', `[Plex Availability] Réseau natif indisponible, nouvel essai via ${nextTransport}.`);
+        }
       });
-      isOk = nativeRes.status >= 200 && nativeRes.status < 300;
+      isOk = response.status >= 200 && response.status < 300;
       if (isOk) {
-        data = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
+        data = response.data;
       }
     } else {
       const controller = new AbortController();

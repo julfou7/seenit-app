@@ -11,6 +11,7 @@ import { getPlexClientId } from '../../services/plex';
 import { Show } from '../../types';
 import { CURRENT_APP_VERSION } from '../../store/updateStore';
 import { authenticatedFetch, getAuthenticatedHeaders } from '../../lib/apiAuth';
+import { executeBackendAttempts } from '../../lib/nativeBackendRetry';
 import {
   buildPlexParentShowIdentityItem,
   buildResolvedPlexIdentity,
@@ -527,21 +528,67 @@ async function fetchPlexHistoryData(token: string, clientId: string, delta: bool
     let data: any = null;
 
     if (isNative) {
-      const nativeRes = await CapacitorHttp.post({
-        url,
-        headers: await getAuthenticatedHeaders({
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Plex-Token': token
-        }),
-        data: { clientId, delta, since },
-        connectTimeout: timeoutMs,
-        readTimeout: timeoutMs
+      const payload = { clientId, delta, since };
+      const nativeRequest = async () => {
+        const nativeRes = await CapacitorHttp.post({
+          url,
+          headers: await getAuthenticatedHeaders({
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Plex-Token': token
+          }),
+          data: payload,
+          connectTimeout: Math.min(timeoutMs, 15000),
+          readTimeout: timeoutMs
+        });
+        return {
+          status: nativeRes.status,
+          data: typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data
+        };
+      };
+      const webViewRequest = async () => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          const response = await authenticatedFetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'X-Plex-Token': token
+            },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+          });
+          const contentType = response.headers.get('content-type') || '';
+          return {
+            status: response.status,
+            data: contentType.includes('application/json') ? await response.json() : null
+          };
+        } finally {
+          clearTimeout(timer);
+        }
+      };
+
+      const nativeResult = await executeBackendAttempts({
+        attempts: [
+          { transport: 'natif Android', request: nativeRequest },
+          { transport: 'WebView', request: webViewRequest },
+          { transport: 'natif Android', request: nativeRequest }
+        ],
+        delaysMs: [400, 1200],
+        onRetry: ({ failedTransport, nextTransport, attempt, error }) => {
+          appLogger.warn(
+            'plex',
+            `[Plex Réseau] ${failedTransport} indisponible (${error instanceof Error ? error.message : String(error)}). ` +
+            `Nouvelle tentative ${attempt + 1}/3 via ${nextTransport}.`
+          );
+        }
       });
-      status = nativeRes.status;
+      status = nativeResult.status;
       isOk = status >= 200 && status < 300;
       if (isOk) {
-        data = typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data;
+        data = nativeResult.data;
       }
     } else {
       const controller = new AbortController();
