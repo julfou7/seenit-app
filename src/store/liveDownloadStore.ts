@@ -85,6 +85,14 @@ function sameCanonicalMedia(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
   return Boolean(aTitle && bTitle && aTitle === bTitle);
 }
 
+function resolutionBucket(item: LiveDownloadItem): '4k' | '1080p' | '720p' | null {
+  const value = `${item.quality || ''} ${item.releaseTitle || ''}`.toLowerCase();
+  if (/2160|4k|uhd/.test(value)) return '4k';
+  if (/1080/.test(value)) return '1080p';
+  if (/720/.test(value)) return '720p';
+  return null;
+}
+
 function sameRequestScope(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
   if (!sameCanonicalMedia(a, b)) return false;
   if (a.mediaType !== 'tv') return true;
@@ -99,6 +107,10 @@ function sameDownloadIdentity(a: LiveDownloadItem, b: LiveDownloadItem): boolean
   // Deux vrais infohash incompatibles = deux torrents différents. Un identifiant
   // temporaire/non-hash de *Arr ne doit en revanche pas bloquer les autres signaux.
   if (hasConflictingStrongPhysicalIds(a, b)) return false;
+
+  const aResolution = resolutionBucket(a);
+  const bResolution = resolutionBucket(b);
+  if (aResolution && bResolution && aResolution !== bResolution) return false;
 
   // Compatibilité avec les doublons persistés avant l'introduction du hash :
   // même release + même taille, tant qu'au moins une des deux représentations

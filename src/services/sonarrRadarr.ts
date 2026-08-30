@@ -760,15 +760,13 @@ function releaseMatchesQualityPreference(release: any, preference?: '1080p' | '4
 function hasOnlyExistingMediaRejections(release: any): boolean {
   const rejections = Array.isArray(release?.rejections) ? release.rejections.filter(Boolean) : [];
   if (!rejections.length) return true;
-  return rejections.every((reason: any) =>
-    /existing file|cutoff|upgrade|custom format|already.*file|equal or higher/i.test(String(reason))
-  );
+  return rejections.every((reason: any) => /existing file/i.test(String(reason)));
 }
 
 function rankInteractiveReleases(releases: any[], preference?: '1080p' | '4k', preferSeasonPack = false): any[] {
   return releases
     .filter(release => releaseMatchesQualityPreference(release, preference))
-    .filter(release => release?.approved === true || release?.rejected !== true || hasOnlyExistingMediaRejections(release))
+    .filter(release => release?.approved === true || hasOnlyExistingMediaRejections(release))
     .sort((a, b) => {
       if (preferSeasonPack && Boolean(a.fullSeason) !== Boolean(b.fullSeason)) return a.fullSeason ? -1 : 1;
       if (Boolean(a.approved) !== Boolean(b.approved)) return a.approved ? -1 : 1;
