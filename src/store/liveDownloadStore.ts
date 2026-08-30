@@ -16,6 +16,7 @@ import {
 import { useToastStore } from './toastStore';
 import { useShowsStore } from './showsStore';
 import { auth } from '../lib/firebase';
+import { getPhysicalDownloadId, samePhysicalDownload } from '../features/downloads/downloadIdentity';
 
 interface LiveDownloadState {
   downloads: LiveDownloadItem[];
@@ -93,6 +94,14 @@ function sameRequestScope(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
 
 function sameDownloadIdentity(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
   if (a.id === b.id) return true;
+
+  const aPhysicalId = getPhysicalDownloadId(a);
+  const bPhysicalId = getPhysicalDownloadId(b);
+  if (samePhysicalDownload(a, b)) return true;
+  // Deux hashes explicites différents = deux téléchargements physiques différents,
+  // même si TMDB/titre sont identiques (ex. 1080p et 4K en parallèle).
+  if (aPhysicalId && bPhysicalId) return false;
+
   if (!sameCanonicalMedia(a, b)) return false;
 
   if (a.mediaType === 'tv') {
@@ -173,6 +182,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           errorMessage: item.errorMessage,
           downloadClient: item.downloadClient || (item.mediaType === 'tv' ? 'Sonarr' : 'Radarr'),
           releaseTitle: item.releaseTitle || item.title,
+          downloadId: item.downloadId,
           isOptimistic: true
         };
 
@@ -270,6 +280,25 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               if (!serverItem.tmdbId && localMatch.tmdbId) serverItem.tmdbId = localMatch.tmdbId;
               if (!serverItem.tvdbId && localMatch.tvdbId) serverItem.tvdbId = localMatch.tvdbId;
               if (!serverItem.quality && localMatch.quality) serverItem.quality = localMatch.quality;
+              if (!serverItem.downloadId && localMatch.downloadId) serverItem.downloadId = localMatch.downloadId;
+
+              // Si qBittorrent est momentanément indisponible, ne jamais faire reculer
+              // la progression physique connue au poll précédent.
+              if (samePhysicalDownload(localMatch, serverItem)
+                  && Number(localMatch.progress || 0) > Number(serverItem.progress || 0)) {
+                serverItem.progress = localMatch.progress;
+                if (localMatch.size > 0) serverItem.size = localMatch.size;
+                serverItem.sizeleft = localMatch.sizeleft;
+                if (localMatch.speedBytesPerSec) serverItem.speedBytesPerSec = localMatch.speedBytesPerSec;
+                if (localMatch.speedFormatted) serverItem.speedFormatted = localMatch.speedFormatted;
+                if (localMatch.timeleftSeconds) serverItem.timeleftSeconds = localMatch.timeleftSeconds;
+                if (localMatch.timeleft) serverItem.timeleft = localMatch.timeleft;
+                if (serverItem.status !== 'error' && localMatch.status !== 'error') {
+                  serverItem.status = localMatch.status;
+                  serverItem.statusText = localMatch.statusText;
+                  serverItem.downloadClient = localMatch.downloadClient || serverItem.downloadClient;
+                }
+              }
             }
 
             if (!serverItem.posterPath && localShows.length > 0) {
@@ -358,8 +387,15 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           }
 
           const itemMap = new Map<string, LiveDownloadItem>();
+          const seenPhysicalIds = new Set<string>();
           for (const item of [...serverItems, ...pendingOptimistic, ...preservedItems]) {
-            if (!removedSet.has(item.id)) itemMap.set(item.id, item);
+            if (removedSet.has(item.id)) continue;
+
+            const physicalId = getPhysicalDownloadId(item);
+            if (physicalId && seenPhysicalIds.has(physicalId)) continue;
+            if (physicalId) seenPhysicalIds.add(physicalId);
+
+            itemMap.set(item.id, item);
           }
           const finalItems = Array.from(itemMap.values());
 

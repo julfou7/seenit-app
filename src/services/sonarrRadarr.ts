@@ -1,6 +1,7 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { C411Torrent } from './c411';
 import { authenticatedFetch } from '../lib/apiAuth';
+import { getPhysicalDownloadId, normalizeDownloadClientId } from '../features/downloads/downloadIdentity';
 
 export interface SonarrRadarrConfig {
   sonarrUrl?: string;
@@ -1376,6 +1377,8 @@ export interface LiveDownloadItem {
   errorMessage?: string;
   downloadClient?: string;
   releaseTitle?: string;
+  /** Identifiant physique du client de téléchargement (hash torrent qBittorrent / downloadId *Arr). */
+  downloadId?: string;
   isOptimistic?: boolean;
 }
 
@@ -1702,6 +1705,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           statusText: statusInfo.status === 'downloading' ? `Téléchargement ${progress}%` : statusInfo.statusText,
           errorMessage: statusInfo.errorMessage,
           downloadClient: rec.downloadClient || 'Sonarr',
+          downloadId: normalizeDownloadClientId(rec.downloadId) || undefined,
           releaseTitle: rec.title
         });
       }
@@ -1758,6 +1762,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           statusText: statusInfo.status === 'downloading' ? `Téléchargement ${progress}%` : statusInfo.statusText,
           errorMessage: statusInfo.errorMessage,
           downloadClient: rec.downloadClient || 'Radarr',
+          downloadId: normalizeDownloadClientId(rec.downloadId) || undefined,
           releaseTitle: rec.title
         });
       }
@@ -1794,55 +1799,75 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
             (typeof t.progress === 'number' && t.progress >= 0.995) || 
             ['uploading', 'stalledUP', 'completed', 'pausedUP', 'checkingUP', 'forcedUP'].includes(t.state)
           );
-          const rawProgress = isDone ? 100 : (typeof t.progress === 'number' ? Math.min(99, Math.round(t.progress * 100)) : 0);
+          const rawProgress = isDone
+            ? 100
+            : (typeof t.progress === 'number'
+                ? Math.min(99.9, Math.max(0, Math.round(t.progress * 1000) / 10))
+                : 0);
           const speed = t.dlspeed || 0;
           const etaSec = t.eta || 0;
           const isTv = t.category === 'tv' || /s\d{1,2}e\d{1,2}/i.test(t.name);
+          const qbitDownloadId = normalizeDownloadClientId(t.hash);
 
           const isQbitError = t.state === 'error' || t.state === 'missingFiles';
           const qbitErrorMsg = isQbitError ? 'Erreur qBittorrent (espace disque insuffisant ou fichier manquant)' : undefined;
-          const qbitStatus = isQbitError ? 'error' : (isDone ? 'completed' : (t.state === 'stalledDL' ? 'warning' : (t.state || 'downloading')));
-          const qbitStatusText = isQbitError ? 'Erreur' : (isDone ? 'Téléchargement terminé 🍿' : (t.state === 'stalledDL' ? 'En attente de sources' : `qBittorrent ${rawProgress}%`));
+          const qbitStatus = isQbitError
+            ? 'error'
+            : (isDone ? 'completed' : (t.state === 'stalledDL' ? 'warning' : (t.state === 'pausedDL' ? 'paused' : 'downloading')));
+          const qbitStatusText = isQbitError
+            ? 'Erreur'
+            : (isDone
+                ? 'Téléchargement terminé 🍿'
+                : (t.state === 'stalledDL'
+                    ? 'En attente de sources'
+                    : (t.state === 'pausedDL' ? `Téléchargement en pause • ${rawProgress}%` : `Téléchargement ${rawProgress}%`)));
 
           const normTName = (t.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
           const existing = items.find(it => {
+            // Le hash du client est l'identité physique fiable. Il permet notamment
+            // de fusionner un titre Radarr en anglais avec un torrent qBittorrent en français.
+            const physicalId = getPhysicalDownloadId(it);
+            if (qbitDownloadId && physicalId && physicalId === qbitDownloadId) return true;
+
+            // Fallback uniquement pour les anciens clients/*Arr qui ne fournissent pas downloadId.
             if (!it.releaseTitle && !it.title) return false;
             const normRel = (it.releaseTitle || it.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-            return normRel && normTName && (normRel === normTName || normRel.includes(normTName) || normTName.includes(normRel));
+            return Boolean(normRel && normTName && (normRel === normTName || normRel.includes(normTName) || normTName.includes(normRel)));
           });
 
           if (existing) {
-            if (isDone) {
-              existing.progress = 100;
-              existing.status = 'completed';
-              existing.statusText = 'Téléchargement terminé 🍿';
-              existing.sizeleft = 0;
-              existing.speedBytesPerSec = 0;
-              existing.speedFormatted = '';
-              existing.timeleft = '';
-              existing.timeleftSeconds = 0;
+            // Métadonnées *Arr (TMDB, titre, poster) + télémétrie qBittorrent (source de vérité live).
+            if (qbitDownloadId && !existing.downloadId) existing.downloadId = qbitDownloadId;
+            if (Number(t.size) > 0) existing.size = Number(t.size);
+            existing.progress = rawProgress;
+            existing.sizeleft = isDone
+              ? 0
+              : Math.max(0, Math.round((Number(t.size) || existing.size || 0) * (1 - (Number(t.progress) || 0))));
+            existing.speedBytesPerSec = isDone ? 0 : speed;
+            existing.speedFormatted = !isDone && speed > 0 ? formatSpeed(speed) : '';
+
+            const hasUsefulEta = !isDone && etaSec > 0 && etaSec < 86400 * 7;
+            existing.timeleftSeconds = hasUsefulEta ? etaSec : 0;
+            existing.timeleft = hasUsefulEta ? formatSecondsToETA(etaSec) : '';
+            existing.downloadClient = 'qBittorrent';
+
+            if (isQbitError) {
+              existing.status = 'error';
+              existing.statusText = 'Erreur';
+              existing.errorMessage = qbitErrorMsg;
+            } else if (existing.status === 'error' && existing.errorMessage) {
+              // Ne pas masquer une erreur d'import *Arr par un torrent sain.
             } else {
-              existing.progress = Math.max(existing.progress || 0, rawProgress);
-              existing.sizeleft = Math.round((t.size || 0) * (1 - (t.progress || 0)));
-              if (speed > 0) {
-                existing.speedBytesPerSec = speed;
-                existing.speedFormatted = formatSpeed(speed);
-              }
-              if (etaSec > 0 && etaSec < 86400 * 7) {
-                existing.timeleftSeconds = etaSec;
-                existing.timeleft = formatSecondsToETA(etaSec);
-              }
-              if (isQbitError) {
-                existing.status = 'error';
-                existing.statusText = 'Erreur';
-                existing.errorMessage = qbitErrorMsg;
-              }
+              existing.status = qbitStatus;
+              existing.statusText = qbitStatusText;
+              existing.errorMessage = undefined;
             }
           } else {
             // Pour qBittorrent direct sans correspondance Radarr/Sonarr, n'ajouter les complétés que si non terminés ou récents
             if (!isDone || (rawProgress >= 100 && (t.completion_on > 0 && Date.now()/1000 - t.completion_on < 86400 * 2))) {
               items.push({
                 id: `qbit_${t.hash || t.name}`,
+                downloadId: qbitDownloadId || undefined,
                 mediaType: isTv ? 'tv' : 'movie',
                 title: t.name,
                 quality: extractQualityFromTitle(t.name),
