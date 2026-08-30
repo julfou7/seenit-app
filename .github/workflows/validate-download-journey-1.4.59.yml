@@ -1,0 +1,55 @@
+name: Validate Download Journey 1.4.59
+
+on:
+  push:
+    branches:
+      - fix/download-journey-1.4.59
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/download-journey-1.4.59
+          fetch-depth: 0
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Apply patch
+        run: node scripts/patch-download-journey-1.4.59.cjs
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Type check
+        run: npm run lint
+
+      - name: Tests Plex et téléchargements
+        run: npm run test:plex
+
+      - name: Build Web and server
+        run: npm run build
+
+      - name: Check diff
+        run: git diff --check
+
+      - name: Commit validated fix
+        run: |
+          git config user.name "julfou7"
+          git config user.email "julianfouillade@gmail.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Aucune modification à committer"
+            exit 0
+          fi
+          git commit -m "fix(downloads): fluidifier le parcours jusqu’à Plex" -m $'- empêche un poll en vol d’écraser une nouvelle demande optimiste\n- conserve immédiatement le poster et l’identité TMDB pendant le démarrage\n- rend toute la carte Téléchargements ouvrable vers la fiche\n- simplifie la fiche en statut en cours / terminé sans dupliquer le monitoring\n- force quelques rafraîchissements Plex après import pour éviter un cache négatif périmé\n- publie SeenIt 1.4.59'
+          git push origin HEAD:fix/download-journey-1.4.59
