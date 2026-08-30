@@ -19,7 +19,7 @@ import { useToastStore } from './toastStore';
 import { useShowsStore } from './showsStore';
 import { auth, db } from '../lib/firebase';
 import { canAttachRecentOptimisticRequest, getPhysicalDownloadId, getStrongPhysicalDownloadIds, hasConflictingStrongPhysicalIds, mergeDownloadIdAliases, sameDownloadRequest, sameLegacyPhysicalTransfer, samePhysicalDownload, sameTransferPath } from '../features/downloads/downloadIdentity';
-import { mergeLateOptimisticMetadata } from '../features/downloads/downloadReconciliation';
+import { findUniqueRecentOptimisticAttachments, mergeLateOptimisticMetadata } from '../features/downloads/downloadReconciliation';
 import { fetchRecentDownloadHistory, resolveDownloadHistoryOutcome } from '../features/downloads/downloadHistory';
 
 interface LiveDownloadState {
@@ -174,15 +174,22 @@ function startSharedDownloadRequestSync(uid: string) {
         const downloads = [...(state.downloads || [])].filter(item =>
           !item.isOptimistic || !removedRequestDocIds.has(sharedRequestDocId(item))
         );
+        const unmatchedRemoteItems: LiveDownloadItem[] = [];
+
         for (const remote of remoteItems) {
           const index = downloads.findIndex(local => sameDownloadIdentity(local, remote) || sameRequestScope(local, remote));
           if (index < 0) {
-            downloads.unshift(remote);
-            optimisticTimestamps[remote.id] = Date.now();
+            unmatchedRemoteItems.push(remote);
             continue;
           }
+
           const local = downloads[index];
-          if (!local.isOptimistic) continue;
+          if (!local.isOptimistic) {
+            downloads[index] = mergeLateOptimisticMetadata(local, remote);
+            markLocalItemMutation(local.id);
+            continue;
+          }
+
           downloads[index] = {
             ...local,
             ...remote,
@@ -190,11 +197,42 @@ function startSharedDownloadRequestSync(uid: string) {
             requestId: local.requestId || remote.requestId,
             posterPath: remote.posterPath || local.posterPath,
             backdropPath: remote.backdropPath || local.backdropPath,
+            movieTitle: remote.mediaType === 'movie'
+              ? (remote.movieTitle || remote.title || local.movieTitle)
+              : (remote.movieTitle || local.movieTitle),
+            seriesTitle: remote.mediaType === 'tv'
+              ? (remote.seriesTitle || remote.title || local.seriesTitle)
+              : (remote.seriesTitle || local.seriesTitle),
             isOptimistic: true,
             isRestored: false
           };
           optimisticTimestamps[local.id] = Date.now();
+          markLocalItemMutation(local.id);
         }
+
+        // La synchro PWA ↔ APK peut arriver après l'apparition du torrent qBittorrent.
+        // On réutilise alors la règle sûre de la 1.4.58 : association unique des deux
+        // côtés, sans aucune comparaison de titre.
+        const liveCandidates = downloads.filter(item => !item.isOptimistic && !isTerminalDownload(item));
+        const attachments = findUniqueRecentOptimisticAttachments(unmatchedRemoteItems, liveCandidates, now);
+        const attachedRequestIndexes = new Set<number>();
+        for (const attachment of attachments) {
+          const request = unmatchedRemoteItems[attachment.requestIndex];
+          const local = liveCandidates[attachment.remoteIndex];
+          const index = downloads.findIndex(item => item.id === local.id);
+          if (index < 0) continue;
+          downloads[index] = mergeLateOptimisticMetadata(downloads[index], request);
+          markLocalItemMutation(local.id);
+          attachedRequestIndexes.add(attachment.requestIndex);
+        }
+
+        unmatchedRemoteItems.forEach((remote, requestIndex) => {
+          if (attachedRequestIndexes.has(requestIndex)) return;
+          downloads.unshift(remote);
+          optimisticTimestamps[remote.id] = Date.now();
+          markLocalItemMutation(remote.id);
+        });
+
         return { downloads };
       });
 
@@ -577,6 +615,20 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               if (!serverItem.transferPath && localMatch.transferPath) serverItem.transferPath = localMatch.transferPath;
               if (!serverItem.addedAt && localMatch.addedAt) serverItem.addedAt = localMatch.addedAt;
               if (!serverItem.requestId && localMatch.requestId) serverItem.requestId = localMatch.requestId;
+
+              // Une fois la demande SeenIt rattachée, son titre d'affichage reste
+              // prioritaire. Le titre du client distant reste disponible dans title /
+              // releaseTitle, mais ne doit plus faire varier l'interface entre langues.
+              if (localMatch.requestId) {
+                if (serverItem.mediaType === 'movie') {
+                  const seenItTitle = localMatch.movieTitle || (localMatch.isOptimistic ? localMatch.title : undefined);
+                  if (seenItTitle) serverItem.movieTitle = seenItTitle;
+                } else {
+                  const seenItTitle = localMatch.seriesTitle || (localMatch.isOptimistic ? localMatch.title : undefined);
+                  if (seenItTitle) serverItem.seriesTitle = seenItTitle;
+                }
+              }
+
               serverItem.isRestored = false;
               // Une même entrée *Arr peut temporairement changer/perdre son downloadId.
               // On garde l'historique des alias appris sur les polls précédents afin que
@@ -825,6 +877,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             const meta = metadataScore(a) >= metadataScore(b) ? a : b;
             const live = liveScore(a) >= liveScore(b) ? a : b;
             const identitySource = !a.isOptimistic ? a : !b.isOptimistic ? b : meta;
+            const seenItRequest = a.isOptimistic ? a : b.isOptimistic ? b : null;
             const aliases = mergeDownloadIdAliases(a, b);
             const strongIds = [...getStrongPhysicalDownloadIds(a), ...getStrongPhysicalDownloadIds(b)];
             const cancelled = isCancelledDownload(a) || isCancelledDownload(b);
@@ -845,7 +898,13 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             return {
               ...meta,
               id: identitySource.id,
-              requestId: a.requestId || b.requestId,
+              requestId: a.requestId || b.requestId || seenItRequest?.id,
+              movieTitle: meta.mediaType === 'movie'
+                ? (seenItRequest?.movieTitle || seenItRequest?.title || meta.movieTitle || live.movieTitle)
+                : meta.movieTitle,
+              seriesTitle: meta.mediaType === 'tv'
+                ? (seenItRequest?.seriesTitle || seenItRequest?.title || meta.seriesTitle || live.seriesTitle)
+                : meta.seriesTitle,
               downloadId: strongIds[0] || getPhysicalDownloadId(live) || getPhysicalDownloadId(meta) || undefined,
               downloadIdAliases: aliases,
               transferPath: meta.transferPath || live.transferPath,
@@ -882,11 +941,28 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           }
 
           // Réconcilie uniquement les mutations locales réellement survenues pendant
-          // ce poll. Une intention optimiste peut apporter identité/poster, jamais écraser
-          // progress/status/débit/ETA d'un snapshot distant déjà observé. Une annulation
-          // locale, elle, gagne toujours afin d'empêcher toute résurrection transitoire.
+          // ce poll. Une intention SeenIt peut apporter identité/poster/titre, jamais
+          // écraser progress/status/débit/ETA d'un snapshot distant déjà observé.
+          // Une annulation locale, elle, gagne toujours afin d'empêcher toute résurrection.
           const latestLocalMutations = (get().downloads || []).filter(item =>
             (localItemMutationRevision[item.id] || 0) > fetchStartedMutationRevision
+          );
+          const lateUnmatchedOptimistics = latestLocalMutations.filter(item =>
+            item.isOptimistic
+            && !removedSet.has(item.id)
+            && !finalItems.some(existing => sameDownloadIdentity(existing, item))
+          );
+          const lateRemoteCandidates = finalItems.filter(item => !item.isOptimistic && !isTerminalDownload(item));
+          const lateAttachments = findUniqueRecentOptimisticAttachments(
+            lateUnmatchedOptimistics,
+            lateRemoteCandidates,
+            Date.now()
+          );
+          const lateAttachmentTargetByRequestId = new Map<string, string>(
+            lateAttachments.map(attachment => [
+              lateUnmatchedOptimistics[attachment.requestIndex].id,
+              lateRemoteCandidates[attachment.remoteIndex].id
+            ])
           );
 
           for (const latestLocal of latestLocalMutations) {
@@ -900,10 +976,29 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               continue;
             }
 
-            if (!latestLocal.isOptimistic || removedSet.has(latestLocal.id)) continue;
+            if (removedSet.has(latestLocal.id)) continue;
 
             const existingIndex = finalItems.findIndex(existing => sameDownloadIdentity(existing, latestLocal));
+
+            // La synchro Firestore peut enrichir un transfert live pendant qu'un poll
+            // est en vol. On rejoue uniquement ses métadonnées SeenIt sur le snapshot
+            // frais afin que le poll ne réintroduise pas le titre distant.
+            if (!latestLocal.isOptimistic) {
+              if (existingIndex >= 0 && latestLocal.requestId) {
+                finalItems[existingIndex] = mergeLateOptimisticMetadata(finalItems[existingIndex], latestLocal);
+              }
+              continue;
+            }
+
             if (existingIndex < 0) {
+              const targetId = lateAttachmentTargetByRequestId.get(latestLocal.id);
+              const targetIndex = targetId
+                ? finalItems.findIndex(existing => existing.id === targetId)
+                : -1;
+              if (targetIndex >= 0) {
+                finalItems[targetIndex] = mergeLateOptimisticMetadata(finalItems[targetIndex], latestLocal);
+                continue;
+              }
               finalItems.unshift(latestLocal);
               continue;
             }
@@ -919,7 +1014,13 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
                 downloadIdAliases: mergeDownloadIdAliases(existing, latestLocal),
                 transferPath: existing.transferPath || latestLocal.transferPath,
                 posterPath: latestLocal.posterPath || existing.posterPath,
-                backdropPath: latestLocal.backdropPath || existing.backdropPath
+                backdropPath: latestLocal.backdropPath || existing.backdropPath,
+                movieTitle: latestLocal.mediaType === 'movie'
+                  ? (latestLocal.movieTitle || latestLocal.title || existing.movieTitle)
+                  : existing.movieTitle,
+                seriesTitle: latestLocal.mediaType === 'tv'
+                  ? (latestLocal.seriesTitle || latestLocal.title || existing.seriesTitle)
+                  : existing.seriesTitle
               };
               continue;
             }

@@ -32,6 +32,7 @@ import {
   beginDownloadRequest,
   failDownloadRequest
 } from '../features/downloads/downloadLifecycle';
+import { truncateDownloadProgressPercent } from '../features/downloads/downloadPresentation';
 
 interface Props {
   onShowClick?: (id: any, mediaType?: 'tv' | 'movie') => void;
@@ -79,15 +80,14 @@ function DownloadItemCard({
   const isWarning = !isCancelled && status === 'warning';
   const isPending = status === 'submitting' || status === 'searching' || status === 'queued';
   const progress = Math.min(100, Math.max(0, Number(item.progress || 0)));
+  const progressPercent = truncateDownloadProgressPercent(progress);
   const qualityBadges = getQualityBadges(item.quality);
   const downloadedBytes = item.size > 0 ? Math.max(0, item.size - item.sizeleft) : 0;
   const progressLabel = isCancelled
-    ? (progress > 0 ? `${progress.toFixed(1).replace(/\.0$/, '')}%` : '—')
+    ? (progress > 0 ? `${progressPercent}%` : '—')
     : isCompleted
       ? '100%'
-      : progress > 0
-        ? `${progress.toFixed(1).replace(/\.0$/, '')}%`
-        : '0%';
+      : `${progressPercent}%`;
   const posterSrc = item.posterPath
     ? item.posterPath.startsWith('http')
       ? item.posterPath

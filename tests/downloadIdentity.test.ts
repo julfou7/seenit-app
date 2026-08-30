@@ -13,7 +13,11 @@ import {
   samePhysicalDownload,
   sameTransferPath
 } from '../src/features/downloads/downloadIdentity.ts';
-import { mergeLateOptimisticMetadata } from '../src/features/downloads/downloadReconciliation.ts';
+import {
+  findUniqueRecentOptimisticAttachments,
+  mergeLateOptimisticMetadata
+} from '../src/features/downloads/downloadReconciliation.ts';
+import { truncateDownloadProgressPercent } from '../src/features/downloads/downloadPresentation.ts';
 
 test('normalise le hash qBittorrent et le downloadId *Arr sans dépendre de la casse', () => {
   assert.equal(normalizeDownloadClientId(' ABCDEF123 '), 'abcdef123');
@@ -187,6 +191,72 @@ test('ne rattache pas une autre résolution pendant la fenêtre transitoire', ()
 });
 
 
+test('la synchro partagée rattache un titre français à l’unique torrent anglais sans comparer les noms', () => {
+  const now = 1_700_000_320_000;
+  const requests = [{
+    id: 'opt_robin',
+    requestId: 'opt_robin',
+    isOptimistic: true,
+    mediaType: 'movie' as const,
+    tmdbId: 1181198,
+    title: 'On l’appelait Robin des Bois',
+    quality: '1080p',
+    addedAt: now - 12_000,
+    size: 0,
+    sizeleft: 0,
+    progress: 0,
+    status: 'searching'
+  }];
+  const remotes = [{
+    id: 'qbit_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    mediaType: 'movie' as const,
+    title: 'The.Death.Of.Robin.Hood.2026.1080p.WEB-DL',
+    releaseTitle: 'The.Death.Of.Robin.Hood.2026.1080p.WEB-DL',
+    quality: '1080p WEB-DL',
+    addedAt: now - 6_000,
+    size: 2_300_000_000,
+    sizeleft: 2_300_000_000,
+    progress: 0,
+    status: 'downloading'
+  }];
+
+  assert.deepEqual(
+    findUniqueRecentOptimisticAttachments(requests, remotes, now),
+    [{ requestIndex: 0, remoteIndex: 0 }]
+  );
+});
+
+test('la synchro partagée refuse le rattachement transitoire dès que deux torrents sont plausibles', () => {
+  const now = 1_700_000_420_000;
+  const request = {
+    id: 'opt_robin',
+    isOptimistic: true,
+    mediaType: 'movie' as const,
+    tmdbId: 1181198,
+    title: 'On l’appelait Robin des Bois',
+    quality: '1080p',
+    addedAt: now - 10_000,
+    size: 0,
+    sizeleft: 0,
+    progress: 0,
+    status: 'searching'
+  };
+  const remotes = ['a', 'b'].map((suffix, index) => ({
+    id: `qbit_${suffix.repeat(40)}`,
+    mediaType: 'movie' as const,
+    title: `Release ${index}`,
+    quality: '1080p WEB-DL',
+    addedAt: now - 5_000 + index,
+    size: 2_300_000_000,
+    sizeleft: 2_300_000_000,
+    progress: 0,
+    status: 'downloading'
+  }));
+
+  assert.deepEqual(findUniqueRecentOptimisticAttachments([request], remotes, now), []);
+});
+
+
 test('corrèle *Arr et qBittorrent par la demande SeenIt même si leurs IDs distants divergent', () => {
   const requestId = 'opt_1700000000000_test';
   assert.equal(sameDownloadRequest(
@@ -235,6 +305,52 @@ test('une mutation optimiste tardive ne peut jamais figer la télémétrie dista
   assert.equal(merged.tmdbId, 1234);
   assert.equal(merged.posterPath, '/poster.jpg');
   assert.equal(merged.isOptimistic, false);
+});
+
+test('la fusion conserve le titre SeenIt localisé tout en gardant la télémétrie distante', () => {
+  const remote = {
+    id: 'radarr_robin',
+    requestId: 'opt_robin',
+    mediaType: 'movie' as const,
+    title: 'The Death Of Robin Hood',
+    movieTitle: 'The Death Of Robin Hood',
+    tmdbId: 1181198,
+    size: 2_300_000_000,
+    sizeleft: 1_200_000_000,
+    progress: 47.8,
+    speedBytesPerSec: 4_000_000,
+    status: 'downloading',
+    statusText: 'Téléchargement en cours',
+    isOptimistic: false
+  };
+  const seenItRequest = {
+    id: 'opt_robin',
+    requestId: 'opt_robin',
+    mediaType: 'movie' as const,
+    title: 'On l’appelait Robin des Bois',
+    tmdbId: 1181198,
+    posterPath: '/robin.jpg',
+    size: 0,
+    sizeleft: 0,
+    progress: 0,
+    status: 'searching',
+    isOptimistic: true
+  };
+
+  const merged = mergeLateOptimisticMetadata(remote, seenItRequest);
+  assert.equal(merged.movieTitle, 'On l’appelait Robin des Bois');
+  assert.equal(merged.progress, 47.8);
+  assert.equal(merged.speedBytesPerSec, 4_000_000);
+  assert.equal(merged.status, 'downloading');
+});
+
+test('tronque le pourcentage affiché sans modifier la précision interne', () => {
+  assert.equal(truncateDownloadProgressPercent(0), 0);
+  assert.equal(truncateDownloadProgressPercent(0.9), 0);
+  assert.equal(truncateDownloadProgressPercent(42.9), 42);
+  assert.equal(truncateDownloadProgressPercent(99.99), 99);
+  assert.equal(truncateDownloadProgressPercent(100.4), 100);
+  assert.equal(truncateDownloadProgressPercent(-4.2), 0);
 });
 
 

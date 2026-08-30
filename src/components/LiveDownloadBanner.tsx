@@ -9,6 +9,7 @@ import {
   Search
 } from 'lucide-react';
 import { type LiveDownloadItem, formatBytes } from '../services/sonarrRadarr';
+import { truncateDownloadProgressPercent } from '../features/downloads/downloadPresentation';
 
 interface LiveDownloadBannerProps {
   items: LiveDownloadItem[];
@@ -58,7 +59,7 @@ export const LiveDownloadBanner: React.FC<LiveDownloadBannerProps> = ({ items, c
         <PhaseIcon kind={phase.kind} />
         <span className="truncate">{phase.label}</span>
         {showProgress && (
-          <span className="shrink-0 text-white">{Math.min(100, Math.max(0, Math.round(item.progress || 0)))}%</span>
+          <span className="shrink-0 text-white">{truncateDownloadProgressPercent(item.progress)}%</span>
         )}
       </div>
     );
@@ -102,7 +103,7 @@ export const LiveDownloadBanner: React.FC<LiveDownloadBannerProps> = ({ items, c
                 <span className={`shrink-0 text-sm font-black ${
                   phase.kind === 'completed' ? 'text-emerald-400' : 'text-cyan-300'
                 }`}>
-                  {Math.round(progress)}%
+                  {truncateDownloadProgressPercent(progress)}%
                 </span>
               )}
             </div>
