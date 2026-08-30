@@ -293,6 +293,11 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
                 if (localMatch.speedFormatted) serverItem.speedFormatted = localMatch.speedFormatted;
                 if (localMatch.timeleftSeconds) serverItem.timeleftSeconds = localMatch.timeleftSeconds;
                 if (localMatch.timeleft) serverItem.timeleft = localMatch.timeleft;
+                if (serverItem.status !== 'error' && localMatch.status !== 'error') {
+                  serverItem.status = localMatch.status;
+                  serverItem.statusText = localMatch.statusText;
+                  serverItem.downloadClient = localMatch.downloadClient || serverItem.downloadClient;
+                }
               }
             }
 
