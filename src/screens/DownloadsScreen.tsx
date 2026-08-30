@@ -134,7 +134,7 @@ function DownloadItemCard({
   return (
     <div
       onClick={canOpenDetails ? openDetails : undefined}
-      className={`relative overflow-hidden rounded-[22px] border bg-gradient-to-br from-zinc-900/95 to-zinc-950/90 p-3.5 shadow-[0_10px_30px_rgba(0,0,0,0.18)] ${canOpenDetails ? 'cursor-pointer transition-transform active:scale-[0.995]' : ''} ${
+      className={`relative overflow-hidden rounded-[22px] border bg-gradient-to-br from-zinc-900/95 to-zinc-950/90 p-3 shadow-[0_10px_30px_rgba(0,0,0,0.18)] ${canOpenDetails ? 'cursor-pointer transition-transform active:scale-[0.995]' : ''} ${
         isCancelled
           ? 'border-zinc-600/30'
           : isError
@@ -146,14 +146,14 @@ function DownloadItemCard({
               : 'border-white/[0.08]'
       }`}
     >
-      <div className="flex gap-3.5">
+      <div className="flex gap-3">
         <button
           type="button"
           onClick={(event) => {
             event.stopPropagation();
             openDetails();
           }}
-          className="relative w-16 aspect-[2/3] shrink-0 self-start overflow-hidden rounded-[14px] border border-white/10 bg-zinc-950 shadow-md flex items-center justify-center"
+          className="relative w-16 aspect-[2/3] shrink-0 self-center overflow-hidden rounded-[14px] border border-white/10 bg-zinc-950 shadow-md flex items-center justify-center"
         >
           {posterSrc ? (
             <img
@@ -179,8 +179,8 @@ function DownloadItemCard({
               }}
               className="min-w-0 flex-1 text-left"
             >
-              <h3 className="text-[15px] font-black leading-tight text-white line-clamp-2">{cleanTitle}</h3>
-              {subTitle && <p className="mt-1 text-[11px] font-semibold text-zinc-400">{subTitle}</p>}
+              <h3 className="text-[15px] font-black leading-tight text-[#E5A93D] line-clamp-2">{cleanTitle}</h3>
+              {subTitle && <p className="mt-0.5 text-[11px] font-semibold text-zinc-400">{subTitle}</p>}
             </button>
 
             <button
@@ -198,13 +198,13 @@ function DownloadItemCard({
           </div>
 
           {qualityBadges.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
+            <div className="mt-1.5 flex flex-wrap gap-1">
               {qualityBadges.map((badge, index) => (
                 <span
                   key={badge}
                   className={`rounded-md border px-1.5 py-0.5 text-[9px] font-black tracking-wide ${
                     index === 0
-                      ? 'border-cyan-400/25 bg-cyan-400/10 text-cyan-200'
+                      ? 'border-cyan-400/15 bg-cyan-400/[0.06] text-cyan-300/80'
                       : 'border-white/10 bg-white/[0.04] text-zinc-300'
                   }`}
                 >
@@ -214,7 +214,7 @@ function DownloadItemCard({
             </div>
           )}
 
-          <div className="mt-3 flex items-end justify-between gap-3">
+          <div className="mt-2 flex items-end justify-between gap-3">
             <div className={`flex min-w-0 items-center gap-1.5 text-[11px] font-bold ${accent}`}>
               <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isCancelled ? 'bg-zinc-500' : isCompleted ? 'bg-emerald-400' : isError ? 'bg-red-400' : isWarning ? 'bg-amber-400' : 'bg-cyan-400'}`} />
               <span className="truncate">{statusLabel}</span>
@@ -223,13 +223,11 @@ function DownloadItemCard({
           </div>
 
           {isPending && progress <= 0 ? (
-            <div className="mt-2 flex h-2 items-center gap-1.5" aria-label="Activité en cours">
-              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400/90 animate-pulse" />
-              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400/65 animate-pulse [animation-delay:160ms]" />
-              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400/40 animate-pulse [animation-delay:320ms]" />
+            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/[0.05]" aria-label="Activité en cours">
+              <div className="h-full w-1/3 rounded-full bg-cyan-400/35 animate-pulse" />
             </div>
           ) : (
-            <div className="relative mt-2 h-2 overflow-hidden rounded-full bg-white/[0.07] ring-1 ring-white/[0.03]">
+            <div className="relative mt-1.5 h-2 overflow-hidden rounded-full bg-white/[0.07] ring-1 ring-white/[0.03]">
               <div
                 className={`relative h-full rounded-full transition-[width] duration-500 ease-out ${progressBar} ${!isCompleted && !isCancelled && !isError ? 'shadow-[0_0_12px_rgba(34,211,238,0.28)]' : ''}`}
                 style={{ width: `${progress}%` }}
@@ -239,7 +237,7 @@ function DownloadItemCard({
             </div>
           )}
 
-          <div className="mt-2 flex items-center justify-between gap-3 text-[10px] text-zinc-400">
+          <div className="mt-1.5 flex items-center justify-between gap-3 text-[10px] text-zinc-400">
             <div className="flex min-w-0 items-center gap-1.5 tabular-nums">
               <HardDrive size={11} className="shrink-0 text-zinc-500" />
               {item.size > 0 && !isPending ? (

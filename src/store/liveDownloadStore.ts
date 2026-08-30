@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { onAuthStateChanged } from 'firebase/auth';
+import { collection, deleteDoc, doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
@@ -16,7 +17,7 @@ import {
 } from '../services/sonarrRadarr';
 import { useToastStore } from './toastStore';
 import { useShowsStore } from './showsStore';
-import { auth } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
 import { canAttachRecentOptimisticRequest, getPhysicalDownloadId, getStrongPhysicalDownloadIds, hasConflictingStrongPhysicalIds, mergeDownloadIdAliases, sameDownloadRequest, sameLegacyPhysicalTransfer, samePhysicalDownload, sameTransferPath } from '../features/downloads/downloadIdentity';
 import { mergeLateOptimisticMetadata } from '../features/downloads/downloadReconciliation';
 import { fetchRecentDownloadHistory, resolveDownloadHistoryOutcome } from '../features/downloads/downloadHistory';
@@ -52,10 +53,157 @@ const missingSince: Record<string, number> = {};
 const completionNotificationEligibility = new Set<string>();
 let localMutationRevision = 0;
 const localItemMutationRevision: Record<string, number> = {};
+let sharedDownloadUnsubscribe: (() => void) | null = null;
+const SHARED_DOWNLOAD_REQUEST_TTL_MS = 10 * 60_000;
 
 function markLocalItemMutation(id: string) {
   localMutationRevision += 1;
   localItemMutationRevision[id] = localMutationRevision;
+}
+
+function sharedRequestDocId(item: Pick<LiveDownloadItem, 'id' | 'requestId'>): string {
+  return String(item.requestId || item.id).replace(/\//g, '_');
+}
+
+function serializeSharedDownloadRequest(item: LiveDownloadItem): Record<string, unknown> {
+  const raw: Record<string, unknown> = {
+    id: item.id,
+    requestId: item.requestId || item.id,
+    mediaType: item.mediaType,
+    title: item.title,
+    seriesTitle: item.seriesTitle,
+    movieTitle: item.movieTitle,
+    tmdbId: item.tmdbId,
+    tvdbId: item.tvdbId,
+    imdbId: item.imdbId,
+    posterPath: item.posterPath,
+    backdropPath: item.backdropPath,
+    seasonNumber: item.seasonNumber,
+    episodeNumber: item.episodeNumber,
+    quality: item.quality,
+    releaseTitle: item.releaseTitle,
+    progress: item.progress || 0,
+    status: item.status,
+    statusText: item.statusText,
+    errorMessage: item.errorMessage,
+    addedAt: item.addedAt || Date.now(),
+    sharedUpdatedAt: Date.now(),
+    sharedExpiresAt: Date.now() + SHARED_DOWNLOAD_REQUEST_TTL_MS
+  };
+  return Object.fromEntries(Object.entries(raw).filter(([, value]) => value !== undefined));
+}
+
+async function publishSharedDownloadRequest(item: LiveDownloadItem) {
+  const user = auth.currentUser;
+  if (!user || !item.isOptimistic) return;
+  try {
+    await setDoc(
+      doc(db, 'users', user.uid, 'downloadRequests', sharedRequestDocId(item)),
+      serializeSharedDownloadRequest(item),
+      { merge: true }
+    );
+  } catch (error) {
+    console.warn('[Downloads Sync] Impossible de publier la demande partagée:', error);
+  }
+}
+
+async function removeSharedDownloadRequest(item: Pick<LiveDownloadItem, 'id' | 'requestId'>) {
+  const user = auth.currentUser;
+  if (!user) return;
+  try {
+    await deleteDoc(doc(db, 'users', user.uid, 'downloadRequests', sharedRequestDocId(item)));
+  } catch {}
+}
+
+function stopSharedDownloadRequestSync() {
+  if (sharedDownloadUnsubscribe) {
+    sharedDownloadUnsubscribe();
+    sharedDownloadUnsubscribe = null;
+  }
+}
+
+function startSharedDownloadRequestSync(uid: string) {
+  stopSharedDownloadRequestSync();
+  sharedDownloadUnsubscribe = onSnapshot(
+    collection(db, 'users', uid, 'downloadRequests'),
+    snapshot => {
+      const now = Date.now();
+      const removedRequestDocIds = new Set(
+        snapshot.docChanges()
+          .filter(change => change.type === 'removed')
+          .map(change => change.doc.id)
+      );
+      const remoteItems: LiveDownloadItem[] = [];
+      for (const entry of snapshot.docs) {
+        const data = entry.data() as any;
+        if (Number(data.sharedExpiresAt || 0) <= now) {
+          void deleteDoc(entry.ref).catch(() => {});
+          continue;
+        }
+        if (!data.title || (data.mediaType !== 'tv' && data.mediaType !== 'movie')) continue;
+        remoteItems.push({
+          id: String(data.id || entry.id),
+          requestId: String(data.requestId || data.id || entry.id),
+          mediaType: data.mediaType,
+          title: String(data.title),
+          seriesTitle: data.seriesTitle,
+          movieTitle: data.movieTitle,
+          tmdbId: data.tmdbId ? Number(data.tmdbId) : undefined,
+          tvdbId: data.tvdbId ? Number(data.tvdbId) : undefined,
+          imdbId: data.imdbId,
+          posterPath: data.posterPath,
+          backdropPath: data.backdropPath,
+          seasonNumber: data.seasonNumber != null ? Number(data.seasonNumber) : undefined,
+          episodeNumber: data.episodeNumber != null ? Number(data.episodeNumber) : undefined,
+          quality: data.quality,
+          releaseTitle: data.releaseTitle || data.title,
+          size: 0,
+          sizeleft: 0,
+          progress: Number(data.progress || 0),
+          status: data.status || 'searching',
+          statusText: data.statusText || 'Synchronisation du téléchargement…',
+          errorMessage: data.errorMessage,
+          addedAt: Number(data.addedAt || data.sharedUpdatedAt || now),
+          isOptimistic: true,
+          isRestored: false
+        });
+      }
+
+      if (!remoteItems.length && removedRequestDocIds.size === 0) return;
+      useLiveDownloadStore.setState(state => {
+        const downloads = [...(state.downloads || [])].filter(item =>
+          !item.isOptimistic || !removedRequestDocIds.has(sharedRequestDocId(item))
+        );
+        for (const remote of remoteItems) {
+          const index = downloads.findIndex(local => sameDownloadIdentity(local, remote) || sameRequestScope(local, remote));
+          if (index < 0) {
+            downloads.unshift(remote);
+            optimisticTimestamps[remote.id] = Date.now();
+            continue;
+          }
+          const local = downloads[index];
+          if (!local.isOptimistic) continue;
+          downloads[index] = {
+            ...local,
+            ...remote,
+            id: local.id,
+            requestId: local.requestId || remote.requestId,
+            posterPath: remote.posterPath || local.posterPath,
+            backdropPath: remote.backdropPath || local.backdropPath,
+            isOptimistic: true,
+            isRestored: false
+          };
+          optimisticTimestamps[local.id] = Date.now();
+        }
+        return { downloads };
+      });
+
+      const state = useLiveDownloadStore.getState();
+      if (!state.isPolling) state.startPolling(1000);
+      else void state.fetchDownloads();
+    },
+    error => console.warn('[Downloads Sync] Écoute Firestore interrompue:', error)
+  );
 }
 const OPTIMISTIC_TTL_MS = 120_000;
 const OPTIMISTIC_ERROR_TTL_MS = 60_000;
@@ -332,6 +480,14 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
                 : download
             )
           }));
+          void publishSharedDownloadRequest({
+            ...existing,
+            ...candidate,
+            id: existing.id,
+            requestId: existing.requestId || candidate.requestId || existing.id,
+            posterPath: candidate.posterPath || existing.posterPath,
+            isOptimistic: true
+          });
           if (!get().isPolling) get().startPolling(1000);
           else void get().fetchDownloads();
           return existing.id;
@@ -340,6 +496,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
         optimisticTimestamps[candidate.id] = Date.now();
         markLocalItemMutation(candidate.id);
         set(state => ({ downloads: [candidate, ...state.downloads] }));
+        void publishSharedDownloadRequest(candidate);
 
         if (!get().isPolling) get().startPolling(1000);
         else void get().fetchDownloads();
@@ -358,6 +515,10 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             download.id === id ? { ...download, ...patch, id: download.id } : download
           )
         }));
+        if (existing) {
+          const next = { ...existing, ...patch, id: existing.id } as LiveDownloadItem;
+          if (next.isOptimistic) void publishSharedDownloadRequest(next);
+        }
       },
 
       fetchDownloads: async () => {
@@ -859,6 +1020,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           });
           delete optimisticTimestamps[item.id];
           delete missingSince[item.id];
+          void removeSharedDownloadRequest(item);
           return true;
         }
 
@@ -883,6 +1045,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
         }));
         delete optimisticTimestamps[item.id];
         delete missingSince[item.id];
+        void removeSharedDownloadRequest(item);
 
         try {
           const result = await deleteLiveDownloadItem(item, {
@@ -942,6 +1105,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
         for (const item of current) {
           delete optimisticTimestamps[item.id];
           delete missingSince[item.id];
+          void removeSharedDownloadRequest(item);
           if (item.isOptimistic || item.id.startsWith('opt_')) continue;
           try {
             await deleteLiveDownloadItem(item, {
@@ -1054,7 +1218,9 @@ if (typeof window !== 'undefined') {
 
     localStorage.setItem(scopeKey, nextUid || '');
 
+    stopSharedDownloadRequestSync();
     if (user) {
+      startSharedDownloadRequestSync(user.uid);
       useLiveDownloadStore.getState().startPolling(1000);
     } else {
       forceStopGlobalPolling();
