@@ -81,13 +81,14 @@ export async function checkPlexAvailability(params: {
   }
 
   const requestKey = getPlexMediaKey(params.tmdbId, params.mediaType || 'movie', uid);
-  const active = activeAvailabilityChecks.get(requestKey);
+  const activeKey = `${requestKey}:${params.forceRefresh ? 'force' : 'cached'}`;
+  const active = activeAvailabilityChecks.get(activeKey);
   if (active) return active;
 
   const promise = performPlexAvailabilityCheck(params, uid).finally(() => {
-    activeAvailabilityChecks.delete(requestKey);
+    activeAvailabilityChecks.delete(activeKey);
   });
-  activeAvailabilityChecks.set(requestKey, promise);
+  activeAvailabilityChecks.set(activeKey, promise);
   return promise;
 }
 
@@ -162,20 +163,23 @@ async function performPlexAvailabilityCheck(params: {
     } else {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 5000);
-      const res = await authenticatedFetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Plex-Token': plexToken
-        },
-        body: JSON.stringify(payload),
-        signal: controller.signal
-      });
-      clearTimeout(timer);
-      isOk = res.ok;
-      if (isOk) {
-        data = await res.json();
+      try {
+        const res = await authenticatedFetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Plex-Token': plexToken
+          },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+        isOk = res.ok;
+        if (isOk) {
+          data = await res.json();
+        }
+      } finally {
+        clearTimeout(timer);
       }
     }
 

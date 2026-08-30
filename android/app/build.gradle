@@ -7,8 +7,8 @@ android {
         applicationId "com.seenit.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 104059
-        versionName "1.4.59"
+        versionCode 104060
+        versionName "1.4.61"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

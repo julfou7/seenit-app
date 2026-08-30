@@ -1,10 +1,19 @@
+import { CURRENT_APP_VERSION } from '../store/updateStore';
+
 export const getPlexClientId = () => {
   let clientId = localStorage.getItem('plex_client_identifier');
-  if (!clientId) {
-    clientId = 'tv-time-app-' + Math.random().toString(36).substring(2, 15);
+  const isUuid = clientId && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(clientId);
+  if (!isUuid) {
+    clientId = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
+          const random = (Math.random() * 16) | 0;
+          const value = character === 'x' ? random : (random & 0x3) | 0x8;
+          return value.toString(16);
+        });
     localStorage.setItem('plex_client_identifier', clientId);
   }
-  return clientId;
+  return clientId!;
 };
 
 export const getPlexPin = async () => {
@@ -13,8 +22,8 @@ export const getPlexPin = async () => {
     method: 'POST',
     headers: {
       'X-Plex-Client-Identifier': clientId,
-      'X-Plex-Product': 'TV Time Sync',
-      'X-Plex-Version': '1.0.0',
+      'X-Plex-Product': 'SeenIt',
+      'X-Plex-Version': CURRENT_APP_VERSION,
       'X-Plex-Platform': 'Web',
       'Accept': 'application/json'
     }

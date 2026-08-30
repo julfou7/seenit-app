@@ -30,6 +30,23 @@ test('extrait les identifiants externes des différentes formes Plex', () => {
   });
 });
 
+test('refuse les identifiants externes contenant un suffixe arbitraire', () => {
+  assert.deepEqual(extractPlexExternalIds({ guid: 'tmdb://42garbage' }), {
+    tmdbId: null,
+    imdbId: null,
+    tvdbId: null,
+    plexGuid: null
+  });
+  assert.equal(extractPlexExternalIds({ guid: 'imdb://tt1234567garbage' }).imdbId, null);
+  assert.equal(extractPlexExternalIds({ guid: 'tvdb://99/path' }).tvdbId, null);
+});
+
+test('accepte les paramètres documentaires des anciens agents sans élargir l’identité', () => {
+  assert.equal(extractPlexExternalIds({ guid: 'tmdb://42?lang=fr' }).tmdbId, 42);
+  assert.equal(extractPlexExternalIds({ guid: 'imdb://tt1234567#main' }).imdbId, 'tt1234567');
+  assert.equal(extractPlexExternalIds({ guid: 'tvdb://99?lang=en' }).tvdbId, 99);
+});
+
 test('accepte tout le jeu de caractères documenté pour un ratingKey provider Plex', () => {
   assert.deepEqual(parsePlexGuid('plex://show/AbC-123_def'), {
     type: 'show',

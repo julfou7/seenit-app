@@ -177,13 +177,25 @@ export function extractPlexExternalIds(rawItem: any): PlexExternalIds {
     const value = typeof raw === 'string' ? raw.trim() : '';
     if (!value) return;
 
-    const tmdbMatch = value.match(/(?:themoviedb|tmdb|com\.plexapp\.agents\.themoviedb):\/\/(\d+)/i);
+    // Les anciens agents Plex peuvent ajouter une query ou un fragment (`?lang=fr`),
+    // mais aucun texte ni segment de chemin ne doit pouvoir suivre l'identifiant.
+    const allowedSuffix = '(?:[?#][^\\s]*)?';
+    const tmdbMatch = value.match(new RegExp(
+      `^(?:themoviedb|tmdb|com\\.plexapp\\.agents\\.themoviedb):\\/\\/(\\d+)${allowedSuffix}$`,
+      'i'
+    ));
     if (tmdbMatch && !tmdbId) tmdbId = Number(tmdbMatch[1]);
 
-    const imdbMatch = value.match(/(?:imdb|com\.plexapp\.agents\.imdb):\/\/(tt\d+)/i);
+    const imdbMatch = value.match(new RegExp(
+      `^(?:imdb|com\\.plexapp\\.agents\\.imdb):\\/\\/(tt\\d+)${allowedSuffix}$`,
+      'i'
+    ));
     if (imdbMatch && !imdbId) imdbId = imdbMatch[1].toLowerCase();
 
-    const tvdbMatch = value.match(/(?:tvdb|thetvdb|com\.plexapp\.agents\.thetvdb):\/\/(\d+)/i);
+    const tvdbMatch = value.match(new RegExp(
+      `^(?:tvdb|thetvdb|com\\.plexapp\\.agents\\.thetvdb):\\/\\/(\\d+)${allowedSuffix}$`,
+      'i'
+    ));
     if (tvdbMatch && !tvdbId) tvdbId = Number(tvdbMatch[1]);
 
     const parsedPlexGuid = parsePlexGuid(value);

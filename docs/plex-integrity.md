@@ -24,8 +24,11 @@ Pour un épisode, seuls les identifiants de la série parente peuvent résoudre 
 
 - La déduplication intervient après résolution, par `movie:<tmdbId>` ou `tv:<tmdbId>:S<season>:E<episode>`.
 - Le scan complet est paginé.
+- Une page en erreur, répétée ou plafonnée rend la collecte incomplète : le résultat partiel peut être importé, mais il ne remplace jamais le cache de disponibilité complet.
 - Le delta parcourt les pages jusqu'au curseur précédent et filtre les entrées plus anciennes.
-- Le nouveau curseur correspond au début de la collecte et n'est enregistré côté client qu'après les écritures Firestore réussies.
+- Le nouveau curseur correspond au début de la collecte et n'est enregistré côté client qu'après une collecte complète, les résolutions vérifiables et les écritures Firestore réussies.
+- Un échec transitoire sur une identité forte conserve l'ancien curseur afin que l'élément soit retenté.
+- La synchronisation des visionnages est additive : elle n'efface jamais une action manuelle SeenIt. Un retrait du statut vu dans Plex ne retire donc pas automatiquement le statut vu dans SeenIt.
 
 ## Tests de non-régression
 
