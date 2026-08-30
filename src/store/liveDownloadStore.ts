@@ -547,6 +547,21 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             if (oldItem.isOptimistic || removedSet.has(oldItem.id)) continue;
             if (serverItems.some(serverItem => sameDownloadIdentity(oldItem, serverItem))) continue;
 
+            if (isCancelledDownload(oldItem)) {
+              preservedItems.push({
+                ...oldItem,
+                status: 'cancelled',
+                statusText: 'Téléchargement annulé',
+                errorMessage: undefined,
+                speedBytesPerSec: 0,
+                speedFormatted: '',
+                timeleft: '',
+                timeleftSeconds: 0,
+                isRestored: false
+              });
+              continue;
+            }
+
             if (isTerminalDownload(oldItem)) {
               preservedItems.push({
                 ...oldItem,
@@ -651,10 +666,19 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             const identitySource = !a.isOptimistic ? a : !b.isOptimistic ? b : meta;
             const aliases = mergeDownloadIdAliases(a, b);
             const strongIds = [...getStrongPhysicalDownloadIds(a), ...getStrongPhysicalDownloadIds(b)];
-            const completed = isTerminalDownload(a) || isTerminalDownload(b);
-            const hasError = !completed && (a.status === 'error' || b.status === 'error' || Boolean(a.errorMessage) || Boolean(b.errorMessage));
+            const cancelled = isCancelledDownload(a) || isCancelledDownload(b);
+            const cancelledSource = isCancelledDownload(a) ? a : b;
+            const completed = !cancelled && (
+              a.status === 'completed' || Number(a.progress || 0) >= 100
+              || b.status === 'completed' || Number(b.progress || 0) >= 100
+            );
+            const hasError = !cancelled && !completed && (a.status === 'error' || b.status === 'error' || Boolean(a.errorMessage) || Boolean(b.errorMessage));
             const errorSource = a.status === 'error' || a.errorMessage ? a : b;
-            const progress = completed ? 100 : Math.max(Number(a.progress || 0), Number(b.progress || 0));
+            const progress = completed
+              ? 100
+              : cancelled
+                ? Number(cancelledSource.progress || 0)
+                : Math.max(Number(a.progress || 0), Number(b.progress || 0));
             const liveWithBestProgress = Number(a.progress || 0) > Number(b.progress || 0) ? a : live;
 
             return {
@@ -670,15 +694,15 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               releaseTitle: meta.releaseTitle || live.releaseTitle,
               quality: extractQualityFromTitle(meta.releaseTitle || live.releaseTitle, meta.quality || live.quality),
               size: liveWithBestProgress.size > 0 ? liveWithBestProgress.size : meta.size,
-              sizeleft: completed ? 0 : liveWithBestProgress.sizeleft,
+              sizeleft: completed ? 0 : cancelled ? cancelledSource.sizeleft : liveWithBestProgress.sizeleft,
               progress,
-              speedBytesPerSec: completed ? 0 : live.speedBytesPerSec,
-              speedFormatted: completed ? '' : live.speedFormatted,
-              timeleft: completed ? '' : live.timeleft,
-              timeleftSeconds: completed ? 0 : live.timeleftSeconds,
-              status: completed ? 'completed' : hasError ? errorSource.status : live.status,
-              statusText: completed ? 'Téléchargement terminé 🍿' : hasError ? errorSource.statusText : live.statusText,
-              errorMessage: completed ? undefined : hasError ? errorSource.errorMessage : undefined,
+              speedBytesPerSec: completed || cancelled ? 0 : live.speedBytesPerSec,
+              speedFormatted: completed || cancelled ? '' : live.speedFormatted,
+              timeleft: completed || cancelled ? '' : live.timeleft,
+              timeleftSeconds: completed || cancelled ? 0 : live.timeleftSeconds,
+              status: cancelled ? 'cancelled' : completed ? 'completed' : hasError ? errorSource.status : live.status,
+              statusText: cancelled ? 'Téléchargement annulé' : completed ? 'Téléchargement terminé 🍿' : hasError ? errorSource.statusText : live.statusText,
+              errorMessage: cancelled || completed ? undefined : hasError ? errorSource.errorMessage : undefined,
               isOptimistic: Boolean(a.isOptimistic && b.isOptimistic),
               isRestored: false
             };
@@ -743,6 +767,10 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           }
 
           for (const finalItem of finalItems) {
+            if (isCancelledDownload(finalItem)) {
+              consumeCompletionNotificationEligibility(finalItem);
+              continue;
+            }
             if (!isTerminalDownload(finalItem)) continue;
             const previous = currentDownloads.find(oldItem => sameDownloadIdentity(oldItem, finalItem));
             if (previous && !isTerminalDownload(previous) && consumeCompletionNotificationEligibility(finalItem)) {
@@ -787,7 +815,10 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           if (!get().isPolling) return;
           const downloads = get().downloads || [];
           const hasActive = downloads.some(item =>
-            item.status !== 'completed' && item.status !== 'error' && item.progress < 100
+            item.status !== 'completed'
+            && item.status !== 'cancelled'
+            && item.status !== 'error'
+            && item.progress < 100
           );
           const hasError = Boolean(get().error);
 
