@@ -1,0 +1,40 @@
+name: Apply Plex 1.4.51
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'scripts/apply-plex-1.4.51.cjs'
+      - '.github/workflows/apply-plex-1.4.51.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Appliquer la refonte Plex ciblée
+        run: node scripts/apply-plex-1.4.51.cjs
+
+      - name: Vérifier les fichiers modifiés
+        run: git diff --check
+
+      - name: Committer les sources générées
+        run: |
+          if git diff --quiet -- server.ts src/features/plex/syncPlex.ts src/screens/ShowDetailScreen.tsx; then
+            echo "Aucun changement à committer"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.ts src/features/plex/syncPlex.ts src/screens/ShowDetailScreen.tsx
+          git commit -m "feat: refondre le full scan et le cache Plex" -m "- récupère les GUID globaux depuis le Watch History du compte Plex\n- restaure le full scan des films et épisodes vus depuis les bibliothèques PMS\n- préchauffe la disponibilité Plex des fiches depuis l'inventaire serveur\n- supprime la double vérification Plex forcée à l'ouverture d'une fiche\n- n'invente plus S1E1 lorsque les coordonnées d'un épisode manquent"
+          git push origin HEAD:main
