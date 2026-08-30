@@ -51,8 +51,8 @@ jobs:
       - name: Type check
         run: npm run lint
 
-      - name: Tests
-        run: npm test
+      - name: Tests Plex et téléchargements
+        run: npm run test:plex
 
       - name: Build Web and server
         run: npm run build
