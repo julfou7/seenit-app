@@ -1,0 +1,55 @@
+name: Validate Download Tracking Cancel 1.4.60
+
+on:
+  push:
+    branches:
+      - fix/download-tracking-cancel-1.4.60
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/download-tracking-cancel-1.4.60
+          fetch-depth: 0
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Apply patch
+        run: node scripts/patch-download-tracking-cancel-1.4.60.cjs
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Type check
+        run: npm run lint
+
+      - name: Tests
+        run: npm run test:plex
+
+      - name: Build Web and server
+        run: npm run build
+
+      - name: Check diff
+        run: git diff --check
+
+      - name: Commit validated fix
+        run: |
+          git config user.name "julfou7"
+          git config user.email "julianfouillade@gmail.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Aucune modification à committer"
+            exit 0
+          fi
+          git commit -m "fix(downloads): fiabiliser le suivi et l’annulation" -m $'- empêche une mutation optimiste tardive d’écraser le pourcentage, le débit ou l’ETA distants\n- corrèle une demande SeenIt entre Radarr/Sonarr et qBittorrent via un requestId interne sans utiliser le titre\n- ne recycle plus une ancienne télémétrie quand une source distante recule temporairement\n- transforme l’arrêt depuis SeenIt en état terminal Annulé et bloque sa résurrection\n- distingue annulation, nettoyage local et erreur technique dans l’UI\n- ajoute des tests de non-régression sur la télémétrie et la corrélation\n- publie SeenIt 1.4.60'
+          git push origin HEAD:fix/download-tracking-cancel-1.4.60
