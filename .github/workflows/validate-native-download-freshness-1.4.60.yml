@@ -1,0 +1,55 @@
+name: Validate Native Download Freshness 1.4.60
+
+on:
+  push:
+    branches:
+      - fix/download-tracking-cancel-1.4.60
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/download-tracking-cancel-1.4.60
+          fetch-depth: 0
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Apply Android freshness patch
+        run: node scripts/patch-native-download-freshness-1.4.60.cjs
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Type check
+        run: npm run lint
+
+      - name: Tests
+        run: npm run test:plex
+
+      - name: Build Web and server
+        run: npm run build
+
+      - name: Check diff
+        run: git diff --check
+
+      - name: Commit validated fix
+        run: |
+          git config user.name "julfou7"
+          git config user.email "julianfouillade@gmail.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Aucune modification à committer"
+            exit 0
+          fi
+          git commit -m "fix(downloads): rafraîchir le suivi Android" -m $'- rend chaque GET Android de polling unique pour éviter les réponses natives périmées\n- force no-store/no-cache sur les lectures Sonarr, Radarr et qBittorrent\n- conserve la PWA inchangée puisqu’elle suit déjà correctement les transferts\n- ajoute un test de non-régression sur les GET de suivi\n- complète SeenIt 1.4.60'
+          git push origin HEAD:fix/download-tracking-cancel-1.4.60
