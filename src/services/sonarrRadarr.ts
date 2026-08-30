@@ -1,7 +1,7 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { C411Torrent } from './c411';
 import { authenticatedFetch } from '../lib/apiAuth';
-import { getPhysicalDownloadId, normalizeDownloadClientId } from '../features/downloads/downloadIdentity';
+import { getPhysicalDownloadId, normalizeDownloadClientId, sameLegacyPhysicalTransfer, samePhysicalDownload } from '../features/downloads/downloadIdentity';
 
 export interface SonarrRadarrConfig {
   sonarrUrl?: string;
@@ -1810,7 +1810,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           const qbitDownloadId = normalizeDownloadClientId(t.hash);
 
           const isQbitError = t.state === 'error' || t.state === 'missingFiles';
-          const qbitErrorMsg = isQbitError ? 'Erreur qBittorrent (espace disque insuffisant ou fichier manquant)' : undefined;
+          const qbitErrorMsg = isQbitError ? 'Erreur de téléchargement (espace disque insuffisant ou fichier manquant)' : undefined;
           const qbitStatus = isQbitError
             ? 'error'
             : (isDone ? 'completed' : (t.state === 'stalledDL' ? 'warning' : (t.state === 'pausedDL' ? 'paused' : 'downloading')));
@@ -1823,17 +1823,62 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
                     : (t.state === 'pausedDL' ? `Téléchargement en pause • ${rawProgress}%` : `Téléchargement ${rawProgress}%`)));
 
           const normTName = (t.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          const existing = items.find(it => {
-            // Le hash du client est l'identité physique fiable. Il permet notamment
-            // de fusionner un titre Radarr en anglais avec un torrent qBittorrent en français.
-            const physicalId = getPhysicalDownloadId(it);
-            if (qbitDownloadId && physicalId && physicalId === qbitDownloadId) return true;
+          const qbitProbe: LiveDownloadItem = {
+            id: `qbit_${t.hash || t.name}`,
+            downloadId: qbitDownloadId || undefined,
+            mediaType: isTv ? 'tv' : 'movie',
+            title: t.name,
+            releaseTitle: t.name,
+            size: Number(t.size || 0),
+            sizeleft: 0,
+            progress: rawProgress,
+            status: qbitStatus,
+            statusText: qbitStatusText
+          };
 
-            // Fallback uniquement pour les anciens clients/*Arr qui ne fournissent pas downloadId.
-            if (!it.releaseTitle && !it.title) return false;
-            const normRel = (it.releaseTitle || it.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-            return Boolean(normRel && normTName && (normRel === normTName || normRel.includes(normTName) || normTName.includes(normRel)));
+          const exactIndexes: number[] = [];
+          const legacyIndexes: number[] = [];
+          items.forEach((it, index) => {
+            if (qbitDownloadId && samePhysicalDownload(it, qbitProbe)) {
+              exactIndexes.push(index);
+              return;
+            }
+
+            // Migration des anciens états : seulement si *Arr n'a pas de hash exploitable,
+            // avec release ET taille physique quasi identiques. Deux hashes différents
+            // ne seront donc jamais fusionnés par ce fallback.
+            if (!getPhysicalDownloadId(it) && sameLegacyPhysicalTransfer(it, qbitProbe)) {
+              legacyIndexes.push(index);
+            }
           });
+
+          const matchingIndexes = exactIndexes.length > 0 ? exactIndexes : legacyIndexes;
+          const metadataScore = (it: LiveDownloadItem) =>
+            (it.posterPath ? 8 : 0)
+            + (it.tmdbId ? 8 : 0)
+            + (it.tvdbId ? 4 : 0)
+            + (it.movieTitle || it.seriesTitle ? 4 : 0)
+            + (it.imdbId ? 2 : 0);
+          const primaryIndex = matchingIndexes.length > 0
+            ? [...matchingIndexes].sort((a, b) => metadataScore(items[b]) - metadataScore(items[a]))[0]
+            : -1;
+          const existing = primaryIndex >= 0 ? items[primaryIndex] : undefined;
+
+          if (existing && matchingIndexes.length > 1) {
+            for (const duplicateIndex of [...matchingIndexes].sort((a, b) => b - a)) {
+              if (duplicateIndex === primaryIndex) continue;
+              const duplicate = items[duplicateIndex];
+              if (!existing.posterPath && duplicate.posterPath) existing.posterPath = duplicate.posterPath;
+              if (!existing.backdropPath && duplicate.backdropPath) existing.backdropPath = duplicate.backdropPath;
+              if (!existing.tmdbId && duplicate.tmdbId) existing.tmdbId = duplicate.tmdbId;
+              if (!existing.tvdbId && duplicate.tvdbId) existing.tvdbId = duplicate.tvdbId;
+              if (!existing.imdbId && duplicate.imdbId) existing.imdbId = duplicate.imdbId;
+              if (!existing.movieTitle && duplicate.movieTitle) existing.movieTitle = duplicate.movieTitle;
+              if (!existing.seriesTitle && duplicate.seriesTitle) existing.seriesTitle = duplicate.seriesTitle;
+              if (!existing.quality && duplicate.quality) existing.quality = duplicate.quality;
+              items.splice(duplicateIndex, 1);
+            }
+          }
 
           if (existing) {
             // Métadonnées *Arr (TMDB, titre, poster) + télémétrie qBittorrent (source de vérité live).
