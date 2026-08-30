@@ -192,18 +192,22 @@ function DownloadItemCard({
             <span className={`shrink-0 text-sm font-black tabular-nums ${accent}`}>{progressLabel}</span>
           </div>
 
-          <div className="relative mt-2 h-2 overflow-hidden rounded-full bg-white/[0.07] ring-1 ring-white/[0.03]">
-            {isPending && progress <= 0 ? (
-              <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-cyan-500/30 via-cyan-300/80 to-cyan-500/30 animate-pulse" />
-            ) : (
+          {isPending && progress <= 0 ? (
+            <div className="mt-2 flex h-2 items-center gap-1.5" aria-label="Activité en cours">
+              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400/90 animate-pulse" />
+              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400/65 animate-pulse [animation-delay:160ms]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400/40 animate-pulse [animation-delay:320ms]" />
+            </div>
+          ) : (
+            <div className="relative mt-2 h-2 overflow-hidden rounded-full bg-white/[0.07] ring-1 ring-white/[0.03]">
               <div
                 className={`relative h-full rounded-full transition-[width] duration-500 ease-out ${progressBar} ${!isCompleted && !isError ? 'shadow-[0_0_12px_rgba(34,211,238,0.28)]' : ''}`}
                 style={{ width: `${progress}%` }}
               >
                 {!isCompleted && progress > 4 && <div className="absolute inset-0 bg-white/[0.08]" />}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           <div className="mt-2 flex items-center justify-between gap-3 text-[10px] text-zinc-400">
             <div className="flex min-w-0 items-center gap-1.5 tabular-nums">
@@ -341,10 +345,13 @@ export function DownloadsScreen({ onShowClick }: Props) {
     setRemovingId(item.id);
     const success = await removeDownload(item);
     setRemovingId(null);
-    showToast(
-      success ? 'Téléchargement retiré.' : 'Retiré de SeenIt, mais le client distant n’a pas confirmé la suppression.',
-      success ? 'success' : 'info'
-    );
+    showToast({
+      title: item.movieTitle || item.seriesTitle || item.title,
+      action: success
+        ? 'Retiré de la liste'
+        : 'Retiré de la liste • arrêt non confirmé',
+      posterPath: item.posterPath
+    }, success ? 'success' : 'info');
   };
 
   const handleClearAll = async () => {

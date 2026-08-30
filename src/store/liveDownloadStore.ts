@@ -17,7 +17,7 @@ import {
 import { useToastStore } from './toastStore';
 import { useShowsStore } from './showsStore';
 import { auth } from '../lib/firebase';
-import { getPhysicalDownloadId, getStrongPhysicalDownloadIds, hasConflictingStrongPhysicalIds, mergeDownloadIdAliases, sameLegacyPhysicalTransfer, samePhysicalDownload, sameTransferPath } from '../features/downloads/downloadIdentity';
+import { canAttachRecentOptimisticRequest, getPhysicalDownloadId, getStrongPhysicalDownloadIds, hasConflictingStrongPhysicalIds, mergeDownloadIdAliases, sameLegacyPhysicalTransfer, samePhysicalDownload, sameTransferPath } from '../features/downloads/downloadIdentity';
 import { fetchRecentDownloadHistory, resolveDownloadHistoryOutcome } from '../features/downloads/downloadHistory';
 
 interface LiveDownloadState {
@@ -48,6 +48,7 @@ let lastFetchTime = 0;
 
 const optimisticTimestamps: Record<string, number> = {};
 const missingSince: Record<string, number> = {};
+const completionNotificationEligibility = new Set<string>();
 const OPTIMISTIC_TTL_MS = 120_000;
 const OPTIMISTIC_ERROR_TTL_MS = 60_000;
 const MISSING_GRACE_MS = 10_000;
@@ -96,6 +97,35 @@ function resolutionBucket(item: LiveDownloadItem): '4k' | '1080p' | '720p' | nul
   return null;
 }
 
+function completionNotificationKeys(item: LiveDownloadItem): string[] {
+  const keys = new Set<string>();
+  for (const id of getStrongPhysicalDownloadIds(item)) keys.add(`physical:${id}`);
+
+  const quality = resolutionBucket(item) || 'auto';
+  if (item.mediaType === 'movie') {
+    if (item.tmdbId) keys.add(`movie:tmdb:${Number(item.tmdbId)}:${quality}`);
+    else if (item.imdbId) keys.add(`movie:imdb:${String(item.imdbId).toLowerCase()}:${quality}`);
+  } else {
+    const canonical = item.tmdbId ? `tmdb:${Number(item.tmdbId)}` : item.tvdbId ? `tvdb:${Number(item.tvdbId)}` : '';
+    if (canonical) {
+      keys.add(`tv:${canonical}:s${item.seasonNumber ?? "*"}:e${item.episodeNumber ?? "*"}:${quality}`);
+    }
+  }
+
+  return Array.from(keys);
+}
+
+function markCompletionNotificationEligible(item: LiveDownloadItem) {
+  for (const key of completionNotificationKeys(item)) completionNotificationEligibility.add(key);
+}
+
+function consumeCompletionNotificationEligibility(item: LiveDownloadItem): boolean {
+  const keys = completionNotificationKeys(item);
+  const eligible = keys.some(key => completionNotificationEligibility.has(key));
+  if (eligible) keys.forEach(key => completionNotificationEligibility.delete(key));
+  return eligible;
+}
+
 function sameRequestScope(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
   if (!sameCanonicalMedia(a, b)) return false;
   if (a.mediaType !== 'tv') return true;
@@ -137,9 +167,24 @@ function sameDownloadIdentity(a: LiveDownloadItem, b: LiveDownloadItem): boolean
   return Boolean(a.isOptimistic || b.isOptimistic || a.isRestored || b.isRestored);
 }
 
-function sendLocalNotification(title: string, body: string, isSuccess = false) {
+function sendLocalNotification(title: string, body: string, isSuccess = false, item?: LiveDownloadItem) {
   try {
-    useToastStore.getState().showToast(`${title}: ${body}`, isSuccess ? 'success' : 'download');
+    if (item) {
+      const mediaTitle = item.movieTitle || item.seriesTitle || item.title;
+      const subtitle = item.mediaType === 'tv' && item.seasonNumber != null
+        ? item.episodeNumber != null
+          ? `S${String(item.seasonNumber).padStart(2, '0')}E${String(item.episodeNumber).padStart(2, '0')}`
+          : `Saison ${item.seasonNumber}`
+        : undefined;
+      useToastStore.getState().showToast({
+        title: mediaTitle,
+        subtitle,
+        action: isSuccess ? 'Téléchargement terminé' : body,
+        posterPath: item.posterPath
+      }, isSuccess ? 'success' : 'download');
+    } else {
+      useToastStore.getState().showToast(`${title}: ${body}`, isSuccess ? 'success' : 'download');
+    }
   } catch {}
 
   if (!Capacitor.isNativePlatform()) {
@@ -215,6 +260,8 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           isRestored: false,
           isOptimistic: true
         };
+
+        markCompletionNotificationEligible(candidate);
 
         const existing = get().downloads.find(download =>
           download.status !== 'completed'
@@ -365,8 +412,44 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               serverItem.status = 'completed';
               serverItem.statusText = 'Téléchargement terminé 🍿';
               serverItem.sizeleft = 0;
+            } else {
+              markCompletionNotificationEligible(serverItem);
             }
           });
+
+          const handshakeNow = Date.now();
+          const recentOptimistics = currentDownloads.filter(item => item.isOptimistic && !isTerminalDownload(item));
+          const handshakeCandidates = recentOptimistics.map(optimistic => ({
+            optimistic,
+            candidates: serverItems.filter(serverItem =>
+              !sameDownloadIdentity(optimistic, serverItem)
+              && (serverItem.id.startsWith('qbit_') || (!serverItem.tmdbId && !serverItem.tvdbId))
+              && canAttachRecentOptimisticRequest(optimistic, serverItem, handshakeNow)
+            )
+          }));
+
+          for (const entry of handshakeCandidates) {
+            if (entry.candidates.length !== 1) continue;
+            const serverItem = entry.candidates[0];
+            const contenders = handshakeCandidates.filter(other => other.candidates.includes(serverItem));
+            if (contenders.length !== 1) continue;
+
+            const optimistic = entry.optimistic;
+            if (!serverItem.tmdbId && optimistic.tmdbId) serverItem.tmdbId = optimistic.tmdbId;
+            if (!serverItem.tvdbId && optimistic.tvdbId) serverItem.tvdbId = optimistic.tvdbId;
+            if (!serverItem.imdbId && optimistic.imdbId) serverItem.imdbId = optimistic.imdbId;
+            if (!serverItem.posterPath && optimistic.posterPath) serverItem.posterPath = optimistic.posterPath;
+            if (!serverItem.backdropPath && optimistic.backdropPath) serverItem.backdropPath = optimistic.backdropPath;
+            if (serverItem.seasonNumber == null && optimistic.seasonNumber != null) serverItem.seasonNumber = optimistic.seasonNumber;
+            if (serverItem.episodeNumber == null && optimistic.episodeNumber != null) serverItem.episodeNumber = optimistic.episodeNumber;
+            if (serverItem.mediaType === 'movie') {
+              serverItem.movieTitle = optimistic.movieTitle || optimistic.title;
+            } else {
+              serverItem.seriesTitle = optimistic.seriesTitle || optimistic.title;
+            }
+            serverItem.downloadIdAliases = mergeDownloadIdAliases(serverItem, optimistic);
+            markCompletionNotificationEligible(serverItem);
+          }
 
           const now = Date.now();
           const pendingOptimistic: LiveDownloadItem[] = [];
@@ -562,11 +645,12 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           for (const finalItem of finalItems) {
             if (!isTerminalDownload(finalItem)) continue;
             const previous = currentDownloads.find(oldItem => sameDownloadIdentity(oldItem, finalItem));
-            if (previous && !isTerminalDownload(previous)) {
+            if (previous && !isTerminalDownload(previous) && consumeCompletionNotificationEligibility(finalItem)) {
               sendLocalNotification(
                 'Téléchargement terminé 🍿',
-                `Le téléchargement de "${finalItem.title}" est terminé !`,
-                true
+                `Le téléchargement de "${finalItem.movieTitle || finalItem.seriesTitle || finalItem.title}" est terminé !`,
+                true,
+                finalItem
               );
             }
           }

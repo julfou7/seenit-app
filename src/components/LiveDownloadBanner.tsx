@@ -86,7 +86,7 @@ export const LiveDownloadBanner: React.FC<LiveDownloadBannerProps> = ({ items, c
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-extrabold text-white break-words leading-snug">
-                  {item.releaseTitle || item.title}
+                  {item.movieTitle || item.seriesTitle || item.title}
                 </p>
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-zinc-400">
                   {item.quality && <span>{item.quality}</span>}
@@ -120,10 +120,14 @@ export const LiveDownloadBanner: React.FC<LiveDownloadBannerProps> = ({ items, c
               </div>
             )}
 
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-800">
-              {showIndeterminate ? (
-                <div className="h-full w-1/3 rounded-full bg-blue-500/70 animate-pulse" />
-              ) : (
+            {showIndeterminate ? (
+              <div className="mt-3 flex h-2 items-center gap-1.5" aria-label="Activité en cours">
+                <span className="h-1.5 w-1.5 rounded-full bg-cyan-400/90 animate-pulse" />
+                <span className="h-1.5 w-1.5 rounded-full bg-cyan-400/65 animate-pulse [animation-delay:160ms]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-cyan-400/40 animate-pulse [animation-delay:320ms]" />
+              </div>
+            ) : (
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-800">
                 <div
                   className={`h-full rounded-full transition-[width] duration-300 ${
                     phase.kind === 'error'
@@ -136,8 +140,8 @@ export const LiveDownloadBanner: React.FC<LiveDownloadBannerProps> = ({ items, c
                   }`}
                   style={{ width: `${progress}%` }}
                 />
-              )}
-            </div>
+              </div>
+            )}
           </div>
         );
       })}
