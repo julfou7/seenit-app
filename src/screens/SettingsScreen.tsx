@@ -132,7 +132,7 @@ export function SettingsScreen() {
       });
       const data = await res.json();
       if (data.success) {
-        showToast("✅ Code synchronisé avec succès depuis GitHub !", "success");
+        showToast("✅ Code synchronisé ! Rechargement de l'application...", "success");
         setGitOutputText(data.output || 'Dépôt à jour.');
         setShowGitOutput(true);
         if (data.commit) {
@@ -143,9 +143,11 @@ export function SettingsScreen() {
             isClean: true,
             message: 'Dépôt synchronisé'
           });
-        } else {
-          fetchGitStatus();
         }
+        // Force le rechargement de la page après 1.2s pour charger les nouveaux fichiers JS
+        setTimeout(() => {
+          window.location.reload();
+        }, 1200);
       } else {
         showToast(`Erreur Git Pull : ${data.error || 'Échec'}`, "error");
         setGitOutputText(data.error || data.stderr || 'Erreur lors du pull');
