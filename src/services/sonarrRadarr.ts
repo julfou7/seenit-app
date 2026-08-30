@@ -943,6 +943,27 @@ export async function searchAndDownloadInSonarr(params: {
       }, headers);
     };
 
+    const findEpisodeByNumber = async (
+      seriesId: number,
+      season: number,
+      episode: number,
+      attempts = 1
+    ): Promise<any | null> => {
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        const episodes: any[] = await executeGet(`${base}/api/v3/episode?seriesId=${seriesId}`, headers);
+        const target = Array.isArray(episodes)
+          ? episodes.find((ep: any) =>
+              Number(ep.seasonNumber) === Number(season) && Number(ep.episodeNumber) === Number(episode)
+            )
+          : null;
+        if (target) return target;
+        if (attempt < attempts - 1) {
+          await new Promise(resolve => setTimeout(resolve, 450 * (attempt + 1)));
+        }
+      }
+      return null;
+    };
+
     // 1. Vérifier si la série est déjà présente dans la bibliothèque Sonarr
     let seriesList: any[] = [];
     try {
@@ -986,10 +1007,12 @@ export async function searchAndDownloadInSonarr(params: {
       // Recherche par épisode spécifique
       if (params.season !== undefined && params.episode !== undefined && params.season !== null && params.episode !== null) {
         try {
-          const episodes: any[] = await executeGet(`${base}/api/v3/episode?seriesId=${seriesId}`, headers);
-          const targetEp = Array.isArray(episodes) ? episodes.find((ep: any) => 
-            Number(ep.seasonNumber) === Number(params.season) && Number(ep.episodeNumber) === Number(params.episode)
-          ) : null;
+          const targetEp = await findEpisodeByNumber(
+            Number(seriesId),
+            Number(params.season),
+            Number(params.episode),
+            1
+          );
           
           if (targetEp && targetEp.id) {
             await ensureEpisodeMonitored(targetEp);
@@ -1164,10 +1187,12 @@ export async function searchAndDownloadInSonarr(params: {
     if (created && created.id) {
       if (isEpisodeSearch) {
         try {
-          const episodes: any[] = await executeGet(`${base}/api/v3/episode?seriesId=${created.id}`, headers);
-          const targetEp = Array.isArray(episodes) ? episodes.find((ep: any) => 
-            Number(ep.seasonNumber) === Number(params.season) && Number(ep.episodeNumber) === Number(params.episode)
-          ) : null;
+          const targetEp = await findEpisodeByNumber(
+            Number(created.id),
+            Number(params.season),
+            Number(params.episode),
+            4
+          );
           
           if (targetEp && targetEp.id) {
             await ensureEpisodeMonitored(targetEp);

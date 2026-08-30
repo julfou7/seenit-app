@@ -128,6 +128,11 @@ function startSharedDownloadRequestSync(uid: string) {
     collection(db, 'users', uid, 'downloadRequests'),
     snapshot => {
       const now = Date.now();
+      const removedRequestDocIds = new Set(
+        snapshot.docChanges()
+          .filter(change => change.type === 'removed')
+          .map(change => change.doc.id)
+      );
       const remoteItems: LiveDownloadItem[] = [];
       for (const entry of snapshot.docs) {
         const data = entry.data() as any;
@@ -164,9 +169,11 @@ function startSharedDownloadRequestSync(uid: string) {
         });
       }
 
-      if (!remoteItems.length) return;
+      if (!remoteItems.length && removedRequestDocIds.size === 0) return;
       useLiveDownloadStore.setState(state => {
-        const downloads = [...(state.downloads || [])];
+        const downloads = [...(state.downloads || [])].filter(item =>
+          !item.isOptimistic || !removedRequestDocIds.has(sharedRequestDocId(item))
+        );
         for (const remote of remoteItems) {
           const index = downloads.findIndex(local => sameDownloadIdentity(local, remote) || sameRequestScope(local, remote));
           if (index < 0) {
