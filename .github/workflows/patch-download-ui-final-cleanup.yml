@@ -1,0 +1,49 @@
+name: Patch Download UI Final Cleanup
+
+on:
+  push:
+    branches:
+      - fix/download-ui-abstraction-1.4.55
+    paths:
+      - 'scripts/patch-download-ui-final-cleanup.cjs'
+      - '.github/workflows/patch-download-ui-final-cleanup.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/download-ui-abstraction-1.4.55
+          fetch-depth: 0
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply cleanup
+        run: node scripts/patch-download-ui-final-cleanup.cjs
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+      - name: Type check
+        run: npm run lint
+      - name: Tests
+        run: npm run test:plex
+      - name: Build web and server
+        run: npm run build
+      - name: Check diff
+        run: git diff --check
+      - name: Commit cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/screens/DownloadsScreen.tsx src/components/DownloadModal.tsx src/services/sonarrRadarr.ts
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git commit -m "fix(downloads): masquer les derniers libellés techniques"
+          git push origin HEAD:fix/download-ui-abstraction-1.4.55
