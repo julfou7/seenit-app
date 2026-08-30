@@ -27,6 +27,7 @@ jobs:
       - name: Apply patch
         run: |
           node scripts/patch-download-tracking-cancel-1.4.60.cjs
+          sed -i "s#from './downloadIdentity';#from './downloadIdentity.ts';#" src/features/downloads/downloadReconciliation.ts
           sed -i "/const remote = {/,/};/ s/mediaType: 'movie'/mediaType: 'movie' as const/" tests/downloadIdentity.test.ts
           sed -i "/const lateOptimistic = {/,/};/ s/mediaType: 'movie'/mediaType: 'movie' as const/" tests/downloadIdentity.test.ts
 
