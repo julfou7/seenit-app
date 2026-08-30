@@ -21,6 +21,7 @@ import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { useToastStore } from '../store/toastStore';
 import { LiveDownloadBanner } from './LiveDownloadBanner';
 import {
+  fetchQualityProfiles,
   pushReleaseDirectly,
   searchAndDownloadInRadarr,
   searchAndDownloadInSonarr
@@ -31,6 +32,7 @@ import {
   beginDownloadRequest,
   failDownloadRequest
 } from '../features/downloads/downloadLifecycle';
+import { resolveEffectiveQualityProfileId } from '../features/downloads/qualityProfileSelection';
 
 export interface SeasonInfo {
   season_number: number;
@@ -275,6 +277,18 @@ export function DownloadModal({
     onClose();
 
     try {
+      const configuredProfileId = isTv
+        ? (qualityPreference === '4k' ? config.sonarr4kProfileId : config.sonarr1080pProfileId)
+        : (qualityPreference === '4k' ? config.radarr4kProfileId : config.radarr1080pProfileId);
+      const clientUrl = isTv ? config.sonarrUrl : config.radarrUrl;
+      const clientApiKey = isTv ? config.sonarrApiKey : config.radarrApiKey;
+
+      let effectiveProfileId = configuredProfileId ?? undefined;
+      if (!effectiveProfileId) {
+        const profiles = await fetchQualityProfiles(isTv ? 'sonarr' : 'radarr', clientUrl, clientApiKey);
+        effectiveProfileId = resolveEffectiveQualityProfileId(profiles, qualityPreference);
+      }
+
       const result = isTv
         ? await searchAndDownloadInSonarr({
             url: config.sonarrUrl,
@@ -285,9 +299,7 @@ export function DownloadModal({
             season: scopeMode === 'all' ? undefined : selectedSeason,
             episode: scopeMode === 'episode' ? selectedEpisode : undefined,
             qualityPreference,
-            qualityProfileId: qualityPreference === '4k'
-              ? (config.sonarr4kProfileId ?? undefined)
-              : (config.sonarr1080pProfileId ?? undefined)
+            qualityProfileId: effectiveProfileId
           })
         : await searchAndDownloadInRadarr({
             url: config.radarrUrl,
@@ -296,9 +308,7 @@ export function DownloadModal({
             tmdbId,
             year,
             qualityPreference,
-            qualityProfileId: qualityPreference === '4k'
-              ? (config.radarr4kProfileId ?? undefined)
-              : (config.radarr1080pProfileId ?? undefined)
+            qualityProfileId: effectiveProfileId
           });
 
       if (result.success) {

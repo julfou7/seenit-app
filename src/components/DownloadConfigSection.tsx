@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import {
   AlertCircle,
+  Check,
   CheckCircle2,
+  ChevronDown,
   Cloud,
   Download,
   HardDrive,
@@ -9,7 +11,8 @@ import {
   Loader2,
   Save,
   Server,
-  Wifi
+  Wifi,
+  X
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
@@ -17,6 +20,11 @@ import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { useToastStore } from '../store/toastStore';
 import { fetchQualityProfiles, testServiceConnection } from '../services/sonarrRadarr';
 import { testC411Connection } from '../services/c411';
+import {
+  resolveAutoQualityProfile,
+  type DownloadQualityPreference,
+  type QualityProfileSummary
+} from '../features/downloads/qualityProfileSelection';
 
 interface DownloadConfigSectionProps {
   defaultOpen?: boolean;
@@ -24,7 +32,7 @@ interface DownloadConfigSectionProps {
 }
 
 type TestKey = 'c411' | 'sonarr' | 'radarr' | 'qbittorrent';
-type QualityProfile = { id: number; name: string };
+type QualityProfile = QualityProfileSummary;
 
 export function DownloadConfigSection({ defaultOpen = false, hideToggle = false }: DownloadConfigSectionProps) {
   const config = useDownloadConfigStore();
@@ -405,41 +413,138 @@ function QualityProfileMapping({
     <div className="rounded-xl bg-zinc-900/70 border border-zinc-800 p-2.5 space-y-2">
       <div>
         <p className="text-[10px] font-bold text-zinc-300">Profils qualité SeenIt → {serviceLabel}</p>
-        <p className="text-[9px] text-zinc-500 mt-0.5">Choisis le profil exact. “Auto” garde la détection par nom comme secours.</p>
+        <p className="text-[9px] text-zinc-500 mt-0.5">
+          “Auto” choisit le profil le plus spécifique disponible et affiche celui qui sera réellement utilisé.
+        </p>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <ProfileSelect label="1080p" profiles={profiles} value={profile1080pId} onChange={on1080pChange} />
-        <ProfileSelect label="4K" profiles={profiles} value={profile4kId} onChange={on4kChange} />
+        <ProfilePicker
+          label="1080p"
+          preference="1080p"
+          profiles={profiles}
+          value={profile1080pId}
+          onChange={on1080pChange}
+        />
+        <ProfilePicker
+          label="4K"
+          preference="4k"
+          profiles={profiles}
+          value={profile4kId}
+          onChange={on4kChange}
+        />
       </div>
     </div>
   );
 }
 
-function ProfileSelect({
+function ProfilePicker({
   label,
+  preference,
   profiles,
   value,
   onChange
 }: {
   label: string;
+  preference: DownloadQualityPreference;
   profiles: QualityProfile[];
   value: number | null;
   onChange: (value: number | null) => void;
 }) {
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const autoProfile = resolveAutoQualityProfile(profiles, preference);
+  const selectedProfile = value != null ? profiles.find(profile => profile.id === value) : null;
+  const displayValue = selectedProfile?.name
+    || (value != null ? `Profil #${value}` : `Auto → ${autoProfile?.name || 'détection'}`);
+
   return (
-    <label className="space-y-1">
+    <div className="space-y-1">
       <span className="block text-[9px] font-black uppercase text-zinc-500">{label}</span>
-      <select
-        value={value ?? ''}
-        onChange={event => onChange(event.target.value ? Number(event.target.value) : null)}
-        className="w-full rounded-lg bg-zinc-950 border border-zinc-700 px-2 py-2 text-[10px] text-zinc-200 outline-none"
+      <button
+        type="button"
+        onClick={() => setIsPickerOpen(true)}
+        className="w-full min-h-10 rounded-lg bg-zinc-950 border border-zinc-700 px-2.5 py-2 text-left text-[10px] text-zinc-200 outline-none flex items-center justify-between gap-2"
+        aria-haspopup="dialog"
+        aria-expanded={isPickerOpen}
       >
-        <option value="">Auto</option>
-        {profiles.map(profile => (
-          <option key={profile.id} value={profile.id}>{profile.name}</option>
-        ))}
-      </select>
-    </label>
+        <span className="min-w-0 truncate font-semibold">{displayValue}</span>
+        <ChevronDown size={13} className="shrink-0 text-zinc-500" />
+      </button>
+
+      {isPickerOpen && (
+        <div
+          className="fixed inset-0 z-[320] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-4"
+          onClick={() => setIsPickerOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Choisir le profil ${label}`}
+            className="w-full max-w-sm max-h-[76vh] overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl flex flex-col"
+            onClick={event => event.stopPropagation()}
+          >
+            <div className="shrink-0 flex items-center justify-between gap-3 px-3.5 py-3 border-b border-zinc-800">
+              <div>
+                <p className="text-sm font-extrabold text-white">Profil {label}</p>
+                <p className="text-[10px] text-zinc-500 mt-0.5">Sélection SeenIt pour Sonarr/Radarr</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPickerOpen(false)}
+                className="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 flex items-center justify-center"
+                aria-label="Fermer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(null);
+                  setIsPickerOpen(false);
+                }}
+                className={`w-full rounded-xl border px-3 py-2.5 text-left flex items-center justify-between gap-3 ${
+                  value == null
+                    ? 'border-blue-500/40 bg-blue-500/10 text-white'
+                    : 'border-zinc-800 bg-zinc-950/70 text-zinc-200'
+                }`}
+              >
+                <span className="min-w-0">
+                  <span className="block text-xs font-bold">Auto</span>
+                  <span className="block text-[10px] mt-0.5 text-zinc-400 truncate">
+                    {autoProfile ? `Utilisera ${autoProfile.name}` : 'Détection au moment du téléchargement'}
+                  </span>
+                </span>
+                {value == null && <Check size={15} className="shrink-0 text-blue-400" />}
+              </button>
+
+              {profiles.map(profile => {
+                const selected = value === profile.id;
+                return (
+                  <button
+                    key={profile.id}
+                    type="button"
+                    onClick={() => {
+                      onChange(profile.id);
+                      setIsPickerOpen(false);
+                    }}
+                    className={`w-full rounded-xl border px-3 py-2.5 text-left flex items-center justify-between gap-3 ${
+                      selected
+                        ? 'border-blue-500/40 bg-blue-500/10 text-white'
+                        : 'border-zinc-800 bg-zinc-950/70 text-zinc-200'
+                    }`}
+                  >
+                    <span className="min-w-0 text-xs font-semibold truncate">{profile.name}</span>
+                    {selected && <Check size={15} className="shrink-0 text-blue-400" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
