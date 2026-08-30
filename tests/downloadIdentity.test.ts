@@ -6,8 +6,10 @@ import {
   hasConflictingStrongPhysicalIds,
   mergeDownloadIdAliases,
   normalizeDownloadClientId,
+  normalizeQualityLabel,
   sameLegacyPhysicalTransfer,
-  samePhysicalDownload
+  samePhysicalDownload,
+  sameTransferPath
 } from '../src/features/downloads/downloadIdentity.ts';
 
 test('normalise le hash qBittorrent et le downloadId *Arr sans dépendre de la casse', () => {
@@ -124,4 +126,31 @@ test('deux vrais infohash différents ne sont jamais fusionnés par le fallback 
 
   assert.equal(hasConflictingStrongPhysicalIds(a, b), true);
   assert.equal(sameLegacyPhysicalTransfer(a, b), false);
+});
+
+
+test('normalise de façon stable la qualité Radarr et qBittorrent', () => {
+  const radarr = normalizeQualityLabel('Normal.2026.1080p.BluRay.x265', 'BluRay-1080p');
+  const qbit = normalizeQualityLabel('Normal.2026.1080p.BluRay.x265');
+  assert.equal(radarr, '1080p BluRay');
+  assert.equal(qbit, '1080p BluRay');
+});
+
+test('normalise 2160p WEB-DL vers le même badge 4K', () => {
+  assert.equal(normalizeQualityLabel('Film.2160p.WEB-DL.HDR'), '4K WEB-DL HDR');
+  assert.equal(normalizeQualityLabel('Film 4K WEBDL HDR10'), '4K WEB-DL HDR');
+});
+
+test('rattache Radarr et qBittorrent par chemin de transfert quand le hash manque', () => {
+  assert.equal(sameTransferPath(
+    { transferPath: 'D:\\Downloads\\Normal.2026.1080p', size: 10_000_000_000 },
+    { transferPath: 'd:/downloads/Normal.2026.1080p/', size: 10_000_000_000 }
+  ), true);
+});
+
+test('le fallback release accepte un identifiant Arr temporaire non-hash', () => {
+  assert.equal(sameLegacyPhysicalTransfer(
+    { downloadId: 'radarr-temporary-id', mediaType: 'movie', releaseTitle: 'Normal.2026.1080p.BluRay', size: 10_000_000_000 },
+    { mediaType: 'movie', releaseTitle: 'Normal 2026 1080p BluRay x265', size: 10_005_000_000 }
+  ), true);
 });

@@ -1,7 +1,7 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { C411Torrent } from './c411';
 import { authenticatedFetch } from '../lib/apiAuth';
-import { getPhysicalDownloadId, isStrongTorrentHash, mergeDownloadIdAliases, normalizeDownloadClientId, sameLegacyPhysicalTransfer, samePhysicalDownload } from '../features/downloads/downloadIdentity';
+import { getPhysicalDownloadId, isStrongTorrentHash, mergeDownloadIdAliases, normalizeDownloadClientId, normalizeQualityLabel, sameLegacyPhysicalTransfer, samePhysicalDownload, sameTransferPath } from '../features/downloads/downloadIdentity';
 
 export interface SonarrRadarrConfig {
   sonarrUrl?: string;
@@ -1586,52 +1586,17 @@ export interface LiveDownloadItem {
   downloadId?: string;
   /** Tous les identifiants connus du même torrent (hash qBit, infohash v1/v2, alias *Arr). */
   downloadIdAliases?: string[];
+  /** Chemin de travail remonté par *Arr / qBittorrent, utile comme identité forte de secours. */
+  transferPath?: string;
+  /** Date d'ajout du transfert quand la source la fournit. */
+  addedAt?: number;
+  /** Item réhydraté du stockage local en attente de confirmation serveur. */
+  isRestored?: boolean;
   isOptimistic?: boolean;
 }
 
 export function extractQualityFromTitle(rawTitle?: string, fallbackQuality?: string): string | undefined {
-  if (fallbackQuality && fallbackQuality.trim() && fallbackQuality !== 'Unknown') {
-    const cleanFallback = fallbackQuality
-      .replace(/WEBDL/i, 'WEB-DL')
-      .replace(/WEBRip/i, 'WEB-DL')
-      .replace(/Bluray/i, 'BluRay')
-      .trim();
-    if (cleanFallback) return cleanFallback;
-  }
-  if (!rawTitle) return undefined;
-  const raw = rawTitle.toUpperCase();
-  const tokens: string[] = [];
-
-  if (raw.includes('2160P') || raw.includes('4K') || raw.includes('UHD')) {
-    tokens.push('4K');
-  } else if (raw.includes('1080P') || raw.includes('FHD')) {
-    tokens.push('1080p');
-  } else if (raw.includes('720P') || raw.includes('HD')) {
-    tokens.push('720p');
-  }
-
-  if (raw.includes('REMUX')) {
-    tokens.push('REMUX');
-  } else if (raw.includes('BLURAY') || raw.includes('BLU-RAY') || raw.includes('BDRIP')) {
-    tokens.push('BluRay');
-  } else if (raw.includes('WEB-DL') || raw.includes('WEBDL') || raw.includes('WEBRIP')) {
-    tokens.push('WEB-DL');
-  } else if (raw.includes('HDTV')) {
-    tokens.push('HDTV');
-  } else if (raw.includes('DVDRIP') || raw.includes('DVD')) {
-    tokens.push('DVD');
-  }
-
-  if (raw.includes('HDR10+') || raw.includes('HDR10') || raw.includes('HDR')) {
-    tokens.push('HDR');
-  } else if (raw.includes('DV') || raw.includes('DOVI') || raw.includes('DOLBY VISION')) {
-    tokens.push('DV');
-  }
-
-  if (tokens.length > 0) {
-    return tokens.join(' ');
-  }
-  return undefined;
+  return normalizeQualityLabel(rawTitle, fallbackQuality);
 }
 
 export function formatBytes(bytes: number, decimals = 1): string {
@@ -1853,8 +1818,46 @@ function parseQueueRecordStatus(rec: any): { status: string; statusText: string;
   return { status, statusText, errorMessage };
 }
 
+export interface LiveDownloadSourceState {
+  configured: boolean;
+  ok: boolean;
+  checkedAt: number;
+  error?: string;
+}
+
+export interface LiveDownloadSourceHealth {
+  sonarr: LiveDownloadSourceState;
+  radarr: LiveDownloadSourceState;
+  qbittorrent: LiveDownloadSourceState;
+}
+
+const emptySourceHealth = (configured = false): LiveDownloadSourceState => ({
+  configured,
+  ok: false,
+  checkedAt: Date.now()
+});
+
+let lastLiveDownloadSourceHealth: LiveDownloadSourceHealth = {
+  sonarr: emptySourceHealth(false),
+  radarr: emptySourceHealth(false),
+  qbittorrent: emptySourceHealth(false)
+};
+
+export function getLastLiveDownloadSourceHealth(): LiveDownloadSourceHealth {
+  return {
+    sonarr: { ...lastLiveDownloadSourceHealth.sonarr },
+    radarr: { ...lastLiveDownloadSourceHealth.radarr },
+    qbittorrent: { ...lastLiveDownloadSourceHealth.qbittorrent }
+  };
+}
+
 export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promise<LiveDownloadItem[]> {
   const items: LiveDownloadItem[] = [];
+  const sourceHealth: LiveDownloadSourceHealth = {
+    sonarr: emptySourceHealth(Boolean(config.sonarrUrl && config.sonarrApiKey)),
+    radarr: emptySourceHealth(Boolean(config.radarrUrl && config.radarrApiKey)),
+    qbittorrent: emptySourceHealth(Boolean(config.qbittorrentUrl))
+  };
 
   // 1. Sonarr Queue
   if (config.sonarrUrl && config.sonarrApiKey) {
@@ -1865,6 +1868,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
         'Accept': 'application/json'
       });
 
+      sourceHealth.sonarr = { configured: true, ok: true, checkedAt: Date.now() };
       const records = Array.isArray(res) ? res : (Array.isArray(res?.records) ? res.records : []);
 
       for (const rec of records) {
@@ -1914,10 +1918,14 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           downloadClient: rec.downloadClient || 'Sonarr',
           downloadId: normalizeDownloadClientId(rec.downloadId) || undefined,
           downloadIdAliases: normalizeDownloadClientId(rec.downloadId) ? [normalizeDownloadClientId(rec.downloadId)!] : undefined,
-          releaseTitle: rec.title
+          releaseTitle: rec.title,
+          transferPath: rec.outputPath || undefined,
+          addedAt: rec.added ? Date.parse(rec.added) : undefined,
+          isRestored: false
         });
       }
     } catch (e: any) {
+      sourceHealth.sonarr = { configured: true, ok: false, checkedAt: Date.now(), error: e?.message || 'Sonarr indisponible' };
       if (!e?.message?.includes('PWA Web')) {
         console.warn('[LiveQueue] Erreur Sonarr queue:', e);
       }
@@ -1933,6 +1941,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
         'Accept': 'application/json'
       });
 
+      sourceHealth.radarr = { configured: true, ok: true, checkedAt: Date.now() };
       const records = Array.isArray(res) ? res : (Array.isArray(res?.records) ? res.records : []);
 
       for (const rec of records) {
@@ -1972,10 +1981,14 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           downloadClient: rec.downloadClient || 'Radarr',
           downloadId: normalizeDownloadClientId(rec.downloadId) || undefined,
           downloadIdAliases: normalizeDownloadClientId(rec.downloadId) ? [normalizeDownloadClientId(rec.downloadId)!] : undefined,
-          releaseTitle: rec.title
+          releaseTitle: rec.title,
+          transferPath: rec.outputPath || undefined,
+          addedAt: rec.added ? Date.parse(rec.added) : undefined,
+          isRestored: false
         });
       }
     } catch (e: any) {
+      sourceHealth.radarr = { configured: true, ok: false, checkedAt: Date.now(), error: e?.message || 'Radarr indisponible' };
       if (!e?.message?.includes('PWA Web')) {
         console.warn('[LiveQueue] Erreur Radarr queue:', e);
       }
@@ -2002,6 +2015,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
       if (cookieHeader) qHeaders['Cookie'] = cookieHeader;
 
       const res = await executeGet(`${qbitBase}/api/v2/torrents/info?filter=all&sort=added_on&reverse=true&limit=50`, qHeaders);
+      sourceHealth.qbittorrent = { configured: true, ok: true, checkedAt: Date.now() };
       if (Array.isArray(res)) {
         for (const t of res) {
           const isDone = Boolean(
@@ -2049,7 +2063,10 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
             sizeleft: 0,
             progress: rawProgress,
             status: qbitStatus,
-            statusText: qbitStatusText
+            statusText: qbitStatusText,
+            transferPath: t.content_path || t.save_path || undefined,
+            addedAt: Number(t.added_on) > 0 ? Number(t.added_on) * 1000 : undefined,
+            isRestored: false
           };
 
           const exactIndexes: number[] = [];
@@ -2059,11 +2076,15 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
               exactIndexes.push(index);
               return;
             }
+            if (sameTransferPath(it, qbitProbe)) {
+              exactIndexes.push(index);
+              return;
+            }
 
-            // Migration des anciens états : seulement si *Arr n'a pas de hash exploitable,
-            // avec release ET taille physique quasi identiques. Deux hashes différents
-            // ne seront donc jamais fusionnés par ce fallback.
-            if (!getPhysicalDownloadId(it) && sameLegacyPhysicalTransfer(it, qbitProbe)) {
+            // Fallback ancien/transitoire : release + taille. La fonction refuse déjà
+            // deux vrais infohash incompatibles, donc un downloadId temporaire *Arr ne
+            // bloque plus le rattachement au torrent qBittorrent réel.
+            if (sameLegacyPhysicalTransfer(it, qbitProbe)) {
               legacyIndexes.push(index);
             }
           });
@@ -2099,6 +2120,10 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           if (existing) {
             // Métadonnées *Arr (TMDB, titre, poster) + télémétrie qBittorrent (source de vérité live).
             existing.downloadIdAliases = mergeDownloadIdAliases(existing, qbitProbe);
+            existing.transferPath = existing.transferPath || qbitProbe.transferPath;
+            existing.addedAt = existing.addedAt || qbitProbe.addedAt;
+            existing.isRestored = false;
+            existing.quality = extractQualityFromTitle(t.name, existing.quality);
             // Le hash qBittorrent devient l'identifiant principal uniquement lorsque
             // *Arr n'en fournit pas un vrai. Les alias v1/v2 restent tous conservés.
             if (qbitDownloadId && (!existing.downloadId || !isStrongTorrentHash(existing.downloadId))) {
@@ -2149,19 +2174,24 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
                 statusText: qbitStatusText,
                 errorMessage: qbitErrorMsg,
                 downloadClient: 'qBittorrent',
-                releaseTitle: t.name
+                releaseTitle: t.name,
+                transferPath: t.content_path || t.save_path || undefined,
+                addedAt: Number(t.added_on) > 0 ? Number(t.added_on) * 1000 : undefined,
+                isRestored: false
               });
             }
           }
         }
       }
     } catch (e: any) {
+      sourceHealth.qbittorrent = { configured: true, ok: false, checkedAt: Date.now(), error: e?.message || 'qBittorrent indisponible' };
       if (!e?.message?.includes('PWA Web')) {
         console.warn('[LiveQueue] Erreur qBittorrent queue:', e);
       }
     }
   }
 
+  lastLiveDownloadSourceHealth = sourceHealth;
   return items;
 }
 

@@ -1,10 +1,5 @@
 import { type LiveDownloadItem } from '../../services/sonarrRadarr';
 import { useLiveDownloadStore } from '../../store/liveDownloadStore';
-import {
-  scheduleResumeDownloadCompletionWatchers,
-  startDownloadCompletionWatcher
-} from './downloadCompletionWatcher';
-import { ensureQbitRealtimeMonitor } from './qbitRealtimeMonitor';
 
 export interface BeginDownloadRequestInput {
   title: string;
@@ -20,9 +15,6 @@ export interface BeginDownloadRequestInput {
   statusText?: string;
   releaseTitle?: string;
 }
-
-scheduleResumeDownloadCompletionWatchers();
-ensureQbitRealtimeMonitor();
 
 export function beginDownloadRequest(input: BeginDownloadRequestInput): string {
   return useLiveDownloadStore.getState().addOptimisticDownload({
@@ -40,7 +32,9 @@ export function beginDownloadRequest(input: BeginDownloadRequestInput): string {
     status: 'submitting',
     statusText: input.statusText || `Demande prise en compte • envoi à ${input.downloadClient}…`,
     releaseTitle: input.releaseTitle || input.title,
-    isOptimistic: true
+    addedAt: Date.now(),
+    isOptimistic: true,
+    isRestored: false
   });
 }
 
@@ -54,15 +48,13 @@ export function acceptDownloadRequest(
     status,
     statusText,
     errorMessage: undefined,
-    isOptimistic: true
+    isOptimistic: true,
+    isRestored: false
   });
 
-  const requestItem = useLiveDownloadStore.getState().downloads.find(item => item.id === id);
-  if (requestItem) {
-    startDownloadCompletionWatcher(requestItem);
-  }
-
-  useLiveDownloadStore.getState().fetchDownloads();
+  // Un seul moteur est autorisé à écrire dans liveDownloadStore : le polling central.
+  // Cela évite les courses entre Radarr/Sonarr, qBittorrent et les anciens watchers.
+  void useLiveDownloadStore.getState().fetchDownloads();
 }
 
 export function failDownloadRequest(id: string, message: string): void {
@@ -71,7 +63,8 @@ export function failDownloadRequest(id: string, message: string): void {
     status: 'error',
     statusText: 'Impossible de lancer le téléchargement',
     errorMessage: message,
-    isOptimistic: true
+    isOptimistic: true,
+    isRestored: false
   });
 }
 
