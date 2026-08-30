@@ -1,0 +1,55 @@
+name: Validate Download Polish 1.4.58
+
+on:
+  push:
+    branches:
+      - fix/download-polish-1.4.58
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/download-polish-1.4.58
+          fetch-depth: 0
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Apply patch
+        run: node scripts/patch-download-polish-1.4.58.cjs
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Type check
+        run: npm run lint
+
+      - name: Tests Plex et téléchargements
+        run: npm run test:plex
+
+      - name: Build Web and server
+        run: npm run build
+
+      - name: Check diff
+        run: git diff --check
+
+      - name: Commit validated fix
+        run: |
+          git config user.name "julfou7"
+          git config user.email "julianfouillade@gmail.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Aucune modification à committer"
+            exit 0
+          fi
+          git commit -m "fix(downloads): polir le cycle de téléchargement" -m $'- élimine le doublon transitoire entre titre localisé et titre original sans matching par nom\n- remplace la fausse progression de recherche par un indicateur indéterminé\n- réserve les notifications de fin aux téléchargements réellement observés pendant la session\n- enrichit les toasts de téléchargement avec le poster et un libellé court\n- conserve le titre média SeenIt pendant le rattachement au torrent\n- publie SeenIt 1.4.58'
+          git push origin HEAD:fix/download-polish-1.4.58
