@@ -14,6 +14,8 @@ export interface DownloadIdentityLike {
   episodeNumber?: number | null;
   quality?: string | null;
   isOptimistic?: boolean | null;
+  /** Identifiant interne de la demande SeenIt ayant créé ce transfert. */
+  requestId?: string | null;
 }
 
 export function normalizeDownloadClientId(value: unknown): string | null {
@@ -100,6 +102,19 @@ export function mergeDownloadIdAliases(...items: Array<DownloadIdentityLike | nu
     for (const id of getPhysicalDownloadIds(item)) aliases.add(id);
   }
   return Array.from(aliases);
+}
+
+/**
+ * Corrélation interne sûre : le requestId n'est attribué qu'à la demande créée
+ * par SeenIt et aux représentations distantes qui lui ont été rattachées.
+ */
+export function sameDownloadRequest(
+  a?: DownloadIdentityLike | null,
+  b?: DownloadIdentityLike | null
+): boolean {
+  const aRequestId = typeof a?.requestId === 'string' ? a.requestId.trim() : '';
+  const bRequestId = typeof b?.requestId === 'string' ? b.requestId.trim() : '';
+  return Boolean(aRequestId && bRequestId && aRequestId === bRequestId);
 }
 
 export function samePhysicalDownload(

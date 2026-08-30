@@ -502,14 +502,19 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
 
   const hasActiveDownload = mediaDownloads.some(item =>
     item.status !== 'completed'
+    && item.status !== 'cancelled'
     && item.status !== 'error'
     && Number(item.progress || 0) < 100
   );
   const hasCompletedDownload = mediaDownloads.some(item =>
     item.status === 'completed' || Number(item.progress || 0) >= 100
   );
+  const hasCancelledDownload = !hasActiveDownload
+    && !hasCompletedDownload
+    && mediaDownloads.some(item => item.status === 'cancelled');
   const hasDownloadError = !hasActiveDownload
     && !hasCompletedDownload
+    && !hasCancelledDownload
     && mediaDownloads.some(item => item.status === 'error' || Boolean(item.errorMessage));
 
   // Vérification présence locale (Sonarr / Radarr / Plex)
@@ -2547,7 +2552,9 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                   ? "border-cyan-500/20 bg-cyan-500/[0.08] text-cyan-200"
                   : hasCompletedDownload
                     ? "border-emerald-500/20 bg-emerald-500/[0.08] text-emerald-300"
-                    : "border-red-500/20 bg-red-500/[0.08] text-red-300"
+                    : hasCancelledDownload
+                      ? "border-zinc-600/30 bg-zinc-500/[0.06] text-zinc-400"
+                      : "border-red-500/20 bg-red-500/[0.08] text-red-300"
               )}>
                 {hasActiveDownload ? (
                   <>
@@ -2558,6 +2565,11 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                   <>
                     <CheckCircle2 size={16} className="shrink-0" />
                     <span>Téléchargement terminé</span>
+                  </>
+                ) : hasCancelledDownload ? (
+                  <>
+                    <X size={16} className="shrink-0" />
+                    <span>Téléchargement annulé</span>
                   </>
                 ) : hasDownloadError ? (
                   <>

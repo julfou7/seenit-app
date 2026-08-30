@@ -8,10 +8,12 @@ import {
   mergeDownloadIdAliases,
   normalizeDownloadClientId,
   normalizeQualityLabel,
+  sameDownloadRequest,
   sameLegacyPhysicalTransfer,
   samePhysicalDownload,
   sameTransferPath
 } from '../src/features/downloads/downloadIdentity.ts';
+import { mergeLateOptimisticMetadata } from '../src/features/downloads/downloadReconciliation.ts';
 
 test('normalise le hash qBittorrent et le downloadId *Arr sans dépendre de la casse', () => {
   assert.equal(normalizeDownloadClientId(' ABCDEF123 '), 'abcdef123');
@@ -182,4 +184,73 @@ test('ne rattache pas une autre résolution pendant la fenêtre transitoire', ()
     { mediaType: 'movie', quality: '4K WEB-DL', addedAt: now - 2_000 },
     now
   ), false);
+});
+
+
+test('corrèle *Arr et qBittorrent par la demande SeenIt même si leurs IDs distants divergent', () => {
+  const requestId = 'opt_1700000000000_test';
+  assert.equal(sameDownloadRequest(
+    { requestId, downloadId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+    { requestId, downloadId: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' }
+  ), true);
+});
+
+test('une mutation optimiste tardive ne peut jamais figer la télémétrie distante', () => {
+  const remote = {
+    id: 'radarr_42',
+    requestId: 'opt_42',
+    mediaType: 'movie' as const,
+    title: 'Michael',
+    size: 4_800_000_000,
+    sizeleft: 3_000_000_000,
+    progress: 37.5,
+    speedBytesPerSec: 8_000_000,
+    speedFormatted: '7.6 Mo/s',
+    timeleft: '6m 15s',
+    timeleftSeconds: 375,
+    status: 'downloading',
+    statusText: 'Téléchargement 37.5%',
+    isOptimistic: false
+  };
+  const lateOptimistic = {
+    id: 'opt_42',
+    requestId: 'opt_42',
+    mediaType: 'movie' as const,
+    title: 'Michael',
+    tmdbId: 1234,
+    posterPath: '/poster.jpg',
+    size: 0,
+    sizeleft: 0,
+    progress: 0,
+    status: 'searching',
+    statusText: 'Recherche en cours',
+    isOptimistic: true
+  };
+
+  const merged = mergeLateOptimisticMetadata(remote, lateOptimistic);
+  assert.equal(merged.progress, 37.5);
+  assert.equal(merged.status, 'downloading');
+  assert.equal(merged.speedBytesPerSec, 8_000_000);
+  assert.equal(merged.timeleftSeconds, 375);
+  assert.equal(merged.tmdbId, 1234);
+  assert.equal(merged.posterPath, '/poster.jpg');
+  assert.equal(merged.isOptimistic, false);
+});
+
+
+test('les GET Android de suivi sont uniques et explicitement non cachables', async () => {
+  const { buildFreshGetUrl, buildNoCacheHeaders } = await import('../src/features/downloads/downloadNetwork.ts');
+  assert.equal(
+    buildFreshGetUrl('https://example.test/api/v3/queue?page=1', 12345),
+    'https://example.test/api/v3/queue?page=1&_seenitFresh=12345'
+  );
+  assert.equal(
+    buildFreshGetUrl('https://example.test/api/v2/torrents/info', 67890),
+    'https://example.test/api/v2/torrents/info?_seenitFresh=67890'
+  );
+  const headers = buildNoCacheHeaders({ 'X-Api-Key': 'abc', 'cache-control': 'public, max-age=3600' });
+  assert.equal(headers['X-Api-Key'], 'abc');
+  assert.equal(headers['Cache-Control'], 'no-cache, no-store, max-age=0');
+  assert.equal(headers.Pragma, 'no-cache');
+  assert.equal(headers.Expires, '0');
 });
