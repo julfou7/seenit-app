@@ -1810,7 +1810,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           const qbitDownloadId = normalizeDownloadClientId(t.hash);
 
           const isQbitError = t.state === 'error' || t.state === 'missingFiles';
-          const qbitErrorMsg = isQbitError ? 'Erreur qBittorrent (espace disque insuffisant ou fichier manquant)' : undefined;
+          const qbitErrorMsg = isQbitError ? 'Erreur de téléchargement (espace disque insuffisant ou fichier manquant)' : undefined;
           const qbitStatus = isQbitError
             ? 'error'
             : (isDone ? 'completed' : (t.state === 'stalledDL' ? 'warning' : (t.state === 'pausedDL' ? 'paused' : 'downloading')));

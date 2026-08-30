@@ -334,7 +334,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
 
       if (result.success) {
         acceptDownloadRequest(requestId, 'Téléchargement accepté • mise en file d’attente', 'queued');
-        showToast(result.message, 'success');
+        showToast('Téléchargement lancé.', 'success');
       } else {
         failDownloadRequest(requestId, result.message);
         showToast(result.message, 'error');

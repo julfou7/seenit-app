@@ -422,9 +422,10 @@ export function DownloadModal({
           `Téléchargement accepté • mise en file d'attente`,
           'queued'
         );
-        setActionMessage({ text: result.message, type: 'success' });
-        if (onSuccessToast) onSuccessToast(result.message);
-        else showToast(result.message, 'success');
+        const successMessage = 'Téléchargement lancé.';
+        setActionMessage({ text: successMessage, type: 'success' });
+        if (onSuccessToast) onSuccessToast(successMessage);
+        else showToast(successMessage, 'success');
       } else {
         failDownloadRequest(requestId, result.message);
         setActionMessage({ text: result.message, type: 'error' });
