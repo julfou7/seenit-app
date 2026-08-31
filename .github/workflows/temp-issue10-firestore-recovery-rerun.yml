@@ -1,0 +1,109 @@
+name: Validation finale issue 10 Firestore
+
+on:
+  push:
+    branches:
+      - fix/issue-10-firestore-recovery
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      - name: Rejouer le correctif avec le contrat IDBFactory actuel
+        run: |
+          awk '
+            /^[[:space:]]*- name: Préparer le correctif Firestore IndexedDB$/ { found=1; next }
+            found && /^[[:space:]]*run: \|$/ { capture=1; next }
+            capture && /^[[:space:]]*- name: Installer les dépendances$/ { exit }
+            capture { sub(/^          /, ""); print }
+          ' .github/workflows/temp-issue10-firestore-recovery.yml > /tmp/prepare-issue10.sh
+
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('/tmp/prepare-issue10.sh')
+          text = p.read_text()
+          text, count = re.subn(
+              r"\ninterface IndexedDbFactoryWithListing extends IDBFactory \{\n  databases\?: \(\) => Promise<IndexedDbDatabaseInfoLike\[\]>;\n\}\n",
+              "\n",
+              text,
+              count=1
+          )
+          if count != 1:
+              raise SystemExit('Bloc IndexedDbFactoryWithListing introuvable')
+          text = text.replace('factory: IndexedDbFactoryWithListing,', 'factory: IDBFactory,', 1)
+          old = """    if (typeof factory.databases !== 'function') return [expected];
+              try {
+                const databases = await factory.databases.call(factory);"""
+          new = """    const listDatabases = (factory as IDBFactory & {
+                databases?: () => Promise<IndexedDbDatabaseInfoLike[]>;
+              }).databases;
+              if (typeof listDatabases !== 'function') return [expected];
+              try {
+                const databases = await listDatabases.call(factory);"""
+          if old not in text:
+              raise SystemExit('Bloc databases() introuvable')
+          text = text.replace(old, new, 1)
+          old_factory = '    const factory = (options.indexedDbFactory ?? indexedDB) as IndexedDbFactoryWithListing;'
+          if old_factory not in text:
+              raise SystemExit('Cast factory introuvable')
+          text = text.replace(old_factory, '    const factory = options.indexedDbFactory ?? indexedDB;', 1)
+          p.write_text(text)
+          PY
+
+          bash /tmp/prepare-issue10.sh
+
+      - name: Installer les dépendances
+        run: npm ci --legacy-peer-deps
+
+      - name: Contrat de changement SPEC
+        env:
+          SPEC_BASE_SHA: 9ef6ee2e31f69e28d575c8d65fc02e67e40e2cc2
+        run: |
+          export GITHUB_SHA="$(git rev-parse HEAD)"
+          npm run test:spec:changes
+
+      - name: SPEC, contrat Android, TypeScript et tests
+        run: npm test
+
+      - name: Audit des dépendances de production
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Build PWA et synchronisation Capacitor
+        run: |
+          npm run build
+          npx cap sync android
+          npm run test:android
+
+      - name: Compiler l’APK de validation
+        run: |
+          cd android
+          ./gradlew --no-daemon assembleDebug --stacktrace
+
+      - name: Finaliser la branche sans workflows temporaires
+        run: |
+          git rm .github/workflows/temp-issue10-firestore-recovery.yml .github/workflows/temp-issue10-firestore-recovery-rerun.yml
+          git add android
+          git commit --amend --no-edit
+          git push --force-with-lease origin HEAD:fix/issue-10-firestore-recovery
