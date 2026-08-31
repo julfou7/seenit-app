@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 31 août 2026  
-Version applicative : **1.4.81**
+Version applicative : **1.4.82**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -241,6 +241,11 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   Android, valide le JAR officiel et l'empreinte de la distribution Gradle, compile exclusivement
   avec ce wrapper puis publie l'APK et son SHA-256 depuis le même commit. Le tag `vX.Y.Z` désigne
   exactement ce commit.
+- **SEENIT-RELEASE-003** — Les notes publiques d'une version agrègent tous les commits compris entre
+  le dernier tag SemVer strictement antérieur à la version courante et le commit publié. Un dernier
+  commit détaillé ne peut jamais masquer les changements précédents de la même version. Si le tag de
+  la version courante existe déjà lors d'une régénération, il est ignoré comme borne de départ afin de
+  conserver la totalité de l'historique de cette version.
 - Canal PWA : le déploiement Web peut être instantané et réversible côté hébergeur.
 - Canal APK : une correction, y compris un rollback logique, est toujours une nouvelle version avec
   un `versionCode` supérieur. On ne remplace jamais silencieusement l'asset d'une version déjà testée.
