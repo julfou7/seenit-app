@@ -1,10 +1,9 @@
-const { execSync } = require('child_process');
-const fs = require('fs');
+const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
 
 function fixFrenchFormatting(text) {
   if (!text) return '';
   return text
-    // Missing apostrophes
     .replace(/\bd\s+([aáàâeéèêiíìîoóòôuúùûh])/gi, "d'$1")
     .replace(/\bl\s+([aáàâeéèêiíìîoóòôuúùûh])/gi, "l'$1")
     .replace(/\bc\s+est\b/gi, "c'est")
@@ -13,7 +12,6 @@ function fixFrenchFormatting(text) {
     .replace(/\bqu\s+([aáàâeéèêiíìîoóòôuúùûh])/gi, "qu'$1")
     .replace(/\bm\s+([aáàâeéèêiíìîoóòôuúùû])/gi, "m'$1")
     .replace(/\bs\s+([aáàâeéèêiíìîoóòôuúùû])/gi, "s'$1")
-    // Missing accents & common words
     .replace(/\bpassage a la\b/gi, "passage à la")
     .replace(/\bPassage a la\b/g, "Passage à la")
     .replace(/\bmise a jour\b/gi, "mise à jour")
@@ -61,108 +59,188 @@ function fixFrenchFormatting(text) {
     .replace(/\bcles\b/gi, "clés");
 }
 
-function generate() {
-  const version = process.env.APP_VERSION || '1.2.0';
-  let releaseBody = '';
+function runGit(args, cwd = process.cwd()) {
+  return execFileSync('git', args, {
+    cwd,
+    stdio: ['ignore', 'pipe', 'ignore'],
+    encoding: 'utf8'
+  }).trim();
+}
+
+function parseSemver(value) {
+  const match = String(value || '').trim().match(/^v?(\d+)\.(\d+)\.(\d+)$/);
+  if (!match) return null;
+  return match.slice(1).map(Number);
+}
+
+function compareSemver(a, b) {
+  for (let index = 0; index < 3; index += 1) {
+    if (a[index] !== b[index]) return a[index] - b[index];
+  }
+  return 0;
+}
+
+function findPreviousReleaseTag(version, cwd = process.cwd()) {
+  const target = parseSemver(version);
+  if (!target) return null;
+
+  let tags = '';
+  try {
+    tags = runGit(['tag', '--list', 'v*', '--sort=-v:refname'], cwd);
+  } catch {
+    return null;
+  }
+
+  for (const tag of tags.split('\n').map(value => value.trim()).filter(Boolean)) {
+    const parsed = parseSemver(tag);
+    if (parsed && compareSemver(parsed, target) < 0) return tag;
+  }
+  return null;
+}
+
+function normalizeCommitMessage(message) {
+  return String(message || '')
+    .replace(/\\n/g, '\n')
+    .replace(/\r\n/g, '\n')
+    .trim();
+}
+
+function collectReleaseCommits(version, cwd = process.cwd()) {
+  const previousTag = findPreviousReleaseTag(version, cwd);
+  let output = '';
 
   try {
-    // 1. Check if the latest commit message has detailed body text
-    let latestCommitFull = '';
+    const range = previousTag ? `${previousTag}..HEAD` : 'HEAD';
+    const args = previousTag
+      ? ['log', '--reverse', '--format=%H%x1f%B%x1e', range]
+      : ['log', '-n', '10', '--reverse', '--format=%H%x1f%B%x1e', range];
+    output = runGit(args, cwd);
+  } catch {
+    return { previousTag, commits: [] };
+  }
+
+  const commits = output
+    .split('\x1e')
+    .map(record => record.trim())
+    .filter(Boolean)
+    .map(record => {
+      const separatorIndex = record.indexOf('\x1f');
+      if (separatorIndex < 0) return null;
+      return {
+        hash: record.slice(0, separatorIndex).trim(),
+        message: normalizeCommitMessage(record.slice(separatorIndex + 1))
+      };
+    })
+    .filter(Boolean);
+
+  return { previousTag, commits };
+}
+
+function cleanConventionalSubject(subject) {
+  return String(subject || '')
+    .replace(/^(fix|feat|perf|style|chore|refactor|docs|build)(\([^)]+\))?:\s*/i, '')
+    .trim();
+}
+
+function notePrefixFromSubject(subject) {
+  const match = String(subject || '').match(/^(fix|feat|perf|style|chore|refactor|docs|build)(\(([^)]+)\))?:/i);
+  if (!match) return '- ';
+  const type = match[1].toLowerCase();
+  const scope = String(match[3] || '').toLowerCase();
+  if (type === 'fix') return '- **Correction** : ';
+  if (type === 'feat') return '- **Nouveauté** : ';
+  if (type === 'perf') return '- **Performance** : ';
+  if (type === 'style' || scope === 'ui' || scope === 'ux') return '- **Interface** : ';
+  if (type === 'build') return '- **Build** : ';
+  return '- ';
+}
+
+function extractCommitNotes(message) {
+  const normalized = normalizeCommitMessage(message);
+  if (!normalized) return [];
+
+  const lines = normalized.split('\n');
+  const subject = (lines.shift() || '').trim();
+  const bulletItems = [];
+
+  for (const line of lines) {
+    const match = line.match(/^\s*(?:[-*•]|\d+[.)])\s+(.+)$/);
+    if (!match) continue;
+    const item = fixFrenchFormatting(match[1].trim());
+    if (item) bulletItems.push(`- ${item}`);
+  }
+
+  if (bulletItems.length > 0) return bulletItems;
+  if (/^Merge\b/i.test(subject) || /^chore\(release\):\s*(?:aligner|valider)\b/i.test(subject)) return [];
+
+  const cleaned = fixFrenchFormatting(cleanConventionalSubject(subject));
+  if (!cleaned) return [];
+  const sentence = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  return [`${notePrefixFromSubject(subject)}${sentence}`];
+}
+
+function deduplicateNotes(notes) {
+  const seen = new Set();
+  const result = [];
+  for (const note of notes) {
+    const key = note
+      .replace(/^[-*•]\s*/, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLocaleLowerCase('fr-FR');
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(note);
+  }
+  return result;
+}
+
+function buildReleaseBody(commits) {
+  const notes = deduplicateNotes(commits.flatMap(commit => extractCommitNotes(commit.message)));
+  if (!notes.length) return '';
+  return `### 🛠️ Ce qui a été fait\n\n${notes.join('\n')}`;
+}
+
+function generateReleaseNotes({ version = process.env.APP_VERSION || '1.2.0', cwd = process.cwd() } = {}) {
+  try {
+    const { commits } = collectReleaseCommits(version, cwd);
+    const body = buildReleaseBody(commits);
+    if (body) return body;
+
+    let latestCommit = '';
     try {
-      latestCommitFull = execSync('git log -n 1 --pretty=%B', { stdio: ['pipe', 'pipe', 'ignore'] }).toString().trim();
-    } catch (e) {}
-
-    // Check if the commit message has structured notes
-    if (latestCommitFull && (latestCommitFull.includes('🛠️') || latestCommitFull.includes('Ce qui a été fait') || latestCommitFull.includes('\n- ') || latestCommitFull.includes('\n• '))) {
-      // Clean commit message first line header if it's "fix: ..." and start directly from body or section
-      let cleaned = latestCommitFull;
-      const lines = cleaned.split('\n');
-      if (/^(fix|feat|perf|style|chore|refactor)(\([^)]+\))?:/i.test(lines[0])) {
-        lines.shift(); // remove subject line
-        cleaned = lines.join('\n').trim();
-      }
-
-      if (cleaned) {
-        releaseBody = fixFrenchFormatting(cleaned);
-      }
-    }
-
-    // 2. Fallback to commits range if no detailed body was found
-    if (!releaseBody) {
-      let rawLogs = '';
-      try {
-        const lastTag = execSync('git describe --tags --abbrev=0', { stdio: ['pipe', 'pipe', 'ignore'] }).toString().trim();
-        if (lastTag) {
-          rawLogs = execSync(`git log ${lastTag}..HEAD --pretty=%B`, { stdio: ['pipe', 'pipe', 'ignore'] }).toString().trim();
-        }
-      } catch (e) {}
-
-      if (!rawLogs) {
-        try {
-          rawLogs = execSync('git log -n 5 --pretty=%s', { stdio: ['pipe', 'pipe', 'ignore'] }).toString().trim();
-        } catch (e) {}
-      }
-
-      if (rawLogs) {
-        const lines = rawLogs.split('\n').map(l => l.trim()).filter(Boolean);
-        const items = [];
-
-        for (let rawMsg of lines) {
-          if (/^\d+\.\d+\.\d+$/i.test(rawMsg) || /^bump/i.test(rawMsg) || rawMsg.includes('Merge branch')) continue;
-
-          const ccRegex = /^(fix|feat|style|perf|refactor|docs|build|chore)(\(([^)]+)\))?:\s*(.*)$/i;
-          const match = rawMsg.match(ccRegex);
-
-          let type = '';
-          let scope = '';
-          let body = rawMsg;
-
-          if (match) {
-            type = match[1].toLowerCase();
-            scope = match[3] ? match[3].toLowerCase() : '';
-            body = match[4].trim();
-          }
-
-          let prefix = '- ';
-          if (type === 'fix') prefix = '- **Correction** : ';
-          else if (type === 'feat') prefix = '- **Nouveauté** : ';
-          else if (type === 'style' || scope === 'ui') prefix = '- **Interface** : ';
-          else if (type === 'perf') prefix = '- **Performance** : ';
-
-          let text = body;
-          text = text.charAt(0).toUpperCase() + text.slice(1);
-          text = fixFrenchFormatting(text);
-          items.push(`${prefix}${text}`);
-        }
-
-        if (items.length > 0) {
-          releaseBody = `### 🛠️ Ce qui a été fait\n\n${items.join('\n')}`;
-        }
-      }
-    }
-  } catch (err) {
-    console.error('Error generating release notes:', err);
+      latestCommit = runGit(['log', '-n', '1', '--pretty=%B'], cwd);
+    } catch {}
+    const fallbackBody = buildReleaseBody([{ hash: '', message: latestCommit }]);
+    if (fallbackBody) return fallbackBody;
+  } catch (error) {
+    console.error('Error generating release notes:', error);
   }
 
-  if (!releaseBody) {
-    releaseBody = `### 🛠️ Ce qui a été fait\n\n- Améliorations générales de l'interface, stabilité et optimisations.`;
-  }
+  return `### 🛠️ Ce qui a été fait\n\n- Améliorations générales de l'interface, stabilité et optimisations.`;
+}
 
-  // Ensure header exists
-  if (!releaseBody.startsWith('#')) {
-    releaseBody = `### 🛠️ Ce qui a été fait\n\n${releaseBody}`;
+function writeGithubOutput(releaseBody) {
+  if (!process.env.GITHUB_OUTPUT) return;
+  try {
+    fs.appendFileSync(process.env.GITHUB_OUTPUT, `NOTES<<EOF\n${releaseBody}\nEOF\n`);
+  } catch (error) {
+    console.error('Failed to write GITHUB_OUTPUT:', error);
   }
+}
 
-  if (process.env.GITHUB_OUTPUT) {
-    try {
-      const outputLine = `NOTES<<EOF\n${releaseBody}\nEOF\n`;
-      fs.appendFileSync(process.env.GITHUB_OUTPUT, outputLine);
-    } catch (e) {
-      console.error('Failed to write GITHUB_OUTPUT:', e);
-    }
-  }
-
+function main() {
+  const releaseBody = generateReleaseNotes();
+  writeGithubOutput(releaseBody);
   console.log(releaseBody);
 }
 
-generate();
+module.exports = {
+  buildReleaseBody,
+  collectReleaseCommits,
+  extractCommitNotes,
+  findPreviousReleaseTag,
+  generateReleaseNotes
+};
+
+if (require.main === module) main();
