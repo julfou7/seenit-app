@@ -1,0 +1,54 @@
+name: Validation temporaire release notes 1.4.82
+
+on:
+  push:
+    branches:
+      - fix/release-notes-complete-1482
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Node 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Dépendances
+        run: npm ci --legacy-peer-deps
+
+      - name: Aligner les surfaces de version
+        run: npm run version:sync
+
+      - name: SPEC, contrat Android, TypeScript et tests
+        run: npm test
+
+      - name: Build PWA et serveur
+        run: npm run build
+
+      - name: Synchroniser Capacitor Android
+        run: npx cap sync android
+
+      - name: Revalider le contrat Android
+        run: npm run test:android
+
+      - name: Enregistrer uniquement l’alignement de version sur la branche de travail
+        run: |
+          git add android/app/build.gradle src/store/updateStore.ts server.ts package.json package-lock.json docs/specifications/requirements.json docs/specifications/android-contract.json docs/specifications/seenit.md
+          if git diff --cached --quiet; then
+            echo "Aucun alignement supplémentaire à enregistrer."
+            exit 0
+          fi
+          git config user.name "seenit-validation-bot"
+          git config user.email "seenit-validation-bot@users.noreply.github.com"
+          git commit -m "chore(version): aligner SeenIt 1.4.82 sur la branche de validation"
+          git push origin HEAD:fix/release-notes-complete-1482
