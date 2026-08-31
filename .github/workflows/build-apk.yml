@@ -34,17 +34,102 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Align SeenIt Version
+      - name: Appliquer le correctif UX Plex épisode
         id: version_sync
         run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          episode_path = Path('src/screens/EpisodeDetailModal.tsx')
+          episode = episode_path.read_text(encoding='utf-8')
+          start_marker = "                    if (isEpisodeAvailable) {"
+          end_marker = "\n                    return (\n                      <button"
+          start = episode.index(start_marker)
+          end = episode.index(end_marker, start)
+          new_block = '''                    if (isEpisodeAvailable) {
+                      if (presence.plexInfo?.available) {
+                        return (
+                          <div className="flex flex-col items-center gap-2.5 w-full">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const targetTmdbId = tmdbShowId || activeShow?.tmdbId;
+                                void openPlexWatchUrl(activeShow || {
+                                  tmdbId: targetTmdbId,
+                                  imdbId: (activeShow as any)?.imdbId,
+                                  title: activeShow?.title || tmdbShowTitle,
+                                  mediaType: 'tv'
+                                });
+                              }}
+                              className="w-full py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] bg-[#E5A93D] hover:bg-[#d4982f] text-black font-extrabold text-sm cursor-pointer shadow-lg shadow-[#E5A93D]/15 touch-manipulation select-none"
+                              aria-label="Regarder cet épisode dans Plex"
+                            >
+                              <Play size={18} className="fill-black shrink-0" />
+                              <span>Regarder dans Plex</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setIsDownloadOpen(true)}
+                              className="inline-flex items-center justify-center gap-1.5 px-2 py-1.5 text-[10px] font-semibold text-zinc-500 hover:text-blue-400 transition-colors active:scale-95 touch-manipulation select-none"
+                            >
+                              <Download size={12} className="shrink-0" />
+                              <span>Télécharger à nouveau</span>
+                            </button>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="flex flex-col items-center gap-2 w-full">
+                          <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold text-[10px] select-none">
+                            <CheckCircle2 size={13} className="shrink-0" />
+                            <span>Téléchargé</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setIsDownloadOpen(true)}
+                            className="inline-flex items-center justify-center gap-1.5 px-2 py-1.5 text-[10px] font-semibold text-zinc-500 hover:text-blue-400 transition-colors active:scale-95 touch-manipulation select-none"
+                          >
+                            <Download size={12} className="shrink-0" />
+                            <span>Télécharger à nouveau</span>
+                          </button>
+                        </div>
+                      );
+                    }
+'''
+          episode = episode[:start] + new_block + episode[end:]
+          episode_path.write_text(episode, encoding='utf-8')
+
+          utils_path = Path('src/lib/utils.ts')
+          utils = utils_path.read_text(encoding='utf-8')
+          plex_log = "      appLogger.info('plex', `[Plex DeepLink] Redirection via intent système : ${targetUrl}`);\n"
+          if 'package=com.plexapp.android' not in utils:
+              if plex_log not in utils:
+                  raise SystemExit('Point d’insertion Plex introuvable dans utils.ts')
+              native_plex = plex_log + """      // Sur Android, cibler explicitement Plex avant l’URL universelle évite\n      // que certains appareils ouvrent watch.plex.tv dans le navigateur.\n      if (Capacitor.getPlatform() === 'android' && /^https?:\\/\\//i.test(targetUrl)) {\n        const plexIntentUrl = `intent://${targetUrl.replace(/^https?:\\/\\//i, '')}#Intent;scheme=https;package=com.plexapp.android;end`;\n        try {\n          const nativePlex = await AppLauncher.openUrl({ url: plexIntentUrl });\n          if (nativePlex?.completed) return true;\n        } catch (err) {\n          appLogger.warn('plex', '[Plex DeepLink] Intent Plex Android indisponible, fallback URL universelle.');\n        }\n      }\n"""
+              utils = utils.replace(plex_log, native_plex, 1)
+          utils_path.write_text(utils, encoding='utf-8')
+
+          gradle_path = Path('android/app/build.gradle')
+          gradle = gradle_path.read_text(encoding='utf-8')
+          if 'versionName "1.4.74"' not in gradle:
+              raise SystemExit('Version Android attendue 1.4.74 introuvable')
+          gradle = gradle.replace('versionCode 104074', 'versionCode 104075', 1)
+          gradle = gradle.replace('versionName "1.4.74"', 'versionName "1.4.75"', 1)
+          gradle_path.write_text(gradle, encoding='utf-8')
+          PY
+
           node scripts/sync-app-version.cjs
-          if git diff --quiet -- android/app/build.gradle src/store/updateStore.ts server.ts; then
+          git show HEAD^:.github/workflows/build-apk.yml > .github/workflows/build-apk.yml
+
+          if git diff --quiet -- android/app/build.gradle src/store/updateStore.ts server.ts src/screens/EpisodeDetailModal.tsx src/lib/utils.ts .github/workflows/build-apk.yml; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add android/app/build.gradle src/store/updateStore.ts server.ts
-            git commit -m "chore(release): align SeenIt version"
+            git add android/app/build.gradle src/store/updateStore.ts server.ts src/screens/EpisodeDetailModal.tsx src/lib/utils.ts .github/workflows/build-apk.yml
+            git commit -m "fix: simplifier l’action Plex dans les épisodes" -m "- Remplace le doublon disponibilité/ouverture par un seul CTA principal « Regarder dans Plex »." -m "- Relègue le retéléchargement en action secondaire discrète pour alléger la fiche épisode." -m "- Utilise l’identité TMDB enrichie de la série comme sur les fiches média pour résoudre Plex de façon fiable." -m "- Cible explicitement l’application Plex Android avant le fallback vers l’URL universelle ou le navigateur." -m "- Conserve un comportement Web/PWA fiable et publie SeenIt 1.4.75."
             git push
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
