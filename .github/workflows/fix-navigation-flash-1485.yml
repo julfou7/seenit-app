@@ -1,287 +1,52 @@
-name: Corriger le flash noir de navigation 1.4.85
+name: Navigation flash 1.4.85
 
 on:
   push:
-    branches:
-      - fix/navigation-first-load-flash-1485
+    branches: [fix/navigation-first-load-flash-1485]
 
 permissions:
   contents: write
 
 jobs:
-  fix-and-validate:
+  validate:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-
-      - name: Node.js 22
-        uses: actions/setup-node@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
-
-      - name: JDK 21
-        uses: actions/setup-java@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: zulu
           java-version: 21
-
-      - name: Installer les dépendances
+      - name: Installer
         run: npm ci --legacy-peer-deps
-
-      - name: Appliquer le correctif de navigation
-        shell: bash
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-          import json
-
-          app_path = Path('src/App.tsx')
-          app = app_path.read_text()
-          app = app.replace(
-              "import { lazy, Suspense, useState, useEffect, useRef } from 'react';",
-              "import { lazy, Suspense, startTransition, useCallback, useState, useEffect, useRef } from 'react';"
-          )
-          app = app.replace(
-              "import { activateLogUserScope } from './store/logStore';",
-              "import { activateLogUserScope } from './store/logStore';\nimport { createCachedAsyncLoader, preloadInBackground } from './features/navigation/screenPreload';"
-          )
-
-          old_lazy = """const ProfileScreen = lazy(() => import('./screens/ProfileScreen').then(module => ({ default: module.ProfileScreen })));
-          const ShowDetailScreen = lazy(() => import('./screens/ShowDetailScreen').then(module => ({ default: module.ShowDetailScreen })));
-          const WatchListScreen = lazy(() => import('./screens/WatchListScreen').then(module => ({ default: module.WatchListScreen })));
-          const DiscoverScreen = lazy(() => import('./screens/DiscoverScreen').then(module => ({ default: module.DiscoverScreen })));
-          const DownloadsScreen = lazy(() => import('./screens/DownloadsScreen').then(module => ({ default: module.DownloadsScreen })));""".replace('          ', '')
-          new_lazy = """const loadProfileScreen = createCachedAsyncLoader(() => import('./screens/ProfileScreen').then(module => ({ default: module.ProfileScreen })));
-          const loadShowDetailScreen = createCachedAsyncLoader(() => import('./screens/ShowDetailScreen').then(module => ({ default: module.ShowDetailScreen })));
-          const loadWatchListScreen = createCachedAsyncLoader(() => import('./screens/WatchListScreen').then(module => ({ default: module.WatchListScreen })));
-          const loadDiscoverScreen = createCachedAsyncLoader(() => import('./screens/DiscoverScreen').then(module => ({ default: module.DiscoverScreen })));
-          const loadDownloadsScreen = createCachedAsyncLoader(() => import('./screens/DownloadsScreen').then(module => ({ default: module.DownloadsScreen })));
-
-          const ProfileScreen = lazy(loadProfileScreen);
-          const ShowDetailScreen = lazy(loadShowDetailScreen);
-          const WatchListScreen = lazy(loadWatchListScreen);
-          const DiscoverScreen = lazy(loadDiscoverScreen);
-          const DownloadsScreen = lazy(loadDownloadsScreen);
-
-          const privateScreenPreloaders = [
-            loadWatchListScreen,
-            loadProfileScreen,
-            loadDiscoverScreen,
-            loadDownloadsScreen,
-            loadShowDetailScreen
-          ];
-
-          const tabScreenPreloaders: Record<string, () => Promise<unknown>> = {
-            watchlist: loadWatchListScreen,
-            library: loadWatchListScreen,
-            profile: loadProfileScreen,
-            settings: loadProfileScreen,
-            discover: loadDiscoverScreen,
-            downloads: loadDownloadsScreen
-          };""".replace('          ', '')
-          if old_lazy not in app:
-              raise SystemExit('Bloc lazy attendu introuvable dans App.tsx')
-          app = app.replace(old_lazy, new_lazy)
-
-          marker = "  const isReady = currentUser !== undefined;\n"
-          preload_effect = """
-
-  useEffect(() => {
-    if (!currentUser) return;
-    void preloadInBackground(privateScreenPreloaders);
-  }, [currentUser]);
-"""
-          if marker not in app:
-              raise SystemExit('Marqueur isReady introuvable')
-          app = app.replace(marker, marker + preload_effect, 1)
-
-          app = app.replace('openShow(', 'openShowSmooth(')
-
-          old_nav = """  const { currentTab, changeTab, selectedShow, openShow, closeShow } = useNavigation();
-  const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => new Set(['watchlist']));
-"""
-          new_nav = """  const { currentTab, changeTab, selectedShow, openShow, closeShow } = useNavigation();
-  const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => new Set(['watchlist', currentTab]));
-
-  const handleTabChange = useCallback((tab: Parameters<typeof changeTab>[0]) => {
-    void tabScreenPreloaders[tab]?.();
-    startTransition(() => {
-      setMountedTabs(previous => {
-        if (previous.has(tab)) return previous;
-        const next = new Set(previous);
-        next.add(tab);
-        return next;
-      });
-      changeTab(tab);
-    });
-  }, [changeTab]);
-
-  const openShowSmooth = useCallback((
-    id: any,
-    type: 'local' | 'tmdb' = 'local',
-    mediaType?: 'tv' | 'movie',
-    tmdbId?: number,
-    initialSeason?: number,
-    initialEpisode?: number
-  ) => {
-    void loadShowDetailScreen();
-    startTransition(() => {
-      openShow(id, type, mediaType, tmdbId, initialSeason, initialEpisode);
-    });
-  }, [openShow]);
-"""
-          if old_nav not in app:
-              raise SystemExit('Bloc navigation attendu introuvable')
-          app = app.replace(old_nav, new_nav, 1)
-          app = app.replace('[openShow, updateShow, showToast]', '[openShowSmooth, updateShow, showToast]')
-          app = app.replace('onTabChange={changeTab}', 'onTabChange={handleTabChange}')
-          app = app.replace('fallback={<div className="flex-1 bg-[#040406]" aria-label="Chargement de l’écran" />}', 'fallback={<div className="flex-1 bg-premium-ambient" aria-label="Chargement de l’écran" />}')
-          app = app.replace('fallback={<div className="flex-1 bg-black" aria-label="Chargement de la fiche" />}', 'fallback={<div className="flex-1 bg-premium-ambient" aria-label="Chargement de la fiche" />}')
-          app_path.write_text(app)
-
-          helper = """export function createCachedAsyncLoader<T>(loader: () => Promise<T>): () => Promise<T> {
-  let cachedPromise: Promise<T> | null = null;
-
-  return () => {
-    if (!cachedPromise) {
-      cachedPromise = loader().catch(error => {
-        cachedPromise = null;
-        throw error;
-      });
-    }
-    return cachedPromise;
-  };
-}
-
-export async function preloadInBackground(loaders: Array<() => Promise<unknown>>): Promise<void> {
-  await Promise.allSettled(loaders.map(loader => loader()));
-}
-"""
-          helper_path = Path('src/features/navigation/screenPreload.ts')
-          helper_path.parent.mkdir(parents=True, exist_ok=True)
-          helper_path.write_text(helper)
-
-          test = """import test from 'node:test';
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { createCachedAsyncLoader, preloadInBackground } from '../src/features/navigation/screenPreload.ts';
-
-test('SEENIT-UX-003 précharge et déduplique les écrans privés avant la première navigation', async () => {
-  let calls = 0;
-  const loader = createCachedAsyncLoader(async () => {
-    calls += 1;
-    return { ready: true };
-  });
-
-  const first = loader();
-  const second = loader();
-  assert.equal(first, second);
-  await preloadInBackground([loader, loader]);
-  assert.equal(calls, 1);
-  assert.deepEqual(await first, { ready: true });
-});
-
-test('SEENIT-UX-003 réessaie un chunk dont le premier préchargement a échoué', async () => {
-  let calls = 0;
-  const loader = createCachedAsyncLoader(async () => {
-    calls += 1;
-    if (calls === 1) throw new Error('chunk indisponible');
-    return 'ok';
-  });
-
-  await assert.rejects(loader(), /chunk indisponible/);
-  assert.equal(await loader(), 'ok');
-  assert.equal(calls, 2);
-});
-
-test('SEENIT-UX-003 conserve l’écran courant pendant le chargement d’un nouvel écran lazy', () => {
-  const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
-  assert.match(appSource, /const ProfileScreen = lazy\(loadProfileScreen\)/);
-  assert.match(appSource, /preloadInBackground\(privateScreenPreloaders\)/);
-  assert.match(appSource, /startTransition\(\(\) => \{\s*setMountedTabs/s);
-  assert.match(appSource, /startTransition\(\(\) => \{\s*openShow\(/s);
-  assert.match(appSource, /onTabChange=\{handleTabChange\}/);
-});
-"""
-          Path('tests/navigationPreload.test.ts').write_text(test)
-
-          spec_path = Path('docs/specifications/seenit.md')
-          spec = spec_path.read_text()
-          ux2 = """- **SEENIT-UX-002** — La clé de rendu et l'affiche d'un téléchargement restent stables pendant
-  la transition intention → transfert distant afin d'éviter les clignotements.
-"""
-          ux3 = ux2 + """- **SEENIT-UX-003** — La première navigation vers un écran privé chargé paresseusement ne
-  remplace jamais l'écran courant par un écran vide ou noir. Les chunks des onglets et des fiches
-  média restent séparés du bundle initial, sont préchargés en arrière-plan pendant le splash et les
-  changements d'écran sont engagés dans une transition React afin de conserver le contenu déjà
-  affiché jusqu'à ce que la prochaine vue soit prête.
-"""
-          if ux2 not in spec:
-              raise SystemExit('SEENIT-UX-002 introuvable dans la SPEC')
-          spec_path.write_text(spec.replace(ux2, ux3, 1))
-
-          req_path = Path('docs/specifications/requirements.json')
-          req = json.loads(req_path.read_text())
-          if any(item.get('id') == 'SEENIT-UX-003' for item in req['requirements']):
-              raise SystemExit('SEENIT-UX-003 existe déjà dans requirements.json')
-          req['requirements'].append({
-              'id': 'SEENIT-UX-003',
-              'title': 'Navigation lazy sans flash noir au premier accès',
-              'targets': ['pwa', 'apk'],
-              'tests': [
-                  {
-                      'file': 'tests/navigationPreload.test.ts',
-                      'contains': 'SEENIT-UX-003 précharge et déduplique les écrans privés avant la première navigation'
-                  },
-                  {
-                      'file': 'tests/navigationPreload.test.ts',
-                      'contains': 'SEENIT-UX-003 conserve l’écran courant pendant le chargement d’un nouvel écran lazy'
-                  }
-              ]
-          })
-          req_path.write_text(json.dumps(req, ensure_ascii=False, indent=2) + '\n')
-
-          gradle_path = Path('android/app/build.gradle')
-          gradle = gradle_path.read_text()
-          gradle = gradle.replace('versionCode 104084', 'versionCode 104085', 1)
-          gradle = gradle.replace('versionName "1.4.84"', 'versionName "1.4.85"', 1)
-          gradle_path.write_text(gradle)
-          PY
-
-      - name: Synchroniser SeenIt 1.4.85
+      - name: Appliquer le correctif
+        run: node scripts/fix-nav-flash-1485.cjs
+      - name: Synchroniser la version
         run: npm run version:sync
-
-      - name: Valider SPEC, Android, TypeScript et tests
+      - name: Tester
         run: npm test
-
-      - name: Auditer les dépendances de production
+      - name: Auditer
         run: npm audit --omit=dev --audit-level=high
-
-      - name: Construire la PWA et le backend
+      - name: Construire
         run: npm run build
-
-      - name: Contrat Android avant Capacitor
+      - name: Vérifier Android avant sync
         run: npm run test:android
-
-      - name: Synchroniser Capacitor Android
+      - name: Synchroniser Android
         run: npx cap sync android
-
-      - name: Contrat Android après Capacitor
+      - name: Vérifier Android après sync
         run: npm run test:android
-
-      - name: Compiler l'APK de validation
+      - name: Compiler APK
         working-directory: android
         run: ./gradlew assembleDebug
-
-      - name: Finaliser la branche propre
-        shell: bash
+      - name: Finaliser la branche
         run: |
           git config user.name "julfou7"
           git config user.email "julianfouillade@gmail.com"
-          git rm .github/workflows/fix-navigation-flash-1485.yml
+          git rm .github/workflows/fix-navigation-flash-1485.yml scripts/fix-nav-flash-1485.cjs
           git add -A
           git commit -m "perf(ux): supprimer le flash noir au premier changement d’écran" -m "- précharge les chunks privés pendant le splash sans supprimer le code splitting
           - conserve l’écran déjà affiché grâce aux transitions React lors du premier changement d’onglet
