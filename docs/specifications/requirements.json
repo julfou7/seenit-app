@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.82",
+  "applicationVersion": "1.4.83",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -89,6 +89,24 @@
         {
           "file": "tests/logPrivacy.test.ts",
           "contains": "SEENIT-DATA-003 isole les journaux techniques par UID sur chaque appareil"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DATA-004",
+      "title": "Récupération Firestore IndexedDB ciblée et anti-boucle",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/firestoreRecovery.test.ts",
+          "contains": "SEENIT-DATA-004 sélectionne uniquement la base Firestore exacte du projet courant"
+        },
+        {
+          "file": "tests/firestoreRecovery.test.ts",
+          "contains": "SEENIT-DATA-004 partage une seule tentative entre onglets et casse la boucle de rechargement"
         }
       ]
     },

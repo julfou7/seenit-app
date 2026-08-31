@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 31 août 2026  
-Version applicative : **1.4.82**
+Version applicative : **1.4.83**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -63,6 +63,14 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   qBittorrent, sessions et états hors ligne sont isolés par UID et identité de configuration.
 - **SEENIT-DATA-003** — Les journaux techniques persistés localement sont partitionnés par UID.
   L'ancien journal global est supprimé et aucun log collecté avant authentification n'est persisté.
+- **SEENIT-DATA-004** — Lorsqu'une assertion interne Firestore indique une corruption de la
+  persistance IndexedDB, SeenIt cible exclusivement la base locale correspondant au `projectId` et au
+  `databaseId` réellement configurés. Une seule tentative automatique est autorisée pendant cinq
+  minutes et son état est partagé par `localStorage` : en PWA, les autres onglets libèrent leur client
+  Firestore avant la suppression puis ne rechargent qu'après le signal de succès ; dans l'APK, la même
+  garde s'applique à l'unique WebView. Un diagnostic visible précède tout rechargement et une seconde
+  erreur dans la fenêtre de garde interrompt l'automatisme afin d'éviter une boucle. Les autres bases
+  IndexedDB de l'origine ne sont jamais supprimées.
 - Une réponse asynchrone capture l'UID et un epoch ; elle est ignorée si le compte change avant
   son écriture.
 - La PWA et l'APK d'un même UID partagent Firestore et convergent vers les mêmes données, sans

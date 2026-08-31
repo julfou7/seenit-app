@@ -21,6 +21,8 @@ googleAuthProvider.setCustomParameters({
 
 const isNative = Capacitor.isNativePlatform();
 
+export const FIRESTORE_DATABASE_ID = 'default';
+
 export const db = initializeFirestore(
   app,
   { 
@@ -29,7 +31,7 @@ export const db = initializeFirestore(
       : persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
     experimentalForceLongPolling: isNative
   },
-  'default'
+  FIRESTORE_DATABASE_ID
 );
 
 // Log diagnostic for Firestore initialization
