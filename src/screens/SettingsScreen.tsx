@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Cloud, LogIn, LogOut, FileText, CheckCircle2, MonitorPlay, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronDown, ChevronUp, ChevronRight, Check, AlertCircle, Info, Bug, Sparkles, Download, X, UploadCloud, DownloadCloud, GitBranch, GitPullRequest } from 'lucide-react';
-import { auth, db, googleAuthProvider, requestNotificationPermission, sendNativeNotification } from '../lib/firebase';
+import { auth, db, googleAuthProvider, requestNotificationPermission, revokeCurrentDeviceNotifications, sendNativeNotification } from '../lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
@@ -470,6 +470,7 @@ export function SettingsScreen() {
     localStorage.setItem('explicit_logout', 'true');
     clearPlexCredentials(auth.currentUser?.uid);
     usePlexAvailabilityStore.getState().clearCache();
+    await revokeCurrentDeviceNotifications();
     await signOut(auth);
   };
 

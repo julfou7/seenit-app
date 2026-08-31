@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
+import { invalidateQbitCache } from '../services/sonarrRadarr';
 
 export interface DownloadClientConfig {
   c411ApiKey: string;
@@ -20,6 +21,7 @@ export interface DownloadClientConfig {
 }
 
 interface DownloadConfigState extends DownloadClientConfig {
+  scopeUid: string | null;
   isHydrated: boolean;
   isSaving: boolean;
   saveError: string | null;
@@ -46,6 +48,8 @@ const DEFAULT_CONFIG: DownloadClientConfig = {
   autoSendToDownloader: true
 };
 
+let downloadConfigEpoch = 0;
+
 function normalizeConfig(input: Partial<DownloadClientConfig>): Partial<DownloadClientConfig> {
   const output: Partial<DownloadClientConfig> = {};
 
@@ -60,6 +64,7 @@ function normalizeConfig(input: Partial<DownloadClientConfig>): Partial<Download
 
 export const useDownloadConfigStore = create<DownloadConfigState>()((set, get) => ({
   ...DEFAULT_CONFIG,
+  scopeUid: null,
   isHydrated: false,
   isSaving: false,
   saveError: null,
@@ -70,7 +75,14 @@ export const useDownloadConfigStore = create<DownloadConfigState>()((set, get) =
   },
 
   saveConfig: async newConfig => {
-    set({ ...normalizeConfig(newConfig), saveError: null });
+    const previous = get();
+    const normalized = normalizeConfig(newConfig);
+    const qbitScopeChanged =
+      (normalized.qbittorrentUrl !== undefined && normalized.qbittorrentUrl !== previous.qbittorrentUrl)
+      || (normalized.qbittorrentUsername !== undefined && normalized.qbittorrentUsername !== previous.qbittorrentUsername)
+      || (normalized.qbittorrentPassword !== undefined && normalized.qbittorrentPassword !== previous.qbittorrentPassword);
+    set({ ...normalized, saveError: null });
+    if (qbitScopeChanged) invalidateQbitCache();
     return get().saveToCloud();
   },
 
@@ -81,6 +93,7 @@ export const useDownloadConfigStore = create<DownloadConfigState>()((set, get) =
 
   syncFromCloud: async () => {
     const user = auth.currentUser;
+    const requestEpoch = downloadConfigEpoch;
     if (!user) {
       set({ isHydrated: true });
       return;
@@ -89,6 +102,7 @@ export const useDownloadConfigStore = create<DownloadConfigState>()((set, get) =
     try {
       const docRef = doc(db, 'users', user.uid, 'settings', 'downloadConfig');
       const snap = await getDoc(docRef);
+      if (requestEpoch !== downloadConfigEpoch || auth.currentUser?.uid !== user.uid) return;
       if (snap.exists()) {
         set({
           ...(snap.data() as Partial<DownloadClientConfig>),
@@ -99,6 +113,7 @@ export const useDownloadConfigStore = create<DownloadConfigState>()((set, get) =
         set({ isHydrated: true, saveError: null });
       }
     } catch (error: any) {
+      if (requestEpoch !== downloadConfigEpoch || auth.currentUser?.uid !== user.uid) return;
       console.warn('[DownloadConfig] Erreur syncFromCloud:', error);
       set({
         isHydrated: true,
@@ -109,6 +124,7 @@ export const useDownloadConfigStore = create<DownloadConfigState>()((set, get) =
 
   saveToCloud: async () => {
     const user = auth.currentUser;
+    const requestEpoch = downloadConfigEpoch;
     if (!user) {
       set({ isSaving: false, saveError: 'Utilisateur non connecté.' });
       return false;
@@ -136,9 +152,11 @@ export const useDownloadConfigStore = create<DownloadConfigState>()((set, get) =
 
       const docRef = doc(db, 'users', user.uid, 'settings', 'downloadConfig');
       await setDoc(docRef, dataToSave, { merge: true });
+      if (requestEpoch !== downloadConfigEpoch || auth.currentUser?.uid !== user.uid) return true;
       set({ isSaving: false, saveError: null, isHydrated: true });
       return true;
     } catch (error: any) {
+      if (requestEpoch !== downloadConfigEpoch || auth.currentUser?.uid !== user.uid) return false;
       console.warn('[DownloadConfig] Erreur saveToCloud:', error);
       set({
         isSaving: false,
@@ -157,6 +175,10 @@ if (typeof window !== 'undefined') {
   let unsubscribeSnapshot: (() => void) | null = null;
 
   onAuthStateChanged(auth, user => {
+    downloadConfigEpoch += 1;
+    const listenerEpoch = downloadConfigEpoch;
+    const listenerUid = user?.uid;
+    invalidateQbitCache();
     if (unsubscribeSnapshot) {
       unsubscribeSnapshot();
       unsubscribeSnapshot = null;
@@ -164,6 +186,7 @@ if (typeof window !== 'undefined') {
 
     useDownloadConfigStore.setState({
       ...DEFAULT_CONFIG,
+      scopeUid: user?.uid || null,
       isHydrated: false,
       isSaving: false,
       saveError: null
@@ -181,6 +204,7 @@ if (typeof window !== 'undefined') {
       unsubscribeSnapshot = onSnapshot(
         docRef,
         snapshot => {
+          if (listenerEpoch !== downloadConfigEpoch || auth.currentUser?.uid !== listenerUid) return;
           if (snapshot.exists()) {
             useDownloadConfigStore.setState({
               ...(snapshot.data() as Partial<DownloadClientConfig>),
@@ -192,6 +216,7 @@ if (typeof window !== 'undefined') {
           }
         },
         error => {
+          if (listenerEpoch !== downloadConfigEpoch || auth.currentUser?.uid !== listenerUid) return;
           console.warn('[DownloadConfig] Firestore snapshot warning:', error);
           useDownloadConfigStore.setState({
             isHydrated: true,

@@ -3,25 +3,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
 import { SplashScreen as CapSplashScreen } from '@capacitor/splash-screen';
 import { StatusBar, Style } from '@capacitor/status-bar';
-import { auth, db, requestNotificationPermission } from './lib/firebase';
+import { auth, db, syncGrantedNotificationDevice } from './lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { LoginScreen } from './screens/LoginScreen';
 import { SplashScreen } from './components/SplashScreen';
 
 import { BottomNav } from './components/BottomNav';
 import { ToastContainer } from './components/ToastContainer';
-import { LibraryScreen } from './screens/LibraryScreen';
-import { ProfileScreen } from './screens/ProfileScreen';
-import { ShowDetailScreen } from './screens/ShowDetailScreen';
-import { WatchListScreen } from './screens/WatchListScreen';
-import { DiscoverScreen } from './screens/DiscoverScreen';
-import { DownloadsScreen } from './screens/DownloadsScreen';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { AppUpdateBanner } from './components/AppUpdateBanner';
 import { useNavigation } from './features/navigation/useNavigation';
@@ -38,6 +32,12 @@ import './store/showsStore';
 import { activatePlexUserScope } from './features/plex/plexStorage';
 import { usePlexAvailabilityStore } from './features/plex/plexAvailability';
 import { readUserScopedJson, writeUserScopedJson } from './lib/userIsolation';
+
+const ProfileScreen = lazy(() => import('./screens/ProfileScreen').then(module => ({ default: module.ProfileScreen })));
+const ShowDetailScreen = lazy(() => import('./screens/ShowDetailScreen').then(module => ({ default: module.ShowDetailScreen })));
+const WatchListScreen = lazy(() => import('./screens/WatchListScreen').then(module => ({ default: module.WatchListScreen })));
+const DiscoverScreen = lazy(() => import('./screens/DiscoverScreen').then(module => ({ default: module.DiscoverScreen })));
+const DownloadsScreen = lazy(() => import('./screens/DownloadsScreen').then(module => ({ default: module.DownloadsScreen })));
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null | undefined>(undefined);
@@ -59,6 +59,7 @@ export default function App() {
       }
       setCurrentUser(user);
       if (user) {
+        void syncGrantedNotificationDevice();
         try {
           const prefRef = doc(db, 'users', user.uid, 'settings', 'preferences');
           const snap = await getDoc(prefRef);
@@ -91,7 +92,7 @@ export default function App() {
 
   useEffect(() => {
     if (isNative) {
-      StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
+      StatusBar.setStyle({ style: Style.Light }).catch(() => {});
       StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
       StatusBar.setBackgroundColor({ color: '#040406' }).catch(() => {});
 
@@ -141,6 +142,16 @@ function MainApp() {
   useDetailsSyncWorker();
   useRemindersNotifier();
   const { currentTab, changeTab, selectedShow, openShow, closeShow } = useNavigation();
+  const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => new Set(['watchlist']));
+
+  useEffect(() => {
+    setMountedTabs(previous => {
+      if (previous.has(currentTab)) return previous;
+      const next = new Set(previous);
+      next.add(currentTab);
+      return next;
+    });
+  }, [currentTab]);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
@@ -370,26 +381,34 @@ function MainApp() {
         
         <div className="flex-1 min-h-0 flex flex-col relative">
           <div className="flex-1 min-h-0 flex flex-col">
-            <div className={cn("flex-1 min-h-0 flex flex-col", currentTab !== 'watchlist' && "hidden")}>
-              <WatchListScreen onShowClick={(id, mediaType) => openShow(id, 'local', mediaType)} />
-            </div>
+            <Suspense fallback={<div className="flex-1 bg-[#040406]" aria-label="Chargement de l’écran" />}>
+              {mountedTabs.has('watchlist') && (
+                <div className={cn("flex-1 min-h-0 flex flex-col", currentTab !== 'watchlist' && "hidden")}>
+                  <WatchListScreen onShowClick={(id, mediaType) => openShow(id, 'local', mediaType)} />
+                </div>
+              )}
 
-            <div className={cn("flex-1 min-h-0 flex flex-col", (currentTab !== 'profile' && currentTab !== 'settings') && "hidden")}>
-              <ProfileScreen 
-                initialShowSettings={currentTab === 'settings'} 
-                onShowClick={(id, mediaType) => openShow(id, 'tmdb', mediaType)}
-              />
-            </div>
+              {(mountedTabs.has('profile') || mountedTabs.has('settings')) && (
+                <div className={cn("flex-1 min-h-0 flex flex-col", (currentTab !== 'profile' && currentTab !== 'settings') && "hidden")}>
+                  <ProfileScreen
+                    initialShowSettings={currentTab === 'settings'}
+                    onShowClick={(id, mediaType) => openShow(id, 'tmdb', mediaType)}
+                  />
+                </div>
+              )}
 
-            <div className={cn("flex-1 min-h-0 flex flex-col", currentTab !== 'discover' && "hidden")}>
-              <DiscoverScreen onShowClick={(id, mediaType) => openShow(id, 'tmdb', mediaType)} />
-            </div>
+              {mountedTabs.has('discover') && (
+                <div className={cn("flex-1 min-h-0 flex flex-col", currentTab !== 'discover' && "hidden")}>
+                  <DiscoverScreen onShowClick={(id, mediaType) => openShow(id, 'tmdb', mediaType)} />
+                </div>
+              )}
 
-            <div className={cn("flex-1 min-h-0 flex flex-col", currentTab !== 'downloads' && "hidden")}>
-              <DownloadsScreen 
-                onShowClick={(id, mediaType) => openShow(id, 'tmdb', mediaType)}
-              />
-            </div>
+              {mountedTabs.has('downloads') && (
+                <div className={cn("flex-1 min-h-0 flex flex-col", currentTab !== 'downloads' && "hidden")}>
+                  <DownloadsScreen onShowClick={(id, mediaType) => openShow(id, 'tmdb', mediaType)} />
+                </div>
+              )}
+            </Suspense>
           </div>
 
           {selectedShow && (
@@ -397,16 +416,18 @@ function MainApp() {
               className="fixed inset-0 z-[150] bg-black flex flex-col overflow-hidden max-w-md mx-auto animate-in fade-in slide-in-from-bottom-6 duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] animate-overlay-in pt-safe"
               style={{ willChange: 'transform, opacity' }}
             >
-              <ShowDetailScreen 
-                key={`${selectedShow.id}-${selectedShow.mediaType || 'tv'}`}
-                showId={selectedShow.type === 'local' ? String(selectedShow.id) : undefined}
-                tmdbId={selectedShow.type === 'tmdb' ? Number(selectedShow.id) : (selectedShow.tmdbId ? Number(selectedShow.tmdbId) : undefined)}
-                mediaType={selectedShow.mediaType}
-                initialSeason={selectedShow.initialSeason}
-                initialEpisode={selectedShow.initialEpisode}
-                onBack={closeShow} 
-                onShowClick={(id, mediaType) => openShow(id, 'tmdb', mediaType)}
-              />
+              <Suspense fallback={<div className="flex-1 bg-black" aria-label="Chargement de la fiche" />}>
+                <ShowDetailScreen
+                  key={`${selectedShow.id}-${selectedShow.mediaType || 'tv'}`}
+                  showId={selectedShow.type === 'local' ? String(selectedShow.id) : undefined}
+                  tmdbId={selectedShow.type === 'tmdb' ? Number(selectedShow.id) : (selectedShow.tmdbId ? Number(selectedShow.tmdbId) : undefined)}
+                  mediaType={selectedShow.mediaType}
+                  initialSeason={selectedShow.initialSeason}
+                  initialEpisode={selectedShow.initialEpisode}
+                  onBack={closeShow}
+                  onShowClick={(id, mediaType) => openShow(id, 'tmdb', mediaType)}
+                />
+              </Suspense>
             </div>
           )}
         </div>

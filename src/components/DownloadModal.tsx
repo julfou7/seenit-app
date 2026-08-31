@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   Check,
@@ -50,6 +50,7 @@ export interface DownloadModalProps {
   year?: string | number;
   mediaType: 'movie' | 'tv';
   tmdbId?: number | string;
+  tvdbId?: number | string;
   imdbId?: string;
   posterPath?: string;
   initialSeason?: number;
@@ -76,6 +77,7 @@ export function DownloadModal({
   year,
   mediaType,
   tmdbId,
+  tvdbId,
   imdbId,
   posterPath,
   initialSeason,
@@ -107,6 +109,10 @@ export function DownloadModal({
   const [sortBy, setSortBy] = useState<'seeders' | 'size' | 'date'>('seeders');
   const [sendingTorrentId, setSendingTorrentId] = useState<number | null>(null);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   const getGeneratedQuery = (mode: ScopeMode, season: number, episode: number) => {
     const base = title.trim();
@@ -141,6 +147,22 @@ export function DownloadModal({
     setHasSearched(false);
     setIsTriggeringAuto(false);
   }, [isOpen, title, year, initialSeason, initialEpisode]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusTimer = window.setTimeout(() => dialogRef.current?.focus(), 0);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      onCloseRef.current();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.removeEventListener('keydown', handleKeyDown);
+      previousFocusRef.current?.focus();
+    };
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen || mediaType !== 'tv') return;
@@ -274,6 +296,7 @@ export function DownloadModal({
       title: displayTitle,
       mediaType,
       tmdbId,
+      tvdbId,
       imdbId,
       seasonNumber: isTv && scopeMode !== 'all' ? selectedSeason : undefined,
       episodeNumber: isTv && scopeMode === 'episode' ? selectedEpisode : undefined,
@@ -287,6 +310,16 @@ export function DownloadModal({
     onClose();
 
     try {
+      let verifiedTvdbId = tvdbId;
+      let verifiedImdbId = imdbId;
+      if (isTv && tmdbId && !verifiedTvdbId && !verifiedImdbId) {
+        const identityResult = await tmdb.getShowDetails(Number(tmdbId));
+        if (identityResult.ok) {
+          verifiedTvdbId = identityResult.value?.external_ids?.tvdb_id || undefined;
+          verifiedImdbId = identityResult.value?.external_ids?.imdb_id || undefined;
+        }
+      }
+
       const configuredProfileId = isTv
         ? (qualityPreference === '4k' ? config.sonarr4kProfileId : config.sonarr1080pProfileId)
         : (qualityPreference === '4k' ? config.radarr4kProfileId : config.radarr1080pProfileId);
@@ -297,6 +330,9 @@ export function DownloadModal({
       if (!effectiveProfileId) {
         const profiles = await fetchQualityProfiles(isTv ? 'sonarr' : 'radarr', clientUrl, clientApiKey);
         effectiveProfileId = resolveEffectiveQualityProfileId(profiles, qualityPreference);
+        if (!effectiveProfileId) {
+          throw new Error(`Aucun profil ${qualityLabel} compatible n’est disponible dans ${client}.`);
+        }
       }
 
       const result: DownloadActionResult = isTv
@@ -306,7 +342,8 @@ export function DownloadModal({
               apiKey: config.sonarrApiKey,
               title,
               tmdbId,
-              imdbId,
+              tvdbId: verifiedTvdbId,
+              imdbId: verifiedImdbId,
               season: selectedSeason,
               episode: selectedEpisode,
               qualityPreference,
@@ -320,7 +357,8 @@ export function DownloadModal({
               apiKey: config.sonarrApiKey,
               title,
               tmdbId,
-              imdbId,
+              tvdbId: verifiedTvdbId,
+              imdbId: verifiedImdbId,
               season: scopeMode === 'all' ? undefined : selectedSeason,
               qualityPreference,
               qualityProfileId: effectiveProfileId
@@ -464,6 +502,7 @@ export function DownloadModal({
         mediaInfo: {
           title,
           tmdbId,
+          tvdbId,
           imdbId,
           year,
           season: mediaType === 'tv' && scopeMode !== 'all' ? selectedSeason : undefined,
@@ -522,8 +561,21 @@ export function DownloadModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 pt-10 pb-20 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
-      <div className="relative w-full max-w-md max-h-[88vh] overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-900 shadow-2xl flex flex-col">
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center p-3 pt-10 pb-20 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150"
+      role="presentation"
+      onMouseDown={event => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="download-dialog-title"
+        tabIndex={-1}
+        className="relative w-full max-w-md max-h-[88vh] overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-900 shadow-2xl flex flex-col outline-none"
+      >
         <div className="shrink-0 p-4 border-b border-zinc-800 flex items-center gap-3 bg-zinc-900/95">
           {posterPath ? (
             <img
@@ -538,7 +590,7 @@ export function DownloadModal({
           )}
 
           <div className="flex-1 min-w-0">
-            <h3 className="font-extrabold text-base text-white truncate">{title}</h3>
+            <h3 id="download-dialog-title" className="font-extrabold text-base text-white truncate">{title}</h3>
             <p className="text-xs text-zinc-400 mt-0.5">
               {mediaType === 'tv' ? 'Série' : 'Film'}{year ? ` • ${year}` : ''}
             </p>
@@ -547,8 +599,8 @@ export function DownloadModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
-            aria-label="Fermer"
+            className="w-11 h-11 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
+            aria-label="Fermer la fenêtre de téléchargement"
           >
             <X size={18} />
           </button>
@@ -584,8 +636,8 @@ export function DownloadModal({
                       key={option.id}
                       type="button"
                       onClick={() => handleScopeChange(option.id)}
-                      className={`py-2 rounded-lg text-[11px] font-bold flex items-center justify-center gap-1 transition-colors ${
-                        selected ? 'bg-blue-600 text-white' : 'text-zinc-400 hover:text-white'
+                      className={`min-h-11 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors ${
+                        selected ? 'bg-[#E5A93D] text-black' : 'text-zinc-400 hover:text-white'
                       }`}
                     >
                       <Icon size={12} />
@@ -600,7 +652,7 @@ export function DownloadModal({
                   <button
                     type="button"
                     onClick={() => setIsSeasonPickerOpen(true)}
-                    className="px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-xs font-bold text-white flex items-center gap-2"
+                    className="min-h-11 px-3 rounded-xl bg-zinc-900 border border-zinc-700 text-xs font-bold text-white flex items-center gap-2"
                   >
                     {currentSeason.name || `Saison ${selectedSeason}`}
                     <ChevronDown size={13} className="text-zinc-400" />
@@ -610,7 +662,7 @@ export function DownloadModal({
                     <button
                       type="button"
                       onClick={() => setIsEpisodePickerOpen(true)}
-                      className="px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-xs font-bold text-white flex items-center gap-2"
+                      className="min-h-11 px-3 rounded-xl bg-zinc-900 border border-zinc-700 text-xs font-bold text-white flex items-center gap-2"
                     >
                       Épisode {selectedEpisode}
                       <ChevronDown size={13} className="text-zinc-400" />
@@ -650,7 +702,7 @@ export function DownloadModal({
                     <span className="text-xs font-black text-blue-300">1080p</span>
                     {isTriggeringAuto ? <Loader2 size={14} className="animate-spin text-blue-300" /> : <ChevronRight size={14} className="text-blue-400" />}
                   </div>
-                  <p className="text-[10px] text-zinc-400 mt-1">Préférence HD</p>
+                  <p className="text-xs text-zinc-400 mt-1">Préférence HD</p>
                 </button>
 
                 <button
@@ -663,7 +715,7 @@ export function DownloadModal({
                     <span className="text-xs font-black text-amber-300">4K / 2160p</span>
                     {isTriggeringAuto ? <Loader2 size={14} className="animate-spin text-amber-300" /> : <ChevronRight size={14} className="text-amber-400" />}
                   </div>
-                  <p className="text-[10px] text-zinc-400 mt-1">Préférence Ultra-HD</p>
+                  <p className="text-xs text-zinc-400 mt-1">Préférence Ultra-HD</p>
                 </button>
               </div>
             ) : (
@@ -686,7 +738,7 @@ export function DownloadModal({
                 <Radio size={16} className="text-zinc-400" />
                 <div>
                   <h4 className="text-xs font-extrabold text-white">Choisir une release manuellement</h4>
-                  <p className="text-[10px] text-zinc-500 mt-0.5">Recherche C411 avancée</p>
+                  <p className="text-xs text-zinc-500 mt-0.5">Recherche C411 avancée</p>
                 </div>
               </div>
               <ChevronDown size={15} className={`text-zinc-500 transition-transform ${manualOpen ? 'rotate-180' : ''}`} />
@@ -725,7 +777,7 @@ export function DownloadModal({
                       key={quality}
                       type="button"
                       onClick={() => setSelectedQuality(quality)}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${
+                      className={`min-h-11 px-3 rounded-lg text-xs font-bold border ${
                         selectedQuality === quality
                           ? 'bg-blue-600 text-white border-blue-500'
                           : 'bg-zinc-900 text-zinc-400 border-zinc-800'
@@ -742,7 +794,7 @@ export function DownloadModal({
                       key={sort}
                       type="button"
                       onClick={() => setSortBy(sort)}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-bold border ${
+                      className={`min-h-11 px-3 rounded-lg text-xs font-bold border ${
                         sortBy === sort
                           ? 'bg-zinc-700 text-white border-zinc-600'
                           : 'bg-zinc-900 text-zinc-500 border-zinc-800'
@@ -775,7 +827,7 @@ export function DownloadModal({
                             type="button"
                             disabled={sendingTorrentId === torrent.id}
                             onClick={() => void handleSendToClient(torrent)}
-                            className="flex-1 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-black flex items-center justify-center gap-1.5 disabled:opacity-50"
+                            className="flex-1 min-h-11 rounded-lg bg-[#E5A93D] hover:bg-[#f0b84c] text-black text-xs font-black flex items-center justify-center gap-1.5 disabled:opacity-50"
                           >
                             {sendingTorrentId === torrent.id ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
                             Envoyer
@@ -783,7 +835,7 @@ export function DownloadModal({
                           <button
                             type="button"
                             onClick={() => void handleCopyMagnet(torrent)}
-                            className="px-3 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-[10px] font-bold flex items-center gap-1.5"
+                            className="min-h-11 px-3 rounded-lg bg-zinc-800 text-zinc-300 text-xs font-bold flex items-center gap-1.5"
                           >
                             {copiedHash === torrent.infoHash ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
                             Magnet
@@ -826,12 +878,15 @@ export function DownloadModal({
           onClick={() => setIsSeasonPickerOpen(false)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="season-picker-title"
             className="w-full max-w-sm max-h-[70vh] overflow-y-auto rounded-2xl bg-zinc-900 border border-zinc-700 p-3 space-y-1.5"
             onClick={event => event.stopPropagation()}
           >
             <div className="flex items-center justify-between px-1 pb-2 mb-1 border-b border-zinc-800">
-              <span className="text-sm font-extrabold text-white">Choisir la saison</span>
-              <button type="button" onClick={() => setIsSeasonPickerOpen(false)} className="p-1 text-zinc-400">
+              <span id="season-picker-title" className="text-sm font-extrabold text-white">Choisir la saison</span>
+              <button type="button" onClick={() => setIsSeasonPickerOpen(false)} className="w-11 h-11 text-zinc-400 flex items-center justify-center" aria-label="Fermer le choix de saison">
                 <X size={17} />
               </button>
             </div>
@@ -843,9 +898,9 @@ export function DownloadModal({
                   handleScopeChange(scopeMode, season.season_number, selectedEpisode);
                   setIsSeasonPickerOpen(false);
                 }}
-                className={`w-full px-3 py-2.5 rounded-xl text-left flex items-center justify-between ${
+                className={`w-full min-h-11 px-3 py-2.5 rounded-xl text-left flex items-center justify-between ${
                   selectedSeason === season.season_number
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-[#E5A93D] text-black'
                     : 'bg-zinc-800/70 text-zinc-200'
                 }`}
               >
@@ -866,12 +921,15 @@ export function DownloadModal({
           onClick={() => setIsEpisodePickerOpen(false)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="episode-picker-title"
             className="w-full max-w-sm max-h-[70vh] overflow-y-auto rounded-2xl bg-zinc-900 border border-zinc-700 p-3"
             onClick={event => event.stopPropagation()}
           >
             <div className="flex items-center justify-between px-1 pb-2 mb-2 border-b border-zinc-800">
-              <span className="text-sm font-extrabold text-white">Choisir l'épisode</span>
-              <button type="button" onClick={() => setIsEpisodePickerOpen(false)} className="p-1 text-zinc-400">
+              <span id="episode-picker-title" className="text-sm font-extrabold text-white">Choisir l'épisode</span>
+              <button type="button" onClick={() => setIsEpisodePickerOpen(false)} className="w-11 h-11 text-zinc-400 flex items-center justify-center" aria-label="Fermer le choix d'épisode">
                 <X size={17} />
               </button>
             </div>
@@ -884,9 +942,9 @@ export function DownloadModal({
                     handleScopeChange('episode', selectedSeason, episode);
                     setIsEpisodePickerOpen(false);
                   }}
-                  className={`px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between ${
+                  className={`min-h-11 px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between ${
                     selectedEpisode === episode
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-[#E5A93D] text-black'
                       : 'bg-zinc-800/70 text-zinc-200'
                   }`}
                 >

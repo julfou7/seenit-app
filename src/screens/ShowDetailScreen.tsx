@@ -513,14 +513,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const [downloadTargetEpisode, setDownloadTargetEpisode] = useState<number | undefined>(undefined);
 
   // Téléchargements en direct (Sonarr / Radarr / qBittorrent)
-  const { startPolling, stopPolling, getShowDownloads, getMovieDownload, getEpisodeDownload } = useLiveDownloadStore();
-
-  useEffect(() => {
-    startPolling(4000);
-    return () => {
-      stopPolling();
-    };
-  }, [startPolling, stopPolling]);
+  const { getShowDownloads, getMovieDownload, getEpisodeDownload } = useLiveDownloadStore();
 
   const mediaDownloads = isSeries
     ? getShowDownloads(effectiveTmdbId, tmdbDetails?.external_ids?.tvdb_id || (show as any)?.tvdbId, tmdbDetails?.name || show?.title)
@@ -3407,6 +3400,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
           year={(tmdbDetails?.release_date || tmdbDetails?.first_air_date || show?.firstAirDate)?.slice(0, 4)}
           mediaType={isSeries ? 'tv' : 'movie'}
           tmdbId={effectiveTmdbId}
+          tvdbId={tmdbDetails?.external_ids?.tvdb_id || (show as any)?.tvdbId}
           imdbId={tmdbDetails?.external_ids?.imdb_id || (show as any)?.imdbId}
           posterPath={posterPath || tmdbDetails?.poster_path || show?.posterPath}
           initialSeason={downloadTargetSeason}

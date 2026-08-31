@@ -10,6 +10,7 @@ import {
   normalizeDownloadRelease,
   normalizeQualityLabel
 } from './downloadIdentity';
+import { auth } from '../../lib/firebase';
 
 export interface DownloadHistorySource {
   configured: boolean;
@@ -35,6 +36,15 @@ const HISTORY_CACHE_MS = 8_000;
 let cachedAt = 0;
 let cachedKey = '';
 let cachedSnapshot: DownloadHistorySnapshot | null = null;
+
+function credentialFingerprint(value?: string): string {
+  let hash = 2166136261;
+  for (const char of String(value || '')) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
 
 function emptySource(configured: boolean): DownloadHistorySource {
   return { configured, ok: false, records: [] };
@@ -76,7 +86,13 @@ async function fetchSourceHistory(
 }
 
 export async function fetchRecentDownloadHistory(config: SonarrRadarrConfig): Promise<DownloadHistorySnapshot> {
-  const key = `${cleanUrl(config.radarrUrl || '')}|${cleanUrl(config.sonarrUrl || '')}`;
+  const key = [
+    auth.currentUser?.uid || 'signed-out',
+    cleanUrl(config.radarrUrl || ''),
+    credentialFingerprint(config.radarrApiKey),
+    cleanUrl(config.sonarrUrl || ''),
+    credentialFingerprint(config.sonarrApiKey)
+  ].join('|');
   if (cachedSnapshot && cachedKey === key && Date.now() - cachedAt < HISTORY_CACHE_MS) {
     return cachedSnapshot;
   }
@@ -122,9 +138,7 @@ function canonicalMediaMatches(item: LiveDownloadItem, record: any): boolean {
     const movie = record?.movie;
     if (item.tmdbId && movie?.tmdbId && Number(item.tmdbId) === Number(movie.tmdbId)) return true;
     if (item.imdbId && movie?.imdbId && String(item.imdbId).toLowerCase() === String(movie.imdbId).toLowerCase()) return true;
-    const expected = normalizeDownloadRelease(item.movieTitle || item.title);
-    const actual = normalizeDownloadRelease(movie?.title);
-    return Boolean(expected && actual && expected === actual);
+    return false;
   }
 
   const series = record?.series;
@@ -132,9 +146,7 @@ function canonicalMediaMatches(item: LiveDownloadItem, record: any): boolean {
   if (item.tmdbId && series?.tmdbId && Number(item.tmdbId) === Number(series.tmdbId)) return true;
   if (item.imdbId && series?.imdbId && String(item.imdbId).toLowerCase() === String(series.imdbId).toLowerCase()) return true;
 
-  const expected = normalizeDownloadRelease(item.seriesTitle || item.title);
-  const actual = normalizeDownloadRelease(series?.title);
-  return Boolean(expected && actual && expected === actual);
+  return false;
 }
 
 function episodeScopeMatches(item: LiveDownloadItem, record: any): boolean {

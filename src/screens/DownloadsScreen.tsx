@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   ArrowLeft,
@@ -38,6 +38,7 @@ import {
   getStableDownloadRenderKey,
   selectStableDownloadPosterPath
 } from '../features/downloads/downloadPosterStability';
+import { isDownloadInHistorySection } from '../features/downloads/downloadStatePolicy';
 
 interface Props {
   onShowClick?: (id: any, mediaType?: 'tv' | 'movie') => void;
@@ -220,8 +221,8 @@ function DownloadItemCard({
                 event.stopPropagation();
                 onRemove(item);
               }}
-              className="-mr-1 -mt-1 rounded-full p-2 text-zinc-600 transition-colors hover:bg-white/5 hover:text-red-400 disabled:opacity-50"
-              aria-label="Supprimer"
+              className="-mr-1 -mt-1 min-h-11 min-w-11 rounded-full text-zinc-600 transition-colors hover:bg-white/5 hover:text-red-400 disabled:opacity-50 flex items-center justify-center"
+              aria-label={isCompleted || isCancelled || isError ? `Effacer ${cleanTitle}` : `Annuler le téléchargement de ${cleanTitle}`}
             >
               {isRemoving ? <Loader2 size={14} className="animate-spin" /> : <X size={15} />}
             </button>
@@ -314,8 +315,6 @@ export function DownloadsScreen({ onShowClick }: Props) {
   const {
     downloads,
     lastUpdated,
-    startPolling,
-    stopPolling,
     fetchDownloads,
     removeDownload,
     clearAllDownloads
@@ -326,7 +325,8 @@ export function DownloadsScreen({ onShowClick }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>('downloads');
   const [showConfiguration, setShowConfiguration] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
-  const [isClearing, setIsClearing] = useState(false);
+  const [clearingSection, setClearingSection] = useState<'completed' | 'cancelled' | 'error' | null>(null);
+  const [pendingCancellation, setPendingCancellation] = useState<LiveDownloadItem | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMediaType, setSelectedMediaType] = useState<SearchMediaType>('all');
@@ -338,12 +338,6 @@ export function DownloadsScreen({ onShowClick }: Props) {
   const [sendingTorrentId, setSendingTorrentId] = useState<number | null>(null);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
 
-  useEffect(() => {
-    // DownloadsScreen reste monté dans MainApp : il sert de vue du moniteur global.
-    startPolling(1000);
-    return () => stopPolling();
-  }, [startPolling, stopPolling]);
-
   const isConfigured = Boolean(
     (config.sonarrUrl && config.sonarrApiKey) ||
     (config.radarrUrl && config.radarrApiKey) ||
@@ -351,11 +345,19 @@ export function DownloadsScreen({ onShowClick }: Props) {
   );
 
   const activeDownloads = useMemo(
-    () => downloads.filter(item => item.status !== 'completed' && item.status !== 'cancelled' && item.progress < 100),
+    () => downloads.filter(item => item.status !== 'completed' && item.status !== 'cancelled' && item.status !== 'error' && item.progress < 100),
+    [downloads]
+  );
+  const errorDownloads = useMemo(
+    () => downloads.filter(item => isDownloadInHistorySection(item, 'error')),
+    [downloads]
+  );
+  const cancelledDownloads = useMemo(
+    () => downloads.filter(item => isDownloadInHistorySection(item, 'cancelled')),
     [downloads]
   );
   const completedDownloads = useMemo(
-    () => downloads.filter(item => item.status === 'completed' || item.status === 'cancelled' || item.progress >= 100),
+    () => downloads.filter(item => isDownloadInHistorySection(item, 'completed')),
     [downloads]
   );
 
@@ -403,7 +405,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
     return list;
   }, [torrents, selectedQuality, sortBy]);
 
-  const handleRemove = async (item: LiveDownloadItem) => {
+  const performRemove = async (item: LiveDownloadItem) => {
     const status = String(item.status || '').toLowerCase();
     const wasActive = status !== 'completed'
       && status !== 'cancelled'
@@ -422,17 +424,28 @@ export function DownloadsScreen({ onShowClick }: Props) {
     }, success ? 'success' : 'info');
   };
 
-  const handleClearAll = async () => {
-    if (!downloads.length || isClearing) return;
-    setIsClearing(true);
-    await clearAllDownloads();
-    setIsClearing(false);
-    showToast('Liste des téléchargements vidée.', 'success');
+  const handleRemove = (item: LiveDownloadItem) => {
+    const isActive = item.status !== 'completed'
+      && item.status !== 'cancelled'
+      && item.status !== 'error'
+      && Number(item.progress || 0) < 100;
+    if (isActive) {
+      setPendingCancellation(item);
+      return;
+    }
+    void performRemove(item);
   };
 
-  const resolveSearchMediaType = (torrent: C411Torrent): 'movie' | 'tv' | null => {
+  const handleClearAll = async (section: 'completed' | 'cancelled' | 'error') => {
+    if (clearingSection) return;
+    setClearingSection(section);
+    await clearAllDownloads(section);
+    setClearingSection(null);
+    showToast('Cette section a été vidée sans toucher aux téléchargements actifs.', 'success');
+  };
+
+  const resolveSearchMediaType = (_torrent: C411Torrent): 'movie' | 'tv' | null => {
     if (selectedMediaType === 'movie' || selectedMediaType === 'tv') return selectedMediaType;
-    if (/\bS\d{1,2}(?:E\d{1,3})?\b|\bseason\b|\bsaison\b/i.test(torrent.name)) return 'tv';
     return null;
   };
 
@@ -532,7 +545,8 @@ export function DownloadsScreen({ onShowClick }: Props) {
           <button
             type="button"
             onClick={() => setShowConfiguration(false)}
-            className="w-9 h-9 rounded-xl bg-zinc-900 border border-white/10 flex items-center justify-center text-zinc-300"
+            className="w-11 h-11 rounded-xl bg-zinc-900 border border-white/10 flex items-center justify-center text-zinc-300"
+            aria-label="Retour aux téléchargements"
           >
             <ArrowLeft size={18} />
           </button>
@@ -562,16 +576,18 @@ export function DownloadsScreen({ onShowClick }: Props) {
             <button
               type="button"
               onClick={() => void fetchDownloads()}
-              className="w-9 h-9 rounded-xl bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white flex items-center justify-center"
+              className="w-11 h-11 rounded-xl bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white flex items-center justify-center"
               title="Actualiser"
+              aria-label="Actualiser les téléchargements"
             >
               <RefreshCw size={16} />
             </button>
             <button
               type="button"
               onClick={() => setShowConfiguration(true)}
-              className="w-9 h-9 rounded-xl bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white flex items-center justify-center"
+              className="w-11 h-11 rounded-xl bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white flex items-center justify-center"
               title="Réglages"
+              aria-label="Ouvrir les réglages de téléchargement"
             >
               <Settings size={16} />
             </button>
@@ -635,18 +651,73 @@ export function DownloadsScreen({ onShowClick }: Props) {
               </section>
             )}
 
+            {errorDownloads.length > 0 && (
+              <section className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xs font-black uppercase tracking-wider text-red-400">En erreur • {errorDownloads.length}</h2>
+                  <button
+                    type="button"
+                    disabled={Boolean(clearingSection)}
+                    onClick={() => void handleClearAll('error')}
+                    className="min-h-11 px-3 text-xs font-bold text-zinc-400 hover:text-red-300 flex items-center gap-1 disabled:opacity-50"
+                    aria-label="Effacer les téléchargements en erreur"
+                  >
+                    {clearingSection === 'error' ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    Effacer
+                  </button>
+                </div>
+                {errorDownloads.map(item => (
+                  <DownloadItemCard
+                    key={getStableDownloadRenderKey(item)}
+                    item={item}
+                    onShowClick={onShowClick}
+                    onRemove={handleRemove}
+                    isRemoving={removingId === item.id}
+                  />
+                ))}
+              </section>
+            )}
+
+            {cancelledDownloads.length > 0 && (
+              <section className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xs font-black uppercase tracking-wider text-zinc-500">Annulés • {cancelledDownloads.length}</h2>
+                  <button
+                    type="button"
+                    disabled={Boolean(clearingSection)}
+                    onClick={() => void handleClearAll('cancelled')}
+                    className="min-h-11 px-3 text-xs font-bold text-zinc-400 hover:text-red-300 flex items-center gap-1 disabled:opacity-50"
+                    aria-label="Effacer les téléchargements annulés"
+                  >
+                    {clearingSection === 'cancelled' ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    Effacer
+                  </button>
+                </div>
+                {cancelledDownloads.map(item => (
+                  <DownloadItemCard
+                    key={getStableDownloadRenderKey(item)}
+                    item={item}
+                    onShowClick={onShowClick}
+                    onRemove={handleRemove}
+                    isRemoving={removingId === item.id}
+                  />
+                ))}
+              </section>
+            )}
+
             {completedDownloads.length > 0 && (
               <section className="space-y-2.5">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xs font-black uppercase tracking-wider text-zinc-500">Terminés • {completedDownloads.length}</h2>
                   <button
                     type="button"
-                    disabled={isClearing}
-                    onClick={() => void handleClearAll()}
-                    className="text-[10px] font-bold text-zinc-500 hover:text-red-400 flex items-center gap-1 disabled:opacity-50"
+                    disabled={Boolean(clearingSection)}
+                    onClick={() => void handleClearAll('completed')}
+                    className="min-h-11 px-3 text-xs font-bold text-zinc-500 hover:text-red-400 flex items-center gap-1 disabled:opacity-50"
+                    aria-label="Effacer les téléchargements terminés"
                   >
-                    {isClearing ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                    Vider
+                    {clearingSection === 'completed' ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    Effacer
                   </button>
                 </div>
                 {completedDownloads.map(item => (
@@ -694,7 +765,8 @@ export function DownloadsScreen({ onShowClick }: Props) {
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500"
+                    className="absolute right-0 top-1/2 -translate-y-1/2 w-11 h-11 text-zinc-500 flex items-center justify-center"
+                    aria-label="Effacer la recherche"
                   >
                     <X size={14} />
                   </button>
@@ -719,7 +791,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
                   key={option.id}
                   type="button"
                   onClick={() => setSelectedMediaType(option.id)}
-                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border shrink-0 ${
+                  className={`min-h-11 px-3 rounded-lg text-xs font-bold border shrink-0 ${
                     selectedMediaType === option.id
                       ? 'bg-zinc-700 text-white border-zinc-600'
                       : 'bg-zinc-900 text-zinc-400 border-zinc-800'
@@ -736,7 +808,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
                   key={quality}
                   type="button"
                   onClick={() => setSelectedQuality(quality)}
-                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold border shrink-0 ${
+                  className={`min-h-11 px-3 rounded-lg text-xs font-bold border shrink-0 ${
                     selectedQuality === quality
                       ? 'bg-blue-600 text-white border-blue-500'
                       : 'bg-zinc-900 text-zinc-400 border-zinc-800'
@@ -748,13 +820,13 @@ export function DownloadsScreen({ onShowClick }: Props) {
             </div>
 
             <div className="flex items-center gap-1.5">
-              <span className="text-[9px] uppercase font-black text-zinc-600">Tri</span>
+              <span className="text-xs uppercase font-black text-zinc-500">Tri</span>
               {(['seeders', 'size', 'date'] as const).map(sort => (
                 <button
                   key={sort}
                   type="button"
                   onClick={() => setSortBy(sort)}
-                  className={`px-2 py-1 rounded-lg text-[9px] font-bold border ${
+                  className={`min-h-11 px-3 rounded-lg text-xs font-bold border ${
                     sortBy === sort
                       ? 'bg-zinc-700 text-white border-zinc-600'
                       : 'bg-zinc-900 text-zinc-500 border-zinc-800'
@@ -787,7 +859,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
                         type="button"
                         disabled={sendingTorrentId === torrent.id}
                         onClick={() => void handleSendTorrent(torrent)}
-                        className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-black flex items-center justify-center gap-1.5 disabled:opacity-50"
+                        className="flex-1 min-h-11 rounded-xl bg-[#E5A93D] hover:bg-[#f0b84c] text-black text-xs font-black flex items-center justify-center gap-1.5 disabled:opacity-50"
                       >
                         {sendingTorrentId === torrent.id ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
                         Envoyer
@@ -795,7 +867,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
                       <button
                         type="button"
                         onClick={() => void copyMagnet(torrent)}
-                        className="px-3 py-2.5 rounded-xl bg-zinc-800 text-zinc-300 text-[10px] font-bold flex items-center gap-1.5"
+                        className="min-h-11 px-3 rounded-xl bg-zinc-800 text-zinc-300 text-xs font-bold flex items-center gap-1.5"
                       >
                         {copiedHash === torrent.infoHash ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
                         Magnet
@@ -814,6 +886,54 @@ export function DownloadsScreen({ onShowClick }: Props) {
           </div>
         )}
       </div>
+
+      {pendingCancellation && (
+        <div
+          className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center bg-black/75 p-4"
+          role="presentation"
+          onMouseDown={event => {
+            if (event.target === event.currentTarget) setPendingCancellation(null);
+          }}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="cancel-download-title"
+            aria-describedby="cancel-download-description"
+            className="w-full max-w-sm rounded-3xl border border-white/10 bg-zinc-950 p-5 shadow-2xl"
+            onKeyDown={event => {
+              if (event.key === 'Escape') setPendingCancellation(null);
+            }}
+          >
+            <h2 id="cancel-download-title" className="text-lg font-black text-white">Annuler le téléchargement ?</h2>
+            <p id="cancel-download-description" className="mt-2 text-sm leading-relaxed text-zinc-300">
+              « {pendingCancellation.movieTitle || pendingCancellation.seriesTitle || pendingCancellation.title} » sera retiré de {pendingCancellation.downloadClient || 'son client distant'}.
+              {String(pendingCancellation.downloadClient || '').toLowerCase().includes('qbittorrent') && ' Les fichiers déjà téléchargés seront conservés.'}
+            </p>
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setPendingCancellation(null)}
+                className="min-h-11 rounded-xl border border-white/10 bg-zinc-900 px-4 text-sm font-bold text-zinc-200"
+              >
+                Garder
+              </button>
+              <button
+                type="button"
+                autoFocus
+                onClick={() => {
+                  const item = pendingCancellation;
+                  setPendingCancellation(null);
+                  void performRemove(item);
+                }}
+                className="min-h-11 rounded-xl bg-red-500 px-4 text-sm font-black text-white"
+              >
+                Confirmer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

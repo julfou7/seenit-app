@@ -39,14 +39,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   const { shows, addShow, updateShow } = useShows();
   const { showToast } = useToastStore();
 
-  const { startPolling, stopPolling, getEpisodeDownload } = useLiveDownloadStore();
-
-  useEffect(() => {
-    startPolling(4000);
-    return () => {
-      stopPolling();
-    };
-  }, [startPolling, stopPolling]);
+  const { getEpisodeDownload } = useLiveDownloadStore();
 
   // Find live show from Zustand store so updates are instantly reactive
   const liveShow = shows.find(s => 
@@ -1131,6 +1124,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
       title={activeShow?.title || tmdbShowTitle || 'Série'}
       mediaType="tv"
       tmdbId={tmdbShowId || activeShow?.tmdbId}
+      tvdbId={(activeShow as any)?.tvdbId}
       imdbId={activeShow?.imdbId}
       initialSeason={currentSeason}
       initialEpisode={currentEpisode.episode_number}

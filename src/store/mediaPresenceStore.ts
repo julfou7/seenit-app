@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { useDownloadConfigStore } from './downloadConfigStore';
 import { executeGet, cleanUrl } from '../services/sonarrRadarr';
 import { checkPlexAvailability, PlexMediaInfo } from '../features/plex/plexAvailability';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 
 export interface MediaPresenceData {
   loading: boolean;
@@ -16,8 +18,8 @@ export interface MediaPresenceData {
 
 interface MediaPresenceStore {
   presenceCache: Record<string, MediaPresenceData>;
-  radarrMoviesCache: { data: any[]; timestamp: number } | null;
-  sonarrSeriesCache: { data: any[]; timestamp: number } | null;
+  radarrMoviesCache: { data: any[]; timestamp: number; scopeKey: string } | null;
+  sonarrSeriesCache: { data: any[]; timestamp: number; scopeKey: string } | null;
 
   getPresence: (tmdbId?: number | string, mediaType?: 'movie' | 'tv', title?: string) => MediaPresenceData | undefined;
 
@@ -33,13 +35,18 @@ interface MediaPresenceStore {
   }) => Promise<MediaPresenceData>;
 }
 
+let mediaPresenceEpoch = 0;
+
 export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
   presenceCache: {},
   radarrMoviesCache: null,
   sonarrSeriesCache: null,
 
   getPresence: (tmdbId, mediaType = 'movie', title) => {
-    const key = `${mediaType}:${tmdbId || title || ''}`;
+    if (!tmdbId) return undefined;
+    const config = useDownloadConfigStore.getState();
+    const configScope = `${cleanUrl(config.radarrUrl)}|${cleanUrl(config.sonarrUrl)}`;
+    const key = `${auth.currentUser?.uid || 'signed-out'}|${configScope}|${mediaType}:${tmdbId}`;
     return get().presenceCache[key];
   },
 
@@ -55,9 +62,24 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
       forceRefresh = false
     } = params;
 
-    const cacheKey = `${mediaType}:${tmdbId || title || ''}`;
+    const config = useDownloadConfigStore.getState();
+    const requestEpoch = mediaPresenceEpoch;
+    const requestUid = auth.currentUser?.uid || null;
+    const configScope = `${cleanUrl(config.radarrUrl)}|${cleanUrl(config.sonarrUrl)}`;
+    const canonicalId = tmdbId || tvdbId || imdbId || 'sans-identifiant';
+    const cacheKey = `${requestUid || 'signed-out'}|${configScope}|${mediaType}:${canonicalId}`;
     const now = Date.now();
     const existing = get().presenceCache[cacheKey];
+
+    if (canonicalId === 'sans-identifiant') {
+      return {
+        loading: false,
+        hasFile: false,
+        seasonsHasFile: {},
+        episodesHasFile: {},
+        lastChecked: now
+      };
+    }
 
     // Stratégie de Cache : 5 minutes pour un média trouvé / disponible, 30 secondes sinon
     if (!forceRefresh && existing) {
@@ -83,8 +105,6 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
       }));
     }
 
-    const config = useDownloadConfigStore.getState();
-
     // 1. Vérification disponibilité Plex en parallèle
     const plexPromise = checkPlexAvailability({
       tmdbId,
@@ -107,13 +127,15 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
         const radarrBase = cleanUrl(config.radarrUrl);
         const headers = { 'X-Api-Key': config.radarrApiKey, 'Accept': 'application/json' };
 
-        let moviesList = get().radarrMoviesCache?.data || [];
-        const isCacheValid = get().radarrMoviesCache && (now - get().radarrMoviesCache!.timestamp < 30 * 1000);
+        const radarrScopeKey = `${requestUid}|${cleanUrl(config.radarrUrl)}|${config.radarrApiKey}`;
+        let moviesList = get().radarrMoviesCache?.scopeKey === radarrScopeKey ? get().radarrMoviesCache?.data || [] : [];
+        const isCacheValid = get().radarrMoviesCache?.scopeKey === radarrScopeKey
+          && (now - get().radarrMoviesCache!.timestamp < 30 * 1000);
 
         if (forceRefresh || !isCacheValid || moviesList.length === 0) {
           moviesList = await executeGet(`${radarrBase}/api/v3/movie`, headers).catch(() => []);
-          if (Array.isArray(moviesList)) {
-            set({ radarrMoviesCache: { data: moviesList, timestamp: now } });
+          if (Array.isArray(moviesList) && requestEpoch === mediaPresenceEpoch && auth.currentUser?.uid === requestUid) {
+            set({ radarrMoviesCache: { data: moviesList, timestamp: now, scopeKey: radarrScopeKey } });
           }
         }
 
@@ -121,7 +143,6 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
           const match = moviesList.find((m: any) => {
             if (tmdbId && m.tmdbId && Number(m.tmdbId) === Number(tmdbId)) return true;
             if (imdbId && m.imdbId && String(m.imdbId).toLowerCase() === String(imdbId).toLowerCase()) return true;
-            if (title && m.title && m.title.toLowerCase() === title.toLowerCase()) return true;
             return false;
           });
 
@@ -140,13 +161,15 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
         const sonarrBase = cleanUrl(config.sonarrUrl);
         const headers = { 'X-Api-Key': config.sonarrApiKey, 'Accept': 'application/json' };
 
-        let seriesList = get().sonarrSeriesCache?.data || [];
-        const isCacheValid = get().sonarrSeriesCache && (now - get().sonarrSeriesCache!.timestamp < 30 * 1000);
+        const sonarrScopeKey = `${requestUid}|${cleanUrl(config.sonarrUrl)}|${config.sonarrApiKey}`;
+        let seriesList = get().sonarrSeriesCache?.scopeKey === sonarrScopeKey ? get().sonarrSeriesCache?.data || [] : [];
+        const isCacheValid = get().sonarrSeriesCache?.scopeKey === sonarrScopeKey
+          && (now - get().sonarrSeriesCache!.timestamp < 30 * 1000);
 
         if (forceRefresh || !isCacheValid || seriesList.length === 0) {
           seriesList = await executeGet(`${sonarrBase}/api/v3/series`, headers).catch(() => []);
-          if (Array.isArray(seriesList)) {
-            set({ sonarrSeriesCache: { data: seriesList, timestamp: now } });
+          if (Array.isArray(seriesList) && requestEpoch === mediaPresenceEpoch && auth.currentUser?.uid === requestUid) {
+            set({ sonarrSeriesCache: { data: seriesList, timestamp: now, scopeKey: sonarrScopeKey } });
           }
         }
 
@@ -155,7 +178,6 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
             if (tvdbId && s.tvdbId && Number(s.tvdbId) === Number(tvdbId)) return true;
             if (tmdbId && s.tmdbId && Number(s.tmdbId) === Number(tmdbId)) return true;
             if (imdbId && s.imdbId && String(s.imdbId).toLowerCase() === String(imdbId).toLowerCase()) return true;
-            if (title && s.title && s.title.toLowerCase() === title.toLowerCase()) return true;
             return false;
           });
 
@@ -211,6 +233,16 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
       lastChecked: now
     };
 
+    if (requestEpoch !== mediaPresenceEpoch || auth.currentUser?.uid !== requestUid) {
+      return {
+        loading: false,
+        hasFile: false,
+        seasonsHasFile: {},
+        episodesHasFile: {},
+        lastChecked: Date.now()
+      };
+    }
+
     set((state) => ({
       presenceCache: {
         ...state.presenceCache,
@@ -221,3 +253,14 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
     return finalData;
   }
 }));
+
+if (typeof window !== 'undefined') {
+  onAuthStateChanged(auth, () => {
+    mediaPresenceEpoch += 1;
+    useMediaPresenceStore.setState({
+      presenceCache: {},
+      radarrMoviesCache: null,
+      sonarrSeriesCache: null
+    });
+  });
+}

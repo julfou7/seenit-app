@@ -1,4 +1,5 @@
 import { auth } from './firebase';
+import { resolveSeenItApiUrl } from './seenitApi';
 
 /**
  * Ajoute le jeton Firebase courant aux appels vers l'API SeenIt.
@@ -23,7 +24,8 @@ export async function authenticatedFetch(
   input: RequestInfo | URL,
   init: RequestInit = {}
 ): Promise<Response> {
-  return fetch(input, {
+  const resolvedInput = typeof input === 'string' ? resolveSeenItApiUrl(input) : input;
+  return fetch(resolvedInput, {
     ...init,
     headers: await getAuthenticatedHeaders(init.headers)
   });

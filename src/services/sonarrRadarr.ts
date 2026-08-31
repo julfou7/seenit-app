@@ -4,6 +4,10 @@ import { authenticatedFetch } from '../lib/apiAuth';
 import { buildFreshGetUrl, buildNoCacheHeaders } from '../features/downloads/downloadNetwork';
 import { extractQbitSessionCookie, isQbitAuthError } from '../features/downloads/qbitNativeSession';
 import { getPhysicalDownloadId, isStrongTorrentHash, mergeDownloadIdAliases, normalizeDownloadClientId, normalizeQualityLabel, sameLegacyPhysicalTransfer, samePhysicalDownload, sameTransferPath } from '../features/downloads/downloadIdentity';
+import { auth } from '../lib/firebase';
+import { buildQbitSessionScopeKey } from '../features/downloads/qbitSessionScope';
+import { nextDownloadSourceBackoffMs, shouldFetchNextArrQueuePage } from '../features/downloads/downloadPollingPolicy';
+import { executeDownloadMutationOnce } from '../features/downloads/downloadMutationPolicy';
 
 export interface SonarrRadarrConfig {
   sonarrUrl?: string;
@@ -44,15 +48,38 @@ export function isLocalNetworkUrl(url: string): boolean {
   );
 }
 
-// Cache pour l'authentification et statut hors-ligne qBittorrent
-let qbittorrentOfflineUntil = 0;
-let cachedQbitCookie = '';
-let cachedQbitCookieTime = 0;
+interface QbitSessionState {
+  cookie: string;
+  cookieTime: number;
+  offlineUntil: number;
+}
 
-export function invalidateQbitCache() {
-  cachedQbitCookie = '';
-  cachedQbitCookieTime = 0;
-  qbittorrentOfflineUntil = Date.now() + 20000;
+// Une session qBittorrent appartient à un compte SeenIt, un serveur et un login.
+// Elle ne doit jamais survivre à un changement de portée utilisateur.
+const qbitSessions = new Map<string, QbitSessionState>();
+
+function qbitSessionKey(url: string, username?: string): string {
+  return buildQbitSessionScopeKey(auth.currentUser?.uid, cleanUrl(url), username);
+}
+
+function getQbitSession(url: string, username?: string): QbitSessionState {
+  const key = qbitSessionKey(url, username);
+  const existing = qbitSessions.get(key);
+  if (existing) return existing;
+  const created = { cookie: '', cookieTime: 0, offlineUntil: 0 };
+  qbitSessions.set(key, created);
+  return created;
+}
+
+export function invalidateQbitCache(url?: string, username?: string, markOffline = true) {
+  if (!url) {
+    qbitSessions.clear();
+    return;
+  }
+  const session = getQbitSession(url, username);
+  session.cookie = '';
+  session.cookieTime = 0;
+  session.offlineUntil = markOffline ? Date.now() + 20_000 : 0;
 }
 
 /**
@@ -178,39 +205,30 @@ export async function executeGet(url: string, headers: Record<string, string> = 
  * Exécute une requête POST multiplateforme (Fetch direct sur Android / Proxy ou Fetch sur Web)
  */
 async function executePost(url: string, body: any, headers: Record<string, string> = {}): Promise<any> {
+  const mutationHeaders = {
+    ...headers,
+    'X-SeenIt-Request-Id': headers['X-SeenIt-Request-Id'] || crypto.randomUUID()
+  };
   if (Capacitor.isNativePlatform()) {
     try {
-      const response = await CapacitorHttp.post({
+      const response = await executeDownloadMutationOnce(() => CapacitorHttp.post({
         url,
         headers: {
-          ...headers,
-          'Content-Type': headers['Content-Type'] || (typeof body === 'string' ? 'application/x-www-form-urlencoded' : 'application/json')
+          ...mutationHeaders,
+          'Content-Type': mutationHeaders['Content-Type'] || (typeof body === 'string' ? 'application/x-www-form-urlencoded' : 'application/json')
         },
         data: body,
         connectTimeout: 5000,
         readTimeout: 5000
-      });
+      }));
       if (response.status >= 200 && response.status < 300) {
         return response.data;
       }
       throw new Error(`Erreur HTTP ${response.status}`);
     } catch (err: any) {
-      try {
-        const directRes = await fetch(url, {
-          method: 'POST',
-          headers: {
-            ...headers,
-            'Content-Type': headers['Content-Type'] || (typeof body === 'string' ? 'application/x-www-form-urlencoded' : 'application/json')
-          },
-          body: typeof body === 'string' ? body : JSON.stringify(body),
-          signal: AbortSignal.timeout(5000)
-        });
-        if (directRes.ok) {
-          const text = await directRes.text();
-          try { return JSON.parse(text); } catch { return text || { success: true }; }
-        }
-      } catch {}
-      throw new Error(err?.message || 'Serveur injoignable sur le réseau local');
+      // Une mutation peut avoir été appliquée côté service avant un timeout réseau.
+      // La rejouer automatiquement via fetch créerait des téléchargements en double.
+      throw new Error(err?.message || 'Résultat de la mutation inconnu : vérifiez le client avant de réessayer');
     }
   } else {
     // Mode PWA / Navigateur Web
@@ -221,8 +239,8 @@ async function executePost(url: string, body: any, headers: Record<string, strin
         const directRes = await fetch(url, {
           method: 'POST',
           headers: {
-            ...headers,
-            'Content-Type': headers['Content-Type'] || (typeof body === 'string' ? 'application/x-www-form-urlencoded' : 'application/json')
+            ...mutationHeaders,
+            'Content-Type': mutationHeaders['Content-Type'] || (typeof body === 'string' ? 'application/x-www-form-urlencoded' : 'application/json')
           },
           body: typeof body === 'string' ? body : JSON.stringify(body),
           signal: AbortSignal.timeout(5000)
@@ -245,7 +263,7 @@ async function executePost(url: string, body: any, headers: Record<string, strin
           body: JSON.stringify({
             targetUrl: url,
             method: 'POST',
-            headers,
+            headers: mutationHeaders,
             body
           }),
           signal: AbortSignal.timeout(12000)
@@ -495,9 +513,10 @@ export async function fetchQualityProfiles(
   const headers = { 'X-Api-Key': apiKey, 'Accept': 'application/json' };
   try {
     const res = await executeGet(`${base}/api/v3/qualityprofile`, headers);
-    return Array.isArray(res) ? res.map((p: any) => ({ id: p.id, name: p.name })) : [];
-  } catch {
-    return [];
+    if (!Array.isArray(res)) throw new Error(`Réponse de profils ${type} invalide`);
+    return res.map((p: any) => ({ id: p.id, name: p.name }));
+  } catch (error: any) {
+    throw new Error(error?.message || `Impossible de charger les profils ${type}.`);
   }
 }
 
@@ -511,14 +530,15 @@ export async function loginQBittorrent(
 ): Promise<{ success: boolean; cookie?: string; message?: string }> {
   const base = cleanUrl(url);
   if (!base) return { success: false, message: 'URL qBittorrent invalide' };
+  const session = getQbitSession(base, username);
 
   // Si un cookie récent (< 5 min) existe, l'utiliser directement
-  if (cachedQbitCookie && Date.now() - cachedQbitCookieTime < 300000) {
-    return { success: true, cookie: cachedQbitCookie };
+  if (session.cookie && Date.now() - session.cookieTime < 300000) {
+    return { success: true, cookie: session.cookie };
   }
 
   // Si le serveur était hors-ligne récemment (< 20s), temporiser
-  if (Date.now() < qbittorrentOfflineUntil) {
+  if (Date.now() < session.offlineUntil) {
     return { success: false, message: 'qBittorrent hors-ligne (attente)' };
   }
 
@@ -542,20 +562,20 @@ export async function loginQBittorrent(
 
       const bodyStr = String(res.data ?? '').trim();
       if (bodyStr === 'Fails.' || res.status === 403 || res.status === 401) {
-        cachedQbitCookie = '';
-        cachedQbitCookieTime = 0;
+        session.cookie = '';
+        session.cookieTime = 0;
         return { success: false, message: 'Identifiants qBittorrent incorrects' };
       }
       if (res.status < 200 || res.status >= 300) {
         throw new Error(`qBittorrent login HTTP ${res.status}`);
       }
 
-      cachedQbitCookie = extractQbitSessionCookie(res.headers as Record<string, unknown> | undefined);
-      cachedQbitCookieTime = Date.now();
-      qbittorrentOfflineUntil = 0;
-      return { success: true, cookie: cachedQbitCookie };
+      session.cookie = extractQbitSessionCookie(res.headers as Record<string, unknown> | undefined);
+      session.cookieTime = Date.now();
+      session.offlineUntil = 0;
+      return { success: true, cookie: session.cookie };
     } catch (err: any) {
-      qbittorrentOfflineUntil = Date.now() + 20000;
+      session.offlineUntil = Date.now() + 20_000;
       return {
         success: false,
         message: err?.message || 'Impossible de joindre qBittorrent sur le réseau local'
@@ -579,14 +599,14 @@ export async function loginQBittorrent(
         });
         const bodyStr = await directRes.text();
         if (bodyStr.trim() === 'Fails.' || directRes.status === 401 || directRes.status === 403) {
-          invalidateQbitCache();
+          invalidateQbitCache(base, username);
           return { success: false, message: 'Identifiants qBittorrent incorrects' };
         }
-        cachedQbitCookieTime = Date.now();
-        qbittorrentOfflineUntil = 0;
+        session.cookieTime = Date.now();
+        session.offlineUntil = 0;
         return { success: true };
       } catch {
-        qbittorrentOfflineUntil = Date.now() + 20000;
+        session.offlineUntil = Date.now() + 20_000;
         return {
           success: false,
           message: "PWA Web : Connexion locale bloquée par le navigateur."
@@ -620,11 +640,11 @@ export async function loginQBittorrent(
 
         const bodyStr = typeof json.data === 'string' ? json.data : JSON.stringify(json.data || '');
         if (bodyStr.trim() === 'Fails.' || json.status === 401 || json.status === 403) {
-          invalidateQbitCache();
+          invalidateQbitCache(base, username);
           return { success: false, message: 'Identifiants qBittorrent incorrects' };
         }
         if (!json.ok && json.error) {
-          qbittorrentOfflineUntil = Date.now() + 20000;
+          session.offlineUntil = Date.now() + 20_000;
           return { success: false, message: json.message || `Erreur proxy (${json.status || 500})` };
         }
 
@@ -637,13 +657,13 @@ export async function loginQBittorrent(
           cookieHeader = cookieStr.split(';')[0];
         }
 
-        cachedQbitCookie = cookieHeader;
-        cachedQbitCookieTime = Date.now();
-        qbittorrentOfflineUntil = 0;
+        session.cookie = cookieHeader;
+        session.cookieTime = Date.now();
+        session.offlineUntil = 0;
 
         return { success: true, cookie: cookieHeader };
       } catch (err: any) {
-        qbittorrentOfflineUntil = Date.now() + 20000;
+        session.offlineUntil = Date.now() + 20_000;
         return { success: false, message: err?.message || 'Erreur réseau' };
       }
     }
@@ -925,15 +945,17 @@ export async function searchAndDownloadInSonarr(params: {
   };
 
   try {
-    // Récupérer les profils de qualité
-    let qualityProfiles: any[] = [];
-    try {
-      const qpRes = await executeGet(`${base}/api/v3/qualityprofile`, headers);
-      if (Array.isArray(qpRes)) qualityProfiles = qpRes;
-    } catch (e) {
-      console.warn('[Sonarr] Erreur récupération qualityprofile:', e);
+    let targetQualityProfileId = params.qualityProfileId;
+    if (!targetQualityProfileId) {
+      let qualityProfiles: any[] = [];
+      try {
+        const qpRes = await executeGet(`${base}/api/v3/qualityprofile`, headers);
+        if (Array.isArray(qpRes)) qualityProfiles = qpRes;
+      } catch (e) {
+        console.warn('[Sonarr] Erreur récupération qualityprofile:', e);
+      }
+      targetQualityProfileId = resolveQualityProfileId(qualityProfiles, params.qualityPreference);
     }
-    const targetQualityProfileId = resolveQualityProfileId(qualityProfiles, params.qualityPreference, params.qualityProfileId);
 
     const ensureEpisodeMonitored = async (episode: any) => {
       if (!episode?.id || episode.monitored === true) return;
@@ -977,13 +999,11 @@ export async function searchAndDownloadInSonarr(params: {
     }
 
     let existingSeries: any = null;
-    const cleanTargetTitle = (params.title || '').trim().toLowerCase();
     if (Array.isArray(seriesList)) {
       existingSeries = seriesList.find((s: any) => {
         if (params.tvdbId && s.tvdbId && Number(s.tvdbId) === Number(params.tvdbId)) return true;
         if (params.imdbId && s.imdbId && String(s.imdbId).toLowerCase() === String(params.imdbId).toLowerCase()) return true;
         if (params.tmdbId && s.tmdbId && Number(s.tmdbId) === Number(params.tmdbId)) return true;
-        if (s.title && s.title.toLowerCase() === cleanTargetTitle) return true;
         return false;
       });
     }
@@ -1096,16 +1116,26 @@ export async function searchAndDownloadInSonarr(params: {
     let lookupResult: any = null;
     const lookupTerms = [
       params.imdbId ? `imdb:${params.imdbId}` : null,
-      params.tvdbId ? `tvdb:${params.tvdbId}` : null,
-      params.title,
-      params.title.replace(/[:’'–-]/g, ' ').replace(/\s+/g, ' ').trim()
+      params.tvdbId ? `tvdb:${params.tvdbId}` : null
     ].filter(Boolean);
+
+    if (lookupTerms.length === 0) {
+      return {
+        success: false,
+        message: 'Identité Sonarr incomplète : un identifiant TVDB ou IMDb vérifié est requis.'
+      };
+    }
 
     for (const term of lookupTerms) {
       try {
         const lookup = await executeGet(`${base}/api/v3/series/lookup?term=${encodeURIComponent(term!)}`, headers);
         if (Array.isArray(lookup) && lookup.length > 0) {
-          lookupResult = lookup[0];
+          lookupResult = lookup.find((candidate: any) =>
+            Boolean(params.tvdbId && candidate?.tvdbId && Number(candidate.tvdbId) === Number(params.tvdbId))
+            || Boolean(params.imdbId && candidate?.imdbId && String(candidate.imdbId).toLowerCase() === String(params.imdbId).toLowerCase())
+          ) || null;
+        }
+        if (lookupResult) {
           break;
         }
       } catch (lErr) {
@@ -1260,15 +1290,24 @@ export async function searchAndDownloadInRadarr(params: {
   };
 
   try {
-    // Récupérer les profils de qualité
-    let qualityProfiles: any[] = [];
-    try {
-      const qpRes = await executeGet(`${base}/api/v3/qualityprofile`, headers);
-      if (Array.isArray(qpRes)) qualityProfiles = qpRes;
-    } catch (e) {
-      console.warn('[Radarr] Erreur récupération qualityprofile:', e);
+    if (!params.tmdbId) {
+      return {
+        success: false,
+        message: 'Identité Radarr incomplète : un identifiant TMDB vérifié est requis.'
+      };
     }
-    const targetQualityProfileId = resolveQualityProfileId(qualityProfiles, params.qualityPreference, params.qualityProfileId);
+
+    let targetQualityProfileId = params.qualityProfileId;
+    if (!targetQualityProfileId) {
+      let qualityProfiles: any[] = [];
+      try {
+        const qpRes = await executeGet(`${base}/api/v3/qualityprofile`, headers);
+        if (Array.isArray(qpRes)) qualityProfiles = qpRes;
+      } catch (e) {
+        console.warn('[Radarr] Erreur récupération qualityprofile:', e);
+      }
+      targetQualityProfileId = resolveQualityProfileId(qualityProfiles, params.qualityPreference);
+    }
 
     // 1. Vérifier si le film est déjà dans Radarr
     const moviesList = await executeGet(`${base}/api/v3/movie`, headers).catch(() => []);
@@ -1276,7 +1315,6 @@ export async function searchAndDownloadInRadarr(params: {
     if (Array.isArray(moviesList)) {
       existingMovie = moviesList.find((m: any) => {
         if (params.tmdbId && m.tmdbId && Number(m.tmdbId) === Number(params.tmdbId)) return true;
-        if (m.title && m.title.toLowerCase() === params.title.toLowerCase()) return true;
         return false;
       });
     }
@@ -1310,16 +1348,17 @@ export async function searchAndDownloadInRadarr(params: {
 
     // 2. Lookup du film
     let lookupResult: any = null;
-    const lookupTerms = [
-      params.tmdbId ? `tmdb:${params.tmdbId}` : null,
-      params.title
-    ].filter(Boolean);
+    const lookupTerms = [`tmdb:${params.tmdbId}`];
 
     for (const term of lookupTerms) {
       try {
         const lookup = await executeGet(`${base}/api/v3/movie/lookup?term=${encodeURIComponent(term!)}`, headers);
         if (Array.isArray(lookup) && lookup.length > 0) {
-          lookupResult = lookup[0];
+          lookupResult = lookup.find((candidate: any) =>
+            candidate?.tmdbId && Number(candidate.tmdbId) === Number(params.tmdbId)
+          ) || null;
+        }
+        if (lookupResult) {
           break;
         }
       } catch (e) {}
@@ -1786,45 +1825,21 @@ export function matchShowDownload(
   item: LiveDownloadItem,
   tmdbId?: number | string,
   tvdbId?: number | string,
-  showTitle?: string
+  _showTitle?: string
 ): boolean {
   if (item.mediaType !== 'tv') return false;
   if (tmdbId && item.tmdbId && Number(item.tmdbId) === Number(tmdbId)) return true;
   if (tvdbId && item.tvdbId && Number(item.tvdbId) === Number(tvdbId)) return true;
-
-  if (showTitle && (item.seriesTitle || item.title)) {
-    const normSearch = showTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const normItemSeries = (item.seriesTitle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const normItemTitle = (item.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (normItemSeries && (normItemSeries === normSearch || normItemSeries.includes(normSearch) || normSearch.includes(normItemSeries))) {
-      return true;
-    }
-    if (normItemTitle && normItemTitle.includes(normSearch)) {
-      return true;
-    }
-  }
   return false;
 }
 
 export function matchMovieDownload(
   item: LiveDownloadItem,
   tmdbId?: number | string,
-  movieTitle?: string
+  _movieTitle?: string
 ): boolean {
   if (item.mediaType !== 'movie') return false;
   if (tmdbId && item.tmdbId && Number(item.tmdbId) === Number(tmdbId)) return true;
-
-  if (movieTitle && (item.movieTitle || item.title)) {
-    const normSearch = movieTitle.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const normItemMovie = (item.movieTitle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const normItemTitle = (item.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (normItemMovie && (normItemMovie === normSearch || normItemMovie.includes(normSearch) || normSearch.includes(normItemMovie))) {
-      return true;
-    }
-    if (normItemTitle && normItemTitle.includes(normSearch)) {
-      return true;
-    }
-  }
   return false;
 }
 
@@ -1911,6 +1926,75 @@ export function getLastLiveDownloadSourceHealth(): LiveDownloadSourceHealth {
   };
 }
 
+type LiveSourceName = keyof LiveDownloadSourceHealth;
+interface LiveSourceRetryState { failures: number; retryAt: number }
+const liveSourceRetries = new Map<string, LiveSourceRetryState>();
+
+function liveSourceRetryKey(source: LiveSourceName, url?: string): string {
+  return `${auth.currentUser?.uid || 'signed-out'}|${source}|${cleanUrl(url || '').toLowerCase()}`;
+}
+
+function sourceRetryDelay(source: LiveSourceName, url?: string): number {
+  const state = liveSourceRetries.get(liveSourceRetryKey(source, url));
+  return state ? Math.max(0, state.retryAt - Date.now()) : 0;
+}
+
+function recordSourceResult(source: LiveSourceName, url: string | undefined, ok: boolean) {
+  const key = liveSourceRetryKey(source, url);
+  if (ok) {
+    liveSourceRetries.delete(key);
+    return;
+  }
+  const previous = liveSourceRetries.get(key);
+  const failures = Math.min(8, (previous?.failures || 0) + 1);
+  const delay = nextDownloadSourceBackoffMs(failures);
+  liveSourceRetries.set(key, { failures, retryAt: Date.now() + delay });
+}
+
+async function fetchAllArrQueuePages(
+  base: string,
+  apiKey: string,
+  query: string
+): Promise<any[]> {
+  const pageSize = 100;
+  const allRecords: any[] = [];
+  for (let page = 1; page <= 100; page += 1) {
+    const res = await executeGet(
+      `${base}/api/v3/queue?page=${page}&pageSize=${pageSize}&${query}`,
+      { 'X-Api-Key': apiKey, Accept: 'application/json' }
+    );
+    if (Array.isArray(res)) return res;
+    const records = Array.isArray(res?.records) ? res.records : [];
+    allRecords.push(...records);
+    const totalRecords = Number(res?.totalRecords ?? res?.total ?? 0);
+    if (!shouldFetchNextArrQueuePage(records.length, totalRecords, allRecords.length, pageSize)) break;
+  }
+  return allRecords;
+}
+
+async function fetchQbitTorrentQueue(config: SonarrRadarrConfig): Promise<any> {
+  const qbitBase = cleanUrl(config.qbittorrentUrl || '');
+  const fetchInfo = async (forceRelogin = false): Promise<any> => {
+    if (forceRelogin) invalidateQbitCache(qbitBase, config.qbittorrentUsername, false);
+    let cookieHeader = '';
+    if (config.qbittorrentUsername || config.qbittorrentPassword) {
+      const loginRes = await loginQBittorrent(qbitBase, config.qbittorrentUsername, config.qbittorrentPassword);
+      if (!loginRes.success) throw new Error(loginRes.message || 'Authentification qBittorrent impossible');
+      cookieHeader = loginRes.cookie || '';
+    }
+    const headers: Record<string, string> = { Accept: 'application/json', Referer: qbitBase, Origin: qbitBase };
+    if (cookieHeader) headers.Cookie = cookieHeader;
+    return executeGet(`${qbitBase}/api/v2/torrents/info?filter=all&sort=added_on&reverse=true`, headers);
+  };
+
+  try {
+    return await fetchInfo(false);
+  } catch (firstError: any) {
+    if (!isQbitAuthError(firstError) || !(config.qbittorrentUsername || config.qbittorrentPassword)) throw firstError;
+    return fetchInfo(true);
+  }
+}
+
 export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promise<LiveDownloadItem[]> {
   const items: LiveDownloadItem[] = [];
   const sourceHealth: LiveDownloadSourceHealth = {
@@ -1918,20 +2002,32 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
     radarr: emptySourceHealth(Boolean(config.radarrUrl && config.radarrApiKey)),
     qbittorrent: emptySourceHealth(Boolean(config.qbittorrentUrl))
   };
+  const arrTasks: Promise<void>[] = [];
 
   // 1. Sonarr Queue
   if (config.sonarrUrl && config.sonarrApiKey) {
-    const sonarrBase = cleanUrl(config.sonarrUrl);
-    try {
-      const res = await executeGet(`${sonarrBase}/api/v3/queue?pageSize=100&includeSeries=true&includeEpisode=true`, {
-        'X-Api-Key': config.sonarrApiKey,
-        'Accept': 'application/json'
-      });
+    const retryDelay = sourceRetryDelay('sonarr', config.sonarrUrl);
+    if (retryDelay > 0) {
+      sourceHealth.sonarr = {
+        configured: true,
+        ok: false,
+        checkedAt: Date.now(),
+        error: `Nouvelle tentative Sonarr dans ${Math.ceil(retryDelay / 1000)} s`
+      };
+    } else {
+      const sonarrBase = cleanUrl(config.sonarrUrl);
+      arrTasks.push((async () => {
+        try {
+          const records = await fetchAllArrQueuePages(
+            sonarrBase,
+            config.sonarrApiKey!,
+            'includeSeries=true&includeEpisode=true'
+          );
 
-      sourceHealth.sonarr = { configured: true, ok: true, checkedAt: Date.now() };
-      const records = Array.isArray(res) ? res : (Array.isArray(res?.records) ? res.records : []);
+          recordSourceResult('sonarr', config.sonarrUrl, true);
+          sourceHealth.sonarr = { configured: true, ok: true, checkedAt: Date.now() };
 
-      for (const rec of records) {
+          for (const rec of records) {
         const totalSize = rec.size || 0;
         const leftSize = rec.sizeleft || 0;
         const downloaded = Math.max(0, totalSize - leftSize);
@@ -1952,7 +2048,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
 
         const statusInfo = parseQueueRecordStatus(rec);
 
-        items.push({
+            items.push({
           id: `sonarr_${rec.id}`,
           mediaType: 'tv',
           title: `${seriesTitle} ${epTitle}` ,
@@ -1982,29 +2078,43 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           transferPath: rec.outputPath || undefined,
           addedAt: rec.added ? Date.parse(rec.added) : undefined,
           isRestored: false
-        });
-      }
-    } catch (e: any) {
-      sourceHealth.sonarr = { configured: true, ok: false, checkedAt: Date.now(), error: e?.message || 'Sonarr indisponible' };
-      if (!e?.message?.includes('PWA Web')) {
-        console.warn('[LiveQueue] Erreur Sonarr queue:', e);
-      }
+            });
+          }
+        } catch (e: any) {
+          recordSourceResult('sonarr', config.sonarrUrl, false);
+          sourceHealth.sonarr = { configured: true, ok: false, checkedAt: Date.now(), error: e?.message || 'Sonarr indisponible' };
+          if (!e?.message?.includes('PWA Web')) {
+            console.warn('[LiveQueue] Erreur Sonarr queue:', e);
+          }
+        }
+      })());
     }
   }
 
   // 2. Radarr Queue
   if (config.radarrUrl && config.radarrApiKey) {
-    const radarrBase = cleanUrl(config.radarrUrl);
-    try {
-      const res = await executeGet(`${radarrBase}/api/v3/queue?pageSize=100&includeMovie=true`, {
-        'X-Api-Key': config.radarrApiKey,
-        'Accept': 'application/json'
-      });
+    const retryDelay = sourceRetryDelay('radarr', config.radarrUrl);
+    if (retryDelay > 0) {
+      sourceHealth.radarr = {
+        configured: true,
+        ok: false,
+        checkedAt: Date.now(),
+        error: `Nouvelle tentative Radarr dans ${Math.ceil(retryDelay / 1000)} s`
+      };
+    } else {
+      const radarrBase = cleanUrl(config.radarrUrl);
+      arrTasks.push((async () => {
+        try {
+          const records = await fetchAllArrQueuePages(
+            radarrBase,
+            config.radarrApiKey!,
+            'includeMovie=true'
+          );
 
-      sourceHealth.radarr = { configured: true, ok: true, checkedAt: Date.now() };
-      const records = Array.isArray(res) ? res : (Array.isArray(res?.records) ? res.records : []);
+          recordSourceResult('radarr', config.radarrUrl, true);
+          sourceHealth.radarr = { configured: true, ok: true, checkedAt: Date.now() };
 
-      for (const rec of records) {
+          for (const rec of records) {
         const totalSize = rec.size || 0;
         const leftSize = rec.sizeleft || 0;
         const downloaded = Math.max(0, totalSize - leftSize);
@@ -2019,7 +2129,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
         const qualityName = extractQualityFromTitle(rec.title, rec.quality?.quality?.name);
         const statusInfo = parseQueueRecordStatus(rec);
 
-        items.push({
+            items.push({
           id: `radarr_${rec.id}`,
           mediaType: 'movie',
           title: movieTitle,
@@ -2045,60 +2155,49 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           transferPath: rec.outputPath || undefined,
           addedAt: rec.added ? Date.parse(rec.added) : undefined,
           isRestored: false
-        });
-      }
-    } catch (e: any) {
-      sourceHealth.radarr = { configured: true, ok: false, checkedAt: Date.now(), error: e?.message || 'Radarr indisponible' };
-      if (!e?.message?.includes('PWA Web')) {
-        console.warn('[LiveQueue] Erreur Radarr queue:', e);
-      }
+            });
+          }
+        } catch (e: any) {
+          recordSourceResult('radarr', config.radarrUrl, false);
+          sourceHealth.radarr = { configured: true, ok: false, checkedAt: Date.now(), error: e?.message || 'Radarr indisponible' };
+          if (!e?.message?.includes('PWA Web')) {
+            console.warn('[LiveQueue] Erreur Radarr queue:', e);
+          }
+        }
+      })());
     }
   }
+
+  const qbitRetryDelay = config.qbittorrentUrl
+    ? sourceRetryDelay('qbittorrent', config.qbittorrentUrl)
+    : 0;
+  // La collecte réseau qBittorrent démarre en même temps que les deux *Arr. Sa
+  // fusion attend ensuite leurs métadonnées techniques (TMDB/TVDB/hash).
+  const qbitQueuePromise = config.qbittorrentUrl && qbitRetryDelay === 0
+    ? fetchQbitTorrentQueue(config).then(
+        value => ({ value, error: null as unknown }),
+        error => ({ value: null, error })
+      )
+    : null;
+
+  await Promise.all(arrTasks);
 
   // 3. qBittorrent direct
   if (config.qbittorrentUrl) {
     const qbitBase = cleanUrl(config.qbittorrentUrl);
-    try {
-      const fetchQbitInfo = async (forceRelogin = false): Promise<any> => {
-        if (forceRelogin) {
-          cachedQbitCookie = '';
-          cachedQbitCookieTime = 0;
-          qbittorrentOfflineUntil = 0;
-        }
-
-        let cookieHeader = '';
-        if (config.qbittorrentUsername || config.qbittorrentPassword) {
-          const loginRes = await loginQBittorrent(qbitBase, config.qbittorrentUsername, config.qbittorrentPassword);
-          if (!loginRes.success) {
-            throw new Error(loginRes.message || 'Authentification qBittorrent impossible');
-          }
-          cookieHeader = loginRes.cookie || '';
-        }
-
-        const qHeaders: Record<string, string> = {
-          Accept: 'application/json',
-          Referer: qbitBase,
-          Origin: qbitBase
-        };
-        if (cookieHeader) qHeaders.Cookie = cookieHeader;
-
-        return executeGet(
-          `${qbitBase}/api/v2/torrents/info?filter=all&sort=added_on&reverse=true&limit=50`,
-          qHeaders
-        );
+    if (qbitRetryDelay > 0) {
+      sourceHealth.qbittorrent = {
+        configured: true,
+        ok: false,
+        checkedAt: Date.now(),
+        error: `Nouvelle tentative qBittorrent dans ${Math.ceil(qbitRetryDelay / 1000)} s`
       };
+    } else try {
+      const qbitResult = await qbitQueuePromise;
+      if (qbitResult?.error) throw qbitResult.error;
+      const res: any = qbitResult?.value;
 
-      let res: any;
-      try {
-        res = await fetchQbitInfo(false);
-      } catch (firstError: any) {
-        if (!isQbitAuthError(firstError) || !(config.qbittorrentUsername || config.qbittorrentPassword)) {
-          throw firstError;
-        }
-        // SID expiré : une seule reconnexion explicite, puis on laisse remonter l'erreur.
-        res = await fetchQbitInfo(true);
-      }
-
+      recordSourceResult('qbittorrent', config.qbittorrentUrl, true);
       sourceHealth.qbittorrent = { configured: true, ok: true, checkedAt: Date.now() };
       if (Array.isArray(res)) {
         for (const t of res) {
@@ -2268,6 +2367,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
         }
       }
     } catch (e: any) {
+      recordSourceResult('qbittorrent', config.qbittorrentUrl, false);
       sourceHealth.qbittorrent = { configured: true, ok: false, checkedAt: Date.now(), error: e?.message || 'qBittorrent indisponible' };
       if (!e?.message?.includes('PWA Web')) {
         console.warn('[LiveQueue] Erreur qBittorrent queue:', e);

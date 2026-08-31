@@ -3,6 +3,8 @@
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
+            <!-- Requis pour les certificats auto-signés installés par l'utilisateur
+                 sur ses instances personnelles Sonarr/Radarr/qBittorrent. -->
             <certificates src="user" />
         </trust-anchors>
     </base-config>

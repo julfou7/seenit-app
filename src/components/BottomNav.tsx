@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { SeenItGlyph, type SeenItSymbolType } from './SeenItLogo';
 import { cn } from '../lib/utils';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
+import { isDownloadActiveOrAttention } from '../features/downloads/downloadStatePolicy';
 
 interface Props {
   currentTab: string;
@@ -18,8 +19,7 @@ interface TabItem {
 
 export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveTabDoubleClick }: Props) {
   const lastTapRef = useRef<number>(0);
-  const activeDownloads = useLiveDownloadStore(state => state.downloads);
-  const activeCount = activeDownloads.length;
+  const activeCount = useLiveDownloadStore(state => state.downloads.filter(isDownloadActiveOrAttention).length);
 
   const tabs: readonly TabItem[] = [
     { id: 'watchlist', label: 'À Voir', symbol: 'watch' },

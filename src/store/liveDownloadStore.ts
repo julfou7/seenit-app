@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, deleteDoc, doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { LocalNotifications } from '@capacitor/local-notifications';
@@ -22,6 +21,8 @@ import { canAttachRecentOptimisticRequest, getPhysicalDownloadId, getStrongPhysi
 import { findUniqueRecentOptimisticAttachments, mergeLateOptimisticMetadata } from '../features/downloads/downloadReconciliation';
 import { fetchRecentDownloadHistory, resolveDownloadHistoryOutcome } from '../features/downloads/downloadHistory';
 import { preferSeenItImagePath } from '../features/downloads/downloadPosterStability';
+import { isDownloadInHistorySection } from '../features/downloads/downloadStatePolicy';
+import { buildLiveDownloadStorageKey, isDownloadRequestScopeCurrent } from '../features/downloads/downloadUserScope';
 
 interface LiveDownloadState {
   downloads: LiveDownloadItem[];
@@ -37,7 +38,7 @@ interface LiveDownloadState {
   addOptimisticDownload: (item: Partial<LiveDownloadItem> & { title: string; mediaType: 'tv' | 'movie' }) => string;
   updateDownloadRequest: (id: string, patch: Partial<LiveDownloadItem>) => void;
   removeDownload: (item: LiveDownloadItem) => Promise<boolean>;
-  clearAllDownloads: () => Promise<void>;
+  clearAllDownloads: (section?: 'completed' | 'cancelled' | 'error') => Promise<void>;
 
   getShowDownloads: (tmdbId?: number | string, tvdbId?: number | string, showTitle?: string) => LiveDownloadItem[];
   getMovieDownload: (tmdbId?: number | string, movieTitle?: string) => LiveDownloadItem | null;
@@ -45,9 +46,10 @@ interface LiveDownloadState {
 }
 
 let pollingTimer: ReturnType<typeof setTimeout> | null = null;
-let pollingIntervalMs = 1000;
-let isFetchingInProgress = false;
-let lastFetchTime = 0;
+let pollingIntervalMs = 3000;
+let activeFetchPromise: Promise<void> | null = null;
+let downloadScopeEpoch = 0;
+let activeDownloadStorageUid: string | null = null;
 
 const optimisticTimestamps: Record<string, number> = {};
 const missingSince: Record<string, number> = {};
@@ -128,6 +130,7 @@ function startSharedDownloadRequestSync(uid: string) {
   sharedDownloadUnsubscribe = onSnapshot(
     collection(db, 'users', uid, 'downloadRequests'),
     snapshot => {
+      if (auth.currentUser?.uid !== uid) return;
       const now = Date.now();
       const removedRequestDocIds = new Set(
         snapshot.docChanges()
@@ -249,39 +252,22 @@ const OPTIMISTIC_ERROR_TTL_MS = 60_000;
 const MISSING_GRACE_MS = 10_000;
 const MISSING_WARNING_DELAY_MS = 20_000;
 
-async function checkAndRequestNotificationPermission() {
+async function checkNotificationPermission() {
   if (!Capacitor.isNativePlatform()) return false;
   try {
-    let permStatus = await LocalNotifications.checkPermissions();
-    if (permStatus.display !== 'granted') {
-      permStatus = await LocalNotifications.requestPermissions();
-    }
+    const permStatus = await LocalNotifications.checkPermissions();
     return permStatus.display === 'granted';
   } catch {
     return false;
   }
 }
 
-function normalizeTitleForMatch(str?: string): string {
-  if (!str) return '';
-  return str
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\(\d{4}\)/g, '')
-    .replace(/s\d{1,2}e\d{1,2}.*/gi, '')
-    .replace(/[^a-z0-9]/g, '')
-    .trim();
-}
-
 function sameCanonicalMedia(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
   if (a.mediaType !== b.mediaType) return false;
   if (a.tmdbId && b.tmdbId && Number(a.tmdbId) === Number(b.tmdbId)) return true;
   if (a.tvdbId && b.tvdbId && Number(a.tvdbId) === Number(b.tvdbId)) return true;
-
-  const aTitle = normalizeTitleForMatch(a.title || a.seriesTitle || a.movieTitle || a.releaseTitle);
-  const bTitle = normalizeTitleForMatch(b.title || b.seriesTitle || b.movieTitle || b.releaseTitle);
-  return Boolean(aTitle && bTitle && aTitle === bTitle);
+  if (a.imdbId && b.imdbId && String(a.imdbId).toLowerCase() === String(b.imdbId).toLowerCase()) return true;
+  return false;
 }
 
 function resolutionBucket(item: LiveDownloadItem): '4k' | '1080p' | '720p' | null {
@@ -426,7 +412,7 @@ function sendLocalNotification(title: string, body: string, isSuccess = false, i
     return;
   }
 
-  checkAndRequestNotificationPermission().then(granted => {
+  checkNotificationPermission().then(granted => {
     if (!granted) return;
     try {
       LocalNotifications.schedule({
@@ -454,8 +440,7 @@ function clearPollingTimer() {
 }
 
 export const useLiveDownloadStore = create<LiveDownloadState>()(
-  persist(
-    (set, get) => ({
+  (set, get) => ({
       downloads: [],
       removedIds: [],
       isLoading: false,
@@ -561,8 +546,18 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
       },
 
       fetchDownloads: async () => {
-        const nowTime = Date.now();
-        if (isFetchingInProgress && nowTime - lastFetchTime < 7000) return;
+        if (activeFetchPromise) return activeFetchPromise;
+
+        const fetchUid = auth.currentUser?.uid || null;
+        const fetchEpoch = downloadScopeEpoch;
+        const isCurrentScope = () => isDownloadRequestScopeCurrent(
+          { uid: fetchUid, epoch: fetchEpoch },
+          { uid: auth.currentUser?.uid || null, epoch: downloadScopeEpoch }
+        );
+        if (!fetchUid) {
+          set({ isLoading: false, error: null });
+          return;
+        }
 
         const config = useDownloadConfigStore.getState();
         const hasAnyClient = Boolean(
@@ -576,8 +571,10 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           return;
         }
 
-        isFetchingInProgress = true;
-        lastFetchTime = nowTime;
+        let resolveFlight!: () => void;
+        const currentFlight = new Promise<void>(resolve => { resolveFlight = resolve; });
+        activeFetchPromise = currentFlight;
+        set({ isLoading: get().lastUpdated == null });
 
         try {
           const fetchStartedMutationRevision = localMutationRevision;
@@ -591,6 +588,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             qbittorrentUsername: config.qbittorrentUsername,
             qbittorrentPassword: config.qbittorrentPassword
           });
+          if (!isCurrentScope()) return;
 
           const sourceHealth = getLastLiveDownloadSourceHealth();
           const rawIds = new Set(rawServerItems.map(item => item.id));
@@ -659,14 +657,9 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               }
             }
 
-            if (!serverItem.posterPath && localShows.length > 0) {
+            if (!serverItem.posterPath && serverItem.tmdbId && localShows.length > 0) {
               const matchedShow = localShows.find(show => {
-                if (serverItem.tmdbId && Number(show.tmdbId) === Number(serverItem.tmdbId)) return true;
-                const showTitle = normalizeTitleForMatch(show.title);
-                const downloadTitle = normalizeTitleForMatch(
-                  serverItem.title || serverItem.seriesTitle || serverItem.movieTitle || serverItem.releaseTitle
-                );
-                return Boolean(showTitle && downloadTitle && showTitle === downloadTitle);
+                return Number(show.tmdbId) === Number(serverItem.tmdbId);
               });
 
               if (matchedShow) {
@@ -763,6 +756,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
                 qbittorrentPassword: config.qbittorrentPassword
               })
             : null;
+          if (!isCurrentScope()) return;
 
           const preservedItems: LiveDownloadItem[] = [];
           for (const oldItem of currentDownloads) {
@@ -1056,6 +1050,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             }
           }
 
+          if (!isCurrentScope()) return;
           set({
             downloads: finalItems,
             removedIds: prunedRemovedIds,
@@ -1064,17 +1059,19 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             error: null
           });
         } catch (error: any) {
+          if (!isCurrentScope()) return;
           set({
             error: error?.message || 'Erreur réseau',
             isLoading: false
           });
         } finally {
-          isFetchingInProgress = false;
+          if (activeFetchPromise === currentFlight) activeFetchPromise = null;
+          resolveFlight();
         }
       },
 
-      startPolling: (intervalMs = 1000) => {
-        pollingIntervalMs = Math.max(1000, Math.min(pollingIntervalMs, intervalMs));
+      startPolling: (intervalMs = 3000) => {
+        pollingIntervalMs = Math.max(3000, Math.min(15_000, intervalMs));
 
         if (get().isPolling) {
           void get().fetchDownloads();
@@ -1096,10 +1093,10 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           const hasError = Boolean(get().error);
 
           const delay = hasError
-            ? 15_000
+            ? 30_000
             : hasActive
               ? pollingIntervalMs
-              : 8_000;
+              : 30_000;
 
           pollingTimer = setTimeout(async () => {
             await get().fetchDownloads();
@@ -1111,9 +1108,8 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
       },
 
       stopPolling: () => {
-        if (auth.currentUser) return;
         clearPollingTimer();
-        pollingIntervalMs = 1000;
+        pollingIntervalMs = 3000;
         set({ isPolling: false });
       },
 
@@ -1204,32 +1200,24 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
         }
       },
 
-      clearAllDownloads: async () => {
+      clearAllDownloads: async (section = 'completed') => {
         const current = get().downloads || [];
+        const completed = current.filter(item => isDownloadInHistorySection(item, section));
+        if (!completed.length) return;
         const newRemovedIds = Array.from(new Set([
           ...(get().removedIds || []),
-          ...current.map(item => item.id)
+          ...completed.map(item => item.id)
         ]));
-        const config = useDownloadConfigStore.getState();
 
-        set({ removedIds: newRemovedIds, downloads: [] });
+        set({
+          removedIds: newRemovedIds,
+          downloads: current.filter(item => !completed.includes(item))
+        });
 
-        for (const item of current) {
+        for (const item of completed) {
           delete optimisticTimestamps[item.id];
           delete missingSince[item.id];
           void removeSharedDownloadRequest(item);
-          if (item.isOptimistic || item.id.startsWith('opt_')) continue;
-          try {
-            await deleteLiveDownloadItem(item, {
-              sonarrUrl: config.sonarrUrl,
-              sonarrApiKey: config.sonarrApiKey,
-              radarrUrl: config.radarrUrl,
-              radarrApiKey: config.radarrApiKey,
-              qbittorrentUrl: config.qbittorrentUrl,
-              qbittorrentUsername: config.qbittorrentUsername,
-              qbittorrentPassword: config.qbittorrentPassword
-            });
-          } catch {}
         }
       },
 
@@ -1277,71 +1265,107 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
 
         return showItems.find(item => item.seasonNumber === undefined) || null;
       }
-    }),
-    {
-      name: 'seenit_live_downloads_v3',
-      partialize: state => ({
-        // Un état actif local n'est jamais une vérité après redémarrage. On conserve
-        // son identité/métadonnées mais pas son ancien pourcentage : le prochain poll
-        // le rattache à la file actuelle ou à l'historique d'import.
-        downloads: state.downloads.map(item => isTerminalDownload(item)
-          ? { ...item, isRestored: false }
-          : {
-              ...item,
-              progress: 0,
-              sizeleft: item.size > 0 ? item.size : 0,
-              speedBytesPerSec: 0,
-              speedFormatted: '',
-              timeleft: '',
-              timeleftSeconds: 0,
-              status: 'searching',
-              statusText: 'Synchronisation du téléchargement…',
-              isOptimistic: false,
-              isRestored: true
-            }),
-        removedIds: state.removedIds
-      })
-    }
-  )
+    })
 );
+
+interface PersistedLiveDownloads {
+  downloads?: LiveDownloadItem[];
+  removedIds?: string[];
+}
+
+function liveDownloadStorageKey(uid: string): string {
+  return buildLiveDownloadStorageKey(uid);
+}
+
+function prepareDownloadsForStorage(downloads: LiveDownloadItem[]): LiveDownloadItem[] {
+  return downloads.map(item => isTerminalDownload(item) || item.status === 'error'
+    ? { ...item, isRestored: false }
+    : {
+        ...item,
+        progress: 0,
+        sizeleft: item.size > 0 ? item.size : 0,
+        speedBytesPerSec: 0,
+        speedFormatted: '',
+        timeleft: '',
+        timeleftSeconds: 0,
+        status: 'searching',
+        statusText: 'Synchronisation du téléchargement…',
+        isOptimistic: false,
+        isRestored: true
+      });
+}
+
+function readScopedDownloads(uid: string): PersistedLiveDownloads {
+  try {
+    const raw = localStorage.getItem(liveDownloadStorageKey(uid));
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as PersistedLiveDownloads;
+    return {
+      downloads: Array.isArray(parsed.downloads) ? parsed.downloads : [],
+      removedIds: Array.isArray(parsed.removedIds) ? parsed.removedIds.map(String) : []
+    };
+  } catch {
+    return {};
+  }
+}
+
+function persistScopedDownloads(state: LiveDownloadState) {
+  if (!activeDownloadStorageUid || typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(liveDownloadStorageKey(activeDownloadStorageUid), JSON.stringify({
+      downloads: prepareDownloadsForStorage(state.downloads || []),
+      removedIds: state.removedIds || []
+    } satisfies PersistedLiveDownloads));
+  } catch {}
+}
 
 function forceStopGlobalPolling() {
   clearPollingTimer();
-  pollingIntervalMs = 1000;
+  pollingIntervalMs = 3000;
   useLiveDownloadStore.setState({ isPolling: false });
 }
 
 if (typeof window !== 'undefined') {
+  useLiveDownloadStore.subscribe(persistScopedDownloads);
+
   onAuthStateChanged(auth, user => {
-    const nextUid = user?.uid || null;
-    const scopeKey = 'seenit_live_downloads_scope_v3';
-    const previousRaw = localStorage.getItem(scopeKey);
-    const previousUid = previousRaw && previousRaw.trim() ? previousRaw : null;
-    const accountChanged = previousUid !== null && previousUid !== nextUid;
-
-    if (accountChanged) {
-      useLiveDownloadStore.setState({
-        downloads: [],
-        removedIds: [],
-        error: null,
-        lastUpdated: null
-      });
-    }
-
-    localStorage.setItem(scopeKey, nextUid || '');
-
+    downloadScopeEpoch += 1;
+    activeFetchPromise = null;
+    activeDownloadStorageUid = null;
+    forceStopGlobalPolling();
     stopSharedDownloadRequestSync();
+
+    Object.keys(optimisticTimestamps).forEach(key => delete optimisticTimestamps[key]);
+    Object.keys(missingSince).forEach(key => delete missingSince[key]);
+    completionNotificationEligibility.clear();
+
+    const scoped = user ? readScopedDownloads(user.uid) : {};
+    useLiveDownloadStore.setState({
+      downloads: scoped.downloads || [],
+      removedIds: scoped.removedIds || [],
+      isLoading: false,
+      error: null,
+      lastUpdated: null,
+      isPolling: false
+    });
+
+    // Les anciennes données n'avaient aucune preuve de propriétaire : elles sont
+    // volontairement supprimées plutôt que migrées vers le compte courant.
+    localStorage.removeItem('seenit_live_downloads_v3');
+    localStorage.removeItem('seenit_live_downloads_scope_v3');
+
     if (user) {
+      activeDownloadStorageUid = user.uid;
       startSharedDownloadRequestSync(user.uid);
-      useLiveDownloadStore.getState().startPolling(1000);
-    } else {
-      forceStopGlobalPolling();
+      useLiveDownloadStore.getState().startPolling(3000);
     }
   });
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && auth.currentUser) {
-      useLiveDownloadStore.getState().startPolling(1000);
+      useLiveDownloadStore.getState().startPolling(3000);
+    } else if (document.visibilityState === 'hidden') {
+      useLiveDownloadStore.getState().stopPolling();
     }
   });
 }
@@ -1350,7 +1374,9 @@ if (Capacitor.isNativePlatform()) {
   try {
     CapApp.addListener('appStateChange', ({ isActive }) => {
       if (isActive && auth.currentUser) {
-        useLiveDownloadStore.getState().startPolling(1000);
+        useLiveDownloadStore.getState().startPolling(3000);
+      } else if (!isActive) {
+        useLiveDownloadStore.getState().stopPolling();
       }
     });
   } catch {}

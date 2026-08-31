@@ -1,11 +1,13 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, persistentSingleTabManager } from 'firebase/firestore';
-import { getMessaging, getToken, isSupported, type Messaging } from 'firebase/messaging';
+import { deleteToken, getMessaging, getToken, isSupported, type Messaging } from 'firebase/messaging';
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { PushNotifications } from '@capacitor/push-notifications';
 import { useLogStore } from '../store/logStore';
 import firebaseConfig from '../../firebase-applet-config.json';
+import { resolveSeenItApiUrl } from './seenitApi';
 
 const app = initializeApp(firebaseConfig);
 
@@ -107,6 +109,12 @@ if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
         url: extra.url
       };
       window.dispatchEvent(new CustomEvent('capacitor-notification-action', { detail: payload }));
+    });
+    PushNotifications.addListener('pushNotificationActionPerformed', action => {
+      const data = action.notification?.data || {};
+      window.dispatchEvent(new CustomEvent('capacitor-notification-action', {
+        detail: { ...data, type: data.type || 'DOWNLOAD_EVENT' }
+      }));
     });
   } catch (err) {
     console.warn('LocalNotifications listener setup warning:', err);
@@ -283,24 +291,92 @@ export async function sendNativeNotification(title: string, options?: NativeNoti
   }
 }
 
+const DEVICE_INSTALLATION_KEY = 'seenit_notification_installation_id_v1';
+
+function getNotificationInstallationId(): string {
+  const existing = localStorage.getItem(DEVICE_INSTALLATION_KEY);
+  if (existing && /^[a-zA-Z0-9_-]{16,128}$/.test(existing)) return existing;
+  const created = typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID().replace(/-/g, '')
+    : `${Date.now().toString(36)}${crypto.getRandomValues(new Uint32Array(4)).join('')}`;
+  localStorage.setItem(DEVICE_INSTALLATION_KEY, created);
+  return created;
+}
+
+async function registerNotificationDevice(fcmToken: string, platform: 'web' | 'android') {
+  const user = auth.currentUser;
+  if (!user || fcmToken.length < 20) return false;
+  const response = await fetch(resolveSeenItApiUrl('/api/devices/register'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${await user.getIdToken()}`
+    },
+    body: JSON.stringify({
+      installationId: getNotificationInstallationId(),
+      fcmToken,
+      platform
+    })
+  });
+  return response.ok;
+}
+
+async function requestNativePushToken(): Promise<string | null> {
+  const permission = await PushNotifications.checkPermissions();
+  const granted = permission.receive === 'granted'
+    ? permission
+    : await PushNotifications.requestPermissions();
+  if (granted.receive !== 'granted') return null;
+
+  return new Promise<string | null>(async resolve => {
+    let settled = false;
+    const finish = (token: string | null) => {
+      if (settled) return;
+      settled = true;
+      resolve(token);
+    };
+    const registrationListener = await PushNotifications.addListener('registration', token => finish(token.value || null));
+    const errorListener = await PushNotifications.addListener('registrationError', () => finish(null));
+    const timer = window.setTimeout(() => finish(null), 12_000);
+    try {
+      await PushNotifications.register();
+    } catch {
+      finish(null);
+    }
+    const cleanup = () => {
+      window.clearTimeout(timer);
+      void registrationListener.remove();
+      void errorListener.remove();
+    };
+    window.setTimeout(cleanup, 12_100);
+  });
+}
+
+export async function revokeCurrentDeviceNotifications(): Promise<void> {
+  const user = auth.currentUser;
+  const installationId = typeof localStorage !== 'undefined' ? localStorage.getItem(DEVICE_INSTALLATION_KEY) : null;
+  if (user && installationId) {
+    await fetch(resolveSeenItApiUrl(`/api/devices/${encodeURIComponent(installationId)}`), {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${await user.getIdToken()}` }
+    }).catch(() => undefined);
+  }
+  if (Capacitor.isNativePlatform()) {
+    await PushNotifications.unregister().catch(() => undefined);
+  } else if (messaging) {
+    await deleteToken(messaging).catch(() => false);
+  }
+}
+
 export async function requestNotificationPermission(): Promise<string | null> {
-  // On Native Capacitor Android Platform, use native Android LocalNotifications permissions
   if (Capacitor.isNativePlatform()) {
     try {
-      const permStatus = await LocalNotifications.checkPermissions();
-      let granted = permStatus.display === 'granted';
-      if (!granted) {
-        const req = await LocalNotifications.requestPermissions();
-        granted = req.display === 'granted';
-      }
-      if (granted) {
-        return 'native-android-granted';
-      } else {
-        console.warn('Native LocalNotifications permission was not granted.');
-        return null;
-      }
+      const token = await requestNativePushToken();
+      if (!token) return null;
+      await registerNotificationDevice(token, 'android');
+      return token;
     } catch (err) {
-      console.warn('LocalNotifications.requestPermissions error:', err);
+      console.warn('PushNotifications registration error:', err);
       return null;
     }
   }
@@ -320,7 +396,7 @@ export async function requestNotificationPermission(): Promise<string | null> {
     const supported = await isSupported();
     if (!supported) {
       console.warn('Firebase Messaging is not supported in this browser.');
-      return 'web-notification-granted';
+      return null;
     }
 
     if (!messaging) {
@@ -349,11 +425,29 @@ export async function requestNotificationPermission(): Promise<string | null> {
       token = await getToken(messaging);
     }
 
-    return token || 'web-notification-granted';
+    if (!token) return null;
+    await registerNotificationDevice(token, 'web');
+    return token;
   } catch (error) {
     console.error('Error in requestNotificationPermission:', error);
     return null;
   }
+}
+
+/**
+ * Rafraîchit le token d'un appareil déjà autorisé sans jamais afficher une
+ * demande de permission au démarrage. La première activation reste une action
+ * explicite de l'utilisateur dans les réglages.
+ */
+export async function syncGrantedNotificationDevice(): Promise<void> {
+  if (!auth.currentUser) return;
+  if (Capacitor.isNativePlatform()) {
+    const permission = await PushNotifications.checkPermissions().catch(() => null);
+    if (permission?.receive !== 'granted') return;
+  } else {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  }
+  await requestNotificationPermission();
 }
 
 

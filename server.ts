@@ -1,4 +1,4 @@
-import express, { Request, Response, NextFunction } from "express";
+import express, { Request, type Response, NextFunction } from "express";
 import path from "path";
 import fs from "fs";
 import { exec } from "node:child_process";
@@ -11,7 +11,18 @@ import { DecodedIdToken } from "firebase-admin/auth";
 import multer from "multer";
 import dns from "node:dns/promises";
 import net from "node:net";
-import { createHash, timingSafeEqual } from "node:crypto";
+import http from "node:http";
+import https from "node:https";
+import { createHash, randomBytes } from "node:crypto";
+import {
+  downloadSecretMatches,
+  hashDownloadSecret,
+  isAllowedServiceProxyPath,
+  isInvalidFcmTokenError,
+  selectUserNotificationDevices
+} from "./src/features/downloads/downloadBackendSecurity.ts";
+import { buildC411SearchParams } from "./src/features/downloads/c411Query.ts";
+import { executeIdempotentMutation, type TimedMutationResult } from "./src/features/downloads/downloadIdempotency.ts";
 import {
   buildPlexParentShowIdentityItem,
   extractPlexExternalIds,
@@ -52,31 +63,82 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
 
 const WEBHOOK_SECRET_HEADER = 'x-seenit-webhook-secret';
 
-const requireWebhookSecret = (req: Request, res: Response, next: NextFunction) => {
-  const expectedSecret = process.env.WEBHOOK_SECRET?.trim();
-  if (!expectedSecret) {
-    console.error('[Webhook] WEBHOOK_SECRET absent : webhook refuse par securite.');
-    return res.status(503).json({ error: 'Webhook non configure' });
+interface RateLimitBucket { count: number; resetAt: number }
+const rateLimitBuckets = new Map<string, RateLimitBucket>();
+const proxyMutationCache = new Map<string, TimedMutationResult<Record<string, unknown>>>();
+const proxyMutationsInFlight = new Map<string, Promise<Record<string, unknown>>>();
+
+function rateLimit(
+  namespace: string,
+  maxRequests: number,
+  windowMs: number,
+  subjectResolver?: (req: AuthRequest) => string
+) {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    const now = Date.now();
+    if (rateLimitBuckets.size > 5_000) {
+      for (const [bucketKey, bucket] of rateLimitBuckets) {
+        if (bucket.resetAt <= now) rateLimitBuckets.delete(bucketKey);
+      }
+    }
+    const subject = subjectResolver?.(req) || req.user?.uid || req.ip || 'unknown';
+    const key = `${namespace}:${subject}`;
+    const current = rateLimitBuckets.get(key);
+    const bucket = !current || current.resetAt <= now
+      ? { count: 0, resetAt: now + windowMs }
+      : current;
+    bucket.count += 1;
+    rateLimitBuckets.set(key, bucket);
+    if (bucket.count > maxRequests) {
+      res.setHeader('Retry-After', String(Math.max(1, Math.ceil((bucket.resetAt - now) / 1000))));
+      return res.status(429).json({ error: 'Trop de requetes, reessaie plus tard.' });
+    }
+    next();
+  };
+}
+
+async function sendPushToUserDevices(
+  uid: string,
+  notification: { title: string; body: string },
+  data: Record<string, string> = {}
+): Promise<{ delivered: number; invalid: number }> {
+  const devicesSnapshot = await adminDb.collection(`users/${uid}/devices`).get();
+  const selected = selectUserNotificationDevices(uid, devicesSnapshot.docs.map(device => ({
+    ownerUid: String(device.get('ownerUid') || uid),
+    token: String(device.get('fcmToken') || ''),
+    platform: device.get('platform') === 'android' ? 'android' : 'web'
+  })));
+  const devices = selected.map(candidate => ({
+    refs: devicesSnapshot.docs
+      .filter(device => String(device.get('fcmToken') || '').trim() === candidate.token.trim())
+      .map(device => device.ref),
+    token: candidate.token.trim()
+  }));
+  if (!devices.length) return { delivered: 0, invalid: 0 };
+
+  let delivered = 0;
+  let invalid = 0;
+  const messaging = getMessaging();
+  for (let index = 0; index < devices.length; index += 500) {
+    const chunk = devices.slice(index, index + 500);
+    const result = await messaging.sendEachForMulticast({
+      tokens: chunk.map(device => device.token),
+      notification,
+      data
+    });
+    delivered += result.successCount;
+    const invalidRefs = result.responses
+      .map((response, responseIndex) => ({ response, refs: chunk[responseIndex].refs }))
+      .filter(entry => !entry.response.success && isInvalidFcmTokenError(entry.response.error?.code))
+      .flatMap(entry => entry.refs);
+    invalid += invalidRefs.length;
+    await Promise.all(invalidRefs.flatMap(ref => [
+      ref.delete().catch(() => undefined),
+      adminDb.doc(`notificationInstallations/${ref.id}`).delete().catch(() => undefined)
+    ]));
   }
-
-  const headerSecret = req.headers[WEBHOOK_SECRET_HEADER];
-  const providedSecret = (
-    (typeof headerSecret === 'string' ? headerSecret : '') ||
-    (typeof req.query.secret === 'string' ? req.query.secret : '')
-  ).trim();
-
-  const expectedBuffer = Buffer.from(expectedSecret);
-  const providedBuffer = Buffer.from(providedSecret);
-  const isValid =
-    expectedBuffer.length === providedBuffer.length &&
-    timingSafeEqual(expectedBuffer, providedBuffer);
-
-  if (!isValid) {
-    return res.status(401).json({ error: 'Secret de webhook invalide' });
-  }
-
-  next();
-};
+  return { delivered, invalid };
+}
 
 function isPrivateOrReservedAddress(address: string): boolean {
   const cleanAddress = address.toLowerCase().split('%')[0];
@@ -119,7 +181,12 @@ function isPrivateOrReservedAddress(address: string): boolean {
   return true;
 }
 
-async function validateOutboundUrl(rawUrl: unknown): Promise<URL> {
+interface ValidatedOutboundTarget {
+  url: URL;
+  address: string;
+}
+
+async function validateOutboundUrl(rawUrl: unknown): Promise<ValidatedOutboundTarget> {
   if (typeof rawUrl !== 'string' || rawUrl.length > 2048) {
     throw new Error('URL cible invalide');
   }
@@ -159,7 +226,7 @@ async function validateOutboundUrl(rawUrl: unknown): Promise<URL> {
     throw new Error('Adresse IP privee ou reservee interdite depuis le serveur');
   }
 
-  return parsedUrl;
+  return { url: parsedUrl, address: addresses[0].address };
 }
 
 const BLOCKED_PROXY_HEADERS = new Set([
@@ -198,10 +265,62 @@ function sanitizeProxyHeaders(input: unknown): Record<string, string> {
 }
 
 async function secureServerFetch(rawUrl: string, init: RequestInit = {}): Promise<globalThis.Response> {
-  const validatedUrl = await validateOutboundUrl(rawUrl);
-  return fetch(validatedUrl, {
-    ...init,
-    redirect: 'error'
+  const target = await validateOutboundUrl(rawUrl);
+  const url = target.url;
+  const requestHeaders = Object.fromEntries(new Headers(init.headers).entries());
+  requestHeaders.host = url.host;
+  const method = String(init.method || 'GET').toUpperCase();
+  const transport = url.protocol === 'https:' ? https : http;
+
+  return new Promise<globalThis.Response>((resolve, reject) => {
+    const request = transport.request({
+      protocol: url.protocol,
+      hostname: target.address,
+      port: url.port || undefined,
+      path: `${url.pathname}${url.search}`,
+      method,
+      headers: requestHeaders,
+      ...(url.protocol === 'https:' ? { servername: url.hostname } : {})
+    }, upstream => {
+      const chunks: Buffer[] = [];
+      let receivedBytes = 0;
+      upstream.on('data', (chunk: Buffer) => {
+        receivedBytes += chunk.length;
+        if (receivedBytes > 10 * 1024 * 1024) {
+          request.destroy(new Error('Reponse du service trop volumineuse'));
+          return;
+        }
+        chunks.push(Buffer.from(chunk));
+      });
+      upstream.on('end', () => {
+        const responseHeaders = new Headers();
+        for (const [key, value] of Object.entries(upstream.headers)) {
+          if (Array.isArray(value)) value.forEach(entry => responseHeaders.append(key, entry));
+          else if (value != null) responseHeaders.set(key, String(value));
+        }
+        const responseBody = chunks.length ? Buffer.concat(chunks) : null;
+        resolve(new Response(responseBody, {
+          status: upstream.statusCode || 502,
+          statusText: upstream.statusMessage,
+          headers: responseHeaders
+        }));
+      });
+    });
+
+    request.on('error', reject);
+    const signal = init.signal;
+    const abort = () => request.destroy(new DOMException('The operation was aborted', 'AbortError'));
+    if (signal?.aborted) abort();
+    else signal?.addEventListener('abort', abort, { once: true });
+
+    if (init.body != null) {
+      if (typeof init.body === 'string' || init.body instanceof Uint8Array) request.write(init.body);
+      else {
+        request.destroy(new Error('Corps de requete proxy non pris en charge'));
+        return;
+      }
+    }
+    request.end();
   });
 }
 
@@ -234,27 +353,19 @@ function startCronJobs() {
 
       for (const doc of remindersSnap.docs) {
         const data = doc.data();
-        if (!data.fcmToken) continue;
-
-        const message = {
-          notification: {
-            title: `Nouvel épisode disponible ! 🍿`,
-            body: `L'épisode ${data.episodeString || ""} de ${data.showTitle || "votre série"} est sorti aujourd'hui.`,
-          },
-          token: data.fcmToken,
-        };
+        const uid = doc.ref.parent.parent?.id;
+        if (!uid) continue;
 
         try {
-          await messaging.send(message);
-          console.log(`[CRON] Notification envoyée pour ${data.showTitle}`);
+          const delivery = await sendPushToUserDevices(uid, {
+            title: `Nouvel épisode disponible ! 🍿`,
+            body: `L'épisode ${data.episodeString || ""} de ${data.showTitle || "votre série"} est sorti aujourd'hui.`,
+          }, { type: 'EPISODE_REMINDER' });
+          console.log(`[CRON] Notification envoyée pour ${data.showTitle} (${delivery.delivered} appareil(s))`);
           // On supprime le rappel une fois envoyé pour éviter les doublons
           batch.delete(doc.ref);
         } catch (err: any) {
-          console.error(`[CRON] Échec de l'envoi au token ${data.fcmToken}:`, err.message);
-          // Si le token n'est plus valide, on supprime quand même le rappel
-          if (err.code === 'messaging/registration-token-not-registered') {
-            batch.delete(doc.ref);
-          }
+          console.error(`[CRON] Échec de l'envoi du rappel ${doc.id}:`, err.message);
         }
       }
 
@@ -349,7 +460,7 @@ async function startServer() {
   app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Plex-Token, X-Plex-Client-Identifier, X-Plex-Product, X-Plex-Version');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Plex-Token, X-Plex-Client-Identifier, X-Plex-Product, X-Plex-Version, X-SeenIt-Webhook-Secret, X-SeenIt-Request-Id');
     if (req.method === 'OPTIONS') {
       return res.sendStatus(200);
     }
@@ -1829,7 +1940,7 @@ async function startServer() {
   });
 
   // Test de connexion C411 pour l'utilisateur authentifié
-  app.post('/api/c411/test', requireAuth, async (req: AuthRequest, res) => {
+  app.post('/api/c411/test', requireAuth, rateLimit('c411-test', 12, 60_000), async (req: AuthRequest, res) => {
     try {
       const userId = req.user?.uid;
       if (!userId) {
@@ -1900,11 +2011,13 @@ async function startServer() {
   });
 
   // C411 Tracker API proxy
-  app.post('/api/c411/search', requireAuth, async (req: AuthRequest, res) => {
+  app.post('/api/c411/search', requireAuth, rateLimit('c411-search', 30, 60_000), async (req: AuthRequest, res) => {
     try {
       const query = (typeof req.body?.query === 'string' ? req.body.query : '').trim();
-      const mediaType = typeof req.body?.mediaType === 'string' ? req.body.mediaType : 'movie';
-      const year = typeof req.body?.year === 'string' ? req.body.year : undefined;
+      const mediaType = req.body?.mediaType === 'movie' || req.body?.mediaType === 'tv'
+        ? req.body.mediaType
+        : undefined;
+      const year = /^\d{4}$/.test(String(req.body?.year || '')) ? String(req.body.year) : undefined;
       const userId = req.user?.uid;
       if (!userId) {
         return res.status(401).json({ error: 'Utilisateur non authentifie', torrents: [] });
@@ -1927,21 +2040,14 @@ async function startServer() {
       }
 
       // Nettoyage de la recherche pour C411
-      const cleanQuery = query
-        .replace(/[:’']/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-      const searchParams = new URLSearchParams();
-      searchParams.set('name', cleanQuery);
-      searchParams.set('category', '1'); // Films & Vidéos
-      
-      // Filtrer par sous-catégorie si possible
-      if (mediaType === 'tv') {
-        searchParams.set('subcategory', '7'); // Séries TV
-      } else if (mediaType === 'movie') {
-        searchParams.set('subcategory', '6'); // Film
-      }
+      const searchParams = buildC411SearchParams(query, mediaType, year);
+      const effectiveQuery = searchParams.get('name') || query;
+      const searchAbortController = new AbortController();
+      req.once('aborted', () => searchAbortController.abort());
+      const c411Signal = () => AbortSignal.any([
+        searchAbortController.signal,
+        AbortSignal.timeout(8000)
+      ]);
 
       const c411Url = `https://c411.org/api/torrents?${searchParams.toString()}`;
       const response = await fetch(c411Url, {
@@ -1949,18 +2055,20 @@ async function startServer() {
           'Authorization': `Bearer ${apiKey}`,
           'Accept': 'application/json',
           'User-Agent': 'SeenIt-App'
-        }
+        },
+        signal: c411Signal()
       });
 
       if (!response.ok) {
         // Fallback sans filtre de sous-catégorie
-        const fallbackUrl = `https://c411.org/api/torrents?name=${encodeURIComponent(cleanQuery)}&category=1`;
+        const fallbackUrl = `https://c411.org/api/torrents?name=${encodeURIComponent(effectiveQuery)}&category=1`;
         const fbRes = await fetch(fallbackUrl, {
           headers: {
             'Authorization': `Bearer ${apiKey}`,
             'Accept': 'application/json',
             'User-Agent': 'SeenIt-App'
-          }
+          },
+          signal: c411Signal()
         });
         if (!fbRes.ok) {
           return res.json({ torrents: [] });
@@ -1974,13 +2082,14 @@ async function startServer() {
 
       // Si aucun résultat avec la sous-catégorie, tentative élargie
       if (torrents.length === 0) {
-        const broadUrl = `https://c411.org/api/torrents?name=${encodeURIComponent(cleanQuery)}`;
+        const broadUrl = `https://c411.org/api/torrents?name=${encodeURIComponent(effectiveQuery)}`;
         const broadRes = await fetch(broadUrl, {
           headers: {
             'Authorization': `Bearer ${apiKey}`,
             'Accept': 'application/json',
             'User-Agent': 'SeenIt-App'
-          }
+          },
+          signal: c411Signal()
         });
         if (broadRes.ok) {
           const broadData = await broadRes.json();
@@ -1990,134 +2099,17 @@ async function startServer() {
 
       return res.json({ torrents });
     } catch (error: any) {
-      console.error('[C411 Search Error]', error);
-      return res.status(500).json({ error: error.message, torrents: [] });
+      console.error('[C411 Search Error]', error?.name || 'RequestError');
+      return res.status(error?.name === 'TimeoutError' || error?.name === 'AbortError' ? 504 : 502).json({
+        error: error?.name === 'TimeoutError' || error?.name === 'AbortError'
+          ? 'C411 ne répond pas dans le délai imparti.'
+          : 'La recherche C411 est momentanément indisponible.',
+        torrents: []
+      });
     }
   });
 
-  // Remote Download Dispatcher (Sonarr / Radarr / qBittorrent)
-  app.post('/api/downloads/push', requireAuth, express.json(), async (req, res) => {
-    try {
-      const {
-        service,
-        url,
-        apiKey,
-        username,
-        password,
-        torrent,
-        mediaType,
-        tmdbId,
-        title,
-        year
-      } = req.body;
-
-      if (!url) {
-        return res.status(400).json({ error: 'URL du service manquante' });
-      }
-
-      const cleanUrl = url.replace(/\/+$/, '');
-
-      // 1. Envoi vers Sonarr (Séries)
-      if (service === 'sonarr') {
-        const sonarrEndpoint = `${cleanUrl}/api/v3/release/push`;
-        const payload = {
-          title: torrent.name,
-          downloadUrl: torrent.magnetUri,
-          protocol: 'torrent',
-          publishDate: torrent.createdAt || new Date().toISOString()
-        };
-
-        const sonarrRes = await secureServerFetch(sonarrEndpoint, {
-          method: 'POST',
-          headers: {
-            'X-Api-Key': apiKey,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(payload)
-        });
-
-        if (sonarrRes.ok) {
-          return res.json({ message: 'Release envoyée avec succès à Sonarr !' });
-        } else {
-          const errTxt = await sonarrRes.text();
-          return res.status(sonarrRes.status).json({ error: `Sonarr a retourné : ${errTxt.substring(0, 150)}` });
-        }
-      }
-
-      // 2. Envoi vers Radarr (Films)
-      if (service === 'radarr') {
-        const radarrEndpoint = `${cleanUrl}/api/v3/release/push`;
-        const payload = {
-          title: torrent.name,
-          downloadUrl: torrent.magnetUri,
-          protocol: 'torrent',
-          publishDate: torrent.createdAt || new Date().toISOString()
-        };
-
-        const radarrRes = await secureServerFetch(radarrEndpoint, {
-          method: 'POST',
-          headers: {
-            'X-Api-Key': apiKey,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(payload)
-        });
-
-        if (radarrRes.ok) {
-          return res.json({ message: 'Release envoyée avec succès à Radarr !' });
-        } else {
-          const errTxt = await radarrRes.text();
-          return res.status(radarrRes.status).json({ error: `Radarr a retourné : ${errTxt.substring(0, 150)}` });
-        }
-      }
-
-      // 3. Envoi vers qBittorrent Web UI
-      if (service === 'qbittorrent') {
-        // Authentification session qBittorrent si username/password
-        let cookieHeader = '';
-        if (username || password) {
-          const loginRes = await secureServerFetch(`${cleanUrl}/api/v2/auth/login`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: `username=${encodeURIComponent(username || '')}&password=${encodeURIComponent(password || '')}`
-          });
-          const setCookie = loginRes.headers.get('set-cookie');
-          if (setCookie) {
-            cookieHeader = setCookie.split(';')[0];
-          }
-        }
-
-        const formData = new URLSearchParams();
-        formData.append('urls', torrent.magnetUri);
-        formData.append('category', mediaType === 'tv' ? 'tv' : 'movies');
-
-        const addRes = await secureServerFetch(`${cleanUrl}/api/v2/torrents/add`, {
-          method: 'POST',
-          headers: {
-            'Cookie': cookieHeader,
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: formData.toString()
-        });
-
-        if (addRes.ok) {
-          return res.json({ message: 'Torrent ajouté avec succès à qBittorrent !' });
-        } else {
-          const errTxt = await addRes.text();
-          return res.status(addRes.status).json({ error: `qBittorrent : ${errTxt}` });
-        }
-      }
-
-      return res.status(400).json({ error: 'Service de téléchargement non reconnu' });
-    } catch (err: any) {
-      console.error('[Downloads Push Error]', err);
-      return res.status(500).json({ error: err.message });
-    }
-  });
-
-      app.get("/api/health", (req, res) => {
+  app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });
 
@@ -2218,7 +2210,7 @@ async function startServer() {
   });
 
   // Proxy pour les requêtes vers les services tiers (Sonarr, Radarr, qBittorrent, etc.) en mode Web
-  app.post('/api/service-proxy', requireAuth, async (req, res) => {
+  app.post('/api/service-proxy', requireAuth, rateLimit('service-proxy', 180, 60_000), async (req: AuthRequest, res) => {
     try {
       const { targetUrl, method = 'GET', headers = {}, body } = req.body;
       if (!targetUrl) {
@@ -2229,6 +2221,9 @@ async function startServer() {
       const allowedMethods = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']);
       if (!allowedMethods.has(normalizedMethod)) {
         return res.status(400).json({ error: 'Methode HTTP non autorisee' });
+      }
+      if (!isAllowedServiceProxyPath(targetUrl, normalizedMethod)) {
+        return res.status(403).json({ error: 'Chemin de service non autorise' });
       }
 
       await validateOutboundUrl(targetUrl);
@@ -2250,6 +2245,14 @@ async function startServer() {
       if (origin && !cleanHeaders['Origin'] && !cleanHeaders['origin']) cleanHeaders['Origin'] = origin;
       if (referer && !cleanHeaders['Referer'] && !cleanHeaders['referer']) cleanHeaders['Referer'] = referer;
 
+      const requestId = String(
+        cleanHeaders['X-SeenIt-Request-Id']
+        || cleanHeaders['x-seenit-request-id']
+        || ''
+      ).trim();
+      const mutationCacheKey = normalizedMethod === 'POST' && requestId && req.user?.uid
+        ? `${req.user.uid}:${normalizedMethod}:${targetUrl}:${requestId}`
+        : null;
       const fetchOptions: any = {
         method: normalizedMethod,
         headers: cleanHeaders,
@@ -2263,26 +2266,40 @@ async function startServer() {
         }
       }
 
-      const response = await secureServerFetch(targetUrl, fetchOptions);
-      const text = await response.text();
-      let data: any = text;
-      try {
-        data = JSON.parse(text);
-      } catch {}
+      const performRequest = async (): Promise<Record<string, unknown>> => {
+        const response = await secureServerFetch(targetUrl, fetchOptions);
+        const text = await response.text();
+        let data: any = text;
+        try {
+          data = JSON.parse(text);
+        } catch {}
 
-      const responseHeaders: Record<string, string> = {};
-      response.headers.forEach((val, key) => {
-        responseHeaders[key.toLowerCase()] = val;
-      });
-      const setCookie = response.headers.get('set-cookie');
+        const responseHeaders: Record<string, string> = {};
+        const contentType = response.headers.get('content-type');
+        if (contentType) responseHeaders['content-type'] = contentType;
+        const setCookie = response.headers.get('set-cookie');
+        return {
+          status: response.status,
+          ok: response.ok,
+          data,
+          headers: responseHeaders,
+          cookie: setCookie
+        };
+      };
 
-      res.status(200).json({
-        status: response.status,
-        ok: response.ok,
-        data,
-        headers: responseHeaders,
-        cookie: setCookie
-      });
+      let responsePayload: Record<string, unknown>;
+      if (mutationCacheKey) {
+        responsePayload = await executeIdempotentMutation({
+          key: mutationCacheKey,
+          cache: proxyMutationCache,
+          inFlight: proxyMutationsInFlight,
+          operation: performRequest,
+          ttlMs: 10 * 60_000
+        });
+      } else {
+        responsePayload = await performRequest();
+      }
+      res.status(200).json(responsePayload);
     } catch (err: any) {
       if (err?.name === 'TimeoutError' || err?.message?.includes('aborted') || err?.message?.includes('timeout')) {
         return res.status(200).json({
@@ -2301,12 +2318,134 @@ async function startServer() {
     }
   });
 
-  // Webhooks Sonarr & Radarr pour notifications instantanées
-  app.post(['/api/webhook/sonarr', '/api/webhook/radarr'], requireWebhookSecret, async (req, res) => {
+  const getPublicAppBaseUrl = (req: Request) => (
+    process.env.PUBLIC_APP_URL?.trim()
+    || (process.env.NODE_ENV === 'production' ? 'https://seenit.ai.studio' : '')
+    || `${req.protocol}://${req.get('host')}`
+  ).replace(/\/+$/, '');
+
+  app.post('/api/devices/register', requireAuth, rateLimit('device-register', 20, 60_000), async (req: AuthRequest, res) => {
+    const uid = req.user?.uid;
+    const installationId = typeof req.body?.installationId === 'string' ? req.body.installationId.trim() : '';
+    const fcmToken = typeof req.body?.fcmToken === 'string' ? req.body.fcmToken.trim() : '';
+    const platform = req.body?.platform === 'android' ? 'android' : 'web';
+    if (!uid || !/^[a-zA-Z0-9_-]{16,128}$/.test(installationId) || fcmToken.length < 20 || fcmToken.length > 4096) {
+      return res.status(400).json({ error: 'Installation ou token de notification invalide' });
+    }
+
+    const installationHash = hashDownloadSecret(installationId);
+    const bindingRef = adminDb.doc(`notificationInstallations/${installationHash}`);
+    const deviceRef = adminDb.doc(`users/${uid}/devices/${installationHash}`);
+    await adminDb.runTransaction(async transaction => {
+      const previous = await transaction.get(bindingRef);
+      const previousUid = previous.get('uid');
+      if (previousUid && previousUid !== uid) {
+        transaction.delete(adminDb.doc(`users/${String(previousUid)}/devices/${installationHash}`));
+      }
+      transaction.set(deviceRef, {
+        fcmToken,
+        platform,
+        ownerUid: uid,
+        installationHash,
+        updatedAt: new Date()
+      }, { merge: true });
+      transaction.set(bindingRef, { uid, updatedAt: new Date() });
+    });
+    return res.json({ success: true, deviceId: installationHash });
+  });
+
+  app.delete('/api/devices/:installationId', requireAuth, rateLimit('device-revoke', 20, 60_000), async (req: AuthRequest, res) => {
+    const uid = req.user?.uid;
+    const installationId = String(req.params.installationId || '').trim();
+    if (!uid || !/^[a-zA-Z0-9_-]{16,128}$/.test(installationId)) {
+      return res.status(400).json({ error: 'Installation invalide' });
+    }
+    const installationHash = hashDownloadSecret(installationId);
+    const bindingRef = adminDb.doc(`notificationInstallations/${installationHash}`);
+    await adminDb.runTransaction(async transaction => {
+      const binding = await transaction.get(bindingRef);
+      if (binding.get('uid') === uid) transaction.delete(bindingRef);
+      transaction.delete(adminDb.doc(`users/${uid}/devices/${installationHash}`));
+    });
+    return res.json({ success: true });
+  });
+
+  const ensurePersonalWebhookConfig = async (uid: string, rotate = false) => {
+    const settingsRef = adminDb.doc(`users/${uid}/settings/downloadWebhooks`);
+    let resolved: { endpointId: string; secret: string } | null = null;
+    await adminDb.runTransaction(async transaction => {
+      const currentSnapshot = await transaction.get(settingsRef);
+      const current = currentSnapshot.data() || {};
+      if (!rotate && current.endpointId && current.secret) {
+        resolved = { endpointId: String(current.endpointId), secret: String(current.secret) };
+        return;
+      }
+
+      const endpointId = randomBytes(12).toString('base64url');
+      const secret = randomBytes(32).toString('base64url');
+      transaction.set(adminDb.doc(`downloadWebhookEndpoints/${endpointId}`), {
+        uid,
+        secretHash: hashDownloadSecret(secret),
+        createdAt: new Date()
+      });
+      transaction.set(settingsRef, { endpointId, secret, rotatedAt: new Date() }, { merge: true });
+      if (current.endpointId && current.endpointId !== endpointId) {
+        transaction.delete(adminDb.doc(`downloadWebhookEndpoints/${String(current.endpointId)}`));
+      }
+      resolved = { endpointId, secret };
+    });
+    if (!resolved) throw new Error('Configuration webhook introuvable');
+    return resolved as { endpointId: string; secret: string };
+  };
+
+  app.get('/api/webhooks/config', requireAuth, rateLimit('webhook-config', 20, 60_000), async (req: AuthRequest, res) => {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ error: 'Utilisateur non authentifie' });
+    const config = await ensurePersonalWebhookConfig(uid);
+    const baseUrl = getPublicAppBaseUrl(req);
+    return res.json({
+      ...config,
+      headerName: WEBHOOK_SECRET_HEADER,
+      sonarrUrl: `${baseUrl}/api/webhook/sonarr/${config.endpointId}`,
+      radarrUrl: `${baseUrl}/api/webhook/radarr/${config.endpointId}`
+    });
+  });
+
+  app.post('/api/webhooks/config/rotate', requireAuth, rateLimit('webhook-rotate', 5, 60_000), async (req: AuthRequest, res) => {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ error: 'Utilisateur non authentifie' });
+    const config = await ensurePersonalWebhookConfig(uid, true);
+    const baseUrl = getPublicAppBaseUrl(req);
+    return res.json({
+      ...config,
+      headerName: WEBHOOK_SECRET_HEADER,
+      sonarrUrl: `${baseUrl}/api/webhook/sonarr/${config.endpointId}`,
+      radarrUrl: `${baseUrl}/api/webhook/radarr/${config.endpointId}`
+    });
+  });
+
+  // Webhooks personnels : l'identifiant public est dans l'URL, le secret reste
+  // exclusivement dans un en-tête afin de ne pas finir dans les journaux d'URL.
+  app.post(
+    '/api/webhook/:source(sonarr|radarr)/:endpointId',
+    rateLimit('download-webhook', 90, 60_000, req => String(req.params.endpointId || req.ip || 'unknown')),
+    async (req, res) => {
     try {
+      const endpointId = String(req.params.endpointId || '');
+      const endpoint = await adminDb.doc(`downloadWebhookEndpoints/${endpointId}`).get();
+      const endpointData = endpoint.data();
+      const providedSecret = typeof req.headers[WEBHOOK_SECRET_HEADER] === 'string'
+        ? String(req.headers[WEBHOOK_SECRET_HEADER]).trim()
+        : '';
+      if (!endpoint.exists || !endpointData?.uid || !providedSecret || !downloadSecretMatches(String(endpointData.secretHash || ''), providedSecret)) {
+        return res.status(401).json({ error: 'Webhook personnel invalide' });
+      }
+
+      const uid = String(endpointData.uid);
+      const source = String(req.params.source);
       const payload = req.body || {};
       const eventType = payload.eventType || payload.event_type || 'Unknown';
-      console.log(`[Webhook ${req.path}] Event received:`, eventType, payload);
+      console.log(`[Webhook] source=${source} event=${String(eventType).slice(0, 40)} uid=${uid.slice(0, 8)}`);
 
       if (eventType === 'Test') {
         return res.json({ success: true, message: 'Test webhook reçu avec succès par SeenIt !' });
@@ -2326,37 +2465,21 @@ async function startServer() {
         body = `"${mediaTitle}${epInfo}" est prêt et disponible !`;
       }
 
-      // Diffusion FCM push si Firebase Admin est configuré
-      try {
-        const db = adminDb;
-        const usersSnap = await db.collection('users').get();
-        const messaging = getMessaging();
-        
-        for (const userDoc of usersSnap.docs) {
-          const userData = userDoc.data();
-          if (userData.fcmToken) {
-            try {
-              await messaging.send({
-                notification: { title, body },
-                token: userData.fcmToken,
-              });
-            } catch (fcmErr) {
-              console.warn('[Webhook] FCM send error for user:', userDoc.id, fcmErr);
-            }
-          }
-        }
-      } catch (dbErr) {
-        console.warn('[Webhook] Error fetching users for push notifications:', dbErr);
-      }
+      const delivery = await sendPushToUserDevices(uid, { title, body }, {
+        type: 'DOWNLOAD_EVENT',
+        source,
+        eventType: String(eventType)
+      });
 
-      return res.json({ success: true, eventType, message: 'Notification traitée avec succès' });
+      return res.json({ success: true, eventType, delivered: delivery.delivered, invalidTokensRemoved: delivery.invalid });
     } catch (err: any) {
-      console.error('[Webhook Error]', err);
-      res.status(500).json({ error: err.message });
+      console.error('[Webhook Error]', err?.name || 'WebhookError');
+      res.status(500).json({ error: 'Impossible de traiter ce webhook.' });
     }
-  });
+    }
+  );
 
-  app.get(['/service-worker.js', '/firebase-messaging-sw.js'], (req, res) => {
+  app.get('/firebase-messaging-sw.js', (req, res) => {
     const filename = req.path.replace('/', '');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');

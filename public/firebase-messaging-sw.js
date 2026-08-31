@@ -13,22 +13,60 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 // Service Worker - Gestionnaire de Notifications & Clics Natifs
-const SW_VERSION = 'v2.5.0';
+const SW_VERSION = 'v3.0.0';
+const STATIC_CACHE = `seenit-static-${SW_VERSION}`;
 
 self.addEventListener('install', (event) => {
-  console.log(`[SW ${SW_VERSION}] Install & skipWaiting`);
+  event.waitUntil(
+    caches.open(STATIC_CACHE)
+      .then(cache => cache.addAll(['/', '/manifest.json', '/icon-192.png']))
+      .catch(() => undefined)
+  );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  console.log(`[SW ${SW_VERSION}] Activate & claim clients`);
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(Promise.all([
+    caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('seenit-static-') && key !== STATIC_CACHE).map(key => caches.delete(key)))),
+    self.clients.claim()
+  ]));
+});
+
+// Un seul service worker gère la PWA et FCM. Les API et données utilisateur ne
+// sont jamais mises en cache. Les navigations utilisent le réseau en priorité ;
+// les assets statiques déjà vus restent disponibles lors d'une coupure brève.
+self.addEventListener('fetch', event => {
+  const request = event.request;
+  if (request.method !== 'GET') return;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
+
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          if (response.ok) caches.open(STATIC_CACHE).then(cache => cache.put('/', response.clone()));
+          return response;
+        })
+        .catch(() => caches.match('/') )
+    );
+    return;
+  }
+
+  if (!/\.(?:js|css|png|jpg|jpeg|webp|svg|woff2?)$/i.test(url.pathname)) return;
+  event.respondWith(
+    caches.match(request).then(cached => {
+      const fresh = fetch(request).then(response => {
+        if (response.ok) caches.open(STATIC_CACHE).then(cache => cache.put(request, response.clone()));
+        return response;
+      });
+      return cached || fresh;
+    })
+  );
 });
 
 // Gérer les notifications en arrière-plan Firebase Cloud Messaging
 messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Message d\'arrière-plan reçu :', payload);
-  
   const notificationTitle = payload.notification?.title || payload.data?.title || 'Nouvel épisode';
   const notificationBody = payload.notification?.body || payload.data?.body || 'Un nouvel épisode arrive aujourd\'hui !';
   const icon = payload.notification?.icon || payload.data?.icon || '/icon-192.png';
