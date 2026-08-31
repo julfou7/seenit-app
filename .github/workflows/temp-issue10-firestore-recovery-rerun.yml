@@ -80,6 +80,31 @@ jobs:
 
           bash /tmp/prepare-issue10.sh
 
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path('tests/androidContract.test.ts')
+          text = p.read_text()
+          needle = "const require = createRequire(import.meta.url);\n"
+          if needle not in text:
+              raise SystemExit('Point d’insertion package.json introuvable')
+          text = text.replace(
+              needle,
+              needle + "const packageJson = require('../package.json') as { version: string };\n",
+              1
+          )
+          expected = "assert.equal(result.contract.applicationVersion, '1.4.82');"
+          if expected not in text:
+              raise SystemExit('Assertion de version figée introuvable')
+          text = text.replace(
+              expected,
+              'assert.equal(result.contract.applicationVersion, packageJson.version);',
+              1
+          )
+          p.write_text(text)
+          PY
+          git add tests/androidContract.test.ts
+          git commit --amend --no-edit
+
       - name: Installer les dépendances
         run: npm ci --legacy-peer-deps
 
