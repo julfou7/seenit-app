@@ -1,0 +1,36 @@
+name: Réparer les notes publiques 1.4.81
+
+on:
+  push:
+    branches:
+      - fix/release-notes-complete-1482
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Restaurer les notes exhaustives de SeenIt 1.4.81
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cat > /tmp/release-1.4.81.md <<'EOF'
+          ### 🛠️ Ce qui a été fait
+
+          - formalise l’audit global et 33 exigences SPEC traçables
+          - protège identité, signature et 19 actifs d’icône Android
+          - fiabilise les mises à jour APK avec fallback production et SHA-256
+          - isole les journaux par UID et masque les secrets
+          - rend la CI immuable, reproductible et bloquante
+          - ajoute le backlog GitHub et 11 nouveaux tests automatisés
+          - remplace le JAR non reconnu par le wrapper officiel Gradle 8.14.3
+          - vérifie le JAR et la distribution par SHA-256 dans le contrat APK
+          - supprime la version Gradle concurrente du workflow
+          - complète la SPEC et les tests de gouvernance de release
+          EOF
+          gh release edit v1.4.81 --repo "$GITHUB_REPOSITORY" --notes-file /tmp/release-1.4.81.md
