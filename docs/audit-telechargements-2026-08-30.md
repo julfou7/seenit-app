@@ -6,6 +6,10 @@ Révision auditée : `47bdbcf`
 Livraison corrective : SeenIt `1.4.76`  
 Statut : implémentation terminée ; validation CI et tests terrain connectés listés en fin de document.
 
+> Archive d'audit : ce document décrit la livraison 1.4.76. La source de vérité courante,
+> notamment pour les évolutions 1.4.77 à 1.4.80, est
+> [`docs/specifications/seenit.md`](./specifications/seenit.md).
+
 ## Principes non négociables
 
 - Les données d'un même compte SeenIt doivent être identiques et synchronisées entre la PWA, l'APK et les différents navigateurs connectés au même compte Google.

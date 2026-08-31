@@ -11,7 +11,11 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test:plex": "node --test tests/*.test.ts",
+    "test": "npm run test:spec && npm run lint && npm run test:unit",
+    "test:unit": "node --test tests/*.test.ts",
+    "test:spec": "node scripts/validate-specifications.cjs",
+    "test:spec:changes": "node scripts/validate-change-contract.cjs",
+    "test:plex": "npm run test:spec && npm run test:unit",
     "git:pull": "bash scripts/pull.sh"
   },
   "dependencies": {

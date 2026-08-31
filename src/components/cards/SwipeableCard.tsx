@@ -1,6 +1,10 @@
-import React, { useRef, useState, type ReactNode } from 'react';
+import React, { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Ban, Trash2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import {
+  describeSwipeKeyboardActions,
+  resolveSwipeKeyboardAction
+} from '../../features/ui/swipeActionPolicy';
 
 interface SwipeActionPresentation {
   title: string;
@@ -10,7 +14,6 @@ interface SwipeActionPresentation {
 }
 
 interface SwipeableCardProps {
-  key?: React.Key;
   children: ReactNode;
   onSwipeLeft?: () => void;
   onSwipeRight?: () => void;
@@ -50,6 +53,21 @@ export const SwipeableCard = React.memo(({
   const isMouseDownRef = useRef(false);
   const wasSwipingRef = useRef(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const pendingTimersRef = useRef<Set<number>>(new Set());
+  const actionDescriptionId = useId();
+
+  const scheduleTimer = (callback: () => void, delay: number) => {
+    const timerId = window.setTimeout(() => {
+      pendingTimersRef.current.delete(timerId);
+      callback();
+    }, delay);
+    pendingTimersRef.current.add(timerId);
+  };
+
+  useEffect(() => () => {
+    pendingTimersRef.current.forEach(timerId => window.clearTimeout(timerId));
+    pendingTimersRef.current.clear();
+  }, []);
 
   const clampToAvailableDirection = (diffX: number, cardWidth: number) => {
     if (diffX > 0 && !onSwipeRight) return 0;
@@ -75,7 +93,7 @@ export const SwipeableCard = React.memo(({
     isMouseDownRef.current = false;
 
     if (wasSwipingRef.current) {
-      window.setTimeout(() => {
+      scheduleTimer(() => {
         wasSwipingRef.current = false;
       }, 200);
     }
@@ -97,19 +115,15 @@ export const SwipeableCard = React.memo(({
 
     if (finalDiffX > 0 && onSwipeRight) {
       setTranslateX(cardWidth + 100);
-      window.setTimeout(() => {
-        onSwipeRight();
-        window.setTimeout(resetGesture, 800);
-      }, 240);
+      scheduleTimer(resetGesture, 1040);
+      scheduleTimer(onSwipeRight, 240);
       return;
     }
 
     if (finalDiffX < 0 && onSwipeLeft) {
       setTranslateX(-cardWidth - 100);
-      window.setTimeout(() => {
-        onSwipeLeft();
-        window.setTimeout(resetGesture, 800);
-      }, 240);
+      scheduleTimer(resetGesture, 1040);
+      scheduleTimer(onSwipeLeft, 240);
       return;
     }
 
@@ -155,6 +169,7 @@ export const SwipeableCard = React.memo(({
   };
 
   const handleTouchEnd = () => completeGesture(isScrollingRef.current === false);
+  const handleTouchCancel = () => completeGesture(false);
 
   const handleMouseDown = (event: React.MouseEvent) => {
     wasSwipingRef.current = false;
@@ -189,6 +204,28 @@ export const SwipeableCard = React.memo(({
     wasSwipingRef.current = false;
   };
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    if (target !== event.currentTarget && target.closest('button, a, input, select, textarea')) return;
+
+    const direction = resolveSwipeKeyboardAction(
+      event.key,
+      Boolean(onSwipeLeft),
+      Boolean(onSwipeRight)
+    );
+    if (!direction) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    if (direction === 'left') onSwipeLeft?.();
+    else onSwipeRight?.();
+  };
+
+  const keyboardDescription = describeSwipeKeyboardActions(
+    onSwipeLeft ? leftAction.title : undefined,
+    onSwipeRight ? rightAction.title : undefined
+  );
+
   const rightTone = rightAction.tone === 'rose'
     ? 'from-rose-600 via-red-600 to-pink-600'
     : 'from-amber-600 via-amber-500 to-orange-500';
@@ -200,8 +237,19 @@ export const SwipeableCard = React.memo(({
     <div
       ref={cardRef}
       onClickCapture={handleClickCapture}
-      className={cn('relative w-full rounded-2xl touch-pan-y select-none', className)}
+      onKeyDown={handleKeyDown}
+      role="group"
+      tabIndex={onSwipeLeft || onSwipeRight ? 0 : undefined}
+      aria-describedby={keyboardDescription ? actionDescriptionId : undefined}
+      aria-keyshortcuts={onSwipeLeft || onSwipeRight ? 'ArrowLeft ArrowRight Delete Backspace' : undefined}
+      className={cn(
+        'relative w-full rounded-2xl touch-pan-y select-none outline-none focus-visible:ring-2 focus-visible:ring-[#E5A93D] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950',
+        className
+      )}
     >
+      {keyboardDescription && (
+        <span id={actionDescriptionId} className="sr-only">{keyboardDescription}</span>
+      )}
       <div className="absolute inset-0 overflow-hidden rounded-2xl bg-zinc-950">
         {onSwipeRight && (
           <div
@@ -271,6 +319,7 @@ export const SwipeableCard = React.memo(({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchCancel}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

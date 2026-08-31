@@ -15,7 +15,7 @@ import {
   Tv,
   X
 } from 'lucide-react';
-import { type C411Torrent, formatTorrentSize, searchC411Torrents } from '../services/c411';
+import { type C411Torrent, formatTorrentSize, openC411Magnet, searchC411Torrents } from '../services/c411';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { useToastStore } from '../store/toastStore';
@@ -465,8 +465,11 @@ export function DownloadModal({
 
     if (!service) {
       if (torrent.magnetUri) {
-        window.location.href = torrent.magnetUri;
-        showToast('Ouverture du client BitTorrent local…', 'info');
+        const opened = await openC411Magnet(torrent.magnetUri);
+        showToast(
+          opened ? 'Ouverture du client BitTorrent local…' : 'Aucun client BitTorrent ne peut ouvrir ce lien.',
+          opened ? 'info' : 'error'
+        );
       } else {
         showToast('Aucun client de téléchargement disponible.', 'error');
       }

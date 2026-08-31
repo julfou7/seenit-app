@@ -25,7 +25,7 @@ import {
   formatCleanMediaInfo,
   pushReleaseDirectly
 } from '../services/sonarrRadarr';
-import { type C411Torrent, formatTorrentSize, searchC411Torrents } from '../services/c411';
+import { type C411Torrent, formatTorrentSize, openC411Magnet, searchC411Torrents } from '../services/c411';
 import { useToastStore } from '../store/toastStore';
 import { DownloadConfigSection } from '../components/DownloadConfigSection';
 import { SwipeableCard } from '../components/cards/SwipeableCard';
@@ -470,8 +470,11 @@ export function DownloadsScreen({ onShowClick }: Props) {
 
     if (!service) {
       if (torrent.magnetUri) {
-        window.location.href = torrent.magnetUri;
-        showToast('Ouverture du client BitTorrent local…', 'info');
+        const opened = await openC411Magnet(torrent.magnetUri);
+        showToast(
+          opened ? 'Ouverture du client BitTorrent local…' : 'Aucun client BitTorrent ne peut ouvrir ce lien.',
+          opened ? 'info' : 'error'
+        );
       } else {
         showToast('Aucun client de téléchargement configuré.', 'error');
       }

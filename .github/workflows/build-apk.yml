@@ -60,11 +60,17 @@ jobs:
         if: steps.version_sync.outputs.changed != 'true'
         run: npm ci --legacy-peer-deps
 
+      - name: Specification Change Contract
+        if: steps.version_sync.outputs.changed != 'true'
+        run: npm run test:spec:changes
+        env:
+          SPEC_BASE_SHA: ${{ github.event.before }}
+
       - name: Type Check
         if: steps.version_sync.outputs.changed != 'true'
         run: npm run lint
 
-      - name: Plex Integrity Tests
+      - name: Specifications & Automated Tests
         if: steps.version_sync.outputs.changed != 'true'
         run: npm run test:plex
 

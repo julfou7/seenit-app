@@ -1,5 +1,8 @@
 # Intégrité de la connexion Plex
 
+> Cette note détaille les invariants Plex. La spécification transversale et sa traçabilité
+> automatisée sont maintenues dans [`docs/specifications/seenit.md`](./specifications/seenit.md).
+
 ## Invariant de résolution
 
 SeenIt ne doit accepter un média Plex que si son TMDB ID provient d'une chaîne d'identifiants vérifiable :

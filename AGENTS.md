@@ -21,7 +21,15 @@ A chaque correctif ou fonctionnalité ajoutée :
 - **Plex :** Les liens Plex doivent s'ouvrir dans l'application Plex Android depuis l'APK lorsque c'est possible, avec un fallback vers le site Plex dans la PWA.
 - **Rapport de livraison :** Indiquez explicitement ce qui a été vérifié pour la PWA et pour l'APK, ainsi que toute différence de comportement volontaire.
 
-## 4. Rapport de fin d'intervention (OBLIGATOIRE)
+## 4. Développement piloté par spécification (OBLIGATOIRE)
+- **Lecture préalable :** Avant toute modification, lisez intégralement `docs/specifications/seenit.md` et `docs/specifications/README.md`.
+- **SPEC avant code :** Toute modification comportementale doit mettre à jour la SPEC dans la même livraison, avec un identifiant `SEENIT-<DOMAINE>-<NUMÉRO>`.
+- **Traçabilité :** Ajoutez ou actualisez l'entrée correspondante dans `docs/specifications/requirements.json`.
+- **Tests obligatoires :** Toute modification comportementale doit ajouter ou adapter au moins un test automatisé précis, référencé par le catalogue.
+- **Validation :** Exécutez `npm test`, `npm run build` et `npx cap sync android`. La CI `test:spec:changes` bloque le code applicatif livré sans SPEC et tests.
+- **Contexte durable :** Ne laissez jamais la SPEC décrire une ancienne version ou un comportement supprimé. Les audits datés sont historiques ; la SPEC est la source de vérité courante.
+
+## 5. Rapport de fin d'intervention (OBLIGATOIRE)
 Après chaque modification, concluez TOUJOURS votre réponse par cette structure fixe :
 
 ---

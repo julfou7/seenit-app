@@ -1,5 +1,5 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
-import { C411Torrent } from './c411';
+import type { C411Torrent } from './c411';
 import { authenticatedFetch } from '../lib/apiAuth';
 import { buildFreshGetUrl, buildNoCacheHeaders } from '../features/downloads/downloadNetwork';
 import { extractQbitSessionCookie, isQbitAuthError } from '../features/downloads/qbitNativeSession';
@@ -8,6 +8,7 @@ import { auth } from '../lib/firebase';
 import { buildQbitSessionScopeKey } from '../features/downloads/qbitSessionScope';
 import { nextDownloadSourceBackoffMs, shouldFetchNextArrQueuePage } from '../features/downloads/downloadPollingPolicy';
 import { executeDownloadMutationOnce } from '../features/downloads/downloadMutationPolicy';
+import { isSafeMagnetLink } from '../features/downloads/magnetLink';
 
 export interface SonarrRadarrConfig {
   sonarrUrl?: string;
@@ -1459,8 +1460,8 @@ export async function pushReleaseDirectly(payload: {
   const base = cleanUrl(payload.url);
   if (!base) return { success: false, message: 'URL du client manquante' };
 
-  if (!payload.torrent.magnetUri) {
-    return { success: false, message: 'Lien Magnet introuvable pour ce torrent' };
+  if (!isSafeMagnetLink(payload.torrent.magnetUri)) {
+    return { success: false, message: 'Lien Magnet absent ou invalide pour ce torrent' };
   }
 
   try {

@@ -1,5 +1,13 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
+import { AppLauncher } from '@capacitor/app-launcher';
 import { authenticatedFetch, getAuthenticatedHeaders } from '../lib/apiAuth';
+import {
+  buildMagnetLink,
+  isSafeMagnetLink,
+  normalizeBtih
+} from '../features/downloads/magnetLink';
+
+export { buildMagnetLink } from '../features/downloads/magnetLink';
 
 export interface C411Torrent {
   id: number;
@@ -74,19 +82,27 @@ export function formatTorrentSize(bytes: number): string {
 }
 
 /**
- * Crée un lien Magnet à partir du hash et du nom.
+ * Ouvre le client BitTorrent adapté à la plateforme. Android passe par le
+ * résolveur d'applications natif ; la PWA remet le protocole au navigateur.
  */
-export function buildMagnetLink(infoHash: string, name: string): string {
-  const trackers = [
-    'udp://tracker.opentrackr.org:1337/announce',
-    'udp://open.tracker.cl:1337/announce',
-    'udp://9.rarbg.com:2810/announce',
-    'udp://tracker.openbittorrent.com:6969/announce',
-    'udp://opentracker.i2p.rocks:6969/announce',
-    'udp://tracker.torrent.eu.org:451/announce'
-  ];
-  const trParams = trackers.map(tr => `&tr=${encodeURIComponent(tr)}`).join('');
-  return `magnet:?xt=urn:btih:${infoHash}&dn=${encodeURIComponent(name)}${trParams}`;
+export async function openC411Magnet(magnetUri: unknown): Promise<boolean> {
+  if (!isSafeMagnetLink(magnetUri)) return false;
+
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const result = await AppLauncher.openUrl({ url: magnetUri });
+      return Boolean(result?.completed);
+    } catch {
+      return false;
+    }
+  }
+
+  try {
+    window.location.href = magnetUri;
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -146,12 +162,16 @@ export async function searchC411Torrents(params: C411SearchParams): Promise<C411
             : null;
 
         if (list) {
-          return list.map((torrent: C411Torrent) => ({
-            ...torrent,
-            magnetUri: torrent.infoHash
-              ? buildMagnetLink(torrent.infoHash, torrent.name)
-              : undefined
-          }));
+          return list.map((torrent: C411Torrent) => {
+            const infoHash = normalizeBtih(torrent.infoHash);
+            return {
+              ...torrent,
+              infoHash: infoHash || '',
+              magnetUri: infoHash
+                ? buildMagnetLink(infoHash, torrent.name) || undefined
+                : undefined
+            };
+          });
         }
 
         throw new Error('Réponse C411 invalide.');
