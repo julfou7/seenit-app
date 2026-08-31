@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 31 août 2026  
-Version applicative : **1.4.84**
+Version applicative : **1.4.85**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -204,6 +204,11 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   tactile annulé remet toujours la carte en place.
 - **SEENIT-UX-002** — La clé de rendu et l'affiche d'un téléchargement restent stables pendant
   la transition intention → transfert distant afin d'éviter les clignotements.
+- **SEENIT-UX-003** — La première navigation vers un écran privé chargé paresseusement ne
+  remplace jamais l'écran courant par un écran vide ou noir. Les chunks des onglets et des fiches
+  média restent séparés du bundle initial, sont préchargés en arrière-plan pendant le splash et les
+  changements d'écran sont engagés dans une transition React afin de conserver le contenu déjà
+  affiché jusqu'à ce que la prochaine vue soit prête.
 - Les dialogues critiques utilisent un rôle adapté, sont fermables par Échap, placent le focus
   sur une action et ne déclenchent aucune suppression sans confirmation quand le transfert est
   actif.

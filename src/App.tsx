@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { lazy, Suspense, useState, useEffect, useRef } from 'react';
+import { lazy, Suspense, startTransition, useCallback, useState, useEffect, useRef } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
@@ -33,12 +33,36 @@ import { activatePlexUserScope } from './features/plex/plexStorage';
 import { usePlexAvailabilityStore } from './features/plex/plexAvailability';
 import { readUserScopedJson, writeUserScopedJson } from './lib/userIsolation';
 import { activateLogUserScope } from './store/logStore';
+import { createCachedAsyncLoader, preloadInBackground } from './features/navigation/screenPreload';
 
-const ProfileScreen = lazy(() => import('./screens/ProfileScreen').then(module => ({ default: module.ProfileScreen })));
-const ShowDetailScreen = lazy(() => import('./screens/ShowDetailScreen').then(module => ({ default: module.ShowDetailScreen })));
-const WatchListScreen = lazy(() => import('./screens/WatchListScreen').then(module => ({ default: module.WatchListScreen })));
-const DiscoverScreen = lazy(() => import('./screens/DiscoverScreen').then(module => ({ default: module.DiscoverScreen })));
-const DownloadsScreen = lazy(() => import('./screens/DownloadsScreen').then(module => ({ default: module.DownloadsScreen })));
+const loadProfileScreen = createCachedAsyncLoader(() => import('./screens/ProfileScreen').then(module => ({ default: module.ProfileScreen })));
+const loadShowDetailScreen = createCachedAsyncLoader(() => import('./screens/ShowDetailScreen').then(module => ({ default: module.ShowDetailScreen })));
+const loadWatchListScreen = createCachedAsyncLoader(() => import('./screens/WatchListScreen').then(module => ({ default: module.WatchListScreen })));
+const loadDiscoverScreen = createCachedAsyncLoader(() => import('./screens/DiscoverScreen').then(module => ({ default: module.DiscoverScreen })));
+const loadDownloadsScreen = createCachedAsyncLoader(() => import('./screens/DownloadsScreen').then(module => ({ default: module.DownloadsScreen })));
+
+const ProfileScreen = lazy(loadProfileScreen);
+const ShowDetailScreen = lazy(loadShowDetailScreen);
+const WatchListScreen = lazy(loadWatchListScreen);
+const DiscoverScreen = lazy(loadDiscoverScreen);
+const DownloadsScreen = lazy(loadDownloadsScreen);
+
+const privateScreenPreloaders = [
+  loadWatchListScreen,
+  loadProfileScreen,
+  loadDiscoverScreen,
+  loadDownloadsScreen,
+  loadShowDetailScreen
+];
+
+const tabScreenPreloaders: Record<string, () => Promise<unknown>> = {
+  watchlist: loadWatchListScreen,
+  library: loadWatchListScreen,
+  profile: loadProfileScreen,
+  settings: loadProfileScreen,
+  discover: loadDiscoverScreen,
+  downloads: loadDownloadsScreen
+};
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null | undefined>(undefined);
@@ -93,6 +117,11 @@ export default function App() {
   const isReady = currentUser !== undefined;
 
   useEffect(() => {
+    if (!currentUser) return;
+    void preloadInBackground(privateScreenPreloaders);
+  }, [currentUser]);
+
+  useEffect(() => {
     if (isNative) {
       StatusBar.setStyle({ style: Style.Light }).catch(() => {});
       StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
@@ -144,7 +173,34 @@ function MainApp() {
   useDetailsSyncWorker();
   useRemindersNotifier();
   const { currentTab, changeTab, selectedShow, openShow, closeShow } = useNavigation();
-  const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => new Set(['watchlist']));
+  const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => new Set(['watchlist', currentTab]));
+
+  const handleTabChange = useCallback((tab: Parameters<typeof changeTab>[0]) => {
+    void tabScreenPreloaders[tab]?.();
+    startTransition(() => {
+      setMountedTabs(previous => {
+        if (previous.has(tab)) return previous;
+        const next = new Set(previous);
+        next.add(tab);
+        return next;
+      });
+      changeTab(tab);
+    });
+  }, [changeTab]);
+
+  const openShowSmooth = useCallback((
+    id: any,
+    type: 'local' | 'tmdb' = 'local',
+    mediaType?: 'tv' | 'movie',
+    tmdbId?: number,
+    initialSeason?: number,
+    initialEpisode?: number
+  ) => {
+    void loadShowDetailScreen();
+    startTransition(() => {
+      openShow(id, type, mediaType, tmdbId, initialSeason, initialEpisode);
+    });
+  }, [openShow]);
 
   useEffect(() => {
     setMountedTabs(previous => {
@@ -229,7 +285,7 @@ function MainApp() {
         if (season && episode) {
           markEpisodeWatched(effectiveId, Number(season), Number(episode), updateShow);
         }
-        openShow(
+        openShowSmooth(
           effectiveId, 
           'local', 
           mediaType, 
@@ -238,7 +294,7 @@ function MainApp() {
           episode ? Number(episode) : undefined
         );
       } else {
-        openShow(
+        openShowSmooth(
           effectiveId, 
           'local', 
           mediaType, 
@@ -257,7 +313,7 @@ function MainApp() {
       if (data.type === 'NAVIGATE_SHOW') {
         const idToOpen = data.showId || data.tmdbId;
         if (idToOpen) {
-          openShow(
+          openShowSmooth(
             idToOpen, 
             'local', 
             data.mediaType || 'tv', 
@@ -278,7 +334,7 @@ function MainApp() {
         }
 
         if (idToWatch) {
-          openShow(
+          openShowSmooth(
             idToWatch,
             'local',
             data.mediaType || 'tv',
@@ -334,7 +390,7 @@ function MainApp() {
       window.removeEventListener('focus', handleVisibilityOrFocus);
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
     };
-  }, [openShow, updateShow, showToast]);
+  }, [openShowSmooth, updateShow, showToast]);
 
   const handleActiveTabClick = () => {
     window.dispatchEvent(new CustomEvent('app-close-modals'));
@@ -382,10 +438,10 @@ function MainApp() {
         
         <div className="flex-1 min-h-0 flex flex-col relative">
           <div className="flex-1 min-h-0 flex flex-col">
-            <Suspense fallback={<div className="flex-1 bg-[#040406]" aria-label="Chargement de l’écran" />}>
+            <Suspense fallback={<div className="flex-1 bg-premium-ambient" aria-label="Chargement de l’écran" />}>
               {mountedTabs.has('watchlist') && (
                 <div className={cn("flex-1 min-h-0 flex flex-col", currentTab !== 'watchlist' && "hidden")}>
-                  <WatchListScreen onShowClick={(id, mediaType) => openShow(id, 'local', mediaType)} />
+                  <WatchListScreen onShowClick={(id, mediaType) => openShowSmooth(id, 'local', mediaType)} />
                 </div>
               )}
 
@@ -393,20 +449,20 @@ function MainApp() {
                 <div className={cn("flex-1 min-h-0 flex flex-col", (currentTab !== 'profile' && currentTab !== 'settings') && "hidden")}>
                   <ProfileScreen
                     initialShowSettings={currentTab === 'settings'}
-                    onShowClick={(id, mediaType) => openShow(id, 'tmdb', mediaType)}
+                    onShowClick={(id, mediaType) => openShowSmooth(id, 'tmdb', mediaType)}
                   />
                 </div>
               )}
 
               {mountedTabs.has('discover') && (
                 <div className={cn("flex-1 min-h-0 flex flex-col", currentTab !== 'discover' && "hidden")}>
-                  <DiscoverScreen onShowClick={(id, mediaType) => openShow(id, 'tmdb', mediaType)} />
+                  <DiscoverScreen onShowClick={(id, mediaType) => openShowSmooth(id, 'tmdb', mediaType)} />
                 </div>
               )}
 
               {mountedTabs.has('downloads') && (
                 <div className={cn("flex-1 min-h-0 flex flex-col", currentTab !== 'downloads' && "hidden")}>
-                  <DownloadsScreen onShowClick={(id, mediaType) => openShow(id, 'tmdb', mediaType)} />
+                  <DownloadsScreen onShowClick={(id, mediaType) => openShowSmooth(id, 'tmdb', mediaType)} />
                 </div>
               )}
             </Suspense>
@@ -417,7 +473,7 @@ function MainApp() {
               className="fixed inset-0 z-[150] bg-black flex flex-col overflow-hidden max-w-md mx-auto animate-in fade-in slide-in-from-bottom-6 duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] animate-overlay-in pt-safe"
               style={{ willChange: 'transform, opacity' }}
             >
-              <Suspense fallback={<div className="flex-1 bg-black" aria-label="Chargement de la fiche" />}>
+              <Suspense fallback={<div className="flex-1 bg-premium-ambient" aria-label="Chargement de la fiche" />}>
                 <ShowDetailScreen
                   key={`${selectedShow.id}-${selectedShow.mediaType || 'tv'}`}
                   showId={selectedShow.type === 'local' ? String(selectedShow.id) : undefined}
@@ -426,7 +482,7 @@ function MainApp() {
                   initialSeason={selectedShow.initialSeason}
                   initialEpisode={selectedShow.initialEpisode}
                   onBack={closeShow}
-                  onShowClick={(id, mediaType) => openShow(id, 'tmdb', mediaType)}
+                  onShowClick={(id, mediaType) => openShowSmooth(id, 'tmdb', mediaType)}
                 />
               </Suspense>
             </div>
@@ -435,7 +491,7 @@ function MainApp() {
 
         <BottomNav 
           currentTab={currentTab} 
-          onTabChange={changeTab}
+          onTabChange={handleTabChange}
           onActiveTabClick={handleActiveTabClick}
           onActiveTabDoubleClick={handleActiveTabDoubleClick}
         />
