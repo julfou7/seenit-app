@@ -33,7 +33,10 @@ import {
   beginDownloadRequest,
   failDownloadRequest
 } from '../features/downloads/downloadLifecycle';
-import { truncateDownloadProgressPercent } from '../features/downloads/downloadPresentation';
+import {
+  sortDownloadsByAddedAt,
+  truncateDownloadProgressPercent
+} from '../features/downloads/downloadPresentation';
 import {
   getStableDownloadRenderKey,
   selectStableDownloadPosterPath
@@ -86,6 +89,7 @@ function DownloadItemCard({
       && Number(show.tmdbId) === Number(item.tmdbId)
     )?.posterPath || undefined;
   });
+
   const status = String(item.status || '').toLowerCase();
   const isCompleted = status === 'completed' || item.progress >= 100;
   const isCancelled = status === 'cancelled';
@@ -96,6 +100,7 @@ function DownloadItemCard({
   const progressPercent = truncateDownloadProgressPercent(progress);
   const qualityBadges = getQualityBadges(item.quality);
   const downloadedBytes = item.size > 0 ? Math.max(0, item.size - item.sizeleft) : 0;
+  const pendingWithoutProgress = isPending && progress <= 0;
   const progressLabel = isPending
     ? null
     : isCancelled
@@ -104,9 +109,6 @@ function DownloadItemCard({
         ? '100%'
         : `${progressPercent}%`;
 
-  // La carte garde le poster qu'elle a reçu lors de la demande SeenIt. Grâce à la
-  // clé requestId stable, ce ref survit au remplacement opt_* -> radarr/qbit et le
-  // navigateur n'a plus à démonter/recharger l'image au début du transfert.
   const lockedPosterPathRef = useRef<string | undefined>(undefined);
   lockedPosterPathRef.current = selectStableDownloadPosterPath(
     lockedPosterPathRef.current,
@@ -118,6 +120,7 @@ function DownloadItemCard({
       ? stablePosterPath
       : `https://image.tmdb.org/t/p/w185${stablePosterPath}`
     : null;
+
   const canOpenDetails = Boolean(item.tmdbId && onShowClick);
   const openDetails = () => {
     if (!item.tmdbId || !onShowClick) return;
@@ -127,34 +130,40 @@ function DownloadItemCard({
   const accent = isCancelled
     ? 'text-zinc-400'
     : isError
-    ? 'text-red-300'
-    : isWarning
-      ? 'text-amber-300'
-      : isCompleted
-        ? 'text-emerald-300'
-        : 'text-cyan-300';
+      ? 'text-red-300'
+      : isWarning
+        ? 'text-amber-300'
+        : isCompleted
+          ? 'text-emerald-300'
+          : 'text-cyan-300';
 
   const progressBar = isCancelled
     ? 'bg-zinc-600'
     : isError
-    ? 'bg-red-500'
-    : isWarning
-      ? 'bg-amber-400'
-      : isCompleted
-        ? 'bg-gradient-to-r from-emerald-500 to-emerald-300'
-        : 'bg-gradient-to-r from-cyan-500 via-sky-400 to-cyan-300';
+      ? 'bg-red-500'
+      : isWarning
+        ? 'bg-amber-400'
+        : isCompleted
+          ? 'bg-gradient-to-r from-emerald-500 to-emerald-300'
+          : 'bg-gradient-to-r from-cyan-500 via-sky-400 to-cyan-300';
 
   const statusLabel = isCancelled
     ? 'Annulé'
     : isError
-    ? 'Erreur'
-    : isWarning
-      ? (item.statusText || 'En attente')
-      : isCompleted
-        ? 'Terminé'
-        : isPending
-          ? (status === 'searching' ? 'Recherche' : 'Préparation')
+      ? 'Erreur'
+      : isWarning
+        ? 'En attente'
+        : isCompleted
+          ? 'Terminé'
           : 'Téléchargement';
+
+  const pendingLabel = status === 'searching'
+    ? 'Recherche en cours'
+    : 'Préparation du téléchargement';
+
+  const hasTransferMeta = item.size > 0
+    || Boolean(item.speedFormatted)
+    || Boolean(item.timeleft && item.timeleft !== '--');
 
   return (
     <div
@@ -163,16 +172,29 @@ function DownloadItemCard({
         isCancelled
           ? 'border-zinc-600/30'
           : isError
-          ? 'border-red-500/25'
-          : isWarning
-            ? 'border-amber-500/20'
-            : isCompleted
-              ? 'border-emerald-500/20'
-              : 'border-white/[0.08]'
+            ? 'border-red-500/25'
+            : isWarning
+              ? 'border-amber-500/20'
+              : isCompleted
+                ? 'border-emerald-500/20'
+                : 'border-white/[0.08]'
       }`}
     >
-      <div className="flex gap-3">
-        <div className="w-16 shrink-0 self-center overflow-hidden rounded-[14px] border border-white/10 bg-zinc-950 shadow-md">
+      <button
+        type="button"
+        disabled={isRemoving}
+        onClick={(event) => {
+          event.stopPropagation();
+          onRemove(item);
+        }}
+        className="absolute right-1.5 top-1.5 z-10 flex min-h-11 min-w-11 items-center justify-center rounded-full text-zinc-600 transition-colors hover:bg-white/5 hover:text-red-400 disabled:opacity-50"
+        aria-label={isCompleted || isCancelled || isError ? `Effacer ${cleanTitle}` : `Annuler le téléchargement de ${cleanTitle}`}
+      >
+        {isRemoving ? <Loader2 size={14} className="animate-spin" /> : <X size={15} />}
+      </button>
+
+      <div className="flex items-start gap-3">
+        <div className="w-16 shrink-0 overflow-hidden rounded-[14px] border border-white/10 bg-zinc-950 shadow-md">
           <button
             type="button"
             onClick={(event) => {
@@ -189,44 +211,29 @@ function DownloadItemCard({
                 loading={isCompleted ? 'lazy' : 'eager'}
               />
             ) : isTv ? (
-              <Tv size={22} className="text-purple-400" />
+              <Tv size={22} className="text-indigo-400" />
             ) : (
-              <Film size={22} className="text-amber-400" />
+              <Film size={22} className="text-rose-400" />
             )}
           </button>
-          <div className="flex items-center justify-center gap-1 border-t border-white/10 bg-white/[0.04] py-1 text-[8px] font-extrabold uppercase tracking-wide text-[#E5A93D]">
+          <div className={`flex items-center justify-center gap-1 border-t border-white/10 py-1 text-[8px] font-extrabold uppercase tracking-wide text-white ${isTv ? 'bg-indigo-600' : 'bg-rose-600'}`}>
             {isTv ? <Tv size={9} /> : <Film size={9} />}
             <span>{isTv ? 'Série' : 'Film'}</span>
           </div>
         </div>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-2">
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                openDetails();
-              }}
-              className="min-w-0 flex-1 text-left"
-            >
-              <h3 className="text-[15px] font-black leading-tight text-[#E5A93D] line-clamp-2">{cleanTitle}</h3>
-              {subTitle && <p className="mt-0.5 text-[11px] font-semibold text-zinc-400">{subTitle}</p>}
-            </button>
-
-            <button
-              type="button"
-              disabled={isRemoving}
-              onClick={(event) => {
-                event.stopPropagation();
-                onRemove(item);
-              }}
-              className="-mr-1 -mt-1 min-h-11 min-w-11 rounded-full text-zinc-600 transition-colors hover:bg-white/5 hover:text-red-400 disabled:opacity-50 flex items-center justify-center"
-              aria-label={isCompleted || isCancelled || isError ? `Effacer ${cleanTitle}` : `Annuler le téléchargement de ${cleanTitle}`}
-            >
-              {isRemoving ? <Loader2 size={14} className="animate-spin" /> : <X size={15} />}
-            </button>
-          </div>
+        <div className="min-w-0 flex-1 pr-8">
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              openDetails();
+            }}
+            className="block min-w-0 max-w-full text-left"
+          >
+            <h3 className="line-clamp-2 text-[15px] font-black leading-tight text-[#E5A93D]">{cleanTitle}</h3>
+            {subTitle && <p className="mt-0.5 text-[11px] font-semibold text-zinc-400">{subTitle}</p>}
+          </button>
 
           {qualityBadges.length > 0 && (
             <div className="mt-1.5 flex flex-wrap gap-1">
@@ -245,60 +252,63 @@ function DownloadItemCard({
             </div>
           )}
 
-          <div className="mt-2 flex items-end justify-between gap-3">
-            <div className={`flex min-w-0 items-center gap-1.5 text-[11px] font-bold ${accent}`}>
-              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isCancelled ? 'bg-zinc-500' : isCompleted ? 'bg-emerald-400' : isError ? 'bg-red-400' : isWarning ? 'bg-amber-400' : 'bg-cyan-400'}`} />
-              <span className="truncate">{statusLabel}</span>
-            </div>
-            {progressLabel && (
-              <span className={`shrink-0 text-sm font-black tabular-nums ${accent}`}>{progressLabel}</span>
-            )}
-          </div>
-
-          {isPending && progress <= 0 ? (
-            <div className="mt-2 flex h-2 items-center gap-1.5" aria-label="Préparation en cours">
-              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400/90 animate-pulse" />
-              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400/60 animate-pulse [animation-delay:160ms]" />
-              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400/30 animate-pulse [animation-delay:320ms]" />
+          {pendingWithoutProgress ? (
+            <div className="mt-2.5 flex items-center gap-2 text-[11px] font-bold text-cyan-300">
+              <Loader2 size={13} className="shrink-0 animate-spin" />
+              <span>{pendingLabel}</span>
             </div>
           ) : (
-            <div className="relative mt-1.5 h-2 overflow-hidden rounded-full bg-white/[0.07] ring-1 ring-white/[0.03]">
-              <div
-                className={`relative h-full rounded-full transition-[width] duration-500 ease-out ${progressBar} ${!isCompleted && !isCancelled && !isError ? 'shadow-[0_0_12px_rgba(34,211,238,0.28)]' : ''}`}
-                style={{ width: `${progress}%` }}
-              >
-                {!isCompleted && progress > 4 && <div className="absolute inset-0 bg-white/[0.08]" />}
+            <>
+              <div className="mt-2 flex items-end justify-between gap-3">
+                <div className={`flex min-w-0 items-center gap-1.5 text-[11px] font-bold ${accent}`}>
+                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isCancelled ? 'bg-zinc-500' : isCompleted ? 'bg-emerald-400' : isError ? 'bg-red-400' : isWarning ? 'bg-amber-400' : 'bg-cyan-400'}`} />
+                  <span className="truncate">{statusLabel}</span>
+                </div>
+                {progressLabel && (
+                  <span className={`shrink-0 text-sm font-black tabular-nums ${accent}`}>{progressLabel}</span>
+                )}
               </div>
-            </div>
-          )}
 
-          <div className="mt-1.5 flex items-center justify-between gap-3 text-[10px] text-zinc-400">
-            <div className="flex min-w-0 items-center gap-1.5 tabular-nums">
-              <HardDrive size={11} className="shrink-0 text-zinc-500" />
-              {item.size > 0 && !isPending ? (
-                <span className="truncate">{formatBytes(downloadedBytes)} / {formatBytes(item.size)}</span>
-              ) : (
-                <span className="truncate">{item.statusText || statusLabel}</span>
+              <div className="relative mt-1.5 h-2 overflow-hidden rounded-full bg-white/[0.07] ring-1 ring-white/[0.03]">
+                <div
+                  className={`relative h-full rounded-full transition-[width] duration-500 ease-out ${progressBar} ${!isCompleted && !isCancelled && !isError ? 'shadow-[0_0_12px_rgba(34,211,238,0.28)]' : ''}`}
+                  style={{ width: `${progress}%` }}
+                >
+                  {!isCompleted && progress > 4 && <div className="absolute inset-0 bg-white/[0.08]" />}
+                </div>
+              </div>
+
+              {hasTransferMeta && (
+                <div className="mt-1.5 flex items-center justify-between gap-3 text-[10px] text-zinc-400">
+                  <div className="flex min-w-0 items-center gap-1.5 tabular-nums">
+                    {item.size > 0 && (
+                      <>
+                        <HardDrive size={11} className="shrink-0 text-zinc-500" />
+                        <span className="truncate">{formatBytes(downloadedBytes)} / {formatBytes(item.size)}</span>
+                      </>
+                    )}
+                  </div>
+
+                  {!isCompleted && !isCancelled && !isError && (
+                    <div className="flex shrink-0 items-center gap-2.5 tabular-nums">
+                      {item.speedFormatted && (
+                        <span className="flex items-center gap-1 font-semibold text-zinc-300">
+                          <Download size={11} className="text-cyan-400" />
+                          {item.speedFormatted}
+                        </span>
+                      )}
+                      {item.timeleft && item.timeleft !== '--' && (
+                        <span className="flex items-center gap-1 text-zinc-400">
+                          <Clock3 size={11} />
+                          {item.timeleft}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
-            </div>
-
-            {!isCompleted && !isCancelled && !isError && !isPending && (
-              <div className="flex shrink-0 items-center gap-2.5 tabular-nums">
-                {item.speedFormatted && (
-                  <span className="flex items-center gap-1 font-semibold text-zinc-300">
-                    <Download size={11} className="text-cyan-400" />
-                    {item.speedFormatted}
-                  </span>
-                )}
-                {item.timeleft && item.timeleft !== '--' && (
-                  <span className="flex items-center gap-1 text-zinc-400">
-                    <Clock3 size={11} />
-                    {item.timeleft}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
+            </>
+          )}
 
           {item.errorMessage && (
             <p className="mt-2 rounded-xl border border-red-500/15 bg-red-500/[0.07] px-2.5 py-2 text-[10px] leading-snug text-red-300">
@@ -314,7 +324,6 @@ function DownloadItemCard({
 export function DownloadsScreen({ onShowClick }: Props) {
   const {
     downloads,
-    lastUpdated,
     fetchDownloads,
     removeDownload,
     clearAllDownloads
@@ -339,25 +348,28 @@ export function DownloadsScreen({ onShowClick }: Props) {
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
 
   const isConfigured = Boolean(
-    (config.sonarrUrl && config.sonarrApiKey) ||
-    (config.radarrUrl && config.radarrApiKey) ||
-    config.qbittorrentUrl
+    (config.sonarrUrl && config.sonarrApiKey)
+    || (config.radarrUrl && config.radarrApiKey)
+    || config.qbittorrentUrl
   );
 
   const activeDownloads = useMemo(
-    () => downloads.filter(item => item.status !== 'completed' && item.status !== 'cancelled' && item.status !== 'error' && item.progress < 100),
+    () => sortDownloadsByAddedAt(
+      downloads.filter(item => item.status !== 'completed' && item.status !== 'cancelled' && item.status !== 'error' && item.progress < 100),
+      'asc'
+    ),
     [downloads]
   );
   const errorDownloads = useMemo(
-    () => downloads.filter(item => isDownloadInHistorySection(item, 'error')),
+    () => sortDownloadsByAddedAt(downloads.filter(item => isDownloadInHistorySection(item, 'error')), 'desc'),
     [downloads]
   );
   const cancelledDownloads = useMemo(
-    () => downloads.filter(item => isDownloadInHistorySection(item, 'cancelled')),
+    () => sortDownloadsByAddedAt(downloads.filter(item => isDownloadInHistorySection(item, 'cancelled')), 'desc'),
     [downloads]
   );
   const completedDownloads = useMemo(
-    () => downloads.filter(item => isDownloadInHistorySection(item, 'completed')),
+    () => sortDownloadsByAddedAt(downloads.filter(item => isDownloadInHistorySection(item, 'completed')), 'desc'),
     [downloads]
   );
 
@@ -493,10 +505,10 @@ export function DownloadsScreen({ onShowClick }: Props) {
       title: torrent.name,
       mediaType,
       downloadClient: clientLabel,
-      statusText: 'Demande prise en compte • préparation du téléchargement…',
+      statusText: 'Recherche en cours',
       releaseTitle: torrent.name
     });
-    showToast('Demande prise en compte • préparation du téléchargement…', 'download');
+    showToast('Recherche du téléchargement…', 'download');
 
     try {
       const result = await pushReleaseDirectly({
@@ -511,7 +523,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
       });
 
       if (result.success) {
-        acceptDownloadRequest(requestId, 'Téléchargement accepté • mise en file d’attente', 'queued');
+        acceptDownloadRequest(requestId, 'Préparation du téléchargement', 'queued');
         showToast('Téléchargement lancé.', 'success');
       } else {
         failDownloadRequest(requestId, result.message);
@@ -561,6 +573,40 @@ export function DownloadsScreen({ onShowClick }: Props) {
       </div>
     );
   }
+
+  const renderSection = (
+    title: string,
+    items: LiveDownloadItem[],
+    tone: string,
+    clearSection?: 'completed' | 'cancelled' | 'error'
+  ) => (
+    <section className="space-y-2.5">
+      <div className="flex items-center justify-between">
+        <h2 className={`text-xs font-black uppercase tracking-wider ${tone}`}>{title} • {items.length}</h2>
+        {clearSection && (
+          <button
+            type="button"
+            disabled={Boolean(clearingSection)}
+            onClick={() => void handleClearAll(clearSection)}
+            className="min-h-11 px-3 text-xs font-bold text-zinc-500 hover:text-red-400 flex items-center gap-1 disabled:opacity-50"
+            aria-label={`Effacer la section ${title}`}
+          >
+            {clearingSection === clearSection ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+            Effacer
+          </button>
+        )}
+      </div>
+      {items.map(item => (
+        <DownloadItemCard
+          key={getStableDownloadRenderKey(item)}
+          item={item}
+          onShowClick={onShowClick}
+          onRemove={handleRemove}
+          isRemoving={removingId === item.id}
+        />
+      ))}
+    </section>
+  );
 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-premium-ambient text-white overflow-hidden">
@@ -629,108 +675,10 @@ export function DownloadsScreen({ onShowClick }: Props) {
               </button>
             )}
 
-            {activeDownloads.length > 0 && (
-              <section className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xs font-black uppercase tracking-wider text-zinc-400">En cours • {activeDownloads.length}</h2>
-                  {lastUpdated && (
-                    <span className="text-[9px] text-zinc-600">
-                      {new Date(lastUpdated).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                    </span>
-                  )}
-                </div>
-                {activeDownloads.map(item => (
-                  <DownloadItemCard
-                    key={getStableDownloadRenderKey(item)}
-                    item={item}
-                    onShowClick={onShowClick}
-                    onRemove={handleRemove}
-                    isRemoving={removingId === item.id}
-                  />
-                ))}
-              </section>
-            )}
-
-            {errorDownloads.length > 0 && (
-              <section className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xs font-black uppercase tracking-wider text-red-400">En erreur • {errorDownloads.length}</h2>
-                  <button
-                    type="button"
-                    disabled={Boolean(clearingSection)}
-                    onClick={() => void handleClearAll('error')}
-                    className="min-h-11 px-3 text-xs font-bold text-zinc-400 hover:text-red-300 flex items-center gap-1 disabled:opacity-50"
-                    aria-label="Effacer les téléchargements en erreur"
-                  >
-                    {clearingSection === 'error' ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                    Effacer
-                  </button>
-                </div>
-                {errorDownloads.map(item => (
-                  <DownloadItemCard
-                    key={getStableDownloadRenderKey(item)}
-                    item={item}
-                    onShowClick={onShowClick}
-                    onRemove={handleRemove}
-                    isRemoving={removingId === item.id}
-                  />
-                ))}
-              </section>
-            )}
-
-            {cancelledDownloads.length > 0 && (
-              <section className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xs font-black uppercase tracking-wider text-zinc-500">Annulés • {cancelledDownloads.length}</h2>
-                  <button
-                    type="button"
-                    disabled={Boolean(clearingSection)}
-                    onClick={() => void handleClearAll('cancelled')}
-                    className="min-h-11 px-3 text-xs font-bold text-zinc-400 hover:text-red-300 flex items-center gap-1 disabled:opacity-50"
-                    aria-label="Effacer les téléchargements annulés"
-                  >
-                    {clearingSection === 'cancelled' ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                    Effacer
-                  </button>
-                </div>
-                {cancelledDownloads.map(item => (
-                  <DownloadItemCard
-                    key={getStableDownloadRenderKey(item)}
-                    item={item}
-                    onShowClick={onShowClick}
-                    onRemove={handleRemove}
-                    isRemoving={removingId === item.id}
-                  />
-                ))}
-              </section>
-            )}
-
-            {completedDownloads.length > 0 && (
-              <section className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xs font-black uppercase tracking-wider text-zinc-500">Terminés • {completedDownloads.length}</h2>
-                  <button
-                    type="button"
-                    disabled={Boolean(clearingSection)}
-                    onClick={() => void handleClearAll('completed')}
-                    className="min-h-11 px-3 text-xs font-bold text-zinc-500 hover:text-red-400 flex items-center gap-1 disabled:opacity-50"
-                    aria-label="Effacer les téléchargements terminés"
-                  >
-                    {clearingSection === 'completed' ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                    Effacer
-                  </button>
-                </div>
-                {completedDownloads.map(item => (
-                  <DownloadItemCard
-                    key={getStableDownloadRenderKey(item)}
-                    item={item}
-                    onShowClick={onShowClick}
-                    onRemove={handleRemove}
-                    isRemoving={removingId === item.id}
-                  />
-                ))}
-              </section>
-            )}
+            {activeDownloads.length > 0 && renderSection('En cours', activeDownloads, 'text-zinc-400')}
+            {errorDownloads.length > 0 && renderSection('En erreur', errorDownloads, 'text-red-400', 'error')}
+            {cancelledDownloads.length > 0 && renderSection('Annulés', cancelledDownloads, 'text-zinc-500', 'cancelled')}
+            {completedDownloads.length > 0 && renderSection('Terminés', completedDownloads, 'text-zinc-500', 'completed')}
 
             {!downloads.length && (
               <div className="py-16 flex flex-col items-center text-center gap-3 text-zinc-500">
