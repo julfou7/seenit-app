@@ -40,13 +40,21 @@ jobs:
           python3 <<'PY'
           from pathlib import Path
 
+          gradle_path = Path('android/app/build.gradle')
+          gradle = gradle_path.read_text(encoding='utf-8')
+          is_old_version = 'versionName "1.4.74"' in gradle
+          is_target_version = 'versionName "1.4.75"' in gradle
+          if not is_old_version and not is_target_version:
+              raise SystemExit('Version Android attendue 1.4.74 ou 1.4.75 introuvable')
+
           episode_path = Path('src/screens/EpisodeDetailModal.tsx')
           episode = episode_path.read_text(encoding='utf-8')
-          start_marker = "                    if (isEpisodeAvailable) {"
-          end_marker = "\n                    return (\n                      <button"
-          start = episode.index(start_marker)
-          end = episode.index(end_marker, start)
-          new_block = '''                    if (isEpisodeAvailable) {
+          if 'Regarder dans Plex' not in episode:
+              start_marker = "                    if (isEpisodeAvailable) {"
+              end_marker = "\n                    return (\n                      <button"
+              start = episode.index(start_marker)
+              end = episode.index(end_marker, start)
+              new_block = '''                    if (isEpisodeAvailable) {
                       if (presence.plexInfo?.available) {
                         return (
                           <div className="flex flex-col items-center gap-2.5 w-full">
@@ -97,9 +105,9 @@ jobs:
                         </div>
                       );
                     }
-          '''
-          episode = episode[:start] + new_block + episode[end:]
-          episode_path.write_text(episode, encoding='utf-8')
+              '''
+              episode = episode[:start] + new_block + episode[end:]
+              episode_path.write_text(episode, encoding='utf-8')
 
           utils_path = Path('src/lib/utils.ts')
           utils = utils_path.read_text(encoding='utf-8')
@@ -109,26 +117,22 @@ jobs:
                   raise SystemExit('Point d’insertion Plex introuvable dans utils.ts')
               native_plex = plex_log + """      // Sur Android, cibler explicitement Plex avant l’URL universelle évite\n      // que certains appareils ouvrent watch.plex.tv dans le navigateur.\n      if (Capacitor.getPlatform() === 'android' && /^https?:\\/\\//i.test(targetUrl)) {\n        const plexIntentUrl = `intent://${targetUrl.replace(/^https?:\\/\\//i, '')}#Intent;scheme=https;package=com.plexapp.android;end`;\n        try {\n          const nativePlex = await AppLauncher.openUrl({ url: plexIntentUrl });\n          if (nativePlex?.completed) return true;\n        } catch (err) {\n          appLogger.warn('plex', '[Plex DeepLink] Intent Plex Android indisponible, fallback URL universelle.');\n        }\n      }\n              """
               utils = utils.replace(plex_log, native_plex, 1)
-          utils_path.write_text(utils, encoding='utf-8')
+              utils_path.write_text(utils, encoding='utf-8')
 
-          gradle_path = Path('android/app/build.gradle')
-          gradle = gradle_path.read_text(encoding='utf-8')
-          if 'versionName "1.4.74"' not in gradle:
-              raise SystemExit('Version Android attendue 1.4.74 introuvable')
-          gradle = gradle.replace('versionCode 104074', 'versionCode 104075', 1)
-          gradle = gradle.replace('versionName "1.4.74"', 'versionName "1.4.75"', 1)
-          gradle_path.write_text(gradle, encoding='utf-8')
+          if is_old_version:
+              gradle = gradle.replace('versionCode 104074', 'versionCode 104075', 1)
+              gradle = gradle.replace('versionName "1.4.74"', 'versionName "1.4.75"', 1)
+              gradle_path.write_text(gradle, encoding='utf-8')
           PY
 
           node scripts/sync-app-version.cjs
-          git show HEAD^:.github/workflows/build-apk.yml > .github/workflows/build-apk.yml
 
-          if git diff --quiet -- android/app/build.gradle src/store/updateStore.ts server.ts src/screens/EpisodeDetailModal.tsx src/lib/utils.ts .github/workflows/build-apk.yml; then
+          if git diff --quiet -- android/app/build.gradle src/store/updateStore.ts server.ts src/screens/EpisodeDetailModal.tsx src/lib/utils.ts; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add android/app/build.gradle src/store/updateStore.ts server.ts src/screens/EpisodeDetailModal.tsx src/lib/utils.ts .github/workflows/build-apk.yml
+            git add android/app/build.gradle src/store/updateStore.ts server.ts src/screens/EpisodeDetailModal.tsx src/lib/utils.ts
             git commit -m "fix: simplifier l’action Plex dans les épisodes" -m "- Remplace le doublon disponibilité/ouverture par un seul CTA principal « Regarder dans Plex »." -m "- Relègue le retéléchargement en action secondaire discrète pour alléger la fiche épisode." -m "- Utilise l’identité TMDB enrichie de la série comme sur les fiches média pour résoudre Plex de façon fiable." -m "- Cible explicitement l’application Plex Android avant le fallback vers l’URL universelle ou le navigateur." -m "- Conserve un comportement Web/PWA fiable et publie SeenIt 1.4.75."
             git push
             echo "changed=true" >> "$GITHUB_OUTPUT"
