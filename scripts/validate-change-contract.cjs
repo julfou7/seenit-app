@@ -1,65 +1,143 @@
 const { execFileSync } = require('node:child_process');
 
-const base = String(process.env.SPEC_BASE_SHA || '').trim();
-const head = String(process.env.GITHUB_SHA || 'HEAD').trim();
+const VERSION_ONLY_PATTERNS = {
+  'android/app/build.gradle': [
+    /^versionCode\s+\d+$/,
+    /^versionName\s+"\d+\.\d+\.\d+"$/
+  ],
+  'docs/specifications/android-contract.json': [
+    /^"applicationVersion":\s*"\d+\.\d+\.\d+",?$/,
+    /^"versionCode":\s*\d+,?$/
+  ],
+  'docs/specifications/requirements.json': [
+    /^"applicationVersion":\s*"\d+\.\d+\.\d+",?$/
+  ],
+  'docs/specifications/seenit.md': [
+    /^Version applicative\s*:\s*\*\*\d+\.\d+\.\d+\*\*$/
+  ],
+  'package-lock.json': [
+    /^"version":\s*"\d+\.\d+\.\d+",?$/
+  ],
+  'package.json': [
+    /^"version":\s*"\d+\.\d+\.\d+",?$/
+  ],
+  'server.ts': [
+    /^'X-Plex-Version':\s*'\d+\.\d+\.\d+',?$/
+  ],
+  'src/store/updateStore.ts': [
+    /^export const CURRENT_APP_VERSION\s*=\s*'\d+\.\d+\.\d+';$/
+  ]
+};
 
-if (!/^[a-f0-9]{40}$/i.test(base) || /^0{40}$/.test(base)) {
-  console.log('[SPEC] Contrat de changement ignoré : aucune base Git fournie.');
-  process.exit(0);
+function normalizePath(file) {
+  return String(file || '').trim().replace(/\\/g, '/');
 }
 
-let changedFiles;
-try {
-  changedFiles = execFileSync(
-    'git',
-    ['diff', '--name-only', `${base}..${head}`],
-    { encoding: 'utf8' }
-  )
+function getChangedContentLines(patch) {
+  return String(patch || '')
     .split(/\r?\n/)
-    .map(file => file.trim().replace(/\\/g, '/'))
+    .filter(line => (line.startsWith('+') && !line.startsWith('+++'))
+      || (line.startsWith('-') && !line.startsWith('---')))
+    .map(line => line.slice(1).trim())
     .filter(Boolean);
-} catch (error) {
-  console.error('[SPEC] Impossible de calculer les fichiers modifiés :', error.message);
-  process.exit(1);
 }
 
-const versionOnlyFiles = new Set([
-  'android/app/build.gradle',
-  'src/store/updateStore.ts',
-  'server.ts'
-]);
-if (changedFiles.length > 0 && changedFiles.every(file => versionOnlyFiles.has(file))) {
-  console.log('[SPEC] Alignement de version pur : contrat comportemental non requis.');
-  process.exit(0);
+function isVersionOnlyPatch(file, patch) {
+  const patterns = VERSION_ONLY_PATTERNS[normalizePath(file)];
+  if (!patterns) return false;
+  const lines = getChangedContentLines(patch);
+  return lines.length > 0 && lines.every(line => patterns.some(pattern => pattern.test(line)));
 }
 
-const behavioralFiles = changedFiles.filter(file =>
-  (file.startsWith('src/') && file !== 'src/store/updateStore.ts')
-  || file === 'server.ts'
-  || file.startsWith('android/app/src/')
-  || file === 'public/firebase-messaging-sw.js'
-  || file === 'capacitor.config.ts'
-);
-
-if (behavioralFiles.length === 0) {
-  console.log('[SPEC] Aucun comportement applicatif modifié.');
-  process.exit(0);
+function isPureVersionAlignment(changedFiles, readPatch) {
+  return changedFiles.length > 0 && changedFiles.every(file => {
+    const normalized = normalizePath(file);
+    if (!VERSION_ONLY_PATTERNS[normalized]) return false;
+    return isVersionOnlyPatch(normalized, readPatch(normalized));
+  });
 }
 
-const hasSpecification = changedFiles.includes('docs/specifications/seenit.md')
-  && changedFiles.includes('docs/specifications/requirements.json');
-const hasAutomatedTests = changedFiles.some(file => /^tests\/.+\.test\.ts$/.test(file));
+function main() {
+  const base = String(process.env.SPEC_BASE_SHA || '').trim();
+  const head = String(process.env.GITHUB_SHA || 'HEAD').trim();
 
-if (!hasSpecification || !hasAutomatedTests) {
-  console.error('[SPEC] Livraison comportementale incomplète.');
-  console.error(`[SPEC] Fichiers applicatifs : ${behavioralFiles.join(', ')}`);
-  if (!hasSpecification) {
-    console.error('[SPEC] Mets à jour seenit.md ET requirements.json dans la même livraison.');
+  if (!/^[a-f0-9]{40}$/i.test(base) || /^0{40}$/.test(base)) {
+    console.log('[SPEC] Contrat de changement ignoré : aucune base Git fournie.');
+    return 0;
   }
-  if (!hasAutomatedTests) {
-    console.error('[SPEC] Ajoute ou adapte au moins un test automatisé dans tests/*.test.ts.');
+
+  let changedFiles;
+  try {
+    changedFiles = execFileSync(
+      'git',
+      ['diff', '--name-only', `${base}..${head}`],
+      { encoding: 'utf8' }
+    )
+      .split(/\r?\n/)
+      .map(normalizePath)
+      .filter(Boolean);
+  } catch (error) {
+    console.error('[SPEC] Impossible de calculer les fichiers modifiés :', error.message);
+    return 1;
   }
-  process.exit(1);
+
+  const readPatch = file => execFileSync(
+    'git',
+    ['diff', '--unified=0', `${base}..${head}`, '--', file],
+    { encoding: 'utf8' }
+  );
+
+  try {
+    if (isPureVersionAlignment(changedFiles, readPatch)) {
+      console.log('[SPEC] Alignement de version pur : contrat comportemental non requis.');
+      return 0;
+    }
+  } catch (error) {
+    console.error('[SPEC] Impossible de vérifier l’alignement de version :', error.message);
+    return 1;
+  }
+
+  const behavioralFiles = changedFiles.filter(file =>
+    (file.startsWith('src/') && file !== 'src/store/updateStore.ts')
+    || file === 'server.ts'
+    || file.startsWith('android/app/src/')
+    || file === 'public/firebase-messaging-sw.js'
+    || file === 'capacitor.config.ts'
+  );
+
+  if (behavioralFiles.length === 0) {
+    console.log('[SPEC] Aucun comportement applicatif modifié.');
+    return 0;
+  }
+
+  const hasSpecification = changedFiles.includes('docs/specifications/seenit.md')
+    && changedFiles.includes('docs/specifications/requirements.json');
+  const hasAutomatedTests = changedFiles.some(file => /^tests\/.+\.test\.ts$/.test(file));
+
+  if (!hasSpecification || !hasAutomatedTests) {
+    console.error('[SPEC] Livraison comportementale incomplète.');
+    console.error(`[SPEC] Fichiers applicatifs : ${behavioralFiles.join(', ')}`);
+    if (!hasSpecification) {
+      console.error('[SPEC] Mets à jour seenit.md ET requirements.json dans la même livraison.');
+    }
+    if (!hasAutomatedTests) {
+      console.error('[SPEC] Ajoute ou adapte au moins un test automatisé dans tests/*.test.ts.');
+    }
+    return 1;
+  }
+
+  console.log(`[SPEC] Contrat respecté pour ${behavioralFiles.length} fichier(s) applicatif(s).`);
+  return 0;
 }
 
-console.log(`[SPEC] Contrat respecté pour ${behavioralFiles.length} fichier(s) applicatif(s).`);
+if (require.main === module) {
+  process.exit(main());
+}
+
+module.exports = {
+  VERSION_ONLY_PATTERNS,
+  getChangedContentLines,
+  isVersionOnlyPatch,
+  isPureVersionAlignment,
+  main
+};
