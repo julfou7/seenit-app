@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { getUserLogStorageKey, sanitizeLogDetails } from '../features/logging/logPrivacy';
 
 export type LogLevel = 'info' | 'success' | 'warn' | 'error';
 export type LogCategory = 'plex' | 'tmdb' | 'sync' | 'system' | 'auth';
@@ -19,12 +20,13 @@ interface LogState {
   getLogsAsText: () => string;
 }
 
-const STORAGE_KEY = 'app_activity_logs_v1';
+const LEGACY_STORAGE_KEY = 'app_activity_logs_v1';
 const MAX_LOGS = 150;
+let activeLogUid: string | null = null;
 
-const loadInitialLogs = (): AppLogEntry[] => {
+const loadUserLogs = (uid: string): AppLogEntry[] => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(getUserLogStorageKey(uid));
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed.slice(0, MAX_LOGS) : [];
@@ -34,15 +36,16 @@ const loadInitialLogs = (): AppLogEntry[] => {
 };
 
 const saveLogs = (logs: AppLogEntry[]) => {
+  if (!activeLogUid) return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(logs.slice(0, MAX_LOGS)));
+    localStorage.setItem(getUserLogStorageKey(activeLogUid), JSON.stringify(logs.slice(0, MAX_LOGS)));
   } catch {
     // ignore quota error
   }
 };
 
 export const useLogStore = create<LogState>((set, get) => ({
-  logs: loadInitialLogs(),
+  logs: [],
 
   addLog: (categoryOrMsg: any, messageOrLevel?: any, details?: any, level: LogLevel = 'info') => {
     let category: LogCategory = 'sync';
@@ -69,18 +72,18 @@ export const useLogStore = create<LogState>((set, get) => ({
       timestamp: Date.now(),
       level: actualLevel,
       category,
-      message,
-      details: actualDetails ? (typeof actualDetails === 'object' ? JSON.parse(JSON.stringify(actualDetails)) : actualDetails) : undefined
+      message: String(sanitizeLogDetails(message)),
+      details: actualDetails ? sanitizeLogDetails(actualDetails) : undefined
     };
 
     // Also mirror to browser console for easy inspection
     const prefix = `[${category.toUpperCase()}]`;
     if (actualLevel === 'error') {
-      console.error(prefix, message, actualDetails || '');
+      console.error(prefix, newEntry.message, newEntry.details || '');
     } else if (actualLevel === 'warn') {
-      console.warn(prefix, message, actualDetails || '');
+      console.warn(prefix, newEntry.message, newEntry.details || '');
     } else {
-      console.log(prefix, message, actualDetails || '');
+      console.log(prefix, newEntry.message, newEntry.details || '');
     }
 
     set((state) => {
@@ -92,7 +95,7 @@ export const useLogStore = create<LogState>((set, get) => ({
 
   clearLogs: () => {
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      if (activeLogUid) localStorage.removeItem(getUserLogStorageKey(activeLogUid));
     } catch {}
     set({ logs: [] });
   },
@@ -111,6 +114,16 @@ export const useLogStore = create<LogState>((set, get) => ({
       .join('\n');
   }
 }));
+
+export function activateLogUserScope(uid?: string | null): void {
+  const nextUid = String(uid || '').trim() || null;
+  if (nextUid === activeLogUid) return;
+  activeLogUid = nextUid;
+  try {
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+  } catch {}
+  useLogStore.setState({ logs: nextUid ? loadUserLogs(nextUid) : [] });
+}
 
 // Quick helper function for easy logging anywhere
 export const appLogger = {

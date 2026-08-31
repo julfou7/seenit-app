@@ -10,9 +10,25 @@ Vous devez suivre strictement ces règles lors de toutes vos interventions sur l
 ## 2. Versioning & Git Automatisé
 A chaque correctif ou fonctionnalité ajoutée :
 - Incrémentez systématiquement la version dans `android/app/build.gradle` (`versionName` et `versionCode`).
-- Mettez également à jour la constante `CURRENT_APP_VERSION` dans `src/store/updateStore.ts`.
+- Exécutez `npm run version:sync` après le bump Android pour aligner `package.json`, la SPEC,
+  le catalogue, le contrat Android, `CURRENT_APP_VERSION` et `X-Plex-Version`.
 - Rédigez un message de commit propre au format Conventional Commits (`fix:`, `perf:`, `feat:`) incluant le détail des modifications sous forme de liste à puces **en français**.
 - Effectuez le `git push` sur la branche principale (`main`) à la fin de chaque tâche pour déclencher automatiquement le build de l'APK sur GitHub Actions.
+- La CI vérifie et publie ; elle ne corrige, ne commit et ne pousse jamais automatiquement `main`.
+- Un rollback APK se livre avec un nouveau patch et un `versionCode` supérieur. Ne tentez jamais de
+  republier un ancien numéro de version ou d'abaisser `versionCode`.
+
+### Contrat APK immuable
+- Ne supprimez, ne renommez et ne régénérez jamais silencieusement les icônes du lanceur.
+- Ne modifiez jamais `applicationId` (`com.seenit.app`), le nom SeenIt, le deep link ou la clé
+  `android/app/debug.keystore` sans plan de migration explicitement validé : Android considérerait
+  l'application comme différente ou refuserait la mise à jour sur place.
+- Toute modification Android doit mettre à jour `docs/specifications/android-contract.json` uniquement
+  si le changement est intentionnel, documenté dans la SPEC et couvert par un test.
+- Exécutez `npm run test:android` avant et après `npx cap sync android`. Ce contrôle protège l'icône,
+  la signature, le package, les permissions, les safe areas, l'origine backend et le canal de build.
+- L'APK publié reste le build `assembleDebug` signé avec la clé historique tant que la migration vers
+  une signature de production n'a pas été conçue et testée sur une installation existante.
 
 ## 3. Compatibilité PWA et APK Android
 - **Double cible obligatoire :** SeenIt doit rester pleinement fonctionnelle en PWA et dans l'APK Android. Toute modification doit prendre en compte et vérifier les deux environnements.
@@ -27,9 +43,19 @@ A chaque correctif ou fonctionnalité ajoutée :
 - **Traçabilité :** Ajoutez ou actualisez l'entrée correspondante dans `docs/specifications/requirements.json`.
 - **Tests obligatoires :** Toute modification comportementale doit ajouter ou adapter au moins un test automatisé précis, référencé par le catalogue.
 - **Validation :** Exécutez `npm test`, `npm run build` et `npx cap sync android`. La CI `test:spec:changes` bloque le code applicatif livré sans SPEC et tests.
+- **Validation APK :** Exécutez aussi `npm run test:android` après la synchronisation Capacitor.
 - **Contexte durable :** Ne laissez jamais la SPEC décrire une ancienne version ou un comportement supprimé. Les audits datés sont historiques ; la SPEC est la source de vérité courante.
 
-## 5. Rapport de fin d'intervention (OBLIGATOIRE)
+## 5. Backlog et autonomie contrôlée
+- Les sujets différés vivent dans les issues GitHub avec priorité `[P0]`, `[P1]`, `[P2]` ou `[P3]`
+  et domaine `[APK]`, `[PWA]`, `[Sécurité]`, `[Performance]`, `[UX]` ou `[Architecture]`.
+- Un agent peut ouvrir une issue lorsqu'un audit révèle un risque réel et la résoudre sans nouvelle
+  autorisation si la solution reste dans le périmètre SeenIt, n'efface aucune donnée et respecte SPEC/tests.
+- Il est interdit de fermer une issue sans preuves : test automatisé, validation PWA/APK applicable,
+  commit et lien de release. Les décisions nécessitant une migration de signature, de données ou une
+  baisse de sécurité restent soumises à validation utilisateur.
+
+## 6. Rapport de fin d'intervention (OBLIGATOIRE)
 Après chaque modification, concluez TOUJOURS votre réponse par cette structure fixe :
 
 ---

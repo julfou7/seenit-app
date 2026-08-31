@@ -558,7 +558,7 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.80',
+        'X-Plex-Version': '1.4.81',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
@@ -2115,7 +2115,7 @@ async function startServer() {
 
   const execAsync = promisify(exec);
 
-  app.get('/api/git/status', async (req, res) => {
+  app.get('/api/git/status', requireAuth, async (req, res) => {
     try {
       const gitDirExists = fs.existsSync(path.join(process.cwd(), '.git'));
       if (!gitDirExists) {

@@ -2,7 +2,11 @@ import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { FileOpener } from '@capacitor-community/file-opener';
 import { openExternalUrl } from '../lib/utils';
-import { GITHUB_PAT } from '../store/updateStore';
+import {
+  isTrustedSeenItApkUrl,
+  normalizeSha256Digest,
+  type SeenItReleaseInfo
+} from '../features/release/releasePolicy';
 
 export interface UpdateProgress {
   percent: number;
@@ -10,23 +14,32 @@ export interface UpdateProgress {
   message: string;
 }
 
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function calculateCachedApkSha256(path: string): Promise<string> {
+  const file = await Filesystem.readFile({ path, directory: Directory.Cache });
+  if (typeof file.data !== 'string') {
+    throw new Error('Le format du fichier APK téléchargé ne permet pas sa vérification.');
+  }
+  const binary = atob(file.data.replace(/^data:[^;]+;base64,/, ''));
+  const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return bytesToHex(new Uint8Array(digest));
+}
+
 /**
  * Downloads APK directly inside the app using Capacitor's native Filesystem downloadFile,
  * verifies the file integrity/size, and launches Android Package Installer.
  */
 export async function downloadAndInstallApk(
-  rawApkUrl: string,
+  release: Pick<SeenItReleaseInfo, 'version' | 'apkDownloadUrl' | 'apkSha256'>,
   onProgress?: (progress: UpdateProgress) => void
 ): Promise<{ success: boolean; error?: string }> {
-  if (!rawApkUrl) {
+  const apkUrl = release.apkDownloadUrl;
+  if (!apkUrl || !isTrustedSeenItApkUrl(apkUrl, release.version)) {
     return { success: false, error: 'URL de téléchargement introuvable.' };
-  }
-
-  // Normalisation de l'URL : s'assurer qu'on utilise le binaire direct et pas l'API REST metadata JSON
-  let apkUrl = rawApkUrl;
-  if (apkUrl.includes('api.github.com/repos/') && apkUrl.includes('/releases/assets/')) {
-    // Remplacer par l'URL publique de téléchargement direct
-    apkUrl = apkUrl.replace('api.github.com/repos/', 'github.com/').replace('/releases/assets/', '/releases/download/');
   }
 
   // If running on web / preview
@@ -98,6 +111,16 @@ export async function downloadAndInstallApk(
 
     if (!stat || stat.size < 1024 * 500) {
       throw new Error(`Le fichier téléchargé est invalide ou incomplet (${Math.round((stat?.size || 0) / 1024)} Ko). Veuillez réessayer.`);
+    }
+
+    const expectedSha256 = normalizeSha256Digest(release.apkSha256);
+    if (expectedSha256) {
+      onProgress?.({ percent: 98, status: 'downloading', message: 'Vérification de l’intégrité de l’APK...' });
+      const actualSha256 = await calculateCachedApkSha256(fileName);
+      if (actualSha256 !== expectedSha256) {
+        await Filesystem.deleteFile({ path: fileName, directory: Directory.Cache }).catch(() => undefined);
+        throw new Error('La signature SHA-256 de la mise à jour ne correspond pas à la release GitHub. Fichier supprimé.');
+      }
     }
 
     onProgress?.({ percent: 99, status: 'installing', message: 'Ouverture de l\'installeur Android...' });

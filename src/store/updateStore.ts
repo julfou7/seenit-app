@@ -2,21 +2,15 @@ import { appLogger } from './logStore';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Capacitor } from '@capacitor/core';
+import {
+  compareSemanticVersions,
+  getUpdateMetadataEndpoints,
+  parseSeenItRelease,
+  type SeenItReleaseInfo
+} from '../features/release/releasePolicy';
 
-export const CURRENT_APP_VERSION = '1.4.80';
-export const GITHUB_REPO = 'julfou7/seenit-app';
-export const GITHUB_PAT = ''; // Plus de jeton d'accès privé codé en dur pour éviter les révocations de sécurité. Rendre le dépôt public est recommandé et gratuit !
-
-export interface AppReleaseInfo {
-  version: string;
-  tagName: string;
-  name: string;
-  releaseNotes: string;
-  publishedAt: string;
-  apkDownloadUrl: string;
-  browserDownloadUrl: string;
-  htmlUrl: string;
-}
+export const CURRENT_APP_VERSION = '1.4.81';
+export type AppReleaseInfo = SeenItReleaseInfo;
 
 interface UpdateState {
   currentVersion: string;
@@ -30,19 +24,6 @@ interface UpdateState {
   checkForUpdates: (force?: boolean) => Promise<boolean>;
   dismissUpdate: (version: string) => void;
   resetDismissed: () => void;
-}
-
-function compareVersions(v1: string, v2: string): number {
-  const p1 = v1.replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
-  const p2 = v2.replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
-
-  for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
-    const num1 = p1[i] || 0;
-    const num2 = p2[i] || 0;
-    if (num1 > num2) return 1;
-    if (num1 < num2) return -1;
-  }
-  return 0;
 }
 
 export const useUpdateStore = create<UpdateState>()(
@@ -69,65 +50,35 @@ export const useUpdateStore = create<UpdateState>()(
         set({ isChecking: true, error: null });
 
         try {
-          let data: any = null;
+          let releaseInfo: AppReleaseInfo | null = null;
+          const native = Capacitor.isNativePlatform();
 
-          try {
-            const ghUrl = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest?_ts=${Date.now()}`;
-            const headers: Record<string, string> = {
-              'Accept': 'application/vnd.github.v3+json'
-            };
-            if (GITHUB_PAT) {
-              headers['Authorization'] = `Bearer ${GITHUB_PAT}`;
-            }
-            const ghRes = await fetch(ghUrl, { headers });
-            const contentType = ghRes.headers.get('content-type') || '';
-            if (ghRes.ok && contentType.includes('application/json')) {
-              data = await ghRes.json();
-            }
-          } catch (e) {
-            console.warn('[UpdateCheck] Direct GitHub API fetch failed:', e);
-          }
-
-          if (!data && !Capacitor.isNativePlatform() && typeof window !== 'undefined' && window.location.protocol.startsWith('http')) {
+          for (const endpoint of getUpdateMetadataEndpoints(native)) {
             try {
-              const proxyRes = await fetch('/api/update');
-              const proxyContentType = proxyRes.headers.get('content-type') || '';
-              if (proxyRes.ok && proxyContentType.includes('application/json')) {
-                data = await proxyRes.json();
-              }
-            } catch (e) {
-              console.warn('[UpdateCheck] Backend proxy fallback failed:', e);
+              const separator = endpoint.url.includes('?') ? '&' : '?';
+              const response = await fetch(`${endpoint.url}${separator}_ts=${Date.now()}`, {
+                headers: endpoint.kind === 'github'
+                  ? { Accept: 'application/vnd.github.v3+json' }
+                  : { Accept: 'application/json' }
+              });
+              const contentType = response.headers.get('content-type') || '';
+              if (!response.ok || !contentType.includes('application/json')) continue;
+              releaseInfo = parseSeenItRelease(await response.json());
+              if (releaseInfo) break;
+            } catch (error) {
+              console.warn(`[UpdateCheck] Source ${endpoint.kind} indisponible:`, error);
             }
           }
 
-          if (!data || !data.tag_name) {
+          if (!releaseInfo) {
             throw new Error('Impossible de contacter le serveur de mise à jour.');
           }
 
-          const tagName = data.tag_name || '';
-          const remoteVersion = tagName.replace(/^v/i, '');
+          const remoteVersion = releaseInfo.version;
+          const isNewer = compareSemanticVersions(remoteVersion, CURRENT_APP_VERSION) > 0
+            && (force || !get().dismissedVersions.includes(remoteVersion));
 
-          const apkAsset = Array.isArray(data.assets)
-            ? data.assets.find((a: any) => a.name && a.name.toLowerCase().endsWith('.apk') && a.name.startsWith('SeenIt-')) ||
-              data.assets.find((a: any) => a.name && a.name.toLowerCase().endsWith('.apk'))
-            : null;
-
-          const browserUrl = apkAsset?.browser_download_url || `https://github.com/${GITHUB_REPO}/releases/download/${tagName}/SeenIt-${tagName}.apk`;
-
-          const releaseInfo: AppReleaseInfo = {
-            version: remoteVersion,
-            tagName,
-            name: data.name || tagName,
-            releaseNotes: data.body || '',
-            publishedAt: data.published_at || new Date().toISOString(),
-            apkDownloadUrl: browserUrl,
-            browserDownloadUrl: browserUrl,
-            htmlUrl: data.html_url || `https://github.com/${GITHUB_REPO}/releases`
-          };
-
-          const isNewer = compareVersions(remoteVersion, CURRENT_APP_VERSION) > 0 && (force || !get().dismissedVersions.includes(remoteVersion));
-
-          if (force && compareVersions(remoteVersion, CURRENT_APP_VERSION) > 0) {
+          if (force && compareSemanticVersions(remoteVersion, CURRENT_APP_VERSION) > 0) {
             set(state => ({
               dismissedVersions: state.dismissedVersions.filter(v => v !== remoteVersion)
             }));

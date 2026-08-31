@@ -32,6 +32,7 @@ import './store/showsStore';
 import { activatePlexUserScope } from './features/plex/plexStorage';
 import { usePlexAvailabilityStore } from './features/plex/plexAvailability';
 import { readUserScopedJson, writeUserScopedJson } from './lib/userIsolation';
+import { activateLogUserScope } from './store/logStore';
 
 const ProfileScreen = lazy(() => import('./screens/ProfileScreen').then(module => ({ default: module.ProfileScreen })));
 const ShowDetailScreen = lazy(() => import('./screens/ShowDetailScreen').then(module => ({ default: module.ShowDetailScreen })));
@@ -54,6 +55,7 @@ export default function App() {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
+      activateLogUserScope(user?.uid);
       if (activatePlexUserScope(user?.uid)) {
         usePlexAvailabilityStore.getState().clearCache();
       }

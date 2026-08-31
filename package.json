@@ -1,7 +1,11 @@
 {
-  "name": "react-example",
+  "name": "seenit-app",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.4.81",
+  "packageManager": "npm@10.9.3",
+  "engines": {
+    "node": ">=22 <25"
+  },
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
@@ -11,11 +15,13 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "npm run test:spec && npm run lint && npm run test:unit",
+    "test": "npm run test:spec && npm run test:android && npm run lint && npm run test:unit",
     "test:unit": "node --test tests/*.test.ts",
     "test:spec": "node scripts/validate-specifications.cjs",
+    "test:android": "node scripts/validate-android-contract.cjs",
     "test:spec:changes": "node scripts/validate-change-contract.cjs",
     "test:plex": "npm run test:spec && npm run test:unit",
+    "version:sync": "node scripts/sync-app-version.cjs",
     "git:pull": "bash scripts/pull.sh"
   },
   "dependencies": {

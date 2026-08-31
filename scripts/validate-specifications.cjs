@@ -88,12 +88,16 @@ const specificationVersion = specification.match(/Version applicative\s*:\s*\*\*
 const gradleVersion = read('android/app/build.gradle').match(/versionName\s+["']([^"']+)["']/)?.[1];
 const storeVersion = read('src/store/updateStore.ts').match(/CURRENT_APP_VERSION\s*=\s*["']([^"']+)["']/)?.[1];
 const serverVersion = read('server.ts').match(/["']X-Plex-Version["']\s*:\s*["']([^"']+)["']/)?.[1];
+const packageVersion = JSON.parse(read('package.json')).version;
+const androidContractVersion = JSON.parse(read('docs/specifications/android-contract.json')).applicationVersion;
 const versions = [
   ['catalogue', catalogue.applicationVersion],
   ['SPEC', specificationVersion],
   ['Android', gradleVersion],
   ['updateStore', storeVersion],
-  ['serveur Plex', serverVersion]
+  ['serveur Plex', serverVersion],
+  ['package npm', packageVersion],
+  ['contrat APK', androidContractVersion]
 ];
 const expectedVersion = versions[0][1];
 for (const [label, version] of versions) {

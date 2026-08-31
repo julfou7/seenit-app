@@ -5,6 +5,11 @@ const root = path.resolve(__dirname, '..');
 const gradlePath = path.join(root, 'android/app/build.gradle');
 const updateStorePath = path.join(root, 'src/store/updateStore.ts');
 const serverPath = path.join(root, 'server.ts');
+const packagePath = path.join(root, 'package.json');
+const packageLockPath = path.join(root, 'package-lock.json');
+const requirementsPath = path.join(root, 'docs/specifications/requirements.json');
+const androidContractPath = path.join(root, 'docs/specifications/android-contract.json');
+const specificationPath = path.join(root, 'docs/specifications/seenit.md');
 
 function read(file) {
   return fs.readFileSync(file, 'utf8');
@@ -61,10 +66,48 @@ const server = replaceRequired(
   'X-Plex-Version'
 );
 
+function alignJsonVersion(file, transform = value => value) {
+  const initial = read(file);
+  const parsed = JSON.parse(initial);
+  transform(parsed);
+  const next = `${JSON.stringify(parsed, null, 2)}\n`;
+  return { initial, next };
+}
+
+const packageVersion = alignJsonVersion(packagePath, value => {
+  value.name = 'seenit-app';
+  value.version = version;
+});
+const packageLockVersion = alignJsonVersion(packageLockPath, value => {
+  value.name = 'seenit-app';
+  value.version = version;
+  value.packages[''].name = 'seenit-app';
+  value.packages[''].version = version;
+});
+const requirementsVersion = alignJsonVersion(requirementsPath, value => {
+  value.applicationVersion = version;
+});
+const androidContractVersion = alignJsonVersion(androidContractPath, value => {
+  value.applicationVersion = version;
+  value.versionCode = versionCode;
+});
+const initialSpecification = read(specificationPath);
+const specification = replaceRequired(
+  initialSpecification,
+  /Version applicative\s*:\s*\*\*\d+\.\d+\.\d+\*\*/,
+  `Version applicative : **${version}**`,
+  'version de la SPEC'
+);
+
 const changedFiles = [];
 if (writeIfChanged(gradlePath, initialGradle, gradle)) changedFiles.push('android/app/build.gradle');
 if (writeIfChanged(updateStorePath, initialUpdateStore, updateStore)) changedFiles.push('src/store/updateStore.ts');
 if (writeIfChanged(serverPath, initialServer, server)) changedFiles.push('server.ts');
+if (writeIfChanged(packagePath, packageVersion.initial, packageVersion.next)) changedFiles.push('package.json');
+if (writeIfChanged(packageLockPath, packageLockVersion.initial, packageLockVersion.next)) changedFiles.push('package-lock.json');
+if (writeIfChanged(requirementsPath, requirementsVersion.initial, requirementsVersion.next)) changedFiles.push('docs/specifications/requirements.json');
+if (writeIfChanged(androidContractPath, androidContractVersion.initial, androidContractVersion.next)) changedFiles.push('docs/specifications/android-contract.json');
+if (writeIfChanged(specificationPath, initialSpecification, specification)) changedFiles.push('docs/specifications/seenit.md');
 
 if (changedFiles.length) {
   console.log(`[Version Sync] SeenIt ${version} : aligné ${changedFiles.join(', ')}`);

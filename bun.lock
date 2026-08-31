@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "react-example",
+      "name": "seenit-app",
       "dependencies": {
         "@capacitor-community/file-opener": "^8.0.1",
         "@capacitor-firebase/authentication": "^8.4.0",

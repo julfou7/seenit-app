@@ -80,7 +80,7 @@ export function AppUpdateBanner() {
     });
 
     const result = await downloadAndInstallApk(
-      latestRelease.apkDownloadUrl,
+      latestRelease,
       (progress) => setDownloadProgress(progress)
     );
 

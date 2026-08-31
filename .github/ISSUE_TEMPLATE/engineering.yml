@@ -1,0 +1,54 @@
+name: Travail d’ingénierie SeenIt
+description: Correctif, durcissement, performance ou dette technique piloté par la SPEC
+title: "[P2][Domaine] "
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexte et preuve
+      description: Logs, écrans, audit ou code qui démontre le besoin.
+    validations:
+      required: true
+  - type: textarea
+    id: risk
+    attributes:
+      label: Risque utilisateur
+      description: Impact concret PWA, APK, données, sécurité, performance ou UX.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Critères d’acceptation
+      description: Résultats observables, y compris absence de régression.
+      placeholder: |
+        - [ ] SPEC et catalogue mis à jour
+        - [ ] Tests automatisés ajoutés
+        - [ ] PWA vérifiée
+        - [ ] APK vérifié
+        - [ ] Version patch publiée
+    validations:
+      required: true
+  - type: input
+    id: requirements
+    attributes:
+      label: Exigences SPEC concernées
+      placeholder: SEENIT-APK-001, SEENIT-QUALITY-001
+    validations:
+      required: true
+  - type: textarea
+    id: exclusions
+    attributes:
+      label: Hors périmètre et risques de migration
+      description: Ce que l’agent ne doit pas changer dans cette issue.
+    validations:
+      required: true
+  - type: checkboxes
+    id: platforms
+    attributes:
+      label: Plateformes à valider
+      options:
+        - label: PWA
+        - label: APK Android
+        - label: Backend/API
+        - label: CI/release

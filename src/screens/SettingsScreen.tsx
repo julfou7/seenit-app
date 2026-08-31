@@ -29,6 +29,7 @@ import {
 } from '../features/plex/plexStorage';
 import { usePlexAvailabilityStore } from '../features/plex/plexAvailability';
 import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
+import { authenticatedFetch } from '../lib/apiAuth';
 
 const DEFAULT_NOTIFICATION_PREFS = {
   release_today_tv: true,
@@ -105,7 +106,8 @@ export function SettingsScreen() {
 
   const fetchGitStatus = async () => {
     try {
-      const res = await fetch('/api/git/status');
+      if (!auth.currentUser) return;
+      const res = await authenticatedFetch('/api/git/status');
       if (res.ok) {
         const data = await res.json();
         setGitStatus(data);
@@ -124,13 +126,9 @@ export function SettingsScreen() {
     setIsPullingGit(true);
     showToast("Synchronisation Git en cours...", "info");
     try {
-      const token = await auth.currentUser?.getIdToken();
-      const res = await fetch('/api/git/pull', {
+      const res = await authenticatedFetch('/api/git/pull', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        }
+        headers: { 'Content-Type': 'application/json' }
       });
       const data = await res.json();
       if (data.success) {
@@ -551,7 +549,7 @@ export function SettingsScreen() {
     });
 
     const result = await downloadAndInstallApk(
-      latestRelease.apkDownloadUrl,
+      latestRelease,
       (progress) => setApkUpdateProgress(progress)
     );
 
