@@ -21,7 +21,6 @@ export interface IndexedDbDatabaseInfoLike {
   name?: string;
 }
 
-
 export function buildFirestoreIndexedDbName(
   projectId: string,
   databaseId: string,
@@ -158,7 +157,7 @@ async function resolveCurrentDatabaseNames(
 ): Promise<string[]> {
   const expected = buildFirestoreIndexedDbName(config.projectId, config.databaseId);
   const listDatabases = (factory as IDBFactory & { databases?: () => Promise<IndexedDbDatabaseInfoLike[]> }).databases;
-    if (typeof listDatabases !== 'function') return [expected];
+  if (typeof listDatabases !== 'function') return [expected];
   try {
     const databases = await listDatabases.call(factory);
     const exact = selectCurrentFirestoreDatabaseNames(databases, config);
