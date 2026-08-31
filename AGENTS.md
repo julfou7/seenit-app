@@ -5,7 +5,7 @@ Vous devez suivre strictement ces règles lors de toutes vos interventions sur l
 ## 1. Langue de communication et de livraison
 - **Langue de l'interface & de la discussion :** Toutes vos réponses et explications à l'utilisateur doivent être rédigées exclusivement en **français**.
 - **Messages de Commit Git :** Tous vos messages de commit (titre et corps de commit) doivent être rédigés exclusivement en **français**.
-- **Changelog & Release Notes :** Comme le script de génération de notes de version extrait le corps du dernier commit, le corps de votre message de commit doit être rédigé en français structuré sous forme de puces claires et lisibles pour l'utilisateur final.
+- **Changelog & Release Notes :** Le générateur de notes agrège tous les commits de la version depuis le dernier tag SemVer strictement antérieur. Chaque commit doit donc conserver un corps en français, structuré en puces claires et lisibles pour l'utilisateur final ; aucun dernier commit ne doit résumer ou écraser à lui seul le reste de la version.
 
 ## 2. Versioning & Git Automatisé
 A chaque correctif ou fonctionnalité ajoutée :
