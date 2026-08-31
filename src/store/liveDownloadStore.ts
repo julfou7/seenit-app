@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, deleteDoc, doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
 import { useDownloadConfigStore } from './downloadConfigStore';
@@ -23,6 +22,7 @@ import { fetchRecentDownloadHistory, resolveDownloadHistoryOutcome } from '../fe
 import { preferSeenItImagePath } from '../features/downloads/downloadPosterStability';
 import { isDownloadInHistorySection } from '../features/downloads/downloadStatePolicy';
 import { buildLiveDownloadStorageKey, isDownloadRequestScopeCurrent } from '../features/downloads/downloadUserScope';
+import { normalizeUnresolvedQbitScope, shouldSuppressUnresolvedQbit } from '../features/downloads/downloadTransientVisibility';
 
 interface LiveDownloadState {
   downloads: LiveDownloadItem[];
@@ -46,7 +46,7 @@ interface LiveDownloadState {
 }
 
 let pollingTimer: ReturnType<typeof setTimeout> | null = null;
-let pollingIntervalMs = 3000;
+let pollingIntervalMs = 1000;
 let activeFetchPromise: Promise<void> | null = null;
 let downloadScopeEpoch = 0;
 let activeDownloadStorageUid: string | null = null;
@@ -214,9 +214,6 @@ function startSharedDownloadRequestSync(uid: string) {
           markLocalItemMutation(local.id);
         }
 
-        // La synchro PWA ↔ APK peut arriver après l'apparition du torrent qBittorrent.
-        // On réutilise alors la règle sûre de la 1.4.58 : association unique des deux
-        // côtés, sans aucune comparaison de titre.
         const liveCandidates = downloads.filter(item => !item.isOptimistic && !isTerminalDownload(item));
         const attachments = findUniqueRecentOptimisticAttachments(unmatchedRemoteItems, liveCandidates, now);
         const attachedRequestIndexes = new Set<number>();
@@ -251,16 +248,6 @@ const OPTIMISTIC_TTL_MS = 120_000;
 const OPTIMISTIC_ERROR_TTL_MS = 60_000;
 const MISSING_GRACE_MS = 10_000;
 const MISSING_WARNING_DELAY_MS = 20_000;
-
-async function checkNotificationPermission() {
-  if (!Capacitor.isNativePlatform()) return false;
-  try {
-    const permStatus = await LocalNotifications.checkPermissions();
-    return permStatus.display === 'granted';
-  } catch {
-    return false;
-  }
-}
 
 function sameCanonicalMedia(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
   if (a.mediaType !== b.mediaType) return false;
@@ -327,7 +314,6 @@ function sameDownloadIdentity(a: LiveDownloadItem, b: LiveDownloadItem): boolean
   if (sameDownloadRequest(a, b)) return true;
   if (samePhysicalDownload(a, b)) return true;
 
-  // Deux vrais torrents différents restent distincts, même s'ils concernent le même film.
   if (hasConflictingStrongPhysicalIds(a, b)) return false;
   if (sameTransferPath(a, b)) return true;
 
@@ -337,8 +323,6 @@ function sameDownloadIdentity(a: LiveDownloadItem, b: LiveDownloadItem): boolean
 
   if (sameLegacyPhysicalTransfer(a, b)) return true;
 
-  // Un transfert terminé ne doit jamais absorber un nouveau re-téléchargement du
-  // même média simplement parce que le TMDB est identique.
   if (isTerminalDownload(a) !== isTerminalDownload(b)) return false;
   if (!sameCanonicalMedia(a, b)) return false;
 
@@ -347,9 +331,6 @@ function sameDownloadIdentity(a: LiveDownloadItem, b: LiveDownloadItem): boolean
     if (a.episodeNumber != null && b.episodeNumber != null && a.episodeNumber !== b.episodeNumber) return false;
   }
 
-  // Le fallback canonique sert uniquement à raccrocher une intention SeenIt ou un
-  // état réhydraté. Deux snapshots distants sans identité physique commune ne sont
-  // jamais fusionnés sur le seul titre/TMDB.
   return Boolean(a.isOptimistic || b.isOptimistic || a.isRestored || b.isRestored);
 }
 
@@ -375,8 +356,6 @@ function sameCancellationIdentity(cancelled: LiveDownloadItem, remote: LiveDownl
     return !(cancelledResolution && remoteResolution && cancelledResolution !== remoteResolution);
   }
 
-  // Pour une recherche manuelle sans ID canonique, la fenêtre temporelle + type +
-  // scope + résolution suffit, toujours sans utiliser le titre comme identité.
   return canAttachRecentOptimisticRequest(
     { ...cancelled, isOptimistic: true },
     remote,
@@ -388,7 +367,8 @@ function sameCancellationIdentity(cancelled: LiveDownloadItem, remote: LiveDownl
 function sendLocalNotification(title: string, body: string, isSuccess = false, item?: LiveDownloadItem) {
   try {
     if (item) {
-      const mediaTitle = item.movieTitle || item.seriesTitle || item.title;
+      const mediaTitle = item.movieTitle || item.seriesTitle;
+      if (!mediaTitle) return;
       const subtitle = item.mediaType === 'tv' && item.seasonNumber != null
         ? item.episodeNumber != null
           ? `S${String(item.seasonNumber).padStart(2, '0')}E${String(item.episodeNumber).padStart(2, '0')}`
@@ -405,31 +385,9 @@ function sendLocalNotification(title: string, body: string, isSuccess = false, i
     }
   } catch {}
 
-  if (!Capacitor.isNativePlatform()) {
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-      try { new Notification(title, { body }); } catch {}
-    }
-    return;
-  }
-
-  checkNotificationPermission().then(granted => {
-    if (!granted) return;
-    try {
-      LocalNotifications.schedule({
-        notifications: [{
-          title,
-          body,
-          id: Math.floor(Math.random() * 2_000_000_000) + 1,
-          schedule: { at: new Date(Date.now() + 200) },
-          sound: undefined,
-          actionTypeId: '',
-          extra: null
-        }]
-      });
-    } catch (error) {
-      console.warn('[Notifications] Impossible de planifier la notification:', error);
-    }
-  });
+  // Les notifications système de téléchargement sont désormais exclusivement
+  // émises par les webhooks Sonarr/Radarr → FCM. Le polling local ne produit qu'un
+  // toast dans SeenIt afin d'éviter les doubles notifications et les noms de torrent.
 }
 
 function clearPollingTimer() {
@@ -591,13 +549,17 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           if (!isCurrentScope()) return;
 
           const sourceHealth = getLastLiveDownloadSourceHealth();
-          const rawIds = new Set(rawServerItems.map(item => item.id));
+          const normalizedServerItems = rawServerItems.map(normalizeUnresolvedQbitScope);
+          const rawIds = new Set(normalizedServerItems.map(item => item.id));
           const prunedRemovedIds = (get().removedIds || []).filter(id => rawIds.has(id));
           const removedSet = new Set(prunedRemovedIds);
           const cancelledLocals = currentDownloads.filter(isCancelledDownload);
-          const serverItems = rawServerItems.filter(item =>
+          const pendingRequests = currentDownloads.filter(item => item.isOptimistic && !isTerminalDownload(item));
+          const visibilityNow = Date.now();
+          const serverItems = normalizedServerItems.filter(item =>
             !removedSet.has(item.id)
             && !cancelledLocals.some(cancelled => sameCancellationIdentity(cancelled, item))
+            && !shouldSuppressUnresolvedQbit(item, pendingRequests, visibilityNow)
           );
           const localShows = useShowsStore.getState().shows || [];
 
@@ -606,9 +568,6 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
 
             const localMatch = currentDownloads.find(current => sameDownloadIdentity(current, serverItem));
             if (localMatch) {
-              // Dès qu'un transfert est lié à une demande SeenIt, le poster/backdrop
-              // transmis par la fiche est l'identité visuelle de référence. Les images
-              // des clients distants ne peuvent plus le remplacer pendant un poll.
               if (localMatch.requestId) {
                 serverItem.posterPath = preferSeenItImagePath(serverItem.posterPath, localMatch.posterPath);
                 serverItem.backdropPath = preferSeenItImagePath(serverItem.backdropPath, localMatch.backdropPath);
@@ -623,9 +582,6 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               if (!serverItem.addedAt && localMatch.addedAt) serverItem.addedAt = localMatch.addedAt;
               if (!serverItem.requestId && localMatch.requestId) serverItem.requestId = localMatch.requestId;
 
-              // Une fois la demande SeenIt rattachée, son titre d'affichage reste
-              // prioritaire. Le titre du client distant reste disponible dans title /
-              // releaseTitle, mais ne doit plus faire varier l'interface entre langues.
               if (localMatch.requestId) {
                 if (serverItem.mediaType === 'movie') {
                   const seenItTitle = localMatch.movieTitle || (localMatch.isOptimistic ? localMatch.title : undefined);
@@ -637,15 +593,9 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               }
 
               serverItem.isRestored = false;
-              // Une même entrée *Arr peut temporairement changer/perdre son downloadId.
-              // On garde l'historique des alias appris sur les polls précédents afin que
-              // le torrent qBittorrent reste rattaché sans clignotement 1 → 2 → 1.
               serverItem.downloadIdAliases = mergeDownloadIdAliases(serverItem, localMatch);
               if (!serverItem.downloadId && localMatch.downloadId) serverItem.downloadId = localMatch.downloadId;
 
-              // La progression ne recule pas sur une micro-coupure de source, mais la
-              // télémétrie live (débit/ETA/status) n'est JAMAIS recopiée depuis l'ancien
-              // snapshot. C'est ce recyclage qui figeait visuellement 1 % jusqu'à 100 %.
               if ((samePhysicalDownload(localMatch, serverItem) || sameTransferPath(localMatch, serverItem) || sameLegacyPhysicalTransfer(localMatch, serverItem) || sameDownloadRequest(localMatch, serverItem))
                   && Number(localMatch.progress || 0) > Number(serverItem.progress || 0)) {
                 serverItem.progress = localMatch.progress;
@@ -658,10 +608,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             }
 
             if (!serverItem.posterPath && serverItem.tmdbId && localShows.length > 0) {
-              const matchedShow = localShows.find(show => {
-                return Number(show.tmdbId) === Number(serverItem.tmdbId);
-              });
-
+              const matchedShow = localShows.find(show => Number(show.tmdbId) === Number(serverItem.tmdbId));
               if (matchedShow) {
                 serverItem.posterPath = matchedShow.posterPath || serverItem.posterPath;
                 serverItem.backdropPath = matchedShow.backdropPath || serverItem.backdropPath;
@@ -841,9 +788,6 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             const qbitHealthy = !qbitHealth.configured || qbitHealth.ok;
             const sourcesHealthy = arrHealthy && qbitHealthy;
 
-            // Si toutes les sources configurées répondent et que l'item n'existe ni
-            // dans les files ni dans l'historique d'import, l'état local est périmé.
-            // On le retire au lieu de ressusciter éternellement un ancien pourcentage.
             if (sourcesHealthy && missingFor >= MISSING_GRACE_MS) {
               delete missingSince[oldItem.id];
               continue;
@@ -945,10 +889,6 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             finalItems.push(item);
           }
 
-          // Réconcilie uniquement les mutations locales réellement survenues pendant
-          // ce poll. Une intention SeenIt peut apporter identité/poster/titre, jamais
-          // écraser progress/status/débit/ETA d'un snapshot distant déjà observé.
-          // Une annulation locale, elle, gagne toujours afin d'empêcher toute résurrection.
           const latestLocalMutations = (get().downloads || []).filter(item =>
             (localItemMutationRevision[item.id] || 0) > fetchStartedMutationRevision
           );
@@ -985,9 +925,6 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
 
             const existingIndex = finalItems.findIndex(existing => sameDownloadIdentity(existing, latestLocal));
 
-            // La synchro Firestore peut enrichir un transfert live pendant qu'un poll
-            // est en vol. On rejoue uniquement ses métadonnées SeenIt sur le snapshot
-            // frais afin que le poll ne réintroduise pas le titre distant.
             if (!latestLocal.isOptimistic) {
               if (existingIndex >= 0 && latestLocal.requestId) {
                 finalItems[existingIndex] = mergeLateOptimisticMetadata(finalItems[existingIndex], latestLocal);
@@ -1070,8 +1007,8 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
         }
       },
 
-      startPolling: (intervalMs = 3000) => {
-        pollingIntervalMs = Math.max(3000, Math.min(15_000, intervalMs));
+      startPolling: (intervalMs = 1000) => {
+        pollingIntervalMs = Math.max(1000, Math.min(15_000, intervalMs));
 
         if (get().isPolling) {
           void get().fetchDownloads();
@@ -1093,7 +1030,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           const hasError = Boolean(get().error);
 
           const delay = hasError
-            ? 30_000
+            ? 15_000
             : hasActive
               ? pollingIntervalMs
               : 30_000;
@@ -1109,7 +1046,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
 
       stopPolling: () => {
         clearPollingTimer();
-        pollingIntervalMs = 3000;
+        pollingIntervalMs = 1000;
         set({ isPolling: false });
       },
 
@@ -1118,8 +1055,6 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
         const status = String(item.status || '').toLowerCase();
         const shouldCancelRemote = !isTerminalDownload(item) && status !== 'error';
 
-        // Une seconde action sur un état terminal ne touche plus au client distant :
-        // elle nettoie simplement l'historique SeenIt.
         if (!shouldCancelRemote) {
           const newRemovedIds = Array.from(new Set([...(get().removedIds || []), item.id]));
           set({
@@ -1321,7 +1256,7 @@ function persistScopedDownloads(state: LiveDownloadState) {
 
 function forceStopGlobalPolling() {
   clearPollingTimer();
-  pollingIntervalMs = 3000;
+  pollingIntervalMs = 1000;
   useLiveDownloadStore.setState({ isPolling: false });
 }
 
@@ -1349,21 +1284,19 @@ if (typeof window !== 'undefined') {
       isPolling: false
     });
 
-    // Les anciennes données n'avaient aucune preuve de propriétaire : elles sont
-    // volontairement supprimées plutôt que migrées vers le compte courant.
     localStorage.removeItem('seenit_live_downloads_v3');
     localStorage.removeItem('seenit_live_downloads_scope_v3');
 
     if (user) {
       activeDownloadStorageUid = user.uid;
       startSharedDownloadRequestSync(user.uid);
-      useLiveDownloadStore.getState().startPolling(3000);
+      useLiveDownloadStore.getState().startPolling(1000);
     }
   });
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && auth.currentUser) {
-      useLiveDownloadStore.getState().startPolling(3000);
+      useLiveDownloadStore.getState().startPolling(1000);
     } else if (document.visibilityState === 'hidden') {
       useLiveDownloadStore.getState().stopPolling();
     }
@@ -1374,7 +1307,7 @@ if (Capacitor.isNativePlatform()) {
   try {
     CapApp.addListener('appStateChange', ({ isActive }) => {
       if (isActive && auth.currentUser) {
-        useLiveDownloadStore.getState().startPolling(3000);
+        useLiveDownloadStore.getState().startPolling(1000);
       } else if (!isActive) {
         useLiveDownloadStore.getState().stopPolling();
       }

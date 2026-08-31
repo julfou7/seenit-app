@@ -34,7 +34,15 @@ test('les tokens invalides sont identifiés sans bloquer les appareils valides',
 test('le proxy n’accepte que les chemins Sonarr Radarr et qBittorrent nécessaires', () => {
   assert.equal(isAllowedServiceProxyPath('https://sonarr.example/api/v3/queue?page=1', 'GET'), true);
   assert.equal(isAllowedServiceProxyPath('https://radarr.example/api/v3/release/push', 'POST'), true);
+  assert.equal(isAllowedServiceProxyPath('https://qbit.example/api/v2/torrents/info?filter=all', 'GET'), true);
+  assert.equal(isAllowedServiceProxyPath('https://qbit.example/api/v2/torrents/files?hash=abc', 'GET'), true);
+  assert.equal(isAllowedServiceProxyPath('https://qbit.example/api/v2/torrents/filePrio', 'POST'), true);
+  assert.equal(isAllowedServiceProxyPath('https://qbit.example/api/v2/torrents/stop', 'POST'), true);
+  assert.equal(isAllowedServiceProxyPath('https://qbit.example/api/v2/torrents/pause', 'POST'), true);
+  assert.equal(isAllowedServiceProxyPath('https://qbit.example/api/v2/torrents/start', 'POST'), true);
+  assert.equal(isAllowedServiceProxyPath('https://qbit.example/api/v2/torrents/resume', 'POST'), true);
   assert.equal(isAllowedServiceProxyPath('https://qbit.example/api/v2/torrents/delete', 'POST'), true);
+  assert.equal(isAllowedServiceProxyPath('https://qbit.example/api/v2/torrents/reannounce', 'POST'), false);
   assert.equal(isAllowedServiceProxyPath('https://example.org/admin/export', 'GET'), false);
   assert.equal(isAllowedServiceProxyPath('https://example.org/api/v3/queue', 'PATCH'), false);
 });

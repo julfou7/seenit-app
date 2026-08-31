@@ -92,9 +92,11 @@ export default function App() {
 
   useEffect(() => {
     if (isNative) {
+      // L'interface possède déjà pt-safe : la WebView peut donc dessiner sous la
+      // barre système sans créer une bande noire séparée. Les icônes restent claires.
       StatusBar.setStyle({ style: Style.Light }).catch(() => {});
-      StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
-      StatusBar.setBackgroundColor({ color: '#040406' }).catch(() => {});
+      StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});
+      StatusBar.setBackgroundColor({ color: '#00000000' }).catch(() => {});
 
       const animFrame = requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -311,7 +313,6 @@ function MainApp() {
       };
     } catch (e) {}
 
-    // Écouter quand la fenêtre redevient active (retour d'arrière-plan ou focus onglet)
     const handleVisibilityOrFocus = () => {
       checkUrlParams();
       if (document.visibilityState === 'visible' && auth.currentUser) {
