@@ -52,23 +52,29 @@ jobs:
           )
           if count != 1:
               raise SystemExit('Bloc IndexedDbFactoryWithListing introuvable')
+
+          if 'factory: IndexedDbFactoryWithListing,' not in text:
+              raise SystemExit('Type factory introuvable')
           text = text.replace('factory: IndexedDbFactoryWithListing,', 'factory: IDBFactory,', 1)
-          old = """    if (typeof factory.databases !== 'function') return [expected];
-              try {
-                const databases = await factory.databases.call(factory);"""
-          new = """    const listDatabases = (factory as IDBFactory & {
-                databases?: () => Promise<IndexedDbDatabaseInfoLike[]>;
-              }).databases;
-              if (typeof listDatabases !== 'function') return [expected];
-              try {
-                const databases = await listDatabases.call(factory);"""
-          if old not in text:
-              raise SystemExit('Bloc databases() introuvable')
-          text = text.replace(old, new, 1)
-          old_factory = '    const factory = (options.indexedDbFactory ?? indexedDB) as IndexedDbFactoryWithListing;'
-          if old_factory not in text:
+
+          marker = "if (typeof factory.databases !== 'function') return [expected];"
+          if marker not in text:
+              raise SystemExit('Garde databases() introuvable')
+          text = text.replace(
+              marker,
+              "const listDatabases = (factory as IDBFactory & { databases?: () => Promise<IndexedDbDatabaseInfoLike[]> }).databases;\n    if (typeof listDatabases !== 'function') return [expected];",
+              1
+          )
+
+          call = 'const databases = await factory.databases.call(factory);'
+          if call not in text:
+              raise SystemExit('Appel databases() introuvable')
+          text = text.replace(call, 'const databases = await listDatabases.call(factory);', 1)
+
+          cast = 'const factory = (options.indexedDbFactory ?? indexedDB) as IndexedDbFactoryWithListing;'
+          if cast not in text:
               raise SystemExit('Cast factory introuvable')
-          text = text.replace(old_factory, '    const factory = options.indexedDbFactory ?? indexedDB;', 1)
+          text = text.replace(cast, 'const factory = options.indexedDbFactory ?? indexedDB;', 1)
           p.write_text(text)
           PY
 
