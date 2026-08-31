@@ -28,6 +28,7 @@ import {
 import { type C411Torrent, formatTorrentSize, searchC411Torrents } from '../services/c411';
 import { useToastStore } from '../store/toastStore';
 import { DownloadConfigSection } from '../components/DownloadConfigSection';
+import { SwipeableCard } from '../components/cards/SwipeableCard';
 import {
   acceptDownloadRequest,
   beginDownloadRequest,
@@ -72,14 +73,10 @@ function getQualityBadges(quality?: string) {
 
 function DownloadItemCard({
   item,
-  onShowClick,
-  onRemove,
-  isRemoving
+  onShowClick
 }: {
   item: LiveDownloadItem;
   onShowClick?: Props['onShowClick'];
-  onRemove: (item: LiveDownloadItem) => void;
-  isRemoving: boolean;
 }) {
   const { cleanTitle, subTitle, isTv } = formatCleanMediaInfo(item);
   const libraryPosterPath = useShowsStore(state => {
@@ -98,7 +95,7 @@ function DownloadItemCard({
   const isPending = status === 'submitting' || status === 'searching' || status === 'queued';
   const progress = Math.min(100, Math.max(0, Number(item.progress || 0)));
   const progressPercent = truncateDownloadProgressPercent(progress);
-  const qualityBadges = getQualityBadges(item.quality);
+  const qualityBadges = getQualityBadges(`${item.quality || ''} ${item.releaseTitle || ''}`);
   const downloadedBytes = item.size > 0 ? Math.max(0, item.size - item.sizeleft) : 0;
   const pendingWithoutProgress = isPending && progress <= 0;
   const progressLabel = isPending
@@ -118,7 +115,7 @@ function DownloadItemCard({
   const posterSrc = stablePosterPath
     ? stablePosterPath.startsWith('http')
       ? stablePosterPath
-      : `https://image.tmdb.org/t/p/w185${stablePosterPath}`
+      : `https://image.tmdb.org/t/p/w342${stablePosterPath}`
     : null;
 
   const canOpenDetails = Boolean(item.tmdbId && onShowClick);
@@ -144,7 +141,7 @@ function DownloadItemCard({
       : isWarning
         ? 'bg-amber-400'
         : isCompleted
-          ? 'bg-gradient-to-r from-emerald-500 to-emerald-300'
+          ? 'bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-300'
           : 'bg-gradient-to-r from-cyan-500 via-sky-400 to-cyan-300';
 
   const statusLabel = isCancelled
@@ -160,6 +157,9 @@ function DownloadItemCard({
   const pendingLabel = status === 'searching'
     ? 'Recherche en cours'
     : 'Préparation du téléchargement';
+  const pendingHint = status === 'searching'
+    ? 'Sélection de la meilleure release disponible'
+    : 'Connexion au client de téléchargement';
 
   const hasTransferMeta = item.size > 0
     || Boolean(item.speedFormatted)
@@ -168,61 +168,42 @@ function DownloadItemCard({
   return (
     <div
       onClick={canOpenDetails ? openDetails : undefined}
-      className={`relative overflow-hidden rounded-[22px] border bg-gradient-to-br from-zinc-900/95 to-zinc-950/90 p-3 shadow-[0_10px_30px_rgba(0,0,0,0.18)] ${canOpenDetails ? 'cursor-pointer transition-transform active:scale-[0.995]' : ''} ${
-        isCancelled
-          ? 'border-zinc-600/30'
-          : isError
-            ? 'border-red-500/25'
-            : isWarning
-              ? 'border-amber-500/20'
-              : isCompleted
-                ? 'border-emerald-500/20'
-                : 'border-white/[0.08]'
-      }`}
+      className={`group relative isolate min-h-[116px] overflow-hidden rounded-2xl bg-zinc-900/60 shadow-[0_12px_30px_rgba(0,0,0,0.20)] ${canOpenDetails ? 'cursor-pointer active:scale-[0.995]' : ''}`}
     >
-      <button
-        type="button"
-        disabled={isRemoving}
-        onClick={(event) => {
-          event.stopPropagation();
-          onRemove(item);
-        }}
-        className="absolute right-1.5 top-1.5 z-10 flex min-h-11 min-w-11 items-center justify-center rounded-full text-zinc-600 transition-colors hover:bg-white/5 hover:text-red-400 disabled:opacity-50"
-        aria-label={isCompleted || isCancelled || isError ? `Effacer ${cleanTitle}` : `Annuler le téléchargement de ${cleanTitle}`}
-      >
-        {isRemoving ? <Loader2 size={14} className="animate-spin" /> : <X size={15} />}
-      </button>
+      <div className="pointer-events-none absolute inset-0 z-20 rounded-2xl ring-1 ring-inset ring-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)]" />
+      <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-br from-white/[0.035] via-transparent to-black/10" />
 
-      <div className="flex items-start gap-3">
-        <div className="w-16 shrink-0 overflow-hidden rounded-[14px] border border-white/10 bg-zinc-950 shadow-md">
+      <div className="relative z-10 flex min-h-[116px] items-stretch">
+        <div className="flex w-[92px] shrink-0 flex-col overflow-hidden bg-zinc-950">
           <button
             type="button"
             onClick={(event) => {
               event.stopPropagation();
               openDetails();
             }}
-            className="relative flex w-full aspect-[2/3] items-center justify-center overflow-hidden bg-zinc-950"
+            className="relative min-h-0 flex-1 overflow-hidden bg-zinc-950"
           >
             {posterSrc ? (
               <img
                 src={posterSrc}
                 alt={cleanTitle}
-                className="absolute inset-0 block h-full w-full object-cover object-center"
+                className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
                 loading={isCompleted ? 'lazy' : 'eager'}
+                decoding="async"
               />
-            ) : isTv ? (
-              <Tv size={22} className="text-indigo-400" />
             ) : (
-              <Film size={22} className="text-rose-400" />
+              <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
+                {isTv ? <Tv size={24} className="text-indigo-400" /> : <Film size={24} className="text-rose-400" />}
+              </div>
             )}
           </button>
-          <div className={`flex items-center justify-center gap-1 border-t border-white/10 py-1 text-[8px] font-extrabold uppercase tracking-wide text-white ${isTv ? 'bg-indigo-600' : 'bg-rose-600'}`}>
+          <div className={`flex h-[22px] shrink-0 items-center justify-center gap-1 text-[8px] font-extrabold uppercase tracking-wide text-white ${isTv ? 'bg-indigo-600' : 'bg-rose-600'}`}>
             {isTv ? <Tv size={9} /> : <Film size={9} />}
             <span>{isTv ? 'Série' : 'Film'}</span>
           </div>
         </div>
 
-        <div className="min-w-0 flex-1 pr-8">
+        <div className="flex min-w-0 flex-1 flex-col justify-center px-3 py-2.5">
           <button
             type="button"
             onClick={(event) => {
@@ -231,8 +212,8 @@ function DownloadItemCard({
             }}
             className="block min-w-0 max-w-full text-left"
           >
-            <h3 className="line-clamp-2 text-[15px] font-black leading-tight text-[#E5A93D]">{cleanTitle}</h3>
-            {subTitle && <p className="mt-0.5 text-[11px] font-semibold text-zinc-400">{subTitle}</p>}
+            <h3 className="line-clamp-2 text-[15px] font-black leading-[1.15] text-[#E5A93D]">{cleanTitle}</h3>
+            {subTitle && <p className="mt-0.5 line-clamp-1 text-[10px] font-semibold text-zinc-400">{subTitle}</p>}
           </button>
 
           {qualityBadges.length > 0 && (
@@ -242,8 +223,8 @@ function DownloadItemCard({
                   key={badge}
                   className={`rounded-md border px-1.5 py-0.5 text-[9px] font-black tracking-wide ${
                     index === 0
-                      ? 'border-cyan-400/15 bg-cyan-400/[0.06] text-cyan-300/80'
-                      : 'border-white/10 bg-white/[0.04] text-zinc-300'
+                      ? 'border-cyan-400/20 bg-cyan-400/[0.08] text-cyan-300'
+                      : 'border-white/10 bg-white/[0.045] text-zinc-300'
                   }`}
                 >
                   {badge}
@@ -253,9 +234,14 @@ function DownloadItemCard({
           )}
 
           {pendingWithoutProgress ? (
-            <div className="mt-2.5 flex items-center gap-2 text-[11px] font-bold text-cyan-300">
-              <Loader2 size={13} className="shrink-0 animate-spin" />
-              <span>{pendingLabel}</span>
+            <div className="mt-2 flex min-w-0 items-center gap-2 rounded-xl border border-cyan-400/10 bg-cyan-400/[0.055] px-2.5 py-2">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cyan-400/10 text-cyan-300 ring-1 ring-cyan-300/10">
+                {status === 'searching' ? <Search size={13} /> : <Loader2 size={13} className="animate-spin" />}
+              </div>
+              <div className="min-w-0">
+                <div className="truncate text-[11px] font-bold text-cyan-200">{pendingLabel}</div>
+                <div className="truncate text-[9px] text-zinc-500">{pendingHint}</div>
+              </div>
             </div>
           ) : (
             <>
@@ -264,42 +250,38 @@ function DownloadItemCard({
                   <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isCancelled ? 'bg-zinc-500' : isCompleted ? 'bg-emerald-400' : isError ? 'bg-red-400' : isWarning ? 'bg-amber-400' : 'bg-cyan-400'}`} />
                   <span className="truncate">{statusLabel}</span>
                 </div>
-                {progressLabel && (
-                  <span className={`shrink-0 text-sm font-black tabular-nums ${accent}`}>{progressLabel}</span>
-                )}
+                {progressLabel && <span className={`shrink-0 text-sm font-black tabular-nums ${accent}`}>{progressLabel}</span>}
               </div>
 
-              <div className="relative mt-1.5 h-2 overflow-hidden rounded-full bg-white/[0.07] ring-1 ring-white/[0.03]">
+              <div className="relative mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.07] ring-1 ring-white/[0.03]">
                 <div
-                  className={`relative h-full rounded-full transition-[width] duration-500 ease-out ${progressBar} ${!isCompleted && !isCancelled && !isError ? 'shadow-[0_0_12px_rgba(34,211,238,0.28)]' : ''}`}
+                  className={`h-full rounded-full transition-[width] duration-500 ease-out ${progressBar}`}
                   style={{ width: `${progress}%` }}
-                >
-                  {!isCompleted && progress > 4 && <div className="absolute inset-0 bg-white/[0.08]" />}
-                </div>
+                />
               </div>
 
               {hasTransferMeta && (
-                <div className="mt-1.5 flex items-center justify-between gap-3 text-[10px] text-zinc-400">
+                <div className="mt-1.5 flex items-center justify-between gap-2 text-[9px] text-zinc-400">
                   <div className="flex min-w-0 items-center gap-1.5 tabular-nums">
                     {item.size > 0 && (
                       <>
-                        <HardDrive size={11} className="shrink-0 text-zinc-500" />
+                        <HardDrive size={10} className="shrink-0 text-zinc-500" />
                         <span className="truncate">{formatBytes(downloadedBytes)} / {formatBytes(item.size)}</span>
                       </>
                     )}
                   </div>
 
                   {!isCompleted && !isCancelled && !isError && (
-                    <div className="flex shrink-0 items-center gap-2.5 tabular-nums">
+                    <div className="flex shrink-0 items-center gap-2 tabular-nums">
                       {item.speedFormatted && (
                         <span className="flex items-center gap-1 font-semibold text-zinc-300">
-                          <Download size={11} className="text-cyan-400" />
+                          <Download size={10} className="text-cyan-400" />
                           {item.speedFormatted}
                         </span>
                       )}
                       {item.timeleft && item.timeleft !== '--' && (
                         <span className="flex items-center gap-1 text-zinc-400">
-                          <Clock3 size={11} />
+                          <Clock3 size={10} />
                           {item.timeleft}
                         </span>
                       )}
@@ -311,7 +293,7 @@ function DownloadItemCard({
           )}
 
           {item.errorMessage && (
-            <p className="mt-2 rounded-xl border border-red-500/15 bg-red-500/[0.07] px-2.5 py-2 text-[10px] leading-snug text-red-300">
+            <p className="mt-2 rounded-lg border border-red-500/15 bg-red-500/[0.07] px-2 py-1.5 text-[9px] leading-snug text-red-300">
               {item.errorMessage}
             </p>
           )}
@@ -333,7 +315,6 @@ export function DownloadsScreen({ onShowClick }: Props) {
 
   const [viewMode, setViewMode] = useState<ViewMode>('downloads');
   const [showConfiguration, setShowConfiguration] = useState(false);
-  const [removingId, setRemovingId] = useState<string | null>(null);
   const [clearingSection, setClearingSection] = useState<'completed' | 'cancelled' | 'error' | null>(null);
   const [pendingCancellation, setPendingCancellation] = useState<LiveDownloadItem | null>(null);
 
@@ -424,9 +405,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
       && status !== 'error'
       && Number(item.progress || 0) < 100;
 
-    setRemovingId(item.id);
     const success = await removeDownload(item);
-    setRemovingId(null);
     showToast({
       title: item.movieTitle || item.seriesTitle || item.title,
       action: success
@@ -580,15 +559,15 @@ export function DownloadsScreen({ onShowClick }: Props) {
     tone: string,
     clearSection?: 'completed' | 'cancelled' | 'error'
   ) => (
-    <section className="space-y-2.5">
-      <div className="flex items-center justify-between">
+    <section className="space-y-2">
+      <div className="flex items-center justify-between px-0.5">
         <h2 className={`text-xs font-black uppercase tracking-wider ${tone}`}>{title} • {items.length}</h2>
         {clearSection && (
           <button
             type="button"
             disabled={Boolean(clearingSection)}
             onClick={() => void handleClearAll(clearSection)}
-            className="min-h-11 px-3 text-xs font-bold text-zinc-500 hover:text-red-400 flex items-center gap-1 disabled:opacity-50"
+            className="min-h-10 px-2 text-xs font-bold text-zinc-500 hover:text-red-400 flex items-center gap-1 disabled:opacity-50"
             aria-label={`Effacer la section ${title}`}
           >
             {clearingSection === clearSection ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
@@ -596,15 +575,28 @@ export function DownloadsScreen({ onShowClick }: Props) {
           </button>
         )}
       </div>
-      {items.map(item => (
-        <DownloadItemCard
-          key={getStableDownloadRenderKey(item)}
-          item={item}
-          onShowClick={onShowClick}
-          onRemove={handleRemove}
-          isRemoving={removingId === item.id}
-        />
-      ))}
+      {items.map(item => {
+        const itemStatus = String(item.status || '').toLowerCase();
+        const isActive = itemStatus !== 'completed'
+          && itemStatus !== 'cancelled'
+          && itemStatus !== 'error'
+          && Number(item.progress || 0) < 100;
+
+        return (
+          <SwipeableCard
+            key={getStableDownloadRenderKey(item)}
+            onSwipeRight={() => handleRemove(item)}
+            rightAction={{
+              title: isActive ? 'Annuler' : 'Retirer',
+              subtitle: isActive ? 'Arrêter le téléchargement' : 'Effacer de la liste',
+              icon: <Trash2 size={20} className="text-white" />,
+              tone: 'rose'
+            }}
+          >
+            <DownloadItemCard item={item} onShowClick={onShowClick} />
+          </SwipeableCard>
+        );
+      })}
     </section>
   );
 
@@ -658,7 +650,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3.5 py-4 pb-28">
+      <div className="flex-1 overflow-y-auto px-3 py-3.5 pb-28">
         {viewMode === 'downloads' ? (
           <div className="space-y-4">
             {!isConfigured && (
