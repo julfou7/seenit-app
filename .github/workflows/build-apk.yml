@@ -37,8 +37,6 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
-        with:
-          gradle-version: '8.13'
 
       - name: Install Dependencies
         run: npm ci --legacy-peer-deps

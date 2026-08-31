@@ -10,6 +10,12 @@
     "path": "android/app/debug.keystore",
     "sha256": "184991ec7f1d7db579676e4896fa0d438725c2d1d026827db5bb471693955673"
   },
+  "gradleWrapper": {
+    "path": "android/gradle/wrapper/gradle-wrapper.jar",
+    "sha256": "7d3a4ac4de1c32b59bc6a4eb8ecb8e612ccd0cf1ae1e99f66902da64df296172",
+    "distributionUrl": "https://services.gradle.org/distributions/gradle-8.14.3-all.zip",
+    "distributionSha256Sum": "ed1a8d686605fd7c23bdf62c7fc7add1c5b23b2bbc3721e661934ef4a4911d7c"
+  },
   "brandAssets": [
     {
       "path": "public/icon-192.png",

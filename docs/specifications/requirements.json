@@ -482,7 +482,7 @@
     },
     {
       "id": "SEENIT-RELEASE-002",
-      "title": "CI reproductible sans mutation automatique de main",
+      "title": "CI reproductible, chaîne Gradle vérifiée et aucune mutation automatique de main",
       "targets": [
         "ci",
         "pwa",

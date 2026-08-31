@@ -41,6 +41,7 @@ function validateAndroidContract() {
   const seenitApi = readText('src/lib/seenitApi.ts');
   const packageJson = JSON.parse(readText('package.json'));
   const workflow = readText('.github/workflows/build-apk.yml');
+  const wrapperProperties = readText('android/gradle/wrapper/gradle-wrapper.properties');
 
   if (contract.schemaVersion !== 1) throw new Error('schemaVersion Android invalide.');
   const versionName = gradle.match(/versionName\s+["']([^"']+)["']/)?.[1];
@@ -76,6 +77,21 @@ function validateAndroidContract() {
     throw new Error('La clé de signature APK a changé : une mise à jour sur place deviendrait impossible.');
   }
 
+  const wrapperJar = read(contract.gradleWrapper.path);
+  if (sha256(wrapperJar) !== contract.gradleWrapper.sha256) {
+    throw new Error('Le JAR Gradle Wrapper ne correspond plus au binaire officiel approuvé.');
+  }
+  requireIncludes(
+    wrapperProperties,
+    `distributionUrl=${contract.gradleWrapper.distributionUrl.replace(':', '\\:')}`,
+    'distribution Gradle'
+  );
+  requireIncludes(
+    wrapperProperties,
+    `distributionSha256Sum=${contract.gradleWrapper.distributionSha256Sum}`,
+    'empreinte de la distribution Gradle'
+  );
+
   for (const asset of contract.brandAssets) {
     const content = read(asset.path);
     const dimensions = readPngDimensions(content, asset.path);
@@ -91,6 +107,9 @@ function validateAndroidContract() {
 
   requireIncludes(workflow, './gradlew --no-daemon assembleDebug', 'build APK reproductible via wrapper');
   requireIncludes(workflow, 'SeenIt-v${VERSION}.apk', 'nom de l’APK versionné');
+  if (/gradle-version:/.test(workflow)) {
+    throw new Error('La CI doit utiliser exclusivement la version définie et vérifiée par le wrapper.');
+  }
   if (/git\s+(commit|push)/.test(workflow)) {
     throw new Error('La CI ne doit jamais modifier automatiquement la branche main.');
   }

@@ -49,8 +49,9 @@ publication qui aurait perdu ces actifs ou cassé la mise à jour sur place.
    statut n'est plus public.
 6. Logs locaux partitionnés par UID et détails sensibles masqués avant stockage/export.
 7. Version unique 1.4.81 synchronisée sur toutes les surfaces ; la CI n'écrit plus dans `main`.
-8. Pipeline modernisé sur les actions Node 24, wrapper Gradle, audit de dépendances et publication
-   conjointe de l'APK et de son fichier `.sha256`.
+8. Pipeline modernisé sur les actions Node 24, wrapper Gradle officiel 8.14.3 et distribution
+   contrôlés par SHA-256, audit de dépendances et publication conjointe de l'APK et de son fichier
+   `.sha256`.
 
 ## Constats ouverts et priorités
 

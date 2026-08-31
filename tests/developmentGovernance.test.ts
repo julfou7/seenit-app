@@ -11,6 +11,7 @@ test('SEENIT-RELEASE-002 la CI valide puis publie sans modifier automatiquement 
   assert.match(workflow, /npm run test:android/);
   assert.match(workflow, /npx cap sync android[\s\S]+npm run test:android/);
   assert.match(workflow, /\.\/gradlew --no-daemon assembleDebug/);
+  assert.doesNotMatch(workflow, /gradle-version:/);
   assert.match(workflow, /sha256sum "SeenIt-v\$\{VERSION\}\.apk"/);
 });
 

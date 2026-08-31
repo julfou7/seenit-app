@@ -238,8 +238,9 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 - **SEENIT-RELEASE-002** — La CI est un contrôleur et un producteur d'artefact, jamais un auteur de
   code : elle ne commit ni ne pousse sur `main`. Elle installe depuis le lockfile, vérifie SPEC/tests,
   audite les dépendances de production, construit la PWA, synchronise Capacitor, revalide le contrat
-  Android, compile avec le wrapper Gradle historique puis publie l'APK et son SHA-256 depuis le même
-  commit. Le tag `vX.Y.Z` désigne exactement ce commit.
+  Android, valide le JAR officiel et l'empreinte de la distribution Gradle, compile exclusivement
+  avec ce wrapper puis publie l'APK et son SHA-256 depuis le même commit. Le tag `vX.Y.Z` désigne
+  exactement ce commit.
 - Canal PWA : le déploiement Web peut être instantané et réversible côté hébergeur.
 - Canal APK : une correction, y compris un rollback logique, est toujours une nouvelle version avec
   un `versionCode` supérieur. On ne remplace jamais silencieusement l'asset d'une version déjà testée.
