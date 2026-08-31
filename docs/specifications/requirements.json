@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.81",
+  "applicationVersion": "1.4.82",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -492,6 +492,25 @@
         {
           "file": "tests/developmentGovernance.test.ts",
           "contains": "SEENIT-RELEASE-002 la CI valide puis publie sans modifier automatiquement main"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-RELEASE-003",
+      "title": "Notes de release exhaustives sur tous les commits de la version",
+      "targets": [
+        "ci",
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/releaseNotes.test.ts",
+          "contains": "SEENIT-RELEASE-003 agrège tous les commits de la version au lieu du seul dernier commit"
+        },
+        {
+          "file": "tests/releaseNotes.test.ts",
+          "contains": "SEENIT-RELEASE-003 ignore le tag de la version courante pour retrouver la vraie version précédente"
         }
       ]
     },
