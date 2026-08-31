@@ -39,7 +39,18 @@ export async function openExternalUrl(
     // 1. Gestion Plex : Deep Link Universel via AppLauncher / Browser au lieu de location.href
     if ((targetUrl.includes('plex.tv') || targetUrl.startsWith('plex://')) && !targetUrl.includes('/auth')) {
       appLogger.info('plex', `[Plex DeepLink] Redirection via intent système : ${targetUrl}`);
-      try {
+      // Sur Android, cibler explicitement Plex avant l’URL universelle évite
+      // que certains appareils ouvrent watch.plex.tv dans le navigateur.
+      if (Capacitor.getPlatform() === 'android' && /^https?:\/\//i.test(targetUrl)) {
+        const plexIntentUrl = `intent://${targetUrl.replace(/^https?:\/\//i, '')}#Intent;scheme=https;package=com.plexapp.android;end`;
+        try {
+          const nativePlex = await AppLauncher.openUrl({ url: plexIntentUrl });
+          if (nativePlex?.completed) return true;
+        } catch (err) {
+          appLogger.warn('plex', '[Plex DeepLink] Intent Plex Android indisponible, fallback URL universelle.');
+        }
+      }
+                    try {
         const res = await AppLauncher.openUrl({ url: targetUrl });
         if (res && res.completed) return true;
       } catch (err) {

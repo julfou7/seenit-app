@@ -977,38 +977,57 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                     const isEpisodeAvailable = presence.episodesHasFile[epKey] || presence.seasonsHasFile[currentSeason] || (presence.hasFile && (presence.plexInfo?.available || presence.sonarrHasFile));
 
                     if (isEpisodeAvailable) {
-                      return (
-                        <div className="flex flex-col gap-2 w-full">
-                          <div className="w-full py-3 px-4 rounded-2xl flex items-center justify-center gap-2.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold text-xs shadow-sm select-none">
-                            <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
-                            <span>{presence.plexInfo?.available ? "Épisode disponible sur Plex" : "Téléchargé"}</span>
-                          </div>
+            if (presence.plexInfo?.available) {
+              return (
+                <div className="flex flex-col items-center gap-2.5 w-full">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const targetTmdbId = tmdbShowId || activeShow?.tmdbId;
+                      void openPlexWatchUrl(activeShow || {
+                        tmdbId: targetTmdbId,
+                        imdbId: (activeShow as any)?.imdbId,
+                        title: activeShow?.title || tmdbShowTitle,
+                        mediaType: 'tv'
+                      });
+                    }}
+                    className="w-full py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] bg-[#E5A93D] hover:bg-[#d4982f] text-black font-extrabold text-sm cursor-pointer shadow-lg shadow-[#E5A93D]/15 touch-manipulation select-none"
+                    aria-label="Regarder cet épisode dans Plex"
+                  >
+                    <Play size={18} className="fill-black shrink-0" />
+                    <span>Regarder dans Plex</span>
+                  </button>
 
-                          {presence.plexInfo?.available && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                openPlexWatchUrl(show);
-                              }}
-                              className="w-full py-2.5 px-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 font-bold text-xs cursor-pointer shadow-sm"
-                            >
-                              <Play size={16} className="text-amber-400 fill-amber-400 shrink-0" />
-                              <span>Ouvrir dans Plex</span>
-                            </button>
-                          )}
+                  <button
+                    type="button"
+                    onClick={() => setIsDownloadOpen(true)}
+                    className="inline-flex items-center justify-center gap-1.5 px-2 py-1.5 text-[10px] font-semibold text-zinc-500 hover:text-blue-400 transition-colors active:scale-95 touch-manipulation select-none"
+                  >
+                    <Download size={12} className="shrink-0" />
+                    <span>Télécharger à nouveau</span>
+                  </button>
+                </div>
+              );
+            }
 
-                          <button
-                            type="button"
-                            onClick={() => setIsDownloadOpen(true)}
-                            className="w-full py-2.5 px-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] bg-blue-600/15 hover:bg-blue-600/25 border border-blue-500/30 text-blue-400 font-bold text-xs cursor-pointer shadow-sm touch-manipulation select-none"
-                          >
-                            <Download size={16} className="text-blue-400 shrink-0" />
-                            <span>Forcer le téléchargement</span>
-                          </button>
-                        </div>
-                      );
-                    }
-
+            return (
+              <div className="flex flex-col items-center gap-2 w-full">
+                <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold text-[10px] select-none">
+                  <CheckCircle2 size={13} className="shrink-0" />
+                  <span>Téléchargé</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsDownloadOpen(true)}
+                  className="inline-flex items-center justify-center gap-1.5 px-2 py-1.5 text-[10px] font-semibold text-zinc-500 hover:text-blue-400 transition-colors active:scale-95 touch-manipulation select-none"
+                >
+                  <Download size={12} className="shrink-0" />
+                  <span>Télécharger à nouveau</span>
+                </button>
+              </div>
+            );
+          }
+    
                     return (
                       <button
                         type="button"
