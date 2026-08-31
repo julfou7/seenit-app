@@ -92,11 +92,9 @@ export default function App() {
 
   useEffect(() => {
     if (isNative) {
-      // L'interface possède déjà pt-safe : la WebView peut donc dessiner sous la
-      // barre système sans créer une bande noire séparée. Les icônes restent claires.
       StatusBar.setStyle({ style: Style.Light }).catch(() => {});
-      StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});
-      StatusBar.setBackgroundColor({ color: '#00000000' }).catch(() => {});
+      StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
+      StatusBar.setBackgroundColor({ color: '#040406' }).catch(() => {});
 
       const animFrame = requestAnimationFrame(() => {
         requestAnimationFrame(() => {
