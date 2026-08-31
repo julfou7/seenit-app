@@ -1,293 +1,269 @@
-import React, { useState, useRef, ReactNode } from 'react';
+import React, { useRef, useState, type ReactNode } from 'react';
 import { Ban, Trash2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+
+interface SwipeActionPresentation {
+  title: string;
+  subtitle?: string;
+  icon?: ReactNode;
+  tone?: 'amber' | 'rose';
+}
 
 interface SwipeableCardProps {
   key?: React.Key;
   children: ReactNode;
-  onSwipeLeft: () => void;  // Swipe vers la gauche -> Archiver
-  onSwipeRight: () => void; // Swipe vers la droite -> Ne plus suivre
+  onSwipeLeft?: () => void;
+  onSwipeRight?: () => void;
+  leftAction?: SwipeActionPresentation;
+  rightAction?: SwipeActionPresentation;
   className?: string;
 }
 
-export const SwipeableCard = React.memo(({ children, onSwipeLeft, onSwipeRight, className }: SwipeableCardProps) => {
+const DEFAULT_RIGHT_ACTION: SwipeActionPresentation = {
+  title: 'Abandonner',
+  subtitle: 'Ne plus suivre',
+  tone: 'amber'
+};
+
+const DEFAULT_LEFT_ACTION: SwipeActionPresentation = {
+  title: 'Supprimer',
+  subtitle: 'Retirer la série',
+  tone: 'rose'
+};
+
+export const SwipeableCard = React.memo(({
+  children,
+  onSwipeLeft,
+  onSwipeRight,
+  leftAction = DEFAULT_LEFT_ACTION,
+  rightAction = DEFAULT_RIGHT_ACTION,
+  className
+}: SwipeableCardProps) => {
   const [translateX, setTranslateX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  
+
   const startXRef = useRef<number | null>(null);
   const startYRef = useRef<number | null>(null);
-  const latestDiffXRef = useRef<number>(0);
-  const startTimeRef = useRef<number>(0);
+  const latestDiffXRef = useRef(0);
+  const startTimeRef = useRef(0);
   const isScrollingRef = useRef<boolean | null>(null);
-  const isMouseDownRef = useRef<boolean>(false);
-  const wasSwipingRef = useRef<boolean>(false);
+  const isMouseDownRef = useRef(false);
+  const wasSwipingRef = useRef(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  const handleTouchStart = (e: React.TouchEvent) => {
+  const clampToAvailableDirection = (diffX: number, cardWidth: number) => {
+    if (diffX > 0 && !onSwipeRight) return 0;
+    if (diffX < 0 && !onSwipeLeft) return 0;
+    if (diffX > cardWidth) return cardWidth + (diffX - cardWidth) * 0.25;
+    if (diffX < -cardWidth) return -cardWidth + (diffX + cardWidth) * 0.25;
+    return diffX;
+  };
+
+  const resetGesture = () => {
+    latestDiffXRef.current = 0;
+    setTranslateX(0);
+  };
+
+  const completeGesture = (wasHorizontal: boolean) => {
+    setIsDragging(false);
+    const finalDiffX = latestDiffXRef.current;
+    const duration = Date.now() - startTimeRef.current;
+
+    startXRef.current = null;
+    startYRef.current = null;
+    isScrollingRef.current = null;
+    isMouseDownRef.current = false;
+
+    if (wasSwipingRef.current) {
+      window.setTimeout(() => {
+        wasSwipingRef.current = false;
+      }, 200);
+    }
+
+    if (!cardRef.current || !wasHorizontal) {
+      resetGesture();
+      return;
+    }
+
+    const cardWidth = cardRef.current.offsetWidth || 350;
+    const triggerThreshold = cardWidth * 0.20;
+    const isFastFlick = Math.abs(finalDiffX) > 30 && duration < 320;
+    const isPastThreshold = Math.abs(finalDiffX) > triggerThreshold;
+
+    if (!(isFastFlick || isPastThreshold)) {
+      resetGesture();
+      return;
+    }
+
+    if (finalDiffX > 0 && onSwipeRight) {
+      setTranslateX(cardWidth + 100);
+      window.setTimeout(() => {
+        onSwipeRight();
+        window.setTimeout(resetGesture, 800);
+      }, 240);
+      return;
+    }
+
+    if (finalDiffX < 0 && onSwipeLeft) {
+      setTranslateX(-cardWidth - 100);
+      window.setTimeout(() => {
+        onSwipeLeft();
+        window.setTimeout(resetGesture, 800);
+      }, 240);
+      return;
+    }
+
+    resetGesture();
+  };
+
+  const handleTouchStart = (event: React.TouchEvent) => {
     wasSwipingRef.current = false;
-    startXRef.current = e.touches[0].clientX;
-    startYRef.current = e.touches[0].clientY;
+    startXRef.current = event.touches[0].clientX;
+    startYRef.current = event.touches[0].clientY;
     latestDiffXRef.current = 0;
     startTimeRef.current = Date.now();
     isScrollingRef.current = null;
     setIsDragging(true);
   };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
+  const handleTouchMove = (event: React.TouchEvent) => {
     if (startXRef.current === null || startYRef.current === null) return;
 
-    const currentX = e.touches[0].clientX;
-    const currentY = e.touches[0].clientY;
+    const diffX = event.touches[0].clientX - startXRef.current;
+    const diffY = event.touches[0].clientY - startYRef.current;
 
-    const diffX = currentX - startXRef.current;
-    const diffY = currentY - startYRef.current;
-
-    // Directional lock detection
     if (isScrollingRef.current === null) {
       if (Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffY) > 6) {
-        isScrollingRef.current = true; // Vertical scroll
+        isScrollingRef.current = true;
       } else if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 6) {
-        isScrollingRef.current = false; // Horizontal swipe
+        isScrollingRef.current = false;
       }
     }
 
     if (isScrollingRef.current === true) {
-      latestDiffXRef.current = 0;
-      setTranslateX(0);
+      resetGesture();
       return;
     }
 
     if (isScrollingRef.current === false) {
-      if (Math.abs(diffX) > 8) {
-        wasSwipingRef.current = true;
-      }
+      if (Math.abs(diffX) > 8) wasSwipingRef.current = true;
       const cardWidth = cardRef.current?.offsetWidth || 350;
-      let calculatedX = diffX;
-      
-      // Permettre un swipe fluide sans blocage jusqu'au bout de la carte
-      if (diffX > cardWidth) {
-        calculatedX = cardWidth + (diffX - cardWidth) * 0.25;
-      } else if (diffX < -cardWidth) {
-        calculatedX = -cardWidth + (diffX + cardWidth) * 0.25;
-      }
-      
+      const calculatedX = clampToAvailableDirection(diffX, cardWidth);
       latestDiffXRef.current = calculatedX;
       setTranslateX(calculatedX);
     }
   };
 
-  const handleTouchEnd = () => {
-    setIsDragging(false);
-    const finalDiffX = latestDiffXRef.current;
-    const duration = Date.now() - startTimeRef.current;
-    const wasHorizontal = isScrollingRef.current === false;
+  const handleTouchEnd = () => completeGesture(isScrollingRef.current === false);
 
-    // Reset touch refs
-    startXRef.current = null;
-    startYRef.current = null;
-    isScrollingRef.current = null;
-
-    if (wasSwipingRef.current) {
-      setTimeout(() => {
-        wasSwipingRef.current = false;
-      }, 200);
-    }
-
-    if (cardRef.current && wasHorizontal) {
-      const cardWidth = cardRef.current.offsetWidth || 350;
-      const triggerThreshold = cardWidth * 0.20; // 20% drag threshold
-      
-      const isFastFlick = Math.abs(finalDiffX) > 30 && duration < 320;
-      const isPastThreshold = Math.abs(finalDiffX) > triggerThreshold;
-
-      if (isPastThreshold || isFastFlick) {
-        if (finalDiffX > 0) {
-          setTranslateX(cardWidth + 100);
-          setTimeout(() => {
-            onSwipeRight();
-            setTimeout(() => {
-              setTranslateX(0);
-              latestDiffXRef.current = 0;
-            }, 800);
-          }, 240);
-          return;
-        } else if (finalDiffX < 0) {
-          setTranslateX(-cardWidth - 100);
-          setTimeout(() => {
-            onSwipeLeft();
-            setTimeout(() => {
-              setTranslateX(0);
-              latestDiffXRef.current = 0;
-            }, 800);
-          }, 240);
-          return;
-        }
-      }
-    }
-
-    latestDiffXRef.current = 0;
-    setTranslateX(0);
-  };
-
-  // Mouse fallback for desktop testing
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = (event: React.MouseEvent) => {
     wasSwipingRef.current = false;
     isMouseDownRef.current = true;
-    startXRef.current = e.clientX;
-    startYRef.current = e.clientY;
+    startXRef.current = event.clientX;
+    startYRef.current = event.clientY;
     latestDiffXRef.current = 0;
     startTimeRef.current = Date.now();
     isScrollingRef.current = false;
     setIsDragging(true);
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handleMouseMove = (event: React.MouseEvent) => {
     if (!isMouseDownRef.current || startXRef.current === null) return;
-    const currentX = e.clientX;
-    const diffX = currentX - startXRef.current;
-    if (Math.abs(diffX) > 8) {
-      wasSwipingRef.current = true;
-    }
+    const diffX = event.clientX - startXRef.current;
+    if (Math.abs(diffX) > 8) wasSwipingRef.current = true;
     const cardWidth = cardRef.current?.offsetWidth || 350;
-    let calculatedX = diffX;
-
-    if (diffX > cardWidth) {
-      calculatedX = cardWidth + (diffX - cardWidth) * 0.25;
-    } else if (diffX < -cardWidth) {
-      calculatedX = -cardWidth + (diffX + cardWidth) * 0.25;
-    }
-
+    const calculatedX = clampToAvailableDirection(diffX, cardWidth);
     latestDiffXRef.current = calculatedX;
     setTranslateX(calculatedX);
   };
 
   const handleMouseUp = () => {
     if (!isMouseDownRef.current) return;
-    isMouseDownRef.current = false;
-    setIsDragging(false);
-
-    const finalDiffX = latestDiffXRef.current;
-    const duration = Date.now() - startTimeRef.current;
-
-    startXRef.current = null;
-    startYRef.current = null;
-    isScrollingRef.current = null;
-
-    if (wasSwipingRef.current) {
-      setTimeout(() => {
-        wasSwipingRef.current = false;
-      }, 200);
-    }
-
-    if (cardRef.current) {
-      const cardWidth = cardRef.current.offsetWidth || 350;
-      const triggerThreshold = cardWidth * 0.20;
-      const isFastFlick = Math.abs(finalDiffX) > 30 && duration < 320;
-      const isPastThreshold = Math.abs(finalDiffX) > triggerThreshold;
-
-      if (isPastThreshold || isFastFlick) {
-        if (finalDiffX > 0) {
-          setTranslateX(cardWidth + 100);
-          setTimeout(() => {
-            onSwipeRight();
-            setTimeout(() => {
-              setTranslateX(0);
-              latestDiffXRef.current = 0;
-            }, 800);
-          }, 240);
-          return;
-        } else if (finalDiffX < 0) {
-          setTranslateX(-cardWidth - 100);
-          setTimeout(() => {
-            onSwipeLeft();
-            setTimeout(() => {
-              setTranslateX(0);
-              latestDiffXRef.current = 0;
-            }, 800);
-          }, 240);
-          return;
-        }
-      }
-    }
-
-    latestDiffXRef.current = 0;
-    setTranslateX(0);
+    completeGesture(true);
   };
 
-  const handleClickCapture = (e: React.MouseEvent) => {
-    if (wasSwipingRef.current) {
-      e.stopPropagation();
-      e.preventDefault();
-      wasSwipingRef.current = false;
-    }
+  const handleClickCapture = (event: React.MouseEvent) => {
+    if (!wasSwipingRef.current) return;
+    event.stopPropagation();
+    event.preventDefault();
+    wasSwipingRef.current = false;
   };
+
+  const rightTone = rightAction.tone === 'rose'
+    ? 'from-rose-600 via-red-600 to-pink-600'
+    : 'from-amber-600 via-amber-500 to-orange-500';
+  const leftTone = leftAction.tone === 'amber'
+    ? 'from-amber-600 via-amber-500 to-orange-500'
+    : 'from-rose-600 via-red-600 to-pink-600';
 
   return (
-    <div 
-      ref={cardRef} 
+    <div
+      ref={cardRef}
       onClickCapture={handleClickCapture}
-      className={cn("relative w-full rounded-2xl touch-pan-y select-none", className)}
+      className={cn('relative w-full rounded-2xl touch-pan-y select-none', className)}
     >
-      {/* ARRIÈRE-PLAN DES ACTIONS */}
-      <div className="absolute inset-0 bg-zinc-950 rounded-2xl overflow-hidden">
-        {/* Dégradé Orange / Amber (Swipe vers la droite -> Abandonner) */}
-        <div 
-          className={cn(
-            "absolute inset-y-0 left-0 bg-gradient-to-r from-amber-600 via-amber-500 to-orange-500 flex items-center justify-start pl-6 sm:pl-10 transition-opacity duration-150",
-            translateX > 0 ? "opacity-100" : "opacity-0 pointer-events-none"
-          )}
-          style={{ width: translateX > 0 ? '100%' : '0%' }}
-        >
-          <div 
-            className="flex items-center gap-3 transition-transform duration-150"
-            style={{ 
-              transform: `scale(${Math.min(1.1, Math.max(0.85, translateX / 120))})`,
-              opacity: Math.min(1, translateX / 30)
-            }}
+      <div className="absolute inset-0 overflow-hidden rounded-2xl bg-zinc-950">
+        {onSwipeRight && (
+          <div
+            className={cn(
+              'absolute inset-y-0 left-0 flex items-center justify-start bg-gradient-to-r pl-6 transition-opacity duration-150 sm:pl-10',
+              rightTone,
+              translateX > 0 ? 'opacity-100' : 'pointer-events-none opacity-0'
+            )}
+            style={{ width: translateX > 0 ? '100%' : '0%' }}
           >
-            <div className="w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center border border-white/30 shadow-md">
-              <Ban className="text-white shrink-0 drop-shadow" size={20} />
-            </div>
-            <div className="flex flex-col text-white">
-              <span className="text-xs font-black uppercase tracking-wider drop-shadow-sm">Abandonner</span>
-              <span className="text-[10px] font-medium text-amber-100/90 leading-tight">Ne plus suivre</span>
+            <div
+              className="flex items-center gap-3 text-white transition-transform duration-150"
+              style={{
+                transform: `scale(${Math.min(1.1, Math.max(0.85, translateX / 120))})`,
+                opacity: Math.min(1, translateX / 30)
+              }}
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/20 shadow-md backdrop-blur-md">
+                {rightAction.icon || <Ban className="shrink-0 text-white drop-shadow" size={20} />}
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-black uppercase tracking-wider drop-shadow-sm">{rightAction.title}</span>
+                {rightAction.subtitle && <span className="text-[10px] font-medium leading-tight text-white/80">{rightAction.subtitle}</span>}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Dégradé Rouge / Rose (Swipe vers la gauche -> Supprimer) */}
-        <div 
-          className={cn(
-            "absolute inset-y-0 right-0 bg-gradient-to-l from-rose-600 via-red-600 to-pink-600 flex items-center justify-end pr-6 sm:pr-10 transition-opacity duration-150",
-            translateX < 0 ? "opacity-100" : "opacity-0 pointer-events-none"
-          )}
-          style={{ width: translateX < 0 ? '100%' : '0%' }}
-        >
-          <div 
-            className="flex items-center gap-3 transition-transform duration-150"
-            style={{ 
-              transform: `scale(${Math.min(1.1, Math.max(0.85, Math.abs(translateX) / 120))})`,
-              opacity: Math.min(1, Math.abs(translateX) / 30)
-            }}
+        {onSwipeLeft && (
+          <div
+            className={cn(
+              'absolute inset-y-0 right-0 flex items-center justify-end bg-gradient-to-l pr-6 transition-opacity duration-150 sm:pr-10',
+              leftTone,
+              translateX < 0 ? 'opacity-100' : 'pointer-events-none opacity-0'
+            )}
+            style={{ width: translateX < 0 ? '100%' : '0%' }}
           >
-            <div className="flex flex-col text-white text-right">
-              <span className="text-xs font-black uppercase tracking-wider drop-shadow-sm">Supprimer</span>
-              <span className="text-[10px] font-medium text-red-100/90 leading-tight">Retirer la série</span>
-            </div>
-            <div className="w-10 h-10 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center border border-white/30 shadow-md">
-              <Trash2 className="text-white shrink-0 drop-shadow" size={20} />
+            <div
+              className="flex items-center gap-3 text-right text-white transition-transform duration-150"
+              style={{
+                transform: `scale(${Math.min(1.1, Math.max(0.85, Math.abs(translateX) / 120))})`,
+                opacity: Math.min(1, Math.abs(translateX) / 30)
+              }}
+            >
+              <div className="flex flex-col">
+                <span className="text-xs font-black uppercase tracking-wider drop-shadow-sm">{leftAction.title}</span>
+                {leftAction.subtitle && <span className="text-[10px] font-medium leading-tight text-white/80">{leftAction.subtitle}</span>}
+              </div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/20 shadow-md backdrop-blur-md">
+                {leftAction.icon || <Trash2 className="shrink-0 text-white drop-shadow" size={20} />}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* CARTE SUPERIEURE PRINCIPALE (AVEC ACCÉLÉRATION MATÉRIELLE ET COURBE FLUIDE) */}
-      <div 
+      <div
         className={cn(
-          "relative w-full z-10 will-change-transform",
-          isDragging ? "transition-none" : "transition-transform duration-300 ease-[cubic-bezier(0.175,0.885,0.32,1.275)]"
+          'relative z-10 w-full will-change-transform',
+          isDragging ? 'transition-none' : 'transition-transform duration-300 ease-[cubic-bezier(0.175,0.885,0.32,1.275)]'
         )}
-        style={{ 
+        style={{
           transform: `translateX(${translateX}px)`,
           willChange: 'transform',
           transition: isDragging ? 'none' : 'transform 300ms cubic-bezier(0.175, 0.885, 0.32, 1.275)'
