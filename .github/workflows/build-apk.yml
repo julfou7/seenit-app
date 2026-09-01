@@ -82,7 +82,7 @@ jobs:
       - name: Build APK with Gradle
         run: |
           cd android
-          ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest --stacktrace
+          ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
 
       - name: Prepare Named APK
         run: |
