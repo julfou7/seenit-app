@@ -1,9 +1,9 @@
 import { CapacitorConfig } from '@capacitor/cli';
-import { SEENIT_APP_ID, SEENIT_APP_NAME, SEENIT_FIREBASE_PROJECT_ID } from './src/config/seenit';
+import { SEENIT_FIREBASE_PROJECT_ID } from './src/config/seenit';
 
 const config: CapacitorConfig = {
-  appId: SEENIT_APP_ID,
-  appName: SEENIT_APP_NAME,
+  appId: 'com.seenit.app',
+  appName: 'SeenIt',
   webDir: 'dist',
   backgroundColor: '#040406',
   server: {
