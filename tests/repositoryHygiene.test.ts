@@ -27,6 +27,13 @@ test('SEENIT-QUALITY-001 utilise un nettoyage Node portable', () => {
   assert.doesNotMatch(cleanScript, /rm\s+-rf/);
 });
 
+test('SEENIT-QUALITY-001 retire uniquement la pile Drizzle PostgreSQL sans usage applicatif', () => {
+  assert.equal(packageJson.dependencies['drizzle-orm'], undefined);
+  assert.equal(packageJson.dependencies.pg, undefined);
+  assert.equal(packageJson.devDependencies['drizzle-kit'], undefined);
+  assert.equal(packageJson.devDependencies['@types/pg'], undefined);
+});
+
 test('SEENIT-NOTIFICATION-001 documente les webhooks personnels sans secret global', () => {
   assert.match(envExample, /PUBLIC_APP_URL=/);
   assert.match(envExample, /x-seenit-webhook-secret/);
