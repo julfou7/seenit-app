@@ -1,0 +1,65 @@
+name: Validate release 1.4.90
+
+on:
+  push:
+    branches: [ fix/release-1.4.90 ]
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: '21'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+      - name: Align version 1.4.90
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('android/app/build.gradle')
+          text = path.read_text()
+          text = text.replace('versionName "1.4.89"', 'versionName "1.4.90"')
+          path.write_text(text)
+          PY
+          npm run version:sync
+      - name: Validate change contract
+        run: npm run test:spec:changes
+        env:
+          SPEC_BASE_SHA: fa10f7a82260c74ed6dcdebe9919dc9a45cf6538
+      - name: Test
+        run: npm test
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Build and sync
+        run: |
+          npm run build
+          npx cap sync android
+          npm run test:android
+      - name: Build app APK and app AndroidTest APK
+        run: |
+          cd android
+          ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
+      - name: Commit aligned version surfaces
+        run: |
+          if git diff --quiet; then
+            echo "Version surfaces already aligned."
+            exit 0
+          fi
+          git config user.name "seenit-validation-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add android/app/build.gradle src/store/updateStore.ts server.ts package.json package-lock.json docs/specifications/requirements.json docs/specifications/android-contract.json docs/specifications/seenit.md
+          git commit -m "chore(release): aligner SeenIt 1.4.90"
+          git push origin HEAD:fix/release-1.4.90
