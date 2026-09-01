@@ -42,14 +42,12 @@ test('SEENIT-NOTIFICATION-001 documente les webhooks personnels sans secret glob
   assert.doesNotMatch(envExample, /^GEMINI_API_KEY=/m);
 });
 
-test('SEENIT-PLATFORM-001 centralise les identités techniques non secrètes partagées', () => {
-  assert.match(seenitConfig, /SEENIT_APP_ID/);
-  assert.match(seenitConfig, /SEENIT_API_ORIGIN/);
+test('SEENIT-PLATFORM-001 centralise la configuration Firebase partageable sans masquer les invariants natifs', () => {
   assert.match(seenitConfig, /SEENIT_FIREBASE_PROJECT_ID/);
-  assert.match(seenitConfig, /SEENIT_FIRESTORE_DATABASE_ID/);
-  assert.match(capacitorConfig, /SEENIT_APP_ID/);
   assert.match(capacitorConfig, /SEENIT_FIREBASE_PROJECT_ID/);
   assert.match(firebaseAdmin, /SEENIT_FIREBASE_PROJECT_ID/);
-  assert.match(firebaseAdmin, /SEENIT_FIRESTORE_DATABASE_ID/);
-  assert.match(seenitApi, /SEENIT_API_ORIGIN/);
+  assert.match(capacitorConfig, /appId: 'com\.seenit\.app'/);
+  assert.match(capacitorConfig, /appName: 'SeenIt'/);
+  assert.match(firebaseAdmin, /getFirestore\('default'\)/);
+  assert.match(seenitApi, /SEENIT_API_ORIGIN = 'https:\/\/seenit\.ai\.studio'/);
 });
