@@ -1,3 +1,0 @@
-### 🛠️ Ce qui a été fait
-
-- Remplacement du jeton d'accès personnel (PAT) 'ghp_' codé en dur par la variable standard et sécurisée secrets.GITHUB_TOKEN pour éviter tout blocage ou révocation automatique par GitHub.
