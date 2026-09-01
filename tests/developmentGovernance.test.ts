@@ -4,6 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 
 const workflow = readFileSync('.github/workflows/build-apk.yml', 'utf8');
 const agentRules = readFileSync('AGENTS.md', 'utf8');
+const livingSpecification = readFileSync('docs/specifications/seenit.md', 'utf8');
 const specificationGuide = readFileSync('docs/specifications/README.md', 'utf8');
 const auditIndex = readFileSync('docs/audits/README.md', 'utf8');
 const globalAudit = readFileSync('docs/audits/audit-global-2026-08-31.md', 'utf8');
@@ -56,4 +57,15 @@ test('SEENIT-QUALITY-003 mémorise chaque demande durable dans la SPEC et le reg
   assert.match(requestRegistry, /USR-2026-08-31-003/);
   assert.match(requestRegistry, /SEENIT-QUALITY-002/);
   assert.match(requestRegistry, /SEENIT-QUALITY-003/);
+});
+
+test('SEENIT-QUALITY-004 maintient les issues et leurs checkboxes à jour pendant le travail', () => {
+  assert.match(agentRules, /Suivi continu des issues/);
+  assert.match(agentRules, /Après chaque jalon[\s\S]+actualisez l'état/);
+  assert.match(agentRules, /Cochez chaque checkbox[\s\S]+réellement prouvé/);
+  assert.match(livingSpecification, /SEENIT-QUALITY-004/);
+  assert.match(livingSpecification, /source de vérité opérationnelle[\s\S]+chaque critère d'acceptation/);
+  assert.match(specificationGuide, /checkboxes des critères sont[\s\S]+réellement satisfaites/);
+  assert.match(requestRegistry, /USR-2026-09-01-001/);
+  assert.match(requestRegistry, /SEENIT-QUALITY-004/);
 });
