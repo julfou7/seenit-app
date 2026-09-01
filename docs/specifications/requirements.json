@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.88",
+  "applicationVersion": "1.4.89",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -236,6 +236,14 @@
         {
           "file": "tests/apiSurface.test.ts",
           "contains": "SEENIT-SECURITY-002 le diagnostic Git exige une session SeenIt et passe par le transport APK"
+        },
+        {
+          "file": "tests/gitAdminPolicy.test.ts",
+          "contains": "SEENIT-SECURITY-002 refuse les opérations Git sans allowlist administrateur"
+        },
+        {
+          "file": "tests/gitAdminPolicy.test.ts",
+          "contains": "SEENIT-SECURITY-002 protège les routes Git et masque les outils aux non-administrateurs"
         }
       ]
     },

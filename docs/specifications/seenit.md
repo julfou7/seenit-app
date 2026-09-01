@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 1er septembre 2026
-Version applicative : **1.4.88**
+Version applicative : **1.4.89**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -237,8 +237,11 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 ## 11. Sécurité opérationnelle
 
 - **SEENIT-SECURITY-002** — Les routes de diagnostic et de synchronisation Git exigent une session
-  Firebase SeenIt et les clients PWA/APK utilisent le transport authentifié commun. Le statut Git,
-  les chemins locaux, les sorties de commande et les erreurs ne sont jamais publics.
+  Firebase SeenIt puis un UID présent exactement dans l'allowlist serveur `SEENIT_ADMIN_UIDS`. Une
+  allowlist absente ou vide refuse tout accès Git, notamment en production. Un UID non administrateur
+  reçoit uniquement un `403` générique, sans chemin, sortie de commande ou détail d'exploitation ;
+  les clients PWA/APK utilisent le transport authentifié commun et ne rendent la section Git qu'après
+  confirmation de l'autorisation par le serveur.
 - **SEENIT-SECURITY-003** — Avant toute persistance ou export de log, les champs sensibles et les
   secrets reconnaissables dans les chaînes sont masqués. La profondeur, la taille et le nombre
   d'éléments sérialisés sont bornés.

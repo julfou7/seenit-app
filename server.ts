@@ -38,6 +38,7 @@ import {
   PLEX_ACCOUNT_HISTORY_QUERY
 } from "./src/features/plex/plexAccountHistory.ts";
 import { evaluatePlexSourceCompletion } from "./src/features/plex/plexSyncIntegrity.ts";
+import { isSeenItGitAdmin } from "./src/features/admin/gitAdminPolicy.ts";
 
 export interface AuthRequest extends Request {
   user?: DecodedIdToken;
@@ -59,6 +60,13 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
     console.error("Error verifying Firebase ID token:", error);
     return res.status(401).json({ error: "Unauthorized: Invalid token" });
   }
+};
+
+export const requireGitAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (!isSeenItGitAdmin(req.user?.uid, process.env.SEENIT_ADMIN_UIDS)) {
+    return res.status(403).json({ error: "Accès administrateur requis" });
+  }
+  next();
 };
 
 const WEBHOOK_SECRET_HEADER = 'x-seenit-webhook-secret';
@@ -558,7 +566,7 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.88',
+        'X-Plex-Version': '1.4.89',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
@@ -2115,7 +2123,7 @@ async function startServer() {
 
   const execAsync = promisify(exec);
 
-  app.get('/api/git/status', requireAuth, async (req, res) => {
+  app.get('/api/git/status', requireAuth, requireGitAdmin, async (req, res) => {
     try {
       const gitDirExists = fs.existsSync(path.join(process.cwd(), '.git'));
       if (!gitDirExists) {
@@ -2152,7 +2160,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/git/pull', requireAuth, async (req, res) => {
+  app.post('/api/git/pull', requireAuth, requireGitAdmin, async (req, res) => {
     try {
       console.log('[Git Pull] Déclenchement de la synchronisation Git via API...');
       const { stdout, stderr } = await execAsync('bash scripts/pull.sh');
