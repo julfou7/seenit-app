@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 1er septembre 2026
-Version applicative : **1.4.87**
+Version applicative : **1.4.88**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -40,6 +40,15 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   `ic_launcher_round`, toutes les densités Android existent avec leurs dimensions attendues et les
   icônes Web canoniques conservent leur empreinte. Une refonte volontaire doit régénérer toutes les
   densités, mettre à jour le contrat et obtenir une validation visuelle explicite.
+- **SEENIT-APK-003** — Avant toute publication APK, la CI télécharge la dernière release stable
+  strictement antérieure depuis le dépôt SeenIt officiel et vérifie sa paire APK/SHA-256. Sur des
+  émulateurs propres Android 12 et Android cible, elle installe cette version N, initialise des
+  sentinelles dans le stockage privé de l'application et de session, accorde les notifications si
+  nécessaire, puis installe N+1 avec `adb install -r`, sans désinstallation. Le test compare
+  `applicationId`, signature et versions, puis prouve la conservation des sentinelles, de l'icône,
+  de la permission de notification, du launcher et du deep link. Il exécute enfin démarrage à froid,
+  reprise et Retour et archive les diagnostics. La publication dépend du succès de chaque matrice ;
+  aucun compte Google personnel ni service externe privé n'est utilisé par ce smoke.
 - Le fichier `docs/specifications/android-contract.json` fixe les invariants natifs vérifiables :
   identité, signature, version, icônes, permissions, deep link, origine API, safe areas et canal APK.
 - Le contrôle Android s'exécute avant et après `npx cap sync android` afin de détecter une mutation
@@ -281,8 +290,8 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 2. bump Android puis `npm run version:sync` ;
 3. `npm test`, `npm run build`, `npx cap sync android`, `npm run test:android` ;
 4. commit Conventional Commits en français, puis push de `main` ;
-5. CI et compilation Gradle ;
-6. release GitHub, APK et fichier `.sha256` ;
+5. CI, compilation Gradle et smoke instrumenté N → N+1 sur Android 12 et Android cible ;
+6. release GitHub, APK et fichier `.sha256` uniquement après le smoke ;
 7. validation terrain PWA et installation/mise à jour APK.
 
 ## 13. Contrat de développement et définition de terminé

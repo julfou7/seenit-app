@@ -82,7 +82,7 @@ jobs:
       - name: Build APK with Gradle
         run: |
           cd android
-          ./gradlew --no-daemon assembleDebug --stacktrace
+          ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest --stacktrace
 
       - name: Prepare Named APK
         run: |
@@ -102,9 +102,101 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Upload Android Upgrade Test Harness
+        uses: actions/upload-artifact@v7
+        with:
+          name: SeenIt-Android-Upgrade-Test-v${{ steps.release_candidate.outputs.APP_VERSION }}
+          path: android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          if-no-files-found: error
+          retention-days: 30
+
+  android_upgrade_smoke:
+    name: APK Upgrade Smoke (Android ${{ matrix.api-level }})
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [31, 36]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Download Current APK Pair
+        uses: actions/download-artifact@v8
+        with:
+          name: SeenIt-Android-APK-v${{ needs.build.outputs.app_version }}
+          path: current-release
+
+      - name: Download Android Upgrade Test Harness
+        uses: actions/download-artifact@v8
+        with:
+          name: SeenIt-Android-Upgrade-Test-v${{ needs.build.outputs.app_version }}
+          path: test-harness
+
+      - name: Verify Current APK Pair
+        run: |
+          cd current-release
+          sha256sum --check "SeenIt-v${{ needs.build.outputs.app_version }}.apk.sha256"
+
+      - name: Download and Verify Previous Official Release
+        id: baseline
+        run: node scripts/download-upgrade-baseline.cjs upgrade-baseline
+        env:
+          CURRENT_VERSION: ${{ needs.build.outputs.app_version }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run N to N+1 Upgrade Smoke
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: >-
+            bash scripts/android-upgrade-smoke.sh
+            "upgrade-baseline/SeenIt-v${{ steps.baseline.outputs.BASELINE_VERSION }}.apk"
+            "current-release/SeenIt-v${{ needs.build.outputs.app_version }}.apk"
+            "test-harness/app-debug-androidTest.apk"
+            "upgrade-reports/android-${{ matrix.api-level }}"
+            "${{ matrix.api-level }}"
+
+      - name: Publish Upgrade Smoke Evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: SeenIt-APK-Upgrade-Smoke-Android-${{ matrix.api-level }}-v${{ needs.build.outputs.app_version }}
+          path: upgrade-reports/android-${{ matrix.api-level }}
+          if-no-files-found: warn
+          retention-days: 30
+
   publish:
     name: Publish Immutable APK Release
-    needs: build
+    needs: [build, android_upgrade_smoke]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     permissions:

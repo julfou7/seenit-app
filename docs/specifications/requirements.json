@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.87",
+  "applicationVersion": "1.4.88",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -47,6 +47,32 @@
         {
           "file": "tests/androidContract.test.ts",
           "contains": "SEENIT-APK-002 conserve toutes les icônes du lanceur et leur identité visuelle"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-APK-003",
+      "title": "Mise à jour APK N vers N+1 réellement testée avant publication",
+      "targets": [
+        "apk",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/androidUpgradeSmoke.test.ts",
+          "contains": "SEENIT-APK-003 sélectionne uniquement la dernière release strictement antérieure et vérifiée"
+        },
+        {
+          "file": "tests/androidUpgradeSmoke.test.ts",
+          "contains": "SEENIT-APK-003 bloque toute baseline APK dont l’empreinte est incohérente"
+        },
+        {
+          "file": "tests/androidUpgradeSmoke.test.ts",
+          "contains": "SEENIT-APK-003 installe réellement N puis N+1 sans désinstaller les données"
+        },
+        {
+          "file": "tests/androidUpgradeSmoke.test.ts",
+          "contains": "SEENIT-APK-003 exécute le smoke sur Android 12 et la cible Android courante avant publication"
         }
       ]
     },

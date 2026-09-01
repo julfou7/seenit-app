@@ -27,7 +27,9 @@ des tests. Les alignements de version purs, la documentation et la CI sont exemp
 
 La CI ne répare jamais une version et ne pousse aucun commit. Le développeur incrémente
 `versionName`, lance `npm run version:sync`, puis livre un arbre déjà cohérent. Une release APK
-contient l'APK exact et son fichier SHA-256.
+contient l'APK exact et son fichier SHA-256. Avant sa publication, `android_upgrade_smoke`
+installe la dernière release puis la candidate sans désinstallation sur Android 12 et Android cible ;
+les rapports instrumentés sont conservés comme artefacts de CI.
 
 ## Convention des exigences
 

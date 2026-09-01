@@ -63,7 +63,7 @@ test('SEENIT-RELEASE-004 sépare le build de la publication et vérifie la paire
   assert.match(workflow, /cancel-in-progress: false/);
   assert.match(workflow, /^\s{2}build:/m);
   assert.match(workflow, /^\s{2}publish:/m);
-  assert.match(workflow, /publish:[\s\S]+needs: build/);
+  assert.match(workflow, /publish:[\s\S]+needs: \[build, android_upgrade_smoke\]/);
   assert.match(workflow, /publish:[\s\S]+permissions:\s+contents: write/);
   assert.match(workflow, /actions\/upload-artifact@v7/);
   assert.match(workflow, /actions\/download-artifact@v8/);

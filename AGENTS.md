@@ -30,6 +30,8 @@ A chaque correctif ou fonctionnalité ajoutée :
   si le changement est intentionnel, documenté dans la SPEC et couvert par un test.
 - Exécutez `npm run test:android` avant et après `npx cap sync android`. Ce contrôle protège l'icône,
   la signature, le package, les permissions, les safe areas, l'origine backend et le canal de build.
+- Ne contournez jamais le job `android_upgrade_smoke` : la publication attend l'installation réelle
+  de N puis N+1 sans désinstallation sur Android 12 et Android cible, ainsi que ses preuves archivées.
 - L'APK publié reste le build `assembleDebug` signé avec la clé historique tant que la migration vers
   une signature de production n'a pas été conçue et testée sur une installation existante.
 

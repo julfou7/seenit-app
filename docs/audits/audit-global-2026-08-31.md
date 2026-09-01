@@ -126,10 +126,10 @@ brutale pour une application personnelle stable.
 | AUD-GLO-05 | P1 | Opérations Git non limitées à une allowlist administrateur | [issue #11](https://github.com/julfou7/seenit-app/issues/11) |
 | AUD-GLO-06 | P1 | Clés TVDB/OMDb livrées au client | [issue #12](https://github.com/julfou7/seenit-app/issues/12) |
 | AUD-GLO-07 | P1/décision | Clé de signature historique suivie ; rotation interdite sans migration | [issue #9](https://github.com/julfou7/seenit-app/issues/9) |
-| AUD-GLO-08 | P1 | Tests Android instrumentés factices et mauvais package de test | [issue #13](https://github.com/julfou7/seenit-app/issues/13) |
+| AUD-GLO-08 | Livré | Smoke instrumenté N → N+1 sur Android 12/cible, stockage privé, signature, icône, notifications, deep link et cycle de vie | [issue #13](https://github.com/julfou7/seenit-app/issues/13), `SEENIT-APK-003`, [release 1.4.88](https://github.com/julfou7/seenit-app/releases/tag/v1.4.88) |
 | AUD-GLO-09 | P2 | Modules critiques trop volumineux | [issue #14](https://github.com/julfou7/seenit-app/issues/14) |
 | AUD-GLO-10 | P2 | Couverture E2E/accessibilité et budgets de performance absents | [issue #15](https://github.com/julfou7/seenit-app/issues/15) |
-| AUD-GLO-11 | P1 | Une version GitHub pourrait être republiée depuis un push ultérieur | [issue #16](https://github.com/julfou7/seenit-app/issues/16) |
+| AUD-GLO-11 | Livré | Releases APK immuables et publication séparée du build | [issue #16](https://github.com/julfou7/seenit-app/issues/16), `SEENIT-RELEASE-004`, [release 1.4.87](https://github.com/julfou7/seenit-app/releases/tag/v1.4.87) |
 | AUD-GLO-12 | P2 | Racine, lockfiles, dépendances et configuration à assainir | [issue #17](https://github.com/julfou7/seenit-app/issues/17) |
 | AUD-GLO-13 | P2 | TypeScript permissif, lint/formatage incomplets et forte baseline `any` | [issue #18](https://github.com/julfou7/seenit-app/issues/18) |
 | AUD-GLO-14 | P2 | En-têtes Web/CSP et cycle de vie du service worker non testés | [issue #19](https://github.com/julfou7/seenit-app/issues/19) |
