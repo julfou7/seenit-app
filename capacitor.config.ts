@@ -1,8 +1,9 @@
 import { CapacitorConfig } from '@capacitor/cli';
+import { SEENIT_APP_ID, SEENIT_APP_NAME, SEENIT_FIREBASE_PROJECT_ID } from './src/config/seenit';
 
 const config: CapacitorConfig = {
-  appId: 'com.seenit.app',
-  appName: 'SeenIt',
+  appId: SEENIT_APP_ID,
+  appName: SEENIT_APP_NAME,
   webDir: 'dist',
   backgroundColor: '#040406',
   server: {
@@ -36,7 +37,7 @@ const config: CapacitorConfig = {
     FirebaseAuthentication: {
       skipNativeAuth: true,
       providers: ["google.com"],
-      authDomain: "gen-lang-client-0201895414.firebaseapp.com"
+      authDomain: `${SEENIT_FIREBASE_PROJECT_ID}.firebaseapp.com`
     },
     LocalNotifications: {
       smallIcon: "ic_stat_seenit",
