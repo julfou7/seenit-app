@@ -61,6 +61,8 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   modification est une migration Firebase Android explicite, jamais un effet secondaire d'import.
   La CI exécute ce contrat avant le garde d'immuabilité de release afin qu'une dérive native issue
   d'un import soit diagnostiquée précisément, même lorsque la version du commit est déjà publiée.
+  Avant Gradle, elle restaure explicitement le droit d'exécution de `android/gradlew` : une
+  normalisation de mode de fichier par AI Studio ou un connecteur Windows ne peut plus bloquer le build.
 - Le fichier `docs/specifications/android-contract.json` fixe les invariants natifs vérifiables :
   identité, signature, version, icônes, permissions, deep link, origine API, safe areas et canal APK.
 - Le contrôle Android s'exécute avant et après `npx cap sync android` afin de détecter une mutation

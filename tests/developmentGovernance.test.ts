@@ -29,6 +29,13 @@ test('SEENIT-APK-004 exécute le contrat Android avant le garde de release', () 
   assert.ok(releaseGuardIndex > contractIndex, 'le contrat Android doit précéder le garde de release');
 });
 
+test('SEENIT-APK-004 restaure le droit d’exécution Gradle avant le build', () => {
+  const permissionIndex = workflow.indexOf('chmod +x android/gradlew');
+  const gradleIndex = workflow.indexOf('./gradlew --no-daemon');
+  assert.ok(permissionIndex >= 0, 'la CI doit rendre gradlew exécutable');
+  assert.ok(gradleIndex > permissionIndex, 'le droit d’exécution doit être restauré avant Gradle');
+});
+
 test('SEENIT-QUALITY-001 les règles imposent SPEC, tests et validation APK à chaque évolution', () => {
   assert.match(agentRules, /SPEC avant code/);
   assert.match(agentRules, /Contrat APK immuable/);

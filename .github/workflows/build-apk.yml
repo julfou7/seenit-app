@@ -104,6 +104,10 @@ jobs:
             exit 1
           fi
 
+      - name: Restore Gradle Wrapper Executable Permission
+        if: steps.delivery.outputs.DELIVERY_MODE == 'apk'
+        run: chmod +x android/gradlew
+
       - name: Build APK with Gradle
         if: steps.delivery.outputs.DELIVERY_MODE == 'apk'
         run: |
