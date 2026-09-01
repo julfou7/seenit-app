@@ -64,6 +64,14 @@ A chaque correctif ou fonctionnalité ajoutée :
   et domaine `[APK]`, `[PWA]`, `[Sécurité]`, `[Performance]`, `[UX]` ou `[Architecture]`.
 - Un agent peut ouvrir une issue lorsqu'un audit révèle un risque réel et la résoudre sans nouvelle
   autorisation si la solution reste dans le périmètre SeenIt, n'efface aucune donnée et respecte SPEC/tests.
+- **Suivi continu des issues :** dès qu'une intervention est reliée à une issue, maintenez son corps
+  à jour pendant toute l'exécution et pas uniquement au moment de la résolution. Après chaque jalon
+  prouvé (implémentation, tests, intégration sur `main`, CI, release ou blocage), actualisez l'état,
+  les commits/runs concernés et la prochaine étape utile.
+- Cochez chaque checkbox d'un critère d'acceptation dès que ce critère est réellement prouvé, jamais
+  par anticipation. Si une information du corps devient obsolète, remplacez-la afin que l'issue reste
+  la source de vérité opérationnelle ; utilisez les commentaires pour conserver les preuves ou jalons
+  chronologiques sans laisser deux états contradictoires dans le corps.
 - Il est interdit de fermer une issue sans preuves : test automatisé, validation PWA/APK applicable,
   commit et lien de release. Les décisions nécessitant une migration de signature, de données ou une
   baisse de sécurité restent soumises à validation utilisateur.
