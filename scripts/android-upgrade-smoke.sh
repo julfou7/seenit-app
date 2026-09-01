@@ -29,26 +29,42 @@ AAPT="$BUILD_TOOLS_DIR/aapt"
 test -x "$APKSIGNER" || { echo "apksigner introuvable"; exit 1; }
 test -x "$AAPT" || { echo "aapt introuvable"; exit 1; }
 
-apk_field() {
-  local apk="$1"
-  local field="$2"
-  local badging
-  local package_line
-  badging="$("$AAPT" dump badging "$apk")"
-  package_line="${badging%%$'\n'*}"
-  sed -n "s/^package:.*${field}='\([^']*\)'.*/\1/p" <<< "$package_line"
-}
-
-apk_signer() {
-  local certificates
-  certificates="$("$APKSIGNER" verify --print-certs "$1")"
-  sed -n 's/^Signer #1 certificate SHA-256 digest: //p' <<< "$certificates" \
-    | tr '[:upper:]' '[:lower:]'
-}
-
 preflight_failure() {
   echo "[APK Upgrade] Échec préflight : $1" | tee -a "$REPORT_DIR/preflight.txt" >&2
   exit 1
+}
+
+apk_field() {
+  local apk="$1"
+  local field="$2"
+  local label="$3"
+  local badging
+  local package_line
+  if ! badging="$("$AAPT" dump badging "$apk" 2>&1)"; then
+    printf '%s\n' "$badging" > "$REPORT_DIR/aapt-$label.txt"
+    preflight_failure "aapt n’a pas pu lire l’APK $label."
+  fi
+  printf '%s\n' "$badging" > "$REPORT_DIR/aapt-$label.txt"
+  package_line="${badging%%$'\n'*}"
+  # L’espace avant l’attribut est obligatoire : `name` ne doit jamais capturer
+  # le suffixe de `compileSdkVersionCodename`.
+  sed -n "s/^package:.*[[:space:]]${field}='\([^']*\)'.*/\1/p" <<< "$package_line"
+}
+
+apk_signer() {
+  local apk="$1"
+  local label="$2"
+  local certificates
+  local digest
+  if ! certificates="$("$APKSIGNER" verify --print-certs "$apk" 2>&1)"; then
+    printf '%s\n' "$certificates" > "$REPORT_DIR/apksigner-$label.txt"
+    preflight_failure "apksigner n’a pas pu vérifier l’APK $label."
+  fi
+  printf '%s\n' "$certificates" > "$REPORT_DIR/apksigner-$label.txt"
+  digest="$(sed -n 's/^.*certificate SHA-256 digest:[[:space:]]*//p' <<< "$certificates")"
+  digest="${digest%%$'\n'*}"
+  digest="${digest//$'\r'/}"
+  printf '%s' "${digest,,}"
 }
 
 require_equal() {
@@ -65,14 +81,14 @@ require_nonempty() {
   [[ -n "$actual" ]] || preflight_failure "$label absent."
 }
 
-BASELINE_PACKAGE="$(apk_field "$BASELINE_APK" name)"
-CURRENT_PACKAGE="$(apk_field "$CURRENT_APK" name)"
-BASELINE_CODE="$(apk_field "$BASELINE_APK" versionCode)"
-CURRENT_CODE="$(apk_field "$CURRENT_APK" versionCode)"
-BASELINE_VERSION="$(apk_field "$BASELINE_APK" versionName)"
-CURRENT_VERSION="$(apk_field "$CURRENT_APK" versionName)"
-BASELINE_SIGNER="$(apk_signer "$BASELINE_APK")"
-CURRENT_SIGNER="$(apk_signer "$CURRENT_APK")"
+BASELINE_PACKAGE="$(apk_field "$BASELINE_APK" name baseline)"
+CURRENT_PACKAGE="$(apk_field "$CURRENT_APK" name candidate)"
+BASELINE_CODE="$(apk_field "$BASELINE_APK" versionCode baseline)"
+CURRENT_CODE="$(apk_field "$CURRENT_APK" versionCode candidate)"
+BASELINE_VERSION="$(apk_field "$BASELINE_APK" versionName baseline)"
+CURRENT_VERSION="$(apk_field "$CURRENT_APK" versionName candidate)"
+BASELINE_SIGNER="$(apk_signer "$BASELINE_APK" baseline)"
+CURRENT_SIGNER="$(apk_signer "$CURRENT_APK" candidate)"
 
 {
   echo "Baseline package=$BASELINE_PACKAGE version=$BASELINE_VERSION code=$BASELINE_CODE signer=$BASELINE_SIGNER"

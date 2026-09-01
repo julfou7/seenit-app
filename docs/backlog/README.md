@@ -37,7 +37,7 @@ un choix de produit, une migration de données ou de signature reste ouverte ave
 - [#10 — récupération Firestore IndexedDB — livrée en 1.4.84](https://github.com/julfou7/seenit-app/issues/10)
 - [#11 — allowlist administrateur pour les opérations Git](https://github.com/julfou7/seenit-app/issues/11)
 - [#12 — clés TVDB/OMDb derrière le backend](https://github.com/julfou7/seenit-app/issues/12)
-- [#13 — test de mise à jour APK sur place — livré en 1.4.91](https://github.com/julfou7/seenit-app/issues/13)
+- [#13 — test de mise à jour APK sur place — livré en 1.4.92](https://github.com/julfou7/seenit-app/issues/13)
 - [#14 — découpage des modules volumineux](https://github.com/julfou7/seenit-app/issues/14)
 - [#15 — E2E, accessibilité et budgets de performance](https://github.com/julfou7/seenit-app/issues/15)
 - [#16 — immuabilité des releases APK — livrée en 1.4.87](https://github.com/julfou7/seenit-app/issues/16)
