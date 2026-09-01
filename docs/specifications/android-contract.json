@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.92",
-  "versionCode": 104092,
+  "applicationVersion": "1.4.93",
+  "versionCode": 104093,
   "applicationId": "com.seenit.app",
   "appName": "SeenIt",
   "customUrlScheme": "com.seenit.app",
@@ -133,5 +133,11 @@
     "android.permission.VIBRATE",
     "android.permission.RECEIVE_BOOT_COMPLETED",
     "android.permission.SCHEDULE_EXACT_ALARM"
-  ]
+  ],
+  "firebase": {
+    "projectId": "gen-lang-client-0201895414",
+    "firestoreDatabaseId": "default",
+    "androidPackageName": "com.seenit.app",
+    "androidMobileSdkAppId": "1:799043440232:android:729435c4ab36bc039275dd"
+  }
 }

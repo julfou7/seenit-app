@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 1er septembre 2026
-Version applicative : **1.4.92**
+Version applicative : **1.4.93**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -54,6 +54,11 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   attributs `aapt` par leur nom exact : `name` ne doit notamment jamais correspondre au suffixe de
   `compileSdkVersionCodename`. Il archive les sorties brutes de `aapt`/`apksigner`, les valeurs
   package/version/signature et nomme précisément l'invariant fautif avant toute installation.
+- **SEENIT-APK-004** — L'identité Firebase Android est immuable au même titre que l'identité APK :
+  `android/app/google-services.json` reste présent, son `project_id` reste `gen-lang-client-0201895414`,
+  son package reste `com.seenit.app` et son `mobilesdk_app_id` reste celui de l'application SeenIt
+  actuellement publiée. Le contrat Android vérifie ces valeurs en lisant réellement le JSON. Toute
+  modification est une migration Firebase Android explicite, jamais un effet secondaire d'import.
 - Le fichier `docs/specifications/android-contract.json` fixe les invariants natifs vérifiables :
   identité, signature, version, icônes, permissions, deep link, origine API, safe areas et canal APK.
 - Le contrôle Android s'exécute avant et après `npx cap sync android` afin de détecter une mutation
@@ -85,6 +90,12 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   garde s'applique à l'unique WebView. Un diagnostic visible précède tout rechargement et une seconde
   erreur dans la fenêtre de garde interrompt l'automatisme afin d'éviter une boucle. Les autres bases
   IndexedDB de l'origine ne sont jamais supprimées.
+- **SEENIT-DATA-005** — La base Firestore applicative SeenIt est exactement `default`. Le client
+  PWA/APK la sélectionne explicitement et Firebase Admin utilise explicitement `getFirestore('default')`.
+  Le champ `firebase-applet-config.json.firestoreDatabaseId`, y compris lorsqu'AI Studio lui attribue
+  un identifiant personnalisé, n'est jamais utilisé pour choisir la base SeenIt. `(default)`, une
+  initialisation Admin implicite ou tout autre databaseId sont refusés hors migration de données
+  explicitement approuvée, sauvegardée, testée et réversible.
 - Une réponse asynchrone capture l'UID et un epoch ; elle est ignorée si le compte change avant
   son écriture.
 - La PWA et l'APK d'un même UID partagent Firestore et convergent vers les mêmes données, sans
@@ -315,6 +326,20 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   produit, UX, sécurité, plateforme ou développement est comparée à la SPEC. Si elle n'y figure pas,
   elle est ajoutée à la SPEC, au catalogue, aux tests et au registre des demandes. Le travail différé
   possède une issue GitHub ; les questions ponctuelles et les éléments de diagnostic restent hors SPEC.
+- **SEENIT-QUALITY-004** — Dès qu'un travail est relié à une issue GitHub, son corps reste la source
+  de vérité opérationnelle pendant toute l'intervention : l'agent l'actualise après chaque jalon
+  significatif prouvé (implémentation, tests, intégration sur `main`, CI, release ou blocage), coche
+  chaque critère d'acceptation dès qu'il est réellement satisfait et jamais par anticipation, remplace
+  les informations devenues obsolètes et indique clairement le blocage courant ainsi que la prochaine
+  étape. Les commentaires peuvent conserver la chronologie et les preuves, mais ne doivent pas laisser
+  le corps de l'issue décrire un état contradictoire ou dépassé.
+- **SEENIT-QUALITY-005** — Un import, une reconnexion ou une synchronisation AI Studio/GitHub est un
+  transport non autoritatif. Avant tout commit depuis un workspace importé, le diff est comparé à la
+  branche GitHub source et toute mutation automatique non demandée de Firebase/Firestore, Android,
+  versions, lockfiles, SPEC ou fichiers suivis est rejetée. Les règles sont préchargées via
+  `.agents/AGENTS.md` puis complétées par la lecture intégrale du `AGENTS.md` racine ; les invariants
+  critiques restent en plus protégés par des tests afin qu'une omission de lecture ne puisse pas les
+  réintroduire silencieusement.
 
 Une modification comportementale est terminée uniquement si :
 
@@ -340,6 +365,9 @@ et l'existence exacte des tests référencés. `test:android` protège l'identit
   sans recopier les conversations ni stocker de secret ou de donnée personnelle.
 - Une issue porte une priorité `[P0]` à `[P3]`, un domaine, le risque, les critères d'acceptation,
   les exigences concernées, les tests attendus et la matrice PWA/APK.
+- Une issue en cours est maintenue à jour au fil des preuves : ses checkboxes reflètent l'avancement
+  réel, ses commits/runs/blocages sont actualisés et les éléments obsolètes sont remplacés sans attendre
+  la résolution finale.
 - Un agent peut ouvrir et traiter automatiquement une issue sûre dans le périmètre SeenIt. Il ne peut
   pas décider seul d'une migration de signature, d'une suppression de données, d'un affaiblissement
   de sécurité ou d'un changement d'identité média.

@@ -42,6 +42,10 @@ function validateAndroidContract() {
   const packageJson = JSON.parse(readText('package.json'));
   const workflow = readText('.github/workflows/build-apk.yml');
   const wrapperProperties = readText('android/gradle/wrapper/gradle-wrapper.properties');
+  const firebaseClient = readText('src/lib/firebase.ts');
+  const firebaseAdmin = readText('src/lib/firebase-admin.ts');
+  const firebaseAppletConfig = JSON.parse(readText('firebase-applet-config.json'));
+  const googleServices = JSON.parse(readText('android/app/google-services.json'));
 
   if (contract.schemaVersion !== 1) throw new Error('schemaVersion Android invalide.');
   const versionName = gradle.match(/versionName\s+["']([^"']+)["']/)?.[1];
@@ -70,6 +74,34 @@ function validateAndroidContract() {
   requireIncludes(manifest, '<category android:name="android.intent.category.LAUNCHER"', 'intent LAUNCHER');
   for (const permission of contract.requiredPermissions) {
     requireIncludes(manifest, `android:name="${permission}"`, `permission ${permission}`);
+  }
+
+  if (!contract.firebase || contract.firebase.firestoreDatabaseId !== 'default') {
+    throw new Error('Le contrat Firebase doit verrouiller Firestore sur default.');
+  }
+  requireIncludes(firebaseClient, "export const FIRESTORE_DATABASE_ID = 'default';", 'databaseId Firestore client canonique');
+  requireIncludes(firebaseClient, 'FIRESTORE_DATABASE_ID\n);', 'sélection explicite de la base Firestore client');
+  if (firebaseClient.includes('(default)') || firebaseClient.includes('firestoreDatabaseId')) {
+    throw new Error('Le client Firestore ne doit utiliser ni (default) ni firestoreDatabaseId provenant d’AI Studio.');
+  }
+  requireIncludes(firebaseAdmin, "getFirestore('default')", 'databaseId Firestore Admin canonique');
+  if (/getFirestore\(\s*\)/.test(firebaseAdmin)) {
+    throw new Error('Firebase Admin doit sélectionner explicitement la base default.');
+  }
+  if (firebaseAppletConfig.projectId !== contract.firebase.projectId) {
+    throw new Error(`Projet Firebase Web inattendu : ${firebaseAppletConfig.projectId}.`);
+  }
+  const androidFirebaseClient = (googleServices.client || []).find(client =>
+    client?.client_info?.android_client_info?.package_name === contract.firebase.androidPackageName
+  );
+  if (googleServices.project_info?.project_id !== contract.firebase.projectId) {
+    throw new Error(`Projet Firebase Android inattendu : ${googleServices.project_info?.project_id || '(absent)'}.`);
+  }
+  if (!androidFirebaseClient) {
+    throw new Error(`Package Firebase Android ${contract.firebase.androidPackageName} absent de google-services.json.`);
+  }
+  if (androidFirebaseClient.client_info?.mobilesdk_app_id !== contract.firebase.androidMobileSdkAppId) {
+    throw new Error('mobilesdk_app_id Firebase Android inattendu.');
   }
 
   const signingFile = read(contract.signing.path);

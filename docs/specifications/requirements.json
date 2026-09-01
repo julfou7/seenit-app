@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.92",
+  "applicationVersion": "1.4.93",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -77,6 +77,20 @@
       ]
     },
     {
+      "id": "SEENIT-APK-004",
+      "title": "Identité Firebase Android protégée contre les imports et régénérations",
+      "targets": [
+        "apk",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/firebaseIdentityGuardrails.test.ts",
+          "contains": "SEENIT-APK-004 protège l’identité Firebase Android canonique"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-DATA-001",
       "title": "Caches locaux isolés par UID",
       "targets": [
@@ -133,6 +147,22 @@
         {
           "file": "tests/firestoreRecovery.test.ts",
           "contains": "SEENIT-DATA-004 partage une seule tentative entre onglets et casse la boucle de rechargement"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DATA-005",
+      "title": "Base Firestore SeenIt explicitement verrouillée sur default",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/firebaseIdentityGuardrails.test.ts",
+          "contains": "SEENIT-DATA-005 verrouille la base Firestore canonique sur default"
         }
       ]
     },
@@ -656,6 +686,35 @@
         {
           "file": "tests/developmentGovernance.test.ts",
           "contains": "SEENIT-QUALITY-003 mémorise chaque demande durable dans la SPEC et le registre"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-QUALITY-004",
+      "title": "Issues maintenues à jour pendant toute l’intervention",
+      "targets": [
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/issueTrackingGovernance.test.ts",
+          "contains": "SEENIT-QUALITY-004 maintient les issues et leurs checkboxes à jour pendant le travail"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-QUALITY-005",
+      "title": "Imports AI Studio non autoritatifs et règles agent préchargées",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/firebaseIdentityGuardrails.test.ts",
+          "contains": "SEENIT-QUALITY-005 traite AI Studio comme un transport non autoritatif"
         }
       ]
     }
