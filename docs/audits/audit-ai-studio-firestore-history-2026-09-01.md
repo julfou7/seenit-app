@@ -3,7 +3,7 @@
 - **Identifiant** : AUDIT-2026-09-01-AISTUDIO-FIRESTORE
 - **Date** : 1er septembre 2026
 - **Dernière vérification** : 1er septembre 2026
-- **Statut** : incident d'import AI Studio `71b7bd6` bloqué par la CI ; restauration et diagnostic renforcé dans la candidate SeenIt 1.4.96 suivie par l'issue #21
+- **Statut** : clos — restauration Firebase/Gradle publiée dans SeenIt 1.4.98, CI et smokes Android 31/36 verts
 - **Version de référence avant intégration** : SeenIt 1.4.92
 - **Commit de référence** : `4e644a4ca05994061eaf90fa8f5f38735943a4c3`
 - **Périmètre** : historique Git des changements de configuration Firebase/Firestore et comportement des imports/synchronisations AI Studio.
@@ -72,3 +72,7 @@ Le même commit a également normalisé silencieusement les modes Unix de `andro
 Le run correctif suivant a confirmé que le garde d'immuabilité interdit aussi la réutilisation d'un numéro après un commit de candidate échoué. Cette politique stricte est conservée : la restauration des droits Gradle et son filet de sécurité sont donc publiés sous SeenIt 1.4.97, tandis que 1.4.96 reste une candidate Git non publiée.
 
 La candidate 1.4.97 a ensuite été arrêtée par le contrat SPEC avant Gradle : son commit d'alignement modifiait `server.ts` sans nouveau diff dans `tests/*.test.ts`. La correction finale 1.4.98 ajoute une preuve automatisée de progression après candidate échouée, conserve les 176 tests précédents et satisfait explicitement le contrat SPEC sans réécrire l'historique de `main`.
+
+## Validation finale SeenIt 1.4.98
+
+Le run [33565430954](https://github.com/julfou7/seenit-app/actions/runs/33565430954) est entièrement vert : contrat SPEC, 177 tests, audit de dépendances, build Web, synchronisation Capacitor, contrat Android après synchronisation, compilation Gradle, mise à niveau réelle Android API 31 et API 36, puis publication immuable. La [release v1.4.98](https://github.com/julfou7/seenit-app/releases/tag/v1.4.98) contient `SeenIt-v1.4.98.apk` et son fichier `.sha256` ; le contrôle de publication confirme `SeenIt-v1.4.98.apk: OK` avant l’envoi des deux assets.
