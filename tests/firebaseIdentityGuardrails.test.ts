@@ -14,7 +14,6 @@ test('SEENIT-DATA-005 verrouille la base Firestore canonique sur default', () =>
   assert.match(admin, /getFirestore\(['"]default['"]\)/);
   assert.equal(/getFirestore\(\s*\)/.test(admin), false);
 });
-
 test('SEENIT-APK-004 protège l’identité Firebase Android canonique', () => {
   const contract = JSON.parse(read('docs/specifications/android-contract.json'));
   const googleServices = JSON.parse(read('android/app/google-services.json'));

@@ -1,4 +1,9 @@
 const { execFileSync } = require('node:child_process');
+const {
+  classifyDelivery,
+  readAt,
+  readGitChanges
+} = require('./classify-delivery.cjs');
 
 const VERSION_ONLY_PATTERNS = {
   'android/app/build.gradle': [
@@ -67,18 +72,29 @@ function main() {
   }
 
   let changedFiles;
+  let deliveryClassification;
   try {
-    changedFiles = execFileSync(
-      'git',
-      ['diff', '--name-only', `${base}..${head}`],
-      { encoding: 'utf8' }
-    )
-      .split(/\r?\n/)
-      .map(normalizePath)
-      .filter(Boolean);
+    const changes = readGitChanges(base, head);
+    changedFiles = changes.map(change => normalizePath(change.path));
+    deliveryClassification = classifyDelivery({
+      changes,
+      readBefore: file => readAt(base, file),
+      readAfter: file => readAt(head, file)
+    });
   } catch (error) {
     console.error('[SPEC] Impossible de calculer les fichiers modifiés :', error.message);
     return 1;
+  }
+
+  if (String(process.env.DELIVERY_MODE || '').toLowerCase() === 'light'
+    && deliveryClassification.mode !== 'light') {
+    console.error('[SPEC] Le mode light déclaré ne correspond pas au diff contrôlé.');
+    return 1;
+  }
+
+  if (deliveryClassification.mode === 'light') {
+    console.log('[SPEC] Changement light vérifié : aucune nouvelle exigence comportementale requise.');
+    return 0;
   }
 
   const readPatch = file => execFileSync(

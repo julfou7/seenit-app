@@ -80,7 +80,9 @@ function validateAndroidContract() {
     throw new Error('Le contrat Firebase doit verrouiller Firestore sur default.');
   }
   requireIncludes(firebaseClient, "export const FIRESTORE_DATABASE_ID = 'default';", 'databaseId Firestore client canonique');
-  requireIncludes(firebaseClient, 'FIRESTORE_DATABASE_ID\n);', 'sélection explicite de la base Firestore client');
+  if (!/FIRESTORE_DATABASE_ID\s*\)/.test(firebaseClient)) {
+    throw new Error('Sélection explicite de la base Firestore client absente.');
+  }
   if (firebaseClient.includes('(default)') || firebaseClient.includes('firestoreDatabaseId')) {
     throw new Error('Le client Firestore ne doit utiliser ni (default) ni firestoreDatabaseId provenant d’AI Studio.');
   }

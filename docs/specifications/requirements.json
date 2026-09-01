@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.93",
+  "applicationVersion": "1.4.94",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -715,6 +715,34 @@
         {
           "file": "tests/firebaseIdentityGuardrails.test.ts",
           "contains": "SEENIT-QUALITY-005 traite AI Studio comme un transport non autoritatif"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-QUALITY-006",
+      "title": "Parcours de livraison proportionné et classé automatiquement",
+      "targets": [
+        "ci",
+        "pwa",
+        "apk",
+        "backend"
+      ],
+      "tests": [
+        {
+          "file": "tests/deliveryClassification.test.ts",
+          "contains": "SEENIT-QUALITY-006 classe un renommage de label JSX dans le parcours light"
+        },
+        {
+          "file": "tests/deliveryClassification.test.ts",
+          "contains": "SEENIT-QUALITY-006 reconnaît un libellé non JSX marqué explicitement par uiCopy"
+        },
+        {
+          "file": "tests/deliveryClassification.test.ts",
+          "contains": "SEENIT-QUALITY-006 refuse une URL ou une condition modifiée comme simple texte"
+        },
+        {
+          "file": "tests/deliveryClassification.test.ts",
+          "contains": "SEENIT-QUALITY-006 permet de forcer le parcours complet mais jamais le parcours light"
         }
       ]
     }

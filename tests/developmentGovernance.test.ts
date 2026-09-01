@@ -9,6 +9,7 @@ const auditIndex = readFileSync('docs/audits/README.md', 'utf8');
 const globalAudit = readFileSync('docs/audits/audit-global-2026-08-31.md', 'utf8');
 const requestRegistry = readFileSync('docs/requests/registry.md', 'utf8');
 const issueTemplate = readFileSync('.github/ISSUE_TEMPLATE/engineering.yml', 'utf8');
+const deliveryClassifier = readFileSync('scripts/classify-delivery.cjs', 'utf8');
 
 test('SEENIT-RELEASE-002 la CI valide puis publie sans modifier automatiquement main', () => {
   assert.doesNotMatch(workflow, /git\s+(commit|push)/);
@@ -56,4 +57,16 @@ test('SEENIT-QUALITY-003 mémorise chaque demande durable dans la SPEC et le reg
   assert.match(requestRegistry, /USR-2026-08-31-003/);
   assert.match(requestRegistry, /SEENIT-QUALITY-002/);
   assert.match(requestRegistry, /SEENIT-QUALITY-003/);
+});
+
+test('SEENIT-QUALITY-006 réserve le pipeline APK aux changements qui le nécessitent', () => {
+  assert.match(workflow, /Classify Delivery Path/);
+  assert.match(workflow, /delivery:classify/);
+  assert.match(workflow, /if: steps\.delivery\.outputs\.DELIVERY_MODE == 'apk'[\s\S]+npx cap sync android/);
+  assert.match(workflow, /if: needs\.build\.outputs\.delivery_mode == 'apk'/);
+  assert.match(workflow, /FORCED_DELIVERY_MODE/);
+  assert.doesNotMatch(workflow, /options:\s*[\s\S]*- light/);
+  assert.match(deliveryClassifier, /Le parcours léger est refusé par sécurité/);
+  assert.match(agentRules, /interdit de forcer le mode light/);
+  assert.match(requestRegistry, /USR-2026-09-01-003/);
 });

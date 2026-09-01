@@ -15,12 +15,23 @@ Vous devez suivre strictement ces règles lors de toutes vos interventions sur l
 - **Changelog & Release Notes :** Le générateur de notes agrège tous les commits de la version depuis le dernier tag SemVer strictement antérieur. Chaque commit doit donc conserver un corps en français, structuré en puces claires et lisibles pour l'utilisateur final ; aucun dernier commit ne doit résumer ou écraser à lui seul le reste de la version.
 
 ## 2. Versioning & Git Automatisé
-A chaque correctif ou fonctionnalité ajoutée :
-- Incrémentez systématiquement la version dans `android/app/build.gradle` (`versionName` et `versionCode`).
-- Exécutez `npm run version:sync` après le bump Android pour aligner `package.json`, la SPEC,
-  le catalogue, le contrat Android, `CURRENT_APP_VERSION` et `X-Plex-Version`.
+Avant toute livraison, laissez `npm run delivery:classify` qualifier le diff :
+- Le parcours **light** est réservé automatiquement à la documentation, aux tests sans code livré,
+  aux commentaires/formatages, aux textes de présentation JSX explicitement reconnus et aux littéraux
+  non JSX déjà marqués par `uiCopy(...)`. Ce marqueur est interdit pour une URL, route, clé, identité
+  ou valeur logique. Le parcours exécute les validations JavaScript et le build Web, mais ne modifie
+  aucune version et ne publie aucun APK.
+- Tout fichier natif, serveur, dépendance, configuration, changement comportemental ou diff ambigu
+  utilise par défaut le parcours **APK complet**. Il est interdit de forcer le mode light ; seul le
+  parcours APK peut être forcé manuellement.
+- Pour chaque parcours APK complet, incrémentez la version dans `android/app/build.gradle`
+  (`versionName` et `versionCode`), puis exécutez `npm run version:sync` pour aligner `package.json`,
+  la SPEC, le catalogue, le contrat Android, `CURRENT_APP_VERSION` et `X-Plex-Version`.
+- Un changement light est immédiatement disponible dans la PWA après son déploiement, mais reste
+  volontairement absent de l'APK embarqué jusqu'à la prochaine release APK complète.
 - Rédigez un message de commit propre au format Conventional Commits (`fix:`, `perf:`, `feat:`) incluant le détail des modifications sous forme de liste à puces **en français**.
-- Effectuez le `git push` sur la branche principale (`main`) à la fin de chaque tâche pour déclencher automatiquement le build de l'APK sur GitHub Actions.
+- Effectuez le `git push` sur la branche principale (`main`) à la fin de chaque tâche : GitHub Actions
+  valide toujours le changement, mais ne construit et ne publie l'APK que pour le parcours complet.
 - La CI vérifie et publie ; elle ne corrige, ne commit et ne pousse jamais automatiquement `main`.
 - Un rollback APK se livre avec un nouveau patch et un `versionCode` supérieur. Ne tentez jamais de
   republier un ancien numéro de version ou d'abaisser `versionCode`.
@@ -71,11 +82,11 @@ A chaque correctif ou fonctionnalité ajoutée :
   donnée par l'utilisateur à la SPEC. Si elle est absente ou différente, inscrivez-la dans la SPEC,
   le catalogue et `docs/requests/registry.md` avant ou avec l'implémentation. Une question ponctuelle,
   une demande de statut ou un log de diagnostic ne devient pas une exigence durable.
-- **SPEC avant code :** Toute modification comportementale doit mettre à jour la SPEC dans la même livraison, avec un identifiant `SEENIT-<DOMAINE>-<NUMÉRO>`.
+- **SPEC avant code :** Toute modification comportementale doit mettre à jour la SPEC dans la même livraison, avec un identifiant `SEENIT-<DOMAINE>-<NUMÉRO>`. Une correction de texte strictement présentational classée light ne crée pas artificiellement une nouvelle exigence.
 - **Traçabilité :** Ajoutez ou actualisez l'entrée correspondante dans `docs/specifications/requirements.json`.
 - **Tests obligatoires :** Toute modification comportementale doit ajouter ou adapter au moins un test automatisé précis, référencé par le catalogue.
-- **Validation :** Exécutez `npm test`, `npm run build` et `npx cap sync android`. La CI `test:spec:changes` bloque le code applicatif livré sans SPEC et tests.
-- **Validation APK :** Exécutez aussi `npm run test:android` après la synchronisation Capacitor.
+- **Validation :** Exécutez toujours `npm test` et `npm run build`. La CI `test:spec:changes` bloque le code applicatif livré sans SPEC et tests, sauf diff light revérifié automatiquement.
+- **Validation APK :** Pour le parcours APK complet, exécutez aussi `npx cap sync android` puis `npm run test:android`. Ces étapes sont volontairement omises du parcours light.
 - **Contexte durable :** Ne laissez jamais la SPEC décrire une ancienne version ou un comportement supprimé. Les audits datés sont historiques ; la SPEC est la source de vérité courante.
 
 ## 5. Backlog et autonomie contrôlée
@@ -107,7 +118,7 @@ Après chaque modification, concluez TOUJOURS votre réponse par cette structure
 - Résumé clair des fichiers modifiés et des optimisations apportées.
 
 ### 📌 Impact & Mode de déploiement
-- Précise si le fix est Web (instantané via Live Web View) ou Natif (nécessite la compilation du nouvel APK sur GitHub Actions).
+- Précise si le fix suit le parcours light Web, le parcours APK complet, ou si le rendu APK attend volontairement la prochaine release groupée.
 
 ### 🚀 Action requise de ton côté
 - Indique l'action exacte à réaliser (ex : "Ferme et rouvre l'app", "Attends 2 à 3 min puis clique sur Installer la mise à jour").

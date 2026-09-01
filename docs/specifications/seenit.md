@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 1er septembre 2026
-Version applicative : **1.4.93**
+Version applicative : **1.4.94**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -300,10 +300,26 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   un `versionCode` supérieur. On ne remplace jamais silencieusement l'asset d'une version déjà testée.
 - Le canal personnel actuel publie `assembleDebug` signé par la clé historique afin de préserver les
   mises à jour sur place. Passer à `assembleRelease` ou à une autre clé est un projet de migration.
-- Les versions majeures/minor impliquent une décision produit ; les correctifs ordinaires incrémentent
-  le patch. Une seule livraison produit à la fois la PWA et l'APK correspondants.
+- Les versions majeures/minor impliquent une décision produit ; les correctifs ordinaires d'une
+  release APK incrémentent le patch. Une livraison APK complète produit à la fois la PWA et l'APK
+  correspondants ; une livraison light assume explicitement que l'APK attend la prochaine release.
 
-### Pipeline de référence
+### 12.1 Parcours de livraison proportionnés
+
+- **SEENIT-QUALITY-006** — La CI classe automatiquement chaque diff sans accepter de marqueur capable
+  de forcer le parcours léger. La documentation Markdown, les tests sans code livré, les changements
+  de commentaires/formatage, les textes de présentation JSX reconnus et les littéraux non JSX déjà
+  marqués par `uiCopy(...)` peuvent suivre le parcours `light`. Ce marqueur identitaire est réservé à
+  la copie visible et ne peut envelopper ni URL, route, clé, identité technique ou valeur logique.
+  `npm test`, audit de dépendances et build Web restent obligatoires, tandis que le
+  bump Android, Capacitor, Gradle, les émulateurs et la release APK sont omis. Les attributs techniques
+  (`href`, route, identifiant, rôle, classe, valeur), chaînes hors JSX, labels vidés, fichiers nouveaux
+  ou supprimés et tout diff natif, serveur, configuration, dépendance ou ambigu utilisent le parcours
+  APK complet par défaut. Un opérateur peut forcer `apk`, jamais `light`. Comme l'APK embarque `dist`,
+  une correction light est visible dans la PWA déployée et rejoint l'APK lors de la prochaine release
+  complète groupée ; toute publication APK conserve obligatoirement le smoke N → N+1 Android 31/36.
+
+### Pipeline APK complet de référence
 
 1. SPEC et tests dans le même changement ;
 2. bump Android puis `npm run version:sync` ;
@@ -312,6 +328,14 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 5. CI, compilation Gradle et smoke instrumenté N → N+1 sur Android 12 et Android cible ;
 6. release GitHub, APK et fichier `.sha256` uniquement après le smoke ;
 7. validation terrain PWA et installation/mise à jour APK.
+
+### Pipeline light de référence
+
+1. classification automatique et conservatrice du diff ;
+2. `npm test`, audit des dépendances de production et `npm run build` ;
+3. commit français et push de `main` ;
+4. déploiement PWA selon l'hébergeur, sans bump ni release APK ;
+5. regroupement du rendu APK dans la prochaine livraison complète.
 
 ## 13. Contrat de développement et définition de terminé
 
@@ -340,8 +364,11 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   `.agents/AGENTS.md` puis complétées par la lecture intégrale du `AGENTS.md` racine ; les invariants
   critiques restent en plus protégés par des tests afin qu'une omission de lecture ne puisse pas les
   réintroduire silencieusement.
+- **SEENIT-QUALITY-006** — Les contrôles et le déploiement sont proportionnés au risque selon la
+  classification automatique décrite en section 12.1. Le doute ne réduit jamais les validations :
+  un changement non reconnu comme light bascule vers le pipeline APK complet.
 
-Une modification comportementale est terminée uniquement si :
+Une modification comportementale ou une release APK est terminée uniquement si :
 
 1. cette SPEC est mise à jour avant ou avec le code ;
 2. l'exigence possède un identifiant et une entrée dans `requirements.json` ;
@@ -352,6 +379,9 @@ Une modification comportementale est terminée uniquement si :
 7. toute nouvelle demande durable est reliée depuis le registre à la SPEC et à ses éventuelles issues ;
 8. tout audit modifié possède une matrice exhaustive des constats vers les issues ou risques acceptés ;
 9. la CI compile l'APK et publie la release GitHub.
+
+Une modification light est terminée lorsque le classificateur l'a confirmée, que `npm test`, l'audit
+de dépendances et le build Web passent et que l'absence volontaire de nouvelle release APK est annoncée.
 
 Le contrôle CI `test:spec:changes` refuse une livraison comportementale qui ne contient pas à
 la fois la SPEC et des tests. `test:spec` vérifie la version, les identifiants, les plateformes

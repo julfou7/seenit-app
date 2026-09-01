@@ -6,7 +6,7 @@ un test automatisé précis.
 [`android-contract.json`](./android-contract.json) fige les invariants indispensables aux mises à
 jour APK : identité, signature, icônes, version, permissions et configuration native.
 
-## Cycle obligatoire pour toute évolution
+## Cycle obligatoire pour toute évolution comportementale ou release APK
 
 1. Lire la SPEC avant de modifier le code et qualifier la demande dans
    [`../requests/registry.md`](../requests/registry.md) si elle introduit une règle durable.
@@ -16,6 +16,14 @@ jour APK : identité, signature, icônes, version, permissions et configuration 
 5. Exécuter `npm test`, puis le build PWA, la synchronisation Capacitor Android et de nouveau
    `npm run test:android` afin de détecter une mutation native générée.
 6. Incrémenter la version SeenIt et livrer la PWA et l'APK ensemble.
+
+Une correction strictement présentational ou documentaire peut suivre le parcours light défini par
+`SEENIT-QUALITY-006`. Le script `npm run delivery:classify` doit confirmer ce mode depuis le diff :
+il reste impossible de le forcer. Ce parcours conserve `npm test`, l'audit et le build Web, sans bump,
+Capacitor, Gradle, émulateur ni release APK. Le rendu APK correspondant attend la prochaine release
+complète groupée. Un libellé non JSX peut préparer ses futurs renommages avec le marqueur
+`uiCopy(...)`, réservé au texte visible et jamais aux valeurs techniques. Tout cas non reconnu reprend
+automatiquement le cycle complet ci-dessus.
 
 Un audit suit en plus le protocole de [`../audits/README.md`](../audits/README.md) : rapport daté,
 preuves reproductibles et matrice exhaustive vers des issues GitHub priorisées ou des risques

@@ -1,7 +1,7 @@
 {
   "name": "seenit-app",
   "private": true,
-  "version": "1.4.93",
+  "version": "1.4.94",
   "packageManager": "npm@10.9.3",
   "engines": {
     "node": ">=22 <25"
@@ -20,6 +20,7 @@
     "test:spec": "node scripts/validate-specifications.cjs",
     "test:android": "node scripts/validate-android-contract.cjs",
     "test:spec:changes": "node scripts/validate-change-contract.cjs",
+    "delivery:classify": "node scripts/classify-delivery.cjs",
     "test:plex": "npm run test:spec && npm run test:unit",
     "version:sync": "node scripts/sync-app-version.cjs",
     "git:pull": "bash scripts/pull.sh"
