@@ -31,6 +31,8 @@ import { usePlexAvailabilityStore } from '../features/plex/plexAvailability';
 import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
 import { authenticatedFetch } from '../lib/apiAuth';
 
+type GitAccessState = 'checking' | 'allowed' | 'denied';
+
 const DEFAULT_NOTIFICATION_PREFS = {
   release_today_tv: true,
   season_d7: true,
@@ -93,6 +95,7 @@ export function SettingsScreen() {
   const [copiedLogs, setCopiedLogs] = useState(false);
 
   // Git Sync state
+  const [gitAccess, setGitAccess] = useState<GitAccessState>('checking');
   const [gitStatus, setGitStatus] = useState<{
     configured: boolean;
     branch?: string;
@@ -106,20 +109,42 @@ export function SettingsScreen() {
 
   const fetchGitStatus = async () => {
     try {
-      if (!auth.currentUser) return;
+      if (!auth.currentUser) {
+        setGitAccess('checking');
+        setGitStatus(null);
+        return;
+      }
       const res = await authenticatedFetch('/api/git/status');
+      if (res.status === 403) {
+        setGitAccess('denied');
+        setGitStatus(null);
+        setGitOutputText('');
+        setShowGitOutput(false);
+        return;
+      }
       if (res.ok) {
         const data = await res.json();
+        setGitAccess('allowed');
         setGitStatus(data);
+        return;
       }
+      setGitAccess('checking');
+      setGitStatus(null);
     } catch (err) {
+      setGitAccess('checking');
+      setGitStatus(null);
       console.warn('[Git Status] Impossible de récupérer le statut Git', err);
     }
   };
 
   useEffect(() => {
-    fetchGitStatus();
-  }, []);
+    if (!user) {
+      setGitAccess('checking');
+      setGitStatus(null);
+      return;
+    }
+    void fetchGitStatus();
+  }, [user?.uid]);
 
   const handleGitPull = async () => {
     if (isPullingGit) return;
@@ -131,6 +156,14 @@ export function SettingsScreen() {
         headers: { 'Content-Type': 'application/json' }
       });
       const data = await res.json();
+      if (res.status === 403) {
+        setGitAccess('denied');
+        setGitStatus(null);
+        setGitOutputText('');
+        setShowGitOutput(false);
+        showToast("Accès administrateur requis.", "error");
+        return;
+      }
       if (data.success) {
         showToast("✅ Code synchronisé ! Rechargement de l'application...", "success");
         setGitOutputText(data.output || 'Dépôt à jour.');
@@ -992,6 +1025,7 @@ export function SettingsScreen() {
               </div>
 
               {/* GitHub Git Sync Card */}
+              {gitAccess === 'allowed' && (
               <div className="p-3 bg-zinc-800/40 border border-zinc-800 rounded-xl flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -1049,6 +1083,7 @@ export function SettingsScreen() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* Updater Progress */}
               {apkUpdateProgress && (
