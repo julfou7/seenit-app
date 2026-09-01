@@ -39,6 +39,9 @@ function validateAndroidContract() {
   const strings = readText('android/app/src/main/res/values/strings.xml');
   const capacitor = readText('capacitor.config.ts');
   const seenitApi = readText('src/lib/seenitApi.ts');
+  const firebaseClient = readText('src/lib/firebase.ts');
+  const firebaseAdmin = readText('src/lib/firebase-admin.ts');
+  const googleServices = JSON.parse(readText('android/app/google-services.json'));
   const packageJson = JSON.parse(readText('package.json'));
   const workflow = readText('.github/workflows/build-apk.yml');
   const wrapperProperties = readText('android/gradle/wrapper/gradle-wrapper.properties');
@@ -70,6 +73,35 @@ function validateAndroidContract() {
   requireIncludes(manifest, '<category android:name="android.intent.category.LAUNCHER"', 'intent LAUNCHER');
   for (const permission of contract.requiredPermissions) {
     requireIncludes(manifest, `android:name="${permission}"`, `permission ${permission}`);
+  }
+
+  if (!contract.firebase || contract.firebase.firestoreDatabaseId !== 'default') {
+    throw new Error('Le contrat Firebase doit verrouiller Firestore sur databaseId=default.');
+  }
+  if (googleServices?.project_info?.project_id !== contract.firebase.projectId) {
+    throw new Error(`Projet Firebase Android invalide : ${googleServices?.project_info?.project_id || 'absent'}.`);
+  }
+  const firebaseAndroidClient = (googleServices.client || []).find(client =>
+    client?.client_info?.android_client_info?.package_name === contract.firebase.androidPackageName
+  );
+  if (!firebaseAndroidClient) {
+    throw new Error(`Client Firebase Android ${contract.firebase.androidPackageName} absent de google-services.json.`);
+  }
+  if (firebaseAndroidClient?.client_info?.mobilesdk_app_id !== contract.firebase.androidAppId) {
+    throw new Error('mobilesdk_app_id Firebase Android différent de l’identité SeenIt approuvée.');
+  }
+  if (contract.firebase.androidPackageName !== contract.applicationId) {
+    throw new Error('Le package Firebase Android doit être identique à applicationId SeenIt.');
+  }
+
+  requireIncludes(firebaseClient, "export const FIRESTORE_DATABASE_ID = 'default';", 'databaseId Firestore client canonique');
+  requireIncludes(firebaseClient, 'FIRESTORE_DATABASE_ID\n);', 'sélection explicite de Firestore côté client');
+  if (/firestoreDatabaseId/.test(firebaseClient) || /\(default\)/.test(firebaseClient)) {
+    throw new Error('Le client Firestore ne doit suivre ni firestoreDatabaseId AI Studio ni (default).');
+  }
+  requireIncludes(firebaseAdmin, "getFirestore('default')", 'databaseId Firestore Admin canonique');
+  if (/getFirestore\(\s*\)/.test(firebaseAdmin) || /firestoreDatabaseId/.test(firebaseAdmin) || /\(default\)/.test(firebaseAdmin)) {
+    throw new Error('Firebase Admin doit sélectionner explicitement et uniquement la base default.');
   }
 
   const signingFile = read(contract.signing.path);
