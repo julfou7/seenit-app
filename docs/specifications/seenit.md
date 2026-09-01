@@ -49,8 +49,15 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   de la permission de notification, du launcher et du deep link. Il exécute enfin démarrage à froid,
   reprise et Retour et archive les diagnostics. La publication dépend du succès de chaque matrice ;
   aucun compte Google personnel ni service externe privé n'est utilisé par ce smoke.
+- **SEENIT-APK-004** — L'association Firebase Android est un invariant de l'APK :
+  `android/app/google-services.json` reste présent et correspond au projet Firebase SeenIt
+  `gen-lang-client-0201895414`, au package `com.seenit.app` et au même `mobilesdk_app_id`. Un import,
+  une synchronisation ou une régénération AI Studio ne peut jamais supprimer ou remplacer cette
+  association. Toute migration Firebase Android nécessite une décision explicite, un plan de migration
+  et des tests PWA/APK dédiés.
 - Le fichier `docs/specifications/android-contract.json` fixe les invariants natifs vérifiables :
-  identité, signature, version, icônes, permissions, deep link, origine API, safe areas et canal APK.
+  identité, signature, version, icônes, permissions, deep link, origine API, safe areas, association
+  Firebase Android et canal APK.
 - Le contrôle Android s'exécute avant et après `npx cap sync android` afin de détecter une mutation
   générée par Capacitor avant la compilation.
 
@@ -80,6 +87,12 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   garde s'applique à l'unique WebView. Un diagnostic visible précède tout rechargement et une seconde
   erreur dans la fenêtre de garde interrompt l'automatisme afin d'éviter une boucle. Les autres bases
   IndexedDB de l'origine ne sont jamais supprimées.
+- **SEENIT-DATA-005** — La base Firestore applicative de SeenIt porte exactement l'identifiant
+  `default`. Le client PWA/APK la sélectionne explicitement et Firebase Admin utilise explicitement
+  `getFirestore('default')`. Le champ `firestoreDatabaseId` de `firebase-applet-config.json` est une
+  métadonnée de workspace AI Studio et ne pilote jamais l'initialisation Firestore. `(default)`, une
+  sélection implicite ou un databaseId personnalisé sont interdits sans migration de données validée,
+  sauvegarde/inventaire, rollback et tests PWA + APK.
 - Une réponse asynchrone capture l'UID et un epoch ; elle est ignorée si le compte change avant
   son écriture.
 - La PWA et l'APK d'un même UID partagent Firestore et convergent vers les mêmes données, sans
@@ -317,6 +330,12 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   les informations devenues obsolètes et indique clairement le blocage courant ainsi que la prochaine
   étape. Les commentaires peuvent conserver la chronologie et les preuves, mais ne doivent pas laisser
   le corps de l'issue décrire un état contradictoire ou dépassé.
+- **SEENIT-QUALITY-005** — Un import, une reconnexion ou une synchronisation AI Studio/GitHub est un
+  transport non autoritatif. Avant le premier commit d'un workspace importé, le diff généré est comparé
+  à la branche GitHub source et tout changement non demandé de Firebase/Firestore, Android, versions,
+  lockfiles, SPEC, serveur ou configuration est rejeté. `.agents/AGENTS.md` sert de bootstrap vers les
+  règles racine afin que cette politique soit chargée par les harnais qui utilisent ce chemin, mais les
+  tests automatiques restent obligatoires et bloquent les dérives même si un agent omet une consigne.
 
 Une modification comportementale est terminée uniquement si :
 
@@ -346,8 +365,8 @@ et l'existence exacte des tests référencés. `test:android` protège l'identit
   réel, ses commits/runs/blocages sont actualisés et les éléments obsolètes sont remplacés sans attendre
   la résolution finale.
 - Un agent peut ouvrir et traiter automatiquement une issue sûre dans le périmètre SeenIt. Il ne peut
-  pas décider seul d'une migration de signature, d'une suppression de données, d'un affaiblissement
-  de sécurité ou d'un changement d'identité média.
+  pas décider seul d'une migration de signature, de données, de projet Firebase/databaseId, d'une
+  suppression de données, d'un affaiblissement de sécurité ou d'un changement d'identité média.
 - Fermer une issue exige un commit, des tests, la validation des plateformes concernées et, pour une
   modification livrée, le lien de la release.
 
