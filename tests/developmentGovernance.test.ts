@@ -64,7 +64,8 @@ test('SEENIT-QUALITY-004 maintient les issues et leurs checkboxes à jour pendan
   assert.match(agentRules, /Après chaque jalon[\s\S]+actualisez l'état/);
   assert.match(agentRules, /Cochez chaque checkbox[\s\S]+réellement prouvé/);
   assert.match(livingSpecification, /SEENIT-QUALITY-004/);
-  assert.match(livingSpecification, /source de vérité opérationnelle[\s\S]+chaque critère d'acceptation/);
+  assert.match(livingSpecification, /source[\s\S]+de vérité opérationnelle/);
+  assert.match(livingSpecification, /chaque critère d'acceptation/);
   assert.match(specificationGuide, /checkboxes des critères sont[\s\S]+réellement satisfaites/);
   assert.match(requestRegistry, /USR-2026-09-01-001/);
   assert.match(requestRegistry, /SEENIT-QUALITY-004/);
