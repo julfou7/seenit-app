@@ -4,11 +4,12 @@ La source de vérité fonctionnelle et technique est [`seenit.md`](./seenit.md).
 [`requirements.json`](./requirements.json) relie chaque exigence non négociable à au moins
 un test automatisé précis.
 [`android-contract.json`](./android-contract.json) fige les invariants indispensables aux mises à
-jour APK : identité, signature, icônes, version, permissions et configuration native.
+jour APK : identité, signature, icônes, version, permissions, configuration native et association
+Firebase Android.
 
 ## Cycle obligatoire pour toute évolution
 
-1. Lire la SPEC avant de modifier le code et qualifier la demande dans
+1. Lire intégralement `AGENTS.md`, puis la SPEC avant de modifier le code et qualifier la demande dans
    [`../requests/registry.md`](../requests/registry.md) si elle introduit une règle durable.
 2. Modifier ou ajouter l'exigence concernée dans `seenit.md`.
 3. Mettre à jour `requirements.json` avec l'identifiant, les plateformes et le test associé.
@@ -26,6 +27,19 @@ l'intervention : son corps est actualisé après chaque jalon prouvé, les check
 cochées dès qu'elles sont réellement satisfaites, les références obsolètes sont remplacées et tout
 blocage courant est documenté avec la prochaine étape. La mise à jour de l'issue ne doit donc jamais
 être repoussée uniquement au moment de sa fermeture.
+
+### Import / synchronisation AI Studio
+
+Un workspace AI Studio importé depuis GitHub n'est pas une nouvelle source de vérité du projet. Avant
+le premier commit, son diff doit être comparé à la branche GitHub importée. Les changements générés
+uniquement par l'environnement (Firebase/Firestore, Android, versions, lockfiles, SPEC, configuration
+serveur) sont rejetés tant qu'une évolution volontaire ne les justifie pas.
+
+La base Firestore canonique de SeenIt reste exactement `default`, explicitement côté client et Firebase
+Admin. Le champ `firestoreDatabaseId` du fichier `firebase-applet-config.json` est une métadonnée AI
+Studio et ne pilote pas la base applicative. Toute modification de projet Firebase, databaseId ou
+association Android Firebase est une migration distincte qui exige validation explicite, plan de
+migration/rollback et tests PWA + APK.
 
 La CI refuse désormais une modification comportementale de `src/`, `server.ts`, du service
 worker ou du code Android si la même livraison ne contient pas une mise à jour de la SPEC et
