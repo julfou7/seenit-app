@@ -21,6 +21,12 @@ Un audit suit en plus le protocole de [`../audits/README.md`](../audits/README.m
 preuves reproductibles et matrice exhaustive vers des issues GitHub priorisées ou des risques
 explicitement acceptés.
 
+Lorsqu'un travail est relié à une issue GitHub, cette issue est une source de vérité vivante pendant
+l'intervention : son corps est actualisé après chaque jalon prouvé, les checkboxes des critères sont
+cochées dès qu'elles sont réellement satisfaites, les références obsolètes sont remplacées et tout
+blocage courant est documenté avec la prochaine étape. La mise à jour de l'issue ne doit donc jamais
+être repoussée uniquement au moment de sa fermeture.
+
 La CI refuse désormais une modification comportementale de `src/`, `server.ts`, du service
 worker ou du code Android si la même livraison ne contient pas une mise à jour de la SPEC et
 des tests. Les alignements de version purs, la documentation et la CI sont exemptés.
