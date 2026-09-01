@@ -658,6 +658,19 @@
           "contains": "SEENIT-QUALITY-003 mémorise chaque demande durable dans la SPEC et le registre"
         }
       ]
+    },
+    {
+      "id": "SEENIT-QUALITY-004",
+      "title": "Issues maintenues à jour pendant toute l'intervention",
+      "targets": [
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/developmentGovernance.test.ts",
+          "contains": "SEENIT-QUALITY-004 maintient les issues et leurs checkboxes à jour pendant le travail"
+        }
+      ]
     }
   ]
 }
