@@ -1,0 +1,10 @@
+# Registre des demandes durables SeenIt
+
+| ID | Date | Décision durable | Exigences / trace | Statut |
+|---|---|---|---|---|
+| USR-2026-08-30-001 | 2026-08-30 | SeenIt doit rester fonctionnel en PWA et surtout dans l'APK, avec des adaptations natives explicites comme l'ouverture de Plex Android. | `SEENIT-PLATFORM-001`, `SEENIT-APK-001`, `SEENIT-APK-002` | active |
+| USR-2026-08-30-002 | 2026-08-30 | L'identité Plex/TMDB n'est jamais devinée depuis le titre ou l'année ; seuls des identifiants techniques vérifiés sont acceptés. | `SEENIT-IDENTITY-001`, `SEENIT-PLEX-001` | active |
+| USR-2026-08-30-003 | 2026-08-30 | Les données d'un même compte SeenIt sont partagées entre PWA et APK, tandis que les secrets, caches et notifications restent isolés par UID et, lorsque nécessaire, par appareil. | `SEENIT-DATA-001`, `SEENIT-DATA-003`, `SEENIT-NOTIFICATION-001` | active |
+| USR-2026-08-31-001 | 2026-08-31 | Toute évolution comportementale passe par une SPEC à jour et des tests automatisés afin de réduire les régressions. | `SEENIT-QUALITY-001` | active |
+| USR-2026-08-31-002 | 2026-08-31 | L'APK reste installable par-dessus la version précédente ; son icône, son identité, sa signature et ses comportements natifs ne changent jamais accidentellement. | `SEENIT-APK-001`, `SEENIT-APK-002`, [issue #9](https://github.com/julfou7/seenit-app/issues/9), [issue #13](https://github.com/julfou7/seenit-app/issues/13) | active |
+| USR-2026-08-31-003 | 2026-08-31 | Chaque audit est enregistré et produit des issues GitHub priorisées ; chaque nouvelle demande durable absente de la SPEC est mémorisée, spécifiée et testée. | `SEENIT-QUALITY-002`, `SEENIT-QUALITY-003`, [audit global](../audits/audit-global-2026-08-31.md) | active |

@@ -39,6 +39,10 @@ A chaque correctif ou fonctionnalité ajoutée :
 
 ## 4. Développement piloté par spécification (OBLIGATOIRE)
 - **Lecture préalable :** Avant toute modification, lisez intégralement `docs/specifications/seenit.md` et `docs/specifications/README.md`.
+- **Demande durable :** Comparez chaque règle produit, UX, sécurité, plateforme ou développement
+  donnée par l'utilisateur à la SPEC. Si elle est absente ou différente, inscrivez-la dans la SPEC,
+  le catalogue et `docs/requests/registry.md` avant ou avec l'implémentation. Une question ponctuelle,
+  une demande de statut ou un log de diagnostic ne devient pas une exigence durable.
 - **SPEC avant code :** Toute modification comportementale doit mettre à jour la SPEC dans la même livraison, avec un identifiant `SEENIT-<DOMAINE>-<NUMÉRO>`.
 - **Traçabilité :** Ajoutez ou actualisez l'entrée correspondante dans `docs/specifications/requirements.json`.
 - **Tests obligatoires :** Toute modification comportementale doit ajouter ou adapter au moins un test automatisé précis, référencé par le catalogue.
@@ -47,6 +51,10 @@ A chaque correctif ou fonctionnalité ajoutée :
 - **Contexte durable :** Ne laissez jamais la SPEC décrire une ancienne version ou un comportement supprimé. Les audits datés sont historiques ; la SPEC est la source de vérité courante.
 
 ## 5. Backlog et autonomie contrôlée
+- Tout audit doit être enregistré dans `docs/audits/`, indexé dans `docs/audits/README.md` et préciser
+  sa date, la version et le commit audités, le périmètre, les preuves et la décision pour chaque constat.
+- Chaque constat ouvert d'un audit doit être relié à une issue GitHub priorisée, ou marqué comme risque
+  explicitement accepté avec sa justification. Un audit sans cette matrice n'est pas terminé.
 - Les sujets différés vivent dans les issues GitHub avec priorité `[P0]`, `[P1]`, `[P2]` ou `[P3]`
   et domaine `[APK]`, `[PWA]`, `[Sécurité]`, `[Performance]`, `[UX]` ou `[Architecture]`.
 - Un agent peut ouvrir une issue lorsqu'un audit révèle un risque réel et la résoudre sans nouvelle

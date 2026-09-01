@@ -1,0 +1,30 @@
+# Registre des audits SeenIt
+
+Ce dossier conserve les constats historiques. La SPEC reste la source de vérité du comportement
+courant et GitHub Issues la source de vérité des actions à réaliser.
+
+## Contrat d'un audit terminé
+
+Chaque audit doit contenir :
+
+- un identifiant stable, une date, la version et le commit observés ;
+- le périmètre, les limites et les preuves reproductibles ;
+- les points solides afin de ne pas les casser ;
+- chaque constat avec priorité, impact et critère de sortie ;
+- une matrice exhaustive vers une issue GitHub priorisée, une correction déjà livrée ou un risque
+  explicitement accepté et justifié ;
+- la date de dernière vérification et le statut du rapport.
+
+Avant de créer une issue, l'agent recherche les issues ouvertes et fermées pour éviter les doublons.
+Une réévaluation complète crée un nouvel audit ; une précision sur les mêmes preuves met à jour le
+rapport existant et son historique.
+
+## Index
+
+| ID | Date | Baseline | Périmètre | Rapport | Backlog |
+|---|---|---|---|---|---|
+| AUDIT-2026-08-31-GLOBAL | 2026-08-31 | 1.4.80 (`75ec2f1` après durcissement 1.4.81) | application, PWA, APK, backend, sécurité, structure, tests et CI/CD | [Audit global](./audit-global-2026-08-31.md) | [Issues #9 à #19](../backlog/README.md) |
+
+L'audit historique des téléchargements antérieur à ce protocole reste disponible dans
+[`../audit-telechargements-2026-08-30.md`](../audit-telechargements-2026-08-30.md). Ses corrections
+déjà livrées sont couvertes par les exigences `SEENIT-DOWNLOAD-*` et leurs tests.

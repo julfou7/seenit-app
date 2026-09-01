@@ -2,6 +2,14 @@ name: Travail d’ingénierie SeenIt
 description: Correctif, durcissement, performance ou dette technique piloté par la SPEC
 title: "[P2][Domaine] "
 body:
+  - type: input
+    id: source
+    attributes:
+      label: Source traçable
+      description: Audit daté, demande enregistrée, incident ou exigence à l’origine du travail.
+      placeholder: docs/audits/audit-global-2026-08-31.md — constat AUD-GLO-11
+    validations:
+      required: true
   - type: textarea
     id: context
     attributes:

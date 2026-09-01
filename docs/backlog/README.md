@@ -1,7 +1,8 @@
 # Backlog d'ingénierie SeenIt
 
-Les issues GitHub sont la source de vérité du travail restant. L'audit global daté explique les
-risques ; la SPEC définit le comportement courant ; une issue décrit le prochain incrément livrable.
+Les issues GitHub sont la source de vérité du travail restant. Le
+[registre des audits](../audits/README.md) conserve les preuves, la SPEC définit le comportement
+courant et une issue décrit le prochain incrément livrable.
 
 ## Convention
 
@@ -13,7 +14,8 @@ Titre : `[P1][APK] Verbe + résultat observable`.
 - `P3` : amélioration non urgente.
 
 Chaque issue contient : contexte, risque utilisateur, périmètre, critères d'acceptation, exigences
-SPEC concernées, tests automatisés, validations PWA/APK et exclusions explicites.
+SPEC concernées, source traçable, tests automatisés, validations PWA/APK et exclusions explicites.
+Avant toute création, les issues ouvertes et fermées sont recherchées pour éviter un doublon.
 
 ## Autonomie de l'agent
 
@@ -32,9 +34,13 @@ un choix de produit, une migration de données ou de signature reste ouverte ave
 ## Backlog initial issu de l'audit global
 
 - [#9 — migration de la signature APK](https://github.com/julfou7/seenit-app/issues/9)
-- [#10 — récupération Firestore IndexedDB](https://github.com/julfou7/seenit-app/issues/10)
+- [#10 — récupération Firestore IndexedDB — livrée en 1.4.84](https://github.com/julfou7/seenit-app/issues/10)
 - [#11 — allowlist administrateur pour les opérations Git](https://github.com/julfou7/seenit-app/issues/11)
 - [#12 — clés TVDB/OMDb derrière le backend](https://github.com/julfou7/seenit-app/issues/12)
 - [#13 — test de mise à jour APK sur place](https://github.com/julfou7/seenit-app/issues/13)
 - [#14 — découpage des modules volumineux](https://github.com/julfou7/seenit-app/issues/14)
 - [#15 — E2E, accessibilité et budgets de performance](https://github.com/julfou7/seenit-app/issues/15)
+- [#16 — immuabilité des releases APK](https://github.com/julfou7/seenit-app/issues/16)
+- [#17 — assainissement du dépôt, des dépendances et de la configuration](https://github.com/julfou7/seenit-app/issues/17)
+- [#18 — durcissement TypeScript, lint et formatage](https://github.com/julfou7/seenit-app/issues/18)
+- [#19 — en-têtes HTTP et service worker](https://github.com/julfou7/seenit-app/issues/19)

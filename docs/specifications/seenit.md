@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
-Dernière mise à jour : 31 août 2026  
-Version applicative : **1.4.85**
+Dernière mise à jour : 1er septembre 2026
+Version applicative : **1.4.86**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -282,6 +282,14 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 - **SEENIT-QUALITY-001** — Toute évolution comportementale met à jour la SPEC et le catalogue et
   ajoute ou adapte un test précis. Les invariants APK sont en plus vérifiés par le contrat natif avant
   et après la synchronisation Capacitor.
+- **SEENIT-QUALITY-002** — Tout audit est conservé comme rapport daté et indexé, avec version,
+  commit, périmètre et preuves. Chaque constat ouvert renvoie vers une issue GitHub portant une
+  priorité, ou vers une décision de risque accepté justifiée ; aucun point ne reste uniquement dans
+  une conversation.
+- **SEENIT-QUALITY-003** — Toute demande utilisateur qui introduit ou modifie une règle durable de
+  produit, UX, sécurité, plateforme ou développement est comparée à la SPEC. Si elle n'y figure pas,
+  elle est ajoutée à la SPEC, au catalogue, aux tests et au registre des demandes. Le travail différé
+  possède une issue GitHub ; les questions ponctuelles et les éléments de diagnostic restent hors SPEC.
 
 Une modification comportementale est terminée uniquement si :
 
@@ -291,7 +299,9 @@ Une modification comportementale est terminée uniquement si :
 4. `npm test`, le build PWA/serveur et `cap sync android` passent ;
 5. toutes les surfaces de version décrites par `SEENIT-RELEASE-001` sont identiques ;
 6. la différence volontaire PWA/APK est documentée ;
-7. la CI compile l'APK et publie la release GitHub.
+7. toute nouvelle demande durable est reliée depuis le registre à la SPEC et à ses éventuelles issues ;
+8. tout audit modifié possède une matrice exhaustive des constats vers les issues ou risques acceptés ;
+9. la CI compile l'APK et publie la release GitHub.
 
 Le contrôle CI `test:spec:changes` refuse une livraison comportementale qui ne contient pas à
 la fois la SPEC et des tests. `test:spec` vérifie la version, les identifiants, les plateformes
@@ -301,6 +311,8 @@ et l'existence exacte des tests référencés. `test:android` protège l'identit
 
 - Les issues GitHub constituent le backlog actif ; les audits datés expliquent les constats et la
   SPEC décrit uniquement le comportement courant attendu.
+- Le registre des demandes conserve l'origine des décisions durables et leur lien vers les exigences,
+  sans recopier les conversations ni stocker de secret ou de donnée personnelle.
 - Une issue porte une priorité `[P0]` à `[P3]`, un domaine, le risque, les critères d'acceptation,
   les exigences concernées, les tests attendus et la matrice PWA/APK.
 - Un agent peut ouvrir et traiter automatiquement une issue sûre dans le périmètre SeenIt. Il ne peut
