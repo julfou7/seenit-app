@@ -7,6 +7,14 @@ coverage/
 .env*
 !.env.example
 
+# npm est le gestionnaire de paquets canonique du dépôt.
+bun.lock
+
+# Artefacts de travail locaux qui ne doivent pas être versionnés.
+github_output.txt
+notes.txt
+test.js
+
 # App release build artifacts and release scripts
 app-release-*/
 release_v*.cjs
