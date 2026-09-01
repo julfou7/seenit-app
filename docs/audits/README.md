@@ -25,6 +25,7 @@ rapport existant et son historique.
 |---|---|---|---|---|---|
 | AUDIT-2026-08-31-GLOBAL | 2026-08-31 | 1.4.80 (`75ec2f1` après durcissement 1.4.81) | application, PWA, APK, backend, sécurité, structure, tests et CI/CD | [Audit global](./audit-global-2026-08-31.md) | [Issues #9 à #19](../backlog/README.md) |
 | AUDIT-2026-09-01-AISTUDIO-FIRESTORE | 2026-09-01 | 1.4.92 (`4e644a4`) | AI Studio, Firebase, Firestore, identité Android | [Audit ciblé](./audit-ai-studio-firestore-history-2026-09-01.md) | [Issue #21](https://github.com/julfou7/seenit-app/issues/21) |
+| AUDIT-2026-09-01-FIRESTORE-INVENTORY | 2026-09-01 | 1.4.93 (`499eb00`) | inventaire des bases Firestore, partage Firebase SeenIt/ATHIA et nettoyage | [Audit ciblé](./audit-firestore-resource-inventory-2026-09-01.md) | [Issue #22](https://github.com/julfou7/seenit-app/issues/22) |
 
 L'audit historique des téléchargements antérieur à ce protocole reste disponible dans
 [`../audit-telechargements-2026-08-30.md`](../audit-telechargements-2026-08-30.md). Ses corrections
