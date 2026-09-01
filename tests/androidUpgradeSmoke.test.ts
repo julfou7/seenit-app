@@ -83,7 +83,8 @@ test('SEENIT-APK-003 exécute le smoke sur Android 12 et la cible Android couran
     workflow,
     /reactivecircus\/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2\.38\.0/
   );
-  assert.match(workflow, /assembleDebug assembleDebugAndroidTest/);
+  assert.match(workflow, /:app:assembleDebug :app:assembleDebugAndroidTest/);
+  assert.doesNotMatch(workflow, /\.\/gradlew --no-daemon assembleDebug assembleDebugAndroidTest/);
   assert.match(workflow, /needs: \[build, android_upgrade_smoke\]/);
   assert.match(workflow, /SeenIt-APK-Upgrade-Smoke-Android-/);
 });
