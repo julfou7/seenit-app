@@ -2,6 +2,8 @@
 
 - **Identifiant** : AUDIT-2026-09-01-AISTUDIO-FIRESTORE
 - **Date** : 1er septembre 2026
+- **Dernière vérification** : 1er septembre 2026
+- **Statut** : protections en cours d'implémentation via [issue #21](https://github.com/julfou7/seenit-app/issues/21)
 - **Version auditée** : SeenIt 1.4.90
 - **Commit de référence** : `f9626da59af96d5209431366d56d811656f98291`
 - **Périmètre** : historique Git des changements de configuration Firebase/Firestore et comportement des imports/synchronisations AI Studio.
@@ -19,6 +21,14 @@ Le comportement stable confirmé par les correctifs les plus récents est :
 - le champ `firestoreDatabaseId` de `firebase-applet-config.json` est une métadonnée de workspace AI Studio et ne constitue pas la source de vérité de la base utilisée par SeenIt ;
 - `android/app/google-services.json` est requis pour l'intégration Firebase Android/FCM et ne doit pas être supprimé lors d'un import ou d'une synchronisation AI Studio.
 
+## Points solides à conserver
+
+- le projet Firebase actuel reste `gen-lang-client-0201895414` ;
+- le package Android reste `com.seenit.app` ;
+- Firestore est explicitement ouvert sur `default` côté client et Admin ;
+- `google-services.json` est déjà listé parmi les fichiers obligatoires du contrat Android ;
+- le contrat `SEENIT-DATA-004` cible précisément projet + base pour la récupération IndexedDB ; changer le databaseId implicitement invaliderait cette garantie.
+
 ## Chronologie des dérives observées
 
 | Version / commit | Changement | Conséquence / décision suivante |
@@ -34,6 +44,8 @@ Le comportement stable confirmé par les correctifs les plus récents est :
 
 Le problème n'est pas seulement technique : un import ou une synchronisation AI Studio peut produire des modifications automatiques de fichiers de configuration. Si ces changements sont acceptés comme des « mises à niveau » sans comparaison avec GitHub, des métadonnées propres au workspace AI Studio peuvent être prises à tort pour la configuration canonique de SeenIt.
 
+La protection ne peut donc pas dépendre uniquement du fait qu'un agent ait lu une consigne : les invariants doivent aussi être exécutables et faire échouer la validation si un outil les réécrit.
+
 ## Décisions non négociables
 
 1. Un import/sync AI Studio est un mécanisme de transport, pas une migration de configuration.
@@ -47,8 +59,8 @@ Le problème n'est pas seulement technique : un import ou une synchronisation AI
 
 | Constat | Priorité | Décision |
 | --- | --- | --- |
-| Identifiant Firestore réécrit à répétition | P1 | Issue GitHub dédiée : verrouillage `default` + tests |
-| Métadonnée `firestoreDatabaseId` AI Studio prise comme source de vérité | P1 | Interdiction explicite dans AGENTS/SPEC + test de non-utilisation |
-| Import AI Studio générant des diffs non demandés | P1 | Import/sync considéré non autoritatif, comparaison Git obligatoire avant commit |
-| Suppression possible de `google-services.json` | P1 | Fichier déjà requis par le contrat Android ; ajout de vérifications d'identité Firebase |
-| `AGENTS.md` racine pas nécessairement préchargé par le harnais | P1 | Bootstrap `.agents/AGENTS.md` qui impose la lecture de la source de vérité racine |
+| Identifiant Firestore réécrit à répétition | P1 | [Issue #21](https://github.com/julfou7/seenit-app/issues/21) — verrouillage `default` + tests |
+| Métadonnée `firestoreDatabaseId` AI Studio prise comme source de vérité | P1 | [Issue #21](https://github.com/julfou7/seenit-app/issues/21) — interdiction explicite AGENTS/SPEC + test de non-utilisation |
+| Import AI Studio générant des diffs non demandés | P1 | [Issue #21](https://github.com/julfou7/seenit-app/issues/21) — import/sync non autoritatif, comparaison Git obligatoire |
+| Suppression possible de `google-services.json` | P1 | [Issue #21](https://github.com/julfou7/seenit-app/issues/21) — identité Firebase ajoutée au contrat Android |
+| `AGENTS.md` racine potentiellement non préchargé par le harnais | P1 | [Issue #21](https://github.com/julfou7/seenit-app/issues/21) — bootstrap `.agents/AGENTS.md` vers la source racine |
