@@ -1,3 +1,0 @@
-NOTES<<EOF
-TEST
-EOF
