@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 1er septembre 2026
-Version applicative : **1.4.86**
+Version applicative : **1.4.87**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -259,6 +259,14 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   commit détaillé ne peut jamais masquer les changements précédents de la même version. Si le tag de
   la version courante existe déjà lors d'une régénération, il est ignoré comme borne de départ afin de
   conserver la totalité de l'historique de cette version.
+- **SEENIT-RELEASE-004** — Une release APK est immuable. La CI compare `versionName` et
+  `versionCode` au commit précédent et refuse toute version inchangée, régressive ou incohérente.
+  Elle vérifie avant le build puis immédiatement avant publication que ni le tag ni la release
+  `vX.Y.Z` n'existent. La validation/construction s'exécute avec des droits de lecture ; seul un job
+  de publication dépendant possède `contents: write`. L'APK et son fichier `.sha256` forment un
+  artefact indissociable, vérifié après construction et après transfert entre jobs. L'action de
+  publication refuse explicitement tout écrasement et tout fichier manquant. Relancer une version
+  déjà publiée doit échouer : la correction suivante utilise obligatoirement un nouveau patch.
 - Canal PWA : le déploiement Web peut être instantané et réversible côté hébergeur.
 - Canal APK : une correction, y compris un rollback logique, est toujours une nouvelle version avec
   un `versionCode` supérieur. On ne remplace jamais silencieusement l'asset d'une version déjà testée.

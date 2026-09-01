@@ -6,16 +6,20 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: seenit-build-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
-    name: Build & Release APK
+    name: Validate & Build APK
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      app_version: ${{ steps.release_candidate.outputs.APP_VERSION }}
 
     steps:
       - name: Checkout Code
@@ -34,6 +38,14 @@ jobs:
         with:
           node-version: '22'
           package-manager-cache: false
+
+      - name: Validate Unpublished Release Version
+        id: release_candidate
+        run: node scripts/validate-release-immutability.cjs
+        env:
+          RELEASE_BASE_SHA: ${{ github.event.before }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
@@ -73,41 +85,85 @@ jobs:
           ./gradlew --no-daemon assembleDebug --stacktrace
 
       - name: Prepare Named APK
-        id: version_step
         run: |
-          VERSION=$(grep "versionName" android/app/build.gradle | head -1 | awk -F '"' '{print $2}')
+          VERSION="${{ steps.release_candidate.outputs.APP_VERSION }}"
           test -n "$VERSION"
-          echo "APP_VERSION=$VERSION" >> $GITHUB_OUTPUT
           cp android/app/build/outputs/apk/debug/app-debug.apk "SeenIt-v${VERSION}.apk"
           sha256sum "SeenIt-v${VERSION}.apk" > "SeenIt-v${VERSION}.apk.sha256"
+          sha256sum --check "SeenIt-v${VERSION}.apk.sha256"
 
       - name: Upload APK Artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
-          name: SeenIt-Android-APK
+          name: SeenIt-Android-APK-v${{ steps.release_candidate.outputs.APP_VERSION }}
           path: |
-            SeenIt-v${{ steps.version_step.outputs.APP_VERSION }}.apk
-            SeenIt-v${{ steps.version_step.outputs.APP_VERSION }}.apk.sha256
+            SeenIt-v${{ steps.release_candidate.outputs.APP_VERSION }}.apk
+            SeenIt-v${{ steps.release_candidate.outputs.APP_VERSION }}.apk.sha256
+          if-no-files-found: error
           retention-days: 30
+
+  publish:
+    name: Publish Immutable APK Release
+    needs: build
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code and Release History
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Revalidate Release Immutability Before Publish
+        run: node scripts/validate-release-immutability.cjs
+        env:
+          RELEASE_BASE_SHA: ${{ github.event.before }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download Validated APK Pair
+        uses: actions/download-artifact@v8
+        with:
+          name: SeenIt-Android-APK-v${{ needs.build.outputs.app_version }}
+          path: release-assets
+
+      - name: Verify Downloaded APK Pair
+        run: |
+          cd release-assets
+          VERSION="${{ needs.build.outputs.app_version }}"
+          test -f "SeenIt-v${VERSION}.apk"
+          test -f "SeenIt-v${VERSION}.apk.sha256"
+          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 2
+          sha256sum --check "SeenIt-v${VERSION}.apk.sha256"
 
       - name: Generate Release Notes
         id: release_notes
         run: node scripts/generate-release-notes.cjs
         env:
-          APP_VERSION: ${{ steps.version_step.outputs.APP_VERSION }}
+          APP_VERSION: ${{ needs.build.outputs.app_version }}
 
       - name: Publish GitHub Release
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v${{ steps.version_step.outputs.APP_VERSION }}
-          name: SeenIt v${{ steps.version_step.outputs.APP_VERSION }}
+          tag_name: v${{ needs.build.outputs.app_version }}
+          name: SeenIt v${{ needs.build.outputs.app_version }}
+          target_commitish: ${{ github.sha }}
           draft: false
           prerelease: false
           body: ${{ steps.release_notes.outputs.NOTES }}
           generate_release_notes: false
+          overwrite_files: false
+          fail_on_unmatched_files: true
           files: |
-            SeenIt-v${{ steps.version_step.outputs.APP_VERSION }}.apk
-            SeenIt-v${{ steps.version_step.outputs.APP_VERSION }}.apk.sha256
+            release-assets/SeenIt-v${{ needs.build.outputs.app_version }}.apk
+            release-assets/SeenIt-v${{ needs.build.outputs.app_version }}.apk.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

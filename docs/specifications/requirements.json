@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.86",
+  "applicationVersion": "1.4.87",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -529,6 +529,33 @@
         {
           "file": "tests/releaseNotes.test.ts",
           "contains": "SEENIT-RELEASE-003 ignore le tag de la version courante pour retrouver la vraie version précédente"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-RELEASE-004",
+      "title": "Release APK immuable et version strictement progressive",
+      "targets": [
+        "ci",
+        "apk",
+        "pwa"
+      ],
+      "tests": [
+        {
+          "file": "tests/releaseImmutability.test.ts",
+          "contains": "SEENIT-RELEASE-004 refuse une release quand son tag ou sa publication existe déjà"
+        },
+        {
+          "file": "tests/releaseImmutability.test.ts",
+          "contains": "SEENIT-RELEASE-004 refuse un push documentaire à version inchangée ou régressive"
+        },
+        {
+          "file": "tests/releaseImmutability.test.ts",
+          "contains": "SEENIT-RELEASE-004 accepte uniquement une progression N vers N+1 cohérente"
+        },
+        {
+          "file": "tests/releaseImmutability.test.ts",
+          "contains": "SEENIT-RELEASE-004 sépare le build de la publication et vérifie la paire APK SHA-256"
         }
       ]
     },

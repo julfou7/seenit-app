@@ -17,6 +17,9 @@ A chaque correctif ou fonctionnalité ajoutée :
 - La CI vérifie et publie ; elle ne corrige, ne commit et ne pousse jamais automatiquement `main`.
 - Un rollback APK se livre avec un nouveau patch et un `versionCode` supérieur. Ne tentez jamais de
   republier un ancien numéro de version ou d'abaisser `versionCode`.
+- Conservez la construction dans un job CI en lecture seule et la publication dans un job dépendant
+  qui possède seul `contents: write`. Le garde d'immuabilité s'exécute avant le build et avant la
+  publication ; ne le contournez jamais et n'autorisez jamais l'écrasement des assets d'une release.
 
 ### Contrat APK immuable
 - Ne supprimez, ne renommez et ne régénérez jamais silencieusement les icônes du lanceur.
