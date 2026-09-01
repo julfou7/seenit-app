@@ -1,0 +1,34 @@
+name: Validate issue live tracking rule
+
+on:
+  push:
+    branches: [ docs/issue-live-tracking ]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+      - name: Validate specification change contract
+        run: npm run test:spec:changes
+        env:
+          SPEC_BASE_SHA: f9626da59af96d5209431366d56d811656f98291
+      - name: Run tests
+        run: npm test
+      - name: Build web assets
+        run: npm run build
+      - name: Sync Capacitor Android
+        run: npx cap sync android
+      - name: Revalidate Android contract
+        run: npm run test:android
