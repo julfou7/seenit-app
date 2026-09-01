@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 1er septembre 2026
-Version applicative : **1.4.97**
+Version applicative : **1.4.98**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -297,6 +297,8 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   conserver la totalité de l'historique de cette version.
 - **SEENIT-RELEASE-004** — Une release APK est immuable. La CI compare `versionName` et
   `versionCode` au commit précédent et refuse toute version inchangée, régressive ou incohérente.
+  Une candidate déjà commitée consomme donc son numéro même si son pipeline échoue avant publication ;
+  toute correction ultérieure progresse vers un nouveau numéro et apporte sa preuve automatisée.
   Elle vérifie avant le build puis immédiatement avant publication que ni le tag ni la release
   `vX.Y.Z` n'existent. La validation/construction s'exécute avec des droits de lecture ; seul un job
   de publication dépendant possède `contents: write`. L'APK et son fichier `.sha256` forment un

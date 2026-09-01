@@ -58,6 +58,14 @@ test('SEENIT-RELEASE-004 accepte uniquement une progression N vers N+1 cohérent
   assert.equal(selectBaseRef('0'.repeat(40)), 'HEAD^');
 });
 
+test('SEENIT-RELEASE-004 impose un nouveau numéro après une candidate déjà commitée', () => {
+  const current = parseAndroidVersion(readFileSync('android/app/build.gradle', 'utf8'));
+  const failedCandidate = { versionName: '1.4.97', versionCode: 104097 };
+  assert.equal(evaluateReleaseCandidate({ current, previous: failedCandidate }).ok, true);
+  assert.notEqual(current.versionName, failedCandidate.versionName);
+  assert.ok(current.versionCode > failedCandidate.versionCode);
+});
+
 test('SEENIT-RELEASE-004 sépare le build de la publication et vérifie la paire APK SHA-256', () => {
   assert.match(workflow, /^permissions:\s+contents: read/m);
   assert.match(workflow, /cancel-in-progress: false/);

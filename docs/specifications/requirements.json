@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.97",
+  "applicationVersion": "1.4.98",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -640,6 +640,10 @@
         {
           "file": "tests/releaseImmutability.test.ts",
           "contains": "SEENIT-RELEASE-004 accepte uniquement une progression N vers N+1 cohérente"
+        },
+        {
+          "file": "tests/releaseImmutability.test.ts",
+          "contains": "SEENIT-RELEASE-004 impose un nouveau numéro après une candidate déjà commitée"
         },
         {
           "file": "tests/releaseImmutability.test.ts",
