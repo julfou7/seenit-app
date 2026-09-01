@@ -105,7 +105,14 @@ function validateAndroidContract() {
   }
   for (const requiredFile of contract.requiredFiles) read(requiredFile);
 
-  requireIncludes(workflow, './gradlew --no-daemon assembleDebug', 'build APK reproductible via wrapper');
+  requireIncludes(
+    workflow,
+    './gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest',
+    'build APK et AndroidTest reproductible via wrapper sur le module app'
+  );
+  if (/\.\/gradlew\s+--no-daemon\s+assembleDebug\s+assembleDebugAndroidTest/.test(workflow)) {
+    throw new Error('La CI ne doit pas compiler les AndroidTest des modules dépendants : cibler explicitement :app:.');
+  }
   requireIncludes(workflow, 'SeenIt-v${VERSION}.apk', 'nom de l’APK versionné');
   if (/gradle-version:/.test(workflow)) {
     throw new Error('La CI doit utiliser exclusivement la version définie et vérifiée par le wrapper.');
