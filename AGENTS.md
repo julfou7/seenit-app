@@ -1,6 +1,13 @@
 # Instructions pour l'Assistant de Codage AI (AGENTS)
 
-Vous devez suivre strictement ces règles lors de toutes vos interventions sur le projet **SeenIt** :
+Vous devez suivre strictement ces règles lors de toutes vos interventions sur le projet **SeenIt**.
+
+## 0. Première action obligatoire — avant toute analyse ou modification
+- **Lisez ce fichier intégralement avant toute autre action sur le dépôt.** Ne commencez ni analyse, ni édition, ni synchronisation, ni proposition de commit avant cette lecture complète.
+- Lisez ensuite intégralement `docs/specifications/seenit.md` et `docs/specifications/README.md` avant toute modification.
+- Si l'environnement agent précharge `.agents/AGENTS.md`, ce fichier est uniquement un bootstrap : le présent `AGENTS.md` racine reste la source de vérité complète des règles de développement SeenIt.
+- Un workspace importé ou synchronisé depuis AI Studio n'est **jamais** une source de vérité supérieure à GitHub. L'état de la branche GitHub de référence doit être vérifié avant d'accepter un diff généré automatiquement.
+- Si un import/sync AI Studio ouvre le workspace avec des fichiers déjà modifiés sans demande utilisateur correspondante, **ne les commitez pas** : comparez-les à GitHub, restaurez l'état canonique et n'intégrez que les changements explicitement voulus.
 
 ## 1. Langue de communication et de livraison
 - **Langue de l'interface & de la discussion :** Toutes vos réponses et explications à l'utilisateur doivent être rédigées exclusivement en **français**.
@@ -21,6 +28,13 @@ A chaque correctif ou fonctionnalité ajoutée :
   qui possède seul `contents: write`. Le garde d'immuabilité s'exécute avant le build et avant la
   publication ; ne le contournez jamais et n'autorisez jamais l'écrasement des assets d'une release.
 
+### Import et synchronisation AI Studio — transport non autoritatif
+- Un import, une reconnexion ou une synchronisation AI Studio/GitHub est **un mécanisme de transport**, jamais une migration ni une autorisation de « normaliser » le projet.
+- Avant tout commit provenant d'un workspace nouvellement importé, comparez le diff au commit/à la branche GitHub source. Toute modification apparue uniquement à cause de l'import doit être rejetée tant qu'elle n'a pas été demandée et justifiée.
+- AI Studio ne doit jamais modifier automatiquement Firebase/Firestore, `android/app/build.gradle`, `docs/specifications/android-contract.json`, la SPEC, `requirements.json`, les versions, les lockfiles, `server.ts`, les secrets ou la configuration Android sous prétexte d'adapter le workspace.
+- Ne supprimez pas un fichier suivi par GitHub parce qu'AI Studio le considère obsolète. Une suppression doit répondre à une demande explicite, être comprise, spécifiée et testée.
+- La branche GitHub officielle est la référence lors d'un conflit entre fichiers générés/importés et fichiers du dépôt. Une migration volontaire se traite comme un chantier séparé, jamais comme un effet secondaire de synchronisation.
+
 ### Contrat APK immuable
 - Ne supprimez, ne renommez et ne régénérez jamais silencieusement les icônes du lanceur.
 - Ne modifiez jamais `applicationId` (`com.seenit.app`), le nom SeenIt, le deep link ou la clé
@@ -34,6 +48,15 @@ A chaque correctif ou fonctionnalité ajoutée :
   de N puis N+1 sans désinstallation sur Android 12 et Android cible, ainsi que ses preuves archivées.
 - L'APK publié reste le build `assembleDebug` signé avec la clé historique tant que la migration vers
   une signature de production n'a pas été conçue et testée sur une installation existante.
+
+### Contrat Firebase / Firestore immuable
+- **Base Firestore canonique : `default`, exactement, sans parenthèses.** Le client PWA/APK et Firebase Admin doivent tous deux sélectionner explicitement cette base.
+- N'utilisez jamais `(default)`, un `getFirestore()` implicite ni un identifiant de base personnalisé comme remplacement automatique de `default`.
+- Le champ `firestoreDatabaseId` de `firebase-applet-config.json` est une métadonnée du workspace AI Studio. **Il n'est pas la source de vérité du databaseId utilisé par SeenIt** et ne doit pas piloter `initializeFirestore()` ou `getFirestore()`.
+- Le projet Firebase canonique SeenIt est `gen-lang-client-0201895414`. Ne le remplacez jamais automatiquement à l'import, à la reconnexion ou lors d'une régénération de configuration.
+- `android/app/google-services.json` est un fichier Android requis. Ne le supprimez, ne le remplacez et ne changez son `project_id`, son package `com.seenit.app` ou son `mobilesdk_app_id` sans migration Firebase Android explicitement approuvée et testée.
+- Ne proposez jamais de changement de databaseId uniquement parce qu'une valeur différente apparaît dans un fichier généré par AI Studio. L'historique SeenIt a déjà démontré que ces bascules provoquent bibliothèque vide, client offline et synchronisation bloquée.
+- Toute modification du projet Firebase, du databaseId ou de l'association Android Firebase est une **migration de données/identité** : elle nécessite validation utilisateur explicite, inventaire/backup des données, plan de migration, rollback et tests PWA + APK. Aucun agent ne peut la décider seul.
 
 ## 3. Compatibilité PWA et APK Android
 - **Double cible obligatoire :** SeenIt doit rester pleinement fonctionnelle en PWA et dans l'APK Android. Toute modification doit prendre en compte et vérifier les deux environnements.
