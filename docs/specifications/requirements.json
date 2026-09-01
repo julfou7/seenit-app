@@ -6,671 +6,313 @@
     {
       "id": "SEENIT-PLATFORM-001",
       "title": "Transport SeenIt adapté à la PWA et à l'APK",
-      "targets": [
-        "pwa",
-        "apk"
-      ],
+      "targets": ["pwa", "apk"],
       "tests": [
-        {
-          "file": "tests/seenitApi.test.ts",
-          "contains": "les appels API de l’APK ciblent toujours le backend SeenIt"
-        },
-        {
-          "file": "tests/seenitApi.test.ts",
-          "contains": "la PWA conserve les routes relatives"
-        }
+        {"file": "tests/seenitApi.test.ts", "contains": "les appels API de l’APK ciblent toujours le backend SeenIt"},
+        {"file": "tests/seenitApi.test.ts", "contains": "la PWA conserve les routes relatives"}
       ]
     },
     {
       "id": "SEENIT-APK-001",
       "title": "Identité et signature APK immuables",
-      "targets": [
-        "apk",
-        "ci"
-      ],
-      "tests": [
-        {
-          "file": "tests/androidContract.test.ts",
-          "contains": "SEENIT-APK-001 verrouille l’identité, la version et la clé de signature de l’APK"
-        }
-      ]
+      "targets": ["apk", "ci"],
+      "tests": [{"file": "tests/androidContract.test.ts", "contains": "SEENIT-APK-001 verrouille l’identité, la version et la clé de signature de l’APK"}]
     },
     {
       "id": "SEENIT-APK-002",
       "title": "Icônes SeenIt protégées sur toutes les densités Android",
-      "targets": [
-        "pwa",
-        "apk",
-        "ci"
-      ],
-      "tests": [
-        {
-          "file": "tests/androidContract.test.ts",
-          "contains": "SEENIT-APK-002 conserve toutes les icônes du lanceur et leur identité visuelle"
-        }
-      ]
+      "targets": ["pwa", "apk", "ci"],
+      "tests": [{"file": "tests/androidContract.test.ts", "contains": "SEENIT-APK-002 conserve toutes les icônes du lanceur et leur identité visuelle"}]
     },
     {
       "id": "SEENIT-APK-003",
       "title": "Mise à jour APK N vers N+1 réellement testée avant publication",
-      "targets": [
-        "apk",
-        "ci"
-      ],
+      "targets": ["apk", "ci"],
       "tests": [
-        {
-          "file": "tests/androidUpgradeSmoke.test.ts",
-          "contains": "SEENIT-APK-003 sélectionne uniquement la dernière release strictement antérieure et vérifiée"
-        },
-        {
-          "file": "tests/androidUpgradeSmoke.test.ts",
-          "contains": "SEENIT-APK-003 bloque toute baseline APK dont l’empreinte est incohérente"
-        },
-        {
-          "file": "tests/androidUpgradeSmoke.test.ts",
-          "contains": "SEENIT-APK-003 installe réellement N puis N+1 sans désinstaller les données"
-        },
-        {
-          "file": "tests/androidUpgradeSmoke.test.ts",
-          "contains": "SEENIT-APK-003 exécute le smoke sur Android 12 et la cible Android courante avant publication"
-        }
+        {"file": "tests/androidUpgradeSmoke.test.ts", "contains": "SEENIT-APK-003 sélectionne uniquement la dernière release strictement antérieure et vérifiée"},
+        {"file": "tests/androidUpgradeSmoke.test.ts", "contains": "SEENIT-APK-003 bloque toute baseline APK dont l’empreinte est incohérente"},
+        {"file": "tests/androidUpgradeSmoke.test.ts", "contains": "SEENIT-APK-003 installe réellement N puis N+1 sans désinstaller les données"},
+        {"file": "tests/androidUpgradeSmoke.test.ts", "contains": "SEENIT-APK-003 exécute le smoke sur Android 12 et la cible Android courante avant publication"}
       ]
+    },
+    {
+      "id": "SEENIT-APK-004",
+      "title": "Association Firebase Android immuable et vérifiée",
+      "targets": ["apk", "ci"],
+      "tests": [{"file": "tests/firebaseIdentityGuardrails.test.ts", "contains": "SEENIT-APK-004 verrouille l’identité Firebase Android et google-services.json"}]
     },
     {
       "id": "SEENIT-DATA-001",
       "title": "Caches locaux isolés par UID",
-      "targets": [
-        "pwa",
-        "apk"
-      ],
-      "tests": [
-        {
-          "file": "tests/userIsolation.test.ts",
-          "contains": "isole strictement chaque cache local par UID"
-        }
-      ]
+      "targets": ["pwa", "apk"],
+      "tests": [{"file": "tests/userIsolation.test.ts", "contains": "isole strictement chaque cache local par UID"}]
     },
     {
       "id": "SEENIT-DATA-002",
       "title": "Téléchargements persistants isolés par UID",
-      "targets": [
-        "pwa",
-        "apk"
-      ],
-      "tests": [
-        {
-          "file": "tests/downloadUserScope.test.ts",
-          "contains": "le stockage des téléchargements est réellement partitionné par UID"
-        }
-      ]
+      "targets": ["pwa", "apk"],
+      "tests": [{"file": "tests/downloadUserScope.test.ts", "contains": "le stockage des téléchargements est réellement partitionné par UID"}]
     },
     {
       "id": "SEENIT-DATA-003",
       "title": "Journaux techniques isolés par UID",
-      "targets": [
-        "pwa",
-        "apk"
-      ],
-      "tests": [
-        {
-          "file": "tests/logPrivacy.test.ts",
-          "contains": "SEENIT-DATA-003 isole les journaux techniques par UID sur chaque appareil"
-        }
-      ]
+      "targets": ["pwa", "apk"],
+      "tests": [{"file": "tests/logPrivacy.test.ts", "contains": "SEENIT-DATA-003 isole les journaux techniques par UID sur chaque appareil"}]
     },
     {
       "id": "SEENIT-DATA-004",
       "title": "Récupération Firestore IndexedDB ciblée et anti-boucle",
-      "targets": [
-        "pwa",
-        "apk"
-      ],
+      "targets": ["pwa", "apk"],
       "tests": [
-        {
-          "file": "tests/firestoreRecovery.test.ts",
-          "contains": "SEENIT-DATA-004 sélectionne uniquement la base Firestore exacte du projet courant"
-        },
-        {
-          "file": "tests/firestoreRecovery.test.ts",
-          "contains": "SEENIT-DATA-004 partage une seule tentative entre onglets et casse la boucle de rechargement"
-        }
+        {"file": "tests/firestoreRecovery.test.ts", "contains": "SEENIT-DATA-004 sélectionne uniquement la base Firestore exacte du projet courant"},
+        {"file": "tests/firestoreRecovery.test.ts", "contains": "SEENIT-DATA-004 partage une seule tentative entre onglets et casse la boucle de rechargement"}
       ]
+    },
+    {
+      "id": "SEENIT-DATA-005",
+      "title": "Base Firestore canonique default indépendante des métadonnées AI Studio",
+      "targets": ["backend", "pwa", "apk", "ci"],
+      "tests": [{"file": "tests/firebaseIdentityGuardrails.test.ts", "contains": "SEENIT-DATA-005 verrouille Firestore sur la base default sans suivre les métadonnées AI Studio"}]
     },
     {
       "id": "SEENIT-IDENTITY-001",
       "title": "Identité média fondée uniquement sur des identifiants vérifiés",
-      "targets": [
-        "backend",
-        "pwa",
-        "apk"
-      ],
-      "tests": [
-        {
-          "file": "tests/plexIdentity.test.ts",
-          "contains": "ne fabrique aucune identité forte depuis un titre ou une année"
-        }
-      ]
+      "targets": ["backend", "pwa", "apk"],
+      "tests": [{"file": "tests/plexIdentity.test.ts", "contains": "ne fabrique aucune identité forte depuis un titre ou une année"}]
     },
     {
       "id": "SEENIT-PLEX-001",
       "title": "Historique Plex résolu sans titre",
-      "targets": [
-        "backend",
-        "pwa",
-        "apk"
-      ],
-      "tests": [
-        {
-          "file": "tests/plexAccountHistory.test.ts",
-          "contains": "normalise un film du Watch History Plex sans utiliser son titre comme identité"
-        }
-      ]
+      "targets": ["backend", "pwa", "apk"],
+      "tests": [{"file": "tests/plexAccountHistory.test.ts", "contains": "normalise un film du Watch History Plex sans utiliser son titre comme identité"}]
     },
     {
       "id": "SEENIT-PLEX-002",
       "title": "Serveur Plex hors ligne non bloquant",
-      "targets": [
-        "backend",
-        "pwa",
-        "apk"
-      ],
-      "tests": [
-        {
-          "file": "tests/plexSyncIntegrity.test.ts",
-          "contains": "un serveur hors ligne ne bloque ni les autres serveurs ni le curseur du full"
-        }
-      ]
+      "targets": ["backend", "pwa", "apk"],
+      "tests": [{"file": "tests/plexSyncIntegrity.test.ts", "contains": "un serveur hors ligne ne bloque ni les autres serveurs ni le curseur du full"}]
     },
     {
       "id": "SEENIT-PLEX-003",
       "title": "Curseur Plex validé après une synchronisation complète",
-      "targets": [
-        "backend",
-        "pwa",
-        "apk"
-      ],
-      "tests": [
-        {
-          "file": "tests/plexSyncIntegrity.test.ts",
-          "contains": "ne valide le curseur qu’après collecte, résolution et écritures complètes"
-        }
-      ]
+      "targets": ["backend", "pwa", "apk"],
+      "tests": [{"file": "tests/plexSyncIntegrity.test.ts", "contains": "ne valide le curseur qu’après collecte, résolution et écritures complètes"}]
     },
     {
       "id": "SEENIT-PLEX-004",
       "title": "Jeton et curseur Plex isolés par UID",
-      "targets": [
-        "pwa",
-        "apk"
-      ],
-      "tests": [
-        {
-          "file": "tests/plexStorage.test.ts",
-          "contains": "isole le jeton et le curseur Plex par UID SeenIt"
-        }
-      ]
+      "targets": ["pwa", "apk"],
+      "tests": [{"file": "tests/plexStorage.test.ts", "contains": "isole le jeton et le curseur Plex par UID SeenIt"}]
     },
     {
       "id": "SEENIT-SECURITY-001",
       "title": "Allowlist minimale du proxy de services",
-      "targets": [
-        "backend",
-        "pwa"
-      ],
-      "tests": [
-        {
-          "file": "tests/downloadBackendSecurity.test.ts",
-          "contains": "le proxy n’accepte que les chemins Sonarr Radarr et qBittorrent nécessaires"
-        }
-      ]
+      "targets": ["backend", "pwa"],
+      "tests": [{"file": "tests/downloadBackendSecurity.test.ts", "contains": "le proxy n’accepte que les chemins Sonarr Radarr et qBittorrent nécessaires"}]
     },
     {
       "id": "SEENIT-SECURITY-002",
       "title": "Routes Git authentifiées en PWA et dans l’APK",
-      "targets": [
-        "backend",
-        "pwa",
-        "apk"
-      ],
+      "targets": ["backend", "pwa", "apk"],
       "tests": [
-        {
-          "file": "tests/apiSurface.test.ts",
-          "contains": "SEENIT-SECURITY-002 le diagnostic Git exige une session SeenIt et passe par le transport APK"
-        },
-        {
-          "file": "tests/gitAdminPolicy.test.ts",
-          "contains": "SEENIT-SECURITY-002 refuse les opérations Git sans allowlist administrateur"
-        },
-        {
-          "file": "tests/gitAdminPolicy.test.ts",
-          "contains": "SEENIT-SECURITY-002 protège les routes Git et masque les outils aux non-administrateurs"
-        }
+        {"file": "tests/apiSurface.test.ts", "contains": "SEENIT-SECURITY-002 le diagnostic Git exige une session SeenIt et passe par le transport APK"},
+        {"file": "tests/gitAdminPolicy.test.ts", "contains": "SEENIT-SECURITY-002 refuse les opérations Git sans allowlist administrateur"},
+        {"file": "tests/gitAdminPolicy.test.ts", "contains": "SEENIT-SECURITY-002 protège les routes Git et masque les outils aux non-administrateurs"}
       ]
     },
     {
       "id": "SEENIT-SECURITY-003",
       "title": "Secrets masqués avant persistance des logs",
-      "targets": [
-        "pwa",
-        "apk",
-        "backend"
-      ],
-      "tests": [
-        {
-          "file": "tests/logPrivacy.test.ts",
-          "contains": "SEENIT-SECURITY-003 masque les secrets avant de persister un journal"
-        }
-      ]
+      "targets": ["pwa", "apk", "backend"],
+      "tests": [{"file": "tests/logPrivacy.test.ts", "contains": "SEENIT-SECURITY-003 masque les secrets avant de persister un journal"}]
     },
     {
       "id": "SEENIT-C411-001",
       "title": "Filtres C411 exacts et année non dupliquée",
-      "targets": [
-        "backend",
-        "pwa",
-        "apk"
-      ],
+      "targets": ["backend", "pwa", "apk"],
       "tests": [
-        {
-          "file": "tests/c411Query.test.ts",
-          "contains": "le filtre C411 Tous ne devient jamais Film implicitement"
-        },
-        {
-          "file": "tests/c411Query.test.ts",
-          "contains": "l’année C411 est utilisée une seule fois dans la recherche"
-        }
+        {"file": "tests/c411Query.test.ts", "contains": "le filtre C411 Tous ne devient jamais Film implicitement"},
+        {"file": "tests/c411Query.test.ts", "contains": "l’année C411 est utilisée une seule fois dans la recherche"}
       ]
     },
     {
       "id": "SEENIT-C411-002",
       "title": "Magnet BTIH validé et ouvert par la plateforme",
-      "targets": [
-        "pwa",
-        "apk"
-      ],
+      "targets": ["pwa", "apk"],
       "tests": [
-        {
-          "file": "tests/magnetLink.test.ts",
-          "contains": "SEENIT-C411-002 construit un Magnet uniquement depuis un infohash BTIH valide"
-        },
-        {
-          "file": "tests/magnetLink.test.ts",
-          "contains": "SEENIT-C411-002 refuse les URL externes"
-        }
+        {"file": "tests/magnetLink.test.ts", "contains": "SEENIT-C411-002 construit un Magnet uniquement depuis un infohash BTIH valide"},
+        {"file": "tests/magnetLink.test.ts", "contains": "SEENIT-C411-002 refuse les URL externes"}
       ]
     },
     {
       "id": "SEENIT-DOWNLOAD-001",
       "title": "Réconciliation transitoire sans titre",
-      "targets": [
-        "pwa",
-        "apk"
-      ],
-      "tests": [
-        {
-          "file": "tests/downloadTransientVisibility.test.ts",
-          "contains": "deux intentions simultanées masquent le qBit ambigu sans corrélation par titre"
-        }
-      ]
+      "targets": ["pwa", "apk"],
+      "tests": [{"file": "tests/downloadTransientVisibility.test.ts", "contains": "deux intentions simultanées masquent le qBit ambigu sans corrélation par titre"}]
     },
     {
       "id": "SEENIT-DOWNLOAD-002",
       "title": "Infohash incompatibles toujours distincts",
-      "targets": [
-        "pwa",
-        "apk"
-      ],
-      "tests": [
-        {
-          "file": "tests/downloadIdentity.test.ts",
-          "contains": "deux vrais infohash différents ne sont jamais fusionnés"
-        }
-      ]
+      "targets": ["pwa", "apk"],
+      "tests": [{"file": "tests/downloadIdentity.test.ts", "contains": "deux vrais infohash différents ne sont jamais fusionnés"}]
     },
     {
       "id": "SEENIT-DOWNLOAD-003",
       "title": "Mutations concurrentes idempotentes",
-      "targets": [
-        "backend",
-        "pwa",
-        "apk"
-      ],
-      "tests": [
-        {
-          "file": "tests/downloadIdempotency.test.ts",
-          "contains": "deux mutations concurrentes de même identité ne sont exécutées qu’une fois"
-        }
-      ]
+      "targets": ["backend", "pwa", "apk"],
+      "tests": [{"file": "tests/downloadIdempotency.test.ts", "contains": "deux mutations concurrentes de même identité ne sont exécutées qu’une fois"}]
     },
     {
       "id": "SEENIT-DOWNLOAD-004",
       "title": "POST Android non rejoué après timeout ambigu",
-      "targets": [
-        "apk"
-      ],
-      "tests": [
-        {
-          "file": "tests/downloadMutationPolicy.test.ts",
-          "contains": "un timeout de mutation Android ne déclenche jamais un second POST"
-        }
-      ]
+      "targets": ["apk"],
+      "tests": [{"file": "tests/downloadMutationPolicy.test.ts", "contains": "un timeout de mutation Android ne déclenche jamais un second POST"}]
     },
     {
       "id": "SEENIT-DOWNLOAD-005",
       "title": "Polling borné, backoff et pagination complète",
-      "targets": [
-        "pwa",
-        "apk"
-      ],
+      "targets": ["pwa", "apk"],
       "tests": [
-        {
-          "file": "tests/downloadPollingPolicy.test.ts",
-          "contains": "le backoff progresse par source et reste plafonné"
-        },
-        {
-          "file": "tests/downloadPollingPolicy.test.ts",
-          "contains": "les files Arr continuent au-delà de 100 éléments jusqu’au total"
-        }
+        {"file": "tests/downloadPollingPolicy.test.ts", "contains": "le backoff progresse par source et reste plafonné"},
+        {"file": "tests/downloadPollingPolicy.test.ts", "contains": "les files Arr continuent au-delà de 100 éléments jusqu’au total"}
       ]
     },
     {
       "id": "SEENIT-DOWNLOAD-006",
       "title": "Ordre visuel stable des téléchargements",
-      "targets": [
-        "pwa",
-        "apk"
-      ],
-      "tests": [
-        {
-          "file": "tests/downloadPresentation.test.ts",
-          "contains": "l’ordre des téléchargements actifs reste celui des demandes"
-        }
-      ]
+      "targets": ["pwa", "apk"],
+      "tests": [{"file": "tests/downloadPresentation.test.ts", "contains": "l’ordre des téléchargements actifs reste celui des demandes"}]
     },
     {
       "id": "SEENIT-DOWNLOAD-007",
       "title": "Historique séparé sans suppression d'un actif",
-      "targets": [
-        "pwa",
-        "apk"
-      ],
-      "tests": [
-        {
-          "file": "tests/downloadStatePolicy.test.ts",
-          "contains": "vider une section ne sélectionne jamais un téléchargement actif"
-        }
-      ]
+      "targets": ["pwa", "apk"],
+      "tests": [{"file": "tests/downloadStatePolicy.test.ts", "contains": "vider une section ne sélectionne jamais un téléchargement actif"}]
     },
     {
       "id": "SEENIT-DOWNLOAD-008",
       "title": "Fallback pack limité au torrent nouvellement prouvé",
-      "targets": [
-        "pwa",
-        "apk"
-      ],
-      "tests": [
-        {
-          "file": "tests/episodePackSelection.test.ts",
-          "contains": "ne manipule jamais un hash qBittorrent déjà présent avant la demande"
-        }
-      ]
+      "targets": ["pwa", "apk"],
+      "tests": [{"file": "tests/episodePackSelection.test.ts", "contains": "ne manipule jamais un hash qBittorrent déjà présent avant la demande"}]
     },
     {
       "id": "SEENIT-DOWNLOAD-009",
       "title": "Scope TV extrait uniquement de marqueurs techniques",
-      "targets": [
-        "pwa",
-        "apk"
-      ],
-      "tests": [
-        {
-          "file": "tests/downloadTransientVisibility.test.ts",
-          "contains": "le scope TV technique est extrait sans utiliser le nom de la série"
-        }
-      ]
+      "targets": ["pwa", "apk"],
+      "tests": [{"file": "tests/downloadTransientVisibility.test.ts", "contains": "le scope TV technique est extrait sans utiliser le nom de la série"}]
     },
     {
       "id": "SEENIT-NOTIFICATION-001",
       "title": "Notifications isolées par UID et appareil",
-      "targets": [
-        "backend",
-        "pwa",
-        "apk"
-      ],
-      "tests": [
-        {
-          "file": "tests/downloadBackendSecurity.test.ts",
-          "contains": "un événement du compte A ne cible que les appareils de A"
-        }
-      ]
+      "targets": ["backend", "pwa", "apk"],
+      "tests": [{"file": "tests/downloadBackendSecurity.test.ts", "contains": "un événement du compte A ne cible que les appareils de A"}]
     },
     {
       "id": "SEENIT-UPDATE-001",
       "title": "Métadonnées et asset de mise à jour officiels avec fallback APK",
-      "targets": [
-        "backend",
-        "pwa",
-        "apk"
-      ],
+      "targets": ["backend", "pwa", "apk"],
       "tests": [
-        {
-          "file": "tests/updateReleasePolicy.test.ts",
-          "contains": "SEENIT-UPDATE-001 l’APK retente toujours le backend SeenIt de production"
-        },
-        {
-          "file": "tests/updateReleasePolicy.test.ts",
-          "contains": "SEENIT-UPDATE-001 refuse une release ou un APK qui ne vient pas du dépôt SeenIt exact"
-        }
+        {"file": "tests/updateReleasePolicy.test.ts", "contains": "SEENIT-UPDATE-001 l’APK retente toujours le backend SeenIt de production"},
+        {"file": "tests/updateReleasePolicy.test.ts", "contains": "SEENIT-UPDATE-001 refuse une release ou un APK qui ne vient pas du dépôt SeenIt exact"}
       ]
     },
     {
       "id": "SEENIT-UPDATE-002",
       "title": "Empreinte SHA-256 de l’APK vérifiée avant installation",
-      "targets": [
-        "apk"
-      ],
-      "tests": [
-        {
-          "file": "tests/updateReleasePolicy.test.ts",
-          "contains": "SEENIT-UPDATE-002 conserve l’empreinte SHA-256 officielle de la release"
-        }
-      ]
+      "targets": ["apk"],
+      "tests": [{"file": "tests/updateReleasePolicy.test.ts", "contains": "SEENIT-UPDATE-002 conserve l’empreinte SHA-256 officielle de la release"}]
     },
     {
       "id": "SEENIT-UX-001",
       "title": "Actions de swipe accessibles au clavier",
-      "targets": [
-        "pwa",
-        "apk"
-      ],
+      "targets": ["pwa", "apk"],
       "tests": [
-        {
-          "file": "tests/swipeActionPolicy.test.ts",
-          "contains": "SEENIT-UX-001 expose chaque direction de swipe au clavier"
-        },
-        {
-          "file": "tests/swipeActionPolicy.test.ts",
-          "contains": "SEENIT-UX-001 associe Suppr à l’action destructive disponible"
-        }
+        {"file": "tests/swipeActionPolicy.test.ts", "contains": "SEENIT-UX-001 expose chaque direction de swipe au clavier"},
+        {"file": "tests/swipeActionPolicy.test.ts", "contains": "SEENIT-UX-001 associe Suppr à l’action destructive disponible"}
       ]
     },
     {
       "id": "SEENIT-UX-002",
       "title": "Clé de rendu et affiche stables",
-      "targets": [
-        "pwa",
-        "apk"
-      ],
+      "targets": ["pwa", "apk"],
       "tests": [
-        {
-          "file": "tests/downloadPosterStability.test.ts",
-          "contains": "la clé de rendu reste identique quand l’intention SeenIt devient un téléchargement distant"
-        },
-        {
-          "file": "tests/downloadPosterStability.test.ts",
-          "contains": "le poster affiché reste celui vu au premier rendu"
-        }
-      ]
-    },
-    {
-      "id": "SEENIT-RELEASE-001",
-      "title": "Version SeenIt unique et versionCode Android monotone",
-      "targets": [
-        "pwa",
-        "apk",
-        "backend",
-        "ci"
-      ],
-      "tests": [
-        {
-          "file": "tests/updateReleasePolicy.test.ts",
-          "contains": "SEENIT-RELEASE-001 compare uniquement des versions sémantiques SeenIt valides"
-        },
-        {
-          "file": "tests/androidContract.test.ts",
-          "contains": "SEENIT-APK-001 verrouille l’identité, la version et la clé de signature de l’APK"
-        }
-      ]
-    },
-    {
-      "id": "SEENIT-RELEASE-002",
-      "title": "CI reproductible, chaîne Gradle vérifiée et aucune mutation automatique de main",
-      "targets": [
-        "ci",
-        "pwa",
-        "apk"
-      ],
-      "tests": [
-        {
-          "file": "tests/developmentGovernance.test.ts",
-          "contains": "SEENIT-RELEASE-002 la CI valide puis publie sans modifier automatiquement main"
-        }
-      ]
-    },
-    {
-      "id": "SEENIT-RELEASE-003",
-      "title": "Notes de release exhaustives sur tous les commits de la version",
-      "targets": [
-        "ci",
-        "pwa",
-        "apk"
-      ],
-      "tests": [
-        {
-          "file": "tests/releaseNotes.test.ts",
-          "contains": "SEENIT-RELEASE-003 agrège tous les commits de la version au lieu du seul dernier commit"
-        },
-        {
-          "file": "tests/releaseNotes.test.ts",
-          "contains": "SEENIT-RELEASE-003 ignore le tag de la version courante pour retrouver la vraie version précédente"
-        }
-      ]
-    },
-    {
-      "id": "SEENIT-RELEASE-004",
-      "title": "Release APK immuable et version strictement progressive",
-      "targets": [
-        "ci",
-        "apk",
-        "pwa"
-      ],
-      "tests": [
-        {
-          "file": "tests/releaseImmutability.test.ts",
-          "contains": "SEENIT-RELEASE-004 refuse une release quand son tag ou sa publication existe déjà"
-        },
-        {
-          "file": "tests/releaseImmutability.test.ts",
-          "contains": "SEENIT-RELEASE-004 refuse un push documentaire à version inchangée ou régressive"
-        },
-        {
-          "file": "tests/releaseImmutability.test.ts",
-          "contains": "SEENIT-RELEASE-004 accepte uniquement une progression N vers N+1 cohérente"
-        },
-        {
-          "file": "tests/releaseImmutability.test.ts",
-          "contains": "SEENIT-RELEASE-004 sépare le build de la publication et vérifie la paire APK SHA-256"
-        }
-      ]
-    },
-    {
-      "id": "SEENIT-QUALITY-001",
-      "title": "Évolution pilotée par SPEC, tests et contrat APK",
-      "targets": [
-        "ci",
-        "pwa",
-        "apk",
-        "backend"
-      ],
-      "tests": [
-        {
-          "file": "tests/developmentGovernance.test.ts",
-          "contains": "SEENIT-QUALITY-001 les règles imposent SPEC, tests et validation APK à chaque évolution"
-        }
+        {"file": "tests/downloadPosterStability.test.ts", "contains": "la clé de rendu reste identique quand l’intention SeenIt devient un téléchargement distant"},
+        {"file": "tests/downloadPosterStability.test.ts", "contains": "le poster affiché reste celui vu au premier rendu"}
       ]
     },
     {
       "id": "SEENIT-UX-003",
       "title": "Navigation lazy sans flash noir au premier accès",
-      "targets": [
-        "pwa",
-        "apk"
-      ],
+      "targets": ["pwa", "apk"],
       "tests": [
-        {
-          "file": "tests/navigationPreload.test.ts",
-          "contains": "SEENIT-UX-003 précharge et déduplique les écrans privés avant la première navigation"
-        },
-        {
-          "file": "tests/navigationPreload.test.ts",
-          "contains": "SEENIT-UX-003 conserve l’écran courant pendant le chargement d’un nouvel écran lazy"
-        }
+        {"file": "tests/navigationPreload.test.ts", "contains": "SEENIT-UX-003 précharge et déduplique les écrans privés avant la première navigation"},
+        {"file": "tests/navigationPreload.test.ts", "contains": "SEENIT-UX-003 conserve l’écran courant pendant le chargement d’un nouvel écran lazy"}
       ]
+    },
+    {
+      "id": "SEENIT-RELEASE-001",
+      "title": "Version SeenIt unique et versionCode Android monotone",
+      "targets": ["pwa", "apk", "backend", "ci"],
+      "tests": [
+        {"file": "tests/updateReleasePolicy.test.ts", "contains": "SEENIT-RELEASE-001 compare uniquement des versions sémantiques SeenIt valides"},
+        {"file": "tests/androidContract.test.ts", "contains": "SEENIT-APK-001 verrouille l’identité, la version et la clé de signature de l’APK"}
+      ]
+    },
+    {
+      "id": "SEENIT-RELEASE-002",
+      "title": "CI reproductible, chaîne Gradle vérifiée et aucune mutation automatique de main",
+      "targets": ["ci", "pwa", "apk"],
+      "tests": [{"file": "tests/developmentGovernance.test.ts", "contains": "SEENIT-RELEASE-002 la CI valide puis publie sans modifier automatiquement main"}]
+    },
+    {
+      "id": "SEENIT-RELEASE-003",
+      "title": "Notes de release exhaustives sur tous les commits de la version",
+      "targets": ["ci", "pwa", "apk"],
+      "tests": [
+        {"file": "tests/releaseNotes.test.ts", "contains": "SEENIT-RELEASE-003 agrège tous les commits de la version au lieu du seul dernier commit"},
+        {"file": "tests/releaseNotes.test.ts", "contains": "SEENIT-RELEASE-003 ignore le tag de la version courante pour retrouver la vraie version précédente"}
+      ]
+    },
+    {
+      "id": "SEENIT-RELEASE-004",
+      "title": "Release APK immuable et version strictement progressive",
+      "targets": ["ci", "apk", "pwa"],
+      "tests": [
+        {"file": "tests/releaseImmutability.test.ts", "contains": "SEENIT-RELEASE-004 refuse une release quand son tag ou sa publication existe déjà"},
+        {"file": "tests/releaseImmutability.test.ts", "contains": "SEENIT-RELEASE-004 refuse un push documentaire à version inchangée ou régressive"},
+        {"file": "tests/releaseImmutability.test.ts", "contains": "SEENIT-RELEASE-004 accepte uniquement une progression N vers N+1 cohérente"},
+        {"file": "tests/releaseImmutability.test.ts", "contains": "SEENIT-RELEASE-004 sépare le build de la publication et vérifie la paire APK SHA-256"}
+      ]
+    },
+    {
+      "id": "SEENIT-QUALITY-001",
+      "title": "Évolution pilotée par SPEC, tests et contrat APK",
+      "targets": ["ci", "pwa", "apk", "backend"],
+      "tests": [{"file": "tests/developmentGovernance.test.ts", "contains": "SEENIT-QUALITY-001 les règles imposent SPEC, tests et validation APK à chaque évolution"}]
     },
     {
       "id": "SEENIT-QUALITY-002",
       "title": "Audits datés et reliés à un backlog priorisé",
-      "targets": [
-        "ci",
-        "pwa",
-        "apk",
-        "backend"
-      ],
-      "tests": [
-        {
-          "file": "tests/developmentGovernance.test.ts",
-          "contains": "SEENIT-QUALITY-002 impose un audit daté relié à des issues priorisées"
-        }
-      ]
+      "targets": ["ci", "pwa", "apk", "backend"],
+      "tests": [{"file": "tests/developmentGovernance.test.ts", "contains": "SEENIT-QUALITY-002 impose un audit daté relié à des issues priorisées"}]
     },
     {
       "id": "SEENIT-QUALITY-003",
       "title": "Demandes durables mémorisées, spécifiées et testées",
-      "targets": [
-        "ci",
-        "pwa",
-        "apk",
-        "backend"
-      ],
-      "tests": [
-        {
-          "file": "tests/developmentGovernance.test.ts",
-          "contains": "SEENIT-QUALITY-003 mémorise chaque demande durable dans la SPEC et le registre"
-        }
-      ]
+      "targets": ["ci", "pwa", "apk", "backend"],
+      "tests": [{"file": "tests/developmentGovernance.test.ts", "contains": "SEENIT-QUALITY-003 mémorise chaque demande durable dans la SPEC et le registre"}]
     },
     {
       "id": "SEENIT-QUALITY-004",
       "title": "Issues maintenues à jour pendant toute l'intervention",
-      "targets": [
-        "ci"
-      ],
-      "tests": [
-        {
-          "file": "tests/developmentGovernance.test.ts",
-          "contains": "SEENIT-QUALITY-004 maintient les issues et leurs checkboxes à jour pendant le travail"
-        }
-      ]
+      "targets": ["ci"],
+      "tests": [{"file": "tests/developmentGovernance.test.ts", "contains": "SEENIT-QUALITY-004 maintient les issues et leurs checkboxes à jour pendant le travail"}]
+    },
+    {
+      "id": "SEENIT-QUALITY-005",
+      "title": "Imports et synchronisations AI Studio non autoritatifs",
+      "targets": ["ci", "pwa", "apk", "backend"],
+      "tests": [{"file": "tests/firebaseIdentityGuardrails.test.ts", "contains": "SEENIT-QUALITY-005 traite l’import et la synchronisation AI Studio comme un transport non autoritatif"}]
     }
   ]
 }
