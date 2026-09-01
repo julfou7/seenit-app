@@ -310,6 +310,13 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   produit, UX, sécurité, plateforme ou développement est comparée à la SPEC. Si elle n'y figure pas,
   elle est ajoutée à la SPEC, au catalogue, aux tests et au registre des demandes. Le travail différé
   possède une issue GitHub ; les questions ponctuelles et les éléments de diagnostic restent hors SPEC.
+- **SEENIT-QUALITY-004** — Dès qu'un travail est relié à une issue GitHub, son corps reste la source
+  de vérité opérationnelle pendant toute l'intervention : l'agent l'actualise après chaque jalon
+  significatif prouvé (implémentation, tests, intégration sur `main`, CI, release ou blocage), coche
+  chaque critère d'acceptation dès qu'il est réellement satisfait et jamais par anticipation, remplace
+  les informations devenues obsolètes et indique clairement le blocage courant ainsi que la prochaine
+  étape. Les commentaires peuvent conserver la chronologie et les preuves, mais ne doivent pas laisser
+  le corps de l'issue décrire un état contradictoire ou dépassé.
 
 Une modification comportementale est terminée uniquement si :
 
@@ -335,6 +342,9 @@ et l'existence exacte des tests référencés. `test:android` protège l'identit
   sans recopier les conversations ni stocker de secret ou de donnée personnelle.
 - Une issue porte une priorité `[P0]` à `[P3]`, un domaine, le risque, les critères d'acceptation,
   les exigences concernées, les tests attendus et la matrice PWA/APK.
+- Une issue en cours est maintenue à jour au fil des preuves : ses checkboxes reflètent l'avancement
+  réel, ses commits/runs/blocages sont actualisés et les éléments obsolètes sont remplacés sans attendre
+  la résolution finale.
 - Un agent peut ouvrir et traiter automatiquement une issue sûre dans le périmètre SeenIt. Il ne peut
   pas décider seul d'une migration de signature, d'une suppression de données, d'un affaiblissement
   de sécurité ou d'un changement d'identité média.
