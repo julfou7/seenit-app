@@ -3,7 +3,7 @@
 - **Identifiant** : AUDIT-2026-09-01-AISTUDIO-FIRESTORE
 - **Date** : 1er septembre 2026
 - **Dernière vérification** : 1er septembre 2026
-- **Statut** : nettoyage des bases historiques terminé via #22 ; configuration canonique verrouillée en SeenIt 1.4.95
+- **Statut** : incident d'import AI Studio `71b7bd6` bloqué par la CI ; restauration et diagnostic renforcé dans la candidate SeenIt 1.4.96 suivie par l'issue #21
 - **Version de référence avant intégration** : SeenIt 1.4.92
 - **Commit de référence** : `4e644a4ca05994061eaf90fa8f5f38735943a4c3`
 - **Périmètre** : historique Git des changements de configuration Firebase/Firestore et comportement des imports/synchronisations AI Studio.
@@ -32,6 +32,9 @@ Le comportement canonique est désormais figé et testé :
 | 1.3.82 — `b302b31b` | réintroduction d'un `customDbId` provenant de `firebase-applet-config.json`, et Admin sans ID explicite | la synchro reste instable / pointe vers une base non canonique |
 | 1.3.83 — `a9eb23ce` | suppression du `customDbId`, client et Admin figés sur `default` | tests directs : la base réelle utilisée par SeenIt est `default` |
 | 1.4.83–1.4.84 — `3e8d2d8a` / `ad024f99` | récupération IndexedDB ciblée sur projet + base réellement configurés | confirme l'importance de ne jamais changer implicitement l'identité de base |
+| 1.4.95 — `29f396ca` | suppression de la métadonnée AI Studio orpheline et protection de `default` documentée | release valide conservée comme base du correctif |
+| Import AI Studio — `71b7bd6f` | suppression automatique de `android/app/google-services.json` sous motif générique de credentials | CI `33555130076` en échec ; commit refusé comme source canonique |
+| Candidate 1.4.96 | restauration du fichier Android canonique et contrat exécuté avant le garde de release | doit produire un diagnostic Firebase immédiat et une mise à jour APK vérifiée |
 
 ## Cause racine organisationnelle
 
@@ -59,3 +62,7 @@ Un import ou une synchronisation AI Studio peut produire des modifications autom
 ## Clôture du nettoyage Firebase #22
 
 Le 1er septembre 2026, après migration d’ATHIA vers `athia-prod`, les bases historiques `ai-studio-181cc...`, `ai-studio-tvtrackoffline...` et `ai-studio-seenit...` ont été contrôlées puis supprimées. L’ancien dossier Storage ATHIA `exercise_images/` du projet SeenIt a également été supprimé. La base SeenIt `default` reste la seule base applicative canonique et sa Delete Protection a été activée. SeenIt 1.4.95 retire enfin la métadonnée AI Studio devenue orpheline et ajoute un test empêchant sa réintroduction.
+
+## Incident d'import après la release 1.4.95
+
+Après un nouvel import/sync AI Studio, le commit `71b7bd6f46cc551cb0b83649f5ea6bacb2c33984` a supprimé le fichier suivi `android/app/google-services.json`, alors que `SEENIT-APK-004` exige sa présence et vérifie son projet, son package et son app ID. La CI [33555130076](https://github.com/julfou7/seenit-app/actions/runs/33555130076) a classé ce diff en APK complet puis l'a bloqué sur l'immuabilité de la version 1.4.95 déjà publiée. La correction 1.4.96 restaure le blob canonique sans changer d'identité Firebase et déplace le contrat Android avant le garde de release : une récidive sera ainsi bloquée avec le diagnostic natif précis avant toute compilation ou publication.

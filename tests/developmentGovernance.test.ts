@@ -22,6 +22,13 @@ test('SEENIT-RELEASE-002 la CI valide puis publie sans modifier automatiquement 
   assert.match(workflow, /sha256sum "SeenIt-v\$\{VERSION\}\.apk"/);
 });
 
+test('SEENIT-APK-004 exécute le contrat Android avant le garde de release', () => {
+  const contractIndex = workflow.indexOf('Specifications, Android Contract & Automated Tests');
+  const releaseGuardIndex = workflow.indexOf('Validate Unpublished Release Version');
+  assert.ok(contractIndex >= 0, 'le contrat Android doit exister dans la CI');
+  assert.ok(releaseGuardIndex > contractIndex, 'le contrat Android doit précéder le garde de release');
+});
+
 test('SEENIT-QUALITY-001 les règles imposent SPEC, tests et validation APK à chaque évolution', () => {
   assert.match(agentRules, /SPEC avant code/);
   assert.match(agentRules, /Contrat APK immuable/);

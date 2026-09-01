@@ -53,15 +53,6 @@ jobs:
           DELIVERY_BASE_SHA: ${{ github.event.before }}
           FORCED_DELIVERY_MODE: ${{ inputs.delivery_mode || 'auto' }}
 
-      - name: Validate Unpublished Release Version
-        if: steps.delivery.outputs.DELIVERY_MODE == 'apk'
-        id: release_candidate
-        run: node scripts/validate-release-immutability.cjs
-        env:
-          RELEASE_BASE_SHA: ${{ github.event.before }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Specification Change Contract
         run: npm run test:spec:changes
         env:
@@ -70,6 +61,15 @@ jobs:
 
       - name: Specifications, Android Contract & Automated Tests
         run: npm test
+
+      - name: Validate Unpublished Release Version
+        if: steps.delivery.outputs.DELIVERY_MODE == 'apk'
+        id: release_candidate
+        run: node scripts/validate-release-immutability.cjs
+        env:
+          RELEASE_BASE_SHA: ${{ github.event.before }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Production Dependency Audit
         run: npm audit --omit=dev --audit-level=high

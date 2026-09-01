@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.95",
+  "applicationVersion": "1.4.96",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -87,6 +87,10 @@
         {
           "file": "tests/firebaseIdentityGuardrails.test.ts",
           "contains": "SEENIT-APK-004 protège l’identité Firebase Android canonique"
+        },
+        {
+          "file": "tests/developmentGovernance.test.ts",
+          "contains": "SEENIT-APK-004 exécute le contrat Android avant le garde de release"
         }
       ]
     },

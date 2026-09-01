@@ -9,7 +9,7 @@ import {
   type SeenItReleaseInfo
 } from '../features/release/releasePolicy';
 
-export const CURRENT_APP_VERSION = '1.4.95';
+export const CURRENT_APP_VERSION = '1.4.96';
 export type AppReleaseInfo = SeenItReleaseInfo;
 
 interface UpdateState {
