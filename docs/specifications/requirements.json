@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.94",
+  "applicationVersion": "1.4.95",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -163,6 +163,22 @@
         {
           "file": "tests/firebaseIdentityGuardrails.test.ts",
           "contains": "SEENIT-DATA-005 verrouille la base Firestore canonique sur default"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DATA-006",
+      "title": "Delete Protection obligatoire sur la base Firestore canonique",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/firebaseIdentityGuardrails.test.ts",
+          "contains": "SEENIT-DATA-006 protège default contre une suppression accidentelle"
         }
       ]
     },

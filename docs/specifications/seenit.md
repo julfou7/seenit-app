@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 1er septembre 2026
-Version applicative : **1.4.94**
+Version applicative : **1.4.95**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -92,10 +92,14 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   IndexedDB de l'origine ne sont jamais supprimées.
 - **SEENIT-DATA-005** — La base Firestore applicative SeenIt est exactement `default`. Le client
   PWA/APK la sélectionne explicitement et Firebase Admin utilise explicitement `getFirestore('default')`.
-  Le champ `firebase-applet-config.json.firestoreDatabaseId`, y compris lorsqu'AI Studio lui attribue
-  un identifiant personnalisé, n'est jamais utilisé pour choisir la base SeenIt. `(default)`, une
-  initialisation Admin implicite ou tout autre databaseId sont refusés hors migration de données
-  explicitement approuvée, sauvegardée, testée et réversible.
+  Le dépôt canonique ne déclare aucun champ `firestoreDatabaseId` dans `firebase-applet-config.json` ;
+  toute réinjection de cette métadonnée par AI Studio est rejetée et ne peut jamais piloter le runtime.
+  `(default)`, une initialisation Admin implicite ou tout autre databaseId sont refusés hors migration
+  de données explicitement approuvée, sauvegardée, testée et réversible.
+- **SEENIT-DATA-006** — La base Firestore canonique `default` conserve Delete Protection activée afin
+  d’empêcher sa suppression accidentelle. Aucun import/sync AI Studio, script ou agent ne désactive
+  automatiquement cette protection. Une désactivation exige une opération de migration/suppression
+  explicitement approuvée par l’utilisateur, précédée d’une sauvegarde et accompagnée d’un rollback.
 - Une réponse asynchrone capture l'UID et un epoch ; elle est ignorée si le compte change avant
   son écriture.
 - La PWA et l'APK d'un même UID partagent Firestore et convergent vers les mêmes données, sans

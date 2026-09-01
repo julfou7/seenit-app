@@ -3,7 +3,7 @@
 - **Identifiant** : AUDIT-2026-09-01-AISTUDIO-FIRESTORE
 - **Date** : 1er septembre 2026
 - **Dernière vérification** : 1er septembre 2026
-- **Statut** : garde-fous réintégrés sur la candidate SeenIt 1.4.93 ; validation finale suivie dans l'issue #21
+- **Statut** : nettoyage des bases historiques terminé via #22 ; configuration canonique verrouillée en SeenIt 1.4.95
 - **Version de référence avant intégration** : SeenIt 1.4.92
 - **Commit de référence** : `4e644a4ca05994061eaf90fa8f5f38735943a4c3`
 - **Périmètre** : historique Git des changements de configuration Firebase/Firestore et comportement des imports/synchronisations AI Studio.
@@ -18,7 +18,7 @@ Le comportement canonique est désormais figé et testé :
 - base Firestore applicative exacte : `default` ;
 - client Web/PWA/APK : initialisation explicite sur `default` ;
 - Firebase Admin : `getFirestore('default')` ;
-- le champ `firestoreDatabaseId` de `firebase-applet-config.json` reste une métadonnée AI Studio et ne pilote pas SeenIt ;
+- le dépôt canonique ne déclare plus de champ `firestoreDatabaseId` dans `firebase-applet-config.json` ; toute réinjection AI Studio est rejetée ;
 - `android/app/google-services.json`, le projet Firebase, le package Android et le mobile SDK app ID sont contrôlés par le contrat Android ;
 - un import AI Studio est un transport non autoritatif et tout diff automatique non demandé est comparé à GitHub puis rejeté.
 
@@ -55,3 +55,7 @@ Un import ou une synchronisation AI Studio peut produire des modifications autom
 | Import AI Studio générant des diffs non demandés | P1 | [Issue #21](https://github.com/julfou7/seenit-app/issues/21) — import/sync non autoritatif, comparaison Git obligatoire |
 | Suppression possible de `google-services.json` | P1 | [Issue #21](https://github.com/julfou7/seenit-app/issues/21) — identité Firebase intégrée au contrat Android |
 | `AGENTS.md` racine potentiellement non préchargé par le harnais | P1 | [Issue #21](https://github.com/julfou7/seenit-app/issues/21) — bootstrap `.agents/AGENTS.md` vers la source racine |
+
+## Clôture du nettoyage Firebase #22
+
+Le 1er septembre 2026, après migration d’ATHIA vers `athia-prod`, les bases historiques `ai-studio-181cc...`, `ai-studio-tvtrackoffline...` et `ai-studio-seenit...` ont été contrôlées puis supprimées. L’ancien dossier Storage ATHIA `exercise_images/` du projet SeenIt a également été supprimé. La base SeenIt `default` reste la seule base applicative canonique et sa Delete Protection a été activée. SeenIt 1.4.95 retire enfin la métadonnée AI Studio devenue orpheline et ajoute un test empêchant sa réintroduction.

@@ -7,12 +7,27 @@ const read = (path: string) => fs.readFileSync(path, 'utf8');
 test('SEENIT-DATA-005 verrouille la base Firestore canonique sur default', () => {
   const client = read('src/lib/firebase.ts');
   const admin = read('src/lib/firebase-admin.ts');
+  const workspaceConfig = JSON.parse(read('firebase-applet-config.json'));
   assert.match(client, /export const FIRESTORE_DATABASE_ID = ['"]default['"]/);
   assert.match(client, /initializeFirestore[\s\S]*FIRESTORE_DATABASE_ID\s*\)/);
   assert.equal(client.includes('(default)'), false);
   assert.equal(client.includes('firestoreDatabaseId'), false);
   assert.match(admin, /getFirestore\(['"]default['"]\)/);
   assert.equal(/getFirestore\(\s*\)/.test(admin), false);
+  assert.equal('firestoreDatabaseId' in workspaceConfig, false);
+});
+
+test('SEENIT-DATA-006 protège default contre une suppression accidentelle', () => {
+  const agents = read('AGENTS.md');
+  const specification = read('docs/specifications/seenit.md');
+  const workflow = read('.github/workflows/build-apk.yml');
+  const scripts = fs.readdirSync('scripts')
+    .filter(name => name.endsWith('.cjs') || name.endsWith('.sh'))
+    .map(name => read(`scripts/${name}`))
+    .join('\n');
+  assert.match(agents, /Delete Protection activée/);
+  assert.match(specification, /SEENIT-DATA-006[\s\S]*Delete Protection activée/);
+  assert.equal(/--no-delete-protection|DELETE_PROTECTION_DISABLED/.test(`${workflow}\n${scripts}`), false);
 });
 test('SEENIT-APK-004 protège l’identité Firebase Android canonique', () => {
   const contract = JSON.parse(read('docs/specifications/android-contract.json'));

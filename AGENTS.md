@@ -63,7 +63,8 @@ Avant toute livraison, laissez `npm run delivery:classify` qualifier le diff :
 ### Contrat Firebase / Firestore immuable
 - **Base Firestore canonique : `default`, exactement, sans parenthèses.** Le client PWA/APK et Firebase Admin doivent tous deux sélectionner explicitement cette base.
 - N'utilisez jamais `(default)`, un `getFirestore()` implicite ni un identifiant de base personnalisé comme remplacement automatique de `default`.
-- Le champ `firestoreDatabaseId` de `firebase-applet-config.json` est une métadonnée du workspace AI Studio. **Il n'est pas la source de vérité du databaseId utilisé par SeenIt** et ne doit pas piloter `initializeFirestore()` ou `getFirestore()`.
+- Le dépôt canonique ne doit déclarer **aucun** champ `firestoreDatabaseId` dans `firebase-applet-config.json`. Toute réinjection de ce champ par AI Studio est un diff non demandé à rejeter ; le databaseId SeenIt reste sélectionné explicitement dans le code.
+- La base `default` doit conserver **Firestore Delete Protection activée**. Aucun import AI Studio, script ou agent ne peut la désactiver automatiquement ; toute désactivation exige une migration/suppression explicitement approuvée, avec sauvegarde et plan de rollback.
 - Le projet Firebase canonique SeenIt est `gen-lang-client-0201895414`. Ne le remplacez jamais automatiquement à l'import, à la reconnexion ou lors d'une régénération de configuration.
 - `android/app/google-services.json` est un fichier Android requis. Ne le supprimez, ne le remplacez et ne changez son `project_id`, son package `com.seenit.app` ou son `mobilesdk_app_id` sans migration Firebase Android explicitement approuvée et testée.
 - Ne proposez jamais de changement de databaseId uniquement parce qu'une valeur différente apparaît dans un fichier généré par AI Studio. L'historique SeenIt a déjà démontré que ces bascules provoquent bibliothèque vide, client offline et synchronisation bloquée.
