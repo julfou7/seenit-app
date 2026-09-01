@@ -24,6 +24,7 @@ rapport existant et son historique.
 | ID | Date | Baseline | Périmètre | Rapport | Backlog |
 |---|---|---|---|---|---|
 | AUDIT-2026-08-31-GLOBAL | 2026-08-31 | 1.4.80 (`75ec2f1` après durcissement 1.4.81) | application, PWA, APK, backend, sécurité, structure, tests et CI/CD | [Audit global](./audit-global-2026-08-31.md) | [Issues #9 à #19](../backlog/README.md) |
+| AUDIT-2026-09-01-AISTUDIO-FIRESTORE | 2026-09-01 | 1.4.90 (`f9626da`) | historique des changements Firebase/Firestore et effets de l'import/sync AI Studio | [Audit AI Studio / Firestore](./audit-ai-studio-firestore-history-2026-09-01.md) | [Issue #21](https://github.com/julfou7/seenit-app/issues/21) |
 
 L'audit historique des téléchargements antérieur à ce protocole reste disponible dans
 [`../audit-telechargements-2026-08-30.md`](../audit-telechargements-2026-08-30.md). Ses corrections
