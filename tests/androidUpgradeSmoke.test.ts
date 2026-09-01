@@ -64,6 +64,9 @@ test('SEENIT-APK-003 installe réellement N puis N+1 sans désinstaller les donn
   assert.match(smoke, /adb install -r -t "\$CURRENT_APK"/);
   assert.doesNotMatch(smoke, /adb\s+uninstall/);
   assert.match(smoke, /BASELINE_SIGNER.*CURRENT_SIGNER/s);
+  assert.match(smoke, /preflight\.txt/);
+  assert.match(smoke, /Échec préflight/);
+  assert.doesNotMatch(smoke, /dump badging[^\n]+\|[^\n]+head -n 1/);
   assert.match(smoke, /cold-start\.txt/);
   assert.match(smoke, /resume\.txt/);
   assert.match(smoke, /deep-link\.txt/);

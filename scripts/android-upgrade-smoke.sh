@@ -32,14 +32,37 @@ test -x "$AAPT" || { echo "aapt introuvable"; exit 1; }
 apk_field() {
   local apk="$1"
   local field="$2"
-  "$AAPT" dump badging "$apk" | sed -n "s/^package:.*${field}='\([^']*\)'.*/\1/p" | head -n 1
+  local badging
+  local package_line
+  badging="$("$AAPT" dump badging "$apk")"
+  package_line="${badging%%$'\n'*}"
+  sed -n "s/^package:.*${field}='\([^']*\)'.*/\1/p" <<< "$package_line"
 }
 
 apk_signer() {
-  "$APKSIGNER" verify --print-certs "$1" \
-    | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' \
-    | tr '[:upper:]' '[:lower:]' \
-    | head -n 1
+  local certificates
+  certificates="$("$APKSIGNER" verify --print-certs "$1")"
+  sed -n 's/^Signer #1 certificate SHA-256 digest: //p' <<< "$certificates" \
+    | tr '[:upper:]' '[:lower:]'
+}
+
+preflight_failure() {
+  echo "[APK Upgrade] Échec préflight : $1" | tee -a "$REPORT_DIR/preflight.txt" >&2
+  exit 1
+}
+
+require_equal() {
+  local label="$1"
+  local actual="$2"
+  local expected="$3"
+  [[ "$actual" == "$expected" ]] \
+    || preflight_failure "$label inattendu ('$actual', attendu '$expected')."
+}
+
+require_nonempty() {
+  local label="$1"
+  local actual="$2"
+  [[ -n "$actual" ]] || preflight_failure "$label absent."
 }
 
 BASELINE_PACKAGE="$(apk_field "$BASELINE_APK" name)"
@@ -51,12 +74,23 @@ CURRENT_VERSION="$(apk_field "$CURRENT_APK" versionName)"
 BASELINE_SIGNER="$(apk_signer "$BASELINE_APK")"
 CURRENT_SIGNER="$(apk_signer "$CURRENT_APK")"
 
-test "$BASELINE_PACKAGE" = "$PACKAGE_ID"
-test "$CURRENT_PACKAGE" = "$PACKAGE_ID"
-test -n "$BASELINE_SIGNER"
-test "$BASELINE_SIGNER" = "$CURRENT_SIGNER"
-test "$CURRENT_CODE" -gt "$BASELINE_CODE"
-test "$CURRENT_VERSION" != "$BASELINE_VERSION"
+{
+  echo "Baseline package=$BASELINE_PACKAGE version=$BASELINE_VERSION code=$BASELINE_CODE signer=$BASELINE_SIGNER"
+  echo "Candidate package=$CURRENT_PACKAGE version=$CURRENT_VERSION code=$CURRENT_CODE signer=$CURRENT_SIGNER"
+} | tee "$REPORT_DIR/preflight.txt"
+
+require_equal "Package baseline" "$BASELINE_PACKAGE" "$PACKAGE_ID"
+require_equal "Package candidat" "$CURRENT_PACKAGE" "$PACKAGE_ID"
+require_nonempty "Signature baseline" "$BASELINE_SIGNER"
+require_equal "Signature candidate" "$CURRENT_SIGNER" "$BASELINE_SIGNER"
+[[ "$BASELINE_CODE" =~ ^[0-9]+$ ]] || preflight_failure "versionCode baseline invalide ('$BASELINE_CODE')."
+[[ "$CURRENT_CODE" =~ ^[0-9]+$ ]] || preflight_failure "versionCode candidat invalide ('$CURRENT_CODE')."
+(( CURRENT_CODE > BASELINE_CODE )) \
+  || preflight_failure "versionCode candidat $CURRENT_CODE non supérieur à $BASELINE_CODE."
+require_nonempty "versionName baseline" "$BASELINE_VERSION"
+require_nonempty "versionName candidat" "$CURRENT_VERSION"
+[[ "$CURRENT_VERSION" != "$BASELINE_VERSION" ]] \
+  || preflight_failure "versionName candidat identique à la baseline ('$CURRENT_VERSION')."
 
 adb wait-for-device
 adb shell settings put global window_animation_scale 0

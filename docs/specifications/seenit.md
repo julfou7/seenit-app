@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 1er septembre 2026
-Version applicative : **1.4.90**
+Version applicative : **1.4.91**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -48,7 +48,10 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   `applicationId`, signature et versions, puis prouve la conservation des sentinelles, de l'icône,
   de la permission de notification, du launcher et du deep link. Il exécute enfin démarrage à froid,
   reprise et Retour et archive les diagnostics. La publication dépend du succès de chaque matrice ;
-  aucun compte Google personnel ni service externe privé n'est utilisé par ce smoke.
+  aucun compte Google personnel ni service externe privé n'est utilisé par ce smoke. La compilation
+  du harnais cible exclusivement le module Gradle `:app` afin de ne pas fabriquer les APK de test des
+  plugins Capacitor. Le préflight extrait chaque métadonnée sans pipeline interrompu, archive les
+  valeurs package/version/signature et nomme précisément l'invariant fautif avant toute installation.
 - Le fichier `docs/specifications/android-contract.json` fixe les invariants natifs vérifiables :
   identité, signature, version, icônes, permissions, deep link, origine API, safe areas et canal APK.
 - Le contrôle Android s'exécute avant et après `npx cap sync android` afin de détecter une mutation
