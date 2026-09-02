@@ -393,6 +393,7 @@ export function SettingsScreen() {
   };
 
   const handleLogout = async () => {
+    showToast("Déconnexion en cours...", "info");
     localStorage.setItem('explicit_logout', 'true');
     clearPlexCredentials(auth.currentUser?.uid);
     usePlexAvailabilityStore.getState().clearCache();
