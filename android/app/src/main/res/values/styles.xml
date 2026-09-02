@@ -19,9 +19,9 @@
     </style>
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <!-- Android 12+ Splash Screen Native Settings (Zero Flash, Transparent Icon) -->
+        <!-- Android 12+ : surface système obligatoire mais neutre ; le branding appartient au splash Web animé. -->
         <item name="windowSplashScreenBackground">@color/splashBackground</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/seenit_splash_icon</item>
+        <item name="windowSplashScreenAnimatedIcon">@android:color/transparent</item>
         <item name="windowSplashScreenAnimationDuration">0</item>
         <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
         <item name="android:windowBackground">@color/splashBackground</item>
