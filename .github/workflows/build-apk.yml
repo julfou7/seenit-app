@@ -152,7 +152,7 @@ jobs:
     permissions:
       contents: read
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         api-level: [31, 36]
 
