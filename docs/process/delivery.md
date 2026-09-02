@@ -91,6 +91,12 @@ Quand le lot est prêt :
 5. attendre la validation continue verte ;
 6. déclencher manuellement `Validate & Release SeenIt` avec `release_apk=true` depuis `main`.
 
+Le déclenchement manuel de release ne relance pas d'abord le job de validation continue puis un second
+job identique. Le job de candidate exécute lui-même, **une seule fois sur le même runner**, le contrat
+de changement, SPEC, TypeScript, tests unitaires, contrat Android, garde d'immuabilité, audit de
+dépendances et build Web avant Gradle. Le contrôle reste complet, mais `npm ci` et le build Web ne sont
+plus payés deux fois pour la même release.
+
 Une candidate non publiée peut recevoir plusieurs commits correctifs sans consommer un nouveau numéro.
 Une version déjà publiée reste immuable et exige un nouveau patch pour tout correctif ultérieur.
 

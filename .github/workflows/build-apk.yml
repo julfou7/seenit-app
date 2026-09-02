@@ -30,6 +30,7 @@ concurrency:
 jobs:
   validate:
     name: Validate Change
+    if: github.event_name != 'workflow_dispatch' || inputs.release_apk != true
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -93,7 +94,6 @@ jobs:
 
   build:
     name: Build Manual APK Candidate
-    needs: validate
     if: >-
       github.event_name == 'workflow_dispatch' &&
       inputs.release_apk == true &&
@@ -136,6 +136,26 @@ jobs:
           echo "BASE_SHA=$BASE_SHA" >> "$GITHUB_OUTPUT"
           echo "Baseline de release : $PREVIOUS_TAG ($BASE_SHA)"
 
+      - name: Classify Release Candidate
+        id: release_delivery
+        run: npm run delivery:classify
+        env:
+          DELIVERY_BASE_SHA: ${{ steps.release_baseline.outputs.BASE_SHA }}
+          FORCED_DELIVERY_MODE: apk
+
+      - name: Specification Change Contract
+        run: npm run test:spec:changes
+        env:
+          SPEC_BASE_SHA: ${{ steps.release_baseline.outputs.BASE_SHA }}
+          DELIVERY_MODE: apk
+
+      - name: Release Automated Tests
+        run: |
+          npm run test:spec
+          npm run lint
+          npm run test:unit
+          npm run test:android
+
       - name: Validate Unpublished Release Version
         id: release_candidate
         run: node scripts/validate-release-immutability.cjs
@@ -143,6 +163,9 @@ jobs:
           RELEASE_BASE_SHA: ${{ steps.release_baseline.outputs.BASE_SHA }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Production Dependency Audit
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Build Web Assets
         run: npm run build
