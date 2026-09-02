@@ -91,8 +91,8 @@ Quand le lot est prêt :
 5. attendre la validation continue verte ;
 6. déclencher manuellement `Validate & Release SeenIt` avec `release_apk=true` depuis `main`.
 
-Une candidate non publiée peut recevoir des commits correctifs sans consommer un nouveau numéro. Une
-version déjà publiée reste immuable et exige un nouveau patch pour tout correctif ultérieur.
+Une candidate non publiée peut recevoir plusieurs commits correctifs sans consommer un nouveau numéro.
+Une version déjà publiée reste immuable et exige un nouveau patch pour tout correctif ultérieur.
 
 Le garde de release compare la candidate à la dernière release officielle publiée, pas au commit
 immédiatement précédent. Ainsi, les commits intermédiaires d'un lot ne créent plus de faux échec de
