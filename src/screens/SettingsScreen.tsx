@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Cloud, LogIn, LogOut, FileText, CheckCircle2, MonitorPlay, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronDown, ChevronUp, ChevronRight, Check, AlertCircle, Info, Bug, Sparkles, Download, X, UploadCloud, DownloadCloud, GitBranch, GitPullRequest } from 'lucide-react';
+import { Cloud, LogIn, LogOut, FileText, CheckCircle2, MonitorPlay, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronDown, ChevronUp, ChevronRight, Check, AlertCircle, Info, Bug, Sparkles, Download, X, UploadCloud, DownloadCloud } from 'lucide-react';
 import { auth, db, googleAuthProvider, requestNotificationPermission, revokeCurrentDeviceNotifications, sendNativeNotification } from '../lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
@@ -29,10 +29,6 @@ import {
 } from '../features/plex/plexStorage';
 import { usePlexAvailabilityStore } from '../features/plex/plexAvailability';
 import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
-import { authenticatedFetch } from '../lib/apiAuth';
-
-type GitAccessState = 'checking' | 'allowed' | 'denied';
-
 const DEFAULT_NOTIFICATION_PREFS = {
   release_today_tv: true,
   season_d7: true,
@@ -93,107 +89,6 @@ export function SettingsScreen() {
   const [showLogsPanel, setShowLogsPanel] = useState(false);
   const [selectedLogCategory, setSelectedLogCategory] = useState<string>('all');
   const [copiedLogs, setCopiedLogs] = useState(false);
-
-  // Git Sync state
-  const [gitAccess, setGitAccess] = useState<GitAccessState>('checking');
-  const [gitStatus, setGitStatus] = useState<{
-    configured: boolean;
-    branch?: string;
-    commit?: { hash: string; message: string; time: string; author: string } | null;
-    isClean?: boolean;
-    message?: string;
-  } | null>(null);
-  const [isPullingGit, setIsPullingGit] = useState(false);
-  const [showGitOutput, setShowGitOutput] = useState(false);
-  const [gitOutputText, setGitOutputText] = useState<string>('');
-
-  const fetchGitStatus = async () => {
-    try {
-      if (!auth.currentUser) {
-        setGitAccess('checking');
-        setGitStatus(null);
-        return;
-      }
-      const res = await authenticatedFetch('/api/git/status');
-      if (res.status === 403) {
-        setGitAccess('denied');
-        setGitStatus(null);
-        setGitOutputText('');
-        setShowGitOutput(false);
-        return;
-      }
-      if (res.ok) {
-        const data = await res.json();
-        setGitAccess('allowed');
-        setGitStatus(data);
-        return;
-      }
-      setGitAccess('checking');
-      setGitStatus(null);
-    } catch (err) {
-      setGitAccess('checking');
-      setGitStatus(null);
-      console.warn('[Git Status] Impossible de récupérer le statut Git', err);
-    }
-  };
-
-  useEffect(() => {
-    if (!user) {
-      setGitAccess('checking');
-      setGitStatus(null);
-      return;
-    }
-    void fetchGitStatus();
-  }, [user?.uid]);
-
-  const handleGitPull = async () => {
-    if (isPullingGit) return;
-    setIsPullingGit(true);
-    showToast("Synchronisation Git en cours...", "info");
-    try {
-      const res = await authenticatedFetch('/api/git/pull', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      const data = await res.json();
-      if (res.status === 403) {
-        setGitAccess('denied');
-        setGitStatus(null);
-        setGitOutputText('');
-        setShowGitOutput(false);
-        showToast("Accès administrateur requis.", "error");
-        return;
-      }
-      if (data.success) {
-        showToast("✅ Code synchronisé ! Rechargement de l'application...", "success");
-        setGitOutputText(data.output || 'Dépôt à jour.');
-        setShowGitOutput(true);
-        if (data.commit) {
-          setGitStatus({
-            configured: true,
-            branch: 'main',
-            commit: data.commit,
-            isClean: true,
-            message: 'Dépôt synchronisé'
-          });
-        }
-        // Force le rechargement de la page après 1.2s pour charger les nouveaux fichiers JS
-        setTimeout(() => {
-          window.location.reload();
-        }, 1200);
-      } else {
-        showToast(`Erreur Git Pull : ${data.error || 'Échec'}`, "error");
-        setGitOutputText(data.error || data.stderr || 'Erreur lors du pull');
-        setShowGitOutput(true);
-      }
-    } catch (err: any) {
-      showToast(`Erreur réseau : ${err.message}`, "error");
-      setGitOutputText(err.message);
-      setShowGitOutput(true);
-    } finally {
-      setIsPullingGit(false);
-    }
-  };
 
   useEffect(() => {
     let interval: any;
@@ -1023,67 +918,6 @@ export function SettingsScreen() {
                   Logs Système
                 </button>
               </div>
-
-              {/* GitHub Git Sync Card */}
-              {gitAccess === 'allowed' && (
-              <div className="p-3 bg-zinc-800/40 border border-zinc-800 rounded-xl flex flex-col gap-2.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-zinc-700/50 flex items-center justify-center text-zinc-300">
-                      <GitBranch size={14} />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
-                        <span>Code GitHub (Git Pull)</span>
-                        {gitStatus?.branch && (
-                          <span className="text-[10px] font-mono text-amber-400/90 bg-amber-500/10 px-1.5 py-0.5 rounded">
-                            {gitStatus.branch}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-zinc-400">
-                        {gitStatus?.commit ? (
-                          <span className="line-clamp-1">
-                            <span className="font-mono text-zinc-300 font-semibold">{gitStatus.commit.hash}</span> : {gitStatus.commit.message} ({gitStatus.commit.time})
-                          </span>
-                        ) : (
-                          "Synchronisez votre environnement avec GitHub"
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleGitPull}
-                    disabled={isPullingGit}
-                    className="flex-1 py-2 px-3 bg-zinc-700/60 hover:bg-zinc-700 active:scale-95 text-zinc-100 text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 border border-white/5"
-                  >
-                    {isPullingGit ? (
-                      <Loader2 size={13} className="animate-spin text-amber-400" />
-                    ) : (
-                      <GitPullRequest size={13} className="text-amber-400" />
-                    )}
-                    <span>{isPullingGit ? "Synchronisation en cours..." : "Pull depuis GitHub"}</span>
-                  </button>
-                  {gitOutputText && (
-                    <button
-                      onClick={() => setShowGitOutput(!showGitOutput)}
-                      className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-zinc-200 text-xs font-medium rounded-xl transition-colors border border-white/5"
-                    >
-                      {showGitOutput ? "Masquer" : "Détails"}
-                    </button>
-                  )}
-                </div>
-
-                {showGitOutput && gitOutputText && (
-                  <div className="mt-1 p-2 bg-black/70 border border-zinc-800 rounded-lg text-[10px] font-mono text-zinc-300 overflow-x-auto max-h-32 custom-scrollbar whitespace-pre-wrap">
-                    {gitOutputText}
-                  </div>
-                )}
-              </div>
-              )}
 
               {/* Updater Progress */}
               {apkUpdateProgress && (

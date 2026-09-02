@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
-Dernière mise à jour : 1er septembre 2026
-Version applicative : **1.4.100**
+Dernière mise à jour : 2 septembre 2026
+Version applicative : **1.4.101**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -260,12 +260,6 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 
 ## 11. Sécurité opérationnelle
 
-- **SEENIT-SECURITY-002** — Les routes de diagnostic et de synchronisation Git exigent une session
-  Firebase SeenIt puis un UID présent exactement dans l'allowlist serveur `SEENIT_ADMIN_UIDS`. Une
-  allowlist absente ou vide refuse tout accès Git, notamment en production. Un UID non administrateur
-  reçoit uniquement un `403` générique, sans chemin, sortie de commande ou détail d'exploitation ;
-  les clients PWA/APK utilisent le transport authentifié commun et ne rendent la section Git qu'après
-  confirmation de l'autorisation par le serveur.
 - **SEENIT-SECURITY-003** — Avant toute persistance ou export de log, les champs sensibles et les
   secrets reconnaissables dans les chaînes sont masqués. La profondeur, la taille et le nombre
   d'éléments sérialisés sont bornés.
@@ -379,6 +373,13 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 - **SEENIT-QUALITY-006** — Les contrôles et le déploiement sont proportionnés au risque selon la
   classification automatique décrite en section 12.1. Le doute ne réduit jamais les validations :
   un changement non reconnu comme light bascule vers le pipeline APK complet.
+
+
+- **SEENIT-QUALITY-007** — La synchronisation du code entre AI Studio et GitHub est une
+  responsabilité externe au runtime SeenIt, assurée uniquement par l’intégration GitHub native
+  d’AI Studio. La PWA, l’APK et le backend n’exposent aucune route `/api/git/*`, aucun bouton de
+  pull et aucun script `scripts/pull.sh`. `GITHUB_PAT` reste réservé à la consultation des
+  releases via `/api/update` tant que ce fallback existe.
 
 Une modification comportementale ou une release APK est terminée uniquement si :
 

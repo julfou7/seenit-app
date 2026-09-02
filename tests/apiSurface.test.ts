@@ -1,12 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
-test('SEENIT-SECURITY-002 le diagnostic Git exige une session SeenIt et passe par le transport APK', () => {
+test('SEENIT-QUALITY-007 retire toute synchronisation Git embarquée du runtime SeenIt', () => {
   const server = readFileSync('server.ts', 'utf8');
   const settings = readFileSync('src/screens/SettingsScreen.tsx', 'utf8');
-  assert.match(server, /app\.get\('\/api\/git\/status', requireAuth/);
-  assert.match(server, /app\.post\('\/api\/git\/pull', requireAuth/);
-  assert.match(settings, /authenticatedFetch\('\/api\/git\/status'\)/);
-  assert.match(settings, /authenticatedFetch\('\/api\/git\/pull'/);
+  const envExample = readFileSync('.env.example', 'utf8');
+
+  assert.doesNotMatch(server, /\/api\/git\//);
+  assert.doesNotMatch(server, /scripts\/pull\.sh/);
+  assert.doesNotMatch(settings, /\/api\/git\//);
+  assert.doesNotMatch(settings, /Pull depuis GitHub|Code GitHub \(Git Pull\)/);
+  assert.doesNotMatch(envExample, /SEENIT_ADMIN_UIDS/);
+  assert.equal(existsSync('scripts/pull.sh'), false);
+  assert.equal(existsSync('src/features/admin/gitAdminPolicy.ts'), false);
 });
