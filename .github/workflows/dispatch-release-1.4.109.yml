@@ -1,0 +1,24 @@
+name: Dispatch SeenIt 1.4.109
+
+on:
+  push:
+    branches: [ ops/release-1.4.109 ]
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch release 1.4.109 from main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${{ github.repository }}/actions/workflows/build-apk.yml/dispatches" \
+            -f ref=main \
+            -F "inputs[release_apk]=true" \
+            -F "inputs[android12_smoke]=false"
