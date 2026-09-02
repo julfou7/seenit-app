@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.102",
+  "applicationVersion": "1.4.103",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -285,6 +285,37 @@
         {
           "file": "tests/plexStorage.test.ts",
           "contains": "isole le jeton et le curseur Plex par UID SeenIt"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-PLEX-005",
+      "title": "Un état vu Plex exige une preuve de visionnage autoritative",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/plexWatchEvidence.test.ts",
+          "contains": "SEENIT-PLEX-005 une activité Cloud identique à la watchlist ne devient jamais un visionnage"
+        },
+        {
+          "file": "tests/plexWatchEvidence.test.ts",
+          "contains": "SEENIT-PLEX-005 conserve une vraie preuve de visionnage même si le film reste en watchlist"
+        },
+        {
+          "file": "tests/plexWatchEvidence.test.ts",
+          "contains": "SEENIT-PLEX-005 ne rapproche jamais deux films par leur titre ou leur année"
+        },
+        {
+          "file": "tests/plexWatchEvidence.test.ts",
+          "contains": "SEENIT-PLEX-005 le filtrage du full Plex est idempotent"
+        },
+        {
+          "file": "tests/plexWatchEvidence.test.ts",
+          "contains": "SEENIT-PLEX-005 protège réellement la réponse POST /api/plex/history"
         }
       ]
     },

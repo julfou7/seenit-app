@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 2 septembre 2026
-Version applicative : **1.4.102**
+Version applicative : **1.4.103**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -158,6 +158,11 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   résolution sans échec transitoire et écritures Firestore réussies.
 - **SEENIT-PLEX-004** — Jeton Plex, curseur et caches de résolution/disponibilité sont cloisonnés
   par UID. Le jeton passe uniquement dans `X-Plex-Token`.
+- **SEENIT-PLEX-005** — Un média Plex ne devient vu qu'avec une preuve de visionnage autoritative.
+  Une activité `cloud` qui porte exactement la même identité technique qu'un film de la watchlist
+  reste ambiguë et est exclue de l'historique tant qu'une source forte (`account-history`, historique
+  PMS ou `viewCount > 0`) ne confirme pas le visionnage. Le rapprochement ne se fait jamais par
+  titre ou année ; en cas d'ambiguïté SeenIt conserve l'état non vu.
 - Le full scan est paginé. Un inventaire partiel ne remplace pas un cache complet, sauf si au
   moins un inventaire serveur complet et exploitable a été obtenu conformément à la politique.
 - La déduplication finale utilise `movie:<tmdbId>` ou
