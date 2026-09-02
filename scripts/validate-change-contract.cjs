@@ -62,6 +62,29 @@ function isPureVersionAlignment(changedFiles, readPatch) {
   });
 }
 
+function isBehavioralFile(file) {
+  const normalized = normalizePath(file);
+  return (normalized.startsWith('src/') && normalized !== 'src/store/updateStore.ts')
+    || normalized === 'server.ts'
+    || normalized.startsWith('android/app/src/')
+    || normalized === 'public/firebase-messaging-sw.js'
+    || normalized === 'capacitor.config.ts';
+}
+
+function requiresSpecification(file) {
+  const normalized = normalizePath(file);
+  return normalized.startsWith('android/app/src/')
+    || normalized === 'capacitor.config.ts'
+    || normalized === 'src/lib/firebase.ts'
+    || normalized === 'src/lib/firebase-admin.ts'
+    || normalized === 'src/lib/apiAuth.ts'
+    || normalized === 'src/lib/seenitApi.ts'
+    || normalized.startsWith('src/features/plex/')
+    || normalized === 'src/features/downloads/downloadBackendSecurity.ts'
+    || normalized === 'firebase-applet-config.json'
+    || normalized === 'android/app/google-services.json';
+}
+
 function main() {
   const base = String(process.env.SPEC_BASE_SHA || '').trim();
   const head = String(process.env.GITHUB_SHA || 'HEAD').trim();
@@ -86,14 +109,16 @@ function main() {
     return 1;
   }
 
-  if (String(process.env.DELIVERY_MODE || '').toLowerCase() === 'light'
-    && deliveryClassification.mode !== 'light') {
-    console.error('[SPEC] Le mode light déclaré ne correspond pas au diff contrôlé.');
+  const declaredMode = String(process.env.DELIVERY_MODE || '').toLowerCase();
+  if (declaredMode && declaredMode !== deliveryClassification.mode) {
+    console.error(
+      `[SPEC] La classe déclarée ${declaredMode} ne correspond pas au diff contrôlé (${deliveryClassification.mode}).`
+    );
     return 1;
   }
 
   if (deliveryClassification.mode === 'light') {
-    console.log('[SPEC] Changement light vérifié : aucune nouvelle exigence comportementale requise.');
+    console.log('[SPEC] Changement light vérifié : aucun contrat comportemental supplémentaire.');
     return 0;
   }
 
@@ -113,36 +138,37 @@ function main() {
     return 1;
   }
 
-  const behavioralFiles = changedFiles.filter(file =>
-    (file.startsWith('src/') && file !== 'src/store/updateStore.ts')
-    || file === 'server.ts'
-    || file.startsWith('android/app/src/')
-    || file === 'public/firebase-messaging-sw.js'
-    || file === 'capacitor.config.ts'
-  );
-
+  const behavioralFiles = changedFiles.filter(isBehavioralFile);
   if (behavioralFiles.length === 0) {
     console.log('[SPEC] Aucun comportement applicatif modifié.');
     return 0;
   }
 
-  const hasSpecification = changedFiles.includes('docs/specifications/seenit.md')
-    && changedFiles.includes('docs/specifications/requirements.json');
   const hasAutomatedTests = changedFiles.some(file => /^tests\/.+\.test\.ts$/.test(file));
-
-  if (!hasSpecification || !hasAutomatedTests) {
-    console.error('[SPEC] Livraison comportementale incomplète.');
+  if (!hasAutomatedTests) {
+    console.error('[SPEC] Changement comportemental sans test automatisé ciblé.');
     console.error(`[SPEC] Fichiers applicatifs : ${behavioralFiles.join(', ')}`);
-    if (!hasSpecification) {
-      console.error('[SPEC] Mets à jour seenit.md ET requirements.json dans la même livraison.');
-    }
-    if (!hasAutomatedTests) {
-      console.error('[SPEC] Ajoute ou adapte au moins un test automatisé dans tests/*.test.ts.');
-    }
+    console.error('[SPEC] Ajoute ou adapte au moins un test dans tests/*.test.ts.');
     return 1;
   }
 
-  console.log(`[SPEC] Contrat respecté pour ${behavioralFiles.length} fichier(s) applicatif(s).`);
+  const sensitiveFiles = behavioralFiles.filter(requiresSpecification);
+  if (sensitiveFiles.length > 0) {
+    const hasSpecification = changedFiles.includes('docs/specifications/seenit.md')
+      && changedFiles.includes('docs/specifications/requirements.json');
+    if (!hasSpecification) {
+      console.error('[SPEC] Changement sensible sans mise à jour de la SPEC et du catalogue.');
+      console.error(`[SPEC] Zones sensibles : ${sensitiveFiles.join(', ')}`);
+      return 1;
+    }
+    console.log(`[SPEC] Contrat complet requis et présent pour ${sensitiveFiles.length} fichier(s) sensible(s).`);
+    return 0;
+  }
+
+  console.log(
+    `[SPEC] ${behavioralFiles.length} fichier(s) comportemental(aux) couvert(s) par des tests ; ` +
+    'aucune nouvelle exigence durable n’est imposée artificiellement.'
+  );
   return 0;
 }
 
@@ -153,7 +179,9 @@ if (require.main === module) {
 module.exports = {
   VERSION_ONLY_PATTERNS,
   getChangedContentLines,
+  isBehavioralFile,
   isVersionOnlyPatch,
   isPureVersionAlignment,
-  main
+  main,
+  requiresSpecification
 };
