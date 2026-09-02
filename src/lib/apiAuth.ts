@@ -1,5 +1,9 @@
 import { auth } from './firebase';
-import { resolveSeenItApiUrl } from './seenitApi';
+import {
+  isSeenItApiRequest,
+  isUnexpectedHtmlApiResponse,
+  resolveSeenItApiUrl
+} from './seenitApi';
 
 /**
  * Ajoute le jeton Firebase courant aux appels vers l'API SeenIt.
@@ -24,9 +28,25 @@ export async function authenticatedFetch(
   input: RequestInfo | URL,
   init: RequestInit = {}
 ): Promise<Response> {
-  const resolvedInput = typeof input === 'string' ? resolveSeenItApiUrl(input) : input;
-  return fetch(resolvedInput, {
+  const originalString = typeof input === 'string' ? input : null;
+  const resolvedInput = originalString ? resolveSeenItApiUrl(originalString) : input;
+  const response = await fetch(resolvedInput, {
     ...init,
     headers: await getAuthenticatedHeaders(init.headers)
   });
+
+  // Un fallback SPA/Vite peut répondre 200 avec index.html quand le backend /api est absent.
+  // Ce cas doit être une panne explicite, jamais un faux succès API.
+  const resolvedString = typeof resolvedInput === 'string' ? resolvedInput : null;
+  const isSeenItApi = Boolean(
+    (originalString && isSeenItApiRequest(originalString))
+    || (resolvedString && isSeenItApiRequest(resolvedString))
+  );
+  if (isSeenItApi && response.ok && isUnexpectedHtmlApiResponse(response.headers.get('content-type'))) {
+    const error = new Error('Le backend SeenIt a retourné une page HTML au lieu d’une réponse API.');
+    Object.assign(error, { code: 'SEENIT_API_HTML_FALLBACK' });
+    throw error;
+  }
+
+  return response;
 }
