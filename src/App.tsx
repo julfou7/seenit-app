@@ -124,8 +124,8 @@ export default function App() {
   useEffect(() => {
     if (isNative) {
       StatusBar.setStyle({ style: Style.Light }).catch(() => {});
-      StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
-      StatusBar.setBackgroundColor({ color: '#040406' }).catch(() => {});
+      StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});
+      StatusBar.setBackgroundColor({ color: '#00000000' }).catch(() => {});
 
       const animFrame = requestAnimationFrame(() => {
         requestAnimationFrame(() => {

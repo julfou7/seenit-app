@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.105",
+  "applicationVersion": "1.4.106",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -119,6 +119,24 @@
         {
           "file": "tests/developmentGovernance.test.ts",
           "contains": "SEENIT-APK-004 restaure le droit d’exécution Gradle avant le build"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-APK-005",
+      "title": "Lancement Android brandé et status bar edge-to-edge sans flash",
+      "targets": [
+        "apk",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/androidLaunchChrome.test.ts",
+          "contains": "SEENIT-APK-005 supprime la bande noire de status bar sans perdre la safe area"
+        },
+        {
+          "file": "tests/androidLaunchChrome.test.ts",
+          "contains": "SEENIT-APK-005 affiche le branding natif avant le premier rendu WebView"
         }
       ]
     },
