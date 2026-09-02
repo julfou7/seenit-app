@@ -93,15 +93,24 @@ function validateAndroidContract() {
   requireIncludes(login, `overflow-hidden pt-safe`, 'safe area écran de connexion');
 
   if (!contract.launchSurface
-      || contract.launchSurface.nativeSplashMustBeVisible !== true
+      || contract.launchSurface.nativeSplashBranding !== 'transparent'
+      || contract.launchSurface.webSplashComponent !== 'src/components/SplashScreen.tsx'
       || contract.launchSurface.background !== '#040406'
-      || typeof contract.launchSurface.nativeSplashIcon !== 'string') {
-    throw new Error('Le contrat Android doit verrouiller un splash natif SeenIt visible sur fond #040406.');
+      || contract.launchSurface.hideAfterWebPaint !== true) {
+    throw new Error('Le contrat Android doit verrouiller un splash système neutre et un unique splash Web SeenIt.');
   }
-  const nativeSplashName = path.basename(contract.launchSurface.nativeSplashIcon, path.extname(contract.launchSurface.nativeSplashIcon));
-  requireIncludes(styles, `<item name="windowSplashScreenAnimatedIcon">@drawable/${nativeSplashName}</item>`, 'branding du splash natif Android');
-  if (styles.includes(`<item name="windowSplashScreenAnimatedIcon">@android:color/transparent</item>`)) {
-    throw new Error('Le splash Android natif ne doit jamais redevenir transparent.');
+  requireIncludes(styles, `<item name="windowSplashScreenAnimatedIcon">@android:color/transparent</item>`, 'splash système Android neutre');
+  if (styles.includes('@drawable/seenit_splash_icon')) {
+    throw new Error('Le branding natif SeenIt recréerait un double splash et est interdit.');
+  }
+  if (fs.existsSync(path.resolve(root, 'android/app/src/main/res/drawable/seenit_splash_icon.xml'))) {
+    throw new Error('L’ancien pictogramme de splash natif ne doit pas être réintroduit.');
+  }
+  const webSplash = readText(contract.launchSurface.webSplashComponent);
+  requireIncludes(webSplash, `id="seenit-splash-screen"`, 'splash Web SeenIt');
+  requireIncludes(app, `CapSplashScreen.hide()`, 'handoff du splash système vers le splash Web');
+  if (!/requestAnimationFrame\(\(\) => \{[\s\S]*?requestAnimationFrame\(\(\) => \{[\s\S]*?CapSplashScreen\.hide\(\)/.test(app)) {
+    throw new Error('Le splash système doit rester masqué seulement après le premier rendu du splash Web.');
   }
 
   requireIncludes(seenitApi, `SEENIT_API_ORIGIN = '${contract.apiOrigin}'`, 'origine API native');
