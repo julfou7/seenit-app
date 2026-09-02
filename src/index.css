@@ -29,6 +29,14 @@ html, body {
   }
 }
 
+/* Le bandeau Film/Série des cartes Téléchargements est un élément sous l'affiche,
+   comme les bandeaux d'action d'Explorer : il ne doit jamais prendre de hauteur à l'image. */
+button.min-h-0.flex-1.overflow-hidden.bg-zinc-950 {
+  aspect-ratio: 2 / 3;
+  flex: 0 0 auto;
+  width: 100%;
+}
+
 /* Premium discreet ambient background with subtle radial glows and depth */
 .bg-premium-ambient {
   background-color: #08080c;
@@ -81,4 +89,3 @@ html, body {
 .animate-toast-progress {
   animation: toastProgress 5s linear forwards;
 }
-
