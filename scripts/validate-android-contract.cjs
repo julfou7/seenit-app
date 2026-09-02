@@ -37,7 +37,12 @@ function validateAndroidContract() {
   const gradle = readText('android/app/build.gradle');
   const manifest = readText('android/app/src/main/AndroidManifest.xml');
   const strings = readText('android/app/src/main/res/values/strings.xml');
+  const styles = readText('android/app/src/main/res/values/styles.xml');
   const capacitor = readText('capacitor.config.ts');
+  const app = readText('src/App.tsx');
+  const login = readText('src/screens/LoginScreen.tsx');
+  const indexCss = readText('src/index.css');
+  const indexHtml = readText('index.html');
   const seenitApi = readText('src/lib/seenitApi.ts');
   const packageJson = JSON.parse(readText('package.json'));
   const workflow = readText('.github/workflows/build-apk.yml');
@@ -64,7 +69,36 @@ function validateAndroidContract() {
   requireIncludes(capacitor, `appId: '${contract.applicationId}'`, 'appId Capacitor');
   requireIncludes(capacitor, `appName: '${contract.appName}'`, 'nom Capacitor');
   requireIncludes(capacitor, `backgroundColor: '#040406'`, 'fond natif anti-flash');
-  requireIncludes(capacitor, `overlaysWebView: false`, 'safe area StatusBar');
+
+  if (!contract.systemBars
+      || contract.systemBars.statusBarOverlay !== true
+      || contract.systemBars.statusBarTransparent !== true
+      || contract.systemBars.statusBarIconStyle !== 'light'
+      || contract.systemBars.topSafeAreaRequired !== true) {
+    throw new Error('Le contrat Android doit verrouiller la status bar transparente edge-to-edge et la safe area haute.');
+  }
+  requireIncludes(capacitor, `overlaysWebView: true`, 'overlay StatusBar edge-to-edge');
+  requireIncludes(capacitor, `backgroundColor: '#00000000'`, 'fond StatusBar transparent');
+  requireIncludes(app, `StatusBar.setOverlaysWebView({ overlay: true })`, 'overlay StatusBar runtime');
+  requireIncludes(app, `StatusBar.setBackgroundColor({ color: '#00000000' })`, 'StatusBar runtime transparente');
+  requireIncludes(styles, `<item name="android:statusBarColor">@android:color/transparent</item>`, 'statusBarColor thème Android');
+  requireIncludes(indexCss, `padding-top: env(safe-area-inset-top, 0px);`, 'safe area CSS haute');
+  requireIncludes(indexHtml, `viewport-fit=cover`, 'viewport edge-to-edge');
+  requireIncludes(app, `overflow-hidden pt-safe`, 'safe area écran principal');
+  requireIncludes(login, `overflow-hidden pt-safe`, 'safe area écran de connexion');
+
+  if (!contract.launchSurface
+      || contract.launchSurface.nativeSplashMustBeVisible !== true
+      || contract.launchSurface.background !== '#040406'
+      || typeof contract.launchSurface.nativeSplashIcon !== 'string') {
+    throw new Error('Le contrat Android doit verrouiller un splash natif SeenIt visible sur fond #040406.');
+  }
+  const nativeSplashName = path.basename(contract.launchSurface.nativeSplashIcon, path.extname(contract.launchSurface.nativeSplashIcon));
+  requireIncludes(styles, `<item name="windowSplashScreenAnimatedIcon">@drawable/${nativeSplashName}</item>`, 'branding du splash natif Android');
+  if (styles.includes(`<item name="windowSplashScreenAnimatedIcon">@android:color/transparent</item>`)) {
+    throw new Error('Le splash Android natif ne doit jamais redevenir transparent.');
+  }
+
   requireIncludes(seenitApi, `SEENIT_API_ORIGIN = '${contract.apiOrigin}'`, 'origine API native');
   requireIncludes(strings, `<string name="app_name">${contract.appName}</string>`, 'nom du lanceur');
   requireIncludes(strings, `<string name="custom_url_scheme">${contract.customUrlScheme}</string>`, 'deep link SeenIt');
