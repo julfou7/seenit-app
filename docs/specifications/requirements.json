@@ -1,23 +1,47 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.101",
+  "applicationVersion": "1.4.102",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
       "id": "SEENIT-PLATFORM-001",
-      "title": "Transport SeenIt adapté à la PWA et à l'APK",
+      "title": "Transport SeenIt cohérent entre PWA, preview AI Studio et APK",
       "targets": [
+        "pwa",
+        "apk",
+        "backend"
+      ],
+      "tests": [
+        {
+          "file": "tests/seenitApi.test.ts",
+          "contains": "SEENIT-PLATFORM-001 route l’APK et le preview AI Studio vers le backend canonique"
+        },
+        {
+          "file": "tests/seenitApi.test.ts",
+          "contains": "SEENIT-PLATFORM-001 conserve la PWA canonique en même origine"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-RUNTIME-001",
+      "title": "Backend canonique identifiable et résilient aux erreurs asynchrones",
+      "targets": [
+        "backend",
         "pwa",
         "apk"
       ],
       "tests": [
         {
           "file": "tests/seenitApi.test.ts",
-          "contains": "les appels API de l’APK ciblent toujours le backend SeenIt"
+          "contains": "SEENIT-RUNTIME-001 refuse un fallback HTML 200 comme succès API"
         },
         {
-          "file": "tests/seenitApi.test.ts",
-          "contains": "la PWA conserve les routes relatives"
+          "file": "tests/backendRuntime.test.ts",
+          "contains": "SEENIT-RUNTIME-001 garde un health-check indépendant et identifiable"
+        },
+        {
+          "file": "tests/backendRuntime.test.ts",
+          "contains": "SEENIT-RUNTIME-001 contient les rejets async API sans terminer le backend"
         }
       ]
     },
