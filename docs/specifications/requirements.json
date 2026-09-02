@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.108",
+  "applicationVersion": "1.4.109",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -898,6 +898,29 @@
         {
           "file": "tests/apiSurface.test.ts",
           "contains": "SEENIT-QUALITY-007 retire toute synchronisation Git embarquée du runtime SeenIt"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-AUTH-001",
+      "title": "Connexion Google Android native via Credential Manager sans changer le Firebase UID",
+      "targets": [
+        "apk",
+        "pwa",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/nativeGoogleAuth.test.ts",
+          "contains": "SEENIT-AUTH-001 ouvre le sélecteur Google natif Credential Manager comme ATHIA"
+        },
+        {
+          "file": "tests/nativeGoogleAuth.test.ts",
+          "contains": "SEENIT-AUTH-001 conserve le même compte Firebase et un fallback natif propre"
+        },
+        {
+          "file": "tests/nativeGoogleAuth.test.ts",
+          "contains": "SEENIT-AUTH-001 traite l’annulation Google comme une sortie non bloquante"
         }
       ]
     }
