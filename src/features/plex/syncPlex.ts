@@ -47,7 +47,7 @@ import {
   shouldReplacePlexAvailabilityCache
 } from './plexSyncIntegrity';
 import { buildLibraryStateSignature } from '../../lib/userIsolation';
-import { applyExplicitPlexUnwatch, mergePlexProgressMutation } from './plexProgressMerge';
+import { applyPlexLibraryWatchState, mergePlexProgressMutation } from './plexProgressMerge';
 import type { PlexLibraryWatchState } from './plexLibraryWatchState';
 
 export interface PlexSyncResult {
@@ -1340,7 +1340,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           if (!matched) continue;
 
           const current = mutatedShows[matched.id] || matched;
-          const result = applyExplicitPlexUnwatch(current, state);
+          const result = applyPlexLibraryWatchState(current, state);
           if (!result.changed) continue;
 
           mutatedShows[matched.id] = result.show;
