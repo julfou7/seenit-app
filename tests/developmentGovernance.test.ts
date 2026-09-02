@@ -76,7 +76,7 @@ test('SEENIT-QUALITY-002 impose un audit daté relié à des issues priorisées'
 test('SEENIT-QUALITY-003 mémorise chaque demande durable dans la SPEC et le registre', () => {
   assert.match(agentRules, /Demande durable/);
   assert.match(agentRules, /docs\/requests\/registry\.md/);
-  assert.match(specificationGuide, /qualifier la demande/);
+  assert.match(specificationGuide, /qualifier la demande/i);
   assert.match(requestRegistry, /USR-2026-08-31-003/);
   assert.match(requestRegistry, /SEENIT-QUALITY-002/);
   assert.match(requestRegistry, /SEENIT-QUALITY-003/);

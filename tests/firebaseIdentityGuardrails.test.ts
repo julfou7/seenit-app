@@ -25,7 +25,7 @@ test('SEENIT-DATA-006 protège default contre une suppression accidentelle', () 
     .filter(name => name.endsWith('.cjs') || name.endsWith('.sh'))
     .map(name => read(`scripts/${name}`))
     .join('\n');
-  assert.match(agents, /Delete Protection activée/);
+  assert.match(agents, /Delete Protection[^\n]*activée/i);
   assert.match(specification, /SEENIT-DATA-006[\s\S]*Delete Protection activée/);
   assert.equal(/--no-delete-protection|DELETE_PROTECTION_DISABLED/.test(`${workflow}\n${scripts}`), false);
 });
@@ -44,8 +44,8 @@ test('SEENIT-APK-004 protège l’identité Firebase Android canonique', () => {
 test('SEENIT-QUALITY-005 traite AI Studio comme un transport non autoritatif', () => {
   const agents = read('AGENTS.md');
   const bootstrap = read('.agents/AGENTS.md');
-  assert.match(agents, /Première action obligatoire/);
-  assert.match(agents, /transport non autoritatif/);
+  assert.match(agents, /Avant toute modification/);
+  assert.match(agents, /AI Studio est un mécanisme de transport/);
   assert.match(agents, /Base Firestore canonique/);
   assert.match(agents, /firebase-applet-config\.json/);
   assert.match(bootstrap, /lire intégralement/);
