@@ -1,6 +1,6 @@
-import type { Show } from '../../types';
-import { normalizePlexEpisodeKey } from './plexIdentity';
-import type { PlexLibraryWatchState } from './plexLibraryWatchState';
+import type { Show } from '../../types.ts';
+import { normalizePlexEpisodeKey } from './plexIdentity.ts';
+import type { PlexLibraryWatchState } from './plexLibraryWatchState.ts';
 
 function cloneShow(show: Show): Show {
   return {
