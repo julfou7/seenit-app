@@ -30,7 +30,7 @@ if (!tests.includes(testName)) {
   tests += `  assert.equal(fs.existsSync('android/app/debug.keystore'), true, 'la clé de signature historique doit rester suivie');\n`;
   tests += `  if (process.platform !== 'win32') {\n`;
   tests += `    for (const path of ['android/gradlew', 'scripts/pull.sh']) {\n`;
-  tests += `      assert.notEqual(fs.statSync(path).mode & 0o111, 0, \\`${'${path}'} doit rester exécutable dans Git\\`);\n`;
+  tests += `      assert.notEqual(fs.statSync(path).mode & 0o111, 0, path + ' doit rester exécutable dans Git');\n`;
   tests += `    }\n`;
   tests += `  }\n`;
   tests += `});\n`;
@@ -49,8 +49,8 @@ write(requirementsPath, `${JSON.stringify(requirements, null, 2)}\n`);
 
 const specPath = 'docs/specifications/seenit.md';
 let spec = read(specPath);
-const anchor = "  réintroduire silencieusement.";
-const addition = "  réintroduire silencieusement. Les fichiers Android canoniques suivis (`google-services.json`, clé de\\n  signature historique) doivent rester présents et les scripts Unix requis au build doivent conserver leur bit\\n  exécutable ; une normalisation AI Studio de ces éléments est une régression bloquante.";
+const anchor = '  réintroduire silencieusement.';
+const addition = '  réintroduire silencieusement. Les fichiers Android canoniques suivis (`google-services.json`, clé de\n  signature historique) doivent rester présents et les scripts Unix requis au build doivent conserver leur bit\n  exécutable ; une normalisation AI Studio de ces éléments est une régression bloquante.';
 if (!spec.includes('une normalisation AI Studio de ces éléments est une régression bloquante')) {
   if (!spec.includes(anchor)) throw new Error('Ancre SEENIT-QUALITY-005 introuvable dans la SPEC');
   spec = spec.replace(anchor, addition);
