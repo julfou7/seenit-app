@@ -1,0 +1,86 @@
+name: Fix StatusBar White Icons 1.4.107
+on:
+  push:
+    branches:
+      - fix/statusbar-white-icons-1.4.107
+permissions:
+  contents: write
+jobs:
+  fix-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/statusbar-white-icons-1.4.107
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Apply status bar icon style fix
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f'Motif introuvable dans {path}: {old}')
+              p.write_text(text.replace(old, new))
+
+          replace('android/app/build.gradle', 'versionName "1.4.106"', 'versionName "1.4.107"')
+          replace("capacitor.config.ts", "style: 'LIGHT'", "style: 'DARK'")
+          replace('src/App.tsx', 'StatusBar.setStyle({ style: Style.Light })', 'StatusBar.setStyle({ style: Style.Dark })')
+          replace("tests/androidLaunchChrome.test.ts", "style: 'LIGHT'/", "style: 'DARK'/")
+
+          tests = Path('tests/androidLaunchChrome.test.ts')
+          test_text = tests.read_text()
+          anchor = "  assert.match(app, /StatusBar\\.setOverlaysWebView\\(\\{ overlay: true \\}\\)/);"
+          guard = "  assert.match(app, /StatusBar\\.setStyle\\(\\{ style: Style\\.Dark \\}\\)/);\n  assert.doesNotMatch(app, /StatusBar\\.setStyle\\(\\{ style: Style\\.Light \\}\\)/);"
+          if guard not in test_text:
+              if anchor not in test_text:
+                  raise SystemExit('Ancre test status bar introuvable')
+              test_text = test_text.replace(anchor, guard + '\n' + anchor)
+          tests.write_text(test_text)
+
+          validator = Path('scripts/validate-android-contract.cjs')
+          validator_text = validator.read_text()
+          anchor = "  requireIncludes(capacitor, `backgroundColor: '#00000000'`, 'fond StatusBar transparent');"
+          guard = "  requireIncludes(capacitor, `style: 'DARK'`, 'icônes StatusBar claires sur fond sombre');\n  requireIncludes(app, `StatusBar.setStyle({ style: Style.Dark })`, 'style runtime StatusBar clair sur fond sombre');\n  if (capacitor.includes(`style: 'LIGHT'`) || app.includes(`StatusBar.setStyle({ style: Style.Light })`)) {\n    throw new Error('Style.Light/LIGHT produit des icônes sombres et est interdit sur le fond sombre SeenIt.');\n  }"
+          if guard not in validator_text:
+              if anchor not in validator_text:
+                  raise SystemExit('Ancre validator StatusBar introuvable')
+              validator_text = validator_text.replace(anchor, anchor + '\n' + guard)
+          validator.write_text(validator_text)
+
+          spec = Path('docs/specifications/seenit.md')
+          spec_text = spec.read_text()
+          old = "- La status bar Android est edge-to-edge : la WebView s'étend derrière une barre transparente avec\n  icônes claires, tandis que le contenu principal et le login respectent `env(safe-area-inset-top)`.\n  La barre de navigation basse reste sombre et conserve les safe areas CSS."
+          new = "- La status bar Android est edge-to-edge : la WebView s'étend derrière une barre transparente avec\n  icônes claires, tandis que le contenu principal et le login respectent `env(safe-area-inset-top)`.\n  Avec `@capacitor/status-bar`, ce rendu clair sur fond sombre exige explicitement `Style.Dark` / `DARK` ;\n  `Style.Light` / `LIGHT` est interdit car il produit des icônes sombres. La barre de navigation basse\n  reste sombre et conserve les safe areas CSS."
+          if old not in spec_text:
+              raise SystemExit('Bloc SPEC StatusBar introuvable')
+          spec.write_text(spec_text.replace(old, new))
+
+          registry = Path('docs/requests/registry.md')
+          reg_text = registry.read_text()
+          old = "| USR-2026-09-02-006 | 2026-09-02 | Le lancement APK ne doit plus afficher de phase noire vide après une mise à jour et la status bar Android doit être transparente/edge-to-edge au-dessus du fond SeenIt, avec safe area haute conservée. | `SEENIT-APK-005`, [issue #42](https://github.com/julfou7/seenit-app/issues/42) | active |"
+          new = "| USR-2026-09-02-006 | 2026-09-02 | Le lancement APK ne doit plus afficher de phase noire vide après une mise à jour et la status bar Android doit être transparente/edge-to-edge au-dessus du fond SeenIt, avec safe area haute conservée et icônes système claires (`Style.Dark` / `DARK` dans Capacitor). | `SEENIT-APK-005`, [issue #42](https://github.com/julfou7/seenit-app/issues/42) | active |"
+          if old not in reg_text:
+              raise SystemExit('Ligne registre StatusBar introuvable')
+          registry.write_text(reg_text.replace(old, new))
+          PY
+      - name: Align version 1.4.107
+        run: npm run version:sync
+      - run: npm ci --legacy-peer-deps
+      - run: npm test
+      - run: npm run build
+      - name: Commit validated fix
+        run: |
+          git rm .github/workflows/issue-42-statusbar-icons-fix.yml
+          git config user.name "julfou7"
+          git config user.email "julianfouillade@gmail.com"
+          git add -A
+          git commit -m "fix(apk): affiche la status bar en blanc"
+          git push origin fix/statusbar-white-icons-1.4.107
