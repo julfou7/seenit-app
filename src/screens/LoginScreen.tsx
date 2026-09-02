@@ -7,6 +7,18 @@ import { PWAInstallBanner } from '../components/PWAInstallBanner';
 import { AppUpdateBanner } from '../components/AppUpdateBanner';
 import { SeenItLogo } from '../components/SeenItLogo';
 import { Capacitor } from '@capacitor/core';
+import { SeenItAuth } from '../lib/auth/SeenItAuth';
+
+const isGoogleAuthCancellation = (error: any): boolean => {
+  const value = [error?.code, error?.message, typeof error === 'string' ? error : '']
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return value.includes('auth_google_cancelled')
+    || value.includes('cancelled')
+    || value.includes('canceled')
+    || value.includes('12501');
+};
 
 export function LoginScreen() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -41,21 +53,40 @@ export function LoginScreen() {
 
     try {
       if (Capacitor.isNativePlatform()) {
-        // 1. FLUX NATIF MOBILE (APK Android)
-        await GoogleAuth.initialize({
-          clientId: '799043440232-i9s1l0jaerljg58v3oooleuemnhnim4o.apps.googleusercontent.com',
-          scopes: ['profile', 'email'],
-          grantOfflineAccess: true,
-        });
-        const googleUser = await GoogleAuth.signIn();
-        const idToken = googleUser.authentication?.idToken || (googleUser as any)?.idToken;
+        // UX Android primaire : même Credential Manager natif qu'ATHIA.
+        let idToken: string | undefined;
+
+        try {
+          const nativeCredential = await SeenItAuth.signInWithGoogle();
+          idToken = nativeCredential.idToken;
+        } catch (credentialError: any) {
+          if (isGoogleAuthCancellation(credentialError)) return;
+
+          // Compatibilité : l'ancien flux natif reste disponible uniquement en fallback.
+          console.warn('Credential Manager indisponible, fallback Google Auth :', credentialError);
+          try {
+            await GoogleAuth.initialize({
+              clientId: '799043440232-i9s1l0jaerljg58v3oooleuemnhnim4o.apps.googleusercontent.com',
+              scopes: ['profile', 'email'],
+              grantOfflineAccess: true,
+            });
+            const googleUser = await GoogleAuth.signIn();
+            idToken = googleUser.authentication?.idToken || (googleUser as any)?.idToken;
+          } catch (fallbackError: any) {
+            if (isGoogleAuthCancellation(fallbackError)) return;
+            throw fallbackError;
+          }
+        }
+
         if (!idToken) {
           throw new Error("Jeton d'authentification Google manquant.");
         }
+
+        // Le token natif est échangé dans le Firebase Web SDK existant : même UID / même compte SeenIt.
         const credential = GoogleAuthProvider.credential(idToken);
         await signInWithCredential(auth, credential);
       } else {
-        // 2. FLUX WEB STANDARD (Navigateur)
+        // PWA : flux Firebase Web standard inchangé.
         await signInWithPopup(auth, googleAuthProvider);
       }
     } catch (err: any) {
