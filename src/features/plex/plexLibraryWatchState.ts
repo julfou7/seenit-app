@@ -1,4 +1,4 @@
-import { extractPlexExternalIds } from './plexIdentity';
+import { extractPlexExternalIds } from './plexIdentity.ts';
 
 export type PlexLibraryWatchState =
   | {
