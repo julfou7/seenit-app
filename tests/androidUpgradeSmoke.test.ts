@@ -87,15 +87,19 @@ test('SEENIT-APK-003 installe réellement N puis N+1 sans désinstaller les donn
 test('SEENIT-APK-003 exécute le smoke sur Android 12 et la cible Android courante avant publication', () => {
   const workflow = fs.readFileSync('.github/workflows/build-apk.yml', 'utf8');
   assert.match(workflow, /android_upgrade_smoke:/);
-  assert.match(workflow, /api-level: \[31, 36\]/);
+  assert.match(workflow, /android_upgrade_smoke:[\s\S]*api-level: 36/);
   assert.match(workflow, /android_upgrade_smoke:[\s\S]*timeout-minutes: 15/);
-  assert.match(workflow, /cancel-in-progress: true/);
+  assert.match(workflow, /android12_upgrade_smoke:/);
+  assert.match(workflow, /android12_upgrade_smoke:[\s\S]*if: inputs\.android12_smoke == true/);
+  assert.match(workflow, /android12_upgrade_smoke:[\s\S]*api-level: 31/);
+  assert.doesNotMatch(workflow, /api-level: \[31, 36\]/);
   assert.match(
     workflow,
     /reactivecircus\/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2\.38\.0/
   );
   assert.match(workflow, /:app:assembleDebug :app:assembleDebugAndroidTest/);
   assert.doesNotMatch(workflow, /\.\/gradlew --no-daemon assembleDebug assembleDebugAndroidTest/);
-  assert.match(workflow, /needs: \[build, android_upgrade_smoke\]/);
-  assert.match(workflow, /SeenIt-APK-Upgrade-Smoke-Android-/);
+  assert.match(workflow, /needs: \[build, android_upgrade_smoke, android12_upgrade_smoke\]/);
+  assert.match(workflow, /SeenIt-APK-Upgrade-Smoke-Android-36-/);
+  assert.match(workflow, /SeenIt-APK-Upgrade-Smoke-Android-31-/);
 });
