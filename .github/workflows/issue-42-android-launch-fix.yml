@@ -1,0 +1,200 @@
+name: Fix Android Launch Chrome 1.4.106
+on:
+  push:
+    branches:
+      - fix/android-launch-bars-1.4.106
+permissions:
+  contents: write
+jobs:
+  fix-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/android-launch-bars-1.4.106
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Apply Android launch and system bar fix
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+
+          def replace(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f'Motif introuvable dans {path}: {old}')
+              p.write_text(text.replace(old, new))
+
+          # Candidate version; version:sync aligne ensuite tous les artefacts.
+          replace('android/app/build.gradle', 'versionName "1.4.105"', 'versionName "1.4.106"')
+
+          replace(
+              'capacitor.config.ts',
+              "StatusBar: {\n      overlaysWebView: false,\n      backgroundColor: '#040406',\n      style: 'LIGHT'\n    },",
+              "StatusBar: {\n      overlaysWebView: true,\n      backgroundColor: '#00000000',\n      style: 'LIGHT'\n    },"
+          )
+
+          replace(
+              'src/App.tsx',
+              "StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});\n      StatusBar.setBackgroundColor({ color: '#040406' }).catch(() => {});",
+              "StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});\n      StatusBar.setBackgroundColor({ color: '#00000000' }).catch(() => {});"
+          )
+
+          replace(
+              'src/screens/LoginScreen.tsx',
+              'w-full max-w-md bg-premium-ambient h-[100dvh] flex flex-col relative shadow-2xl shadow-black/90 overflow-hidden',
+              'w-full max-w-md bg-premium-ambient h-[100dvh] flex flex-col relative shadow-2xl shadow-black/90 overflow-hidden pt-safe'
+          )
+
+          styles = Path('android/app/src/main/res/values/styles.xml')
+          style_text = styles.read_text()
+          style_text = style_text.replace(
+              '<item name="android:statusBarColor">@color/splashBackground</item>',
+              '<item name="android:statusBarColor">@android:color/transparent</item>'
+          )
+          style_text = style_text.replace(
+              '<item name="windowSplashScreenAnimatedIcon">@android:color/transparent</item>',
+              '<item name="windowSplashScreenAnimatedIcon">@drawable/seenit_splash_icon</item>'
+          )
+          styles.write_text(style_text)
+
+          Path('android/app/src/main/res/drawable/seenit_splash_icon.xml').write_text('''<?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp"
+              android:height="108dp"
+              android:viewportWidth="24"
+              android:viewportHeight="24">
+              <path
+                  android:strokeColor="#F5C518"
+                  android:strokeWidth="1.75"
+                  android:strokeLineCap="round"
+                  android:strokeLineJoin="round"
+                  android:fillColor="#00000000"
+                  android:pathData="M 4,4 L 20,4 C 21.1,4 22,4.9 22,6 L 22,15 C 22,16.1 21.1,17 20,17 L 4,17 C 2.9,17 2,16.1 2,15 L 2,6 C 2,4.9 2.9,4 4,4 Z" />
+              <path
+                  android:strokeColor="#E5A93D"
+                  android:strokeWidth="1.75"
+                  android:strokeLineCap="round"
+                  android:fillColor="#00000000"
+                  android:pathData="M 12,17 L 12,20.5 M 8,20.5 L 16,20.5" />
+              <path
+                  android:strokeColor="#FFF4D0"
+                  android:strokeWidth="2.2"
+                  android:strokeLineCap="round"
+                  android:strokeLineJoin="round"
+                  android:fillColor="#00000000"
+                  android:pathData="M 7.5,10.5 L 10.5,13.5 L 16.5,7.5" />
+          </vector>
+          ''')
+
+          spec = Path('docs/specifications/seenit.md')
+          spec_text = spec.read_text()
+          spec_text = spec_text.replace(
+              "- La status bar Android n'est pas recouverte par la WebView, utilise le fond `#040406` et des\n  icônes claires. La barre de navigation conserve les safe areas CSS.",
+              "- La status bar Android est edge-to-edge : la WebView s'étend derrière une barre transparente avec\n  icônes claires, tandis que le contenu principal et le login respectent `env(safe-area-inset-top)`.\n  La barre de navigation basse reste sombre et conserve les safe areas CSS."
+          )
+          anchor = "- Le fichier `docs/specifications/android-contract.json` fixe les invariants natifs vérifiables :\n"
+          apk5 = "- **SEENIT-APK-005** — Le lancement Android ne présente jamais une surface native vide : dès la\n  création de l'activité, le splash système affiche un symbole SeenIt visible sur le même fond que la\n  WebView, puis laisse place au splash HTML sans flash blanc ou noir intermédiaire. Après lancement,\n  la status bar overlay la WebView avec un fond transparent et des icônes claires ; les écrans racine\n  compensent cette superposition par la safe area haute. Un retour à un splash natif transparent, à\n  `overlaysWebView=false` ou à une status bar noire forcée est une régression bloquée par les tests.\n"
+          if apk5 not in spec_text:
+              if anchor not in spec_text:
+                  raise SystemExit('Ancre APK-005 introuvable dans la SPEC')
+              spec_text = spec_text.replace(anchor, apk5 + anchor)
+          spec.write_text(spec_text)
+
+          req_path = Path('docs/specifications/requirements.json')
+          req = json.loads(req_path.read_text())
+          if not any(r.get('id') == 'SEENIT-APK-005' for r in req['requirements']):
+              idx = next(i for i, r in enumerate(req['requirements']) if r.get('id') == 'SEENIT-APK-004') + 1
+              req['requirements'].insert(idx, {
+                  'id': 'SEENIT-APK-005',
+                  'title': 'Lancement Android brandé et status bar edge-to-edge sans flash',
+                  'targets': ['apk', 'ci'],
+                  'tests': [
+                      {
+                          'file': 'tests/androidLaunchChrome.test.ts',
+                          'contains': 'SEENIT-APK-005 supprime la bande noire de status bar sans perdre la safe area'
+                      },
+                      {
+                          'file': 'tests/androidLaunchChrome.test.ts',
+                          'contains': 'SEENIT-APK-005 affiche le branding natif avant le premier rendu WebView'
+                      }
+                  ]
+              })
+          req_path.write_text(json.dumps(req, ensure_ascii=False, indent=2) + '\n')
+
+          contract_path = Path('docs/specifications/android-contract.json')
+          contract = json.loads(contract_path.read_text())
+          splash_asset = 'android/app/src/main/res/drawable/seenit_splash_icon.xml'
+          if splash_asset not in contract['requiredFiles']:
+              contract['requiredFiles'].insert(contract['requiredFiles'].index('android/app/src/main/res/drawable/splash.png'), splash_asset)
+          contract['systemBars'] = {
+              'statusBarOverlay': True,
+              'statusBarTransparent': True,
+              'statusBarIconStyle': 'light',
+              'topSafeAreaRequired': True
+          }
+          contract['launchSurface'] = {
+              'nativeSplashIcon': splash_asset,
+              'nativeSplashMustBeVisible': True,
+              'background': '#040406'
+          }
+          contract_path.write_text(json.dumps(contract, ensure_ascii=False, indent=2) + '\n')
+
+          registry = Path('docs/requests/registry.md')
+          reg_text = registry.read_text()
+          row = "| USR-2026-09-02-006 | 2026-09-02 | Le lancement APK ne doit plus afficher de phase noire vide après une mise à jour et la status bar Android doit être transparente/edge-to-edge au-dessus du fond SeenIt, avec safe area haute conservée. | `SEENIT-APK-005`, [issue #42](https://github.com/julfou7/seenit-app/issues/42) | active |"
+          if row not in reg_text:
+              registry.write_text(reg_text.rstrip() + '\n' + row + '\n')
+
+          Path('tests/androidLaunchChrome.test.ts').write_text(r'''import test from 'node:test';
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+
+          const capacitorConfig = readFileSync('capacitor.config.ts', 'utf8');
+          const app = readFileSync('src/App.tsx', 'utf8');
+          const login = readFileSync('src/screens/LoginScreen.tsx', 'utf8');
+          const css = readFileSync('src/index.css', 'utf8');
+          const indexHtml = readFileSync('index.html', 'utf8');
+          const styles = readFileSync('android/app/src/main/res/values/styles.xml', 'utf8');
+          const nativeSplash = readFileSync('android/app/src/main/res/drawable/seenit_splash_icon.xml', 'utf8');
+
+          test('SEENIT-APK-005 supprime la bande noire de status bar sans perdre la safe area', () => {
+            assert.match(capacitorConfig, /StatusBar:\s*\{[\s\S]*?overlaysWebView: true,[\s\S]*?backgroundColor: '#00000000',[\s\S]*?style: 'LIGHT'/);
+            assert.match(app, /StatusBar\.setOverlaysWebView\(\{ overlay: true \}\)/);
+            assert.match(app, /StatusBar\.setBackgroundColor\(\{ color: '#00000000' \}\)/);
+            assert.match(styles, /android:statusBarColor">@android:color\/transparent/);
+            assert.match(css, /\.pt-safe\s*\{\s*padding-top: env\(safe-area-inset-top, 0px\)/);
+            assert.match(indexHtml, /viewport-fit=cover/);
+            assert.match(app, /bg-premium-ambient[^"\n]*pt-safe/);
+            assert.match(login, /bg-premium-ambient[^"\n]*pt-safe/);
+          });
+
+          test('SEENIT-APK-005 affiche le branding natif avant le premier rendu WebView', () => {
+            assert.match(styles, /windowSplashScreenAnimatedIcon">@drawable\/seenit_splash_icon/);
+            assert.doesNotMatch(styles, /windowSplashScreenAnimatedIcon">@android:color\/transparent/);
+            assert.match(nativeSplash, /#F5C518/);
+            assert.match(nativeSplash, /M 7\.5,10\.5 L 10\.5,13\.5 L 16\.5,7\.5/);
+            assert.match(indexHtml, /class="instant-splash"/);
+            assert.match(indexHtml, /background-color: #040406/);
+          });
+          ''')
+          PY
+      - name: Align version 1.4.106
+        run: npm run version:sync
+      - run: npm ci --legacy-peer-deps
+      - run: npm test
+      - run: npm run build
+      - name: Commit validated fix
+        run: |
+          git rm .github/workflows/issue-42-android-launch-fix.yml
+          git config user.name "julfou7"
+          git config user.email "julianfouillade@gmail.com"
+          git add -A
+          git commit -m "fix(apk): supprime le flash de lancement et la status bar noire"
+          git push origin fix/android-launch-bars-1.4.106
