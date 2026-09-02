@@ -19,7 +19,7 @@ permissions:
 
 concurrency:
   group: seenit-build-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -148,6 +148,7 @@ jobs:
     needs: build
     if: needs.build.outputs.delivery_mode == 'apk'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
     strategy:

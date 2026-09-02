@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.104",
+  "applicationVersion": "1.4.105",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -321,31 +321,40 @@
     },
     {
       "id": "SEENIT-PLEX-006",
-      "title": "Synchronisation Plex strictement additive face aux actions SeenIt",
+      "title": "Synchronisation bidirectionnelle de l’état vu/non-vu Plex autoritatif",
       "targets": [
+        "backend",
         "pwa",
         "apk"
       ],
       "tests": [
         {
-          "file": "tests/plexAdditiveSync.test.ts",
-          "contains": "SEENIT-PLEX-006 un dé-vu Plex ne retire jamais un film marqué vu dans SeenIt"
+          "file": "tests/plexProgressMerge.test.ts",
+          "contains": "SEENIT-PLEX-006 un dé-vu Plex retire un film vu dans SeenIt"
         },
         {
-          "file": "tests/plexAdditiveSync.test.ts",
-          "contains": "SEENIT-PLEX-006 un dé-vu Plex conserve la progression manuelle des épisodes"
+          "file": "tests/plexProgressMerge.test.ts",
+          "contains": "SEENIT-PLEX-006 un dé-vu Plex retire uniquement l’épisode visé"
         },
         {
-          "file": "tests/plexAdditiveSync.test.ts",
-          "contains": "SEENIT-PLEX-006 une nouvelle preuve Plex s’ajoute sans écraser les données SeenIt"
+          "file": "tests/plexProgressMerge.test.ts",
+          "contains": "SEENIT-PLEX-006 une preuve vue ne passe pas par le chemin de dé-vu"
         },
         {
-          "file": "tests/plexAdditiveSync.test.ts",
-          "contains": "SEENIT-PLEX-006 la fusion additive est idempotente"
+          "file": "tests/plexProgressMerge.test.ts",
+          "contains": "SEENIT-PLEX-006 le dé-vu est idempotent"
         },
         {
-          "file": "tests/plexAdditiveSync.test.ts",
-          "contains": "SEENIT-PLEX-006 protège l’écriture Firestore de la synchro Plex avec un merge additif"
+          "file": "tests/plexProgressMerge.test.ts",
+          "contains": "SEENIT-PLEX-006 une copie vue gagne sur une copie non vue du même média"
+        },
+        {
+          "file": "tests/plexProgressMerge.test.ts",
+          "contains": "SEENIT-PLEX-006 la transaction conserve une action concurrente SeenIt non visée"
+        },
+        {
+          "file": "tests/plexProgressMerge.test.ts",
+          "contains": "SEENIT-PLEX-006 le runtime transmet les états courants et remplace les cartes supprimées"
         }
       ]
     },

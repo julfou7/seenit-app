@@ -9,13 +9,19 @@ CURRENT_APK="${2:?APK courante manquante}"
 TEST_APK="${3:?APK de test instrumenté manquante}"
 REPORT_DIR="${4:?Répertoire de rapport manquant}"
 API_LEVEL="${5:?Niveau API manquant}"
+ADB_TIMEOUT_SECONDS="${ADB_TIMEOUT_SECONDS:-60}"
+ADB_DIAGNOSTIC_TIMEOUT_SECONDS="${ADB_DIAGNOSTIC_TIMEOUT_SECONDS:-10}"
 
 mkdir -p "$REPORT_DIR"
 
+adb_bounded() {
+  timeout --foreground "${ADB_TIMEOUT_SECONDS}s" adb "$@"
+}
+
 collect_diagnostics() {
-  adb shell dumpsys package "$PACKAGE_ID" > "$REPORT_DIR/package.txt" 2>&1 || true
-  adb logcat -d > "$REPORT_DIR/logcat.txt" 2>&1 || true
-  adb exec-out screencap -p > "$REPORT_DIR/final-screen.png" 2>/dev/null || true
+  timeout --foreground "${ADB_DIAGNOSTIC_TIMEOUT_SECONDS}s" adb shell dumpsys package "$PACKAGE_ID" > "$REPORT_DIR/package.txt" 2>&1 || true
+  timeout --foreground "${ADB_DIAGNOSTIC_TIMEOUT_SECONDS}s" adb logcat -d > "$REPORT_DIR/logcat.txt" 2>&1 || true
+  timeout --foreground "${ADB_DIAGNOSTIC_TIMEOUT_SECONDS}s" adb exec-out screencap -p > "$REPORT_DIR/final-screen.png" 2>/dev/null || true
 }
 trap collect_diagnostics EXIT
 
@@ -108,52 +114,52 @@ require_nonempty "versionName candidat" "$CURRENT_VERSION"
 [[ "$CURRENT_VERSION" != "$BASELINE_VERSION" ]] \
   || preflight_failure "versionName candidat identique à la baseline ('$CURRENT_VERSION')."
 
-adb wait-for-device
-adb shell settings put global window_animation_scale 0
-adb shell settings put global transition_animation_scale 0
-adb shell settings put global animator_duration_scale 0
+adb_bounded wait-for-device
+adb_bounded shell settings put global window_animation_scale 0
+adb_bounded shell settings put global transition_animation_scale 0
+adb_bounded shell settings put global animator_duration_scale 0
 
-adb install -r -t "$BASELINE_APK" | tee "$REPORT_DIR/install-baseline.txt"
+adb_bounded install -r -t "$BASELINE_APK" | tee "$REPORT_DIR/install-baseline.txt"
 grep -q '^Success' "$REPORT_DIR/install-baseline.txt"
 
 if [ "$API_LEVEL" -ge 33 ]; then
-  adb shell pm grant "$PACKAGE_ID" android.permission.POST_NOTIFICATIONS
+  adb_bounded shell pm grant "$PACKAGE_ID" android.permission.POST_NOTIFICATIONS
 fi
 
-adb install -r -t "$TEST_APK" | tee "$REPORT_DIR/install-test-harness.txt"
+adb_bounded install -r -t "$TEST_APK" | tee "$REPORT_DIR/install-test-harness.txt"
 grep -q '^Success' "$REPORT_DIR/install-test-harness.txt"
 
-adb shell am instrument -w -r \
+adb_bounded shell am instrument -w -r \
   -e class "$TEST_CLASS#seedUpgradeState" \
   "$TEST_RUNNER" | tee "$REPORT_DIR/instrumentation-seed.txt"
 grep -q '^OK (1 test)' "$REPORT_DIR/instrumentation-seed.txt"
 
 # Le -r est intentionnel : la nouvelle APK remplace N sans désinstaller l'application ni ses données.
-adb install -r -t "$CURRENT_APK" | tee "$REPORT_DIR/install-upgrade.txt"
+adb_bounded install -r -t "$CURRENT_APK" | tee "$REPORT_DIR/install-upgrade.txt"
 grep -q '^Success' "$REPORT_DIR/install-upgrade.txt"
 
-adb shell am instrument -w -r \
+adb_bounded shell am instrument -w -r \
   -e class "$TEST_CLASS#verifyUpgradeStateAndNativeContracts" \
   "$TEST_RUNNER" | tee "$REPORT_DIR/instrumentation-verify.txt"
 grep -q '^OK (1 test)' "$REPORT_DIR/instrumentation-verify.txt"
 
-adb logcat -c
-adb shell am force-stop "$PACKAGE_ID"
-adb shell am start -W -n "$PACKAGE_ID/.MainActivity" | tee "$REPORT_DIR/cold-start.txt"
+adb_bounded logcat -c
+adb_bounded shell am force-stop "$PACKAGE_ID"
+adb_bounded shell am start -W -n "$PACKAGE_ID/.MainActivity" | tee "$REPORT_DIR/cold-start.txt"
 grep -q 'Status: ok' "$REPORT_DIR/cold-start.txt"
 
-adb shell input keyevent KEYCODE_HOME
-adb shell am start -W -n "$PACKAGE_ID/.MainActivity" | tee "$REPORT_DIR/resume.txt"
+adb_bounded shell input keyevent KEYCODE_HOME
+adb_bounded shell am start -W -n "$PACKAGE_ID/.MainActivity" | tee "$REPORT_DIR/resume.txt"
 grep -q 'Status: ok' "$REPORT_DIR/resume.txt"
 
-adb shell am start -W -a android.intent.action.VIEW \
+adb_bounded shell am start -W -a android.intent.action.VIEW \
   -c android.intent.category.BROWSABLE \
   -d 'com.seenit.app://upgrade-smoke' "$PACKAGE_ID" | tee "$REPORT_DIR/deep-link.txt"
 grep -q 'Status: ok' "$REPORT_DIR/deep-link.txt"
 
-adb shell input keyevent KEYCODE_BACK
+adb_bounded shell input keyevent KEYCODE_BACK
 sleep 1
-adb logcat -d > "$REPORT_DIR/runtime-logcat.txt"
+adb_bounded logcat -d > "$REPORT_DIR/runtime-logcat.txt"
 if grep -A 8 'FATAL EXCEPTION' "$REPORT_DIR/runtime-logcat.txt" | grep -q "Process: $PACKAGE_ID"; then
   echo "Crash SeenIt détecté pendant le cycle démarrage/reprise/Retour."
   exit 1

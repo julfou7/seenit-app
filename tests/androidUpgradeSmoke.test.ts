@@ -60,9 +60,9 @@ test('SEENIT-APK-003 installe réellement N puis N+1 sans désinstaller les donn
     'utf8'
   );
 
-  assert.match(smoke, /adb install -r -t "\$BASELINE_APK"/);
-  assert.match(smoke, /adb install -r -t "\$CURRENT_APK"/);
-  assert.doesNotMatch(smoke, /adb\s+uninstall/);
+  assert.match(smoke, /adb_bounded install -r -t "\$BASELINE_APK"/);
+  assert.match(smoke, /adb_bounded install -r -t "\$CURRENT_APK"/);
+  assert.doesNotMatch(smoke, /adb(?:_bounded)?\s+uninstall/);
   assert.match(smoke, /BASELINE_SIGNER.*CURRENT_SIGNER/s);
   assert.match(smoke, /preflight\.txt/);
   assert.match(smoke, /Échec préflight/);
@@ -74,6 +74,8 @@ test('SEENIT-APK-003 installe réellement N puis N+1 sans désinstaller les donn
   assert.match(smoke, /cold-start\.txt/);
   assert.match(smoke, /resume\.txt/);
   assert.match(smoke, /deep-link\.txt/);
+  assert.match(smoke, /timeout --foreground "\$\{ADB_TIMEOUT_SECONDS\}s" adb/);
+  assert.match(smoke, /ADB_DIAGNOSTIC_TIMEOUT_SECONDS/);
 
   assert.match(instrumentation, /seenit-upgrade-private-data-probe/);
   assert.match(instrumentation, /firebase_auth_session_probe/);
@@ -86,6 +88,8 @@ test('SEENIT-APK-003 exécute le smoke sur Android 12 et la cible Android couran
   const workflow = fs.readFileSync('.github/workflows/build-apk.yml', 'utf8');
   assert.match(workflow, /android_upgrade_smoke:/);
   assert.match(workflow, /api-level: \[31, 36\]/);
+  assert.match(workflow, /android_upgrade_smoke:[\s\S]*timeout-minutes: 15/);
+  assert.match(workflow, /cancel-in-progress: true/);
   assert.match(
     workflow,
     /reactivecircus\/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2\.38\.0/

@@ -31,6 +31,7 @@ export interface Show {
   plexSlug?: string;
   plexGuid?: string;
   plexResolvedFrom?: string;
+  plexWatchState?: Record<string, boolean>;
   isSynced?: boolean;
   lastSyncedAt?: number;
   lastWatchedAt?: number;

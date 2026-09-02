@@ -37,6 +37,7 @@ import {
   PLEX_ACCOUNT_HISTORY_QUERY
 } from "./src/features/plex/plexAccountHistory.ts";
 import { evaluatePlexSourceCompletion } from "./src/features/plex/plexSyncIntegrity.ts";
+import { buildPlexLibraryWatchState, mergePlexLibraryWatchStates } from "./src/features/plex/plexLibraryWatchState.ts";
 
 export interface AuthRequest extends Request {
   user?: DecodedIdToken;
@@ -558,7 +559,7 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.104',
+        'X-Plex-Version': '1.4.105',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
@@ -1244,14 +1245,15 @@ async function startServer() {
       console.log(`[Plex Sync] Found ${servers.length} Plex server(s) (personal & shared)`);
 
       // 3. Interroger chaque serveur. En FULL, la bibliothèque actuelle gouverne les
-      // imports Plex et la disponibilité, sans effacer les actions manuelles SeenIt. L'historique PMS n'est
-      // qu'un fallback si le Watch History du compte Plex n'a fourni aucun GUID.
+      // imports Plex, la disponibilité ET l’état vu/non-vu explicite via viewCount. L’historique PMS n’est
+      // qu’un fallback si le Watch History du compte Plex n’a fourni aucun GUID.
       const serverTimeout = delta ? 2500 : 5000;
       const usePmsHistoryInFull = !delta && !accountHistoryAvailable;
       let completeInventoryServers = 0;
       let completeHistoryServers = 0;
       const syncedServers: Array<{ id: string; name: string; watchedItems: number; inventoryItems: number }> = [];
       const skippedServers: Array<{ id: string; name: string; reason: string }> = [];
+      const libraryWatchStateItems: any[] = [];
 
       const describeServerFailure = (message: unknown): string => {
         const normalized = String(message || '').toLowerCase();
@@ -1305,6 +1307,7 @@ async function startServer() {
 
           const connectionRawItems: any[] = [];
           const connectionAvailabilityItems: any[] = [];
+          const connectionWatchStateItems: any[] = [];
           const connectionLibraryGuids = new Set<string>();
           let connectionHistoryComplete = !delta && !usePmsHistoryInFull;
           let connectionInventoryComplete = delta;
@@ -1406,6 +1409,8 @@ async function startServer() {
                       for (const movie of movies) {
                         if (typeof movie?.guid === 'string' && movie.guid) connectionLibraryGuids.add(movie.guid);
                         connectionAvailabilityItems.push({ raw: movie, serverName, serverId });
+                        const watchState = buildPlexLibraryWatchState(movie, { mediaType: 'movie', serverName, serverId });
+                        if (watchState) connectionWatchStateItems.push(watchState);
                       }
                       connectionInventoryCount += movies.length;
 
@@ -1430,6 +1435,8 @@ async function startServer() {
                   }
 
                   if (secType === 'show') {
+                    const showTmdbByRatingKey = new Map<string, number>();
+                    const showTmdbByGuid = new Map<string, number>();
                     // 1) Liste des séries = index de disponibilité Plex pour les fiches SeenIt.
                     try {
                       const shows = await fetchPlexPages(
@@ -1441,6 +1448,14 @@ async function startServer() {
                       for (const show of shows) {
                         if (typeof show?.guid === 'string' && show.guid) connectionLibraryGuids.add(show.guid);
                         connectionAvailabilityItems.push({ raw: show, serverName, serverId });
+                        const ids = extractPlexExternalIds(show);
+                        const tmdbId = Number(ids.tmdbId);
+                        if (Number.isInteger(tmdbId) && tmdbId > 0) {
+                          const ratingKey = getPlexMetadataLookupKey(show);
+                          if (ratingKey) showTmdbByRatingKey.set(String(ratingKey), tmdbId);
+                          const guidCandidates = [show?.guid, ...(Array.isArray(show?.Guid) ? show.Guid.map((g: any) => typeof g === 'string' ? g : g?.id) : [])];
+                          for (const guid of guidCandidates) if (typeof guid === 'string' && guid) showTmdbByGuid.set(guid, tmdbId);
+                        }
                       }
                       connectionInventoryCount += shows.length;
                     } catch (error: any) {
@@ -1460,6 +1475,22 @@ async function startServer() {
                       );
                       for (const episode of episodes) {
                         if (typeof episode?.guid === 'string' && episode.guid) connectionLibraryGuids.add(episode.guid);
+                        const parentIdentity = buildPlexParentShowIdentityItem(episode);
+                        const directTmdb = Number(extractPlexExternalIds(parentIdentity).tmdbId);
+                        const parentRatingKey = getPlexParentShowMetadataLookupKey(episode);
+                        const parentGuidCandidates = [episode?.grandparentGuid, ...(Array.isArray(episode?.grandparentGuids) ? episode.grandparentGuids.map((g: any) => typeof g === 'string' ? g : g?.id) : [])];
+                        let parentTmdbId = Number.isInteger(directTmdb) && directTmdb > 0 ? directTmdb : null;
+                        if (!parentTmdbId && parentRatingKey) parentTmdbId = showTmdbByRatingKey.get(String(parentRatingKey)) || null;
+                        if (!parentTmdbId) {
+                          for (const guid of parentGuidCandidates) {
+                            if (typeof guid === 'string' && showTmdbByGuid.has(guid)) {
+                              parentTmdbId = showTmdbByGuid.get(guid) || null;
+                              break;
+                            }
+                          }
+                        }
+                        const watchState = buildPlexLibraryWatchState(episode, { mediaType: 'episode', parentTmdbId, serverName, serverId });
+                        if (watchState) connectionWatchStateItems.push(watchState);
                       }
 
                       const watchedEpisodes = episodes.filter(isPlexLibraryItemWatched);
@@ -1511,6 +1542,7 @@ async function startServer() {
             if (!delta) {
               allRawItems.push(...libraryItems);
               libraryAvailabilityItems.push(...connectionAvailabilityItems);
+              libraryWatchStateItems.push(...connectionWatchStateItems);
               connectionLibraryGuids.forEach((guid) => currentLibraryGuids.add(guid));
               sourceStats.libraryInventoryItems += connectionInventoryCount;
               sourceStats.libraryWatchedItems += libraryItems.length;
@@ -1899,6 +1931,8 @@ async function startServer() {
         });
       }
 
+      const normalizedLibraryWatchStates = delta ? [] : mergePlexLibraryWatchStates(libraryWatchStateItems);
+
       const stats = {
         ...sourceStats,
         rawItems: allRawItems.length,
@@ -1927,6 +1961,7 @@ async function startServer() {
         history: normalizedHistory,
         watchlist: normalizedWatchlist,
         libraryAvailability: normalizedLibraryAvailability,
+        libraryWatchStates: normalizedLibraryWatchStates,
         stats,
         integrity,
         visitedSources,

@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 2 septembre 2026
-Version applicative : **1.4.104**
+Version applicative : **1.4.105**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -140,8 +140,9 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 
 - Films et séries proviennent de TMDB et sont stockés sous une clé stable liée au type et au
   TMDB ID.
-- Les actions manuelles SeenIt restent prioritaires : une synchronisation externe est additive
-  et ne supprime pas silencieusement une progression saisie par l'utilisateur.
+- Une synchronisation externe ne déduit jamais une suppression depuis une simple absence. Une source
+  explicitement bidirectionnelle peut toutefois appliquer un état contraire lorsqu’elle fournit une preuve
+  autoritative ; pour Plex, seul un `viewCount=0` observé pendant un full scan vaut dé-vu.
 - Les écritures doivent rester idempotentes et la signature de bibliothèque indépendante de
   l'ordre reçu.
 - Les écrans lourds sont chargés à la demande ; les listes conservent des clés et un ordre
@@ -163,12 +164,12 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   reste ambiguë et est exclue de l'historique tant qu'une source forte (`account-history`, historique
   PMS ou `viewCount > 0`) ne confirme pas le visionnage. Le rapprochement ne se fait jamais par
   titre ou année ; en cas d'ambiguïté SeenIt conserve l'état non vu.
-- **SEENIT-PLEX-006** — La synchronisation Plex est strictement additive face à l'état SeenIt.
-  Un média ou épisode absent des preuves Plex, repassé non vu côté Plex ou simplement absent d'un
-  full scan ne retire jamais un marqueur de visionnage, un `episodeRecord`, une note ou une progression
-  déjà enregistrés dans SeenIt. Avant chaque écriture Plex, l'état Firestore courant est relu dans une
-  transaction puis fusionné par union ; une nouvelle preuve Plex peut ajouter un visionnage, jamais
-  transformer une absence de preuve en suppression. Les actions manuelles SeenIt restent prioritaires.
+- **SEENIT-PLEX-006** — Un scan Plex complet réconcilie l’état vu **et explicitement non vu**
+  des films et épisodes présents dans l’inventaire courant. Un `viewCount > 0` constitue une preuve vue ;
+  un `viewCount = 0` explicitement observé retire le visionnage SeenIt correspondant. Une simple absence
+  dans l’historique incrémental ne vaut jamais dé-vu. En présence de plusieurs copies du même média, une
+  copie vue gagne sur une copie non vue. L’écriture Firestore applique uniquement les mutations de
+  progression produites par le scan afin de ne pas écraser une action SeenIt concurrente non concernée.
 - Le full scan est paginé. Un inventaire partiel ne remplace pas un cache complet, sauf si au
   moins un inventaire serveur complet et exploitable a été obtenu conformément à la politique.
 - La déduplication finale utilise `movie:<tmdbId>` ou

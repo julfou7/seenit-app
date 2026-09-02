@@ -68,7 +68,7 @@ test('SEENIT-RELEASE-004 impose un nouveau numéro après une candidate déjà c
 
 test('SEENIT-RELEASE-004 sépare le build de la publication et vérifie la paire APK SHA-256', () => {
   assert.match(workflow, /^permissions:\s+contents: read/m);
-  assert.match(workflow, /cancel-in-progress: false/);
+  assert.match(workflow, /cancel-in-progress: true/);
   assert.match(workflow, /^\s{2}build:/m);
   assert.match(workflow, /^\s{2}publish:/m);
   assert.match(workflow, /publish:[\s\S]+needs: \[build, android_upgrade_smoke\]/);
