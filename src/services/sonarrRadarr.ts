@@ -205,7 +205,7 @@ export async function executeGet(url: string, headers: Record<string, string> = 
 /**
  * Exécute une requête POST multiplateforme (Fetch direct sur Android / Proxy ou Fetch sur Web)
  */
-async function executePost(url: string, body: any, headers: Record<string, string> = {}): Promise<any> {
+export async function executePost(url: string, body: any, headers: Record<string, string> = {}): Promise<any> {
   const mutationHeaders = {
     ...headers,
     'X-SeenIt-Request-Id': headers['X-SeenIt-Request-Id'] || crypto.randomUUID()
@@ -1748,11 +1748,13 @@ export function formatCleanMediaInfo(item: LiveDownloadItem): {
 } {
   // 1. Si c'est un item Sonarr/Radarr structuré
   if (item.seriesTitle) {
+    let cleanSeries = item.seriesTitle.trim();
+    cleanSeries = cleanSeries.replace(/\s*\((?:s\d{1,2}[e._-]?\d{1,2}|\d{1,2}x\d{1,2}|saison\s*\d+|season\s*\d+)\)\s*$/i, '').trim();
     const sStr = item.seasonNumber ? `S${String(item.seasonNumber).padStart(2, '0')}` : '';
     const eStr = item.episodeNumber ? `E${String(item.episodeNumber).padStart(2, '0')}` : '';
     const epCode = sStr && eStr ? `${sStr} | ${eStr}` : (sStr || eStr);
     return {
-      cleanTitle: item.seriesTitle,
+      cleanTitle: cleanSeries,
       subTitle: epCode || undefined,
       isTv: true
     };

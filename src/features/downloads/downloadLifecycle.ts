@@ -3,6 +3,8 @@ import { useLiveDownloadStore } from '../../store/liveDownloadStore';
 
 export interface BeginDownloadRequestInput {
   title: string;
+  seriesTitle?: string;
+  movieTitle?: string;
   mediaType: 'tv' | 'movie';
   tmdbId?: number | string;
   tvdbId?: number | string;
@@ -19,6 +21,8 @@ export interface BeginDownloadRequestInput {
 export function beginDownloadRequest(input: BeginDownloadRequestInput): string {
   return useLiveDownloadStore.getState().addOptimisticDownload({
     title: input.title,
+    seriesTitle: input.seriesTitle || (input.mediaType === 'tv' ? input.title : undefined),
+    movieTitle: input.movieTitle || (input.mediaType === 'movie' ? input.title : undefined),
     mediaType: input.mediaType,
     tmdbId: input.tmdbId ? Number(input.tmdbId) : undefined,
     tvdbId: input.tvdbId ? Number(input.tvdbId) : undefined,

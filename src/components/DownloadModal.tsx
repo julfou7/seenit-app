@@ -86,6 +86,7 @@ export function DownloadModal({
   seasonsData,
   onSuccessToast
 }: DownloadModalProps) {
+  const isTv = mediaType === 'tv';
   const config = useDownloadConfigStore();
   const showToast = useToastStore(state => state.showToast);
   const downloads = useLiveDownloadStore(state => state.downloads);
@@ -294,6 +295,8 @@ export function DownloadModal({
 
     const requestId = beginDownloadRequest({
       title: displayTitle,
+      seriesTitle: isTv ? title : undefined,
+      movieTitle: !isTv ? title : undefined,
       mediaType,
       tmdbId,
       tvdbId,
@@ -480,6 +483,8 @@ export function DownloadModal({
     const clientLabel = service === 'sonarr' ? 'Sonarr' : service === 'radarr' ? 'Radarr' : 'qBittorrent';
     const requestId = beginDownloadRequest({
       title,
+      seriesTitle: isTv ? title : undefined,
+      movieTitle: !isTv ? title : undefined,
       mediaType,
       tmdbId,
       imdbId,

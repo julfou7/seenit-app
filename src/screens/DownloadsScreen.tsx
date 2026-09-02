@@ -40,8 +40,10 @@ import {
 } from '../features/downloads/downloadPresentation';
 import {
   getStableDownloadRenderKey,
+  preferSeenItImagePath,
   selectStableDownloadPosterPath
 } from '../features/downloads/downloadPosterStability';
+import { findMatchingShowForDownload } from '../features/downloads/downloadIdentity';
 import { isDownloadInHistorySection } from '../features/downloads/downloadStatePolicy';
 
 interface Props {
@@ -79,13 +81,9 @@ function DownloadItemCard({
   onShowClick?: Props['onShowClick'];
 }) {
   const { cleanTitle, subTitle, isTv } = formatCleanMediaInfo(item);
-  const libraryPosterPath = useShowsStore(state => {
-    if (!item.tmdbId) return undefined;
-    return state.shows.find(show =>
-      show.mediaType === item.mediaType
-      && Number(show.tmdbId) === Number(item.tmdbId)
-    )?.posterPath || undefined;
-  });
+  const libraryShow = useShowsStore(state => findMatchingShowForDownload(item, state.shows));
+  const libraryPosterPath = libraryShow?.posterPath || undefined;
+  const preferredPoster = preferSeenItImagePath(item.posterPath, libraryPosterPath);
 
   const status = String(item.status || '').toLowerCase();
   const isCompleted = status === 'completed' || item.progress >= 100;
@@ -109,7 +107,7 @@ function DownloadItemCard({
   const lockedPosterPathRef = useRef<string | undefined>(undefined);
   lockedPosterPathRef.current = selectStableDownloadPosterPath(
     lockedPosterPathRef.current,
-    item.posterPath || libraryPosterPath
+    preferredPoster
   );
   const stablePosterPath = lockedPosterPathRef.current;
   const posterSrc = stablePosterPath
@@ -118,10 +116,11 @@ function DownloadItemCard({
       : `https://image.tmdb.org/t/p/w342${stablePosterPath}`
     : null;
 
-  const canOpenDetails = Boolean(item.tmdbId && onShowClick);
+  const effectiveTmdbId = item.tmdbId || (libraryShow?.tmdbId ? Number(libraryShow.tmdbId) : undefined);
+  const canOpenDetails = Boolean(effectiveTmdbId && onShowClick);
   const openDetails = () => {
-    if (!item.tmdbId || !onShowClick) return;
-    onShowClick(item.tmdbId, item.mediaType);
+    if (!effectiveTmdbId || !onShowClick) return;
+    onShowClick(effectiveTmdbId, item.mediaType);
   };
 
   const accent = isCancelled

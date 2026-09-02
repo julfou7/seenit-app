@@ -19,6 +19,7 @@ import {
   selectEpisodeFiles,
   type TorrentFileLike
 } from './episodePackSelection';
+import { registerTrackedSeasonPack } from './episodeSeasonPackCleanup';
 
 export interface EpisodeDownloadWithFallbackParams {
   url: string;
@@ -43,6 +44,10 @@ export interface EpisodeDownloadWithFallbackResult {
   fallbackUsed?: boolean;
   downloadId?: string;
   selectedFile?: string;
+  seriesId?: number;
+  episodeId?: number;
+  season?: number;
+  episode?: number;
 }
 
 interface SonarrTarget {
@@ -663,6 +668,15 @@ export async function downloadEpisodeWithSeasonPackFallback(
     };
   }
 
+  registerTrackedSeasonPack({
+    downloadId: transfer.downloadId,
+    seriesId: Number(target.series.id),
+    episodeId: Number(target.episode.id),
+    seasonNumber: Number(params.season),
+    episodeNumber: Number(params.episode),
+    title: params.title
+  });
+
   const code = `S${String(params.season).padStart(2, '0')}E${String(params.episode).padStart(2, '0')}`;
   return {
     success: true,
@@ -670,6 +684,10 @@ export async function downloadEpisodeWithSeasonPackFallback(
     status: 'queued',
     downloadId: transfer.downloadId,
     selectedFile: selection.selectedFile,
+    seriesId: Number(target.series.id),
+    episodeId: Number(target.episode.id),
+    season: params.season,
+    episode: params.episode,
     message: `Aucune release ${code} isolée • pack Saison ${params.season} utilisé, seul ${code} sera téléchargé.`
   };
 }

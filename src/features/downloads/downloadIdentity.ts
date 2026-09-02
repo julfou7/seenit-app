@@ -4,6 +4,8 @@ export interface DownloadIdentityLike {
   downloadIdAliases?: Array<string | null | undefined> | null;
   releaseTitle?: string | null;
   title?: string | null;
+  seriesTitle?: string | null;
+  movieTitle?: string | null;
   size?: number | null;
   mediaType?: string | null;
   transferPath?: string | null;
@@ -205,13 +207,34 @@ export function canAttachRecentOptimisticRequest(
   if (delta < -5_000 || delta > windowMs) return false;
 
   if (request.tmdbId && remote.tmdbId && Number(request.tmdbId) !== Number(remote.tmdbId)) return false;
-  if (request.tvdbId && remote.tvdbId && Number(request.tvdbId) !== Number(remote.tvdbId)) return false;
+  if (request.tvdbId && remote.tvdbId && Number(request.tvdbId) !== Number(remote.tvdbId)) {
+    const reqTitle = normalizeDownloadRelease(request.seriesTitle || request.movieTitle || request.title);
+    const remTitle = normalizeDownloadRelease(remote.seriesTitle || remote.movieTitle || remote.title);
+    if (!reqTitle || !remTitle || reqTitle !== remTitle) {
+      return false;
+    }
+  }
 
   if (request.mediaType === 'tv') {
+    if (request.seriesTitle && remote.seriesTitle) {
+      const reqSeries = normalizeDownloadRelease(request.seriesTitle);
+      const remSeries = normalizeDownloadRelease(remote.seriesTitle);
+      if (reqSeries && remSeries && reqSeries !== remSeries && !reqSeries.includes(remSeries) && !remSeries.includes(reqSeries)) {
+        return false;
+      }
+    }
     if (request.seasonNumber != null && remote.seasonNumber != null
         && Number(request.seasonNumber) !== Number(remote.seasonNumber)) return false;
     if (request.episodeNumber != null && remote.episodeNumber != null
         && Number(request.episodeNumber) !== Number(remote.episodeNumber)) return false;
+  }
+
+  if (request.mediaType === 'movie' && request.movieTitle && remote.movieTitle) {
+    const reqMovie = normalizeDownloadRelease(request.movieTitle);
+    const remMovie = normalizeDownloadRelease(remote.movieTitle);
+    if (reqMovie && remMovie && reqMovie !== remMovie && !reqMovie.includes(remMovie) && !remMovie.includes(reqMovie)) {
+      return false;
+    }
   }
 
   const requestResolution = identityResolutionBucket(request);
@@ -276,3 +299,76 @@ export function sameLegacyPhysicalTransfer(
   const bMedia = normalizeMediaReleaseKey(b.releaseTitle || b.title);
   return Boolean(aMedia && bMedia && aMedia === bMedia);
 }
+
+export interface ShowLike {
+  mediaType: 'tv' | 'movie';
+  tmdbId?: number | string;
+  tvdbId?: number | string;
+  imdbId?: string;
+  title: string;
+  originalTitle?: string;
+  posterPath?: string;
+  backdropPath?: string;
+}
+
+/**
+ * Recherche la fiche média correspondante dans la bibliothèque SeenIt de l'utilisateur.
+ * Priorités : tmdbId, tvdbId, imdbId, puis titre normalisé.
+ * Permet de garantir que l'affiche et les métadonnées affichées proviennent toujours
+ * de la fiche série/film SeenIt choisie par l'utilisateur.
+ */
+export function findMatchingShowForDownload<T extends ShowLike>(
+  item?: {
+    mediaType?: 'tv' | 'movie' | string;
+    tmdbId?: number | string;
+    tvdbId?: number | string;
+    imdbId?: string;
+    seriesTitle?: string;
+    movieTitle?: string;
+    title?: string;
+    releaseTitle?: string;
+  } | null,
+  shows?: T[] | null
+): T | undefined {
+  if (!item || !shows || shows.length === 0) return undefined;
+  const mediaType = item.mediaType === 'movie' ? 'movie' : 'tv';
+
+  // 1. Match par tmdbId
+  if (item.tmdbId) {
+    const match = shows.find(s => s.mediaType === mediaType && Number(s.tmdbId) === Number(item.tmdbId));
+    if (match) return match;
+  }
+
+  // 2. Match par tvdbId
+  if (item.tvdbId) {
+    const match = shows.find(s => s.mediaType === mediaType && s.tvdbId && Number(s.tvdbId) === Number(item.tvdbId));
+    if (match) return match;
+  }
+
+  // 3. Match par imdbId
+  if (item.imdbId) {
+    const cleanImdb = String(item.imdbId).trim().toLowerCase();
+    const match = shows.find(s => s.mediaType === mediaType && s.imdbId && String(s.imdbId).trim().toLowerCase() === cleanImdb);
+    if (match) return match;
+  }
+
+  // 4. Match par titre normalisé
+  const candidateTitle = item.seriesTitle || item.movieTitle || item.title;
+  let normalized = normalizeDownloadRelease(candidateTitle);
+  // Nettoyer d'éventuels suffixes d'épisode / saison
+  normalized = normalized.replace(/(?:s\d{1,2}[e._-]?\d{1,2}|\d{1,2}x\d{1,2}|saison\d+|season\d+)$/i, '');
+  if (normalized && normalized.length >= 2) {
+    const match = shows.find(s => {
+      if (s.mediaType !== mediaType) return false;
+      const sTitle = normalizeDownloadRelease(s.title);
+      if (sTitle && sTitle === normalized) return true;
+      const sOriginal = s.originalTitle ? normalizeDownloadRelease(s.originalTitle) : '';
+      if (sOriginal && sOriginal === normalized) return true;
+      return false;
+    });
+    if (match) return match;
+  }
+
+  return undefined;
+}
+

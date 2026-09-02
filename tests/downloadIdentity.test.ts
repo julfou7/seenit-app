@@ -375,3 +375,63 @@ test('les GET Android de suivi sont uniques et explicitement non cachables', asy
   assert.equal(headers.Pragma, 'no-cache');
   assert.equal(headers.Expires, '0');
 });
+
+test('canAttachRecentOptimisticRequest rattache une demande optimiste même si tvdbId diffère mais que le titre concorde', () => {
+  const now = 1_700_000_000_000;
+  const request = {
+    id: 'req_123',
+    requestId: 'req_123',
+    mediaType: 'tv' as const,
+    seriesTitle: 'Dark Matter',
+    title: 'Dark Matter (S02E01)',
+    tmdbId: 218738,
+    tvdbId: 423527,
+    seasonNumber: 2,
+    episodeNumber: 1,
+    addedAt: now - 3_000,
+    isOptimistic: true
+  };
+
+  const remote = {
+    id: 'sonarr_55',
+    mediaType: 'tv' as const,
+    seriesTitle: 'Dark Matter',
+    title: 'Dark Matter - S02E01 - Episode 1',
+    // Sonarr pointe parfois sur un ID TVDB alternatif
+    tvdbId: 292115,
+    seasonNumber: 2,
+    episodeNumber: 1,
+    addedAt: now - 1_000,
+    isOptimistic: false
+  };
+
+  assert.equal(canAttachRecentOptimisticRequest(request, remote, now), true);
+});
+
+test('canAttachRecentOptimisticRequest ne rattache pas deux séries aux titres différents même si les identifiants sont absents', () => {
+  const now = 1_700_000_000_000;
+  const request = {
+    id: 'req_123',
+    mediaType: 'tv' as const,
+    seriesTitle: 'Dark Matter',
+    title: 'Dark Matter (S02E01)',
+    seasonNumber: 2,
+    episodeNumber: 1,
+    addedAt: now - 3_000,
+    isOptimistic: true
+  };
+
+  const remote = {
+    id: 'sonarr_99',
+    mediaType: 'tv' as const,
+    seriesTitle: 'Severance',
+    title: 'Severance - S02E01',
+    seasonNumber: 2,
+    episodeNumber: 1,
+    addedAt: now - 1_000,
+    isOptimistic: false
+  };
+
+  assert.equal(canAttachRecentOptimisticRequest(request, remote, now), false);
+});
+

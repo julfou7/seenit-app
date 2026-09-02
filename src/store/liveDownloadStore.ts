@@ -11,18 +11,33 @@ import {
   matchShowDownload,
   matchMovieDownload,
   deleteLiveDownloadItem,
-  extractQualityFromTitle
+  extractQualityFromTitle,
+  formatCleanMediaInfo
 } from '../services/sonarrRadarr';
 import { useToastStore } from './toastStore';
 import { useShowsStore } from './showsStore';
 import { auth, db } from '../lib/firebase';
-import { canAttachRecentOptimisticRequest, getPhysicalDownloadId, getStrongPhysicalDownloadIds, hasConflictingStrongPhysicalIds, mergeDownloadIdAliases, sameDownloadRequest, sameLegacyPhysicalTransfer, samePhysicalDownload, sameTransferPath } from '../features/downloads/downloadIdentity';
+import {
+  canAttachRecentOptimisticRequest,
+  findMatchingShowForDownload,
+  getPhysicalDownloadId,
+  getStrongPhysicalDownloadIds,
+  hasConflictingStrongPhysicalIds,
+  mergeDownloadIdAliases,
+  normalizeDownloadRelease,
+  sameDownloadRequest,
+  sameLegacyPhysicalTransfer,
+  samePhysicalDownload,
+  sameTransferPath
+} from '../features/downloads/downloadIdentity';
 import { findUniqueRecentOptimisticAttachments, mergeLateOptimisticMetadata } from '../features/downloads/downloadReconciliation';
 import { fetchRecentDownloadHistory, resolveDownloadHistoryOutcome } from '../features/downloads/downloadHistory';
 import { preferSeenItImagePath } from '../features/downloads/downloadPosterStability';
 import { isDownloadInHistorySection } from '../features/downloads/downloadStatePolicy';
 import { buildLiveDownloadStorageKey, isDownloadRequestScopeCurrent } from '../features/downloads/downloadUserScope';
 import { normalizeUnresolvedQbitScope, shouldSuppressUnresolvedQbit } from '../features/downloads/downloadTransientVisibility';
+import { processTrackedSeasonPackFallbacks, removeTrackedSeasonPack } from '../features/downloads/episodeSeasonPackCleanup';
+import { normalizeDownloadClientId } from '../features/downloads/downloadIdentity';
 
 interface LiveDownloadState {
   downloads: LiveDownloadItem[];
@@ -309,6 +324,13 @@ function isTerminalDownload(item: LiveDownloadItem): boolean {
   return isCancelledDownload(item) || item.status === 'completed' || Number(item.progress || 0) >= 100;
 }
 
+function cleanMediaTitleForComparison(title?: string): string {
+  if (!title) return '';
+  let cleaned = String(title).trim();
+  cleaned = cleaned.replace(/\s*\((?:s\d{1,2}[e._-]?\d{1,2}|\d{1,2}x\d{1,2}|saison\s*\d+|season\s*\d+)\)\s*$/i, '').trim();
+  return normalizeDownloadRelease(cleaned);
+}
+
 function sameDownloadIdentity(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
   if (a.id === b.id) return true;
   if (sameDownloadRequest(a, b)) return true;
@@ -324,14 +346,31 @@ function sameDownloadIdentity(a: LiveDownloadItem, b: LiveDownloadItem): boolean
   if (sameLegacyPhysicalTransfer(a, b)) return true;
 
   if (isTerminalDownload(a) !== isTerminalDownload(b)) return false;
-  if (!sameCanonicalMedia(a, b)) return false;
+
+  if (a.mediaType !== b.mediaType) return false;
 
   if (a.mediaType === 'tv') {
     if (a.seasonNumber != null && b.seasonNumber != null && a.seasonNumber !== b.seasonNumber) return false;
     if (a.episodeNumber != null && b.episodeNumber != null && a.episodeNumber !== b.episodeNumber) return false;
   }
 
-  return Boolean(a.isOptimistic || b.isOptimistic || a.isRestored || b.isRestored);
+  // 1. Identifiants canoniques stricts
+  if (sameCanonicalMedia(a, b)) {
+    return Boolean(a.isOptimistic || b.isOptimistic || a.isRestored || b.isRestored);
+  }
+
+  // 2. Corrélation optimiste par titre nettoyé quand l'un des items est optimiste ou en cours de demande
+  if (a.isOptimistic || b.isOptimistic || a.requestId || b.requestId) {
+    const cleanA = cleanMediaTitleForComparison(a.seriesTitle || a.movieTitle || a.title || formatCleanMediaInfo(a).cleanTitle);
+    const cleanB = cleanMediaTitleForComparison(b.seriesTitle || b.movieTitle || b.title || formatCleanMediaInfo(b).cleanTitle);
+    if (cleanA && cleanB && cleanA === cleanB) {
+      if (!(a.tmdbId && b.tmdbId && Number(a.tmdbId) !== Number(b.tmdbId))) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 function sameCancellationIdentity(cancelled: LiveDownloadItem, remote: LiveDownloadItem, now = Date.now()): boolean {
@@ -548,6 +587,40 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           });
           if (!isCurrentScope()) return;
 
+          const cleanupResult = await processTrackedSeasonPackFallbacks({
+            sonarrUrl: config.sonarrUrl,
+            sonarrApiKey: config.sonarrApiKey,
+            qbittorrentUrl: config.qbittorrentUrl,
+            qbittorrentUsername: config.qbittorrentUsername,
+            qbittorrentPassword: config.qbittorrentPassword
+          }, activeDownloadStorageUid);
+          if (!isCurrentScope()) return;
+
+          const cleanedDownloadIds = new Set(
+            cleanupResult.cleanedFallbacks.map(f => normalizeDownloadClientId(f.downloadId))
+          );
+          const cleanedQueueIdSet = new Set(
+            cleanupResult.removedQueueIds.map(qid => `sonarr_${qid}`)
+          );
+
+          if (cleanedDownloadIds.size > 0) {
+            currentDownloads.forEach(localItem => {
+              const localDownloadId = normalizeDownloadClientId(localItem.downloadId);
+              if (cleanedDownloadIds.has(localDownloadId)) {
+                localItem.status = 'completed';
+                localItem.progress = 100;
+                localItem.statusText = 'Téléchargement terminé 🍿';
+                localItem.sizeleft = 0;
+                localItem.speedBytesPerSec = 0;
+                localItem.speedFormatted = '';
+                localItem.timeleft = '';
+                localItem.timeleftSeconds = 0;
+                localItem.isOptimistic = false;
+                localItem.isRestored = false;
+              }
+            });
+          }
+
           const sourceHealth = getLastLiveDownloadSourceHealth();
           const normalizedServerItems = rawServerItems.map(normalizeUnresolvedQbitScope);
           const rawIds = new Set(normalizedServerItems.map(item => item.id));
@@ -558,6 +631,8 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           const visibilityNow = Date.now();
           const serverItems = normalizedServerItems.filter(item =>
             !removedSet.has(item.id)
+            && !cleanedQueueIdSet.has(item.id)
+            && !cleanedDownloadIds.has(normalizeDownloadClientId(item.downloadId))
             && !cancelledLocals.some(cancelled => sameCancellationIdentity(cancelled, item))
             && !shouldSuppressUnresolvedQbit(item, pendingRequests, visibilityNow)
           );
@@ -566,15 +641,22 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           serverItems.forEach(serverItem => {
             delete missingSince[serverItem.id];
 
+            // Enrichissement direct depuis la fiche de la série/du film dans SeenIt
+            const matchedShow = findMatchingShowForDownload(serverItem, localShows);
+            if (matchedShow) {
+              serverItem.posterPath = preferSeenItImagePath(serverItem.posterPath, matchedShow.posterPath || undefined);
+              serverItem.backdropPath = preferSeenItImagePath(serverItem.backdropPath, matchedShow.backdropPath || undefined);
+              if (!serverItem.tmdbId && matchedShow.tmdbId) serverItem.tmdbId = Number(matchedShow.tmdbId);
+              if (!serverItem.tvdbId && matchedShow.tvdbId) serverItem.tvdbId = Number(matchedShow.tvdbId);
+              if (!serverItem.imdbId && matchedShow.imdbId) serverItem.imdbId = matchedShow.imdbId;
+              if (serverItem.mediaType === 'tv' && !serverItem.seriesTitle) serverItem.seriesTitle = matchedShow.title;
+              if (serverItem.mediaType === 'movie' && !serverItem.movieTitle) serverItem.movieTitle = matchedShow.title;
+            }
+
             const localMatch = currentDownloads.find(current => sameDownloadIdentity(current, serverItem));
             if (localMatch) {
-              if (localMatch.requestId) {
-                serverItem.posterPath = preferSeenItImagePath(serverItem.posterPath, localMatch.posterPath);
-                serverItem.backdropPath = preferSeenItImagePath(serverItem.backdropPath, localMatch.backdropPath);
-              } else {
-                if (!serverItem.posterPath && localMatch.posterPath) serverItem.posterPath = localMatch.posterPath;
-                if (!serverItem.backdropPath && localMatch.backdropPath) serverItem.backdropPath = localMatch.backdropPath;
-              }
+              serverItem.posterPath = preferSeenItImagePath(serverItem.posterPath, localMatch.posterPath);
+              serverItem.backdropPath = preferSeenItImagePath(serverItem.backdropPath, localMatch.backdropPath);
               if (!serverItem.tmdbId && localMatch.tmdbId) serverItem.tmdbId = localMatch.tmdbId;
               if (!serverItem.tvdbId && localMatch.tvdbId) serverItem.tvdbId = localMatch.tvdbId;
               if (!serverItem.quality && localMatch.quality) serverItem.quality = localMatch.quality;
@@ -582,13 +664,16 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               if (!serverItem.addedAt && localMatch.addedAt) serverItem.addedAt = localMatch.addedAt;
               if (!serverItem.requestId && localMatch.requestId) serverItem.requestId = localMatch.requestId;
 
-              if (localMatch.requestId) {
+              if (localMatch.requestId || localMatch.isOptimistic) {
                 if (serverItem.mediaType === 'movie') {
                   const seenItTitle = localMatch.movieTitle || (localMatch.isOptimistic ? localMatch.title : undefined);
                   if (seenItTitle) serverItem.movieTitle = seenItTitle;
                 } else {
                   const seenItTitle = localMatch.seriesTitle || (localMatch.isOptimistic ? localMatch.title : undefined);
-                  if (seenItTitle) serverItem.seriesTitle = seenItTitle;
+                  if (seenItTitle) {
+                    const clean = seenItTitle.replace(/\s*\((?:s\d{1,2}[e._-]?\d{1,2}|\d{1,2}x\d{1,2}|saison\s*\d+|season\s*\d+)\)\s*$/i, '').trim();
+                    serverItem.seriesTitle = clean || seenItTitle;
+                  }
                 }
               }
 
@@ -604,15 +689,6 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
                   const remoteLeft = Number(serverItem.sizeleft || serverItem.size);
                   serverItem.sizeleft = Math.min(remoteLeft, Number(localMatch.sizeleft || remoteLeft));
                 }
-              }
-            }
-
-            if (!serverItem.posterPath && serverItem.tmdbId && localShows.length > 0) {
-              const matchedShow = localShows.find(show => Number(show.tmdbId) === Number(serverItem.tmdbId));
-              if (matchedShow) {
-                serverItem.posterPath = matchedShow.posterPath || serverItem.posterPath;
-                serverItem.backdropPath = matchedShow.backdropPath || serverItem.backdropPath;
-                if (!serverItem.tmdbId && matchedShow.tmdbId) serverItem.tmdbId = Number(matchedShow.tmdbId);
               }
             }
 
@@ -636,7 +712,6 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             optimistic,
             candidates: serverItems.filter(serverItem =>
               !sameDownloadIdentity(optimistic, serverItem)
-              && (serverItem.id.startsWith('qbit_') || (!serverItem.tmdbId && !serverItem.tvdbId))
               && canAttachRecentOptimisticRequest(optimistic, serverItem, handshakeNow)
             )
           }));
@@ -659,7 +734,9 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             if (serverItem.mediaType === 'movie') {
               serverItem.movieTitle = optimistic.movieTitle || optimistic.title;
             } else {
-              serverItem.seriesTitle = optimistic.seriesTitle || optimistic.title;
+              const rawTitle = optimistic.seriesTitle || optimistic.title;
+              const clean = rawTitle ? rawTitle.replace(/\s*\((?:s\d{1,2}[e._-]?\d{1,2}|\d{1,2}x\d{1,2}|saison\s*\d+|season\s*\d+)\)\s*$/i, '').trim() : '';
+              serverItem.seriesTitle = clean || rawTitle;
             }
             serverItem.downloadIdAliases = mergeDownloadIdAliases(serverItem, optimistic);
             markCompletionNotificationEligible(serverItem);
@@ -1054,6 +1131,10 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
         const config = useDownloadConfigStore.getState();
         const status = String(item.status || '').toLowerCase();
         const shouldCancelRemote = !isTerminalDownload(item) && status !== 'error';
+
+        if (item.downloadId) {
+          removeTrackedSeasonPack(item.downloadId, activeDownloadStorageUid);
+        }
 
         if (!shouldCancelRemote) {
           const newRemovedIds = Array.from(new Set([...(get().removedIds || []), item.id]));

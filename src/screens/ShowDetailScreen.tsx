@@ -319,6 +319,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
 
     const requestId = beginDownloadRequest({
       title: `${showTitle} (${code})`,
+      seriesTitle: showTitle,
       mediaType: 'tv',
       tmdbId: effectiveTmdbId,
       tvdbId,
@@ -390,6 +391,8 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     setIs1ClickDownloading(prev => ({ ...prev, [seasonKey]: true }));
     const showTitle = show?.title || tmdbDetails?.name || tmdbDetails?.original_name || 'Série';
     const tvdbId = tmdbDetails?.external_ids?.tvdb_id || (show as any)?.tvdbId;
+    const posterForDownload = tmdbDetails?.poster_path || show?.posterPath || undefined;
+    const backdropForDownload = tmdbDetails?.backdrop_path || show?.backdropPath || undefined;
 
     // Ajout optimiste immédiat pour affichage instantané du badge "1" et de la barre
     useLiveDownloadStore.getState().addOptimisticDownload({
@@ -399,6 +402,8 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       tmdbId: effectiveTmdbId,
       tvdbId,
       seasonNumber,
+      posterPath: posterForDownload,
+      backdropPath: backdropForDownload,
       downloadClient: 'Sonarr',
       statusText: 'Préparation du téléchargement…'
     });
@@ -440,6 +445,8 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     const movieTitle = show?.title || tmdbDetails?.title || tmdbDetails?.original_title || 'Film';
     const movieYear = releaseYear ? parseInt(releaseYear, 10) : undefined;
     const imdbId = tmdbDetails?.external_ids?.imdb_id;
+    const posterForDownload = tmdbDetails?.poster_path || show?.posterPath || undefined;
+    const backdropForDownload = tmdbDetails?.backdrop_path || show?.backdropPath || undefined;
 
     setIs1ClickDownloading(prev => ({ ...prev, movie: true }));
 
@@ -449,6 +456,8 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       title: movieTitle,
       movieTitle: movieTitle,
       tmdbId: effectiveTmdbId,
+      posterPath: posterForDownload,
+      backdropPath: backdropForDownload,
       downloadClient: 'Radarr',
       statusText: 'Préparation du téléchargement…'
     });
