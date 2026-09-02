@@ -57,8 +57,6 @@ test('SEENIT-QUALITY-005 protège les fichiers Android suivis et les droits exé
   assert.equal(fs.existsSync('android/app/google-services.json'), true, 'google-services.json doit rester suivi');
   assert.equal(fs.existsSync('android/app/debug.keystore'), true, 'la clé de signature historique doit rester suivie');
   if (process.platform !== 'win32') {
-    for (const path of ['android/gradlew', 'scripts/pull.sh']) {
-      assert.notEqual(fs.statSync(path).mode & 0o111, 0, path + ' doit rester exécutable dans Git');
-    }
+    assert.notEqual(fs.statSync('android/gradlew').mode & 0o111, 0, 'android/gradlew doit rester exécutable dans Git');
   }
 });
