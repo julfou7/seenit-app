@@ -47,6 +47,7 @@ import {
   shouldReplacePlexAvailabilityCache
 } from './plexSyncIntegrity';
 import { buildLibraryStateSignature } from '../../lib/userIsolation';
+import { mergeAdditivePlexProgress } from './plexAdditiveSync';
 
 export interface PlexSyncResult {
   success: boolean;
@@ -1429,13 +1430,25 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         const BATCH_SIZE = 250;
         for (let i = 0; i < showEntries.length; i += BATCH_SIZE) {
           const chunk = showEntries.slice(i, i + BATCH_SIZE);
-          const chunkBatch = writeBatch(db);
-          for (const [id, data] of chunk) {
-            const ref = doc(db, `users/${user.uid}/shows`, id);
-            const cleanData = cleanShowForFirestore(data, user.uid);
-            chunkBatch.set(ref, cleanData, { merge: true });
-          }
-          await chunkBatch.commit();
+          await runTransaction(db, async (transaction) => {
+            const refs = chunk.map(([id, data]) => ({
+              id,
+              data,
+              ref: doc(db, `users/${user.uid}/shows`, id)
+            }));
+            const currentSnapshots = await Promise.all(
+              refs.map(({ ref }) => transaction.get(ref))
+            );
+
+            for (let index = 0; index < refs.length; index++) {
+              const { data, ref } = refs[index];
+              const snapshot = currentSnapshots[index];
+              const currentSeenItState = snapshot.exists() ? snapshot.data() : null;
+              const additiveData = mergeAdditivePlexProgress(currentSeenItState, data);
+              const cleanData = cleanShowForFirestore(additiveData, user.uid);
+              transaction.set(ref, cleanData, { merge: true });
+            }
+          });
         }
 
         // 3. Relire le serveur après les commits : le même UID obtient ainsi le

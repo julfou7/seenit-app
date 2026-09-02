@@ -333,7 +333,7 @@ export function ToastContainer() {
             </div>
           ) : (
             /* Floating Compact Pill for Simple & System Notifications */
-            <div className="relative overflow-hidden bg-zinc-900/95 backdrop-blur-2xl border border-white/15 rounded-full shadow-[0_14px_40px_rgba(0,0,0,0.85)] px-3.5 py-2 sm:px-4 sm:py-2.5 flex items-center gap-2.5 w-auto max-w-full">
+            <div className="relative overflow-hidden bg-zinc-900/95 backdrop-blur-2xl border border-white/15 rounded-2xl sm:rounded-full shadow-[0_14px_40px_rgba(0,0,0,0.85)] px-3.5 py-2 sm:px-4 sm:py-2.5 flex items-center gap-2.5 w-full sm:w-auto max-w-full">
               
               {/* Icon badge - Solid 100% Opaque for Plex, Amber for Reminder, Rose for Favorite */}
               {isPlexToast ? (
@@ -363,7 +363,7 @@ export function ToastContainer() {
                     {parsed.title}
                   </span>
                 )}
-                <span className="text-zinc-100 text-[12px] sm:text-xs font-semibold leading-snug whitespace-nowrap sm:whitespace-normal line-clamp-2">
+                <span className="text-zinc-100 text-[12px] sm:text-xs font-semibold leading-snug whitespace-normal break-words">
                   {parsed.action || (typeof message === 'string' ? message : '')}
                 </span>
               </div>
