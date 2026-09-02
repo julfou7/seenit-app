@@ -115,6 +115,12 @@ version.
 Le smoke N → N+1 conserve l'installation par-dessus la dernière release, la signature, les données,
 le deep link, le launcher et les preuves archivées.
 
+Pour éviter de payer un cold boot complet à chaque release, l'AVD Android 36 et son snapshot propre
+sont mis en cache entre les runs. Le snapshot n'est généré qu'en cas de cache miss ; le smoke bloquant
+réutilise ensuite cet AVD avec `force-avd-creation: false` et `-no-snapshot-save`. Cette optimisation ne
+change ni la baseline N, ni l'APK N+1, ni les assertions du TNR : elle ne fait qu'éviter de recréer
+l'environnement virtuel déjà validé.
+
 ## Protections qui restent non négociables
 
 La simplification ne réduit pas les garde-fous sur :
