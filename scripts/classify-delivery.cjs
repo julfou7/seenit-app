@@ -21,15 +21,45 @@ const SAFE_JSX_ATTRIBUTES = new Set([
   'title'
 ]);
 
+const BACKEND_ONLY_FILES = new Set([
+  'server.ts',
+  'src/lib/firebase-admin.ts'
+]);
+
+const DEPENDENCY_FILES = new Set([
+  'package.json',
+  'package-lock.json'
+]);
+
 function normalizePath(file) {
   return String(file || '').trim().replace(/\\/g, '/');
 }
 
-function isNonRuntimeFile(file) {
+function isProcessOnlyFile(file) {
   const normalized = normalizePath(file);
   return normalized.endsWith('.md')
+    || normalized.startsWith('docs/')
     || normalized.startsWith('tests/')
-    || normalized.startsWith('.github/ISSUE_TEMPLATE/');
+    || normalized.startsWith('.github/')
+    || normalized.startsWith('.agents/')
+    || normalized.startsWith('scripts/')
+    || normalized === 'AGENTS.md';
+}
+
+function isNonRuntimeFile(file) {
+  return isProcessOnlyFile(file);
+}
+
+function isBackendOnlyFile(file) {
+  const normalized = normalizePath(file);
+  return BACKEND_ONLY_FILES.has(normalized)
+    || normalized.startsWith('src/backend/')
+    || normalized.startsWith('src/server/')
+    || normalized.startsWith('src/features/runtime/');
+}
+
+function isDependencyFile(file) {
+  return DEPENDENCY_FILES.has(normalizePath(file));
 }
 
 function isSourceFile(file) {
@@ -105,15 +135,24 @@ function classifyDelivery({ changes, readBefore, readAfter, forcedMode = 'auto' 
   if (!['auto', 'apk'].includes(forcedMode)) {
     throw new Error(`Mode de livraison forcé invalide : ${forcedMode}.`);
   }
+
+  const dependenciesChanged = changes.some(change => isDependencyFile(change.path));
   if (forcedMode === 'apk') {
-    return { mode: 'apk', reasons: ['parcours APK demandé explicitement'] };
+    return {
+      mode: 'apk',
+      dependenciesChanged,
+      reasons: ['parcours APK demandé explicitement']
+    };
   }
 
+  let mode = 'light';
   const reasons = [];
+
   for (const change of changes) {
     const file = normalizePath(change.path);
-    if (isNonRuntimeFile(file)) {
-      reasons.push(`${file} : fichier sans effet sur le binaire livré`);
+
+    if (isProcessOnlyFile(file)) {
+      reasons.push(`${file} : documentation, test, CI ou outillage non embarqué`);
       continue;
     }
 
@@ -121,19 +160,27 @@ function classifyDelivery({ changes, readBefore, readAfter, forcedMode = 'auto' 
       const before = readBefore(file);
       const after = readAfter(file);
       if (isCopyOnlySourceChange(file, before, after)) {
-        reasons.push(`${file} : texte d’interface/commentaires uniquement`);
+        reasons.push(`${file} : texte d’interface uniquement`);
         continue;
       }
     }
 
+    if (isBackendOnlyFile(file)) {
+      if (mode === 'light') mode = 'backend';
+      reasons.push(`${file} : backend non embarqué dans l’APK Capacitor`);
+      continue;
+    }
+
     return {
       mode: 'apk',
-      reasons: [`${file} : changement exécutable, natif, de configuration ou ambigu`]
+      dependenciesChanged,
+      reasons: [`${file} : changement du frontend embarqué, Android, dépendances ou configuration applicative`]
     };
   }
 
   return {
-    mode: 'light',
+    mode,
+    dependenciesChanged,
     reasons: reasons.length ? reasons : ['aucun changement livrable détecté']
   };
 }
@@ -202,20 +249,31 @@ function readWorkingFile(file) {
   return fs.readFileSync(path.join(root, normalizePath(file)), 'utf8');
 }
 
-function writeGithubOutput(mode) {
+function writeGithubOutput(result) {
   if (!process.env.GITHUB_OUTPUT) return;
-  fs.appendFileSync(process.env.GITHUB_OUTPUT, `DELIVERY_MODE=${mode}\n`, 'utf8');
+  fs.appendFileSync(process.env.GITHUB_OUTPUT, `DELIVERY_MODE=${result.mode}\n`, 'utf8');
+  fs.appendFileSync(
+    process.env.GITHUB_OUTPUT,
+    `DEPENDENCIES_CHANGED=${result.dependenciesChanged ? 'true' : 'false'}\n`,
+    'utf8'
+  );
 }
 
 function writeGithubSummary(result, changes) {
   if (!process.env.GITHUB_STEP_SUMMARY) return;
+  const labels = {
+    light: 'LIGHT',
+    backend: 'BACKEND',
+    apk: 'APK'
+  };
   const lines = [
     '## Classification de livraison SeenIt',
     '',
-    `**Parcours : ${result.mode === 'light' ? 'LIGHT' : 'APK COMPLET'}**`,
+    `**Classe : ${labels[result.mode] || result.mode.toUpperCase()}**`,
     '',
     ...result.reasons.map(reason => `- ${reason}`),
     '',
+    `Dépendances modifiées : ${result.dependenciesChanged ? 'oui' : 'non'}`,
     `Fichiers examinés : ${changes.length}`,
     ''
   ];
@@ -235,25 +293,30 @@ function main() {
       forcedMode
     });
 
-    writeGithubOutput(result.mode);
+    writeGithubOutput(result);
     writeGithubSummary(result, changes);
-    console.log(`[Delivery] Parcours ${result.mode === 'light' ? 'LIGHT' : 'APK COMPLET'}.`);
+    console.log(`[Delivery] Classe ${result.mode.toUpperCase()}.`);
     for (const reason of result.reasons) console.log(`[Delivery] ${reason}`);
   } catch (error) {
     console.error(`[Delivery] Classification impossible : ${error.message}`);
-    console.error('[Delivery] Le parcours léger est refusé par sécurité.');
-    writeGithubOutput('apk');
+    console.error('[Delivery] Le doute conserve la classe APK.');
+    writeGithubOutput({ mode: 'apk', dependenciesChanged: true });
     process.exitCode = 1;
   }
 }
 
 module.exports = {
+  BACKEND_ONLY_FILES,
+  DEPENDENCY_FILES,
   SAFE_JSX_ATTRIBUTES,
   analyzeSource,
   classifyDelivery,
+  isBackendOnlyFile,
   isCopyOnlySourceChange,
+  isDependencyFile,
   isExplicitUiCopyString,
   isNonRuntimeFile,
+  isProcessOnlyFile,
   normalizePath,
   parseNameStatus,
   readAt,
