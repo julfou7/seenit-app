@@ -24,7 +24,9 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Implement Credential Manager auth like ATHIA
-        run: python scripts/issue-40-finalize.py
+        run: |
+          python scripts/issue-40-finalize.py
+          sed -i 's/### SEENIT-AUTH-001/### **SEENIT-AUTH-001**/' docs/specifications/seenit.md
 
       - name: Align SeenIt 1.4.109
         run: npm run version:sync
