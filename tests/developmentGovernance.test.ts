@@ -10,22 +10,29 @@ const globalAudit = readFileSync('docs/audits/audit-global-2026-08-31.md', 'utf8
 const requestRegistry = readFileSync('docs/requests/registry.md', 'utf8');
 const issueTemplate = readFileSync('.github/ISSUE_TEMPLATE/engineering.yml', 'utf8');
 const deliveryClassifier = readFileSync('scripts/classify-delivery.cjs', 'utf8');
+const deliveryProcess = readFileSync('docs/process/delivery.md', 'utf8');
 
 test('SEENIT-RELEASE-002 la CI valide puis publie sans modifier automatiquement main', () => {
   assert.doesNotMatch(workflow, /git\s+(commit|push)/);
+  assert.match(workflow, /^\s{2}validate:/m);
+  assert.match(workflow, /Fast Automated Tests/);
   assert.match(workflow, /npm run test:spec:changes/);
-  assert.match(workflow, /npm run test:android/);
-  assert.match(workflow, /npx cap sync android[\s\S]+npm run test:android/);
+  assert.match(workflow, /cache: npm/);
+  assert.match(workflow, /release_apk:/);
+  assert.match(workflow, /github\.event_name == 'workflow_dispatch'/);
+  assert.match(workflow, /^\s{2}build:/m);
   assert.match(workflow, /\.\/gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest/);
   assert.doesNotMatch(workflow, /\.\/gradlew\s+--no-daemon\s+assembleDebug\s+assembleDebugAndroidTest/);
   assert.doesNotMatch(workflow, /gradle-version:/);
   assert.match(workflow, /sha256sum "SeenIt-v\$\{VERSION\}\.apk"/);
+  assert.match(workflow, /Production Dependency Audit[\s\S]*DEPENDENCIES_CHANGED/);
+  assert.match(deliveryProcess, /push.*ne publie.*APK/is);
 });
 
 test('SEENIT-APK-004 exécute le contrat Android avant le garde de release', () => {
-  const contractIndex = workflow.indexOf('Specifications, Android Contract & Automated Tests');
+  const contractIndex = workflow.indexOf('Android Contract for APK-impacting Changes');
   const releaseGuardIndex = workflow.indexOf('Validate Unpublished Release Version');
-  assert.ok(contractIndex >= 0, 'le contrat Android doit exister dans la CI');
+  assert.ok(contractIndex >= 0, 'le contrat Android doit exister dans la validation');
   assert.ok(releaseGuardIndex > contractIndex, 'le contrat Android doit précéder le garde de release');
 });
 
@@ -40,6 +47,8 @@ test('SEENIT-QUALITY-001 les règles imposent SPEC, tests et validation APK à c
   assert.match(agentRules, /SPEC avant code/);
   assert.match(agentRules, /Contrat APK immuable/);
   assert.match(agentRules, /npm run test:android/);
+  assert.match(agentRules, /zones sensibles/);
+  assert.match(agentRules, /test automatisé/);
 });
 
 test('SEENIT-QUALITY-002 impose un audit daté relié à des issues priorisées', () => {
@@ -76,11 +85,15 @@ test('SEENIT-QUALITY-003 mémorise chaque demande durable dans la SPEC et le reg
 test('SEENIT-QUALITY-006 réserve le pipeline APK aux changements qui le nécessitent', () => {
   assert.match(workflow, /Classify Delivery Path/);
   assert.match(workflow, /delivery:classify/);
-  assert.match(workflow, /if: steps\.delivery\.outputs\.DELIVERY_MODE == 'apk'[\s\S]+npx cap sync android/);
-  assert.match(workflow, /if: needs\.build\.outputs\.delivery_mode == 'apk'/);
-  assert.match(workflow, /FORCED_DELIVERY_MODE/);
-  assert.doesNotMatch(workflow, /options:\s*[\s\S]*- light/);
-  assert.match(deliveryClassifier, /Le parcours léger est refusé par sécurité/);
+  assert.match(workflow, /DELIVERY_MODE == 'apk'/);
+  assert.match(workflow, /release_apk == true/);
+  assert.match(workflow, /android12_smoke:/);
+  assert.match(workflow, /api-level: 36/);
+  assert.match(workflow, /api-level: 31/);
+  assert.match(deliveryClassifier, /mode = 'backend'/);
+  assert.match(deliveryClassifier, /server\.ts/);
+  assert.match(deliveryClassifier, /Le doute conserve la classe APK/);
   assert.match(agentRules, /interdit de forcer le mode light/);
+  assert.match(agentRules, /une seule fois.*version/is);
   assert.match(requestRegistry, /USR-2026-09-01-003/);
 });
