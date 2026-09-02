@@ -94,6 +94,6 @@ test('SEENIT-QUALITY-006 réserve le pipeline APK aux changements qui le nécess
   assert.match(deliveryClassifier, /server\.ts/);
   assert.match(deliveryClassifier, /Le doute conserve la classe APK/);
   assert.match(agentRules, /interdit de forcer le mode light/);
-  assert.match(agentRules, /une seule fois.*version/is);
+  assert.match(agentRules, /version.*une seule fois/is);
   assert.match(requestRegistry, /USR-2026-09-01-003/);
 });
