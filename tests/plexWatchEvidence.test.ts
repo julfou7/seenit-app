@@ -32,7 +32,7 @@ test('SEENIT-PLEX-005 une activité Cloud identique à la watchlist ne devient j
   assert.deepEqual(payload.history, []);
   assert.deepEqual(payload.watchlist, [watchlistOnlyMovie]);
   assert.equal(payload.stats?.normalizedHistoryItems, 0);
-  assert.equal(payload.stats?.suppressedAmbiguousWatchlistHistory, 1);
+  assert.equal((payload.stats as Record<string, any>)?.suppressedAmbiguousWatchlistHistory, 1);
   assert.equal(payload.totalFound, 1);
 });
 
