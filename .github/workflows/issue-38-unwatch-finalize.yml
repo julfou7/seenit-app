@@ -1,0 +1,42 @@
+name: Finalize Plex Unwatch
+on:
+  push:
+    branches:
+      - issue-38-plex-unwatch
+permissions:
+  contents: write
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: issue-38-plex-unwatch
+          fetch-depth: 0
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Patch Plex unwatch
+        run: python scripts/issue38-patch.py
+      - name: Prepare SeenIt 1.4.105
+        run: node scripts/sync-app-version.cjs 1.4.105
+      - name: Install dependencies
+        run: npm ci
+      - name: Validate candidate
+        run: |
+          npm run test:spec
+          npm test
+          npx tsc --noEmit
+          npm run build
+          git diff --check
+      - name: Commit candidate
+        run: |
+          git rm .github/workflows/issue-38-unwatch-finalize.yml scripts/issue38-patch.py
+          git config user.name "julfou7"
+          git config user.email "julianfouillade@gmail.com"
+          git add -A
+          git commit -m "fix(plex): synchronise les dé-vu explicites"
+          git push origin issue-38-plex-unwatch
