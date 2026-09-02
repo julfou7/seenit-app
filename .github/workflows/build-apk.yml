@@ -1,35 +1,41 @@
-name: Build Android APK
+name: Validate & Release SeenIt
 
 on:
   push:
     branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    - cron: '17 5 * * 1'
   workflow_dispatch:
     inputs:
-      delivery_mode:
-        description: Parcours à exécuter (le mode light ne peut pas être forcé)
+      release_apk:
+        description: Construire, tester et publier la candidate APK courante
         required: true
-        default: auto
-        type: choice
-        options:
-          - auto
-          - apk
+        default: false
+        type: boolean
+      android12_smoke:
+        description: Ajouter le smoke Android 12 optionnel à cette release
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
 concurrency:
-  group: seenit-build-${{ github.ref }}
+  group: seenit-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Validate Change & Build APK When Required
+  validate:
+    name: Validate Change
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
-      app_version: ${{ steps.release_candidate.outputs.APP_VERSION }}
       delivery_mode: ${{ steps.delivery.outputs.DELIVERY_MODE }}
+      dependencies_changed: ${{ steps.delivery.outputs.DEPENDENCIES_CHANGED }}
 
     steps:
       - name: Checkout Code
@@ -37,67 +43,126 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Node.js 22
+      - name: Set up Node.js 22 with npm cache
         uses: actions/setup-node@v6
         with:
           node-version: '22'
-          package-manager-cache: false
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install Dependencies
         run: npm ci --legacy-peer-deps
+
+      - name: Reject Release Request Outside Main
+        if: github.event_name == 'workflow_dispatch' && inputs.release_apk == true
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ] && [ "$GITHUB_REF" != "refs/heads/master" ]; then
+            echo "Une release APK doit être déclenchée depuis main/master."
+            exit 1
+          fi
 
       - name: Classify Delivery Path
         id: delivery
         run: npm run delivery:classify
         env:
-          DELIVERY_BASE_SHA: ${{ github.event.before }}
-          FORCED_DELIVERY_MODE: ${{ inputs.delivery_mode || 'auto' }}
+          DELIVERY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          FORCED_DELIVERY_MODE: auto
 
       - name: Specification Change Contract
         run: npm run test:spec:changes
         env:
-          SPEC_BASE_SHA: ${{ github.event.before }}
+          SPEC_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           DELIVERY_MODE: ${{ steps.delivery.outputs.DELIVERY_MODE }}
 
-      - name: Specifications, Android Contract & Automated Tests
-        run: npm test
+      - name: Fast Automated Tests
+        run: |
+          npm run test:spec
+          npm run lint
+          npm run test:unit
+
+      - name: Android Contract for APK-impacting Changes
+        if: steps.delivery.outputs.DELIVERY_MODE == 'apk' || (github.event_name == 'workflow_dispatch' && inputs.release_apk == true)
+        run: npm run test:android
+
+      - name: Production Dependency Audit
+        if: steps.delivery.outputs.DEPENDENCIES_CHANGED == 'true' || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.release_apk == true)
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Build Web and Server Assets
+        run: npm run build
+
+  build:
+    name: Build Manual APK Candidate
+    needs: validate
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.release_apk == true &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      app_version: ${{ steps.release_candidate.outputs.APP_VERSION }}
+      release_base_sha: ${{ steps.release_baseline.outputs.BASE_SHA }}
+
+    steps:
+      - name: Checkout Code and Release History
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js 22 with npm cache
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install Dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Resolve Previous Published Release Baseline
+        id: release_baseline
+        run: |
+          CURRENT_VERSION="$(node -p "require('./package.json').version")"
+          PREVIOUS_TAG="$(git tag --list 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -vx "v${CURRENT_VERSION}" | head -n 1)"
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "Aucune release SemVer précédente trouvée."
+            exit 1
+          fi
+          BASE_SHA="$(git rev-list -n 1 "$PREVIOUS_TAG")"
+          test -n "$BASE_SHA"
+          echo "PREVIOUS_TAG=$PREVIOUS_TAG" >> "$GITHUB_OUTPUT"
+          echo "BASE_SHA=$BASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "Baseline de release : $PREVIOUS_TAG ($BASE_SHA)"
 
       - name: Validate Unpublished Release Version
-        if: steps.delivery.outputs.DELIVERY_MODE == 'apk'
         id: release_candidate
         run: node scripts/validate-release-immutability.cjs
         env:
-          RELEASE_BASE_SHA: ${{ github.event.before }}
+          RELEASE_BASE_SHA: ${{ steps.release_baseline.outputs.BASE_SHA }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Production Dependency Audit
-        run: npm audit --omit=dev --audit-level=high
 
       - name: Build Web Assets
         run: npm run build
 
       - name: Set up JDK 21
-        if: steps.delivery.outputs.DELIVERY_MODE == 'apk'
         uses: actions/setup-java@v5
         with:
           distribution: 'zulu'
           java-version: '21'
 
       - name: Setup Gradle
-        if: steps.delivery.outputs.DELIVERY_MODE == 'apk'
         uses: gradle/actions/setup-gradle@v6
 
       - name: Sync Capacitor Android
-        if: steps.delivery.outputs.DELIVERY_MODE == 'apk'
         run: npx cap sync android
 
       - name: Revalidate Android Contract After Capacitor Sync
-        if: steps.delivery.outputs.DELIVERY_MODE == 'apk'
         run: npm run test:android
 
       - name: Ensure Debug Keystore
-        if: steps.delivery.outputs.DELIVERY_MODE == 'apk'
         run: |
           if [ ! -f android/app/debug.keystore ]; then
             echo "La clé de signature historique manque : publication refusée."
@@ -105,17 +170,14 @@ jobs:
           fi
 
       - name: Restore Gradle Wrapper Executable Permission
-        if: steps.delivery.outputs.DELIVERY_MODE == 'apk'
         run: chmod +x android/gradlew
 
       - name: Build APK with Gradle
-        if: steps.delivery.outputs.DELIVERY_MODE == 'apk'
         run: |
           cd android
           ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
 
       - name: Prepare Named APK
-        if: steps.delivery.outputs.DELIVERY_MODE == 'apk'
         run: |
           VERSION="${{ steps.release_candidate.outputs.APP_VERSION }}"
           test -n "$VERSION"
@@ -124,7 +186,6 @@ jobs:
           sha256sum --check "SeenIt-v${VERSION}.apk.sha256"
 
       - name: Upload APK Artifact
-        if: steps.delivery.outputs.DELIVERY_MODE == 'apk'
         uses: actions/upload-artifact@v7
         with:
           name: SeenIt-Android-APK-v${{ steps.release_candidate.outputs.APP_VERSION }}
@@ -135,7 +196,6 @@ jobs:
           retention-days: 30
 
       - name: Upload Android Upgrade Test Harness
-        if: steps.delivery.outputs.DELIVERY_MODE == 'apk'
         uses: actions/upload-artifact@v7
         with:
           name: SeenIt-Android-Upgrade-Test-v${{ steps.release_candidate.outputs.APP_VERSION }}
@@ -144,17 +204,12 @@ jobs:
           retention-days: 30
 
   android_upgrade_smoke:
-    name: APK Upgrade Smoke (Android ${{ matrix.api-level }})
+    name: APK Upgrade Smoke (Android 36)
     needs: build
-    if: needs.build.outputs.delivery_mode == 'apk'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
-    strategy:
-      fail-fast: true
-      matrix:
-        api-level: [31, 36]
 
     steps:
       - name: Checkout Code
@@ -166,11 +221,12 @@ jobs:
           distribution: 'zulu'
           java-version: '21'
 
-      - name: Set up Node.js 22
+      - name: Set up Node.js 22 with npm cache
         uses: actions/setup-node@v6
         with:
           node-version: '22'
-          package-manager-cache: false
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Download Current APK Pair
         uses: actions/download-artifact@v8
@@ -206,7 +262,7 @@ jobs:
       - name: Run N to N+1 Upgrade Smoke
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
-          api-level: ${{ matrix.api-level }}
+          api-level: 36
           target: google_apis
           arch: x86_64
           profile: pixel_6
@@ -217,23 +273,109 @@ jobs:
             "upgrade-baseline/SeenIt-v${{ steps.baseline.outputs.BASELINE_VERSION }}.apk"
             "current-release/SeenIt-v${{ needs.build.outputs.app_version }}.apk"
             "test-harness/app-debug-androidTest.apk"
-            "upgrade-reports/android-${{ matrix.api-level }}"
-            "${{ matrix.api-level }}"
+            "upgrade-reports/android-36"
+            "36"
 
       - name: Publish Upgrade Smoke Evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: SeenIt-APK-Upgrade-Smoke-Android-${{ matrix.api-level }}-v${{ needs.build.outputs.app_version }}
-          path: upgrade-reports/android-${{ matrix.api-level }}
+          name: SeenIt-APK-Upgrade-Smoke-Android-36-v${{ needs.build.outputs.app_version }}
+          path: upgrade-reports/android-36
+          if-no-files-found: warn
+          retention-days: 30
+
+  android12_upgrade_smoke:
+    name: Optional APK Upgrade Smoke (Android 12)
+    needs: build
+    if: inputs.android12_smoke == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+
+      - name: Set up Node.js 22 with npm cache
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Download Current APK Pair
+        uses: actions/download-artifact@v8
+        with:
+          name: SeenIt-Android-APK-v${{ needs.build.outputs.app_version }}
+          path: current-release
+
+      - name: Download Android Upgrade Test Harness
+        uses: actions/download-artifact@v8
+        with:
+          name: SeenIt-Android-Upgrade-Test-v${{ needs.build.outputs.app_version }}
+          path: test-harness
+
+      - name: Verify Current APK Pair
+        run: |
+          cd current-release
+          sha256sum --check "SeenIt-v${{ needs.build.outputs.app_version }}.apk.sha256"
+
+      - name: Download and Verify Previous Official Release
+        id: baseline
+        run: node scripts/download-upgrade-baseline.cjs upgrade-baseline
+        env:
+          CURRENT_VERSION: ${{ needs.build.outputs.app_version }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run N to N+1 Upgrade Smoke on Android 12
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 31
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: >-
+            bash scripts/android-upgrade-smoke.sh
+            "upgrade-baseline/SeenIt-v${{ steps.baseline.outputs.BASELINE_VERSION }}.apk"
+            "current-release/SeenIt-v${{ needs.build.outputs.app_version }}.apk"
+            "test-harness/app-debug-androidTest.apk"
+            "upgrade-reports/android-31"
+            "31"
+
+      - name: Publish Android 12 Smoke Evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: SeenIt-APK-Upgrade-Smoke-Android-31-v${{ needs.build.outputs.app_version }}
+          path: upgrade-reports/android-31
           if-no-files-found: warn
           retention-days: 30
 
   publish:
     name: Publish Immutable APK Release
-    needs: [build, android_upgrade_smoke]
+    needs: [build, android_upgrade_smoke, android12_upgrade_smoke]
     if: >-
-      needs.build.outputs.delivery_mode == 'apk' &&
+      always() &&
+      needs.build.result == 'success' &&
+      needs.android_upgrade_smoke.result == 'success' &&
+      (needs.android12_upgrade_smoke.result == 'success' || needs.android12_upgrade_smoke.result == 'skipped') &&
       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
     permissions:
@@ -245,16 +387,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Node.js 22
+      - name: Set up Node.js 22 with npm cache
         uses: actions/setup-node@v6
         with:
           node-version: '22'
-          package-manager-cache: false
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Revalidate Release Immutability Before Publish
         run: node scripts/validate-release-immutability.cjs
         env:
-          RELEASE_BASE_SHA: ${{ github.event.before }}
+          RELEASE_BASE_SHA: ${{ needs.build.outputs.release_base_sha }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
