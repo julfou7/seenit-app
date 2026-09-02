@@ -1,0 +1,105 @@
+name: Finalize issue 26 candidate
+
+on:
+  push:
+    branches:
+      - issue-26-plex-watch-evidence
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prepare SeenIt 1.4.103
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+
+          gradle_path = Path('android/app/build.gradle')
+          gradle = gradle_path.read_text()
+          gradle = gradle.replace('versionName "1.4.102"', 'versionName "1.4.103"')
+          gradle_path.write_text(gradle)
+
+          req_path = Path('docs/specifications/requirements.json')
+          req = json.loads(req_path.read_text())
+          new_id = 'SEENIT-PLEX-005'
+          if not any(item.get('id') == new_id for item in req['requirements']):
+              entry = {
+                  'id': new_id,
+                  'title': 'Un état vu Plex exige une preuve de visionnage autoritative',
+                  'targets': ['backend', 'pwa', 'apk'],
+                  'tests': [
+                      {
+                          'file': 'tests/plexWatchEvidence.test.ts',
+                          'contains': 'SEENIT-PLEX-005 une activité Cloud identique à la watchlist ne devient jamais un visionnage'
+                      },
+                      {
+                          'file': 'tests/plexWatchEvidence.test.ts',
+                          'contains': 'SEENIT-PLEX-005 conserve une vraie preuve de visionnage même si le film reste en watchlist'
+                      },
+                      {
+                          'file': 'tests/plexWatchEvidence.test.ts',
+                          'contains': 'SEENIT-PLEX-005 ne rapproche jamais deux films par leur titre ou leur année'
+                      },
+                      {
+                          'file': 'tests/plexWatchEvidence.test.ts',
+                          'contains': 'SEENIT-PLEX-005 le filtrage du full Plex est idempotent'
+                      },
+                      {
+                          'file': 'tests/plexWatchEvidence.test.ts',
+                          'contains': 'SEENIT-PLEX-005 protège réellement la réponse POST /api/plex/history'
+                      }
+                  ]
+              }
+              index = next(i for i, item in enumerate(req['requirements']) if item.get('id') == 'SEENIT-PLEX-004') + 1
+              req['requirements'].insert(index, entry)
+          req_path.write_text(json.dumps(req, ensure_ascii=False, indent=2) + '\n')
+
+          spec_path = Path('docs/specifications/seenit.md')
+          spec = spec_path.read_text()
+          marker = "- **SEENIT-PLEX-004** — Jeton Plex, curseur et caches de résolution/disponibilité sont cloisonnés\n  par UID. Le jeton passe uniquement dans `X-Plex-Token`.\n"
+          addition = marker + "- **SEENIT-PLEX-005** — Un média Plex ne devient vu qu'avec une preuve de visionnage autoritative.\n  Une activité `cloud` qui porte exactement la même identité technique qu'un film de la watchlist\n  reste ambiguë et est exclue de l'historique tant qu'une source forte (`account-history`, historique\n  PMS ou `viewCount > 0`) ne confirme pas le visionnage. Le rapprochement ne se fait jamais par\n  titre ou année ; en cas d'ambiguïté SeenIt conserve l'état non vu.\n"
+          if '**SEENIT-PLEX-005**' not in spec:
+              if marker not in spec:
+                  raise SystemExit('Marqueur SEENIT-PLEX-004 introuvable dans la SPEC')
+              spec = spec.replace(marker, addition, 1)
+          spec_path.write_text(spec)
+
+          registry_path = Path('docs/requests/registry.md')
+          registry = registry_path.read_text().rstrip() + '\n'
+          row = "| USR-2026-09-02-003 | 2026-09-02 | Une synchronisation Plex ne marque jamais un média vu depuis une simple watchlist ou une activité Cloud ambiguë ; seule une preuve de visionnage autoritative peut faire progresser l'état. | `SEENIT-PLEX-005`, [issue #26](https://github.com/julfou7/seenit-app/issues/26) | active |\n"
+          if 'USR-2026-09-02-003' not in registry:
+              registry += row
+          registry_path.write_text(registry)
+          PY
+
+          npm run version:sync
+          rm .github/workflows/issue-26-finalize.yml
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate candidate
+        run: |
+          npm test
+          npm run build
+          git diff --check
+
+      - name: Commit candidate
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix: fiabilise la preuve de visionnage Plex"
+          git push origin HEAD:issue-26-plex-watch-evidence
