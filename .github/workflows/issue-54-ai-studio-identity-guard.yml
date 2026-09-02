@@ -25,7 +25,12 @@ jobs:
           cache: npm
 
       - name: Appliquer le correctif durable
-        run: python3 scripts/issue54_patch.py
+        run: |
+          python3 scripts/issue54_patch.py
+          sed -i 's/ || sameLegacyPhysicalTransfer(localMatch, serverItem)//' src/store/liveDownloadStore.ts
+          sed -i '/const legacyIndexes: number\[\] = \[\];/d' src/services/sonarrRadarr.ts
+          perl -0pi -e 's/\n\s*\/\/ Fallback ancien\/transitoire[^\n]*\n\s*\/\/ deux vrais infohash incompatibles[^\n]*\n\s*\/\/ bloque plus le rattachement[^\n]*\n\s*if \(sameLegacyPhysicalTransfer\(it, qbitProbe\)\) \{\n\s*legacyIndexes\.push\(index\);\n\s*\}//s' src/services/sonarrRadarr.ts
+          sed -i 's/const matchingIndexes = exactIndexes.length > 0 ? exactIndexes : legacyIndexes;/const matchingIndexes = exactIndexes;/' src/services/sonarrRadarr.ts
 
       - name: Restaurer le mode Gradle et matérialiser Android
         run: |
