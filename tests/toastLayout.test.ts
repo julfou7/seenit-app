@@ -7,12 +7,12 @@ const toastSource = readFileSync(
   'utf8'
 );
 
-test('SEENIT-UX-004 les toasts longs reviennent à la ligne sur mobile', () => {
+test('SEENIT-UX-004 les toasts longs reviennent à la ligne sans troncature sur mobile', () => {
   assert.match(toastSource, /w-full sm:w-auto max-w-full/);
-  assert.match(toastSource, /whitespace-normal break-words line-clamp-2/);
+  assert.match(toastSource, /whitespace-normal break-words/);
   assert.doesNotMatch(
     toastSource,
-    /text-zinc-100[^\n]*whitespace-nowrap/
+    /text-zinc-100[^\n]*(whitespace-nowrap|line-clamp-\d)/
   );
 });
 
