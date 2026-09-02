@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 2 septembre 2026
-Version applicative : **1.4.105**
+Version applicative : **1.4.106**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -27,8 +27,9 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 - L'APK doit gérer explicitement reprise d'activité, bouton Retour Android, safe areas,
   notifications FCM et intents vers les applications natives.
 - Les liens Plex privilégient Plex Android dans l'APK et conservent un fallback Web dans la PWA.
-- La status bar Android n'est pas recouverte par la WebView, utilise le fond `#040406` et des
-  icônes claires. La barre de navigation conserve les safe areas CSS.
+- La status bar Android est edge-to-edge : la WebView s'étend derrière une barre transparente avec
+  icônes claires, tandis que le contenu principal et le login respectent `env(safe-area-inset-top)`.
+  La barre de navigation basse reste sombre et conserve les safe areas CSS.
 
 ### 2.1 Contrat APK immuable
 
@@ -64,6 +65,12 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   d'un import soit diagnostiquée précisément, même lorsque la version du commit est déjà publiée.
   Avant Gradle, elle restaure explicitement le droit d'exécution de `android/gradlew` : une
   normalisation de mode de fichier par AI Studio ou un connecteur Windows ne peut plus bloquer le build.
+- **SEENIT-APK-005** — Le lancement Android ne présente jamais une surface native vide : dès la
+  création de l'activité, le splash système affiche un symbole SeenIt visible sur le même fond que la
+  WebView, puis laisse place au splash HTML sans flash blanc ou noir intermédiaire. Après lancement,
+  la status bar overlay la WebView avec un fond transparent et des icônes claires ; les écrans racine
+  compensent cette superposition par la safe area haute. Un retour à un splash natif transparent, à
+  `overlaysWebView=false` ou à une status bar noire forcée est une régression bloquée par les tests.
 - Le fichier `docs/specifications/android-contract.json` fixe les invariants natifs vérifiables :
   identité, signature, version, icônes, permissions, deep link, origine API, safe areas et canal APK.
 - Le contrôle Android s'exécute avant et après `npx cap sync android` afin de détecter une mutation
