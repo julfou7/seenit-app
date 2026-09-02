@@ -23,6 +23,7 @@ const previous = { versionName: '1.4.86', versionCode: 104086 };
 const next = { versionName: '1.4.87', versionCode: 104087 };
 const workflow = readFileSync('.github/workflows/build-apk.yml', 'utf8');
 const agentRules = readFileSync('AGENTS.md', 'utf8');
+const deliveryProcess = readFileSync('docs/process/delivery.md', 'utf8');
 
 test('SEENIT-RELEASE-004 refuse une release quand son tag ou sa publication existe déjà', () => {
   const withTag = evaluateReleaseCandidate({ current: next, previous, tagExists: true });
@@ -43,6 +44,8 @@ test('SEENIT-RELEASE-004 refuse un push documentaire à version inchangée ou r�
   assert.match(unchanged.errors.join(' '), /strictement supérieure/);
   assert.match(unchanged.errors.join(' '), /strictement supérieur/);
   assert.equal(lowerCode.ok, false);
+  assert.match(workflow, /github\.event_name == 'workflow_dispatch'/);
+  assert.match(workflow, /release_apk == true/);
 });
 
 test('SEENIT-RELEASE-004 accepte uniquement une progression N vers N+1 cohérente', () => {
@@ -60,18 +63,24 @@ test('SEENIT-RELEASE-004 accepte uniquement une progression N vers N+1 cohérent
 
 test('SEENIT-RELEASE-004 impose un nouveau numéro après une candidate déjà commitée', () => {
   const current = parseAndroidVersion(readFileSync('android/app/build.gradle', 'utf8'));
-  const failedCandidate = { versionName: '1.4.97', versionCode: 104097 };
-  assert.equal(evaluateReleaseCandidate({ current, previous: failedCandidate }).ok, true);
-  assert.notEqual(current.versionName, failedCandidate.versionName);
-  assert.ok(current.versionCode > failedCandidate.versionCode);
+  const publishedCandidate = { versionName: '1.4.97', versionCode: 104097 };
+  assert.equal(evaluateReleaseCandidate({ current, previous: publishedCandidate }).ok, true);
+  assert.notEqual(current.versionName, publishedCandidate.versionName);
+  assert.ok(current.versionCode > publishedCandidate.versionCode);
+  assert.match(deliveryProcess, /candidate non publiée.*plusieurs commits/is);
+  assert.match(deliveryProcess, /version déjà publiée.*nouveau patch/is);
 });
 
 test('SEENIT-RELEASE-004 sépare le build de la publication et vérifie la paire APK SHA-256', () => {
   assert.match(workflow, /^permissions:\s+contents: read/m);
   assert.match(workflow, /cancel-in-progress: true/);
+  assert.match(workflow, /^\s{2}validate:/m);
   assert.match(workflow, /^\s{2}build:/m);
+  assert.match(workflow, /Build Manual APK Candidate/);
+  assert.match(workflow, /Resolve Previous Published Release Baseline/);
+  assert.match(workflow, /git tag --list 'v\*' --sort=-v:refname/);
   assert.match(workflow, /^\s{2}publish:/m);
-  assert.match(workflow, /publish:[\s\S]+needs: \[build, android_upgrade_smoke\]/);
+  assert.match(workflow, /publish:[\s\S]+needs: \[build, android_upgrade_smoke, android12_upgrade_smoke\]/);
   assert.match(workflow, /publish:[\s\S]+permissions:\s+contents: write/);
   assert.match(workflow, /actions\/upload-artifact@v7/);
   assert.match(workflow, /actions\/download-artifact@v8/);

@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 2 septembre 2026
-Version applicative : **1.4.107**
+Version applicative : **1.4.108**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -45,38 +45,42 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   icônes Web canoniques conservent leur empreinte. Une refonte volontaire doit régénérer toutes les
   densités, mettre à jour le contrat et obtenir une validation visuelle explicite.
 - **SEENIT-APK-003** — Avant toute publication APK, la CI télécharge la dernière release stable
-  strictement antérieure depuis le dépôt SeenIt officiel et vérifie sa paire APK/SHA-256. Sur des
-  émulateurs propres Android 12 et Android cible, elle installe cette version N, initialise des
-  sentinelles dans le stockage privé de l'application et de session, accorde les notifications si
+  strictement antérieure depuis le dépôt SeenIt officiel et vérifie sa paire APK/SHA-256. Sur un
+  émulateur propre correspondant à la cible Android courante, elle installe cette version N, initialise
+  des sentinelles dans le stockage privé de l'application et de session, accorde les notifications si
   nécessaire, puis installe N+1 avec `adb install -r`, sans désinstallation. Le test compare
   `applicationId`, signature et versions, puis prouve la conservation des sentinelles, de l'icône,
   de la permission de notification, du launcher et du deep link. Il exécute enfin démarrage à froid,
-  reprise et Retour et archive les diagnostics. La publication dépend du succès de chaque matrice ;
-  aucun compte Google personnel ni service externe privé n'est utilisé par ce smoke. La compilation
-  du harnais cible exclusivement le module Gradle `:app` afin de ne pas fabriquer les APK de test des
-  plugins Capacitor. Le préflight extrait chaque métadonnée sans pipeline interrompu et lit les
-  attributs `aapt` par leur nom exact : `name` ne doit notamment jamais correspondre au suffixe de
-  `compileSdkVersionCodename`. Il archive les sorties brutes de `aapt`/`apksigner`, les valeurs
-  package/version/signature et nomme précisément l'invariant fautif avant toute installation.
+  reprise et Retour et archive les diagnostics. Android 12 reste un TNR de compatibilité explicite,
+  déclenchable manuellement ou périodiquement et recommandé pour tout changement natif à risque ; il
+  n'est pas une seconde matrice bloquante par défaut à chaque release. Aucun compte Google personnel
+  ni service externe privé n'est utilisé par les smokes. La compilation du harnais cible exclusivement
+  le module Gradle `:app` afin de ne pas fabriquer les APK de test des plugins Capacitor. Le préflight
+  extrait chaque métadonnée sans pipeline interrompu et lit les attributs `aapt` par leur nom exact :
+  `name` ne doit notamment jamais correspondre au suffixe de `compileSdkVersionCodename`. Il archive
+  les sorties brutes de `aapt`/`apksigner`, les valeurs package/version/signature et nomme précisément
+  l'invariant fautif avant toute installation.
 - **SEENIT-APK-004** — L'identité Firebase Android est immuable au même titre que l'identité APK :
   `android/app/google-services.json` reste présent, son `project_id` reste `gen-lang-client-0201895414`,
   son package reste `com.seenit.app` et son `mobilesdk_app_id` reste celui de l'application SeenIt
   actuellement publiée. Le contrat Android vérifie ces valeurs en lisant réellement le JSON. Toute
   modification est une migration Firebase Android explicite, jamais un effet secondaire d'import.
   La CI exécute ce contrat avant le garde d'immuabilité de release afin qu'une dérive native issue
-  d'un import soit diagnostiquée précisément, même lorsque la version du commit est déjà publiée.
-  Avant Gradle, elle restaure explicitement le droit d'exécution de `android/gradlew` : une
-  normalisation de mode de fichier par AI Studio ou un connecteur Windows ne peut plus bloquer le build.
-- **SEENIT-APK-005** — Le lancement Android ne présente jamais une surface native vide : dès la
-  création de l'activité, le splash système affiche un symbole SeenIt visible sur le même fond que la
-  WebView, puis laisse place au splash HTML sans flash blanc ou noir intermédiaire. Après lancement,
-  la status bar overlay la WebView avec un fond transparent et des icônes claires ; les écrans racine
-  compensent cette superposition par la safe area haute. Un retour à un splash natif transparent, à
-  `overlaysWebView=false` ou à une status bar noire forcée est une régression bloquée par les tests.
+  d'un import soit diagnostiquée précisément. Avant Gradle, elle restaure explicitement le droit
+  d'exécution de `android/gradlew` : une normalisation de mode de fichier par AI Studio ou un
+  connecteur Windows ne peut plus bloquer le build.
+- **SEENIT-APK-005** — Le lancement Android n'affiche qu'un seul branding de démarrage : le splash
+  animé Web `src/components/SplashScreen.tsx`. Le splash système imposé par Android 12+ reste
+  visuellement neutre, avec fond `#040406`, icône transparente et animation native nulle ; il n'est
+  masqué qu'après le premier rendu du splash Web afin d'éviter tout flash vide. Après lancement, la
+  status bar overlay la WebView avec un fond transparent et des icônes claires ; les écrans racine
+  compensent cette superposition par la safe area haute. La réintroduction d'un logo natif distinct,
+  de `Style.Light` / `LIGHT`, de `overlaysWebView=false` ou d'une status bar opaque constitue une
+  régression TNR bloquée par les tests.
 - Le fichier `docs/specifications/android-contract.json` fixe les invariants natifs vérifiables :
   identité, signature, version, icônes, permissions, deep link, origine API, safe areas et canal APK.
-- Le contrôle Android s'exécute avant et après `npx cap sync android` afin de détecter une mutation
-  générée par Capacitor avant la compilation.
+- Lors d'une release APK, le contrôle Android s'exécute avant et après `npx cap sync android` afin de
+  détecter une mutation générée par Capacitor avant la compilation.
 
 ### 2.2 Cycle de vie Android obligatoire
 
@@ -86,7 +90,8 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   puis quitte seulement depuis la racine. Un changement d'onglet ne doit jamais quitter l'application.
 - Les intents Plex, Reddit, Magnet et installateur APK utilisent les API Capacitor natives, avec un
   message lisible lorsqu'aucune application ne peut traiter l'intent.
-- Les validations terrain couvrent au minimum Android 12 et la version cible courante d'Android.
+- Les validations terrain couvrent Android cible à chaque release et Android 12 lors des TNR manuels,
+  périodiques ou des changements natifs à risque.
 
 ### 2.3 Runtime backend canonique
 
@@ -312,78 +317,83 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 
 ## 12. Versionnement et déploiement
 
-- **SEENIT-RELEASE-001** — Chaque livraison comportementale incrémente le patch SemVer. La même
-  version apparaît dans `versionName`, `package.json`, la SPEC, le catalogue, le contrat Android,
+- **SEENIT-RELEASE-001** — Une publication APK incrémente le patch SemVer. Plusieurs commits
+  applicatifs peuvent être regroupés sous une même candidate non publiée : le bump Android et
+  `npm run version:sync` sont effectués une seule fois quand le lot est prêt. La même version apparaît
+  dans `versionName`, `package.json`, la SPEC, le catalogue, le contrat Android,
   `CURRENT_APP_VERSION` et `X-Plex-Version`. `versionCode = major*100000 + minor*1000 + patch` et
   doit être strictement supérieur à la dernière release installable.
-- **SEENIT-RELEASE-002** — La CI est un contrôleur et un producteur d'artefact, jamais un auteur de
-  code : elle ne commit ni ne pousse sur `main`. Elle installe depuis le lockfile, vérifie SPEC/tests,
-  audite les dépendances de production, construit la PWA, synchronise Capacitor, revalide le contrat
-  Android, valide le JAR officiel et l'empreinte de la distribution Gradle, compile exclusivement
-  avec ce wrapper puis publie l'APK et son SHA-256 depuis le même commit. Le tag `vX.Y.Z` désigne
-  exactement ce commit.
+- **SEENIT-RELEASE-002** — La CI est un contrôleur, jamais un auteur de code : elle ne commit ni ne
+  pousse sur `main`. Chaque push/PR exécute une validation rapide avec cache npm, tests et build, sans
+  publier automatiquement d'APK. Le contrat Android n'est exécuté sur un push que si le diff affecte
+  l'APK. L'audit des dépendances de production est limité aux changements de dépendances, au contrôle
+  périodique et aux releases. La construction Gradle, le smoke N → N+1 et la publication APK sont
+  déclenchés explicitement depuis `main`. La release produit l'APK et son SHA-256 depuis le même
+  commit ; le tag `vX.Y.Z` désigne exactement ce commit.
 - **SEENIT-RELEASE-003** — Les notes publiques d'une version agrègent tous les commits compris entre
   le dernier tag SemVer strictement antérieur à la version courante et le commit publié. Un dernier
   commit détaillé ne peut jamais masquer les changements précédents de la même version. Si le tag de
   la version courante existe déjà lors d'une régénération, il est ignoré comme borne de départ afin de
   conserver la totalité de l'historique de cette version.
-- **SEENIT-RELEASE-004** — Une release APK est immuable. La CI compare `versionName` et
-  `versionCode` au commit précédent et refuse toute version inchangée, régressive ou incohérente.
-  Une candidate déjà commitée consomme donc son numéro même si son pipeline échoue avant publication ;
-  toute correction ultérieure progresse vers un nouveau numéro et apporte sa preuve automatisée.
-  Elle vérifie avant le build puis immédiatement avant publication que ni le tag ni la release
-  `vX.Y.Z` n'existent. La validation/construction s'exécute avec des droits de lecture ; seul un job
-  de publication dépendant possède `contents: write`. L'APK et son fichier `.sha256` forment un
-  artefact indissociable, vérifié après construction et après transfert entre jobs. L'action de
-  publication refuse explicitement tout écrasement et tout fichier manquant. Relancer une version
-  déjà publiée doit échouer : la correction suivante utilise obligatoirement un nouveau patch.
+- **SEENIT-RELEASE-004** — Une release APK publiée est immuable. Le garde compare la candidate à la
+  dernière release officielle strictement antérieure et refuse une version régressive, incohérente ou
+  dont le tag/release existe déjà. Une candidate **non publiée** peut recevoir plusieurs commits
+  correctifs sans consommer un nouveau numéro ; seul un tag ou une release publiée rend le numéro
+  définitivement consommé. Le garde s'exécute avant le build puis immédiatement avant publication.
+  La validation/construction s'exécute avec des droits de lecture ; seul un job de publication
+  dépendant possède `contents: write`. L'APK et son fichier `.sha256` forment un artefact indissociable,
+  vérifié après construction et après transfert entre jobs. L'action de publication refuse tout
+  écrasement et tout fichier manquant. Une correction d'une version déjà publiée utilise
+  obligatoirement un nouveau patch.
 - Canal PWA : le déploiement Web peut être instantané et réversible côté hébergeur.
-- Canal APK : une correction, y compris un rollback logique, est toujours une nouvelle version avec
-  un `versionCode` supérieur. On ne remplace jamais silencieusement l'asset d'une version déjà testée.
+- Canal backend : une modification exclusivement serveur suit sa validation propre sans bump Android.
+- Canal APK : une correction d'un binaire déjà publié, y compris un rollback logique, est toujours une
+  nouvelle version avec `versionCode` supérieur. On ne remplace jamais silencieusement l'asset publié.
 - Le canal personnel actuel publie `assembleDebug` signé par la clé historique afin de préserver les
   mises à jour sur place. Passer à `assembleRelease` ou à une autre clé est un projet de migration.
 - Les versions majeures/minor impliquent une décision produit ; les correctifs ordinaires d'une
-  release APK incrémentent le patch. Une livraison APK complète produit à la fois la PWA et l'APK
-  correspondants ; une livraison light assume explicitement que l'APK attend la prochaine release.
+  release APK incrémentent le patch.
 
 ### 12.1 Parcours de livraison proportionnés
 
-- **SEENIT-QUALITY-006** — La CI classe automatiquement chaque diff sans accepter de marqueur capable
-  de forcer le parcours léger. La documentation Markdown, les tests sans code livré, les changements
-  de commentaires/formatage, les textes de présentation JSX reconnus et les littéraux non JSX déjà
-  marqués par `uiCopy(...)` peuvent suivre le parcours `light`. Ce marqueur identitaire est réservé à
-  la copie visible et ne peut envelopper ni URL, route, clé, identité technique ou valeur logique.
-  `npm test`, audit de dépendances et build Web restent obligatoires, tandis que le
-  bump Android, Capacitor, Gradle, les émulateurs et la release APK sont omis. Les attributs techniques
-  (`href`, route, identifiant, rôle, classe, valeur), chaînes hors JSX, labels vidés, fichiers nouveaux
-  ou supprimés et tout diff natif, serveur, configuration, dépendance ou ambigu utilisent le parcours
-  APK complet par défaut. Un opérateur peut forcer `apk`, jamais `light`. Comme l'APK embarque `dist`,
-  une correction light est visible dans la PWA déployée et rejoint l'APK lors de la prochaine release
-  complète groupée ; toute publication APK conserve obligatoirement le smoke N → N+1 Android 31/36.
+- **SEENIT-QUALITY-006** — La CI classe automatiquement chaque diff en `light`, `backend` ou `apk`
+  sans accepter de marqueur capable de forcer `light`. La documentation, les tests, `.github/**`,
+  les scripts/outillages et les changements de pure copie UI peuvent suivre `light`. Le runtime
+  serveur explicitement non embarqué par Capacitor, notamment `server.ts`, suit `backend`. Le frontend
+  embarqué, Android, Capacitor, les dépendances, la configuration applicative et tout diff ambigu
+  suivent `apk`. Un opérateur peut demander explicitement une release APK, jamais forcer `light`.
+  Cette classification indique l'impact du changement, pas une publication : aucun push ne publie
+  automatiquement une APK. Le doute conserve la classe `apk` sans contourner les validations critiques.
 
-### Pipeline APK complet de référence
+### Validation continue de référence
 
-1. SPEC et tests dans le même changement ;
-2. bump Android puis `npm run version:sync` ;
-3. `npm test`, `npm run build`, `npx cap sync android`, `npm run test:android` ;
-4. commit Conventional Commits en français, puis push de `main` ;
-5. CI, compilation Gradle et smoke instrumenté N → N+1 sur Android 12 et Android cible ;
-6. release GitHub, APK et fichier `.sha256` uniquement après le smoke ;
-7. validation terrain PWA et installation/mise à jour APK.
+1. classification `light` / `backend` / `apk` ;
+2. contrat de changement, SPEC, TypeScript et tests unitaires ;
+3. contrat Android uniquement pour un diff `apk` ;
+4. audit de dépendances uniquement si elles changent, périodiquement ou lors d'une release ;
+5. build Web + serveur ;
+6. aucune publication APK automatique.
 
-### Pipeline light de référence
+### Release APK groupée de référence
 
-1. classification automatique et conservatrice du diff ;
-2. `npm test`, audit des dépendances de production et `npm run build` ;
-3. commit français et push de `main` ;
-4. déploiement PWA selon l'hébergeur, sans bump ni release APK ;
-5. regroupement du rendu APK dans la prochaine livraison complète.
+1. regrouper les commits du lot sur `main` ;
+2. quand le lot est prêt, bump Android une seule fois puis `npm run version:sync` ;
+3. obtenir une validation continue verte ;
+4. déclencher manuellement la release depuis `main` ;
+5. `npm run test:android`, build Web, `npx cap sync android`, revalidation Android et Gradle ;
+6. smoke N → N+1 bloquant sur Android cible ; Android 12 optionnel/manual ou périodique ;
+7. publication immuable GitHub de l'APK et du SHA-256 ;
+8. validation terrain de la nouvelle APK.
+
+Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/process/delivery.md`.
 
 ## 13. Contrat de développement et définition de terminé
 
-- **SEENIT-QUALITY-001** — Toute évolution comportementale met à jour la SPEC et le catalogue et
-  ajoute ou adapte un test précis. Les invariants APK sont en plus vérifiés par le contrat natif avant
-  et après la synchronisation Capacitor.
+- **SEENIT-QUALITY-001** — Toute modification comportementale ajoute ou adapte un test automatisé
+  précis. La SPEC et le catalogue sont mis à jour lorsqu'une règle durable est créée/modifiée ou quand
+  une zone sensible est touchée : sécurité/authentification, données/Firestore, identité média/Plex,
+  identité APK/Firebase Android ou configuration native critique. Une correction locale ordinaire qui
+  n'introduit aucune nouvelle règle durable ne crée pas artificiellement une exigence administrative.
 - **SEENIT-QUALITY-002** — Tout audit est conservé comme rapport daté et indexé, avec version,
   commit, périmètre et preuves. Chaque constat ouvert renvoie vers une issue GitHub portant une
   priorité, ou vers une décision de risque accepté justifiée ; aucun point ne reste uniquement dans
@@ -393,12 +403,10 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   elle est ajoutée à la SPEC, au catalogue, aux tests et au registre des demandes. Le travail différé
   possède une issue GitHub ; les questions ponctuelles et les éléments de diagnostic restent hors SPEC.
 - **SEENIT-QUALITY-004** — Dès qu'un travail est relié à une issue GitHub, son corps reste la source
-  de vérité opérationnelle pendant toute l'intervention : l'agent l'actualise après chaque jalon
-  significatif prouvé (implémentation, tests, intégration sur `main`, CI, release ou blocage), coche
-  chaque critère d'acceptation dès qu'il est réellement satisfait et jamais par anticipation, remplace
-  les informations devenues obsolètes et indique clairement le blocage courant ainsi que la prochaine
-  étape. Les commentaires peuvent conserver la chronologie et les preuves, mais ne doivent pas laisser
-  le corps de l'issue décrire un état contradictoire ou dépassé.
+  de vérité opérationnelle pendant toute l'intervention : l'agent l'actualise aux jalons significatifs
+  prouvés (implémentation prête, validation/CI, intégration sur `main`, release ou blocage), coche chaque
+  critère dès qu'il est réellement satisfait et remplace les informations devenues obsolètes. Les
+  micro-commits intermédiaires n'imposent pas une mise à jour administrative séparée.
 - **SEENIT-QUALITY-005** — Un import, une reconnexion ou une synchronisation AI Studio/GitHub est un
   transport non autoritatif. Avant tout commit depuis un workspace importé, le diff est comparé à la
   branche GitHub source et toute mutation automatique non demandée de Firebase/Firestore, Android,
@@ -406,37 +414,36 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   `.agents/AGENTS.md` puis complétées par la lecture intégrale du `AGENTS.md` racine ; les invariants
   critiques restent en plus protégés par des tests afin qu'une omission de lecture ne puisse pas les
   réintroduire silencieusement. Les fichiers Android canoniques suivis (`google-services.json`, clé de
-  signature historique) doivent rester présents et les scripts Unix requis au build doivent conserver leur bit
-  exécutable ; une normalisation AI Studio de ces éléments est une régression bloquante.
-- **SEENIT-QUALITY-006** — Les contrôles et le déploiement sont proportionnés au risque selon la
-  classification automatique décrite en section 12.1. Le doute ne réduit jamais les validations :
-  un changement non reconnu comme light bascule vers le pipeline APK complet.
-
-
+  signature historique) doivent rester présents et les scripts Unix requis au build doivent conserver
+  leur bit exécutable ; une normalisation AI Studio de ces éléments est une régression bloquante.
+- **SEENIT-QUALITY-006** — Les contrôles sont proportionnés au risque selon la classification de la
+  section 12.1 et `docs/process/delivery.md`. Le doute ne réduit jamais les protections critiques :
+  un changement non reconnu comme `light` ou `backend` reste `apk`, sans pour autant déclencher une
+  publication automatique.
 - **SEENIT-QUALITY-007** — La synchronisation du code entre AI Studio et GitHub est une
   responsabilité externe au runtime SeenIt, assurée uniquement par l’intégration GitHub native
   d’AI Studio. La PWA, l’APK et le backend n’exposent aucune route `/api/git/*`, aucun bouton de
   pull et aucun script `scripts/pull.sh`. `GITHUB_PAT` reste réservé à la consultation des
   releases via `/api/update` tant que ce fallback existe.
 
-Une modification comportementale ou une release APK est terminée uniquement si :
+Une modification est terminée lorsque les validations applicables à sa classe sont vertes, son test
+ciblé existe si le comportement change, toute règle durable/zone sensible est reflétée dans la SPEC et
+le registre, et la différence PWA/APK/backend est explicitée. Une classe `light` ou `backend` n'attend
+pas artificiellement une nouvelle APK.
 
-1. cette SPEC est mise à jour avant ou avec le code ;
-2. l'exigence possède un identifiant et une entrée dans `requirements.json` ;
-3. au moins un test automatisé précis est ajouté ou adapté ;
-4. `npm test`, le build PWA/serveur et `cap sync android` passent ;
-5. toutes les surfaces de version décrites par `SEENIT-RELEASE-001` sont identiques ;
-6. la différence volontaire PWA/APK est documentée ;
-7. toute nouvelle demande durable est reliée depuis le registre à la SPEC et à ses éventuelles issues ;
-8. tout audit modifié possède une matrice exhaustive des constats vers les issues ou risques acceptés ;
-9. la CI compile l'APK et publie la release GitHub.
+Une release APK est terminée uniquement si :
 
-Une modification light est terminée lorsque le classificateur l'a confirmée, que `npm test`, l'audit
-de dépendances et le build Web passent et que l'absence volontaire de nouvelle release APK est annoncée.
+1. le lot est versionné et toutes les surfaces de `SEENIT-RELEASE-001` sont alignées ;
+2. les tests et le build sont verts ;
+3. `cap sync android` et le contrat Android passent ;
+4. le smoke Android cible N → N+1 est vert ;
+5. l'APK et son SHA-256 sont publiés immuablement ;
+6. les TNR terrain nécessaires sont exécutés, notamment Android 12 pour un changement natif à risque.
 
-Le contrôle CI `test:spec:changes` refuse une livraison comportementale qui ne contient pas à
-la fois la SPEC et des tests. `test:spec` vérifie la version, les identifiants, les plateformes
-et l'existence exacte des tests référencés. `test:android` protège l'identité de l'APK et ses actifs.
+Le contrôle CI `test:spec:changes` exige un test pour un changement comportemental et exige en plus
+SPEC + catalogue pour les règles durables/zones sensibles. `test:spec` vérifie la version, les
+identifiants, les plateformes et l'existence exacte des tests référencés. `test:android` protège
+l'identité de l'APK et ses actifs.
 
 ## 14. Backlog et autonomie des agents
 
@@ -446,14 +453,13 @@ et l'existence exacte des tests référencés. `test:android` protège l'identit
   sans recopier les conversations ni stocker de secret ou de donnée personnelle.
 - Une issue porte une priorité `[P0]` à `[P3]`, un domaine, le risque, les critères d'acceptation,
   les exigences concernées, les tests attendus et la matrice PWA/APK.
-- Une issue en cours est maintenue à jour au fil des preuves : ses checkboxes reflètent l'avancement
-  réel, ses commits/runs/blocages sont actualisés et les éléments obsolètes sont remplacés sans attendre
-  la résolution finale.
+- Une issue en cours est maintenue à jour aux jalons significatifs ; ses checkboxes reflètent
+  l'avancement réellement prouvé sans imposer un commentaire ou une édition après chaque micro-commit.
 - Un agent peut ouvrir et traiter automatiquement une issue sûre dans le périmètre SeenIt. Il ne peut
   pas décider seul d'une migration de signature, d'une suppression de données, d'un affaiblissement
   de sécurité ou d'un changement d'identité média.
-- Fermer une issue exige un commit, des tests, la validation des plateformes concernées et, pour une
-  modification livrée, le lien de la release.
+- Fermer une issue exige un commit, des tests et les validations applicables à sa classe. Un lien de
+  release n'est obligatoire que si l'issue exige explicitement un binaire publié.
 
 ## 15. Validations terrain conservées
 
@@ -464,5 +470,14 @@ et l'existence exacte des tests référencés. `test:android` protège l'identit
 - Vérifier l'ouverture de l'élément exact dans Plex Android, puis le fallback Web.
 - Installer la nouvelle version par-dessus l'APK précédente et confirmer que compte, données,
   icône du lanceur, raccourci, notifications et deep links sont conservés.
+- **TNR lancement Android — mono-splash :** sur un démarrage à froid après mise à jour N → N+1,
+  enregistrer l'écran et confirmer qu'aucun logo SeenIt natif/statique distinct n'apparaît avant
+  l'animation `SplashScreen.tsx`, qu'aucun flash blanc/noir intermédiaire n'est visible et que le fond
+  de transition reste `#040406`.
+- **TNR lancement Android — status bar :** dès la première image de l'application, confirmer que
+  l'heure, le réseau, le Wi-Fi et la batterie restent clairs/blancs sur le fond sombre, que la barre
+  reste transparente/edge-to-edge et que la safe area ne saute pas. Les invariants `DARK` / `Style.Dark`
+  et mono-splash sont en plus bloqués automatiquement par `tests/androidLaunchChrome.test.ts` et
+  `npm run test:android`.
 - Démarrer l'APK à froid, le reprendre après veille, tester Retour depuis chaque niveau puis vérifier
   qu'aucun listener ou téléchargement n'est dupliqué.

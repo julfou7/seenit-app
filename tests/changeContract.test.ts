@@ -5,10 +5,12 @@ import test from 'node:test';
 const require = createRequire(import.meta.url);
 const {
   isVersionOnlyPatch,
-  isPureVersionAlignment
+  isPureVersionAlignment,
+  requiresSpecification
 } = require('../scripts/validate-change-contract.cjs') as {
   isVersionOnlyPatch: (file: string, patch: string) => boolean;
   isPureVersionAlignment: (files: string[], readPatch: (file: string) => string) => boolean;
+  requiresSpecification: (file: string) => boolean;
 };
 
 test('le contrat SPEC reconnaît un alignement version:sync complet comme non comportemental', () => {
@@ -42,4 +44,16 @@ test('le contrat SPEC refuse tout fichier inconnu même si sa ligne ressemble à
     ),
     false
   );
+});
+
+test('SEENIT-QUALITY-001 réserve la SPEC complète aux zones sensibles ou règles durables', () => {
+  assert.equal(requiresSpecification('src/lib/firebase.ts'), true);
+  assert.equal(requiresSpecification('src/lib/apiAuth.ts'), true);
+  assert.equal(requiresSpecification('src/features/plex/plexIdentity.ts'), true);
+  assert.equal(requiresSpecification('android/app/src/main/AndroidManifest.xml'), true);
+  assert.equal(requiresSpecification('capacitor.config.ts'), true);
+
+  assert.equal(requiresSpecification('server.ts'), false);
+  assert.equal(requiresSpecification('src/components/Toast.tsx'), false);
+  assert.equal(requiresSpecification('src/screens/WatchListScreen.tsx'), false);
 });

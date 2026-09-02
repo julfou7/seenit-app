@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.107",
-  "versionCode": 104107,
+  "applicationVersion": "1.4.108",
+  "versionCode": 104108,
   "applicationId": "com.seenit.app",
   "appName": "SeenIt",
   "customUrlScheme": "com.seenit.app",
@@ -123,7 +123,6 @@
     "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
     "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml",
     "android/app/src/main/res/drawable/ic_stat_seenit.xml",
-    "android/app/src/main/res/drawable/seenit_splash_icon.xml",
     "android/app/src/main/res/drawable/splash.png",
     "android/app/google-services.json"
   ],
@@ -148,8 +147,9 @@
     "topSafeAreaRequired": true
   },
   "launchSurface": {
-    "nativeSplashIcon": "android/app/src/main/res/drawable/seenit_splash_icon.xml",
-    "nativeSplashMustBeVisible": true,
-    "background": "#040406"
+    "nativeSplashBranding": "transparent",
+    "webSplashComponent": "src/components/SplashScreen.tsx",
+    "background": "#040406",
+    "hideAfterWebPaint": true
   }
 }

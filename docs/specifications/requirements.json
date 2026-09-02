@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.107",
+  "applicationVersion": "1.4.108",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -124,7 +124,7 @@
     },
     {
       "id": "SEENIT-APK-005",
-      "title": "Lancement Android brandé et status bar edge-to-edge sans flash",
+      "title": "Lancement Android mono-splash et status bar edge-to-edge stable",
       "targets": [
         "apk",
         "ci"
@@ -132,11 +132,11 @@
       "tests": [
         {
           "file": "tests/androidLaunchChrome.test.ts",
-          "contains": "SEENIT-APK-005 supprime la bande noire de status bar sans perdre la safe area"
+          "contains": "SEENIT-APK-005 TNR conserve la status bar transparente avec icônes claires"
         },
         {
           "file": "tests/androidLaunchChrome.test.ts",
-          "contains": "SEENIT-APK-005 affiche le branding natif avant le premier rendu WebView"
+          "contains": "SEENIT-APK-005 TNR conserve un seul splash brandé visible"
         }
       ]
     },
