@@ -123,7 +123,7 @@ export default function App() {
 
   useEffect(() => {
     if (isNative) {
-      StatusBar.setStyle({ style: Style.Light }).catch(() => {});
+      StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
       StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});
       StatusBar.setBackgroundColor({ color: '#00000000' }).catch(() => {});
 

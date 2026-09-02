@@ -11,7 +11,9 @@ const styles = readFileSync('android/app/src/main/res/values/styles.xml', 'utf8'
 const nativeSplash = readFileSync('android/app/src/main/res/drawable/seenit_splash_icon.xml', 'utf8');
 
 test('SEENIT-APK-005 supprime la bande noire de status bar sans perdre la safe area', () => {
-  assert.match(capacitorConfig, /StatusBar:\s*\{[\s\S]*?overlaysWebView: true,[\s\S]*?backgroundColor: '#00000000',[\s\S]*?style: 'LIGHT'/);
+  assert.match(capacitorConfig, /StatusBar:\s*\{[\s\S]*?overlaysWebView: true,[\s\S]*?backgroundColor: '#00000000',[\s\S]*?style: 'DARK'/);
+  assert.match(app, /StatusBar\.setStyle\(\{ style: Style\.Dark \}\)/);
+  assert.doesNotMatch(app, /StatusBar\.setStyle\(\{ style: Style\.Light \}\)/);
   assert.match(app, /StatusBar\.setOverlaysWebView\(\{ overlay: true \}\)/);
   assert.match(app, /StatusBar\.setBackgroundColor\(\{ color: '#00000000' \}\)/);
   assert.match(styles, /android:statusBarColor">@android:color\/transparent/);
