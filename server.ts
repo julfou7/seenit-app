@@ -21,6 +21,7 @@ import {
 } from "./src/features/downloads/downloadBackendSecurity.ts";
 import { buildC411SearchParams } from "./src/features/downloads/c411Query.ts";
 import { executeIdempotentMutation, type TimedMutationResult } from "./src/features/downloads/downloadIdempotency.ts";
+import { apiErrorMiddleware, backendHealthHandler, installAsyncRouteForwarding } from "./src/features/runtime/backendRuntime.ts";
 import {
   buildPlexParentShowIdentityItem,
   extractPlexExternalIds,
@@ -452,6 +453,7 @@ async function getPlexServers(
 
 async function startServer() {
   const app = express();
+  installAsyncRouteForwarding(app);
   const PORT = 3000;
 
   // CORS Middleware for native mobile app requests (APK) and web
@@ -556,7 +558,7 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.101',
+        'X-Plex-Version': '1.4.102',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
@@ -2107,9 +2109,7 @@ async function startServer() {
     }
   });
 
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
-  });
+  app.get("/api/health", backendHealthHandler);
 
   app.get('/api/update', async (req, res) => {
     try {
@@ -2408,6 +2408,9 @@ async function startServer() {
     }
   );
 
+  // Dernier garde API : toute erreur async qui échappe à une route devient une réponse JSON générique.
+  app.use('/api', apiErrorMiddleware);
+
   app.get('/firebase-messaging-sw.js', (req, res) => {
     const filename = req.path.replace('/', '');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -2450,4 +2453,7 @@ async function startServer() {
   startCronJobs();
 }
 
-startServer();
+void startServer().catch((error: any) => {
+  console.error('[Backend Startup Error]', String(error?.code ?? error?.name ?? 'StartupError').slice(0, 80));
+  process.exitCode = 1;
+});
