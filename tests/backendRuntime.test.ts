@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import express from 'express';
-import { apiErrorMiddleware, backendHealthHandler, buildBackendHealthPayload } from '../src/features/runtime/backendRuntime.ts';
+import {
+  apiErrorMiddleware,
+  backendHealthHandler,
+  buildBackendHealthPayload,
+  installAsyncRouteForwarding
+} from '../src/features/runtime/backendRuntime.ts';
 
 test('SEENIT-RUNTIME-001 garde un health-check indépendant et identifiable', () => {
   assert.deepEqual(buildBackendHealthPayload(), {
@@ -11,49 +16,45 @@ test('SEENIT-RUNTIME-001 garde un health-check indépendant et identifiable', ()
   });
 });
 
-test('SEENIT-RUNTIME-001 transforme une erreur API en JSON générique', () => {
-  const error = Object.assign(new Error('secret à ne jamais exposer'), { code: 'PERMISSION_DENIED' });
-  const request = { method: 'GET' } as any;
-  let statusCode = 200;
-  let payload: unknown;
-  const response = {
-    headersSent: false,
-    status(code: number) {
-      statusCode = code;
-      return this;
-    },
-    json(value: unknown) {
-      payload = value;
-      return this;
-    }
-  } as any;
+test('SEENIT-RUNTIME-001 contient les rejets async API sans terminer le backend', async () => {
+  const app = express();
+  installAsyncRouteForwarding(app);
 
-  apiErrorMiddleware(error, request, response, (() => undefined) as any);
-
-  assert.equal(statusCode, 500);
-  assert.deepEqual(payload, {
-    error: 'BACKEND_REQUEST_FAILED',
-    message: 'Le backend SeenIt a rencontré une erreur.'
+  app.get('/api/fail', async () => {
+    const error = new Error('secret à ne jamais exposer');
+    Object.assign(error, { code: 'PERMISSION_DENIED' });
+    throw error;
   });
-  assert.equal(JSON.stringify(payload).includes('secret à ne jamais exposer'), false);
-});
+  app.get('/api/health', backendHealthHandler);
+  app.use('/api', apiErrorMiddleware);
 
-test('SEENIT-RUNTIME-001 expose le health handler sans Firestore ni service tiers', () => {
-  const headers = new Map<string, string>();
-  let payload: unknown;
-  const response = {
-    setHeader(name: string, value: string) {
-      headers.set(name.toLowerCase(), value);
-    },
-    json(value: unknown) {
-      payload = value;
-      return this;
-    }
-  } as any;
+  const server = await new Promise<ReturnType<typeof app.listen>>((resolve, reject) => {
+    const instance = app.listen(0, '127.0.0.1', () => resolve(instance));
+    instance.once('error', reject);
+  });
 
-  backendHealthHandler({} as any, response, (() => undefined) as any);
+  try {
+    const address = server.address();
+    assert.ok(address && typeof address === 'object');
+    const origin = `http://127.0.0.1:${address.port}`;
 
-  assert.equal(headers.get('cache-control'), 'no-store');
-  assert.equal(headers.get('x-seenit-backend'), 'canonical');
-  assert.deepEqual(payload, buildBackendHealthPayload());
+    const failed = await fetch(`${origin}/api/fail`);
+    assert.equal(failed.status, 500);
+    assert.match(failed.headers.get('content-type') || '', /application\/json/);
+    const failurePayload = await failed.json();
+    assert.deepEqual(failurePayload, {
+      error: 'BACKEND_REQUEST_FAILED',
+      message: 'Le backend SeenIt a rencontré une erreur.'
+    });
+    assert.equal(JSON.stringify(failurePayload).includes('secret à ne jamais exposer'), false);
+
+    const health = await fetch(`${origin}/api/health`);
+    assert.equal(health.status, 200);
+    assert.equal(health.headers.get('x-seenit-backend'), 'canonical');
+    assert.deepEqual(await health.json(), buildBackendHealthPayload());
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close(error => error ? reject(error) : resolve());
+    });
+  }
 });
