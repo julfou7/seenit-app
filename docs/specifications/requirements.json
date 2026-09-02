@@ -102,7 +102,7 @@
     },
     {
       "id": "SEENIT-APK-004",
-      "title": "Identité Firebase Android protégée contre les imports et régénérations",
+      "title": "Identité Firebase Android matérialisée depuis le contrat canonique",
       "targets": [
         "apk",
         "ci"
@@ -110,7 +110,7 @@
       "tests": [
         {
           "file": "tests/firebaseIdentityGuardrails.test.ts",
-          "contains": "SEENIT-APK-004 protège l’identité Firebase Android canonique"
+          "contains": "SEENIT-APK-004 protège l’identité Firebase Android canonique générée"
         },
         {
           "file": "tests/developmentGovernance.test.ts",
@@ -244,6 +244,10 @@
         {
           "file": "tests/plexIdentity.test.ts",
           "contains": "ne fabrique aucune identité forte depuis un titre ou une année"
+        },
+        {
+          "file": "tests/downloadPosterStability.test.ts",
+          "contains": "SEENIT-IDENTITY-001 rattache un téléchargement SeenIt uniquement par TMDB ID"
         }
       ]
     },
@@ -444,7 +448,7 @@
     },
     {
       "id": "SEENIT-DOWNLOAD-001",
-      "title": "Réconciliation transitoire sans titre",
+      "title": "Réconciliation download sans titre, ancrée sur TMDB ou preuve physique exacte",
       "targets": [
         "pwa",
         "apk"
@@ -453,6 +457,14 @@
         {
           "file": "tests/downloadTransientVisibility.test.ts",
           "contains": "deux intentions simultanées masquent le qBit ambigu sans corrélation par titre"
+        },
+        {
+          "file": "tests/downloadIdentity.test.ts",
+          "contains": "SEENIT-DOWNLOAD-001 la synchro partagée rattache uniquement le même TMDB malgré des titres différents"
+        },
+        {
+          "file": "tests/downloadTitleIdentityGuard.test.ts",
+          "contains": "SEENIT-DOWNLOAD-001 interdit durablement tout fallback d’identité par titre ou release"
         }
       ]
     },
@@ -466,7 +478,7 @@
       "tests": [
         {
           "file": "tests/downloadIdentity.test.ts",
-          "contains": "deux vrais infohash différents ne sont jamais fusionnés"
+          "contains": "SEENIT-DOWNLOAD-002 deux vrais infohash différents ne sont jamais fusionnés"
         }
       ]
     },
@@ -849,11 +861,7 @@
       "tests": [
         {
           "file": "tests/firebaseIdentityGuardrails.test.ts",
-          "contains": "SEENIT-QUALITY-005 traite AI Studio comme un transport non autoritatif"
-        },
-        {
-          "file": "tests/firebaseIdentityGuardrails.test.ts",
-          "contains": "SEENIT-QUALITY-005 protège les fichiers Android suivis et les droits exécutables"
+          "contains": "SEENIT-QUALITY-005 matérialise Firebase Android et répare les droits Gradle"
         }
       ]
     },

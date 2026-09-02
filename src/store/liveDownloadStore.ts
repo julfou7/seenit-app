@@ -24,9 +24,7 @@ import {
   getStrongPhysicalDownloadIds,
   hasConflictingStrongPhysicalIds,
   mergeDownloadIdAliases,
-  normalizeDownloadRelease,
   sameDownloadRequest,
-  sameLegacyPhysicalTransfer,
   samePhysicalDownload,
   sameTransferPath
 } from '../features/downloads/downloadIdentity';
@@ -266,10 +264,7 @@ const MISSING_WARNING_DELAY_MS = 20_000;
 
 function sameCanonicalMedia(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
   if (a.mediaType !== b.mediaType) return false;
-  if (a.tmdbId && b.tmdbId && Number(a.tmdbId) === Number(b.tmdbId)) return true;
-  if (a.tvdbId && b.tvdbId && Number(a.tvdbId) === Number(b.tvdbId)) return true;
-  if (a.imdbId && b.imdbId && String(a.imdbId).toLowerCase() === String(b.imdbId).toLowerCase()) return true;
-  return false;
+  return Boolean(a.tmdbId && b.tmdbId && Number(a.tmdbId) === Number(b.tmdbId));
 }
 
 function resolutionBucket(item: LiveDownloadItem): '4k' | '1080p' | '720p' | null {
@@ -287,9 +282,8 @@ function completionNotificationKeys(item: LiveDownloadItem): string[] {
   const quality = resolutionBucket(item) || 'auto';
   if (item.mediaType === 'movie') {
     if (item.tmdbId) keys.add(`movie:tmdb:${Number(item.tmdbId)}:${quality}`);
-    else if (item.imdbId) keys.add(`movie:imdb:${String(item.imdbId).toLowerCase()}:${quality}`);
   } else {
-    const canonical = item.tmdbId ? `tmdb:${Number(item.tmdbId)}` : item.tvdbId ? `tvdb:${Number(item.tvdbId)}` : '';
+    const canonical = item.tmdbId ? `tmdb:${Number(item.tmdbId)}` : '';
     if (canonical) {
       keys.add(`tv:${canonical}:s${item.seasonNumber ?? "*"}:e${item.episodeNumber ?? "*"}:${quality}`);
     }
@@ -324,12 +318,6 @@ function isTerminalDownload(item: LiveDownloadItem): boolean {
   return isCancelledDownload(item) || item.status === 'completed' || Number(item.progress || 0) >= 100;
 }
 
-function cleanMediaTitleForComparison(title?: string): string {
-  if (!title) return '';
-  let cleaned = String(title).trim();
-  cleaned = cleaned.replace(/\s*\((?:s\d{1,2}[e._-]?\d{1,2}|\d{1,2}x\d{1,2}|saison\s*\d+|season\s*\d+)\)\s*$/i, '').trim();
-  return normalizeDownloadRelease(cleaned);
-}
 
 function sameDownloadIdentity(a: LiveDownloadItem, b: LiveDownloadItem): boolean {
   if (a.id === b.id) return true;
@@ -342,8 +330,6 @@ function sameDownloadIdentity(a: LiveDownloadItem, b: LiveDownloadItem): boolean
   const aResolution = resolutionBucket(a);
   const bResolution = resolutionBucket(b);
   if (aResolution && bResolution && aResolution !== bResolution) return false;
-
-  if (sameLegacyPhysicalTransfer(a, b)) return true;
 
   if (isTerminalDownload(a) !== isTerminalDownload(b)) return false;
 
@@ -359,17 +345,6 @@ function sameDownloadIdentity(a: LiveDownloadItem, b: LiveDownloadItem): boolean
     return Boolean(a.isOptimistic || b.isOptimistic || a.isRestored || b.isRestored);
   }
 
-  // 2. Corrélation optimiste par titre nettoyé quand l'un des items est optimiste ou en cours de demande
-  if (a.isOptimistic || b.isOptimistic || a.requestId || b.requestId) {
-    const cleanA = cleanMediaTitleForComparison(a.seriesTitle || a.movieTitle || a.title || formatCleanMediaInfo(a).cleanTitle);
-    const cleanB = cleanMediaTitleForComparison(b.seriesTitle || b.movieTitle || b.title || formatCleanMediaInfo(b).cleanTitle);
-    if (cleanA && cleanB && cleanA === cleanB) {
-      if (!(a.tmdbId && b.tmdbId && Number(a.tmdbId) !== Number(b.tmdbId))) {
-        return true;
-      }
-    }
-  }
-
   return false;
 }
 
@@ -379,8 +354,6 @@ function sameCancellationIdentity(cancelled: LiveDownloadItem, remote: LiveDownl
 
   const sameCanonical = Boolean(
     cancelled.tmdbId && remote.tmdbId && Number(cancelled.tmdbId) === Number(remote.tmdbId)
-  ) || Boolean(
-    cancelled.tvdbId && remote.tvdbId && Number(cancelled.tvdbId) === Number(remote.tvdbId)
   );
 
   if (sameCanonical) {
@@ -681,7 +654,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               serverItem.downloadIdAliases = mergeDownloadIdAliases(serverItem, localMatch);
               if (!serverItem.downloadId && localMatch.downloadId) serverItem.downloadId = localMatch.downloadId;
 
-              if ((samePhysicalDownload(localMatch, serverItem) || sameTransferPath(localMatch, serverItem) || sameLegacyPhysicalTransfer(localMatch, serverItem) || sameDownloadRequest(localMatch, serverItem))
+              if ((samePhysicalDownload(localMatch, serverItem) || sameTransferPath(localMatch, serverItem) || sameDownloadRequest(localMatch, serverItem))
                   && Number(localMatch.progress || 0) > Number(serverItem.progress || 0)) {
                 serverItem.progress = localMatch.progress;
                 if (localMatch.size > 0) serverItem.size = localMatch.size;

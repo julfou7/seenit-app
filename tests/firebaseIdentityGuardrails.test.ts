@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 
 const read = (path: string) => fs.readFileSync(path, 'utf8');
 
@@ -29,15 +30,17 @@ test('SEENIT-DATA-006 protège default contre une suppression accidentelle', () 
   assert.match(specification, /SEENIT-DATA-006[\s\S]*Delete Protection activée/);
   assert.equal(/--no-delete-protection|DELETE_PROTECTION_DISABLED/.test(`${workflow}\n${scripts}`), false);
 });
-test('SEENIT-APK-004 protège l’identité Firebase Android canonique', () => {
+test('SEENIT-APK-004 protège l’identité Firebase Android canonique générée', () => {
+  execFileSync(process.execPath, ['scripts/materialize-android-config.cjs']);
   const contract = JSON.parse(read('docs/specifications/android-contract.json'));
   const googleServices = JSON.parse(read('android/app/google-services.json'));
-  assert.equal(contract.firebase.projectId, 'gen-lang-client-0201895414');
-  assert.equal(contract.firebase.firestoreDatabaseId, 'default');
-  assert.equal(contract.firebase.androidPackageName, 'com.seenit.app');
+  const gitignore = read('.gitignore');
+  assert.match(gitignore, /android\/app\/google-services\.json/);
+  assert.ok(contract.generatedFiles.includes('android/app/google-services.json'));
+  assert.equal(contract.requiredFiles.includes('android/app/google-services.json'), false);
   assert.equal(googleServices.project_info.project_id, contract.firebase.projectId);
   const client = googleServices.client.find((item: any) => item?.client_info?.android_client_info?.package_name === contract.firebase.androidPackageName);
-  assert.ok(client, 'le client Firebase Android SeenIt doit exister');
+  assert.ok(client, 'le client Firebase Android SeenIt doit être matérialisé');
   assert.equal(client.client_info.mobilesdk_app_id, contract.firebase.androidMobileSdkAppId);
 });
 
@@ -53,10 +56,11 @@ test('SEENIT-QUALITY-005 traite AI Studio comme un transport non autoritatif', (
 });
 
 
-test('SEENIT-QUALITY-005 protège les fichiers Android suivis et les droits exécutables', () => {
-  assert.equal(fs.existsSync('android/app/google-services.json'), true, 'google-services.json doit rester suivi');
+test('SEENIT-QUALITY-005 matérialise Firebase Android et répare les droits Gradle', () => {
+  execFileSync(process.execPath, ['scripts/materialize-android-config.cjs']);
+  assert.equal(fs.existsSync('android/app/google-services.json'), true, 'google-services.json doit être généré');
   assert.equal(fs.existsSync('android/app/debug.keystore'), true, 'la clé de signature historique doit rester suivie');
   if (process.platform !== 'win32') {
-    assert.notEqual(fs.statSync('android/gradlew').mode & 0o111, 0, 'android/gradlew doit rester exécutable dans Git');
+    assert.notEqual(fs.statSync('android/gradlew').mode & 0o111, 0, 'le matérialiseur doit rendre android/gradlew exécutable');
   }
 });

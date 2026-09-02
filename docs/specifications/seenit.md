@@ -60,15 +60,13 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   `name` ne doit notamment jamais correspondre au suffixe de `compileSdkVersionCodename`. Il archive
   les sorties brutes de `aapt`/`apksigner`, les valeurs package/version/signature et nomme précisément
   l'invariant fautif avant toute installation.
-- **SEENIT-APK-004** — L'identité Firebase Android est immuable au même titre que l'identité APK :
-  `android/app/google-services.json` reste présent, son `project_id` reste `gen-lang-client-0201895414`,
-  son package reste `com.seenit.app` et son `mobilesdk_app_id` reste celui de l'application SeenIt
-  actuellement publiée. Le contrat Android vérifie ces valeurs en lisant réellement le JSON. Toute
-  modification est une migration Firebase Android explicite, jamais un effet secondaire d'import.
-  La CI exécute ce contrat avant le garde d'immuabilité de release afin qu'une dérive native issue
-  d'un import soit diagnostiquée précisément. Avant Gradle, elle restaure explicitement le droit
-  d'exécution de `android/gradlew` : une normalisation de mode de fichier par AI Studio ou un
-  connecteur Windows ne peut plus bloquer le build.
+- **SEENIT-APK-004** — L'identité Firebase Android est immuable au même titre que l'identité APK.
+  `docs/specifications/android-contract.json` est la source canonique suivie ; `android/app/google-services.json`
+  est git-ignoré et matérialisé de façon déterministe avant les contrôles/builds avec le `project_id`
+  `gen-lang-client-0201895414`, le package `com.seenit.app` et le `mobilesdk_app_id` publié. Une suppression
+  ou régénération AI Studio ne peut donc plus devenir une migration implicite. Le même matérialiseur
+  normalise `android/gradlew` exécutable avant validation/Gradle. Toute modification des valeurs canoniques
+  du contrat reste une migration Firebase Android explicite et testée.
 - **SEENIT-APK-005** — Le lancement Android n'affiche qu'un seul branding de démarrage : le splash
   animé Web `src/components/SplashScreen.tsx`. Le splash système imposé par Android 12+ reste
   visuellement neutre, avec fond `#040406`, icône transparente et animation native nulle ; il n'est
@@ -141,13 +139,13 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 
 ## 4. Identité des médias
 
-- **SEENIT-IDENTITY-001** — Une identité de film ou série ne peut être établie qu'avec un ID
-  technique vérifié : TMDB en priorité, puis TVDB/IMDb résolu explicitement vers TMDB quand
-  nécessaire. Le titre, l'année, la popularité ou la position d'un résultat ne sont jamais une
-  preuve d'identité.
-- Les noms de release peuvent servir uniquement à reconnaître deux représentations du même
-  transfert si une preuve physique supplémentaire existe (infohash, downloadId, chemin ou
-  taille quasi identique). Ils ne créent jamais une identité média.
+- **SEENIT-IDENTITY-001** — Une identité de film ou série SeenIt est canonique par **TMDB ID**.
+  TVDB/IMDb peuvent exister comme métadonnées techniques, mais doivent être résolus vers TMDB avant
+  toute association média. Le titre, le titre original, l'année, la popularité, le nom de fichier,
+  le nom de release ou la position d'un résultat ne sont jamais une preuve d'identité.
+- Pour les téléchargements, un transfert physique ne se fusionne que par `requestId`, infohash/downloadId
+  ou alias exact, ou chemin de transfert exact. Une taille, un titre ou un nom de release, même combinés,
+  ne suffisent jamais ; une ambiguïté reste non résolue.
 - Pour un épisode Plex, l'identité de série provient exclusivement de la série parente.
 
 ## 5. Bibliothèque et progression
@@ -213,8 +211,10 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 ### 7.3 Identité, réconciliation et sécurité destructive
 
 - **SEENIT-DOWNLOAD-001** — Une intention SeenIt et un transfert distant ne sont jamais reliés
-  par titre. Un qBittorrent sans ID reste visible lorsqu'un seul rattachement technique est
-  possible et est masqué temporairement quand plusieurs intentions sont compatibles.
+  par titre, titre original, année ou nom de release. L'association média requiert un **TMDB ID exact** ;
+  TVDB/IMDb seuls ne suffisent pas. La corrélation d'un même transfert sans TMDB n'est permise que par
+  une preuve physique exacte (`requestId`, infohash/downloadId/alias ou chemin). Sinon le transfert reste
+  visible et non rattaché plutôt que produire un faux positif.
 - **SEENIT-DOWNLOAD-002** — Deux infohash incompatibles désignent toujours deux transferts,
   même si leurs titres et tailles se ressemblent.
 - **SEENIT-DOWNLOAD-003** — Deux mutations concurrentes possédant la même clé idempotente ne

@@ -3,7 +3,7 @@ import type { C411Torrent } from './c411';
 import { authenticatedFetch } from '../lib/apiAuth';
 import { buildFreshGetUrl, buildNoCacheHeaders } from '../features/downloads/downloadNetwork';
 import { extractQbitSessionCookie, isQbitAuthError } from '../features/downloads/qbitNativeSession';
-import { getPhysicalDownloadId, isStrongTorrentHash, mergeDownloadIdAliases, normalizeDownloadClientId, normalizeQualityLabel, sameLegacyPhysicalTransfer, samePhysicalDownload, sameTransferPath } from '../features/downloads/downloadIdentity';
+import { getPhysicalDownloadId, isStrongTorrentHash, mergeDownloadIdAliases, normalizeDownloadClientId, normalizeQualityLabel, samePhysicalDownload, sameTransferPath } from '../features/downloads/downloadIdentity';
 import { auth } from '../lib/firebase';
 import { buildQbitSessionScopeKey } from '../features/downloads/qbitSessionScope';
 import { nextDownloadSourceBackoffMs, shouldFetchNextArrQueuePage } from '../features/downloads/downloadPollingPolicy';
@@ -1827,13 +1827,11 @@ export function formatCleanMediaInfo(item: LiveDownloadItem): {
 export function matchShowDownload(
   item: LiveDownloadItem,
   tmdbId?: number | string,
-  tvdbId?: number | string,
+  _tvdbId?: number | string,
   _showTitle?: string
 ): boolean {
-  if (item.mediaType !== 'tv') return false;
-  if (tmdbId && item.tmdbId && Number(item.tmdbId) === Number(tmdbId)) return true;
-  if (tvdbId && item.tvdbId && Number(item.tvdbId) === Number(tvdbId)) return true;
-  return false;
+  if (item.mediaType !== 'tv' || !tmdbId || !item.tmdbId) return false;
+  return Number(item.tmdbId) === Number(tmdbId);
 }
 
 export function matchMovieDownload(
@@ -2256,7 +2254,6 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           };
 
           const exactIndexes: number[] = [];
-          const legacyIndexes: number[] = [];
           items.forEach((it, index) => {
             if (qbitDownloadId && samePhysicalDownload(it, qbitProbe)) {
               exactIndexes.push(index);
@@ -2266,16 +2263,9 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
               exactIndexes.push(index);
               return;
             }
-
-            // Fallback ancien/transitoire : release + taille. La fonction refuse déjà
-            // deux vrais infohash incompatibles, donc un downloadId temporaire *Arr ne
-            // bloque plus le rattachement au torrent qBittorrent réel.
-            if (sameLegacyPhysicalTransfer(it, qbitProbe)) {
-              legacyIndexes.push(index);
-            }
           });
 
-          const matchingIndexes = exactIndexes.length > 0 ? exactIndexes : legacyIndexes;
+          const matchingIndexes = exactIndexes;
           const metadataScore = (it: LiveDownloadItem) =>
             (it.posterPath ? 8 : 0)
             + (it.tmdbId ? 8 : 0)

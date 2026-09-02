@@ -28,55 +28,13 @@ test('le visuel SeenIt gagne sur celui du client distant', () => {
   assert.equal(preferSeenItImagePath('/radarr-alternate.jpg', undefined), '/radarr-alternate.jpg');
 });
 
-test('findMatchingShowForDownload retrouve la fiche série par tmdbId, tvdbId ou titre normalisé', async () => {
+test('SEENIT-IDENTITY-001 rattache un téléchargement SeenIt uniquement par TMDB ID', async () => {
   const { findMatchingShowForDownload } = await import('../src/features/downloads/downloadIdentity.ts');
+  const libraryShows = [{ mediaType: 'tv' as const, tmdbId: 218738, tvdbId: 423527, title: 'Dark Matter', posterPath: '/fiche.jpg' }];
 
-  const libraryShows = [
-    {
-      mediaType: 'tv' as const,
-      tmdbId: 218738,
-      tvdbId: 423527,
-      title: 'Dark Matter',
-      posterPath: '/dark-matter-fiche-2024.jpg'
-    },
-    {
-      mediaType: 'movie' as const,
-      tmdbId: 550,
-      title: 'Fight Club',
-      posterPath: '/fight-club-fiche.jpg'
-    }
-  ];
-
-  // 1. Match par tmdbId
-  const matchById = findMatchingShowForDownload(
-    { mediaType: 'tv', tmdbId: 218738, seriesTitle: 'Dark Matter (2024)' },
-    libraryShows
-  );
-  assert.equal(matchById?.posterPath, '/dark-matter-fiche-2024.jpg');
-
-  // 2. Match par tvdbId
-  const matchByTvdb = findMatchingShowForDownload(
-    { mediaType: 'tv', tvdbId: 423527 },
-    libraryShows
-  );
-  assert.equal(matchByTvdb?.posterPath, '/dark-matter-fiche-2024.jpg');
-
-  // 3. Match par titre normalisé quand le serveur ne fournit pas de tmdbId
-  const matchByTitle = findMatchingShowForDownload(
-    { mediaType: 'tv', seriesTitle: 'Dark Matter (S02E01)' },
-    libraryShows
-  );
-  assert.equal(matchByTitle?.posterPath, '/dark-matter-fiche-2024.jpg');
-
-  // 4. L'image retenue pour l'affichage est bien celle de la fiche série et non du client distant
-  const remoteDownload = {
-    id: 'sonarr_99',
-    mediaType: 'tv' as const,
-    seriesTitle: 'Dark Matter',
-    posterPath: 'http://sonarr.local/api/v3/mediacover/99/poster.jpg'
-  };
-  const matched = findMatchingShowForDownload(remoteDownload, libraryShows);
-  const finalPoster = preferSeenItImagePath(remoteDownload.posterPath, matched?.posterPath);
-  assert.equal(finalPoster, '/dark-matter-fiche-2024.jpg');
+  assert.equal(findMatchingShowForDownload({ mediaType: 'tv', tmdbId: 218738, seriesTitle: 'Un autre titre' }, libraryShows)?.posterPath, '/fiche.jpg');
+  assert.equal(findMatchingShowForDownload({ mediaType: 'tv', tmdbId: 999999, seriesTitle: 'Dark Matter' }, libraryShows), undefined);
+  assert.equal(findMatchingShowForDownload({ mediaType: 'tv', tvdbId: 423527, seriesTitle: 'Dark Matter' }, libraryShows), undefined);
+  assert.equal(findMatchingShowForDownload({ mediaType: 'tv', seriesTitle: 'Dark Matter' }, libraryShows), undefined);
 });
 

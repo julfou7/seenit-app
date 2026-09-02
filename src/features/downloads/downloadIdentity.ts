@@ -186,8 +186,8 @@ function identityResolutionBucket(item?: DownloadIdentityLike | null): '4k' | '1
 /**
  * Rattache temporairement une demande SeenIt au transfert qui vient juste
  * d'apparaître avant que *Arr/qBittorrent ne partagent un hash commun.
- * Aucun titre n'est utilisé : uniquement temps, type, IDs canoniques s'ils
- * existent, scope épisode/saison et résolution.
+ * L'identité média exige un TMDB ID exact. Les titres, années, TVDB/IMDb et
+ * noms de release ne peuvent jamais compenser un TMDB absent ou différent.
  */
 export function canAttachRecentOptimisticRequest(
   request?: DownloadIdentityLike | null,
@@ -197,6 +197,7 @@ export function canAttachRecentOptimisticRequest(
 ): boolean {
   if (!request?.isOptimistic || !remote) return false;
   if (request.mediaType && remote.mediaType && request.mediaType !== remote.mediaType) return false;
+  if (!request.tmdbId || !remote.tmdbId || Number(request.tmdbId) !== Number(remote.tmdbId)) return false;
 
   const requestedAt = Number(request.addedAt || 0);
   const remoteAddedAt = Number(remote.addedAt || 0);
@@ -206,35 +207,11 @@ export function canAttachRecentOptimisticRequest(
   const delta = remoteAddedAt - requestedAt;
   if (delta < -5_000 || delta > windowMs) return false;
 
-  if (request.tmdbId && remote.tmdbId && Number(request.tmdbId) !== Number(remote.tmdbId)) return false;
-  if (request.tvdbId && remote.tvdbId && Number(request.tvdbId) !== Number(remote.tvdbId)) {
-    const reqTitle = normalizeDownloadRelease(request.seriesTitle || request.movieTitle || request.title);
-    const remTitle = normalizeDownloadRelease(remote.seriesTitle || remote.movieTitle || remote.title);
-    if (!reqTitle || !remTitle || reqTitle !== remTitle) {
-      return false;
-    }
-  }
-
   if (request.mediaType === 'tv') {
-    if (request.seriesTitle && remote.seriesTitle) {
-      const reqSeries = normalizeDownloadRelease(request.seriesTitle);
-      const remSeries = normalizeDownloadRelease(remote.seriesTitle);
-      if (reqSeries && remSeries && reqSeries !== remSeries && !reqSeries.includes(remSeries) && !remSeries.includes(reqSeries)) {
-        return false;
-      }
-    }
     if (request.seasonNumber != null && remote.seasonNumber != null
         && Number(request.seasonNumber) !== Number(remote.seasonNumber)) return false;
     if (request.episodeNumber != null && remote.episodeNumber != null
         && Number(request.episodeNumber) !== Number(remote.episodeNumber)) return false;
-  }
-
-  if (request.mediaType === 'movie' && request.movieTitle && remote.movieTitle) {
-    const reqMovie = normalizeDownloadRelease(request.movieTitle);
-    const remMovie = normalizeDownloadRelease(remote.movieTitle);
-    if (reqMovie && remMovie && reqMovie !== remMovie && !reqMovie.includes(remMovie) && !remMovie.includes(reqMovie)) {
-      return false;
-    }
   }
 
   const requestResolution = identityResolutionBucket(request);
@@ -253,52 +230,6 @@ export function normalizeDownloadRelease(value: unknown): string {
     .replace(/[^a-z0-9]/g, '');
 }
 
-function normalizeMediaReleaseKey(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  return String(value)
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\.(mkv|mp4|avi|iso)$/i, ' ')
-    .replace(/\b(19|20)\d{2}\b/g, ' ')
-    .replace(/\b(2160p?|1080p?|720p?|4k|uhd|fhd)\b/g, ' ')
-    .replace(/\b(web[ ._-]?dl|webrip|bluray|blu[ ._-]?ray|bdrip|remux|hdtv|dvdrip)\b/g, ' ')
-    .replace(/\b(x26[45]|h26[45]|hevc|av1|hdr10\+?|hdr|dovi|dolby[ ._-]?vision)\b/g, ' ')
-    .replace(/\b(multi\d*|truefrench|french|vostfr|vff|vf\d*)\b/g, ' ')
-    .replace(/[^a-z0-9]/g, '');
-}
-
-export function sameLegacyPhysicalTransfer(
-  a?: DownloadIdentityLike | null,
-  b?: DownloadIdentityLike | null
-): boolean {
-  if (!a || !b) return false;
-  if (a.mediaType && b.mediaType && a.mediaType !== b.mediaType) return false;
-
-  if (hasConflictingStrongPhysicalIds(a, b)) return false;
-
-  const aSize = Number(a.size || 0);
-  const bSize = Number(b.size || 0);
-  if (aSize <= 0 || bSize <= 0) return false;
-  const sizeDelta = Math.abs(aSize - bSize) / Math.max(aSize, bSize);
-  if (sizeDelta > 0.03) return false;
-
-  const aRelease = normalizeDownloadRelease(a.releaseTitle || a.title);
-  const bRelease = normalizeDownloadRelease(b.releaseTitle || b.title);
-  if (!aRelease || !bRelease) return false;
-
-  if (aRelease === bRelease || aRelease.includes(bRelease) || bRelease.includes(aRelease)) {
-    return true;
-  }
-
-  // Certains clients reformattent le même nom de release. Ce fallback n'est utilisé
-  // que lorsque la taille est pratiquement identique, et jamais entre deux vrais
-  // infohash incompatibles.
-  if (sizeDelta > 0.005) return false;
-  const aMedia = normalizeMediaReleaseKey(a.releaseTitle || a.title);
-  const bMedia = normalizeMediaReleaseKey(b.releaseTitle || b.title);
-  return Boolean(aMedia && bMedia && aMedia === bMedia);
-}
 
 export interface ShowLike {
   mediaType: 'tv' | 'movie';
@@ -312,10 +243,9 @@ export interface ShowLike {
 }
 
 /**
- * Recherche la fiche média correspondante dans la bibliothèque SeenIt de l'utilisateur.
- * Priorités : tmdbId, tvdbId, imdbId, puis titre normalisé.
- * Permet de garantir que l'affiche et les métadonnées affichées proviennent toujours
- * de la fiche série/film SeenIt choisie par l'utilisateur.
+ * Recherche la fiche média correspondante dans la bibliothèque SeenIt.
+ * Le TMDB ID est l'unique identité canonique acceptée pour ce rapprochement.
+ * Aucun fallback TVDB, IMDb, titre, titre original, année ou release n'est autorisé.
  */
 export function findMatchingShowForDownload<T extends ShowLike>(
   item?: {
@@ -330,45 +260,11 @@ export function findMatchingShowForDownload<T extends ShowLike>(
   } | null,
   shows?: T[] | null
 ): T | undefined {
-  if (!item || !shows || shows.length === 0) return undefined;
+  if (!item?.tmdbId || !shows || shows.length === 0) return undefined;
   const mediaType = item.mediaType === 'movie' ? 'movie' : 'tv';
-
-  // 1. Match par tmdbId
-  if (item.tmdbId) {
-    const match = shows.find(s => s.mediaType === mediaType && Number(s.tmdbId) === Number(item.tmdbId));
-    if (match) return match;
-  }
-
-  // 2. Match par tvdbId
-  if (item.tvdbId) {
-    const match = shows.find(s => s.mediaType === mediaType && s.tvdbId && Number(s.tvdbId) === Number(item.tvdbId));
-    if (match) return match;
-  }
-
-  // 3. Match par imdbId
-  if (item.imdbId) {
-    const cleanImdb = String(item.imdbId).trim().toLowerCase();
-    const match = shows.find(s => s.mediaType === mediaType && s.imdbId && String(s.imdbId).trim().toLowerCase() === cleanImdb);
-    if (match) return match;
-  }
-
-  // 4. Match par titre normalisé
-  const candidateTitle = item.seriesTitle || item.movieTitle || item.title;
-  let normalized = normalizeDownloadRelease(candidateTitle);
-  // Nettoyer d'éventuels suffixes d'épisode / saison
-  normalized = normalized.replace(/(?:s\d{1,2}[e._-]?\d{1,2}|\d{1,2}x\d{1,2}|saison\d+|season\d+)$/i, '');
-  if (normalized && normalized.length >= 2) {
-    const match = shows.find(s => {
-      if (s.mediaType !== mediaType) return false;
-      const sTitle = normalizeDownloadRelease(s.title);
-      if (sTitle && sTitle === normalized) return true;
-      const sOriginal = s.originalTitle ? normalizeDownloadRelease(s.originalTitle) : '';
-      if (sOriginal && sOriginal === normalized) return true;
-      return false;
-    });
-    if (match) return match;
-  }
-
-  return undefined;
+  return shows.find(show =>
+    show.mediaType === mediaType
+    && Boolean(show.tmdbId)
+    && Number(show.tmdbId) === Number(item.tmdbId)
+  );
 }
-
