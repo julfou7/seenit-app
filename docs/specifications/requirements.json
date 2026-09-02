@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.103",
+  "applicationVersion": "1.4.104",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -316,6 +316,36 @@
         {
           "file": "tests/plexWatchEvidence.test.ts",
           "contains": "SEENIT-PLEX-005 protège réellement la réponse POST /api/plex/history"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-PLEX-006",
+      "title": "Synchronisation Plex strictement additive face aux actions SeenIt",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/plexAdditiveSync.test.ts",
+          "contains": "SEENIT-PLEX-006 un dé-vu Plex ne retire jamais un film marqué vu dans SeenIt"
+        },
+        {
+          "file": "tests/plexAdditiveSync.test.ts",
+          "contains": "SEENIT-PLEX-006 un dé-vu Plex conserve la progression manuelle des épisodes"
+        },
+        {
+          "file": "tests/plexAdditiveSync.test.ts",
+          "contains": "SEENIT-PLEX-006 une nouvelle preuve Plex s’ajoute sans écraser les données SeenIt"
+        },
+        {
+          "file": "tests/plexAdditiveSync.test.ts",
+          "contains": "SEENIT-PLEX-006 la fusion additive est idempotente"
+        },
+        {
+          "file": "tests/plexAdditiveSync.test.ts",
+          "contains": "SEENIT-PLEX-006 protège l’écriture Firestore de la synchro Plex avec un merge additif"
         }
       ]
     },
@@ -714,6 +744,24 @@
         {
           "file": "tests/navigationPreload.test.ts",
           "contains": "SEENIT-UX-003 conserve l’écran courant pendant le chargement d’un nouvel écran lazy"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-UX-004",
+      "title": "Toasts mobiles longs entièrement lisibles",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/toastLayout.test.ts",
+          "contains": "SEENIT-UX-004 les toasts longs reviennent à la ligne sans troncature sur mobile"
+        },
+        {
+          "file": "tests/toastLayout.test.ts",
+          "contains": "SEENIT-UX-004 le toast reste au-dessus de la navigation et de la safe area"
         }
       ]
     },

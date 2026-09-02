@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 2 septembre 2026
-Version applicative : **1.4.103**
+Version applicative : **1.4.104**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -163,6 +163,12 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   reste ambiguë et est exclue de l'historique tant qu'une source forte (`account-history`, historique
   PMS ou `viewCount > 0`) ne confirme pas le visionnage. Le rapprochement ne se fait jamais par
   titre ou année ; en cas d'ambiguïté SeenIt conserve l'état non vu.
+- **SEENIT-PLEX-006** — La synchronisation Plex est strictement additive face à l'état SeenIt.
+  Un média ou épisode absent des preuves Plex, repassé non vu côté Plex ou simplement absent d'un
+  full scan ne retire jamais un marqueur de visionnage, un `episodeRecord`, une note ou une progression
+  déjà enregistrés dans SeenIt. Avant chaque écriture Plex, l'état Firestore courant est relu dans une
+  transaction puis fusionné par union ; une nouvelle preuve Plex peut ajouter un visionnage, jamais
+  transformer une absence de preuve en suppression. Les actions manuelles SeenIt restent prioritaires.
 - Le full scan est paginé. Un inventaire partiel ne remplace pas un cache complet, sauf si au
   moins un inventaire serveur complet et exploitable a été obtenu conformément à la politique.
 - La déduplication finale utilise `movie:<tmdbId>` ou
@@ -261,6 +267,9 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   média restent séparés du bundle initial, sont préchargés en arrière-plan pendant le splash et les
   changements d'écran sont engagés dans une transition React afin de conserver le contenu déjà
   affiché jusqu'à ce que la prochaine vue soit prête.
+- **SEENIT-UX-004** — Un toast mobile long utilise toute la largeur utile disponible, revient à la
+  ligne sans troncature et reste au-dessus de la navigation basse et de la safe area. La règle vaut
+  pour la PWA et l'APK, notamment pour le bilan détaillé d'une synchronisation Plex.
 - Les dialogues critiques utilisent un rôle adapté, sont fermables par Échap, placent le focus
   sur une action et ne déclenchent aucune suppression sans confirmation quand le transfert est
   actif.
