@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 2 septembre 2026
-Version applicative : **1.4.107**
+Version applicative : **1.4.108**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -67,12 +67,14 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   d'un import soit diagnostiquée précisément, même lorsque la version du commit est déjà publiée.
   Avant Gradle, elle restaure explicitement le droit d'exécution de `android/gradlew` : une
   normalisation de mode de fichier par AI Studio ou un connecteur Windows ne peut plus bloquer le build.
-- **SEENIT-APK-005** — Le lancement Android ne présente jamais une surface native vide : dès la
-  création de l'activité, le splash système affiche un symbole SeenIt visible sur le même fond que la
-  WebView, puis laisse place au splash HTML sans flash blanc ou noir intermédiaire. Après lancement,
-  la status bar overlay la WebView avec un fond transparent et des icônes claires ; les écrans racine
-  compensent cette superposition par la safe area haute. Un retour à un splash natif transparent, à
-  `overlaysWebView=false` ou à une status bar noire forcée est une régression bloquée par les tests.
+- **SEENIT-APK-005** — Le lancement Android n'affiche qu'un seul branding de démarrage : le splash
+  animé Web `src/components/SplashScreen.tsx`. Le splash système imposé par Android 12+ reste
+  visuellement neutre, avec fond `#040406`, icône transparente et animation native nulle ; il n'est
+  masqué qu'après le premier rendu du splash Web afin d'éviter tout flash vide. Après lancement, la
+  status bar overlay la WebView avec un fond transparent et des icônes claires ; les écrans racine
+  compensent cette superposition par la safe area haute. La réintroduction d'un logo natif distinct,
+  de `Style.Light` / `LIGHT`, de `overlaysWebView=false` ou d'une status bar opaque constitue une
+  régression TNR bloquée par les tests.
 - Le fichier `docs/specifications/android-contract.json` fixe les invariants natifs vérifiables :
   identité, signature, version, icônes, permissions, deep link, origine API, safe areas et canal APK.
 - Le contrôle Android s'exécute avant et après `npx cap sync android` afin de détecter une mutation
@@ -464,5 +466,14 @@ et l'existence exacte des tests référencés. `test:android` protège l'identit
 - Vérifier l'ouverture de l'élément exact dans Plex Android, puis le fallback Web.
 - Installer la nouvelle version par-dessus l'APK précédente et confirmer que compte, données,
   icône du lanceur, raccourci, notifications et deep links sont conservés.
+- **TNR lancement Android — mono-splash :** sur un démarrage à froid après mise à jour N → N+1,
+  enregistrer l'écran et confirmer qu'aucun logo SeenIt natif/statique distinct n'apparaît avant
+  l'animation `SplashScreen.tsx`, qu'aucun flash blanc/noir intermédiaire n'est visible et que le fond
+  de transition reste `#040406`.
+- **TNR lancement Android — status bar :** dès la première image de l'application, confirmer que
+  l'heure, le réseau, le Wi-Fi et la batterie restent clairs/blancs sur le fond sombre, que la barre
+  reste transparente/edge-to-edge et que la safe area ne saute pas. Les invariants `DARK` / `Style.Dark`
+  et mono-splash sont en plus bloqués automatiquement par `tests/androidLaunchChrome.test.ts` et
+  `npm run test:android`.
 - Démarrer l'APK à froid, le reprendre après veille, tester Retour depuis chaque niveau puis vérifier
   qu'aucun listener ou téléchargement n'est dupliqué.
