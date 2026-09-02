@@ -31,38 +31,7 @@ jobs:
           sed -i '/const legacyIndexes: number\[\] = \[\];/d' src/services/sonarrRadarr.ts
           perl -0pi -e 's/\n\s*\/\/ Fallback ancien\/transitoire[^\n]*\n\s*\/\/ deux vrais infohash incompatibles[^\n]*\n\s*\/\/ bloque plus le rattachement[^\n]*\n\s*if \(sameLegacyPhysicalTransfer\(it, qbitProbe\)\) \{\n\s*legacyIndexes\.push\(index\);\n\s*\}//s' src/services/sonarrRadarr.ts
           sed -i 's/const matchingIndexes = exactIndexes.length > 0 ? exactIndexes : legacyIndexes;/const matchingIndexes = exactIndexes;/' src/services/sonarrRadarr.ts
-          python3 <<'PY'
-          from pathlib import Path
-          import json
-
-          test_path = Path('tests/downloadIdentity.test.ts')
-          tests = test_path.read_text(encoding='utf-8')
-          marker = "test('SEENIT-DOWNLOAD-002 deux vrais infohash différents ne sont jamais fusionnés'"
-          if marker not in tests:
-              tests += """
-
-test('SEENIT-DOWNLOAD-002 deux vrais infohash différents ne sont jamais fusionnés', () => {
-  const a = { downloadId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' };
-  const b = { downloadId: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' };
-  assert.equal(hasConflictingStrongPhysicalIds(a, b), true);
-  assert.equal(samePhysicalDownload(a, b), false);
-});
-"""
-              test_path.write_text(tests, encoding='utf-8')
-
-          req_path = Path('docs/specifications/requirements.json')
-          req = json.loads(req_path.read_text(encoding='utf-8'))
-          by_id = {item['id']: item for item in req['requirements']}
-          by_id['SEENIT-DOWNLOAD-002']['tests'] = [{
-              'file': 'tests/downloadIdentity.test.ts',
-              'contains': 'SEENIT-DOWNLOAD-002 deux vrais infohash différents ne sont jamais fusionnés'
-          }]
-          by_id['SEENIT-QUALITY-005']['tests'] = [{
-              'file': 'tests/firebaseIdentityGuardrails.test.ts',
-              'contains': 'SEENIT-QUALITY-005 matérialise Firebase Android et répare les droits Gradle'
-          }]
-          req_path.write_text(json.dumps(req, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
-          PY
+          python3 scripts/issue54_finalize.py
 
       - name: Restaurer le mode Gradle et matérialiser Android
         run: |
@@ -88,7 +57,7 @@ test('SEENIT-DOWNLOAD-002 deux vrais infohash différents ne sont jamais fusionn
       - name: Commit du correctif
         run: |
           rm .github/workflows/issue-54-ai-studio-identity-guard.yml
-          rm scripts/issue54_patch.py
+          rm scripts/issue54_patch.py scripts/issue54_finalize.py
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
