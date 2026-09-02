@@ -6,7 +6,8 @@ function cloneShow(show: Show): Show {
   return {
     ...show,
     seenEpisodes: [...(show.seenEpisodes || [])],
-    episodeRecords: { ...(show.episodeRecords || {}) }
+    episodeRecords: { ...(show.episodeRecords || {}) },
+    plexWatchState: { ...(show.plexWatchState || {}) }
   };
 }
 
@@ -17,49 +18,81 @@ function recomputeLastWatchedAt(records: Show['episodeRecords']): number | undef
   return timestamps.length > 0 ? Math.max(...timestamps) : undefined;
 }
 
-export function applyExplicitPlexUnwatch(
+function getWatchStateStorageKey(state: PlexLibraryWatchState): string {
+  return state.mediaType === 'movie'
+    ? 'movie'
+    : `${state.seasonNumber}x${state.episodeNumber}`;
+}
+
+/**
+ * Un `viewCount=0` seul ne prouve pas un dé-vu : le média peut simplement n'avoir
+ * jamais été vu dans Plex. SeenIt ne retire donc une progression que lorsqu'il a
+ * auparavant observé ce même média `watched=true`, puis l'observe `watched=false`.
+ */
+export function applyPlexLibraryWatchState(
   input: Show,
   state: PlexLibraryWatchState
-): { show: Show; changed: boolean } {
-  if (state.watched) return { show: input, changed: false };
-  if (Number(input.tmdbId) !== Number(state.tmdbId)) return { show: input, changed: false };
+): { show: Show; changed: boolean; unwatchApplied: boolean } {
+  if (Number(input.tmdbId) !== Number(state.tmdbId)) {
+    return { show: input, changed: false, unwatchApplied: false };
+  }
+  if (state.mediaType === 'movie' && input.mediaType !== 'movie') {
+    return { show: input, changed: false, unwatchApplied: false };
+  }
+  if (state.mediaType === 'episode' && input.mediaType !== 'tv') {
+    return { show: input, changed: false, unwatchApplied: false };
+  }
+
+  const storageKey = getWatchStateStorageKey(state);
+  const previousPlexState = input.plexWatchState?.[storageKey];
+  const stateChanged = previousPlexState !== state.watched;
+  const shouldUnwatch = state.watched === false && previousPlexState === true;
+
+  if (!stateChanged && !shouldUnwatch) {
+    return { show: input, changed: false, unwatchApplied: false };
+  }
 
   const show = cloneShow(input);
-  let changed = false;
+  show.plexWatchState = { ...(show.plexWatchState || {}), [storageKey]: state.watched };
+  let progressChanged = false;
 
-  if (state.mediaType === 'movie') {
-    if (show.mediaType !== 'movie') return { show: input, changed: false };
+  if (shouldUnwatch && state.mediaType === 'movie') {
     const nextSeen = show.seenEpisodes.filter(key => key !== 'movie');
-    if (nextSeen.length !== show.seenEpisodes.length) changed = true;
+    if (nextSeen.length !== show.seenEpisodes.length) progressChanged = true;
     show.seenEpisodes = nextSeen;
     if (Object.prototype.hasOwnProperty.call(show.episodeRecords, 'movie')) {
       delete show.episodeRecords.movie;
-      changed = true;
+      progressChanged = true;
     }
-    if (changed && show.status === 'completed') show.status = 'plan_to_watch';
-  } else {
-    if (show.mediaType !== 'tv') return { show: input, changed: false };
+    if (progressChanged && show.status === 'completed') show.status = 'plan_to_watch';
+  } else if (shouldUnwatch && state.mediaType === 'episode') {
     const expectedKey = `${state.seasonNumber}x${state.episodeNumber}`;
     const nextSeen = show.seenEpisodes.filter(key => normalizePlexEpisodeKey(key) !== expectedKey);
-    if (nextSeen.length !== show.seenEpisodes.length) changed = true;
+    if (nextSeen.length !== show.seenEpisodes.length) progressChanged = true;
     show.seenEpisodes = nextSeen;
 
     for (const key of Object.keys(show.episodeRecords)) {
       if (normalizePlexEpisodeKey(key) === expectedKey) {
         delete show.episodeRecords[key];
-        changed = true;
+        progressChanged = true;
       }
     }
 
-    if (changed && show.status !== 'dropped') {
+    if (progressChanged && show.status !== 'dropped') {
       show.status = show.seenEpisodes.length > 0 ? 'watching' : 'plan_to_watch';
     }
   }
 
-  if (!changed) return { show: input, changed: false };
-  show.lastWatchedAt = recomputeLastWatchedAt(show.episodeRecords);
-  show.updatedAt = Date.now();
-  return { show, changed: true };
+  if (progressChanged) {
+    show.lastWatchedAt = recomputeLastWatchedAt(show.episodeRecords);
+    show.updatedAt = Date.now();
+  }
+
+  return {
+    show,
+    changed: stateChanged || progressChanged,
+    unwatchApplied: progressChanged
+  };
 }
 
 function normalizedSet(keys: string[]): Set<string> {
@@ -118,6 +151,10 @@ export function mergePlexProgressMutation(
     ...candidate,
     seenEpisodes: nextSeen,
     episodeRecords: nextRecords,
+    plexWatchState: {
+      ...((current.plexWatchState || {}) as Record<string, boolean>),
+      ...(candidate.plexWatchState || {})
+    },
     lastWatchedAt: recomputeLastWatchedAt(nextRecords),
     updatedAt: Math.max(Number(current.updatedAt) || 0, Number(candidate.updatedAt) || 0)
   };
