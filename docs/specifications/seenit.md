@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 2 septembre 2026
-Version applicative : **1.4.101**
+Version applicative : **1.4.102**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -18,10 +18,11 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 
 ## 2. Règles de plateforme
 
-- **SEENIT-PLATFORM-001** — La PWA utilise les routes SeenIt relatives au même domaine ;
-  l'APK utilise le backend HTTPS de production. Un comportement commun partage la même
-  logique métier, mais le transport et l'ouverture d'applications peuvent être adaptés par
-  `Capacitor.isNativePlatform()`.
+- **SEENIT-PLATFORM-001** — La PWA canonique servie depuis `seenit.ai.studio` conserve les routes
+  SeenIt relatives au même domaine. L'APK et tout preview AI Studio dont un label d'hôte commence
+  par `ais-dev-*` ciblent explicitement `https://seenit.ai.studio` pour les routes `/api/*` afin de
+  partager le même backend canonique. Un comportement commun partage la même logique métier, mais
+  le transport et l'ouverture d'applications peuvent être adaptés par la plateforme.
 - La PWA doit fonctionner installée ou dans un navigateur mobile/desktop.
 - L'APK doit gérer explicitement reprise d'activité, bouton Retour Android, safe areas,
   notifications FCM et intents vers les applications natives.
@@ -77,6 +78,19 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 - Les intents Plex, Reddit, Magnet et installateur APK utilisent les API Capacitor natives, avec un
   message lisible lorsqu'aucune application ne peut traiter l'intent.
 - Les validations terrain couvrent au minimum Android 12 et la version cible courante d'Android.
+
+### 2.3 Runtime backend canonique
+
+- **SEENIT-RUNTIME-001** — `/api/health` reste une route légère et indépendante des services privés,
+  désactive le cache et identifie explicitement le backend `canonical`. Une réponse API SeenIt `2xx`
+  en `text/html` est considérée comme une panne de routage et jamais comme un succès métier.
+- Les handlers Express asynchrones transmettent leurs rejets au middleware d'erreur API ; une erreur
+  Firebase ou service externe répond en JSON générique sans laisser la requête tomber dans le fallback
+  SPA et sans terminer le process backend.
+- Une bascule de runtime est non destructive : déployer le remplaçant, vérifier `/api/health`, exécuter
+  un smoke métier, basculer le mapping/domaine, revalider les transports Sonarr/Radarr/qBittorrent/Plex,
+  puis seulement retirer l'ancien runtime. L'ancien service n'est jamais supprimé avant preuve du
+  remplaçant. Le runbook `docs/runtime-cutover.md` décrit ce séquencement et son rollback.
 
 ## 3. Compte, données et isolation
 
