@@ -148,12 +148,6 @@ export function normalizeTransferPath(value: unknown): string {
     .toLowerCase();
 }
 
-function transferBasename(value: unknown): string {
-  const normalized = normalizeTransferPath(value);
-  if (!normalized) return '';
-  return normalized.split('/').filter(Boolean).pop() || '';
-}
-
 export function sameTransferPath(
   a?: DownloadIdentityLike | null,
   b?: DownloadIdentityLike | null
@@ -161,17 +155,7 @@ export function sameTransferPath(
   if (!a || !b) return false;
   const aPath = normalizeTransferPath(a.transferPath);
   const bPath = normalizeTransferPath(b.transferPath);
-  if (!aPath || !bPath) return false;
-  if (aPath === bPath) return true;
-
-  const aBase = transferBasename(aPath);
-  const bBase = transferBasename(bPath);
-  if (!aBase || aBase !== bBase) return false;
-
-  const aSize = Number(a.size || 0);
-  const bSize = Number(b.size || 0);
-  if (aSize <= 0 || bSize <= 0) return false;
-  return Math.abs(aSize - bSize) / Math.max(aSize, bSize) <= 0.03;
+  return Boolean(aPath && bPath && aPath === bPath);
 }
 
 

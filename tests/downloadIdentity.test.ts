@@ -110,6 +110,13 @@ test('rattache Radarr et qBittorrent par chemin de transfert quand le hash manqu
   ), true);
 });
 
+test('SEENIT-DOWNLOAD-001 un même basename et une même taille ne remplacent jamais un chemin exact', () => {
+  assert.equal(sameTransferPath(
+    { transferPath: 'd:/downloads-a/Film.2026.1080p', size: 10_000_000_000 },
+    { transferPath: 'd:/downloads-b/Film.2026.1080p', size: 10_000_000_000 }
+  ), false);
+});
+
 
 
 test('SEENIT-IDENTITY-001 exige un TMDB ID exact pour rattacher une demande à un transfert', () => {
