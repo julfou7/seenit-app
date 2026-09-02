@@ -41,7 +41,7 @@ test('SEENIT-PLEX-006 un jamais-vu Plex ne retire pas une action SeenIt', () => 
   assert.equal(firstObservation.show.plexWatchState?.movie, false);
 });
 
-test('SEENIT-PLEX-006 un vrai dé-vu Plex retire un film vu dans SeenIt', () => {
+test('SEENIT-PLEX-006 un dé-vu Plex retire un film vu dans SeenIt', () => {
   const current = makeShow({
     status: 'completed',
     seenEpisodes: ['movie'],
@@ -94,7 +94,7 @@ test('SEENIT-PLEX-006 un dé-vu Plex retire uniquement l’épisode visé', () =
   assert.equal(result.show.plexWatchState?.['1x2'], false);
 });
 
-test('SEENIT-PLEX-006 une preuve vue mémorise le futur dé-vu sans retirer de progression', () => {
+test('SEENIT-PLEX-006 une preuve vue ne passe pas par le chemin de dé-vu', () => {
   const current = makeShow({ status: 'completed', seenEpisodes: ['movie'] });
   const result = applyPlexLibraryWatchState(current, {
     mediaType: 'movie', tmdbId: 51, watched: true
