@@ -1,4 +1,5 @@
 import type { Application, ErrorRequestHandler, RequestHandler } from 'express';
+import { sanitizePlexSyncWatchEvidence } from '../plex/plexWatchEvidence.ts';
 
 export const SEENIT_BACKEND_IDENTITY = 'canonical';
 
@@ -33,12 +34,29 @@ function wrapRouteHandler(handler: any): any {
   };
 }
 
+function installPlexWatchEvidenceResponseGuard(app: Application): void {
+  app.use((req, res, next) => {
+    if (req.method !== 'POST' || req.path !== '/api/plex/history') {
+      next();
+      return;
+    }
+
+    const originalJson = res.json.bind(res);
+    (res as any).json = (body: any) => originalJson(sanitizePlexSyncWatchEvidence(body));
+    next();
+  });
+}
+
 /**
  * Express 4 ne relaie pas nativement les rejets des handlers async vers next(error).
  * On enveloppe les routes de cette instance avant leur déclaration, sans modifier
  * les middlewares de sécurité ni dépendre d'un patch global du framework.
  */
 export function installAsyncRouteForwarding(app: Application): void {
+  // Ce garde est installé avant les routes : le backend ne peut pas livrer comme
+  // « vu » une simple activité Cloud qui correspond exactement à la watchlist.
+  installPlexWatchEvidenceResponseGuard(app);
+
   const methods = ['all', 'delete', 'get', 'head', 'options', 'patch', 'post', 'put'] as const;
 
   for (const method of methods) {
