@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 2 septembre 2026
-Version applicative : **1.4.106**
+Version applicative : **1.4.107**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -29,7 +29,9 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 - Les liens Plex privilégient Plex Android dans l'APK et conservent un fallback Web dans la PWA.
 - La status bar Android est edge-to-edge : la WebView s'étend derrière une barre transparente avec
   icônes claires, tandis que le contenu principal et le login respectent `env(safe-area-inset-top)`.
-  La barre de navigation basse reste sombre et conserve les safe areas CSS.
+  Avec `@capacitor/status-bar`, ce rendu clair sur fond sombre exige explicitement `Style.Dark` / `DARK` ;
+  `Style.Light` / `LIGHT` est interdit car il produit des icônes sombres. La barre de navigation basse
+  reste sombre et conserve les safe areas CSS.
 
 ### 2.1 Contrat APK immuable
 

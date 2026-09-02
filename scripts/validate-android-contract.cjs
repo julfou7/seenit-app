@@ -79,6 +79,11 @@ function validateAndroidContract() {
   }
   requireIncludes(capacitor, `overlaysWebView: true`, 'overlay StatusBar edge-to-edge');
   requireIncludes(capacitor, `backgroundColor: '#00000000'`, 'fond StatusBar transparent');
+  requireIncludes(capacitor, `style: 'DARK'`, 'icônes StatusBar claires sur fond sombre');
+  requireIncludes(app, `StatusBar.setStyle({ style: Style.Dark })`, 'style runtime StatusBar clair sur fond sombre');
+  if (capacitor.includes(`style: 'LIGHT'`) || app.includes(`StatusBar.setStyle({ style: Style.Light })`)) {
+    throw new Error('Style.Light/LIGHT produit des icônes sombres et est interdit sur le fond sombre SeenIt.');
+  }
   requireIncludes(app, `StatusBar.setOverlaysWebView({ overlay: true })`, 'overlay StatusBar runtime');
   requireIncludes(app, `StatusBar.setBackgroundColor({ color: '#00000000' })`, 'StatusBar runtime transparente');
   requireIncludes(styles, `<item name="android:statusBarColor">@android:color/transparent</item>`, 'statusBarColor thème Android');
