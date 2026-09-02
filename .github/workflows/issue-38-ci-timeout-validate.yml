@@ -1,0 +1,21 @@
+name: Validate Android Smoke Timeout
+on:
+  push:
+    branches:
+      - issue-38-plex-unwatch
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - run: npm ci --legacy-peer-deps
+      - run: npm test
+      - run: npm run build
+      - run: bash -n scripts/android-upgrade-smoke.sh
