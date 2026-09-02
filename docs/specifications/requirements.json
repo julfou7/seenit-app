@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.99",
+  "applicationVersion": "1.4.100",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -743,6 +743,10 @@
         {
           "file": "tests/firebaseIdentityGuardrails.test.ts",
           "contains": "SEENIT-QUALITY-005 traite AI Studio comme un transport non autoritatif"
+        },
+        {
+          "file": "tests/firebaseIdentityGuardrails.test.ts",
+          "contains": "SEENIT-QUALITY-005 protège les fichiers Android suivis et les droits exécutables"
         }
       ]
     },

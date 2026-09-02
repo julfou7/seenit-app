@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 1er septembre 2026
-Version applicative : **1.4.99**
+Version applicative : **1.4.100**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -373,7 +373,9 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   versions, lockfiles, SPEC ou fichiers suivis est rejetée. Les règles sont préchargées via
   `.agents/AGENTS.md` puis complétées par la lecture intégrale du `AGENTS.md` racine ; les invariants
   critiques restent en plus protégés par des tests afin qu'une omission de lecture ne puisse pas les
-  réintroduire silencieusement.
+  réintroduire silencieusement. Les fichiers Android canoniques suivis (`google-services.json`, clé de
+  signature historique) doivent rester présents et les scripts Unix requis au build doivent conserver leur bit
+  exécutable ; une normalisation AI Studio de ces éléments est une régression bloquante.
 - **SEENIT-QUALITY-006** — Les contrôles et le déploiement sont proportionnés au risque selon la
   classification automatique décrite en section 12.1. Le doute ne réduit jamais les validations :
   un changement non reconnu comme light bascule vers le pipeline APK complet.

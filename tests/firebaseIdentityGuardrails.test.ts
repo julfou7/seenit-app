@@ -51,3 +51,14 @@ test('SEENIT-QUALITY-005 traite AI Studio comme un transport non autoritatif', (
   assert.match(bootstrap, /lire intégralement/);
   assert.match(bootstrap, /conserver l'état GitHub/);
 });
+
+
+test('SEENIT-QUALITY-005 protège les fichiers Android suivis et les droits exécutables', () => {
+  assert.equal(fs.existsSync('android/app/google-services.json'), true, 'google-services.json doit rester suivi');
+  assert.equal(fs.existsSync('android/app/debug.keystore'), true, 'la clé de signature historique doit rester suivie');
+  if (process.platform !== 'win32') {
+    for (const path of ['android/gradlew', 'scripts/pull.sh']) {
+      assert.notEqual(fs.statSync(path).mode & 0o111, 0, path + ' doit rester exécutable dans Git');
+    }
+  }
+});
