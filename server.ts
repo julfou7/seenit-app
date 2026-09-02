@@ -1,8 +1,6 @@
 import express, { Request, type Response, NextFunction } from "express";
 import path from "path";
 import fs from "fs";
-import { exec } from "node:child_process";
-import { promisify } from "node:util";
 import { createServer as createViteServer } from "vite";
 import cron from "node-cron";
 import { getMessaging } from "firebase-admin/messaging";
@@ -38,7 +36,6 @@ import {
   PLEX_ACCOUNT_HISTORY_QUERY
 } from "./src/features/plex/plexAccountHistory.ts";
 import { evaluatePlexSourceCompletion } from "./src/features/plex/plexSyncIntegrity.ts";
-import { isSeenItGitAdmin } from "./src/features/admin/gitAdminPolicy.ts";
 
 export interface AuthRequest extends Request {
   user?: DecodedIdToken;
@@ -60,13 +57,6 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
     console.error("Error verifying Firebase ID token:", error);
     return res.status(401).json({ error: "Unauthorized: Invalid token" });
   }
-};
-
-export const requireGitAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
-  if (!isSeenItGitAdmin(req.user?.uid, process.env.SEENIT_ADMIN_UIDS)) {
-    return res.status(403).json({ error: "Accès administrateur requis" });
-  }
-  next();
 };
 
 const WEBHOOK_SECRET_HEADER = 'x-seenit-webhook-secret';
@@ -566,7 +556,7 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.100',
+        'X-Plex-Version': '1.4.101',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
@@ -2119,75 +2109,6 @@ async function startServer() {
 
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
-  });
-
-  const execAsync = promisify(exec);
-
-  app.get('/api/git/status', requireAuth, requireGitAdmin, async (req, res) => {
-    try {
-      const gitDirExists = fs.existsSync(path.join(process.cwd(), '.git'));
-      if (!gitDirExists) {
-        return res.json({
-          configured: false,
-          branch: 'main',
-          commit: null,
-          isClean: true,
-          message: 'Dossier .git non initialisé (récupération automatique disponible au prochain pull)'
-        });
-      }
-
-      const { stdout: commitInfo } = await execAsync('git log -n 1 --format="%h||%s||%cr||%an"');
-      const [hash, message, time, author] = (commitInfo || '').trim().split('||');
-
-      const { stdout: branchName } = await execAsync('git rev-parse --abbrev-ref HEAD');
-      const { stdout: statusOut } = await execAsync('git status --porcelain');
-
-      res.json({
-        configured: true,
-        branch: branchName.trim(),
-        commit: {
-          hash: hash || 'Inconnu',
-          message: message || 'Dernier commit',
-          time: time || '',
-          author: author || ''
-        },
-        isClean: statusOut.trim().length === 0,
-        message: 'Dépôt Git actif et synchronisé'
-      });
-    } catch (err: any) {
-      console.error('[Git Status Error]', err);
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  app.post('/api/git/pull', requireAuth, requireGitAdmin, async (req, res) => {
-    try {
-      console.log('[Git Pull] Déclenchement de la synchronisation Git via API...');
-      const { stdout, stderr } = await execAsync('bash scripts/pull.sh');
-      console.log('[Git Pull Output]', stdout);
-      if (stderr) console.warn('[Git Pull Stderr]', stderr);
-
-      let commit = null;
-      try {
-        const { stdout: commitInfo } = await execAsync('git log -n 1 --format="%h||%s||%cr||%an"');
-        const [hash, message, time, author] = (commitInfo || '').trim().split('||');
-        commit = { hash, message, time, author };
-      } catch {}
-
-      res.json({
-        success: true,
-        message: 'Dépôt Git synchronisé avec succès !',
-        output: stdout,
-        commit
-      });
-    } catch (err: any) {
-      console.error('[Git Pull Error]', err);
-      res.status(500).json({
-        success: false,
-        error: err.message,
-        stderr: err.stderr || ''
-      });
-    }
   });
 
   app.get('/api/update', async (req, res) => {

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.100",
+  "applicationVersion": "1.4.101",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -275,29 +275,6 @@
         {
           "file": "tests/downloadBackendSecurity.test.ts",
           "contains": "le proxy n’accepte que les chemins Sonarr Radarr et qBittorrent nécessaires"
-        }
-      ]
-    },
-    {
-      "id": "SEENIT-SECURITY-002",
-      "title": "Routes Git authentifiées en PWA et dans l’APK",
-      "targets": [
-        "backend",
-        "pwa",
-        "apk"
-      ],
-      "tests": [
-        {
-          "file": "tests/apiSurface.test.ts",
-          "contains": "SEENIT-SECURITY-002 le diagnostic Git exige une session SeenIt et passe par le transport APK"
-        },
-        {
-          "file": "tests/gitAdminPolicy.test.ts",
-          "contains": "SEENIT-SECURITY-002 refuse les opérations Git sans allowlist administrateur"
-        },
-        {
-          "file": "tests/gitAdminPolicy.test.ts",
-          "contains": "SEENIT-SECURITY-002 protège les routes Git et masque les outils aux non-administrateurs"
         }
       ]
     },
@@ -775,6 +752,22 @@
         {
           "file": "tests/deliveryClassification.test.ts",
           "contains": "SEENIT-QUALITY-006 permet de forcer le parcours complet mais jamais le parcours light"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-QUALITY-007",
+      "title": "Synchronisation Git externe au runtime SeenIt",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/apiSurface.test.ts",
+          "contains": "SEENIT-QUALITY-007 retire toute synchronisation Git embarquée du runtime SeenIt"
         }
       ]
     }
