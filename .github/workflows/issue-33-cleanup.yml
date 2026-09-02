@@ -1,0 +1,259 @@
+name: Issue 33 - Retrait sync Git embarquée
+
+on:
+  push:
+    branches:
+      - issue-33-retire-git-sync
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Installer les dépendances
+        run: npm ci --legacy-peer-deps
+
+      - name: Retirer l’ancienne synchronisation Git
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import json
+
+          def read(path):
+              return Path(path).read_text(encoding='utf-8')
+
+          def write(path, content):
+              Path(path).write_text(content, encoding='utf-8')
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: motif attendu 1 fois, trouvé {count}")
+              return text.replace(old, new, 1)
+
+          # UI Réglages : suppression complète de l’état, des appels API et de la carte Git.
+          settings_path = Path('src/screens/SettingsScreen.tsx')
+          settings = read(settings_path)
+          settings = replace_once(
+              settings,
+              "import { Cloud, LogIn, LogOut, FileText, CheckCircle2, MonitorPlay, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronDown, ChevronUp, ChevronRight, Check, AlertCircle, Info, Bug, Sparkles, Download, X, UploadCloud, DownloadCloud, GitBranch, GitPullRequest } from 'lucide-react';",
+              "import { Cloud, LogIn, LogOut, FileText, CheckCircle2, MonitorPlay, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronDown, ChevronUp, ChevronRight, Check, AlertCircle, Info, Bug, Sparkles, Download, X, UploadCloud, DownloadCloud } from 'lucide-react';",
+              'imports icônes Git Settings'
+          )
+          settings = replace_once(settings, "import { authenticatedFetch } from '../lib/apiAuth';\n\n", '', 'import authenticatedFetch Settings')
+          settings = replace_once(settings, "type GitAccessState = 'checking' | 'allowed' | 'denied';\n\n", '', 'type GitAccessState')
+          start = settings.find('  // Git Sync state\n')
+          end = settings.find('  useEffect(() => {\n    let interval: any;', start)
+          if start < 0 or end < 0:
+              raise SystemExit('bloc état/handlers Git Settings introuvable')
+          settings = settings[:start] + settings[end:]
+          start = settings.find('              {/* GitHub Git Sync Card */}')
+          end = settings.find('              {/* Updater Progress */}', start)
+          if start < 0 or end < 0:
+              raise SystemExit('carte Git Settings introuvable')
+          settings = settings[:start] + settings[end:]
+          for forbidden in ('/api/git/', 'Pull depuis GitHub', 'Code GitHub (Git Pull)', 'gitAccess', 'handleGitPull', 'GitPullRequest', 'GitBranch'):
+              if forbidden in settings:
+                  raise SystemExit(f'Settings contient encore {forbidden}')
+          write(settings_path, settings)
+
+          # Backend : suppression des commandes Git, du middleware admin dédié et des routes.
+          server_path = Path('server.ts')
+          server = read(server_path)
+          server = replace_once(server, 'import { exec } from "node:child_process";\n', '', 'import exec serveur')
+          server = replace_once(server, 'import { promisify } from "node:util";\n', '', 'import promisify serveur')
+          server = replace_once(server, 'import { isSeenItGitAdmin } from "./src/features/admin/gitAdminPolicy.ts";\n', '', 'import gitAdminPolicy serveur')
+          start = server.find('export const requireGitAdmin = ')
+          end = server.find("const WEBHOOK_SECRET_HEADER = 'x-seenit-webhook-secret';", start)
+          if start < 0 or end < 0:
+              raise SystemExit('middleware requireGitAdmin introuvable')
+          server = server[:start] + server[end:]
+          start = server.find('  const execAsync = promisify(exec);\n')
+          end = server.find("  app.get('/api/update'", start)
+          if start < 0 or end < 0:
+              raise SystemExit('routes Git serveur introuvables')
+          server = server[:start] + server[end:]
+          for forbidden in ('/api/git/', 'scripts/pull.sh', 'execAsync', 'requireGitAdmin', 'isSeenItGitAdmin', 'SEENIT_ADMIN_UIDS'):
+              if forbidden in server:
+                  raise SystemExit(f'server.ts contient encore {forbidden}')
+          write(server_path, server)
+
+          # Configuration : GITHUB_PAT reste réservé au fallback /api/update.
+          env_path = Path('.env.example')
+          env = read(env_path)
+          env = replace_once(
+              env,
+              "# UID Firebase autorisés à consulter le statut Git et déclencher un pull.\n# Plusieurs UID peuvent être séparés par une virgule. Absent ou vide = accès Git refusé.\nSEENIT_ADMIN_UIDS=\n\n",
+              '',
+              'SEENIT_ADMIN_UIDS .env.example'
+          )
+          if 'SEENIT_ADMIN_UIDS' in env:
+              raise SystemExit('.env.example contient encore SEENIT_ADMIN_UIDS')
+          if 'GITHUB_PAT=' not in env:
+              raise SystemExit('GITHUB_PAT a été supprimé par erreur')
+          write(env_path, env)
+
+          # Test de non-régression : aucune surface Git embarquée ne doit revenir.
+          api_test = """import test from 'node:test';
+          import assert from 'node:assert/strict';
+          import { existsSync, readFileSync } from 'node:fs';
+
+          test('SEENIT-QUALITY-007 retire toute synchronisation Git embarquée du runtime SeenIt', () => {
+            const server = readFileSync('server.ts', 'utf8');
+            const settings = readFileSync('src/screens/SettingsScreen.tsx', 'utf8');
+            const envExample = readFileSync('.env.example', 'utf8');
+
+            assert.doesNotMatch(server, /\\/api\\/git\\//);
+            assert.doesNotMatch(server, /scripts\\/pull\\.sh/);
+            assert.doesNotMatch(settings, /\\/api\\/git\\//);
+            assert.doesNotMatch(settings, /Pull depuis GitHub|Code GitHub \\(Git Pull\\)/);
+            assert.doesNotMatch(envExample, /SEENIT_ADMIN_UIDS/);
+            assert.equal(existsSync('scripts/pull.sh'), false);
+            assert.equal(existsSync('src/features/admin/gitAdminPolicy.ts'), false);
+          });
+          """
+          api_test = '\n'.join(line[10:] if line.startswith('          ') else line for line in api_test.splitlines()) + '\n'
+          write('tests/apiSurface.test.ts', api_test)
+
+          for obsolete in ('scripts/pull.sh', 'src/features/admin/gitAdminPolicy.ts', 'tests/gitAdminPolicy.test.ts'):
+              path = Path(obsolete)
+              if not path.exists():
+                  raise SystemExit(f'fichier obsolète déjà absent de façon inattendue: {obsolete}')
+              path.unlink()
+
+          # SPEC : le runtime SeenIt ne porte plus la synchro de code.
+          spec_path = Path('docs/specifications/seenit.md')
+          spec = read(spec_path)
+          spec = replace_once(spec, 'Dernière mise à jour : 1er septembre 2026', 'Dernière mise à jour : 2 septembre 2026', 'date SPEC')
+          start = spec.find('- **SEENIT-SECURITY-002**')
+          end = spec.find('- **SEENIT-SECURITY-003**', start)
+          if start < 0 or end < 0:
+              raise SystemExit('SEENIT-SECURITY-002 introuvable dans la SPEC')
+          spec = spec[:start] + spec[end:]
+          quality_marker = '\nUne modification comportementale ou une release APK est terminée uniquement si :'
+          quality_rule = """
+          - **SEENIT-QUALITY-007** — La synchronisation du code entre AI Studio et GitHub est une
+            responsabilité externe au runtime SeenIt, assurée uniquement par l’intégration GitHub native
+            d’AI Studio. La PWA, l’APK et le backend n’exposent aucune route `/api/git/*`, aucun bouton de
+            pull et aucun script `scripts/pull.sh`. `GITHUB_PAT` reste réservé à la consultation des
+            releases via `/api/update` tant que ce fallback existe.
+          """
+          quality_rule = '\n'.join(line[10:] if line.startswith('          ') else line for line in quality_rule.splitlines()).rstrip() + '\n'
+          if quality_marker not in spec:
+              raise SystemExit('point insertion SEENIT-QUALITY-007 introuvable')
+          spec = spec.replace(quality_marker, '\n' + quality_rule + quality_marker, 1)
+          if 'SEENIT-SECURITY-002' in spec or spec.count('SEENIT-QUALITY-007') != 1:
+              raise SystemExit('SPEC Git incohérente après migration')
+          write(spec_path, spec)
+
+          # Catalogue d’exigences : retrait de l’ancien contrat de protection des routes Git,
+          # remplacement par un contrat d’absence de ces surfaces.
+          requirements_path = Path('docs/specifications/requirements.json')
+          requirements = json.loads(read(requirements_path))
+          reqs = requirements['requirements']
+          if sum(req.get('id') == 'SEENIT-SECURITY-002' for req in reqs) != 1:
+              raise SystemExit('SEENIT-SECURITY-002 absent ou dupliqué dans requirements.json')
+          reqs = [req for req in reqs if req.get('id') not in {'SEENIT-SECURITY-002', 'SEENIT-QUALITY-007'}]
+          new_req = {
+              'id': 'SEENIT-QUALITY-007',
+              'title': 'Synchronisation Git externe au runtime SeenIt',
+              'targets': ['backend', 'pwa', 'apk', 'ci'],
+              'tests': [{
+                  'file': 'tests/apiSurface.test.ts',
+                  'contains': 'SEENIT-QUALITY-007 retire toute synchronisation Git embarquée du runtime SeenIt'
+              }]
+          }
+          insert_at = next((i + 1 for i, req in enumerate(reqs) if req.get('id') == 'SEENIT-QUALITY-006'), len(reqs))
+          reqs.insert(insert_at, new_req)
+          requirements['requirements'] = reqs
+          write(requirements_path, json.dumps(requirements, ensure_ascii=False, indent=2) + '\n')
+
+          # Registre de la décision utilisateur.
+          registry_path = Path('docs/requests/registry.md')
+          registry = read(registry_path).rstrip() + '\n'
+          row = "| USR-2026-09-02-001 | 2026-09-02 | La synchronisation du code SeenIt entre AI Studio et GitHub repose désormais uniquement sur l’intégration native AI Studio ; le pull Git embarqué dans l’application et le backend est supprimé. | `SEENIT-QUALITY-007`, [issue #33](https://github.com/julfou7/seenit-app/issues/33) | active |"
+          if 'USR-2026-09-02-001' not in registry:
+              registry += row + '\n'
+          write(registry_path, registry)
+
+          # Livraison APK complète : la version 1.4.100 est déjà consommée par un commit candidat.
+          gradle_path = Path('android/app/build.gradle')
+          gradle = read(gradle_path)
+          gradle = replace_once(gradle, 'versionCode 104100', 'versionCode 104101', 'versionCode Android')
+          gradle = replace_once(gradle, 'versionName "1.4.100"', 'versionName "1.4.101"', 'versionName Android')
+          write(gradle_path, gradle)
+          PY
+
+          npm run version:sync
+
+          # Garde locale : aucune surface runtime obsolète ne subsiste.
+          ! grep -R -n -E '/api/git/|scripts/pull\.sh|SEENIT_ADMIN_UIDS|gitAdminPolicy' server.ts src .env.example scripts --exclude='sync-app-version.cjs'
+          test -f scripts/sync-app-version.cjs
+          test ! -e scripts/pull.sh
+          test ! -e src/features/admin/gitAdminPolicy.ts
+
+      - name: Classifier le changement
+        run: env -u GITHUB_SHA FORCED_DELIVERY_MODE=auto npm run delivery:classify
+
+      - name: Tests automatisés
+        run: npm test
+
+      - name: Audit dépendances production
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Build Web
+        run: npm run build
+
+      - name: Synchroniser Capacitor Android
+        run: npx cap sync android
+
+      - name: Contrat Android après Capacitor
+        run: npm run test:android
+
+      - name: Commit de l’implémentation validée
+        shell: bash
+        run: |
+          rm .github/workflows/issue-33-cleanup.yml
+
+          git config user.name "julfou7"
+          git config user.email "julianfouillade@gmail.com"
+
+          git add -A -- \
+            .env.example \
+            .github/workflows/issue-33-cleanup.yml \
+            android/app/build.gradle \
+            docs/requests/registry.md \
+            docs/specifications/android-contract.json \
+            docs/specifications/requirements.json \
+            docs/specifications/seenit.md \
+            package.json \
+            package-lock.json \
+            scripts/pull.sh \
+            server.ts \
+            src/features/admin/gitAdminPolicy.ts \
+            src/screens/SettingsScreen.tsx \
+            src/store/updateStore.ts \
+            tests/apiSurface.test.ts \
+            tests/gitAdminPolicy.test.ts
+
+          echo '--- Diff staged ---'
+          git diff --cached --name-status
+          echo '--- Changements non stagés (générés par validation, non livrés) ---'
+          git diff --name-status
+
+          git commit -m "refactor: retire la synchronisation Git embarquée" -m "- supprime pull.sh, les routes Git et leur allowlist dédiée\n- retire la carte GitHub des Réglages PWA/APK\n- confie la synchronisation de code au plugin GitHub natif AI Studio\n- ajoute le contrat SEENIT-QUALITY-007 et livre SeenIt 1.4.101"
+          git push origin HEAD:issue-33-retire-git-sync
