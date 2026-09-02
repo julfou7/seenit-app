@@ -20,7 +20,7 @@ jobs:
           node-version: '22'
           package-manager-cache: false
       - name: Patch Plex unwatch
-        run: python scripts/issue38-patch.py
+        run: python scripts/issue38-patch-v2.py
       - name: Prepare SeenIt 1.4.105
         run: node scripts/sync-app-version.cjs 1.4.105
       - name: Install dependencies
@@ -34,7 +34,7 @@ jobs:
           git diff --check
       - name: Commit candidate
         run: |
-          git rm .github/workflows/issue-38-unwatch-finalize.yml scripts/issue38-patch.py
+          git rm .github/workflows/issue-38-unwatch-finalize.yml scripts/issue38-patch.py scripts/issue38-patch-v2.py
           git config user.name "julfou7"
           git config user.email "julianfouillade@gmail.com"
           git add -A
