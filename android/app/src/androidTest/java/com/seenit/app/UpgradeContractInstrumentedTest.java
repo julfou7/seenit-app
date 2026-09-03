@@ -36,41 +36,14 @@ public class UpgradeContractInstrumentedTest {
         return InstrumentationRegistry.getInstrumentation().getTargetContext();
     }
 
-    @Test
-    public void seedUpgradeState() throws Exception {
-        Context context = targetContext();
-        PackageInfo packageInfo = context.getPackageManager().getPackageInfo(PACKAGE_ID, 0);
-        try (FileOutputStream output = context.openFileOutput(PROBE_FILE, Context.MODE_PRIVATE)) {
-            output.write(PROBE_VALUE.getBytes(StandardCharsets.UTF_8));
-        }
-        SharedPreferences preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        assertTrue(preferences.edit()
-            .putString(SESSION_PROBE, SESSION_VALUE)
-            .putLong("baseline_version_code", packageInfo.getLongVersionCode())
-            .putString("baseline_version_name", packageInfo.versionName)
-            .commit());
-    }
-
-    @Test
-    public void verifyUpgradeStateAndNativeContracts() throws Exception {
-        Context context = targetContext();
+    private void assertNativeContracts(Context context) throws Exception {
         PackageManager packageManager = context.getPackageManager();
         PackageInfo packageInfo = packageManager.getPackageInfo(
             PACKAGE_ID,
             PackageManager.GET_PERMISSIONS
         );
-        SharedPreferences preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
 
         assertEquals(PACKAGE_ID, context.getPackageName());
-        assertTrue(packageInfo.getLongVersionCode() > preferences.getLong("baseline_version_code", -1));
-        assertTrue(!packageInfo.versionName.equals(preferences.getString("baseline_version_name", "")));
-        assertEquals(SESSION_VALUE, preferences.getString(SESSION_PROBE, null));
-
-        byte[] persisted = new byte[PROBE_VALUE.getBytes(StandardCharsets.UTF_8).length];
-        try (FileInputStream input = context.openFileInput(PROBE_FILE)) {
-            assertEquals(persisted.length, input.read(persisted));
-        }
-        assertEquals(PROBE_VALUE, new String(persisted, StandardCharsets.UTF_8));
 
         ApplicationInfo applicationInfo = packageManager.getApplicationInfo(PACKAGE_ID, 0);
         assertEquals("SeenIt", packageManager.getApplicationLabel(applicationInfo).toString());
@@ -95,5 +68,49 @@ public class UpgradeContractInstrumentedTest {
                 context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
             );
         }
+    }
+
+    @Test
+    public void seedUpgradeState() throws Exception {
+        Context context = targetContext();
+        PackageInfo packageInfo = context.getPackageManager().getPackageInfo(PACKAGE_ID, 0);
+        try (FileOutputStream output = context.openFileOutput(PROBE_FILE, Context.MODE_PRIVATE)) {
+            output.write(PROBE_VALUE.getBytes(StandardCharsets.UTF_8));
+        }
+        SharedPreferences preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        assertTrue(preferences.edit()
+            .putString(SESSION_PROBE, SESSION_VALUE)
+            .putLong("baseline_version_code", packageInfo.getLongVersionCode())
+            .putString("baseline_version_name", packageInfo.versionName)
+            .commit());
+    }
+
+    @Test
+    public void verifyUpgradeStateAndNativeContracts() throws Exception {
+        Context context = targetContext();
+        PackageManager packageManager = context.getPackageManager();
+        PackageInfo packageInfo = packageManager.getPackageInfo(PACKAGE_ID, PackageManager.GET_PERMISSIONS);
+        SharedPreferences preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+
+        assertTrue(packageInfo.getLongVersionCode() > preferences.getLong("baseline_version_code", -1));
+        assertTrue(!packageInfo.versionName.equals(preferences.getString("baseline_version_name", "")));
+        assertEquals(SESSION_VALUE, preferences.getString(SESSION_PROBE, null));
+
+        byte[] persisted = new byte[PROBE_VALUE.getBytes(StandardCharsets.UTF_8).length];
+        try (FileInputStream input = context.openFileInput(PROBE_FILE)) {
+            assertEquals(persisted.length, input.read(persisted));
+        }
+        assertEquals(PROBE_VALUE, new String(persisted, StandardCharsets.UTF_8));
+
+        assertNativeContracts(context);
+    }
+
+    @Test
+    public void verifyFreshInstallNativeContracts() throws Exception {
+        Context context = targetContext();
+        SharedPreferences preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        assertEquals(null, preferences.getString(SESSION_PROBE, null));
+        assertTrue(!context.getFileStreamPath(PROBE_FILE).exists());
+        assertNativeContracts(context);
     }
 }
