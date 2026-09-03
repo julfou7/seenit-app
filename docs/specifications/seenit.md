@@ -35,42 +35,47 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 
 ### 2.1 Contrat APK immuable
 
-- **SEENIT-APK-001** — Une mise à jour APK conserve obligatoirement `applicationId=com.seenit.app`,
-  le schéma `com.seenit.app`, le nom SeenIt et la même clé de signature. La clé historique n'est plus
-  suivie dans l'arbre Git courant : `android/app/debug.keystore` est git-ignoré et matérialisé uniquement
-  pour une release depuis le GitHub Secret `SEENIT_ANDROID_KEYSTORE_B64`. Le matérialiseur refuse un
-  secret absent, un Base64 invalide ou des octets dont le SHA-256 diffère de l'empreinte fixée dans
-  `docs/specifications/android-contract.json`; le smoke N → N+1 compare ensuite le certificat réel des
-  APK. Toute rotation de clé nécessite un plan de migration testé sur une installation existante ; elle
-  ne peut jamais être réalisée comme un correctif ordinaire.
+- **SEENIT-APK-001** — L'identité APK conserve obligatoirement `applicationId=com.seenit.app`, le
+  schéma `com.seenit.app`, le nom SeenIt et, après la migration explicitement approuvée du 03/09/2026,
+  la nouvelle clé release dédiée `seenit`. Cette clé PKCS12 n'est jamais suivie dans Git : la CI la
+  matérialise uniquement depuis `SEENIT_ANDROID_RELEASE_KEYSTORE_B64`, vérifie le SHA-256 exact du
+  conteneur et exige les mots de passe fournis par `SEENIT_ANDROID_RELEASE_STORE_PASSWORD` et
+  `SEENIT_ANDROID_RELEASE_KEY_PASSWORD`. Son alias, son type de store et les empreintes SHA-1/SHA-256
+  du certificat sont verrouillés dans `docs/specifications/android-contract.json`. La clé historique
+  reste uniquement un actif de rollback de l'ancien canal et ne signe plus de nouvelle release.
 - **SEENIT-APK-002** — L'icône SeenIt ne peut être supprimée, remplacée ou vidée par une évolution,
   une résolution de conflit ou `cap sync`. Le manifeste conserve les références `ic_launcher` et
   `ic_launcher_round`, toutes les densités Android existent avec leurs dimensions attendues et les
   icônes Web canoniques conservent leur empreinte. Une refonte volontaire doit régénérer toutes les
   densités, mettre à jour le contrat et obtenir une validation visuelle explicite.
 - **SEENIT-APK-003** — Avant toute publication APK, la CI télécharge la dernière release stable
-  strictement antérieure depuis le dépôt SeenIt officiel et vérifie sa paire APK/SHA-256. Sur un
-  émulateur propre correspondant à la cible Android courante, elle installe cette version N, initialise
-  des sentinelles dans le stockage privé de l'application et de session, accorde les notifications si
-  nécessaire, puis installe N+1 avec `adb install -r`, sans désinstallation. Le test compare
-  `applicationId`, signature et versions, puis prouve la conservation des sentinelles, de l'icône,
-  de la permission de notification, du launcher et du deep link. Il exécute enfin démarrage à froid,
-  reprise et Retour et archive les diagnostics. Android 12 reste un TNR de compatibilité explicite,
-  déclenchable manuellement ou périodiquement et recommandé pour tout changement natif à risque ; il
-  n'est pas une seconde matrice bloquante par défaut à chaque release. Aucun compte Google personnel
-  ni service externe privé n'est utilisé par les smokes. La compilation du harnais cible exclusivement
-  le module Gradle `:app` afin de ne pas fabriquer les APK de test des plugins Capacitor. Le préflight
-  extrait chaque métadonnée sans pipeline interrompu et lit les attributs `aapt` par leur nom exact :
-  `name` ne doit notamment jamais correspondre au suffixe de `compileSdkVersionCodename`. Il archive
-  les sorties brutes de `aapt`/`apksigner`, les valeurs package/version/signature et nomme précisément
-  l'invariant fautif avant toute installation.
-- **SEENIT-APK-004** — L'identité Firebase Android est immuable au même titre que l'identité APK.
-  `docs/specifications/android-contract.json` est la source canonique suivie ; `android/app/google-services.json`
-  est git-ignoré et matérialisé de façon déterministe avant les contrôles/builds avec le `project_id`
-  `gen-lang-client-0201895414`, le package `com.seenit.app` et le `mobilesdk_app_id` publié. Une suppression
-  ou régénération AI Studio ne peut donc plus devenir une migration implicite. Le même matérialiseur
-  normalise `android/gradlew` exécutable avant validation/Gradle. Toute modification des valeurs canoniques
-  du contrat reste une migration Firebase Android explicite et testée.
+  strictement antérieure depuis le dépôt SeenIt officiel et vérifie sa paire APK/SHA-256. Le préflight
+  compare package, versions et certificat réel avec `apksigner`. Tant que N et N+1 portent la nouvelle
+  signature, le smoke conserve le parcours normal : installation N, sentinelles de données/session,
+  `adb install -r` de N+1 sans désinstallation, puis preuve de conservation des données, de l'icône,
+  des notifications, du launcher et du deep link. Une seule exception est autorisée pour la bascule
+  depuis la dernière release portant la signature historique : si et seulement si la baseline présente
+  l'empreinte historique verrouillée et la candidate présente exactement la nouvelle empreinte
+  verrouillée, le smoke doit prouver que la mise à jour sur place est refusée par le changement de
+  signature, désinstaller explicitement N, installer N+1 comme installation fraîche et revalider les
+  contrats natifs. Cette branche de migration accepte volontairement la perte du stockage/session local ;
+  elle n'est plus utilisée dès que la baseline officielle porte la nouvelle signature. Tout autre couple
+  de signatures est bloquant. Android 12 reste un TNR de compatibilité explicite, déclenchable manuellement
+  ou périodiquement et recommandé pour tout changement natif à risque ; il n'est pas une seconde matrice
+  bloquante par défaut à chaque release. Aucun compte Google personnel ni service externe privé n'est
+  utilisé par les smokes. La compilation du harnais cible exclusivement le module Gradle `:app` afin de
+  ne pas fabriquer les APK de test des plugins Capacitor. Le préflight archive les sorties brutes de
+  `aapt`/`apksigner`, les valeurs package/version/signature et nomme précisément l'invariant fautif.
+- **SEENIT-APK-004** — L'identité Firebase Android conserve le projet `gen-lang-client-0201895414`, le
+  package `com.seenit.app` et le `mobilesdk_app_id` publié. `docs/specifications/android-contract.json`
+  est la source canonique suivie ; `android/app/google-services.json` est git-ignoré et matérialisé de
+  façon déterministe avant les contrôles/builds. Pendant et après la rotation, le contrat conserve le
+  client OAuth Android historique pour rollback et le nouveau client OAuth Android associé à la nouvelle
+  empreinte SHA-1 ; le nouveau client est l'identité active des APK futures. Le client OAuth Web servant
+  de `default_web_client_id` reste inchangé. Une suppression ou régénération AI Studio ne peut donc plus
+  devenir une migration implicite. Le même matérialiseur normalise `android/gradlew` exécutable avant
+  validation/Gradle. Toute nouvelle modification de ces valeurs canoniques reste une migration Firebase
+  Android explicite et testée.
 - **SEENIT-APK-005** — Le lancement Android n'affiche qu'un seul branding de démarrage : le splash
   animé Web `src/components/SplashScreen.tsx`. Le splash système imposé par Android 12+ reste
   visuellement neutre, avec fond `#040406`, icône transparente et animation native nulle ; il n'est
@@ -341,12 +346,13 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 - Les clés de service TVDB/OMDb/TMDB actuellement nécessaires au client sont considérées comme des
   identifiants exposés : elles ne doivent disposer d'aucun privilège d'écriture. Leur migration vers
   le backend est suivie comme dette de sécurité prioritaire.
-- La clé de signature APK historique est un actif de continuité, pas un secret neuf. Elle n'est plus
-  suivie dans l'arbre Git courant : la CI matérialise exactement les mêmes octets depuis GitHub Secrets
-  et vérifie leur empreinte avant Gradle. Cette externalisation empêche AI Studio de supprimer ou
-  réécrire le fichier courant, mais ne révoque pas l'exposition passée du keystore dans l'historique
-  public. Une véritable rotation de sécurité reste une migration séparée qui doit préserver la mise à
-  jour des APK déjà installés.
+- La clé historique reste archivée uniquement pour rollback de l'ancien canal. Les nouvelles releases
+  utilisent la clé PKCS12 `seenit`, générée hors dépôt et matérialisée depuis GitHub Secrets ; ses octets,
+  son alias, son type et son certificat sont verrouillés par le contrat. Les mots de passe ne sont jamais
+  stockés dans Git, la SPEC, les issues ou les logs. Cette rotation améliore réellement la sécurité car
+  la nouvelle clé n'a jamais été publiée dans l'historique Git. Tant que la première release nouvelle
+  signature n'est pas validée, l'ancienne clé et l'ancien client OAuth restent disponibles uniquement
+  comme rollback.
 - Les logs de production ne contiennent jamais jeton Firebase, Plex, C411, clé *Arr/qBittorrent,
   secret webhook, SID ou payload personnel complet.
 
@@ -384,8 +390,9 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 - Canal backend : une modification exclusivement serveur suit sa validation propre sans bump Android.
 - Canal APK : une correction d'un binaire déjà publié, y compris un rollback logique, est toujours une
   nouvelle version avec `versionCode` supérieur. On ne remplace jamais silencieusement l'asset publié.
-- Le canal personnel actuel publie `assembleDebug` signé par la clé historique afin de préserver les
-  mises à jour sur place. Passer à `assembleRelease` ou à une autre clé est un projet de migration.
+- Le canal personnel continue de publier `assembleDebug`, mais il est désormais signé par la clé release
+  PKCS12 `seenit`. La première APK portant cette clé exige une désinstallation/réinstallation unique de
+  l'ancienne APK ; toutes les versions suivantes se mettent de nouveau à jour sur place avec la même clé.
 - Les versions majeures/minor impliquent une décision produit ; les correctifs ordinaires d'une
   release APK incrémentent le patch.
 
@@ -415,8 +422,8 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 2. quand le lot est prêt, bump Android une seule fois puis `npm run version:sync` ;
 3. obtenir une validation continue verte ;
 4. déclencher manuellement la release depuis `main` ;
-5. matérialiser la clé historique depuis GitHub Secrets, vérifier son empreinte, exécuter `npm run test:android`, build Web, `npx cap sync android`, revalidation Android et Gradle ;
-6. smoke N → N+1 bloquant sur Android cible ; Android 12 optionnel/manual ou périodique ;
+5. matérialiser la clé release PKCS12 depuis les trois GitHub Secrets de signature, vérifier son empreinte et les invariants du contrat, exécuter `npm run test:android`, build Web, `npx cap sync android`, revalidation Android et Gradle ;
+6. exécuter le smoke bloquant Android cible : migration fraîche contrôlée uniquement si la baseline porte encore l'ancienne signature, sinon N → N+1 sur place ; Android 12 optionnel/manual ou périodique ;
 7. publication immuable GitHub de l'APK et du SHA-256 ;
 8. validation terrain de la nouvelle APK.
 
@@ -449,10 +456,11 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   `.agents/AGENTS.md` puis complétées par la lecture intégrale du `AGENTS.md` racine ; les invariants
   critiques restent en plus protégés par des tests afin qu'une omission de lecture ne puisse pas les
   réintroduire silencieusement. Les artefacts Android matérialisés `android/app/google-services.json`
-  et `android/app/debug.keystore` ne sont pas suivis : leurs seules sources canoniques sont respectivement
-  le contrat Android suivi et le secret de release dont l'empreinte est verrouillée. AI Studio ne doit
-  jamais devenir leur source. Les scripts Unix requis au build doivent conserver leur bit exécutable ;
-  une normalisation AI Studio de ces invariants ou des lockfiles est une régression bloquante.
+  et `android/app/seenit-release.p12` ne sont pas suivis : leurs seules sources canoniques sont
+  respectivement le contrat Android suivi et les GitHub Secrets de release dont l'empreinte est
+  verrouillée. AI Studio ne doit jamais devenir leur source. Les scripts Unix requis au build doivent
+  conserver leur bit exécutable ; une normalisation AI Studio de ces invariants ou des lockfiles est
+  une régression bloquante.
 - **SEENIT-QUALITY-006** — Les contrôles sont proportionnés au risque selon la classification de la
   section 12.1 et `docs/process/delivery.md`. Le doute ne réduit jamais les protections critiques :
   un changement non reconnu comme `light` ou `backend` reste `apk`, sans pour autant déclencher une
@@ -473,7 +481,7 @@ Une release APK est terminée uniquement si :
 1. le lot est versionné et toutes les surfaces de `SEENIT-RELEASE-001` sont alignées ;
 2. les tests et le build sont verts ;
 3. `cap sync android` et le contrat Android passent ;
-4. le smoke Android cible N → N+1 est vert ;
+4. le smoke Android cible valide soit la bascule fraîche historique → nouvelle signature, soit N → N+1 sur place entre deux APK portant la nouvelle signature ;
 5. l'APK et son SHA-256 sont publiés immuablement ;
 6. les TNR terrain nécessaires sont exécutés, notamment Android 12 pour un changement natif à risque.
 
@@ -505,8 +513,10 @@ l'identité de l'APK et ses actifs.
 - Tester une annulation active, un échec distant et deux téléchargements simultanés.
 - Parcourir les cartes et dialogues au clavier en PWA, puis avec TalkBack dans l'APK.
 - Vérifier l'ouverture de l'élément exact dans Plex Android, puis le fallback Web.
-- Installer la nouvelle version par-dessus l'APK précédente et confirmer que compte, données,
-  icône du lanceur, raccourci, notifications et deep links sont conservés.
+- Pour la première APK nouvelle signature, désinstaller l'ancienne APK, installer la nouvelle puis se
+  reconnecter ; confirmer que les données Firestore du même UID réapparaissent. À partir de la release
+  suivante, installer N+1 par-dessus N et confirmer que compte, données locales, icône, raccourci,
+  notifications et deep links sont conservés.
 - **TNR lancement Android — mono-splash :** sur un démarrage à froid après mise à jour N → N+1,
   enregistrer l'écran et confirmer qu'aucun logo SeenIt natif/statique distinct n'apparaît avant
   l'animation `SplashScreen.tsx`, qu'aucun flash blanc/noir intermédiaire n'est visible et que le fond
@@ -518,14 +528,3 @@ l'identité de l'APK et ses actifs.
   `npm run test:android`.
 - Démarrer l'APK à froid, le reprendre après veille, tester Retour depuis chaque niveau puis vérifier
   qu'aucun listener ou téléchargement n'est dupliqué.
-
-
-### **SEENIT-AUTH-001** — Connexion Google native Android via Credential Manager
-
-- Dans l'APK Android, le bouton **Continuer avec Google** utilise en priorité Android Credential Manager / Sign in with Google afin d'afficher le sélecteur de comptes Google natif, selon le même parcours que l'application ATHIA.
-- Le client OAuth est lu depuis `default_web_client_id` généré par le `google-services.json` canonique de `com.seenit.app`; aucun nouvel identifiant utilisateur SeenIt n'est créé par la couche native.
-- Le Google ID token obtenu n'est qu'un transport : il est échangé via `GoogleAuthProvider.credential(...)` puis `signInWithCredential(...)` dans le Firebase Web SDK déjà utilisé par SeenIt, afin de conserver le même Firebase UID et les mêmes données Firestore pour les comptes existants.
-- `setFilterByAuthorizedAccounts(false)` permet une reconnexion / un nouveau consentement lorsque nécessaire et `setAutoSelectEnabled(false)` conserve un choix explicite du compte.
-- Une annulation utilisateur du sélecteur est une sortie normale et ne doit afficher aucune erreur bloquante.
-- Si Credential Manager est indisponible ou échoue pour une raison de compatibilité, l'ancien flux natif Google Auth reste un fallback; la PWA conserve `signInWithPopup`.
-- TNR : toute régression vers le flux legacy comme parcours Android primaire, ou toute rupture de l'échange vers le Firebase UID existant, est interdite.
