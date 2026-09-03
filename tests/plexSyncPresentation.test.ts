@@ -13,9 +13,10 @@ test('SEENIT-UX-004 la synchronisation Plex affiche une phase réelle et la dur�
   assert.equal(formatPlexWaitingStatus(false, 135_000), 'Scan complet Plex • inventaire des bibliothèques • 2 min 15 s');
 });
 
-test('SEENIT-UX-004 le bilan Plex affiche serveurs scannés, vus et dé-vus sans serveur ignoré', () => {
+test('SEENIT-UX-004 le bilan Plex affiche serveurs scannés, vus et non vus sans serveur ignoré', () => {
   const summary = formatPlexCompletionSummary(1, 10, 2);
 
-  assert.equal(summary, 'Synchronisation Plex terminée • 1 serveur scanné • 10 vus • 2 dé-vu');
+  assert.equal(summary, 'Synchronisation Plex terminée • 1 serveur scanné • 10 vus • 2 non vus');
   assert.doesNotMatch(summary, /ignor/i);
+  assert.doesNotMatch(summary, /dé-vu|non-vu/i);
 });
