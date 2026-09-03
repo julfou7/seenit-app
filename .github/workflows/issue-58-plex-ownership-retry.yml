@@ -1,0 +1,65 @@
+name: Issue 58 - Plex progress ownership retry
+
+on:
+  push:
+    branches: [ fix/plex-progress-ownership-58 ]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Réappliquer le patch #58
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path('.github/workflows/issue-58-plex-ownership.yml').read_text().splitlines()
+          out = []
+          active = False
+          for line in source:
+              if line.strip() == "python <<'PY'":
+                  active = True
+                  continue
+              if active and line.strip() == 'PY':
+                  break
+              if active:
+                  out.append(line[10:] if line.startswith('          ') else line)
+          Path('/tmp/issue58.py').write_text('\n'.join(out) + '\n')
+          PY
+          python /tmp/issue58.py
+          node scripts/sync-app-version.cjs
+          rm .github/workflows/issue-58-plex-ownership.yml
+          rm .github/workflows/issue-58-plex-ownership-retry.yml
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(plex): borne le dé-vu aux progressions Plex" -m "- protège les vues manuelles et legacy par provenance explicite\n- supprime les faux dé-vu issus du seul miroir plexWatchState\n- filtre watched=false pour les clients antérieurs à 1.4.111\n- aligne SPEC, TNR et candidate 1.4.111"
+
+      - name: Installer les dépendances
+        run: npm ci --legacy-peer-deps
+
+      - name: Valider le correctif sensible Plex
+        run: |
+          GITHUB_SHA="$(git rev-parse HEAD)" DELIVERY_MODE=apk SPEC_BASE_SHA="$(git rev-parse origin/main)" npm run test:spec:changes
+          npm run test:spec
+          npm run lint
+          npm run test:unit
+          npm run test:android
+          npm run build
+
+      - name: Pousser le correctif validé
+        run: git push origin HEAD:fix/plex-progress-ownership-58
