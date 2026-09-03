@@ -121,10 +121,12 @@ jobs:
       - name: Install Dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Materialize Historical Android Keystore
+      - name: Materialize SeenIt Release Keystore
         run: node scripts/materialize-android-keystore.cjs
         env:
-          SEENIT_ANDROID_KEYSTORE_B64: ${{ secrets.SEENIT_ANDROID_KEYSTORE_B64 }}
+          SEENIT_ANDROID_RELEASE_KEYSTORE_B64: ${{ secrets.SEENIT_ANDROID_RELEASE_KEYSTORE_B64 }}
+          SEENIT_ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.SEENIT_ANDROID_RELEASE_STORE_PASSWORD }}
+          SEENIT_ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.SEENIT_ANDROID_RELEASE_KEY_PASSWORD }}
 
       - name: Resolve Previous Published Release Baseline
         id: release_baseline
@@ -162,6 +164,8 @@ jobs:
           npm run test:android
         env:
           SEENIT_REQUIRE_ANDROID_KEYSTORE: 'true'
+          SEENIT_ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.SEENIT_ANDROID_RELEASE_STORE_PASSWORD }}
+          SEENIT_ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.SEENIT_ANDROID_RELEASE_KEY_PASSWORD }}
 
       - name: Validate Unpublished Release Version
         id: release_candidate
@@ -193,6 +197,8 @@ jobs:
         run: npm run test:android
         env:
           SEENIT_REQUIRE_ANDROID_KEYSTORE: 'true'
+          SEENIT_ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.SEENIT_ANDROID_RELEASE_STORE_PASSWORD }}
+          SEENIT_ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.SEENIT_ANDROID_RELEASE_KEY_PASSWORD }}
 
       - name: Restore Gradle Wrapper Executable Permission
         run: chmod +x android/gradlew
@@ -201,6 +207,10 @@ jobs:
         run: |
           cd android
           ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
+        env:
+          SEENIT_REQUIRE_ANDROID_KEYSTORE: 'true'
+          SEENIT_ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.SEENIT_ANDROID_RELEASE_STORE_PASSWORD }}
+          SEENIT_ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.SEENIT_ANDROID_RELEASE_KEY_PASSWORD }}
 
       - name: Prepare Named APK
         run: |
