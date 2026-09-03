@@ -229,6 +229,14 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   un non vu. Les clients antérieurs au protocole de provenance sûre ne reçoivent pas d’états
   `watched=false`. L’écriture Firestore applique uniquement les mutations Plex réellement possédées afin
   de ne jamais écraser une action SeenIt ou tierce.
+- **SEENIT-PLEX-007** — Le mode DELTA expose dans les journaux techniques visibles un diagnostic
+  borné et non sensible permettant d'expliquer un non-vu non appliqué : taille de la baseline précédente
+  et du snapshot courant, complétude des serveurs, nombre d'identités non résolues, candidats disparus,
+  blocages, rechecks exacts et états `watched=false` produits. Le snapshot courant détaille les
+  `ratingKey` et identifiants techniques utiles au diagnostic afin de comparer deux passages successifs.
+  Les URL Plex, jetons, en-têtes d'authentification et UID complets ne sont jamais inclus ; les identifiants
+  de serveur sont abrégés. Ce diagnostic n'altère aucune décision de synchronisation et ne crée aucun
+  rapprochement par titre ou année.
 - Le full scan est paginé. Un inventaire partiel ne remplace pas un cache complet, sauf si au
   moins un inventaire serveur complet et exploitable a été obtenu conformément à la politique.
 - La déduplication finale utilise `movie:<tmdbId>` ou
