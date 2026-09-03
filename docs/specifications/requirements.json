@@ -115,6 +115,13 @@
         {"file":"tests/plexDeltaUnwatchSnapshot.test.ts","contains":"SEENIT-PLEX-006 la delta ne transforme jamais une absence ou un serveur ignoré en non vu"}
       ]
     },
+    {
+      "id":"SEENIT-PLEX-007","title":"Diagnostic DELTA visible, détaillé et non sensible","targets":["backend","pwa","apk"],"tests":[
+        {"file":"tests/plexDeltaDiagnostics.test.ts","contains":"SEENIT-PLEX-007 détaille la baseline, le snapshot courant et le verrou du non vu DELTA"},
+        {"file":"tests/plexDeltaDiagnostics.test.ts","contains":"SEENIT-PLEX-007 trace les watched=false reçus sans exposer URL, token ou UID"},
+        {"file":"tests/plexDeltaDiagnostics.test.ts","contains":"SEENIT-PLEX-007 la PWA écrit chaque ligne du diagnostic backend dans AppLog"}
+      ]
+    },
     {"id":"SEENIT-SECURITY-001","title":"Allowlist minimale du proxy de services","targets":["backend","pwa"],"tests":[{"file":"tests/downloadBackendSecurity.test.ts","contains":"le proxy n’accepte que les chemins Sonarr Radarr et qBittorrent nécessaires"}]},
     {"id":"SEENIT-SECURITY-003","title":"Secrets masqués avant persistance des logs","targets":["pwa","apk","backend"],"tests":[{"file":"tests/logPrivacy.test.ts","contains":"SEENIT-SECURITY-003 masque les secrets avant de persister un journal"}]},
     {"id":"SEENIT-C411-001","title":"Filtres C411 exacts et année non dupliquée","targets":["backend","pwa","apk"],"tests":[{"file":"tests/c411Query.test.ts","contains":"le filtre C411 Tous ne devient jamais Film implicitement"},{"file":"tests/c411Query.test.ts","contains":"l’année C411 est utilisée une seule fois dans la recherche"}]},

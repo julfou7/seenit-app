@@ -1,5 +1,6 @@
 import { auth } from './firebase';
 import { CURRENT_APP_VERSION } from '../store/updateStore';
+import { appLogger } from '../store/logStore';
 import {
   isSeenItApiRequest,
   isUnexpectedHtmlApiResponse,
@@ -29,6 +30,40 @@ export async function getAuthenticatedHeaders(
   return Object.fromEntries(normalizedHeaders.entries());
 }
 
+function isPlexDeltaHistoryRequest(input: string | null, init: RequestInit): boolean {
+  if (!input || !/\/api\/plex\/history(?:$|[?#])/i.test(input)) return false;
+  if (String(init.method || 'GET').toUpperCase() !== 'POST') return false;
+  if (typeof init.body !== 'string') return false;
+  try {
+    return JSON.parse(init.body)?.delta === true;
+  } catch {
+    return false;
+  }
+}
+
+async function logPlexDeltaDiagnostics(
+  originalInput: string | null,
+  init: RequestInit,
+  response: Response
+): Promise<void> {
+  if (!response.ok || !isPlexDeltaHistoryRequest(originalInput, init)) return;
+  try {
+    const payload = await response.clone().json();
+    const lines = Array.isArray(payload?.deltaDiagnostics)
+      ? payload.deltaDiagnostics.filter((line: unknown) => typeof line === 'string' && line.trim()).slice(0, 180)
+      : [];
+    if (lines.length === 0) {
+      appLogger.warn('plex', '[Plex Delta Debug] Aucun diagnostic détaillé renvoyé par le backend.');
+      return;
+    }
+    appLogger.info('plex', `[Plex Delta Debug] ===== DIAGNOSTIC DELTA (${lines.length} ligne(s)) =====`);
+    lines.forEach((line: string) => appLogger.info('plex', `[Plex Delta Debug] ${line}`));
+    appLogger.info('plex', '[Plex Delta Debug] ===== FIN DIAGNOSTIC DELTA =====');
+  } catch (error: any) {
+    appLogger.warn('plex', `[Plex Delta Debug] Diagnostic illisible : ${String(error?.name || 'PARSE_FAILED').slice(0, 60)}.`);
+  }
+}
+
 export async function authenticatedFetch(
   input: RequestInfo | URL,
   init: RequestInit = {}
@@ -53,5 +88,6 @@ export async function authenticatedFetch(
     throw error;
   }
 
+  await logPlexDeltaDiagnostics(originalString, init, response);
   return response;
 }
