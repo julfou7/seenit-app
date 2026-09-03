@@ -324,6 +324,101 @@ async function buildPlexDeltaWatchedLocator(params: {
   }])[0] || null;
 }
 
+/**
+ * Le full et la lecture PMS exacte n'expriment pas toujours le zéro de la même façon :
+ * un média non-vu peut simplement ne plus avoir de champ viewCount. Ce fallback n'est
+ * autorisé qu'après relecture du ratingKey exact d'un locator précédemment vu ; il ne
+ * transforme donc jamais un 404, un timeout ou une simple absence de snapshot en dé-vu.
+ */
+export function buildPlexDeltaAuthoritativeWatchState(
+  locator: PlexDeltaWatchedLocator,
+  rawMetadata: unknown
+): PlexLibraryWatchState | null {
+  const explicitState = buildExplicitPlexDeltaWatchState(locator, rawMetadata);
+  if (explicitState) return explicitState;
+  if (!rawMetadata || typeof rawMetadata !== 'object') return null;
+
+  const metadata = unwrapPlexMediaItem(rawMetadata);
+  const responseRatingKey = getPlexMetadataLookupKey(metadata);
+  if (!responseRatingKey || responseRatingKey !== locator.ratingKey) return null;
+
+  const hasViewCountField = Object.prototype.hasOwnProperty.call(metadata, 'viewCount')
+    || Object.prototype.hasOwnProperty.call(metadata, 'view_count');
+  // Un champ présent mais invalide reste indéterminé. Seule son omission sur l'objet
+  // technique exact est le codage PMS du zéro que le full interprète déjà comme non-vu.
+  if (hasViewCountField) return null;
+
+  return locator.mediaType === 'movie'
+    ? {
+        mediaType: 'movie',
+        tmdbId: locator.tmdbId,
+        watched: false,
+        serverId: locator.serverId
+      }
+    : {
+        mediaType: 'episode',
+        tmdbId: locator.tmdbId,
+        seasonNumber: locator.seasonNumber!,
+        episodeNumber: locator.episodeNumber!,
+        watched: false,
+        serverId: locator.serverId
+      };
+}
+
+/**
+ * Un full complet sert aussi de baseline à la delta suivante. On ne conserve que les
+ * entrées `library-watched` munies d'une identité technique suffisante ; jamais un titre.
+ * Une collecte partielle/avec serveur ignoré ne remplace pas une baseline antérieure.
+ */
+export function buildPlexFullWatchedDeltaBaseline(payload: any): PlexDeltaWatchedLocator[] | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const integrity = payload.integrity && typeof payload.integrity === 'object' ? payload.integrity : null;
+  if (!integrity || integrity.libraryInventoryScanComplete !== true) return null;
+  if (!Array.isArray(integrity.syncedServers) || integrity.syncedServers.length === 0) return null;
+  if (!Array.isArray(integrity.skippedServers) || integrity.skippedServers.length > 0) return null;
+
+  const history = Array.isArray(payload.history) ? payload.history : [];
+  const locators: PlexDeltaWatchedLocator[] = [];
+
+  for (const rawItem of history) {
+    const item = unwrapPlexMediaItem(rawItem);
+    if (item?.sourceKind !== 'library-watched') continue;
+
+    const serverId = String(item?.serverId || item?.serverIdentifier || '').trim();
+    const ratingKey = getPlexMetadataLookupKey(item);
+    if (!serverId || !ratingKey) continue;
+
+    const mediaType = String(item?.type || '').toLowerCase();
+    if (mediaType === 'movie') {
+      const tmdbId = extractPlexExternalIds(item).tmdbId;
+      if (!tmdbId) continue;
+      locators.push({ serverId, ratingKey, mediaType: 'movie', tmdbId });
+      continue;
+    }
+
+    const isEpisode = mediaType === 'episode' || item?.grandparentTitle || item?.parentTitle;
+    if (!isEpisode) continue;
+    const seasonNumber = Number(item?.parentIndex);
+    const episodeNumber = Number(item?.index);
+    if (!Number.isInteger(seasonNumber) || seasonNumber < 0 || !Number.isInteger(episodeNumber) || episodeNumber <= 0) {
+      continue;
+    }
+    const parentIdentity = buildPlexParentShowIdentityItem({ ...item, serverId });
+    const tmdbId = extractPlexExternalIds(parentIdentity).tmdbId;
+    if (!tmdbId) continue;
+    locators.push({
+      serverId,
+      ratingKey,
+      mediaType: 'episode',
+      tmdbId,
+      seasonNumber,
+      episodeNumber
+    });
+  }
+
+  return sanitizePlexDeltaWatchedLocators(locators);
+}
+
 interface PlexDeltaServerSnapshotResult {
   items: any[];
   locators: PlexDeltaWatchedLocator[];
@@ -484,7 +579,7 @@ async function collectPlexDeltaWatchedSnapshot(req: any): Promise<PlexDeltaSnaps
           6000
         );
         const metadata = readPlexItems(metadataPayload)[0] || null;
-        const state = buildExplicitPlexDeltaWatchState(locator, metadata);
+        const state = buildPlexDeltaAuthoritativeWatchState(locator, metadata);
         if (state?.watched !== false) return;
         confirmedUnwatched.add(getPlexDeltaWatchedLocatorKey(locator));
         explicitStates.push(state);
@@ -593,15 +688,32 @@ export function mergePlexDeltaWatchedSnapshot(payload: any, snapshot: PlexDeltaS
 }
 
 async function enrichPlexDeltaResponse(req: any, body: any): Promise<any> {
-  if (req.body?.delta !== true) return body;
-  try {
-    const snapshot = await collectPlexDeltaWatchedSnapshot(req);
-    return mergePlexDeltaWatchedSnapshot(body, snapshot);
-  } catch (error: any) {
-    const code = String(error?.code ?? error?.name ?? 'PLEX_DELTA_SNAPSHOT_FAILED').slice(0, 80);
-    console.warn('[Plex Delta Snapshot]', { code });
-    return body;
+  if (req.body?.delta === true) {
+    try {
+      const snapshot = await collectPlexDeltaWatchedSnapshot(req);
+      return mergePlexDeltaWatchedSnapshot(body, snapshot);
+    } catch (error: any) {
+      const code = String(error?.code ?? error?.name ?? 'PLEX_DELTA_SNAPSHOT_FAILED').slice(0, 80);
+      console.warn('[Plex Delta Snapshot]', { action: 'delta', code });
+      return body;
+    }
   }
+
+  // Un full complet donne une baseline immédiate au premier delta suivant. Cette
+  // persistance est un miroir technique non destructif ; une collecte partielle ne
+  // remplace jamais la dernière baseline connue.
+  try {
+    const uid = String(req.user?.uid || '').trim();
+    const baseline = buildPlexFullWatchedDeltaBaseline(body);
+    if (uid && baseline) {
+      await persistPlexDeltaWatchedSnapshot(uid, baseline);
+      console.log('[Plex Delta Snapshot]', { action: 'seed-full', items: baseline.length });
+    }
+  } catch (error: any) {
+    const code = String(error?.code ?? error?.name ?? 'PLEX_FULL_SNAPSHOT_SEED_FAILED').slice(0, 80);
+    console.warn('[Plex Delta Snapshot]', { action: 'seed-full', code });
+  }
+  return body;
 }
 
 function installPlexWatchEvidenceResponseGuard(app: Application): void {
