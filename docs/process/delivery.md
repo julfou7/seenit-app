@@ -143,11 +143,11 @@ uniquement de la baseline officielle :
 Dès qu'une release officielle avec la nouvelle signature existe, la branche de migration n'est plus
 éligible et toutes les releases suivantes doivent repasser par la mise à jour sur place normale.
 
-Pour éviter de payer un cold boot complet à chaque release, l'AVD Android 36 et son snapshot propre
-sont mis en cache entre les runs. Le snapshot n'est généré qu'en cas de cache miss ; le smoke bloquant
-réutilise ensuite cet AVD avec `force-avd-creation: false` et `-no-snapshot-save`. Cette optimisation ne
-change ni la baseline N, ni l'APK N+1, ni les assertions du TNR : elle ne fait qu'éviter de recréer
-l'environnement virtuel déjà validé.
+Le smoke Android 36 privilégie la fiabilité à l'optimisation : chaque release recrée un AVD propre
+(`force-avd-creation: true`) et ne réutilise aucun snapshot ou cache `~/.android/avd`. Le cache AVD
+introduit pour v1.4.108 a été retiré après la release v1.4.112 bloquée par un snapshot devenu instable
+alors que toutes les assertions SeenIt avaient déjà passé. Le coût supplémentaire de création de
+l'émulateur est accepté afin d'éviter qu'un état virtuel obsolète bloque une publication sans défaut APK.
 
 ## Gestion et récupération des clés de signature
 
