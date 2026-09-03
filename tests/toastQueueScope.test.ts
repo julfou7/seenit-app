@@ -33,6 +33,15 @@ test('SEENIT-UX-004 le bilan Plex conserve uniquement les serveurs scannés et c
   );
   assert.doesNotMatch(message, /ignor/i);
   assert.doesNotMatch(message, /Serveur A|Serveur B/);
+
+  assert.equal(
+    buildPlexCompletionMessage('Synchronisation Plex terminée • 1 serveur scanné', 1, 0),
+    'Synchronisation Plex terminée • 1 serveur scanné • 1 vu • 0 non vus'
+  );
+  assert.equal(
+    buildPlexCompletionMessage('Synchronisation Plex terminée • 2 serveurs scannés', 0, 1),
+    'Synchronisation Plex terminée • 2 serveurs scannés • 0 vus • 1 non vu'
+  );
 });
 
 test('SEENIT-UX-004 les anciens libellés Plex sont affichés uniquement comme non vu', () => {
