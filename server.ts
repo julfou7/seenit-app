@@ -44,6 +44,17 @@ export interface AuthRequest extends Request {
   user?: DecodedIdToken;
 }
 
+export function supportsPlexOwnedUnwatch(rawVersion: unknown): boolean {
+  const match = String(rawVersion || '').trim().match(/^(\d+)\.(\d+)\.(\d+)$/);
+  if (!match) return false;
+  const major = Number(match[1]);
+  const minor = Number(match[2]);
+  const patch = Number(match[3]);
+  return major > 1
+    || (major === 1 && minor > 4)
+    || (major === 1 && minor === 4 && patch >= 111);
+}
+
 
 export const requireAuth = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
@@ -560,7 +571,7 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.110',
+        'X-Plex-Version': '1.4.111',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
@@ -2044,7 +2055,11 @@ async function startServer() {
         });
       }
 
-      const normalizedLibraryWatchStates = delta ? [] : mergePlexLibraryWatchStates(libraryWatchStateItems);
+      const allNormalizedLibraryWatchStates = delta ? [] : mergePlexLibraryWatchStates(libraryWatchStateItems);
+      const supportsSafeUnwatch = supportsPlexOwnedUnwatch(req.get('X-Plex-Version'));
+      const normalizedLibraryWatchStates = supportsSafeUnwatch
+        ? allNormalizedLibraryWatchStates
+        : allNormalizedLibraryWatchStates.filter(state => state.watched !== false);
 
       const stats = {
         ...sourceStats,

@@ -1122,7 +1122,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               episodeRecords[epKey] = {
                 watchedAt: viewedTimestamp,
                 episodeTitle: item.title || null,
-                ...(episodeRecords[epKey] || {})
+                ...(episodeRecords[epKey] || {}),
+                plexImported: true
               };
 
               showData.seenEpisodes = seenEpisodes;
@@ -1175,7 +1176,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               firstAirDate: tmdbData.first_air_date || '',
               networks: [],
               seenEpisodes: [epKey],
-              episodeRecords: { [epKey]: { watchedAt: viewedTimestamp, episodeTitle: item.title || null } },
+              episodeRecords: { [epKey]: { watchedAt: viewedTimestamp, episodeTitle: item.title || null, plexImported: true } },
               isArchived: false
             };
 
@@ -1257,7 +1258,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               const episodeRecords = { ...(showData.episodeRecords || {}) };
               episodeRecords['movie'] = {
                 watchedAt: viewedTimestamp,
-                ...(episodeRecords['movie'] || {})
+                ...(episodeRecords['movie'] || {}),
+                plexImported: true
               };
 
               showData.seenEpisodes = seenEpisodes;
@@ -1306,7 +1308,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               firstAirDate: tmdbData.release_date || '',
               networks: [],
               seenEpisodes: ['movie'],
-              episodeRecords: { movie: { watchedAt: viewedTimestamp } },
+              episodeRecords: { movie: { watchedAt: viewedTimestamp, plexImported: true } },
               isArchived: false
             };
 
@@ -1343,9 +1345,13 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           const result = applyPlexLibraryWatchState(current, state);
           if (!result.changed) continue;
 
+          // Le miroir technique plexWatchState peut évoluer sans modifier la progression.
+          // On le persiste, mais seul un retrait réellement possédé par Plex est un dé-vu métier.
           mutatedShows[matched.id] = result.show;
           const listIndex = showsList.findIndex(show => show.id === matched.id);
           if (listIndex >= 0) showsList[listIndex] = result.show;
+          if (!result.unwatchApplied) continue;
+
           unwatchedCount++;
           syncCount++;
           if (mediaType === 'movie') moviesCount++;
