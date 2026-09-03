@@ -25,3 +25,6 @@ android/*.zip
 
 # Généré depuis docs/specifications/android-contract.json ; AI Studio ne le transporte pas.
 android/app/google-services.json
+
+# Matérialisé uniquement en release depuis SEENIT_ANDROID_KEYSTORE_B64.
+android/app/debug.keystore
