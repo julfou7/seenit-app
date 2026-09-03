@@ -32,5 +32,5 @@ export function formatPlexCompletionSummary(
   const unwatched = Math.max(0, Number(unwatchedCount) || 0);
 
   return `Synchronisation Plex terminée • ${servers} ${plural(servers, 'serveur')} ${plural(servers, 'scanné')} • ` +
-    `${watched} ${plural(watched, 'vu')} • ${unwatched} dé-vu`;
+    `${watched} ${plural(watched, 'vu')} • ${unwatched} ${plural(unwatched, 'non vu', 'non vus')}`;
 }
