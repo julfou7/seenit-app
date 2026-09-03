@@ -40,9 +40,31 @@ test('SEENIT-APK-004 protège l’identité Firebase Android canonique généré
   assert.ok(contract.generatedFiles.includes('android/app/google-services.json'));
   assert.equal(contract.requiredFiles.includes('android/app/google-services.json'), false);
   assert.equal(googleServices.project_info.project_id, contract.firebase.projectId);
-  const client = googleServices.client.find((item: any) => item?.client_info?.android_client_info?.package_name === contract.firebase.androidPackageName);
+  const client = googleServices.client.find((item: any) =>
+    item?.client_info?.android_client_info?.package_name === contract.firebase.androidPackageName
+  );
   assert.ok(client, 'le client Firebase Android SeenIt doit être matérialisé');
   assert.equal(client.client_info.mobilesdk_app_id, contract.firebase.androidMobileSdkAppId);
+
+  const androidOauth = client.oauth_client.filter((item: any) => item.client_type === 1);
+  assert.equal(contract.firebase.androidOauthClients.length, 2);
+  for (const expected of contract.firebase.androidOauthClients) {
+    assert.ok(
+      androidOauth.some((item: any) =>
+        item.client_id === expected.clientId
+        && item.android_info?.certificate_hash === expected.certificateHash
+        && item.android_info?.package_name === contract.firebase.androidPackageName
+      ),
+      `client OAuth Android manquant pour ${expected.certificateHash}`
+    );
+  }
+  const active = contract.firebase.androidOauthClients.find((item: any) => item.role === 'active');
+  assert.ok(active);
+  assert.equal(active.clientId, contract.firebase.activeAndroidOauthClientId);
+  assert.equal(active.certificateHash, contract.firebase.activeAndroidCertificateHash);
+  assert.ok(client.oauth_client.some((item: any) =>
+    item.client_type === 3 && item.client_id === contract.firebase.webOauthClientId
+  ));
 });
 
 test('SEENIT-QUALITY-005 traite AI Studio comme un transport non autoritatif', () => {
@@ -62,11 +84,13 @@ test('SEENIT-QUALITY-005 matérialise Firebase Android et répare les droits Gra
   const gitignore = read('.gitignore');
 
   assert.equal(fs.existsSync('android/app/google-services.json'), true, 'google-services.json doit être généré');
-  assert.match(gitignore, /android\/app\/debug\.keystore/);
-  assert.ok(contract.generatedFiles.includes('android/app/debug.keystore'));
-  assert.equal(contract.requiredFiles.includes('android/app/debug.keystore'), false);
+  assert.match(gitignore, /android\/app\/seenit-release\.p12/);
+  assert.ok(contract.generatedFiles.includes('android/app/seenit-release.p12'));
+  assert.equal(contract.requiredFiles.includes('android/app/seenit-release.p12'), false);
   assert.equal(contract.signing.source, 'github-secret');
-  assert.equal(contract.signing.secretName, 'SEENIT_ANDROID_KEYSTORE_B64');
+  assert.equal(contract.signing.secretName, 'SEENIT_ANDROID_RELEASE_KEYSTORE_B64');
+  assert.equal(contract.signing.storePasswordSecretName, 'SEENIT_ANDROID_RELEASE_STORE_PASSWORD');
+  assert.equal(contract.signing.keyPasswordSecretName, 'SEENIT_ANDROID_RELEASE_KEY_PASSWORD');
 
   if (process.platform !== 'win32') {
     assert.notEqual(fs.statSync('android/gradlew').mode & 0o111, 0, 'le matérialiseur doit rendre android/gradlew exécutable');
