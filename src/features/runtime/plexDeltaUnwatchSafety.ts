@@ -1,5 +1,7 @@
 import {
+  buildPlexParentShowIdentityItem,
   getPlexMetadataLookupKey,
+  getStrongPlexSourceIdentity,
   unwrapPlexMediaItem
 } from '../plex/plexIdentity.ts';
 import type { PlexDeltaWatchedLocator } from '../plex/plexDeltaUnwatch.ts';
@@ -8,8 +10,42 @@ export interface PlexDeltaUnresolvedWatchedItem {
   serverId: string;
   ratingKey: string;
   mediaType: 'movie' | 'episode';
+  strongIdentity?: string;
   seasonNumber?: number;
   episodeNumber?: number;
+}
+
+function getComparableStrongIdentity(rawItem: unknown, mediaType: 'movie' | 'episode', serverId: string): string | undefined {
+  const item = unwrapPlexMediaItem(rawItem);
+  const identityItem = mediaType === 'episode'
+    ? buildPlexParentShowIdentityItem({ ...item, serverId, serverIdentifier: serverId })
+    : { ...item, serverId, serverIdentifier: serverId };
+  const identity = getStrongPlexSourceIdentity(identityItem);
+
+  // serverId + ratingKey est une excellente identité technique pour recontrôler un objet,
+  // mais deux copies du même média peuvent avoir des ratingKey différents. Ce fallback ne
+  // permet donc jamais, à lui seul, de prouver que deux médias sont différents.
+  if (!identity || identity.startsWith('server:')) return undefined;
+  return identity;
+}
+
+function getLocatorComparableStrongIdentity(locator: PlexDeltaWatchedLocator): string | undefined {
+  const resolutionKey = String(locator.resolutionKey || '').replace(/^(?:movie|tv):/, '');
+  if (/^(?:tmdb|imdb|tvdb|plex):/i.test(resolutionKey)) return resolutionKey.toLowerCase();
+  return undefined;
+}
+
+function strongIdentitiesProveDifferent(
+  locator: PlexDeltaWatchedLocator,
+  unresolved: PlexDeltaUnresolvedWatchedItem
+): boolean {
+  const locatorIdentity = getLocatorComparableStrongIdentity(locator);
+  const unresolvedIdentity = unresolved.strongIdentity?.toLowerCase();
+  if (!locatorIdentity || !unresolvedIdentity) return false;
+
+  const locatorScheme = locatorIdentity.split(':', 1)[0];
+  const unresolvedScheme = unresolvedIdentity.split(':', 1)[0];
+  return locatorScheme === unresolvedScheme && locatorIdentity !== unresolvedIdentity;
 }
 
 export function buildPlexDeltaUnresolvedWatchedItem(
@@ -22,8 +58,15 @@ export function buildPlexDeltaUnresolvedWatchedItem(
   const normalizedServerId = String(serverId || '').trim();
   if (!normalizedServerId || !ratingKey) return null;
 
+  const strongIdentity = getComparableStrongIdentity(item, mediaType, normalizedServerId);
+
   if (mediaType === 'movie') {
-    return { serverId: normalizedServerId, ratingKey, mediaType: 'movie' };
+    return {
+      serverId: normalizedServerId,
+      ratingKey,
+      mediaType: 'movie',
+      ...(strongIdentity ? { strongIdentity } : {})
+    };
   }
 
   const seasonNumber = Number(item?.parentIndex);
@@ -32,6 +75,7 @@ export function buildPlexDeltaUnresolvedWatchedItem(
     serverId: normalizedServerId,
     ratingKey,
     mediaType: 'episode',
+    ...(strongIdentity ? { strongIdentity } : {}),
     ...(Number.isInteger(seasonNumber) && seasonNumber >= 0 ? { seasonNumber } : {}),
     ...(Number.isInteger(episodeNumber) && episodeNumber > 0 ? { episodeNumber } : {})
   };
@@ -48,9 +92,9 @@ export function isPlexDeltaWatchedQueryTechnicallyComplete(watchedItems: unknown
 
 /**
  * Un vu non résolu ne bloque que le candidat qu'il pourrait réellement concurrencer.
- * On ne rapproche jamais par titre/année : pour un film sans identité canonique, toute
- * autre copie film reste ambiguë ; pour un épisode, des coordonnées S/E différentes
- * prouvent qu'il ne s'agit pas du même épisode.
+ * On ne rapproche jamais par titre/année. Deux identités fortes du même fournisseur
+ * (TMDB/IMDb/TVDB/Plex GUID) et de valeurs différentes prouvent au contraire qu'il
+ * s'agit de médias distincts ; elles ne doivent donc pas bloquer un non vu sans rapport.
  */
 export function canRecheckPlexDeltaUnwatchCandidate(
   locator: PlexDeltaWatchedLocator,
@@ -61,6 +105,10 @@ export function canRecheckPlexDeltaUnwatchCandidate(
       return false;
     }
     if (unresolved.mediaType !== locator.mediaType) continue;
+
+    if (strongIdentitiesProveDifferent(locator, unresolved)) {
+      continue;
+    }
 
     if (locator.mediaType === 'movie') {
       return false;
