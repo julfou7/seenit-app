@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { getUserLogStorageKey, sanitizeLogDetails } from '../features/logging/logPrivacy';
+import { normalizePlexNonVuWording } from './toastQueuePolicy';
 
 export type LogLevel = 'info' | 'success' | 'warn' | 'error';
 export type LogCategory = 'plex' | 'tmdb' | 'sync' | 'system' | 'auth';
@@ -24,12 +25,21 @@ const LEGACY_STORAGE_KEY = 'app_activity_logs_v1';
 const MAX_LOGS = 150;
 let activeLogUid: string | null = null;
 
+function normalizeVisibleLogMessage(category: LogCategory, message: unknown): string {
+  const value = String(message || '');
+  return category === 'plex' ? normalizePlexNonVuWording(value) : value;
+}
+
 const loadUserLogs = (uid: string): AppLogEntry[] => {
   try {
     const raw = localStorage.getItem(getUserLogStorageKey(uid));
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.slice(0, MAX_LOGS) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.slice(0, MAX_LOGS).map((entry: AppLogEntry) => ({
+      ...entry,
+      message: normalizeVisibleLogMessage(entry.category, entry.message)
+    }));
   } catch {
     return [];
   }
@@ -72,7 +82,7 @@ export const useLogStore = create<LogState>((set, get) => ({
       timestamp: Date.now(),
       level: actualLevel,
       category,
-      message: String(sanitizeLogDetails(message)),
+      message: String(sanitizeLogDetails(normalizeVisibleLogMessage(category, message))),
       details: actualDetails ? sanitizeLogDetails(actualDetails) : undefined
     };
 

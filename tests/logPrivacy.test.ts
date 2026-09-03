@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { getUserLogStorageKey, sanitizeLogDetails } from '../src/features/logging/logPrivacy.ts';
 
 test('SEENIT-DATA-003 isole les journaux techniques par UID sur chaque appareil', () => {
@@ -17,4 +18,11 @@ test('SEENIT-SECURITY-003 masque les secrets avant de persister un journal', () 
   assert.equal(sanitized.nested.apiKey, '[MASQUÉ]');
   assert.match(sanitized.nested.url, /token=\[MASQUÉ\]/);
   assert.doesNotMatch(JSON.stringify(sanitized), /secret-token|super-secret|plex-secret|token=abc/);
+});
+
+test('SEENIT-UX-004 les journaux Plex visibles normalisent les anciens libellés vers non vu', () => {
+  const logStoreSource = fs.readFileSync(new URL('../src/store/logStore.ts', import.meta.url), 'utf8');
+  assert.match(logStoreSource, /category === 'plex' \? normalizePlexNonVuWording\(value\) : value/);
+  assert.match(logStoreSource, /message:\s*String\(sanitizeLogDetails\(normalizeVisibleLogMessage\(category, message\)\)\)/);
+  assert.match(logStoreSource, /message:\s*normalizeVisibleLogMessage\(entry\.category, entry\.message\)/);
 });
