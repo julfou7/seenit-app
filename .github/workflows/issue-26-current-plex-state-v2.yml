@@ -1,0 +1,45 @@
+name: Issue 26 - Etat courant Plex v2
+
+on:
+  push:
+    branches: [ fix/issue-26-plex-current-watch-state ]
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Appliquer le correctif
+        run: |
+          python .github/tmp/issue26_patch.py
+          rm .github/tmp/issue26_patch.py .github/workflows/issue-26-current-plex-state-v2.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(plex): valider l'état courant avant import" -m "Le Watch History du compte n'est plus traité comme un état vu courant. Le full vérifie userState/viewCount par identité Plex technique et transmet les viewCount=0 à la réconciliation non-vue."
+
+      - name: Installer les dépendances
+        run: npm ci --legacy-peer-deps
+
+      - name: Valider le correctif sensible Plex
+        run: |
+          GITHUB_SHA="$(git rev-parse HEAD)" DELIVERY_MODE=backend SPEC_BASE_SHA="$(git rev-parse origin/main)" npm run test:spec:changes
+          npm run test:spec
+          npm run lint
+          npm run test:unit
+          npm run build
+
+      - name: Pousser le correctif validé
+        run: git push origin HEAD:fix/issue-26-plex-current-watch-state
