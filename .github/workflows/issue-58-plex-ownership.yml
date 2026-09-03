@@ -1,0 +1,147 @@
+name: Issue 58 - Plex progress ownership
+
+on:
+  push:
+    branches: [ fix/plex-progress-ownership-58 ]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Appliquer le correctif #58
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import json
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: attendu 1 occurrence, trouvé {count}")
+              return text.replace(old, new, 1)
+
+          # 1) Le client marque explicitement uniquement les progressions qu'il crée depuis Plex.
+          path = Path('src/features/plex/syncPlex.ts')
+          text = path.read_text()
+          text = replace_once(
+              text,
+              '''              episodeRecords[epKey] = {\n                watchedAt: viewedTimestamp,\n                episodeTitle: item.title || null,\n                ...(episodeRecords[epKey] || {})\n              };''',
+              '''              episodeRecords[epKey] = {\n                watchedAt: viewedTimestamp,\n                episodeTitle: item.title || null,\n                ...(episodeRecords[epKey] || {}),\n                plexImported: true\n              };''',
+              'provenance épisode existant'
+          )
+          text = replace_once(
+              text,
+              '''              episodeRecords: { [epKey]: { watchedAt: viewedTimestamp, episodeTitle: item.title || null } },''',
+              '''              episodeRecords: { [epKey]: { watchedAt: viewedTimestamp, episodeTitle: item.title || null, plexImported: true } },''',
+              'provenance nouvel épisode'
+          )
+          text = replace_once(
+              text,
+              '''              episodeRecords['movie'] = {\n                watchedAt: viewedTimestamp,\n                ...(episodeRecords['movie'] || {})\n              };''',
+              '''              episodeRecords['movie'] = {\n                watchedAt: viewedTimestamp,\n                ...(episodeRecords['movie'] || {}),\n                plexImported: true\n              };''',
+              'provenance film existant'
+          )
+          text = replace_once(
+              text,
+              '''              episodeRecords: { movie: { watchedAt: viewedTimestamp } },''',
+              '''              episodeRecords: { movie: { watchedAt: viewedTimestamp, plexImported: true } },''',
+              'provenance nouveau film'
+          )
+
+          old_report = '''          if (!result.changed) continue;\n\n          mutatedShows[matched.id] = result.show;\n          const listIndex = showsList.findIndex(show => show.id === matched.id);\n          if (listIndex >= 0) showsList[listIndex] = result.show;\n          unwatchedCount++;\n          syncCount++;'''
+          new_report = '''          if (!result.changed) continue;\n\n          // Le miroir technique plexWatchState peut évoluer sans modifier la progression.\n          // On le persiste, mais seul un retrait réellement possédé par Plex est un dé-vu métier.\n          mutatedShows[matched.id] = result.show;\n          const listIndex = showsList.findIndex(show => show.id === matched.id);\n          if (listIndex >= 0) showsList[listIndex] = result.show;\n          if (!result.unwatchApplied) continue;\n\n          unwatchedCount++;\n          syncCount++;'''
+          text = replace_once(text, old_report, new_report, 'comptage dé-vu réel')
+          path.write_text(text)
+
+          # 2) Kill-switch backend pour les APK/PWA antérieurs au protocole sûr 1.4.111.
+          path = Path('server.ts')
+          text = path.read_text()
+          marker = '''export interface AuthRequest extends Request {\n  user?: DecodedIdToken;\n}\n'''
+          helper = '''export interface AuthRequest extends Request {\n  user?: DecodedIdToken;\n}\n\nexport function supportsPlexOwnedUnwatch(rawVersion: unknown): boolean {\n  const match = String(rawVersion || '').trim().match(/^(\\d+)\\.(\\d+)\\.(\\d+)$/);\n  if (!match) return false;\n  const major = Number(match[1]);\n  const minor = Number(match[2]);\n  const patch = Number(match[3]);\n  return major > 1\n    || (major === 1 && minor > 4)\n    || (major === 1 && minor === 4 && patch >= 111);\n}\n'''
+          text = replace_once(text, marker, helper, 'capacité client Plex safe')
+
+          old_states = '''      const normalizedLibraryWatchStates = delta ? [] : mergePlexLibraryWatchStates(libraryWatchStateItems);'''
+          new_states = '''      const allNormalizedLibraryWatchStates = delta ? [] : mergePlexLibraryWatchStates(libraryWatchStateItems);\n      const supportsSafeUnwatch = supportsPlexOwnedUnwatch(req.get('X-Plex-Version'));\n      const normalizedLibraryWatchStates = supportsSafeUnwatch\n        ? allNormalizedLibraryWatchStates\n        : allNormalizedLibraryWatchStates.filter(state => state.watched !== false);'''
+          text = replace_once(text, old_states, new_states, 'kill-switch anciens clients')
+          path.write_text(text)
+
+          # 3) Contrat durable : Plex ne peut retirer que sa propre progression.
+          path = Path('docs/specifications/seenit.md')
+          text = path.read_text()
+          old_spec = '''- **SEENIT-PLEX-006** — Un scan Plex complet réconcilie l’état vu **et explicitement non vu**\n  des films et épisodes présents dans l’inventaire courant. Un `viewCount > 0` constitue une preuve vue ;\n  un `viewCount = 0` explicitement observé retire le visionnage SeenIt correspondant. Une simple absence\n  dans l’historique incrémental ne vaut jamais dé-vu. En présence de plusieurs copies du même média, une\n  copie vue gagne sur une copie non vue. L’écriture Firestore applique uniquement les mutations de\n  progression produites par le scan afin de ne pas écraser une action SeenIt concurrente non concernée.'''
+          new_spec = '''- **SEENIT-PLEX-006** — Un scan Plex complet réconcilie l’état vu et le dé-vu **sans donner à Plex\n  l’autorité sur les progressions créées hors Plex**. Un `viewCount > 0` peut ajouter une progression et\n  celle-ci est alors marquée par une provenance technique Plex explicite. Un `viewCount = 0` ne retire\n  que ce même film/épisode si sa progression SeenIt courante porte encore cette provenance Plex. Un\n  visionnage manuel SeenIt, importé depuis une autre source ou legacy sans provenance certaine reste\n  vu, même si Plex l’observe non vu ou l’avait également observé vu auparavant. Une simple absence dans\n  l’historique incrémental ne vaut jamais dé-vu. En présence de plusieurs copies du même média, une copie\n  vue gagne sur une copie non vue. La mise à jour du miroir `plexWatchState` seule est silencieuse : elle\n  n’est ni comptée ni notifiée comme un dé-vu. Les clients antérieurs au protocole de provenance sûre ne\n  reçoivent pas d’états `watched=false`. L’écriture Firestore applique uniquement les mutations Plex\n  réellement possédées afin de ne jamais écraser une action SeenIt ou tierce.'''
+          text = replace_once(text, old_spec, new_spec, 'SPEC PLEX-006')
+          path.write_text(text)
+
+          # Catalogue d'exigences.
+          path = Path('docs/specifications/requirements.json')
+          data = json.loads(path.read_text())
+          req = next((r for r in data['requirements'] if r['id'] == 'SEENIT-PLEX-006'), None)
+          if req is None:
+              raise SystemExit('SEENIT-PLEX-006 introuvable')
+          req['title'] = 'Dé-vu Plex limité aux progressions explicitement créées par Plex'
+          req['tests'] = [
+              {'file': 'tests/plexProgressMerge.test.ts', 'contains': 'SEENIT-PLEX-006 un jamais-vu Plex ne retire pas une action SeenIt'},
+              {'file': 'tests/plexProgressMerge.test.ts', 'contains': 'SEENIT-PLEX-006 un film manuel reste vu même si Plex avait aussi été observé vu'},
+              {'file': 'tests/plexProgressMerge.test.ts', 'contains': 'SEENIT-PLEX-006 une progression legacy sans provenance reste vue par défaut'},
+              {'file': 'tests/plexProgressMerge.test.ts', 'contains': 'SEENIT-PLEX-006 un dé-vu Plex retire uniquement un film réellement importé par Plex'},
+              {'file': 'tests/plexProgressMerge.test.ts', 'contains': 'SEENIT-PLEX-006 un dé-vu Plex retire uniquement l’épisode Plex visé'},
+              {'file': 'tests/plexProgressMerge.test.ts', 'contains': 'SEENIT-PLEX-006 une preuve vue ne passe pas par le chemin de dé-vu'},
+              {'file': 'tests/plexProgressMerge.test.ts', 'contains': 'SEENIT-PLEX-006 le dé-vu Plex possédé est idempotent'},
+              {'file': 'tests/plexProgressMerge.test.ts', 'contains': 'SEENIT-PLEX-006 une copie vue gagne sur une copie non vue du même média'},
+              {'file': 'tests/plexProgressMerge.test.ts', 'contains': 'SEENIT-PLEX-006 la transaction conserve une action concurrente SeenIt non visée'},
+              {'file': 'tests/plexProgressMerge.test.ts', 'contains': 'SEENIT-PLEX-006 le runtime marque la provenance Plex et ne notifie qu’un vrai retrait'}
+          ]
+          path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
+
+          # Demande durable existante : la bidirectionnalité est bornée par la propriété de la progression.
+          path = Path('docs/requests/registry.md')
+          text = path.read_text()
+          old_registry = "| USR-2026-09-02-004 | 2026-09-02 | La synchronisation Plex complète est bidirectionnelle pour le visionnage : un « vu » Plex ajoute la progression et un `viewCount=0` explicitement observé retire le film/épisode correspondant dans SeenIt ; une simple absence d’historique ne vaut jamais dé-vu. | `SEENIT-PLEX-006`, [issue #38](https://github.com/julfou7/seenit-app/issues/38) | active |"
+          new_registry = "| USR-2026-09-02-004 | 2026-09-02 | La synchronisation Plex complète reste bidirectionnelle, mais Plex ne peut retirer que les progressions qu’il a lui-même créées et qui portent encore une provenance Plex explicite. Un visionnage manuel SeenIt, issu d’une autre source ou legacy sans provenance certaine reste vu même si Plex renvoie `viewCount=0`; un simple changement du miroir Plex n’est jamais présenté comme un dé-vu. | `SEENIT-PLEX-006`, [issue #38](https://github.com/julfou7/seenit-app/issues/38), [issue #58](https://github.com/julfou7/seenit-app/issues/58) | active |"
+          text = replace_once(text, old_registry, new_registry, 'registre Plex bidirectionnel')
+          path.write_text(text)
+
+          # Version APK sûre suivante : 1.4.110 est déjà publiée et immuable.
+          path = Path('android/app/build.gradle')
+          text = path.read_text()
+          text = replace_once(text, 'versionName "1.4.110"', 'versionName "1.4.111"', 'version Android 1.4.111')
+          path.write_text(text)
+          PY
+
+          node scripts/sync-app-version.cjs
+          rm .github/workflows/issue-58-plex-ownership.yml
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(plex): borne le dé-vu aux progressions Plex" -m "- protège les vues manuelles et legacy par provenance explicite\n- supprime les faux dé-vu issus du seul miroir plexWatchState\n- filtre watched=false pour les clients antérieurs à 1.4.111\n- aligne SPEC, TNR et candidate 1.4.111"
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Valider le correctif sensible Plex
+        run: |
+          GITHUB_SHA="$(git rev-parse HEAD)" DELIVERY_MODE=apk SPEC_BASE_SHA="$(git rev-parse origin/main)" npm run test:spec:changes
+          npm run test:spec
+          npm run lint
+          npm run test:unit
+          npm run test:android
+          npm run build
+
+      - name: Pousser le correctif validé
+        run: git push origin HEAD:fix/plex-progress-ownership-58
