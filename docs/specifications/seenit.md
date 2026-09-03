@@ -169,8 +169,9 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 - **SEENIT-PLEX-001** — Les événements Plex sont normalisés et résolus sans utiliser leur titre
   comme identité. Une absence d'identifiant vérifiable reste non résolue.
 - **SEENIT-PLEX-002** — Un serveur Plex hors ligne ou en timeout est ignoré pour le scan courant ;
-  les autres serveurs continuent et leur résultat est importé. Le bilan nomme les serveurs
-  synchronisés et ignorés sans exposer leurs URL ou jetons.
+  les autres serveurs continuent et leur résultat est importé. Les serveurs ignorés restent visibles
+  dans les logs techniques, mais le bilan utilisateur de fin n'affiche que le nombre de serveurs
+  effectivement scannés ainsi que le nombre de vus et de dé-vus appliqués, sans exposer URL ou jeton.
 - **SEENIT-PLEX-003** — Le curseur n'est validé qu'après collecte suffisamment complète,
   résolution sans échec transitoire et écritures Firestore réussies.
 - **SEENIT-PLEX-004** — Jeton Plex, curseur et caches de résolution/disponibilité sont cloisonnés
@@ -182,8 +183,13 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   doit être validée par le `userState` provider de la même identité Plex. Seul un `viewCount > 0`
   explicite permet son import comme vu ; un `viewCount = 0` explicite alimente la réconciliation
   non-vue, et un état courant indisponible n'ajoute aucune progression. L'historique PMS récent et
-  les états `viewCount` explicites restent des preuves selon leur contrat. Le rapprochement ne se
-  fait jamais par titre ou année ; en cas d'ambiguïté SeenIt conserve l'état non vu.
+  les états `viewCount` explicites restent des preuves selon leur contrat. En delta, SeenIt complète
+  l'historique récent par un snapshot léger des éléments **actuellement vus** des bibliothèques PMS :
+  ces entrées `library-watched` sont retenues avec un `viewCount > 0` explicite même si leur dernière
+  date de visionnage est antérieure au curseur. La delta ne collecte ni n'applique jamais de
+  `watched=false` ; la réconciliation destructive reste réservée au full scan et à `SEENIT-PLEX-006`.
+  Le rapprochement ne se fait jamais par titre ou année ; en cas d'ambiguïté SeenIt conserve l'état
+  non vu.
 - **SEENIT-PLEX-006** — Un scan Plex complet réconcilie l’état vu et le dé-vu **sans donner à Plex
   l’autorité sur les progressions créées hors Plex**. Un `viewCount > 0` peut ajouter une progression et
   celle-ci est alors marquée par une provenance technique Plex explicite. Un `viewCount = 0` ne retire
@@ -297,7 +303,11 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   affiché jusqu'à ce que la prochaine vue soit prête.
 - **SEENIT-UX-004** — Un toast mobile long utilise toute la largeur utile disponible, revient à la
   ligne sans troncature et reste au-dessus de la navigation basse et de la safe area. La règle vaut
-  pour la PWA et l'APK, notamment pour le bilan détaillé d'une synchronisation Plex.
+  pour la PWA et l'APK, notamment pour la synchronisation Plex. Pendant une synchronisation longue,
+  le bandeau Plex indique la phase réellement connue et la durée écoulée, sans inventer de pourcentage.
+  Les toasts unitaires Plex d'un même lot peuvent être abandonnés via « Ignorer les suivants » : cette
+  action purge uniquement les notifications Plex encore en file et conserve le bilan final ainsi que
+  les notifications des autres fonctionnalités.
 - Les dialogues critiques utilisent un rôle adapté, sont fermables par Échap, placent le focus
   sur une action et ne déclenchent aucune suppression sans confirmation quand le transfert est
   actif.
