@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.109",
-  "versionCode": 104109,
+  "applicationVersion": "1.4.110",
+  "versionCode": 104110,
   "applicationId": "com.seenit.app",
   "appName": "SeenIt",
   "customUrlScheme": "com.seenit.app",
@@ -123,8 +123,7 @@
     "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
     "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml",
     "android/app/src/main/res/drawable/ic_stat_seenit.xml",
-    "android/app/src/main/res/drawable/splash.png",
-    "android/app/google-services.json"
+    "android/app/src/main/res/drawable/splash.png"
   ],
   "requiredPermissions": [
     "android.permission.INTERNET",
@@ -138,7 +137,13 @@
     "projectId": "gen-lang-client-0201895414",
     "firestoreDatabaseId": "default",
     "androidPackageName": "com.seenit.app",
-    "androidMobileSdkAppId": "1:799043440232:android:729435c4ab36bc039275dd"
+    "androidMobileSdkAppId": "1:799043440232:android:729435c4ab36bc039275dd",
+    "projectNumber": "799043440232",
+    "storageBucket": "gen-lang-client-0201895414.firebasestorage.app",
+    "androidOauthClientId": "799043440232-opho46a7s7dhecfb0t55js78d83rjf49.apps.googleusercontent.com",
+    "androidCertificateHash": "7427c6a9914d1fa8f0d3c871e271e35392747bbb",
+    "webOauthClientId": "799043440232-i9s1l0jaerljg58v3oooleuemnhnim4o.apps.googleusercontent.com",
+    "apiKey": "AIzaSyAKjntYVwu1HR5MPOThktT4CoN9UOWxybY"
   },
   "systemBars": {
     "statusBarOverlay": true,
@@ -151,5 +156,8 @@
     "webSplashComponent": "src/components/SplashScreen.tsx",
     "background": "#040406",
     "hideAfterWebPaint": true
-  }
+  },
+  "generatedFiles": [
+    "android/app/google-services.json"
+  ]
 }

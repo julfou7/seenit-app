@@ -1,6 +1,7 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { materializeAndroidConfig } = require('./materialize-android-config.cjs');
 
 const root = path.resolve(__dirname, '..');
 const contractPath = path.join(root, 'docs/specifications/android-contract.json');
@@ -33,6 +34,7 @@ function requireIncludes(source, expected, label) {
 }
 
 function validateAndroidContract() {
+  materializeAndroidConfig();
   const contract = JSON.parse(readText('docs/specifications/android-contract.json'));
   const gradle = readText('android/app/build.gradle');
   const manifest = readText('android/app/src/main/AndroidManifest.xml');

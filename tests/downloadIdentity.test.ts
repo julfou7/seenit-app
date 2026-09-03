@@ -9,7 +9,6 @@ import {
   normalizeDownloadClientId,
   normalizeQualityLabel,
   sameDownloadRequest,
-  sameLegacyPhysicalTransfer,
   samePhysicalDownload,
   sameTransferPath
 } from '../src/features/downloads/downloadIdentity.ts';
@@ -50,32 +49,7 @@ test('deux hashes différents restent deux téléchargements physiques distincts
 });
 
 
-test('rattache un ancien doublon sans hash grâce à la release et la taille', () => {
-  const arr = {
-    mediaType: 'movie',
-    title: 'Disclosure Day',
-    releaseTitle: 'Disclosure.Day.2026.1080p.BluRay',
-    size: 4_400_000_000
-  };
-  const persistedQbit = {
-    mediaType: 'movie',
-    title: 'Disclosure.Day.2026.1080p.BluRay-GROUP',
-    releaseTitle: 'Disclosure.Day.2026.1080p.BluRay-GROUP',
-    size: 4_410_000_000
-  };
 
-  assert.equal(sameLegacyPhysicalTransfer(arr, persistedQbit), true);
-});
-
-test('ne fusionne pas deux releases de tailles différentes', () => {
-  assert.equal(
-    sameLegacyPhysicalTransfer(
-      { mediaType: 'movie', releaseTitle: 'Film.1080p', size: 4_000_000_000 },
-      { mediaType: 'movie', releaseTitle: 'Film.1080p', size: 8_000_000_000 }
-    ),
-    false
-  );
-});
 
 
 test('rattache un torrent hybride grâce aux alias infohash v1/v2', () => {
@@ -115,25 +89,6 @@ test('conserve les alias appris entre deux polls même si *Arr change temporaire
   );
 });
 
-test('deux vrais infohash différents ne sont jamais fusionnés par le fallback release + taille', () => {
-  const a = {
-    id: 'radarr_1',
-    downloadId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    mediaType: 'movie',
-    releaseTitle: 'Film.2026.2160p.WEB-DL',
-    size: 10_000_000_000
-  };
-  const b = {
-    id: 'qbit_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-    downloadId: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-    mediaType: 'movie',
-    releaseTitle: 'Film.2026.2160p.WEB-DL',
-    size: 10_000_000_000
-  };
-
-  assert.equal(hasConflictingStrongPhysicalIds(a, b), true);
-  assert.equal(sameLegacyPhysicalTransfer(a, b), false);
-});
 
 
 test('normalise de façon stable la qualité Radarr et qBittorrent', () => {
@@ -155,21 +110,21 @@ test('rattache Radarr et qBittorrent par chemin de transfert quand le hash manqu
   ), true);
 });
 
-test('le fallback release accepte un identifiant Arr temporaire non-hash', () => {
-  assert.equal(sameLegacyPhysicalTransfer(
-    { downloadId: 'radarr-temporary-id', mediaType: 'movie', releaseTitle: 'Normal.2026.1080p.BluRay', size: 10_000_000_000 },
-    { mediaType: 'movie', releaseTitle: 'Normal 2026 1080p BluRay x265', size: 10_005_000_000 }
-  ), true);
+test('SEENIT-DOWNLOAD-001 un même basename et une même taille ne remplacent jamais un chemin exact', () => {
+  assert.equal(sameTransferPath(
+    { transferPath: 'd:/downloads-a/Film.2026.1080p', size: 10_000_000_000 },
+    { transferPath: 'd:/downloads-b/Film.2026.1080p', size: 10_000_000_000 }
+  ), false);
 });
 
 
-test('rattache le titre localisé à l’unique torrent apparu juste après la demande sans utiliser le nom', () => {
+
+test('SEENIT-IDENTITY-001 exige un TMDB ID exact pour rattacher une demande à un transfert', () => {
   const now = 1_700_000_020_000;
-  assert.equal(canAttachRecentOptimisticRequest(
-    { isOptimistic: true, mediaType: 'movie', tmdbId: 123, title: 'Le Virtuose', quality: '1080p', addedAt: now - 15_000 },
-    { mediaType: 'movie', title: 'Tuner', releaseTitle: 'Tuner.2026.1080p.WEB-DL', quality: '1080p WEB-DL', addedAt: now - 8_000 },
-    now
-  ), true);
+  const request = { isOptimistic: true, mediaType: 'movie' as const, tmdbId: 123, title: 'Titre français', quality: '1080p', addedAt: now - 15_000 };
+  assert.equal(canAttachRecentOptimisticRequest(request, { mediaType: 'movie', title: 'English title', quality: '1080p', addedAt: now - 8_000 }, now), false);
+  assert.equal(canAttachRecentOptimisticRequest(request, { mediaType: 'movie', tmdbId: 456, title: 'Titre français', quality: '1080p', addedAt: now - 8_000 }, now), false);
+  assert.equal(canAttachRecentOptimisticRequest(request, { mediaType: 'movie', tmdbId: 123, title: 'Completely Different', quality: '1080p', addedAt: now - 8_000 }, now), true);
 });
 
 test('ne rattache jamais un vieux torrent à une nouvelle demande', () => {
@@ -191,41 +146,21 @@ test('ne rattache pas une autre résolution pendant la fenêtre transitoire', ()
 });
 
 
-test('la synchro partagée rattache un titre français à l’unique torrent anglais sans comparer les noms', () => {
+test('SEENIT-DOWNLOAD-001 la synchro partagée rattache uniquement le même TMDB malgré des titres différents', () => {
   const now = 1_700_000_320_000;
-  const requests = [{
-    id: 'opt_robin',
-    requestId: 'opt_robin',
-    isOptimistic: true,
-    mediaType: 'movie' as const,
-    tmdbId: 1181198,
-    title: 'On l’appelait Robin des Bois',
-    quality: '1080p',
-    addedAt: now - 12_000,
-    size: 0,
-    sizeleft: 0,
-    progress: 0,
-    status: 'searching',
-    statusText: 'Recherche en cours'
-  }];
-  const remotes = [{
-    id: 'qbit_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    mediaType: 'movie' as const,
-    title: 'The.Death.Of.Robin.Hood.2026.1080p.WEB-DL',
-    releaseTitle: 'The.Death.Of.Robin.Hood.2026.1080p.WEB-DL',
-    quality: '1080p WEB-DL',
-    addedAt: now - 6_000,
-    size: 2_300_000_000,
-    sizeleft: 2_300_000_000,
-    progress: 0,
-    status: 'downloading',
-    statusText: 'Téléchargement en cours'
-  }];
-
-  assert.deepEqual(
-    findUniqueRecentOptimisticAttachments(requests, remotes, now),
-    [{ requestIndex: 0, remoteIndex: 0 }]
-  );
+  const request = {
+    id: 'opt_robin', requestId: 'opt_robin', isOptimistic: true, mediaType: 'movie' as const,
+    tmdbId: 1181198, title: 'Titre français', quality: '1080p', addedAt: now - 12_000,
+    size: 0, sizeleft: 0, progress: 0, status: 'searching', statusText: 'Recherche en cours'
+  };
+  const remote = {
+    id: 'qbit_robin', mediaType: 'movie' as const, tmdbId: 1181198,
+    title: 'A Totally Different Release Name', quality: '1080p WEB-DL', addedAt: now - 6_000,
+    size: 2_300_000_000, sizeleft: 2_300_000_000, progress: 0,
+    status: 'downloading', statusText: 'Téléchargement en cours'
+  };
+  assert.deepEqual(findUniqueRecentOptimisticAttachments([request], [remote], now), [{ requestIndex: 0, remoteIndex: 0 }]);
+  assert.deepEqual(findUniqueRecentOptimisticAttachments([request], [{ ...remote, tmdbId: undefined }], now), []);
 });
 
 test('la synchro partagée refuse le rattachement transitoire dès que deux torrents sont plausibles', () => {
@@ -376,62 +311,13 @@ test('les GET Android de suivi sont uniques et explicitement non cachables', asy
   assert.equal(headers.Expires, '0');
 });
 
-test('canAttachRecentOptimisticRequest rattache une demande optimiste même si tvdbId diffère mais que le titre concorde', () => {
-  const now = 1_700_000_000_000;
-  const request = {
-    id: 'req_123',
-    requestId: 'req_123',
-    mediaType: 'tv' as const,
-    seriesTitle: 'Dark Matter',
-    title: 'Dark Matter (S02E01)',
-    tmdbId: 218738,
-    tvdbId: 423527,
-    seasonNumber: 2,
-    episodeNumber: 1,
-    addedAt: now - 3_000,
-    isOptimistic: true
-  };
 
-  const remote = {
-    id: 'sonarr_55',
-    mediaType: 'tv' as const,
-    seriesTitle: 'Dark Matter',
-    title: 'Dark Matter - S02E01 - Episode 1',
-    // Sonarr pointe parfois sur un ID TVDB alternatif
-    tvdbId: 292115,
-    seasonNumber: 2,
-    episodeNumber: 1,
-    addedAt: now - 1_000,
-    isOptimistic: false
-  };
 
-  assert.equal(canAttachRecentOptimisticRequest(request, remote, now), true);
+
+
+test('SEENIT-DOWNLOAD-002 deux vrais infohash différents ne sont jamais fusionnés', () => {
+  const a = { downloadId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' };
+  const b = { downloadId: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' };
+  assert.equal(hasConflictingStrongPhysicalIds(a, b), true);
+  assert.equal(samePhysicalDownload(a, b), false);
 });
-
-test('canAttachRecentOptimisticRequest ne rattache pas deux séries aux titres différents même si les identifiants sont absents', () => {
-  const now = 1_700_000_000_000;
-  const request = {
-    id: 'req_123',
-    mediaType: 'tv' as const,
-    seriesTitle: 'Dark Matter',
-    title: 'Dark Matter (S02E01)',
-    seasonNumber: 2,
-    episodeNumber: 1,
-    addedAt: now - 3_000,
-    isOptimistic: true
-  };
-
-  const remote = {
-    id: 'sonarr_99',
-    mediaType: 'tv' as const,
-    seriesTitle: 'Severance',
-    title: 'Severance - S02E01',
-    seasonNumber: 2,
-    episodeNumber: 1,
-    addedAt: now - 1_000,
-    isOptimistic: false
-  };
-
-  assert.equal(canAttachRecentOptimisticRequest(request, remote, now), false);
-});
-

@@ -110,12 +110,20 @@ n'a pas été explicitement conçue et validée.
 - `firebase-applet-config.json` ne contient aucun `firestoreDatabaseId` pilotant le runtime.
 - Firestore Delete Protection reste activée.
 - Projet Firebase canonique : `gen-lang-client-0201895414`.
-- `android/app/google-services.json` reste présent avec le package `com.seenit.app` et son identité
-  Firebase Android canonique.
+- `android/app/google-services.json` est un artefact généré et git-ignoré, matérialisé depuis
+  `docs/specifications/android-contract.json` ; AI Studio ne doit jamais en être la source.
+- `android/gradlew` est normalisé exécutable par le matérialiseur Android avant les contrôles/builds.
 
 Toute modification de projet Firebase, databaseId, signature ou identité Android est une migration :
 validation utilisateur explicite, sauvegarde/inventaire, plan de migration, rollback et tests PWA+APK.
 Aucun agent ne décide seul de cette migration.
+
+## 5.1 Identité média des téléchargements
+
+- **TMDB ID est l’unique identité canonique** pour rattacher une fiche SeenIt à un téléchargement.
+- TVDB/IMDb peuvent être transportés comme métadonnées, mais doivent être résolus vers TMDB avant toute association média.
+- Titre, titre original, année, nom de fichier et nom de release ne sont **jamais** des clés de matching.
+- Un même transfert physique se reconnaît uniquement par `requestId`, infohash/downloadId/alias exact ou chemin de transfert exact ; en cas d’ambiguïté, ne pas fusionner.
 
 ## 6. PWA et APK
 
