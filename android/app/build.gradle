@@ -1,6 +1,15 @@
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 
+def seenitKeystoreFile = file('seenit-release.p12')
+def seenitStorePassword = System.getenv('SEENIT_ANDROID_RELEASE_STORE_PASSWORD')
+def seenitKeyPassword = System.getenv('SEENIT_ANDROID_RELEASE_KEY_PASSWORD')
+def requireSeenitKeystore = System.getenv('SEENIT_REQUIRE_ANDROID_KEYSTORE') == 'true'
+
+if (requireSeenitKeystore && (!seenitKeystoreFile.exists() || !seenitStorePassword || !seenitKeyPassword)) {
+    throw new GradleException('Clé de signature SeenIt matérialisée et mots de passe requis pour ce build.')
+}
+
 android {
     namespace = "com.seenit.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -25,21 +34,22 @@ android {
         jvmTarget = '21'
     }
     signingConfigs {
-        debug {
-            if (file('debug.keystore').exists()) {
-                storeFile file('debug.keystore')
-                storePassword 'android'
-                keyAlias 'androiddebugkey'
-                keyPassword 'android'
+        seenitRelease {
+            if (seenitKeystoreFile.exists() && seenitStorePassword && seenitKeyPassword) {
+                storeFile seenitKeystoreFile
+                storePassword seenitStorePassword
+                keyAlias 'seenit'
+                keyPassword seenitKeyPassword
+                storeType 'PKCS12'
             }
         }
     }
     buildTypes {
         debug {
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.seenitRelease
         }
         release {
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.seenitRelease
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

@@ -159,29 +159,84 @@ function validateAndroidContract() {
   if (androidFirebaseClient.client_info?.mobilesdk_app_id !== contract.firebase.androidMobileSdkAppId) {
     throw new Error('mobilesdk_app_id Firebase Android inattendu.');
   }
+  if (!Array.isArray(contract.firebase.androidOauthClients) || contract.firebase.androidOauthClients.length < 2) {
+    throw new Error('Le contrat Firebase doit conserver les clients OAuth Android historique et actif.');
+  }
+  const materializedOauthClients = androidFirebaseClient.oauth_client || [];
+  for (const expectedClient of contract.firebase.androidOauthClients) {
+    const found = materializedOauthClients.find(client =>
+      client?.client_type === 1
+      && client?.client_id === expectedClient.clientId
+      && client?.android_info?.package_name === contract.firebase.androidPackageName
+      && client?.android_info?.certificate_hash === expectedClient.certificateHash
+    );
+    if (!found) {
+      throw new Error(`Client OAuth Android absent pour le certificat ${expectedClient.certificateHash}.`);
+    }
+  }
+  const activeAndroidOauth = contract.firebase.androidOauthClients.find(client =>
+    client.clientId === contract.firebase.activeAndroidOauthClientId
+    && client.certificateHash === contract.firebase.activeAndroidCertificateHash
+    && client.role === 'active'
+  );
+  if (!activeAndroidOauth) {
+    throw new Error('Le client OAuth Android actif ne correspond pas à la nouvelle signature.');
+  }
+  const webOauth = materializedOauthClients.find(client =>
+    client?.client_type === 3 && client?.client_id === contract.firebase.webOauthClientId
+  );
+  if (!webOauth) {
+    throw new Error('Client OAuth Web Firebase attendu pour Credential Manager absent.');
+  }
 
-  if (!contract.signing
-      || contract.signing.source !== 'github-secret'
-      || contract.signing.secretName !== 'SEENIT_ANDROID_KEYSTORE_B64'
-      || !/^[a-f0-9]{64}$/i.test(contract.signing.sha256 || '')) {
-    throw new Error('Le contrat de signature doit verrouiller le keystore historique matérialisé depuis GitHub Secrets.');
+  const signing = contract.signing || {};
+  if (signing.source !== 'github-secret'
+      || signing.path !== 'android/app/seenit-release.p12'
+      || signing.secretName !== 'SEENIT_ANDROID_RELEASE_KEYSTORE_B64'
+      || signing.storePasswordSecretName !== 'SEENIT_ANDROID_RELEASE_STORE_PASSWORD'
+      || signing.keyPasswordSecretName !== 'SEENIT_ANDROID_RELEASE_KEY_PASSWORD'
+      || signing.storeType !== 'PKCS12'
+      || signing.keyAlias !== 'seenit'
+      || !/^[a-f0-9]{64}$/i.test(signing.sha256 || '')
+      || !/^[a-f0-9]{40}$/i.test(signing.certificateSha1 || '')
+      || !/^[a-f0-9]{64}$/i.test(signing.certificateSha256 || '')) {
+    throw new Error('Le contrat de signature doit verrouiller la clé release PKCS12 SeenIt matérialisée depuis GitHub Secrets.');
   }
-  if (!Array.isArray(contract.generatedFiles) || !contract.generatedFiles.includes(contract.signing.path)) {
-    throw new Error('Le keystore historique doit être déclaré comme artefact Android généré.');
+  if (!signing.migration
+      || signing.migration.mode !== 'reinstall-once'
+      || !/^[a-f0-9]{64}$/i.test(signing.migration.legacySignerSha256 || '')
+      || !/^[a-f0-9]{64}$/i.test(signing.migration.currentSignerSha256 || '')
+      || signing.migration.currentSignerSha256 !== signing.certificateSha256) {
+    throw new Error('Contrat de migration de signature Android invalide.');
   }
-  if (Array.isArray(contract.requiredFiles) && contract.requiredFiles.includes(contract.signing.path)) {
-    throw new Error('Le keystore historique ne doit plus être un fichier Git requis.');
+  if (!Array.isArray(contract.generatedFiles) || !contract.generatedFiles.includes(signing.path)) {
+    throw new Error('Le keystore release doit être déclaré comme artefact Android généré.');
   }
+  if (Array.isArray(contract.requiredFiles) && contract.requiredFiles.includes(signing.path)) {
+    throw new Error('Le keystore release ne doit pas être un fichier Git requis.');
+  }
+  requireIncludes(gradle, `file('seenit-release.p12')`, 'chemin du keystore release Gradle');
+  requireIncludes(gradle, `System.getenv('SEENIT_ANDROID_RELEASE_STORE_PASSWORD')`, 'mot de passe store par environnement');
+  requireIncludes(gradle, `System.getenv('SEENIT_ANDROID_RELEASE_KEY_PASSWORD')`, 'mot de passe clé par environnement');
+  requireIncludes(gradle, `keyAlias 'seenit'`, 'alias de signature SeenIt');
+  requireIncludes(gradle, `storeType 'PKCS12'`, 'type PKCS12 du keystore');
+  requireIncludes(gradle, `signingConfig signingConfigs.seenitRelease`, 'signature SeenIt du build');
 
-  const signingPath = resolveWithinRoot(contract.signing.path);
+  const signingPath = resolveWithinRoot(signing.path);
   const signingMaterialized = fs.existsSync(signingPath);
   if (signingMaterialized) {
     const signingFile = fs.readFileSync(signingPath);
-    if (sha256(signingFile) !== contract.signing.sha256) {
-      throw new Error('La clé de signature APK a changé : une mise à jour sur place deviendrait impossible.');
+    if (sha256(signingFile) !== signing.sha256) {
+      throw new Error('La clé de signature release APK ne correspond pas au contrat approuvé.');
     }
-  } else if (process.env.SEENIT_REQUIRE_ANDROID_KEYSTORE === 'true') {
-    throw new Error('La clé de signature APK matérialisée est obligatoire pour une release.');
+  }
+  if (process.env.SEENIT_REQUIRE_ANDROID_KEYSTORE === 'true') {
+    if (!signingMaterialized) {
+      throw new Error('La clé de signature APK matérialisée est obligatoire pour une release.');
+    }
+    if (!process.env[signing.storePasswordSecretName] || !process.env[signing.keyPasswordSecretName]) {
+      throw new Error('Les mots de passe de la clé de signature APK sont obligatoires pour une release.');
+    }
   }
 
   const wrapperJar = read(contract.gradleWrapper.path);
@@ -234,7 +289,9 @@ function validateAndroidContract() {
 if (require.main === module) {
   try {
     const result = validateAndroidContract();
-    const signingStatus = result.signingMaterialized ? 'clé historique vérifiée' : 'clé externe non requise pour cette validation';
+    const signingStatus = result.signingMaterialized
+      ? 'clé release vérifiée'
+      : 'clé release externe non requise pour cette validation';
     console.log(`[APK] Contrat ${result.contract.applicationId} v${result.contract.applicationVersion} validé : ${result.assetCount} icônes contrôlées, ${signingStatus}.`);
   } catch (error) {
     console.error(`[APK] ${error.message}`);

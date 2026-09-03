@@ -11,11 +11,26 @@ function materializeAndroidConfig() {
   const firebase = contract.firebase || {};
   const required = [
     'projectId', 'androidPackageName', 'androidMobileSdkAppId', 'projectNumber',
-    'storageBucket', 'androidOauthClientId', 'androidCertificateHash',
+    'storageBucket', 'activeAndroidOauthClientId', 'activeAndroidCertificateHash',
     'webOauthClientId', 'apiKey'
   ];
   for (const key of required) {
     if (!firebase[key]) throw new Error(`Contrat Firebase Android incomplet : ${key}`);
+  }
+  if (!Array.isArray(firebase.androidOauthClients) || firebase.androidOauthClients.length < 2) {
+    throw new Error('Contrat Firebase Android incomplet : clients OAuth Android historique et actif attendus.');
+  }
+  for (const client of firebase.androidOauthClients) {
+    if (!client?.clientId || !/^[a-f0-9]{40}$/i.test(client?.certificateHash || '')) {
+      throw new Error('Contrat Firebase Android invalide : client OAuth Android incomplet.');
+    }
+  }
+  const activeClient = firebase.androidOauthClients.find(client =>
+    client.clientId === firebase.activeAndroidOauthClientId
+    && client.certificateHash === firebase.activeAndroidCertificateHash
+  );
+  if (!activeClient) {
+    throw new Error('Contrat Firebase Android invalide : le client OAuth actif ne correspond pas à la signature active.');
   }
 
   const googleServices = {
@@ -30,14 +45,14 @@ function materializeAndroidConfig() {
         android_client_info: { package_name: String(firebase.androidPackageName) }
       },
       oauth_client: [
-        {
-          client_id: String(firebase.androidOauthClientId),
+        ...firebase.androidOauthClients.map(client => ({
+          client_id: String(client.clientId),
           client_type: 1,
           android_info: {
             package_name: String(firebase.androidPackageName),
-            certificate_hash: String(firebase.androidCertificateHash)
+            certificate_hash: String(client.certificateHash)
           }
-        },
+        })),
         { client_id: String(firebase.webOauthClientId), client_type: 3 }
       ],
       api_key: [{ current_key: String(firebase.apiKey) }],
@@ -53,8 +68,7 @@ function materializeAndroidConfig() {
   };
 
   fs.mkdirSync(path.dirname(googleServicesPath), { recursive: true });
-  fs.writeFileSync(googleServicesPath, `${JSON.stringify(googleServices, null, 2)}
-`, 'utf8');
+  fs.writeFileSync(googleServicesPath, `${JSON.stringify(googleServices, null, 2)}\n`, 'utf8');
   if (fs.existsSync(gradlewPath) && process.platform !== 'win32') {
     fs.chmodSync(gradlewPath, 0o755);
   }

@@ -55,8 +55,8 @@ Chaque push ou pull request exécute :
 6. build Web + serveur.
 
 Le contrat Android exécuté en validation continue contrôle l'identité et le contrat de signature sans
-exiger le fichier privé de keystore : le secret de signature n'est jamais exposé aux PR ni aux pushes
-ordinaires. Si un fichier `android/app/debug.keystore` est présent localement, son empreinte est toutefois
+exiger le fichier privé de keystore : les secrets de signature ne sont jamais exposés aux PR ni aux
+pushes ordinaires. Si `android/app/seenit-release.p12` est présent localement, son empreinte est toutefois
 vérifiée et toute divergence est bloquée.
 
 `npm audit --omit=dev --audit-level=high` n'est exécuté que :
@@ -94,8 +94,8 @@ Quand le lot est prêt :
 3. lancer `npm run version:sync` une seule fois pour aligner les surfaces de version ;
 4. pousser cette candidate ;
 5. attendre la validation continue verte ;
-6. vérifier que le secret de dépôt `SEENIT_ANDROID_KEYSTORE_B64` contient **exactement** le keystore
-   historique SeenIt encodé en Base64 ;
+6. vérifier que les trois secrets de dépôt `SEENIT_ANDROID_RELEASE_KEYSTORE_B64`,
+   `SEENIT_ANDROID_RELEASE_STORE_PASSWORD` et `SEENIT_ANDROID_RELEASE_KEY_PASSWORD` sont présents ;
 7. déclencher manuellement `Validate & Release SeenIt` avec `release_apk=true` depuis `main`.
 
 Le déclenchement manuel de release ne relance pas d'abord le job de validation continue puis un second
@@ -104,11 +104,13 @@ de changement, SPEC, TypeScript, tests unitaires, contrat Android, garde d'immua
 dépendances et build Web avant Gradle. Le contrôle reste complet, mais `npm ci` et le build Web ne sont
 plus payés deux fois pour la même release.
 
-Avant les tests Android de release, la CI décode `SEENIT_ANDROID_KEYSTORE_B64` dans
-`android/app/debug.keystore`, refuse un secret absent ou un Base64 invalide puis compare le SHA-256 aux
-octets historiques verrouillés dans `docs/specifications/android-contract.json`. Le fichier généré est
-local au runner et n'est jamais commité. Une empreinte différente bloque la release **avant Gradle**.
-Après `npx cap sync android`, le contrat Android est rejoué avec la présence du keystore obligatoire.
+Avant les tests Android de release, la CI décode `SEENIT_ANDROID_RELEASE_KEYSTORE_B64` dans
+`android/app/seenit-release.p12`, refuse un secret absent ou un Base64 invalide puis compare le SHA-256
+aux octets verrouillés dans `docs/specifications/android-contract.json`. Le contrat exige également le
+store PKCS12, l'alias `seenit`, les empreintes du certificat et la présence des deux mots de passe de
+release. Le fichier généré est local au runner et n'est jamais commité. Une empreinte différente bloque
+la release **avant Gradle**. Après `npx cap sync android`, le contrat Android est rejoué avec la présence
+du keystore obligatoire.
 
 Une candidate non publiée peut recevoir plusieurs commits correctifs sans consommer un nouveau numéro.
 Une version déjà publiée reste immuable et exige un nouveau patch pour tout correctif ultérieur.
@@ -125,9 +127,21 @@ version.
 - Android 12 / API 31 : **optionnel manuel** via `android12_smoke=true` et utilisable comme contrôle
   périodique ou lors d'un changement Android à risque.
 
-Le smoke N → N+1 conserve l'installation par-dessus la dernière release, la signature, les données,
-le deep link, le launcher et les preuves archivées. L'externalisation du keystore n'est validée qu'une
-fois ce smoke passé avec le **même certificat réel** entre N et N+1.
+Le smoke compare toujours le package, les versions et les certificats réels. Son comportement dépend
+uniquement de la baseline officielle :
+
+- si N et N+1 portent la nouvelle signature release, le smoke N → N+1 reste strictement inchangé :
+  installation sur place avec `adb install -r`, conservation des données/session, icône, notifications,
+  launcher et deep link ;
+- si N porte exactement l'ancienne empreinte historique et N+1 exactement la nouvelle empreinte
+  verrouillée, la seule migration autorisée est une désinstallation contrôlée de N puis une installation
+  fraîche de N+1. Ce smoke valide le package, la nouvelle signature, l'installation, l'icône, les
+  permissions, le launcher, le deep link et le cycle de vie, mais n'exige pas la conservation du stockage
+  local puisqu'Android le supprime volontairement à la désinstallation ;
+- tout autre changement de signature bloque la publication.
+
+Dès qu'une release officielle avec la nouvelle signature existe, la branche de migration n'est plus
+éligible et toutes les releases suivantes doivent repasser par la mise à jour sur place normale.
 
 Pour éviter de payer un cold boot complet à chaque release, l'AVD Android 36 et son snapshot propre
 sont mis en cache entre les runs. Le snapshot n'est généré qu'en cas de cache miss ; le smoke bloquant
@@ -135,26 +149,30 @@ réutilise ensuite cet AVD avec `force-avd-creation: false` et `-no-snapshot-sav
 change ni la baseline N, ni l'APK N+1, ni les assertions du TNR : elle ne fait qu'éviter de recréer
 l'environnement virtuel déjà validé.
 
-## Gestion et récupération de la clé historique
+## Gestion et récupération des clés de signature
 
-`android/app/debug.keystore` est un **artefact généré**, pas une source Git. Les sources de confiance sont :
+`android/app/seenit-release.p12` est un **artefact généré**, pas une source Git. Les sources de confiance
+de la nouvelle signature sont :
 
-- l'empreinte SHA-256 publique verrouillée par le contrat Android ;
-- le secret de dépôt `SEENIT_ANDROID_KEYSTORE_B64`, qui fournit les octets au runner de release ;
-- une sauvegarde hors ligne opérateur des mêmes octets, conservée séparément de GitHub.
+- le SHA-256 du PKCS12 et les empreintes SHA-1/SHA-256 du certificat verrouillés par le contrat Android ;
+- le secret `SEENIT_ANDROID_RELEASE_KEYSTORE_B64`, qui fournit les octets au runner de release ;
+- les secrets `SEENIT_ANDROID_RELEASE_STORE_PASSWORD` et `SEENIT_ANDROID_RELEASE_KEY_PASSWORD` ;
+- une sauvegarde opérateur privée de la clé, conservée séparément de GitHub.
 
-Cette externalisation ne constitue pas une rotation de sécurité : le keystore a existé dans l'historique
-public du dépôt. Une future rotation doit suivre son propre plan Android, prouver la compatibilité avec
-les installations existantes et ne peut jamais être introduite en remplaçant simplement le secret.
+Le keystore historique externalisé lors de la phase précédente reste temporairement conservé comme
+rollback de l'ancien canal, avec son ancien client OAuth Firebase. Il ne signe plus les nouvelles
+releases. Une fois la première APK nouvelle signature validée sur l'appareil et la stratégie de rollback
+jugée suffisante, son secret historique pourra être archivé/supprimé dans un jalon séparé explicitement
+tracé dans #9.
 
 ## Protections qui restent non négociables
 
 La simplification ne réduit pas les garde-fous sur :
 
 - `applicationId=com.seenit.app` ;
-- signature APK historique ;
+- nouvelle signature APK release après la migration approuvée ;
 - icônes/launcher et deep link ;
-- projet Firebase Android canonique ;
+- projet Firebase Android canonique et double client OAuth temporaire de migration ;
 - Firestore `default` et sa Delete Protection ;
 - absence de secrets dans les logs ;
 - immuabilité d'une release publiée ;
