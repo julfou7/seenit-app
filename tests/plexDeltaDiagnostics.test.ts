@@ -44,7 +44,7 @@ test('SEENIT-PLEX-007 détaille la baseline, le snapshot courant et le verrou du
       deltaWatchedSnapshotComplete: false,
       deltaWatchedSnapshotServers: 1
     }
-  });
+  }) as any;
 
   const lines = payload.deltaDiagnostics as string[];
   assert.ok(Array.isArray(lines));
