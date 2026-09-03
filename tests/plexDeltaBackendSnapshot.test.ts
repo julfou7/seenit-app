@@ -19,8 +19,10 @@ test('SEENIT-PLEX-005 la delta ajoute un état library-watched courant sans dép
       lastViewedAt: 1,
       sourceKind: 'library-watched'
     }],
+    watchStates: [],
     scannedServers: 1,
-    skippedServers: 0
+    skippedServers: 0,
+    explicitUnwatchItems: 0
   });
 
   assert.equal(merged.history.length, 1);
@@ -44,7 +46,13 @@ test('SEENIT-PLEX-005 la delta déduplique une preuve PMS déjà présente par i
 
   const merged = mergePlexDeltaWatchedSnapshot(
     { history: [existing], watchlist: [] },
-    { items: [current], scannedServers: 1, skippedServers: 0 }
+    {
+      items: [current],
+      watchStates: [],
+      scannedServers: 1,
+      skippedServers: 0,
+      explicitUnwatchItems: 0
+    }
   );
 
   assert.equal(merged.history.length, 1);
