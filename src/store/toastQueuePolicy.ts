@@ -12,6 +12,12 @@ export function filterQueuedToastsByScope<T extends ScopedToastLike>(
   return queue.filter((item) => item.scope !== scope || item.retainOnScopeClear === true);
 }
 
+export function normalizePlexNonVuWording(value: string): string {
+  return String(value || '')
+    .replace(/\bdé-vus?\b/gi, (match) => match.toLowerCase().endsWith('s') ? 'non vus' : 'non vu')
+    .replace(/\bnon-vus?\b/gi, (match) => match.toLowerCase().endsWith('s') ? 'non vus' : 'non vu');
+}
+
 export function normalizePlexCompletionServers(message: string): string {
   const alreadySummarized = message.match(/(\d+)\s+serveur(?:s)?\s+scanné(?:s)?/i);
   if (alreadySummarized) {
@@ -38,6 +44,7 @@ export function buildPlexCompletionMessage(
   unwatched: number
 ): string {
   const watchedLabel = watched === 1 ? 'vu' : 'vus';
+  const unwatchedLabel = unwatched === 1 ? 'non vu' : 'non vus';
   const normalized = normalizePlexCompletionServers(message);
-  return `${normalized} • ${watched} ${watchedLabel} • ${unwatched} dé-vu`;
+  return `${normalized} • ${watched} ${watchedLabel} • ${unwatched} ${unwatchedLabel}`;
 }
