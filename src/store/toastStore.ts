@@ -1,8 +1,13 @@
 import { create } from 'zustand';
 import { Show } from '../types';
+import {
+  buildPlexCompletionMessage,
+  filterQueuedToastsByScope,
+  type ToastQueueScope
+} from './toastQueuePolicy';
 
 export type ToastType = 'archive' | 'unfollow' | 'dropped' | 'success' | 'info' | 'follow' | 'error' | 'reminder' | 'favorite' | 'download';
-export type ToastScope = 'plex';
+export type ToastScope = ToastQueueScope;
 
 export interface ToastMessageObj {
   title?: string;
@@ -60,30 +65,8 @@ function isPlexCompletionMessage(message: string | ToastMessageObj): boolean {
   return typeof message === 'string' && /^Synchronisation Plex terminée\b/i.test(message.trim());
 }
 
-function normalizePlexCompletionServers(message: string): string {
-  const alreadySummarized = message.match(/(\d+)\s+serveur(?:s)?\s+scanné(?:s)?/i);
-  if (alreadySummarized) {
-    return message.replace(/\s*•\s*Ignorés\s*:[\s\S]*$/i, '').trim();
-  }
-
-  const synchronized = message.match(/Synchronisés\s*:\s*(.*?)(?:\s*•\s*Ignorés\s*:|$)/i);
-  if (!synchronized) {
-    return message.replace(/\s*•\s*Ignorés\s*:[\s\S]*$/i, '').trim();
-  }
-
-  const servers = synchronized[1]
-    .split(',')
-    .map(server => server.trim())
-    .filter(Boolean);
-  const count = servers.length;
-  const label = count === 1 ? 'serveur scanné' : 'serveurs scannés';
-  return `Synchronisation Plex terminée • ${count} ${label}`;
-}
-
 function enrichPlexCompletionMessage(message: string): string {
-  const watchedLabel = plexBatchStats.watched === 1 ? 'vu' : 'vus';
-  const normalized = normalizePlexCompletionServers(message);
-  return `${normalized} • ${plexBatchStats.watched} ${watchedLabel} • ${plexBatchStats.unwatched} dé-vu`;
+  return buildPlexCompletionMessage(message, plexBatchStats.watched, plexBatchStats.unwatched);
 }
 
 export const useToastStore = create<ToastState>((set, get) => ({
@@ -161,7 +144,6 @@ export const useToastStore = create<ToastState>((set, get) => ({
         visible: true
       });
     } else {
-      // Add to queue to display sequentially
       set((prev) => ({
         queue: [...prev.queue, newItem]
       }));
@@ -170,11 +152,7 @@ export const useToastStore = create<ToastState>((set, get) => ({
 
   hideToast: () => {
     if (dequeueTimer) clearTimeout(dequeueTimer);
-
-    // Trigger exit animation
     set({ visible: false });
-
-    // Wait for exit animation (300ms) before popping next item
     dequeueTimer = setTimeout(() => {
       get().processNext();
     }, 320);
@@ -213,7 +191,7 @@ export const useToastStore = create<ToastState>((set, get) => ({
 
   clearQueuedScope: (scope) => {
     set((state) => ({
-      queue: state.queue.filter((item) => item.scope !== scope || item.retainOnScopeClear === true)
+      queue: filterQueuedToastsByScope(state.queue, scope)
     }));
   }
 }));
