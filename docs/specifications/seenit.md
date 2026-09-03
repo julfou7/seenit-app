@@ -173,9 +173,13 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   par UID. Le jeton passe uniquement dans `X-Plex-Token`.
 - **SEENIT-PLEX-005** — Un média Plex ne devient vu qu'avec une preuve de visionnage autoritative.
   Une activité `cloud` qui porte exactement la même identité technique qu'un film de la watchlist
-  reste ambiguë et est exclue de l'historique tant qu'une source forte (`account-history`, historique
-  PMS ou `viewCount > 0`) ne confirme pas le visionnage. Le rapprochement ne se fait jamais par
-  titre ou année ; en cas d'ambiguïté SeenIt conserve l'état non vu.
+  reste ambiguë. L'appartenance au **Watch History du compte Plex est elle aussi historique et ne
+  représente jamais, à elle seule, l'état courant** : en full scan, chaque entrée `account-history`
+  doit être validée par le `userState` provider de la même identité Plex. Seul un `viewCount > 0`
+  explicite permet son import comme vu ; un `viewCount = 0` explicite alimente la réconciliation
+  non-vue, et un état courant indisponible n'ajoute aucune progression. L'historique PMS récent et
+  les états `viewCount` explicites restent des preuves selon leur contrat. Le rapprochement ne se
+  fait jamais par titre ou année ; en cas d'ambiguïté SeenIt conserve l'état non vu.
 - **SEENIT-PLEX-006** — Un scan Plex complet réconcilie l’état vu **et explicitement non vu**
   des films et épisodes présents dans l’inventaire courant. Un `viewCount > 0` constitue une preuve vue ;
   un `viewCount = 0` explicitement observé retire le visionnage SeenIt correspondant. Une simple absence

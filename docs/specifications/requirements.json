@@ -338,6 +338,14 @@
         {
           "file": "tests/plexWatchEvidence.test.ts",
           "contains": "SEENIT-PLEX-005 protège réellement la réponse POST /api/plex/history"
+        },
+        {
+          "file": "tests/plexAccountHistory.test.ts",
+          "contains": "SEENIT-PLEX-005 le Watch History du compte exige un userState courant explicite"
+        },
+        {
+          "file": "tests/plexAccountHistory.test.ts",
+          "contains": "SEENIT-PLEX-005 le backend refuse un historique compte sans état courant vu"
         }
       ]
     },

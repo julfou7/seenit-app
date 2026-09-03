@@ -4,6 +4,8 @@ import {
   isPlexLibraryItemWatched,
   normalizePlexAccountHistoryNode
 } from '../src/features/plex/plexAccountHistory.ts';
+import { readExplicitPlexCurrentWatchState } from '../src/features/runtime/plexAccountCurrentState.ts';
+import { readFileSync } from 'node:fs';
 
 test('normalise un film du Watch History Plex sans utiliser son titre comme identité', () => {
   const item = normalizePlexAccountHistoryNode({
@@ -63,4 +65,21 @@ test('le full scan ne retient comme vus que les items dont viewCount est positif
   assert.equal(isPlexLibraryItemWatched({ viewCount: 4 }), true);
   assert.equal(isPlexLibraryItemWatched({ viewCount: 0, lastViewedAt: 123 }), false);
   assert.equal(isPlexLibraryItemWatched({}), false);
+});
+
+
+test('SEENIT-PLEX-005 le Watch History du compte exige un userState courant explicite', () => {
+  assert.equal(readExplicitPlexCurrentWatchState({ guid: 'plex://movie/history-only' }), null);
+  assert.equal(readExplicitPlexCurrentWatchState({ MediaContainer: { Metadata: [{ viewCount: 0 }] } }), false);
+  assert.equal(readExplicitPlexCurrentWatchState({ MediaContainer: { Metadata: [{ viewCount: 2 }] } }), true);
+  assert.equal(readExplicitPlexCurrentWatchState({ view_count: '0' }), false);
+});
+
+test('SEENIT-PLEX-005 le backend refuse un historique compte sans état courant vu', () => {
+  const serverSource = readFileSync(new URL('../server.ts', import.meta.url), 'utf8');
+  assert.ok(serverSource.includes('metadata.provider.plex.tv/library/metadata/'));
+  assert.ok(serverSource.includes('/userState'));
+  assert.ok(serverSource.includes("sourceKind === 'account-history'"));
+  assert.ok(serverSource.includes('accountCurrentWatched !== true'));
+  assert.ok(serverSource.includes('plexAccountCurrentUnwatched'));
 });
