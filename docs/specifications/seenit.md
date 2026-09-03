@@ -158,7 +158,8 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   TMDB ID.
 - Une synchronisation externe ne déduit jamais une suppression depuis une simple absence. Une source
   explicitement bidirectionnelle peut toutefois appliquer un état contraire lorsqu’elle fournit une preuve
-  autoritative ; pour Plex, seul un `viewCount=0` observé pendant un full scan vaut dé-vu.
+  autoritative ; pour Plex, un `viewCount=0` explicitement observé sur l'identité technique exacte vaut
+  dé-vu en full comme en delta, sous réserve de la propriété Plex définie par `SEENIT-PLEX-006`.
 - Les écritures doivent rester idempotentes et la signature de bibliothèque indépendante de
   l'ordre reçu.
 - Les écrans lourds sont chargés à la demande ; les listes conservent des clés et un ordre
@@ -186,21 +187,26 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   les états `viewCount` explicites restent des preuves selon leur contrat. En delta, SeenIt complète
   l'historique récent par un snapshot léger des éléments **actuellement vus** des bibliothèques PMS :
   ces entrées `library-watched` sont retenues avec un `viewCount > 0` explicite même si leur dernière
-  date de visionnage est antérieure au curseur. La delta ne collecte ni n'applique jamais de
-  `watched=false` ; la réconciliation destructive reste réservée au full scan et à `SEENIT-PLEX-006`.
-  Le rapprochement ne se fait jamais par titre ou année ; en cas d'ambiguïté SeenIt conserve l'état
-  non vu.
-- **SEENIT-PLEX-006** — Un scan Plex complet réconcilie l’état vu et le dé-vu **sans donner à Plex
-  l’autorité sur les progressions créées hors Plex**. Un `viewCount > 0` peut ajouter une progression et
-  celle-ci est alors marquée par une provenance technique Plex explicite. Un `viewCount = 0` ne retire
-  que ce même film/épisode si sa progression SeenIt courante porte encore cette provenance Plex. Un
-  visionnage manuel SeenIt, importé depuis une autre source ou legacy sans provenance certaine reste
-  vu, même si Plex l’observe non vu ou l’avait également observé vu auparavant. Une simple absence dans
-  l’historique incrémental ne vaut jamais dé-vu. En présence de plusieurs copies du même média, une copie
-  vue gagne sur une copie non vue. La mise à jour du miroir `plexWatchState` seule est silencieuse : elle
-  n’est ni comptée ni notifiée comme un dé-vu. Les clients antérieurs au protocole de provenance sûre ne
-  reçoivent pas d’états `watched=false`. L’écriture Firestore applique uniquement les mutations Plex
-  réellement possédées afin de ne jamais écraser une action SeenIt ou tierce.
+  date de visionnage est antérieure au curseur. Le backend conserve par UID un miroir compact de leurs
+  identités techniques et localisateurs PMS, sans jeton. Lorsqu'une identité précédemment vue disparaît
+  du snapshot d'un serveur effectivement scanné, cette absence n'est qu'un candidat : SeenIt recontrôle
+  directement la métadonnée PMS exacte et ne produit `watched=false` que si `viewCount=0` est explicitement
+  confirmé. Un 404, un timeout, un serveur ignoré ou une absence seule ne provoque aucun dé-vu. Le
+  rapprochement ne se fait jamais par titre ou année ; en cas d'ambiguïté SeenIt conserve l'état vu.
+- **SEENIT-PLEX-006** — Une synchronisation Plex, **full ou delta**, réconcilie l’état vu et le dé-vu
+  **sans donner à Plex l’autorité sur les progressions créées hors Plex**. Un `viewCount > 0` peut ajouter
+  une progression et celle-ci est alors marquée par une provenance technique Plex explicite. Un
+  `viewCount = 0` explicitement confirmé ne retire que ce même film/épisode si sa progression SeenIt
+  courante porte encore `plexImported=true`. Le miroir `plexWatchState` décrit l'état observé mais n'est
+  jamais une condition de propriété : son absence ou son ancien état ne bloque pas le retrait d'une
+  progression dont la provenance Plex est déjà prouvée. Un visionnage manuel SeenIt, importé depuis une
+  autre source ou legacy sans provenance certaine reste vu, même si Plex l’observe non vu ou l’avait
+  également observé vu auparavant. Une simple absence dans l’historique incrémental ou dans le snapshot
+  des vus ne vaut jamais dé-vu. En présence de plusieurs copies du même média, une copie vue gagne sur
+  une copie non vue. La mise à jour du miroir `plexWatchState` seule est silencieuse : elle n’est ni
+  comptée ni notifiée comme un dé-vu. Les clients antérieurs au protocole de provenance sûre ne reçoivent
+  pas d’états `watched=false`. L’écriture Firestore applique uniquement les mutations Plex réellement
+  possédées afin de ne jamais écraser une action SeenIt ou tierce.
 - Le full scan est paginé. Un inventaire partiel ne remplace pas un cache complet, sauf si au
   moins un inventaire serveur complet et exploitable a été obtenu conformément à la politique.
 - La déduplication finale utilise `movie:<tmdbId>` ou
@@ -307,7 +313,10 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   le bandeau Plex indique la phase réellement connue et la durée écoulée, sans inventer de pourcentage.
   Les toasts unitaires Plex d'un même lot peuvent être abandonnés via « Ignorer les suivants » : cette
   action purge uniquement les notifications Plex encore en file et conserve le bilan final ainsi que
-  les notifications des autres fonctionnalités.
+  les notifications des autres fonctionnalités. Le bilan final Plex n'est jamais rendu comme une seule
+  phrase dense : il utilise un bloc Plex visuellement distinct, un titre « Synchronisation Plex terminée »
+  puis des lignes séparées pour les serveurs scannés et le couple `vus / dé-vus`, avec un pictogramme ou
+  logo Plex de taille suffisante pour identifier immédiatement la source.
 - Les dialogues critiques utilisent un rôle adapté, sont fermables par Échap, placent le focus
   sur une action et ne déclenchent aucune suppression sans confirmation quand le transfert est
   actif.

@@ -324,7 +324,7 @@
     },
     {
       "id": "SEENIT-PLEX-005",
-      "title": "Un état vu Plex exige une preuve de visionnage autoritative, y compris en delta",
+      "title": "Un état Plex vu ou non-vu exige une preuve autoritative, y compris en delta",
       "targets": [
         "backend",
         "pwa",
@@ -374,12 +374,16 @@
         {
           "file": "tests/plexDeltaBackendSnapshot.test.ts",
           "contains": "SEENIT-PLEX-005 la delta déduplique une preuve PMS déjà présente par identité technique"
+        },
+        {
+          "file": "tests/plexDeltaUnwatchSnapshot.test.ts",
+          "contains": "SEENIT-PLEX-005 la delta recontrôle explicitement une identité vue disparue avant de produire watched=false"
         }
       ]
     },
     {
       "id": "SEENIT-PLEX-006",
-      "title": "Dé-vu Plex limité aux progressions explicitement créées par Plex",
+      "title": "Dé-vu Plex full et delta limité aux progressions explicitement créées par Plex",
       "targets": [
         "backend",
         "pwa",
@@ -425,6 +429,14 @@
         {
           "file": "tests/plexProgressMerge.test.ts",
           "contains": "SEENIT-PLEX-006 le runtime marque la provenance Plex et ne notifie qu’un vrai retrait"
+        },
+        {
+          "file": "tests/plexOwnedUnwatch.test.ts",
+          "contains": "SEENIT-PLEX-006 un viewCount=0 explicite retire une progression plexImported même sans ancien miroir"
+        },
+        {
+          "file": "tests/plexDeltaUnwatchSnapshot.test.ts",
+          "contains": "SEENIT-PLEX-006 la delta ne transforme jamais une absence ou un serveur ignoré en dé-vu"
         }
       ]
     },
@@ -836,7 +848,7 @@
     },
     {
       "id": "SEENIT-UX-004",
-      "title": "Toasts mobiles longs lisibles et lot Plex contrôlable",
+      "title": "Toasts mobiles longs lisibles et bilan Plex multi-lignes contrôlable",
       "targets": [
         "pwa",
         "apk"
@@ -869,6 +881,10 @@
         {
           "file": "tests/toastQueueScope.test.ts",
           "contains": "SEENIT-UX-004 le toast Plex expose le bouton Ignorer les suivants"
+        },
+        {
+          "file": "tests/plexToastSummary.test.ts",
+          "contains": "SEENIT-UX-004 le bilan final Plex utilise un bloc multi-lignes avec identité Plex"
         }
       ]
     },

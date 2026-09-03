@@ -1,4 +1,5 @@
 import { auth } from './firebase';
+import { CURRENT_APP_VERSION } from '../store/updateStore';
 import {
   isSeenItApiRequest,
   isUnexpectedHtmlApiResponse,
@@ -8,6 +9,9 @@ import {
 /**
  * Ajoute le jeton Firebase courant aux appels vers l'API SeenIt.
  * Le jeton est rafraichi automatiquement par le SDK Firebase si necessaire.
+ * La version applicative accompagne aussi les appels authentifiés afin que les
+ * réponses Plex destructrices restent réservées aux clients qui comprennent la
+ * provenance `plexImported`.
  */
 export async function getAuthenticatedHeaders(
   headers: HeadersInit = {}
@@ -20,6 +24,7 @@ export async function getAuthenticatedHeaders(
   const token = await user.getIdToken();
   const normalizedHeaders = new Headers(headers);
   normalizedHeaders.set('Authorization', `Bearer ${token}`);
+  normalizedHeaders.set('X-Plex-Version', CURRENT_APP_VERSION);
 
   return Object.fromEntries(normalizedHeaders.entries());
 }

@@ -64,8 +64,10 @@ export function applyPlexLibraryWatchState(
   const storageKey = getWatchStateStorageKey(state);
   const previousPlexState = input.plexWatchState?.[storageKey];
   const stateChanged = previousPlexState !== state.watched;
+  // La provenance `plexImported` est l'unique preuve de propriété. Le miroir peut être
+  // absent sur une progression Plex plus ancienne et ne doit jamais bloquer un dé-vu
+  // explicitement confirmé par Plex.
   const shouldUnwatch = state.watched === false
-    && previousPlexState === true
     && hasPlexOwnedProgress(input, state);
 
   if (!stateChanged && !shouldUnwatch) {
