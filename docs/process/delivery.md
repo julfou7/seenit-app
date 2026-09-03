@@ -144,10 +144,13 @@ Dès qu'une release officielle avec la nouvelle signature existe, la branche de 
 éligible et toutes les releases suivantes doivent repasser par la mise à jour sur place normale.
 
 Le smoke Android 36 privilégie la fiabilité à l'optimisation : chaque release recrée un AVD propre
-(`force-avd-creation: true`) et ne réutilise aucun snapshot ou cache `~/.android/avd`. Le cache AVD
-introduit pour v1.4.108 a été retiré après la release v1.4.112 bloquée par un snapshot devenu instable
-alors que toutes les assertions SeenIt avaient déjà passé. Le coût supplémentaire de création de
-l'émulateur est accepté afin d'éviter qu'un état virtuel obsolète bloque une publication sans défaut APK.
+(`force-avd-creation: true`) et ne réutilise aucun snapshot ou cache `~/.android/avd`. Le run de release
+1.4.112 `33806746182` a confirmé que le cache n'était pas la cause racine : l'AVD neuf a validé la
+rotation, l'installation fraîche, les contrats natifs, le cold start, la reprise et le deep link avant
+de disparaître au contrôle Retour. L'AVD API 36 est donc plafonné explicitement à `2048M`, comme l'API
+31 stable, afin de réduire la pression mémoire hôte sans modifier les assertions du TNR. Les preuves du
+smoke archivent aussi `free`, les principaux RSS et la fin de `dmesg` pour distinguer un kill QEMU sous
+pression d'un défaut applicatif. L'API 36 reste bloquante et le contrôle Retour n'est pas supprimé.
 
 ## Gestion et récupération des clés de signature
 
