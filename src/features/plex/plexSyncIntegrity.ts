@@ -59,21 +59,27 @@ export function shouldReplacePlexAvailabilityCache(
   return !delta && integrity?.libraryInventoryScanSucceeded === true;
 }
 
-/**
- * Le bilan utilisateur ne liste plus les serveurs ignorés : ils restent disponibles
- * dans `integrity.skippedServers` et dans les logs de diagnostic. Le toast ne montre
- * que le nombre de serveurs effectivement scannés.
- */
 export function describePlexServerSync(
   integrity?: PlexCollectionIntegrity | null
 ): string {
   const syncedServers = Array.isArray(integrity?.syncedServers)
     ? integrity.syncedServers.filter((server) => server?.name)
     : [];
+  const skippedServers = Array.isArray(integrity?.skippedServers)
+    ? integrity.skippedServers.filter((server) => server?.name)
+    : [];
+  const parts: string[] = [];
 
-  if (syncedServers.length === 0) return '';
-  const serverLabel = syncedServers.length === 1 ? 'serveur scanné' : 'serveurs scannés';
-  return `${syncedServers.length} ${serverLabel}`;
+  if (syncedServers.length > 0) {
+    parts.push(`Synchronisés : ${syncedServers.map((server) => server.name).join(', ')}`);
+  }
+  if (skippedServers.length > 0) {
+    parts.push(`Ignorés : ${skippedServers.map((server) => (
+      server.reason ? `${server.name} (${server.reason})` : server.name
+    )).join(', ')}`);
+  }
+
+  return parts.join(' • ');
 }
 
 export function getPlexServerSyncCounts(
