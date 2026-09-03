@@ -1,4 +1,4 @@
-import { appLogger } from '../store/logStore';
+import { appLogger } from '../store/logStore.ts';
 
 export type NativeBackendTransport = 'natif Android' | 'WebView';
 
