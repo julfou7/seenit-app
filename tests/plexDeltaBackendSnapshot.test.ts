@@ -10,7 +10,10 @@ import {
   canRecheckPlexDeltaUnwatchCandidate,
   isPlexDeltaWatchedQueryTechnicallyComplete
 } from '../src/features/runtime/plexDeltaUnwatchSafety.ts';
-import type { PlexDeltaWatchedLocator } from '../src/features/plex/plexDeltaUnwatch.ts';
+import {
+  hydratePlexDeltaWatchedLocator,
+  type PlexDeltaWatchedLocator
+} from '../src/features/plex/plexDeltaUnwatch.ts';
 
 test('SEENIT-PLEX-005 la delta ajoute un état library-watched courant sans dépendre de la date du curseur', () => {
   const payload = {
@@ -115,15 +118,23 @@ test('SEENIT-PLEX-005 le full complet initialise la baseline watched de la delta
       serverId: 'server-a',
       ratingKey: '101',
       mediaType: 'movie',
-      tmdbId: 51
+      tmdbId: 51,
+      resolutionKey: 'movie:tmdb:51'
     },
     {
       serverId: 'server-b',
       ratingKey: '202',
       mediaType: 'episode',
       tmdbId: 900,
+      resolutionKey: 'tv:tmdb:900',
       seasonNumber: 0,
       episodeNumber: 2
+    },
+    {
+      serverId: 'server-a',
+      ratingKey: '404',
+      mediaType: 'movie',
+      resolutionKey: 'movie:server:server-a:rating:404'
     }
   ]);
 
@@ -136,6 +147,39 @@ test('SEENIT-PLEX-005 le full complet initialise la baseline watched de la delta
     }
   });
   assert.equal(incomplete, null);
+});
+
+test('SEENIT-PLEX-005 la baseline delta conserve un vu technique sans TMDB puis réutilise le cache de résolution', () => {
+  const baseline = buildPlexFullWatchedDeltaBaseline({
+    history: [{
+      type: 'movie',
+      sourceKind: 'library-watched',
+      serverId: 'server-a',
+      ratingKey: '404'
+    }],
+    integrity: {
+      libraryInventoryScanComplete: true,
+      syncedServers: [{ id: 'server-a' }],
+      skippedServers: []
+    }
+  });
+
+  assert.ok(baseline);
+  assert.deepEqual(baseline[0], {
+    serverId: 'server-a',
+    ratingKey: '404',
+    mediaType: 'movie',
+    resolutionKey: 'movie:server:server-a:rating:404'
+  });
+
+  const hydrated = hydratePlexDeltaWatchedLocator(baseline[0], {
+    'movie:server:server-a:rating:404': { id: 9876, title: 'Nom sans rôle identitaire' }
+  });
+  assert.equal(hydrated.tmdbId, 9876);
+  assert.deepEqual(
+    buildPlexDeltaAuthoritativeWatchState(hydrated, { ratingKey: '404', viewCount: 0 }),
+    { mediaType: 'movie', tmdbId: 9876, watched: false, serverId: 'server-a' }
+  );
 });
 
 test('SEENIT-PLEX-005 le recontrôle delta interprète un viewCount omis comme zéro uniquement sur le ratingKey exact', () => {
@@ -163,7 +207,7 @@ test('SEENIT-PLEX-005 le recontrôle delta interprète un viewCount omis comme z
   assert.equal(buildPlexDeltaAuthoritativeWatchState(locator, { ratingKey: '101', viewCount: 'unknown' }), null);
 });
 
-test('SEENIT-PLEX-005 un média vu non résolu sans rapport ne bloque plus tous les dé-vu delta', () => {
+test('SEENIT-PLEX-005 un média vu non résolu sans rapport ne bloque plus tous les non vus delta', () => {
   const movieCandidate: PlexDeltaWatchedLocator = {
     serverId: 'server-a',
     ratingKey: '101',
@@ -193,7 +237,7 @@ test('SEENIT-PLEX-005 un média vu non résolu sans rapport ne bloque plus tous 
   );
   assert.equal(isPlexDeltaWatchedQueryTechnicallyComplete([{ title: 'sans ratingKey' }]), false);
 
-  // Un épisode non résolu sans rapport ne doit plus désactiver un dé-vu film.
+  // Un épisode non résolu sans rapport ne doit plus désactiver un non vu film.
   assert.equal(canRecheckPlexDeltaUnwatchCandidate(movieCandidate, [unresolvedEpisode]), true);
   // Des coordonnées S/E différentes prouvent qu'il ne s'agit pas du même épisode.
   assert.equal(canRecheckPlexDeltaUnwatchCandidate(episodeCandidate, [unresolvedEpisode]), true);
