@@ -212,13 +212,15 @@ test('SEENIT-PLEX-005 un média vu non résolu sans rapport ne bloque plus tous 
     serverId: 'server-a',
     ratingKey: '101',
     mediaType: 'movie',
-    tmdbId: 51
+    tmdbId: 51,
+    resolutionKey: 'movie:imdb:tt0000051'
   };
   const episodeCandidate: PlexDeltaWatchedLocator = {
     serverId: 'server-a',
     ratingKey: '202',
     mediaType: 'episode',
     tmdbId: 900,
+    resolutionKey: 'tv:tvdb:900',
     seasonNumber: 1,
     episodeNumber: 2
   };
@@ -239,24 +241,76 @@ test('SEENIT-PLEX-005 un média vu non résolu sans rapport ne bloque plus tous 
 
   // Un épisode non résolu sans rapport ne doit plus désactiver un non vu film.
   assert.equal(canRecheckPlexDeltaUnwatchCandidate(movieCandidate, [unresolvedEpisode]), true);
-  // Des coordonnées S/E différentes prouvent qu'il ne s'agit pas du même épisode.
+  // Sans identité de série commune démontrée, des coordonnées S/E ne suffisent jamais à bloquer.
   assert.equal(canRecheckPlexDeltaUnwatchCandidate(episodeCandidate, [unresolvedEpisode]), true);
 
-  const ambiguousEpisode = buildPlexDeltaUnresolvedWatchedItem(
-    { ratingKey: '998', parentIndex: 1, index: 2, viewCount: 1 },
+  const unrelatedStrongMovie = buildPlexDeltaUnresolvedWatchedItem(
+    { ratingKey: '996', Guid: [{ id: 'imdb://tt9999999' }], viewCount: 1 },
+    'movie',
+    'server-b'
+  );
+  assert.ok(unrelatedStrongMovie);
+  assert.equal(unrelatedStrongMovie.relationIdentity, 'imdb:tt9999999');
+  assert.equal(canRecheckPlexDeltaUnwatchCandidate(movieCandidate, [unrelatedStrongMovie]), true);
+
+  const sameStrongMovie = buildPlexDeltaUnresolvedWatchedItem(
+    { ratingKey: '995', Guid: [{ id: 'imdb://tt0000051' }], viewCount: 1 },
+    'movie',
+    'server-b'
+  );
+  assert.ok(sameStrongMovie);
+  assert.equal(canRecheckPlexDeltaUnwatchCandidate(movieCandidate, [sameStrongMovie]), false);
+
+  const unrelatedStrongEpisode = buildPlexDeltaUnresolvedWatchedItem(
+    {
+      ratingKey: '994',
+      grandparentGuids: [{ id: 'tvdb://901' }],
+      parentIndex: 1,
+      index: 2,
+      viewCount: 1
+    },
     'episode',
     'server-b'
   );
-  assert.ok(ambiguousEpisode);
-  assert.equal(canRecheckPlexDeltaUnwatchCandidate(episodeCandidate, [ambiguousEpisode]), false);
+  assert.ok(unrelatedStrongEpisode);
+  assert.equal(canRecheckPlexDeltaUnwatchCandidate(episodeCandidate, [unrelatedStrongEpisode]), true);
 
-  const ambiguousMovie = buildPlexDeltaUnresolvedWatchedItem(
+  const sameSeriesSameEpisode = buildPlexDeltaUnresolvedWatchedItem(
+    {
+      ratingKey: '993',
+      grandparentGuids: [{ id: 'tvdb://900' }],
+      parentIndex: 1,
+      index: 2,
+      viewCount: 1
+    },
+    'episode',
+    'server-b'
+  );
+  assert.ok(sameSeriesSameEpisode);
+  assert.equal(canRecheckPlexDeltaUnwatchCandidate(episodeCandidate, [sameSeriesSameEpisode]), false);
+
+  const sameSeriesOtherEpisode = buildPlexDeltaUnresolvedWatchedItem(
+    {
+      ratingKey: '992',
+      grandparentGuids: [{ id: 'tvdb://900' }],
+      parentIndex: 1,
+      index: 3,
+      viewCount: 1
+    },
+    'episode',
+    'server-b'
+  );
+  assert.ok(sameSeriesOtherEpisode);
+  assert.equal(canRecheckPlexDeltaUnwatchCandidate(episodeCandidate, [sameSeriesOtherEpisode]), true);
+
+  const unrelatedUnknownMovie = buildPlexDeltaUnresolvedWatchedItem(
     { ratingKey: '997', viewCount: 1 },
     'movie',
     'server-b'
   );
-  assert.ok(ambiguousMovie);
-  assert.equal(canRecheckPlexDeltaUnwatchCandidate(movieCandidate, [ambiguousMovie]), false);
+  assert.ok(unrelatedUnknownMovie);
+  // Sans relation technique avec le candidat, un film inconnu ne bloque plus tous les films.
+  assert.equal(canRecheckPlexDeltaUnwatchCandidate(movieCandidate, [unrelatedUnknownMovie]), true);
 
   const sameTechnicalItem = buildPlexDeltaUnresolvedWatchedItem(
     { ratingKey: '101', viewCount: 1 },

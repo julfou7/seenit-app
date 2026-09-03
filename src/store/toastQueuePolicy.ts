@@ -18,6 +18,19 @@ export function normalizePlexNonVuWording(value: string): string {
     .replace(/\bnon-vus?\b/gi, (match) => match.toLowerCase().endsWith('s') ? 'non vus' : 'non vu');
 }
 
+export function normalizePlexItemAction(action: string, subtitle?: string): string {
+  const normalizedAction = normalizePlexNonVuWording(action);
+  const normalizedSubtitle = normalizePlexNonVuWording(subtitle || '');
+
+  // Le sous-titre d'un retrait porte déjà le contexte « non vu sur Plex ».
+  // Ne jamais lui ajouter l'action contradictoire « Vu sur Plex » ni répéter « non vu ».
+  if (/\bnon vu\b[\s\S]*\bplex\b/i.test(normalizedSubtitle)) {
+    return 'Synchronisé';
+  }
+
+  return normalizedAction;
+}
+
 export function normalizePlexCompletionServers(message: string): string {
   const alreadySummarized = message.match(/(\d+)\s+serveur(?:s)?\s+scanné(?:s)?/i);
   if (alreadySummarized) {

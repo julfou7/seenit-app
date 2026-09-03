@@ -1,5 +1,7 @@
 import {
+  buildPlexParentShowIdentityItem,
   getPlexMetadataLookupKey,
+  getStrongPlexSourceIdentity,
   unwrapPlexMediaItem
 } from '../plex/plexIdentity.ts';
 import type { PlexDeltaWatchedLocator } from '../plex/plexDeltaUnwatch.ts';
@@ -8,8 +10,32 @@ export interface PlexDeltaUnresolvedWatchedItem {
   serverId: string;
   ratingKey: string;
   mediaType: 'movie' | 'episode';
+  relationIdentity?: string;
   seasonNumber?: number;
   episodeNumber?: number;
+}
+
+function getRelationIdentity(rawItem: unknown, mediaType: 'movie' | 'episode', serverId: string): string | undefined {
+  const item = unwrapPlexMediaItem(rawItem);
+  const identityItem = mediaType === 'episode'
+    ? buildPlexParentShowIdentityItem({ ...item, serverId, serverIdentifier: serverId })
+    : { ...item, serverId, serverIdentifier: serverId };
+  const identity = getStrongPlexSourceIdentity(identityItem);
+  return identity || undefined;
+}
+
+function getLocatorRelationIdentity(locator: PlexDeltaWatchedLocator): string | undefined {
+  const resolutionKey = String(locator.resolutionKey || '').replace(/^(?:movie|tv):/, '');
+  return resolutionKey || undefined;
+}
+
+function hasDemonstratedTechnicalRelation(
+  locator: PlexDeltaWatchedLocator,
+  unresolved: PlexDeltaUnresolvedWatchedItem
+): boolean {
+  const locatorIdentity = getLocatorRelationIdentity(locator)?.toLowerCase();
+  const unresolvedIdentity = unresolved.relationIdentity?.toLowerCase();
+  return Boolean(locatorIdentity && unresolvedIdentity && locatorIdentity === unresolvedIdentity);
 }
 
 export function buildPlexDeltaUnresolvedWatchedItem(
@@ -22,8 +48,15 @@ export function buildPlexDeltaUnresolvedWatchedItem(
   const normalizedServerId = String(serverId || '').trim();
   if (!normalizedServerId || !ratingKey) return null;
 
+  const relationIdentity = getRelationIdentity(item, mediaType, normalizedServerId);
+
   if (mediaType === 'movie') {
-    return { serverId: normalizedServerId, ratingKey, mediaType: 'movie' };
+    return {
+      serverId: normalizedServerId,
+      ratingKey,
+      mediaType: 'movie',
+      ...(relationIdentity ? { relationIdentity } : {})
+    };
   }
 
   const seasonNumber = Number(item?.parentIndex);
@@ -32,6 +65,7 @@ export function buildPlexDeltaUnresolvedWatchedItem(
     serverId: normalizedServerId,
     ratingKey,
     mediaType: 'episode',
+    ...(relationIdentity ? { relationIdentity } : {}),
     ...(Number.isInteger(seasonNumber) && seasonNumber >= 0 ? { seasonNumber } : {}),
     ...(Number.isInteger(episodeNumber) && episodeNumber > 0 ? { episodeNumber } : {})
   };
@@ -47,10 +81,11 @@ export function isPlexDeltaWatchedQueryTechnicallyComplete(watchedItems: unknown
 }
 
 /**
- * Un vu non résolu ne bloque que le candidat qu'il pourrait réellement concurrencer.
- * On ne rapproche jamais par titre/année : pour un film sans identité canonique, toute
- * autre copie film reste ambiguë ; pour un épisode, des coordonnées S/E différentes
- * prouvent qu'il ne s'agit pas du même épisode.
+ * Un vu non résolu ne bloque que le candidat auquel une relation technique est réellement
+ * démontrée. Le titre et l'année ne participent jamais à cette décision. Un autre film sans
+ * identité commune, ou un épisode d'une autre série, ne peut donc plus désactiver tous les
+ * non vus DELTA. Le même ratingKey reste toujours bloquant ; pour une autre copie, une identité
+ * provider/parent commune est exigée avant de la considérer concurrente.
  */
 export function canRecheckPlexDeltaUnwatchCandidate(
   locator: PlexDeltaWatchedLocator,
@@ -61,6 +96,7 @@ export function canRecheckPlexDeltaUnwatchCandidate(
       return false;
     }
     if (unresolved.mediaType !== locator.mediaType) continue;
+    if (!hasDemonstratedTechnicalRelation(locator, unresolved)) continue;
 
     if (locator.mediaType === 'movie') {
       return false;
