@@ -528,3 +528,13 @@ l'identité de l'APK et ses actifs.
   `npm run test:android`.
 - Démarrer l'APK à froid, le reprendre après veille, tester Retour depuis chaque niveau puis vérifier
   qu'aucun listener ou téléchargement n'est dupliqué.
+
+### **SEENIT-AUTH-001** — Connexion Google native Android via Credential Manager
+
+- Dans l'APK Android, le bouton **Continuer avec Google** utilise en priorité Android Credential Manager / Sign in with Google afin d'afficher le sélecteur de comptes Google natif, selon le même parcours que l'application ATHIA.
+- Le client OAuth est lu depuis `default_web_client_id` généré par le `google-services.json` canonique de `com.seenit.app`; aucun nouvel identifiant utilisateur SeenIt n'est créé par la couche native.
+- Le Google ID token obtenu n'est qu'un transport : il est échangé via `GoogleAuthProvider.credential(...)` puis `signInWithCredential(...)` dans le Firebase Web SDK déjà utilisé par SeenIt, afin de conserver le même Firebase UID et les mêmes données Firestore pour les comptes existants.
+- `setFilterByAuthorizedAccounts(false)` permet une reconnexion / un nouveau consentement lorsque nécessaire et `setAutoSelectEnabled(false)` conserve un choix explicite du compte.
+- Une annulation utilisateur du sélecteur est une sortie normale et ne doit afficher aucune erreur bloquante.
+- Si Credential Manager est indisponible ou échoue pour une raison de compatibilité, l'ancien flux natif Google Auth reste un fallback; la PWA conserve `signInWithPopup`.
+- TNR : toute régression vers le flux legacy comme parcours Android primaire, ou toute rupture de l'échange vers le Firebase UID existant, est interdite.
