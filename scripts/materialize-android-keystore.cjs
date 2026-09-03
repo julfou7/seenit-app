@@ -36,15 +36,36 @@ function loadSigningContract() {
   if (signing.source !== 'github-secret') {
     throw new Error('Source de signature Android invalide : github-secret attendu.');
   }
-  if (!signing.secretName || !signing.path || !/^[a-f0-9]{64}$/i.test(signing.sha256 || '')) {
-    throw new Error('Contrat de signature Android incomplet.');
+  const required = [
+    'secretName', 'storePasswordSecretName', 'keyPasswordSecretName', 'path',
+    'storeType', 'keyAlias', 'sha256', 'certificateSha1', 'certificateSha256'
+  ];
+  for (const key of required) {
+    if (!signing[key]) throw new Error(`Contrat de signature Android incomplet : ${key}.`);
+  }
+  if (signing.storeType !== 'PKCS12' || signing.keyAlias !== 'seenit') {
+    throw new Error('Contrat de signature Android invalide : PKCS12 / alias seenit attendus.');
+  }
+  if (!/^[a-f0-9]{64}$/i.test(signing.sha256)
+      || !/^[a-f0-9]{40}$/i.test(signing.certificateSha1)
+      || !/^[a-f0-9]{64}$/i.test(signing.certificateSha256)) {
+    throw new Error('Empreintes du contrat de signature Android invalides.');
   }
   return signing;
+}
+
+function requireSecretValue(secretName, label) {
+  const value = String(process.env[secretName] || '');
+  if (!value) throw new Error(`${label} absent (${secretName}).`);
+  return value;
 }
 
 function materializeAndroidKeystore() {
   const signing = loadSigningContract();
   const payload = decodeKeystorePayload(process.env[signing.secretName], signing.sha256);
+  requireSecretValue(signing.storePasswordSecretName, 'Mot de passe du keystore Android');
+  requireSecretValue(signing.keyPasswordSecretName, 'Mot de passe de la clé Android');
+
   const outputPath = path.resolve(root, signing.path);
   if (!outputPath.startsWith(`${root}${path.sep}`)) {
     throw new Error(`Chemin de keystore hors dépôt refusé : ${signing.path}.`);
@@ -59,14 +80,16 @@ function materializeAndroidKeystore() {
   return {
     path: signing.path,
     sha256: signing.sha256,
-    secretName: signing.secretName
+    secretName: signing.secretName,
+    storeType: signing.storeType,
+    keyAlias: signing.keyAlias
   };
 }
 
 if (require.main === module) {
   try {
     const result = materializeAndroidKeystore();
-    console.log(`[Android Signing] Keystore historique matérialisé dans ${result.path} et empreinte vérifiée.`);
+    console.log(`[Android Signing] Keystore release ${result.storeType}/${result.keyAlias} matérialisé dans ${result.path} et empreinte vérifiée.`);
   } catch (error) {
     console.error(`[Android Signing] ${error.message}`);
     process.exit(1);
@@ -77,5 +100,6 @@ module.exports = {
   decodeKeystorePayload,
   loadSigningContract,
   materializeAndroidKeystore,
+  requireSecretValue,
   sha256
 };
