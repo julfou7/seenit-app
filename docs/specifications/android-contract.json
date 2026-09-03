@@ -8,6 +8,8 @@
   "apiOrigin": "https://seenit.ai.studio",
   "signing": {
     "path": "android/app/debug.keystore",
+    "source": "github-secret",
+    "secretName": "SEENIT_ANDROID_KEYSTORE_B64",
     "sha256": "184991ec7f1d7db579676e4896fa0d438725c2d1d026827db5bb471693955673"
   },
   "gradleWrapper": {
@@ -158,6 +160,7 @@
     "hideAfterWebPaint": true
   },
   "generatedFiles": [
-    "android/app/google-services.json"
+    "android/app/google-services.json",
+    "android/app/debug.keystore"
   ]
 }
