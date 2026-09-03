@@ -56,6 +56,10 @@
         {
           "file": "tests/androidContract.test.ts",
           "contains": "SEENIT-APK-001 verrouille l’identité, la version et la clé de signature de l’APK"
+        },
+        {
+          "file": "tests/androidSigningMaterialization.test.ts",
+          "contains": "SEENIT-APK-001 refuse toute clé matérialisée dont l’empreinte diffère du contrat"
         }
       ]
     },

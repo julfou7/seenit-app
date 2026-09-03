@@ -30,6 +30,7 @@ test('SEENIT-DATA-006 protège default contre une suppression accidentelle', () 
   assert.match(specification, /SEENIT-DATA-006[\s\S]*Delete Protection activée/);
   assert.equal(/--no-delete-protection|DELETE_PROTECTION_DISABLED/.test(`${workflow}\n${scripts}`), false);
 });
+
 test('SEENIT-APK-004 protège l’identité Firebase Android canonique générée', () => {
   execFileSync(process.execPath, ['scripts/materialize-android-config.cjs']);
   const contract = JSON.parse(read('docs/specifications/android-contract.json'));
@@ -55,11 +56,18 @@ test('SEENIT-QUALITY-005 traite AI Studio comme un transport non autoritatif', (
   assert.match(bootstrap, /conserver l'état GitHub/);
 });
 
-
 test('SEENIT-QUALITY-005 matérialise Firebase Android et répare les droits Gradle', () => {
   execFileSync(process.execPath, ['scripts/materialize-android-config.cjs']);
+  const contract = JSON.parse(read('docs/specifications/android-contract.json'));
+  const gitignore = read('.gitignore');
+
   assert.equal(fs.existsSync('android/app/google-services.json'), true, 'google-services.json doit être généré');
-  assert.equal(fs.existsSync('android/app/debug.keystore'), true, 'la clé de signature historique doit rester suivie');
+  assert.match(gitignore, /android\/app\/debug\.keystore/);
+  assert.ok(contract.generatedFiles.includes('android/app/debug.keystore'));
+  assert.equal(contract.requiredFiles.includes('android/app/debug.keystore'), false);
+  assert.equal(contract.signing.source, 'github-secret');
+  assert.equal(contract.signing.secretName, 'SEENIT_ANDROID_KEYSTORE_B64');
+
   if (process.platform !== 'win32') {
     assert.notEqual(fs.statSync('android/gradlew').mode & 0o111, 0, 'le matérialiseur doit rendre android/gradlew exécutable');
   }

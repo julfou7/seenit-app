@@ -1,6 +1,6 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
-Dernière mise à jour : 2 septembre 2026
+Dernière mise à jour : 3 septembre 2026
 Version applicative : **1.4.111**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
@@ -36,9 +36,13 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 ### 2.1 Contrat APK immuable
 
 - **SEENIT-APK-001** — Une mise à jour APK conserve obligatoirement `applicationId=com.seenit.app`,
-  le schéma `com.seenit.app`, le nom SeenIt et la même clé de signature. La clé historique est
-  contrôlée par empreinte SHA-256. Toute rotation de clé nécessite un plan de migration testé sur
-  une installation existante ; elle ne peut jamais être réalisée comme un correctif ordinaire.
+  le schéma `com.seenit.app`, le nom SeenIt et la même clé de signature. La clé historique n'est plus
+  suivie dans l'arbre Git courant : `android/app/debug.keystore` est git-ignoré et matérialisé uniquement
+  pour une release depuis le GitHub Secret `SEENIT_ANDROID_KEYSTORE_B64`. Le matérialiseur refuse un
+  secret absent, un Base64 invalide ou des octets dont le SHA-256 diffère de l'empreinte fixée dans
+  `docs/specifications/android-contract.json`; le smoke N → N+1 compare ensuite le certificat réel des
+  APK. Toute rotation de clé nécessite un plan de migration testé sur une installation existante ; elle
+  ne peut jamais être réalisée comme un correctif ordinaire.
 - **SEENIT-APK-002** — L'icône SeenIt ne peut être supprimée, remplacée ou vidée par une évolution,
   une résolution de conflit ou `cap sync`. Le manifeste conserve les références `ic_launcher` et
   `ic_launcher_round`, toutes les densités Android existent avec leurs dimensions attendues et les
@@ -318,9 +322,12 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 - Les clés de service TVDB/OMDb/TMDB actuellement nécessaires au client sont considérées comme des
   identifiants exposés : elles ne doivent disposer d'aucun privilège d'écriture. Leur migration vers
   le backend est suivie comme dette de sécurité prioritaire.
-- La clé de signature APK historique est un actif de continuité, pas un secret neuf. Son empreinte
-  est figée pour empêcher une rotation accidentelle ; sa migration vers une signature protégée doit
-  préserver la possibilité de mise à jour des APK déjà installés.
+- La clé de signature APK historique est un actif de continuité, pas un secret neuf. Elle n'est plus
+  suivie dans l'arbre Git courant : la CI matérialise exactement les mêmes octets depuis GitHub Secrets
+  et vérifie leur empreinte avant Gradle. Cette externalisation empêche AI Studio de supprimer ou
+  réécrire le fichier courant, mais ne révoque pas l'exposition passée du keystore dans l'historique
+  public. Une véritable rotation de sécurité reste une migration séparée qui doit préserver la mise à
+  jour des APK déjà installés.
 - Les logs de production ne contiennent jamais jeton Firebase, Plex, C411, clé *Arr/qBittorrent,
   secret webhook, SID ou payload personnel complet.
 
@@ -389,7 +396,7 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 2. quand le lot est prêt, bump Android une seule fois puis `npm run version:sync` ;
 3. obtenir une validation continue verte ;
 4. déclencher manuellement la release depuis `main` ;
-5. `npm run test:android`, build Web, `npx cap sync android`, revalidation Android et Gradle ;
+5. matérialiser la clé historique depuis GitHub Secrets, vérifier son empreinte, exécuter `npm run test:android`, build Web, `npx cap sync android`, revalidation Android et Gradle ;
 6. smoke N → N+1 bloquant sur Android cible ; Android 12 optionnel/manual ou périodique ;
 7. publication immuable GitHub de l'APK et du SHA-256 ;
 8. validation terrain de la nouvelle APK.
@@ -422,9 +429,11 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   versions, lockfiles, SPEC ou fichiers suivis est rejetée. Les règles sont préchargées via
   `.agents/AGENTS.md` puis complétées par la lecture intégrale du `AGENTS.md` racine ; les invariants
   critiques restent en plus protégés par des tests afin qu'une omission de lecture ne puisse pas les
-  réintroduire silencieusement. Les fichiers Android canoniques suivis (`google-services.json`, clé de
-  signature historique) doivent rester présents et les scripts Unix requis au build doivent conserver
-  leur bit exécutable ; une normalisation AI Studio de ces éléments est une régression bloquante.
+  réintroduire silencieusement. Les artefacts Android matérialisés `android/app/google-services.json`
+  et `android/app/debug.keystore` ne sont pas suivis : leurs seules sources canoniques sont respectivement
+  le contrat Android suivi et le secret de release dont l'empreinte est verrouillée. AI Studio ne doit
+  jamais devenir leur source. Les scripts Unix requis au build doivent conserver leur bit exécutable ;
+  une normalisation AI Studio de ces invariants ou des lockfiles est une régression bloquante.
 - **SEENIT-QUALITY-006** — Les contrôles sont proportionnés au risque selon la classification de la
   section 12.1 et `docs/process/delivery.md`. Le doute ne réduit jamais les protections critiques :
   un changement non reconnu comme `light` ou `backend` reste `apk`, sans pour autant déclencher une

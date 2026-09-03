@@ -121,6 +121,11 @@ jobs:
       - name: Install Dependencies
         run: npm ci --legacy-peer-deps
 
+      - name: Materialize Historical Android Keystore
+        run: node scripts/materialize-android-keystore.cjs
+        env:
+          SEENIT_ANDROID_KEYSTORE_B64: ${{ secrets.SEENIT_ANDROID_KEYSTORE_B64 }}
+
       - name: Resolve Previous Published Release Baseline
         id: release_baseline
         run: |
@@ -155,6 +160,8 @@ jobs:
           npm run lint
           npm run test:unit
           npm run test:android
+        env:
+          SEENIT_REQUIRE_ANDROID_KEYSTORE: 'true'
 
       - name: Validate Unpublished Release Version
         id: release_candidate
@@ -184,13 +191,8 @@ jobs:
 
       - name: Revalidate Android Contract After Capacitor Sync
         run: npm run test:android
-
-      - name: Ensure Debug Keystore
-        run: |
-          if [ ! -f android/app/debug.keystore ]; then
-            echo "La clé de signature historique manque : publication refusée."
-            exit 1
-          fi
+        env:
+          SEENIT_REQUIRE_ANDROID_KEYSTORE: 'true'
 
       - name: Restore Gradle Wrapper Executable Permission
         run: chmod +x android/gradlew

@@ -54,6 +54,11 @@ Chaque push ou pull request exécute :
 5. contrat Android uniquement si le diff touche l'APK ;
 6. build Web + serveur.
 
+Le contrat Android exécuté en validation continue contrôle l'identité et le contrat de signature sans
+exiger le fichier privé de keystore : le secret de signature n'est jamais exposé aux PR ni aux pushes
+ordinaires. Si un fichier `android/app/debug.keystore` est présent localement, son empreinte est toutefois
+vérifiée et toute divergence est bloquée.
+
 `npm audit --omit=dev --audit-level=high` n'est exécuté que :
 
 - lorsqu'un manifeste/lockfile de dépendances change ;
@@ -89,13 +94,21 @@ Quand le lot est prêt :
 3. lancer `npm run version:sync` une seule fois pour aligner les surfaces de version ;
 4. pousser cette candidate ;
 5. attendre la validation continue verte ;
-6. déclencher manuellement `Validate & Release SeenIt` avec `release_apk=true` depuis `main`.
+6. vérifier que le secret de dépôt `SEENIT_ANDROID_KEYSTORE_B64` contient **exactement** le keystore
+   historique SeenIt encodé en Base64 ;
+7. déclencher manuellement `Validate & Release SeenIt` avec `release_apk=true` depuis `main`.
 
 Le déclenchement manuel de release ne relance pas d'abord le job de validation continue puis un second
 job identique. Le job de candidate exécute lui-même, **une seule fois sur le même runner**, le contrat
 de changement, SPEC, TypeScript, tests unitaires, contrat Android, garde d'immuabilité, audit de
 dépendances et build Web avant Gradle. Le contrôle reste complet, mais `npm ci` et le build Web ne sont
 plus payés deux fois pour la même release.
+
+Avant les tests Android de release, la CI décode `SEENIT_ANDROID_KEYSTORE_B64` dans
+`android/app/debug.keystore`, refuse un secret absent ou un Base64 invalide puis compare le SHA-256 aux
+octets historiques verrouillés dans `docs/specifications/android-contract.json`. Le fichier généré est
+local au runner et n'est jamais commité. Une empreinte différente bloque la release **avant Gradle**.
+Après `npx cap sync android`, le contrat Android est rejoué avec la présence du keystore obligatoire.
 
 Une candidate non publiée peut recevoir plusieurs commits correctifs sans consommer un nouveau numéro.
 Une version déjà publiée reste immuable et exige un nouveau patch pour tout correctif ultérieur.
@@ -113,13 +126,26 @@ version.
   périodique ou lors d'un changement Android à risque.
 
 Le smoke N → N+1 conserve l'installation par-dessus la dernière release, la signature, les données,
-le deep link, le launcher et les preuves archivées.
+le deep link, le launcher et les preuves archivées. L'externalisation du keystore n'est validée qu'une
+fois ce smoke passé avec le **même certificat réel** entre N et N+1.
 
 Pour éviter de payer un cold boot complet à chaque release, l'AVD Android 36 et son snapshot propre
 sont mis en cache entre les runs. Le snapshot n'est généré qu'en cas de cache miss ; le smoke bloquant
 réutilise ensuite cet AVD avec `force-avd-creation: false` et `-no-snapshot-save`. Cette optimisation ne
 change ni la baseline N, ni l'APK N+1, ni les assertions du TNR : elle ne fait qu'éviter de recréer
 l'environnement virtuel déjà validé.
+
+## Gestion et récupération de la clé historique
+
+`android/app/debug.keystore` est un **artefact généré**, pas une source Git. Les sources de confiance sont :
+
+- l'empreinte SHA-256 publique verrouillée par le contrat Android ;
+- le secret de dépôt `SEENIT_ANDROID_KEYSTORE_B64`, qui fournit les octets au runner de release ;
+- une sauvegarde hors ligne opérateur des mêmes octets, conservée séparément de GitHub.
+
+Cette externalisation ne constitue pas une rotation de sécurité : le keystore a existé dans l'historique
+public du dépôt. Une future rotation doit suivre son propre plan Android, prouver la compatibilité avec
+les installations existantes et ne peut jamais être introduite en remplaçant simplement le secret.
 
 ## Protections qui restent non négociables
 

@@ -6,12 +6,16 @@ const { materializeAndroidConfig } = require('./materialize-android-config.cjs')
 const root = path.resolve(__dirname, '..');
 const contractPath = path.join(root, 'docs/specifications/android-contract.json');
 
-function read(relativePath) {
+function resolveWithinRoot(relativePath) {
   const absolutePath = path.resolve(root, relativePath);
   if (!absolutePath.startsWith(`${root}${path.sep}`)) {
     throw new Error(`Chemin hors dépôt refusé : ${relativePath}`);
   }
-  return fs.readFileSync(absolutePath);
+  return absolutePath;
+}
+
+function read(relativePath) {
+  return fs.readFileSync(resolveWithinRoot(relativePath));
 }
 
 function readText(relativePath) {
@@ -156,9 +160,28 @@ function validateAndroidContract() {
     throw new Error('mobilesdk_app_id Firebase Android inattendu.');
   }
 
-  const signingFile = read(contract.signing.path);
-  if (sha256(signingFile) !== contract.signing.sha256) {
-    throw new Error('La clé de signature APK a changé : une mise à jour sur place deviendrait impossible.');
+  if (!contract.signing
+      || contract.signing.source !== 'github-secret'
+      || contract.signing.secretName !== 'SEENIT_ANDROID_KEYSTORE_B64'
+      || !/^[a-f0-9]{64}$/i.test(contract.signing.sha256 || '')) {
+    throw new Error('Le contrat de signature doit verrouiller le keystore historique matérialisé depuis GitHub Secrets.');
+  }
+  if (!Array.isArray(contract.generatedFiles) || !contract.generatedFiles.includes(contract.signing.path)) {
+    throw new Error('Le keystore historique doit être déclaré comme artefact Android généré.');
+  }
+  if (Array.isArray(contract.requiredFiles) && contract.requiredFiles.includes(contract.signing.path)) {
+    throw new Error('Le keystore historique ne doit plus être un fichier Git requis.');
+  }
+
+  const signingPath = resolveWithinRoot(contract.signing.path);
+  const signingMaterialized = fs.existsSync(signingPath);
+  if (signingMaterialized) {
+    const signingFile = fs.readFileSync(signingPath);
+    if (sha256(signingFile) !== contract.signing.sha256) {
+      throw new Error('La clé de signature APK a changé : une mise à jour sur place deviendrait impossible.');
+    }
+  } else if (process.env.SEENIT_REQUIRE_ANDROID_KEYSTORE === 'true') {
+    throw new Error('La clé de signature APK matérialisée est obligatoire pour une release.');
   }
 
   const wrapperJar = read(contract.gradleWrapper.path);
@@ -205,13 +228,14 @@ function validateAndroidContract() {
     throw new Error('La CI ne doit jamais modifier automatiquement la branche main.');
   }
 
-  return { contract, assetCount: contract.brandAssets.length };
+  return { contract, assetCount: contract.brandAssets.length, signingMaterialized };
 }
 
 if (require.main === module) {
   try {
     const result = validateAndroidContract();
-    console.log(`[APK] Contrat ${result.contract.applicationId} v${result.contract.applicationVersion} validé : ${result.assetCount} icônes contrôlées.`);
+    const signingStatus = result.signingMaterialized ? 'clé historique vérifiée' : 'clé externe non requise pour cette validation';
+    console.log(`[APK] Contrat ${result.contract.applicationId} v${result.contract.applicationVersion} validé : ${result.assetCount} icônes contrôlées, ${signingStatus}.`);
   } catch (error) {
     console.error(`[APK] ${error.message}`);
     process.exit(1);

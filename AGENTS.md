@@ -91,13 +91,20 @@ Ne modifiez jamais silencieusement :
 
 - `applicationId=com.seenit.app` ;
 - nom SeenIt, deep link et launcher ;
-- clé `android/app/debug.keystore` ;
+- certificat et empreinte de la clé de signature historique ;
 - icônes Android ;
 - identité Firebase Android.
 
+`android/app/debug.keystore` n'est pas une source Git : il est git-ignoré et ne doit jamais être
+(re)généré par AI Studio, Android Studio ou un agent. Pour une release, la CI matérialise **exactement**
+les octets historiques depuis le GitHub Secret `SEENIT_ANDROID_KEYSTORE_B64`, puis vérifie leur SHA-256
+contre `docs/specifications/android-contract.json` avant les tests Android et Gradle. Un secret absent,
+un Base64 invalide ou une empreinte différente bloque la release. Remplacer le secret par une autre clé
+est une rotation de signature et reste interdit sans migration explicite.
+
 Une modification Android intentionnelle doit être couverte par un test et, si elle touche un invariant,
-par la SPEC/contrat Android. Lors d'une release APK, exécuter `npm run test:android`, puis
-`npx cap sync android`, puis de nouveau `npm run test:android` avant Gradle.
+par la SPEC/contrat Android. Lors d'une release APK, matérialiser d'abord la clé historique, exécuter
+`npm run test:android`, puis `npx cap sync android`, puis de nouveau `npm run test:android` avant Gradle.
 
 Le smoke N → N+1 doit conserver signature, données, launcher, permission notification et deep link.
 L'APK publiée reste `assembleDebug` signée par la clé historique tant qu'une migration de signature
