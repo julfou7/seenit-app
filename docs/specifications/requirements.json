@@ -378,6 +378,14 @@
         {
           "file": "tests/plexDeltaUnwatchSnapshot.test.ts",
           "contains": "SEENIT-PLEX-005 la delta recontrôle explicitement une identité vue disparue avant de produire watched=false"
+        },
+        {
+          "file": "tests/plexDeltaBackendSnapshot.test.ts",
+          "contains": "SEENIT-PLEX-005 le full complet initialise la baseline watched de la delta"
+        },
+        {
+          "file": "tests/plexDeltaBackendSnapshot.test.ts",
+          "contains": "SEENIT-PLEX-005 le recontrôle delta interprète un viewCount omis comme zéro uniquement sur le ratingKey exact"
         }
       ]
     },
