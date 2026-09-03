@@ -23,6 +23,12 @@ import {
   mergePlexLibraryWatchStates,
   type PlexLibraryWatchState
 } from '../plex/plexLibraryWatchState.ts';
+import {
+  buildPlexDeltaUnresolvedWatchedItem,
+  canRecheckPlexDeltaUnwatchCandidate,
+  isPlexDeltaWatchedQueryTechnicallyComplete,
+  type PlexDeltaUnresolvedWatchedItem
+} from './plexDeltaUnwatchSafety.ts';
 
 export const SEENIT_BACKEND_IDENTITY = 'canonical';
 
@@ -422,6 +428,7 @@ export function buildPlexFullWatchedDeltaBaseline(payload: any): PlexDeltaWatche
 interface PlexDeltaServerSnapshotResult {
   items: any[];
   locators: PlexDeltaWatchedLocator[];
+  unresolvedWatchedItems: PlexDeltaUnresolvedWatchedItem[];
   scanned: boolean;
   completeForUnwatch: boolean;
   serverId: string;
@@ -435,13 +442,35 @@ interface PlexDeltaSnapshotResult {
   scannedServers: number;
   skippedServers: number;
   explicitUnwatchItems: number;
+  incompleteServers?: number;
+  previousLocatorItems?: number;
+  currentLocatorItems?: number;
+  unresolvedWatchedItems?: number;
+  missingUnwatchCandidates?: number;
+  blockedUnwatchCandidates?: number;
+  recheckedUnwatchCandidates?: number;
 }
 
 async function collectPlexDeltaWatchedSnapshot(req: any): Promise<PlexDeltaSnapshotResult> {
   const token = typeof req.headers?.['x-plex-token'] === 'string' ? req.headers['x-plex-token'] : '';
   const clientId = typeof req.body?.clientId === 'string' ? req.body.clientId : 'seenit-delta';
   const uid = String(req.user?.uid || '').trim();
-  if (!token) return { items: [], watchStates: [], scannedServers: 0, skippedServers: 0, explicitUnwatchItems: 0 };
+  if (!token) {
+    return {
+      items: [],
+      watchStates: [],
+      scannedServers: 0,
+      skippedServers: 0,
+      explicitUnwatchItems: 0,
+      incompleteServers: 0,
+      previousLocatorItems: 0,
+      currentLocatorItems: 0,
+      unresolvedWatchedItems: 0,
+      missingUnwatchCandidates: 0,
+      blockedUnwatchCandidates: 0,
+      recheckedUnwatchCandidates: 0
+    };
+  }
 
   const previousLocatorsPromise = loadPlexDeltaWatchedSnapshot(uid);
   const resourcesResponse = await fetch(
@@ -492,6 +521,7 @@ async function collectPlexDeltaWatchedSnapshot(req: any): Promise<PlexDeltaSnaps
       return {
         items: [],
         locators: [],
+        unresolvedWatchedItems: [],
         scanned: false,
         completeForUnwatch: false,
         serverId,
@@ -528,20 +558,32 @@ async function collectPlexDeltaWatchedSnapshot(req: any): Promise<PlexDeltaSnaps
           parentMetadataCache
         })));
         const locators = locatorResults.filter((locator): locator is PlexDeltaWatchedLocator => Boolean(locator));
+        const unresolvedWatchedItems = watchedItems.flatMap((item, index) => {
+          if (locatorResults[index]) return [];
+          const unresolved = buildPlexDeltaUnresolvedWatchedItem(item, query.mediaType, serverId);
+          return unresolved ? [unresolved] : [];
+        });
 
         return {
           items: watchedItems,
           locators,
-          complete: locators.length === watchedItems.length
+          unresolvedWatchedItems,
+          complete: isPlexDeltaWatchedQueryTechnicallyComplete(watchedItems)
         };
       } catch {
-        return { items: [] as any[], locators: [] as PlexDeltaWatchedLocator[], complete: false };
+        return {
+          items: [] as any[],
+          locators: [] as PlexDeltaWatchedLocator[],
+          unresolvedWatchedItems: [] as PlexDeltaUnresolvedWatchedItem[],
+          complete: false
+        };
       }
     }));
 
     return {
       items: queryResults.flatMap(result => result.items),
       locators: queryResults.flatMap(result => result.locators),
+      unresolvedWatchedItems: queryResults.flatMap(result => result.unresolvedWatchedItems),
       scanned: true,
       completeForUnwatch: Boolean(serverId) && queryResults.every(result => result.complete),
       serverId,
@@ -552,10 +594,13 @@ async function collectPlexDeltaWatchedSnapshot(req: any): Promise<PlexDeltaSnaps
 
   const previousLocators = await previousLocatorsPromise;
   const currentLocators = sanitizePlexDeltaWatchedLocators(serverResults.flatMap(result => result.locators));
+  const unresolvedWatched = serverResults.flatMap(result => result.unresolvedWatchedItems);
   const scannedServers = serverResults.filter(result => result.scanned).length;
   const skippedServers = serverResults.filter(result => !result.scanned).length;
+  const incompleteServers = serverResults.filter(result => result.scanned && !result.completeForUnwatch).length;
   const allServersSafeForUnwatch = serverResults.length > 0
     && skippedServers === 0
+    && incompleteServers === 0
     && serverResults.every(result => result.scanned && result.completeForUnwatch);
   const unwatchServerIds = allServersSafeForUnwatch
     ? new Set(serverResults.map(result => result.serverId).filter(Boolean))
@@ -563,14 +608,23 @@ async function collectPlexDeltaWatchedSnapshot(req: any): Promise<PlexDeltaSnaps
   const confirmedUnwatched = new Set<string>();
   const explicitStates: PlexLibraryWatchState[] = [];
   const supportsOwnedUnwatch = supportsPlexOwnedUnwatchVersion(req.headers?.['x-plex-version']);
+  let missingUnwatchCandidates = 0;
+  let blockedUnwatchCandidates = 0;
+  let recheckedUnwatchCandidates = 0;
 
   if (supportsOwnedUnwatch && unwatchServerIds.size > 0) {
     const missingLocators = findMissingPlexDeltaWatchedLocators(previousLocators, currentLocators, unwatchServerIds);
+    missingUnwatchCandidates = missingLocators.length;
+    const recheckableLocators = missingLocators.filter(locator => (
+      canRecheckPlexDeltaUnwatchCandidate(locator, unresolvedWatched)
+    ));
+    blockedUnwatchCandidates = missingLocators.length - recheckableLocators.length;
     const serverById = new Map(serverResults.map(result => [result.serverId, result]));
 
-    await runPlexDeltaTasks(missingLocators, 6, async locator => {
+    await runPlexDeltaTasks(recheckableLocators, 6, async locator => {
       const server = serverById.get(locator.serverId);
       if (!server?.baseUri || !server.serverToken) return;
+      recheckedUnwatchCandidates += 1;
       try {
         const metadataPayload = await fetchPlexJson(
           `${server.baseUri}/library/metadata/${encodeURIComponent(locator.ratingKey)}?includeGuids=1`,
@@ -613,12 +667,31 @@ async function collectPlexDeltaWatchedSnapshot(req: any): Promise<PlexDeltaSnaps
   const watchStates = mergePlexLibraryWatchStates([...currentTrueStates, ...explicitStates])
     .filter(state => state.watched === false);
 
+  console.log('[Plex Delta Unwatch]', {
+    previous: previousLocators.length,
+    current: currentLocators.length,
+    unresolvedWatched: unresolvedWatched.length,
+    candidates: missingUnwatchCandidates,
+    blocked: blockedUnwatchCandidates,
+    rechecked: recheckedUnwatchCandidates,
+    confirmed: watchStates.length,
+    incompleteServers,
+    skippedServers
+  });
+
   return {
     items: serverResults.flatMap(result => result.items),
     watchStates,
     scannedServers,
     skippedServers,
-    explicitUnwatchItems: watchStates.length
+    explicitUnwatchItems: watchStates.length,
+    incompleteServers,
+    previousLocatorItems: previousLocators.length,
+    currentLocatorItems: currentLocators.length,
+    unresolvedWatchedItems: unresolvedWatched.length,
+    missingUnwatchCandidates,
+    blockedUnwatchCandidates,
+    recheckedUnwatchCandidates
   };
 }
 
@@ -665,6 +738,7 @@ export function mergePlexDeltaWatchedSnapshot(payload: any, snapshot: PlexDeltaS
     visitedSources.push('library-unwatched-delta-explicit');
   }
 
+  const incompleteServers = Number(snapshot.incompleteServers || 0);
   return {
     ...payload,
     history: nextHistory,
@@ -676,11 +750,18 @@ export function mergePlexDeltaWatchedSnapshot(payload: any, snapshot: PlexDeltaS
       deltaWatchedSnapshotItems: snapshot.items.length,
       deltaWatchedSnapshotServers: snapshot.scannedServers,
       deltaWatchedSnapshotSkippedServers: snapshot.skippedServers,
+      deltaWatchedSnapshotIncompleteServers: incompleteServers,
+      deltaPreviousLocatorItems: Number(snapshot.previousLocatorItems || 0),
+      deltaCurrentLocatorItems: Number(snapshot.currentLocatorItems || 0),
+      deltaUnresolvedWatchedItems: Number(snapshot.unresolvedWatchedItems || 0),
+      deltaMissingUnwatchCandidates: Number(snapshot.missingUnwatchCandidates || 0),
+      deltaBlockedUnwatchCandidates: Number(snapshot.blockedUnwatchCandidates || 0),
+      deltaRecheckedUnwatchCandidates: Number(snapshot.recheckedUnwatchCandidates || 0),
       deltaExplicitUnwatchItems: snapshot.explicitUnwatchItems
     },
     integrity: {
       ...(payload.integrity && typeof payload.integrity === 'object' ? payload.integrity : {}),
-      deltaWatchedSnapshotComplete: snapshot.skippedServers === 0,
+      deltaWatchedSnapshotComplete: snapshot.skippedServers === 0 && incompleteServers === 0,
       deltaWatchedSnapshotServers: snapshot.scannedServers
     },
     totalFound: nextHistory.length + (Array.isArray(payload.watchlist) ? payload.watchlist.length : 0)
