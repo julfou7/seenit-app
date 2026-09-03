@@ -36,15 +36,17 @@ test('SEENIT-APK-004 exécute le contrat Android avant le garde de release', () 
   assert.ok(releaseGuardIndex > contractIndex, 'le contrat Android doit précéder le garde de release');
 });
 
-test('SEENIT-APK-001 matérialise la clé historique avant les tests de release et Gradle', () => {
-  const materializeIndex = workflow.indexOf('Materialize Historical Android Keystore');
+test('SEENIT-APK-001 matérialise la clé release avant les tests de release et Gradle', () => {
+  const materializeIndex = workflow.indexOf('Materialize SeenIt Release Keystore');
   const releaseTestsIndex = workflow.indexOf('Release Automated Tests');
   const gradleIndex = workflow.indexOf('./gradlew --no-daemon');
 
-  assert.ok(materializeIndex >= 0, 'la release doit matérialiser le keystore historique');
+  assert.ok(materializeIndex >= 0, 'la release doit matérialiser le keystore release');
   assert.ok(releaseTestsIndex > materializeIndex, 'le keystore doit exister avant le contrat Android de release');
   assert.ok(gradleIndex > materializeIndex, 'le keystore doit exister avant Gradle');
-  assert.match(workflow, /SEENIT_ANDROID_KEYSTORE_B64:\s*\$\{\{ secrets\.SEENIT_ANDROID_KEYSTORE_B64 \}\}/);
+  assert.match(workflow, /SEENIT_ANDROID_RELEASE_KEYSTORE_B64:\s*\$\{\{ secrets\.SEENIT_ANDROID_RELEASE_KEYSTORE_B64 \}\}/);
+  assert.match(workflow, /SEENIT_ANDROID_RELEASE_STORE_PASSWORD:\s*\$\{\{ secrets\.SEENIT_ANDROID_RELEASE_STORE_PASSWORD \}\}/);
+  assert.match(workflow, /SEENIT_ANDROID_RELEASE_KEY_PASSWORD:\s*\$\{\{ secrets\.SEENIT_ANDROID_RELEASE_KEY_PASSWORD \}\}/);
   assert.match(workflow, /SEENIT_REQUIRE_ANDROID_KEYSTORE:\s*['"]true['"]/);
 });
 
