@@ -20,3 +20,14 @@ test('SEENIT-UX-004 le bilan Plex affiche serveurs scannés, vus et non vus sans
   assert.doesNotMatch(summary, /ignor/i);
   assert.doesNotMatch(summary, /dé-vu|non-vu/i);
 });
+
+test('SEENIT-UX-004 le bilan Plex met zéro au pluriel et uniquement un au singulier', () => {
+  assert.equal(
+    formatPlexCompletionSummary(0, 1, 0),
+    'Synchronisation Plex terminée • 0 serveurs scannés • 1 vu • 0 non vus'
+  );
+  assert.equal(
+    formatPlexCompletionSummary(2, 0, 1),
+    'Synchronisation Plex terminée • 2 serveurs scannés • 0 vus • 1 non vu'
+  );
+});
