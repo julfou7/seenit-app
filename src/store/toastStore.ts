@@ -3,6 +3,7 @@ import { Show } from '../types';
 import {
   buildPlexCompletionMessage,
   filterQueuedToastsByScope,
+  normalizePlexNonVuWording,
   type ToastQueueScope
 } from './toastQueuePolicy';
 
@@ -65,6 +66,16 @@ function isPlexCompletionMessage(message: string | ToastMessageObj): boolean {
   return typeof message === 'string' && /^Synchronisation Plex terminée\b/i.test(message.trim());
 }
 
+function normalizePlexToastMessage(message: string | ToastMessageObj): string | ToastMessageObj {
+  if (typeof message === 'string') return normalizePlexNonVuWording(message);
+  return {
+    ...message,
+    ...(message.title ? { title: normalizePlexNonVuWording(message.title) } : {}),
+    ...(message.subtitle ? { subtitle: normalizePlexNonVuWording(message.subtitle) } : {}),
+    action: normalizePlexNonVuWording(message.action)
+  };
+}
+
 function enrichPlexCompletionMessage(message: string): string {
   return buildPlexCompletionMessage(message, plexBatchStats.watched, plexBatchStats.unwatched);
 }
@@ -112,10 +123,10 @@ export const useToastStore = create<ToastState>((set, get) => ({
     const inferredScope: ToastScope | undefined = scope || (isPlexToastMessage(message) ? 'plex' : undefined);
     const searchText = getToastSearchText(message);
     const isCompletion = inferredScope === 'plex' && isPlexCompletionMessage(message);
-    let finalMessage = message;
+    let finalMessage = inferredScope === 'plex' ? normalizePlexToastMessage(message) : message;
 
     if (inferredScope === 'plex' && !isCompletion) {
-      if (/dé-vu\s+sur\s+plex/i.test(searchText)) {
+      if (/(?:dé-vu|non[- ]vu)\s+sur\s+plex/i.test(searchText)) {
         plexBatchStats.unwatched += 1;
       } else if (/\bvu\s+sur\s+plex\b/i.test(searchText) && !/watchlist/i.test(searchText)) {
         plexBatchStats.watched += 1;
