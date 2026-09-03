@@ -13,7 +13,7 @@ const PlexLogo = ({ className = "w-4 h-4" }: { className?: string }) => (
 );
 
 export function ToastContainer() {
-  const { currentToast, message, type, show, visible, onUndo, hideToast } = useToastStore();
+  const { currentToast, queue, message, type, show, visible, onUndo, hideToast, clearQueuedScope } = useToastStore();
   const { updateShow } = useShows();
   const touchStartY = useRef<number | null>(null);
 
@@ -63,6 +63,14 @@ export function ToastContainer() {
   };
 
   const hasUndoAction = Boolean(onUndo || (type === 'archive' && show));
+  const queuedPlexCount = currentToast?.scope === 'plex'
+    ? queue.filter((item) => item.scope === 'plex').length
+    : 0;
+  const canSkipPlexQueue = queuedPlexCount > 0;
+
+  const handleSkipFollowingPlexToasts = () => {
+    clearQueuedScope('plex');
+  };
 
   // Parse the message into structured data
   const getParsedMessage = (): ToastMessageObj => {
@@ -132,6 +140,7 @@ export function ToastContainer() {
 
   const rawMsgStr = typeof message === 'string' ? message : (parsed.action || '');
   const isPlexToast = Boolean(
+    currentToast?.scope === 'plex' ||
     rawMsgStr.toLowerCase().includes('plex') ||
     parsed.action?.toLowerCase().includes('plex') ||
     parsed.title?.toLowerCase().includes('plex')
@@ -302,21 +311,37 @@ export function ToastContainer() {
               </div>
 
               {/* Actions Button Area */}
-              {hasUndoAction && (
-                <div className="flex items-center shrink-0 pr-3 py-2.5">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleUndo();
-                    }}
-                    onTouchStart={(e) => e.stopPropagation()}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 text-xs font-bold border border-amber-500/30 shadow-sm transition-all cursor-pointer touch-manipulation select-none"
-                    title="Annuler l'action"
-                  >
-                    <RotateCcw size={12} className="stroke-[2.5]" />
-                    <span>Annuler</span>
-                  </button>
+              {(hasUndoAction || canSkipPlexQueue) && (
+                <div className="flex items-center gap-2 shrink-0 pr-3 py-2.5">
+                  {hasUndoAction && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUndo();
+                      }}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 text-xs font-bold border border-amber-500/30 shadow-sm transition-all cursor-pointer touch-manipulation select-none"
+                      title="Annuler l'action"
+                    >
+                      <RotateCcw size={12} className="stroke-[2.5]" />
+                      <span>Annuler</span>
+                    </button>
+                  )}
+                  {canSkipPlexQueue && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSkipFollowingPlexToasts();
+                      }}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      className="px-2.5 py-1.5 rounded-xl bg-white/8 hover:bg-white/12 active:scale-95 text-zinc-200 text-[11px] font-bold border border-white/15 transition-all cursor-pointer touch-manipulation select-none"
+                      title={`Ignorer ${queuedPlexCount} notification(s) Plex suivante(s)`}
+                    >
+                      Ignorer les suivants
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -368,21 +393,39 @@ export function ToastContainer() {
                 </span>
               </div>
 
-              {/* Undo action button if present */}
-              {hasUndoAction && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleUndo();
-                  }}
-                  onTouchStart={(e) => e.stopPropagation()}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 text-xs font-bold border border-amber-500/30 shadow-sm transition-all cursor-pointer shrink-0 ml-1"
-                  title="Annuler"
-                >
-                  <RotateCcw size={11} className="stroke-[2.5]" />
-                  <span>Annuler</span>
-                </button>
+              {/* Actions */}
+              {(hasUndoAction || canSkipPlexQueue) && (
+                <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                  {hasUndoAction && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUndo();
+                      }}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 text-xs font-bold border border-amber-500/30 shadow-sm transition-all cursor-pointer shrink-0"
+                      title="Annuler"
+                    >
+                      <RotateCcw size={11} className="stroke-[2.5]" />
+                      <span>Annuler</span>
+                    </button>
+                  )}
+                  {canSkipPlexQueue && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSkipFollowingPlexToasts();
+                      }}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      className="px-2.5 py-1 rounded-full bg-white/8 hover:bg-white/12 active:scale-95 text-zinc-200 text-[11px] font-bold border border-white/15 transition-all cursor-pointer shrink-0"
+                      title={`Ignorer ${queuedPlexCount} notification(s) Plex suivante(s)`}
+                    >
+                      Ignorer les suivants
+                    </button>
+                  )}
+                </div>
               )}
 
               {/* Dynamic Progress Bar along bottom */}
@@ -402,4 +445,3 @@ export function ToastContainer() {
     </AnimatePresence>
   );
 }
-

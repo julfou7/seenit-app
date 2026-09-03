@@ -272,7 +272,7 @@
     },
     {
       "id": "SEENIT-PLEX-002",
-      "title": "Serveur Plex hors ligne non bloquant",
+      "title": "Serveur Plex hors ligne non bloquant et bilan centré sur les serveurs scannés",
       "targets": [
         "backend",
         "pwa",
@@ -282,6 +282,14 @@
         {
           "file": "tests/plexSyncIntegrity.test.ts",
           "contains": "un serveur hors ligne ne bloque ni les autres serveurs ni le curseur du full"
+        },
+        {
+          "file": "tests/plexSyncPresentation.test.ts",
+          "contains": "SEENIT-UX-004 le bilan Plex affiche serveurs scannés, vus et dé-vus sans serveur ignoré"
+        },
+        {
+          "file": "tests/toastQueueScope.test.ts",
+          "contains": "SEENIT-UX-004 le bilan Plex conserve uniquement les serveurs scannés et compte les vus et dé-vus"
         }
       ]
     },
@@ -316,7 +324,7 @@
     },
     {
       "id": "SEENIT-PLEX-005",
-      "title": "Un état vu Plex exige une preuve de visionnage autoritative",
+      "title": "Un état vu Plex exige une preuve de visionnage autoritative, y compris en delta",
       "targets": [
         "backend",
         "pwa",
@@ -350,6 +358,22 @@
         {
           "file": "tests/plexAccountHistory.test.ts",
           "contains": "SEENIT-PLEX-005 le backend refuse un historique compte sans état courant vu"
+        },
+        {
+          "file": "tests/plexDeltaWatchSnapshot.test.ts",
+          "contains": "SEENIT-PLEX-005 la delta interroge uniquement les éléments actuellement vus des sections Plex"
+        },
+        {
+          "file": "tests/plexDeltaWatchSnapshot.test.ts",
+          "contains": "SEENIT-PLEX-005 un état courant vu n’est jamais rejeté par le curseur historique de la delta"
+        },
+        {
+          "file": "tests/plexDeltaBackendSnapshot.test.ts",
+          "contains": "SEENIT-PLEX-005 la delta ajoute un état library-watched courant sans dépendre de la date du curseur"
+        },
+        {
+          "file": "tests/plexDeltaBackendSnapshot.test.ts",
+          "contains": "SEENIT-PLEX-005 la delta déduplique une preuve PMS déjà présente par identité technique"
         }
       ]
     },
@@ -812,7 +836,7 @@
     },
     {
       "id": "SEENIT-UX-004",
-      "title": "Toasts mobiles longs entièrement lisibles",
+      "title": "Toasts mobiles longs lisibles et lot Plex contrôlable",
       "targets": [
         "pwa",
         "apk"
@@ -825,6 +849,26 @@
         {
           "file": "tests/toastLayout.test.ts",
           "contains": "SEENIT-UX-004 le toast reste au-dessus de la navigation et de la safe area"
+        },
+        {
+          "file": "tests/plexSyncPresentation.test.ts",
+          "contains": "SEENIT-UX-004 la synchronisation Plex affiche une phase réelle et la durée écoulée sans faux pourcentage"
+        },
+        {
+          "file": "tests/plexSyncPresentation.test.ts",
+          "contains": "SEENIT-UX-004 le bilan Plex affiche serveurs scannés, vus et dé-vus sans serveur ignoré"
+        },
+        {
+          "file": "tests/toastQueueScope.test.ts",
+          "contains": "SEENIT-UX-004 ignorer les suivants purge uniquement les futurs toasts Plex"
+        },
+        {
+          "file": "tests/toastQueueScope.test.ts",
+          "contains": "SEENIT-UX-004 le bilan Plex conserve uniquement les serveurs scannés et compte les vus et dé-vus"
+        },
+        {
+          "file": "tests/toastQueueScope.test.ts",
+          "contains": "SEENIT-UX-004 le toast Plex expose le bouton Ignorer les suivants"
         }
       ]
     },
