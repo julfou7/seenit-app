@@ -38,6 +38,7 @@ import {
 } from "./src/features/plex/plexAccountHistory.ts";
 import { evaluatePlexSourceCompletion } from "./src/features/plex/plexSyncIntegrity.ts";
 import { buildPlexLibraryWatchState, mergePlexLibraryWatchStates } from "./src/features/plex/plexLibraryWatchState.ts";
+import { readExplicitPlexCurrentWatchState } from "./src/features/runtime/plexAccountCurrentState.ts";
 
 export interface AuthRequest extends Request {
   user?: DecodedIdToken;
@@ -1040,6 +1041,10 @@ async function startServer() {
         cloudItems: 0,
         plexAccountHistoryItems: 0,
         plexAccountHistoryRetained: 0,
+        plexAccountCurrentStateResolved: 0,
+        plexAccountCurrentWatched: 0,
+        plexAccountCurrentUnwatched: 0,
+        plexAccountCurrentStateUnknown: 0,
         pmsHistoryItems: 0,
         libraryWatchedItems: 0,
         libraryInventoryItems: 0,
@@ -1631,7 +1636,7 @@ async function startServer() {
         if (providerMetadataCache.has(plexId)) return providerMetadataCache.get(plexId);
 
         try {
-          const response = await fetch(`https://discover.provider.plex.tv/library/metadata/${encodeURIComponent(plexId)}?includeGuids=1`, {
+          const response = await fetch(`https://discover.provider.plex.tv/library/metadata/${encodeURIComponent(plexId)}?includeGuids=1&includeUserState=1`, {
             headers: {
               'Accept': 'application/json',
               'X-Plex-Token': token,
@@ -1645,6 +1650,28 @@ async function startServer() {
           const metadata = extractItems(payload)[0] || null;
           if (metadata) providerMetadataCache.set(plexId, metadata);
           return metadata;
+        } catch {
+          return null;
+        }
+      };
+
+      const fetchProviderUserState = async (rawGuid: unknown): Promise<any | null> => {
+        if (typeof rawGuid !== 'string' || !rawGuid.trim()) return null;
+        const plexId = extractPlexExternalIds({ guid: rawGuid }).plexGuid;
+        if (!plexId) return null;
+
+        try {
+          const response = await fetch(`https://metadata.provider.plex.tv/library/metadata/${encodeURIComponent(plexId)}/userState`, {
+            headers: {
+              'Accept': 'application/json',
+              'X-Plex-Token': token,
+              'X-Plex-Client-Identifier': plexClientIdentifier,
+              'X-Plex-Product': 'SeenIt'
+            },
+            signal: AbortSignal.timeout(4000)
+          });
+          if (!response.ok) return null;
+          return await response.json();
         } catch {
           return null;
         }
@@ -1684,8 +1711,10 @@ async function startServer() {
         // pour charger l'objet Metadata documenté par Plex : ratingKey/key/guid et,
         // pour les épisodes, parentIndex/index/grandparentGuid deviennent disponibles.
         if (entry.sourceKind === 'account-history' && typeof meta?.guid === 'string') {
+          let accountCurrentWatched: boolean | null = null;
           const providerMetadata = await fetchProviderMetadata(meta.guid);
           if (providerMetadata) {
+            accountCurrentWatched = readExplicitPlexCurrentWatchState(providerMetadata);
             raw = {
               ...originalRaw,
               ...providerMetadata,
@@ -1695,9 +1724,37 @@ async function startServer() {
               parentAccountMetadataId: originalRaw.parentAccountMetadataId,
               grandparentAccountMetadataId: originalRaw.grandparentAccountMetadataId
             };
-            entry = { ...entry, raw };
             meta = unwrapPlexMediaItem(raw);
           }
+
+          // includeUserState=1 évite normalement un second appel. Si Plex ne renvoie
+          // pas viewCount avec Metadata, interroger explicitement le userState courant.
+          if (accountCurrentWatched === null) {
+            accountCurrentWatched = readExplicitPlexCurrentWatchState(
+              await fetchProviderUserState(meta.guid || originalRaw.guid)
+            );
+          }
+
+          // Pour un épisode hors bibliothèque PMS, enrichir aussi la série parente
+          // afin de conserver l'identité canonique TMDB du show.
+          const accountType = String(meta?.type || '').toLowerCase();
+          if (accountType === 'episode') {
+            const parentIdentity = buildPlexParentShowIdentityItem(meta);
+            const parentIds = extractPlexExternalIds(parentIdentity);
+            if (!parentIds.tmdbId && typeof meta?.grandparentGuid === 'string') {
+              const parentMetadata = await fetchProviderMetadata(meta.grandparentGuid);
+              if (parentMetadata) {
+                raw = {
+                  ...raw,
+                  grandparentGuid: meta.grandparentGuid || parentMetadata.guid,
+                  grandparentGuids: parentMetadata.Guid || parentMetadata.guids || meta.grandparentGuids
+                };
+                meta = unwrapPlexMediaItem(raw);
+              }
+            }
+          }
+
+          entry = { ...entry, raw, accountCurrentWatched };
         }
 
         const rawType = String(meta.type || raw.type || '').toLowerCase();
@@ -1792,10 +1849,66 @@ async function startServer() {
 
       // 5. Normaliser sans aucune déduplication par titre ou année.
       // La déduplication fiable a lieu côté client après résolution du TMDB ID.
+      let accountCurrentStateResolved = 0;
+      let accountCurrentWatched = 0;
+      let accountCurrentUnwatched = 0;
+      let accountCurrentStateUnknown = 0;
+
+      for (const entry of enrichedEntries) {
+        if (entry?.sourceKind !== 'account-history') continue;
+        if (typeof entry?.accountCurrentWatched !== 'boolean') {
+          accountCurrentStateUnknown++;
+          continue;
+        }
+
+        accountCurrentStateResolved++;
+        if (entry.accountCurrentWatched) accountCurrentWatched++;
+        else accountCurrentUnwatched++;
+
+        const meta = unwrapPlexMediaItem(entry.raw || {});
+        const rawType = String(meta?.type || '').toLowerCase();
+        let watchState = null;
+
+        if (rawType === 'movie') {
+          watchState = buildPlexLibraryWatchState(
+            { ...meta, viewCount: entry.accountCurrentWatched ? 1 : 0 },
+            { mediaType: 'movie', serverName: 'Plex Account' }
+          );
+        } else if (rawType === 'episode') {
+          const parentTmdbId = Number(extractPlexExternalIds(buildPlexParentShowIdentityItem(meta)).tmdbId);
+          watchState = buildPlexLibraryWatchState(
+            { ...meta, viewCount: entry.accountCurrentWatched ? 1 : 0 },
+            {
+              mediaType: 'episode',
+              parentTmdbId: Number.isInteger(parentTmdbId) && parentTmdbId > 0 ? parentTmdbId : null,
+              serverName: 'Plex Account'
+            }
+          );
+        }
+
+        if (watchState) libraryWatchStateItems.push(watchState);
+      }
+
+      sourceStats.plexAccountCurrentStateResolved = accountCurrentStateResolved;
+      sourceStats.plexAccountCurrentWatched = accountCurrentWatched;
+      sourceStats.plexAccountCurrentUnwatched = accountCurrentUnwatched;
+      sourceStats.plexAccountCurrentStateUnknown = accountCurrentStateUnknown;
+      // « retenus » représente désormais les éléments réellement confirmés vus.
+      sourceStats.plexAccountHistoryRetained = accountCurrentWatched;
+
+      console.log(
+        `[Plex Sync] Account current state: resolved=${accountCurrentStateResolved}, ` +
+        `watched=${accountCurrentWatched}, unwatched=${accountCurrentUnwatched}, unknown=${accountCurrentStateUnknown}.`
+      );
+
       const normalizedHistory: any[] = [];
       const normalizedSince = Number.isFinite(Number(since)) ? Number(since) : undefined;
 
       for (const entry of enrichedEntries) {
+        // Le Watch History est un journal d'événements, pas l'état courant.
+        // Sans confirmation viewCount > 0, il ne peut jamais créer un « vu ».
+        if (entry?.sourceKind === 'account-history' && entry?.accountCurrentWatched !== true) continue;
+
         const raw = entry.raw || {};
         const meta = unwrapPlexMediaItem(raw);
         const source = entry.source;
