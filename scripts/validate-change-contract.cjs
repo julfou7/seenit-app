@@ -34,6 +34,11 @@ const VERSION_ONLY_PATTERNS = {
   ]
 };
 
+const VERSION_ONLY_JSON_FIELDS = {
+  'docs/specifications/android-contract.json': ['applicationVersion', 'versionCode'],
+  'docs/specifications/requirements.json': ['applicationVersion']
+};
+
 function normalizePath(file) {
   return String(file || '').trim().replace(/\\/g, '/');
 }
@@ -54,10 +59,48 @@ function isVersionOnlyPatch(file, patch) {
   return lines.length > 0 && lines.every(line => patterns.some(pattern => pattern.test(line)));
 }
 
-function isPureVersionAlignment(changedFiles, readPatch) {
+function isVersionOnlyJsonChange(file, before, after) {
+  const normalized = normalizePath(file);
+  const fields = VERSION_ONLY_JSON_FIELDS[normalized];
+  if (!fields) return false;
+
+  const beforeJson = JSON.parse(String(before || ''));
+  const afterJson = JSON.parse(String(after || ''));
+
+  const hasExpectedFields = fields.every(field => (
+    Object.prototype.hasOwnProperty.call(beforeJson, field)
+    && Object.prototype.hasOwnProperty.call(afterJson, field)
+  ));
+  if (!hasExpectedFields) return false;
+
+  const allVersionFieldsChanged = fields.every(field => beforeJson[field] !== afterJson[field]);
+  if (!allVersionFieldsChanged) return false;
+
+  for (const field of fields) {
+    delete beforeJson[field];
+    delete afterJson[field];
+  }
+
+  return JSON.stringify(beforeJson) === JSON.stringify(afterJson);
+}
+
+function isPureVersionAlignment(changedFiles, readPatch, readBefore, readAfter) {
   return changedFiles.length > 0 && changedFiles.every(file => {
     const normalized = normalizePath(file);
     if (!VERSION_ONLY_PATTERNS[normalized]) return false;
+
+    if (
+      VERSION_ONLY_JSON_FIELDS[normalized]
+      && typeof readBefore === 'function'
+      && typeof readAfter === 'function'
+    ) {
+      return isVersionOnlyJsonChange(
+        normalized,
+        readBefore(normalized),
+        readAfter(normalized)
+      );
+    }
+
     return isVersionOnlyPatch(normalized, readPatch(normalized));
   });
 }
@@ -129,7 +172,12 @@ function main() {
   );
 
   try {
-    if (isPureVersionAlignment(changedFiles, readPatch)) {
+    if (isPureVersionAlignment(
+      changedFiles,
+      readPatch,
+      file => readAt(base, file),
+      file => readAt(head, file)
+    )) {
       console.log('[SPEC] Alignement de version pur : contrat comportemental non requis.');
       return 0;
     }
@@ -178,8 +226,10 @@ if (require.main === module) {
 
 module.exports = {
   VERSION_ONLY_PATTERNS,
+  VERSION_ONLY_JSON_FIELDS,
   getChangedContentLines,
   isBehavioralFile,
+  isVersionOnlyJsonChange,
   isVersionOnlyPatch,
   isPureVersionAlignment,
   main,
