@@ -69,6 +69,18 @@ function enrichPlexCompletionMessage(message: string): string {
   return buildPlexCompletionMessage(message, plexBatchStats.watched, plexBatchStats.unwatched);
 }
 
+function buildPlexCompletionToast(message: string): ToastMessageObj {
+  const enriched = enrichPlexCompletionMessage(message);
+  const details = enriched
+    .replace(/^Synchronisation Plex terminée\s*•\s*/i, '')
+    .trim();
+
+  return {
+    title: 'PLEX • Synchronisation terminée',
+    action: details || 'Synchronisation terminée'
+  };
+}
+
 export const useToastStore = create<ToastState>((set, get) => ({
   currentToast: null,
   queue: [],
@@ -111,7 +123,7 @@ export const useToastStore = create<ToastState>((set, get) => ({
     }
 
     if (isCompletion && typeof message === 'string') {
-      finalMessage = enrichPlexCompletionMessage(message);
+      finalMessage = buildPlexCompletionToast(message);
       plexBatchStats = { watched: 0, unwatched: 0 };
     } else if (
       inferredScope === 'plex' &&
@@ -127,8 +139,11 @@ export const useToastStore = create<ToastState>((set, get) => ({
       show: finalShow,
       onUndo: finalUndo,
       duration: finalDuration,
-      scope: inferredScope,
-      retainOnScopeClear: isCompletion
+      // Le bilan final reste identifiable comme Plex par son titre, mais sort du scope
+      // purgeable afin que « Ignorer les suivants » ne puisse jamais le supprimer ni
+      // continuer d'afficher le bouton quand il ne reste que le résumé final.
+      scope: isCompletion ? undefined : inferredScope,
+      retainOnScopeClear: false
     };
 
     const state = get();
