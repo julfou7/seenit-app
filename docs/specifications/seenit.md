@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 2 septembre 2026
-Version applicative : **1.4.110**
+Version applicative : **1.4.111**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -180,12 +180,17 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   non-vue, et un état courant indisponible n'ajoute aucune progression. L'historique PMS récent et
   les états `viewCount` explicites restent des preuves selon leur contrat. Le rapprochement ne se
   fait jamais par titre ou année ; en cas d'ambiguïté SeenIt conserve l'état non vu.
-- **SEENIT-PLEX-006** — Un scan Plex complet réconcilie l’état vu **et explicitement non vu**
-  des films et épisodes présents dans l’inventaire courant. Un `viewCount > 0` constitue une preuve vue ;
-  un `viewCount = 0` explicitement observé retire le visionnage SeenIt correspondant. Une simple absence
-  dans l’historique incrémental ne vaut jamais dé-vu. En présence de plusieurs copies du même média, une
-  copie vue gagne sur une copie non vue. L’écriture Firestore applique uniquement les mutations de
-  progression produites par le scan afin de ne pas écraser une action SeenIt concurrente non concernée.
+- **SEENIT-PLEX-006** — Un scan Plex complet réconcilie l’état vu et le dé-vu **sans donner à Plex
+  l’autorité sur les progressions créées hors Plex**. Un `viewCount > 0` peut ajouter une progression et
+  celle-ci est alors marquée par une provenance technique Plex explicite. Un `viewCount = 0` ne retire
+  que ce même film/épisode si sa progression SeenIt courante porte encore cette provenance Plex. Un
+  visionnage manuel SeenIt, importé depuis une autre source ou legacy sans provenance certaine reste
+  vu, même si Plex l’observe non vu ou l’avait également observé vu auparavant. Une simple absence dans
+  l’historique incrémental ne vaut jamais dé-vu. En présence de plusieurs copies du même média, une copie
+  vue gagne sur une copie non vue. La mise à jour du miroir `plexWatchState` seule est silencieuse : elle
+  n’est ni comptée ni notifiée comme un dé-vu. Les clients antérieurs au protocole de provenance sûre ne
+  reçoivent pas d’états `watched=false`. L’écriture Firestore applique uniquement les mutations Plex
+  réellement possédées afin de ne jamais écraser une action SeenIt ou tierce.
 - Le full scan est paginé. Un inventaire partiel ne remplace pas un cache complet, sauf si au
   moins un inventaire serveur complet et exploitable a été obtenu conformément à la politique.
 - La déduplication finale utilise `movie:<tmdbId>` ou
