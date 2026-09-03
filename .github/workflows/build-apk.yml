@@ -294,28 +294,6 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Restore Android 36 AVD Snapshot
-        id: avd-cache
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.android/avd/*
-            ~/.android/adb*
-          key: seenit-avd-${{ runner.os }}-36-google_apis-x86_64-v1
-
-      - name: Create Android 36 AVD Snapshot
-        if: steps.avd-cache.outputs.cache-hit != 'true'
-        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
-        with:
-          api-level: 36
-          target: google_apis
-          arch: x86_64
-          profile: pixel_6
-          force-avd-creation: false
-          disable-animations: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: echo "Snapshot Android 36 prêt pour les prochaines releases."
-
       - name: Run N to N+1 Upgrade Smoke
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
@@ -323,9 +301,9 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
-          force-avd-creation: false
+          force-avd-creation: true
           disable-animations: true
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: >-
             bash scripts/android-upgrade-smoke.sh
             "upgrade-baseline/SeenIt-v${{ steps.baseline.outputs.BASELINE_VERSION }}.apk"
