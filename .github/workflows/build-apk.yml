@@ -301,6 +301,7 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
+          ram-size: 2048M
           force-avd-creation: true
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
@@ -311,6 +312,19 @@ jobs:
             "test-harness/app-debug-androidTest.apk"
             "upgrade-reports/android-36"
             "36"
+
+      - name: Capture Android 36 Host Diagnostics
+        if: always()
+        run: |
+          mkdir -p upgrade-reports/android-36
+          {
+            echo "# free -m"
+            free -m
+            echo
+            echo "# top RSS"
+            ps -eo pid,ppid,rss,vsz,comm --sort=-rss | head -n 20
+          } > upgrade-reports/android-36/host-memory.txt
+          sudo dmesg --ctime | tail -n 500 > upgrade-reports/android-36/host-dmesg.txt 2>&1 || true
 
       - name: Publish Upgrade Smoke Evidence
         if: always()
