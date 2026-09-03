@@ -24,10 +24,28 @@ function getWatchStateStorageKey(state: PlexLibraryWatchState): string {
     : `${state.seasonNumber}x${state.episodeNumber}`;
 }
 
+function isPlexOwnedProgressRecord(record: unknown): boolean {
+  return Boolean(record && typeof record === 'object' && (record as Record<string, unknown>).plexImported === true);
+}
+
+function hasPlexOwnedProgress(show: Show, state: PlexLibraryWatchState): boolean {
+  if (state.mediaType === 'movie') {
+    return isPlexOwnedProgressRecord(show.episodeRecords?.movie);
+  }
+
+  const expectedKey = `${state.seasonNumber}x${state.episodeNumber}`;
+  return Object.entries(show.episodeRecords || {}).some(
+    ([key, record]) => normalizePlexEpisodeKey(key) === expectedKey && isPlexOwnedProgressRecord(record)
+  );
+}
+
 /**
- * Un `viewCount=0` seul ne prouve pas un dé-vu : le média peut simplement n'avoir
- * jamais été vu dans Plex. SeenIt ne retire donc une progression que lorsqu'il a
- * auparavant observé ce même média `watched=true`, puis l'observe `watched=false`.
+ * Le miroir `plexWatchState` décrit uniquement l'état observé côté Plex. Il ne donne
+ * jamais à Plex la propriété d'une progression SeenIt. Un `viewCount=0` ne peut donc
+ * retirer que le film/épisode dont l'enregistrement porte explicitement
+ * `plexImported=true`, c'est-à-dire une progression réellement créée par la synchro
+ * Plex. Les progressions manuelles, importées ailleurs et legacy sans provenance
+ * certaine sont conservées par défaut.
  */
 export function applyPlexLibraryWatchState(
   input: Show,
@@ -46,7 +64,9 @@ export function applyPlexLibraryWatchState(
   const storageKey = getWatchStateStorageKey(state);
   const previousPlexState = input.plexWatchState?.[storageKey];
   const stateChanged = previousPlexState !== state.watched;
-  const shouldUnwatch = state.watched === false && previousPlexState === true;
+  const shouldUnwatch = state.watched === false
+    && previousPlexState === true
+    && hasPlexOwnedProgress(input, state);
 
   if (!stateChanged && !shouldUnwatch) {
     return { show: input, changed: false, unwatchApplied: false };
@@ -60,19 +80,23 @@ export function applyPlexLibraryWatchState(
     const nextSeen = show.seenEpisodes.filter(key => key !== 'movie');
     if (nextSeen.length !== show.seenEpisodes.length) progressChanged = true;
     show.seenEpisodes = nextSeen;
-    if (Object.prototype.hasOwnProperty.call(show.episodeRecords, 'movie')) {
+    if (isPlexOwnedProgressRecord(show.episodeRecords.movie)) {
       delete show.episodeRecords.movie;
       progressChanged = true;
     }
     if (progressChanged && show.status === 'completed') show.status = 'plan_to_watch';
   } else if (shouldUnwatch && state.mediaType === 'episode') {
     const expectedKey = `${state.seasonNumber}x${state.episodeNumber}`;
-    const nextSeen = show.seenEpisodes.filter(key => normalizePlexEpisodeKey(key) !== expectedKey);
-    if (nextSeen.length !== show.seenEpisodes.length) progressChanged = true;
-    show.seenEpisodes = nextSeen;
+    const plexOwnedKeys = Object.entries(show.episodeRecords)
+      .filter(([key, record]) => normalizePlexEpisodeKey(key) === expectedKey && isPlexOwnedProgressRecord(record))
+      .map(([key]) => key);
 
-    for (const key of Object.keys(show.episodeRecords)) {
-      if (normalizePlexEpisodeKey(key) === expectedKey) {
+    if (plexOwnedKeys.length > 0) {
+      const nextSeen = show.seenEpisodes.filter(key => normalizePlexEpisodeKey(key) !== expectedKey);
+      if (nextSeen.length !== show.seenEpisodes.length) progressChanged = true;
+      show.seenEpisodes = nextSeen;
+
+      for (const key of plexOwnedKeys) {
         delete show.episodeRecords[key];
         progressChanged = true;
       }
