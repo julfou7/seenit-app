@@ -714,19 +714,27 @@ async function collectPlexDeltaWatchedSnapshot(req: any): Promise<PlexDeltaSnaps
   await persistPlexDeltaWatchedSnapshot(uid, nextLocators);
 
   // Une copie toujours vue gagne sur une copie explicitement recontrôlée non vue.
-  const currentTrueStates: PlexLibraryWatchState[] = currentLocators.flatMap(locator => {
-    if (!locator.tmdbId) return [];
-    return locator.mediaType === 'movie'
-      ? [{ mediaType: 'movie' as const, tmdbId: locator.tmdbId, watched: true, serverId: locator.serverId }]
-      : [{
-          mediaType: 'episode' as const,
-          tmdbId: locator.tmdbId,
-          seasonNumber: locator.seasonNumber!,
-          episodeNumber: locator.episodeNumber!,
-          watched: true,
-          serverId: locator.serverId
-        }];
-  });
+  const currentTrueStates: PlexLibraryWatchState[] = [];
+  for (const locator of currentLocators) {
+    if (!locator.tmdbId) continue;
+    if (locator.mediaType === 'movie') {
+      currentTrueStates.push({
+        mediaType: 'movie',
+        tmdbId: locator.tmdbId,
+        watched: true,
+        serverId: locator.serverId
+      });
+      continue;
+    }
+    currentTrueStates.push({
+      mediaType: 'episode',
+      tmdbId: locator.tmdbId,
+      seasonNumber: locator.seasonNumber!,
+      episodeNumber: locator.episodeNumber!,
+      watched: true,
+      serverId: locator.serverId
+    });
+  }
   const watchStates = mergePlexLibraryWatchStates([...currentTrueStates, ...explicitStates])
     .filter(state => state.watched === false);
   const previousCanonicalLocatorItems = previousLocators.filter(locator => Boolean(locator.tmdbId)).length;
