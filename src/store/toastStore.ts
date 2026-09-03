@@ -3,6 +3,7 @@ import { Show } from '../types';
 import {
   buildPlexCompletionMessage,
   filterQueuedToastsByScope,
+  normalizePlexItemAction,
   normalizePlexNonVuWording,
   type ToastQueueScope
 } from './toastQueuePolicy';
@@ -72,7 +73,7 @@ function normalizePlexToastMessage(message: string | ToastMessageObj): string | 
     ...message,
     ...(message.title ? { title: normalizePlexNonVuWording(message.title) } : {}),
     ...(message.subtitle ? { subtitle: normalizePlexNonVuWording(message.subtitle) } : {}),
-    action: normalizePlexNonVuWording(message.action)
+    action: normalizePlexItemAction(message.action, message.subtitle)
   };
 }
 
