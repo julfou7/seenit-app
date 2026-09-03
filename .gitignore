@@ -26,5 +26,8 @@ android/*.zip
 # Généré depuis docs/specifications/android-contract.json ; AI Studio ne le transporte pas.
 android/app/google-services.json
 
-# Matérialisé uniquement en release depuis SEENIT_ANDROID_KEYSTORE_B64.
+# Ancienne clé historique : conservée hors Git uniquement comme rollback.
 android/app/debug.keystore
+
+# Nouvelle clé release matérialisée uniquement depuis les GitHub Secrets de signature.
+android/app/seenit-release.p12
