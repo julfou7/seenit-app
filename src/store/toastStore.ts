@@ -60,9 +60,30 @@ function isPlexCompletionMessage(message: string | ToastMessageObj): boolean {
   return typeof message === 'string' && /^Synchronisation Plex terminée\b/i.test(message.trim());
 }
 
+function normalizePlexCompletionServers(message: string): string {
+  const alreadySummarized = message.match(/(\d+)\s+serveur(?:s)?\s+scanné(?:s)?/i);
+  if (alreadySummarized) {
+    return message.replace(/\s*•\s*Ignorés\s*:[\s\S]*$/i, '').trim();
+  }
+
+  const synchronized = message.match(/Synchronisés\s*:\s*(.*?)(?:\s*•\s*Ignorés\s*:|$)/i);
+  if (!synchronized) {
+    return message.replace(/\s*•\s*Ignorés\s*:[\s\S]*$/i, '').trim();
+  }
+
+  const servers = synchronized[1]
+    .split(',')
+    .map(server => server.trim())
+    .filter(Boolean);
+  const count = servers.length;
+  const label = count === 1 ? 'serveur scanné' : 'serveurs scannés';
+  return `Synchronisation Plex terminée • ${count} ${label}`;
+}
+
 function enrichPlexCompletionMessage(message: string): string {
   const watchedLabel = plexBatchStats.watched === 1 ? 'vu' : 'vus';
-  return `${message} • ${plexBatchStats.watched} ${watchedLabel} • ${plexBatchStats.unwatched} dé-vu`;
+  const normalized = normalizePlexCompletionServers(message);
+  return `${normalized} • ${plexBatchStats.watched} ${watchedLabel} • ${plexBatchStats.unwatched} dé-vu`;
 }
 
 export const useToastStore = create<ToastState>((set, get) => ({
