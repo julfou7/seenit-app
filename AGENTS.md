@@ -95,27 +95,25 @@ Ne modifiez jamais silencieusement :
 - icônes Android ;
 - identité Firebase Android.
 
-La rotation de signature approuvée le 03/09/2026 remplace la clé historique par une clé release PKCS12
-privée, alias `seenit`. `android/app/seenit-release.p12` est git-ignoré et ne doit jamais être
-(re)généré par AI Studio, Android Studio ou un agent. Pour une release, la CI matérialise exactement
-ses octets depuis `SEENIT_ANDROID_RELEASE_KEYSTORE_B64`, puis vérifie leur SHA-256 contre
-`docs/specifications/android-contract.json`. Les mots de passe proviennent exclusivement de
-`SEENIT_ANDROID_RELEASE_STORE_PASSWORD` et `SEENIT_ANDROID_RELEASE_KEY_PASSWORD`. Un secret absent,
+La rotation de signature validée avec la release 1.4.112 a définitivement remplacé la clé historique
+par la clé release PKCS12 privée, alias `seenit`. `android/app/seenit-release.p12` est git-ignoré et ne
+doit jamais être (re)généré par AI Studio, Android Studio ou un agent. Pour une release, la CI
+matérialise exactement ses octets depuis `SEENIT_ANDROID_RELEASE_KEYSTORE_B64`, puis vérifie leur
+SHA-256 contre `docs/specifications/android-contract.json`. Les mots de passe proviennent exclusivement
+de `SEENIT_ANDROID_RELEASE_STORE_PASSWORD` et `SEENIT_ANDROID_RELEASE_KEY_PASSWORD`. Un secret absent,
 un Base64 invalide, une empreinte différente, un alias/type inattendu ou des identifiants de signature
-manquants bloquent la release. Remplacer ensuite cette clé est une nouvelle rotation et reste interdit
-sans migration explicite.
+manquants bloquent la release. Remplacer cette clé est une nouvelle rotation et reste interdit sans
+migration explicite.
 
 Une modification Android intentionnelle doit être couverte par un test et, si elle touche un invariant,
 par la SPEC/contrat Android. Lors d'une release APK, matérialiser d'abord la clé release, exécuter
 `npm run test:android`, puis `npx cap sync android`, puis de nouveau `npm run test:android` avant Gradle.
 
-Le smoke Android conserve package, données, launcher, permission notification et deep link lors des
-mises à jour ordinaires. Une seule branche spéciale est autorisée pour la première release nouvelle
-signature : si la baseline porte exactement l'ancienne empreinte et la candidate exactement la nouvelle,
-le smoke doit désinstaller l'ancienne APK puis valider une installation fraîche. Dès que la baseline
-officielle porte la nouvelle signature, toute désinstallation redevient interdite et N → N+1 doit
-conserver les données/session. L'APK publiée reste `assembleDebug`, désormais signée par la clé release
-`seenit`, tant qu'un changement de canal de build n'a pas été explicitement conçu et validé.
+Depuis la baseline officielle 1.4.112, le smoke Android exige la **même signature release active** sur
+N et N+1, installe N+1 par-dessus N avec `adb install -r` et conserve package, données/session, launcher,
+permission notification et deep link. Toute divergence de signature ou toute branche de désinstallation
+est bloquante. L'APK publiée reste `assembleDebug`, signée par la clé release `seenit`, tant qu'un
+changement de canal de build n'a pas été explicitement conçu et validé.
 
 ## 5. Firebase / Firestore immuables
 
@@ -126,8 +124,8 @@ conserver les données/session. L'APK publiée reste `assembleDebug`, désormais
 - Projet Firebase canonique : `gen-lang-client-0201895414`.
 - `android/app/google-services.json` est un artefact généré et git-ignoré, matérialisé depuis
   `docs/specifications/android-contract.json` ; AI Studio ne doit jamais en être la source.
-- Le contrat Firebase conserve l'ancien client OAuth Android pour rollback et le nouveau client lié
-  au certificat release actif ; le client OAuth Web utilisé par Credential Manager reste inchangé.
+- Le contrat Firebase contient **un unique client OAuth Android actif**, lié au certificat release
+  `seenit` ; le client OAuth Web utilisé par Credential Manager reste inchangé.
 - `android/gradlew` est normalisé exécutable par le matérialiseur Android avant les contrôles/builds.
 
 Toute modification de projet Firebase, databaseId, signature ou identité Android est une migration :

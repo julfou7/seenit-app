@@ -17,19 +17,16 @@ function materializeAndroidConfig() {
   for (const key of required) {
     if (!firebase[key]) throw new Error(`Contrat Firebase Android incomplet : ${key}`);
   }
-  if (!Array.isArray(firebase.androidOauthClients) || firebase.androidOauthClients.length < 2) {
-    throw new Error('Contrat Firebase Android incomplet : clients OAuth Android historique et actif attendus.');
+  if (!Array.isArray(firebase.androidOauthClients) || firebase.androidOauthClients.length !== 1) {
+    throw new Error('Contrat Firebase Android invalide : un unique client OAuth Android actif est attendu.');
   }
-  for (const client of firebase.androidOauthClients) {
-    if (!client?.clientId || !/^[a-f0-9]{40}$/i.test(client?.certificateHash || '')) {
-      throw new Error('Contrat Firebase Android invalide : client OAuth Android incomplet.');
-    }
+  const [activeClient] = firebase.androidOauthClients;
+  if (!activeClient?.clientId || !/^[a-f0-9]{40}$/i.test(activeClient?.certificateHash || '')) {
+    throw new Error('Contrat Firebase Android invalide : client OAuth Android actif incomplet.');
   }
-  const activeClient = firebase.androidOauthClients.find(client =>
-    client.clientId === firebase.activeAndroidOauthClientId
-    && client.certificateHash === firebase.activeAndroidCertificateHash
-  );
-  if (!activeClient) {
+  if (activeClient.role !== 'active'
+      || activeClient.clientId !== firebase.activeAndroidOauthClientId
+      || activeClient.certificateHash !== firebase.activeAndroidCertificateHash) {
     throw new Error('Contrat Firebase Android invalide : le client OAuth actif ne correspond pas à la signature active.');
   }
 
@@ -45,14 +42,14 @@ function materializeAndroidConfig() {
         android_client_info: { package_name: String(firebase.androidPackageName) }
       },
       oauth_client: [
-        ...firebase.androidOauthClients.map(client => ({
-          client_id: String(client.clientId),
+        {
+          client_id: String(activeClient.clientId),
           client_type: 1,
           android_info: {
             package_name: String(firebase.androidPackageName),
-            certificate_hash: String(client.certificateHash)
+            certificate_hash: String(activeClient.certificateHash)
           }
-        })),
+        },
         { client_id: String(firebase.webOauthClientId), client_type: 3 }
       ],
       api_key: [{ current_key: String(firebase.apiKey) }],
