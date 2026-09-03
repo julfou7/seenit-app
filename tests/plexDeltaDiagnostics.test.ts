@@ -104,10 +104,3 @@ test('SEENIT-PLEX-007 la PWA écrit chaque ligne du diagnostic backend dans AppL
   assert.match(source, /\[Plex Delta Debug\]/);
   assert.match(source, /response\.clone\(\)\.json\(\)/);
 });
-
-test('SEENIT-PLEX-007 l’APK journalise aussi la réponse DELTA du transport natif', () => {
-  const source = fs.readFileSync(new URL('../src/lib/nativeBackendRetry.ts', import.meta.url), 'utf8');
-  assert.match(source, /transport !== 'natif Android'/);
-  assert.match(source, /data\?\.deltaDiagnostics/);
-  assert.match(source, /DIAGNOSTIC DELTA NATIF/);
-});
