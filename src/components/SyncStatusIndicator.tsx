@@ -1,10 +1,39 @@
+import { useEffect, useRef, useState } from 'react';
 import { useSyncStore } from '../store/syncStore';
 import { Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { formatPlexElapsed } from '../features/plex/plexSyncPresentation';
 
 export function SyncStatusIndicator() {
   const syncStatus = useSyncStore(state => state.syncStatus);
   const plexSyncStatus = useSyncStore(state => state.plexSyncStatus);
   const isQuotaExceeded = useSyncStore(state => state.isQuotaExceeded);
+  const [plexElapsedMs, setPlexElapsedMs] = useState(0);
+  const plexStartedAtRef = useRef<number | null>(null);
+  const plexMessage = plexSyncStatus?.message || '';
+  const isPlexCompleted = plexMessage.toLowerCase().includes('terminé') ||
+                          plexMessage.toLowerCase().includes('à jour') ||
+                          plexMessage.toLowerCase().includes('erreur');
+
+  useEffect(() => {
+    if (!plexSyncStatus || isPlexCompleted) {
+      plexStartedAtRef.current = null;
+      setPlexElapsedMs(0);
+      return;
+    }
+
+    if (plexStartedAtRef.current === null) {
+      plexStartedAtRef.current = Date.now();
+    }
+
+    const updateElapsed = () => {
+      if (plexStartedAtRef.current !== null) {
+        setPlexElapsedMs(Date.now() - plexStartedAtRef.current);
+      }
+    };
+    updateElapsed();
+    const timer = setInterval(updateElapsed, 1000);
+    return () => clearInterval(timer);
+  }, [Boolean(plexSyncStatus), isPlexCompleted]);
 
   if (isQuotaExceeded) {
     return (
@@ -33,13 +62,17 @@ export function SyncStatusIndicator() {
   if (plexSyncStatus) {
     const isCompleted = plexSyncStatus.message.toLowerCase().includes('terminé') || 
                         plexSyncStatus.message.toLowerCase().includes('à jour');
+    const sanitizedMessage = plexSyncStatus.message.replace(/,\s*\d+\s+ignoré\(s\)/gi, '');
+    const displayMessage = !isCompleted && plexElapsedMs >= 1000
+      ? `${sanitizedMessage} • ${formatPlexElapsed(plexElapsedMs)}`
+      : sanitizedMessage;
 
     return (
       <div 
         className={`flex items-center gap-1.5 xs:gap-2 bg-zinc-900/95 text-zinc-200 px-2 py-1 xs:px-2.5 xs:py-1.5 rounded-xl border ${
           isCompleted ? 'border-emerald-500/40' : 'border-amber-500/40 animate-pulse'
         } text-[10px] xs:text-[11px] font-bold tracking-tight max-w-[220px] xs:max-w-[270px] sm:max-w-[380px] min-w-0 overflow-hidden shadow-md shadow-black/50 transition-colors duration-300`}
-        title={plexSyncStatus.message}
+        title={displayMessage}
       >
         {/* Solid Opaque Plex Badge */}
         <div className={`w-4 h-4 xs:w-5 xs:h-5 rounded-md ${isCompleted ? 'bg-emerald-500' : 'bg-[#E5A93D]'} text-zinc-950 flex items-center justify-center font-black shadow-sm shrink-0 transition-colors duration-300`}>
@@ -57,7 +90,7 @@ export function SyncStatusIndicator() {
           <span className={`line-clamp-2 leading-tight break-words text-left font-semibold min-w-0 flex-1 ${
             isCompleted ? 'text-emerald-300' : 'text-zinc-200'
           }`}>
-            {plexSyncStatus.message}
+            {displayMessage}
           </span>
         </div>
       </div>
@@ -66,7 +99,3 @@ export function SyncStatusIndicator() {
 
   return null;
 }
-
-
-
-
