@@ -19,6 +19,7 @@ export interface ToastItem {
   onUndo?: (() => void | Promise<void>) | null;
   duration?: number;
   scope?: ToastScope;
+  retainOnScopeClear?: boolean;
 }
 
 interface ToastState {
@@ -44,6 +45,25 @@ interface ToastState {
 }
 
 let dequeueTimer: any = null;
+let plexBatchStats = { watched: 0, unwatched: 0 };
+
+function getToastSearchText(message: string | ToastMessageObj): string {
+  if (typeof message === 'string') return message;
+  return [message.title, message.subtitle, message.action].filter(Boolean).join(' • ');
+}
+
+function isPlexToastMessage(message: string | ToastMessageObj): boolean {
+  return /plex/i.test(getToastSearchText(message));
+}
+
+function isPlexCompletionMessage(message: string | ToastMessageObj): boolean {
+  return typeof message === 'string' && /^Synchronisation Plex terminée\b/i.test(message.trim());
+}
+
+function enrichPlexCompletionMessage(message: string): string {
+  const watchedLabel = plexBatchStats.watched === 1 ? 'vu' : 'vus';
+  return `${message} • ${plexBatchStats.watched} ${watchedLabel} • ${plexBatchStats.unwatched} dé-vu`;
+}
 
 export const useToastStore = create<ToastState>((set, get) => ({
   currentToast: null,
@@ -73,14 +93,38 @@ export const useToastStore = create<ToastState>((set, get) => ({
       finalUndo = onUndo;
     }
 
+    const inferredScope: ToastScope | undefined = scope || (isPlexToastMessage(message) ? 'plex' : undefined);
+    const searchText = getToastSearchText(message);
+    const isCompletion = inferredScope === 'plex' && isPlexCompletionMessage(message);
+    let finalMessage = message;
+
+    if (inferredScope === 'plex' && !isCompletion) {
+      if (/dé-vu\s+sur\s+plex/i.test(searchText)) {
+        plexBatchStats.unwatched += 1;
+      } else if (/\bvu\s+sur\s+plex\b/i.test(searchText) && !/watchlist/i.test(searchText)) {
+        plexBatchStats.watched += 1;
+      }
+    }
+
+    if (isCompletion && typeof message === 'string') {
+      finalMessage = enrichPlexCompletionMessage(message);
+      plexBatchStats = { watched: 0, unwatched: 0 };
+    } else if (
+      inferredScope === 'plex' &&
+      /Plex sera retenté|Erreur de synchronisation Plex|Synchronisation Plex incomplète/i.test(searchText)
+    ) {
+      plexBatchStats = { watched: 0, unwatched: 0 };
+    }
+
     const newItem: ToastItem = {
       id: Math.random().toString(36).substring(2, 9) + Date.now().toString(36),
-      message,
+      message: finalMessage,
       type,
       show: finalShow,
       onUndo: finalUndo,
       duration: finalDuration,
-      scope
+      scope: inferredScope,
+      retainOnScopeClear: isCompletion
     };
 
     const state = get();
@@ -142,12 +186,13 @@ export const useToastStore = create<ToastState>((set, get) => ({
 
   clearQueue: () => {
     if (dequeueTimer) clearTimeout(dequeueTimer);
+    plexBatchStats = { watched: 0, unwatched: 0 };
     set({ queue: [], visible: false, currentToast: null, onUndo: null });
   },
 
   clearQueuedScope: (scope) => {
     set((state) => ({
-      queue: state.queue.filter((item) => item.scope !== scope)
+      queue: state.queue.filter((item) => item.scope !== scope || item.retainOnScopeClear === true)
     }));
   }
 }));
