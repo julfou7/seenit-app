@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Show } from '../types';
 
 export type ToastType = 'archive' | 'unfollow' | 'dropped' | 'success' | 'info' | 'follow' | 'error' | 'reminder' | 'favorite' | 'download';
+export type ToastScope = 'plex';
 
 export interface ToastMessageObj {
   title?: string;
@@ -17,6 +18,7 @@ export interface ToastItem {
   show?: Show;
   onUndo?: (() => void | Promise<void>) | null;
   duration?: number;
+  scope?: ToastScope;
 }
 
 interface ToastState {
@@ -28,15 +30,17 @@ interface ToastState {
   onUndo?: (() => void | Promise<void>) | null;
   visible: boolean;
   showToast: (
-    message: string | ToastMessageObj, 
-    type?: ToastType, 
-    show?: any, 
+    message: string | ToastMessageObj,
+    type?: ToastType,
+    show?: any,
     onUndo?: (() => void | Promise<void>) | null,
-    duration?: number
+    duration?: number,
+    scope?: ToastScope
   ) => void;
   hideToast: () => void;
   processNext: () => void;
   clearQueue: () => void;
+  clearQueuedScope: (scope: ToastScope) => void;
 }
 
 let dequeueTimer: any = null;
@@ -49,10 +53,10 @@ export const useToastStore = create<ToastState>((set, get) => ({
   visible: false,
   onUndo: null,
 
-  showToast: (message, type = 'info', show, onUndo, duration = 5000) => {
+  showToast: (message, type = 'info', show, onUndo, duration = 5000, scope) => {
     let finalShow: Show | undefined = undefined;
     let finalUndo: (() => void | Promise<void>) | null = null;
-    let finalDuration = typeof duration === 'number' ? duration : 5000;
+    const finalDuration = typeof duration === 'number' ? duration : 5000;
 
     if (typeof show === 'function') {
       finalUndo = show as any;
@@ -75,7 +79,8 @@ export const useToastStore = create<ToastState>((set, get) => ({
       type,
       show: finalShow,
       onUndo: finalUndo,
-      duration: finalDuration
+      duration: finalDuration,
+      scope
     };
 
     const state = get();
@@ -138,5 +143,11 @@ export const useToastStore = create<ToastState>((set, get) => ({
   clearQueue: () => {
     if (dequeueTimer) clearTimeout(dequeueTimer);
     set({ queue: [], visible: false, currentToast: null, onUndo: null });
+  },
+
+  clearQueuedScope: (scope) => {
+    set((state) => ({
+      queue: state.queue.filter((item) => item.scope !== scope)
+    }));
   }
 }));
