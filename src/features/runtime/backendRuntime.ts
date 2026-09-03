@@ -3,12 +3,31 @@ import dns from 'node:dns/promises';
 import net from 'node:net';
 import { sanitizePlexSyncWatchEvidence } from '../plex/plexWatchEvidence.ts';
 import {
+  buildPlexParentShowIdentityItem,
+  extractPlexExternalIds,
+  getPlexMetadataLookupKey,
+  getPlexParentShowMetadataLookupKey,
   getStrongPlexSourceIdentity,
   unwrapPlexMediaItem
 } from '../plex/plexIdentity.ts';
 import { buildPlexDeltaWatchedSectionQueries } from '../plex/plexDeltaWatchSnapshot.ts';
+import {
+  buildExplicitPlexDeltaWatchState,
+  findMissingPlexDeltaWatchedLocators,
+  getPlexDeltaWatchedLocatorKey,
+  mergePlexDeltaWatchedLocators,
+  sanitizePlexDeltaWatchedLocators,
+  type PlexDeltaWatchedLocator
+} from '../plex/plexDeltaUnwatch.ts';
+import {
+  mergePlexLibraryWatchStates,
+  type PlexLibraryWatchState
+} from '../plex/plexLibraryWatchState.ts';
 
 export const SEENIT_BACKEND_IDENTITY = 'canonical';
+
+const PLEX_DELTA_SNAPSHOT_FIELD = 'deltaWatchedSnapshotV1';
+const MAX_PLEX_DELTA_SNAPSHOT_ITEMS = 5000;
 
 export function buildBackendHealthPayload() {
   return {
@@ -179,17 +198,157 @@ async function fetchPlexPagedItems(
   return items;
 }
 
+function supportsPlexOwnedUnwatchVersion(rawVersion: unknown): boolean {
+  const match = String(rawVersion || '').trim().match(/^(\d+)\.(\d+)\.(\d+)$/);
+  if (!match) return false;
+  const version = match.slice(1).map(Number);
+  const minimum = [1, 4, 111];
+  for (let index = 0; index < minimum.length; index++) {
+    if (version[index] > minimum[index]) return true;
+    if (version[index] < minimum[index]) return false;
+  }
+  return true;
+}
+
+async function runPlexDeltaTasks<T>(
+  values: T[],
+  concurrency: number,
+  worker: (value: T) => Promise<void>
+): Promise<void> {
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(Math.max(1, concurrency), values.length) }, async () => {
+    while (cursor < values.length) {
+      const value = values[cursor++];
+      await worker(value);
+    }
+  });
+  await Promise.all(workers);
+}
+
+async function loadPlexDeltaWatchedSnapshot(uid: string): Promise<PlexDeltaWatchedLocator[]> {
+  if (!uid) return [];
+  try {
+    const { adminDb } = await import('../../lib/firebase-admin.ts');
+    const snapshot = await adminDb.doc(`users/${uid}/settings/plex`).get();
+    return sanitizePlexDeltaWatchedLocators(snapshot.get(PLEX_DELTA_SNAPSHOT_FIELD));
+  } catch (error: any) {
+    console.warn('[Plex Delta Snapshot Store]', {
+      action: 'read',
+      code: String(error?.code ?? error?.name ?? 'READ_FAILED').slice(0, 80)
+    });
+    return [];
+  }
+}
+
+async function persistPlexDeltaWatchedSnapshot(uid: string, locators: PlexDeltaWatchedLocator[]): Promise<void> {
+  if (!uid) return;
+  try {
+    const { adminDb } = await import('../../lib/firebase-admin.ts');
+    const safeLocators = sanitizePlexDeltaWatchedLocators(locators);
+    const storedLocators = safeLocators.length <= MAX_PLEX_DELTA_SNAPSHOT_ITEMS ? safeLocators : [];
+    await adminDb.doc(`users/${uid}/settings/plex`).set({
+      [PLEX_DELTA_SNAPSHOT_FIELD]: storedLocators,
+      deltaWatchedSnapshotUpdatedAt: Date.now(),
+      deltaWatchedSnapshotOverflow: safeLocators.length > MAX_PLEX_DELTA_SNAPSHOT_ITEMS
+    }, { merge: true });
+    if (safeLocators.length > MAX_PLEX_DELTA_SNAPSHOT_ITEMS) {
+      console.warn('[Plex Delta Snapshot Store]', { action: 'write', code: 'SNAPSHOT_TOO_LARGE' });
+    }
+  } catch (error: any) {
+    console.warn('[Plex Delta Snapshot Store]', {
+      action: 'write',
+      code: String(error?.code ?? error?.name ?? 'WRITE_FAILED').slice(0, 80)
+    });
+  }
+}
+
+async function buildPlexDeltaWatchedLocator(params: {
+  item: any;
+  mediaType: 'movie' | 'episode';
+  serverId: string;
+  baseUri: string;
+  serverToken: string;
+  clientId: string;
+  parentMetadataCache: Map<string, Promise<any | null>>;
+}): Promise<PlexDeltaWatchedLocator | null> {
+  const item = unwrapPlexMediaItem(params.item);
+  const ratingKey = getPlexMetadataLookupKey(item);
+  if (!params.serverId || !ratingKey) return null;
+
+  if (params.mediaType === 'movie') {
+    const tmdbId = extractPlexExternalIds(item).tmdbId;
+    if (!tmdbId) return null;
+    return sanitizePlexDeltaWatchedLocators([{
+      serverId: params.serverId,
+      ratingKey,
+      mediaType: 'movie',
+      tmdbId
+    }])[0] || null;
+  }
+
+  const seasonNumber = Number(item?.parentIndex);
+  const episodeNumber = Number(item?.index);
+  if (!Number.isInteger(seasonNumber) || seasonNumber < 0 || !Number.isInteger(episodeNumber) || episodeNumber <= 0) {
+    return null;
+  }
+
+  const parentIdentity = buildPlexParentShowIdentityItem({ ...item, serverId: params.serverId });
+  let tmdbId = extractPlexExternalIds(parentIdentity).tmdbId;
+  if (!tmdbId) {
+    const parentRatingKey = getPlexParentShowMetadataLookupKey(item);
+    if (!parentRatingKey) return null;
+
+    const cacheKey = `${params.serverId}:${parentRatingKey}`;
+    let parentPromise = params.parentMetadataCache.get(cacheKey);
+    if (!parentPromise) {
+      parentPromise = fetchPlexJson(
+        `${params.baseUri}/library/metadata/${encodeURIComponent(parentRatingKey)}?includeGuids=1`,
+        params.serverToken,
+        params.clientId,
+        6000
+      ).then(payload => readPlexItems(payload)[0] || null).catch(() => null);
+      params.parentMetadataCache.set(cacheKey, parentPromise);
+    }
+    const parentMetadata = await parentPromise;
+    tmdbId = extractPlexExternalIds(parentMetadata).tmdbId;
+  }
+  if (!tmdbId) return null;
+
+  return sanitizePlexDeltaWatchedLocators([{
+    serverId: params.serverId,
+    ratingKey,
+    mediaType: 'episode',
+    tmdbId,
+    seasonNumber,
+    episodeNumber
+  }])[0] || null;
+}
+
+interface PlexDeltaServerSnapshotResult {
+  items: any[];
+  locators: PlexDeltaWatchedLocator[];
+  scanned: boolean;
+  completeForUnwatch: boolean;
+  serverId: string;
+  baseUri: string | null;
+  serverToken: string;
+}
+
 interface PlexDeltaSnapshotResult {
   items: any[];
+  watchStates: PlexLibraryWatchState[];
   scannedServers: number;
   skippedServers: number;
+  explicitUnwatchItems: number;
 }
 
 async function collectPlexDeltaWatchedSnapshot(req: any): Promise<PlexDeltaSnapshotResult> {
   const token = typeof req.headers?.['x-plex-token'] === 'string' ? req.headers['x-plex-token'] : '';
   const clientId = typeof req.body?.clientId === 'string' ? req.body.clientId : 'seenit-delta';
-  if (!token) return { items: [], scannedServers: 0, skippedServers: 0 };
+  const uid = String(req.user?.uid || '').trim();
+  if (!token) return { items: [], watchStates: [], scannedServers: 0, skippedServers: 0, explicitUnwatchItems: 0 };
 
+  const previousLocatorsPromise = loadPlexDeltaWatchedSnapshot(uid);
   const resourcesResponse = await fetch(
     'https://plex.tv/api/v2/resources?includeHttps=1&includeRelay=1',
     {
@@ -208,7 +367,7 @@ async function collectPlexDeltaWatchedSnapshot(req: any): Promise<PlexDeltaSnaps
     ? resources.filter((resource: any) => String(resource?.provides || '').includes('server'))
     : [];
 
-  const serverResults = await Promise.all(servers.map(async (server: any) => {
+  const serverResults: PlexDeltaServerSnapshotResult[] = await Promise.all(servers.map(async (server: any) => {
     const serverId = String(server?.clientIdentifier || server?.machineIdentifier || '').trim();
     const serverName = String(server?.name || 'Serveur Plex').trim();
     const serverToken = String(server?.accessToken || token).trim();
@@ -234,13 +393,24 @@ async function collectPlexDeltaWatchedSnapshot(req: any): Promise<PlexDeltaSnaps
       }
     }
 
-    if (!baseUri || !sections) return { items: [] as any[], scanned: false };
+    if (!baseUri || !sections) {
+      return {
+        items: [],
+        locators: [],
+        scanned: false,
+        completeForUnwatch: false,
+        serverId,
+        baseUri: null,
+        serverToken
+      };
+    }
 
+    const parentMetadataCache = new Map<string, Promise<any | null>>();
     const queries = buildPlexDeltaWatchedSectionQueries(baseUri, serverName, sections);
     const queryResults = await Promise.all(queries.map(async (query) => {
       try {
         const pageItems = await fetchPlexPagedItems(query.endpoint, serverToken, clientId, 9000);
-        return pageItems
+        const watchedItems = pageItems
           .filter((item: any) => Number(item?.viewCount ?? item?.view_count ?? 0) > 0)
           .map((item: any) => ({
             ...item,
@@ -252,18 +422,108 @@ async function collectPlexDeltaWatchedSnapshot(req: any): Promise<PlexDeltaSnaps
             serverName,
             viewedAt: item?.lastViewedAt ?? item?.viewedAt ?? item?.lastViewedAtTimestamp ?? Date.now()
           }));
+
+        const locatorResults = await Promise.all(watchedItems.map(item => buildPlexDeltaWatchedLocator({
+          item,
+          mediaType: query.mediaType,
+          serverId,
+          baseUri: baseUri!,
+          serverToken,
+          clientId,
+          parentMetadataCache
+        })));
+        const locators = locatorResults.filter((locator): locator is PlexDeltaWatchedLocator => Boolean(locator));
+
+        return {
+          items: watchedItems,
+          locators,
+          complete: locators.length === watchedItems.length
+        };
       } catch {
-        return [] as any[];
+        return { items: [] as any[], locators: [] as PlexDeltaWatchedLocator[], complete: false };
       }
     }));
 
-    return { items: queryResults.flat(), scanned: true };
+    return {
+      items: queryResults.flatMap(result => result.items),
+      locators: queryResults.flatMap(result => result.locators),
+      scanned: true,
+      completeForUnwatch: Boolean(serverId) && queryResults.every(result => result.complete),
+      serverId,
+      baseUri,
+      serverToken
+    };
   }));
+
+  const previousLocators = await previousLocatorsPromise;
+  const currentLocators = sanitizePlexDeltaWatchedLocators(serverResults.flatMap(result => result.locators));
+  const scannedServers = serverResults.filter(result => result.scanned).length;
+  const skippedServers = serverResults.filter(result => !result.scanned).length;
+  const allServersSafeForUnwatch = serverResults.length > 0
+    && skippedServers === 0
+    && serverResults.every(result => result.scanned && result.completeForUnwatch);
+  const unwatchServerIds = allServersSafeForUnwatch
+    ? new Set(serverResults.map(result => result.serverId).filter(Boolean))
+    : new Set<string>();
+  const confirmedUnwatched = new Set<string>();
+  const explicitStates: PlexLibraryWatchState[] = [];
+  const supportsOwnedUnwatch = supportsPlexOwnedUnwatchVersion(req.headers?.['x-plex-version']);
+
+  if (supportsOwnedUnwatch && unwatchServerIds.size > 0) {
+    const missingLocators = findMissingPlexDeltaWatchedLocators(previousLocators, currentLocators, unwatchServerIds);
+    const serverById = new Map(serverResults.map(result => [result.serverId, result]));
+
+    await runPlexDeltaTasks(missingLocators, 6, async locator => {
+      const server = serverById.get(locator.serverId);
+      if (!server?.baseUri || !server.serverToken) return;
+      try {
+        const metadataPayload = await fetchPlexJson(
+          `${server.baseUri}/library/metadata/${encodeURIComponent(locator.ratingKey)}?includeGuids=1`,
+          server.serverToken,
+          clientId,
+          6000
+        );
+        const metadata = readPlexItems(metadataPayload)[0] || null;
+        const state = buildExplicitPlexDeltaWatchState(locator, metadata);
+        if (state?.watched !== false) return;
+        confirmedUnwatched.add(getPlexDeltaWatchedLocatorKey(locator));
+        explicitStates.push(state);
+      } catch {
+        // Un timeout/404 est indéterminé : conserver la dernière vue connue.
+      }
+    });
+  }
+
+  const nextLocators = mergePlexDeltaWatchedLocators({
+    previous: previousLocators,
+    current: currentLocators,
+    scannedServerIds: unwatchServerIds,
+    confirmedUnwatched
+  });
+  await persistPlexDeltaWatchedSnapshot(uid, nextLocators);
+
+  // Une copie toujours vue gagne sur une copie explicitement recontrôlée non-vue.
+  const currentTrueStates: PlexLibraryWatchState[] = currentLocators.map(locator => (
+    locator.mediaType === 'movie'
+      ? { mediaType: 'movie', tmdbId: locator.tmdbId, watched: true, serverId: locator.serverId }
+      : {
+          mediaType: 'episode',
+          tmdbId: locator.tmdbId,
+          seasonNumber: locator.seasonNumber!,
+          episodeNumber: locator.episodeNumber!,
+          watched: true,
+          serverId: locator.serverId
+        }
+  ));
+  const watchStates = mergePlexLibraryWatchStates([...currentTrueStates, ...explicitStates])
+    .filter(state => state.watched === false);
 
   return {
     items: serverResults.flatMap(result => result.items),
-    scannedServers: serverResults.filter(result => result.scanned).length,
-    skippedServers: serverResults.filter(result => !result.scanned).length
+    watchStates,
+    scannedServers,
+    skippedServers,
+    explicitUnwatchItems: watchStates.length
   };
 }
 
@@ -300,19 +560,28 @@ export function mergePlexDeltaWatchedSnapshot(payload: any, snapshot: PlexDeltaS
   }
 
   const nextHistory = [...history, ...appended];
+  const nextLibraryWatchStates = mergePlexLibraryWatchStates([
+    ...(Array.isArray(payload.libraryWatchStates) ? payload.libraryWatchStates : []),
+    ...snapshot.watchStates
+  ]);
   const visitedSources = Array.isArray(payload.visitedSources) ? [...payload.visitedSources] : [];
   if (!visitedSources.includes('library-watched-delta')) visitedSources.push('library-watched-delta');
+  if (snapshot.explicitUnwatchItems > 0 && !visitedSources.includes('library-unwatched-delta-explicit')) {
+    visitedSources.push('library-unwatched-delta-explicit');
+  }
 
   return {
     ...payload,
     history: nextHistory,
+    libraryWatchStates: nextLibraryWatchStates,
     visitedSources,
     stats: {
       ...(payload.stats && typeof payload.stats === 'object' ? payload.stats : {}),
       libraryWatchedItems: snapshot.items.length,
       deltaWatchedSnapshotItems: snapshot.items.length,
       deltaWatchedSnapshotServers: snapshot.scannedServers,
-      deltaWatchedSnapshotSkippedServers: snapshot.skippedServers
+      deltaWatchedSnapshotSkippedServers: snapshot.skippedServers,
+      deltaExplicitUnwatchItems: snapshot.explicitUnwatchItems
     },
     integrity: {
       ...(payload.integrity && typeof payload.integrity === 'object' ? payload.integrity : {}),
@@ -363,7 +632,8 @@ function installPlexWatchEvidenceResponseGuard(app: Application): void {
  */
 export function installAsyncRouteForwarding(app: Application): void {
   // Ce garde est installé avant les routes : il complète la delta avec l'état vu
-  // courant des bibliothèques, puis élimine les preuves Cloud ambiguës.
+  // courant des bibliothèques, recontrôle les disparitions vues avant tout dé-vu,
+  // puis élimine les preuves Cloud ambiguës.
   installPlexWatchEvidenceResponseGuard(app);
 
   const methods = ['all', 'delete', 'get', 'head', 'options', 'patch', 'post', 'put'] as const;
