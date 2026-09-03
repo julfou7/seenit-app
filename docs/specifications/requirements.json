@@ -390,6 +390,10 @@
         {
           "file": "tests/plexDeltaBackendSnapshot.test.ts",
           "contains": "SEENIT-PLEX-005 le recontrôle delta interprète un viewCount omis comme zéro uniquement sur le ratingKey exact"
+        },
+        {
+          "file": "tests/plexDeltaBackendSnapshot.test.ts",
+          "contains": "SEENIT-PLEX-005 un média vu non résolu sans rapport ne bloque plus tous les dé-vu delta"
         }
       ]
     },

@@ -199,14 +199,19 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   même si leur dernière date de visionnage est antérieure au curseur. Le backend conserve par UID un
   miroir compact de leurs identités techniques et localisateurs PMS, sans jeton. Un full dont l’inventaire
   des bibliothèques est complet alimente lui aussi ce miroir des localisateurs actuellement vus afin que
-  le premier delta suivant dispose déjà d’une baseline et ne dépende pas d’un delta préalable. Lorsqu’une
-  identité précédemment vue disparaît du snapshot d’un serveur effectivement scanné, cette absence n’est
-  qu’un candidat : SeenIt recontrôle directement la métadonnée PMS exacte du même `ratingKey`. Si l’objet
-  exact existe encore, `viewCount > 0` confirme vu ; `viewCount=0` **ou l’absence de `viewCount`**, s’il
-  n’existe aucun compteur positif, confirme le zéro selon la même sémantique que l’inventaire full et
-  produit `watched=false`. Un 404, un timeout, un serveur ignoré, un `ratingKey` différent ou une absence
-  seule du snapshot ne provoque aucun dé-vu. Le rapprochement ne se fait jamais par titre ou année ; en
-  cas d’ambiguïté SeenIt conserve l’état vu.
+  le premier delta suivant dispose déjà d’une baseline et ne dépende pas d’un delta préalable. La
+  complétude destructive du snapshot delta repose sur le succès des requêtes watched et la présence d’un
+  `ratingKey` PMS exact pour chaque objet retourné, **pas** sur la résolution TMDB immédiate de tous les
+  objets vus. Un objet vu non résolu sans rapport avec un candidat ne désactive donc pas globalement les
+  dé-vu du serveur ; si un objet vu non résolu peut en revanche représenter une autre copie du même média,
+  seul ce candidat est bloqué jusqu’à désambiguïsation. Lorsqu’une identité précédemment vue disparaît du
+  snapshot d’un serveur effectivement scanné, cette absence n’est qu’un candidat : SeenIt recontrôle
+  directement la métadonnée PMS exacte du même `ratingKey`. Si l’objet exact existe encore,
+  `viewCount > 0` confirme vu ; `viewCount=0` **ou l’absence de `viewCount`**, s’il n’existe aucun compteur
+  positif, confirme le zéro selon la même sémantique que l’inventaire full et produit `watched=false`.
+  Un 404, un timeout, un serveur ignoré, un `ratingKey` différent ou une absence seule du snapshot ne
+  provoque aucun dé-vu. Le rapprochement ne se fait jamais par titre ou année ; en cas d’ambiguïté SeenIt
+  conserve l’état vu.
 - **SEENIT-PLEX-006** — Une synchronisation Plex, **full ou delta**, réconcilie l’état vu et le dé-vu
   **sans donner à Plex l’autorité sur les progressions créées hors Plex**. Un `viewCount > 0` peut ajouter
   une progression et celle-ci est alors marquée par une provenance technique Plex explicite. Un état

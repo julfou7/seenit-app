@@ -5,6 +5,11 @@ import {
   buildPlexFullWatchedDeltaBaseline,
   mergePlexDeltaWatchedSnapshot
 } from '../src/features/runtime/backendRuntime.ts';
+import {
+  buildPlexDeltaUnresolvedWatchedItem,
+  canRecheckPlexDeltaUnwatchCandidate,
+  isPlexDeltaWatchedQueryTechnicallyComplete
+} from '../src/features/runtime/plexDeltaUnwatchSafety.ts';
 import type { PlexDeltaWatchedLocator } from '../src/features/plex/plexDeltaUnwatch.ts';
 
 test('SEENIT-PLEX-005 la delta ajoute un état library-watched courant sans dépendre de la date du curseur', () => {
@@ -156,4 +161,64 @@ test('SEENIT-PLEX-005 le recontrôle delta interprète un viewCount omis comme z
   assert.equal(buildPlexDeltaAuthoritativeWatchState(locator, { ratingKey: '999' }), null);
   assert.equal(buildPlexDeltaAuthoritativeWatchState(locator, null), null);
   assert.equal(buildPlexDeltaAuthoritativeWatchState(locator, { ratingKey: '101', viewCount: 'unknown' }), null);
+});
+
+test('SEENIT-PLEX-005 un média vu non résolu sans rapport ne bloque plus tous les dé-vu delta', () => {
+  const movieCandidate: PlexDeltaWatchedLocator = {
+    serverId: 'server-a',
+    ratingKey: '101',
+    mediaType: 'movie',
+    tmdbId: 51
+  };
+  const episodeCandidate: PlexDeltaWatchedLocator = {
+    serverId: 'server-a',
+    ratingKey: '202',
+    mediaType: 'episode',
+    tmdbId: 900,
+    seasonNumber: 1,
+    episodeNumber: 2
+  };
+
+  const unresolvedEpisode = buildPlexDeltaUnresolvedWatchedItem(
+    { ratingKey: '999', parentIndex: 1, index: 9, viewCount: 1 },
+    'episode',
+    'server-a'
+  );
+  assert.ok(unresolvedEpisode);
+  assert.equal(
+    isPlexDeltaWatchedQueryTechnicallyComplete([
+      { ratingKey: '999', parentIndex: 1, index: 9, viewCount: 1 }
+    ]),
+    true
+  );
+  assert.equal(isPlexDeltaWatchedQueryTechnicallyComplete([{ title: 'sans ratingKey' }]), false);
+
+  // Un épisode non résolu sans rapport ne doit plus désactiver un dé-vu film.
+  assert.equal(canRecheckPlexDeltaUnwatchCandidate(movieCandidate, [unresolvedEpisode]), true);
+  // Des coordonnées S/E différentes prouvent qu'il ne s'agit pas du même épisode.
+  assert.equal(canRecheckPlexDeltaUnwatchCandidate(episodeCandidate, [unresolvedEpisode]), true);
+
+  const ambiguousEpisode = buildPlexDeltaUnresolvedWatchedItem(
+    { ratingKey: '998', parentIndex: 1, index: 2, viewCount: 1 },
+    'episode',
+    'server-b'
+  );
+  assert.ok(ambiguousEpisode);
+  assert.equal(canRecheckPlexDeltaUnwatchCandidate(episodeCandidate, [ambiguousEpisode]), false);
+
+  const ambiguousMovie = buildPlexDeltaUnresolvedWatchedItem(
+    { ratingKey: '997', viewCount: 1 },
+    'movie',
+    'server-b'
+  );
+  assert.ok(ambiguousMovie);
+  assert.equal(canRecheckPlexDeltaUnwatchCandidate(movieCandidate, [ambiguousMovie]), false);
+
+  const sameTechnicalItem = buildPlexDeltaUnresolvedWatchedItem(
+    { ratingKey: '101', viewCount: 1 },
+    'movie',
+    'server-a'
+  );
+  assert.ok(sameTechnicalItem);
+  assert.equal(canRecheckPlexDeltaUnwatchCandidate(movieCandidate, [sameTechnicalItem]), false);
 });
