@@ -1,5 +1,5 @@
 function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
-  return count > 1 ? pluralForm : singular;
+  return count === 1 ? singular : pluralForm;
 }
 
 export function formatPlexElapsed(elapsedMs: number): string {
