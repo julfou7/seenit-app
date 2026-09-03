@@ -60,9 +60,11 @@ test('SEENIT-APK-003 installe réellement N puis N+1 sans désinstaller les donn
     'utf8'
   );
 
+  assert.match(smoke, /SMOKE_MODE="upgrade-in-place"/);
   assert.match(smoke, /adb_bounded install -r -t "\$BASELINE_APK"/);
-  assert.match(smoke, /adb_bounded install -r -t "\$CURRENT_APK"/);
-  assert.doesNotMatch(smoke, /adb(?:_bounded)?\s+uninstall/);
+  assert.match(smoke, /seedUpgradeState/);
+  assert.match(smoke, /adb_bounded install -r -t "\$CURRENT_APK" \| tee "\$REPORT_DIR\/install-upgrade\.txt"/);
+  assert.match(smoke, /verifyUpgradeStateAndNativeContracts/);
   assert.match(smoke, /BASELINE_SIGNER.*CURRENT_SIGNER/s);
   assert.match(smoke, /preflight\.txt/);
   assert.match(smoke, /Échec préflight/);
@@ -82,6 +84,30 @@ test('SEENIT-APK-003 installe réellement N puis N+1 sans désinstaller les donn
   assert.match(instrumentation, /getApplicationIcon/);
   assert.match(instrumentation, /POST_NOTIFICATIONS/);
   assert.match(instrumentation, /com\.seenit\.app:\/\/upgrade-smoke/);
+});
+
+test('SEENIT-APK-003 autorise une unique réinstallation contrôlée lors de la rotation de signature', () => {
+  const smoke = fs.readFileSync('scripts/android-upgrade-smoke.sh', 'utf8');
+  const instrumentation = fs.readFileSync(
+    'android/app/src/androidTest/java/com/seenit/app/UpgradeContractInstrumentedTest.java',
+    'utf8'
+  );
+  const contract = JSON.parse(fs.readFileSync('docs/specifications/android-contract.json', 'utf8'));
+
+  assert.equal(contract.signing.migration.mode, 'reinstall-once');
+  assert.equal(contract.signing.migration.legacySignerSha256, 'ab3897d47a966e0386824ea6c5c90e617738e8b9ac6216a268411715289988cd');
+  assert.equal(contract.signing.migration.currentSignerSha256, contract.signing.certificateSha256);
+  assert.match(smoke, /SIGNING_MIGRATION_MODE/);
+  assert.match(smoke, /LEGACY_SIGNER/);
+  assert.match(smoke, /EXPECTED_CURRENT_SIGNER/);
+  assert.match(smoke, /SMOKE_MODE="signature-rotation-reinstall"/);
+  assert.match(smoke, /install-rotation-rejected\.txt/);
+  assert.match(smoke, /INSTALL_FAILED_UPDATE_INCOMPATIBLE/);
+  assert.match(smoke, /adb_bounded uninstall "\$PACKAGE_ID"/);
+  assert.match(smoke, /adb_bounded install -t "\$CURRENT_APK"/);
+  assert.match(smoke, /verifyFreshInstallNativeContracts/);
+  assert.match(instrumentation, /void verifyFreshInstallNativeContracts\(\)/);
+  assert.match(instrumentation, /!context\.getFileStreamPath\(PROBE_FILE\)\.exists\(\)/);
 });
 
 test('SEENIT-APK-003 exécute le smoke sur Android 12 et la cible Android courante avant publication', () => {
