@@ -104,13 +104,4 @@ public class UpgradeContractInstrumentedTest {
 
         assertNativeContracts(context);
     }
-
-    @Test
-    public void verifyFreshInstallNativeContracts() throws Exception {
-        Context context = targetContext();
-        SharedPreferences preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        assertEquals(null, preferences.getString(SESSION_PROBE, null));
-        assertTrue(!context.getFileStreamPath(PROBE_FILE).exists());
-        assertNativeContracts(context);
-    }
 }

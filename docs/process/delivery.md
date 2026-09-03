@@ -127,55 +127,43 @@ version.
 - Android 12 / API 31 : **optionnel manuel** via `android12_smoke=true` et utilisable comme contrôle
   périodique ou lors d'un changement Android à risque.
 
-Le smoke compare toujours le package, les versions et les certificats réels. Son comportement dépend
-uniquement de la baseline officielle :
-
-- si N et N+1 portent la nouvelle signature release, le smoke N → N+1 reste strictement inchangé :
-  installation sur place avec `adb install -r`, conservation des données/session, icône, notifications,
-  launcher et deep link ;
-- si N porte exactement l'ancienne empreinte historique et N+1 exactement la nouvelle empreinte
-  verrouillée, la seule migration autorisée est une désinstallation contrôlée de N puis une installation
-  fraîche de N+1. Ce smoke valide le package, la nouvelle signature, l'installation, l'icône, les
-  permissions, le launcher, le deep link et le cycle de vie, mais n'exige pas la conservation du stockage
-  local puisqu'Android le supprime volontairement à la désinstallation ;
-- tout autre changement de signature bloque la publication.
-
-Dès qu'une release officielle avec la nouvelle signature existe, la branche de migration n'est plus
-éligible et toutes les releases suivantes doivent repasser par la mise à jour sur place normale.
+Depuis la release 1.4.112, la rotation est terminée et la baseline officielle porte la signature
+release active. Le smoke compare package, versions et certificats réels puis exige que **N et N+1
+portent exactement cette même signature**. Il installe N, pose les sentinelles de données/session,
+installe N+1 sur place avec `adb install -r`, puis prouve la conservation des données/session, de
+l'icône, des notifications, du launcher et du deep link. Toute divergence de signature et toute
+réinstallation par désinstallation sont bloquantes.
 
 Le smoke Android 36 privilégie la fiabilité à l'optimisation : chaque release recrée un AVD propre
-(`force-avd-creation: true`) et ne réutilise aucun snapshot ou cache `~/.android/avd`. Le run de release
-1.4.112 `33806746182` a confirmé que le cache n'était pas la cause racine : l'AVD neuf a validé la
-rotation, l'installation fraîche, les contrats natifs, le cold start, la reprise et le deep link avant
-de disparaître au contrôle Retour. L'AVD API 36 est donc plafonné explicitement à `2048M`, comme l'API
-31 stable, afin de réduire la pression mémoire hôte sans modifier les assertions du TNR. Les preuves du
-smoke archivent aussi `free`, les principaux RSS et la fin de `dmesg` pour distinguer un kill QEMU sous
-pression d'un défaut applicatif. L'API 36 reste bloquante et le contrôle Retour n'est pas supprimé.
+(`force-avd-creation: true`) et ne réutilise aucun snapshot ou cache `~/.android/avd`. L'AVD API 36 est
+plafonné explicitement à `2048M`, comme l'API 31 stable, afin de réduire la pression mémoire hôte sans
+modifier les assertions du TNR. Les preuves du smoke archivent aussi `free`, les principaux RSS et la
+fin de `dmesg` pour distinguer un kill QEMU sous pression d'un défaut applicatif. Le run de release
+1.4.112 `33809261658` a validé ce parcours sur Android 36 et Android 12. L'API 36 reste bloquante et le
+contrôle Retour n'est pas supprimé.
 
 ## Gestion et récupération des clés de signature
 
 `android/app/seenit-release.p12` est un **artefact généré**, pas une source Git. Les sources de confiance
-de la nouvelle signature sont :
+de la signature active sont :
 
 - le SHA-256 du PKCS12 et les empreintes SHA-1/SHA-256 du certificat verrouillés par le contrat Android ;
 - le secret `SEENIT_ANDROID_RELEASE_KEYSTORE_B64`, qui fournit les octets au runner de release ;
 - les secrets `SEENIT_ANDROID_RELEASE_STORE_PASSWORD` et `SEENIT_ANDROID_RELEASE_KEY_PASSWORD` ;
 - une sauvegarde opérateur privée de la clé, conservée séparément de GitHub.
 
-Le keystore historique externalisé lors de la phase précédente reste temporairement conservé comme
-rollback de l'ancien canal, avec son ancien client OAuth Firebase. Il ne signe plus les nouvelles
-releases. Une fois la première APK nouvelle signature validée sur l'appareil et la stratégie de rollback
-jugée suffisante, son secret historique pourra être archivé/supprimé dans un jalon séparé explicitement
-tracé dans #9.
+Après validation terrain de 1.4.112, la fenêtre de rollback historique a été explicitement fermée dans
+#9 : l'ancien secret GitHub et l'ancienne empreinte/client OAuth Android Firebase ont été supprimés.
+Ils ne font plus partie du contrat ni du processus de release.
 
 ## Protections qui restent non négociables
 
 La simplification ne réduit pas les garde-fous sur :
 
 - `applicationId=com.seenit.app` ;
-- nouvelle signature APK release après la migration approuvée ;
+- signature APK release active et stable ;
 - icônes/launcher et deep link ;
-- projet Firebase Android canonique et double client OAuth temporaire de migration ;
+- projet Firebase Android canonique et unique client OAuth Android actif ;
 - Firestore `default` et sa Delete Protection ;
 - absence de secrets dans les logs ;
 - immuabilité d'une release publiée ;
