@@ -4,7 +4,14 @@ export interface PlexDeltaWatchedLocator {
   serverId: string;
   ratingKey: string;
   mediaType: 'movie' | 'episode';
-  tmdbId: number;
+  /**
+   * Le TMDB est l'identité canonique SeenIt, mais il n'est pas obligatoire au moment
+   * où le PMS rapporte simplement que le ratingKey est vu. Il doit être résolu avant
+   * de produire un watched=false destiné au client.
+   */
+  tmdbId?: number;
+  /** Clé purement technique du cache de résolution partagé du même UID. */
+  resolutionKey?: string;
   seasonNumber?: number;
   episodeNumber?: number;
 }
@@ -19,11 +26,26 @@ function nonNegativeInteger(value: unknown): number | null {
   return Number.isInteger(numeric) && numeric >= 0 ? numeric : null;
 }
 
-export function getPlexDeltaWatchedLocatorKey(locator: PlexDeltaWatchedLocator): string {
-  if (locator.mediaType === 'movie') {
-    return `${locator.serverId}:movie:${locator.tmdbId}:${locator.ratingKey}`;
+function sanitizeResolutionKey(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const key = value.trim();
+  if (!key || key.length > 320) return undefined;
+  if (/^(?:movie|tv):(?:tmdb:\d+|imdb:tt\d+|tvdb:\d+|plex:[A-Za-z0-9_-]+)$/i.test(key)) {
+    return key;
   }
-  return `${locator.serverId}:episode:${locator.tmdbId}:${locator.seasonNumber}:${locator.episodeNumber}:${locator.ratingKey}`;
+  if (/^(?:movie|tv):server:[A-Za-z0-9_-]+:rating:[A-Za-z0-9_-]+$/i.test(key)) {
+    return key;
+  }
+  return undefined;
+}
+
+/**
+ * La clé de présence watched est volontairement purement PMS. Le TMDB peut être
+ * enrichi entre deux runs (par exemple par Plex Discover côté client) sans que cela
+ * transforme artificiellement le même ratingKey en disparition + nouvel élément.
+ */
+export function getPlexDeltaWatchedLocatorKey(locator: PlexDeltaWatchedLocator): string {
+  return `${locator.serverId}:${locator.mediaType}:${locator.ratingKey}`;
 }
 
 export function sanitizePlexDeltaWatchedLocators(value: unknown): PlexDeltaWatchedLocator[] {
@@ -37,17 +59,32 @@ export function sanitizePlexDeltaWatchedLocators(value: unknown): PlexDeltaWatch
     const serverId = String(item.serverId || '').trim();
     const ratingKey = String(item.ratingKey || '').trim();
     const mediaType = item.mediaType === 'episode' ? 'episode' : item.mediaType === 'movie' ? 'movie' : null;
-    const tmdbId = positiveInteger(item.tmdbId);
-    if (!serverId || !ratingKey || !mediaType || !tmdbId) continue;
+    if (!serverId || !ratingKey || !mediaType) continue;
 
+    const tmdbId = positiveInteger(item.tmdbId) || undefined;
+    const resolutionKey = sanitizeResolutionKey(item.resolutionKey);
     let locator: PlexDeltaWatchedLocator;
     if (mediaType === 'episode') {
       const seasonNumber = nonNegativeInteger(item.seasonNumber);
       const episodeNumber = positiveInteger(item.episodeNumber);
       if (seasonNumber === null || !episodeNumber) continue;
-      locator = { serverId, ratingKey, mediaType, tmdbId, seasonNumber, episodeNumber };
+      locator = {
+        serverId,
+        ratingKey,
+        mediaType,
+        ...(tmdbId ? { tmdbId } : {}),
+        ...(resolutionKey ? { resolutionKey } : {}),
+        seasonNumber,
+        episodeNumber
+      };
     } else {
-      locator = { serverId, ratingKey, mediaType, tmdbId };
+      locator = {
+        serverId,
+        ratingKey,
+        mediaType,
+        ...(tmdbId ? { tmdbId } : {}),
+        ...(resolutionKey ? { resolutionKey } : {})
+      };
     }
 
     const key = getPlexDeltaWatchedLocatorKey(locator);
@@ -56,6 +93,18 @@ export function sanitizePlexDeltaWatchedLocators(value: unknown): PlexDeltaWatch
     result.push(locator);
   }
   return result;
+}
+
+export function hydratePlexDeltaWatchedLocator(
+  locator: PlexDeltaWatchedLocator,
+  resolutionCache: unknown
+): PlexDeltaWatchedLocator {
+  if (locator.tmdbId || !locator.resolutionKey) return locator;
+  if (!resolutionCache || typeof resolutionCache !== 'object' || Array.isArray(resolutionCache)) return locator;
+
+  const cached = (resolutionCache as Record<string, any>)[locator.resolutionKey];
+  const tmdbId = positiveInteger(cached?.id ?? cached?.tmdbId);
+  return tmdbId ? { ...locator, tmdbId } : locator;
 }
 
 export function findMissingPlexDeltaWatchedLocators(
@@ -72,7 +121,7 @@ export function findMissingPlexDeltaWatchedLocators(
 
 /**
  * Une disparition du snapshot des seuls éléments vus n'est jamais suffisante pour
- * déduire un dé-vu. On exige la réponse exacte du ratingKey PMS et un viewCount
+ * déduire un état non vu. On exige la réponse exacte du ratingKey PMS et un viewCount
  * numérique explicite. Une valeur absente, invalide ou un autre ratingKey reste
  * indéterminée et ne produit aucune mutation destructive.
  */
@@ -80,6 +129,7 @@ export function buildExplicitPlexDeltaWatchState(
   locator: PlexDeltaWatchedLocator,
   rawMetadata: unknown
 ): PlexLibraryWatchState | null {
+  if (!locator.tmdbId) return null;
   if (!rawMetadata || typeof rawMetadata !== 'object') return null;
   const metadata = rawMetadata as Record<string, unknown>;
   const responseRatingKey = String(metadata.ratingKey || '').trim();
@@ -132,7 +182,14 @@ export function mergePlexDeltaWatchedLocators(params: {
     }
     if (params.confirmedUnwatched.has(key)) continue;
     if (replacement) {
-      next.push(replacement);
+      // Conserver l'identité canonique/cache déjà enrichie si la requête watched
+      // courante retourne une forme plus pauvre du même ratingKey.
+      next.push({
+        ...locator,
+        ...replacement,
+        tmdbId: replacement.tmdbId || locator.tmdbId,
+        resolutionKey: replacement.resolutionKey || locator.resolutionKey
+      });
       consumedCurrent.add(key);
     } else {
       // Recontrôle inconnu/échoué : conserver le dernier état vu connu plutôt que

@@ -3,7 +3,8 @@ import test from 'node:test';
 import fs from 'node:fs';
 import {
   buildPlexCompletionMessage,
-  filterQueuedToastsByScope
+  filterQueuedToastsByScope,
+  normalizePlexNonVuWording
 } from '../src/store/toastQueuePolicy.ts';
 
 test('SEENIT-UX-004 ignorer les suivants purge uniquement les futurs toasts Plex', () => {
@@ -18,7 +19,7 @@ test('SEENIT-UX-004 ignorer les suivants purge uniquement les futurs toasts Plex
   assert.deepEqual(filtered.map((item) => item.id), ['other', 'plex-final']);
 });
 
-test('SEENIT-UX-004 le bilan Plex conserve uniquement les serveurs scannés et compte les vus et dé-vus', () => {
+test('SEENIT-UX-004 le bilan Plex conserve uniquement les serveurs scannés et compte les vus et non vus', () => {
   const message = buildPlexCompletionMessage(
     'Synchronisation Plex terminée • Synchronisés : Serveur A • Ignorés : Serveur B (timeout)',
     1,
@@ -27,10 +28,16 @@ test('SEENIT-UX-004 le bilan Plex conserve uniquement les serveurs scannés et c
 
   assert.equal(
     message,
-    'Synchronisation Plex terminée • 1 serveur scanné • 1 vu • 1 dé-vu'
+    'Synchronisation Plex terminée • 1 serveur scanné • 1 vu • 1 non vu'
   );
   assert.doesNotMatch(message, /ignor/i);
   assert.doesNotMatch(message, /Serveur A|Serveur B/);
+});
+
+test('SEENIT-UX-004 les anciens libellés Plex sont affichés uniquement comme non vu', () => {
+  assert.equal(normalizePlexNonVuWording('Dé-vu sur Plex'), 'non vu sur Plex');
+  assert.equal(normalizePlexNonVuWording('2 dé-vus'), '2 non vus');
+  assert.equal(normalizePlexNonVuWording('non-vu sur Plex'), 'non vu sur Plex');
 });
 
 test('SEENIT-UX-004 le toast Plex expose le bouton Ignorer les suivants', () => {

@@ -47,7 +47,7 @@ test('SEENIT-PLEX-005 la delta recontrôle explicitement une identité vue dispa
   });
 });
 
-test('SEENIT-PLEX-006 la delta ne transforme jamais une absence ou un serveur ignoré en dé-vu', () => {
+test('SEENIT-PLEX-006 la delta ne transforme jamais une absence ou un serveur ignoré en non vu', () => {
   const missing = findMissingPlexDeltaWatchedLocators(
     [previousMovie, previousEpisode],
     [],
@@ -70,7 +70,7 @@ test('SEENIT-PLEX-006 la delta ne transforme jamais une absence ou un serveur ig
     previous: [previousMovie, previousEpisode],
     current: [],
     scannedServerIds: new Set(['server-a']),
-    confirmedUnwatched: new Set(['server-a:movie:51:101'])
+    confirmedUnwatched: new Set(['server-a:movie:101'])
   });
   assert.deepEqual(removedOnlyAfterProof, [previousEpisode]);
 });

@@ -163,12 +163,12 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   TMDB ID.
 - Une synchronisation externe ne déduit jamais une suppression depuis une simple absence. Une source
   explicitement bidirectionnelle peut toutefois appliquer un état contraire lorsqu’elle fournit une preuve
-  autoritative. Pour Plex PMS, l’état courant **non-vu** est confirmé sur l’identité technique exacte
+  autoritative. Pour Plex PMS, l’état courant **non vu** est confirmé sur l’identité technique exacte
   lorsque la métadonnée existe encore et n’expose aucun compteur de vue positif. Plex peut encoder ce zéro
   soit par `viewCount=0`, soit en omettant `viewCount` sur la réponse exacte `/library/metadata/{ratingKey}`.
-  Ce signal vaut dé-vu en full comme en delta, sous réserve de la propriété Plex définie par
+  Ce signal vaut état non vu en full comme en delta, sous réserve de la propriété Plex définie par
   `SEENIT-PLEX-006`. Un 404, un timeout, un serveur ignoré ou une simple absence du snapshot ne valent
-  jamais confirmation non-vue.
+  jamais confirmation non vue.
 - Les écritures doivent rester idempotentes et la signature de bibliothèque indépendante de
   l'ordre reçu.
 - Les écrans lourds sont chargés à la demande ; les listes conservent des clés et un ordre
@@ -181,7 +181,7 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 - **SEENIT-PLEX-002** — Un serveur Plex hors ligne ou en timeout est ignoré pour le scan courant ;
   les autres serveurs continuent et leur résultat est importé. Les serveurs ignorés restent visibles
   dans les logs techniques, mais le bilan utilisateur de fin n'affiche que le nombre de serveurs
-  effectivement scannés ainsi que le nombre de vus et de dé-vus appliqués, sans exposer URL ou jeton.
+  effectivement scannés ainsi que le nombre de vus et de non vus appliqués, sans exposer URL ou jeton.
 - **SEENIT-PLEX-003** — Le curseur n'est validé qu'après collecte suffisamment complète,
   résolution sans échec transitoire et écritures Firestore réussies.
 - **SEENIT-PLEX-004** — Jeton Plex, curseur et caches de résolution/disponibilité sont cloisonnés
@@ -191,42 +191,49 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   reste ambiguë. L'appartenance au **Watch History du compte Plex est elle aussi historique et ne
   représente jamais, à elle seule, l'état courant** : en full scan, chaque entrée `account-history`
   doit être validée par le `userState` provider de la même identité Plex. Seul un `viewCount > 0`
-  explicite permet son import comme vu ; un état courant non-vu explicitement retourné par le provider
-  alimente la réconciliation non-vue, et un état courant indisponible n'ajoute aucune progression.
+  explicite permet son import comme vu ; un état courant non vu explicitement retourné par le provider
+  alimente la réconciliation non vue, et un état courant indisponible n'ajoute aucune progression.
   L'historique PMS récent et les états `viewCount` explicites restent des preuves selon leur contrat.
   En delta, SeenIt complète l'historique récent par un snapshot léger des éléments **actuellement vus**
   des bibliothèques PMS : ces entrées `library-watched` sont retenues avec un `viewCount > 0` explicite
   même si leur dernière date de visionnage est antérieure au curseur. Le backend conserve par UID un
-  miroir compact de leurs identités techniques et localisateurs PMS, sans jeton. Un full dont l’inventaire
-  des bibliothèques est complet alimente lui aussi ce miroir des localisateurs actuellement vus afin que
-  le premier delta suivant dispose déjà d’une baseline et ne dépende pas d’un delta préalable. La
-  complétude destructive du snapshot delta repose sur le succès des requêtes watched et la présence d’un
-  `ratingKey` PMS exact pour chaque objet retourné, **pas** sur la résolution TMDB immédiate de tous les
-  objets vus. Un objet vu non résolu sans rapport avec un candidat ne désactive donc pas globalement les
-  dé-vu du serveur ; si un objet vu non résolu peut en revanche représenter une autre copie du même média,
-  seul ce candidat est bloqué jusqu’à désambiguïsation. Lorsqu’une identité précédemment vue disparaît du
+  miroir compact de **tous** les localisateurs PMS vus techniquement observés (`serverId`, `ratingKey`,
+  type média et, pour un épisode, saison/épisode), même si le TMDB n'est pas immédiatement disponible.
+  Les identifiants techniques forts TMDB/IMDb/TVDB/Plex disponibles sont conservés comme indices de
+  désambiguïsation, jamais le titre ou l'année. Un full dont l’inventaire des bibliothèques est complet
+  alimente lui aussi ce miroir afin que le premier delta suivant dispose déjà d’une baseline.
+  La résolution TMDB est obligatoire uniquement avant de produire un état SeenIt `watched=false` : un
+  candidat peut récupérer son TMDB depuis l'identité exacte courante, depuis le cache de résolution
+  Plex du même UID alimenté par un import vu réussi, ou depuis une métadonnée provider technique exacte.
+  Un localisateur sans TMDB n'est donc jamais supprimé de la baseline au seul motif qu'il n'était pas
+  résolu au moment où il était vu. La complétude destructive du snapshot delta repose sur le succès des
+  requêtes watched et la présence d’un `ratingKey` PMS exact pour chaque objet retourné, pas sur la
+  résolution TMDB immédiate de tous les objets vus. Lorsqu’un localisateur précédemment vu disparaît du
   snapshot d’un serveur effectivement scanné, cette absence n’est qu’un candidat : SeenIt recontrôle
   directement la métadonnée PMS exacte du même `ratingKey`. Si l’objet exact existe encore,
   `viewCount > 0` confirme vu ; `viewCount=0` **ou l’absence de `viewCount`**, s’il n’existe aucun compteur
-  positif, confirme le zéro selon la même sémantique que l’inventaire full et produit `watched=false`.
-  Un 404, un timeout, un serveur ignoré, un `ratingKey` différent ou une absence seule du snapshot ne
-  provoque aucun dé-vu. Le rapprochement ne se fait jamais par titre ou année ; en cas d’ambiguïté SeenIt
-  conserve l’état vu.
-- **SEENIT-PLEX-006** — Une synchronisation Plex, **full ou delta**, réconcilie l’état vu et le dé-vu
+  positif, confirme l'état non vu selon la même sémantique que l’inventaire full et produit
+  `watched=false`. Un 404, un timeout, un serveur ignoré, un `ratingKey` différent ou une absence seule du
+  snapshot ne provoque aucun état non vu. En présence d'une autre copie encore vue, les identifiants
+  techniques forts puis le TMDB servent à vérifier si elle représente le même média ; une ambiguïté qui
+  concerne réellement ce candidat conserve l'état vu, mais un média non résolu sans relation technique
+  démontrable ne désactive jamais globalement tous les candidats du serveur. Le rapprochement ne se fait
+  jamais par titre ou année.
+- **SEENIT-PLEX-006** — Une synchronisation Plex, **full ou delta**, réconcilie l’état vu et non vu
   **sans donner à Plex l’autorité sur les progressions créées hors Plex**. Un `viewCount > 0` peut ajouter
   une progression et celle-ci est alors marquée par une provenance technique Plex explicite. Un état
-  PMS non-vu autoritatif, confirmé sur la métadonnée technique exacte (`viewCount=0` ou compteur omis
+  PMS non vu autoritatif, confirmé sur la métadonnée technique exacte (`viewCount=0` ou compteur omis
   lorsque Plex encode ainsi zéro), ne retire que ce même film/épisode si sa progression SeenIt courante
   porte encore `plexImported=true`. Le miroir `plexWatchState` décrit l'état observé mais n'est jamais une
   condition de propriété : son absence ou son ancien état ne bloque pas le retrait d'une progression dont
   la provenance Plex est déjà prouvée. Un visionnage manuel SeenIt, importé depuis une autre source ou
   legacy sans provenance certaine reste vu, même si Plex l’observe non vu ou l’avait également observé vu
   auparavant. Une simple absence dans l’historique incrémental ou dans le snapshot des vus ne vaut jamais
-  dé-vu. En présence de plusieurs copies du même média, une copie vue gagne sur une copie non vue. La mise
-  à jour du miroir `plexWatchState` seule est silencieuse : elle n’est ni comptée ni notifiée comme un
-  dé-vu. Les clients antérieurs au protocole de provenance sûre ne reçoivent pas d’états `watched=false`.
-  L’écriture Firestore applique uniquement les mutations Plex réellement possédées afin de ne jamais
-  écraser une action SeenIt ou tierce.
+  état non vu. En présence de plusieurs copies du même média, une copie vue gagne sur une copie non vue.
+  La mise à jour du miroir `plexWatchState` seule est silencieuse : elle n’est ni comptée ni notifiée comme
+  un non vu. Les clients antérieurs au protocole de provenance sûre ne reçoivent pas d’états
+  `watched=false`. L’écriture Firestore applique uniquement les mutations Plex réellement possédées afin
+  de ne jamais écraser une action SeenIt ou tierce.
 - Le full scan est paginé. Un inventaire partiel ne remplace pas un cache complet, sauf si au
   moins un inventaire serveur complet et exploitable a été obtenu conformément à la politique.
 - La déduplication finale utilise `movie:<tmdbId>` ou
@@ -335,8 +342,10 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   action purge uniquement les notifications Plex encore en file et conserve le bilan final ainsi que
   les notifications des autres fonctionnalités. Le bilan final Plex n'est jamais rendu comme une seule
   phrase dense : il utilise un bloc Plex visuellement distinct, un titre « Synchronisation Plex terminée »
-  puis des lignes séparées pour les serveurs scannés et le couple `vus / dé-vus`, avec un pictogramme ou
-  logo Plex de taille suffisante pour identifier immédiatement la source.
+  puis des lignes séparées pour les serveurs scannés et le couple `vus / non vus`, avec un pictogramme ou
+  logo Plex de taille suffisante pour identifier immédiatement la source. Dans tous les textes français
+  destinés à l'utilisateur, l'état inverse de « vu » est nommé **« non vu »** ; le terme « dé-vu » n'est
+  plus utilisé.
 - Les dialogues critiques utilisent un rôle adapté, sont fermables par Échap, placent le focus
   sur une action et ne déclenchent aucune suppression sans confirmation quand le transfert est
   actif.

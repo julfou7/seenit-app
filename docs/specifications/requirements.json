@@ -289,11 +289,11 @@
         },
         {
           "file": "tests/plexSyncPresentation.test.ts",
-          "contains": "SEENIT-UX-004 le bilan Plex affiche serveurs scannés, vus et dé-vus sans serveur ignoré"
+          "contains": "SEENIT-UX-004 le bilan Plex affiche serveurs scannés, vus et non vus sans serveur ignoré"
         },
         {
           "file": "tests/toastQueueScope.test.ts",
-          "contains": "SEENIT-UX-004 le bilan Plex conserve uniquement les serveurs scannés et compte les vus et dé-vus"
+          "contains": "SEENIT-UX-004 le bilan Plex conserve uniquement les serveurs scannés et compte les vus et non vus"
         }
       ]
     },
@@ -328,7 +328,7 @@
     },
     {
       "id": "SEENIT-PLEX-005",
-      "title": "Un état Plex vu ou non-vu exige une preuve autoritative, y compris en delta",
+      "title": "Un état Plex vu ou non vu exige une preuve autoritative, y compris en delta",
       "targets": [
         "backend",
         "pwa",
@@ -389,17 +389,21 @@
         },
         {
           "file": "tests/plexDeltaBackendSnapshot.test.ts",
+          "contains": "SEENIT-PLEX-005 la baseline delta conserve un vu technique sans TMDB puis réutilise le cache de résolution"
+        },
+        {
+          "file": "tests/plexDeltaBackendSnapshot.test.ts",
           "contains": "SEENIT-PLEX-005 le recontrôle delta interprète un viewCount omis comme zéro uniquement sur le ratingKey exact"
         },
         {
           "file": "tests/plexDeltaBackendSnapshot.test.ts",
-          "contains": "SEENIT-PLEX-005 un média vu non résolu sans rapport ne bloque plus tous les dé-vu delta"
+          "contains": "SEENIT-PLEX-005 un média vu non résolu sans rapport ne bloque plus tous les non vus delta"
         }
       ]
     },
     {
       "id": "SEENIT-PLEX-006",
-      "title": "Dé-vu Plex full et delta limité aux progressions explicitement créées par Plex",
+      "title": "État non vu Plex full et delta limité aux progressions explicitement créées par Plex",
       "targets": [
         "backend",
         "pwa",
@@ -452,7 +456,7 @@
         },
         {
           "file": "tests/plexDeltaUnwatchSnapshot.test.ts",
-          "contains": "SEENIT-PLEX-006 la delta ne transforme jamais une absence ou un serveur ignoré en dé-vu"
+          "contains": "SEENIT-PLEX-006 la delta ne transforme jamais une absence ou un serveur ignoré en non vu"
         }
       ]
     },
@@ -884,7 +888,7 @@
         },
         {
           "file": "tests/plexSyncPresentation.test.ts",
-          "contains": "SEENIT-UX-004 le bilan Plex affiche serveurs scannés, vus et dé-vus sans serveur ignoré"
+          "contains": "SEENIT-UX-004 le bilan Plex affiche serveurs scannés, vus et non vus sans serveur ignoré"
         },
         {
           "file": "tests/toastQueueScope.test.ts",
@@ -892,7 +896,11 @@
         },
         {
           "file": "tests/toastQueueScope.test.ts",
-          "contains": "SEENIT-UX-004 le bilan Plex conserve uniquement les serveurs scannés et compte les vus et dé-vus"
+          "contains": "SEENIT-UX-004 le bilan Plex conserve uniquement les serveurs scannés et compte les vus et non vus"
+        },
+        {
+          "file": "tests/toastQueueScope.test.ts",
+          "contains": "SEENIT-UX-004 les anciens libellés Plex sont affichés uniquement comme non vu"
         },
         {
           "file": "tests/toastQueueScope.test.ts",
