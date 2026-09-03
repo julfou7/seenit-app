@@ -14,6 +14,11 @@ function positiveInteger(value: unknown): number | null {
   return Number.isInteger(numeric) && numeric > 0 ? numeric : null;
 }
 
+function nonNegativeInteger(value: unknown): number | null {
+  const numeric = Number(value);
+  return Number.isInteger(numeric) && numeric >= 0 ? numeric : null;
+}
+
 export function getPlexDeltaWatchedLocatorKey(locator: PlexDeltaWatchedLocator): string {
   if (locator.mediaType === 'movie') {
     return `${locator.serverId}:movie:${locator.tmdbId}:${locator.ratingKey}`;
@@ -37,9 +42,9 @@ export function sanitizePlexDeltaWatchedLocators(value: unknown): PlexDeltaWatch
 
     let locator: PlexDeltaWatchedLocator;
     if (mediaType === 'episode') {
-      const seasonNumber = positiveInteger(item.seasonNumber);
+      const seasonNumber = nonNegativeInteger(item.seasonNumber);
       const episodeNumber = positiveInteger(item.episodeNumber);
-      if (!seasonNumber || !episodeNumber) continue;
+      if (seasonNumber === null || !episodeNumber) continue;
       locator = { serverId, ratingKey, mediaType, tmdbId, seasonNumber, episodeNumber };
     } else {
       locator = { serverId, ratingKey, mediaType, tmdbId };
