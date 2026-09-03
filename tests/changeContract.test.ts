@@ -4,12 +4,19 @@ import test from 'node:test';
 
 const require = createRequire(import.meta.url);
 const {
+  isVersionOnlyJsonChange,
   isVersionOnlyPatch,
   isPureVersionAlignment,
   requiresSpecification
 } = require('../scripts/validate-change-contract.cjs') as {
+  isVersionOnlyJsonChange: (file: string, before: string, after: string) => boolean;
   isVersionOnlyPatch: (file: string, patch: string) => boolean;
-  isPureVersionAlignment: (files: string[], readPatch: (file: string) => string) => boolean;
+  isPureVersionAlignment: (
+    files: string[],
+    readPatch: (file: string) => string,
+    readBefore?: (file: string) => string,
+    readAfter?: (file: string) => string
+  ) => boolean;
   requiresSpecification: (file: string) => boolean;
 };
 
@@ -28,6 +35,49 @@ test('le contrat SPEC reconnaît un alignement version:sync complet comme non co
   assert.equal(
     isPureVersionAlignment(Object.keys(patches), file => patches[file]),
     true
+  );
+});
+
+test('le contrat SPEC accepte un reformatage JSON si seuls les champs de version changent', () => {
+  const before: Record<string, string> = {
+    'docs/specifications/android-contract.json': '{"applicationVersion":"1.4.111","versionCode":104111,"androidPackageName":"com.seenit.app"}',
+    'docs/specifications/requirements.json': '{"schemaVersion":1,"applicationVersion":"1.4.111","requirements":[{"id":"SEENIT-APK-001"}]}'
+  };
+  const after: Record<string, string> = {
+    'docs/specifications/android-contract.json': JSON.stringify({
+      applicationVersion: '1.4.112',
+      versionCode: 104112,
+      androidPackageName: 'com.seenit.app'
+    }, null, 2),
+    'docs/specifications/requirements.json': JSON.stringify({
+      schemaVersion: 1,
+      applicationVersion: '1.4.112',
+      requirements: [{ id: 'SEENIT-APK-001' }]
+    }, null, 2)
+  };
+
+  assert.equal(
+    isPureVersionAlignment(
+      Object.keys(before),
+      () => '',
+      file => before[file],
+      file => after[file]
+    ),
+    true
+  );
+});
+
+test('le contrat SPEC refuse un reformatage JSON qui masque un changement sémantique', () => {
+  const before = '{"schemaVersion":1,"applicationVersion":"1.4.111","requirements":[{"id":"SEENIT-APK-001"}]}';
+  const after = JSON.stringify({
+    schemaVersion: 1,
+    applicationVersion: '1.4.112',
+    requirements: [{ id: 'SEENIT-APK-999' }]
+  }, null, 2);
+
+  assert.equal(
+    isVersionOnlyJsonChange('docs/specifications/requirements.json', before, after),
+    false
   );
 });
 
