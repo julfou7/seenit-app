@@ -159,28 +159,26 @@ function validateAndroidContract() {
   if (androidFirebaseClient.client_info?.mobilesdk_app_id !== contract.firebase.androidMobileSdkAppId) {
     throw new Error('mobilesdk_app_id Firebase Android inattendu.');
   }
-  if (!Array.isArray(contract.firebase.androidOauthClients) || contract.firebase.androidOauthClients.length < 2) {
-    throw new Error('Le contrat Firebase doit conserver les clients OAuth Android historique et actif.');
+  if (!Array.isArray(contract.firebase.androidOauthClients) || contract.firebase.androidOauthClients.length !== 1) {
+    throw new Error('Le contrat Firebase doit conserver un unique client OAuth Android actif.');
+  }
+  const [activeAndroidOauth] = contract.firebase.androidOauthClients;
+  if (!activeAndroidOauth
+      || activeAndroidOauth.clientId !== contract.firebase.activeAndroidOauthClientId
+      || activeAndroidOauth.certificateHash !== contract.firebase.activeAndroidCertificateHash
+      || activeAndroidOauth.role !== 'active') {
+    throw new Error('Le client OAuth Android actif ne correspond pas à la signature active.');
   }
   const materializedOauthClients = androidFirebaseClient.oauth_client || [];
-  for (const expectedClient of contract.firebase.androidOauthClients) {
-    const found = materializedOauthClients.find(client =>
-      client?.client_type === 1
-      && client?.client_id === expectedClient.clientId
-      && client?.android_info?.package_name === contract.firebase.androidPackageName
-      && client?.android_info?.certificate_hash === expectedClient.certificateHash
-    );
-    if (!found) {
-      throw new Error(`Client OAuth Android absent pour le certificat ${expectedClient.certificateHash}.`);
-    }
+  const materializedAndroidOauth = materializedOauthClients.filter(client => client?.client_type === 1);
+  if (materializedAndroidOauth.length !== 1) {
+    throw new Error('google-services.json doit contenir un unique client OAuth Android actif.');
   }
-  const activeAndroidOauth = contract.firebase.androidOauthClients.find(client =>
-    client.clientId === contract.firebase.activeAndroidOauthClientId
-    && client.certificateHash === contract.firebase.activeAndroidCertificateHash
-    && client.role === 'active'
-  );
-  if (!activeAndroidOauth) {
-    throw new Error('Le client OAuth Android actif ne correspond pas à la nouvelle signature.');
+  const materializedActive = materializedAndroidOauth[0];
+  if (materializedActive?.client_id !== activeAndroidOauth.clientId
+      || materializedActive?.android_info?.package_name !== contract.firebase.androidPackageName
+      || materializedActive?.android_info?.certificate_hash !== activeAndroidOauth.certificateHash) {
+    throw new Error('Client OAuth Android matérialisé incohérent avec le contrat actif.');
   }
   const webOauth = materializedOauthClients.find(client =>
     client?.client_type === 3 && client?.client_id === contract.firebase.webOauthClientId
@@ -202,12 +200,8 @@ function validateAndroidContract() {
       || !/^[a-f0-9]{64}$/i.test(signing.certificateSha256 || '')) {
     throw new Error('Le contrat de signature doit verrouiller la clé release PKCS12 SeenIt matérialisée depuis GitHub Secrets.');
   }
-  if (!signing.migration
-      || signing.migration.mode !== 'reinstall-once'
-      || !/^[a-f0-9]{64}$/i.test(signing.migration.legacySignerSha256 || '')
-      || !/^[a-f0-9]{64}$/i.test(signing.migration.currentSignerSha256 || '')
-      || signing.migration.currentSignerSha256 !== signing.certificateSha256) {
-    throw new Error('Contrat de migration de signature Android invalide.');
+  if ('migration' in signing) {
+    throw new Error('Le contrat Android stable ne doit plus contenir de branche de migration de signature.');
   }
   if (!Array.isArray(contract.generatedFiles) || !contract.generatedFiles.includes(signing.path)) {
     throw new Error('Le keystore release doit être déclaré comme artefact Android généré.');

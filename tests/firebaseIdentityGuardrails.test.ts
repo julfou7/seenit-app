@@ -46,22 +46,18 @@ test('SEENIT-APK-004 protège l’identité Firebase Android canonique généré
   assert.ok(client, 'le client Firebase Android SeenIt doit être matérialisé');
   assert.equal(client.client_info.mobilesdk_app_id, contract.firebase.androidMobileSdkAppId);
 
-  const androidOauth = client.oauth_client.filter((item: any) => item.client_type === 1);
-  assert.equal(contract.firebase.androidOauthClients.length, 2);
-  for (const expected of contract.firebase.androidOauthClients) {
-    assert.ok(
-      androidOauth.some((item: any) =>
-        item.client_id === expected.clientId
-        && item.android_info?.certificate_hash === expected.certificateHash
-        && item.android_info?.package_name === contract.firebase.androidPackageName
-      ),
-      `client OAuth Android manquant pour ${expected.certificateHash}`
-    );
-  }
-  const active = contract.firebase.androidOauthClients.find((item: any) => item.role === 'active');
-  assert.ok(active);
+  assert.equal(contract.firebase.androidOauthClients.length, 1);
+  const [active] = contract.firebase.androidOauthClients;
+  assert.equal(active.role, 'active');
   assert.equal(active.clientId, contract.firebase.activeAndroidOauthClientId);
   assert.equal(active.certificateHash, contract.firebase.activeAndroidCertificateHash);
+
+  const androidOauth = client.oauth_client.filter((item: any) => item.client_type === 1);
+  assert.equal(androidOauth.length, 1);
+  assert.equal(androidOauth[0].client_id, active.clientId);
+  assert.equal(androidOauth[0].android_info?.certificate_hash, active.certificateHash);
+  assert.equal(androidOauth[0].android_info?.package_name, contract.firebase.androidPackageName);
+  assert.equal(contract.firebase.androidOauthClients.some((item: any) => item.role !== 'active'), false);
   assert.ok(client.oauth_client.some((item: any) =>
     item.client_type === 3 && item.client_id === contract.firebase.webOauthClientId
   ));
