@@ -1,7 +1,7 @@
 # SeenIt — Référence fonctionnelle canonique
 
 Dernière vérification : 4 septembre 2026  
-Baseline observée : **1.4.112**, `main` `567187a1798b5724bf731d21b0fba664bd3bf138`  
+Baseline observée : **1.4.113**, `main` `f633f10c0a4cb57c251e76175217a5cfd720492c`  
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : composante obligatoire de la SPEC SeenIt
 
@@ -329,6 +329,17 @@ sortie cinéma le jour J et estimation DVD/VOD à J+120. L'horaire de référenc
 - Les webhooks Sonarr/Radarr ciblent seulement les installations du propriétaire de l'endpoint.
 - Les notifications profondes ouvrent le média/épisode exact ; l'APK peut exposer « Marquer comme vu ».
 - Les clés locales de programmation évitent le doublon sur une même installation.
+- Toute notification de rappel média est typée visuellement par un petit marqueur d'événement :
+  `🆕` pour un nouvel épisode, `📅` pour la première d'une saison à J-7, `🎬` pour une sortie cinéma et
+  `📺` pour DVD/VOD. Le titre du média reste présent et l'action rapide épisode est conservée.
+- Lorsqu'un visuel TMDB du média existe, la notification tente toujours de l'afficher. La PWA conserve
+  l'URL d'image distante adaptée au service worker. Dans l'APK, l'affiche TMDB compacte `w154` est
+  téléchargée par le plugin Filesystem vers `Directory.Data` avant la programmation ; seul son URI
+  fichier local court est remis à LocalNotifications. Aucun Base64, blob ni octet d'image ne transite
+  dans le payload Capacitor/Binder. Le fichier est borné à 512 KiB et les accès réseau ont des timeouts.
+- Si le visuel est absent, refusé, trop grand ou indisponible, le rappel reste une notification texte
+  fonctionnelle ; cette dégradation ne bloque ni le rappel courant ni le traitement des médias suivants.
+  Le patch Android ne décode que des ressources ou fichiers locaux et n'ajoute plus de BigPicture/Base64.
 
 Chaque média est évalué indépendamment : un média archivé/abandonné, sans date exploitable ou sans
 prochain épisode est ignoré sans interrompre la programmation des suivants. Aucun rappel n'est programmé
@@ -379,7 +390,7 @@ le databaseId ou la signature APK.
 | Plex | Nouvel onglet Web | Intent application Plex, puis fallback Web |
 | Reddit/autres liens | Nouvel onglet | Application associée, puis Custom Tab |
 | Magnet | Gestionnaire navigateur/système | Intent Android compatible |
-| Notifications | Web Push/service worker | Push + notifications locales Capacitor |
+| Notifications | Web Push/service worker, image distante + emoji | Push + local Capacitor, affiche locale compacte + emoji |
 | Mise à jour | Bannière/rechargement PWA | Téléchargement, SHA-256, installateur Android |
 | Hors-ligne | Shell/cache et dernier état UID | Même logique dans la WebView |
 
