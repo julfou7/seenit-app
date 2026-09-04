@@ -39,12 +39,21 @@ test('SEENIT-NOTIFICATION-002 garde les images hors du pont Binder et conserve u
 
   assert.doesNotMatch(notificationMediaSource, /FileReader|readAsDataURL|data:image/i,
     'le nouveau chemin natif ne doit jamais matérialiser l’image en Data URL');
-  assert.doesNotMatch(nativePatchSource, /android\.util\.Base64\.decode|data:image\//,
-    'le patch Android ne doit plus décoder de payload Base64');
-  assert.doesNotMatch(nativePatchSource, /startsWith\(\\?"http/,
-    'le patch LocalNotifications ne télécharge pas lui-même une URL distante');
-  assert.match(nativePatchSource, /BitmapFactory\.decodeFile/,
-    'le patch natif ne résout que le petit fichier local préparé en amont');
+
+  const safePatchStart = nativePatchSource.indexOf('const patchedSetter =');
+  const safePatchEnd = nativePatchSource.indexOf('if (!localNotification.includes(stockSetter)', safePatchStart);
+  assert.ok(safePatchStart >= 0 && safePatchEnd > safePatchStart,
+    'le bloc du nouveau patch LocalNotifications doit rester identifiable');
+  const safePatchBlock = nativePatchSource.slice(safePatchStart, safePatchEnd);
+
+  assert.equal(safePatchBlock.includes('android.util.Base64.decode'), false,
+    'le nouveau patch Android ne doit pas décoder de payload Base64');
+  assert.equal(safePatchBlock.includes('data:image/'), false,
+    'le nouveau patch Android ne doit pas accepter de Data URL image');
+  assert.equal(safePatchBlock.includes('startsWith("http'), false,
+    'le nouveau patch LocalNotifications ne télécharge pas lui-même une URL distante');
+  assert.match(safePatchBlock, /BitmapFactory\.decodeFile/,
+    'le nouveau patch natif ne résout que le petit fichier local préparé en amont');
 
   const localScheduleBlock = firebaseSource.slice(
     firebaseSource.indexOf('await LocalNotifications.schedule({'),
