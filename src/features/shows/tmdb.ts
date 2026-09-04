@@ -10,7 +10,12 @@ import {
   hasFrenchTheatricalCinemaEvidence,
   rememberFrenchTheatricalEvidence,
 } from './cinemaPolicy';
-import { decorateParentalRatingDetails } from './parentalRating';
+import {
+  decorateParentalRatingDetails,
+  matchesMaxRecommendedAge,
+  parseMaxAgeFilter,
+  resolveParentalRating,
+} from './parentalRating';
 import { getParentalRatingOverride } from '../../store/parentalRatingStore';
 
 export * from './tmdbClient';
@@ -61,6 +66,52 @@ tmdbClient.getMovieDetails = (async (id: number) => {
   }
   return result;
 }) as typeof tmdbClient.getMovieDetails;
+
+const originalDiscoverWithFilters = tmdbClient.discoverWithFilters.bind(tmdbClient);
+tmdbClient.discoverWithFilters = (async (options) => {
+  const maxAge = parseMaxAgeFilter(options?.pegi || 'Tous');
+
+  // Le client historique sait encore interpréter d'anciens tokens PEGI et appliquer
+  // des exclusions de genres. La façade canonique neutralise volontairement ce chemin :
+  // la décision parentale ne dépend plus que des détails TMDB US et d'un éventuel
+  // choix personnel du même UID.
+  const result = await originalDiscoverWithFilters({
+    ...options,
+    pegi: 'Tous',
+  });
+
+  if (!result.ok || maxAge === null || !Array.isArray(result.value?.results)) {
+    return result;
+  }
+
+  const hydrated = await Promise.all(result.value.results.map(async (item: any) => {
+    const mediaType: 'movie' | 'tv' = item.media_type === 'movie' || Boolean(item.release_date)
+      ? 'movie'
+      : 'tv';
+    const detailsResult = mediaType === 'movie'
+      ? await tmdbClient.getMovieDetails(Number(item.id))
+      : await tmdbClient.getShowDetails(Number(item.id));
+
+    if (!detailsResult.ok || !detailsResult.value) return null;
+
+    const rating = resolveParentalRating(
+      mediaType,
+      detailsResult.value,
+      getParentalRatingOverride(mediaType, Number(item.id)),
+    );
+
+    if (!matchesMaxRecommendedAge(rating, maxAge)) return null;
+    return {
+      ...item,
+      seenitParentalRating: rating,
+    };
+  }));
+
+  return ok({
+    ...result.value,
+    results: hydrated.filter((item): item is NonNullable<typeof item> => item !== null),
+  });
+}) as typeof tmdbClient.discoverWithFilters;
 
 const strictFrenchNowPlaying = async (page: number = 1) => {
   const apiKey = localStorage.getItem('TMDB_API_KEY')
