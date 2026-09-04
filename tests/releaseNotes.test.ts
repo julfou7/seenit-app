@@ -1,16 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const {
+  extractCommitNotes,
   findPreviousReleaseTag,
   generateReleaseNotes
 } = require('../scripts/generate-release-notes.cjs') as {
+  extractCommitNotes: (message: string) => string[];
   findPreviousReleaseTag: (version: string, cwd?: string) => string | null;
   generateReleaseNotes: (options?: { version?: string; cwd?: string }) => string;
 };
@@ -57,12 +59,12 @@ test('SEENIT-RELEASE-003 agrège tous les commits de la version au lieu du seul 
 
     const notes = generateReleaseNotes({ version: '1.4.81', cwd });
 
-    assert.match(notes, /protège identité, signature et actifs Android/);
-    assert.match(notes, /fiabilise les mises à jour APK avec SHA-256/);
-    assert.match(notes, /remplace le wrapper non reconnu par Gradle officiel/);
-    assert.match(notes, /vérifie la distribution Gradle par SHA-256/);
+    assert.match(notes, /Protège identité, signature et actifs Android\./);
+    assert.match(notes, /Fiabilise les mises à jour APK avec SHA-256\./);
+    assert.match(notes, /Remplace le wrapper non reconnu par Gradle officiel\./);
+    assert.match(notes, /Vérifie la distribution Gradle par SHA-256\./);
     assert.ok(
-      notes.indexOf('protège identité') < notes.indexOf('remplace le wrapper'),
+      notes.indexOf('Protège identité') < notes.indexOf('Remplace le wrapper'),
       'les notes doivent conserver l’ordre chronologique des commits de la version'
     );
   } finally {
@@ -87,4 +89,43 @@ test('SEENIT-RELEASE-003 ignore le tag de la version courante pour retrouver la 
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
+});
+
+test('SEENIT-RELEASE-003 sépare le changelog public des détails techniques', () => {
+  const notes = extractCommitNotes(`fix(plex): fiabiliser la réconciliation des non vus
+
+Changelog:
+- La synchronisation Plex conserve les éléments vus lorsqu’une source temporaire est indisponible
+- Les éléments réellement marqués non vus sont mieux réconciliés avec SeenIt.
+
+Détails techniques:
+- conserve les ratingKey dans la baseline du même UID
+- hydrate le cache de résolution avant la comparaison`);
+
+  assert.deepEqual(notes, [
+    '- La synchronisation Plex conserve les éléments vus lorsqu’une source temporaire est indisponible.',
+    '- Les éléments réellement marqués non vus sont mieux réconciliés avec SeenIt.'
+  ]);
+  assert.doesNotMatch(notes.join('\n'), /ratingKey|baseline|UID|cache/i);
+  assert.deepEqual(
+    extractCommitNotes('docs: actualiser le processus\n\nChangelog: aucun\n\n- détail interne'),
+    []
+  );
+});
+
+test('SEENIT-RELEASE-003 documente un format public court et homogène', () => {
+  const agents = readFileSync(new URL('../AGENTS.md', import.meta.url), 'utf8');
+  const specification = readFileSync(new URL('../docs/specifications/seenit.md', import.meta.url), 'utf8');
+  const delivery = readFileSync(new URL('../docs/process/delivery.md', import.meta.url), 'utf8');
+  const viewer = readFileSync(new URL('../src/components/ChangelogViewer.tsx', import.meta.url), 'utf8');
+
+  for (const source of [agents, specification, delivery]) {
+    assert.match(source, /### 🛠️ Ce qui a été fait/);
+    assert.match(source, /deux à cinq/i);
+    assert.match(source, /Changelog:/);
+    assert.match(source, /Détails techniques:/);
+  }
+
+  assert.doesNotMatch(viewer, /\\bs\\s\+\(\[aáàâ/);
+  assert.match(viewer, /\(\^\|\[\\s\(«“\]\)/);
 });

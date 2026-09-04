@@ -13,14 +13,10 @@ function fixFrenchFormatting(text: string): string {
   if (!text) return '';
   return text
     // Missing apostrophes
-    .replace(/\bd\s+([aáàâeéèêiíìîoóòôuúùûh])/gi, "d'$1")
-    .replace(/\bl\s+([aáàâeéèêiíìîoóòôuúùûh])/gi, "l'$1")
-    .replace(/\bc\s+est\b/gi, "c'est")
-    .replace(/\bn\s+est\b/gi, "n'est")
-    .replace(/\bj\s+([aáàâeéèêiíìîoóòôuúùû])/gi, "j'$1")
-    .replace(/\bqu\s+([aáàâeéèêiíìîoóòôuúùûh])/gi, "qu'$1")
-    .replace(/\bm\s+([aáàâeéèêiíìîoóòôuúùû])/gi, "m'$1")
-    .replace(/\bs\s+([aáàâeéèêiíìîoóòôuúùû])/gi, "s'$1")
+    .replace(
+      /(^|[\s(«“])((?:qu)|[dlcjnms])\s+([aáàâeéèêiíìîoóòôuúùûh])/gi,
+      (_match, prefix, pronoun, vowel) => `${prefix}${pronoun}'${vowel}`
+    )
     // Missing accents & common words
     .replace(/\bpassage a la\b/gi, "passage à la")
     .replace(/\bPassage a la\b/g, "Passage à la")

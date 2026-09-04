@@ -538,7 +538,13 @@ preuves complètes, ils doivent converger vers la même bibliothèque.
   le dernier tag SemVer strictement antérieur à la version courante et le commit publié. Un dernier
   commit détaillé ne peut jamais masquer les changements précédents de la même version. Si le tag de
   la version courante existe déjà lors d'une régénération, il est ignoré comme borne de départ afin de
-  conserver la totalité de l'historique de cette version.
+  conserver la totalité de l'historique de cette version. Le rendu public utilise un seul titre
+  `### 🛠️ Ce qui a été fait` et vise deux à cinq puces courtes, homogènes et orientées utilisateur :
+  une phrase avec majuscule et ponctuation, formulée avec le vocabulaire visible dans l'application.
+  Les changements liés sont regroupés ; les identifiants internes, fichiers, fonctions, caches,
+  baselines, tests, CI, commits, PR et issues restent dans les preuves techniques. Chaque commit peut
+  isoler ses phrases publiques dans `Changelog:` et ses détails dans `Détails techniques:` ; la valeur
+  `Changelog: aucun` exclut explicitement un changement sans effet utilisateur.
 - **SEENIT-RELEASE-004** — Une release APK publiée est immuable. Le garde compare la candidate à la
   dernière release officielle strictement antérieure et refuse une version régressive, incohérente ou
   dont le tag/release existe déjà. Une candidate **non publiée** peut recevoir plusieurs commits
