@@ -2,7 +2,9 @@ import { Capacitor } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 
 const NOTIFICATION_MEDIA_DIR = 'notification-media';
-const NATIVE_IMAGE_TIMEOUT_MS = 4_500;
+const NATIVE_IMAGE_CONNECT_TIMEOUT_MS = 2_500;
+const NATIVE_IMAGE_READ_TIMEOUT_MS = 2_500;
+const MAX_NATIVE_IMAGE_FILE_BYTES = 512 * 1024;
 const ALLOWED_NATIVE_IMAGE_HOSTS = new Set(['image.tmdb.org', 'seenit.app']);
 
 export interface NotificationMediaVisual {
@@ -29,16 +31,12 @@ export function notificationMediaCachePath(url: string): string {
   return `${NOTIFICATION_MEDIA_DIR}/${(hash >>> 0).toString(16)}.img`;
 }
 
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error('notification image timeout')), timeoutMs);
-  });
-
+async function hasUsableCachedImage(path: string): Promise<boolean> {
   try {
-    return await Promise.race([promise, timeout]);
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
+    const stat = await Filesystem.stat({ path, directory: Directory.Data });
+    return stat.type === 'file' && stat.size > 0 && stat.size <= MAX_NATIVE_IMAGE_FILE_BYTES;
+  } catch {
+    return false;
   }
 }
 
@@ -46,25 +44,22 @@ async function cacheNativeNotificationImage(url: string): Promise<string | undef
   if (!isAllowedNativeNotificationImageUrl(url)) return undefined;
 
   const path = notificationMediaCachePath(url);
-  let exists = false;
-  try {
-    await Filesystem.stat({ path, directory: Directory.Data });
-    exists = true;
-  } catch {
-    exists = false;
-  }
+  if (!(await hasUsableCachedImage(path))) {
+    await Filesystem.deleteFile({ path, directory: Directory.Data }).catch(() => undefined);
+    await Filesystem.downloadFile({
+      url,
+      path,
+      directory: Directory.Data,
+      recursive: true,
+      progress: false,
+      connectTimeout: NATIVE_IMAGE_CONNECT_TIMEOUT_MS,
+      readTimeout: NATIVE_IMAGE_READ_TIMEOUT_MS
+    });
 
-  if (!exists) {
-    await withTimeout(
-      Filesystem.downloadFile({
-        url,
-        path,
-        directory: Directory.Data,
-        recursive: true,
-        progress: false
-      }),
-      NATIVE_IMAGE_TIMEOUT_MS
-    );
+    if (!(await hasUsableCachedImage(path))) {
+      await Filesystem.deleteFile({ path, directory: Directory.Data }).catch(() => undefined);
+      return undefined;
+    }
   }
 
   const result = await Filesystem.getUri({ path, directory: Directory.Data });
