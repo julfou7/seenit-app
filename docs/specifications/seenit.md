@@ -16,6 +16,12 @@ Les objectifs prioritaires sont la fiabilité des identités média, l'absence d
 utilisateurs, la cohérence PWA/APK, une synchronisation explicable et une interface mobile
 rapide. Une donnée incertaine doit rester non résolue plutôt que produire un faux positif.
 
+- **SEENIT-FUNCTIONAL-001** — La carte complète du produit, de ses écrans, parcours, données et
+  différences PWA/APK vit dans [`functional-reference.md`](./functional-reference.md). Elle est lue
+  avant toute intervention et mise à jour dans la même livraison dès qu'un résultat fonctionnel
+  observable est ajouté, retiré, déplacé ou modifié. Un écart entre code et SPEC reste explicitement
+  relié à une issue priorisée ; il ne devient jamais une règle implicite.
+
 ## 2. Règles de plateforme
 
 - **SEENIT-PLATFORM-001** — La PWA canonique servie depuis `seenit.ai.studio` conserve les routes
@@ -206,6 +212,77 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
 - TMDB permet de distinguer théâtral et digital mais ne constitue pas une base temps réel des séances :
   « Au cinéma » signifie ici sortie théâtrale française dans cette fenêtre, pas présence garantie dans
   au moins une salle aujourd'hui.
+
+### 5.3 Machine d'états canonique
+
+Le statut, la progression et les intentions secondaires sont des dimensions différentes :
+
+| Dimension | Valeur | Sens autoritatif |
+|---|---|---|
+| Existence | Non suivi | Absence de document sous `users/{uid}/shows`; ce n'est jamais une valeur de `status`. |
+| Statut | `plan_to_watch` | Média suivi sans progression : « À voir » / « À commencer ». |
+| Statut | `watching` | Série commencée avec au moins une progression et encore un épisode à voir. La reprise explicite d'une série à revoir peut temporairement porter cet état avant S1E1. |
+| Statut | `completed` | Film vu, ou série dont la progression couvre tous les épisodes connus à regarder. |
+| Statut | `dropped` | Série abandonnée volontairement ; sa progression est conservée. Ce n'est pas l'état normal d'un film. |
+| Progression | `seenEpisodes` | `movie` pour un film vu ; clés `SxE` normalisées sous forme `saison x épisode` pour une série. |
+| Preuve | `episodeRecords` | Métadonnées de visionnage, dont `watchedAt`, note/émotion éventuelle et provenance `plexImported`. |
+| Présentation | À jour | État calculé d'une série dont tous les épisodes diffusés sont vus ; ce n'est pas un statut stocké. |
+| Intention | `isArchived` | Retrait du parcours actif sans effacement de la fiche/progression. Peut être automatique seulement pour une série finie et complète. |
+| Intention | `isFavorite` | Favori indépendant de la progression ; l'activation autorise aussi les notifications du média. |
+| Intention | `notificationsEnabled` | Choix de rappel du média, partagé par le compte mais délivré à chaque appareil autorisé. |
+
+La règle d'état initial est unique : **tout ajout ou suivi sans progression commence en
+`plan_to_watch`**, quel que soit l'écran d'origine ou la source. L'écart de code historique où certains
+points d'entrée créent `watching` sans épisode est suivi par
+[#93](https://github.com/julfou7/seenit-app/issues/93) et ne modifie pas cette règle.
+
+### 5.4 Transitions Film et Série
+
+#### Films
+
+| État avant | Événement | État après | Effets / garde-fous |
+|---|---|---|---|
+| Non suivi | Ajouter aux films à voir / Watchlist Plex ajoutée | `plan_to_watch` | Crée la fiche TMDB sans progression. La provenance Watchlist doit être explicite. |
+| Non suivi ou `plan_to_watch` | Marquer vu, manuellement ou par preuve Plex | `completed` | Ajoute `movie`, `episodeRecords.movie.watchedAt`; `plexImported=true` seulement si Plex a créé la progression. |
+| `completed` | Marquer non vu dans SeenIt | `plan_to_watch` | Retire `movie` et son record ; favori/note/rappel restent indépendants. |
+| `completed` | Non-vu Plex exact | `plan_to_watch` ou inchangé | Retire seulement une progression dont `plexImported=true`; une preuve SeenIt/legacy reste vue. |
+| `plan_to_watch` | Retirer du suivi | Non suivi | Suppression explicite si aucune autre intention durable ne doit être conservée ; action annulable. |
+| Tout état suivi | Archiver/désarchiver, noter, favoriser | Même statut | Ne crée ni ne retire de progression. |
+
+#### Séries
+
+| État avant | Événement | État après | Effets / garde-fous |
+|---|---|---|---|
+| Non suivie | Suivre / Watchlist Plex ajoutée | `plan_to_watch` | Crée la fiche TMDB, progression vide. |
+| `plan_to_watch` | Premier épisode vu | `watching` | Ajoute l'épisode/record, `lastWatchedAt`, recalcule le prochain épisode. |
+| `watching` | Épisode ou saison vu(e) | `watching` ou `completed` | Une saison manuelle ne marque que les épisodes déjà diffusés lorsque TMDB les fournit. |
+| `completed` | Un épisode repasse non vu | `watching` | Désarchive si nécessaire et désigne le premier épisode restant. |
+| `plan_to_watch` ou `watching` | Abandonner | `dropped` | Conserve progression, note, favori et métadonnées. |
+| `dropped` | Reprendre | `plan_to_watch` si aucune progression, sinon `watching` | Conserve la progression existante et recalcule le prochain épisode. |
+| `completed` / archivée | Revoir | `watching` | Réinitialise la progression, désarchive et positionne le prochain épisode sur S1E1. |
+| Série terminée/annulée et complète | Calcul automatique | `completed` + `isArchived=true` | L'archive automatique exige l'état TMDB final et aucune progression restante. |
+| Sans progression | Retirer du suivi | Non suivie | Supprime la fiche après confirmation ; une synchronisation externe ne le déduit pas d'une absence ambiguë. |
+| Tout état suivi | Archiver/désarchiver, noter, favoriser | Même statut | Ces intentions ne prouvent aucun visionnage. |
+
+Une action répétée qui ne change pas l'état final est idempotente. Les mises à jour optimistes doivent
+être annulables ou rechargées depuis Firestore en cas d'échec, sans fusion par titre.
+
+### 5.5 Événements Plex → effets SeenIt
+
+| Événement Plex autoritatif | Effet SeenIt | Full / Delta | Cas sans effet |
+|---|---|---|---|
+| Watchlist Plex ajoutée, média absent | Crée `plan_to_watch` avec provenance Watchlist | Même état final | Identité non résolue vers TMDB. |
+| Watchlist Plex déjà présente | Aucun doublon | Idempotent | Média déjà suivi : ne remplace ni progression ni intention SeenIt. |
+| Watchlist Plex retirée | Cible : redevient Non suivi seulement si la Watchlist avait seule créé la fiche, sans progression/favori/note/rappel | Doit converger sur collecte complète | Fonction encore ouverte dans [#68](https://github.com/julfou7/seenit-app/issues/68) ; absence/incomplétude = aucun effet. |
+| Film `viewCount>0` / userState vu exact | Film `completed`, record `movie` marqué `plexImported` si créé par Plex | Même état final | Watchlist ou activité Cloud ambiguë seule. |
+| Épisode `viewCount>0` exact | Ajoute l'épisode, recalcule `watching`/`completed`, provenance Plex | Même état final | Saison conteneur, épisode sans série parente résolue, identité ambiguë. |
+| Film/épisode exact actuellement non vu | Retire uniquement la progression possédée par Plex et recalcule l'état | Full ou recheck Delta exact | 404, timeout, serveur ignoré, disparition seule, progression SeenIt/legacy. |
+| Inventaire de bibliothèque | Reconstruit la disponibilité et l'URL Plex exactes | Full ; cache réutilisé ensuite | La présence ne marque jamais vu. |
+| Serveur hors ligne | Continue avec les autres serveurs | Full/Delta | Aucun état connu n'est supprimé ; serveur journalisé comme ignoré. |
+| Source/cursor incomplet | Conserve le curseur pertinent pour nouvel essai | Full/Delta | Aucune suppression ou non-vu dérivé. |
+
+Full et Delta peuvent collecter différemment mais n'ont pas deux sémantiques métier : avec les mêmes
+preuves complètes, ils doivent converger vers la même bibliothèque.
 
 ## 6. Synchronisation Plex
 
@@ -615,3 +692,4 @@ l'identité de l'APK et ses actifs.
 - Une annulation utilisateur du sélecteur est une sortie normale et ne doit afficher aucune erreur bloquante.
 - Si Credential Manager est indisponible ou échoue pour une raison de compatibilité, l'ancien flux natif Google Auth reste un fallback; la PWA conserve `signInWithPopup`.
 - TNR : toute régression vers le flux legacy comme parcours Android primaire, ou toute rupture de l'échange vers le Firebase UID existant, est interdite.
+

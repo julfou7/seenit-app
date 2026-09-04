@@ -38,22 +38,30 @@ Le build Web est produit dans `dist/`. En production, le backend compilé est `d
 
 ## APK Android
 
-Pour une livraison classée `apk` :
+Pour vérifier localement un changement classé `apk` sans consommer de version :
 
 ```bash
-npm run version:sync
 npm test
 npm run build
 npx cap sync android
 npm run test:android
-cd android
-./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest
 ```
 
-Sous Windows, utilise `gradlew.bat` à la place de `./gradlew`.
+Le bump via `npm run version:sync`, Gradle et les smokes N → N+1 appartiennent à la préparation de la
+release APK groupée décrite par le processus canonique. Sous Windows, utilise `gradlew.bat` à la place
+de `./gradlew` lorsque Gradle est explicitement requis.
 
 ## Release
 
-La source de vérité du processus de livraison est `AGENTS.md` avec la SPEC `docs/specifications/seenit.md`. Une livraison comportementale suit le pipeline complet : SPEC + tests, bump SemVer, synchronisation des versions, validations PWA/Android, commit Conventional Commits en français, push sur `main`, CI, smoke N→N+1 Android 31/36 puis release GitHub immuable.
+Le processus n'est pas dupliqué ici. Les sources de vérité sont :
 
-Les changements reconnus automatiquement comme `light` n'entraînent pas de nouvelle release APK ; ils doivent tout de même passer `npm test`, l'audit des dépendances de production et `npm run build`.
+- [`AGENTS.md`](./AGENTS.md) pour les règles obligatoires de l'agent ;
+- [`docs/specifications/seenit.md`](./docs/specifications/seenit.md) pour les invariants ;
+- [`docs/specifications/functional-reference.md`](./docs/specifications/functional-reference.md) pour la
+  **référence fonctionnelle** écran par écran ;
+- [`docs/process/delivery.md`](./docs/process/delivery.md) pour les parcours `light`, `backend`, `apk`
+  et la release APK groupée.
+
+Un push valide le changement mais ne publie jamais automatiquement une APK. La version Android est
+incrémentée une seule fois lorsque le lot APK est prêt, puis la release est déclenchée manuellement.
+

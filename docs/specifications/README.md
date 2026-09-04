@@ -1,6 +1,8 @@
 # Spécifications vivantes SeenIt
 
-La source de vérité fonctionnelle et technique est [`seenit.md`](./seenit.md).
+La source de vérité fonctionnelle et technique est composée de [`seenit.md`](./seenit.md), qui porte
+les invariants et machines d'états, et de la
+[`référence fonctionnelle`](./functional-reference.md), qui décrit le produit écran par écran.
 [`requirements.json`](./requirements.json) relie les exigences non négociables à des tests précis et
 [`android-contract.json`](./android-contract.json) fige les invariants natifs indispensables.
 
@@ -11,7 +13,7 @@ triggers ou des jobs de CI ; la SPEC reste autoritative pour le comportement pro
 
 ## Qualifier la demande avant de modifier
 
-1. Lire la SPEC.
+1. Lire la SPEC et la référence fonctionnelle intégralement.
 2. **Qualifier la demande** : règle durable/zone sensible, ou correction locale ordinaire.
 3. Toute règle durable produit/UX structurante/sécurité/données/identité/plateforme est inscrite dans
    [`../requests/registry.md`](../requests/registry.md).
@@ -52,6 +54,9 @@ Un audit suit en plus le **protocole de** [`../audits/README.md`](../audits/READ
 preuves reproductibles et matrice exhaustive vers des issues GitHub priorisées ou des risques
 explicitement acceptés.
 
+Un audit fonctionnel met à jour `functional-reference.md`. Un écart code/SPEC est relié à une issue ;
+il n'est jamais transformé silencieusement en comportement voulu pour faire disparaître le constat.
+
 Un import/sync AI Studio n'est jamais une migration implicite. GitHub reste canonique ; Firestore reste
 `default` et l'identité Firebase Android reste celle du contrat jusqu'à migration explicitement validée.
 
@@ -61,3 +66,4 @@ Un import/sync AI Studio n'est jamais une migration implicite. GitHub reste cano
 - Une exigence décrit un résultat observable ou un invariant durable, pas un détail temporaire de CI.
 - Un test référencé existe réellement et son intitulé correspond au catalogue.
 - Les validations terrain impossibles à automatiser restent explicites dans la SPEC ou un runbook/TNR.
+

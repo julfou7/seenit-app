@@ -13,6 +13,16 @@
       ]
     },
     {
+      "id": "SEENIT-FUNCTIONAL-001",
+      "title": "Référence fonctionnelle complète, obligatoire et synchronisée avec le produit",
+      "targets": ["pwa", "apk", "backend", "ci"],
+      "tests": [
+        {"file": "tests/functionalSpecification.test.ts", "contains": "SEENIT-FUNCTIONAL-001 impose la lecture de la référence produit avant toute intervention"},
+        {"file": "tests/functionalSpecification.test.ts", "contains": "SEENIT-FUNCTIONAL-001 couvre tous les écrans et parcours structurants"},
+        {"file": "tests/functionalSpecification.test.ts", "contains": "SEENIT-FUNCTIONAL-001 garde la machine d’états et le mapping Plex dans la SPEC canonique"}
+      ]
+    },
+    {
       "id": "SEENIT-RUNTIME-001",
       "title": "Backend canonique identifiable et résilient aux erreurs asynchrones",
       "targets": ["backend", "pwa", "apk"],
@@ -158,3 +168,4 @@
     {"id":"SEENIT-AUTH-001","title":"Connexion Google Android native via Credential Manager sans changer le Firebase UID","targets":["apk","pwa","ci"],"tests":[{"file":"tests/nativeGoogleAuth.test.ts","contains":"SEENIT-AUTH-001 ouvre le sélecteur Google natif Credential Manager comme ATHIA"},{"file":"tests/nativeGoogleAuth.test.ts","contains":"SEENIT-AUTH-001 conserve le même compte Firebase et un fallback natif propre"},{"file":"tests/nativeGoogleAuth.test.ts","contains":"SEENIT-AUTH-001 traite l’annulation Google comme une sortie non bloquante"}]}
   ]
 }
+
