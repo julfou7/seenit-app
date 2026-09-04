@@ -35,7 +35,7 @@ test('SEENIT-DISCOVER-001 exige une sortie théâtrale française pour Au ciném
   }), false, 'une date générique récente ne prouve plus une sortie cinéma');
 });
 
-test('SEENIT-DISCOVER-001 respecte la fenêtre cinéma et borne le marqueur issu de la requête théâtrale', () => {
+test('SEENIT-DISCOVER-001 respecte la fenêtre cinéma et le marqueur issu de la requête théâtrale', () => {
   assert.equal(isMovieAtCinema(movieWithFrenchRelease(3, -76)), false);
   assert.equal(isMovieAtCinema(movieWithFrenchRelease(3, 11)), false);
   assert.equal(isMovieAtCinema({
