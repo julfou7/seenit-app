@@ -440,6 +440,16 @@ preuves complètes, ils doivent converger vers la même bibliothèque.
 
 - **SEENIT-NOTIFICATION-001** — Chaque appareil possède son propre token FCM rattaché à un UID.
   Un webhook personnel notifie tous les appareils PWA/APK de ce UID et aucun autre compte.
+- **SEENIT-NOTIFICATION-002** — Toute notification de rappel média est immédiatement identifiable :
+  elle porte un petit marqueur d'événement (`🆕` nouvel épisode, `📅` saison à J-7, `🎬` cinéma,
+  `📺` DVD/VOD) et tente d'afficher le visuel du film/de la série lorsqu'un visuel TMDB existe. La PWA
+  peut remettre l'URL distante au service worker ; l'APK ne transporte jamais les octets de l'image,
+  un blob ou une Data URL/Base64 dans le pont Capacitor/Binder. L'affiche TMDB compacte `w154` est
+  téléchargée par le plugin Filesystem vers `Directory.Data`, via HTTPS sur hôtes autorisés, avec
+  timeouts et fichier limité à 512 KiB ; seul l'URI fichier local court est remis à LocalNotifications.
+  Le patch Android ne résout que ressources/fichiers locaux et ne réintroduit pas le BigPicture/Base64
+  historique. Si le visuel manque ou échoue, la notification texte, son deep link et ses actions restent
+  fonctionnels et l'échec n'interrompt jamais le traitement des rappels suivants.
 - Le secret webhook est personnel, comparé en temps constant, absent des query strings et des
   logs. Les payloads complets et secrets ne sont jamais journalisés.
 - Un token FCM invalide est supprimé sans bloquer les appareils valides.
@@ -702,6 +712,11 @@ l'identité de l'APK et ses actifs.
 - Pour toute nouvelle release APK, installer N+1 par-dessus N et confirmer que compte, données locales,
   icône, raccourci, notifications et deep links sont conservés. Une désinstallation ne fait plus partie
   du parcours normal de validation après la baseline `v1.4.112`.
+- **TNR notifications Android — visuel et anti-crash :** après tout changement du chemin natif de
+  notification, provoquer au minimum un rappel d'épisode avec affiche + emoji + « Marquer comme vu »
+  et un cas d'image indisponible. Confirmer que les deux notifications arrivent, qu'aucun crash/ANR ni
+  `TransactionTooLargeException` n'apparaît et que les rappels suivants continuent. Ce TNR est exécuté
+  sur Android cible lors de la prochaine release et sur Android 12 pour un changement natif à risque.
 - **TNR lancement Android — mono-splash :** sur un démarrage à froid après mise à jour N → N+1,
   enregistrer l'écran et confirmer qu'aucun logo SeenIt natif/statique distinct n'apparaît avant
   l'animation `SplashScreen.tsx`, qu'aucun flash blanc/noir intermédiaire n'est visible et que le fond
