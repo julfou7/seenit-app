@@ -8,7 +8,8 @@ const {
   isBackendOnlyFile,
   isCopyOnlySourceChange,
   isNonRuntimeFile,
-  isProcessOnlyFile
+  isProcessOnlyFile,
+  isToolingOnlyPackageChange
 } = require('../scripts/classify-delivery.cjs') as {
   classifyDelivery: (input: {
     changes: Array<{ status: string; path: string }>;
@@ -20,6 +21,7 @@ const {
   isCopyOnlySourceChange: (file: string, before: string, after: string) => boolean;
   isNonRuntimeFile: (file: string) => boolean;
   isProcessOnlyFile: (file: string) => boolean;
+  isToolingOnlyPackageChange: (before: string, after: string) => boolean;
 };
 
 test('SEENIT-QUALITY-006 classe un renommage de label JSX dans le parcours light', () => {
@@ -151,6 +153,37 @@ test('SEENIT-QUALITY-006 détecte les dépendances sans transformer les fichiers
   });
   assert.equal(ciChange.mode, 'light');
   assert.equal(ciChange.dependenciesChanged, false);
+});
+
+test('SEENIT-QUALITY-006 classe les scripts npm de release seuls en light sans audit de dépendances', () => {
+  const before = JSON.stringify({ name: 'seenit-app', version: '1.4.112', scripts: { build: 'vite build' }, dependencies: { react: '^19.0.1' } });
+  const after = JSON.stringify({
+    name: 'seenit-app',
+    version: '1.4.112',
+    scripts: { build: 'vite build', 'release:status': 'node scripts/release-status.cjs' },
+    dependencies: { react: '^19.0.1' }
+  });
+  assert.equal(isToolingOnlyPackageChange(before, after), true);
+  const result = classifyDelivery({
+    changes: [{ status: 'M', path: 'package.json' }],
+    readBefore: () => before,
+    readAfter: () => after
+  });
+  assert.equal(result.mode, 'light');
+  assert.equal(result.dependenciesChanged, false);
+
+  const dependencyAfter = JSON.stringify({
+    name: 'seenit-app',
+    version: '1.4.112',
+    scripts: { build: 'vite build' },
+    dependencies: { react: '^20.0.0' }
+  });
+  assert.equal(isToolingOnlyPackageChange(before, dependencyAfter), false);
+  assert.equal(classifyDelivery({
+    changes: [{ status: 'M', path: 'package.json' }],
+    readBefore: () => before,
+    readAfter: () => dependencyAfter
+  }).mode, 'apk');
 });
 
 test('SEENIT-QUALITY-006 permet de forcer le parcours complet mais jamais le parcours light', () => {

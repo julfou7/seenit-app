@@ -122,21 +122,111 @@ administratifs. Le test ciblé et l'issue éventuelle suffisent.
 Les décisions de processus sont tracées ici, dans les audits et les issues d'architecture plutôt que
 d'être dupliquées dans chaque fiche produit.
 
+## Fast path de publication APK
+
+Lorsqu'une demande porte **uniquement** sur la publication d'une APK déjà décidée, le fast path de
+`AGENTS.md` est prioritaire. Il remplace la reconstruction manuelle du contexte de release par trois
+commandes bornées ; il ne remplace aucun contrôle de GitHub Actions.
+
+### 1. Lire l'état canonique
+
+```bash
+npm run release:status -- --json
+```
+
+La commande récupère `origin/main` et expose dans un JSON stable :
+
+- SHA et version du `main` canonique ;
+- dernière release GitHub publiée ;
+- prochaine version attendue ;
+- branche/PR candidate éventuelle ;
+- compatibilité de la candidate avec le `main` courant ;
+- état agrégé des checks (`none`, `pending`, `green`, `failed`) ;
+- action suivante exacte (`prepare`, `wait_checks`, `fix_checks`, `merge_then_dispatch`, `dispatch`…).
+
+Une candidate existante est toujours réutilisée lorsqu'elle est compatible. Une candidate non basée
+sur le `main` courant ou dont les checks échouent provoque une action de correction ciblée, jamais une
+seconde branche parallèle. Le fast path n'effectue ni audit global, ni recherche fonctionnelle, ni
+recherche Web/plugin.
+
+### 2. Préparer la version si nécessaire
+
+Depuis un workspace **propre**, sur la branche locale `main` exactement égale à `origin/main` :
+
+```bash
+npm run release:prepare -- 1.4.113
+```
+
+La commande :
+
+1. vérifie que la version demandée est exactement la prochaine version attendue et qu'aucun tag/release
+   identique n'existe ;
+2. refuse un workspace sale ou un `HEAD` différent du `main` GitHub canonique ;
+3. réutilise une branche/PR `release/vX.Y.Z` compatible si elle existe ;
+4. sinon crée cette unique branche, modifie uniquement `android/app/build.gradle`, puis exécute
+   `npm run version:sync` pour aligner toutes les surfaces canoniques ;
+5. refuse tout fichier modifié hors de l'allowlist des surfaces de version ;
+6. produit **exactement un commit** `chore: préparer la release APK X.Y.Z`, pousse la branche et ouvre
+   une seule PR vers `main`.
+
+Les surfaces autorisées sont celles synchronisées par `version:sync` : Gradle, `updateStore`, en-tête
+Plex serveur, `package.json`, `package-lock.json`, catalogue SPEC, contrat Android et version de la SPEC.
+Aucun écran, composant, store métier ou autre code fonctionnel ne peut être modifié par cette commande.
+
+### 3. Fusionner puis déclencher le workflow
+
+Une fois les checks requis de la PR verts, fusionner selon les protections du dépôt puis relancer
+`release:status`. L'état attendu est alors `dispatch`.
+
+Pour le `workflow_dispatch`, l'ordre canonique est :
+
+1. **outil GitHub direct** de déclenchement de workflow s'il est réellement disponible dans la session,
+   avec ref `main`, `release_apk=true` et `android12_smoke=false` par défaut ;
+2. sinon fallback local borné :
+
+```bash
+npm run release:dispatch
+```
+
+Ce wrapper exécute l'équivalent canonique :
+
+```bash
+gh workflow run build-apk.yml --repo julfou7/seenit-app --ref main -f release_apk=true -f android12_smoke=false
+```
+
+Il vérifie d'abord que le workspace est propre et exactement sur `main`, puis recherche pendant au plus
+30 secondes le run `workflow_dispatch` portant le même SHA. Si le run n'est pas retrouvé, il s'arrête
+sans relancer aveuglément. Le suivi se fait ensuite sur ce run précis avec la commande `gh run watch`
+fournie dans sa sortie.
+
+### 4. Mesure « demande → workflow »
+
+Au début d'une demande release-only, l'agent conserve l'heure dans
+`SEENIT_RELEASE_REQUEST_STARTED_AT` (ISO-8601 ou epoch). `release:dispatch` publie alors la durée
+**demande → création du workflow** dans `RELEASE_DISPATCH_JSON`. Si un outil direct est utilisé, la
+même mesure est calculée entre l'heure de la demande et le `created_at` du run. Cette métrique est
+reportée dans l'issue/release concernée ; le temps d'attente des checks de PR n'est pas compté dans le
+budget opérateur.
+
+Cibles : ≤ 2 minutes de travail opérateur avec candidate prête et verte ; ≤ 5 minutes hors attente CI
+si la candidate doit être préparée.
+
 ## Préparation d'une release APK
 
 Les changements `apk` peuvent s'accumuler sur `main` avec plusieurs commits. La version Android n'est
 pas incrémentée à chaque commit.
 
-Quand le lot est prêt :
+Quand le lot est prêt, le chemin canonique est désormais :
 
-1. choisir le prochain patch SemVer ;
-2. modifier `android/app/build.gradle` une seule fois ;
-3. lancer `npm run version:sync` une seule fois pour aligner les surfaces de version ;
-4. pousser cette candidate ;
-5. attendre la validation continue verte ;
-6. vérifier que les trois secrets de dépôt `SEENIT_ANDROID_RELEASE_KEYSTORE_B64`,
+1. lire `npm run release:status -- --json` ;
+2. si nécessaire, préparer le prochain patch avec `npm run release:prepare -- X.Y.Z` ;
+3. attendre la validation continue verte de l'unique PR de candidate ;
+4. fusionner cette candidate ;
+5. vérifier que les trois secrets de dépôt `SEENIT_ANDROID_RELEASE_KEYSTORE_B64`,
    `SEENIT_ANDROID_RELEASE_STORE_PASSWORD` et `SEENIT_ANDROID_RELEASE_KEY_PASSWORD` sont présents ;
-7. déclencher manuellement `Validate & Release SeenIt` avec `release_apk=true` depuis `main`.
+6. déclencher manuellement `Validate & Release SeenIt` avec `release_apk=true` depuis `main`, via
+   l'outil GitHub direct disponible ou `release:dispatch` ;
+7. suivre ce run précis jusqu'à la publication immuable.
 
 Le déclenchement manuel de release ne relance pas d'abord le job de validation continue puis un second
 job identique. Le job de candidate exécute lui-même, **une seule fois sur le même runner**, le contrat

@@ -44,6 +44,14 @@ Chaque push/PR suit la validation rapide décrite dans `docs/process/delivery.md
 n'est plus automatique : les changements APK sont regroupés, la version est synchronisée une seule
 fois quand le lot est prêt, puis la release est déclenchée manuellement.
 
+Pour une demande explicite de **publication APK seule**, le fast path décrit dans `AGENTS.md` et
+`docs/process/delivery.md` est l'orchestration canonique de `SEENIT-RELEASE-002` : `release:status`
+retourne l'état et l'action suivante, `release:prepare` réutilise ou prépare atomiquement la candidate
+par `version:sync`, puis `release:dispatch` constitue le fallback borné de `workflow_dispatch` quand
+aucun outil GitHub direct n'est disponible. Cette accélération ne change aucun invariant de
+`seenit.md` : signature, immuabilité, contrôles Android et smoke cible restent intégralement exécutés
+par la release.
+
 Le contrat Android complet (`npm run test:android` → `npx cap sync android` → `npm run test:android`)
 et Gradle s'exécutent lors de la release APK. Android cible reste le smoke bloquant ; Android 12 est
 un TNR optionnel/manual ou périodique.
@@ -66,4 +74,3 @@ Un import/sync AI Studio n'est jamais une migration implicite. GitHub reste cano
 - Une exigence décrit un résultat observable ou un invariant durable, pas un détail temporaire de CI.
 - Un test référencé existe réellement et son intitulé correspond au catalogue.
 - Les validations terrain impossibles à automatiser restent explicites dans la SPEC ou un runbook/TNR.
-
