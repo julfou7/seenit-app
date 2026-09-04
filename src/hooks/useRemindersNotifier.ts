@@ -31,10 +31,10 @@ export function useRemindersNotifier() {
       for (const s of shows) {
         // Small delay between each processing to let the JS event loop breathe
         await new Promise(r => setTimeout(r, 50));
-      if (s.isArchived || s.status === 'dropped') return;
+      if (s.isArchived || s.status === 'dropped') continue;
 
       const isShowNotification = s.notificationsEnabled === true || readUserScopedJson(uid, `reminder_${s.id}`, false);
-      if (!isShowNotification && s.notificationsEnabled === false) return;
+      if (!isShowNotification && s.notificationsEnabled === false) continue;
 
       const title = s.title;
       const iconUrl = s.posterPath 
@@ -46,9 +46,10 @@ export function useRemindersNotifier() {
         : (s.posterPath ? (s.posterPath.startsWith('http') ? s.posterPath : `https://image.tmdb.org/t/p/w500${s.posterPath}`) : iconUrl);
 
       // --- FILMS ---
+      if (s.mediaType === 'movie' && !s.firstAirDate) continue;
       if (s.mediaType === 'movie' && s.firstAirDate) {
         const [year, month, day] = s.firstAirDate.split('-').map(Number);
-        if (!year || !month || !day) return;
+        if (!year || !month || !day) continue;
 
         const releaseDate = new Date(year, month - 1, day, 9, 0, 0, 0);
         // VOD/DVD Release approx 4 months (120 days) after theatrical release in France
@@ -98,21 +99,21 @@ export function useRemindersNotifier() {
         if (userPrefs.movie_dvd_vod) {
           await scheduleMovieAlert(dvdDate, 'vod', title, `Sortie DVD / VOD : ${title} est désormais disponible !`, true);
         }
-        return;
+        continue;
       }
 
       // --- SÉRIES TV ---
       const upcoming = getUpcomingEpisodeInfo(s);
-      if (!upcoming || !upcoming.air_date) return;
+      if (!upcoming || !upcoming.air_date) continue;
 
       const sNum = String(upcoming.season_number).padStart(2, '0');
       const eNum = String(upcoming.episode_number).padStart(2, '0');
 
       const isSpecificReminder = readUserScopedJson(uid, `reminder_${s.id}_S${upcoming.season_number}E${upcoming.episode_number}`, false);
-      if (!isSpecificReminder && !isShowNotification && s.notificationsEnabled === false) return;
+      if (!isSpecificReminder && !isShowNotification && s.notificationsEnabled === false) continue;
 
       const [year, month, day] = upcoming.air_date.split('-').map(Number);
-      if (!year || !month || !day) return;
+      if (!year || !month || !day) continue;
 
       const airDate9Am = new Date(year, month - 1, day, 9, 0, 0, 0);
       const d7Date9Am = new Date(airDate9Am.getTime() - 7 * 24 * 60 * 60 * 1000);

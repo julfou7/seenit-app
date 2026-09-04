@@ -317,9 +317,10 @@ sortie cinéma le jour J et estimation DVD/VOD à J+120. L'horaire de référenc
 - Les notifications profondes ouvrent le média/épisode exact ; l'APK peut exposer « Marquer comme vu ».
 - Les clés locales de programmation évitent le doublon sur une même installation.
 
-Le traitement doit continuer après chaque média non éligible ; l'écart actuel de boucle est suivi par
-#94. Les tests « Tester » des réglages valident l'autorisation et le rendu, pas l'arrivée future d'une
-donnée TMDB ou d'un webhook réel.
+Chaque média est évalué indépendamment : un média archivé/abandonné, sans date exploitable ou sans
+prochain épisode est ignoré sans interrompre la programmation des suivants. Aucun rappel n'est programmé
+pour l'élément inéligible. Les tests « Tester » des réglages valident l'autorisation et le rendu, pas
+l'arrivée future d'une donnée TMDB ou d'un webhook réel.
 
 ## 12. Réglages et maintenance utilisateur
 
@@ -376,7 +377,6 @@ elle est nécessaire à la plateforme et explicitement documentée.
 | Priorité | Écart observé | Décision / issue |
 |---|---|---|
 | P1 | Les points d'entrée d'ajout créent tantôt `plan_to_watch`, tantôt `watching` sans progression. | Normaliser selon la machine d'états : [#93](https://github.com/julfou7/seenit-app/issues/93). |
-| P1 | Un `return` sur un média inéligible peut arrêter toute la programmation des rappels suivants. | Corriger et caractériser : [#94](https://github.com/julfou7/seenit-app/issues/94). |
 | P1 | Les personnes favorites restent locales et font diverger les recommandations PWA/APK. | Rendre Firestore autoritatif : [#95](https://github.com/julfou7/seenit-app/issues/95). |
 | P1 | Le retrait de Watchlist Plex ne retire pas encore un suivi créé uniquement par cette Watchlist. | Implémentation avec provenance : [#68](https://github.com/julfou7/seenit-app/issues/68). |
 | P2 | Partager une fiche ou le profil ne garantit pas encore un lien réouvrable conforme. | Décider/corriger : [#96](https://github.com/julfou7/seenit-app/issues/96). |
@@ -395,4 +395,3 @@ elle est nécessaire à la plateforme et explicitement documentée.
   retire de sa matrice un écart seulement après preuve de correction.
 - Pour chaque changement, vérifier au minimum : écran d'entrée, état avant/après, Firestore et cache,
   PWA, APK/Retour/intents/safe areas, erreurs réseau, isolation UID, notifications et tests.
-
