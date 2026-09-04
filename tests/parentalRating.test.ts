@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  decorateParentalRatingDetails,
   matchesMaxRecommendedAge,
   parentalRatingKey,
+  parseMaxAgeFilter,
   resolveParentalRating,
 } from '../src/features/shows/parentalRating.ts';
 
@@ -67,6 +69,10 @@ test('SEENIT-PARENTAL-001 applique un âge maximum cumulatif et exclut les incon
   assert.equal(matchesMaxRecommendedAge(thirteen, 10), false);
   assert.equal(matchesMaxRecommendedAge(unknown, 10), false);
   assert.equal(matchesMaxRecommendedAge(unknown, null), true);
+
+  assert.equal(parseMaxAgeFilter('Tous'), null);
+  assert.equal(parseMaxAgeFilter('age:10'), 10);
+  assert.equal(parseMaxAgeFilter('age:18'), 18);
 });
 
 test('SEENIT-PARENTAL-001 donne priorité au choix personnel par identité TMDB exacte', () => {
@@ -76,4 +82,15 @@ test('SEENIT-PARENTAL-001 donne priorité au choix personnel par identité TMDB 
   assert.equal(result.label, '6+ · Choix personnel');
   assert.equal(parentalRatingKey('movie', 1029575), 'movie:1029575');
   assert.equal(parentalRatingKey('tv', 1029575), 'tv:1029575');
+});
+
+test('SEENIT-PARENTAL-001 adapte les écrans legacy sans muter la certification TMDB source', () => {
+  const source = structuredClone(familyPlan);
+  const decorated = decorateParentalRatingDetails('movie', source);
+
+  assert.equal(source.release_dates.results[0].release_dates[0].certification, 'TP');
+  assert.equal(source.release_dates.results[1].release_dates[0].certification, 'PG-13');
+  assert.equal(decorated.release_dates.results[0].release_dates[0].certification, '');
+  assert.equal(decorated.release_dates.results[1].release_dates[0].certification, 'PG-13 · US · 13+');
+  assert.equal(decorated.seenitParentalRating.original, 'PG-13');
 });
