@@ -45,14 +45,43 @@ La classe `apk` signifie seulement « devra entrer dans la prochaine APK ». Ell
 
 ## Validation continue
 
-Chaque push ou pull request exécute :
+Chaque push ou pull request exécute, dans cet ordre :
 
-1. installation avec cache npm ;
-2. classification `light` / `backend` / `apk` ;
-3. contrat de changement ;
-4. SPEC, TypeScript et tests unitaires ;
-5. contrat Android uniquement si le diff touche l'APK ;
-6. build Web + serveur.
+1. configuration de Node sans installation applicative ;
+2. préflight sans dépendances : classification `light` / `backend` / `apk`, contrat de
+   changement et intégrité du catalogue SPEC ;
+3. restauration éventuelle d'un cache `node_modules` exact ;
+4. sur cache absent seulement, `npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund` ;
+5. rematérialisation systématique de la configuration Android canonique, y compris sur cache trouvé ;
+6. TypeScript puis tests unitaires dans deux étapes séparées ;
+7. contrat Android uniquement si le diff touche l'APK ;
+8. audit de dépendances lorsqu'il est applicable ;
+9. build Web + serveur ;
+10. résumé du mode, du cache et des durées principales.
+
+L'intégrité SPEC est volontairement exécutée avant l'installation : son validateur utilise uniquement
+Node et les fichiers du dépôt. Une erreur de catalogue, de version ou de référence de test doit ainsi
+échouer avant tout coût npm.
+
+Le cache `node_modules` est strictement exact. Sa clé comprend le système, l'architecture, la version
+Node réellement résolue, `package.json`, `package-lock.json`, le patch des notifications locales et
+le matérialiseur Android. Aucun préfixe de restauration approximatif n'est autorisé. Les PR peuvent
+lire le cache de la branche par défaut selon les règles de portée GitHub Actions, mais ne le sauvegardent
+jamais. Seul un push vert sur `main` ou `master` peut créer le cache de référence, après tous les
+tests et le build. Le fichier `android/app/google-services.json` reste hors cache et est régénéré à
+chaque validation depuis le contrat suivi.
+
+Le cache npm de téléchargement de `actions/setup-node` reste actif comme secours d'une installation
+froide. `npm audit` n'est jamais mélangé à `npm ci` : il conserve son étape conditionnelle et son
+niveau bloquant existant.
+
+Le job `Validate Change` possède un plafond dur de 10 minutes. Ce plafond n'est pas le budget nominal :
+la cible reste une médiane maximale de 45 secondes et un p95 maximal de 90 secondes sur 20 validations
+consécutives. Un cache froid après changement de lockfile peut dépasser cette cible ponctuellement ;
+il doit être visible comme `miss` dans le résumé puis alimenter le cache de référence depuis
+`main`. Une installation qui approche le plafond est traitée comme un incident d'infrastructure :
+ne pas retirer de test, vérifier le statut GitHub/npm, relancer une seule fois sur le même commit et
+ouvrir/actualiser une issue si la dérive se répète.
 
 Le contrat Android exécuté en validation continue contrôle l'identité et le contrat de signature sans
 exiger le fichier privé de keystore : les secrets de signature ne sont jamais exposés aux PR ni aux
@@ -66,6 +95,14 @@ vérifiée et toute divergence est bloquée.
 - lors du contrôle périodique hebdomadaire.
 
 Un push sur `main` **ne publie jamais automatiquement une APK**.
+
+### TNR du chemin rapide
+
+Le test `tests/ciValidationPerformance.test.ts` bloque automatiquement toute régression de l'ordre
+fail-fast, de la clé de cache exacte, de la confiance d'écriture, des options d'installation, de la
+rematérialisation Android, de la séparation des contrôles, du résumé et du plafond. La preuve du SLO
+est maintenue dans l'issue #84 à partir de 20 validations réelles consécutives ; elle n'est pas simulée
+par des runs artificiels.
 
 ## Gouvernance proportionnée
 
