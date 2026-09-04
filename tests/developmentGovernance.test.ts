@@ -15,7 +15,9 @@ const deliveryProcess = readFileSync('docs/process/delivery.md', 'utf8');
 test('SEENIT-RELEASE-002 la CI valide puis publie sans modifier automatiquement main', () => {
   assert.doesNotMatch(workflow, /git\s+(commit|push)/);
   assert.match(workflow, /^\s{2}validate:/m);
-  assert.match(workflow, /Fast Automated Tests/);
+  assert.match(workflow, /Validate Specification Integrity/);
+  assert.match(workflow, /TypeScript Check/);
+  assert.match(workflow, /Unit Tests/);
   assert.match(workflow, /npm run test:spec:changes/);
   assert.match(workflow, /cache: npm/);
   assert.match(workflow, /release_apk:/);

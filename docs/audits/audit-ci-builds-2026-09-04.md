@@ -251,6 +251,24 @@ code SeenIt.
 | CI-12 | tests + build prennent environ 20–25 s | solide | conserver intégralement les contrôles | aucune action |
 | CI-13 | la PR documentaire de l’audit a attendu 6 min 25 s avant un échec local trivial | P1 | préflight local obligatoire et fail-fast distant | [#83](https://github.com/julfou7/seenit-app/issues/83) et [#84](https://github.com/julfou7/seenit-app/issues/84) |
 
+## Mise en œuvre de #84 — PR #87
+
+La première implémentation du chemin rapide est portée par la
+[PR #87](https://github.com/julfou7/seenit-app/pull/87).
+
+| Run | Résultat | Cache | Installation | Job | Preuve |
+|---|---|---|---:|---:|---|
+| [#554](https://github.com/julfou7/seenit-app/actions/runs/33852234487) | échec de conception | non atteint | 0 s | 13 s | la classification chargeait TypeScript avant le cache ; l'échec est apparu sans installation |
+| [#558](https://github.com/julfou7/seenit-app/actions/runs/33852570774) | succès | miss | 15 s | 45 s | SPEC, classification, contrat, TypeScript, 256+ tests et build verts |
+
+Le run #554 a permis de corriger le contrat : l'intégrité SPEC reste entièrement indépendante des
+dépendances ; la classification de pure copie, qui utilise l'analyseur TypeScript, s'exécute après la
+restauration du cache et après l'installation uniquement lors d'un bootstrap `miss`. Le run #558
+passe déjà sous la cible de 90 s malgré un cache `node_modules` encore absent.
+
+La preuve d'écriture du cache depuis `main`, d'un hit ultérieur et la série de 20 validations réelles
+restent à collecter dans #84. Aucun run artificiel n'est lancé uniquement pour améliorer la métrique.
+
 ## Décision
 
 Le chantier n'est pas de retirer des tests. Il consiste à déplacer les contrôles les moins coûteux
