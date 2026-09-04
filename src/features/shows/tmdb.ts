@@ -9,6 +9,7 @@ export * from './tmdbClient';
 const CINEMA_PAST_DAYS = 75;
 const CINEMA_FUTURE_DAYS = 10;
 const FRENCH_THEATRICAL_RELEASE_TYPES = new Set([2, 3]);
+const frenchTheatricalMovieIds = new Set<number>();
 
 const getCinemaWindow = () => {
   const now = new Date();
@@ -32,6 +33,14 @@ const getFrenchTheatricalReleaseDates = (media: any): Date[] => {
     .filter((releaseDate: Date) => !Number.isNaN(releaseDate.getTime()));
 };
 
+const hasCurrentFrenchTheatricalRelease = (media: any): boolean => {
+  const theatricalDates = getFrenchTheatricalReleaseDates(media);
+  if (theatricalDates.length === 0) return false;
+
+  const { pastCutoff, futureCutoff } = getCinemaWindow();
+  return theatricalDates.some(releaseDate => releaseDate >= pastCutoff && releaseDate <= futureCutoff);
+};
+
 /**
  * SeenIt considère « Au cinéma » uniquement lorsqu'une sortie théâtrale française
  * TMDB (type 2 ou 3) est prouvée dans la fenêtre courante. Une date de sortie
@@ -46,12 +55,28 @@ export function isMovieAtCinema(media: any): boolean {
   // TMDB France contrainte aux release types 2|3 et à la même fenêtre temporelle.
   if (media.seenitFrenchTheatrical === true) return true;
 
-  const theatricalDates = getFrenchTheatricalReleaseDates(media);
-  if (theatricalDates.length === 0) return false;
+  const mediaId = Number(media.id ?? media.tmdbId);
+  if (Number.isFinite(mediaId) && frenchTheatricalMovieIds.has(mediaId)) return true;
 
-  const { pastCutoff, futureCutoff } = getCinemaWindow();
-  return theatricalDates.some(releaseDate => releaseDate >= pastCutoff && releaseDate <= futureCutoff);
+  const isTheatrical = hasCurrentFrenchTheatricalRelease(media);
+  if (isTheatrical && Number.isFinite(mediaId)) frenchTheatricalMovieIds.add(mediaId);
+  return isTheatrical;
 }
+
+const originalGetMovieDetails = tmdbClient.getMovieDetails.bind(tmdbClient);
+tmdbClient.getMovieDetails = (async (id: number) => {
+  const result = await originalGetMovieDetails(id);
+  if (result.ok && result.value) {
+    if (hasCurrentFrenchTheatricalRelease(result.value)) {
+      frenchTheatricalMovieIds.add(Number(id));
+      result.value.seenitFrenchTheatrical = true;
+    } else {
+      frenchTheatricalMovieIds.delete(Number(id));
+      result.value.seenitFrenchTheatrical = false;
+    }
+  }
+  return result;
+}) as typeof tmdbClient.getMovieDetails;
 
 const strictFrenchNowPlaying = async (page: number = 1) => {
   const apiKey = localStorage.getItem('TMDB_API_KEY')
@@ -79,11 +104,14 @@ const strictFrenchNowPlaying = async (page: number = 1) => {
 
   if (jsonResult.value && Array.isArray(jsonResult.value.results)) {
     jsonResult.value.results = jsonResult.value.results
-      .map((movie: any) => ({
-        ...movie,
-        media_type: 'movie' as const,
-        seenitFrenchTheatrical: true,
-      }))
+      .map((movie: any) => {
+        frenchTheatricalMovieIds.add(Number(movie.id));
+        return {
+          ...movie,
+          media_type: 'movie' as const,
+          seenitFrenchTheatrical: true,
+        };
+      })
       .filter((movie: any) => !isAdultOrParodyMedia(movie))
       .filter((movie: any) => Number(movie.vote_count || 0) >= 5);
   }
