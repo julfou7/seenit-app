@@ -8,15 +8,20 @@ export * from './tmdbClient';
 
 const CINEMA_PAST_DAYS = 75;
 const CINEMA_FUTURE_DAYS = 10;
+const CINEMA_EVIDENCE_TTL_MS = 6 * 60 * 60 * 1000;
 const FRENCH_THEATRICAL_RELEASE_TYPES = new Set([2, 3]);
-const frenchTheatricalMovieIds = new Set<number>();
+const frenchTheatricalMovieEvidence = new Map<number, number>();
 
 const getCinemaWindow = () => {
   const now = new Date();
   const pastCutoff = new Date(now);
-  pastCutoff.setDate(now.getDate() - CINEMA_PAST_DAYS);
+  pastCutoff.setHours(0, 0, 0, 0);
+  pastCutoff.setDate(pastCutoff.getDate() - CINEMA_PAST_DAYS);
+
   const futureCutoff = new Date(now);
-  futureCutoff.setDate(now.getDate() + CINEMA_FUTURE_DAYS);
+  futureCutoff.setHours(23, 59, 59, 999);
+  futureCutoff.setDate(futureCutoff.getDate() + CINEMA_FUTURE_DAYS);
+
   return { pastCutoff, futureCutoff };
 };
 
@@ -41,6 +46,29 @@ const hasCurrentFrenchTheatricalRelease = (media: any): boolean => {
   return theatricalDates.some(releaseDate => releaseDate >= pastCutoff && releaseDate <= futureCutoff);
 };
 
+const rememberFrenchTheatricalEvidence = (mediaId: number, checkedAt: number = Date.now()) => {
+  if (Number.isFinite(mediaId)) {
+    frenchTheatricalMovieEvidence.set(mediaId, checkedAt);
+  }
+};
+
+const hasFreshFrenchTheatricalEvidence = (mediaId: number): boolean => {
+  if (!Number.isFinite(mediaId)) return false;
+  const checkedAt = frenchTheatricalMovieEvidence.get(mediaId);
+  if (!checkedAt) return false;
+  if (Date.now() - checkedAt > CINEMA_EVIDENCE_TTL_MS) {
+    frenchTheatricalMovieEvidence.delete(mediaId);
+    return false;
+  }
+  return true;
+};
+
+const isFreshInlineTheatricalEvidence = (media: any): boolean => {
+  if (media?.seenitFrenchTheatrical !== true) return false;
+  const checkedAt = Number(media?.seenitFrenchTheatricalCheckedAt);
+  return Number.isFinite(checkedAt) && Date.now() - checkedAt <= CINEMA_EVIDENCE_TTL_MS;
+};
+
 /**
  * SeenIt considère « Au cinéma » uniquement lorsqu'une sortie théâtrale française
  * TMDB (type 2 ou 3) est prouvée dans la fenêtre courante. Une date de sortie
@@ -51,29 +79,38 @@ export function isMovieAtCinema(media: any): boolean {
   const isTv = media.media_type === 'tv' || media.first_air_date !== undefined;
   if (isTv || isAdultOrParodyMedia(media)) return false;
 
+  const mediaId = Number(media.id ?? media.tmdbId);
+  const hasReleaseDatesPayload = Array.isArray(media?.release_dates?.results);
+
+  // Un payload release_dates complet est prioritaire sur tout cache : il permet de
+  // confirmer ou d'invalider directement la preuve théâtrale française.
+  if (hasReleaseDatesPayload) {
+    const isTheatrical = hasCurrentFrenchTheatricalRelease(media);
+    if (Number.isFinite(mediaId)) {
+      if (isTheatrical) rememberFrenchTheatricalEvidence(mediaId);
+      else frenchTheatricalMovieEvidence.delete(mediaId);
+    }
+    return isTheatrical;
+  }
+
   // Les résultats de getNowPlaying portent ce marqueur uniquement après une requête
   // TMDB France contrainte aux release types 2|3 et à la même fenêtre temporelle.
-  if (media.seenitFrenchTheatrical === true) return true;
+  if (isFreshInlineTheatricalEvidence(media)) return true;
 
-  const mediaId = Number(media.id ?? media.tmdbId);
-  if (Number.isFinite(mediaId) && frenchTheatricalMovieIds.has(mediaId)) return true;
-
-  const isTheatrical = hasCurrentFrenchTheatricalRelease(media);
-  if (isTheatrical && Number.isFinite(mediaId)) frenchTheatricalMovieIds.add(mediaId);
-  return isTheatrical;
+  return hasFreshFrenchTheatricalEvidence(mediaId);
 }
 
 const originalGetMovieDetails = tmdbClient.getMovieDetails.bind(tmdbClient);
 tmdbClient.getMovieDetails = (async (id: number) => {
   const result = await originalGetMovieDetails(id);
   if (result.ok && result.value) {
-    if (hasCurrentFrenchTheatricalRelease(result.value)) {
-      frenchTheatricalMovieIds.add(Number(id));
-      result.value.seenitFrenchTheatrical = true;
-    } else {
-      frenchTheatricalMovieIds.delete(Number(id));
-      result.value.seenitFrenchTheatrical = false;
-    }
+    const checkedAt = Date.now();
+    const isTheatrical = hasCurrentFrenchTheatricalRelease(result.value);
+    if (isTheatrical) rememberFrenchTheatricalEvidence(Number(id), checkedAt);
+    else frenchTheatricalMovieEvidence.delete(Number(id));
+
+    result.value.seenitFrenchTheatrical = isTheatrical;
+    result.value.seenitFrenchTheatricalCheckedAt = checkedAt;
   }
   return result;
 }) as typeof tmdbClient.getMovieDetails;
@@ -103,13 +140,15 @@ const strictFrenchNowPlaying = async (page: number = 1) => {
   if (!jsonResult.ok) return err((jsonResult as any).error);
 
   if (jsonResult.value && Array.isArray(jsonResult.value.results)) {
+    const checkedAt = Date.now();
     jsonResult.value.results = jsonResult.value.results
       .map((movie: any) => {
-        frenchTheatricalMovieIds.add(Number(movie.id));
+        rememberFrenchTheatricalEvidence(Number(movie.id), checkedAt);
         return {
           ...movie,
           media_type: 'movie' as const,
           seenitFrenchTheatrical: true,
+          seenitFrenchTheatricalCheckedAt: checkedAt,
         };
       })
       .filter((movie: any) => !isAdultOrParodyMedia(movie))
