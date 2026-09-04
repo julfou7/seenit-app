@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   buildPlexDeltaAuthoritativeWatchState,
   buildPlexFullWatchedDeltaBaseline,
+  getPlexDeltaAuthoritativeUnwatchServerIds,
   mergePlexDeltaWatchedSnapshot
 } from '../src/features/runtime/backendRuntime.ts';
 import {
@@ -11,6 +12,7 @@ import {
   isPlexDeltaWatchedQueryTechnicallyComplete
 } from '../src/features/runtime/plexDeltaUnwatchSafety.ts';
 import {
+  findMissingPlexDeltaWatchedLocators,
   hydratePlexDeltaWatchedLocator,
   type PlexDeltaWatchedLocator
 } from '../src/features/plex/plexDeltaUnwatch.ts';
@@ -239,9 +241,7 @@ test('SEENIT-PLEX-005 un média vu non résolu sans rapport ne bloque plus tous 
   );
   assert.equal(isPlexDeltaWatchedQueryTechnicallyComplete([{ title: 'sans ratingKey' }]), false);
 
-  // Un épisode non résolu sans rapport ne doit plus désactiver un non vu film.
   assert.equal(canRecheckPlexDeltaUnwatchCandidate(movieCandidate, [unresolvedEpisode]), true);
-  // Sans identité de série commune démontrée, des coordonnées S/E ne suffisent jamais à bloquer.
   assert.equal(canRecheckPlexDeltaUnwatchCandidate(episodeCandidate, [unresolvedEpisode]), true);
 
   const unrelatedStrongMovie = buildPlexDeltaUnresolvedWatchedItem(
@@ -309,7 +309,6 @@ test('SEENIT-PLEX-005 un média vu non résolu sans rapport ne bloque plus tous 
     'server-b'
   );
   assert.ok(unrelatedUnknownMovie);
-  // Sans relation technique avec le candidat, un film inconnu ne bloque plus tous les films.
   assert.equal(canRecheckPlexDeltaUnwatchCandidate(movieCandidate, [unrelatedUnknownMovie]), true);
 
   const sameTechnicalItem = buildPlexDeltaUnresolvedWatchedItem(
@@ -319,4 +318,35 @@ test('SEENIT-PLEX-005 un média vu non résolu sans rapport ne bloque plus tous 
   );
   assert.ok(sameTechnicalItem);
   assert.equal(canRecheckPlexDeltaUnwatchCandidate(movieCandidate, [sameTechnicalItem]), false);
+});
+
+test('SEENIT-PLEX-006 un serveur ignoré ne bloque pas le non vu exact d’un autre serveur autoritatif', () => {
+  const serverIds = getPlexDeltaAuthoritativeUnwatchServerIds([
+    { serverId: 'server-a', scanned: true, completeForUnwatch: true },
+    { serverId: 'server-b', scanned: false, completeForUnwatch: false },
+    { serverId: 'server-c', scanned: true, completeForUnwatch: false }
+  ]);
+
+  assert.deepEqual([...serverIds], ['server-a']);
+
+  const colony: PlexDeltaWatchedLocator = {
+    serverId: 'server-a',
+    ratingKey: '384',
+    mediaType: 'movie',
+    tmdbId: 1375646
+  };
+  const ignoredServerMovie: PlexDeltaWatchedLocator = {
+    serverId: 'server-b',
+    ratingKey: '999',
+    mediaType: 'movie',
+    tmdbId: 999
+  };
+
+  const missing = findMissingPlexDeltaWatchedLocators(
+    [colony, ignoredServerMovie],
+    [],
+    serverIds
+  );
+
+  assert.deepEqual(missing, [colony]);
 });
