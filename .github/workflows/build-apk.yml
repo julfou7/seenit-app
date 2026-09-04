@@ -65,27 +65,16 @@ jobs:
             exit 1
           fi
 
-      - name: Classify Delivery Path
-        id: delivery
-        run: npm run delivery:classify
-        env:
-          DELIVERY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          FORCED_DELIVERY_MODE: auto
-
-      - name: Specification Change Contract
-        run: npm run test:spec:changes
-        env:
-          SPEC_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          DELIVERY_MODE: ${{ steps.delivery.outputs.DELIVERY_MODE }}
-
       - name: Validate Specification Integrity
         run: npm run test:spec
 
       - name: Complete Preflight Metrics
         if: always()
         run: |
-          now=$(date +%s)
-          echo "SEENIT_PREFLIGHT_SECONDS=$((now-SEENIT_PREFLIGHT_STARTED))" >> "$GITHUB_ENV"
+          if [ -n "${SEENIT_PREFLIGHT_STARTED:-}" ]; then
+            now=$(date +%s)
+            echo "SEENIT_PREFLIGHT_SECONDS=$((now-SEENIT_PREFLIGHT_STARTED))" >> "$GITHUB_ENV"
+          fi
 
       - name: Resolve Node Cache Identity
         id: runtime
@@ -120,6 +109,19 @@ jobs:
           now=$(date +%s)
           echo "SEENIT_MATERIALIZE_SECONDS=$((now-started))" >> "$GITHUB_ENV"
           exit "$status"
+
+      - name: Classify Delivery Path
+        id: delivery
+        run: npm run delivery:classify
+        env:
+          DELIVERY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          FORCED_DELIVERY_MODE: auto
+
+      - name: Specification Change Contract
+        run: npm run test:spec:changes
+        env:
+          SPEC_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          DELIVERY_MODE: ${{ steps.delivery.outputs.DELIVERY_MODE }}
 
       - name: TypeScript Check
         run: |
@@ -184,8 +186,12 @@ jobs:
       - name: Publish Validation Summary
         if: always()
         run: |
-          now=$(date +%s)
-          total_seconds=$((now-SEENIT_VALIDATION_STARTED))
+          if [ -n "${SEENIT_VALIDATION_STARTED:-}" ]; then
+            now=$(date +%s)
+            total_seconds=$((now-SEENIT_VALIDATION_STARTED))
+          else
+            total_seconds='n/a'
+          fi
           delivery_mode='${{ steps.delivery.outputs.DELIVERY_MODE }}'
           cache_hit='${{ steps.node_modules_cache.outputs.cache-hit }}'
           if [ -z "$delivery_mode" ]; then delivery_mode='inconnu'; fi
@@ -201,7 +207,7 @@ jobs:
             echo "|---|---:|"
             echo "| Mode de livraison | $delivery_mode |"
             echo "| Cache node_modules | $cache_status |"
-            echo "| Préflight | ${SEENIT_PREFLIGHT_SECONDS:-n/a} s |"
+            echo "| Préflight SPEC | ${SEENIT_PREFLIGHT_SECONDS:-n/a} s |"
             echo "| Installation npm | ${SEENIT_INSTALL_SECONDS:-0} s |"
             echo "| Matérialisation Android | ${SEENIT_MATERIALIZE_SECONDS:-n/a} s |"
             echo "| TypeScript | ${SEENIT_TYPESCRIPT_SECONDS:-n/a} s |"
