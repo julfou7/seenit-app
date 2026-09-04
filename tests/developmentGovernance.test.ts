@@ -29,6 +29,13 @@ test('SEENIT-RELEASE-002 la CI valide puis publie sans modifier automatiquement 
   assert.match(workflow, /sha256sum "SeenIt-v\$\{VERSION\}\.apk"/);
   assert.match(workflow, /Production Dependency Audit[\s\S]*DEPENDENCIES_CHANGED/);
   assert.match(deliveryProcess, /push.*ne publie.*APK/is);
+  assert.match(agentRules, /Fast path prioritaire.*publication APK seule/is);
+  assert.match(agentRules, /release:status/);
+  assert.match(agentRules, /release:prepare/);
+  assert.match(agentRules, /release:dispatch/);
+  assert.match(deliveryProcess, /Fast path de publication APK/);
+  assert.match(deliveryProcess, /gh workflow run build-apk\.yml/);
+  assert.match(deliveryProcess, /demande.*workflow/is);
 });
 
 test('SEENIT-APK-004 exécute le contrat Android avant le garde de release', () => {

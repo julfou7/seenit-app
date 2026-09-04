@@ -31,6 +31,12 @@ const DEPENDENCY_FILES = new Set([
   'package-lock.json'
 ]);
 
+const RELEASE_TOOL_SCRIPTS = new Set([
+  'release:status',
+  'release:prepare',
+  'release:dispatch'
+]);
+
 function normalizePath(file) {
   return String(file || '').trim().replace(/\\/g, '/');
 }
@@ -60,6 +66,29 @@ function isBackendOnlyFile(file) {
 
 function isDependencyFile(file) {
   return DEPENDENCY_FILES.has(normalizePath(file));
+}
+
+function isToolingOnlyPackageChange(before, after) {
+  try {
+    const previous = JSON.parse(before);
+    const current = JSON.parse(after);
+    const previousScripts = previous.scripts || {};
+    const currentScripts = current.scripts || {};
+    delete previous.scripts;
+    delete current.scripts;
+    if (JSON.stringify(previous) !== JSON.stringify(current)) return false;
+
+    const scriptNames = new Set([...Object.keys(previousScripts), ...Object.keys(currentScripts)]);
+    let changed = false;
+    for (const name of scriptNames) {
+      if (previousScripts[name] === currentScripts[name]) continue;
+      changed = true;
+      if (!RELEASE_TOOL_SCRIPTS.has(name)) return false;
+    }
+    return changed;
+  } catch {
+    return false;
+  }
 }
 
 function isSourceFile(file) {
@@ -131,12 +160,23 @@ function isCopyOnlySourceChange(file, before, after) {
   });
 }
 
+function dependencyImpactChanged(changes, readBefore, readAfter) {
+  return changes.some(change => {
+    const file = normalizePath(change.path);
+    if (!isDependencyFile(file)) return false;
+    if (file === 'package.json' && change.status === 'M') {
+      return !isToolingOnlyPackageChange(readBefore(file), readAfter(file));
+    }
+    return true;
+  });
+}
+
 function classifyDelivery({ changes, readBefore, readAfter, forcedMode = 'auto' }) {
   if (!['auto', 'apk'].includes(forcedMode)) {
     throw new Error(`Mode de livraison forcé invalide : ${forcedMode}.`);
   }
 
-  const dependenciesChanged = changes.some(change => isDependencyFile(change.path));
+  const dependenciesChanged = dependencyImpactChanged(changes, readBefore, readAfter);
   if (forcedMode === 'apk') {
     return {
       mode: 'apk',
@@ -154,6 +194,15 @@ function classifyDelivery({ changes, readBefore, readAfter, forcedMode = 'auto' 
     if (isProcessOnlyFile(file)) {
       reasons.push(`${file} : documentation, test, CI ou outillage non embarqué`);
       continue;
+    }
+
+    if (file === 'package.json' && change.status === 'M') {
+      const before = readBefore(file);
+      const after = readAfter(file);
+      if (isToolingOnlyPackageChange(before, after)) {
+        reasons.push(`${file} : scripts npm de release uniquement`);
+        continue;
+      }
     }
 
     if (change.status === 'M' && isSourceFile(file)) {
@@ -308,15 +357,18 @@ function main() {
 module.exports = {
   BACKEND_ONLY_FILES,
   DEPENDENCY_FILES,
+  RELEASE_TOOL_SCRIPTS,
   SAFE_JSX_ATTRIBUTES,
   analyzeSource,
   classifyDelivery,
+  dependencyImpactChanged,
   isBackendOnlyFile,
   isCopyOnlySourceChange,
   isDependencyFile,
   isExplicitUiCopyString,
   isNonRuntimeFile,
   isProcessOnlyFile,
+  isToolingOnlyPackageChange,
   normalizePath,
   parseNameStatus,
   readAt,

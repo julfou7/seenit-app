@@ -2,7 +2,26 @@
 
 Ces règles sont obligatoires pour toute intervention sur **SeenIt**.
 
+## 0.0 Fast path prioritaire — publication APK seule
+
+Une demande explicite **« Publie l'APK »**, **« release APK »**, **« publie l'APK suite au dernier travail »** ou équivalent, lorsqu'elle ne demande aucune nouvelle modification fonctionnelle, suit **ce fast path avant le préflight général de la section 0**.
+
+Objectif : lancer la release en moins de 2 minutes de travail opérateur lorsqu'une candidate verte existe déjà, ou en moins de 5 minutes hors attente CI lorsqu'il faut préparer la candidate, sans retirer aucun garde-fou GitHub Actions.
+
+1. Noter immédiatement l'heure de la demande dans `SEENIT_RELEASE_REQUEST_STARTED_AT` si l'environnement le permet ; cette valeur sert uniquement à mesurer « demande → lancement du workflow ».
+2. Lire ce fichier et `docs/process/delivery.md`, puis exécuter `npm run release:status -- --json`. Cette commande récupère le `main` GitHub canonique et retourne le SHA, la version `main`, la dernière release, la prochaine version, la candidate/PR éventuelle, l'état des checks et **l'action suivante exacte**.
+3. **Réutiliser** toute branche/PR `release/vX.Y.Z` compatible. Ne jamais créer une seconde candidate pour la même version.
+4. Si aucune candidate compatible n'existe, exécuter uniquement depuis un workspace propre positionné sur le `main` canonique exact : `npm run release:prepare -- X.Y.Z`. Cette commande modifie `versionName`, lance `npm run version:sync`, vérifie l'allowlist des seules surfaces de version et produit **un seul commit de préparation**, une seule branche et une seule PR.
+5. Attendre uniquement les checks requis de cette PR. Ne pas rejouer localement TypeScript, les tests complets, Gradle, les smokes ou l'audit déjà garantis par le workflow de release, sauf échec explicite qui exige un diagnostic ciblé.
+6. Après CI verte, fusionner selon les protections du dépôt. Rejouer `release:status` : sur `main` versionné, l'action doit devenir `dispatch`.
+7. Déclencher `Validate & Release SeenIt` sur `main` avec `release_apk=true`. Utiliser en priorité un outil GitHub direct de `workflow_dispatch` s'il est réellement disponible ; sinon utiliser le fallback borné `npm run release:dispatch` (qui encapsule `gh workflow run build-apk.yml`). Ne cherchez **ni sur le Web ni via des plugins** un autre mécanisme lorsque ces commandes canoniques sont disponibles.
+8. Suivre uniquement le run déclenché jusqu'à l'APK signé, son `.sha256` et la release immuable. Reporter la mesure « demande → workflow » fournie par `release:dispatch` ou calculée au moment du dispatch direct.
+
+Ce fast path est une exception **bornée à l'orchestration d'une release déjà demandée**. Il ne relit pas l'historique fonctionnel complet, ne lance pas d'audit global et ne réécrit pas la référence fonctionnelle. Il n'affaiblit jamais `SEENIT-APK-001..005`, le smoke Android 36, la signature `seenit`, le garde d'immuabilité ou les protections de branche. Si `release:status` révèle une incohérence de code, de version, de signature, de SPEC ou une candidate non basée sur `main`, sortir du fast path et reprendre le préflight général ciblé sur ce blocage.
+
 ## 0. Avant toute analyse, proposition ou modification
+
+**Hors fast path release-only ci-dessus :**
 
 1. Lire intégralement ce fichier.
 2. Récupérer l'état courant de la branche GitHub `main` et son commit de tête. **GitHub `main` est la source de vérité** : ne jamais analyser ou modifier SeenIt à partir d'un workspace supposé à jour sans l'avoir confronté au `main` courant.
@@ -184,4 +203,3 @@ Après chaque modification, conclure exactement avec :
 
 ### 🚀 Action requise de ton côté
 - Action concrète attendue, ou « Aucune » si rien n'est nécessaire.
-

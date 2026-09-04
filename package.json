@@ -22,7 +22,10 @@
     "test:spec:changes": "node scripts/validate-change-contract.cjs",
     "delivery:classify": "node scripts/classify-delivery.cjs",
     "test:plex": "npm run test:spec && npm run test:unit",
-    "version:sync": "node scripts/sync-app-version.cjs"
+    "version:sync": "node scripts/sync-app-version.cjs",
+    "release:status": "node scripts/release-status.cjs",
+    "release:prepare": "node scripts/prepare-release.cjs",
+    "release:dispatch": "node scripts/dispatch-release.cjs"
   },
   "dependencies": {
     "@capacitor-community/file-opener": "^8.0.1",
