@@ -9,7 +9,8 @@ const relativeIso = (days: number) => {
   return date.toISOString();
 };
 
-const movieWithFrenchRelease = (type: number, days: number) => ({
+const movieWithFrenchRelease = (type: number, days: number, id?: number) => ({
+  id,
   media_type: 'movie',
   release_date: relativeIso(days).slice(0, 10),
   release_dates: {
@@ -48,6 +49,14 @@ test('SEENIT-DISCOVER-001 respecte la fenêtre cinéma et le marqueur issu de la
     seenitFrenchTheatrical: true,
     seenitFrenchTheatricalCheckedAt: Date.now() - (7 * 60 * 60 * 1000),
   }), false, 'une preuve interne périmée ne doit pas maintenir le badge indéfiniment');
+});
+
+test('SEENIT-DISCOVER-001 donne la priorité au payload release_dates sur une ancienne preuve en cache', () => {
+  const id = 910091;
+  assert.equal(isMovieAtCinema(movieWithFrenchRelease(3, -5, id)), true);
+  assert.equal(isMovieAtCinema({ id, media_type: 'movie' }), true, 'la preuve fraîche est réutilisable entre cartes');
+  assert.equal(isMovieAtCinema(movieWithFrenchRelease(4, -5, id)), false, 'un détail digital invalide la preuve positive précédente');
+  assert.equal(isMovieAtCinema({ id, media_type: 'movie' }), false, 'le cache positif doit être purgé après invalidation');
 });
 
 test('SEENIT-DISCOVER-001 contraint Explorer aux release types TMDB 2 ou 3 en France', () => {
