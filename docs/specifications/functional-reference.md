@@ -349,6 +349,11 @@ Les réglages généraux contiennent :
 - version, changelog, recherche et installation d'une mise à jour APK ;
 - logs techniques filtrables, copiables/exportables et effaçables.
 
+Le changelog présenté dans la fenêtre de mise à jour résume les effets visibles de la version sous un
+titre unique et quelques phrases courtes. Il emploie les mots compris dans l'interface et ne montre
+pas les identifiants Plex, UID, noms de cache, fichiers, tests ou détails de CI réservés aux preuves
+techniques. Les corrections liées sont regroupées afin que la lecture reste rapide sur mobile.
+
 L'import TV Time résout les entrées vers TMDB avant écriture. Un résultat introuvable reste en échec
 modifiable ; il n'est pas inventé. Les actions de maintenance ne changent jamais l'identité Firebase,
 le databaseId ou la signature APK.

@@ -265,6 +265,25 @@ Le garde de release compare la candidate à la dernière release officielle publ
 immédiatement précédent. Ainsi, les commits intermédiaires d'un lot ne créent plus de faux échec de
 version.
 
+### Notes de version publiques
+
+Un commit qui modifie l'expérience utilisateur sépare la synthèse publique des preuves internes :
+
+```text
+Changelog:
+- La synchronisation Plex reste fiable lorsqu'un serveur est indisponible.
+
+Détails techniques:
+- Ignore le serveur en timeout et poursuit les autres collectes.
+```
+
+`Changelog: aucun` signale explicitement un commit sans effet visible. Le générateur privilégie cette
+section, ignore les détails techniques et conserve un fallback pour les anciens commits. Le résultat
+utilise un seul titre `### 🛠️ Ce qui a été fait`, avec des phrases françaises courtes, ponctuées et
+orientées usage. Pour éviter de surcharger la fenêtre mobile, viser deux à cinq puces et regrouper les
+changements liés ; les noms de fichiers, identifiants internes, tests, CI, commits, PR et issues restent
+dans les preuves GitHub.
+
 ## Smokes Android
 
 À chaque release :

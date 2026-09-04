@@ -4,14 +4,10 @@ const fs = require('node:fs');
 function fixFrenchFormatting(text) {
   if (!text) return '';
   return text
-    .replace(/\bd\s+([aáàâeéèêiíìîoóòôuúùûh])/gi, "d'$1")
-    .replace(/\bl\s+([aáàâeéèêiíìîoóòôuúùûh])/gi, "l'$1")
-    .replace(/\bc\s+est\b/gi, "c'est")
-    .replace(/\bn\s+est\b/gi, "n'est")
-    .replace(/\bj\s+([aáàâeéèêiíìîoóòôuúùû])/gi, "j'$1")
-    .replace(/\bqu\s+([aáàâeéèêiíìîoóòôuúùûh])/gi, "qu'$1")
-    .replace(/\bm\s+([aáàâeéèêiíìîoóòôuúùû])/gi, "m'$1")
-    .replace(/\bs\s+([aáàâeéèêiíìîoóòôuúùû])/gi, "s'$1")
+    .replace(
+      /(^|[\s(«“])((?:qu)|[dlcjnms])\s+([aáàâeéèêiíìîoóòôuúùûh])/gi,
+      (_match, prefix, pronoun, vowel) => `${prefix}${pronoun}'${vowel}`
+    )
     .replace(/\bpassage a la\b/gi, "passage à la")
     .replace(/\bPassage a la\b/g, "Passage à la")
     .replace(/\bmise a jour\b/gi, "mise à jour")
@@ -138,21 +134,47 @@ function collectReleaseCommits(version, cwd = process.cwd()) {
 
 function cleanConventionalSubject(subject) {
   return String(subject || '')
-    .replace(/^(fix|feat|perf|style|chore|refactor|docs|build)(\([^)]+\))?:\s*/i, '')
+    .replace(/^(fix|feat|perf|style|chore|refactor|docs|build|ci|test)(\([^)]+\))?:\s*/i, '')
     .trim();
 }
 
-function notePrefixFromSubject(subject) {
-  const match = String(subject || '').match(/^(fix|feat|perf|style|chore|refactor|docs|build)(\(([^)]+)\))?:/i);
-  if (!match) return '- ';
-  const type = match[1].toLowerCase();
-  const scope = String(match[3] || '').toLowerCase();
-  if (type === 'fix') return '- **Correction** : ';
-  if (type === 'feat') return '- **Nouveauté** : ';
-  if (type === 'perf') return '- **Performance** : ';
-  if (type === 'style' || scope === 'ui' || scope === 'ux') return '- **Interface** : ';
-  if (type === 'build') return '- **Build** : ';
-  return '- ';
+function formatPublicNote(value) {
+  let sentence = fixFrenchFormatting(
+    String(value || '')
+      .replace(/^\s*(?:[-*•]|\d+[.)])\s+/, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
+  if (!sentence) return '';
+
+  sentence = sentence.charAt(0).toLocaleUpperCase('fr-FR') + sentence.slice(1);
+  if (!/[.!?…]$/.test(sentence)) sentence += '.';
+  return `- ${sentence}`;
+}
+
+function extractExplicitChangelog(lines) {
+  const headerIndex = lines.findIndex(line => /^\s*changelog\s*:/i.test(line));
+  if (headerIndex < 0) return null;
+
+  const header = lines[headerIndex].match(/^\s*changelog\s*:\s*(.*)$/i);
+  const inline = String(header?.[1] || '').trim();
+  if (/^(?:aucun|néant|none|n\/?a)$/i.test(inline)) return [];
+
+  const items = inline ? [inline] : [];
+  for (let index = headerIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    const bullet = line.match(/^\s*(?:[-*•]|\d+[.)])\s+(.+)$/);
+    if (bullet) {
+      items.push(bullet[1].trim());
+      continue;
+    }
+
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (/^[^:]{1,80}:\s*$/.test(trimmed) || items.length > 0) break;
+  }
+
+  return items.map(formatPublicNote).filter(Boolean);
 }
 
 function extractCommitNotes(message) {
@@ -161,22 +183,28 @@ function extractCommitNotes(message) {
 
   const lines = normalized.split('\n');
   const subject = (lines.shift() || '').trim();
+  const explicitNotes = extractExplicitChangelog(lines);
+  if (explicitNotes !== null) return explicitNotes;
+
   const bulletItems = [];
 
   for (const line of lines) {
     const match = line.match(/^\s*(?:[-*•]|\d+[.)])\s+(.+)$/);
     if (!match) continue;
-    const item = fixFrenchFormatting(match[1].trim());
-    if (item) bulletItems.push(`- ${item}`);
+    const item = formatPublicNote(match[1]);
+    if (item) bulletItems.push(item);
   }
 
   if (bulletItems.length > 0) return bulletItems;
-  if (/^Merge\b/i.test(subject) || /^chore\(release\):\s*(?:aligner|valider)\b/i.test(subject)) return [];
+  if (
+    /^Merge\b/i.test(subject) ||
+    /^(?:chore|docs|build|ci|test)(?:\([^)]+\))?:/i.test(subject) ||
+    /^chore\(release\):\s*(?:aligner|valider)\b/i.test(subject)
+  ) return [];
 
-  const cleaned = fixFrenchFormatting(cleanConventionalSubject(subject));
-  if (!cleaned) return [];
-  const sentence = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
-  return [`${notePrefixFromSubject(subject)}${sentence}`];
+  const cleaned = cleanConventionalSubject(subject);
+  const note = formatPublicNote(cleaned);
+  return note ? [note] : [];
 }
 
 function deduplicateNotes(notes) {
@@ -239,6 +267,7 @@ module.exports = {
   buildReleaseBody,
   collectReleaseCommits,
   extractCommitNotes,
+  formatPublicNote,
   findPreviousReleaseTag,
   generateReleaseNotes
 };

@@ -41,6 +41,17 @@ GitHub est canonique. AI Studio est un mécanisme de transport : une modificatio
 - Réponses, commits, changelog et release notes : **français**.
 - Commits : Conventional Commits (`fix:`, `feat:`, `perf:`, `ci:`, `docs:`…), avec un corps court en
   puces lorsque plusieurs changements sont inclus.
+- Lorsqu'un commit apporte un changement visible, son corps contient une section `Changelog:` avec
+  **une à deux phrases destinées à l'utilisateur**, puis, si nécessaire, une section séparée
+  `Détails techniques:`. Un commit sans effet visible porte `Changelog: aucun`. Le générateur ne doit
+  jamais confondre ces détails internes avec les notes publiques.
+- Le changelog public conserve exactement le titre `### 🛠️ Ce qui a été fait` et vise **deux à cinq
+  puces courtes** pour l'ensemble d'une version. Chaque puce commence par une majuscule, se termine par
+  une ponctuation et décrit un résultat concret avec les mots de l'interface. Regroupez les changements
+  liés au lieu d'énumérer leur implémentation. Sauf nécessité pour comprendre l'usage, n'y exposez ni
+  nom de fichier, fonction, variable, `ratingKey`, UID, cache/baseline, test, CI, commit, PR ou issue.
+- Évitez les formulations vagues (« améliorations générales », « diverses corrections ») lorsqu'un
+  bénéfice précis peut être nommé. Les preuves techniques restent dans le commit, la PR ou l'issue.
 - Une release agrège les commits du lot ; ne créez pas un commit artificiel par garde-fou administratif.
 
 ## 2. Processus de livraison proportionné
