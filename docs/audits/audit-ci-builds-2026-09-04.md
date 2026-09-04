@@ -1,6 +1,6 @@
 # Audit des builds et de la chaîne CI/CD — 4 septembre 2026
 
-- **ID :** AUDIT-2026-09-04-CI-RECENT-BUILDS
+- **Identifiant :** AUDIT-2026-09-04-CI-RECENT-BUILDS
 - **Date :** 4 septembre 2026
 - **Baseline :** SeenIt 1.4.112, commit `3e46bc2036abc6aef17b4fcfec05cf446fa47ae2`
 - **Périmètre :** GitHub Actions, validations PR/main, releases APK manuelles, temps d'installation, causes d'échec et gouvernance des pushes
@@ -86,6 +86,12 @@ Son job `Validate Change` dure 459 s :
 L'installation consomme donc environ **92 %** du job. La PR correspondante
 [#549](https://github.com/julfou7/seenit-app/actions/runs/33847067500) consomme déjà 358 s dans
 `npm ci` sur 388 s.
+
+Une contre-mesure réalisée après la fenêtre principale confirme le phénomène : la PR documentaire
+[#551](https://github.com/julfou7/seenit-app/actions/runs/33849323003) a passé **385 s** dans `npm ci`
+sur un job de 406 s. Elle a ensuite échoué en 11 s parce que cet audit employait initialement le
+libellé `ID` au lieu du libellé contractuel `Identifiant`. Ce défaut, reproductible localement sans
+installation supplémentaire, illustre simultanément CI-01 et CI-04.
 
 Dans les deux cas :
 
@@ -243,6 +249,7 @@ code SeenIt.
 | CI-10 | le fresh AVD allonge la release mais a restauré sa fiabilité | accepté | conserver le smoke ; budget p95 de 8 min | [#50](https://github.com/julfou7/seenit-app/issues/50) clôturée |
 | CI-11 | checkout complet de validation coûte seulement 2–7 s | accepté | ne pas complexifier avant nouvelle mesure | risque faible accepté |
 | CI-12 | tests + build prennent environ 20–25 s | solide | conserver intégralement les contrôles | aucune action |
+| CI-13 | la PR documentaire de l’audit a attendu 6 min 25 s avant un échec local trivial | P1 | préflight local obligatoire et fail-fast distant | [#83](https://github.com/julfou7/seenit-app/issues/83) et [#84](https://github.com/julfou7/seenit-app/issues/84) |
 
 ## Décision
 
