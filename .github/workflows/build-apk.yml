@@ -32,6 +32,7 @@ jobs:
     name: Validate Change
     if: github.event_name != 'workflow_dispatch' || inputs.release_apk != true
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
     outputs:
@@ -44,15 +45,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Initialize Validation Metrics
+        run: |
+          echo "SEENIT_VALIDATION_STARTED=$(date +%s)" >> "$GITHUB_ENV"
+          echo "SEENIT_PREFLIGHT_STARTED=$(date +%s)" >> "$GITHUB_ENV"
+
       - name: Set up Node.js 22 with npm cache
         uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: package-lock.json
-
-      - name: Install Dependencies
-        run: npm ci --legacy-peer-deps
 
       - name: Reject Release Request Outside Main
         if: github.event_name == 'workflow_dispatch' && inputs.release_apk == true
@@ -75,22 +78,138 @@ jobs:
           SPEC_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           DELIVERY_MODE: ${{ steps.delivery.outputs.DELIVERY_MODE }}
 
-      - name: Fast Automated Tests
+      - name: Validate Specification Integrity
+        run: npm run test:spec
+
+      - name: Complete Preflight Metrics
+        if: always()
         run: |
-          npm run test:spec
+          now=$(date +%s)
+          echo "SEENIT_PREFLIGHT_SECONDS=$((now-SEENIT_PREFLIGHT_STARTED))" >> "$GITHUB_ENV"
+
+      - name: Resolve Node Cache Identity
+        id: runtime
+        run: echo "node_version=$(node -p 'process.versions.node')" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Exact node_modules Cache
+        id: node_modules_cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules
+          key: seenit-node-modules-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.runtime.outputs.node_version }}-${{ hashFiles('package.json', 'package-lock.json', 'scripts/patch-local-notifications.cjs', 'scripts/materialize-android-config.cjs') }}
+
+      - name: Install Dependencies on Cache Miss
+        if: steps.node_modules_cache.outputs.cache-hit != 'true'
+        run: |
+          started=$(date +%s)
+          set +e
+          npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
+          status=$?
+          set -e
+          now=$(date +%s)
+          echo "SEENIT_INSTALL_SECONDS=$((now-started))" >> "$GITHUB_ENV"
+          exit "$status"
+
+      - name: Materialize Android Configuration
+        run: |
+          started=$(date +%s)
+          set +e
+          node scripts/materialize-android-config.cjs
+          status=$?
+          set -e
+          now=$(date +%s)
+          echo "SEENIT_MATERIALIZE_SECONDS=$((now-started))" >> "$GITHUB_ENV"
+          exit "$status"
+
+      - name: TypeScript Check
+        run: |
+          started=$(date +%s)
+          set +e
           npm run lint
+          status=$?
+          set -e
+          now=$(date +%s)
+          echo "SEENIT_TYPESCRIPT_SECONDS=$((now-started))" >> "$GITHUB_ENV"
+          exit "$status"
+
+      - name: Unit Tests
+        run: |
+          started=$(date +%s)
+          set +e
           npm run test:unit
+          status=$?
+          set -e
+          now=$(date +%s)
+          echo "SEENIT_UNIT_SECONDS=$((now-started))" >> "$GITHUB_ENV"
+          exit "$status"
 
       - name: Android Contract for APK-impacting Changes
         if: steps.delivery.outputs.DELIVERY_MODE == 'apk' || (github.event_name == 'workflow_dispatch' && inputs.release_apk == true)
-        run: npm run test:android
+        run: |
+          started=$(date +%s)
+          set +e
+          npm run test:android
+          status=$?
+          set -e
+          now=$(date +%s)
+          echo "SEENIT_ANDROID_SECONDS=$((now-started))" >> "$GITHUB_ENV"
+          exit "$status"
 
       - name: Production Dependency Audit
         if: steps.delivery.outputs.DEPENDENCIES_CHANGED == 'true' || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.release_apk == true)
         run: npm audit --omit=dev --audit-level=high
 
       - name: Build Web and Server Assets
-        run: npm run build
+        run: |
+          started=$(date +%s)
+          set +e
+          npm run build
+          status=$?
+          set -e
+          now=$(date +%s)
+          echo "SEENIT_BUILD_SECONDS=$((now-started))" >> "$GITHUB_ENV"
+          exit "$status"
+
+      - name: Save Trusted node_modules Cache
+        if: >-
+          success() &&
+          steps.node_modules_cache.outputs.cache-hit != 'true' &&
+          github.event_name == 'push' &&
+          (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules
+          key: seenit-node-modules-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.runtime.outputs.node_version }}-${{ hashFiles('package.json', 'package-lock.json', 'scripts/patch-local-notifications.cjs', 'scripts/materialize-android-config.cjs') }}
+
+      - name: Publish Validation Summary
+        if: always()
+        run: |
+          now=$(date +%s)
+          total_seconds=$((now-SEENIT_VALIDATION_STARTED))
+          delivery_mode='${{ steps.delivery.outputs.DELIVERY_MODE }}'
+          cache_hit='${{ steps.node_modules_cache.outputs.cache-hit }}'
+          if [ -z "$delivery_mode" ]; then delivery_mode='inconnu'; fi
+          if [ "$cache_hit" = 'true' ]; then
+            cache_status='hit'
+          else
+            cache_status='miss'
+          fi
+          {
+            echo "## Validate Change"
+            echo
+            echo "| Mesure | Valeur |"
+            echo "|---|---:|"
+            echo "| Mode de livraison | $delivery_mode |"
+            echo "| Cache node_modules | $cache_status |"
+            echo "| Préflight | ${SEENIT_PREFLIGHT_SECONDS:-n/a} s |"
+            echo "| Installation npm | ${SEENIT_INSTALL_SECONDS:-0} s |"
+            echo "| Matérialisation Android | ${SEENIT_MATERIALIZE_SECONDS:-n/a} s |"
+            echo "| TypeScript | ${SEENIT_TYPESCRIPT_SECONDS:-n/a} s |"
+            echo "| Tests unitaires | ${SEENIT_UNIT_SECONDS:-n/a} s |"
+            echo "| Contrat Android | ${SEENIT_ANDROID_SECONDS:-n/a} s |"
+            echo "| Build Web + serveur | ${SEENIT_BUILD_SECONDS:-n/a} s |"
+            echo "| Total mesuré | $total_seconds s |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   build:
     name: Build Manual APK Candidate
