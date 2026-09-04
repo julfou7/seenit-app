@@ -122,9 +122,11 @@ export function resolveParentalRating(
 }
 
 /**
- * Ajoute le résultat SeenIt sans réécrire les certifications TMDB brutes. Les autres
- * consommateurs (cinéma, diagnostics, futurs mappings) continuent ainsi à voir le
- * payload officiel inchangé.
+ * Ajoute le résultat SeenIt et fournit un adaptateur de présentation aux écrans
+ * historiques qui lisent encore `release_dates` / `content_ratings`. Le payload
+ * source reçu n'est jamais muté : toutes les structures modifiées sont clonées et
+ * `seenitParentalRating.original` conserve la certification US TMDB effectivement
+ * utilisée par le résolveur.
  */
 export function decorateParentalRatingDetails(
   mediaType: ParentalMediaType,
@@ -132,9 +134,55 @@ export function decorateParentalRatingDetails(
   override?: ParentalRatingOverride | null,
 ): any {
   if (!details) return details;
+  const rating = resolveParentalRating(mediaType, details, override);
+
+  if (mediaType === 'movie') {
+    const rawResults = Array.isArray(details.release_dates?.results) ? details.release_dates.results : [];
+    let hasUs = false;
+    const results = rawResults.map((entry: any) => {
+      if (entry?.iso_3166_1 === 'FR') {
+        return {
+          ...entry,
+          release_dates: Array.isArray(entry.release_dates)
+            ? entry.release_dates.map((release: any) => ({ ...release, certification: '' }))
+            : [],
+        };
+      }
+      if (entry?.iso_3166_1 === 'US') {
+        hasUs = true;
+        const releases = Array.isArray(entry.release_dates) && entry.release_dates.length > 0
+          ? entry.release_dates.map((release: any, index: number) => ({
+              ...release,
+              certification: index === 0 ? rating.label : '',
+            }))
+          : [{ certification: rating.label }];
+        return { ...entry, release_dates: releases };
+      }
+      return entry;
+    });
+    if (!hasUs) results.push({ iso_3166_1: 'US', release_dates: [{ certification: rating.label }] });
+    return {
+      ...details,
+      release_dates: { ...(details.release_dates || {}), results },
+      seenitParentalRating: rating,
+    };
+  }
+
+  const rawResults = Array.isArray(details.content_ratings?.results) ? details.content_ratings.results : [];
+  let hasUs = false;
+  const results = rawResults.map((entry: any) => {
+    if (entry?.iso_3166_1 === 'FR') return { ...entry, rating: '' };
+    if (entry?.iso_3166_1 === 'US') {
+      hasUs = true;
+      return { ...entry, rating: rating.label };
+    }
+    return entry;
+  });
+  if (!hasUs) results.push({ iso_3166_1: 'US', rating: rating.label });
   return {
     ...details,
-    seenitParentalRating: resolveParentalRating(mediaType, details, override),
+    content_ratings: { ...(details.content_ratings || {}), results },
+    seenitParentalRating: rating,
   };
 }
 
