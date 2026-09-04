@@ -549,6 +549,13 @@ preuves complètes, ils doivent converger vers la même bibliothèque.
   vérifié après construction et après transfert entre jobs. L'action de publication refuse tout
   écrasement et tout fichier manquant. Une correction d'une version déjà publiée utilise
   obligatoirement un nouveau patch.
+- **SEENIT-RELEASE-005** — Une demande explicite de publication APK autorise l'agent à fusionner la
+  candidate prête, déclencher lui-même le workflow depuis `main` et le suivre jusqu'à l'APK signé, au
+  SHA-256 et à la release immuable. Les voies sont essayées dans cet ordre : outil GitHub direct,
+  `release:dispatch`/`gh`, puis interface GitHub Actions via navigateur authentifié contrôlable.
+  L'absence de CLI ou de token shell ne justifie pas un renvoi vers un clic utilisateur si le navigateur
+  est disponible. Avant chaque déclenchement, l'agent vérifie qu'aucun run du même SHA/version n'est
+  déjà actif ; une intervention humaine n'est demandée qu'après échec réel des trois voies.
 - Canal PWA : le déploiement Web peut être instantané et réversible côté hébergeur.
 - Canal backend : une modification exclusivement serveur suit sa validation propre sans bump Android.
 - Canal APK : une correction d'un binaire déjà publié, y compris un rollback logique, est toujours une
@@ -584,7 +591,8 @@ preuves complètes, ils doivent converger vers la même bibliothèque.
 1. regrouper les commits du lot sur `main` ;
 2. quand le lot est prêt, bump Android une seule fois puis `npm run version:sync` ;
 3. obtenir une validation continue verte ;
-4. déclencher manuellement la release depuis `main` ;
+4. après demande explicite, laisser l'agent déclencher et suivre la release depuis `main` via l'une
+   des trois voies canoniques, sans renvoyer prématurément l'utilisateur vers un clic manuel ;
 5. matérialiser la clé release PKCS12 depuis les trois GitHub Secrets de signature, vérifier son empreinte et les invariants du contrat, exécuter `npm run test:android`, build Web, `npx cap sync android`, revalidation Android et Gradle ;
 6. exécuter le smoke bloquant Android cible : N → N+1 sur place avec la même signature et conservation des données/session ; Android 12 optionnel/manual ou périodique ;
 7. publication immuable GitHub de l'APK et du SHA-256 ;
