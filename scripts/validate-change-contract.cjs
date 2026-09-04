@@ -56,42 +56,21 @@ function getChangedContentLines(patch) {
     return changed.map(entry => entry.content);
   }
 
-  const additions = new Map();
-  const removals = new Map();
-  for (const entry of changed) {
-    const target = entry.sign === '+' ? additions : removals;
-    target.set(entry.content, (target.get(entry.content) || 0) + 1);
+  const effective = [];
+  for (let index = 0; index < changed.length; index += 1) {
+    const current = changed[index];
+    const next = changed[index + 1];
+    if (
+      next
+      && current.sign !== next.sign
+      && current.content === next.content
+    ) {
+      index += 1;
+      continue;
+    }
+    effective.push(current.content);
   }
-
-  const cancelled = new Map();
-  for (const [content, removedCount] of removals) {
-    const pairCount = Math.min(removedCount, additions.get(content) || 0);
-    if (pairCount > 0) cancelled.set(content, pairCount);
-  }
-
-  const remainingCancelled = new Map(cancelled);
-  return changed
-    .filter(entry => {
-      const count = remainingCancelled.get(entry.content) || 0;
-      if (count === 0) return true;
-
-      if (entry.sign === '-') {
-        remainingCancelled.set(entry.content, count - 1);
-        return false;
-      }
-
-      const removedTotal = cancelled.get(entry.content) || 0;
-      const removalsStillPresent = changed.some(candidate => (
-        candidate.sign === '-'
-        && candidate.content === entry.content
-      ));
-      if (removedTotal > 0 && removalsStillPresent) {
-        cancelled.set(entry.content, removedTotal - 1);
-        return false;
-      }
-      return true;
-    })
-    .map(entry => entry.content);
+  return effective;
 }
 
 function isVersionOnlyPatch(file, patch) {
