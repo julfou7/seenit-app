@@ -44,12 +44,33 @@ function normalizePath(file) {
 }
 
 function getChangedContentLines(patch) {
-  return String(patch || '')
+  const source = String(patch || '');
+  const changed = source
     .split(/\r?\n/)
     .filter(line => (line.startsWith('+') && !line.startsWith('+++'))
       || (line.startsWith('-') && !line.startsWith('---')))
-    .map(line => line.slice(1).trim())
-    .filter(Boolean);
+    .map(line => ({ sign: line[0], content: line.slice(1).trim() }))
+    .filter(entry => Boolean(entry.content));
+
+  if (!source.includes('\\ No newline at end of file')) {
+    return changed.map(entry => entry.content);
+  }
+
+  const effective = [];
+  for (let index = 0; index < changed.length; index += 1) {
+    const current = changed[index];
+    const next = changed[index + 1];
+    if (
+      next
+      && current.sign !== next.sign
+      && current.content === next.content
+    ) {
+      index += 1;
+      continue;
+    }
+    effective.push(current.content);
+  }
+  return effective;
 }
 
 function isVersionOnlyPatch(file, patch) {

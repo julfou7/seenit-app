@@ -38,6 +38,14 @@ test('le contrat SPEC reconnaît un alignement version:sync complet comme non co
   );
 });
 
+test('le contrat SPEC tolère une différence de fin de fichier sans effet pendant le bump de version', () => {
+  const patch = '@@ -4 +4 @@\n-Version applicative : **1.4.112**\n+Version applicative : **1.4.113**\n@@ -714 +714 @@\n-- TNR : invariant inchangé.\n+- TNR : invariant inchangé.\n\\ No newline at end of file';
+  assert.equal(isVersionOnlyPatch('docs/specifications/seenit.md', patch), true);
+
+  const samePatchWithoutMarker = patch.replace('\n\\ No newline at end of file', '');
+  assert.equal(isVersionOnlyPatch('docs/specifications/seenit.md', samePatchWithoutMarker), false);
+});
+
 test('le contrat SPEC accepte un reformatage JSON si seuls les champs de version changent', () => {
   const before: Record<string, string> = {
     'docs/specifications/android-contract.json': '{"applicationVersion":"1.4.111","versionCode":104111,"androidPackageName":"com.seenit.app"}',
