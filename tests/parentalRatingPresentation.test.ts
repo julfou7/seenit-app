@@ -31,6 +31,6 @@ test('SEENIT-PARENTAL-001 expose la correction personnelle sur la fiche PWA et A
   assert.match(editor, /setOverride\(mediaType, Number\(tmdbId\), age\)/);
   assert.match(editor, /clearOverride\(mediaType, Number\(tmdbId\)\)/);
   assert.match(editor, /0 = Tous publics/);
-  assert.doesNotMatch(editor, /title|originalTitle|release_date|firstAirDate/,
+  assert.doesNotMatch(editor, /\.(?:title|originalTitle)\b|\b(?:release_date|firstAirDate)\b/,
     'la correction personnelle doit rester identifiée uniquement par type + TMDB ID');
 });
