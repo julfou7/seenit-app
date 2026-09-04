@@ -190,6 +190,23 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
   classement. Ainsi une série affichée « il y a 38/39 jours » dans « Continuer à regarder » est conforme
   au comportement attendu.
 
+### 5.2 Explorer « Au cinéma » — preuve théâtrale France
+
+- **SEENIT-DISCOVER-001** — La catégorie Explorer **« Au cinéma »** et tout badge portant ce libellé
+  exigent une preuve TMDB de sortie théâtrale en France : une entrée `release_dates` de pays `FR` et de
+  type `2` (Theatrical limited) ou `3` (Theatrical), dans la fenêtre courante de J-75 à J+10. Une date
+  générique `release_date` / `primary_release_date` ne suffit jamais ; une sortie uniquement numérique
+  (`type=4`), physique (`type=5`) ou TV (`type=6`) est exclue.
+- La liste Explorer est alimentée par une requête TMDB `discover/movie` avec `region=FR`,
+  `with_release_type=2|3` et des bornes `release_date.gte/lte`. Un marqueur interne de preuve théâtrale
+  peut être attaché uniquement aux résultats issus de cette requête contrainte, afin que le filtre et
+  les cartes réutilisent exactement la même sémantique sans redeviner depuis une date générique.
+- Les fiches détaillées utilisent les `release_dates` TMDB déjà récupérées avec les détails du film pour
+  appliquer la même règle aux badges individuels. La logique est commune à la PWA et à l'APK.
+- TMDB permet de distinguer théâtral et digital mais ne constitue pas une base temps réel des séances :
+  « Au cinéma » signifie ici sortie théâtrale française dans cette fenêtre, pas présence garantie dans
+  au moins une salle aujourd'hui.
+
 ## 6. Synchronisation Plex
 
 - **SEENIT-PLEX-001** — Les événements Plex sont normalisés et résolus sans utiliser leur titre
@@ -524,13 +541,13 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   l’intégrité de la SPEC s’exécute avant tout accès aux dépendances, puis un cache `node_modules` exact
   est restauré avant l’installation conditionnelle. Sa clé dépend du système, de l’architecture, de la
   version Node, du lockfile et des scripts de patch ; seul `main` alimente le cache de référence et une
-  PR ne peut pas l’empoisonner. Sur cache trouvé, aucune installation n’a lieu et la classification
-  comme le contrat de changement s’exécutent directement. Un cache absent déclenche une installation
+  PR ne peut pas l'empoisonner. Sur cache trouvé, aucune installation n'a lieu et la classification
+  comme le contrat de changement s'exécutent directement. Un cache absent déclenche une installation
   npm déterministe sans audit implicite avant ces contrôles dépendants de TypeScript. La configuration
   Android est toujours rematérialisée hors cache. SPEC, TypeScript, tests unitaires, contrat Android
   applicable et build restent distincts et obligatoires. Le résumé expose le mode, le cache et les
   durées. La cible nominale est une médiane de 45 s et un p95 de 90 s sur 20 validations consécutives ;
-  un plafond dur de 10 minutes transforme toute dérive d’infrastructure prolongée en échec explicite.
+  un plafond dur de 10 minutes transforme toute dérive d'infrastructure prolongée en échec explicite.
 
 Une modification est terminée lorsque les validations applicables à sa classe sont vertes, son test
 ciblé existe si le comportement change, toute règle durable/zone sensible est reflétée dans la SPEC et
