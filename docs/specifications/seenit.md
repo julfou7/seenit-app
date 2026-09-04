@@ -495,16 +495,17 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   d’AI Studio. La PWA, l’APK et le backend n’exposent aucune route `/api/git/*`, aucun bouton de
   pull et aucun script `scripts/pull.sh`. `GITHUB_PAT` reste réservé à la consultation des
   releases via `/api/update` tant que ce fallback existe.
-- **SEENIT-QUALITY-008** — La validation continue échoue vite sans retirer de contrôle : la
-  classification, le contrat de changement et l’intégrité de la SPEC s’exécutent avant toute
-  installation de dépendances. Les dépendances peuvent être restaurées depuis un cache `node_modules`
-  exact, lié au système, à l’architecture, à la version Node, au lockfile et aux scripts de patch ;
-  seul `main` alimente le cache de référence et une PR ne peut pas l’empoisonner. Un cache absent
-  déclenche une installation npm déterministe sans audit implicite, puis la configuration Android est
-  toujours rematérialisée hors cache. SPEC, TypeScript, tests unitaires, contrat Android applicable et
-  build restent distincts et obligatoires. Le résumé expose le mode, le cache et les durées. La cible
-  nominale est une médiane de 45 s et un p95 de 90 s sur 20 validations consécutives ; un plafond dur
-  de 10 minutes transforme toute dérive d’infrastructure prolongée en échec explicite.
+- **SEENIT-QUALITY-008** — La validation continue échoue vite sans retirer de contrôle :
+  l’intégrité de la SPEC s’exécute avant tout accès aux dépendances, puis un cache `node_modules` exact
+  est restauré avant l’installation conditionnelle. Sa clé dépend du système, de l’architecture, de la
+  version Node, du lockfile et des scripts de patch ; seul `main` alimente le cache de référence et une
+  PR ne peut pas l’empoisonner. Sur cache trouvé, aucune installation n’a lieu et la classification
+  comme le contrat de changement s’exécutent directement. Un cache absent déclenche une installation
+  npm déterministe sans audit implicite avant ces contrôles dépendants de TypeScript. La configuration
+  Android est toujours rematérialisée hors cache. SPEC, TypeScript, tests unitaires, contrat Android
+  applicable et build restent distincts et obligatoires. Le résumé expose le mode, le cache et les
+  durées. La cible nominale est une médiane de 45 s et un p95 de 90 s sur 20 validations consécutives ;
+  un plafond dur de 10 minutes transforme toute dérive d’infrastructure prolongée en échec explicite.
 
 Une modification est terminée lorsque les validations applicables à sa classe sont vertes, son test
 ciblé existe si le comportement change, toute règle durable/zone sensible est reflétée dans la SPEC et
