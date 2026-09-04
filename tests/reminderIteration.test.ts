@@ -28,7 +28,7 @@ test('issue #94 ignore chaque média inéligible sans interrompre les suivants',
   assert.doesNotMatch(loop, /\breturn\s*;/, 'aucun média ne doit pouvoir quitter processReminders depuis la boucle');
 
   assert.match(loop, /if \(s\.isArchived \|\| s\.status === 'dropped'\) continue;/);
-  assert.match(loop, /if \(s\.mediaType === 'movie'\) \{\s*if \(!s\.firstAirDate\) continue;/);
+  assert.match(loop, /if \(s\.mediaType === 'movie' && !s\.firstAirDate\) continue;/);
   assert.match(loop, /if \(!upcoming \|\| !upcoming\.air_date\) continue;/);
 
   const invalidDateGuards = loop.match(/if \(!year \|\| !month \|\| !day\) continue;/g) || [];
@@ -38,7 +38,7 @@ test('issue #94 ignore chaque média inéligible sans interrompre les suivants',
 test('issue #94 ne programme rien avant les garde-fous d’éligibilité', () => {
   const firstNativeNotification = loop.indexOf('sendNativeNotification(');
   assert.ok(firstNativeNotification > loop.indexOf("if (s.isArchived || s.status === 'dropped') continue;"));
-  assert.ok(firstNativeNotification > loop.indexOf('if (!s.firstAirDate) continue;'));
+  assert.ok(firstNativeNotification > loop.indexOf("if (s.mediaType === 'movie' && !s.firstAirDate) continue;"));
 
   const tvSchedule = loop.indexOf('const scheduleTvAlert');
   assert.ok(tvSchedule > loop.indexOf('if (!upcoming || !upcoming.air_date) continue;'));
