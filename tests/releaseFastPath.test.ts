@@ -181,7 +181,7 @@ test('SEENIT-RELEASE-002 le fast path est autonome, borné et sans Web/plugin', 
   assert.equal(packageJson.scripts['release:dispatch'], 'node scripts/dispatch-release.cjs');
   assert.match(agentRules, /Fast path.*publication APK/is);
   assert.match(agentRules, /release:status/);
-  assert.match(agentRules, /recherches Web.*plugins/is);
+  assert.match(agentRules, /ni sur le Web ni via des plugins/is);
   assert.match(bootstrapRules, /fast path.*APK/is);
   assert.match(deliveryProcess, /release:status/);
   assert.match(deliveryProcess, /gh workflow run build-apk\.yml/);
