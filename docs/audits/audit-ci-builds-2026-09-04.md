@@ -260,14 +260,18 @@ La première implémentation du chemin rapide est portée par la
 |---|---|---|---:|---:|---|
 | [#554](https://github.com/julfou7/seenit-app/actions/runs/33852234487) | échec de conception | non atteint | 0 s | 13 s | la classification chargeait TypeScript avant le cache ; l'échec est apparu sans installation |
 | [#558](https://github.com/julfou7/seenit-app/actions/runs/33852570774) | succès | miss | 15 s | 45 s | SPEC, classification, contrat, TypeScript, 256+ tests et build verts |
+| [#559](https://github.com/julfou7/seenit-app/actions/runs/33852694803) | succès | miss | 17 s | 56 s | audit mis à jour et résumé détaillé validé |
+| [#560](https://github.com/julfou7/seenit-app/actions/runs/33852857321) | succès `main` | miss d’amorçage | 15 s | 55 s | cache exact sauvegardé depuis `main` après tous les contrôles verts |
 
 Le run #554 a permis de corriger le contrat : l'intégrité SPEC reste entièrement indépendante des
 dépendances ; la classification de pure copie, qui utilise l'analyseur TypeScript, s'exécute après la
 restauration du cache et après l'installation uniquement lors d'un bootstrap `miss`. Le run #558
 passe déjà sous la cible de 90 s malgré un cache `node_modules` encore absent.
 
-La preuve d'écriture du cache depuis `main`, d'un hit ultérieur et la série de 20 validations réelles
-restent à collecter dans #84. Aucun run artificiel n'est lancé uniquement pour améliorer la métrique.
+L’écriture du cache depuis `main` est prouvée par #560. La présente mise à jour documentaire sert de
+première validation réelle de lecture depuis une PR ; son résultat est consigné dans #84. La série de
+20 validations réelles reste à collecter sans lancer de runs artificiels uniquement pour améliorer la
+métrique.
 
 ## Décision
 
