@@ -18,6 +18,7 @@ import { BottomNav } from './components/BottomNav';
 import { ToastContainer } from './components/ToastContainer';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { AppUpdateBanner } from './components/AppUpdateBanner';
+import { ParentalRatingEditor } from './components/ParentalRatingEditor';
 import { useNavigation } from './features/navigation/useNavigation';
 import { useDetailsSyncWorker } from './hooks/useDetailsSyncWorker';
 import { useRemindersNotifier } from './hooks/useRemindersNotifier';
@@ -25,6 +26,8 @@ import { useSyncStore } from './store/syncStore';
 import { useShows } from './hooks/useShows';
 import { useShowsStore } from './store/showsStore';
 import { useToastStore } from './store/toastStore';
+import { useParentalRatingStore } from './store/parentalRatingStore';
+import { parentalRatingKey } from './features/shows/parentalRating';
 import { markEpisodeWatched } from './features/shows/markEpisodeWatched';
 import { cn } from './lib/utils';
 import { cleanOldCache } from './db/dexie';
@@ -162,6 +165,7 @@ export default function App() {
 function MainApp() {
   const { updateShow } = useShows();
   const shows = useShowsStore(state => state.shows);
+  const parentalRatingOverrides = useParentalRatingStore(state => state.overrides);
   const showToast = useToastStore(state => state.showToast);
   const processedActionsRef = useRef<Set<string>>(new Set());
 
@@ -174,6 +178,24 @@ function MainApp() {
   useRemindersNotifier();
   const { currentTab, changeTab, selectedShow, openShow, closeShow } = useNavigation();
   const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => new Set(['watchlist', currentTab]));
+
+  const selectedLocalShow = selectedShow?.type === 'local'
+    ? shows.find(show => String(show.id) === String(selectedShow.id) || String(show.tmdbId) === String(selectedShow.id))
+    : undefined;
+  const selectedRatingTmdbId = selectedShow
+    ? Number(
+        selectedShow.type === 'tmdb'
+          ? selectedShow.id
+          : (selectedShow.tmdbId || selectedLocalShow?.tmdbId || 0)
+      )
+    : 0;
+  const selectedRatingMediaType: 'tv' | 'movie' = selectedShow?.mediaType || selectedLocalShow?.mediaType || 'tv';
+  const selectedRatingKey = selectedRatingTmdbId
+    ? parentalRatingKey(selectedRatingMediaType, selectedRatingTmdbId)
+    : null;
+  const selectedRatingRevision = selectedRatingKey
+    ? (parentalRatingOverrides[selectedRatingKey]?.updatedAt || 0)
+    : 0;
 
   const handleTabChange = useCallback((tab: Parameters<typeof changeTab>[0]) => {
     void tabScreenPreloaders[tab]?.();
@@ -475,7 +497,7 @@ function MainApp() {
             >
               <Suspense fallback={<div className="flex-1 bg-premium-ambient" aria-label="Chargement de la fiche" />}>
                 <ShowDetailScreen
-                  key={`${selectedShow.id}-${selectedShow.mediaType || 'tv'}`}
+                  key={`${selectedShow.id}-${selectedShow.mediaType || 'tv'}-${selectedRatingRevision}`}
                   showId={selectedShow.type === 'local' ? String(selectedShow.id) : undefined}
                   tmdbId={selectedShow.type === 'tmdb' ? Number(selectedShow.id) : (selectedShow.tmdbId ? Number(selectedShow.tmdbId) : undefined)}
                   mediaType={selectedShow.mediaType}
@@ -485,6 +507,10 @@ function MainApp() {
                   onShowClick={(id, mediaType) => openShowSmooth(id, 'tmdb', mediaType)}
                 />
               </Suspense>
+              <ParentalRatingEditor
+                tmdbId={selectedRatingTmdbId || null}
+                mediaType={selectedRatingMediaType}
+              />
             </div>
           )}
         </div>

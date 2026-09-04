@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { cn } from '../lib/utils';
-import { Tv, Film, Star, ChevronDown, Check, X, Sparkles, FileText, User, Ticket } from 'lucide-react';
+import { Tv, Film, X, Sparkles, FileText, User, Ticket } from 'lucide-react';
 
 interface FilterModalProps {
   onClose: () => void;
@@ -15,7 +15,7 @@ interface FilterModalProps {
 }
 
 const GENRE_OPTIONS = [
-  'Action', 'Aventure', 'Animation', 'Biopic', 'Comédie', 'Drame', 
+  'Action', 'Aventure', 'Animation', 'Biopic', 'Comédie', 'Drame',
   'Fantastique', 'Horreur', 'Romance', 'Sci-Fi', 'Thriller'
 ];
 
@@ -29,18 +29,23 @@ const PLATFORMS = [
   { id: 'max', label: 'Max', color: 'text-blue-400' },
 ];
 
-const PEGI_OPTIONS = [
+// Tokens volontairement distincts des anciennes valeurs PEGI : la façade TMDB
+// les interprète comme une borne d'âge maximale cumulative.
+const AGE_OPTIONS = [
   { id: 'Tous', label: 'Tous' },
-  { id: 'TP', label: 'TP' },
-  { id: '10', label: '-10' },
-  { id: '12', label: '-12' },
-  { id: '16', label: '-16' },
+  { id: 'age:0', label: 'TP' },
+  { id: 'age:7', label: '≤ 7' },
+  { id: 'age:10', label: '≤ 10' },
+  { id: 'age:13', label: '≤ 13' },
+  { id: 'age:14', label: '≤ 14' },
+  { id: 'age:17', label: '≤ 17' },
+  { id: 'age:18', label: '≤ 18' },
 ];
 const RATING_OPTIONS = ['Toutes', '6+', '7+', '7.5+', '8+', '8.5+', '9+'];
 
-export function FilterModal({ 
-  onClose, 
-  activeCategory, 
+export function FilterModal({
+  onClose,
+  activeCategory,
   setActiveCategory,
   initialSelectedPlatforms,
   initialSelectedGenres,
@@ -91,16 +96,16 @@ export function FilterModal({
   };
 
   return (
-    <div 
+    <div
       ref={overlayRef}
       onClick={handleOverlayClick}
       className="fixed inset-0 z-[100] flex flex-col justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
     >
       <div className="w-full max-w-xl mx-auto bg-[#1C1C1E] rounded-t-[2rem] pt-3 px-5 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] shadow-2xl animate-in slide-in-from-bottom-full duration-300 max-h-[90vh] flex flex-col">
-        
+
         {/* Handle */}
         <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-4 shrink-0" />
-        
+
         {/* Header with Reset */}
         <div className="flex justify-between items-center mb-4 shrink-0">
           <button onClick={handleReset} className="text-[13px] font-semibold text-zinc-400 hover:text-white transition-colors">
@@ -116,37 +121,37 @@ export function FilterModal({
           <div>
             <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-3">Type de contenu</h3>
             <div className="flex flex-wrap gap-2">
-              <button 
+              <button
                 onClick={() => setActiveCategory('Séries')}
                 className={cn("px-4 py-2 rounded-full text-[13px] font-semibold flex items-center gap-1.5 transition-all border", activeCategory === 'Séries' ? "bg-[#E5A93D]/20 text-[#E5A93D] border-[#E5A93D]/50" : "bg-white/5 border-white/5 text-zinc-300 hover:bg-white/10")}
               >
                 <Tv size={14}/> Séries
               </button>
-              <button 
+              <button
                 onClick={() => setActiveCategory('Films')}
                 className={cn("px-4 py-2 rounded-full text-[13px] font-semibold flex items-center gap-1.5 transition-all border", activeCategory === 'Films' ? "bg-[#E5A93D]/20 text-[#E5A93D] border-[#E5A93D]/50" : "bg-white/5 border-white/5 text-zinc-300 hover:bg-white/10")}
               >
                 <Film size={14}/> Films
               </button>
-              <button 
+              <button
                 onClick={() => setActiveCategory('Pépites')}
                 className={cn("px-4 py-2 rounded-full text-[13px] font-semibold flex items-center gap-1.5 transition-all border", activeCategory === 'Pépites' ? "bg-[#E5A93D]/20 text-[#E5A93D] border-[#E5A93D]/50" : "bg-white/5 border-white/5 text-zinc-300 hover:bg-white/10")}
               >
                 <Sparkles size={14}/> Pépites
               </button>
-              <button 
+              <button
                 onClick={() => setActiveCategory('Au cinéma')}
                 className={cn("px-4 py-2 rounded-full text-[13px] font-semibold flex items-center gap-1.5 transition-all border", activeCategory === 'Au cinéma' ? "bg-[#E5A93D]/20 text-[#E5A93D] border-[#E5A93D]/50" : "bg-white/5 border-white/5 text-zinc-300 hover:bg-white/10")}
               >
                 <Ticket size={14}/> Au cinéma
               </button>
-              <button 
+              <button
                 onClick={() => setActiveCategory('Documentaires')}
                 className={cn("px-4 py-2 rounded-full text-[13px] font-semibold flex items-center gap-1.5 transition-all border", activeCategory === 'Documentaires' ? "bg-[#E5A93D]/20 text-[#E5A93D] border-[#E5A93D]/50" : "bg-white/5 border-white/5 text-zinc-300 hover:bg-white/10")}
               >
                 <FileText size={14}/> Documentaires
               </button>
-              <button 
+              <button
                 onClick={() => setActiveCategory('Personnes')}
                 className={cn("px-4 py-2 rounded-full text-[13px] font-semibold flex items-center gap-1.5 transition-all border", activeCategory === 'Personnes' ? "bg-[#E5A93D]/20 text-[#E5A93D] border-[#E5A93D]/50" : "bg-white/5 border-white/5 text-zinc-300 hover:bg-white/10")}
               >
@@ -167,13 +172,13 @@ export function FilterModal({
             </div>
             <div className={cn("flex flex-wrap gap-2", isSearchActive && "opacity-30 pointer-events-none grayscale")}>
               {PLATFORMS.map(platform => (
-                <button 
+                <button
                   key={platform.id}
                   onClick={() => togglePlatform(platform.id)}
                   className={cn(
-                    "px-4 py-2 rounded-full text-[13px] font-semibold transition-all border", 
-                    selectedPlatforms.includes(platform.id) 
-                      ? "bg-white/15 border-white/20" 
+                    "px-4 py-2 rounded-full text-[13px] font-semibold transition-all border",
+                    selectedPlatforms.includes(platform.id)
+                      ? "bg-white/15 border-white/20"
                       : "bg-transparent border-white/10 hover:border-white/20",
                     platform.color
                   )}
@@ -189,13 +194,13 @@ export function FilterModal({
             <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-3">Genre</h3>
             <div className="flex flex-wrap gap-2">
               {GENRE_OPTIONS.map(genre => (
-                <button 
+                <button
                   key={genre}
                   onClick={() => toggleGenre(genre)}
                   className={cn(
-                    "px-4 py-2 rounded-full text-[13px] font-medium transition-all border", 
-                    selectedGenres.includes(genre) 
-                      ? "bg-[#E5A93D]/20 border-[#E5A93D]/50 text-[#E5A93D]" 
+                    "px-4 py-2 rounded-full text-[13px] font-medium transition-all border",
+                    selectedGenres.includes(genre)
+                      ? "bg-[#E5A93D]/20 border-[#E5A93D]/50 text-[#E5A93D]"
                       : "bg-transparent border-white/10 text-zinc-300 hover:border-white/20"
                   )}
                 >
@@ -205,25 +210,28 @@ export function FilterModal({
             </div>
           </div>
 
-          {/* CLASSIFICATION PEGI */}
+          {/* ÂGE CONSEILLÉ MAXIMUM */}
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Classification PEGI</h3>
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div>
+                <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Âge conseillé maximum</h3>
+                <p className="text-[10px] text-zinc-600 mt-1">Classification US TMDB · inconnues exclues</p>
+              </div>
               {isSearchActive && (
-                <span className="text-[10px] text-amber-500 font-medium bg-amber-500/10 px-2 py-0.5 rounded">
+                <span className="text-[10px] text-amber-500 font-medium bg-amber-500/10 px-2 py-0.5 rounded shrink-0">
                   Indisponible en recherche texte
                 </span>
               )}
             </div>
             <div className={cn("flex flex-wrap gap-2", isSearchActive && "opacity-30 pointer-events-none grayscale")}>
-              {PEGI_OPTIONS.map(opt => (
-                <button 
+              {AGE_OPTIONS.map(opt => (
+                <button
                   key={opt.id}
                   onClick={() => setPegi(opt.id)}
                   className={cn(
-                    "w-12 h-12 flex items-center justify-center rounded-xl text-[13px] font-bold transition-all border", 
-                    pegi === opt.id 
-                      ? opt.id === 'Tous' ? "bg-green-500/20 text-green-400 border-green-500/50" : "bg-[#E5A93D]/20 border-[#E5A93D]/50 text-[#E5A93D]" 
+                    "min-w-12 h-11 px-3 flex items-center justify-center rounded-xl text-[13px] font-bold transition-all border",
+                    pegi === opt.id
+                      ? opt.id === 'Tous' ? "bg-green-500/20 text-green-400 border-green-500/50" : "bg-[#E5A93D]/20 border-[#E5A93D]/50 text-[#E5A93D]"
                       : "bg-transparent border-white/10 text-zinc-400 hover:border-white/20"
                   )}
                 >
@@ -238,13 +246,13 @@ export function FilterModal({
             <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-3">Note Minimum — Toutes</h3>
             <div className="flex flex-wrap gap-2">
               {RATING_OPTIONS.map(opt => (
-                <button 
+                <button
                   key={opt}
                   onClick={() => setRating(opt)}
                   className={cn(
-                    "px-4 py-2.5 rounded-full text-[13px] font-bold transition-all border", 
-                    rating === opt 
-                      ? "bg-[#E5A93D]/20 text-[#E5A93D] border-[#E5A93D]/50" 
+                    "px-4 py-2.5 rounded-full text-[13px] font-bold transition-all border",
+                    rating === opt
+                      ? "bg-[#E5A93D]/20 text-[#E5A93D] border-[#E5A93D]/50"
                       : "bg-transparent border-white/10 text-zinc-400 hover:border-white/20"
                   )}
                 >
@@ -257,7 +265,7 @@ export function FilterModal({
 
         {/* Validate Button */}
         <div className="pt-4 border-t border-white/5 shrink-0">
-          <button 
+          <button
             onClick={handleValidate}
             className="w-full bg-[#E5A93D] text-black font-bold text-[15px] py-4 rounded-2xl shadow-[0_4px_14px_0_rgba(229,169,61,0.3)] hover:bg-[#F6BA4E] transition-colors"
           >

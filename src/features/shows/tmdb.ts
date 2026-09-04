@@ -1,4 +1,4 @@
-import { err, tryCatch } from '../../core/Result';
+import { err, ok, tryCatch } from '../../core/Result';
 import {
   tmdb as tmdbClient,
   isAdultOrParodyMedia,
@@ -10,6 +10,13 @@ import {
   hasFrenchTheatricalCinemaEvidence,
   rememberFrenchTheatricalEvidence,
 } from './cinemaPolicy';
+import {
+  decorateParentalRatingDetails,
+  matchesMaxRecommendedAge,
+  parseMaxAgeFilter,
+  resolveParentalRating,
+} from './parentalRating';
+import { getParentalRatingOverride } from '../../store/parentalRatingStore';
 
 export * from './tmdbClient';
 
@@ -25,6 +32,18 @@ export function isMovieAtCinema(media: any): boolean {
   return hasFrenchTheatricalCinemaEvidence(media);
 }
 
+const originalGetShowDetails = tmdbClient.getShowDetails.bind(tmdbClient);
+tmdbClient.getShowDetails = (async (id: number) => {
+  const result = await originalGetShowDetails(id);
+  if (!result.ok || !result.value) return result;
+  const decorated = decorateParentalRatingDetails(
+    'tv',
+    result.value,
+    getParentalRatingOverride('tv', Number(id)),
+  );
+  return ok(decorated);
+}) as typeof tmdbClient.getShowDetails;
+
 const originalGetMovieDetails = tmdbClient.getMovieDetails.bind(tmdbClient);
 tmdbClient.getMovieDetails = (async (id: number) => {
   const result = await originalGetMovieDetails(id);
@@ -34,11 +53,65 @@ tmdbClient.getMovieDetails = (async (id: number) => {
     if (isTheatrical) rememberFrenchTheatricalEvidence(Number(id), checkedAt);
     else clearFrenchTheatricalEvidence(Number(id));
 
-    result.value.seenitFrenchTheatrical = isTheatrical;
-    result.value.seenitFrenchTheatricalCheckedAt = checkedAt;
+    const withCinemaEvidence = {
+      ...result.value,
+      seenitFrenchTheatrical: isTheatrical,
+      seenitFrenchTheatricalCheckedAt: checkedAt,
+    };
+    return ok(decorateParentalRatingDetails(
+      'movie',
+      withCinemaEvidence,
+      getParentalRatingOverride('movie', Number(id)),
+    ));
   }
   return result;
 }) as typeof tmdbClient.getMovieDetails;
+
+const originalDiscoverWithFilters = tmdbClient.discoverWithFilters.bind(tmdbClient);
+tmdbClient.discoverWithFilters = (async (options) => {
+  const maxAge = parseMaxAgeFilter(options?.pegi || 'Tous');
+
+  // Le client historique sait encore interpréter d'anciens tokens PEGI et appliquer
+  // des exclusions de genres. La façade canonique neutralise volontairement ce chemin :
+  // la décision parentale ne dépend plus que des détails TMDB US et d'un éventuel
+  // choix personnel du même UID.
+  const result = await originalDiscoverWithFilters({
+    ...options,
+    pegi: 'Tous',
+  });
+
+  if (!result.ok || maxAge === null || !Array.isArray(result.value?.results)) {
+    return result;
+  }
+
+  const hydrated = await Promise.all(result.value.results.map(async (item: any) => {
+    const mediaType: 'movie' | 'tv' = item.media_type === 'movie' || Boolean(item.release_date)
+      ? 'movie'
+      : 'tv';
+    const detailsResult = mediaType === 'movie'
+      ? await tmdbClient.getMovieDetails(Number(item.id))
+      : await tmdbClient.getShowDetails(Number(item.id));
+
+    if (!detailsResult.ok || !detailsResult.value) return null;
+
+    const rating = resolveParentalRating(
+      mediaType,
+      detailsResult.value,
+      getParentalRatingOverride(mediaType, Number(item.id)),
+    );
+
+    if (!matchesMaxRecommendedAge(rating, maxAge)) return null;
+    return {
+      ...item,
+      seenitParentalRating: rating,
+    };
+  }));
+
+  return ok({
+    ...result.value,
+    results: hydrated.filter((item): item is NonNullable<typeof item> => item !== null),
+  });
+}) as typeof tmdbClient.discoverWithFilters;
 
 const strictFrenchNowPlaying = async (page: number = 1) => {
   const apiKey = localStorage.getItem('TMDB_API_KEY')
@@ -84,7 +157,7 @@ const strictFrenchNowPlaying = async (page: number = 1) => {
 };
 
 // Façade stable : tous les consommateurs historiques gardent le même singleton,
-// seule la politique « Au cinéma » est durcie ici.
+// seules les politiques « Au cinéma » et « Âge conseillé » sont durcies ici.
 tmdbClient.getNowPlaying = strictFrenchNowPlaying as typeof tmdbClient.getNowPlaying;
 
 export const tmdb = tmdbClient;

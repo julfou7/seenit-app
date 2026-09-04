@@ -213,6 +213,29 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
   « Au cinéma » signifie ici sortie théâtrale française dans cette fenêtre, pas présence garantie dans
   au moins une salle aujourd'hui.
 
+### 5.2.1 Classification parentale et âge conseillé
+
+- **SEENIT-PARENTAL-001** — La classification d'âge SeenIt est conservatrice et commune à la PWA et
+  à l'APK. La seule source automatique est une **certification US explicite de TMDB** : `release_dates`
+  pour un film et `content_ratings` pour une série. Une certification française, un genre, un titre,
+  un synopsis, une plateforme, une popularité ou une date ne sert jamais à inventer ou abaisser un âge.
+  SeenIt ne scrape ni Apple TV, ni Netflix, ni une autre plateforme pour déterminer cette donnée.
+- Le résolveur conserve la certification originale et sa provenance : `G`, `TV-Y` et `TV-G` valent
+  « Tous publics » ; `TV-Y7` vaut `7+` ; `PG` et `TV-PG` valent `10+` ; `PG-13` vaut `13+` ; `TV-14`
+  vaut `14+` ; `R` vaut `17+` ; `NC-17`, `TV-MA` et une certification numérique explicite `18` valent
+  `18+`. Une valeur absente, vide ou non reconnue devient **« Âge à vérifier »**, jamais « Tous publics ».
+  L'affichage automatique expose la preuve sous une forme du type `PG-13 · US · 13+` afin de ne jamais
+  faire passer cette traduction pour une classification CNC française.
+- Une correction personnelle peut remplacer ce résultat pour le média exact, identifié uniquement par
+  `mediaType + TMDB ID`. Elle est stockée sous le même UID Firestore, converge entre PWA et APK et a
+  priorité sur TMDB. Elle est toujours signalée comme **« Choix personnel »** et ne modifie pas la donnée
+  TMDB source. Une correction ne peut jamais être retrouvée par titre ou année.
+- Le filtre Explorer est nommé **« Âge conseillé »**. Il représente une borne maximale cumulative :
+  par exemple `10 ans` conserve les classifications explicites « Tous publics », `7+` et `10+`, mais
+  exclut `13+`, `14+`, `17+`, `18+` et toute valeur « Âge à vérifier ». Le mode « Tous » ne filtre pas.
+- La fiche, les cartes et Explorer réutilisent le même résolveur ; aucune copie locale de mapping ou
+  heuristique de genre n'est autorisée.
+
 ### 5.3 Machine d'états canonique
 
 Le statut, la progression et les intentions secondaires sont des dimensions différentes :
@@ -692,4 +715,3 @@ l'identité de l'APK et ses actifs.
 - Une annulation utilisateur du sélecteur est une sortie normale et ne doit afficher aucune erreur bloquante.
 - Si Credential Manager est indisponible ou échoue pour une raison de compatibilité, l'ancien flux natif Google Auth reste un fallback; la PWA conserve `signInWithPopup`.
 - TNR : toute régression vers le flux legacy comme parcours Android primaire, ou toute rupture de l'échange vers le Firebase UID existant, est interdite.
-
