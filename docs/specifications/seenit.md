@@ -169,6 +169,27 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 - Les écrans lourds sont chargés à la demande ; les listes conservent des clés et un ordre
   visuel stables.
 
+### 5.1 Accueil « À regarder » — classement des séries
+
+Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 jours**, et non de
+30 jours. Il s'applique après le filtrage des séries encore candidates à un visionnage :
+
+- **Nouveautés** est prioritaire : une nouvelle saison disponible ou une série jamais commencée dont
+  la sortie/l'ajout pertinent date de 60 jours ou moins peut y être classée.
+- **Continuer à regarder** contient une série déjà commencée, non classée dans « Nouveautés », lorsque
+  son dernier visionnage connu date de **60 jours ou moins** (`<= 60 jours`). La date privilégiée est
+  le `watchedAt` le plus récent d'un épisode réellement présent dans `seenEpisodes`; en l'absence de
+  preuve explicite exploitable, `lastWatchedAt` puis `createdAt` servent de repli pour les données legacy.
+- **Pas vu depuis un moment** contient les séries candidates qui ne sont ni dans « Nouveautés » ni dans
+  « Continuer à regarder ». Pour une série déjà commencée, cela correspond donc à un dernier visionnage
+  **strictement supérieur à 60 jours** (`> 60 jours`). Une série jamais commencée et devenue trop ancienne
+  pour « Nouveautés » peut également apparaître dans cette section ; son intitulé ne signifie donc pas
+  que chaque carte a forcément déjà été visionnée.
+- La frontière est inclusive côté « Continuer à regarder » : à exactement 60 jours la série y reste ;
+  elle bascule dans « Pas vu depuis un moment » seulement au-delà, sous réserve des autres règles de
+  classement. Ainsi une série affichée « il y a 38/39 jours » dans « Continuer à regarder » est conforme
+  au comportement attendu.
+
 ## 6. Synchronisation Plex
 
 - **SEENIT-PLEX-001** — Les événements Plex sont normalisés et résolus sans utiliser leur titre
@@ -469,9 +490,13 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   produit, UX, sécurité, plateforme ou développement est comparée à la SPEC. Si elle n'y figure pas,
   elle est ajoutée à la SPEC, au catalogue, aux tests et au registre des demandes. Le travail différé
   possède une issue GitHub ; les questions ponctuelles et les éléments de diagnostic restent hors SPEC.
-- **SEENIT-QUALITY-004** — Dès qu'un travail est relié à une issue GitHub, son corps reste la source
-  de vérité opérationnelle pendant toute l'intervention : l'agent l'actualise aux jalons significatifs
-  prouvés (implémentation prête, validation/CI, intégration sur `main`, release ou blocage), coche chaque
+- **SEENIT-QUALITY-004** — Avant toute analyse, proposition ou modification, l'agent récupère l'état
+  courant de GitHub `main`, lit intégralement les consignes agents, la SPEC et la documentation pertinente,
+  puis recherche les issues GitHub ouvertes et fermées liées au sujet ainsi que les PR, commits, audits et
+  documents pertinents. Il réutilise ou rouvre l'issue adaptée lorsqu'elle existe au lieu de créer un
+  doublon. Dès qu'un travail est relié à une issue GitHub, son corps reste la source de vérité opérationnelle
+  pendant toute l'intervention : l'agent l'actualise aux jalons significatifs prouvés (diagnostic et décisions
+  utiles, implémentation prête, validation/CI, intégration sur `main`, release ou blocage), coche chaque
   critère dès qu'il est réellement satisfait et remplace les informations devenues obsolètes. Les
   micro-commits intermédiaires n'imposent pas une mise à jour administrative séparée.
 - **SEENIT-QUALITY-005** — Un import, une reconnexion ou une synchronisation AI Studio/GitHub est un

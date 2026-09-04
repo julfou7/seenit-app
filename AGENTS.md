@@ -2,12 +2,14 @@
 
 Ces règles sont obligatoires pour toute intervention sur **SeenIt**.
 
-## 0. Avant toute modification
+## 0. Avant toute analyse, proposition ou modification
 
 1. Lire intégralement ce fichier.
-2. Lire `docs/specifications/seenit.md`, `docs/specifications/README.md` et, pour toute livraison,
-   `docs/process/delivery.md`.
-3. Vérifier la branche GitHub de référence avant d'accepter un diff provenant d'AI Studio.
+2. Récupérer l'état courant de la branche GitHub `main` et son commit de tête. **GitHub `main` est la source de vérité** : ne jamais analyser ou modifier SeenIt à partir d'un workspace supposé à jour sans l'avoir confronté au `main` courant.
+3. Lire intégralement `docs/specifications/seenit.md`, `docs/specifications/README.md` et toute documentation pertinente pour le sujet ; pour toute livraison, lire aussi `docs/process/delivery.md`.
+4. Rechercher systématiquement les issues GitHub **ouvertes et fermées liées au sujet**, ainsi que les PR, commits, audits et documents pertinents, afin de reprendre l'historique existant. Réutiliser ou rouvrir l'issue pertinente lorsqu'elle existe et éviter les doublons.
+5. Dès qu'une issue est concernée, la maintenir à jour aux jalons significatifs de l'intervention : diagnostic, décisions, modifications, validations, merge/release ou blocage.
+6. Vérifier la branche GitHub de référence avant d'accepter un diff provenant d'AI Studio.
 
 GitHub est canonique. AI Studio est un mécanisme de transport : une modification apparue uniquement
 à l'import/sync n'est jamais une migration implicite et ne doit pas être commitée sans demande claire.
