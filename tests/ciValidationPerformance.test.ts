@@ -17,16 +17,18 @@ function position(label: string): number {
 test('SEENIT-QUALITY-008 impose un préflight sans dépendances et un cache exact de confiance', () => {
   assert.match(validateJob, /timeout-minutes:\s*10/);
 
-  const classify = position('Classify Delivery Path');
-  const changeContract = position('Specification Change Contract');
   const specification = position('Validate Specification Integrity');
   const restore = position('Restore Exact node_modules Cache');
   const install = position('Install Dependencies on Cache Miss');
+  const materialize = position('Materialize Android Configuration');
+  const classify = position('Classify Delivery Path');
+  const changeContract = position('Specification Change Contract');
 
-  assert.ok(classify < restore, 'la classification doit précéder le cache et l’installation');
-  assert.ok(changeContract < restore, 'le contrat de changement doit précéder le cache et l’installation');
   assert.ok(specification < restore, 'l’intégrité SPEC doit précéder le cache et l’installation');
   assert.ok(restore < install, 'la restauration exacte doit précéder l’installation de secours');
+  assert.ok(install < materialize, 'la configuration Android doit suivre la restauration ou l’installation');
+  assert.ok(materialize < classify, 'la classification complète doit disposer du runtime matérialisé');
+  assert.ok(classify < changeContract, 'la classe calculée doit précéder le contrat de changement');
 
   assert.match(validateJob, /uses:\s*actions\/cache\/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9/);
   assert.match(validateJob, /path:\s*node_modules/);
@@ -40,10 +42,6 @@ test('SEENIT-QUALITY-008 impose un préflight sans dépendances et un cache exac
   assert.match(
     validateJob,
     /npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund/
-  );
-  assert.ok(
-    position('Materialize Android Configuration') > install,
-    'la configuration Android doit être rematérialisée après restauration ou installation'
   );
   assert.match(
     validateJob,
