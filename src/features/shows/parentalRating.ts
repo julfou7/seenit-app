@@ -118,69 +118,37 @@ export function resolveParentalRating(
     };
   }
 
-  if (details?.seenitParentalRating) {
-    return details.seenitParentalRating as ParentalRatingResult;
-  }
-
   return resolveAutomaticRating(mediaType, details);
 }
 
+/**
+ * Ajoute le résultat SeenIt sans réécrire les certifications TMDB brutes. Les autres
+ * consommateurs (cinéma, diagnostics, futurs mappings) continuent ainsi à voir le
+ * payload officiel inchangé.
+ */
 export function decorateParentalRatingDetails(
   mediaType: ParentalMediaType,
   details: any,
   override?: ParentalRatingOverride | null,
 ): any {
   if (!details) return details;
-  const rating = resolveParentalRating(mediaType, details, override);
-
-  if (mediaType === 'movie') {
-    const rawResults = Array.isArray(details.release_dates?.results) ? details.release_dates.results : [];
-    let hasUs = false;
-    const results = rawResults.map((entry: any) => {
-      if (entry?.iso_3166_1 === 'FR') {
-        return {
-          ...entry,
-          release_dates: Array.isArray(entry.release_dates)
-            ? entry.release_dates.map((release: any) => ({ ...release, certification: '' }))
-            : [],
-        };
-      }
-      if (entry?.iso_3166_1 === 'US') {
-        hasUs = true;
-        const releases = Array.isArray(entry.release_dates) && entry.release_dates.length > 0
-          ? entry.release_dates.map((release: any, index: number) => ({
-              ...release,
-              certification: index === 0 ? rating.label : '',
-            }))
-          : [{ certification: rating.label }];
-        return { ...entry, release_dates: releases };
-      }
-      return entry;
-    });
-    if (!hasUs) results.push({ iso_3166_1: 'US', release_dates: [{ certification: rating.label }] });
-    return {
-      ...details,
-      release_dates: { ...(details.release_dates || {}), results },
-      seenitParentalRating: rating,
-    };
-  }
-
-  const rawResults = Array.isArray(details.content_ratings?.results) ? details.content_ratings.results : [];
-  let hasUs = false;
-  const results = rawResults.map((entry: any) => {
-    if (entry?.iso_3166_1 === 'FR') return { ...entry, rating: '' };
-    if (entry?.iso_3166_1 === 'US') {
-      hasUs = true;
-      return { ...entry, rating: rating.label };
-    }
-    return entry;
-  });
-  if (!hasUs) results.push({ iso_3166_1: 'US', rating: rating.label });
   return {
     ...details,
-    content_ratings: { ...(details.content_ratings || {}), results },
-    seenitParentalRating: rating,
+    seenitParentalRating: resolveParentalRating(mediaType, details, override),
   };
+}
+
+export function getParentalRatingColorClass(result: ParentalRatingResult): string {
+  if (!result.isKnown || result.age === null) {
+    return 'bg-zinc-800/80 border-white/10 text-zinc-400';
+  }
+  if (result.age === 0) {
+    return 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400';
+  }
+  if (result.age >= 17) {
+    return 'bg-red-500/15 border-red-500/30 text-red-400';
+  }
+  return 'bg-amber-500/15 border-amber-500/30 text-amber-400';
 }
 
 export function matchesMaxRecommendedAge(result: ParentalRatingResult, maxAge: number | null): boolean {
