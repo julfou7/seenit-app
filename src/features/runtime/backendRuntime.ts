@@ -469,6 +469,16 @@ interface PlexDeltaServerSnapshotResult {
   serverToken: string;
 }
 
+export function getPlexDeltaAuthoritativeUnwatchServerIds(
+  serverResults: Array<{ serverId: string; scanned: boolean; completeForUnwatch: boolean }>
+): Set<string> {
+  return new Set(
+    serverResults
+      .filter(result => result.scanned && result.completeForUnwatch && Boolean(result.serverId))
+      .map(result => result.serverId)
+  );
+}
+
 interface PlexDeltaSnapshotResult {
   items: any[];
   watchStates: PlexLibraryWatchState[];
@@ -639,13 +649,7 @@ async function collectPlexDeltaWatchedSnapshot(req: any): Promise<PlexDeltaSnaps
   const scannedServers = serverResults.filter(result => result.scanned).length;
   const skippedServers = serverResults.filter(result => !result.scanned).length;
   const incompleteServers = serverResults.filter(result => result.scanned && !result.completeForUnwatch).length;
-  const allServersSafeForUnwatch = serverResults.length > 0
-    && skippedServers === 0
-    && incompleteServers === 0
-    && serverResults.every(result => result.scanned && result.completeForUnwatch);
-  const unwatchServerIds = allServersSafeForUnwatch
-    ? new Set(serverResults.map(result => result.serverId).filter(Boolean))
-    : new Set<string>();
+  const unwatchServerIds = getPlexDeltaAuthoritativeUnwatchServerIds(serverResults);
   const confirmedUnwatched = new Set<string>();
   const explicitStates: PlexLibraryWatchState[] = [];
   const supportsOwnedUnwatch = supportsPlexOwnedUnwatchVersion(req.headers?.['x-plex-version']);
