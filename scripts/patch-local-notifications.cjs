@@ -27,12 +27,58 @@ if (!fs.existsSync(localNotificationPath)) {
 
 let localNotification = fs.readFileSync(localNotificationPath, 'utf8');
 
-if (!localNotification.includes(PATCH_MARKER)) {
-  const stockSetter = `var largeIcon: String? = null
+const stockSetter = `var largeIcon: String? = null
         set(value) {
             field = AssetUtil.getResourceBaseName(value)
         }`;
 
+const stockResolver = `fun resolveLargeIcon(context: Context): Bitmap? {
+        largeIcon?.let {
+            val resId = AssetUtil.getResourceID(context, it, "drawable")
+            return BitmapFactory.decodeResource(context.resources, resId)
+        }
+        return null
+    }`;
+
+// Migrate an already-installed node_modules tree from the historical SeenIt
+// patch before applying the new contract. Fresh npm ci installations never
+// enter this branch, but local npm install remains deterministic as well.
+if (!localNotification.includes(PATCH_MARKER) && localNotification.includes('android.util.Base64.decode')) {
+  const legacySetter = `var largeIcon: String? = null
+        set(value) {
+            field = if (value != null && (value.startsWith("data:") || value.startsWith("/") || value.startsWith("file://") || value.startsWith("http"))) value else AssetUtil.getResourceBaseName(value)
+        }`;
+  const legacyResolver = `fun resolveLargeIcon(context: Context): Bitmap? {
+        val icon = largeIcon ?: return null
+        try {
+            if (icon.startsWith("data:image/")) {
+                val base64Data = icon.substringAfter("base64,")
+                val decodedBytes = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
+                return BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+            } else if (icon.startsWith("/") || icon.startsWith("file://")) {
+                val filePath = icon.removePrefix("file://")
+                return BitmapFactory.decodeFile(filePath)
+            } else {
+                val resId = AssetUtil.getResourceID(context, AssetUtil.getResourceBaseName(icon), "drawable")
+                if (resId != AssetUtil.RESOURCE_ID_ZERO_VALUE) {
+                    return BitmapFactory.decodeResource(context.resources, resId)
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("LocalNotification", "Failed to resolve large icon: " + e.message)
+        }
+        return null
+    }`;
+
+  if (!localNotification.includes(legacySetter) || !localNotification.includes(legacyResolver)) {
+    throw new Error('Legacy SeenIt LocalNotification patch detected but cannot be migrated safely.');
+  }
+  localNotification = localNotification
+    .replace(legacySetter, stockSetter)
+    .replace(legacyResolver, stockResolver);
+}
+
+if (!localNotification.includes(PATCH_MARKER)) {
   const patchedSetter = `// ${PATCH_MARKER}: preserve only short local file paths.
     // Remote/base64 image bytes must never cross the Capacitor/Binder payload.
     var largeIcon: String? = null
@@ -43,14 +89,6 @@ if (!localNotification.includes(PATCH_MARKER)) {
                 AssetUtil.getResourceBaseName(value)
             }
         }`;
-
-  const stockResolver = `fun resolveLargeIcon(context: Context): Bitmap? {
-        largeIcon?.let {
-            val resId = AssetUtil.getResourceID(context, it, "drawable")
-            return BitmapFactory.decodeResource(context.resources, resId)
-        }
-        return null
-    }`;
 
   const patchedResolver = `fun resolveLargeIcon(context: Context): Bitmap? {
         val icon = largeIcon ?: return null
