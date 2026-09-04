@@ -51,4 +51,6 @@ test('SEENIT-DISCOVER-001 contraint Explorer aux release types TMDB 2 ou 3 en Fr
   assert.match(source, /release_date\.gte/);
   assert.match(source, /release_date\.lte/);
   assert.doesNotMatch(source, /primary_release_date\.gte/);
+  assert.match(source, /getMovieDetails/,
+    'les détails film doivent alimenter la même preuve utilisée par les badges');
 });
