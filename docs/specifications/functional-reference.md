@@ -1,7 +1,7 @@
 # SeenIt — Référence fonctionnelle canonique
 
 Dernière vérification : 4 septembre 2026  
-Baseline observée : **1.4.112**, `main` `30f90cea9f35bc268ffa6e20aa44985b1e3b9e40`  
+Baseline observée : **1.4.112**, `main` `567187a1798b5724bf731d21b0fba664bd3bf138`  
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : composante obligatoire de la SPEC SeenIt
 
@@ -102,6 +102,7 @@ métadonnées publiques de mise à jour sont les exceptions prévues.
 |---|---|
 | Bibliothèque, progression, note, favori média, archive | Compte, partagée PWA/APK |
 | Plateformes de streaming et préférences de notification | Compte, partagées PWA/APK |
+| Corrections personnelles d’âge conseillé (`mediaType + TMDB ID`) | Compte, partagées PWA/APK |
 | Jeton/curseur Plex et réglages C411/Arr/qBit | Compte, partagés PWA/APK, isolés par UID |
 | Intentions de téléchargement | Compte, partagées PWA/APK |
 | News lues et rappels métier | Compte, partagés PWA/APK |
@@ -190,7 +191,12 @@ Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, 
 **Au cinéma**, **Documentaires** et **Personnes**.
 
 - Recherche multi-pages TMDB, regroupée en personnes, séries et films.
-- Filtres par plateformes choisies dans les réglages, genres, classification d'âge et note minimale.
+- Filtres par plateformes choisies dans les réglages, genres, **Âge conseillé** maximal et note minimale.
+- Le filtre d’âge est cumulatif : `10 ans` accepte seulement les médias dont la preuve résolue vaut
+  « Tous publics », `7+` ou `10+`; une certification inconnue est exclue. « Tous » ne filtre pas.
+- La classification automatique provient exclusivement de la certification US explicite TMDB. Une
+  certification absente ou inconnue s'affiche **« Âge à vérifier »** ; aucun genre n'est utilisé comme
+  fallback et le terme PEGI n'est pas employé pour les films/séries.
 - Tri Populaires, Mieux notés, Plus récents, Ordre alphabétique ou Top 100.
 - Hero Top 10, chargement infini, aperçu long-press et cache utilisable lors d'une panne réseau.
 - Les recommandations combinent genres regardés et personnes favorites, puis excluent les médias
@@ -198,17 +204,24 @@ Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, 
 - « Au cinéma » exige une sortie théâtrale française TMDB type 2/3 dans la fenêtre J-75 à J+10 ; une
   sortie streaming/VOD seule n'est jamais « au cinéma ».
 
-Depuis une carte, l'utilisateur peut ouvrir la fiche, suivre/retirer, ou marquer un film vu. Toute
-création de suivi sans progression doit converger vers `plan_to_watch` ; l'écart actuel entre points
-d'entrée est suivi par #93.
+Depuis une carte, l'utilisateur peut ouvrir la fiche, suivre/retirer, ou marquer un film vu. Les cartes
+qui disposent de la preuve détaillée utilisent le même résolveur parental que la fiche et Explorer.
+Toute création de suivi sans progression doit converger vers `plan_to_watch` ; l'écart actuel entre
+points d'entrée est suivi par #93.
 
 ## 8. Fiche média et détails associés
 
 ### 8.1 Contenu commun
 
 La fiche combine les détails TMDB, notes TMDB/IMDb (OMDb), disponibilité streaming en France,
-présence Plex/Arr, bande-annonce, classification d'âge, casting, recommandations, collection/franchise
+présence Plex/Arr, bande-annonce, âge conseillé, casting, recommandations, collection/franchise
 et discussions Reddit. Les modals personne et épisode restent dans la pile Retour.
+
+L'âge conseillé automatique affiche la certification US TMDB originale, sa provenance et sa traduction
+lisible, par exemple `PG-13 · US · 13+`. « Tous publics » n'est affiché que lorsqu'une certification US
+explicite le prouve ; sinon SeenIt affiche « Âge à vérifier ». Une correction personnelle par média peut
+être choisie ; elle est synchronisée par UID, prioritaire, et clairement marquée « Choix personnel ».
+Cette correction est identifiée uniquement par type de média + TMDB ID et ne réécrit pas TMDB.
 
 Actions transverses : suivre/retirer, favori, note utilisateur, partage, archive lorsque disponible,
 ouverture fournisseur et téléchargement. Un favori active les notifications du média sans créer de
@@ -347,7 +360,7 @@ le databaseId ou la signature APK.
   pendant un chargement afin d'éviter un flash noir.
 - Les erreurs réseau privées deviennent des messages ou logs bornés, sans secret.
 - Une indisponibilité TMDB peut laisser un écran partiel ou un cache ; elle ne justifie aucun matching
-  par titre.
+  par titre et ne transforme jamais une classification d'âge inconnue en « Tous publics ».
 - Une indisponibilité d'un serveur Plex/Arr/qBit ne doit pas effacer un état connu.
 - SeenIt est pour l'instant un produit personnel mono-propriétaire logique. Il n'existe pas encore de
   profil public, partage social, administration multi-utilisateur ou catalogue éditorial propre.
@@ -360,6 +373,7 @@ le databaseId ou la signature APK.
 |---|---|---|
 | Auth Google | Popup Firebase | Credential Manager, fallback natif |
 | Données compte | Firestore `default` | Même Firestore et même UID |
+| Âge conseillé personnel | Firestore du même UID | Même Firestore et même UID |
 | Backend | Même origine canonique | `https://seenit.ai.studio` explicite |
 | Retour | Historique navigateur | Modals → fiche → historique → À Voir → quitter |
 | Plex | Nouvel onglet Web | Intent application Plex, puis fallback Web |
@@ -377,6 +391,7 @@ elle est nécessaire à la plateforme et explicitement documentée.
 | Priorité | Écart observé | Décision / issue |
 |---|---|---|
 | P1 | Les points d'entrée d'ajout créent tantôt `plan_to_watch`, tantôt `watching` sans progression. | Normaliser selon la machine d'états : [#93](https://github.com/julfou7/seenit-app/issues/93). |
+| P1 | La classification d’âge actuelle peut préférer une valeur FR permissive, sous-classer des certifications US et inventer un TP par genre. | Appliquer `SEENIT-PARENTAL-001` : [#98](https://github.com/julfou7/seenit-app/issues/98). |
 | P1 | Les personnes favorites restent locales et font diverger les recommandations PWA/APK. | Rendre Firestore autoritatif : [#95](https://github.com/julfou7/seenit-app/issues/95). |
 | P1 | Le retrait de Watchlist Plex ne retire pas encore un suivi créé uniquement par cette Watchlist. | Implémentation avec provenance : [#68](https://github.com/julfou7/seenit-app/issues/68). |
 | P2 | Partager une fiche ou le profil ne garantit pas encore un lien réouvrable conforme. | Décider/corriger : [#96](https://github.com/julfou7/seenit-app/issues/96). |
