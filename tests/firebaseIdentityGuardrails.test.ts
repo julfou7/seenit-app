@@ -66,7 +66,7 @@ test('SEENIT-APK-004 protège l’identité Firebase Android canonique généré
 test('SEENIT-QUALITY-005 traite AI Studio comme un transport non autoritatif', () => {
   const agents = read('AGENTS.md');
   const bootstrap = read('.agents/AGENTS.md');
-  assert.match(agents, /Avant toute modification/);
+  assert.match(agents, /Avant toute analyse, proposition ou modification/);
   assert.match(agents, /AI Studio est un mécanisme de transport/);
   assert.match(agents, /Base Firestore canonique/);
   assert.match(agents, /firebase-applet-config\.json/);
