@@ -6,7 +6,10 @@ Ces règles sont obligatoires pour toute intervention sur **SeenIt**.
 
 1. Lire intégralement ce fichier.
 2. Récupérer l'état courant de la branche GitHub `main` et son commit de tête. **GitHub `main` est la source de vérité** : ne jamais analyser ou modifier SeenIt à partir d'un workspace supposé à jour sans l'avoir confronté au `main` courant.
-3. Lire intégralement `docs/specifications/seenit.md`, `docs/specifications/README.md` et toute documentation pertinente pour le sujet ; pour toute livraison, lire aussi `docs/process/delivery.md`.
+3. Lire intégralement `docs/specifications/seenit.md`, `docs/specifications/functional-reference.md`,
+   `docs/specifications/README.md` et toute documentation pertinente pour le sujet ; pour toute
+   livraison, lire aussi `docs/process/delivery.md`. La référence fonctionnelle est obligatoire :
+   elle décrit les écrans, parcours, responsabilités des sources, différences PWA/APK et écarts connus.
 4. Rechercher systématiquement les issues GitHub **ouvertes et fermées liées au sujet**, ainsi que les PR, commits, audits et documents pertinents, afin de reprendre l'historique existant. Réutiliser ou rouvrir l'issue pertinente lorsqu'elle existe et éviter les doublons.
 5. Dès qu'une issue est concernée, la maintenir à jour aux jalons significatifs de l'intervention : diagnostic, décisions, modifications, validations, merge/release ou blocage.
 6. Vérifier la branche GitHub de référence avant d'accepter un diff provenant d'AI Studio.
@@ -84,6 +87,11 @@ exigence. Un **test automatisé** ciblé suffit pour tout changement comportemen
 
 `npm run test:spec:changes` applique cette règle : tests pour le comportement ; SPEC + catalogue en
 plus pour les zones sensibles. Une pure copie d'interface reconnue `light` peut rester sans nouveau test.
+
+`docs/specifications/functional-reference.md` est la carte produit vivante. Toute fonction ajoutée,
+retirée, déplacée ou dont le résultat observable change doit y être répercutée dans la même livraison.
+Un comportement du code qui contredit la SPEC n'est pas une nouvelle règle implicite : ouvrir ou
+mettre à jour une issue priorisée, puis corriger le code ou obtenir une décision produit explicite.
 
 ## 4. Contrat APK immuable
 
@@ -176,3 +184,4 @@ Après chaque modification, conclure exactement avec :
 
 ### 🚀 Action requise de ton côté
 - Action concrète attendue, ou « Aucune » si rien n'est nécessaire.
+

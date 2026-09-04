@@ -1,0 +1,398 @@
+# SeenIt — Référence fonctionnelle canonique
+
+Dernière vérification : 4 septembre 2026  
+Baseline observée : **1.4.112**, `main` `30f90cea9f35bc268ffa6e20aa44985b1e3b9e40`  
+Plateformes : **PWA Web** et **APK Android Capacitor**  
+Statut : composante obligatoire de la SPEC SeenIt
+
+Ce document explique ce que fait SeenIt, où vit chaque fonction et comment les parcours s'articulent.
+Les invariants détaillés et la machine d'états autoritative restent dans [`seenit.md`](./seenit.md).
+Le processus de livraison reste dans [`../process/delivery.md`](../process/delivery.md). Un agent ne
+doit jamais déduire une nouvelle règle depuis le seul comportement accidentel du code : les écarts
+connus sont listés à la fin et reliés à GitHub Issues.
+
+## 1. Produit, vocabulaire et sources de vérité
+
+SeenIt est l'application personnelle de suivi de films et séries de son propriétaire. Le même compte
+Google doit retrouver sa bibliothèque et ses intentions durables sur PWA et APK. L'application est
+d'abord mobile ; l'APK est la plateforme la plus sensible, mais la PWA reste un client complet du même
+compte et du même backend.
+
+| Terme | Signification SeenIt |
+|---|---|
+| Média | Film ou série identifié par son type et son TMDB ID. |
+| Suivi | Présence d'un document dans la bibliothèque du compte. |
+| Non suivi | Absence de document ; ce n'est pas une valeur de `status`. |
+| À voir | Média suivi sans progression, `plan_to_watch`. |
+| En cours | Série commencée et non terminée, `watching`. |
+| Vu / Terminée | Film vu ou série terminée, `completed`. |
+| Abandonnée | Série conservée avec sa progression mais sortie du parcours actif, `dropped`. |
+| Archivée | Dimension `isArchived`, indépendante du statut et de la progression. |
+| Favorite | Intention `isFavorite`, indépendante du visionnage. L'activation active aussi les notifications du média. |
+| À jour | État calculé d'une série dont tous les épisodes diffusés sont vus ; ce n'est pas un `status` persistant. |
+| Full Plex | Reconstruction complète de l'état depuis les sources Plex disponibles. |
+| Delta Plex | Synchronisation incrémentale depuis la dernière baseline validée. |
+
+Hiérarchie des sources :
+
+1. **Firestore `default` sous le Firebase UID** est autoritatif pour les données durables du compte.
+2. **TMDB** fournit l'identité canonique, les fiches, saisons, épisodes, personnes, dates et
+   disponibilités éditoriales.
+3. **Plex** fournit seulement des preuves de watchlist, visionnage/non-vu et disponibilité, jamais
+   l'identité finale par titre ou année.
+4. **Sonarr, Radarr et qBittorrent** fournissent l'état réel des téléchargements ; C411 fournit les
+   résultats de recherche.
+5. Les stockages locaux servent à accélérer, fonctionner hors-ligne ou porter un état propre à
+   l'installation. Ils ne doivent pas devenir une seconde base métier divergente.
+
+## 2. Architecture fonctionnelle en une vue
+
+| Couche | Responsabilité | Points d'entrée principaux |
+|---|---|---|
+| Shell | Authentification, splash, navigation, deep links, Retour Android, lazy loading | `src/App.tsx`, `src/features/navigation/**` |
+| Écrans | Accueil, profil/bibliothèque, Explorer, téléchargements, réglages, fiches | `src/screens/**` |
+| État client | Bibliothèque, téléchargements, réglages, disponibilité, toasts, logs | `src/store/**` |
+| Métier | Progression, TMDB, Plex, downloads, release, runtime | `src/features/**` |
+| Cloud utilisateur | Données isolées sous `users/{uid}/...` dans Firestore `default` | Firebase Web/Admin |
+| Backend | Proxy authentifié et borné vers Plex/C411/Arr/qBit, webhooks, appareils, updates | `server.ts` |
+| Android | Conteneur Capacitor, intents, notifications, mise à jour sur place | `android/**`, plugins Capacitor |
+
+Les routes backend produit sont :
+
+- `GET /api/health` : identité et santé du backend canonique ;
+- `POST /api/plex/history` (`/api/plex-sync` alias) : full/delta Plex ;
+- `POST /api/plex/availability` et `GET|POST /api/plex/resolve-slug` : disponibilité et ouverture ;
+- `POST /api/c411/test` et `POST /api/c411/search` : test/recherche C411 ;
+- `POST /api/service-proxy` : allowlist Sonarr/Radarr/qBittorrent ;
+- `POST /api/devices/register` et `DELETE /api/devices/:installationId` : appareil de notification ;
+- `GET /api/webhooks/config`, `POST /api/webhooks/config/rotate` et webhooks personnels : réception
+  des événements Arr ;
+- `GET /api/update` : dernière release SeenIt officielle.
+
+Toutes les routes métier privées exigent un jeton Firebase du compte. Le health-check et les
+métadonnées publiques de mise à jour sont les exceptions prévues.
+
+## 3. Compte, démarrage et synchronisation multi-appareils
+
+### 3.1 Connexion
+
+- La PWA utilise la fenêtre Google Firebase.
+- L'APK propose d'abord les comptes Android via Credential Manager, échange le même ID token dans
+  Firebase Web et conserve donc le **même UID** que la PWA. Le plugin Google historique n'est qu'un
+  fallback natif.
+- Une annulation utilisateur n'est pas une erreur bloquante.
+- Sans compte authentifié, l'utilisateur reste sur l'écran de connexion et les données d'un ancien
+  UID ne sont pas exposées.
+
+### 3.2 Démarrage et convergence
+
+- Un splash Web SeenIt unique masque l'initialisation ; le splash système Android reste neutre.
+- Le cache local du bon UID peut produire le premier rendu, puis Firestore serveur remplace ce rendu.
+- Un listener Firestore maintient la bibliothèque à jour entre PWA et APK.
+- Le serveur gagne après le rendu de cache : un média supprimé sur un autre appareil ne doit pas être
+  ressuscité par un cache ancien.
+- Les doublons de bibliothèque sont dédupliqués par `mediaType + tmdbId`, et l'ancien document est
+  nettoyé en arrière-plan.
+- Les actions ordinaires sont optimistes pour rester instantanées ; un échec rétablit l'état depuis
+  le Cloud ou propose une annulation lorsque le parcours le permet.
+
+### 3.3 Données partagées et données par appareil
+
+| Donnée | Portée attendue |
+|---|---|
+| Bibliothèque, progression, note, favori média, archive | Compte, partagée PWA/APK |
+| Plateformes de streaming et préférences de notification | Compte, partagées PWA/APK |
+| Jeton/curseur Plex et réglages C411/Arr/qBit | Compte, partagés PWA/APK, isolés par UID |
+| Intentions de téléchargement | Compte, partagées PWA/APK |
+| News lues et rappels métier | Compte, partagés PWA/APK |
+| Token FCM, permission système, installation notification | Appareil, rattachés au UID courant |
+| Cache TMDB/OMDb/Plex, clés anti-doublon de notification | Appareil et UID |
+| Logs techniques | Appareil et UID ; export volontaire seulement |
+| Personnes favorites | Doivent être partagées ; écart actuel suivi par #95 |
+
+Le bouton « Sauvegarder » des réglages pousse l'état local courant et les réglages vers Firestore ;
+« Recharger » redemande l'état serveur. La synchronisation temps réel reste le fonctionnement normal,
+ces boutons sont des actions de récupération explicites.
+
+## 4. Navigation globale
+
+La barre basse possède quatre destinations stables, dans cet ordre :
+
+1. **À Voir** : accueil opérationnel ;
+2. **Profil** : statistiques, Ma Liste et accès Réglages ;
+3. **Explorer** : recherche et découverte TMDB ;
+4. **Télécharger** : suivi et lancement des téléchargements.
+
+L'onglet actif et ses glyphes utilisent l'or SeenIt. Le badge Télécharger compte les transferts actifs
+ou qui demandent une attention. Un appui sur l'onglet actif ferme le niveau courant ; un double appui
+réinitialise/ramène le contenu en haut lorsque l'écran l'implémente.
+
+L'ouverture d'une fiche est un niveau de navigation au-dessus de l'onglet courant. Le Retour Android
+ferme dans l'ordre : dialogue ou modal, fiche, historique interne, retour à À Voir, puis application.
+Les deep links de notification acceptent `showId` ou `tmdbId`, `mediaType`, saison et épisode. Une
+action notification `mark_watched` peut marquer l'épisode exact après résolution de la fiche.
+
+## 5. Écran « À Voir »
+
+L'écran comporte une navigation haute entre **À Regarder**, **À Venir** et **Historique**, ainsi que
+le fil d'actualités des médias suivis.
+
+### 5.1 À Regarder
+
+- **Nouveautés** est prioritaire pour une série/nouvelle saison récente ;
+- **Continuer à regarder** reçoit les séries commencées vues dans les 60 derniers jours inclus ;
+- **Pas vu depuis un moment** reçoit les autres séries encore regardables ;
+- **Films à voir** reçoit les films suivis non vus dont la sortie n'est pas future.
+
+Les règles exactes de frontière sont dans `seenit.md` §5.1. Chaque carrousel affiche un premier lot,
+peut être étendu par « Voir tout » puis paginé par lots de huit. Les médias abandonnés, archivés ou
+terminés ne reviennent pas dans le parcours actif.
+
+Sur une carte série, un swipe permet de retirer le suivi (avec confirmation) ou d'abandonner la
+série ; les actions sont aussi accessibles au clavier. Une action destructive possède un toast avec
+annulation.
+
+### 5.2 À Venir
+
+- Liste les prochains épisodes connus avec leur date relative.
+- Ouvre directement la fiche ou le détail d'épisode.
+- Permet d'activer/désactiver un rappel pour l'épisode présenté.
+- Un rappel spécifique met à jour l'intention de notification du média et son document Firestore.
+
+### 5.3 Historique et actualités
+
+- L'historique est trié depuis les `watchedAt` des épisodes/films.
+- « Marquer comme non vu » retire uniquement la progression ciblée et propose Annuler.
+- Le fil Actualités affiche les événements non lus de séries encore présentes : nouvelle saison,
+  diffusion, renouvellement/annulation et informations générées par le worker de détails.
+- Une actualité lue est retirée et son état est partagé entre appareils.
+
+## 6. Profil, statistiques et Ma Liste
+
+Le profil affiche l'identité Google, l'année d'inscription et deux onglets :
+
+- **Statistiques** : temps de visionnage estimé, volumes, répartitions, personnes fréquentes et badges
+  Centenaire, Oiseau de Nuit, Grand Écran et Binge-Master ;
+- **Ma Liste** : vue exhaustive de la bibliothèque par intention et progression.
+
+Ma Liste ordonne les favoris en premier puis expose : Séries en cours, Séries à commencer, Séries à
+venir, Films au cinéma, Films à voir, Séries à jour et Films vus. Une même fiche peut apparaître dans
+les favoris et dans sa section métier. Les grilles sont extensibles et les cartes permettent les
+actions rapides de suivi/visionnage.
+
+Le bouton Réglages ouvre un écran superposé refermable par Retour ou swipe depuis le bord gauche.
+Le bouton Partager ne doit promettre qu'un lien réellement réouvrable ; l'écart actuel est suivi par
+#96.
+
+## 7. Explorer
+
+Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, **Pépites**,
+**Au cinéma**, **Documentaires** et **Personnes**.
+
+- Recherche multi-pages TMDB, regroupée en personnes, séries et films.
+- Filtres par plateformes choisies dans les réglages, genres, classification d'âge et note minimale.
+- Tri Populaires, Mieux notés, Plus récents, Ordre alphabétique ou Top 100.
+- Hero Top 10, chargement infini, aperçu long-press et cache utilisable lors d'une panne réseau.
+- Les recommandations combinent genres regardés et personnes favorites, puis excluent les médias
+  déjà vus/terminés ou abandonnés.
+- « Au cinéma » exige une sortie théâtrale française TMDB type 2/3 dans la fenêtre J-75 à J+10 ; une
+  sortie streaming/VOD seule n'est jamais « au cinéma ».
+
+Depuis une carte, l'utilisateur peut ouvrir la fiche, suivre/retirer, ou marquer un film vu. Toute
+création de suivi sans progression doit converger vers `plan_to_watch` ; l'écart actuel entre points
+d'entrée est suivi par #93.
+
+## 8. Fiche média et détails associés
+
+### 8.1 Contenu commun
+
+La fiche combine les détails TMDB, notes TMDB/IMDb (OMDb), disponibilité streaming en France,
+présence Plex/Arr, bande-annonce, classification d'âge, casting, recommandations, collection/franchise
+et discussions Reddit. Les modals personne et épisode restent dans la pile Retour.
+
+Actions transverses : suivre/retirer, favori, note utilisateur, partage, archive lorsque disponible,
+ouverture fournisseur et téléchargement. Un favori active les notifications du média sans créer de
+progression. Une note/favorite/archive est une intention distincte du statut de visionnage.
+
+### 8.2 Films
+
+- Ajouter à « Films à voir » suit sans marquer vu.
+- « Film vu » crée `seenEpisodes=['movie']`, un `episodeRecords.movie.watchedAt` et `completed`.
+- Repasser non vu retire cette progression et revient à « À voir ».
+- Le téléchargement rapide privilégie Radarr ; C411/magnet sert de parcours manuel de repli.
+
+### 8.3 Séries et épisodes
+
+- Suivre sans visionner crée « À voir ».
+- Marquer un épisode vu/non vu met à jour `seenEpisodes`, `episodeRecords`, `lastWatchedAt` et le
+  prochain épisode à voir.
+- Marquer une saison cible uniquement les épisodes déjà diffusés lorsque TMDB les distingue.
+- Une série complète devient `completed`; si TMDB la déclare Ended/Canceled elle peut être archivée
+  automatiquement.
+- Abandonner conserve l'historique ; Reprendre le conserve et recalcule l'état actif.
+- Revoir réinitialise la progression et propose S1E1 comme prochain épisode.
+- Les téléchargements Sonarr existent au niveau série, saison ou épisode ; le détail affiche aussi
+  la disponibilité par saison/épisode.
+
+La machine d'états exhaustive et le mapping Plex sont autoritatifs dans `seenit.md` §5.3 à §5.5.
+
+## 9. Plex
+
+### 9.1 Association et ouverture
+
+- L'association utilise le PIN Plex dans une page externe, sondée toutes les trois secondes jusqu'au
+  jeton ou à l'arrêt du parcours.
+- Le jeton est sauvegardé pour le même UID ; une synchronisation complète démarre après association.
+- Dans l'APK, une fiche Plex cible d'abord l'application Android Plex, puis l'URL universelle et le
+  navigateur. Dans la PWA, elle ouvre l'URL Web officielle.
+- Si le TMDB ID ne peut pas résoudre exactement une fiche Plex, SeenIt n'ouvre pas aveuglément
+  l'accueil Plex.
+
+### 9.2 Synchronisation
+
+- **Rapide** utilise la baseline/cursor et les preuves actuelles nécessaires.
+- **Complète** reconstruit historique, états vus, watchlist et disponibilité sur les serveurs joignables.
+- Un serveur hors ligne est ignoré sans bloquer les autres ; le bilan distingue serveurs scannés,
+  vus et non vus.
+- Une source incomplète ne provoque aucune suppression et peut empêcher la validation du curseur
+  concerné.
+- Les deux modes doivent converger au même état final lorsqu'ils disposent de sources complètes.
+- Seules les preuves d'identité TMDB ou un identifiant externe technique résolu vers TMDB sont
+  acceptées. Titre et année ne servent jamais au mapping.
+- Un non-vu Plex ne retire qu'une progression portant encore `plexImported=true`; une action SeenIt
+  ou legacy sans provenance prouvée gagne.
+- Le cache de disponibilité est reconstruit atomiquement et isolé par UID.
+
+Le retrait de Watchlist vers « non suivi » reste volontairement ouvert dans #68 ; aucune absence
+ambiguë ne doit être interprétée en attendant.
+
+## 10. Téléchargements
+
+L'onglet Télécharger possède deux modes : **Mes téléchargements** et **Recherche C411**. L'icône
+Réglages de son en-tête ouvre la configuration C411/Sonarr/Radarr/qBittorrent et webhooks, qui ne doit
+pas être dupliquée dans les réglages généraux.
+
+### 10.1 Mes téléchargements
+
+- Réconcilie les intentions SeenIt avec les files Sonarr/Radarr et qBittorrent.
+- Affiche séparément actifs, erreurs, annulés et terminés.
+- Les actifs conservent l'ordre de lancement ; l'historique affiche les plus récents d'abord.
+- Un swipe droit supprime une entrée d'historique ou demande confirmation pour annuler un actif.
+- L'annulation active retire la demande du client ; les fichiers qBittorrent sont conservés.
+- « Vider » ne touche que la section d'historique visée, jamais un actif.
+
+### 10.2 Recherche et lancement
+
+- C411 recherche avec filtres Tous/Film/Série, qualité Toutes/4K/1080p/720p et tri seeders/taille/date.
+- Si le type Tous est actif, l'utilisateur doit choisir Film ou Série avant l'envoi.
+- Film va à Radarr, Série à Sonarr. qBittorrent ou l'ouverture d'un magnet BTIH validé servent de
+  fallback selon la configuration disponible.
+- Les cartes C411 n'ouvrent une fiche SeenIt que si un TMDB ID exact est connu.
+
+### 10.3 Identité et cohérence
+
+- Une fiche/téléchargement est rattaché uniquement par TMDB ID.
+- Un transfert se réconcilie par `requestId`, infohash/downloadId/alias exact ou chemin exact.
+- Un titre, une release, une taille ou une proximité temporelle ne suffisent jamais à fusionner.
+- Les mutations sont idempotentes ; un POST Android dont le résultat est ambigu après timeout n'est
+  jamais rejoué automatiquement.
+- Le polling est borné, paginé et possède un backoff par source.
+
+### 10.4 Configuration personnelle
+
+Chaque compte possède ses URL et identifiants C411, Sonarr, Radarr et qBittorrent. Les boutons de test
+emploient le même transport que l'action réelle. Sonarr/Radarr disposent de profils qualité séparés
+1080p/4K. Les webhooks personnels exposent une URL par service et un secret envoyé dans l'en-tête
+`x-seenit-webhook-secret`; la rotation invalide l'ancien secret. Aucun secret n'est affiché dans les logs.
+
+## 11. Notifications, actualités et appareils
+
+Les préférences globales du compte couvrent : nouvel épisode le jour J, première d'une saison à J-7,
+sortie cinéma le jour J et estimation DVD/VOD à J+120. L'horaire de référence est 09:00 locale.
+
+- L'intention est partagée via Firestore ; chaque installation autorisée possède son propre token.
+- Un téléphone et une PWA du même compte peuvent recevoir l'événement sans partager un token unique.
+- Déconnecter un appareil révoque son installation sans désactiver les autres.
+- Les webhooks Sonarr/Radarr ciblent seulement les installations du propriétaire de l'endpoint.
+- Les notifications profondes ouvrent le média/épisode exact ; l'APK peut exposer « Marquer comme vu ».
+- Les clés locales de programmation évitent le doublon sur une même installation.
+
+Le traitement doit continuer après chaque média non éligible ; l'écart actuel de boucle est suivi par
+#94. Les tests « Tester » des réglages valident l'autorisation et le rendu, pas l'arrivée future d'une
+donnée TMDB ou d'un webhook réel.
+
+## 12. Réglages et maintenance utilisateur
+
+Les réglages généraux contiennent :
+
+- compte Google, sauvegarde/rechargement Cloud et déconnexion ;
+- plateformes Netflix, Prime Video, Disney+, Canal+/MyCanal, Apple TV+, Paramount+, Max, France TV,
+  Arte ;
+- préférences et autorisation de notifications ;
+- association/déconnexion Plex, synchro Rapide/Complète et purge des slugs Plex ;
+- import TV Time CSV avec progression, correction des échecs et reprise ;
+- actualisation forcée des détails TMDB ;
+- version, changelog, recherche et installation d'une mise à jour APK ;
+- logs techniques filtrables, copiables/exportables et effaçables.
+
+L'import TV Time résout les entrées vers TMDB avant écriture. Un résultat introuvable reste en échec
+modifiable ; il n'est pas inventé. Les actions de maintenance ne changent jamais l'identité Firebase,
+le databaseId ou la signature APK.
+
+## 13. Résilience, UX et limites assumées
+
+- Le rendu mobile respecte les safe areas ; la barre basse ne masque ni contenu ni toast.
+- Les écrans lourds sont lazy-loadés et préchargés après connexion ; l'écran courant reste visible
+  pendant un chargement afin d'éviter un flash noir.
+- Les erreurs réseau privées deviennent des messages ou logs bornés, sans secret.
+- Une indisponibilité TMDB peut laisser un écran partiel ou un cache ; elle ne justifie aucun matching
+  par titre.
+- Une indisponibilité d'un serveur Plex/Arr/qBit ne doit pas effacer un état connu.
+- SeenIt est pour l'instant un produit personnel mono-propriétaire logique. Il n'existe pas encore de
+  profil public, partage social, administration multi-utilisateur ou catalogue éditorial propre.
+- L'estimation DVD/VOD à 120 jours et la fenêtre « Au cinéma » ne sont pas des programmations temps
+  réel de salles ou de distributeurs.
+
+## 14. Matrice PWA / APK
+
+| Parcours | PWA | APK Android |
+|---|---|---|
+| Auth Google | Popup Firebase | Credential Manager, fallback natif |
+| Données compte | Firestore `default` | Même Firestore et même UID |
+| Backend | Même origine canonique | `https://seenit.ai.studio` explicite |
+| Retour | Historique navigateur | Modals → fiche → historique → À Voir → quitter |
+| Plex | Nouvel onglet Web | Intent application Plex, puis fallback Web |
+| Reddit/autres liens | Nouvel onglet | Application associée, puis Custom Tab |
+| Magnet | Gestionnaire navigateur/système | Intent Android compatible |
+| Notifications | Web Push/service worker | Push + notifications locales Capacitor |
+| Mise à jour | Bannière/rechargement PWA | Téléchargement, SHA-256, installateur Android |
+| Hors-ligne | Shell/cache et dernier état UID | Même logique dans la WebView |
+
+Un changement commun doit être vérifié sur les deux colonnes. Une divergence n'est acceptable que si
+elle est nécessaire à la plateforme et explicitement documentée.
+
+## 15. Écarts connus à ne pas normaliser silencieusement
+
+| Priorité | Écart observé | Décision / issue |
+|---|---|---|
+| P1 | Les points d'entrée d'ajout créent tantôt `plan_to_watch`, tantôt `watching` sans progression. | Normaliser selon la machine d'états : [#93](https://github.com/julfou7/seenit-app/issues/93). |
+| P1 | Un `return` sur un média inéligible peut arrêter toute la programmation des rappels suivants. | Corriger et caractériser : [#94](https://github.com/julfou7/seenit-app/issues/94). |
+| P1 | Les personnes favorites restent locales et font diverger les recommandations PWA/APK. | Rendre Firestore autoritatif : [#95](https://github.com/julfou7/seenit-app/issues/95). |
+| P1 | Le retrait de Watchlist Plex ne retire pas encore un suivi créé uniquement par cette Watchlist. | Implémentation avec provenance : [#68](https://github.com/julfou7/seenit-app/issues/68). |
+| P2 | Partager une fiche ou le profil ne garantit pas encore un lien réouvrable conforme. | Décider/corriger : [#96](https://github.com/julfou7/seenit-app/issues/96). |
+| P2 | Les parcours fonctionnels réels ne sont pas encore couverts de bout en bout. | Programme E2E/accessibilité/performance : [#15](https://github.com/julfou7/seenit-app/issues/15). |
+
+## 16. Contrat de maintenance de cette référence
+
+- **SEENIT-FUNCTIONAL-001** — Avant une modification, l'agent lit cette référence avec `AGENTS.md`
+  et `seenit.md`. Toute fonction ajoutée, retirée ou dont le résultat observable change met à jour la
+  section concernée dans la même livraison.
+- Une règle durable nouvelle est enregistrée dans `docs/requests/registry.md`, puis reliée à une
+  exigence et un test lorsque la gouvernance de la SPEC l'impose.
+- Un écart entre la SPEC et le code n'est jamais résolu en réécrivant la SPEC pour épouser un bug :
+  il produit une issue priorisée, ou une décision produit explicite qui modifie ensuite la SPEC.
+- Un audit reste une photographie datée. Cette référence décrit toujours le produit voulu/courant et
+  retire de sa matrice un écart seulement après preuve de correction.
+- Pour chaque changement, vérifier au minimum : écran d'entrée, état avant/après, Firestore et cache,
+  PWA, APK/Retour/intents/safe areas, erreurs réseau, isolation UID, notifications et tests.
+
