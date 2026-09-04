@@ -30,25 +30,25 @@ export const MovieWatchCard = React.memo(function MovieWatchCard({ show, onShowC
   const [fullReleaseDate, setFullReleaseDate] = useState<string | null>(
     show.firstAirDate || (show as any).release_date || (show as any).releaseDate || null
   );
+  const [movieDetails, setMovieDetails] = useState<any>(null);
   const [providerLogo, setProviderLogo] = useState<string | null>(null);
   const [providerName, setProviderName] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
     if (show.tmdbId) {
-      if (!runtime || !releaseYear || !fullReleaseDate || fullReleaseDate.length <= 4) {
-        tmdb.getMovieDetails(show.tmdbId).then(res => {
-          if (isMounted && res.ok && res.value) {
-            if (res.value.runtime && !runtime) {
-              setRuntime(res.value.runtime);
-            }
-            if (res.value.release_date) {
-              if (!releaseYear) setReleaseYear(res.value.release_date.slice(0, 4));
-              if (fullReleaseDate !== res.value.release_date) setFullReleaseDate(res.value.release_date);
-            }
+      tmdb.getMovieDetails(show.tmdbId).then(res => {
+        if (isMounted && res.ok && res.value) {
+          setMovieDetails(res.value);
+          if (res.value.runtime && !runtime) {
+            setRuntime(res.value.runtime);
           }
-        }).catch(() => {});
-      }
+          if (res.value.release_date) {
+            if (!releaseYear) setReleaseYear(res.value.release_date.slice(0, 4));
+            if (fullReleaseDate !== res.value.release_date) setFullReleaseDate(res.value.release_date);
+          }
+        }
+      }).catch(() => {});
 
       tmdb.getWatchProviders(show.tmdbId, 'movie').then(res => {
         if (!isMounted) return;
@@ -80,7 +80,7 @@ export const MovieWatchCard = React.memo(function MovieWatchCard({ show, onShowC
       }).catch(() => {});
     }
     return () => { isMounted = false; };
-  }, [show.tmdbId, runtime, releaseYear, show.title]);
+  }, [show.tmdbId, runtime, releaseYear, fullReleaseDate, show.title]);
 
   const rawPath = show.posterPath || show.backdropPath;
   const imgSrc = rawPath ? (rawPath.startsWith('http') ? rawPath : `https://image.tmdb.org/t/p/w500${rawPath}`) : null;
@@ -92,9 +92,10 @@ export const MovieWatchCard = React.memo(function MovieWatchCard({ show, onShowC
   if (formattedRuntime) metaParts.push(formattedRuntime);
   const metaStr = metaParts.join(' • ') || 'Film';
 
-  // Badge "AU CINÉMA" / sortie récente
+  // Badge de sortie : « AU CINÉMA » exige désormais une preuve théâtrale française TMDB.
   let cinemaBadge = null;
   const mockTmdbData = { media_type: 'movie', release_date: fullReleaseDate };
+  const isAtCinema = isMovieAtCinema(movieDetails);
   
   if (fullReleaseDate) {
     const [y, m, d] = fullReleaseDate.split('-').map(Number);
@@ -124,7 +125,7 @@ export const MovieWatchCard = React.memo(function MovieWatchCard({ show, onShowC
             SORTI IL Y A {diffDays}J 🆕
           </div>
         );
-      } else if (isMovieAtCinema(mockTmdbData)) {
+      } else if (isAtCinema) {
         cinemaBadge = (
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-20 bg-gradient-to-r from-amber-600 to-rose-600 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-t-lg shadow-lg uppercase tracking-wider whitespace-nowrap shadow-black/50">
             AU CINÉMA 🎬
@@ -138,7 +139,7 @@ export const MovieWatchCard = React.memo(function MovieWatchCard({ show, onShowC
         );
       }
     } else {
-      if (isMovieAtCinema(mockTmdbData)) {
+      if (isAtCinema) {
         cinemaBadge = (
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-20 bg-gradient-to-r from-amber-600 to-rose-600 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-t-lg shadow-lg uppercase tracking-wider whitespace-nowrap shadow-black/50">
             AU CINÉMA 🎬
@@ -152,6 +153,12 @@ export const MovieWatchCard = React.memo(function MovieWatchCard({ show, onShowC
         );
       }
     }
+  } else if (isAtCinema) {
+    cinemaBadge = (
+      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-20 bg-gradient-to-r from-amber-600 to-rose-600 text-white text-[9px] font-extrabold px-2 py-0.5 rounded-t-lg shadow-lg uppercase tracking-wider whitespace-nowrap shadow-black/50">
+        AU CINÉMA 🎬
+      </div>
+    );
   }
 
   return (
