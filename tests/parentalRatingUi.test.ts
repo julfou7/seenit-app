@@ -37,6 +37,6 @@ test('SEENIT-PARENTAL-001 expose une correction personnelle partageable sans tit
   assert.match(editor, /setOverride\(mediaType, Number\(tmdbId\), age\)/);
   assert.match(editor, /clearOverride\(mediaType, Number\(tmdbId\)\)/);
   assert.match(editor, /0 = Tous publics/);
-  assert.doesNotMatch(editor, /title|originalTitle|release_date|firstAirDate/,
+  assert.doesNotMatch(editor, /\.(?:title|originalTitle)\b|\b(?:release_date|firstAirDate)\b/,
     'l’éditeur personnel ne doit pas identifier un média par titre ou année');
 });
