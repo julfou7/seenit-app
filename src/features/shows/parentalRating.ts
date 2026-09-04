@@ -189,7 +189,10 @@ export function matchesMaxRecommendedAge(result: ParentalRatingResult, maxAge: n
 }
 
 export function parseMaxAgeFilter(value: string): number | null {
-  if (!value || value === 'Tous') return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  const normalized = String(value || '').trim();
+  if (!normalized || normalized === 'Tous') return null;
+  if (normalized === 'TP' || normalized === 'Tout Public' || normalized === 'Tous publics') return 0;
+  const stripped = normalized.replace(/^age:/i, '').replace(/^[-+]/, '').replace(/\+$/, '');
+  const parsed = Number(stripped);
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 18 ? parsed : null;
 }
