@@ -48,20 +48,23 @@ La classe `apk` signifie seulement « devra entrer dans la prochaine APK ». Ell
 Chaque push ou pull request exécute, dans cet ordre :
 
 1. configuration de Node sans installation applicative ;
-2. préflight sans dépendances : classification `light` / `backend` / `apk`, contrat de
-   changement et intégrité du catalogue SPEC ;
+2. préflight sans dépendances : intégrité du catalogue SPEC ;
 3. restauration éventuelle d'un cache `node_modules` exact ;
 4. sur cache absent seulement, `npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund` ;
 5. rematérialisation systématique de la configuration Android canonique, y compris sur cache trouvé ;
-6. TypeScript puis tests unitaires dans deux étapes séparées ;
-7. contrat Android uniquement si le diff touche l'APK ;
-8. audit de dépendances lorsqu'il est applicable ;
-9. build Web + serveur ;
-10. résumé du mode, du cache et des durées principales.
+6. classification `light` / `backend` / `apk` et contrat de changement ;
+7. TypeScript puis tests unitaires dans deux étapes séparées ;
+8. contrat Android uniquement si le diff touche l'APK ;
+9. audit de dépendances lorsqu'il est applicable ;
+10. build Web + serveur ;
+11. résumé du mode, du cache et des durées principales.
 
-L'intégrité SPEC est volontairement exécutée avant l'installation : son validateur utilise uniquement
-Node et les fichiers du dépôt. Une erreur de catalogue, de version ou de référence de test doit ainsi
-échouer avant tout coût npm.
+L'intégrité SPEC est volontairement exécutée avant le cache et l'installation : son validateur utilise
+uniquement Node et les fichiers du dépôt. Une erreur de catalogue, de version ou de référence de test
+échoue ainsi avant tout coût npm. La classification sûre des changements de pure copie s'appuie en
+revanche sur l'analyseur TypeScript. Elle s'exécute donc sans installation lorsque le cache exact est
+trouvé ; lors du bootstrap exceptionnel d'un cache absent, l'installation déterministe précède ce
+contrôle sans le supprimer ni l'assouplir.
 
 Le cache `node_modules` est strictement exact. Sa clé comprend le système, l'architecture, la version
 Node réellement résolue, `package.json`, `package-lock.json`, le patch des notifications locales et
