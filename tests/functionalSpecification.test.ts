@@ -47,11 +47,11 @@ test('SEENIT-FUNCTIONAL-001 garde la machine d’états et le mapping Plex dans 
   assert.match(spec, /#93/);
 });
 
-test('SEENIT-QUALITY-002 indexe et clôt la matrice du nouvel audit fonctionnel', () => {
+test('SEENIT-QUALITY-002 indexe l’audit fonctionnel et ne conserve que les écarts encore actifs', () => {
   assert.match(auditIndex, /AUDIT-2026-09-04-FONCTIONNEL/);
   assert.match(auditIndex, /audit-fonctionnel-2026-09-04\.md/);
-  assert.match(functional, /#94/);
+  assert.match(auditIndex, /#94/);
+  assert.doesNotMatch(functional, /#94/);
   assert.match(functional, /#95/);
   assert.match(functional, /#96/);
 });
-
