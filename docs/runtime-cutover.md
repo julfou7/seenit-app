@@ -14,6 +14,8 @@ Le workflow `.github/workflows/deploy-backend.yml` écoute les zones susceptible
 
 Le build et le déploiement sont volontairement séparés. Cloud Build construit d'abord une image avec les Buildpacks Google et `project.toml`, la pousse dans Artifact Registry puis le workflow résout son digest SHA-256. Cloud Run reçoit ensuite cette référence immuable `image@sha256:...` comme nouvelle révision candidate. Le workflow ne réutilise pas `gcloud run deploy --source` : les métadonnées source héritées d'un déploiement AI Studio ne doivent pas piloter ni bloquer le runtime canonique GitHub.
 
+Cloud Build est soumis en mode asynchrone puis suivi par son statut API avec `gcloud builds describe`. Le compte GitHub n'a donc pas besoin d'un rôle général `Viewer` ni d'un accès au bucket de logs pour attendre la fin d'un build : seuls `SUCCESS` autorise la résolution du digest et la suite du déploiement ; tout état terminal d'échec bloque avant Cloud Run.
+
 Le workflow utilise exclusivement Workload Identity Federation. Les identifiants non secrets sont canonisés dans le dépôt :
 
 - projet : `gen-lang-client-0201895414` (`799043440232`) ;
@@ -34,7 +36,7 @@ Ce bootstrap n'écrit aucune clé JSON durable. Il configure la fédération Git
 ## Procédure
 
 1. Attendre une validation GitHub verte du même SHA `main`.
-2. Construire l'image du runtime avec Cloud Build/Buildpacks, la publier dans Artifact Registry et résoudre son digest immuable.
+2. Construire l'image du runtime avec Cloud Build/Buildpacks, attendre explicitement le statut `SUCCESS`, la publier dans Artifact Registry et résoudre son digest immuable.
 3. Déployer ce digest comme nouvelle révision sans trafic avec un tag candidat.
 4. Vérifier le nouveau runtime avec `/api/health` : HTTP 200 JSON, `status=ok`, `service=seenit-backend`, `identity=canonical`, header `X-SeenIt-Backend: canonical` et `Cache-Control: no-store`.
 5. Pour le parcours de notification de release, vérifier aussi que `POST /api/releases/notify` est réellement servi avec une requête volontairement invalide qui doit être rejetée avant tout accès FCM.
@@ -59,6 +61,7 @@ Le workflow automatise ce rollback si le smoke de l'origine canonique échoue ap
 ## Preuves à conserver
 
 - SHA Git du runtime, digest d'image et révision Cloud Run correspondante ;
+- identifiant et statut terminal du Cloud Build ;
 - résultat du health-check avant et après bascule ;
 - résultat du smoke spécifique au parcours modifié ;
 - heure de bascule et, si nécessaire, heure du rollback ;
