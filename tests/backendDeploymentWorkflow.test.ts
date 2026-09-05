@@ -47,6 +47,18 @@ test('SEENIT-RUNTIME-001 utilise une WIF bornée au dépôt sans clé JSON durab
   assert.doesNotMatch(`${workflow}\n${bootstrap}`, /credentials_json|GCP_CREDENTIALS|SERVICE_ACCOUNT_KEY/);
 });
 
+test('SEENIT-RUNTIME-001 initialise le dépôt Docker Artifact Registry de façon idempotente', () => {
+  const describeRepository = workflow.indexOf('gcloud artifacts repositories describe "$GCP_ARTIFACT_REPOSITORY"');
+  const createRepository = workflow.indexOf('gcloud artifacts repositories create "$GCP_ARTIFACT_REPOSITORY"');
+  const buildImage = workflow.indexOf('gcloud builds submit .');
+
+  assert.ok(describeRepository >= 0);
+  assert.ok(createRepository > describeRepository);
+  assert.ok(buildImage > createRepository);
+  assert.match(workflow, /--repository-format=docker/);
+  assert.match(workflow, /--location "\$GCP_REGION"/);
+});
+
 test('SEENIT-RUNTIME-001 sépare le build de l’image du déploiement Cloud Run hérité', () => {
   const buildImage = workflow.indexOf('gcloud builds submit .');
   const resolveDigest = workflow.indexOf('image_summary.digest');
