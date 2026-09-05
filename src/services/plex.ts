@@ -1,6 +1,7 @@
 import { CURRENT_APP_VERSION } from '../store/updateStore';
 
 export const PLEX_PRODUCT = 'SeenIt' as const;
+export const PLEX_VERSION = CURRENT_APP_VERSION;
 export type PlexAuthPlatform = 'Web' | 'Android';
 
 export type PlexAuthAttempt = Readonly<{
@@ -91,7 +92,7 @@ export const getPlexClientId = () => {
 const assertAttemptIdentity = (attempt: PlexAuthAttempt) => {
   if (
     attempt.product !== PLEX_PRODUCT
-    || attempt.version !== CURRENT_APP_VERSION
+    || attempt.version !== PLEX_VERSION
     || !attempt.clientIdentifier
     || !attempt.pinId
     || !attempt.code
@@ -214,7 +215,7 @@ export const getPlexPin = async (
   const identity = {
     clientIdentifier,
     product: PLEX_PRODUCT,
-    version: CURRENT_APP_VERSION,
+    version: PLEX_VERSION,
     platform
   } as const;
 
