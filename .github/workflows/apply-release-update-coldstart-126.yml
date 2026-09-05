@@ -1,0 +1,276 @@
+name: Apply APK Release Push Cold Start 126
+
+on:
+  push:
+    branches:
+      - feat/126-apk-release-push
+    paths:
+      - .github/workflows/apply-release-update-coldstart-126.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v6
+        with:
+          ref: feat/126-apk-release-push
+          fetch-depth: 0
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Apply cold-start notification handling
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+
+          const replaceOnce = (source, before, after, label) => {
+            const first = source.indexOf(before);
+            if (first < 0) throw new Error(`Motif introuvable: ${label}`);
+            if (source.indexOf(before, first + before.length) >= 0) throw new Error(`Motif non unique: ${label}`);
+            return source.slice(0, first) + after + source.slice(first + before.length);
+          };
+
+          fs.writeFileSync('src/features/release/releaseUpdatePushClient.ts', `import { APP_UPDATE_AVAILABLE_PUSH_TYPE } from './releaseUpdatePushCore';
+
+export interface AppUpdateAvailablePushData {
+  type: typeof APP_UPDATE_AVAILABLE_PUSH_TYPE;
+  version: string;
+}
+
+const VERSION_RE = /^\\d+\\.\\d+\\.\\d+$/;
+let pendingAppUpdateAvailablePush: AppUpdateAvailablePushData | null = null;
+
+export function isAppUpdateAvailablePush(data: unknown): data is AppUpdateAvailablePushData {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+  const candidate = data as Record<string, unknown>;
+  return candidate.type === APP_UPDATE_AVAILABLE_PUSH_TYPE
+    && typeof candidate.version === 'string'
+    && VERSION_RE.test(candidate.version.trim());
+}
+
+export function queueAppUpdateAvailablePush(data: unknown): boolean {
+  if (!isAppUpdateAvailablePush(data)) return false;
+  pendingAppUpdateAvailablePush = {
+    type: APP_UPDATE_AVAILABLE_PUSH_TYPE,
+    version: data.version.trim()
+  };
+  return true;
+}
+
+export function consumeAppUpdateAvailablePush(): AppUpdateAvailablePushData | null {
+  const pending = pendingAppUpdateAvailablePush;
+  pendingAppUpdateAvailablePush = null;
+  return pending;
+}
+
+export async function handleAppUpdateAvailablePush(
+  data: unknown,
+  checkForUpdates: (force?: boolean) => Promise<boolean>
+): Promise<boolean> {
+  if (!isAppUpdateAvailablePush(data)) return false;
+  await checkForUpdates(true);
+  return true;
+}
+`);
+
+          fs.writeFileSync('tests/releaseUpdatePushClient.test.ts', `import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  consumeAppUpdateAvailablePush,
+  handleAppUpdateAvailablePush,
+  queueAppUpdateAvailablePush
+} from '../src/features/release/releaseUpdatePushClient';
+
+test('SEENIT-UPDATE-003 force le contrôle canonique au toucher du push Android', async () => {
+  const forces: boolean[] = [];
+  const checkForUpdates = async (force = false) => {
+    forces.push(force);
+    return true;
+  };
+
+  assert.equal(await handleAppUpdateAvailablePush({
+    type: 'APP_UPDATE_AVAILABLE',
+    version: '1.4.115'
+  }, checkForUpdates), true);
+  assert.deepEqual(forces, [true]);
+
+  assert.equal(await handleAppUpdateAvailablePush({
+    type: 'APP_UPDATE_AVAILABLE',
+    version: 'https://example.test/SeenIt.apk'
+  }, checkForUpdates), false);
+  assert.equal(await handleAppUpdateAvailablePush({
+    type: 'DOWNLOAD_EVENT',
+    version: '1.4.115'
+  }, checkForUpdates), false);
+  assert.deepEqual(forces, [true]);
+});
+
+test('SEENIT-UPDATE-003 conserve le clic Android reçu avant le montage de MainApp', () => {
+  consumeAppUpdateAvailablePush();
+  assert.equal(queueAppUpdateAvailablePush({ type: 'DOWNLOAD_EVENT', version: '1.4.115' }), false);
+  assert.equal(queueAppUpdateAvailablePush({ type: 'APP_UPDATE_AVAILABLE', version: ' 1.4.115 ' }), true);
+  assert.deepEqual(consumeAppUpdateAvailablePush(), {
+    type: 'APP_UPDATE_AVAILABLE',
+    version: '1.4.115'
+  });
+  assert.equal(consumeAppUpdateAvailablePush(), null);
+});
+`);
+
+          let firebase = fs.readFileSync('src/lib/firebase.ts', 'utf8');
+          firebase = replaceOnce(
+            firebase,
+            "import { resolveSeenItApiUrl } from './seenitApi';\n",
+            "import { resolveSeenItApiUrl } from './seenitApi';\nimport { queueAppUpdateAvailablePush } from '../features/release/releaseUpdatePushClient';\n",
+            'import queue update push'
+          );
+          firebase = replaceOnce(
+            firebase,
+            `    PushNotifications.addListener('pushNotificationActionPerformed', action => {
+      const data = action.notification?.data || {};
+      window.dispatchEvent(new CustomEvent('capacitor-notification-action', {
+        detail: { ...data, type: data.type || 'DOWNLOAD_EVENT' }
+      }));
+    });`,
+            `    PushNotifications.addListener('pushNotificationActionPerformed', action => {
+      const data = action.notification?.data || {};
+      const payload = { ...data, type: data.type || 'DOWNLOAD_EVENT' };
+      queueAppUpdateAvailablePush(payload);
+      window.dispatchEvent(new CustomEvent('capacitor-notification-action', {
+        detail: payload
+      }));
+    });`,
+            'queue cold-start push action'
+          );
+          fs.writeFileSync('src/lib/firebase.ts', firebase);
+
+          let app = fs.readFileSync('src/App.tsx', 'utf8');
+          app = replaceOnce(
+            app,
+            "import { handleAppUpdateAvailablePush, isAppUpdateAvailablePush } from './features/release/releaseUpdatePushClient';\n",
+            "import { consumeAppUpdateAvailablePush, handleAppUpdateAvailablePush, isAppUpdateAvailablePush } from './features/release/releaseUpdatePushClient';\n",
+            'import consume update push'
+          );
+          app = replaceOnce(
+            app,
+            `      if (isAppUpdateAvailablePush(data)) {
+        void handleAppUpdateAvailablePush(
+          data,
+          useUpdateStore.getState().checkForUpdates
+        );
+        return;
+      }`,
+            `      if (isAppUpdateAvailablePush(data)) {
+        consumeAppUpdateAvailablePush();
+        void handleAppUpdateAvailablePush(
+          data,
+          useUpdateStore.getState().checkForUpdates
+        );
+        return;
+      }`,
+            'clear queued update on live event'
+          );
+          app = replaceOnce(
+            app,
+            `    window.addEventListener('capacitor-notification-action' as any, handleCapacitorAction);
+
+    let bc: BroadcastChannel | null = null;`,
+            `    window.addEventListener('capacitor-notification-action' as any, handleCapacitorAction);
+
+    const pendingAppUpdatePush = consumeAppUpdateAvailablePush();
+    if (pendingAppUpdatePush) {
+      handleNotificationMessage(pendingAppUpdatePush);
+    }
+
+    let bc: BroadcastChannel | null = null;`,
+            'consume cold-start update after listener registration'
+          );
+          fs.writeFileSync('src/App.tsx', app);
+
+          fs.writeFileSync('tests/releaseUpdatePushWorkflow.test.ts', `import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const workflow = readFileSync('.github/workflows/release-update-push.yml', 'utf8');
+const notifyScript = readFileSync('scripts/notify-release-update.cjs', 'utf8');
+const server = readFileSync('server.ts', 'utf8');
+const app = readFileSync('src/App.tsx', 'utf8');
+const firebase = readFileSync('src/lib/firebase.ts', 'utf8');
+
+test('SEENIT-UPDATE-003 déclenche l’alerte seulement après un workflow de release réussi', () => {
+  assert.match(workflow, /workflow_run:/);
+  assert.match(workflow, /Validate & Release SeenIt/);
+  assert.match(workflow, /workflow_run\\.conclusion == 'success'/);
+  assert.match(workflow, /workflow_run\\.event == 'workflow_dispatch'/);
+  assert.match(workflow, /workflow_run\\.head_branch == 'main'/);
+  assert.match(workflow, /RELEASE_RUN_ID: \\$\\{\\{ github\\.event\\.workflow_run\\.id \\}\\}/);
+  assert.match(workflow, /RELEASE_HEAD_SHA: \\$\\{\\{ github\\.event\\.workflow_run\\.head_sha \\}\\}/);
+  assert.match(notifyScript, /const maxAttempts = 3/);
+  assert.match(notifyScript, /https:\\/\\/seenit\\.ai\\.studio\\/api\\/releases\\/notify/);
+  assert.match(server, /app\\.post\\('\\/api\\/releases\\/notify'/);
+  assert.match(server, /processReleaseUpdateNotificationRequest/);
+});
+
+test('SEENIT-UPDATE-003 branche le clic Android sur le contrôle de mise à jour existant', () => {
+  assert.match(app, /handleAppUpdateAvailablePush/);
+  assert.match(app, /isAppUpdateAvailablePush/);
+  assert.match(app, /useUpdateStore\\.getState\\(\\)\\.checkForUpdates/);
+  assert.match(firebase, /queueAppUpdateAvailablePush\\(payload\\)/);
+  assert.match(app, /consumeAppUpdateAvailablePush\\(\\)/);
+});
+`);
+          NODE
+
+      - name: Remove bootstrap workflow from final diff
+        run: rm .github/workflows/apply-release-update-coldstart-126.yml
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
+
+      - name: Validate specification
+        run: npm run test:spec
+
+      - name: TypeScript check
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Android contract
+        run: npm run test:android
+
+      - name: Build Web and server
+        run: npm run build
+
+      - name: Verify final changed paths
+        run: |
+          unexpected="$(git status --short | sed 's/^.. //' | grep -vE '^(\.github/workflows/apply-release-update-coldstart-126\.yml|src/App\.tsx|src/lib/firebase\.ts|src/features/release/releaseUpdatePushClient\.ts|tests/releaseUpdatePushClient\.test\.ts|tests/releaseUpdatePushWorkflow\.test\.ts)$' || true)"
+          if [ -n "$unexpected" ]; then
+            echo "Fichiers inattendus:" >&2
+            echo "$unexpected" >&2
+            exit 1
+          fi
+
+      - name: Commit cold-start fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add --all
+          git commit -m 'fix(update): conserver le clic push au démarrage' \
+            -m 'Changelog:' \
+            -m '- Toucher l’alerte de mise à jour ouvre correctement SeenIt même après un démarrage à froid.' \
+            -m 'Détails techniques:' \
+            -m '- Mémorise au plus une action APP_UPDATE_AVAILABLE jusqu’au montage de MainApp puis la consomme une seule fois.' \
+            -m '- Ajoute un TNR du chemin Capacitor avant montage React.' \
+            -m 'Relatif à #126.'
+          git push origin HEAD:feat/126-apk-release-push
