@@ -15,8 +15,10 @@ printf 'Configuration du déploiement backend SeenIt dans %s...\n' "$PROJECT_ID"
 gcloud config set project "$PROJECT_ID" >/dev/null
 
 gcloud services enable \
+  iam.googleapis.com \
   iamcredentials.googleapis.com \
   sts.googleapis.com \
+  cloudresourcemanager.googleapis.com \
   run.googleapis.com \
   cloudbuild.googleapis.com \
   artifactregistry.googleapis.com
