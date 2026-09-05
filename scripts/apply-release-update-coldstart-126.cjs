@@ -46,13 +46,13 @@ const clientTestPath = 'tests/releaseUpdatePushClient.test.ts';
 let clientTest = fs.readFileSync(clientTestPath, 'utf8');
 clientTest = replaceOnce(
   clientTest,
-  "import { handleAppUpdateAvailablePush } from '../src/features/release/releaseUpdatePushClient';\n",
+  "import { handleAppUpdateAvailablePush } from '../src/features/release/releaseUpdatePushClient.ts';\n",
   [
     "import {",
     "  consumeAppUpdateAvailablePush,",
     "  handleAppUpdateAvailablePush,",
     "  queueAppUpdateAvailablePush",
-    "} from '../src/features/release/releaseUpdatePushClient';"
+    "} from '../src/features/release/releaseUpdatePushClient.ts';"
   ].join('\n') + '\n',
   'client test imports'
 );
