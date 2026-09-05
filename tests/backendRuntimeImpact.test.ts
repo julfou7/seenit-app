@@ -32,11 +32,12 @@ test('SEENIT-RUNTIME-001 déploie un module serveur partagé sans déployer un f
   assert.equal(hasBackendRuntimeImpact(['docs/runtime-cutover.md'], dependencies), false);
 });
 
-test('SEENIT-RUNTIME-001 traite les dépendances npm et son propre garde comme impact runtime conservateur', () => {
+test('SEENIT-RUNTIME-001 traite les dépendances npm, Buildpacks et son propre garde comme impact runtime conservateur', () => {
   const dependencies: Set<string> = collectLocalRuntimeDependencies();
 
   assert.equal(hasBackendRuntimeImpact(['package.json'], dependencies), true);
   assert.equal(hasBackendRuntimeImpact(['package-lock.json'], dependencies), true);
+  assert.equal(hasBackendRuntimeImpact(['project.toml'], dependencies), true);
   assert.equal(hasBackendRuntimeImpact(['.github/workflows/deploy-backend.yml'], dependencies), true);
   assert.equal(hasBackendRuntimeImpact(['scripts/backend-runtime-impact.cjs'], dependencies), true);
 });

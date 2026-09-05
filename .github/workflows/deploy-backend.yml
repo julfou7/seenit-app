@@ -8,6 +8,7 @@ on:
       - src/**
       - package.json
       - package-lock.json
+      - project.toml
       - scripts/backend-runtime-impact.cjs
       - .github/workflows/deploy-backend.yml
   workflow_dispatch:
@@ -26,6 +27,7 @@ env:
   GCP_PROJECT_NUMBER: '799043440232'
   GCP_REGION: us-west1
   GCP_SERVICE: seenit-app
+  GCP_ARTIFACT_REPOSITORY: cloud-run-source-deploy
   GCP_WORKLOAD_IDENTITY_PROVIDER: projects/799043440232/locations/global/workloadIdentityPools/seenit-github/providers/seenit-main
   GCP_DEPLOY_SERVICE_ACCOUNT: seenit-github-deployer@gen-lang-client-0201895414.iam.gserviceaccount.com
   CANONICAL_ORIGIN: https://seenit.ai.studio
@@ -110,6 +112,35 @@ jobs:
         if: steps.impact.outputs.SHOULD_DEPLOY == 'true'
         uses: google-github-actions/setup-gcloud@v3
 
+      - name: Build the immutable candidate image with Cloud Buildpacks
+        id: image
+        if: steps.impact.outputs.SHOULD_DEPLOY == 'true'
+        run: |
+          set -euo pipefail
+          image_tag="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_ARTIFACT_REPOSITORY}/${GCP_SERVICE}:${GITHUB_SHA}"
+
+          gcloud artifacts repositories describe "$GCP_ARTIFACT_REPOSITORY" \
+            --project "$GCP_PROJECT_ID" \
+            --location "$GCP_REGION" \
+            --format='value(name)' >/dev/null
+
+          gcloud builds submit . \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
+            --pack "image=${image_tag}"
+
+          digest="$(gcloud artifacts docker images describe "$image_tag" \
+            --project "$GCP_PROJECT_ID" \
+            --format='value(image_summary.digest)')"
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "Digest Artifact Registry invalide pour $image_tag: ${digest:-absent}"
+            exit 1
+          fi
+
+          image_uri="${image_tag%:*}@${digest}"
+          echo "uri=$image_uri" >> "$GITHUB_OUTPUT"
+          echo "Image candidate immuable: $image_uri"
+
       - name: Capture the currently served revision
         if: steps.impact.outputs.SHOULD_DEPLOY == 'true'
         run: |
@@ -126,14 +157,14 @@ jobs:
           echo "PREVIOUS_REVISION=$previous_revision" >> "$GITHUB_ENV"
           echo "Révision actuellement servie: $previous_revision"
 
-      - name: Deploy the candidate revision without traffic
+      - name: Deploy the candidate image without traffic
         id: deploy
         if: steps.impact.outputs.SHOULD_DEPLOY == 'true'
         uses: google-github-actions/deploy-cloudrun@v3
         with:
           service: ${{ env.GCP_SERVICE }}
           region: ${{ env.GCP_REGION }}
-          source: .
+          image: ${{ steps.image.outputs.uri }}
           no_traffic: true
           tag: candidate-${{ github.run_id }}
 
