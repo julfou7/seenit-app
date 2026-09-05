@@ -10,7 +10,7 @@ import {
   type ReleaseNotificationStore,
   type ReleasePushMessage,
   type VerifiedReleaseNotification
-} from '../src/features/release/releaseUpdatePushCore';
+} from '../src/features/release/releaseUpdatePushCore.ts';
 
 const HEAD_SHA = 'a'.repeat(40);
 const RUN_ID = 123456;
@@ -97,8 +97,11 @@ interface DeliveryState {
 class MemoryStore implements ReleaseNotificationStore {
   states = new Map<string, DeliveryState>();
   removed = new Set<string>();
+  devices: ReleaseNotificationDevice[];
 
-  constructor(public devices: ReleaseNotificationDevice[]) {}
+  constructor(devices: ReleaseNotificationDevice[]) {
+    this.devices = devices;
+  }
 
   key(release: VerifiedReleaseNotification, device: ReleaseNotificationDevice): string {
     return `${release.version}:${device.installationHash}`;
