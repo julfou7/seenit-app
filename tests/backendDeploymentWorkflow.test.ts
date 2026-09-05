@@ -22,11 +22,19 @@ test('SEENIT-RUNTIME-001 déploie le backend canonique uniquement après validat
   assert.match(workflow, /SHOULD_DEPLOY/);
 });
 
+test('SEENIT-RUNTIME-001 aligne l’installation npm sur la CI canonique', () => {
+  assert.match(workflow, /npm ci --legacy-peer-deps --ignore-scripts --prefer-offline --no-audit --no-fund/);
+});
+
 test('SEENIT-RUNTIME-001 utilise une WIF bornée au dépôt sans clé JSON durable', () => {
   assert.match(workflow, /id-token:\s*write/);
   assert.match(workflow, /google-github-actions\/auth@v3/);
   assert.match(workflow, /projects\/799043440232\/locations\/global\/workloadIdentityPools\/seenit-github\/providers\/seenit-main/);
   assert.match(workflow, /seenit-github-deployer@gen-lang-client-0201895414\.iam\.gserviceaccount\.com/);
+  assert.match(bootstrap, /iam\.googleapis\.com/);
+  assert.match(bootstrap, /iamcredentials\.googleapis\.com/);
+  assert.match(bootstrap, /sts\.googleapis\.com/);
+  assert.match(bootstrap, /cloudresourcemanager\.googleapis\.com/);
   assert.match(bootstrap, /REPOSITORY_ID="1338192018"/);
   assert.match(bootstrap, /assertion\.repository_id=='\$\{REPOSITORY_ID\}'/);
   assert.match(bootstrap, /assertion\.ref=='refs\/heads\/main'/);
