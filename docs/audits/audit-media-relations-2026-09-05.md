@@ -44,7 +44,7 @@ L'interface présente trois intentions différentes :
 Cette séparation d'interface est pertinente. Le défaut central se situe dans la preuve acceptée pour
 construire l'univers et dans l'absence de groupe canonique indépendant du média de départ.
 
-## Mesures de caractérisation
+## Preuves reproductibles et mesures de caractérisation
 
 | Point d'entrée | Résultat | Temps observé | Analyse |
 |---|---:|---:|---|
