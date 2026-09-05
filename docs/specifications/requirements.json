@@ -1228,6 +1228,37 @@
           "contains": "SEENIT-AUTH-001 traite l’annulation Google comme une sortie non bloquante"
         }
       ]
+    },
+    {
+      "id": "SEENIT-RELATION-001",
+      "title": "Sagas et univers cross-media exacts, réciproques et distincts des similaires",
+      "targets": [
+        "pwa",
+        "apk",
+        "backend"
+      ],
+      "tests": [
+        {
+          "file": "tests/mediaRelationsSpecification.test.ts",
+          "contains": "SEENIT-RELATION-001 sépare saga univers et médias similaires"
+        },
+        {
+          "file": "tests/mediaRelationsSpecification.test.ts",
+          "contains": "SEENIT-RELATION-001 interdit tout univers déduit du titre ou de la popularité"
+        },
+        {
+          "file": "tests/mediaRelationsSpecification.test.ts",
+          "contains": "SEENIT-RELATION-001 impose une identité mediaType plus TMDB et des groupes bidirectionnels"
+        },
+        {
+          "file": "tests/mediaRelationsSpecification.test.ts",
+          "contains": "SEENIT-RELATION-001 fixe les TNR Yellowstone Breaking Bad Harry Potter Marvel DC et House of Guinness"
+        },
+        {
+          "file": "tests/mediaRelationsSpecification.test.ts",
+          "contains": "SEENIT-RELATION-001 borne les sources distantes et les performances"
+        }
+      ]
     }
   ]
 }
