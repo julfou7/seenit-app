@@ -729,8 +729,10 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   elle est ajoutée à la SPEC, au catalogue, aux tests et au registre des demandes. Le travail différé
   possède une issue GitHub ; les questions ponctuelles et les éléments de diagnostic restent hors SPEC.
 - **SEENIT-QUALITY-004** — Avant toute analyse, proposition ou modification, l'agent récupère l'état
-  courant de GitHub `main`, lit intégralement les consignes agents, la SPEC et la documentation pertinente,
-  puis recherche les issues GitHub ouvertes et fermées liées au sujet ainsi que les PR, commits, audits et
+  courant de GitHub `main` et lit intégralement les consignes agents. Hors fast path explicitement borné,
+  il lit intégralement la SPEC et la documentation pertinente ; un correctif ciblé conforme à
+  `SEENIT-QUALITY-009` lit la carte et les seules sections canoniques directement concernées. L'agent
+  recherche ensuite les issues GitHub ouvertes et fermées liées au sujet ainsi que les PR, commits, audits et
   documents pertinents. Il réutilise ou rouvre l'issue adaptée lorsqu'elle existe au lieu de créer un
   doublon. Dès qu'un travail est relié à une issue GitHub, son corps reste la source de vérité opérationnelle
   pendant toute l'intervention : l'agent l'actualise aux jalons significatifs prouvés (diagnostic et décisions
@@ -769,6 +771,16 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   applicable et build restent distincts et obligatoires. Le résumé expose le mode, le cache et les
   durées. La cible nominale est une médiane de 45 s et un p95 de 90 s sur 20 validations consécutives ;
   un plafond dur de 10 minutes transforme toute dérive d'infrastructure prolongée en échec explicite.
+- **SEENIT-QUALITY-009** — Un correctif ciblé dont l'issue, la cause racine et le périmètre sont déjà
+  établis suit une intervention bornée : l'agent lit la carte fonctionnelle et les sections canoniques
+  directement concernées, conserve l'accès aux index complets sans reconstruire l'historique global,
+  puis modifie SPEC, tests et code dans un même changement cohérent. « SPEC avant code » impose l'ordre
+  des modifications pour une zone sensible, pas des micro-commits. Les tests ciblés servent à la mise au
+  point, puis la validation complète applicable s'exécute une seule fois avant push ; la CI distante ne
+  sert pas de debugger d'une erreur locale reproductible. Toute réécriture mécanique hors périmètre,
+  notamment un churn massif du catalogue sans changement sémantique proportionné, est bloquée. Après dix
+  minutes sans artefact concret, l'agent publie un blocage précis au lieu d'enchaîner une nouvelle passe
+  silencieuse. Ce fast path ne réduit aucune preuve sensible, validation terrain ou protection de release.
 
 Une modification est terminée lorsque les validations applicables à sa classe sont vertes, son test
 ciblé existe si le comportement change, toute règle durable/zone sensible est reflétée dans la SPEC et

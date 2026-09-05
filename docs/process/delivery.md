@@ -122,6 +122,31 @@ administratifs. Le test ciblé et l'issue éventuelle suffisent.
 Les décisions de processus sont tracées ici, dans les audits et les issues d'architecture plutôt que
 d'être dupliquées dans chaque fiche produit.
 
+## Fast path de correctif ciblé
+
+Ce chemin s'applique à une issue existante dont la cause racine est confirmée et le périmètre borné.
+Il ne s'applique pas à un audit global, une migration, une refonte transverse ou un désaccord entre la
+SPEC et la décision produit.
+
+1. Vérifier `main`, puis lire l'issue, ses commentaires, la carte fonctionnelle et uniquement les
+   sections de SPEC, fichiers et tests utiles au changement. Les documents canoniques restent la
+   connaissance complète consultable ; ils ne sont pas tous relus lorsqu'un index et une exigence
+   identifient sans ambiguïté le périmètre.
+2. Pour une règle durable ou une zone sensible, modifier SPEC et catalogue avant le code, dans le même
+   workspace et la même livraison. Aucun commit ou push administratif intermédiaire n'est requis.
+3. Développer avec les tests ciblés. Quand ils sont verts, exécuter une seule fois la validation complète
+   applicable avant le premier push. Un échec local reproductible est corrigé localement ; la CI distante
+   ne devient pas une boucle de mise au point.
+4. Produire un commit cohérent et une PR ; un second commit est réservé à une correction réelle. Toute
+   réécriture mécanique hors périmètre est retirée avant push. Le contrat de changement refuse notamment
+   un churn massif de `requirements.json` disproportionné aux exigences réellement modifiées.
+5. Si dix minutes ne produisent ni artefact concret ni blocage précis, publier un jalon sur l'issue et
+   cibler le blocage avant de continuer.
+6. Après merge, une publication déjà demandée reprend directement le fast path APK ci-dessous.
+
+Ce raccourci porte sur l'orchestration de l'agent, pas sur les preuves : tests, protections de branche,
+contrats Plex/identité/données/APK et validations terrain nécessaires restent inchangés.
+
 ## Fast path de publication APK
 
 Lorsqu'une demande porte **uniquement** sur la publication d'une APK déjà décidée, le fast path de

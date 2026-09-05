@@ -126,6 +126,47 @@ function isPureVersionAlignment(changedFiles, readPatch, readBefore, readAfter) 
   });
 }
 
+function countLineChurn(before, after) {
+  const left = String(before || '').split(/\r?\n/);
+  const right = String(after || '').split(/\r?\n/);
+  const previous = new Uint32Array(right.length + 1);
+
+  for (const leftLine of left) {
+    const current = new Uint32Array(right.length + 1);
+    for (let index = 1; index <= right.length; index += 1) {
+      current[index] = leftLine === right[index - 1]
+        ? previous[index - 1] + 1
+        : Math.max(previous[index], current[index - 1]);
+    }
+    previous.set(current);
+  }
+
+  const commonLines = previous[right.length];
+  return left.length + right.length - (2 * commonLines);
+}
+
+function analyzeRequirementsChurn(before, after) {
+  const beforeJson = JSON.parse(String(before || ''));
+  const afterJson = JSON.parse(String(after || ''));
+  const beforeById = new Map((beforeJson.requirements || []).map(item => [item.id, JSON.stringify(item)]));
+  const afterById = new Map((afterJson.requirements || []).map(item => [item.id, JSON.stringify(item)]));
+  const requirementIds = new Set([...beforeById.keys(), ...afterById.keys()]);
+  const changedRequirements = [...requirementIds].filter(id => beforeById.get(id) !== afterById.get(id));
+  const topLevelFields = ['schemaVersion', 'applicationVersion', 'specification'];
+  const changedTopLevelFields = topLevelFields.filter(field => beforeJson[field] !== afterJson[field]);
+  const semanticChanges = changedRequirements.length + changedTopLevelFields.length;
+  const lineChurn = countLineChurn(before, after);
+  const lineBudget = 30 + (semanticChanges * 40);
+
+  return {
+    changedRequirements,
+    changedTopLevelFields,
+    lineBudget,
+    lineChurn,
+    excessive: semanticChanges > 0 && lineChurn > lineBudget
+  };
+}
+
 function isBehavioralFile(file) {
   const normalized = normalizePath(file);
   return (normalized.startsWith('src/') && normalized !== 'src/store/updateStore.ts')
@@ -181,11 +222,6 @@ function main() {
     return 1;
   }
 
-  if (deliveryClassification.mode === 'light') {
-    console.log('[SPEC] Changement light vérifié : aucun contrat comportemental supplémentaire.');
-    return 0;
-  }
-
   const readPatch = file => execFileSync(
     'git',
     ['diff', '--unified=0', `${base}..${head}`, '--', file],
@@ -193,18 +229,38 @@ function main() {
   );
 
   try {
-    if (isPureVersionAlignment(
+    const pureVersionAlignment = isPureVersionAlignment(
       changedFiles,
       readPatch,
       file => readAt(base, file),
       file => readAt(head, file)
-    )) {
+    );
+    if (pureVersionAlignment) {
       console.log('[SPEC] Alignement de version pur : contrat comportemental non requis.');
       return 0;
     }
+
+    if (changedFiles.includes('docs/specifications/requirements.json')) {
+      const churn = analyzeRequirementsChurn(
+        readAt(base, 'docs/specifications/requirements.json'),
+        readAt(head, 'docs/specifications/requirements.json')
+      );
+      if (churn.excessive) {
+        console.error(
+          `[SPEC] Reformatage massif du catalogue refusé : ${churn.lineChurn} lignes de churn ` +
+          `pour ${churn.changedRequirements.length} exigence(s) modifiée(s).`
+        );
+        return 1;
+      }
+    }
   } catch (error) {
-    console.error('[SPEC] Impossible de vérifier l’alignement de version :', error.message);
+    console.error('[SPEC] Impossible de vérifier l’alignement de version ou le catalogue :', error.message);
     return 1;
+  }
+
+  if (deliveryClassification.mode === 'light') {
+    console.log('[SPEC] Changement light vérifié : aucun contrat comportemental supplémentaire.');
+    return 0;
   }
 
   const behavioralFiles = changedFiles.filter(isBehavioralFile);
@@ -248,6 +304,8 @@ if (require.main === module) {
 module.exports = {
   VERSION_ONLY_PATTERNS,
   VERSION_ONLY_JSON_FIELDS,
+  analyzeRequirementsChurn,
+  countLineChurn,
   getChangedContentLines,
   isBehavioralFile,
   isVersionOnlyJsonChange,

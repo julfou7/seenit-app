@@ -120,3 +120,15 @@ test('SEENIT-QUALITY-006 réserve le pipeline APK aux changements qui le nécess
   assert.match(agentRules, /version.*une seule fois/is);
   assert.match(requestRegistry, /USR-2026-09-01-003/);
 });
+
+test('SEENIT-QUALITY-009 borne le fast path des correctifs ciblés sans réduire les preuves', () => {
+  assert.match(agentRules, /Fast path prioritaire — correctif ciblé/);
+  assert.match(agentRules, /SPEC avant code.*ordre de travail.*pas une obligation de commit/is);
+  assert.match(agentRules, /tests ciblés.*une seule fois la validation complète/is);
+  assert.match(agentRules, /GitHub Actions confirme un\s+état local vert.*ne sert pas de debugger/is);
+  assert.match(agentRules, /Après dix minutes sans fichier modifié, test ciblé exécuté, commit, PR ou blocage précis/is);
+  assert.match(agentRules, /ne réduit aucun contrôle de sécurité.*test terrain.*release/is);
+  assert.match(deliveryProcess, /Fast path de correctif ciblé/);
+  assert.match(deliveryProcess, /un commit cohérent et une PR/);
+  assert.match(requestRegistry, /USR-2026-09-05-005/);
+});
