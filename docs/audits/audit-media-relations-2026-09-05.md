@@ -1,6 +1,6 @@
 # Audit des sagas, univers et médias similaires — 5 septembre 2026
 
-**ID :** AUDIT-2026-09-05-MEDIA-RELATIONS  
+**Identifiant :** AUDIT-2026-09-05-MEDIA-RELATIONS  
 **Baseline :** SeenIt 1.4.114, main afae1ae7654af1f34839d0240f006ac74ea772db  
 **Statut :** terminé ; écarts ouverts dans [#130](https://github.com/julfou7/seenit-app/issues/130)  
 **Dernière vérification :** 5 septembre 2026
@@ -209,7 +209,7 @@ autrement.
 - [Wikidata Query Service](https://www.mediawiki.org/wiki/Wikidata_query_service/User_Manual) documente
   timeout et limites d'usage qui excluent son endpoint public comme dépendance temps réel fiable.
 
-## Traçabilité exhaustive
+## Matrice exhaustive des constats
 
 | Constat | Priorité | Issue | Statut au 5 septembre 2026 |
 |---|---:|---|---|

@@ -369,7 +369,7 @@ lorsqu'un film et une série partagent le même ID numérique.
 - Une relation incomplète ou incertaine est masquée plutôt que complétée par supposition.
 
 Les TNR minimales couvrent les parcours réciproques Yellowstone, Breaking Bad/Better Call Saul/El
-Camino, Wizarding World films+série, la séparation des continuités Marvel et DC, House of Guinness
+Camino, Wizarding World / Harry Potter films+série, la séparation des continuités Marvel et DC, House of Guinness
 sans section auto-référente, la collision movie:42/tv:42 et l'exclusion saga/univers des similaires.
 L'écart courant et le plan de correction sont suivis dans
 [#130](https://github.com/julfou7/seenit-app/issues/130).
