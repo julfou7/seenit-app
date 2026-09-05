@@ -242,7 +242,11 @@ Quand le lot est prêt, le chemin canonique est désormais :
 6. sur demande explicite, laisser l'agent déclencher `Validate & Release SeenIt` avec
    `release_apk=true` depuis `main`, via l'outil GitHub direct, `release:dispatch` ou le navigateur
    GitHub authentifié ;
-7. suivre ce run précis jusqu'à la publication immuable.
+7. suivre ce run précis jusqu'à la publication immuable ;
+8. après terminaison réussie du workflow de release, `Notify Android APK Update` transmet uniquement
+   l'identité publique du run au backend canonique ; celui-ci revalide GitHub puis diffuse l'alerte FCM
+   Android de manière idempotente, sans rendre l'état de la release dépendant de FCM ;
+9. valider sur appareil Android réel la réception et l'ouverture de l'alerte lorsque ce parcours change.
 
 Le déclenchement manuel de release ne relance pas d'abord le job de validation continue puis un second
 job identique. Le job de candidate exécute lui-même, **une seule fois sur le même runner**, le contrat

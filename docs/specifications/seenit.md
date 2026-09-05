@@ -461,9 +461,14 @@ preuves complètes, ils doivent converger vers la même bibliothèque.
   `julfou7/seenit-app`, tag sémantique `vX.Y.Z`, asset exact `SeenIt-vX.Y.Z.apk` et empreinte
   SHA-256 officielle. La première version cible uniquement les installations Android enregistrées et
   autorisées ; la PWA n'est pas destinataire afin d'éviter un doublon sur le même compte.
+- Le déclencheur post-release ne fait confiance à aucune preuve fournie par son appelant : le backend
+  revalide auprès de GitHub le run `Validate & Release SeenIt` terminé avec succès sur `main`, son SHA,
+  le tag correspondant, la release officielle et la paire APK/SHA-256 avant toute diffusion FCM.
 - La diffusion est idempotente : une installation reçoit au plus une notification par version, même
-  en cas de reprise ou de concurrence. Les tokens restent isolés par UID et appareil ; un token invalide
-  est retiré sans bloquer les autres destinataires.
+  en cas de reprise ou de concurrence. Une transaction persistante réserve chaque couple version/installation ;
+  une livraison réussie n'est jamais rejouée, les échecs explicites sont repris au plus trois fois et un
+  token invalide devient terminal puis est retiré sans bloquer les autres destinataires. Les tokens restent
+  isolés par UID et appareil.
 - Le push est un signal non fiable contenant seulement des métadonnées bornées, par exemple le type
   d'événement et la version. Il ne transporte ni APK, ni URL d'APK considérée comme fiable, ni
   instruction exécutable. Un appui ouvre SeenIt et force son contrôle canonique de mise à jour ; seul
