@@ -104,8 +104,8 @@ const deliveryPath = 'docs/process/delivery.md';
 let delivery = fs.readFileSync(deliveryPath, 'utf8');
 delivery = replaceOnce(
   delivery,
-  "7. publication immuable GitHub de l'APK et du SHA-256 ;\n8. validation terrain de la nouvelle APK.\n",
-  "7. publication immuable GitHub de l'APK et du SHA-256 ;\n8. après terminaison réussie du workflow de release, `Notify Android APK Update` transmet uniquement\n   l'identité publique du run au backend canonique ; celui-ci revalide GitHub puis diffuse l'alerte FCM\n   Android de manière idempotente, sans rendre l'état de la release dépendant de FCM ;\n9. validation terrain de la nouvelle APK.\n",
+  "7. suivre ce run précis jusqu'à la publication immuable.\n",
+  "7. suivre ce run précis jusqu'à la publication immuable ;\n8. après terminaison réussie du workflow de release, `Notify Android APK Update` transmet uniquement\n   l'identité publique du run au backend canonique ; celui-ci revalide GitHub puis diffuse l'alerte FCM\n   Android de manière idempotente, sans rendre l'état de la release dépendant de FCM ;\n9. valider sur appareil Android réel la réception et l'ouverture de l'alerte lorsque ce parcours change.\n",
   'étape notification post-release'
 );
 fs.writeFileSync(deliveryPath, delivery);
