@@ -84,7 +84,7 @@ jobs:
           cache: npm
 
       - name: Install dependency graph tooling
-        run: npm ci --ignore-scripts --prefer-offline --no-audit
+        run: npm ci --legacy-peer-deps --ignore-scripts --prefer-offline --no-audit --no-fund
 
       - name: Detect a real backend runtime impact
         id: impact
