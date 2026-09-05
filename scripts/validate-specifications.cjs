@@ -19,11 +19,18 @@ function read(relativePath) {
 }
 
 let catalogue;
+let catalogueSource = '';
 try {
-  catalogue = JSON.parse(fs.readFileSync(cataloguePath, 'utf8'));
+  catalogueSource = fs.readFileSync(cataloguePath, 'utf8');
+  catalogue = JSON.parse(catalogueSource);
 } catch (error) {
   console.error('[SPEC] Catalogue illisible :', error.message);
   process.exit(1);
+}
+
+const canonicalCatalogue = `${JSON.stringify(catalogue, null, 2)}\n`;
+if (catalogueSource !== canonicalCatalogue) {
+  fail('requirements.json doit conserver le format JSON canonique à deux espaces avec fin de ligne.');
 }
 
 if (catalogue.schemaVersion !== 1) fail('schemaVersion doit valoir 1.');

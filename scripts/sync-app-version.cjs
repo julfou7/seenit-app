@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { replaceUniqueJsonScalar } = require('./prepare-release-files.cjs');
 
 const root = path.resolve(__dirname, '..');
 const gradlePath = path.join(root, 'android/app/build.gradle');
@@ -84,13 +85,21 @@ const packageLockVersion = alignJsonVersion(packageLockPath, value => {
   value.packages[''].name = 'seenit-app';
   value.packages[''].version = version;
 });
-const requirementsVersion = alignJsonVersion(requirementsPath, value => {
-  value.applicationVersion = version;
-});
-const androidContractVersion = alignJsonVersion(androidContractPath, value => {
-  value.applicationVersion = version;
-  value.versionCode = versionCode;
-});
+const initialRequirements = read(requirementsPath);
+const requirementsVersion = {
+  initial: initialRequirements,
+  next: replaceUniqueJsonScalar(initialRequirements, 'applicationVersion', version, 'applicationVersion du catalogue SPEC')
+};
+const initialAndroidContract = read(androidContractPath);
+const androidContractVersion = {
+  initial: initialAndroidContract,
+  next: replaceUniqueJsonScalar(
+    replaceUniqueJsonScalar(initialAndroidContract, 'applicationVersion', version, 'applicationVersion du contrat Android'),
+    'versionCode',
+    versionCode,
+    'versionCode du contrat Android'
+  )
+};
 const initialSpecification = read(specificationPath);
 const specification = replaceRequired(
   initialSpecification,
