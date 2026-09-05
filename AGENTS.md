@@ -19,9 +19,38 @@ Objectif : lancer la release en moins de 2 minutes de travail opérateur lorsqu'
 
 Ce fast path est une exception **bornée à l'orchestration d'une release déjà demandée**. Il ne relit pas l'historique fonctionnel complet, ne lance pas d'audit global et ne réécrit pas la référence fonctionnelle. Il n'affaiblit jamais `SEENIT-APK-001..005`, le smoke Android 36, la signature `seenit`, le garde d'immuabilité ou les protections de branche. Si l'état GitHub révèle une incohérence de code, de version, de signature, de SPEC ou une candidate non basée sur `main`, sortir du fast path et reprendre le préflight général ciblé sur ce blocage.
 
+## 0.1 Fast path prioritaire — correctif ciblé
+
+Un correctif peut suivre ce chemin lorsque son issue existe, que sa cause racine est confirmée et que
+son périmètre est borné. Un audit global, une migration, une refonte transverse ou une contradiction
+entre code, SPEC et décision produit sort immédiatement de ce fast path.
+
+1. Lire intégralement ce fichier, vérifier le `main` GitHub canonique, puis lire l'issue et ses
+   commentaires, la carte fonctionnelle et les sections de SPEC directement concernées, les fichiers
+   touchés et leurs tests. La connaissance complète reste disponible via les index canoniques ; ne pas
+   reconstruire l'historique global si aucune ambiguïté ne l'exige.
+2. En zone sensible, mettre la SPEC et le catalogue à jour **avant le code dans le même workspace**.
+   « SPEC avant code » décrit l'ordre de travail, pas une obligation de commit, push ou commentaire
+   distinct pour chaque phase.
+3. Utiliser une branche unique depuis `main`. Modifier SPEC, tests et code comme un seul changement
+   cohérent. Ne pas reformater mécaniquement un fichier hors des lignes nécessaires, notamment
+   `docs/specifications/requirements.json`.
+4. Pendant le développement, exécuter les tests ciblés jusqu'à ce qu'ils soient verts. Exécuter ensuite
+   une seule fois la validation complète applicable avant le premier push. GitHub Actions confirme un
+   état local vert ; elle ne sert pas de debugger pour une erreur reproductible localement.
+5. Viser un commit cohérent et une PR. Un second commit est réservé à une correction réelle révélée
+   par la revue ou la CI, puis la PR est fusionnée selon les protections du dépôt.
+6. Après dix minutes sans fichier modifié, test ciblé exécuté, commit, PR ou blocage précis, publier un
+   jalon concret et réorienter le diagnostic ; ne pas enchaîner une seconde longue passe silencieuse.
+7. Après merge d'un correctif qui doit être publié, basculer directement vers le fast path release-only
+   de la section 0.0 sans relire une seconde fois tout le contexte produit.
+
+Ce chemin ne réduit aucun contrôle de sécurité, d'identité média/Plex, de données, d'APK, de signature,
+de test terrain ou de release. Il réduit uniquement la lecture et les validations redondantes.
+
 ## 0. Avant toute analyse, proposition ou modification
 
-**Hors fast path release-only ci-dessus :**
+**Hors fast paths des sections 0.0 et 0.1 :**
 
 1. Lire intégralement ce fichier.
 2. Récupérer l'état courant de la branche GitHub `main` et son commit de tête. **GitHub `main` est la source de vérité** : ne jamais analyser ou modifier SeenIt à partir d'un workspace supposé à jour sans l'avoir confronté au `main` courant.

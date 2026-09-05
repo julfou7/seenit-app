@@ -1,14 +1,22 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const require = createRequire(import.meta.url);
 const {
+  analyzeRequirementsChurn,
   isVersionOnlyJsonChange,
   isVersionOnlyPatch,
   isPureVersionAlignment,
   requiresSpecification
 } = require('../scripts/validate-change-contract.cjs') as {
+  analyzeRequirementsChurn: (before: string, after: string) => {
+    excessive: boolean;
+    lineChurn: number;
+    lineBudget: number;
+    changedRequirements: string[];
+  };
   isVersionOnlyJsonChange: (file: string, before: string, after: string) => boolean;
   isVersionOnlyPatch: (file: string, patch: string) => boolean;
   isPureVersionAlignment: (
@@ -19,6 +27,34 @@ const {
   ) => boolean;
   requiresSpecification: (file: string) => boolean;
 };
+
+test('SEENIT-QUALITY-009 refuse un reformatage massif du catalogue pour un changement ciblé', () => {
+  const before = readFileSync('docs/specifications/requirements.json', 'utf8');
+  const parsed = JSON.parse(before);
+  const extraRequirement = {
+    id: 'SEENIT-TEST-999',
+    title: 'Fixture de test',
+    targets: ['ci'],
+    tests: [{ file: 'tests/changeContract.test.ts', contains: 'fixture' }]
+  };
+  const reformatted = `${JSON.stringify({
+    ...parsed,
+    requirements: [...parsed.requirements, extraRequirement]
+  }, null, 4)}\n`;
+  const eol = before.includes('\r\n') ? '\r\n' : '\n';
+  const closingIndex = before.lastIndexOf(`${eol}  ]`);
+  assert.ok(closingIndex > 0, 'la fin du tableau requirements doit être trouvée');
+  const targeted = `${before.slice(0, closingIndex)},${eol}    ${JSON.stringify(extraRequirement)}${before.slice(closingIndex)}`;
+
+  const excessive = analyzeRequirementsChurn(before, reformatted);
+  assert.equal(excessive.changedRequirements.length, 1);
+  assert.equal(excessive.excessive, true);
+  assert.ok(excessive.lineChurn > excessive.lineBudget);
+
+  const bounded = analyzeRequirementsChurn(before, targeted);
+  assert.equal(bounded.changedRequirements.length, 1);
+  assert.equal(bounded.excessive, false);
+});
 
 test('le contrat SPEC reconnaît un alignement version:sync complet comme non comportemental', () => {
   const patches: Record<string, string> = {

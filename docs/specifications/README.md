@@ -43,6 +43,12 @@ copie reconnue `light` peut être exemptée de nouveau test.
 
 ## Validation et release
 
+Une issue dont la cause racine et le périmètre sont déjà établis peut suivre le fast path de correctif
+ciblé défini par `SEENIT-QUALITY-009` et `docs/process/delivery.md` : la carte produit et les sections
+directement concernées suffisent à l'intervention, SPEC/tests/code restent un seul changement cohérent,
+les tests ciblés précèdent une unique validation complète et le catalogue n'est jamais reformaté en masse.
+Ce chemin n'exempte aucune preuve sensible ou terrain.
+
 Chaque push/PR suit la validation rapide décrite dans `docs/process/delivery.md`. La publication APK
 n'est plus automatique : les changements APK sont regroupés, la version est synchronisée une seule
 fois quand le lot est prêt, puis la release est déclenchée explicitement.
