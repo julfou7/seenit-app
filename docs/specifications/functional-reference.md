@@ -65,12 +65,15 @@ Les routes backend produit sont :
 - `POST /api/c411/test` et `POST /api/c411/search` : test/recherche C411 ;
 - `POST /api/service-proxy` : allowlist Sonarr/Radarr/qBittorrent ;
 - `POST /api/devices/register` et `DELETE /api/devices/:installationId` : appareil de notification ;
+- `POST /api/releases/notify` : signal post-release public borné, dont le run, le SHA, le tag, l'APK et
+  son SHA-256 sont revalidés auprès du dépôt officiel avant toute notification Android ;
 - `GET /api/webhooks/config`, `POST /api/webhooks/config/rotate` et webhooks personnels : réception
   des événements Arr ;
 - `GET /api/update` : dernière release SeenIt officielle.
 
-Toutes les routes métier privées exigent un jeton Firebase du compte. Le health-check et les
-métadonnées publiques de mise à jour sont les exceptions prévues.
+Toutes les routes métier privées exigent un jeton Firebase du compte. Le health-check, les
+métadonnées publiques de mise à jour et le signal post-release sans donnée utilisateur sont les exceptions
+prévues ; ce dernier n'accorde aucune confiance à l'appelant et exige les preuves GitHub officielles.
 
 ## 3. Compte, démarrage et synchronisation multi-appareils
 

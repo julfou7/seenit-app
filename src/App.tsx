@@ -26,6 +26,8 @@ import { useSyncStore } from './store/syncStore';
 import { useShows } from './hooks/useShows';
 import { useShowsStore } from './store/showsStore';
 import { useToastStore } from './store/toastStore';
+import { useUpdateStore } from './store/updateStore';
+import { consumeAppUpdateAvailablePush, handleAppUpdateAvailablePush, isAppUpdateAvailablePush } from './features/release/releaseUpdatePushClient';
 import { useParentalRatingStore } from './store/parentalRatingStore';
 import { parentalRatingKey } from './features/shows/parentalRating';
 import { markEpisodeWatched } from './features/shows/markEpisodeWatched';
@@ -332,6 +334,15 @@ function MainApp() {
     const handleNotificationMessage = (data: any) => {
       if (!data) return;
 
+      if (isAppUpdateAvailablePush(data)) {
+        consumeAppUpdateAvailablePush();
+        void handleAppUpdateAvailablePush(
+          data,
+          useUpdateStore.getState().checkForUpdates
+        );
+        return;
+      }
+
       if (data.type === 'NAVIGATE_SHOW') {
         const idToOpen = data.showId || data.tmdbId;
         if (idToOpen) {
@@ -382,6 +393,11 @@ function MainApp() {
       }
     };
     window.addEventListener('capacitor-notification-action' as any, handleCapacitorAction);
+
+    const pendingAppUpdatePush = consumeAppUpdateAvailablePush();
+    if (pendingAppUpdatePush) {
+      handleNotificationMessage(pendingAppUpdatePush);
+    }
 
     let bc: BroadcastChannel | null = null;
     try {

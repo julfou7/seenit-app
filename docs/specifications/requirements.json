@@ -838,6 +838,26 @@
         {
           "file": "tests/releaseUpdateNotificationSpecification.test.ts",
           "contains": "SEENIT-UPDATE-003 conserve une release publiée si FCM échoue"
+        },
+        {
+          "file": "tests/releaseUpdatePushBackend.test.ts",
+          "contains": "SEENIT-UPDATE-003 valide la release officielle avant toute diffusion Android"
+        },
+        {
+          "file": "tests/releaseUpdatePushBackend.test.ts",
+          "contains": "SEENIT-UPDATE-003 rend la diffusion Android idempotente face aux replays et à la concurrence"
+        },
+        {
+          "file": "tests/releaseUpdatePushBackend.test.ts",
+          "contains": "SEENIT-UPDATE-003 reprend seulement les échecs FCM explicites et supprime les tokens invalides"
+        },
+        {
+          "file": "tests/releaseUpdatePushClient.test.ts",
+          "contains": "SEENIT-UPDATE-003 force le contrôle canonique au toucher du push Android"
+        },
+        {
+          "file": "tests/releaseUpdatePushWorkflow.test.ts",
+          "contains": "SEENIT-UPDATE-003 déclenche l’alerte seulement après un workflow de release réussi"
         }
       ]
     },

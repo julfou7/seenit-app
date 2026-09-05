@@ -5,6 +5,7 @@ import { createServer as createViteServer } from "vite";
 import cron from "node-cron";
 import { getMessaging } from "firebase-admin/messaging";
 import { adminAuth, adminDb } from "./src/lib/firebase-admin.ts";
+import { processReleaseUpdateNotificationRequest } from "./src/features/release/releaseUpdatePushBackend.ts";
 import { DecodedIdToken } from "firebase-admin/auth";
 import multer from "multer";
 import dns from "node:dns/promises";
@@ -2273,6 +2274,24 @@ async function startServer() {
   });
 
   app.get("/api/health", backendHealthHandler);
+
+  app.post('/api/releases/notify', rateLimit('release-notification', 30, 60_000), async (req, res) => {
+    const result = await processReleaseUpdateNotificationRequest(req.body, {
+      githubToken: process.env.GITHUB_PAT || ''
+    });
+    if (result.status === 204) return res.status(204).end();
+
+    const body = result.body || { success: false, error: 'release_notification_failed' };
+    if (result.status < 400 && typeof body.version === 'string') {
+      console.log(
+        `[ReleaseUpdatePush] v${body.version}: ${Number(body.sent || 0)} envoyée(s), ` +
+        `${Number(body.alreadySent || 0)} déjà traitée(s), ${Number(body.invalid || 0)} token(s) invalide(s).`
+      );
+    } else if (result.status >= 400) {
+      console.warn(`[ReleaseUpdatePush] Échec borné (${result.status}, ${String(body.error || 'retryable')}).`);
+    }
+    return res.status(result.status).json(body);
+  });
 
   app.get('/api/update', async (req, res) => {
     try {
