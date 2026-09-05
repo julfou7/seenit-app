@@ -31,6 +31,40 @@ jobs:
       - name: Apply backend, client and specification integration
         run: node scripts/apply-release-update-push-126.cjs
 
+      - name: Normalize release push TypeScript for Node strip-only
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = 'src/features/release/releaseUpdatePushCore.ts';
+          let source = fs.readFileSync(path, 'utf8');
+          const before = `export class ReleaseNotificationSourceError extends Error {
+            constructor(
+              public readonly status: number,
+              public readonly code: string,
+              message: string
+            ) {
+              super(message);
+              this.name = 'ReleaseNotificationSourceError';
+            }
+          }`;
+          const after = `export class ReleaseNotificationSourceError extends Error {
+            readonly status: number;
+            readonly code: string;
+
+            constructor(status: number, code: string, message: string) {
+              super(message);
+              this.name = 'ReleaseNotificationSourceError';
+              this.status = status;
+              this.code = code;
+            }
+          }`;
+          if (!source.includes(before)) {
+            throw new Error('Bloc ReleaseNotificationSourceError attendu introuvable');
+          }
+          source = source.replace(before, after);
+          fs.writeFileSync(path, source);
+          NODE
+
       - name: Remove bootstrap files from final diff
         run: rm .github/workflows/apply-release-update-push-126.yml scripts/apply-release-update-push-126.cjs
 
@@ -55,7 +89,7 @@ jobs:
       - name: Verify final changed paths
         shell: bash
         run: |
-          unexpected="$(git status --short | sed 's/^.. //' | grep -vE '^(\.github/workflows/apply-release-update-push-126\.yml|scripts/apply-release-update-push-126\.cjs|server\.ts|src/App\.tsx|docs/specifications/seenit\.md|docs/specifications/functional-reference\.md|docs/specifications/requirements\.json|docs/process/delivery\.md)$' || true)"
+          unexpected="$(git status --short | sed 's/^.. //' | grep -vE '^(\.github/workflows/apply-release-update-push-126\.yml|scripts/apply-release-update-push-126\.cjs|server\.ts|src/App\.tsx|src/features/release/releaseUpdatePushCore\.ts|docs/specifications/seenit\.md|docs/specifications/functional-reference\.md|docs/specifications/requirements\.json|docs/process/delivery\.md)$' || true)"
           if [ -n "$unexpected" ]; then
             echo "Fichiers inattendus:" >&2
             echo "$unexpected" >&2
