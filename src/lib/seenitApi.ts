@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 
 export const SEENIT_API_ORIGIN = 'https://seenit.ai.studio';
+export const SEENIT_API_FALLBACK_ORIGIN = 'https://seenit-app-799043440232.us-west1.run.app';
 
 export function isAiStudioPreviewHostname(hostname: string): boolean {
   const normalized = String(hostname || '').trim().toLowerCase().replace(/\.$/, '');
@@ -38,4 +39,15 @@ export function resolveSeenItApiUrl(
   }
 
   return input;
+}
+
+export function resolveSeenItApiCandidates(
+  input: string,
+  native = Capacitor.isNativePlatform(),
+  hostname = currentBrowserHostname()
+): string[] {
+  const primary = resolveSeenItApiUrl(input, native, hostname);
+  if (!native || !input.startsWith('/api/')) return [primary];
+
+  return [primary, `${SEENIT_API_FALLBACK_ORIGIN}${input}`];
 }

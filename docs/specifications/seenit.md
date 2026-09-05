@@ -28,7 +28,11 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   SeenIt relatives au même domaine. L'APK et tout preview AI Studio dont un label d'hôte commence
   par `ais-dev-*` ciblent explicitement `https://seenit.ai.studio` pour les routes `/api/*` afin de
   partager le même backend canonique. Un comportement commun partage la même logique métier, mais
-  le transport et l'ouverture d'applications peuvent être adaptés par la plateforme.
+  le transport et l'ouverture d'applications peuvent être adaptés par la plateforme. Dans l'APK,
+  une panne réseau temporaire ou une résolution DNS impossible de cette origine primaire déclenche
+  de façon bornée l'URL Cloud Run Google vérifiée du **même service canonique** ; ce secours n'est
+  jamais utilisé après une réponse HTTP fonctionnelle et ne modifie ni authentification, ni corps,
+  ni données utilisateur. La PWA reste en même origine et n'utilise pas ce secours natif.
 - La PWA doit fonctionner installée ou dans un navigateur mobile/desktop.
 - L'APK doit gérer explicitement reprise d'activité, bouton Retour Android, safe areas,
   notifications FCM et intents vers les applications natives.
@@ -382,6 +386,9 @@ L'écart courant et le plan de correction sont suivis dans
   les autres serveurs continuent et leur résultat est importé. Les serveurs ignorés restent visibles
   dans les logs techniques, mais le bilan utilisateur de fin n'affiche que le nombre de serveurs
   effectivement scannés ainsi que le nombre de vus et de non vus appliqués, sans exposer URL ou jeton.
+  Une panne DNS entre l'APK et le backend SeenIt n'est pas confondue avec un serveur Plex hors ligne :
+  la synchro rapide, la synchro complète et la disponibilité essaient les origines SeenIt approuvées
+  selon `SEENIT-PLATFORM-001`, en conservant strictement la même requête authentifiée.
 - **SEENIT-PLEX-003** — Le curseur n'est validé qu'après collecte suffisamment complète,
   résolution sans échec transitoire et écritures Firestore réussies.
 - **SEENIT-PLEX-004** — Jeton Plex, curseur et caches de résolution/disponibilité sont cloisonnés
