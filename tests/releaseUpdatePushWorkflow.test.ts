@@ -6,6 +6,7 @@ const workflow = readFileSync('.github/workflows/release-update-push.yml', 'utf8
 const notifyScript = readFileSync('scripts/notify-release-update.cjs', 'utf8');
 const server = readFileSync('server.ts', 'utf8');
 const app = readFileSync('src/App.tsx', 'utf8');
+const firebase = readFileSync('src/lib/firebase.ts', 'utf8');
 
 test('SEENIT-UPDATE-003 déclenche l’alerte seulement après un workflow de release réussi', () => {
   assert.match(workflow, /workflow_run:/);
@@ -25,4 +26,6 @@ test('SEENIT-UPDATE-003 branche le clic Android sur le contrôle de mise à jour
   assert.match(app, /handleAppUpdateAvailablePush/);
   assert.match(app, /isAppUpdateAvailablePush/);
   assert.match(app, /useUpdateStore\.getState\(\)\.checkForUpdates/);
+  assert.match(firebase, /queueAppUpdateAvailablePush\(payload\)/);
+  assert.match(app, /consumeAppUpdateAvailablePush\(\)/);
 });

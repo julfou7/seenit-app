@@ -8,6 +8,7 @@ import { PushNotifications } from '@capacitor/push-notifications';
 import { useLogStore } from '../store/logStore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { resolveSeenItApiUrl } from './seenitApi';
+import { queueAppUpdateAvailablePush } from '../features/release/releaseUpdatePushClient';
 
 const app = initializeApp(firebaseConfig);
 
@@ -114,8 +115,10 @@ if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
     });
     PushNotifications.addListener('pushNotificationActionPerformed', action => {
       const data = action.notification?.data || {};
+      const payload = { ...data, type: data.type || 'DOWNLOAD_EVENT' };
+      queueAppUpdateAvailablePush(payload);
       window.dispatchEvent(new CustomEvent('capacitor-notification-action', {
-        detail: { ...data, type: data.type || 'DOWNLOAD_EVENT' }
+        detail: payload
       }));
     });
   } catch (err) {
