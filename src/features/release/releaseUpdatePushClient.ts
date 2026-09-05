@@ -1,4 +1,4 @@
-import { APP_UPDATE_AVAILABLE_PUSH_TYPE } from './releaseUpdatePushCore';
+import { APP_UPDATE_AVAILABLE_PUSH_TYPE } from './releaseUpdatePushCore.ts';
 
 export interface AppUpdateAvailablePushData {
   type: typeof APP_UPDATE_AVAILABLE_PUSH_TYPE;
