@@ -1,20 +1,14 @@
-const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync, spawnSync } = require('node:child_process');
 const { computeExpectedVersion, parseSemver } = require('./release-status.cjs');
+const {
+  RELEASE_VERSION_FILES,
+  assertReleaseOnlyFiles,
+  prepareReleaseFiles,
+  updateGradleVersionName
+} = require('./prepare-release-files.cjs');
 
 const root = path.resolve(__dirname, '..');
-const RELEASE_VERSION_FILES = Object.freeze([
-  'android/app/build.gradle',
-  'src/store/updateStore.ts',
-  'server.ts',
-  'package.json',
-  'package-lock.json',
-  'docs/specifications/requirements.json',
-  'docs/specifications/android-contract.json',
-  'docs/specifications/seenit.md'
-]);
-const RELEASE_VERSION_FILE_SET = new Set(RELEASE_VERSION_FILES);
 
 function run(command, args, options = {}) {
   const output = execFileSync(command, args, {
@@ -41,26 +35,6 @@ function assertCleanWorkspace(status) {
   if (String(status || '').trim()) {
     throw new Error('Workspace sale : release:prepare exige un arbre Git propre avant toute préparation.');
   }
-}
-
-function assertReleaseOnlyFiles(files) {
-  const normalized = [...new Set((files || []).map(file => String(file || '').trim()).filter(Boolean))];
-  const unexpected = normalized.filter(file => !RELEASE_VERSION_FILE_SET.has(file));
-  if (unexpected.length) {
-    throw new Error(`Fichier hors surfaces de version détecté : ${unexpected.join(', ')}.`);
-  }
-  if (!normalized.includes('android/app/build.gradle')) {
-    throw new Error('La préparation doit modifier android/app/build.gradle.');
-  }
-  return normalized;
-}
-
-function updateGradleVersionName(source, version) {
-  if (!parseSemver(version)) throw new Error(`Version SemVer invalide : ${version}.`);
-  if (!/versionName\s+["']\d+\.\d+\.\d+["']/.test(source)) {
-    throw new Error('versionName Android introuvable.');
-  }
-  return source.replace(/versionName\s+["']\d+\.\d+\.\d+["']/, `versionName "${version}"`);
 }
 
 function validateRequestedVersion({ targetVersion, mainVersion, latestReleaseTag, tagExists = false, releaseExists = false }) {
@@ -96,7 +70,7 @@ function evaluateExistingCandidate({ targetVersion, branchVersion, basedOnMain, 
 function ensureGh() {
   const result = spawnSync('gh', ['--version'], { encoding: 'utf8', stdio: 'ignore' });
   if (result.status !== 0) {
-    throw new Error('GitHub CLI `gh` est requis pour release:prepare lorsqu’aucun outil GitHub direct n’est disponible. Ne pas chercher de contournement Web/plugin.');
+    throw new Error('GitHub CLI `gh` est requis uniquement pour l’orchestration distante de release:prepare. La génération atomique des huit surfaces reste disponible via release:prepare:files sans gh.');
   }
 }
 
@@ -124,9 +98,9 @@ function createPr(repository, branch, version) {
     '--body', [
       `Préparation atomique de la release APK **${version}**.`,
       '',
-      '- version synchronisée via `npm run version:sync` ;',
+      '- huit surfaces synchronisées via `release:prepare:files` ;',
       '- aucune modification métier hors surfaces de version ;',
-      '- publication uniquement après validation de la PR puis workflow manuel sur `main`.',
+      '- publication uniquement après validation de la PR puis déclenchement sécurisé sur `main`.',
       '',
       'Relatif à #102.'
     ].join('\n')
@@ -167,11 +141,9 @@ function rollbackLocalBranch(previousBranch, branch) {
 
 function prepareRelease(targetVersion) {
   const startedAt = Date.now();
-  ensureGh();
   assertCleanWorkspace(run('git', ['status', '--porcelain']));
   run('git', ['fetch', '--quiet', 'origin', 'main', '--tags', '--prune']);
 
-  const repository = resolveRepository();
   const currentBranch = run('git', ['branch', '--show-current']);
   const headSha = run('git', ['rev-parse', 'HEAD']);
   const mainSha = run('git', ['rev-parse', 'refs/remotes/origin/main']);
@@ -180,6 +152,12 @@ function prepareRelease(targetVersion) {
   }
 
   const mainPackage = JSON.parse(run('git', ['show', `${mainSha}:package.json`]));
+
+  // Toute la génération des huit surfaces est désormais disponible sans GitHub CLI via
+  // `npm run release:prepare:files -- X.Y.Z`. `gh` ne sert plus qu'à l'orchestration distante
+  // historique (lecture release, PR et push) de cette commande complète.
+  ensureGh();
+  const repository = resolveRepository();
   const latestReleaseTag = readLatestReleaseTag(repository);
   const tagExists = Boolean(run('git', ['tag', '--list', `v${targetVersion}`]));
   const releaseExists = Boolean(tryRun('gh', ['release', 'view', `v${targetVersion}`, '--repo', repository, '--json', 'tagName']));
@@ -216,16 +194,19 @@ function prepareRelease(targetVersion) {
 
   run('git', ['switch', '-c', branch]);
   try {
-    const gradlePath = path.join(root, 'android/app/build.gradle');
-    const gradle = fs.readFileSync(gradlePath, 'utf8');
-    fs.writeFileSync(gradlePath, updateGradleVersionName(gradle, targetVersion), 'utf8');
-
-    run('npm', ['run', 'version:sync'], { stdio: 'inherit' });
+    const generated = prepareReleaseFiles(targetVersion, { rootDir: root, requireAllEight: true });
     const changedFiles = run('git', ['diff', '--name-only']).split('\n').filter(Boolean);
     assertReleaseOnlyFiles(changedFiles);
+    if (generated.changedFiles.length !== RELEASE_VERSION_FILES.length) {
+      throw new Error(`Préparation non atomique : ${generated.changedFiles.length}/8 surfaces modifiées.`);
+    }
     run('git', ['diff', '--check']);
     run('git', ['add', '--', ...RELEASE_VERSION_FILES]);
-    run('git', ['commit', '-m', `chore: préparer la release APK ${targetVersion}`], { stdio: 'inherit' });
+    run('git', [
+      'commit',
+      '-m', `chore: préparer la release APK ${targetVersion}`,
+      '-m', 'Changelog: aucun\n\nDétails techniques:\n- Aligne atomiquement les huit surfaces de version.'
+    ], { stdio: 'inherit' });
 
     const commitCount = Number(run('git', ['rev-list', '--count', 'refs/remotes/origin/main..HEAD']));
     if (commitCount !== 1) {
@@ -275,6 +256,7 @@ module.exports = {
   assertCleanWorkspace,
   assertReleaseOnlyFiles,
   evaluateExistingCandidate,
+  prepareReleaseFiles,
   updateGradleVersionName,
   validateRequestedVersion
 };

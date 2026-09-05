@@ -1,0 +1,45 @@
+name: SeenIt Release Control
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seenit-release-control
+  cancel-in-progress: false
+
+jobs:
+  release_control:
+    name: Release Control
+    if: >-
+      github.event.issue.number == 102 &&
+      github.event.comment.user.login == github.event.repository.owner.login &&
+      github.event.comment.author_association == 'OWNER' &&
+      (github.event.comment.body == '/release-apk' ||
+       github.event.comment.body == '/release-apk android12_smoke=true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      actions: write
+      contents: read
+      issues: write
+
+    steps:
+      - name: Checkout canonical main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Validate and dispatch immutable APK release
+        run: node scripts/release-control.cjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

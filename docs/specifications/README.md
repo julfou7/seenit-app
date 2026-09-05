@@ -5,11 +5,14 @@ les invariants et machines d'états, et de la
 [`référence fonctionnelle`](./functional-reference.md), qui décrit le produit écran par écran.
 [`requirements.json`](./requirements.json) relie les exigences non négociables à des tests précis et
 [`android-contract.json`](./android-contract.json) fige les invariants natifs indispensables.
+Pour `SEENIT-RELEASE-005`, [`release-control.md`](./release-control.md) précise le contrat exécutable du
+déclencheur GitHub natif utilisable depuis une conversation ne disposant que du connecteur GitHub.
 
 La mécanique CI/CD, la classification `light/backend/apk`, la cadence de version et les déclencheurs
 de release vivent désormais dans [`../process/delivery.md`](../process/delivery.md). Ce document de
 processus prévaut sur les anciennes descriptions procédurales de la SPEC lorsqu'elles détaillent des
-triggers ou des jobs de CI ; la SPEC reste autoritative pour le comportement produit et les invariants.
+triggers ou des jobs de CI ; `release-control.md` complète cette mécanique pour le déclencheur
+`issue_comment` natif, tandis que la SPEC reste autoritative pour le comportement produit et les invariants.
 
 ## Qualifier la demande avant de modifier
 
@@ -42,15 +45,19 @@ copie reconnue `light` peut être exemptée de nouveau test.
 
 Chaque push/PR suit la validation rapide décrite dans `docs/process/delivery.md`. La publication APK
 n'est plus automatique : les changements APK sont regroupés, la version est synchronisée une seule
-fois quand le lot est prêt, puis la release est déclenchée manuellement.
+fois quand le lot est prêt, puis la release est déclenchée explicitement.
 
 Pour une demande explicite de **publication APK seule**, le fast path décrit dans `AGENTS.md` et
-`docs/process/delivery.md` est l'orchestration canonique de `SEENIT-RELEASE-002` : `release:status`
-retourne l'état et l'action suivante, `release:prepare` réutilise ou prépare atomiquement la candidate
-par `version:sync`, puis `release:dispatch` constitue le fallback borné de `workflow_dispatch` quand
-aucun outil GitHub direct n'est disponible. Cette accélération ne change aucun invariant de
-`seenit.md` : signature, immuabilité, contrôles Android et smoke cible restent intégralement exécutés
-par la release.
+`docs/process/delivery.md` reste l'orchestration canonique. Une conversation disposant seulement du
+connecteur GitHub n'a toutefois plus besoin de `workflow_dispatch` direct, de `gh` ou d'un navigateur :
+elle publie la commande exacte `/release-apk` sur #102, ou `/release-apk android12_smoke=true` lorsqu'un
+smoke Android 12 est requis. `SeenIt Release Control` applique le contrat de
+[`release-control.md`](./release-control.md), puis déclenche nativement `Validate & Release SeenIt`
+après vérification de l'auteur, de `main`, de la version attendue, de l'immuabilité et de l'anti-doublon.
+
+La génération atomique des huit surfaces est elle aussi indépendante de GitHub CLI via
+`npm run release:prepare:files -- X.Y.Z`. `release:prepare` peut continuer à assurer l'orchestration
+distante historique, mais la production cohérente des fichiers de version n'en dépend plus.
 
 Le contrat Android complet (`npm run test:android` → `npx cap sync android` → `npm run test:android`)
 et Gradle s'exécutent lors de la release APK. Android cible reste le smoke bloquant ; Android 12 est
