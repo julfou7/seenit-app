@@ -1,7 +1,8 @@
 # Audit des sagas, univers et médias similaires — 5 septembre 2026
 
 **Identifiant :** AUDIT-2026-09-05-MEDIA-RELATIONS  
-**Baseline :** SeenIt 1.4.114, main afae1ae7654af1f34839d0240f006ac74ea772db  
+**Version observée :** SeenIt 1.4.114  
+**Commit observé :** afae1ae7654af1f34839d0240f006ac74ea772db  
 **Statut :** terminé ; écarts ouverts dans [#130](https://github.com/julfou7/seenit-app/issues/130)  
 **Dernière vérification :** 5 septembre 2026
 
