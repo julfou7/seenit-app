@@ -197,7 +197,8 @@ Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, 
 - La classification automatique provient exclusivement de la certification US explicite TMDB. Une
   certification absente ou inconnue s'affiche **« Âge à vérifier »** ; aucun genre n'est utilisé comme
   fallback et le terme PEGI n'est pas employé pour les films/séries.
-- Tri Populaires, Mieux notés, Plus récents, Ordre alphabétique ou Top 100.
+- Le panneau « Type de contenu » permet notamment de choisir **Top 100** ; ce choix change de catégorie et ne constitue pas un tri.
+- Tri Populaires, Mieux notés, Plus récents ou Ordre alphabétique.
 - Hero Top 10, chargement infini, aperçu long-press et cache utilisable lors d'une panne réseau.
 - Les recommandations combinent genres regardés et personnes favorites, puis excluent les médias
   déjà vus/terminés ou abandonnés.
