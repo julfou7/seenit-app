@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { cn } from '../lib/utils';
-import { Tv, Film, X, Sparkles, FileText, User, Ticket } from 'lucide-react';
+import { Tv, Film, X, Sparkles, FileText, User, Ticket, Trophy } from 'lucide-react';
 
 interface FilterModalProps {
   onClose: () => void;
@@ -99,7 +99,7 @@ export function FilterModal({
     <div
       ref={overlayRef}
       onClick={handleOverlayClick}
-      className="fixed inset-0 z-[100] flex flex-col justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
+      className="fixed inset-0 z-[200] flex flex-col justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
     >
       <div className="w-full max-w-xl mx-auto bg-[#1C1C1E] rounded-t-[2rem] pt-3 px-5 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] shadow-2xl animate-in slide-in-from-bottom-full duration-300 max-h-[90vh] flex flex-col">
 
@@ -132,6 +132,12 @@ export function FilterModal({
                 className={cn("px-4 py-2 rounded-full text-[13px] font-semibold flex items-center gap-1.5 transition-all border", activeCategory === 'Films' ? "bg-[#E5A93D]/20 text-[#E5A93D] border-[#E5A93D]/50" : "bg-white/5 border-white/5 text-zinc-300 hover:bg-white/10")}
               >
                 <Film size={14}/> Films
+              </button>
+              <button
+                onClick={() => setActiveCategory('Top 100')}
+                className={cn("px-4 py-2 rounded-full text-[13px] font-semibold flex items-center gap-1.5 transition-all border", activeCategory === 'Top 100' ? "bg-[#E5A93D]/20 text-[#E5A93D] border-[#E5A93D]/50" : "bg-white/5 border-white/5 text-zinc-300 hover:bg-white/10")}
+              >
+                <Trophy size={14}/> Top 100
               </button>
               <button
                 onClick={() => setActiveCategory('Pépites')}

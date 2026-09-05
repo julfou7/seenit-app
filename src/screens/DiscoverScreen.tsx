@@ -51,8 +51,7 @@ const SORT_OPTIONS = [
   { id: 'popular', label: 'Populaires' },
   { id: 'rating', label: 'Mieux notés' },
   { id: 'date', label: 'Plus récents' },
-  { id: 'title', label: 'Ordre alphabétique' },
-  { id: 'top100', label: 'Top 100' }
+  { id: 'title', label: 'Ordre alphabétique' }
 ];
 
 interface GenreOption {
@@ -140,7 +139,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
       return !show?.isArchived;
     });
   }, [recommendations, showsByTmdbId]);
-  const [sortBy, setSortBy] = useState<'popular' | 'rating' | 'date' | 'title' | 'top100'>('popular');
+  const [sortBy, setSortBy] = useState<'popular' | 'rating' | 'date' | 'title'>('popular');
   const [isSortPickerOpen, setIsSortPickerOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedGenreIds, setSelectedGenreIds] = useState<string[]>([]);
@@ -1028,9 +1027,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
         return (b.popularity || 0) - (a.popularity || 0);
       });
     } else if (sortBy !== 'popular' || (!qClean && sortBy === 'popular')) {
-      if (sortBy === 'top100') {
-        list.sort((a: any, b: any) => (b.vote_average || 0) - (a.vote_average || 0));
-      } else if (sortBy !== 'popular') {
+      if (sortBy !== 'popular') {
         list.sort((a: any, b: any) => {
           let valA = 0;
           let valB = 0;
