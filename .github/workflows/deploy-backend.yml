@@ -119,6 +119,19 @@ jobs:
           set -euo pipefail
           image_tag="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_ARTIFACT_REPOSITORY}/${GCP_SERVICE}:${GITHUB_SHA}"
 
+          if ! gcloud artifacts repositories describe "$GCP_ARTIFACT_REPOSITORY" \
+            --project "$GCP_PROJECT_ID" \
+            --location "$GCP_REGION" \
+            --format='value(name)' >/dev/null 2>&1; then
+            echo "Création du dépôt Artifact Registry $GCP_ARTIFACT_REPOSITORY dans $GCP_REGION."
+            gcloud artifacts repositories create "$GCP_ARTIFACT_REPOSITORY" \
+              --project "$GCP_PROJECT_ID" \
+              --location "$GCP_REGION" \
+              --repository-format=docker \
+              --description='Images backend canoniques SeenIt construites par GitHub Actions' \
+              --quiet
+          fi
+
           gcloud artifacts repositories describe "$GCP_ARTIFACT_REPOSITORY" \
             --project "$GCP_PROJECT_ID" \
             --location "$GCP_REGION" \
