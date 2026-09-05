@@ -27,7 +27,8 @@ test('SEENIT-RUNTIME-001 utilise une WIF bornée au dépôt sans clé JSON durab
   assert.match(workflow, /google-github-actions\/auth@v3/);
   assert.match(workflow, /projects\/799043440232\/locations\/global\/workloadIdentityPools\/seenit-github\/providers\/seenit-main/);
   assert.match(workflow, /seenit-github-deployer@gen-lang-client-0201895414\.iam\.gserviceaccount\.com/);
-  assert.match(bootstrap, /assertion\.repository_id=='1338192018'/);
+  assert.match(bootstrap, /REPOSITORY_ID="1338192018"/);
+  assert.match(bootstrap, /assertion\.repository_id=='\$\{REPOSITORY_ID\}'/);
   assert.match(bootstrap, /assertion\.ref=='refs\/heads\/main'/);
   assert.match(bootstrap, /roles\/iam\.workloadIdentityUser/);
   assert.doesNotMatch(`${workflow}\n${bootstrap}`, /credentials_json|GCP_CREDENTIALS|SERVICE_ACCOUNT_KEY/);
@@ -56,6 +57,6 @@ test('SEENIT-RUNTIME-001 conserve un rollback vers la révision précédemment s
 
 test('SEENIT-RUNTIME-001 documente que la sync AI Studio ne vaut jamais preuve de déploiement', () => {
   assert.match(runbook, /sync Git AI Studio/i);
-  assert.match(runbook, /ne constitue pas un déploiement/i);
+  assert.match(runbook, /ne constitu(?:e|ent) pas un déploiement/i);
   assert.match(runbook, /bootstrap-gcp-backend-deploy\.sh/);
 });
