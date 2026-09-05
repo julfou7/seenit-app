@@ -11,6 +11,9 @@ const requestRegistry = readFileSync('docs/requests/registry.md', 'utf8');
 const issueTemplate = readFileSync('.github/ISSUE_TEMPLATE/engineering.yml', 'utf8');
 const deliveryClassifier = readFileSync('scripts/classify-delivery.cjs', 'utf8');
 const deliveryProcess = readFileSync('docs/process/delivery.md', 'utf8');
+const requirementsSource = readFileSync('docs/specifications/requirements.json', 'utf8');
+const specificationValidator = readFileSync('scripts/validate-specifications.cjs', 'utf8');
+const versionSync = readFileSync('scripts/sync-app-version.cjs', 'utf8');
 
 test('SEENIT-RELEASE-002 la CI valide puis publie sans modifier automatiquement main', () => {
   assert.doesNotMatch(workflow, /git\s+(commit|push)/);
@@ -131,4 +134,7 @@ test('SEENIT-QUALITY-009 borne le fast path des correctifs ciblés sans réduire
   assert.match(deliveryProcess, /Fast path de correctif ciblé/);
   assert.match(deliveryProcess, /un commit cohérent et une PR/);
   assert.match(requestRegistry, /USR-2026-09-05-005/);
+  assert.equal(requirementsSource, `${JSON.stringify(JSON.parse(requirementsSource), null, 2)}\n`);
+  assert.match(specificationValidator, /format JSON canonique à deux espaces/);
+  assert.match(versionSync, /replaceUniqueJsonScalar/);
 });

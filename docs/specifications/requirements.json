@@ -6,169 +6,1309 @@
     {
       "id": "SEENIT-PLATFORM-001",
       "title": "Transport SeenIt cohérent entre PWA, preview AI Studio et APK",
-      "targets": ["pwa", "apk", "backend"],
+      "targets": [
+        "pwa",
+        "apk",
+        "backend"
+      ],
       "tests": [
-        {"file": "tests/seenitApi.test.ts", "contains": "SEENIT-PLATFORM-001 route l’APK et le preview AI Studio vers le backend canonique"},
-        {"file": "tests/seenitApi.test.ts", "contains": "SEENIT-PLATFORM-001 conserve la PWA canonique en même origine"}
+        {
+          "file": "tests/seenitApi.test.ts",
+          "contains": "SEENIT-PLATFORM-001 route l’APK et le preview AI Studio vers le backend canonique"
+        },
+        {
+          "file": "tests/seenitApi.test.ts",
+          "contains": "SEENIT-PLATFORM-001 conserve la PWA canonique en même origine"
+        }
       ]
     },
     {
       "id": "SEENIT-FUNCTIONAL-001",
       "title": "Référence fonctionnelle complète, obligatoire et synchronisée avec le produit",
-      "targets": ["pwa", "apk", "backend", "ci"],
+      "targets": [
+        "pwa",
+        "apk",
+        "backend",
+        "ci"
+      ],
       "tests": [
-        {"file": "tests/functionalSpecification.test.ts", "contains": "SEENIT-FUNCTIONAL-001 impose la lecture de la référence produit avant toute intervention"},
-        {"file": "tests/functionalSpecification.test.ts", "contains": "SEENIT-FUNCTIONAL-001 couvre tous les écrans et parcours structurants"},
-        {"file": "tests/functionalSpecification.test.ts", "contains": "SEENIT-FUNCTIONAL-001 garde la machine d’états et le mapping Plex dans la SPEC canonique"}
+        {
+          "file": "tests/functionalSpecification.test.ts",
+          "contains": "SEENIT-FUNCTIONAL-001 impose la lecture de la référence produit avant toute intervention"
+        },
+        {
+          "file": "tests/functionalSpecification.test.ts",
+          "contains": "SEENIT-FUNCTIONAL-001 couvre tous les écrans et parcours structurants"
+        },
+        {
+          "file": "tests/functionalSpecification.test.ts",
+          "contains": "SEENIT-FUNCTIONAL-001 garde la machine d’états et le mapping Plex dans la SPEC canonique"
+        }
       ]
     },
     {
       "id": "SEENIT-RUNTIME-001",
       "title": "Backend canonique identifiable et résilient aux erreurs asynchrones",
-      "targets": ["backend", "pwa", "apk"],
+      "targets": [
+        "backend",
+        "pwa",
+        "apk"
+      ],
       "tests": [
-        {"file": "tests/seenitApi.test.ts", "contains": "SEENIT-RUNTIME-001 refuse un fallback HTML 200 comme succès API"},
-        {"file": "tests/backendRuntime.test.ts", "contains": "SEENIT-RUNTIME-001 garde un health-check indépendant et identifiable"},
-        {"file": "tests/backendRuntime.test.ts", "contains": "SEENIT-RUNTIME-001 contient les rejets async API sans terminer le backend"}
+        {
+          "file": "tests/seenitApi.test.ts",
+          "contains": "SEENIT-RUNTIME-001 refuse un fallback HTML 200 comme succès API"
+        },
+        {
+          "file": "tests/backendRuntime.test.ts",
+          "contains": "SEENIT-RUNTIME-001 garde un health-check indépendant et identifiable"
+        },
+        {
+          "file": "tests/backendRuntime.test.ts",
+          "contains": "SEENIT-RUNTIME-001 contient les rejets async API sans terminer le backend"
+        }
       ]
     },
     {
       "id": "SEENIT-APK-001",
       "title": "Identité APK et nouvelle signature release verrouillées",
-      "targets": ["apk", "ci"],
+      "targets": [
+        "apk",
+        "ci"
+      ],
       "tests": [
-        {"file": "tests/androidContract.test.ts", "contains": "SEENIT-APK-001 verrouille l’identité, la version et la clé de signature de l’APK"},
-        {"file": "tests/androidSigningMaterialization.test.ts", "contains": "SEENIT-APK-001 refuse toute clé matérialisée dont l’empreinte diffère du contrat"}
+        {
+          "file": "tests/androidContract.test.ts",
+          "contains": "SEENIT-APK-001 verrouille l’identité, la version et la clé de signature de l’APK"
+        },
+        {
+          "file": "tests/androidSigningMaterialization.test.ts",
+          "contains": "SEENIT-APK-001 refuse toute clé matérialisée dont l’empreinte diffère du contrat"
+        }
       ]
     },
-    {"id": "SEENIT-APK-002", "title": "Icônes SeenIt protégées sur toutes les densités Android", "targets": ["pwa", "apk", "ci"], "tests": [{"file": "tests/androidContract.test.ts", "contains": "SEENIT-APK-002 conserve toutes les icônes du lanceur et leur identité visuelle"}]},
+    {
+      "id": "SEENIT-APK-002",
+      "title": "Icônes SeenIt protégées sur toutes les densités Android",
+      "targets": [
+        "pwa",
+        "apk",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/androidContract.test.ts",
+          "contains": "SEENIT-APK-002 conserve toutes les icônes du lanceur et leur identité visuelle"
+        }
+      ]
+    },
     {
       "id": "SEENIT-APK-003",
       "title": "Mise à jour APK sur place avec signature stable réellement testée avant publication",
-      "targets": ["apk", "ci"],
+      "targets": [
+        "apk",
+        "ci"
+      ],
       "tests": [
-        {"file": "tests/androidUpgradeSmoke.test.ts", "contains": "SEENIT-APK-003 sélectionne uniquement la dernière release strictement antérieure et vérifiée"},
-        {"file": "tests/androidUpgradeSmoke.test.ts", "contains": "SEENIT-APK-003 bloque toute baseline APK dont l’empreinte est incohérente"},
-        {"file": "tests/androidUpgradeSmoke.test.ts", "contains": "SEENIT-APK-003 installe réellement N puis N+1 sans désinstaller les données"},
-        {"file": "tests/androidUpgradeSmoke.test.ts", "contains": "SEENIT-APK-003 interdit toute réinstallation ou divergence de signature après rotation"},
-        {"file": "tests/androidUpgradeSmoke.test.ts", "contains": "SEENIT-APK-003 exécute le smoke sur Android 12 et la cible Android courante avant publication"}
+        {
+          "file": "tests/androidUpgradeSmoke.test.ts",
+          "contains": "SEENIT-APK-003 sélectionne uniquement la dernière release strictement antérieure et vérifiée"
+        },
+        {
+          "file": "tests/androidUpgradeSmoke.test.ts",
+          "contains": "SEENIT-APK-003 bloque toute baseline APK dont l’empreinte est incohérente"
+        },
+        {
+          "file": "tests/androidUpgradeSmoke.test.ts",
+          "contains": "SEENIT-APK-003 installe réellement N puis N+1 sans désinstaller les données"
+        },
+        {
+          "file": "tests/androidUpgradeSmoke.test.ts",
+          "contains": "SEENIT-APK-003 interdit toute réinstallation ou divergence de signature après rotation"
+        },
+        {
+          "file": "tests/androidUpgradeSmoke.test.ts",
+          "contains": "SEENIT-APK-003 exécute le smoke sur Android 12 et la cible Android courante avant publication"
+        }
       ]
     },
     {
       "id": "SEENIT-APK-004",
       "title": "Identité Firebase Android matérialisée depuis le contrat canonique",
-      "targets": ["apk", "ci"],
+      "targets": [
+        "apk",
+        "ci"
+      ],
       "tests": [
-        {"file": "tests/firebaseIdentityGuardrails.test.ts", "contains": "SEENIT-APK-004 protège l’identité Firebase Android canonique générée"},
-        {"file": "tests/developmentGovernance.test.ts", "contains": "SEENIT-APK-004 exécute le contrat Android avant le garde de release"},
-        {"file": "tests/developmentGovernance.test.ts", "contains": "SEENIT-APK-004 restaure le droit d’exécution Gradle avant le build"}
+        {
+          "file": "tests/firebaseIdentityGuardrails.test.ts",
+          "contains": "SEENIT-APK-004 protège l’identité Firebase Android canonique générée"
+        },
+        {
+          "file": "tests/developmentGovernance.test.ts",
+          "contains": "SEENIT-APK-004 exécute le contrat Android avant le garde de release"
+        },
+        {
+          "file": "tests/developmentGovernance.test.ts",
+          "contains": "SEENIT-APK-004 restaure le droit d’exécution Gradle avant le build"
+        }
       ]
     },
-    {"id": "SEENIT-APK-005", "title": "Lancement Android mono-splash et status bar edge-to-edge stable", "targets": ["apk", "ci"], "tests": [{"file": "tests/androidLaunchChrome.test.ts", "contains": "SEENIT-APK-005 TNR conserve la status bar transparente avec icônes claires"}, {"file": "tests/androidLaunchChrome.test.ts", "contains": "SEENIT-APK-005 TNR conserve un seul splash brandé visible"}]},
-    {"id": "SEENIT-DATA-001", "title": "Caches locaux isolés par UID", "targets": ["pwa", "apk"], "tests": [{"file": "tests/userIsolation.test.ts", "contains": "isole strictement chaque cache local par UID"}]},
-    {"id": "SEENIT-DATA-002", "title": "Téléchargements persistants isolés par UID", "targets": ["pwa", "apk"], "tests": [{"file": "tests/downloadUserScope.test.ts", "contains": "le stockage des téléchargements est réellement partitionné par UID"}]},
-    {"id": "SEENIT-DATA-003", "title": "Journaux techniques isolés par UID", "targets": ["pwa", "apk"], "tests": [{"file": "tests/logPrivacy.test.ts", "contains": "SEENIT-DATA-003 isole les journaux techniques par UID sur chaque appareil"}]},
-    {"id": "SEENIT-DATA-004", "title": "Récupération Firestore IndexedDB ciblée et anti-boucle", "targets": ["pwa", "apk"], "tests": [{"file": "tests/firestoreRecovery.test.ts", "contains": "SEENIT-DATA-004 sélectionne uniquement la base Firestore exacte du projet courant"}, {"file": "tests/firestoreRecovery.test.ts", "contains": "SEENIT-DATA-004 partage une seule tentative entre onglets et casse la boucle de rechargement"}]},
-    {"id": "SEENIT-DATA-005", "title": "Base Firestore SeenIt explicitement verrouillée sur default", "targets": ["backend", "pwa", "apk", "ci"], "tests": [{"file": "tests/firebaseIdentityGuardrails.test.ts", "contains": "SEENIT-DATA-005 verrouille la base Firestore canonique sur default"}]},
-    {"id": "SEENIT-DATA-006", "title": "Delete Protection obligatoire sur la base Firestore canonique", "targets": ["backend", "pwa", "apk", "ci"], "tests": [{"file": "tests/firebaseIdentityGuardrails.test.ts", "contains": "SEENIT-DATA-006 protège default contre une suppression accidentelle"}]},
-    {"id": "SEENIT-IDENTITY-001", "title": "Identité média fondée uniquement sur des identifiants vérifiés", "targets": ["backend", "pwa", "apk"], "tests": [{"file": "tests/plexIdentity.test.ts", "contains": "ne fabrique aucune identité forte depuis un titre ou une année"}, {"file": "tests/downloadPosterStability.test.ts", "contains": "SEENIT-IDENTITY-001 rattache un téléchargement SeenIt uniquement par TMDB ID"}]},
-    {"id": "SEENIT-DISCOVER-001", "title": "Au cinéma limité aux sorties théâtrales françaises TMDB", "targets": ["pwa", "apk"], "tests": [{"file": "tests/cinemaReleaseSemantics.test.ts", "contains": "SEENIT-DISCOVER-001 exige une sortie théâtrale française pour Au cinéma"}, {"file": "tests/cinemaReleaseSemantics.test.ts", "contains": "SEENIT-DISCOVER-001 respecte la fenêtre cinéma et le marqueur issu de la requête théâtrale"}, {"file": "tests/cinemaReleaseSemantics.test.ts", "contains": "SEENIT-DISCOVER-001 contraint Explorer aux release types TMDB 2 ou 3 en France"}]},
-    {"id": "SEENIT-PARENTAL-001", "title": "Classification d’âge conservatrice, explicite et synchronisée", "targets": ["pwa", "apk"], "tests": [{"file": "tests/parentalRating.test.ts", "contains": "SEENIT-PARENTAL-001 préfère la certification US explicite et refuse un faux Tous publics"}, {"file": "tests/parentalRating.test.ts", "contains": "SEENIT-PARENTAL-001 traite les inconnues et les ratings adultes sans sous-classer"}, {"file": "tests/parentalRating.test.ts", "contains": "SEENIT-PARENTAL-001 applique un âge maximum cumulatif et exclut les inconnues"}, {"file": "tests/parentalRating.test.ts", "contains": "SEENIT-PARENTAL-001 donne priorité au choix personnel par identité TMDB exacte"}, {"file": "tests/parentalRatingPersistence.test.ts", "contains": "SEENIT-PARENTAL-001 synchronise les choix personnels sous le même UID Firestore"}, {"file": "tests/parentalRatingPresentation.test.ts", "contains": "SEENIT-PARENTAL-001 supprime PEGI et les heuristiques parentales de genre"}]},
-    {"id": "SEENIT-PLEX-001", "title": "Historique Plex résolu sans titre", "targets": ["backend", "pwa", "apk"], "tests": [{"file": "tests/plexAccountHistory.test.ts", "contains": "normalise un film du Watch History Plex sans utiliser son titre comme identité"}]},
-    {"id": "SEENIT-PLEX-002", "title": "Serveur Plex hors ligne non bloquant et bilan centré sur les serveurs scannés", "targets": ["backend", "pwa", "apk"], "tests": [{"file": "tests/plexSyncIntegrity.test.ts", "contains": "un serveur hors ligne ne bloque ni les autres serveurs ni le curseur du full"}, {"file": "tests/plexSyncPresentation.test.ts", "contains": "SEENIT-UX-004 le bilan Plex affiche serveurs scannés, vus et non vus sans serveur ignoré"}, {"file": "tests/toastQueueScope.test.ts", "contains": "SEENIT-UX-004 le bilan Plex conserve uniquement les serveurs scannés et compte les vus et non vus"}]},
-    {"id": "SEENIT-PLEX-003", "title": "Curseur Plex validé après une synchronisation complète", "targets": ["backend", "pwa", "apk"], "tests": [{"file": "tests/plexSyncIntegrity.test.ts", "contains": "ne valide le curseur qu’après collecte, résolution et écritures complètes"}]},
-    {"id": "SEENIT-PLEX-004", "title": "Jeton et curseur Plex isolés par UID", "targets": ["pwa", "apk"], "tests": [{"file": "tests/plexStorage.test.ts", "contains": "isole le jeton et le curseur Plex par UID SeenIt"}]},
+    {
+      "id": "SEENIT-APK-005",
+      "title": "Lancement Android mono-splash et status bar edge-to-edge stable",
+      "targets": [
+        "apk",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/androidLaunchChrome.test.ts",
+          "contains": "SEENIT-APK-005 TNR conserve la status bar transparente avec icônes claires"
+        },
+        {
+          "file": "tests/androidLaunchChrome.test.ts",
+          "contains": "SEENIT-APK-005 TNR conserve un seul splash brandé visible"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DATA-001",
+      "title": "Caches locaux isolés par UID",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/userIsolation.test.ts",
+          "contains": "isole strictement chaque cache local par UID"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DATA-002",
+      "title": "Téléchargements persistants isolés par UID",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/downloadUserScope.test.ts",
+          "contains": "le stockage des téléchargements est réellement partitionné par UID"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DATA-003",
+      "title": "Journaux techniques isolés par UID",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/logPrivacy.test.ts",
+          "contains": "SEENIT-DATA-003 isole les journaux techniques par UID sur chaque appareil"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DATA-004",
+      "title": "Récupération Firestore IndexedDB ciblée et anti-boucle",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/firestoreRecovery.test.ts",
+          "contains": "SEENIT-DATA-004 sélectionne uniquement la base Firestore exacte du projet courant"
+        },
+        {
+          "file": "tests/firestoreRecovery.test.ts",
+          "contains": "SEENIT-DATA-004 partage une seule tentative entre onglets et casse la boucle de rechargement"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DATA-005",
+      "title": "Base Firestore SeenIt explicitement verrouillée sur default",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/firebaseIdentityGuardrails.test.ts",
+          "contains": "SEENIT-DATA-005 verrouille la base Firestore canonique sur default"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DATA-006",
+      "title": "Delete Protection obligatoire sur la base Firestore canonique",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/firebaseIdentityGuardrails.test.ts",
+          "contains": "SEENIT-DATA-006 protège default contre une suppression accidentelle"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-IDENTITY-001",
+      "title": "Identité média fondée uniquement sur des identifiants vérifiés",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/plexIdentity.test.ts",
+          "contains": "ne fabrique aucune identité forte depuis un titre ou une année"
+        },
+        {
+          "file": "tests/downloadPosterStability.test.ts",
+          "contains": "SEENIT-IDENTITY-001 rattache un téléchargement SeenIt uniquement par TMDB ID"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DISCOVER-001",
+      "title": "Au cinéma limité aux sorties théâtrales françaises TMDB",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/cinemaReleaseSemantics.test.ts",
+          "contains": "SEENIT-DISCOVER-001 exige une sortie théâtrale française pour Au cinéma"
+        },
+        {
+          "file": "tests/cinemaReleaseSemantics.test.ts",
+          "contains": "SEENIT-DISCOVER-001 respecte la fenêtre cinéma et le marqueur issu de la requête théâtrale"
+        },
+        {
+          "file": "tests/cinemaReleaseSemantics.test.ts",
+          "contains": "SEENIT-DISCOVER-001 contraint Explorer aux release types TMDB 2 ou 3 en France"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-PARENTAL-001",
+      "title": "Classification d’âge conservatrice, explicite et synchronisée",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/parentalRating.test.ts",
+          "contains": "SEENIT-PARENTAL-001 préfère la certification US explicite et refuse un faux Tous publics"
+        },
+        {
+          "file": "tests/parentalRating.test.ts",
+          "contains": "SEENIT-PARENTAL-001 traite les inconnues et les ratings adultes sans sous-classer"
+        },
+        {
+          "file": "tests/parentalRating.test.ts",
+          "contains": "SEENIT-PARENTAL-001 applique un âge maximum cumulatif et exclut les inconnues"
+        },
+        {
+          "file": "tests/parentalRating.test.ts",
+          "contains": "SEENIT-PARENTAL-001 donne priorité au choix personnel par identité TMDB exacte"
+        },
+        {
+          "file": "tests/parentalRatingPersistence.test.ts",
+          "contains": "SEENIT-PARENTAL-001 synchronise les choix personnels sous le même UID Firestore"
+        },
+        {
+          "file": "tests/parentalRatingPresentation.test.ts",
+          "contains": "SEENIT-PARENTAL-001 supprime PEGI et les heuristiques parentales de genre"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-PLEX-001",
+      "title": "Historique Plex résolu sans titre",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/plexAccountHistory.test.ts",
+          "contains": "normalise un film du Watch History Plex sans utiliser son titre comme identité"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-PLEX-002",
+      "title": "Serveur Plex hors ligne non bloquant et bilan centré sur les serveurs scannés",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/plexSyncIntegrity.test.ts",
+          "contains": "un serveur hors ligne ne bloque ni les autres serveurs ni le curseur du full"
+        },
+        {
+          "file": "tests/plexSyncPresentation.test.ts",
+          "contains": "SEENIT-UX-004 le bilan Plex affiche serveurs scannés, vus et non vus sans serveur ignoré"
+        },
+        {
+          "file": "tests/toastQueueScope.test.ts",
+          "contains": "SEENIT-UX-004 le bilan Plex conserve uniquement les serveurs scannés et compte les vus et non vus"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-PLEX-003",
+      "title": "Curseur Plex validé après une synchronisation complète",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/plexSyncIntegrity.test.ts",
+          "contains": "ne valide le curseur qu’après collecte, résolution et écritures complètes"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-PLEX-004",
+      "title": "Jeton et curseur Plex isolés par UID",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/plexStorage.test.ts",
+          "contains": "isole le jeton et le curseur Plex par UID SeenIt"
+        }
+      ]
+    },
     {
       "id": "SEENIT-PLEX-005",
       "title": "Un état Plex vu ou non vu exige une preuve autoritative, y compris en delta",
-      "targets": ["backend", "pwa", "apk"],
+      "targets": [
+        "backend",
+        "pwa",
+        "apk"
+      ],
       "tests": [
-        {"file": "tests/plexWatchEvidence.test.ts", "contains": "SEENIT-PLEX-005 une activité Cloud identique à la watchlist ne devient jamais un visionnage"},
-        {"file": "tests/plexWatchEvidence.test.ts", "contains": "SEENIT-PLEX-005 conserve une vraie preuve de visionnage même si le film reste en watchlist"},
-        {"file": "tests/plexWatchEvidence.test.ts", "contains": "SEENIT-PLEX-005 ne rapproche jamais deux films par leur titre ou leur année"},
-        {"file": "tests/plexWatchEvidence.test.ts", "contains": "SEENIT-PLEX-005 le filtrage du full Plex est idempotent"},
-        {"file": "tests/plexWatchEvidence.test.ts", "contains": "SEENIT-PLEX-005 protège réellement la réponse POST /api/plex/history"},
-        {"file": "tests/plexAccountHistory.test.ts", "contains": "SEENIT-PLEX-005 le Watch History du compte exige un userState courant explicite"},
-        {"file": "tests/plexAccountHistory.test.ts", "contains": "SEENIT-PLEX-005 le backend refuse un historique compte sans état courant vu"},
-        {"file": "tests/plexDeltaWatchSnapshot.test.ts", "contains": "SEENIT-PLEX-005 la delta interroge uniquement les éléments actuellement vus des sections Plex"},
-        {"file": "tests/plexDeltaWatchSnapshot.test.ts", "contains": "SEENIT-PLEX-005 un état courant vu n’est jamais rejeté par le curseur historique de la delta"},
-        {"file": "tests/plexDeltaBackendSnapshot.test.ts", "contains": "SEENIT-PLEX-005 la delta ajoute un état library-watched courant sans dépendre de la date du curseur"},
-        {"file": "tests/plexDeltaBackendSnapshot.test.ts", "contains": "SEENIT-PLEX-005 la delta déduplique une preuve PMS déjà présente par identité technique"},
-        {"file": "tests/plexDeltaUnwatchSnapshot.test.ts", "contains": "SEENIT-PLEX-005 la delta recontrôle explicitement une identité vue disparue avant de produire watched=false"},
-        {"file": "tests/plexDeltaBackendSnapshot.test.ts", "contains": "SEENIT-PLEX-005 le full complet initialise la baseline watched de la delta"},
-        {"file": "tests/plexDeltaBackendSnapshot.test.ts", "contains": "SEENIT-PLEX-005 la baseline delta conserve un vu technique sans TMDB puis réutilise le cache de résolution"},
-        {"file": "tests/plexDeltaBackendSnapshot.test.ts", "contains": "SEENIT-PLEX-005 le recontrôle delta interprète un viewCount omis comme zéro uniquement sur le ratingKey exact"},
-        {"file": "tests/plexDeltaBackendSnapshot.test.ts", "contains": "SEENIT-PLEX-005 un média vu non résolu sans rapport ne bloque plus tous les non vus delta"}
+        {
+          "file": "tests/plexWatchEvidence.test.ts",
+          "contains": "SEENIT-PLEX-005 une activité Cloud identique à la watchlist ne devient jamais un visionnage"
+        },
+        {
+          "file": "tests/plexWatchEvidence.test.ts",
+          "contains": "SEENIT-PLEX-005 conserve une vraie preuve de visionnage même si le film reste en watchlist"
+        },
+        {
+          "file": "tests/plexWatchEvidence.test.ts",
+          "contains": "SEENIT-PLEX-005 ne rapproche jamais deux films par leur titre ou leur année"
+        },
+        {
+          "file": "tests/plexWatchEvidence.test.ts",
+          "contains": "SEENIT-PLEX-005 le filtrage du full Plex est idempotent"
+        },
+        {
+          "file": "tests/plexWatchEvidence.test.ts",
+          "contains": "SEENIT-PLEX-005 protège réellement la réponse POST /api/plex/history"
+        },
+        {
+          "file": "tests/plexAccountHistory.test.ts",
+          "contains": "SEENIT-PLEX-005 le Watch History du compte exige un userState courant explicite"
+        },
+        {
+          "file": "tests/plexAccountHistory.test.ts",
+          "contains": "SEENIT-PLEX-005 le backend refuse un historique compte sans état courant vu"
+        },
+        {
+          "file": "tests/plexDeltaWatchSnapshot.test.ts",
+          "contains": "SEENIT-PLEX-005 la delta interroge uniquement les éléments actuellement vus des sections Plex"
+        },
+        {
+          "file": "tests/plexDeltaWatchSnapshot.test.ts",
+          "contains": "SEENIT-PLEX-005 un état courant vu n’est jamais rejeté par le curseur historique de la delta"
+        },
+        {
+          "file": "tests/plexDeltaBackendSnapshot.test.ts",
+          "contains": "SEENIT-PLEX-005 la delta ajoute un état library-watched courant sans dépendre de la date du curseur"
+        },
+        {
+          "file": "tests/plexDeltaBackendSnapshot.test.ts",
+          "contains": "SEENIT-PLEX-005 la delta déduplique une preuve PMS déjà présente par identité technique"
+        },
+        {
+          "file": "tests/plexDeltaUnwatchSnapshot.test.ts",
+          "contains": "SEENIT-PLEX-005 la delta recontrôle explicitement une identité vue disparue avant de produire watched=false"
+        },
+        {
+          "file": "tests/plexDeltaBackendSnapshot.test.ts",
+          "contains": "SEENIT-PLEX-005 le full complet initialise la baseline watched de la delta"
+        },
+        {
+          "file": "tests/plexDeltaBackendSnapshot.test.ts",
+          "contains": "SEENIT-PLEX-005 la baseline delta conserve un vu technique sans TMDB puis réutilise le cache de résolution"
+        },
+        {
+          "file": "tests/plexDeltaBackendSnapshot.test.ts",
+          "contains": "SEENIT-PLEX-005 le recontrôle delta interprète un viewCount omis comme zéro uniquement sur le ratingKey exact"
+        },
+        {
+          "file": "tests/plexDeltaBackendSnapshot.test.ts",
+          "contains": "SEENIT-PLEX-005 un média vu non résolu sans rapport ne bloque plus tous les non vus delta"
+        }
       ]
     },
     {
       "id": "SEENIT-PLEX-006",
       "title": "État non vu Plex full et delta limité aux progressions explicitement créées par Plex",
-      "targets": ["backend", "pwa", "apk"],
+      "targets": [
+        "backend",
+        "pwa",
+        "apk"
+      ],
       "tests": [
-        {"file": "tests/plexProgressMerge.test.ts", "contains": "SEENIT-PLEX-006 un jamais-vu Plex ne retire pas une action SeenIt"},
-        {"file": "tests/plexProgressMerge.test.ts", "contains": "SEENIT-PLEX-006 un film manuel reste vu même si Plex avait aussi été observé vu"},
-        {"file": "tests/plexProgressMerge.test.ts", "contains": "SEENIT-PLEX-006 une progression legacy sans provenance reste vue par défaut"},
-        {"file": "tests/plexProgressMerge.test.ts", "contains": "SEENIT-PLEX-006 un dé-vu Plex retire uniquement un film réellement importé par Plex"},
-        {"file": "tests/plexProgressMerge.test.ts", "contains": "SEENIT-PLEX-006 un dé-vu Plex retire uniquement l’épisode Plex visé"},
-        {"file": "tests/plexProgressMerge.test.ts", "contains": "SEENIT-PLEX-006 une preuve vue ne passe pas par le chemin de dé-vu"},
-        {"file": "tests/plexProgressMerge.test.ts", "contains": "SEENIT-PLEX-006 le dé-vu Plex possédé est idempotent"},
-        {"file": "tests/plexProgressMerge.test.ts", "contains": "SEENIT-PLEX-006 une copie vue gagne sur une copie non vue du même média"},
-        {"file": "tests/plexProgressMerge.test.ts", "contains": "SEENIT-PLEX-006 la transaction conserve une action concurrente SeenIt non visée"},
-        {"file": "tests/plexProgressMerge.test.ts", "contains": "SEENIT-PLEX-006 le runtime marque la provenance Plex et ne notifie qu’un vrai retrait"},
-        {"file": "tests/plexOwnedUnwatch.test.ts", "contains": "SEENIT-PLEX-006 un viewCount=0 explicite retire une progression plexImported même sans ancien miroir"},
-        {"file": "tests/plexDeltaUnwatchSnapshot.test.ts", "contains": "SEENIT-PLEX-006 la delta ne transforme jamais une absence ou un serveur ignoré en non vu"}
+        {
+          "file": "tests/plexProgressMerge.test.ts",
+          "contains": "SEENIT-PLEX-006 un jamais-vu Plex ne retire pas une action SeenIt"
+        },
+        {
+          "file": "tests/plexProgressMerge.test.ts",
+          "contains": "SEENIT-PLEX-006 un film manuel reste vu même si Plex avait aussi été observé vu"
+        },
+        {
+          "file": "tests/plexProgressMerge.test.ts",
+          "contains": "SEENIT-PLEX-006 une progression legacy sans provenance reste vue par défaut"
+        },
+        {
+          "file": "tests/plexProgressMerge.test.ts",
+          "contains": "SEENIT-PLEX-006 un dé-vu Plex retire uniquement un film réellement importé par Plex"
+        },
+        {
+          "file": "tests/plexProgressMerge.test.ts",
+          "contains": "SEENIT-PLEX-006 un dé-vu Plex retire uniquement l’épisode Plex visé"
+        },
+        {
+          "file": "tests/plexProgressMerge.test.ts",
+          "contains": "SEENIT-PLEX-006 une preuve vue ne passe pas par le chemin de dé-vu"
+        },
+        {
+          "file": "tests/plexProgressMerge.test.ts",
+          "contains": "SEENIT-PLEX-006 le dé-vu Plex possédé est idempotent"
+        },
+        {
+          "file": "tests/plexProgressMerge.test.ts",
+          "contains": "SEENIT-PLEX-006 une copie vue gagne sur une copie non vue du même média"
+        },
+        {
+          "file": "tests/plexProgressMerge.test.ts",
+          "contains": "SEENIT-PLEX-006 la transaction conserve une action concurrente SeenIt non visée"
+        },
+        {
+          "file": "tests/plexProgressMerge.test.ts",
+          "contains": "SEENIT-PLEX-006 le runtime marque la provenance Plex et ne notifie qu’un vrai retrait"
+        },
+        {
+          "file": "tests/plexOwnedUnwatch.test.ts",
+          "contains": "SEENIT-PLEX-006 un viewCount=0 explicite retire une progression plexImported même sans ancien miroir"
+        },
+        {
+          "file": "tests/plexDeltaUnwatchSnapshot.test.ts",
+          "contains": "SEENIT-PLEX-006 la delta ne transforme jamais une absence ou un serveur ignoré en non vu"
+        }
       ]
     },
-    {"id": "SEENIT-PLEX-007", "title": "Diagnostic DELTA visible, détaillé et non sensible", "targets": ["backend", "pwa", "apk"], "tests": [{"file": "tests/plexDeltaDiagnostics.test.ts", "contains": "SEENIT-PLEX-007 détaille la baseline, le snapshot courant et le verrou du non vu DELTA"}, {"file": "tests/plexDeltaDiagnostics.test.ts", "contains": "SEENIT-PLEX-007 trace les watched=false reçus sans exposer URL, token ou UID"}, {"file": "tests/plexDeltaDiagnostics.test.ts", "contains": "SEENIT-PLEX-007 la PWA écrit chaque ligne du diagnostic backend dans AppLog"}]},
+    {
+      "id": "SEENIT-PLEX-007",
+      "title": "Diagnostic DELTA visible, détaillé et non sensible",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/plexDeltaDiagnostics.test.ts",
+          "contains": "SEENIT-PLEX-007 détaille la baseline, le snapshot courant et le verrou du non vu DELTA"
+        },
+        {
+          "file": "tests/plexDeltaDiagnostics.test.ts",
+          "contains": "SEENIT-PLEX-007 trace les watched=false reçus sans exposer URL, token ou UID"
+        },
+        {
+          "file": "tests/plexDeltaDiagnostics.test.ts",
+          "contains": "SEENIT-PLEX-007 la PWA écrit chaque ligne du diagnostic backend dans AppLog"
+        }
+      ]
+    },
     {
       "id": "SEENIT-PLEX-008",
       "title": "Association Plex cohérente, bornée et isolée par UID",
-      "targets": ["pwa", "apk"],
+      "targets": [
+        "pwa",
+        "apk"
+      ],
       "tests": [
-        {"file": "tests/plexAuth.test.ts", "contains": "SEENIT-PLEX-008 partage strictement l’identité de la tentative entre POST URL et polling"},
-        {"file": "tests/plexAuth.test.ts", "contains": "SEENIT-PLEX-008 fige le clientIdentifier même si le stockage local change"},
-        {"file": "tests/plexAuth.test.ts", "contains": "SEENIT-PLEX-008 borne expiration refus et rate limiting sans boucle infinie"},
-        {"file": "tests/plexAuth.test.ts", "contains": "SEENIT-PLEX-008 valide le jeton avant de déclarer l’association réussie"},
-        {"file": "tests/plexAuth.test.ts", "contains": "SEENIT-PLEX-008 interdit les secrets de l’association Plex dans les logs"}
+        {
+          "file": "tests/plexAuth.test.ts",
+          "contains": "SEENIT-PLEX-008 partage strictement l’identité de la tentative entre POST URL et polling"
+        },
+        {
+          "file": "tests/plexAuth.test.ts",
+          "contains": "SEENIT-PLEX-008 fige le clientIdentifier même si le stockage local change"
+        },
+        {
+          "file": "tests/plexAuth.test.ts",
+          "contains": "SEENIT-PLEX-008 borne expiration refus et rate limiting sans boucle infinie"
+        },
+        {
+          "file": "tests/plexAuth.test.ts",
+          "contains": "SEENIT-PLEX-008 valide le jeton avant de déclarer l’association réussie"
+        },
+        {
+          "file": "tests/plexAuth.test.ts",
+          "contains": "SEENIT-PLEX-008 interdit les secrets de l’association Plex dans les logs"
+        }
       ]
     },
-    {"id": "SEENIT-SECURITY-001", "title": "Allowlist minimale du proxy de services", "targets": ["backend", "pwa"], "tests": [{"file": "tests/downloadBackendSecurity.test.ts", "contains": "le proxy n’accepte que les chemins Sonarr Radarr et qBittorrent nécessaires"}]},
-    {"id": "SEENIT-SECURITY-003", "title": "Secrets masqués avant persistance des logs", "targets": ["pwa", "apk", "backend"], "tests": [{"file": "tests/logPrivacy.test.ts", "contains": "SEENIT-SECURITY-003 masque les secrets avant de persister un journal"}]},
-    {"id": "SEENIT-C411-001", "title": "Filtres C411 exacts et année non dupliquée", "targets": ["backend", "pwa", "apk"], "tests": [{"file": "tests/c411Query.test.ts", "contains": "le filtre C411 Tous ne devient jamais Film implicitement"}, {"file": "tests/c411Query.test.ts", "contains": "l’année C411 est utilisée une seule fois dans la recherche"}]},
-    {"id": "SEENIT-C411-002", "title": "Magnet BTIH validé et ouvert par la plateforme", "targets": ["pwa", "apk"], "tests": [{"file": "tests/magnetLink.test.ts", "contains": "SEENIT-C411-002 construit un Magnet uniquement depuis un infohash BTIH valide"}, {"file": "tests/magnetLink.test.ts", "contains": "SEENIT-C411-002 refuse les URL externes"}]},
-    {"id": "SEENIT-DOWNLOAD-001", "title": "Réconciliation download sans titre, ancrée sur TMDB ou preuve physique exacte", "targets": ["pwa", "apk"], "tests": [{"file": "tests/downloadTransientVisibility.test.ts", "contains": "deux intentions simultanées masquent le qBit ambigu sans corrélation par titre"}, {"file": "tests/downloadIdentity.test.ts", "contains": "SEENIT-DOWNLOAD-001 la synchro partagée rattache uniquement le même TMDB malgré des titres différents"}, {"file": "tests/downloadTitleIdentityGuard.test.ts", "contains": "SEENIT-DOWNLOAD-001 interdit durablement tout fallback d’identité par titre ou release"}]},
-    {"id": "SEENIT-DOWNLOAD-002", "title": "Infohash incompatibles toujours distincts", "targets": ["pwa", "apk"], "tests": [{"file": "tests/downloadIdentity.test.ts", "contains": "SEENIT-DOWNLOAD-002 deux vrais infohash différents ne sont jamais fusionnés"}]},
-    {"id": "SEENIT-DOWNLOAD-003", "title": "Mutations concurrentes idempotentes", "targets": ["backend", "pwa", "apk"], "tests": [{"file": "tests/downloadIdempotency.test.ts", "contains": "deux mutations concurrentes de même identité ne sont exécutées qu’une fois"}]},
-    {"id": "SEENIT-DOWNLOAD-004", "title": "POST Android non rejoué après timeout ambigu", "targets": ["apk"], "tests": [{"file": "tests/downloadMutationPolicy.test.ts", "contains": "un timeout de mutation Android ne déclenche jamais un second POST"}]},
-    {"id": "SEENIT-DOWNLOAD-005", "title": "Polling borné, backoff et pagination complète", "targets": ["pwa", "apk"], "tests": [{"file": "tests/downloadPollingPolicy.test.ts", "contains": "le backoff progresse par source et reste plafonné"}, {"file": "tests/downloadPollingPolicy.test.ts", "contains": "les files Arr continuent au-delà de 100 éléments jusqu’au total"}]},
-    {"id": "SEENIT-DOWNLOAD-006", "title": "Ordre visuel stable des téléchargements", "targets": ["pwa", "apk"], "tests": [{"file": "tests/downloadPresentation.test.ts", "contains": "l’ordre des téléchargements actifs reste celui des demandes"}]},
-    {"id": "SEENIT-DOWNLOAD-007", "title": "Historique séparé sans suppression d'un actif", "targets": ["pwa", "apk"], "tests": [{"file": "tests/downloadStatePolicy.test.ts", "contains": "vider une section ne sélectionne jamais un téléchargement actif"}]},
-    {"id": "SEENIT-DOWNLOAD-008", "title": "Fallback pack limité au torrent nouvellement prouvé", "targets": ["pwa", "apk"], "tests": [{"file": "tests/episodePackSelection.test.ts", "contains": "ne manipule jamais un hash qBittorrent déjà présent avant la demande"}]},
-    {"id": "SEENIT-DOWNLOAD-009", "title": "Scope TV extrait uniquement de marqueurs techniques", "targets": ["pwa", "apk"], "tests": [{"file": "tests/downloadTransientVisibility.test.ts", "contains": "le scope TV technique est extrait sans utiliser le nom de la série"}]},
-    {"id": "SEENIT-NOTIFICATION-001", "title": "Notifications isolées par UID et appareil", "targets": ["backend", "pwa", "apk"], "tests": [{"file": "tests/downloadBackendSecurity.test.ts", "contains": "un événement du compte A ne cible que les appareils de A"}]},
-    {"id": "SEENIT-UPDATE-001", "title": "Métadonnées et asset de mise à jour officiels avec fallback APK", "targets": ["backend", "pwa", "apk"], "tests": [{"file": "tests/updateReleasePolicy.test.ts", "contains": "SEENIT-UPDATE-001 l’APK retente toujours le backend SeenIt de production"}, {"file": "tests/updateReleasePolicy.test.ts", "contains": "SEENIT-UPDATE-001 refuse une release ou un APK qui ne vient pas du dépôt SeenIt exact"}]},
-    {"id": "SEENIT-UPDATE-002", "title": "Empreinte SHA-256 de l’APK vérifiée avant installation", "targets": ["apk"], "tests": [{"file": "tests/updateReleasePolicy.test.ts", "contains": "SEENIT-UPDATE-002 conserve l’empreinte SHA-256 officielle de la release"}]},
-    {"id": "SEENIT-UPDATE-003", "title": "Notification push Android idempotente après publication officielle", "targets": ["backend", "apk", "ci"], "tests": [{"file": "tests/releaseUpdateNotificationSpecification.test.ts", "contains": "SEENIT-UPDATE-003 spécifie un push Android uniquement après une release officielle vérifiée"}, {"file": "tests/releaseUpdateNotificationSpecification.test.ts", "contains": "SEENIT-UPDATE-003 limite la diffusion à une fois par version et installation"}, {"file": "tests/releaseUpdateNotificationSpecification.test.ts", "contains": "SEENIT-UPDATE-003 sépare le signal push du téléchargement APK"}, {"file": "tests/releaseUpdateNotificationSpecification.test.ts", "contains": "SEENIT-UPDATE-003 conserve une release publiée si FCM échoue"}, {"file": "tests/releaseUpdatePushBackend.test.ts", "contains": "SEENIT-UPDATE-003 valide la release officielle avant toute diffusion Android"}, {"file": "tests/releaseUpdatePushBackend.test.ts", "contains": "SEENIT-UPDATE-003 rend la diffusion Android idempotente face aux replays et à la concurrence"}, {"file": "tests/releaseUpdatePushBackend.test.ts", "contains": "SEENIT-UPDATE-003 reprend seulement les échecs FCM explicites et supprime les tokens invalides"}, {"file": "tests/releaseUpdatePushClient.test.ts", "contains": "SEENIT-UPDATE-003 force le contrôle canonique au toucher du push Android"}, {"file": "tests/releaseUpdatePushWorkflow.test.ts", "contains": "SEENIT-UPDATE-003 déclenche l’alerte seulement après un workflow de release réussi"}]},
-    {"id": "SEENIT-UX-001", "title": "Actions de swipe accessibles au clavier", "targets": ["pwa", "apk"], "tests": [{"file": "tests/swipeActionPolicy.test.ts", "contains": "SEENIT-UX-001 expose chaque direction de swipe au clavier"}, {"file": "tests/swipeActionPolicy.test.ts", "contains": "SEENIT-UX-001 associe Suppr à l’action destructive disponible"}]},
-    {"id": "SEENIT-UX-002", "title": "Clé de rendu et affiche stables", "targets": ["pwa", "apk"], "tests": [{"file": "tests/downloadPosterStability.test.ts", "contains": "la clé de rendu reste identique quand l’intention SeenIt devient un téléchargement distant"}, {"file": "tests/downloadPosterStability.test.ts", "contains": "le poster affiché reste celui vu au premier rendu"}]},
-    {"id": "SEENIT-RELEASE-001", "title": "Version SeenIt unique et versionCode Android monotone", "targets": ["pwa", "apk", "backend", "ci"], "tests": [{"file": "tests/updateReleasePolicy.test.ts", "contains": "SEENIT-RELEASE-001 compare uniquement des versions sémantiques SeenIt valides"}, {"file": "tests/androidContract.test.ts", "contains": "SEENIT-APK-001 verrouille l’identité, la version et la clé de signature de l’APK"}]},
-    {"id": "SEENIT-RELEASE-002", "title": "CI reproductible, chaîne Gradle vérifiée et aucune mutation automatique de main", "targets": ["ci", "pwa", "apk"], "tests": [{"file": "tests/developmentGovernance.test.ts", "contains": "SEENIT-RELEASE-002 la CI valide puis publie sans modifier automatiquement main"}]},
-    {"id": "SEENIT-RELEASE-003", "title": "Notes de release exhaustives, homogènes et orientées utilisateur", "targets": ["ci", "pwa", "apk"], "tests": [{"file": "tests/releaseNotes.test.ts", "contains": "SEENIT-RELEASE-003 agrège tous les commits de la version au lieu du seul dernier commit"}, {"file": "tests/releaseNotes.test.ts", "contains": "SEENIT-RELEASE-003 ignore le tag de la version courante pour retrouver la vraie version précédente"}, {"file": "tests/releaseNotes.test.ts", "contains": "SEENIT-RELEASE-003 sépare le changelog public des détails techniques"}, {"file": "tests/releaseNotes.test.ts", "contains": "SEENIT-RELEASE-003 documente un format public court et homogène"}]},
-    {"id": "SEENIT-RELEASE-004", "title": "Release APK immuable et version strictement progressive", "targets": ["ci", "apk", "pwa"], "tests": [{"file": "tests/releaseImmutability.test.ts", "contains": "SEENIT-RELEASE-004 refuse une release quand son tag ou sa publication existe déjà"}, {"file": "tests/releaseImmutability.test.ts", "contains": "SEENIT-RELEASE-004 refuse un push documentaire à version inchangée ou régressive"}, {"file": "tests/releaseImmutability.test.ts", "contains": "SEENIT-RELEASE-004 accepte uniquement une progression N vers N+1 cohérente"}, {"file": "tests/releaseImmutability.test.ts", "contains": "SEENIT-RELEASE-004 impose un nouveau numéro après une candidate déjà commitée"}, {"file": "tests/releaseImmutability.test.ts", "contains": "SEENIT-RELEASE-004 sépare le build de la publication et vérifie la paire APK SHA-256"}]},
-    {"id": "SEENIT-RELEASE-005", "title": "Publication APK autonome par l'agent avec fallbacks bornés", "targets": ["ci", "apk"], "tests": [{"file": "tests/releaseFastPath.test.ts", "contains": "SEENIT-RELEASE-005 rend l'agent autonome jusqu'au workflow avec fallback navigateur"}]},
-    {"id": "SEENIT-QUALITY-001", "title": "Évolution pilotée par SPEC, tests et contrat APK", "targets": ["ci", "pwa", "apk", "backend"], "tests": [{"file": "tests/developmentGovernance.test.ts", "contains": "SEENIT-QUALITY-001 les règles imposent SPEC, tests et validation APK à chaque évolution"}]},
-    {"id": "SEENIT-UX-003", "title": "Navigation lazy sans flash noir au premier accès", "targets": ["pwa", "apk"], "tests": [{"file": "tests/navigationPreload.test.ts", "contains": "SEENIT-UX-003 précharge et déduplique les écrans privés avant la première navigation"}, {"file": "tests/navigationPreload.test.ts", "contains": "SEENIT-UX-003 conserve l’écran courant pendant le chargement d’un nouvel écran lazy"}]},
-    {"id": "SEENIT-UX-004", "title": "Toasts mobiles longs lisibles et bilan Plex multi-lignes contrôlable", "targets": ["pwa", "apk"], "tests": [{"file": "tests/toastLayout.test.ts", "contains": "SEENIT-UX-004 les toasts longs reviennent à la ligne sans troncature sur mobile"}, {"file": "tests/toastLayout.test.ts", "contains": "SEENIT-UX-004 le toast reste au-dessus de la navigation et de la safe area"}, {"file": "tests/plexSyncPresentation.test.ts", "contains": "SEENIT-UX-004 la synchronisation Plex affiche une phase réelle et la durée écoulée sans faux pourcentage"}, {"file": "tests/plexSyncPresentation.test.ts", "contains": "SEENIT-UX-004 le bilan Plex affiche serveurs scannés, vus et non vus sans serveur ignoré"}, {"file": "tests/toastQueueScope.test.ts", "contains": "SEENIT-UX-004 ignorer les suivants purge uniquement les futurs toasts Plex"}, {"file": "tests/toastQueueScope.test.ts", "contains": "SEENIT-UX-004 le bilan Plex conserve uniquement les serveurs scannés et compte les vus et non vus"}, {"file": "tests/toastQueueScope.test.ts", "contains": "SEENIT-UX-004 les anciens libellés Plex sont affichés uniquement comme non vu"}, {"file": "tests/toastQueueScope.test.ts", "contains": "SEENIT-UX-004 le toast Plex expose le bouton Ignorer les suivants"}, {"file": "tests/plexToastSummary.test.ts", "contains": "SEENIT-UX-004 le bilan final Plex utilise un bloc multi-lignes avec identité Plex"}]},
-    {"id": "SEENIT-QUALITY-002", "title": "Audits datés et reliés à un backlog priorisé", "targets": ["ci", "pwa", "apk", "backend"], "tests": [{"file": "tests/developmentGovernance.test.ts", "contains": "SEENIT-QUALITY-002 impose un audit daté relié à des issues priorisées"}]},
-    {"id": "SEENIT-QUALITY-003", "title": "Demandes durables mémorisées, spécifiées et testées", "targets": ["ci", "pwa", "apk", "backend"], "tests": [{"file": "tests/developmentGovernance.test.ts", "contains": "SEENIT-QUALITY-003 mémorise chaque demande durable dans la SPEC et le registre"}]},
-    {"id": "SEENIT-QUALITY-004", "title": "Contexte GitHub complet avant intervention et issues maintenues à jour", "targets": ["ci"], "tests": [{"file": "tests/issueTrackingGovernance.test.ts", "contains": "SEENIT-QUALITY-004 maintient les issues et leurs checkboxes à jour pendant le travail"}, {"file": "tests/issueTrackingGovernance.test.ts", "contains": "SEENIT-QUALITY-004 impose le contexte GitHub complet avant toute intervention"}]},
-    {"id": "SEENIT-QUALITY-005", "title": "Imports AI Studio non autoritatifs et règles agent préchargées", "targets": ["backend", "pwa", "apk", "ci"], "tests": [{"file": "tests/firebaseIdentityGuardrails.test.ts", "contains": "SEENIT-QUALITY-005 matérialise Firebase Android et répare les droits Gradle"}]},
-    {"id": "SEENIT-QUALITY-006", "title": "Parcours de livraison proportionné et classé automatiquement", "targets": ["ci", "pwa", "apk", "backend"], "tests": [{"file": "tests/deliveryClassification.test.ts", "contains": "SEENIT-QUALITY-006 classe un renommage de label JSX dans le parcours light"}, {"file": "tests/deliveryClassification.test.ts", "contains": "SEENIT-QUALITY-006 reconnaît un libellé non JSX marqué explicitement par uiCopy"}, {"file": "tests/deliveryClassification.test.ts", "contains": "SEENIT-QUALITY-006 refuse une URL ou une condition modifiée comme simple texte"}, {"file": "tests/deliveryClassification.test.ts", "contains": "SEENIT-QUALITY-006 permet de forcer le parcours complet mais jamais le parcours light"}]},
-    {"id": "SEENIT-QUALITY-007", "title": "Synchronisation Git externe au runtime SeenIt", "targets": ["backend", "pwa", "apk", "ci"], "tests": [{"file": "tests/apiSurface.test.ts", "contains": "SEENIT-QUALITY-007 retire toute synchronisation Git embarquée du runtime SeenIt"}]},
-    {"id": "SEENIT-QUALITY-008", "title": "Validation continue fail-fast, déterministe, mesurée et bornée", "targets": ["ci"], "tests": [{"file": "tests/ciValidationPerformance.test.ts", "contains": "SEENIT-QUALITY-008 impose un préflight sans dépendances et un cache exact de confiance"}]},
-    {"id": "SEENIT-QUALITY-009", "title": "Correctifs ciblés cohérents sans lecture, validation ni formatage redondants", "targets": ["ci", "pwa", "apk", "backend"], "tests": [{"file": "tests/developmentGovernance.test.ts", "contains": "SEENIT-QUALITY-009 borne le fast path des correctifs ciblés sans réduire les preuves"}, {"file": "tests/changeContract.test.ts", "contains": "SEENIT-QUALITY-009 refuse un reformatage massif du catalogue pour un changement ciblé"}]},
-    {"id": "SEENIT-AUTH-001", "title": "Connexion Google Android native via Credential Manager sans changer le Firebase UID", "targets": ["apk", "pwa", "ci"], "tests": [{"file": "tests/nativeGoogleAuth.test.ts", "contains": "SEENIT-AUTH-001 ouvre le sélecteur Google natif Credential Manager comme ATHIA"}, {"file": "tests/nativeGoogleAuth.test.ts", "contains": "SEENIT-AUTH-001 conserve le même compte Firebase et un fallback natif propre"}, {"file": "tests/nativeGoogleAuth.test.ts", "contains": "SEENIT-AUTH-001 traite l’annulation Google comme une sortie non bloquante"}]},
-    {"id": "SEENIT-RELATION-001", "title": "Sagas et univers cross-media exacts, réciproques et distincts des similaires", "targets": ["pwa", "apk", "backend"], "tests": [{"file": "tests/mediaRelationsSpecification.test.ts", "contains": "SEENIT-RELATION-001 sépare saga univers et médias similaires"}, {"file": "tests/mediaRelationsSpecification.test.ts", "contains": "SEENIT-RELATION-001 interdit tout univers déduit du titre ou de la popularité"}, {"file": "tests/mediaRelationsSpecification.test.ts", "contains": "SEENIT-RELATION-001 impose une identité mediaType plus TMDB et des groupes bidirectionnels"}, {"file": "tests/mediaRelationsSpecification.test.ts", "contains": "SEENIT-RELATION-001 fixe les TNR Yellowstone Breaking Bad Harry Potter Marvel DC et House of Guinness"}, {"file": "tests/mediaRelationsSpecification.test.ts", "contains": "SEENIT-RELATION-001 borne les sources distantes et les performances"}]}
+    {
+      "id": "SEENIT-SECURITY-001",
+      "title": "Allowlist minimale du proxy de services",
+      "targets": [
+        "backend",
+        "pwa"
+      ],
+      "tests": [
+        {
+          "file": "tests/downloadBackendSecurity.test.ts",
+          "contains": "le proxy n’accepte que les chemins Sonarr Radarr et qBittorrent nécessaires"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-SECURITY-003",
+      "title": "Secrets masqués avant persistance des logs",
+      "targets": [
+        "pwa",
+        "apk",
+        "backend"
+      ],
+      "tests": [
+        {
+          "file": "tests/logPrivacy.test.ts",
+          "contains": "SEENIT-SECURITY-003 masque les secrets avant de persister un journal"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-C411-001",
+      "title": "Filtres C411 exacts et année non dupliquée",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/c411Query.test.ts",
+          "contains": "le filtre C411 Tous ne devient jamais Film implicitement"
+        },
+        {
+          "file": "tests/c411Query.test.ts",
+          "contains": "l’année C411 est utilisée une seule fois dans la recherche"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-C411-002",
+      "title": "Magnet BTIH validé et ouvert par la plateforme",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/magnetLink.test.ts",
+          "contains": "SEENIT-C411-002 construit un Magnet uniquement depuis un infohash BTIH valide"
+        },
+        {
+          "file": "tests/magnetLink.test.ts",
+          "contains": "SEENIT-C411-002 refuse les URL externes"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DOWNLOAD-001",
+      "title": "Réconciliation download sans titre, ancrée sur TMDB ou preuve physique exacte",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/downloadTransientVisibility.test.ts",
+          "contains": "deux intentions simultanées masquent le qBit ambigu sans corrélation par titre"
+        },
+        {
+          "file": "tests/downloadIdentity.test.ts",
+          "contains": "SEENIT-DOWNLOAD-001 la synchro partagée rattache uniquement le même TMDB malgré des titres différents"
+        },
+        {
+          "file": "tests/downloadTitleIdentityGuard.test.ts",
+          "contains": "SEENIT-DOWNLOAD-001 interdit durablement tout fallback d’identité par titre ou release"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DOWNLOAD-002",
+      "title": "Infohash incompatibles toujours distincts",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/downloadIdentity.test.ts",
+          "contains": "SEENIT-DOWNLOAD-002 deux vrais infohash différents ne sont jamais fusionnés"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DOWNLOAD-003",
+      "title": "Mutations concurrentes idempotentes",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/downloadIdempotency.test.ts",
+          "contains": "deux mutations concurrentes de même identité ne sont exécutées qu’une fois"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DOWNLOAD-004",
+      "title": "POST Android non rejoué après timeout ambigu",
+      "targets": [
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/downloadMutationPolicy.test.ts",
+          "contains": "un timeout de mutation Android ne déclenche jamais un second POST"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DOWNLOAD-005",
+      "title": "Polling borné, backoff et pagination complète",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/downloadPollingPolicy.test.ts",
+          "contains": "le backoff progresse par source et reste plafonné"
+        },
+        {
+          "file": "tests/downloadPollingPolicy.test.ts",
+          "contains": "les files Arr continuent au-delà de 100 éléments jusqu’au total"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DOWNLOAD-006",
+      "title": "Ordre visuel stable des téléchargements",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/downloadPresentation.test.ts",
+          "contains": "l’ordre des téléchargements actifs reste celui des demandes"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DOWNLOAD-007",
+      "title": "Historique séparé sans suppression d'un actif",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/downloadStatePolicy.test.ts",
+          "contains": "vider une section ne sélectionne jamais un téléchargement actif"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DOWNLOAD-008",
+      "title": "Fallback pack limité au torrent nouvellement prouvé",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/episodePackSelection.test.ts",
+          "contains": "ne manipule jamais un hash qBittorrent déjà présent avant la demande"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DOWNLOAD-009",
+      "title": "Scope TV extrait uniquement de marqueurs techniques",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/downloadTransientVisibility.test.ts",
+          "contains": "le scope TV technique est extrait sans utiliser le nom de la série"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-NOTIFICATION-001",
+      "title": "Notifications isolées par UID et appareil",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/downloadBackendSecurity.test.ts",
+          "contains": "un événement du compte A ne cible que les appareils de A"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-UPDATE-001",
+      "title": "Métadonnées et asset de mise à jour officiels avec fallback APK",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/updateReleasePolicy.test.ts",
+          "contains": "SEENIT-UPDATE-001 l’APK retente toujours le backend SeenIt de production"
+        },
+        {
+          "file": "tests/updateReleasePolicy.test.ts",
+          "contains": "SEENIT-UPDATE-001 refuse une release ou un APK qui ne vient pas du dépôt SeenIt exact"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-UPDATE-002",
+      "title": "Empreinte SHA-256 de l’APK vérifiée avant installation",
+      "targets": [
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/updateReleasePolicy.test.ts",
+          "contains": "SEENIT-UPDATE-002 conserve l’empreinte SHA-256 officielle de la release"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-UPDATE-003",
+      "title": "Notification push Android idempotente après publication officielle",
+      "targets": [
+        "backend",
+        "apk",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/releaseUpdateNotificationSpecification.test.ts",
+          "contains": "SEENIT-UPDATE-003 spécifie un push Android uniquement après une release officielle vérifiée"
+        },
+        {
+          "file": "tests/releaseUpdateNotificationSpecification.test.ts",
+          "contains": "SEENIT-UPDATE-003 limite la diffusion à une fois par version et installation"
+        },
+        {
+          "file": "tests/releaseUpdateNotificationSpecification.test.ts",
+          "contains": "SEENIT-UPDATE-003 sépare le signal push du téléchargement APK"
+        },
+        {
+          "file": "tests/releaseUpdateNotificationSpecification.test.ts",
+          "contains": "SEENIT-UPDATE-003 conserve une release publiée si FCM échoue"
+        },
+        {
+          "file": "tests/releaseUpdatePushBackend.test.ts",
+          "contains": "SEENIT-UPDATE-003 valide la release officielle avant toute diffusion Android"
+        },
+        {
+          "file": "tests/releaseUpdatePushBackend.test.ts",
+          "contains": "SEENIT-UPDATE-003 rend la diffusion Android idempotente face aux replays et à la concurrence"
+        },
+        {
+          "file": "tests/releaseUpdatePushBackend.test.ts",
+          "contains": "SEENIT-UPDATE-003 reprend seulement les échecs FCM explicites et supprime les tokens invalides"
+        },
+        {
+          "file": "tests/releaseUpdatePushClient.test.ts",
+          "contains": "SEENIT-UPDATE-003 force le contrôle canonique au toucher du push Android"
+        },
+        {
+          "file": "tests/releaseUpdatePushWorkflow.test.ts",
+          "contains": "SEENIT-UPDATE-003 déclenche l’alerte seulement après un workflow de release réussi"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-UX-001",
+      "title": "Actions de swipe accessibles au clavier",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/swipeActionPolicy.test.ts",
+          "contains": "SEENIT-UX-001 expose chaque direction de swipe au clavier"
+        },
+        {
+          "file": "tests/swipeActionPolicy.test.ts",
+          "contains": "SEENIT-UX-001 associe Suppr à l’action destructive disponible"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-UX-002",
+      "title": "Clé de rendu et affiche stables",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/downloadPosterStability.test.ts",
+          "contains": "la clé de rendu reste identique quand l’intention SeenIt devient un téléchargement distant"
+        },
+        {
+          "file": "tests/downloadPosterStability.test.ts",
+          "contains": "le poster affiché reste celui vu au premier rendu"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-RELEASE-001",
+      "title": "Version SeenIt unique et versionCode Android monotone",
+      "targets": [
+        "pwa",
+        "apk",
+        "backend",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/updateReleasePolicy.test.ts",
+          "contains": "SEENIT-RELEASE-001 compare uniquement des versions sémantiques SeenIt valides"
+        },
+        {
+          "file": "tests/androidContract.test.ts",
+          "contains": "SEENIT-APK-001 verrouille l’identité, la version et la clé de signature de l’APK"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-RELEASE-002",
+      "title": "CI reproductible, chaîne Gradle vérifiée et aucune mutation automatique de main",
+      "targets": [
+        "ci",
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/developmentGovernance.test.ts",
+          "contains": "SEENIT-RELEASE-002 la CI valide puis publie sans modifier automatiquement main"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-RELEASE-003",
+      "title": "Notes de release exhaustives, homogènes et orientées utilisateur",
+      "targets": [
+        "ci",
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/releaseNotes.test.ts",
+          "contains": "SEENIT-RELEASE-003 agrège tous les commits de la version au lieu du seul dernier commit"
+        },
+        {
+          "file": "tests/releaseNotes.test.ts",
+          "contains": "SEENIT-RELEASE-003 ignore le tag de la version courante pour retrouver la vraie version précédente"
+        },
+        {
+          "file": "tests/releaseNotes.test.ts",
+          "contains": "SEENIT-RELEASE-003 sépare le changelog public des détails techniques"
+        },
+        {
+          "file": "tests/releaseNotes.test.ts",
+          "contains": "SEENIT-RELEASE-003 documente un format public court et homogène"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-RELEASE-004",
+      "title": "Release APK immuable et version strictement progressive",
+      "targets": [
+        "ci",
+        "apk",
+        "pwa"
+      ],
+      "tests": [
+        {
+          "file": "tests/releaseImmutability.test.ts",
+          "contains": "SEENIT-RELEASE-004 refuse une release quand son tag ou sa publication existe déjà"
+        },
+        {
+          "file": "tests/releaseImmutability.test.ts",
+          "contains": "SEENIT-RELEASE-004 refuse un push documentaire à version inchangée ou régressive"
+        },
+        {
+          "file": "tests/releaseImmutability.test.ts",
+          "contains": "SEENIT-RELEASE-004 accepte uniquement une progression N vers N+1 cohérente"
+        },
+        {
+          "file": "tests/releaseImmutability.test.ts",
+          "contains": "SEENIT-RELEASE-004 impose un nouveau numéro après une candidate déjà commitée"
+        },
+        {
+          "file": "tests/releaseImmutability.test.ts",
+          "contains": "SEENIT-RELEASE-004 sépare le build de la publication et vérifie la paire APK SHA-256"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-RELEASE-005",
+      "title": "Publication APK autonome par l'agent avec fallbacks bornés",
+      "targets": [
+        "ci",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/releaseFastPath.test.ts",
+          "contains": "SEENIT-RELEASE-005 rend l'agent autonome jusqu'au workflow avec fallback navigateur"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-QUALITY-001",
+      "title": "Évolution pilotée par SPEC, tests et contrat APK",
+      "targets": [
+        "ci",
+        "pwa",
+        "apk",
+        "backend"
+      ],
+      "tests": [
+        {
+          "file": "tests/developmentGovernance.test.ts",
+          "contains": "SEENIT-QUALITY-001 les règles imposent SPEC, tests et validation APK à chaque évolution"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-UX-003",
+      "title": "Navigation lazy sans flash noir au premier accès",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/navigationPreload.test.ts",
+          "contains": "SEENIT-UX-003 précharge et déduplique les écrans privés avant la première navigation"
+        },
+        {
+          "file": "tests/navigationPreload.test.ts",
+          "contains": "SEENIT-UX-003 conserve l’écran courant pendant le chargement d’un nouvel écran lazy"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-UX-004",
+      "title": "Toasts mobiles longs lisibles et bilan Plex multi-lignes contrôlable",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/toastLayout.test.ts",
+          "contains": "SEENIT-UX-004 les toasts longs reviennent à la ligne sans troncature sur mobile"
+        },
+        {
+          "file": "tests/toastLayout.test.ts",
+          "contains": "SEENIT-UX-004 le toast reste au-dessus de la navigation et de la safe area"
+        },
+        {
+          "file": "tests/plexSyncPresentation.test.ts",
+          "contains": "SEENIT-UX-004 la synchronisation Plex affiche une phase réelle et la durée écoulée sans faux pourcentage"
+        },
+        {
+          "file": "tests/plexSyncPresentation.test.ts",
+          "contains": "SEENIT-UX-004 le bilan Plex affiche serveurs scannés, vus et non vus sans serveur ignoré"
+        },
+        {
+          "file": "tests/toastQueueScope.test.ts",
+          "contains": "SEENIT-UX-004 ignorer les suivants purge uniquement les futurs toasts Plex"
+        },
+        {
+          "file": "tests/toastQueueScope.test.ts",
+          "contains": "SEENIT-UX-004 le bilan Plex conserve uniquement les serveurs scannés et compte les vus et non vus"
+        },
+        {
+          "file": "tests/toastQueueScope.test.ts",
+          "contains": "SEENIT-UX-004 les anciens libellés Plex sont affichés uniquement comme non vu"
+        },
+        {
+          "file": "tests/toastQueueScope.test.ts",
+          "contains": "SEENIT-UX-004 le toast Plex expose le bouton Ignorer les suivants"
+        },
+        {
+          "file": "tests/plexToastSummary.test.ts",
+          "contains": "SEENIT-UX-004 le bilan final Plex utilise un bloc multi-lignes avec identité Plex"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-QUALITY-002",
+      "title": "Audits datés et reliés à un backlog priorisé",
+      "targets": [
+        "ci",
+        "pwa",
+        "apk",
+        "backend"
+      ],
+      "tests": [
+        {
+          "file": "tests/developmentGovernance.test.ts",
+          "contains": "SEENIT-QUALITY-002 impose un audit daté relié à des issues priorisées"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-QUALITY-003",
+      "title": "Demandes durables mémorisées, spécifiées et testées",
+      "targets": [
+        "ci",
+        "pwa",
+        "apk",
+        "backend"
+      ],
+      "tests": [
+        {
+          "file": "tests/developmentGovernance.test.ts",
+          "contains": "SEENIT-QUALITY-003 mémorise chaque demande durable dans la SPEC et le registre"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-QUALITY-004",
+      "title": "Contexte GitHub complet avant intervention et issues maintenues à jour",
+      "targets": [
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/issueTrackingGovernance.test.ts",
+          "contains": "SEENIT-QUALITY-004 maintient les issues et leurs checkboxes à jour pendant le travail"
+        },
+        {
+          "file": "tests/issueTrackingGovernance.test.ts",
+          "contains": "SEENIT-QUALITY-004 impose le contexte GitHub complet avant toute intervention"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-QUALITY-005",
+      "title": "Imports AI Studio non autoritatifs et règles agent préchargées",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/firebaseIdentityGuardrails.test.ts",
+          "contains": "SEENIT-QUALITY-005 matérialise Firebase Android et répare les droits Gradle"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-QUALITY-006",
+      "title": "Parcours de livraison proportionné et classé automatiquement",
+      "targets": [
+        "ci",
+        "pwa",
+        "apk",
+        "backend"
+      ],
+      "tests": [
+        {
+          "file": "tests/deliveryClassification.test.ts",
+          "contains": "SEENIT-QUALITY-006 classe un renommage de label JSX dans le parcours light"
+        },
+        {
+          "file": "tests/deliveryClassification.test.ts",
+          "contains": "SEENIT-QUALITY-006 reconnaît un libellé non JSX marqué explicitement par uiCopy"
+        },
+        {
+          "file": "tests/deliveryClassification.test.ts",
+          "contains": "SEENIT-QUALITY-006 refuse une URL ou une condition modifiée comme simple texte"
+        },
+        {
+          "file": "tests/deliveryClassification.test.ts",
+          "contains": "SEENIT-QUALITY-006 permet de forcer le parcours complet mais jamais le parcours light"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-QUALITY-007",
+      "title": "Synchronisation Git externe au runtime SeenIt",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/apiSurface.test.ts",
+          "contains": "SEENIT-QUALITY-007 retire toute synchronisation Git embarquée du runtime SeenIt"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-QUALITY-008",
+      "title": "Validation continue fail-fast, déterministe, mesurée et bornée",
+      "targets": [
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/ciValidationPerformance.test.ts",
+          "contains": "SEENIT-QUALITY-008 impose un préflight sans dépendances et un cache exact de confiance"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-QUALITY-009",
+      "title": "Correctifs ciblés cohérents sans lecture, validation ni formatage redondants",
+      "targets": [
+        "ci",
+        "pwa",
+        "apk",
+        "backend"
+      ],
+      "tests": [
+        {
+          "file": "tests/developmentGovernance.test.ts",
+          "contains": "SEENIT-QUALITY-009 borne le fast path des correctifs ciblés sans réduire les preuves"
+        },
+        {
+          "file": "tests/changeContract.test.ts",
+          "contains": "SEENIT-QUALITY-009 refuse un reformatage massif du catalogue pour un changement ciblé"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-AUTH-001",
+      "title": "Connexion Google Android native via Credential Manager sans changer le Firebase UID",
+      "targets": [
+        "apk",
+        "pwa",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/nativeGoogleAuth.test.ts",
+          "contains": "SEENIT-AUTH-001 ouvre le sélecteur Google natif Credential Manager comme ATHIA"
+        },
+        {
+          "file": "tests/nativeGoogleAuth.test.ts",
+          "contains": "SEENIT-AUTH-001 conserve le même compte Firebase et un fallback natif propre"
+        },
+        {
+          "file": "tests/nativeGoogleAuth.test.ts",
+          "contains": "SEENIT-AUTH-001 traite l’annulation Google comme une sortie non bloquante"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-RELATION-001",
+      "title": "Sagas et univers cross-media exacts, réciproques et distincts des similaires",
+      "targets": [
+        "pwa",
+        "apk",
+        "backend"
+      ],
+      "tests": [
+        {
+          "file": "tests/mediaRelationsSpecification.test.ts",
+          "contains": "SEENIT-RELATION-001 sépare saga univers et médias similaires"
+        },
+        {
+          "file": "tests/mediaRelationsSpecification.test.ts",
+          "contains": "SEENIT-RELATION-001 interdit tout univers déduit du titre ou de la popularité"
+        },
+        {
+          "file": "tests/mediaRelationsSpecification.test.ts",
+          "contains": "SEENIT-RELATION-001 impose une identité mediaType plus TMDB et des groupes bidirectionnels"
+        },
+        {
+          "file": "tests/mediaRelationsSpecification.test.ts",
+          "contains": "SEENIT-RELATION-001 fixe les TNR Yellowstone Breaking Bad Harry Potter Marvel DC et House of Guinness"
+        },
+        {
+          "file": "tests/mediaRelationsSpecification.test.ts",
+          "contains": "SEENIT-RELATION-001 borne les sources distantes et les performances"
+        }
+      ]
+    }
   ]
 }

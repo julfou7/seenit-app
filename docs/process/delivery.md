@@ -197,8 +197,9 @@ La commande :
 Les surfaces autorisées sont celles synchronisées par `version:sync` : Gradle, `updateStore`, en-tête
 Plex serveur, `package.json`, `package-lock.json`, catalogue SPEC, contrat Android et version de la SPEC.
 Aucun écran, composant, store métier ou autre code fonctionnel ne peut être modifié par cette commande.
-Les catalogues JSON de spécification conservent leur format existant : seuls les champs de version
-canoniques changent. Une candidate qui reformate massivement `requirements.json` est invalide.
+`requirements.json` reste dans son format canonique JSON à deux espaces avec fin de ligne terminale ;
+la validation SPEC refuse une autre sérialisation. Les champs de version sont remplacés sans toucher
+aux autres octets. Une candidate qui reformate massivement le catalogue est invalide.
 
 ### 3. Fusionner puis déclencher le workflow
 
