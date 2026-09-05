@@ -8,10 +8,12 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const {
+  buildReleaseBody,
   extractCommitNotes,
   findPreviousReleaseTag,
   generateReleaseNotes
 } = require('../scripts/generate-release-notes.cjs') as {
+  buildReleaseBody: (commits: Array<{ hash: string; message: string }>) => string;
   extractCommitNotes: (message: string) => string[];
   findPreviousReleaseTag: (version: string, cwd?: string) => string | null;
   generateReleaseNotes: (options?: { version?: string; cwd?: string }) => string;
@@ -111,6 +113,34 @@ Détails techniques:
     extractCommitNotes('docs: actualiser le processus\n\nChangelog: aucun\n\n- détail interne'),
     []
   );
+  assert.deepEqual(
+    extractCommitNotes('chore: préparer la release\n\nChangelog: aucun.\n\nDétails techniques:\n- aligne les versions'),
+    []
+  );
+  assert.deepEqual(
+    extractCommitNotes('ci: ajuster la publication\n\nChangelog:\n- Aucun.\n\nDétails techniques:\n- ajuste le workflow'),
+    []
+  );
+});
+
+test('SEENIT-RELEASE-003 ne publie jamais les marqueurs de changelog vide', () => {
+  const body = buildReleaseBody([
+    {
+      hash: 'visible',
+      message: 'fix(notifications): restaurer les rappels\n\nChangelog:\n- Les rappels média retrouvent leur visuel.'
+    },
+    {
+      hash: 'release',
+      message: 'chore: préparer la release\n\nChangelog: aucun.'
+    },
+    {
+      hash: 'ci',
+      message: 'ci: fiabiliser le workflow\n\nChangelog:\n- Néant !'
+    }
+  ]);
+
+  assert.match(body, /Les rappels média retrouvent leur visuel\./);
+  assert.doesNotMatch(body, /Aucun|Néant|None|N\/A/i);
 });
 
 test('SEENIT-RELEASE-003 documente un format public court et homogène', () => {

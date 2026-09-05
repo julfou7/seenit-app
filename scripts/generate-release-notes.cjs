@@ -152,13 +152,22 @@ function formatPublicNote(value) {
   return `- ${sentence}`;
 }
 
+function isEmptyChangelogMarker(value) {
+  const normalized = String(value || '')
+    .replace(/^\s*(?:[-*•]|\d+[.)])\s+/, '')
+    .trim()
+    .replace(/[.!?…]+$/, '')
+    .trim();
+  return /^(?:aucun(?:e|s|es)?|néant|none|n\/?a)$/i.test(normalized);
+}
+
 function extractExplicitChangelog(lines) {
   const headerIndex = lines.findIndex(line => /^\s*changelog\s*:/i.test(line));
   if (headerIndex < 0) return null;
 
   const header = lines[headerIndex].match(/^\s*changelog\s*:\s*(.*)$/i);
   const inline = String(header?.[1] || '').trim();
-  if (/^(?:aucun|néant|none|n\/?a)$/i.test(inline)) return [];
+  if (isEmptyChangelogMarker(inline)) return [];
 
   const items = inline ? [inline] : [];
   for (let index = headerIndex + 1; index < lines.length; index += 1) {
@@ -174,7 +183,10 @@ function extractExplicitChangelog(lines) {
     if (/^[^:]{1,80}:\s*$/.test(trimmed) || items.length > 0) break;
   }
 
-  return items.map(formatPublicNote).filter(Boolean);
+  return items
+    .filter(item => !isEmptyChangelogMarker(item))
+    .map(formatPublicNote)
+    .filter(Boolean);
 }
 
 function extractCommitNotes(message) {
