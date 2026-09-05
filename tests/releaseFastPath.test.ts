@@ -301,6 +301,8 @@ test("SEENIT-RELEASE-005 rend l'agent autonome jusqu'au workflow avec fallback n
   const releaseRequirement = requirements.requirements.find((entry: { id: string }) => entry.id === 'SEENIT-RELEASE-005');
   assert.ok(releaseRequirement, 'l’exigence durable doit être cataloguée');
   assert.match(connectorReleaseSpec, /extension normative de `SEENIT-RELEASE-005`/);
+  assert.match(connectorReleaseSpec, /rend la main par défaut/);
+  assert.match(connectorReleaseSpec, /publie et attends le résultat/);
   assert.match(connectorControlWorkflow, /issue_comment:/);
   assert.match(connectorControlWorkflow, /github\.event\.issue\.number == 102/);
   assert.match(connectorControlWorkflow, /author_association == 'OWNER'/);
@@ -338,5 +340,8 @@ test("SEENIT-RELEASE-005 rend l'agent autonome jusqu'au workflow avec fallback n
     inputs: { release_apk: 'true', android12_smoke: 'true' }
   });
   assert.match(bootstrapRules, /connecteur GitHub/i);
+  assert.match(agentRules, /rendre la main par défaut/);
+  assert.match(agentRules, /Ne pas conserver la conversation active avec des polls rapprochés/);
+  assert.match(bootstrapRules, /rend la main par défaut/);
   assert.match(seenitSpec, /SEENIT-RELEASE-005/);
 });

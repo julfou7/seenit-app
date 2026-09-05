@@ -76,11 +76,11 @@ test('SEENIT-RELEASE-004 sépare le build de la publication et vérifie la paire
   assert.match(workflow, /cancel-in-progress: true/);
   assert.match(workflow, /^\s{2}validate:/m);
   assert.match(workflow, /^\s{2}build:/m);
-  assert.match(workflow, /Build Manual APK Candidate/);
+  assert.match(workflow, /Build & APK Upgrade Smoke \(Android 36\)/);
   assert.match(workflow, /Resolve Previous Published Release Baseline/);
   assert.match(workflow, /git tag --list 'v\*' --sort=-v:refname/);
   assert.match(workflow, /^\s{2}publish:/m);
-  assert.match(workflow, /publish:[\s\S]+needs: \[build, android_upgrade_smoke, android12_upgrade_smoke\]/);
+  assert.match(workflow, /publish:[\s\S]+needs: \[build, android12_upgrade_smoke\]/);
   assert.match(workflow, /publish:[\s\S]+permissions:\s+contents: write/);
   assert.match(workflow, /actions\/upload-artifact@v7/);
   assert.match(workflow, /actions\/download-artifact@v8/);

@@ -46,6 +46,24 @@ Le contrôleur mémorise les IDs des runs existants avant le POST, puis recherch
 
 La concurrence `seenit-release-control` est sérialisée (`cancel-in-progress: false`). Deux commandes simultanées ne peuvent donc pas contourner le contrôle anti-doublon ; la seconde doit constater le run actif créé par la première.
 
+GitHub ne permet pas de filtrer `issue_comment` par numéro d'issue ou contenu dans `on:`. Chaque nouveau
+commentaire du dépôt peut donc matérialiser un run de contrôle dont l'unique job est immédiatement
+ignoré par son `if`. Ce bruit sans build ni test est accepté tant que le connecteur ne fournit pas
+directement `workflow_dispatch` : aucune infrastructure ou clé externe n'est ajoutée uniquement pour
+le masquer. Le workflow de notification post-release, lui, ne doit pas utiliser ce modèle global.
+
+## Retour immédiat après dispatch
+
+La preuve attendue du contrôleur est le lien du run `workflow_dispatch` portant exactement le SHA de
+la candidate. Après cette identification bornée à 30 secondes, l'agent rend la main par défaut : il
+n'attend pas la construction Gradle, l'émulateur ou la publication en répétant des lectures toutes les
+quelques secondes. La CI et la notification Android poursuivent le parcours de manière autonome.
+
+Un suivi synchrone complet reste possible lorsque l'utilisateur demande explicitement d'attendre le
+résultat. Il cible alors uniquement le run identifié, espace ses lectures et traite un échec réel sans
+redéclenchement aveugle. « Publie l'APK » seul signifie donc une orchestration autonome et asynchrone ;
+« publie et attends le résultat » demande en plus la surveillance de bout en bout.
+
 ## Préparation des huit surfaces de version sans `gh`
 
 La génération des surfaces de version est indépendante de toute API GitHub et de GitHub CLI. La commande :
@@ -77,12 +95,10 @@ Toutes les transformations sont calculées avant écriture. Si une écriture ou 
 
 Les assertions documentaires seules ne suffisent plus pour satisfaire `SEENIT-RELEASE-005`.
 
-## Validation terrain de #102
+## Preuves terrain
 
-#102 reste ouverte jusqu’à ce qu’une conversation ne disposant ni de GitHub CLI ni d’un navigateur authentifié :
-
-1. utilise uniquement le connecteur GitHub pour publier la commande exacte sur #102 ;
-2. observe le contrôleur natif créer le run de `Validate & Release SeenIt` ;
-3. suive ce run jusqu’à la release APK immuable et son SHA-256.
-
-La première preuve réelle attendue est la publication SeenIt **1.4.114** avec `android12_smoke=true`, car le correctif natif de notifications #106 exige ce TNR.
+La release 1.4.114 a validé le parcours connector-only complet sans GitHub CLI, token shell ni
+navigateur authentifié. La release 1.4.115 a confirmé un dispatch en 17,9 secondes, mais son run #619
+a aussi révélé près de 6 min 50 d'attente entre deux runners. L'issue #135 traite ce second problème :
+le build et le smoke Android 36 partagent désormais le même job de lecture, tandis que le job de
+publication conserve seul `contents: write`.

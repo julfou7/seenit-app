@@ -544,6 +544,10 @@ L'écart courant et le plan de correction sont suivis dans
 - Le déclencheur post-release ne fait confiance à aucune preuve fournie par son appelant : le backend
   revalide auprès de GitHub le run `Validate & Release SeenIt` terminé avec succès sur `main`, son SHA,
   le tag correspondant, la release officielle et la paire APK/SHA-256 avant toute diffusion FCM.
+- Le job de publication émet, après création de la release, un `repository_dispatch` dédié qui ne crée
+  un workflow de notification que pour une release. Ce workflow attend de façon bornée la fin réussie
+  du run source avant d'appeler le backend. Le rejeu manuel exige le `run_id` et le SHA exacts de cette
+  même release ; aucun `workflow_run` global ne doit polluer les validations PR ou les pushes ordinaires.
 - La diffusion est idempotente : une installation reçoit au plus une notification par version, même
   en cas de reprise ou de concurrence. Une transaction persistante réserve chaque couple version/installation ;
   une livraison réussie n'est jamais rejouée, les échecs explicites sont repris au plus trois fois et un
@@ -656,12 +660,15 @@ L'écart courant et le plan de correction sont suivis dans
   écrasement et tout fichier manquant. Une correction d'une version déjà publiée utilise
   obligatoirement un nouveau patch.
 - **SEENIT-RELEASE-005** — Une demande explicite de publication APK autorise l'agent à fusionner la
-  candidate prête, déclencher lui-même le workflow depuis `main` et le suivre jusqu'à l'APK signé, au
-  SHA-256 et à la release immuable. Les voies sont essayées dans cet ordre : outil GitHub direct,
+  candidate prête et déclencher lui-même le workflow depuis `main`. Les voies sont essayées dans cet ordre : outil GitHub direct,
   `release:dispatch`/`gh`, puis interface GitHub Actions via navigateur authentifié contrôlable.
   L'absence de CLI ou de token shell ne justifie pas un renvoi vers un clic utilisateur si le navigateur
   est disponible. Avant chaque déclenchement, l'agent vérifie qu'aucun run du même SHA/version n'est
-  déjà actif ; une intervention humaine n'est demandée qu'après échec réel des trois voies.
+  déjà actif ; une intervention humaine n'est demandée qu'après échec réel des trois voies. Dès que le
+  run exact est identifié, l'agent rend la main par défaut et la CI poursuit de manière autonome ; il
+  n'effectue un suivi synchrone jusqu'à l'APK signé, son SHA-256 et la release immuable que sur demande
+  explicite. Les lectures d'état sont bornées et espacées, jamais réalisées par une boucle de polls
+  rapprochés. La notification Android confirme ensuite la disponibilité de la nouvelle version.
 - Canal PWA : le déploiement Web peut être instantané et réversible côté hébergeur.
 - Canal backend : une modification exclusivement serveur suit sa validation propre sans bump Android.
 - Canal APK : une correction d'un binaire déjà publié, y compris un rollback logique, est toujours une

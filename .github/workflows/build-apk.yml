@@ -218,12 +218,13 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   build:
-    name: Build Manual APK Candidate
+    name: Build & APK Upgrade Smoke (Android 36)
     if: >-
       github.event_name == 'workflow_dispatch' &&
       inputs.release_apk == true &&
       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
     outputs:
@@ -231,6 +232,9 @@ jobs:
       release_base_sha: ${{ steps.release_baseline.outputs.BASE_SHA }}
 
     steps:
+      - name: Initialize Release Metrics
+        run: echo "SEENIT_RELEASE_JOB_STARTED=$(date +%s)" >> "$GITHUB_ENV"
+
       - name: Checkout Code and Release History
         uses: actions/checkout@v6
         with:
@@ -363,53 +367,11 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  android_upgrade_smoke:
-    name: APK Upgrade Smoke (Android 36)
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v6
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v5
-        with:
-          distribution: 'zulu'
-          java-version: '21'
-
-      - name: Set up Node.js 22 with npm cache
-        uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Download Current APK Pair
-        uses: actions/download-artifact@v8
-        with:
-          name: SeenIt-Android-APK-v${{ needs.build.outputs.app_version }}
-          path: current-release
-
-      - name: Download Android Upgrade Test Harness
-        uses: actions/download-artifact@v8
-        with:
-          name: SeenIt-Android-Upgrade-Test-v${{ needs.build.outputs.app_version }}
-          path: test-harness
-
-      - name: Verify Current APK Pair
-        run: |
-          cd current-release
-          sha256sum --check "SeenIt-v${{ needs.build.outputs.app_version }}.apk.sha256"
-
       - name: Download and Verify Previous Official Release
-        id: baseline
+        id: android36_baseline
         run: node scripts/download-upgrade-baseline.cjs upgrade-baseline
         env:
-          CURRENT_VERSION: ${{ needs.build.outputs.app_version }}
+          CURRENT_VERSION: ${{ steps.release_candidate.outputs.APP_VERSION }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -419,7 +381,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Run N to N+1 Upgrade Smoke
+      - name: Run N to N+1 Upgrade Smoke on Android 36
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 36
@@ -432,9 +394,9 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: >-
             bash scripts/android-upgrade-smoke.sh
-            "upgrade-baseline/SeenIt-v${{ steps.baseline.outputs.BASELINE_VERSION }}.apk"
-            "current-release/SeenIt-v${{ needs.build.outputs.app_version }}.apk"
-            "test-harness/app-debug-androidTest.apk"
+            "upgrade-baseline/SeenIt-v${{ steps.android36_baseline.outputs.BASELINE_VERSION }}.apk"
+            "SeenIt-v${{ steps.release_candidate.outputs.APP_VERSION }}.apk"
+            "android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
             "upgrade-reports/android-36"
             "36"
 
@@ -455,10 +417,24 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: SeenIt-APK-Upgrade-Smoke-Android-36-v${{ needs.build.outputs.app_version }}
+          name: SeenIt-APK-Upgrade-Smoke-Android-36-v${{ steps.release_candidate.outputs.APP_VERSION }}
           path: upgrade-reports/android-36
           if-no-files-found: warn
           retention-days: 30
+
+      - name: Publish Release Critical Path Metrics
+        if: always()
+        run: |
+          now=$(date +%s)
+          total_seconds=$((now-SEENIT_RELEASE_JOB_STARTED))
+          {
+            echo "## Release APK — chemin critique"
+            echo
+            echo "| Mesure | Valeur |"
+            echo "|---|---:|"
+            echo "| Build, contrôles et smoke Android 36 | ${total_seconds} s |"
+            echo "| Transition de runner build → Android 36 | 0 s |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   android12_upgrade_smoke:
     name: Optional APK Upgrade Smoke (Android 12)
@@ -545,11 +521,10 @@ jobs:
 
   publish:
     name: Publish Immutable APK Release
-    needs: [build, android_upgrade_smoke, android12_upgrade_smoke]
+    needs: [build, android12_upgrade_smoke]
     if: >-
       always() &&
       needs.build.result == 'success' &&
-      needs.android_upgrade_smoke.result == 'success' &&
       (needs.android12_upgrade_smoke.result == 'success' || needs.android12_upgrade_smoke.result == 'skipped') &&
       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
@@ -614,3 +589,26 @@ jobs:
             release-assets/SeenIt-v${{ needs.build.outputs.app_version }}.apk.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Queue Android Update Notification
+        id: release_notification
+        continue-on-error: true
+        run: node scripts/dispatch-release-update.cjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+          RELEASE_RUN_ID: ${{ github.run_id }}
+          RELEASE_HEAD_SHA: ${{ github.sha }}
+
+      - name: Report Notification Dispatch Failure
+        if: steps.release_notification.outcome == 'failure'
+        run: |
+          echo "::warning::La release est publiée mais la notification Android n'a pas été mise en file."
+          {
+            echo "## Notification Android à rejouer"
+            echo
+            echo "Relancer le workflow **Android APK Update Notification** avec :"
+            echo
+            echo "- release_run_id : ${{ github.run_id }}"
+            echo "- release_head_sha : ${{ github.sha }}"
+          } >> "$GITHUB_STEP_SUMMARY"

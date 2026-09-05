@@ -102,9 +102,10 @@ test('SEENIT-APK-003 interdit toute réinstallation ou divergence de signature a
 
 test('SEENIT-APK-003 exécute le smoke sur Android 12 et la cible Android courante avant publication', () => {
   const workflow = fs.readFileSync('.github/workflows/build-apk.yml', 'utf8');
-  assert.match(workflow, /android_upgrade_smoke:/);
-  assert.match(workflow, /android_upgrade_smoke:[\s\S]*api-level: 36/);
-  assert.match(workflow, /android_upgrade_smoke:[\s\S]*timeout-minutes: 15/);
+  assert.doesNotMatch(workflow, /^  android_upgrade_smoke:/m);
+  assert.match(workflow, /build:[\s\S]*Build & APK Upgrade Smoke \(Android 36\)/);
+  assert.match(workflow, /build:[\s\S]*api-level: 36/);
+  assert.match(workflow, /build:[\s\S]*timeout-minutes: 20/);
   assert.match(workflow, /android12_upgrade_smoke:/);
   assert.match(workflow, /android12_upgrade_smoke:[\s\S]*if: inputs\.android12_smoke == true/);
   assert.match(workflow, /android12_upgrade_smoke:[\s\S]*api-level: 31/);
@@ -115,7 +116,7 @@ test('SEENIT-APK-003 exécute le smoke sur Android 12 et la cible Android couran
   );
   assert.match(workflow, /:app:assembleDebug :app:assembleDebugAndroidTest/);
   assert.doesNotMatch(workflow, /\.\/gradlew --no-daemon assembleDebug assembleDebugAndroidTest/);
-  assert.match(workflow, /needs: \[build, android_upgrade_smoke, android12_upgrade_smoke\]/);
+  assert.match(workflow, /needs: \[build, android12_upgrade_smoke\]/);
   assert.match(workflow, /SeenIt-APK-Upgrade-Smoke-Android-36-/);
   assert.match(workflow, /SeenIt-APK-Upgrade-Smoke-Android-31-/);
 });
