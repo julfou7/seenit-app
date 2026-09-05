@@ -1,44 +1,51 @@
-name: Notify Android APK Update
+name: Android APK Update Notification
 
 on:
-  workflow_run:
-    workflows:
-      - Validate & Release SeenIt
-    types: [completed]
+  repository_dispatch:
+    types: [seenit_apk_release_published]
+  workflow_dispatch:
+    inputs:
+      release_run_id:
+        description: ID du run Validate & Release SeenIt déjà terminé avec succès
+        required: true
+        type: string
+      release_head_sha:
+        description: SHA main exact publié par ce run
+        required: true
+        type: string
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
-  group: seenit-release-update-${{ github.event.workflow_run.head_sha }}
+  group: seenit-release-update-${{ github.event.client_payload.release_run_id || inputs.release_run_id }}
   cancel-in-progress: false
 
 jobs:
   notify_android_update:
     name: Notify Android Update
     if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'workflow_dispatch' &&
-      github.event.workflow_run.head_branch == 'main'
+      github.event_name == 'repository_dispatch' ||
+      github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 3
 
     steps:
-      - name: Checkout released commit
+      - name: Checkout trusted notification workflow revision
         uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-          fetch-depth: 1
 
       - name: Set up Node.js 22
         uses: actions/setup-node@v6
         with:
           node-version: '22'
 
-      - name: Notify registered Android installations
+      - name: Wait for source workflow and notify registered Android installations
         run: node scripts/notify-release-update.cjs
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_NOTIFICATION_ENDPOINT: https://seenit.ai.studio/api/releases/notify
           RELEASE_REPOSITORY: ${{ github.repository }}
-          RELEASE_RUN_ID: ${{ github.event.workflow_run.id }}
-          RELEASE_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RELEASE_RUN_ID: ${{ github.event.client_payload.release_run_id || inputs.release_run_id }}
+          RELEASE_HEAD_SHA: ${{ github.event.client_payload.release_head_sha || inputs.release_head_sha }}
+          RELEASE_WAIT_FOR_COMPLETION: 'true'

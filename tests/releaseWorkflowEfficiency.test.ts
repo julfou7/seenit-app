@@ -15,7 +15,7 @@ function extractJob(name: string, nextName: string) {
 
 test('la release manuelle ne paie pas deux fois la validation rapide', () => {
   const validate = extractJob('validate', 'build');
-  const build = extractJob('build', 'android_upgrade_smoke');
+  const build = extractJob('build', 'android12_upgrade_smoke');
 
   assert.match(
     validate,
@@ -34,12 +34,15 @@ test('la release manuelle ne paie pas deux fois la validation rapide', () => {
 });
 
 test('la simplification conserve le smoke Android 36 bloquant', () => {
-  const smoke = extractJob('android_upgrade_smoke', 'android12_upgrade_smoke');
+  const smoke = extractJob('build', 'android12_upgrade_smoke');
   const publish = workflow.slice(workflow.indexOf('  publish:'));
 
   assert.match(smoke, /api-level: 36/);
   assert.match(smoke, /android-upgrade-smoke\.sh/);
-  assert.match(publish, /needs\.android_upgrade_smoke\.result == 'success'/);
+  assert.doesNotMatch(workflow, /^  android_upgrade_smoke:/m);
+  assert.match(publish, /needs: \[build, android12_upgrade_smoke\]/);
+  assert.match(publish, /needs\.build\.result == 'success'/);
+  assert.match(smoke, /Transition de runner build → Android 36 \| 0 s/);
   assert.match(deliveryProcess, /Android cible courant \(API 36 actuellement\) : \*\*bloquant\*\*/);
 });
 

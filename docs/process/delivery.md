@@ -179,14 +179,17 @@ Une fois les checks requis de la PR verts, fusionner selon les protections du d�
 `release:status`. L'état attendu est alors `dispatch`.
 
 Une demande explicite « Publie l'APK », « Lance la release » ou équivalent vaut mandat opérationnel :
-l'agent déclenche lui-même la release et la suit jusqu'au résultat. Il ne se contente pas de fournir
-un bouton ou une commande à exécuter par l'utilisateur.
+l'agent déclenche lui-même la release. Il ne se contente pas de fournir un bouton ou une commande à
+exécuter par l'utilisateur. Après identification du run, il rend la main par défaut ; « publie et
+attends le résultat » ajoute explicitement un suivi synchrone.
 
-Pour le `workflow_dispatch`, l'ordre canonique est :
+Pour créer le `workflow_dispatch`, l'ordre canonique est :
 
-1. **outil GitHub direct** de déclenchement de workflow s'il est réellement disponible dans la session,
+1. depuis une conversation disposant du connecteur GitHub, publier la commande exacte `/release-apk`
+   sur l'issue #102 ; `SeenIt Release Control` applique les contrôles et crée le run nativement ;
+2. **outil GitHub direct** de déclenchement de workflow s'il est réellement disponible dans la session,
    avec ref `main`, `release_apk=true` et `android12_smoke=false` par défaut ;
-2. sinon fallback local borné :
+3. sinon fallback local borné :
 
 ```bash
 npm run release:dispatch
@@ -198,7 +201,7 @@ Ce wrapper exécute l'équivalent canonique :
 gh workflow run build-apk.yml --repo julfou7/seenit-app --ref main -f release_apk=true -f android12_smoke=false
 ```
 
-3. si le connecteur ne sait pas créer le run et que `gh` ou son authentification shell manque,
+4. si aucune des voies précédentes ne sait créer le run et que `gh` ou son authentification shell manque,
    utiliser l'**interface GitHub Actions via un navigateur authentifié contrôlable par l'agent** : ouvrir
    `Validate & Release SeenIt`, choisir exactement `main`, activer `release_apk`, laisser
    `android12_smoke=false` par défaut, puis déclencher le workflow.
@@ -211,8 +214,9 @@ pour un blocage concret d'accès, d'authentification ou d'autorisation.
 Quelle que soit la voie, vérifier avant le dispatch qu'aucun run de release portant le même SHA/version
 n'est déjà actif. Le wrapper vérifie d'abord que le workspace est propre et exactement sur `main`, puis
 recherche pendant au plus 30 secondes le run `workflow_dispatch` portant le même SHA. Si le run n'est
-pas retrouvé, il s'arrête sans relancer aveuglément. Le suivi se fait ensuite sur ce run précis avec la
-commande `gh run watch` fournie dans sa sortie ou directement dans GitHub Actions.
+pas retrouvé, il s'arrête sans relancer aveuglément. Dès que le run est identifié, l'agent publie son
+lien et rend la main ; il n'enchaîne pas des attentes et polls rapprochés. Sur demande explicite de suivi,
+les lectures sont espacées et ciblent uniquement ce run précis.
 
 ### 4. Mesure « demande → workflow »
 
@@ -222,6 +226,10 @@ Au début d'une demande release-only, l'agent conserve l'heure dans
 même mesure est calculée entre l'heure de la demande et le `created_at` du run. Cette métrique est
 reportée dans l'issue/release concernée ; le temps d'attente des checks de PR n'est pas compté dans le
 budget opérateur.
+
+Le workflow de release publie séparément le temps actif du job regroupant contrôles, build et smoke
+Android 36. Le passage build → smoke reste à zéro seconde de transition de runner. Le temps total du
+run permet de distinguer la file GitHub précédant le job de publication du travail réellement exécuté.
 
 Cibles : ≤ 2 minutes de travail opérateur avec candidate prête et verte ; ≤ 5 minutes hors attente CI
 si la candidate doit être préparée.
@@ -242,17 +250,19 @@ Quand le lot est prêt, le chemin canonique est désormais :
 6. sur demande explicite, laisser l'agent déclencher `Validate & Release SeenIt` avec
    `release_apk=true` depuis `main`, via l'outil GitHub direct, `release:dispatch` ou le navigateur
    GitHub authentifié ;
-7. suivre ce run précis jusqu'à la publication immuable ;
-8. après terminaison réussie du workflow de release, `Notify Android APK Update` transmet uniquement
-   l'identité publique du run au backend canonique ; celui-ci revalide GitHub puis diffuse l'alerte FCM
-   Android de manière idempotente, sans rendre l'état de la release dépendant de FCM ;
+7. rendre la main dès que le run précis est identifié, sauf demande explicite de suivi synchrone ;
+8. après création de la release, le job de publication émet un `repository_dispatch` dédié ; le workflow
+   `Android APK Update Notification` attend la terminaison réussie du run source, puis transmet
+   uniquement son identité publique au backend canonique. Celui-ci revalide GitHub et diffuse l'alerte
+   FCM Android de manière idempotente, sans rendre l'état de la release dépendant de FCM ;
 9. valider sur appareil Android réel la réception et l'ouverture de l'alerte lorsque ce parcours change.
 
 Le déclenchement manuel de release ne relance pas d'abord le job de validation continue puis un second
 job identique. Le job de candidate exécute lui-même, **une seule fois sur le même runner**, le contrat
 de changement, SPEC, TypeScript, tests unitaires, contrat Android, garde d'immuabilité, audit de
-dépendances et build Web avant Gradle. Le contrôle reste complet, mais `npm ci` et le build Web ne sont
-plus payés deux fois pour la même release.
+dépendances, build Web, Gradle et smoke Android 36. Le contrôle reste complet, mais `npm ci`, le build Web,
+la configuration Node/JDK et la transition vers un second runner ne sont plus payés deux fois pour le
+chemin Android cible. Le smoke Android 12 optionnel reste un job séparé et démarre après ce chemin critique.
 
 Avant les tests Android de release, la CI décode `SEENIT_ANDROID_RELEASE_KEYSTORE_B64` dans
 `android/app/seenit-release.p12`, refuse un secret absent ou un Base64 invalide puis compare le SHA-256
@@ -309,7 +319,8 @@ plafonné explicitement à `2048M`, comme l'API 31 stable, afin de réduire la p
 modifier les assertions du TNR. Les preuves du smoke archivent aussi `free`, les principaux RSS et la
 fin de `dmesg` pour distinguer un kill QEMU sous pression d'un défaut applicatif. Le run de release
 1.4.112 `33809261658` a validé ce parcours sur Android 36 et Android 12. L'API 36 reste bloquante et le
-contrôle Retour n'est pas supprimé.
+contrôle Retour n'est pas supprimé. Depuis #135, le build et ce smoke partagent le même runner à droits
+de lecture ; seul le job de publication séparé conserve `contents: write`.
 
 ## Gestion et récupération des clés de signature
 
