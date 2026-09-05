@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Cloud, LogIn, LogOut, FileText, CheckCircle2, MonitorPlay, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronDown, ChevronUp, ChevronRight, Check, AlertCircle, Info, Bug, Sparkles, Download, X, UploadCloud, DownloadCloud } from 'lucide-react';
 import { auth, db, googleAuthProvider, requestNotificationPermission, revokeCurrentDeviceNotifications, sendNativeNotification } from '../lib/firebase';
@@ -7,7 +7,7 @@ import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
-import { cn, openExternalUrl } from '../lib/utils';
+import { cn } from '../lib/utils';
 import { CsvImporter } from '../components/CsvImporter';
 import { useToastStore } from '../store/toastStore';
 import { useSyncStore } from '../store/syncStore';
@@ -15,7 +15,13 @@ import { useShowsStore } from '../store/showsStore';
 import { useLogStore, appLogger, LogCategory } from '../store/logStore';
 import { useUpdateStore, CURRENT_APP_VERSION } from '../store/updateStore';
 import { performDetailsSync } from '../hooks/useDetailsSyncWorker';
-import { getPlexPin, checkPlexPin } from '../services/plex';
+import {
+  buildPlexAuthUrl,
+  getPlexPin,
+  pollPlexAuthAttempt,
+  PlexAuthError,
+  type PlexAuthAttempt
+} from '../services/plex';
 import { performPlexSync, purgeAllPlexSlugsInDb } from '../features/plex/syncPlex';
 import { SeenItLogo } from '../components/SeenItLogo';
 import { ChangelogViewer } from '../components/ChangelogViewer';
@@ -48,6 +54,11 @@ const STREAMING_PLATFORMS = [
   { id: 239, name: 'Arte' }
 ];
 
+type PlexAuthSession = Readonly<{
+  uid: string;
+  attempt: PlexAuthAttempt;
+}>;
+
 export function SettingsScreen() {
   const { showToast } = useToastStore();
   const syncStatus = useSyncStore(state => state.syncStatus);
@@ -79,7 +90,10 @@ export function SettingsScreen() {
   };
 
   // Plex Auth State
-  const [plexPin, setPlexPin] = useState<any>(null);
+  const [plexAuthSession, setPlexAuthSession] = useState<PlexAuthSession | null>(null);
+  const [plexAuthError, setPlexAuthError] = useState<string | null>(null);
+  const [isStartingPlexAuth, setIsStartingPlexAuth] = useState(false);
+  const plexAuthStartGuard = useRef(false);
   const [plexToken, setPlexToken] = useState<string | null>(
     getStoredPlexToken(auth.currentUser?.uid)
   );
@@ -91,49 +105,104 @@ export function SettingsScreen() {
   const [copiedLogs, setCopiedLogs] = useState(false);
 
   useEffect(() => {
-    let interval: any;
-    if (plexPin && !plexToken) {
-      interval = setInterval(async () => {
+    if (!plexAuthSession || plexToken) return;
+
+    const controller = new AbortController();
+    let active = true;
+    const { uid, attempt } = plexAuthSession;
+
+    appLogger.info('plex', 'Association Plex en attente d’autorisation.', { platform: attempt.platform });
+
+    void (async () => {
+      try {
+        const res = await pollPlexAuthAttempt(attempt, { signal: controller.signal });
+        if (!active || !res.authToken || auth.currentUser?.uid !== uid) return;
+
+        const username = res.username || '';
+        const plexRef = doc(db, 'users', uid, 'settings', 'plex');
+        await setDoc(plexRef, { authToken: res.authToken, username }, { merge: true });
+
+        if (!active || auth.currentUser?.uid !== uid) return;
+        storePlexCredentials(uid, res.authToken, username);
+        setPlexToken(res.authToken);
+        setPlexAuthSession(null);
+        setPlexAuthError(null);
+        showToast('Compte Plex connecté !', 'success');
+        appLogger.success('plex', 'Compte Plex authentifié et validé avec succès.');
+
         try {
-          const res = await checkPlexPin(plexPin.id);
-          if (res.authToken) {
-            if (!user?.uid) {
-              throw new Error('Utilisateur SeenIt non connecté');
-            }
-            setPlexToken(res.authToken);
-            storePlexCredentials(user.uid, res.authToken, res.username || '');
-            try {
-              const plexRef = doc(db, 'users', user.uid, 'settings', 'plex');
-              await setDoc(plexRef, { authToken: res.authToken, username: res.username || '' }, { merge: true });
-            } catch (err) {
-              console.error('[Settings] Erreur sauvegarde Plex dans Firestore:', err);
-            }
-            setPlexPin(null);
-            showToast("Compte Plex connecté !", "success");
-            appLogger.success('plex', 'Compte Plex authentifié avec succès');
-            clearInterval(interval);
-            // Déclencher automatiquement une synchronisation complète pour peupler la bibliothèque
-            performPlexSync({ delta: false, silent: false, ignoreCooldown: true });
-          }
-        } catch (e: any) {
-          console.error(e);
-          appLogger.error('plex', 'Erreur lors du suivi du PIN Plex', e);
+          await performPlexSync({ delta: false, silent: false, ignoreCooldown: true });
+        } catch {
+          appLogger.warn('plex', 'Compte Plex associé, mais la première synchronisation complète a échoué.');
         }
-      }, 3000);
-    }
-    return () => clearInterval(interval);
-  }, [plexPin, plexToken, user, showToast]);
+      } catch (error: any) {
+        if (!active || (error instanceof PlexAuthError && error.code === 'cancelled')) return;
+
+        const message = error instanceof PlexAuthError
+          ? error.message
+          : "Impossible de terminer l'association Plex. Réessayez.";
+        setPlexAuthSession(null);
+        setPlexAuthError(message);
+        showToast(message, 'error');
+        appLogger.warn('plex', 'Association Plex interrompue.', {
+          code: error instanceof PlexAuthError ? error.code : 'unknown'
+        });
+      }
+    })();
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [plexAuthSession, plexToken, user?.uid, showToast]);
 
   const handlePlexLogin = async () => {
+    if (!user?.uid || plexAuthStartGuard.current || plexAuthSession) return;
+
+    const uid = user.uid;
+    plexAuthStartGuard.current = true;
+    setIsStartingPlexAuth(true);
+    setPlexAuthError(null);
+
     try {
-      const pin = await getPlexPin();
-      setPlexPin(pin);
-      const authUrl = `https://app.plex.tv/auth#?clientID=${pin.clientIdentifier}&code=${pin.code}&context[device][product]=TV%20Time%20Sync`;
-      await openExternalUrl(authUrl);
-    } catch (e: any) {
-      showToast("Erreur de connexion à Plex", "error");
-      appLogger.error('plex', 'Erreur génération PIN Plex', e);
+      const platform = Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android'
+        ? 'Android' as const
+        : 'Web' as const;
+      const attempt = await getPlexPin(platform);
+      if (auth.currentUser?.uid !== uid) return;
+
+      setPlexAuthSession(Object.freeze({ uid, attempt }));
+      appLogger.info('plex', 'Demande d’association Plex créée ; ouverture de l’autorisation.', { platform });
+      const authUrl = buildPlexAuthUrl(attempt);
+
+      if (Capacitor.isNativePlatform()) {
+        await Browser.open({ url: authUrl, windowName: '_system' });
+      } else {
+        const opened = window.open(authUrl, '_blank', 'noopener,noreferrer');
+        if (!opened) throw new Error("Le navigateur a bloqué l'ouverture de Plex.");
+      }
+    } catch (error: any) {
+      setPlexAuthSession(null);
+      const message = error instanceof PlexAuthError
+        ? error.message
+        : "Impossible d'ouvrir l'autorisation Plex. Réessayez.";
+      setPlexAuthError(message);
+      showToast(message, 'error');
+      appLogger.warn('plex', 'Impossible de démarrer l’association Plex.', {
+        code: error instanceof PlexAuthError ? error.code : 'open_failed'
+      });
+    } finally {
+      plexAuthStartGuard.current = false;
+      setIsStartingPlexAuth(false);
     }
+  };
+
+  const handleCancelPlexLogin = () => {
+    setPlexAuthSession(null);
+    setPlexAuthError(null);
+    plexAuthStartGuard.current = false;
+    setIsStartingPlexAuth(false);
+    appLogger.info('plex', 'Association Plex annulée par l’utilisateur.');
   };
 
   const handlePlexSync = async (delta: boolean = true) => {
@@ -149,6 +218,8 @@ export function SettingsScreen() {
   };
 
   const handlePlexLogout = async () => {
+    setPlexAuthSession(null);
+    setPlexAuthError(null);
     setPlexToken(null);
     clearPlexCredentials(user?.uid);
     usePlexAvailabilityStore.getState().clearCache();
@@ -175,6 +246,10 @@ export function SettingsScreen() {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       const scopeChanged = activatePlexUserScope(currentUser?.uid);
       if (scopeChanged) usePlexAvailabilityStore.getState().clearCache();
+      setPlexAuthSession(current => current && current.uid !== currentUser?.uid ? null : current);
+      setPlexAuthError(null);
+      plexAuthStartGuard.current = false;
+      setIsStartingPlexAuth(false);
       setPlexToken(getStoredPlexToken(currentUser?.uid));
       setUser(currentUser);
       if (currentUser) {
@@ -233,6 +308,7 @@ export function SettingsScreen() {
           }
         }
       } else {
+        setPlexAuthSession(null);
         setPlexToken(null);
         setUserPlatforms([]);
         setNotificationPrefs(DEFAULT_NOTIFICATION_PREFS);
@@ -395,6 +471,7 @@ export function SettingsScreen() {
   const handleLogout = async () => {
     showToast("Déconnexion en cours...", "info");
     localStorage.setItem('explicit_logout', 'true');
+    setPlexAuthSession(null);
     clearPlexCredentials(auth.currentUser?.uid);
     usePlexAvailabilityStore.getState().clearCache();
     await revokeCurrentDeviceNotifications();
@@ -731,13 +808,34 @@ export function SettingsScreen() {
                   Connectez-vous pour associer Plex.
                 </div>
               ) : !plexToken ? (
-                <button
-                  onClick={handlePlexLogin}
-                  disabled={!!plexPin}
-                  className="w-full flex items-center justify-center gap-2 bg-orange-500/10 hover:bg-orange-500/20 active:scale-95 text-orange-500 font-bold py-2 px-4 rounded-xl text-xs transition-all cursor-pointer border border-orange-500/20 disabled:opacity-50"
-                >
-                  {plexPin ? "En attente..." : "Associer mon compte Plex"}
-                </button>
+                <div className="flex flex-col gap-2">
+                  {plexAuthError && (
+                    <p className="text-[10px] text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg px-2.5 py-2 leading-relaxed">
+                      {plexAuthError}
+                    </p>
+                  )}
+                  <button
+                    onClick={handlePlexLogin}
+                    disabled={isStartingPlexAuth || !!plexAuthSession}
+                    className="w-full flex items-center justify-center gap-2 bg-orange-500/10 hover:bg-orange-500/20 active:scale-95 text-orange-500 font-bold py-2 px-4 rounded-xl text-xs transition-all cursor-pointer border border-orange-500/20 disabled:opacity-50"
+                  >
+                    {isStartingPlexAuth
+                      ? 'Ouverture...'
+                      : plexAuthSession
+                        ? 'En attente...'
+                        : plexAuthError
+                          ? 'Réessayer l’association Plex'
+                          : 'Associer mon compte Plex'}
+                  </button>
+                  {plexAuthSession && (
+                    <button
+                      onClick={handleCancelPlexLogin}
+                      className="text-[10px] text-zinc-500 font-medium hover:text-zinc-300 underline self-center"
+                    >
+                      Annuler l’association
+                    </button>
+                  )}
+                </div>
               ) : (
                 <div className="flex flex-col gap-2">
                   <div className="flex gap-2">
