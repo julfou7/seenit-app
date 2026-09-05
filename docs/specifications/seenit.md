@@ -1,6 +1,6 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
-Dernière mise à jour : 4 septembre 2026
+Dernière mise à jour : 5 septembre 2026
 Version applicative : **1.4.114**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
@@ -456,6 +456,21 @@ preuves complètes, ils doivent converger vers la même bibliothèque.
 - **SEENIT-UPDATE-002** — Lorsque GitHub fournit l'empreinte SHA-256 de l'asset, l'APK téléchargé
   est vérifié avant l'ouverture de l'installateur. Un écart supprime le fichier et bloque
   l'installation. Android réalise ensuite son propre contrôle de package et de signature.
+- **SEENIT-UPDATE-003** — Une notification de nouvelle version n'est éligible qu'après la publication
+  réussie et la vérification indépendante d'une release immuable sur le `main` officiel : dépôt exact
+  `julfou7/seenit-app`, tag sémantique `vX.Y.Z`, asset exact `SeenIt-vX.Y.Z.apk` et empreinte
+  SHA-256 officielle. La première version cible uniquement les installations Android enregistrées et
+  autorisées ; la PWA n'est pas destinataire afin d'éviter un doublon sur le même compte.
+- La diffusion est idempotente : une installation reçoit au plus une notification par version, même
+  en cas de reprise ou de concurrence. Les tokens restent isolés par UID et appareil ; un token invalide
+  est retiré sans bloquer les autres destinataires.
+- Le push est un signal non fiable contenant seulement des métadonnées bornées, par exemple le type
+  d'événement et la version. Il ne transporte ni APK, ni URL d'APK considérée comme fiable, ni
+  instruction exécutable. Un appui ouvre SeenIt et force son contrôle canonique de mise à jour ; seul
+  le parcours `SEENIT-UPDATE-001` / `SEENIT-UPDATE-002` choisit la release, vérifie sa source et son
+  SHA-256, puis propose l'installation.
+- Un échec FCM total ou partiel est journalisé de façon bornée et peut être rejoué de manière
+  idempotente. Il ne retire, ne remplace et ne réécrit jamais une release déjà publiée avec succès.
 - Le téléchargement n'efface aucune donnée applicative et utilise le cache temporaire. Une erreur
   laisse l'application courante utilisable et propose le lien officiel comme solution de secours.
 

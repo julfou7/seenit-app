@@ -815,6 +815,33 @@
       ]
     },
     {
+      "id": "SEENIT-UPDATE-003",
+      "title": "Notification push Android idempotente après publication officielle",
+      "targets": [
+        "backend",
+        "apk",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/releaseUpdateNotificationSpecification.test.ts",
+          "contains": "SEENIT-UPDATE-003 spécifie un push Android uniquement après une release officielle vérifiée"
+        },
+        {
+          "file": "tests/releaseUpdateNotificationSpecification.test.ts",
+          "contains": "SEENIT-UPDATE-003 limite la diffusion à une fois par version et installation"
+        },
+        {
+          "file": "tests/releaseUpdateNotificationSpecification.test.ts",
+          "contains": "SEENIT-UPDATE-003 sépare le signal push du téléchargement APK"
+        },
+        {
+          "file": "tests/releaseUpdateNotificationSpecification.test.ts",
+          "contains": "SEENIT-UPDATE-003 conserve une release publiée si FCM échoue"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-UX-001",
       "title": "Actions de swipe accessibles au clavier",
       "targets": [
