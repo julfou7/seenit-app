@@ -9,6 +9,7 @@ const ALWAYS_RUNTIME_FILES = new Set([
   ENTRY_FILE,
   'package.json',
   'package-lock.json',
+  'project.toml',
   '.github/workflows/deploy-backend.yml',
   'scripts/backend-runtime-impact.cjs'
 ]);
