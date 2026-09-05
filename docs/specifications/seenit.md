@@ -281,7 +281,7 @@ points d'entrée créent `watching` sans épisode est suivi par
 | `watching` | Épisode ou saison vu(e) | `watching` ou `completed` | Une saison manuelle ne marque que les épisodes déjà diffusés lorsque TMDB les fournit. |
 | `completed` | Un épisode repasse non vu | `watching` | Désarchive si nécessaire et désigne le premier épisode restant. |
 | `plan_to_watch` ou `watching` | Abandonner | `dropped` | Conserve progression, note, favori et métadonnées. |
-| `dropped` | Reprendre | `plan_to_watch` si aucune progression, sinon `watching` | Conserve la progression existante et recalcule le prochain épisode. |
+| `dropped` | Reprendre | `plan_to_watch` si aucune progression, sinon `watching` | Conserve la progression existante et recalcule l'état actif. |
 | `completed` / archivée | Revoir | `watching` | Réinitialise la progression, désarchive et positionne le prochain épisode sur S1E1. |
 | Série terminée/annulée et complète | Calcul automatique | `completed` + `isArchived=true` | L'archive automatique exige l'état TMDB final et aucune progression restante. |
 | Sans progression | Retirer du suivi | Non suivie | Supprime la fiche après confirmation ; une synchronisation externe ne le déduit pas d'une absence ambiguë. |
@@ -442,6 +442,19 @@ L'écart courant et le plan de correction sont suivis dans
   Les URL Plex, jetons, en-têtes d'authentification et UID complets ne sont jamais inclus ; les identifiants
   de serveur sont abrégés. Ce diagnostic n'altère aucune décision de synchronisation et ne crée aucun
   rapprochement par titre ou année.
+- **SEENIT-PLEX-008** — L’association d’un compte Plex repose sur une tentative immuable : la création
+  du PIN, l’URL d’autorisation et chaque vérification réutilisent exactement le même `clientIdentifier`,
+  le produit `SeenIt`, la version SeenIt, la plateforme, le `pinId`, le `code` et l’expiration. Aucun écran
+  ne reconstruit une identité différente. Une seule vérification séquentielle peut être active ; elle
+  s’arrête au succès, à l’annulation, au changement de Firebase UID, à l’expiration ou à une erreur
+  permanente. Un `429` applique un backoff borné et un échec terminal réactive explicitement l’action
+  « Réessayer ». Un `authToken` n’est persisté pour le même UID et la première synchronisation complète
+  n’est déclenchée qu’après validation du jeton via `GET https://plex.tv/api/v2/user` avec cette même
+  identité. Le code PIN, le jeton, l’URL d’autorisation complète et le `clientIdentifier` complet ne sont
+  jamais journalisés. La PWA et l’APK partagent ce contrat ; l’APK ouvre l’autorisation dans le navigateur
+  externe puis reprend la même tentative sans créer un second poller. Le flux PIN historique reste le
+  contrat courant tant qu’il est accepté ; toute migration JWK/JWT constitue une évolution explicite
+  distincte.
 - Le full scan est paginé. Un inventaire partiel ne remplace pas un cache complet, sauf si au
   moins un inventaire serveur complet et exploitable a été obtenu conformément à la politique.
 - La déduplication finale utilise `movie:<tmdbId>` ou
