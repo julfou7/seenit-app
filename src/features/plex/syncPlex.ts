@@ -11,7 +11,12 @@ import { getPlexClientId } from '../../services/plex';
 import { Show } from '../../types';
 import { CURRENT_APP_VERSION } from '../../store/updateStore';
 import { authenticatedFetch, getAuthenticatedHeaders } from '../../lib/apiAuth';
-import { executeBackendAttempts } from '../../lib/nativeBackendRetry';
+import {
+  buildNativeBackendAttempts,
+  describeBackendNetworkFailure,
+  executeBackendAttempts
+} from '../../lib/nativeBackendRetry';
+import { resolveSeenItApiCandidates, resolveSeenItApiUrl } from '../../lib/seenitApi';
 import {
   buildPlexParentShowIdentityItem,
   buildResolvedPlexIdentity,
@@ -515,15 +520,14 @@ const findShowInLocalLibrary = (
   );
 };
 
-const PLEX_PRODUCTION_ORIGIN = 'https://seenit.ai.studio';
-
 function getPlexBackendUrl(pathname: string): string {
-  return Capacitor.isNativePlatform() ? `${PLEX_PRODUCTION_ORIGIN}${pathname}` : pathname;
+  return resolveSeenItApiUrl(pathname);
 }
 
 async function fetchPlexHistoryData(token: string, clientId: string, delta: boolean, since?: number) {
   const isNative = Capacitor.isNativePlatform();
-  const url = getPlexBackendUrl('/api/plex/history');
+  const urls = resolveSeenItApiCandidates('/api/plex/history', isNative);
+  const url = urls[0];
   const timeoutMs = delta ? 45000 : 120000;
 
   appLogger.info('plex', `Début requête Plex (${isNative ? 'APK Natif' : 'PWA Web'}, Mode: ${delta ? 'Rapide' : 'Complet'})`);
@@ -536,9 +540,9 @@ async function fetchPlexHistoryData(token: string, clientId: string, delta: bool
 
     if (isNative) {
       const payload = { clientId, delta, since };
-      const nativeRequest = async () => {
+      const nativeRequest = async (requestUrl: string) => {
         const nativeRes = await CapacitorHttp.post({
-          url,
+          url: requestUrl,
           headers: await getAuthenticatedHeaders({
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -553,11 +557,11 @@ async function fetchPlexHistoryData(token: string, clientId: string, delta: bool
           data: typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data
         };
       };
-      const webViewRequest = async () => {
+      const webViewRequest = async (requestUrl: string) => {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), timeoutMs);
         try {
-          const response = await authenticatedFetch(url, {
+          const response = await authenticatedFetch(requestUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -578,17 +582,14 @@ async function fetchPlexHistoryData(token: string, clientId: string, delta: bool
       };
 
       const nativeResult = await executeBackendAttempts({
-        attempts: [
-          { transport: 'natif Android', request: nativeRequest },
-          { transport: 'WebView', request: webViewRequest },
-          { transport: 'natif Android', request: nativeRequest }
-        ],
-        delaysMs: [400, 1200],
-        onRetry: ({ failedTransport, nextTransport, attempt, error }) => {
+        attempts: buildNativeBackendAttempts({ urls, nativeRequest, webViewRequest }),
+        delaysMs: [250, 500, 1000],
+        onRetry: ({ failedTransport, nextTransport, nextEndpoint, attempt, error }) => {
+          const nextOrigin = nextEndpoint ? new URL(nextEndpoint).hostname : 'origine SeenIt suivante';
           appLogger.warn(
             'plex',
             `[Plex Réseau] ${failedTransport} indisponible (${error instanceof Error ? error.message : String(error)}). ` +
-            `Nouvelle tentative ${attempt + 1}/3 via ${nextTransport}.`
+            `Nouvelle tentative ${attempt + 1}/${urls.length * 2} via ${nextTransport} (${nextOrigin}).`
           );
         }
       });
@@ -1592,8 +1593,9 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         ...(canCommitCursor ? {} : { error: describeIncompletePlexSync(plexData?.integrity, retryableUnresolvedCount) })
       };
     } catch (err: any) {
-      const errorMsg = err?.message || String(err);
-      appLogger.error('plex', 'Exception lors de la synchronisation Plex', { error: errorMsg });
+      const technicalErrorMsg = err?.message || String(err);
+      const errorMsg = describeBackendNetworkFailure(err);
+      appLogger.error('plex', 'Exception lors de la synchronisation Plex', { error: technicalErrorMsg });
       clearPlexSyncStatusDelayed(`Erreur Plex : ${errorMsg}`, 4000);
       if (!silent) {
         useToastStore.getState().showToast(`Erreur de synchronisation Plex : ${errorMsg}`, 'error');

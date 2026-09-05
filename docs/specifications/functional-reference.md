@@ -429,6 +429,11 @@ le databaseId ou la signature APK.
 | Mise à jour | Bannière/rechargement PWA | Téléchargement, SHA-256, installateur Android |
 | Hors-ligne | Shell/cache et dernier état UID | Même logique dans la WebView |
 
+Dans l'APK, une erreur réseau/DNS temporaire vers `seenit.ai.studio` peut replier une requête Plex
+sur l'URL Cloud Run vérifiée du même backend canonique. Les couples origine/transport sont essayés
+une seule fois chacun ; une réponse HTTP, même en erreur, arrête ce repli. La PWA conserve ses routes
+relatives de même origine.
+
 Un changement commun doit être vérifié sur les deux colonnes. Une divergence n'est acceptable que si
 elle est nécessaire à la plateforme et explicitement documentée.
 

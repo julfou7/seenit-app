@@ -6,7 +6,8 @@ import { auth } from '../../lib/firebase';
 
 import { appLogger } from '../../store/logStore';
 import { authenticatedFetch, getAuthenticatedHeaders } from '../../lib/apiAuth';
-import { executeBackendAttempts } from '../../lib/nativeBackendRetry';
+import { buildNativeBackendAttempts, executeBackendAttempts } from '../../lib/nativeBackendRetry';
+import { resolveSeenItApiCandidates } from '../../lib/seenitApi';
 import { getStoredPlexToken } from './plexStorage';
 import { buildPlexMediaUrl, replacePlexUserCache } from './plexAvailabilityCache';
 
@@ -70,7 +71,6 @@ export function getPlexMediaKey(
   return `v3:${uid}:${mediaType}:none`;
 }
 
-const PLEX_PRODUCTION_ORIGIN = 'https://seenit.ai.studio';
 const activeAvailabilityChecks = new Map<string, Promise<PlexMediaInfo>>();
 
 export async function checkPlexAvailability(params: {
@@ -138,9 +138,8 @@ async function performPlexAvailabilityCheck(params: {
 
   const clientId = getPlexClientId();
   const isNative = Capacitor.isNativePlatform();
-  const url = isNative
-    ? `${PLEX_PRODUCTION_ORIGIN}/api/plex/availability`
-    : '/api/plex/availability';
+  const urls = resolveSeenItApiCandidates('/api/plex/availability', isNative);
+  const url = urls[0];
 
   try {
     let data: any = null;
@@ -152,9 +151,9 @@ async function performPlexAvailabilityCheck(params: {
     };
 
     if (isNative) {
-      const nativeRequest = async () => {
+      const nativeRequest = async (requestUrl: string) => {
         const nativeRes = await CapacitorHttp.post({
-          url,
+          url: requestUrl,
           headers: await getAuthenticatedHeaders({
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -169,8 +168,8 @@ async function performPlexAvailabilityCheck(params: {
           data: typeof nativeRes.data === 'string' ? JSON.parse(nativeRes.data) : nativeRes.data
         };
       };
-      const webViewRequest = async () => {
-        const response = await authenticatedFetch(url, {
+      const webViewRequest = async (requestUrl: string) => {
+        const response = await authenticatedFetch(requestUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -187,14 +186,11 @@ async function performPlexAvailabilityCheck(params: {
         };
       };
       const response = await executeBackendAttempts({
-        attempts: [
-          { transport: 'natif Android', request: nativeRequest },
-          { transport: 'WebView', request: webViewRequest },
-          { transport: 'natif Android', request: nativeRequest }
-        ],
-        delaysMs: [250, 600],
-        onRetry: ({ nextTransport }) => {
-          appLogger.warn('plex', `[Plex Availability] Réseau natif indisponible, nouvel essai via ${nextTransport}.`);
+        attempts: buildNativeBackendAttempts({ urls, nativeRequest, webViewRequest }),
+        delaysMs: [200, 400, 800],
+        onRetry: ({ nextTransport, nextEndpoint }) => {
+          const nextOrigin = nextEndpoint ? new URL(nextEndpoint).hostname : 'origine SeenIt suivante';
+          appLogger.warn('plex', `[Plex Availability] Réseau indisponible, nouvel essai via ${nextTransport} (${nextOrigin}).`);
         }
       });
       isOk = response.status >= 200 && response.status < 300;

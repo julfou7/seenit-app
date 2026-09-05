@@ -19,6 +19,10 @@
         {
           "file": "tests/seenitApi.test.ts",
           "contains": "SEENIT-PLATFORM-001 conserve la PWA canonique en même origine"
+        },
+        {
+          "file": "tests/seenitApi.test.ts",
+          "contains": "SEENIT-PLATFORM-001 fournit à l’APK une origine de secours indépendante pour le même backend"
         }
       ]
     },
