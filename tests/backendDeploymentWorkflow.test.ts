@@ -45,6 +45,7 @@ test('SEENIT-RUNTIME-001 utilise une WIF bornée au dépôt sans clé JSON durab
   assert.match(bootstrap, /assertion\.ref=='refs\/heads\/main'/);
   assert.match(bootstrap, /roles\/iam\.workloadIdentityUser/);
   assert.doesNotMatch(`${workflow}\n${bootstrap}`, /credentials_json|GCP_CREDENTIALS|SERVICE_ACCOUNT_KEY/);
+  assert.doesNotMatch(bootstrap, /roles\/(viewer|logging\.viewer)/);
 });
 
 test('SEENIT-RUNTIME-001 initialise le dépôt Docker Artifact Registry de façon idempotente', () => {
@@ -57,6 +58,24 @@ test('SEENIT-RUNTIME-001 initialise le dépôt Docker Artifact Registry de faço
   assert.ok(buildImage > createRepository);
   assert.match(workflow, /--repository-format=docker/);
   assert.match(workflow, /--location "\$GCP_REGION"/);
+});
+
+test('SEENIT-RUNTIME-001 suit Cloud Build sans exiger la lecture du bucket de logs', () => {
+  const buildImage = workflow.indexOf('gcloud builds submit .');
+  const asyncSubmit = workflow.indexOf('--async', buildImage);
+  const describeBuild = workflow.indexOf('gcloud builds describe "$build_id"');
+  const successGate = workflow.indexOf('SUCCESS)', describeBuild);
+  const resolveDigest = workflow.indexOf('image_summary.digest');
+
+  assert.ok(buildImage >= 0);
+  assert.ok(asyncSubmit > buildImage);
+  assert.ok(describeBuild > asyncSubmit);
+  assert.ok(successGate > describeBuild);
+  assert.ok(resolveDigest > successGate);
+  assert.match(workflow, /PENDING\|QUEUED\|WORKING/);
+  assert.match(workflow, /FAILURE\|INTERNAL_ERROR\|TIMEOUT\|CANCELLED\|EXPIRED\|STATUS_UNKNOWN/);
+  assert.match(workflow, /Cloud Build lancé sans streaming de logs/);
+  assert.doesNotMatch(workflow, /gcloud builds log/);
 });
 
 test('SEENIT-RUNTIME-001 sépare le build de l’image du déploiement Cloud Run hérité', () => {

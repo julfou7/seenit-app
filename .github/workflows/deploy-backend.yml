@@ -137,10 +137,57 @@ jobs:
             --location "$GCP_REGION" \
             --format='value(name)' >/dev/null
 
-          gcloud builds submit . \
+          build_id="$(gcloud builds submit . \
             --project "$GCP_PROJECT_ID" \
             --region "$GCP_REGION" \
-            --pack "image=${image_tag}"
+            --pack "image=${image_tag}" \
+            --async \
+            --format='value(id)')"
+          if [[ ! "$build_id" =~ ^[0-9a-f-]{36}$ ]]; then
+            echo "Identifiant Cloud Build invalide: ${build_id:-absent}"
+            exit 1
+          fi
+          echo "Cloud Build lancé sans streaming de logs: $build_id"
+
+          build_deadline=$((SECONDS + 900))
+          build_succeeded=false
+          while (( SECONDS < build_deadline )); do
+            build_json="$(gcloud builds describe "$build_id" \
+              --project "$GCP_PROJECT_ID" \
+              --region "$GCP_REGION" \
+              --format=json)"
+            build_status="$(jq -r '.status // "STATUS_UNKNOWN"' <<<"$build_json")"
+            echo "Cloud Build $build_id: $build_status"
+
+            case "$build_status" in
+              SUCCESS)
+                build_succeeded=true
+                break
+                ;;
+              PENDING|QUEUED|WORKING)
+                sleep 10
+                ;;
+              FAILURE|INTERNAL_ERROR|TIMEOUT|CANCELLED|EXPIRED|STATUS_UNKNOWN)
+                echo "Cloud Build terminé en échec: $build_status"
+                jq '{id, status, statusDetail, results, steps: [.steps[]? | {id, name, status, timing}]}' <<<"$build_json" || true
+                exit 1
+                ;;
+              *)
+                echo "Statut Cloud Build inattendu: $build_status"
+                jq '{id, status, statusDetail}' <<<"$build_json" || true
+                exit 1
+                ;;
+            esac
+          done
+
+          if [[ "$build_succeeded" != 'true' ]]; then
+            echo "Cloud Build $build_id n'a pas atteint SUCCESS dans la fenêtre autorisée."
+            gcloud builds describe "$build_id" \
+              --project "$GCP_PROJECT_ID" \
+              --region "$GCP_REGION" \
+              --format=json || true
+            exit 1
+          fi
 
           digest="$(gcloud artifacts docker images describe "$image_tag" \
             --project "$GCP_PROJECT_ID" \
