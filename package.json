@@ -25,6 +25,7 @@
     "version:sync": "node scripts/sync-app-version.cjs",
     "release:status": "node scripts/release-status.cjs",
     "release:prepare": "node scripts/prepare-release.cjs",
+    "release:prepare:files": "node scripts/prepare-release-files.cjs",
     "release:dispatch": "node scripts/dispatch-release.cjs"
   },
   "dependencies": {
