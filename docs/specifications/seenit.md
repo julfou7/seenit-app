@@ -307,6 +307,73 @@ Une action répétée qui ne change pas l'état final est idempotente. Les mises
 Full et Delta peuvent collecter différemment mais n'ont pas deux sémantiques métier : avec les mêmes
 preuves complètes, ils doivent converger vers la même bibliothèque.
 
+### 5.6 Relations entre médias : saga, univers et similaires
+
+- **SEENIT-RELATION-001** — SeenIt distingue trois relations qui n'ont ni la même source ni la
+  même promesse :
+  - **Ordre de visionnage / saga** : groupe explicite, potentiellement ordonné, fourni par une
+    collection TMDB ou une relation SeenIt validée ;
+  - **Même univers narratif** : continuité explicite pouvant réunir films, séries et spin-off ;
+  - **Similaires** : recommandations contextuelles TMDB, sans valeur de preuve d'appartenance à une
+    saga ou un univers et sans obligation de réciprocité.
+
+L'identité d'une œuvre est toujours le couple mediaType + tmdbId, sérialisé sous la forme
+movie:<tmdbId> ou tv:<tmdbId>. Les espaces d'identifiants Film et Série sont distincts : movie:42 et
+tv:42 ne sont jamais fusionnés, y compris dans la navigation, les badges, l'historique, les caches et
+la déduplication.
+
+Une saga ou un univers n'est accepté qu'avec une provenance explicite et reproductible : collection
+TMDB, manifeste SeenIt versionné de clés exactes, ou groupe TVDB épinglé/approuvé atteint depuis un
+identifiant externe exact. Chaque groupe porte groupId, relationKind, source, sourceGroupId, version,
+membres typés et ordre éventuel. Une liste dite officielle, son nom ou son score ne suffisent jamais.
+Tout identifiant IMDb, TVDB ou Plex est d'abord résolu vers un TMDB et son type exact.
+
+Le titre, l'année, la popularité, les genres, les mots-clés, le casting, le studio, la marque ou le
+premier résultat d'une recherche ne prouvent **jamais** une relation. L'indisponibilité d'un
+fournisseur ne déclenche donc aucun fallback par titre. Wikidata peut uniquement enrichir hors ligne
+un manifeste à partir d'identifiants exacts et validés ; son endpoint public n'est pas une dépendance
+synchrone de la fiche.
+
+#### Réciprocité, continuités et affichage
+
+- Une relation saga/univers est normalisée par groupId. Si A et B appartiennent au même groupe,
+  chaque point d'entrée retourne le même ensemble et le même ordre ; seul le média marqué « actuel »
+  change.
+- La fiche courante peut apparaître pour montrer sa position, mais toute section ne contenant qu'elle
+  est masquée.
+- Les continuités Marvel et DC sont séparées. MCU, Sony/Fox/X-Men, DCEU, DCU, Arrowverse, trilogie
+  Nolan et autres adaptations ne sont jamais regroupés sur la seule marque.
+- Reboot, remake, adaptation parallèle et œuvre homonyme ne sont pas « même univers » sans preuve
+  explicite ; ils peuvent rester de simples similaires.
+- Une panne de relation masque seulement la section concernée et ne bloque ni la fiche, ni ses autres
+  actions.
+
+#### Priorité, déduplication et navigation
+
+L'ordre de priorité est : saga/ordre de visionnage, puis même univers, puis similaires. Un média
+n'apparaît que dans la première section qui le possède, selon sa clé mediaType + tmdbId. Les
+similaires excluent donc la fiche courante, sa saga et son univers. Leurs filtres restent identiques
+sur PWA et APK, mais leur classement peut évoluer côté TMDB et n'est pas soumis à la réciprocité.
+
+Toute navigation entre cartes transmet mediaType et tmdbId. Une réponse asynchrone d'une ancienne
+fiche est annulée ou ignorée ; elle ne peut jamais remplacer l'état de la fiche courante, notamment
+lorsqu'un film et une série partagent le même ID numérique.
+
+#### Performance et résilience
+
+- Cache normalisé par mediaKey et groupId, partagé entre les membres et réutilisable en
+  stale-if-error.
+- Concurrence distante bornée, timeout et annulation lors de la navigation ; aucun fan-out non borné.
+- Objectifs mesurés sur la logique de relation : cache chaud inférieur ou égal à 150 ms ; résolution
+  froide ciblée à 2,5 s ; timeout dur à 4 s.
+- Une relation incomplète ou incertaine est masquée plutôt que complétée par supposition.
+
+Les TNR minimales couvrent les parcours réciproques Yellowstone, Breaking Bad/Better Call Saul/El
+Camino, Wizarding World / Harry Potter films+série, la séparation des continuités Marvel et DC, House of Guinness
+sans section auto-référente, la collision movie:42/tv:42 et l'exclusion saga/univers des similaires.
+L'écart courant et le plan de correction sont suivis dans
+[#130](https://github.com/julfou7/seenit-app/issues/130).
+
 ## 6. Synchronisation Plex
 
 - **SEENIT-PLEX-001** — Les événements Plex sont normalisés et résolus sans utiliser leur titre

@@ -251,6 +251,30 @@ progression. Une note/favorite/archive est une intention distincte du statut de 
 - Les téléchargements Sonarr existent au niveau série, saison ou épisode ; le détail affiche aussi
   la disponibilité par saison/épisode.
 
+### 8.4 Sagas, univers cross-media et médias similaires
+
+La fiche peut afficher trois sections distinctes, dans cet ordre de priorité :
+
+1. **Ordre de visionnage** pour une saga explicite et ordonnée ;
+2. **Dans le même univers** pour une continuité narrative vérifiée, y compris entre films, séries et
+   spin-off ;
+3. **Séries similaires** ou **Films similaires** pour les recommandations contextuelles TMDB.
+
+Une œuvre déjà affichée dans une section prioritaire n'est pas répétée dans les suivantes. Les sagas
+et univers sont bidirectionnels : entrer par n'importe lequel de leurs membres restitue le même groupe
+et le même ordre, avec seulement le badge « actuel » déplacé. La fiche courante peut servir de repère
+dans un vrai groupe, mais une section contenant uniquement ce média est masquée.
+
+SeenIt ne déduit jamais une saga ou un univers d'un titre, d'une année, de la popularité ou d'une
+marque. Marvel et DC sont séparés par continuité narrative explicite. Les similaires ne sont pas une
+preuve de franchise et ne sont pas nécessairement réciproques.
+
+L'identité utilisée dans chaque carte et chaque navigation combine toujours le type Film/Série et
+l'ID TMDB. Le contrat exhaustif, les sources admises, les budgets de performance et la matrice
+Yellowstone, Breaking Bad, Harry Potter, Marvel, DC et House of Guinness sont définis par
+SEENIT-RELATION-001. L'écart de l'implémentation actuelle reste suivi dans
+[#130](https://github.com/julfou7/seenit-app/issues/130).
+
 La machine d'états exhaustive et le mapping Plex sont autoritatifs dans `seenit.md` §5.3 à §5.5.
 
 ## 9. Plex
@@ -414,6 +438,7 @@ elle est nécessaire à la plateforme et explicitement documentée.
 |---|---|---|
 | P1 | Les points d'entrée d'ajout créent tantôt `plan_to_watch`, tantôt `watching` sans progression. | Normaliser selon la machine d'états : [#93](https://github.com/julfou7/seenit-app/issues/93). |
 | P1 | La classification d’âge actuelle peut préférer une valeur FR permissive, sous-classer des certifications US et inventer un TP par genre. | Appliquer `SEENIT-PARENTAL-001` : [#98](https://github.com/julfou7/seenit-app/issues/98). |
+| P1 | Les sagas/univers peuvent dépendre du point d’entrée, accepter des listes ou titres non probants et afficher un groupe auto-référent. | Appliquer `SEENIT-RELATION-001` et ses TNR cross-media : [#130](https://github.com/julfou7/seenit-app/issues/130). |
 | P1 | Les personnes favorites restent locales et font diverger les recommandations PWA/APK. | Rendre Firestore autoritatif : [#95](https://github.com/julfou7/seenit-app/issues/95). |
 | P1 | Le retrait de Watchlist Plex ne retire pas encore un suivi créé uniquement par cette Watchlist. | Implémentation avec provenance : [#68](https://github.com/julfou7/seenit-app/issues/68). |
 | P2 | Partager une fiche ou le profil ne garantit pas encore un lien réouvrable conforme. | Décider/corriger : [#96](https://github.com/julfou7/seenit-app/issues/96). |
