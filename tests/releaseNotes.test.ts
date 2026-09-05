@@ -121,6 +121,10 @@ Détails techniques:
     extractCommitNotes('ci: ajuster la publication\n\nChangelog:\n- Aucun.\n\nDétails techniques:\n- ajuste le workflow'),
     []
   );
+  assert.deepEqual(
+    extractCommitNotes('docs(release): documenter le fallback navigateur\n\n- ajoute le fallback navigateur GitHub\n- ajoute le TNR interne'),
+    []
+  );
 });
 
 test('SEENIT-RELEASE-003 ne publie jamais les marqueurs de changelog vide', () => {
@@ -136,11 +140,16 @@ test('SEENIT-RELEASE-003 ne publie jamais les marqueurs de changelog vide', () =
     {
       hash: 'ci',
       message: 'ci: fiabiliser le workflow\n\nChangelog:\n- Néant !'
+    },
+    {
+      hash: 'legacy-docs',
+      message: 'docs(release): rendre le déclenchement autonome\n\n- ajoute le fallback navigateur GitHub\n- inscrit la règle dans la SPEC'
     }
   ]);
 
   assert.match(body, /Les rappels média retrouvent leur visuel\./);
   assert.doesNotMatch(body, /Aucun|Néant|None|N\/A/i);
+  assert.doesNotMatch(body, /fallback navigateur|SPEC/i);
 });
 
 test('SEENIT-RELEASE-003 documente un format public court et homogène', () => {

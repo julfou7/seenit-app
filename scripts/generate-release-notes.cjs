@@ -198,6 +198,11 @@ function extractCommitNotes(message) {
   const explicitNotes = extractExplicitChangelog(lines);
   if (explicitNotes !== null) return explicitNotes;
 
+  if (
+    /^Merge\b/i.test(subject) ||
+    /^(?:chore|docs|build|ci|test)(?:\([^)]+\))?:/i.test(subject)
+  ) return [];
+
   const bulletItems = [];
 
   for (const line of lines) {
@@ -208,12 +213,6 @@ function extractCommitNotes(message) {
   }
 
   if (bulletItems.length > 0) return bulletItems;
-  if (
-    /^Merge\b/i.test(subject) ||
-    /^(?:chore|docs|build|ci|test)(?:\([^)]+\))?:/i.test(subject) ||
-    /^chore\(release\):\s*(?:aligner|valider)\b/i.test(subject)
-  ) return [];
-
   const cleaned = cleanConventionalSubject(subject);
   const note = formatPublicNote(cleaned);
   return note ? [note] : [];
