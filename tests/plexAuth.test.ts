@@ -43,6 +43,7 @@ test('SEENIT-PLEX-008 partage strictement l’identité de la tentative entre PO
   assert.equal(postHeaders?.get('X-Plex-Client-Identifier'), initialClientId);
   assert.equal(postHeaders?.get('X-Plex-Product'), 'SeenIt');
   assert.equal(postHeaders?.get('X-Plex-Platform'), 'Android');
+  assert.equal(postHeaders?.get('X-Plex-Version'), plex.PLEX_VERSION);
   assert.ok(Object.isFrozen(attempt));
 
   const authUrl = plex.buildPlexAuthUrl(attempt);
@@ -51,7 +52,7 @@ test('SEENIT-PLEX-008 partage strictement l’identité de la tentative entre PO
   assert.equal(fragment.get('code'), 'ABCD');
   assert.equal(fragment.get('context[device][product]'), 'SeenIt');
   assert.equal(fragment.get('context[device][platform]'), 'Android');
-  assert.equal(fragment.get('context[device][version]'), attempt.version);
+  assert.equal(fragment.get('context[device][version]'), plex.PLEX_VERSION);
 
   const requests: Array<{ url: string; headers: Headers }> = [];
   const result = await plex.checkPlexPin(attempt, {
@@ -66,6 +67,7 @@ test('SEENIT-PLEX-008 partage strictement l’identité de la tentative entre PO
   assert.equal(result.authToken, 'token-secret');
   assert.equal(requests[0].headers.get('X-Plex-Client-Identifier'), initialClientId);
   assert.equal(requests[0].headers.get('X-Plex-Product'), 'SeenIt');
+  assert.equal(requests[0].headers.get('X-Plex-Version'), plex.PLEX_VERSION);
   assert.equal(requests[1].url, 'https://plex.tv/api/v2/user');
 });
 
@@ -102,7 +104,7 @@ test('un produit divergent est refusé avant de construire une URL Plex', async 
     code: 'CODE',
     clientIdentifier: '44444444-4444-4444-8444-444444444444',
     product: 'TV Time Sync' as any,
-    version: '1.4.115',
+    version: plex.PLEX_VERSION,
     platform: 'Web' as const,
     createdAt: 1_000,
     expiresAt: 60_000
@@ -121,7 +123,7 @@ test('SEENIT-PLEX-008 borne expiration refus et rate limiting sans boucle infini
     code: 'BOUND',
     clientIdentifier: '55555555-5555-4555-8555-555555555555',
     product: plex.PLEX_PRODUCT,
-    version: '1.4.115',
+    version: plex.PLEX_VERSION,
     platform: 'Web' as const,
     createdAt: 1_000,
     expiresAt: 120_000
@@ -168,7 +170,7 @@ test('SEENIT-PLEX-008 valide le jeton avant de déclarer l’association réussi
     code: 'TOKEN',
     clientIdentifier: '66666666-6666-4666-8666-666666666666',
     product: plex.PLEX_PRODUCT,
-    version: '1.4.115',
+    version: plex.PLEX_VERSION,
     platform: 'Android' as const,
     createdAt: 1_000,
     expiresAt: 120_000
@@ -198,4 +200,25 @@ test('SEENIT-PLEX-008 interdit les secrets de l’association Plex dans les logs
   assert.doesNotMatch(settingsSource, /TV Time Sync/);
   assert.doesNotMatch(settingsSource, /appLogger\.(?:info|warn|error|success)\([^\n]+authUrl/);
   assert.doesNotMatch(settingsSource, /openExternalUrl\(authUrl\)/);
+});
+
+test('le parcours UI Plex utilise un poller unique annulable et reste lié au Firebase UID', () => {
+  const settingsSource = readFileSync('src/screens/SettingsScreen.tsx', 'utf8');
+  assert.match(settingsSource, /pollPlexAuthAttempt\(attempt, \{ signal: controller\.signal \}\)/);
+  assert.match(settingsSource, /const controller = new AbortController\(\)/);
+  assert.match(settingsSource, /controller\.abort\(\)/);
+  assert.match(settingsSource, /auth\.currentUser\?\.uid !== uid/);
+  assert.match(settingsSource, /plexAuthStartGuard\.current/);
+  assert.doesNotMatch(settingsSource, /checkPlexPin\(plexPin\.id\)/);
+});
+
+test('la première synchro Plex ne part qu’après persistance locale et cloud du token validé', () => {
+  const settingsSource = readFileSync('src/screens/SettingsScreen.tsx', 'utf8');
+  const persistCloudIndex = settingsSource.indexOf("await setDoc(plexRef, { authToken: res.authToken, username }, { merge: true })");
+  const persistLocalIndex = settingsSource.indexOf('storePlexCredentials(uid, res.authToken, username)');
+  const syncIndex = settingsSource.indexOf('await performPlexSync({ delta: false, silent: false, ignoreCooldown: true })');
+
+  assert.ok(persistCloudIndex >= 0, 'persistance Firestore absente');
+  assert.ok(persistLocalIndex > persistCloudIndex, 'le stockage local doit suivre Firestore');
+  assert.ok(syncIndex > persistLocalIndex, 'la première synchro doit suivre la persistance validée');
 });
