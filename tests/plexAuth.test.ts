@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import * as ts from 'typescript';
 
 class MemoryStorage {
   private values = new Map<string, string>();
@@ -18,7 +19,25 @@ const jsonResponse = (body: unknown, status = 200, headers: Record<string, strin
 const originalFetch = globalThis.fetch;
 
 async function loadPlex() {
-  return import('../src/services/plex.ts');
+  const source = readFileSync('src/services/plex.ts', 'utf8');
+  const updateStoreSource = readFileSync('src/store/updateStore.ts', 'utf8');
+  const version = updateStoreSource.match(/CURRENT_APP_VERSION\s*=\s*'([^']+)'/)?.[1];
+  assert.ok(version, 'version SeenIt introuvable');
+
+  const testableSource = source.replace(
+    "import { CURRENT_APP_VERSION } from '../store/updateStore';",
+    `const CURRENT_APP_VERSION = ${JSON.stringify(version)};`
+  );
+  assert.notEqual(testableSource, source, 'import de version Plex non substitué');
+
+  const output = ts.transpileModule(testableSource, {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.ESNext
+    }
+  }).outputText;
+  const dataUrl = `data:text/javascript;base64,${Buffer.from(output).toString('base64')}#${Date.now()}-${Math.random()}`;
+  return import(dataUrl);
 }
 
 test.beforeEach(() => {
