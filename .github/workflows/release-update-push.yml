@@ -1,0 +1,44 @@
+name: Notify Android APK Update
+
+on:
+  workflow_run:
+    workflows:
+      - Validate & Release SeenIt
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seenit-release-update-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  notify_android_update:
+    name: Notify Android Update
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'workflow_dispatch' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Checkout released commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 1
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Notify registered Android installations
+        run: node scripts/notify-release-update.cjs
+        env:
+          RELEASE_NOTIFICATION_ENDPOINT: https://seenit.ai.studio/api/releases/notify
+          RELEASE_REPOSITORY: ${{ github.repository }}
+          RELEASE_RUN_ID: ${{ github.event.workflow_run.id }}
+          RELEASE_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
