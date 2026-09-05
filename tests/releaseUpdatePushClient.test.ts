@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { handleAppUpdateAvailablePush } from '../src/features/release/releaseUpdatePushClient';
+import { handleAppUpdateAvailablePush } from '../src/features/release/releaseUpdatePushClient.ts';
 
 test('SEENIT-UPDATE-003 force le contrôle canonique au toucher du push Android', async () => {
   const forces: boolean[] = [];
