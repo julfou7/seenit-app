@@ -6,22 +6,31 @@ import { fileURLToPath } from 'node:url';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const workflowPath = path.join(rootDir, '.github', 'workflows', 'deploy-backend.yml');
+const bootstrapPath = path.join(rootDir, 'scripts', 'bootstrap-gcp-backend-deploy.sh');
+const runbookPath = path.join(rootDir, 'docs', 'runtime-cutover.md');
 const workflow = fs.readFileSync(workflowPath, 'utf8');
+const bootstrap = fs.readFileSync(bootstrapPath, 'utf8');
+const runbook = fs.readFileSync(runbookPath, 'utf8');
 
 test('SEENIT-RUNTIME-001 déploie le backend canonique uniquement après validation de main', () => {
   assert.match(workflow, /branches:\s*\[main\]/);
   assert.match(workflow, /server\.ts/);
-  assert.match(workflow, /src\/features\/runtime\/\*\*/);
+  assert.match(workflow, /src\/\*\*/);
+  assert.match(workflow, /backend-runtime-impact\.cjs/);
   assert.match(workflow, /actions\/workflows\/build-apk\.yml\/runs\?head_sha=\$\{GITHUB_SHA\}&event=push/);
   assert.match(workflow, /conclusion[^\n]*success/);
+  assert.match(workflow, /SHOULD_DEPLOY/);
 });
 
-test('SEENIT-RUNTIME-001 utilise WIF sans clé JSON durable', () => {
+test('SEENIT-RUNTIME-001 utilise une WIF bornée au dépôt sans clé JSON durable', () => {
   assert.match(workflow, /id-token:\s*write/);
   assert.match(workflow, /google-github-actions\/auth@v3/);
-  assert.match(workflow, /SEENIT_GCP_WORKLOAD_IDENTITY_PROVIDER/);
-  assert.match(workflow, /SEENIT_GCP_DEPLOY_SERVICE_ACCOUNT/);
-  assert.doesNotMatch(workflow, /credentials_json|GCP_CREDENTIALS|SERVICE_ACCOUNT_KEY/);
+  assert.match(workflow, /projects\/799043440232\/locations\/global\/workloadIdentityPools\/seenit-github\/providers\/seenit-main/);
+  assert.match(workflow, /seenit-github-deployer@gen-lang-client-0201895414\.iam\.gserviceaccount\.com/);
+  assert.match(bootstrap, /assertion\.repository_id=='1338192018'/);
+  assert.match(bootstrap, /assertion\.ref=='refs\/heads\/main'/);
+  assert.match(bootstrap, /roles\/iam\.workloadIdentityUser/);
+  assert.doesNotMatch(`${workflow}\n${bootstrap}`, /credentials_json|GCP_CREDENTIALS|SERVICE_ACCOUNT_KEY/);
 });
 
 test('SEENIT-RUNTIME-001 valide la nouvelle révision avant de basculer le trafic', () => {
@@ -43,4 +52,10 @@ test('SEENIT-RUNTIME-001 conserve un rollback vers la révision précédemment s
   assert.match(workflow, /PREVIOUS_REVISION/);
   assert.match(workflow, /Rollback vers \$PREVIOUS_REVISION/);
   assert.match(workflow, /--to-revisions "\$PREVIOUS_REVISION=100"/);
+});
+
+test('SEENIT-RUNTIME-001 documente que la sync AI Studio ne vaut jamais preuve de déploiement', () => {
+  assert.match(runbook, /sync Git AI Studio/i);
+  assert.match(runbook, /ne constitue pas un déploiement/i);
+  assert.match(runbook, /bootstrap-gcp-backend-deploy\.sh/);
 });
