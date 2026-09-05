@@ -1,7 +1,7 @@
 # SeenIt — Référence fonctionnelle canonique
 
-Dernière vérification : 4 septembre 2026  
-Baseline observée : **1.4.112**, `main` `567187a1798b5724bf731d21b0fba664bd3bf138`  
+Dernière vérification : 5 septembre 2026  
+Baseline observée : **1.4.114**, `main` `7335c2447cf5c77dc6b7f954192754d3c2a8e549`  
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : composante obligatoire de la SPEC SeenIt
 
@@ -330,12 +330,25 @@ sortie cinéma le jour J et estimation DVD/VOD à J+120. L'horaire de référenc
 - Les notifications profondes ouvrent le média/épisode exact ; l'APK peut exposer « Marquer comme vu ».
 - Les clés locales de programmation évitent le doublon sur une même installation.
 
+Après qu'une release APK officielle a été publiée et vérifiée, SeenIt peut prévenir les installations
+Android autorisées du compte :
+
+- l'envoi vise Android uniquement dans la première version ; la PWA ne reçoit pas ce push ;
+- une même installation reçoit au plus une notification par version, y compris après une reprise ;
+- toucher la notification ouvre SeenIt et déclenche son contrôle canonique de mise à jour ;
+- la notification ne constitue jamais une source d'installation : l'application revalide la release,
+  l'asset exact et son SHA-256 avant tout téléchargement ;
+- une panne FCM reste observable et rejouable sans annuler ni altérer la release déjà publiée.
+
 Chaque média est évalué indépendamment : un média archivé/abandonné, sans date exploitable ou sans
 prochain épisode est ignoré sans interrompre la programmation des suivants. Aucun rappel n'est programmé
 pour l'élément inéligible. Les tests « Tester » des réglages valident l'autorisation et le rendu, pas
 l'arrivée future d'une donnée TMDB ou d'un webhook réel.
 
 ## 12. Réglages et maintenance utilisateur
+
+L'autorisation « notifications sur cet appareil » couvre aussi l'alerte de nouvelle version sur
+Android ; aucun réglage séparé n'est ajouté initialement.
 
 Les réglages généraux contiennent :
 
