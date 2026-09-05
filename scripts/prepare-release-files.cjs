@@ -65,6 +65,20 @@ function stringifyJson(source, mutate) {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
+function replaceUniqueJsonScalar(source, field, value, label = field) {
+  JSON.parse(source);
+  const escapedField = String(field).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const scalar = typeof value === 'number' ? String(value) : `"${String(value)}"`;
+  const regex = new RegExp(`("${escapedField}"\\s*:\\s*)(?:"(?:\\\\.|[^"\\\\])*"|-?\\d+(?:\\.\\d+)?)`, 'g');
+  const matches = [...source.matchAll(regex)];
+  if (matches.length !== 1) {
+    throw new Error(`Champ JSON unique attendu pour ${label}, trouvé ${matches.length}.`);
+  }
+  const next = source.replace(regex, `$1${scalar}`);
+  JSON.parse(next);
+  return next;
+}
+
 function buildReleaseFileContents(targetVersion, { rootDir = DEFAULT_ROOT } = {}) {
   if (!parseSemver(targetVersion)) throw new Error(`Version SemVer invalide : ${targetVersion}.`);
   const code = versionCodeFor(targetVersion);
@@ -101,13 +115,24 @@ function buildReleaseFileContents(targetVersion, { rootDir = DEFAULT_ROOT } = {}
     value.packages[''].name = 'seenit-app';
     value.packages[''].version = targetVersion;
   });
-  next['docs/specifications/requirements.json'] = stringifyJson(before['docs/specifications/requirements.json'], value => {
-    value.applicationVersion = targetVersion;
-  });
-  next['docs/specifications/android-contract.json'] = stringifyJson(before['docs/specifications/android-contract.json'], value => {
-    value.applicationVersion = targetVersion;
-    value.versionCode = code;
-  });
+  next['docs/specifications/requirements.json'] = replaceUniqueJsonScalar(
+    before['docs/specifications/requirements.json'],
+    'applicationVersion',
+    targetVersion,
+    'applicationVersion du catalogue SPEC'
+  );
+  next['docs/specifications/android-contract.json'] = replaceUniqueJsonScalar(
+    before['docs/specifications/android-contract.json'],
+    'applicationVersion',
+    targetVersion,
+    'applicationVersion du contrat Android'
+  );
+  next['docs/specifications/android-contract.json'] = replaceUniqueJsonScalar(
+    next['docs/specifications/android-contract.json'],
+    'versionCode',
+    code,
+    'versionCode du contrat Android'
+  );
   next['docs/specifications/seenit.md'] = replaceRequired(
     before['docs/specifications/seenit.md'],
     /Version applicative\s*:\s*\*\*\d+\.\d+\.\d+\*\*/,
@@ -197,6 +222,7 @@ module.exports = {
   assertReleaseOnlyFiles,
   buildReleaseFileContents,
   prepareReleaseFiles,
+  replaceUniqueJsonScalar,
   updateGradleVersionName,
   validateAlignedReleaseFiles,
   versionCodeFor

@@ -83,6 +83,11 @@ calcule en mémoire puis aligne exactement les huit surfaces canoniques :
 
 Toutes les transformations sont calculées avant écriture. Si une écriture ou la validation finale échoue, les fichiers déjà écrits sont restaurés. Une préparation normale N → N+1 exige que les huit surfaces changent et qu’elles soient toutes cohérentes avant commit. L’orchestration distante de branche/PR peut encore utiliser un connecteur GitHub ou `gh`, mais **la production cohérente des huit fichiers n’en dépend plus**.
 
+La préparation est aussi **conservative sur le format** : pour les catalogues JSON de spécification,
+elle remplace uniquement les scalaires canoniques de version (`applicationVersion` et, pour le contrat
+Android, `versionCode`). Tout autre octet reste inchangé. Une release ne doit donc jamais reformater
+`requirements.json` ni produire un churn documentaire sans rapport avec la version.
+
 ## Tests obligatoires
 
 `tests/releaseFastPath.test.ts` couvre réellement :
@@ -92,6 +97,7 @@ Toutes les transformations sont calculées avant écriture. Si une écriture ou 
 - le refus d’un checkout non `main`, d’une version inattendue, d’un tag/release existant et d’un run actif identique ;
 - la construction et l’appel du endpoint natif `workflow_dispatch` avec un client API injecté, sans CLI ;
 - la préparation d’un fixture réel contenant les huit surfaces, puis leur cohérence en N+1 sans `gh`.
+- la conservation octet par octet du format des catalogues JSON, hors valeurs de version attendues.
 
 Les assertions documentaires seules ne suffisent plus pour satisfaire `SEENIT-RELEASE-005`.
 

@@ -39,6 +39,7 @@ const {
 };
 const {
   prepareReleaseFiles,
+  replaceUniqueJsonScalar,
   validateAlignedReleaseFiles
 } = require('../scripts/prepare-release-files.cjs') as {
   prepareReleaseFiles: (version: string, options?: { rootDir?: string; requireAllEight?: boolean }) => {
@@ -47,6 +48,7 @@ const {
     versionCode: number;
     surfaces: number;
   };
+  replaceUniqueJsonScalar: (source: string, field: string, value: string | number, label?: string) => string;
   validateAlignedReleaseFiles: (version: string, options?: { rootDir?: string }) => any;
 };
 const {
@@ -228,6 +230,8 @@ test('SEENIT-RELEASE-002 la préparation est atomique et release-only', () => {
 
   const root = createVersionFixture();
   try {
+    const requirementsBefore = readFileSync(join(root, 'docs/specifications/requirements.json'), 'utf8');
+    const androidContractBefore = readFileSync(join(root, 'docs/specifications/android-contract.json'), 'utf8');
     const result = prepareReleaseFiles('1.4.114', { rootDir: root });
     assert.deepEqual(result.changedFiles, RELEASE_VERSION_FILES);
     assert.equal(result.version, '1.4.114');
@@ -238,9 +242,31 @@ test('SEENIT-RELEASE-002 la préparation est atomique et release-only', () => {
     });
     assert.match(readFileSync(join(root, 'server.ts'), 'utf8'), /X-Plex-Version': '1\.4\.114'/);
     assert.equal(JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8')).packages[''].version, '1.4.114');
+    assert.equal(
+      readFileSync(join(root, 'docs/specifications/requirements.json'), 'utf8'),
+      requirementsBefore.replace('"applicationVersion":"1.4.113"', '"applicationVersion":"1.4.114"')
+    );
+    assert.equal(
+      readFileSync(join(root, 'docs/specifications/android-contract.json'), 'utf8'),
+      androidContractBefore
+        .replace('"applicationVersion":"1.4.113"', '"applicationVersion":"1.4.114"')
+        .replace('"versionCode":104113', '"versionCode":104114')
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('SEENIT-QUALITY-009 conserve le format JSON hors scalaire de version ciblé', () => {
+  const mixedFormatting = '{\n  "applicationVersion": "1.4.113",\n  "targets": ["pwa", "apk"],\n  "nested": { "value": true }\n}\n';
+  assert.equal(
+    replaceUniqueJsonScalar(mixedFormatting, 'applicationVersion', '1.4.114'),
+    mixedFormatting.replace('1.4.113', '1.4.114')
+  );
+  assert.throws(
+    () => replaceUniqueJsonScalar('{"versionCode":1,"nested":{"versionCode":2}}', 'versionCode', 3),
+    /Champ JSON unique attendu/
+  );
 });
 
 test('SEENIT-RELEASE-002 le fast path est autonome, borné et sans Web/plugin', () => {
