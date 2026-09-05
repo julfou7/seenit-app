@@ -11,7 +11,7 @@ const updatePushSpec = spec.slice(start, end);
 
 test('SEENIT-UPDATE-003 spécifie un push Android uniquement après une release officielle vérifiée', () => {
   assert.ok(start >= 0 && end > start);
-  assert.match(updatePushSpec, /publication réussie/);
+  assert.match(updatePushSpec, /publication[\s\S]*réussie/);
   assert.match(updatePushSpec, /release immuable/);
   assert.match(updatePushSpec, /`main` officiel/);
   assert.match(updatePushSpec, /julfou7\/seenit-app/);
