@@ -5,10 +5,10 @@ on:
     branches: [main]
     paths:
       - server.ts
-      - src/lib/firebase-admin.ts
-      - src/features/runtime/**
-      - src/backend/**
-      - src/server/**
+      - src/**
+      - package.json
+      - package-lock.json
+      - scripts/backend-runtime-impact.cjs
       - .github/workflows/deploy-backend.yml
   workflow_dispatch:
 
@@ -23,8 +23,11 @@ concurrency:
 
 env:
   GCP_PROJECT_ID: gen-lang-client-0201895414
+  GCP_PROJECT_NUMBER: '799043440232'
   GCP_REGION: us-west1
   GCP_SERVICE: seenit-app
+  GCP_WORKLOAD_IDENTITY_PROVIDER: projects/799043440232/locations/global/workloadIdentityPools/seenit-github/providers/seenit-main
+  GCP_DEPLOY_SERVICE_ACCOUNT: seenit-github-deployer@gen-lang-client-0201895414.iam.gserviceaccount.com
   CANONICAL_ORIGIN: https://seenit.ai.studio
 
 jobs:
@@ -32,14 +35,14 @@ jobs:
     name: Deploy Canonical Backend
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
       - name: Checkout canonical main
         uses: actions/checkout@v6
         with:
           ref: ${{ github.sha }}
-          fetch-depth: 1
+          fetch-depth: 2
 
       - name: Wait for the canonical validation run
         if: github.event_name == 'push'
@@ -74,28 +77,41 @@ jobs:
           echo "Aucune validation verte trouvée pour ${GITHUB_SHA} dans la fenêtre autorisée."
           exit 1
 
-      - name: Verify Workload Identity configuration
+      - name: Set up Node.js 22 for runtime impact analysis
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependency graph tooling
+        run: npm ci --ignore-scripts --prefer-offline --no-audit
+
+      - name: Detect a real backend runtime impact
+        id: impact
+        run: node scripts/backend-runtime-impact.cjs
         env:
-          WIF_PROVIDER: ${{ vars.SEENIT_GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          DEPLOY_SERVICE_ACCOUNT: ${{ vars.SEENIT_GCP_DEPLOY_SERVICE_ACCOUNT }}
-        run: |
-          set -euo pipefail
-          if [[ -z "$WIF_PROVIDER" || -z "$DEPLOY_SERVICE_ACCOUNT" ]]; then
-            echo "Configuration GCP absente. Définir les variables de dépôt SEENIT_GCP_WORKLOAD_IDENTITY_PROVIDER et SEENIT_GCP_DEPLOY_SERVICE_ACCOUNT (issue #57)."
-            exit 1
-          fi
+          BACKEND_BASE_SHA: ${{ github.event.before }}
+          BACKEND_HEAD_SHA: ${{ github.sha }}
+          FORCE_BACKEND_DEPLOY: ${{ github.event_name == 'workflow_dispatch' }}
+
+      - name: Skip non-runtime source change
+        if: steps.impact.outputs.SHOULD_DEPLOY != 'true'
+        run: echo "Aucune dépendance du runtime server.ts n'a changé ; aucun déploiement Cloud Run nécessaire."
 
       - name: Authenticate to Google Cloud with Workload Identity Federation
+        if: steps.impact.outputs.SHOULD_DEPLOY == 'true'
         uses: google-github-actions/auth@v3
         with:
-          workload_identity_provider: ${{ vars.SEENIT_GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.SEENIT_GCP_DEPLOY_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_DEPLOY_SERVICE_ACCOUNT }}
           project_id: ${{ env.GCP_PROJECT_ID }}
 
       - name: Set up gcloud
+        if: steps.impact.outputs.SHOULD_DEPLOY == 'true'
         uses: google-github-actions/setup-gcloud@v3
 
       - name: Capture the currently served revision
+        if: steps.impact.outputs.SHOULD_DEPLOY == 'true'
         run: |
           set -euo pipefail
           service_json="$(gcloud run services describe "$GCP_SERVICE" \
@@ -112,6 +128,7 @@ jobs:
 
       - name: Deploy the candidate revision without traffic
         id: deploy
+        if: steps.impact.outputs.SHOULD_DEPLOY == 'true'
         uses: google-github-actions/deploy-cloudrun@v3
         with:
           service: ${{ env.GCP_SERVICE }}
@@ -121,6 +138,7 @@ jobs:
           tag: candidate-${{ github.run_id }}
 
       - name: Health-check candidate, promote, and verify production
+        if: steps.impact.outputs.SHOULD_DEPLOY == 'true'
         env:
           CANDIDATE_TAG: candidate-${{ github.run_id }}
         run: |
