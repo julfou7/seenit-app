@@ -4,6 +4,8 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const cataloguePath = path.join(root, 'docs/specifications/requirements.json');
 const allowedTargets = new Set(['backend', 'pwa', 'apk', 'ci']);
+const requirementIdPattern = /^SEENIT-(?:[A-Z0-9]+-)+\d{3}$/;
+const documentedRequirementPattern = /\*\*(SEENIT-(?:[A-Z0-9]+-)+\d{3})\*\*/g;
 
 function fail(message) {
   console.error(`[SPEC] ${message}`);
@@ -48,7 +50,7 @@ try {
 const requirementIds = new Set();
 for (const requirement of catalogue.requirements || []) {
   const id = String(requirement.id || '');
-  if (!/^SEENIT-[A-Z0-9]+-\d{3}$/.test(id)) fail(`Identifiant invalide : ${id || '(vide)'}.`);
+  if (!requirementIdPattern.test(id)) fail(`Identifiant invalide : ${id || '(vide)'}.`);
   if (requirementIds.has(id)) fail(`Identifiant dupliqué : ${id}.`);
   requirementIds.add(id);
 
@@ -82,7 +84,7 @@ for (const requirement of catalogue.requirements || []) {
 }
 
 const documentedIds = new Set(
-  Array.from(specification.matchAll(/\*\*(SEENIT-[A-Z0-9]+-\d{3})\*\*/g), match => match[1])
+  Array.from(specification.matchAll(documentedRequirementPattern), match => match[1])
 );
 for (const id of requirementIds) {
   if (!documentedIds.has(id)) fail(`${id} existe dans le catalogue mais pas dans la SPEC.`);

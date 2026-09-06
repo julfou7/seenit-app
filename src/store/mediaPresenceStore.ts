@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { useDownloadConfigStore } from './downloadConfigStore';
 import { executeGet, cleanUrl } from '../services/sonarrRadarr';
 import { checkPlexAvailability, PlexMediaInfo } from '../features/plex/plexAvailability';
+import { isDownloadFeatureEnabled } from '../features/downloads/downloadFeatureVisibility';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 
@@ -11,7 +12,7 @@ export interface MediaPresenceData {
   radarrHasFile?: boolean;
   sonarrHasFile?: boolean;
   seasonsHasFile: Record<number, boolean>;
-  episodesHasFile: Record<string, boolean>; // e.g., "S1E1": true
+  episodesHasFile: Record<string, boolean>;
   plexInfo?: PlexMediaInfo;
   lastChecked: number;
 }
@@ -37,6 +38,12 @@ interface MediaPresenceStore {
 
 let mediaPresenceEpoch = 0;
 
+function getDownloadPresenceScope(): string {
+  const config = useDownloadConfigStore.getState();
+  if (!isDownloadFeatureEnabled(config)) return 'downloads-hidden';
+  return `${cleanUrl(config.radarrUrl)}|${cleanUrl(config.sonarrUrl)}`;
+}
+
 export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
   presenceCache: {},
   radarrMoviesCache: null,
@@ -44,8 +51,7 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
 
   getPresence: (tmdbId, mediaType = 'movie', title) => {
     if (!tmdbId) return undefined;
-    const config = useDownloadConfigStore.getState();
-    const configScope = `${cleanUrl(config.radarrUrl)}|${cleanUrl(config.sonarrUrl)}`;
+    const configScope = getDownloadPresenceScope();
     const key = `${auth.currentUser?.uid || 'signed-out'}|${configScope}|${mediaType}:${tmdbId}`;
     return get().presenceCache[key];
   },
@@ -63,9 +69,12 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
     } = params;
 
     const config = useDownloadConfigStore.getState();
+    const downloadsEnabled = isDownloadFeatureEnabled(config);
     const requestEpoch = mediaPresenceEpoch;
     const requestUid = auth.currentUser?.uid || null;
-    const configScope = `${cleanUrl(config.radarrUrl)}|${cleanUrl(config.sonarrUrl)}`;
+    const configScope = downloadsEnabled
+      ? `${cleanUrl(config.radarrUrl)}|${cleanUrl(config.sonarrUrl)}`
+      : 'downloads-hidden';
     const canonicalId = tmdbId || tvdbId || imdbId || 'sans-identifiant';
     const cacheKey = `${requestUid || 'signed-out'}|${configScope}|${mediaType}:${canonicalId}`;
     const now = Date.now();
@@ -81,7 +90,6 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
       };
     }
 
-    // Stratégie de Cache : 5 minutes pour un média trouvé / disponible, 30 secondes sinon
     if (!forceRefresh && existing) {
       const ttl = (existing.hasFile || existing.plexInfo?.available) ? 5 * 60 * 1000 : 30 * 1000;
       if (now - existing.lastChecked < ttl) {
@@ -89,7 +97,6 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
       }
     }
 
-    // Indiquer l'état de chargement si aucune donnée préalable
     if (!existing) {
       set((state) => ({
         presenceCache: {
@@ -105,7 +112,6 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
       }));
     }
 
-    // 1. Vérification disponibilité Plex en parallèle
     const plexPromise = checkPlexAvailability({
       tmdbId,
       imdbId,
@@ -121,8 +127,7 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
     const seasonsHasFile: Record<number, boolean> = {};
     const episodesHasFile: Record<string, boolean> = {};
 
-    // 2. Vérification Radarr pour les films
-    if (mediaType === 'movie' && config.radarrUrl && config.radarrApiKey) {
+    if (downloadsEnabled && mediaType === 'movie' && config.radarrUrl && config.radarrApiKey) {
       try {
         const radarrBase = cleanUrl(config.radarrUrl);
         const headers = { 'X-Api-Key': config.radarrApiKey, 'Accept': 'application/json' };
@@ -155,8 +160,7 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
       }
     }
 
-    // 3. Vérification Sonarr pour les séries / saisons / épisodes
-    if (mediaType === 'tv' && config.sonarrUrl && config.sonarrApiKey) {
+    if (downloadsEnabled && mediaType === 'tv' && config.sonarrUrl && config.sonarrApiKey) {
       try {
         const sonarrBase = cleanUrl(config.sonarrUrl);
         const headers = { 'X-Api-Key': config.sonarrApiKey, 'Accept': 'application/json' };
@@ -182,7 +186,6 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
           });
 
           if (match && match.id) {
-            // Récupérer la liste des épisodes pour cette série
             const episodes: any[] = await executeGet(`${sonarrBase}/api/v3/episode?seriesId=${match.id}`, headers).catch(() => []);
             if (Array.isArray(episodes) && episodes.length > 0) {
               const episodesBySeason: Record<number, any[]> = {};
@@ -199,7 +202,6 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
                 }
               });
 
-              // Une saison est considérée comme complète si 100% des épisodes de la saison ont hasFile === true
               Object.entries(episodesBySeason).forEach(([sNumStr, epList]) => {
                 const sNum = Number(sNumStr);
                 if (epList.length > 0) {
@@ -207,7 +209,6 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
                 }
               });
 
-              // La série est considérée comme complète si 100% des épisodes hors hors-série ont hasFile === true
               const allMainEps = episodes.filter((ep: any) => ep.seasonNumber > 0);
               if (allMainEps.length > 0) {
                 sonarrHasFile = allMainEps.every((ep: any) => ep.hasFile === true);
@@ -224,11 +225,11 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
 
     const finalData: MediaPresenceData = {
       loading: false,
-      hasFile: radarrHasFile || sonarrHasFile || !!plexInfo.available,
-      radarrHasFile,
-      sonarrHasFile,
-      seasonsHasFile,
-      episodesHasFile,
+      hasFile: (downloadsEnabled && (radarrHasFile || sonarrHasFile)) || !!plexInfo.available,
+      radarrHasFile: downloadsEnabled ? radarrHasFile : false,
+      sonarrHasFile: downloadsEnabled ? sonarrHasFile : false,
+      seasonsHasFile: downloadsEnabled ? seasonsHasFile : {},
+      episodesHasFile: downloadsEnabled ? episodesHasFile : {},
       plexInfo,
       lastChecked: now
     };
@@ -254,13 +255,21 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
   }
 }));
 
+function resetMediaPresenceState() {
+  mediaPresenceEpoch += 1;
+  useMediaPresenceStore.setState({
+    presenceCache: {},
+    radarrMoviesCache: null,
+    sonarrSeriesCache: null
+  });
+}
+
 if (typeof window !== 'undefined') {
-  onAuthStateChanged(auth, () => {
-    mediaPresenceEpoch += 1;
-    useMediaPresenceStore.setState({
-      presenceCache: {},
-      radarrMoviesCache: null,
-      sonarrSeriesCache: null
-    });
+  onAuthStateChanged(auth, resetMediaPresenceState);
+
+  useDownloadConfigStore.subscribe((state, previousState) => {
+    if (isDownloadFeatureEnabled(state) !== isDownloadFeatureEnabled(previousState)) {
+      resetMediaPresenceState();
+    }
   });
 }

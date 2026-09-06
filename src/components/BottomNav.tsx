@@ -1,8 +1,10 @@
-import React, { useRef } from 'react';
+import React, { lazy, Suspense, useRef } from 'react';
 import { SeenItGlyph, type SeenItSymbolType } from './SeenItLogo';
 import { cn } from '../lib/utils';
-import { useLiveDownloadStore } from '../store/liveDownloadStore';
-import { isDownloadActiveOrAttention } from '../features/downloads/downloadStatePolicy';
+import { useDownloadConfigStore } from '../store/downloadConfigStore';
+import { isDownloadFeatureEnabled } from '../features/downloads/downloadFeatureVisibility';
+
+const DownloadNavBadge = lazy(() => import('./DownloadNavBadge').then(module => ({ default: module.DownloadNavBadge })));
 
 interface Props {
   currentTab: string;
@@ -19,7 +21,7 @@ interface TabItem {
 
 export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveTabDoubleClick }: Props) {
   const lastTapRef = useRef<number>(0);
-  const activeCount = useLiveDownloadStore(state => state.downloads.filter(isDownloadActiveOrAttention).length);
+  const downloadsEnabled = useDownloadConfigStore(isDownloadFeatureEnabled);
 
   const tabs: readonly TabItem[] = [
     { id: 'watchlist', label: 'À Voir', symbol: 'watch' },
@@ -27,6 +29,8 @@ export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveT
     { id: 'discover', label: 'Explorer', symbol: 'discover' },
     { id: 'downloads', label: 'Télécharger', symbol: 'download' },
   ] as const;
+
+  const visibleTabs = downloadsEnabled ? tabs : tabs.filter(tab => tab.id !== 'downloads');
 
   const handleTabClick = (e: React.MouseEvent, tabId: string) => {
     e.preventDefault();
@@ -40,13 +44,11 @@ export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveT
     }
 
     if (timeSinceLastTap > 0 && timeSinceLastTap < 450) {
-      // Double tap : Scroll to top / reset filtres
       if (onActiveTabDoubleClick) {
         onActiveTabDoubleClick();
       }
-      lastTapRef.current = 0; // reset
+      lastTapRef.current = 0;
     } else {
-      // Single tap : Exécuté IMMÉDIATEMENT (Retour arrière)
       if (onActiveTabClick) {
         onActiveTabClick();
       }
@@ -56,7 +58,7 @@ export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveT
 
   return (
     <div className="absolute bottom-0 inset-x-0 bg-zinc-950/95 backdrop-blur-2xl border-t border-white/10 pt-1.5 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] px-1 sm:px-4 flex justify-around items-center z-[160]">
-      {tabs.map((tab) => {
+      {visibleTabs.map((tab) => {
         const isActive = currentTab === tab.id;
         const isDownloadTab = tab.id === 'downloads';
 
@@ -79,10 +81,10 @@ export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveT
                 idPrefix={`bnav-${tab.id}`}
                 color="gold"
               />
-              {isDownloadTab && activeCount > 0 && (
-                <span className="absolute -top-0.5 -right-1 min-w-[16px] h-[16px] px-1 rounded-full bg-[#E5A93D] border border-zinc-950 text-black font-black text-[9.5px] leading-none flex items-center justify-center shadow-md shadow-[#E5A93D]/40 animate-pulse">
-                  {activeCount}
-                </span>
+              {isDownloadTab && downloadsEnabled && (
+                <Suspense fallback={null}>
+                  <DownloadNavBadge />
+                </Suspense>
               )}
             </div>
             <span className={cn(
