@@ -59,6 +59,14 @@ function getToastSearchText(message: string | ToastMessageObj): string {
   return [message.title, message.subtitle, message.action].filter(Boolean).join(' • ');
 }
 
+function normalizeNotificationTestToastMessage(message: string | ToastMessageObj): string | ToastMessageObj {
+  if (typeof message !== 'string') return message;
+  if (!/(?:Test envoyé à votre téléphone|Test avec le prochain événement|Aucun événement à venir)/i.test(message)) {
+    return message;
+  }
+  return message.replace(/^(?:\u{1F514}|\uFFFD)\s*/u, '');
+}
+
 function isPlexToastMessage(message: string | ToastMessageObj): boolean {
   return /plex/i.test(getToastSearchText(message));
 }
@@ -124,7 +132,9 @@ export const useToastStore = create<ToastState>((set, get) => ({
     const inferredScope: ToastScope | undefined = scope || (isPlexToastMessage(message) ? 'plex' : undefined);
     const searchText = getToastSearchText(message);
     const isCompletion = inferredScope === 'plex' && isPlexCompletionMessage(message);
-    let finalMessage = inferredScope === 'plex' ? normalizePlexToastMessage(message) : message;
+    let finalMessage = inferredScope === 'plex'
+      ? normalizePlexToastMessage(message)
+      : normalizeNotificationTestToastMessage(message);
 
     if (inferredScope === 'plex' && !isCompletion) {
       if (/(?:dé-vu|non[- ]vu)\s+sur\s+plex/i.test(searchText)) {
