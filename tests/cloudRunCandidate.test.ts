@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { prepareCandidateService } = require('../scripts/prepare-cloud-run-candidate.cjs');
+const { deriveCandidateTag, prepareCandidateService } = require('../scripts/prepare-cloud-run-candidate.cjs');
 
 const image = `us-west1-docker.pkg.dev/gen-lang-client-0201895414/cloud-run-source-deploy/seenit-app@sha256:${'a'.repeat(64)}`;
 const baseOptions = {
@@ -63,8 +63,16 @@ test('SEENIT-RUNTIME-001 prépare une candidate image en conservant la configura
   assert.match(prepared, /keep-value/);
   assert.match(prepared, /memory: 512Mi/);
   assert.match(prepared, /serviceAccountName: runtime@example\.iam\.gserviceaccount\.com/);
-  assert.match(prepared, /percent: 100/);
-  assert.match(prepared, /revisionName: seenit-app-00014-wjw/);
+  assert.match(prepared, /percent: 100\n    revisionName: seenit-app-00014-wjw/);
+  assert.match(prepared, /percent: 0\n    revisionName: seenit-app-gh-12345\n    tag: candidate-12345/);
+});
+
+test('SEENIT-RUNTIME-001 dérive le tag candidat attendu par le workflow', () => {
+  assert.equal(deriveCandidateTag('seenit-app', 'seenit-app-gh-34014482896-1'), 'candidate-34014482896-1');
+  assert.throws(
+    () => deriveCandidateTag('seenit-app', 'seenit-app-blue'),
+    /hors convention seenit-app-gh-/
+  );
 });
 
 test('SEENIT-RUNTIME-001 refuse un export dont le trafic suit latestRevision', () => {
