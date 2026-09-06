@@ -33,6 +33,8 @@ spec:
       containerConcurrency: 80
       containers:
       - env:
+        - name: NODE_ENV
+          value: development
         - name: KEEP_ENV
           value: keep-value
         image: us-west1-docker.pkg.dev/legacy/source/app:old
@@ -63,8 +65,21 @@ test('SEENIT-RUNTIME-001 prépare une candidate image en conservant la configura
   assert.match(prepared, /keep-value/);
   assert.match(prepared, /memory: 512Mi/);
   assert.match(prepared, /serviceAccountName: runtime@example\.iam\.gserviceaccount\.com/);
+  assert.match(prepared, /name: NODE_ENV\n\s+value: production/);
+  assert.doesNotMatch(prepared, /name: NODE_ENV\n\s+value: development/);
+  assert.equal((prepared.match(/name: NODE_ENV/g) || []).length, 1);
   assert.match(prepared, /percent: 100\n    revisionName: seenit-app-00014-wjw/);
   assert.match(prepared, /percent: 0\n    revisionName: seenit-app-gh-12345\n    tag: candidate-12345/);
+});
+
+test('SEENIT-RUNTIME-001 ajoute NODE_ENV=production quand le service exporté n’a pas de bloc env', () => {
+  const noEnv = exportedService.replace(
+    `      - env:\n        - name: NODE_ENV\n          value: development\n        - name: KEEP_ENV\n          value: keep-value\n        image:`,
+    '      - image:'
+  );
+  const prepared = prepareCandidateService(noEnv, baseOptions);
+
+  assert.match(prepared, /- env:\n\s+- name: NODE_ENV\n\s+value: production\n\s+image:/);
 });
 
 test('SEENIT-RUNTIME-001 dérive le tag candidat attendu par le workflow', () => {
