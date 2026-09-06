@@ -209,6 +209,11 @@ autrement.
   identifiant distant ; l'application doit toutefois épingler les groupes admis.
 - [Wikidata Query Service](https://www.mediawiki.org/wiki/Wikidata_query_service/User_Manual) documente
   timeout et limites d'usage qui excluent son endpoint public comme dépendance temps réel fiable.
+- Les propriétés Wikidata structurées utilisées hors ligne sont
+  [`narrative universe` P1080](https://www.wikidata.org/wiki/Property:P1080),
+  [`part of the series` P179](https://www.wikidata.org/wiki/Property:P179),
+  [`TMDB movie ID` P4947](https://www.wikidata.org/wiki/Property:P4947) et
+  [`TMDB TV series ID` P4983](https://www.wikidata.org/wiki/Property:P4983).
 
 ## Matrice exhaustive des constats
 
@@ -244,6 +249,27 @@ acceptées sur une simple ressemblance.
 
 L'issue #130 est rouverte. #165 reste une donnée exacte utile, mais ne clôt ni REL-10 ni la couverture
 globale des univers.
+
+### Traitement systémique du 6 septembre 2026
+
+REL-10 est traité au niveau de l'architecture : les groupes ne sont plus déclarés dans le résolveur.
+La source éditoriale vit dans `data/media-relations/catalog.json`, avec version et provenance par
+groupe ; un générateur validant produit le snapshot TypeScript embarqué. Toute divergence source /
+snapshot bloque désormais les contrôles et tous les groupes passent les mêmes invariants d'identité,
+unicité et réciprocité.
+
+La couverture n'est plus limitée à des signalements nominatifs : un détecteur hors ligne parcourt les
+relations structurées Wikidata `narrative universe` (`P1080`) et `part of the series` (`P179`), puis ne
+retient que les œuvres disposant d'un ID TMDB Film (`P4947`) ou Série (`P4983`). Sa première exécution
+réelle a produit 1 352 groupes candidats (1 350 sagas et 2 univers) et rejeté 95 identités ambiguës,
+sans mutation du catalogue. Les identités ambiguës sont rejetées ; les propositions restent
+`pending-review` et sont archivées chaque semaine comme artefact GitHub Actions. Une panne Wikidata
+n'affecte ni le runtime, ni le dernier snapshot approuvé.
+
+**Risque résiduel assumé :** aucune source globale ne garantit à la fois exhaustivité et exactitude de
+toutes les continuités narratives. SeenIt privilégie donc zéro faux positif : une relation réelle absente
+des déclarations structurées ou non encore revue reste masquée. L'automatisation accélère la détection
+et la maintenance ; elle ne remplace pas la validation éditoriale.
 
 ## Décision
 

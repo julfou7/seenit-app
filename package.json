@@ -17,7 +17,7 @@
     "lint": "tsc --noEmit",
     "test": "npm run test:spec && npm run test:android && npm run lint && npm run test:unit",
     "test:unit": "node --test tests/*.test.ts",
-    "test:spec": "node scripts/validate-specifications.cjs",
+    "test:spec": "node scripts/validate-specifications.cjs && node scripts/media-relations-catalog.cjs check",
     "test:android": "node scripts/validate-android-contract.cjs",
     "test:spec:changes": "node scripts/validate-change-contract.cjs",
     "delivery:classify": "node scripts/classify-delivery.cjs",
@@ -26,7 +26,10 @@
     "release:status": "node scripts/release-status.cjs",
     "release:prepare": "node scripts/prepare-release.cjs",
     "release:prepare:files": "node scripts/prepare-release-files.cjs",
-    "release:dispatch": "node scripts/dispatch-release.cjs"
+    "release:dispatch": "node scripts/dispatch-release.cjs",
+    "relations:build": "node scripts/media-relations-catalog.cjs build",
+    "relations:check": "node scripts/media-relations-catalog.cjs check",
+    "relations:discover": "node scripts/discover-media-relations.cjs --output=build/media-relations-candidates.json"
   },
   "dependencies": {
     "@capacitor-community/file-opener": "^8.0.1",

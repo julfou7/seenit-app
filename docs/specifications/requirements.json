@@ -1361,6 +1361,22 @@
         {
           "file": "tests/mediaRelationsSpecification.test.ts",
           "contains": "SEENIT-RELATION-001 borne les sources distantes et les performances"
+        },
+        {
+          "file": "tests/mediaRelationsSpecification.test.ts",
+          "contains": "SEENIT-RELATION-001 impose un catalogue généré et une revue des candidats hors ligne"
+        },
+        {
+          "file": "tests/mediaRelationsCatalog.test.ts",
+          "contains": "SEENIT-RELATION-001 génère un snapshot déterministe depuis le catalogue éditorial"
+        },
+        {
+          "file": "tests/mediaRelationsCatalog.test.ts",
+          "contains": "SEENIT-RELATION-001 rejette les identités, conflits et champs heuristiques"
+        },
+        {
+          "file": "tests/mediaRelationsCatalog.test.ts",
+          "contains": "SEENIT-RELATION-001 découvre des candidats exacts sans les publier"
         }
       ]
     },

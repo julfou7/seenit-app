@@ -1,6 +1,6 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
-Dernière mise à jour : 5 septembre 2026
+Dernière mise à jour : 6 septembre 2026
 Version applicative : **1.4.119**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
@@ -332,6 +332,21 @@ identifiant externe exact. Chaque groupe porte groupId, relationKind, source, so
 membres typés et ordre éventuel. Une liste dite officielle, son nom ou son score ne suffisent jamais.
 Tout identifiant IMDb, TVDB ou Plex est d'abord résolu vers un TMDB et son type exact.
 
+Le manifeste SeenIt est produit hors ligne à partir d'un **catalogue éditorial séparé du code**. Ce
+catalogue porte pour chaque groupe une provenance vérifiable, une date de revue et uniquement des
+identités `movie:<tmdbId>` / `tv:<tmdbId>`. Un générateur déterministe valide les schémas, l'unicité,
+les conflits de type/relation, la réciprocité implicite du groupe et l'intégrité des métadonnées, puis
+fabrique le snapshot embarqué commun à la PWA et à l'APK. Le snapshot généré n'est jamais modifié à la
+main et la CI refuse tout écart avec sa source.
+
+La découverte globale de nouvelles relations est un traitement hors ligne distinct du runtime. Elle
+peut proposer des groupes Wikidata portant les propriétés explicites `narrative universe` ou
+`part of the series`, ainsi que des groupes fournisseurs préalablement approuvés, mais elle ne publie
+rien directement. Un candidat reste en
+`pending-review` tant qu'un humain n'a pas confirmé la continuité, la complétude, le type de relation
+et chaque identité TMDB. Les titres, labels et dates sont des métadonnées d'affichage et ne peuvent
+ni créer ni fusionner un candidat. Un fournisseur indisponible conserve le dernier snapshot validé.
+
 Le titre, l'année, la popularité, les genres, les mots-clés, le casting, le studio, la marque ou le
 premier résultat d'une recherche ne prouvent **jamais** une relation. L'indisponibilité d'un
 fournisseur ne déclenche donc aucun fallback par titre. Wikidata peut uniquement enrichir hors ligne
@@ -382,9 +397,9 @@ lorsqu'un film et une série partagent le même ID numérique.
 Les TNR minimales couvrent les parcours réciproques Yellowstone, Breaking Bad/Better Call Saul/El
 Camino, Wizarding World / Harry Potter films+série, Punisher/One Last Kill, la séparation des continuités
 Marvel et DC, House of Guinness sans section auto-référente, la collision movie:42/tv:42, la réciprocité
-générique de chaque groupe du manifeste et l'exclusion saga/univers des similaires.
-L'écart courant et le plan de correction sont suivis dans
-[#130](https://github.com/julfou7/seenit-app/issues/130).
+générique de chaque groupe du manifeste, la génération déterministe, le rejet des candidats ambigus ou
+heuristiques et l'exclusion saga/univers des similaires. Le catalogue n'est pas une encyclopédie
+magiquement complète : la détection hors ligne réduit cet écart sans sacrifier la règle zéro faux positif.
 
 ### 5.7 Réouverture et cache chaud d'une fiche média
 

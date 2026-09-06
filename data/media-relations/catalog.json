@@ -1,0 +1,971 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": 1,
+  "groups": [
+    {
+      "groupId": "yellowstone-television-universe",
+      "relationKind": "universe",
+      "sourceGroupId": "yellowstone-television-universe",
+      "version": 1,
+      "provenance": {
+        "provider": "seenit-editorial-review",
+        "reference": "https://github.com/julfou7/seenit-app/issues/130",
+        "reviewedAt": "2026-09-06"
+      },
+      "members": [
+        {
+          "mediaKey": "tv:73586",
+          "mediaType": "tv",
+          "tmdbId": 73586,
+          "label": "Yellowstone",
+          "releaseDate": "2018-06-20",
+          "posterPath": "/peNC0eyc3TQJa6x4TdKcBPNP4t0.jpg"
+        },
+        {
+          "mediaKey": "tv:118357",
+          "mediaType": "tv",
+          "tmdbId": 118357,
+          "label": "1883",
+          "releaseDate": "2021-12-19",
+          "posterPath": "/3VSB4OPwPBs6TJPwx0nZqlaEdsz.jpg"
+        },
+        {
+          "mediaKey": "tv:157744",
+          "mediaType": "tv",
+          "tmdbId": 157744,
+          "label": "1923",
+          "releaseDate": "2022-12-18",
+          "posterPath": "/3LsJXaOXmG2S972apBicb2QRiOS.jpg"
+        },
+        {
+          "mediaKey": "tv:157732",
+          "mediaType": "tv",
+          "tmdbId": 157732,
+          "label": "Lawmen: L'histoire de Bass Reeves",
+          "releaseDate": "2023-11-05",
+          "posterPath": "/s59RO5UUZXayUODKeLW4QcyaEsS.jpg"
+        },
+        {
+          "mediaKey": "tv:290856",
+          "mediaType": "tv",
+          "tmdbId": 290856,
+          "label": "Marshals: A Yellowstone Story",
+          "releaseDate": "2026-03-01",
+          "posterPath": "/jPOKjzCG8tgUigtWyA4ME9fNeia.jpg"
+        },
+        {
+          "mediaKey": "tv:299167",
+          "mediaType": "tv",
+          "tmdbId": 299167,
+          "label": "Dutton Ranch",
+          "releaseDate": "2026-05-15",
+          "posterPath": "/kaWNHypRh9OFSJzEgj8prvMkA5h.jpg"
+        }
+      ]
+    },
+    {
+      "groupId": "breaking-bad-universe",
+      "relationKind": "universe",
+      "sourceGroupId": "breaking-bad-universe",
+      "version": 1,
+      "provenance": {
+        "provider": "seenit-editorial-review",
+        "reference": "https://github.com/julfou7/seenit-app/issues/130",
+        "reviewedAt": "2026-09-06"
+      },
+      "members": [
+        {
+          "mediaKey": "tv:1396",
+          "mediaType": "tv",
+          "tmdbId": 1396,
+          "label": "Breaking Bad",
+          "releaseDate": "2008-01-20",
+          "posterPath": "/hVVxgGZFR3JaXmkstnG1IR9Qbt6.jpg"
+        },
+        {
+          "mediaKey": "tv:60059",
+          "mediaType": "tv",
+          "tmdbId": 60059,
+          "label": "Better Call Saul",
+          "releaseDate": "2015-02-08",
+          "posterPath": "/7KyuCBjxsr4sNQga16DcN9ccEyf.jpg"
+        },
+        {
+          "mediaKey": "movie:559969",
+          "mediaType": "movie",
+          "tmdbId": 559969,
+          "label": "El Camino : Un film Breaking Bad",
+          "releaseDate": "2019-10-11",
+          "posterPath": "/vGmDs7qGOgST23o9hKwiyGd6WeW.jpg"
+        }
+      ]
+    },
+    {
+      "groupId": "wizarding-world",
+      "relationKind": "universe",
+      "sourceGroupId": "wizarding-world",
+      "version": 1,
+      "provenance": {
+        "provider": "seenit-editorial-review",
+        "reference": "https://github.com/julfou7/seenit-app/issues/130",
+        "reviewedAt": "2026-09-06"
+      },
+      "members": [
+        {
+          "mediaKey": "movie:671",
+          "mediaType": "movie",
+          "tmdbId": 671,
+          "label": "Harry Potter à l'école des sorciers",
+          "releaseDate": "2001-11-16",
+          "posterPath": "/fbxQ44VRdM2PVzHSNajUseUteem.jpg"
+        },
+        {
+          "mediaKey": "movie:672",
+          "mediaType": "movie",
+          "tmdbId": 672,
+          "label": "Harry Potter et la Chambre des secrets",
+          "releaseDate": "2002-11-13",
+          "posterPath": "/8KpHRokGpiaqEGpjYe0rpywtvUx.jpg"
+        },
+        {
+          "mediaKey": "movie:673",
+          "mediaType": "movie",
+          "tmdbId": 673,
+          "label": "Harry Potter et le Prisonnier d'Azkaban",
+          "releaseDate": "2004-05-31",
+          "posterPath": "/t4P2079IyK19njHDP2GwQrKdvzd.jpg"
+        },
+        {
+          "mediaKey": "movie:674",
+          "mediaType": "movie",
+          "tmdbId": 674,
+          "label": "Harry Potter et la Coupe de feu",
+          "releaseDate": "2005-11-16",
+          "posterPath": "/hBak1pn5pbI4ycAbrgMMn1YI7P1.jpg"
+        },
+        {
+          "mediaKey": "movie:675",
+          "mediaType": "movie",
+          "tmdbId": 675,
+          "label": "Harry Potter et l'Ordre du Phénix",
+          "releaseDate": "2007-07-08",
+          "posterPath": "/9ZfpCVNx0y8jpColnnfdA1HI4Zb.jpg"
+        },
+        {
+          "mediaKey": "movie:767",
+          "mediaType": "movie",
+          "tmdbId": 767,
+          "label": "Harry Potter et le Prince de sang-mêlé",
+          "releaseDate": "2009-07-15",
+          "posterPath": "/A4WWOzWUASfUeESXxduQxVmoD7t.jpg"
+        },
+        {
+          "mediaKey": "movie:12444",
+          "mediaType": "movie",
+          "tmdbId": 12444,
+          "label": "Harry Potter et les Reliques de la Mort - 1ère partie",
+          "releaseDate": "2010-11-17",
+          "posterPath": "/yJm61MmTMjOmNXxPxdoaIkdqnOm.jpg"
+        },
+        {
+          "mediaKey": "movie:12445",
+          "mediaType": "movie",
+          "tmdbId": 12445,
+          "label": "Harry Potter et les Reliques de la Mort - 2ème partie",
+          "releaseDate": "2011-07-12",
+          "posterPath": "/alQOPmKEPHkH4BLMEla1vTNYrUr.jpg"
+        },
+        {
+          "mediaKey": "movie:259316",
+          "mediaType": "movie",
+          "tmdbId": 259316,
+          "label": "Les Animaux Fantastiques",
+          "releaseDate": "2016-11-16",
+          "posterPath": "/7641iyvTdREC0eO2YUPmIk4PtrO.jpg"
+        },
+        {
+          "mediaKey": "movie:338952",
+          "mediaType": "movie",
+          "tmdbId": 338952,
+          "label": "Les Animaux Fantastiques : Les Crimes de Grindelwald",
+          "releaseDate": "2018-11-14",
+          "posterPath": "/aU1AKE8tTkZouGNImmArvfP5smR.jpg"
+        },
+        {
+          "mediaKey": "movie:338953",
+          "mediaType": "movie",
+          "tmdbId": 338953,
+          "label": "Les Animaux fantastiques : Les Secrets de Dumbledore",
+          "releaseDate": "2022-04-06",
+          "posterPath": "/gzvSMS4MqBg2ThgGOS2YkNkoebf.jpg"
+        },
+        {
+          "mediaKey": "tv:224377",
+          "mediaType": "tv",
+          "tmdbId": 224377,
+          "label": "Harry Potter",
+          "releaseDate": "2026-12-25",
+          "posterPath": "/4NqpRFYM63YrBhWhdQC1rIM3836.jpg"
+        }
+      ]
+    },
+    {
+      "groupId": "marvel-cinematic-universe",
+      "relationKind": "universe",
+      "sourceGroupId": "marvel-cinematic-universe",
+      "version": 1,
+      "provenance": {
+        "provider": "seenit-editorial-review",
+        "reference": "https://github.com/julfou7/seenit-app/issues/130",
+        "reviewedAt": "2026-09-06"
+      },
+      "members": [
+        {
+          "mediaKey": "movie:1726",
+          "mediaType": "movie",
+          "tmdbId": 1726,
+          "label": "Iron Man",
+          "releaseDate": "2008-04-30",
+          "posterPath": "/kNKUCNLu1lZDGAHOBEHxR6psYHx.jpg"
+        },
+        {
+          "mediaKey": "movie:1724",
+          "mediaType": "movie",
+          "tmdbId": 1724,
+          "label": "L'Incroyable Hulk",
+          "releaseDate": "2008-06-12",
+          "posterPath": "/cImKVGUiEnwLsNUyoMA0a0na2y5.jpg"
+        },
+        {
+          "mediaKey": "movie:10138",
+          "mediaType": "movie",
+          "tmdbId": 10138,
+          "label": "Iron Man 2",
+          "releaseDate": "2010-04-28",
+          "posterPath": "/g9DSeSozGi4zpUyeOYZYMNmIv9O.jpg"
+        },
+        {
+          "mediaKey": "movie:10195",
+          "mediaType": "movie",
+          "tmdbId": 10195,
+          "label": "Thor",
+          "releaseDate": "2011-04-21",
+          "posterPath": "/q8pF6s9b9veTQvxTqMDIQf9nJKi.jpg"
+        },
+        {
+          "mediaKey": "movie:1771",
+          "mediaType": "movie",
+          "tmdbId": 1771,
+          "label": "Captain America : First Avenger",
+          "releaseDate": "2011-07-22",
+          "posterPath": "/l1SP3gyHA5ZEuf72WKx5ihtZZFO.jpg"
+        },
+        {
+          "mediaKey": "movie:24428",
+          "mediaType": "movie",
+          "tmdbId": 24428,
+          "label": "Avengers",
+          "releaseDate": "2012-04-25",
+          "posterPath": "/ylsAO88v2tF0iXRFojPa0UaAJf1.jpg"
+        },
+        {
+          "mediaKey": "movie:68721",
+          "mediaType": "movie",
+          "tmdbId": 68721,
+          "label": "Iron Man 3",
+          "releaseDate": "2013-04-18",
+          "posterPath": "/sE71EBrRMfW0NKMHlXPO55Km88X.jpg"
+        },
+        {
+          "mediaKey": "movie:76338",
+          "mediaType": "movie",
+          "tmdbId": 76338,
+          "label": "Thor : Le Monde des ténèbres",
+          "releaseDate": "2013-10-30",
+          "posterPath": "/eAIGX0nlwlb5sMb4uDRGNFqMyG9.jpg"
+        },
+        {
+          "mediaKey": "movie:100402",
+          "mediaType": "movie",
+          "tmdbId": 100402,
+          "label": "Captain America : Le Soldat de l'hiver",
+          "releaseDate": "2014-03-20",
+          "posterPath": "/n3Xa8g1sWrUVUal6zk0OoC9ARo1.jpg"
+        },
+        {
+          "mediaKey": "movie:118340",
+          "mediaType": "movie",
+          "tmdbId": 118340,
+          "label": "Les Gardiens de la Galaxie",
+          "releaseDate": "2014-07-30",
+          "posterPath": "/9a6fGeSV5kffyNPPMWCPhLOhLdJ.jpg"
+        },
+        {
+          "mediaKey": "movie:99861",
+          "mediaType": "movie",
+          "tmdbId": 99861,
+          "label": "Avengers : L'Ère d'Ultron",
+          "releaseDate": "2015-04-22",
+          "posterPath": "/A0tw88n1byyR2vodhJMlFPQGQgF.jpg"
+        },
+        {
+          "mediaKey": "movie:102899",
+          "mediaType": "movie",
+          "tmdbId": 102899,
+          "label": "Ant-Man",
+          "releaseDate": "2015-07-14",
+          "posterPath": "/hAH2Rt2WvfMBK2tZDLMNuUTUwxG.jpg"
+        },
+        {
+          "mediaKey": "movie:271110",
+          "mediaType": "movie",
+          "tmdbId": 271110,
+          "label": "Captain America : Civil War",
+          "releaseDate": "2016-04-27",
+          "posterPath": "/i2nc9IAP1xRWoa3MgeR7ldsshkV.jpg"
+        },
+        {
+          "mediaKey": "movie:284052",
+          "mediaType": "movie",
+          "tmdbId": 284052,
+          "label": "Doctor Strange",
+          "releaseDate": "2016-10-25",
+          "posterPath": "/7wZ7mx7tY5SgflQKuJmQvwu3wGm.jpg"
+        },
+        {
+          "mediaKey": "movie:283995",
+          "mediaType": "movie",
+          "tmdbId": 283995,
+          "label": "Les Gardiens de la Galaxie Vol. 2",
+          "releaseDate": "2017-04-25",
+          "posterPath": "/brgkPEPQJNGLuKRy8omRTcDfDuL.jpg"
+        },
+        {
+          "mediaKey": "movie:315635",
+          "mediaType": "movie",
+          "tmdbId": 315635,
+          "label": "Spider-Man : Homecoming",
+          "releaseDate": "2017-07-05",
+          "posterPath": "/wFNNv1ZHglNdXJLYiEgpLY5sa9S.jpg"
+        },
+        {
+          "mediaKey": "movie:284053",
+          "mediaType": "movie",
+          "tmdbId": 284053,
+          "label": "Thor : Ragnarok",
+          "releaseDate": "2017-10-02",
+          "posterPath": "/mAA8RXkgF87jSWWMSf6hgLl73mk.jpg"
+        },
+        {
+          "mediaKey": "tv:67178",
+          "mediaType": "tv",
+          "tmdbId": 67178,
+          "label": "Marvel's The Punisher",
+          "releaseDate": "2017-11-17",
+          "posterPath": "/tM6xqRKXoloH9UchaJEyyRE9O1w.jpg"
+        },
+        {
+          "mediaKey": "movie:284054",
+          "mediaType": "movie",
+          "tmdbId": 284054,
+          "label": "Black Panther",
+          "releaseDate": "2018-02-13",
+          "posterPath": "/g94IcdzPswTYl1ISdgn2EwvaZtt.jpg"
+        },
+        {
+          "mediaKey": "movie:299536",
+          "mediaType": "movie",
+          "tmdbId": 299536,
+          "label": "Avengers : Infinity War",
+          "releaseDate": "2018-04-25",
+          "posterPath": "/hSfuKPtyEryeFzapZ8UgZd4aESu.jpg"
+        },
+        {
+          "mediaKey": "movie:363088",
+          "mediaType": "movie",
+          "tmdbId": 363088,
+          "label": "Ant-Man et la Guêpe",
+          "releaseDate": "2018-07-04",
+          "posterPath": "/r3Vapr4sdXOhHBThTNtfuijKe5V.jpg"
+        },
+        {
+          "mediaKey": "movie:299537",
+          "mediaType": "movie",
+          "tmdbId": 299537,
+          "label": "Captain Marvel",
+          "releaseDate": "2019-03-06",
+          "posterPath": "/aRJAoQ6mqPHAKXjP3CqNyLC8FAh.jpg"
+        },
+        {
+          "mediaKey": "movie:299534",
+          "mediaType": "movie",
+          "tmdbId": 299534,
+          "label": "Avengers : Endgame",
+          "releaseDate": "2019-04-24",
+          "posterPath": "/wF7jv3x51hXgkl7t5KHePuRjXc8.jpg"
+        },
+        {
+          "mediaKey": "movie:429617",
+          "mediaType": "movie",
+          "tmdbId": 429617,
+          "label": "Spider-Man : Far From Home",
+          "releaseDate": "2019-06-28",
+          "posterPath": "/9FkewgPxlMPjgKhFN7LaRJEqmCI.jpg"
+        },
+        {
+          "mediaKey": "tv:85271",
+          "mediaType": "tv",
+          "tmdbId": 85271,
+          "label": "WandaVision",
+          "releaseDate": "2021-01-15",
+          "posterPath": "/AXnCR7WE8BKlzsabQtUITySChn.jpg"
+        },
+        {
+          "mediaKey": "tv:88396",
+          "mediaType": "tv",
+          "tmdbId": 88396,
+          "label": "Falcon et le Soldat de l’hiver",
+          "releaseDate": "2021-03-19",
+          "posterPath": "/6NrUwEWDxZI2XffOnw3nuibukmX.jpg"
+        },
+        {
+          "mediaKey": "tv:84958",
+          "mediaType": "tv",
+          "tmdbId": 84958,
+          "label": "Loki",
+          "releaseDate": "2021-06-09",
+          "posterPath": "/zNwEwSXojMrQapZHQx5fO8iph4R.jpg"
+        },
+        {
+          "mediaKey": "movie:497698",
+          "mediaType": "movie",
+          "tmdbId": 497698,
+          "label": "Black Widow",
+          "releaseDate": "2021-07-07",
+          "posterPath": "/tIdq9lGrbSsq3RkgB9r0g0vYTbl.jpg"
+        },
+        {
+          "mediaKey": "tv:91363",
+          "mediaType": "tv",
+          "tmdbId": 91363,
+          "label": "What If...?",
+          "releaseDate": "2021-08-11",
+          "posterPath": "/mj98hl3XsRcxYdw99arNavsSBDP.jpg"
+        },
+        {
+          "mediaKey": "movie:566525",
+          "mediaType": "movie",
+          "tmdbId": 566525,
+          "label": "Shang-Chi et la Légende des Dix Anneaux",
+          "releaseDate": "2021-09-01",
+          "posterPath": "/g54eUtuCTAOQaNlVpr7Kpr7sVoH.jpg"
+        },
+        {
+          "mediaKey": "movie:524434",
+          "mediaType": "movie",
+          "tmdbId": 524434,
+          "label": "Les Éternels",
+          "releaseDate": "2021-11-03",
+          "posterPath": "/vV7TrS7PNRZJHCxNmiYN1SU7s1w.jpg"
+        },
+        {
+          "mediaKey": "tv:88329",
+          "mediaType": "tv",
+          "tmdbId": 88329,
+          "label": "Hawkeye",
+          "releaseDate": "2021-11-24",
+          "posterPath": "/cybZ7FoeBoBJPieKvSp4wh2yCMR.jpg"
+        },
+        {
+          "mediaKey": "movie:634649",
+          "mediaType": "movie",
+          "tmdbId": 634649,
+          "label": "Spider-Man : No Way Home",
+          "releaseDate": "2021-12-15",
+          "posterPath": "/jwfDFqzxBkXC5bERBZrCEfK9iii.jpg"
+        },
+        {
+          "mediaKey": "tv:92749",
+          "mediaType": "tv",
+          "tmdbId": 92749,
+          "label": "Moon Knight",
+          "releaseDate": "2022-03-30",
+          "posterPath": "/xrkDlkL6u26DLeBw2Cao8pYtrYH.jpg"
+        },
+        {
+          "mediaKey": "movie:453395",
+          "mediaType": "movie",
+          "tmdbId": 453395,
+          "label": "Doctor Strange in the Multiverse of Madness",
+          "releaseDate": "2022-05-04",
+          "posterPath": "/arfzjn1tGvXWwkX7eaGVuXsc0mp.jpg"
+        },
+        {
+          "mediaKey": "tv:92782",
+          "mediaType": "tv",
+          "tmdbId": 92782,
+          "label": "Miss Marvel",
+          "releaseDate": "2022-06-08",
+          "posterPath": "/3x1eRyuz2NOOSXODDcDl9EjGRQ.jpg"
+        },
+        {
+          "mediaKey": "movie:616037",
+          "mediaType": "movie",
+          "tmdbId": 616037,
+          "label": "Thor : Love and Thunder",
+          "releaseDate": "2022-07-06",
+          "posterPath": "/kSMarEm3ESOOr11dzsep2RZ1ClD.jpg"
+        },
+        {
+          "mediaKey": "tv:92783",
+          "mediaType": "tv",
+          "tmdbId": 92783,
+          "label": "She-Hulk : Avocate",
+          "releaseDate": "2022-08-18",
+          "posterPath": "/poWy1hDzaIFv6UaYtFDNcNfiM2C.jpg"
+        },
+        {
+          "mediaKey": "movie:894205",
+          "mediaType": "movie",
+          "tmdbId": 894205,
+          "label": "Werewolf by Night",
+          "releaseDate": "2022-09-25",
+          "posterPath": "/5p6Q5dsqgT7dknImjtoRvNx50k9.jpg"
+        },
+        {
+          "mediaKey": "movie:505642",
+          "mediaType": "movie",
+          "tmdbId": 505642,
+          "label": "Black Panther : Wakanda Forever",
+          "releaseDate": "2022-11-09",
+          "posterPath": "/rNTKgJdJ8tyfpiUug5ittECK8CS.jpg"
+        },
+        {
+          "mediaKey": "movie:774752",
+          "mediaType": "movie",
+          "tmdbId": 774752,
+          "label": "Les Gardiens de la Galaxie : Joyeuses Fêtes",
+          "releaseDate": "2022-11-24",
+          "posterPath": "/cF3E6CrCm3NUy5PDRBbGyXRChYb.jpg"
+        },
+        {
+          "mediaKey": "movie:640146",
+          "mediaType": "movie",
+          "tmdbId": 640146,
+          "label": "Ant-Man et la Guêpe : Quantumania",
+          "releaseDate": "2023-02-15",
+          "posterPath": "/2hq8EKF6kaUyOxB9KhmIb5JUxEe.jpg"
+        },
+        {
+          "mediaKey": "movie:447365",
+          "mediaType": "movie",
+          "tmdbId": 447365,
+          "label": "Les Gardiens de la Galaxie : Volume 3",
+          "releaseDate": "2023-05-03",
+          "posterPath": "/dnyQnKSSqQ8aOEMiE5hYDNJO4dE.jpg"
+        },
+        {
+          "mediaKey": "tv:114472",
+          "mediaType": "tv",
+          "tmdbId": 114472,
+          "label": "Secret Invasion",
+          "releaseDate": "2023-06-21",
+          "posterPath": "/AbqvJTbFEOmL8vHk54lVolqQg8Y.jpg"
+        },
+        {
+          "mediaKey": "movie:609681",
+          "mediaType": "movie",
+          "tmdbId": 609681,
+          "label": "The Marvels",
+          "releaseDate": "2023-11-08",
+          "posterPath": "/mqAQO6j5gkq6iwCXNbXpzf0RXBU.jpg"
+        },
+        {
+          "mediaKey": "tv:122226",
+          "mediaType": "tv",
+          "tmdbId": 122226,
+          "label": "Echo",
+          "releaseDate": "2024-01-09",
+          "posterPath": "/g7Y8pX0yndEpGAa0v4ZGpGuMrF0.jpg"
+        },
+        {
+          "mediaKey": "movie:533535",
+          "mediaType": "movie",
+          "tmdbId": 533535,
+          "label": "Deadpool & Wolverine",
+          "releaseDate": "2024-07-24",
+          "posterPath": "/7CtRdKd5hQPB2b1apKCqxxQUKSf.jpg"
+        },
+        {
+          "mediaKey": "tv:138501",
+          "mediaType": "tv",
+          "tmdbId": 138501,
+          "label": "Agatha All Along",
+          "releaseDate": "2024-09-18",
+          "posterPath": "/mGsxKwXUjojitRv2E9qMTbxbBRd.jpg"
+        },
+        {
+          "mediaKey": "movie:822119",
+          "mediaType": "movie",
+          "tmdbId": 822119,
+          "label": "Captain America : Brave New World",
+          "releaseDate": "2025-02-12",
+          "posterPath": "/wDRXmiAEJdhNIcuetM4016fOCx8.jpg"
+        },
+        {
+          "mediaKey": "tv:202555",
+          "mediaType": "tv",
+          "tmdbId": 202555,
+          "label": "Daredevil : Born Again",
+          "releaseDate": "2025-03-04",
+          "posterPath": "/7UMmvMvhSw1jBgdz0NzLo9pa93g.jpg"
+        },
+        {
+          "mediaKey": "movie:986056",
+          "mediaType": "movie",
+          "tmdbId": 986056,
+          "label": "Thunderbolts*",
+          "releaseDate": "2025-04-30",
+          "posterPath": "/zctISSBEZRgVQPG178HqRJMnc4x.jpg"
+        },
+        {
+          "mediaKey": "tv:114471",
+          "mediaType": "tv",
+          "tmdbId": 114471,
+          "label": "Ironheart",
+          "releaseDate": "2025-06-24",
+          "posterPath": "/dtpiECNwAeLnGJSU3HTWhcQGHk1.jpg"
+        },
+        {
+          "mediaKey": "movie:617126",
+          "mediaType": "movie",
+          "tmdbId": 617126,
+          "label": "Les 4 Fantastiques : Premiers Pas",
+          "releaseDate": "2025-07-23",
+          "posterPath": "/rNc4KARs6fVa4axzvuv3NfUiNy1.jpg"
+        },
+        {
+          "mediaKey": "tv:198178",
+          "mediaType": "tv",
+          "tmdbId": 198178,
+          "label": "Wonder Man",
+          "releaseDate": "2026-01-27",
+          "posterPath": "/5uHI0TCde9YDGY7Fm54L3mBNILK.jpg"
+        },
+        {
+          "mediaKey": "movie:1439930",
+          "mediaType": "movie",
+          "tmdbId": 1439930,
+          "label": "The Punisher: One Last Kill",
+          "releaseDate": "2026-05-12",
+          "posterPath": "/qQclTgLMDvGBuUBFGHRipxkEwWR.jpg"
+        }
+      ]
+    },
+    {
+      "groupId": "the-dark-knight-trilogy",
+      "relationKind": "saga",
+      "sourceGroupId": "the-dark-knight-trilogy",
+      "version": 1,
+      "provenance": {
+        "provider": "seenit-editorial-review",
+        "reference": "https://github.com/julfou7/seenit-app/issues/130",
+        "reviewedAt": "2026-09-06"
+      },
+      "members": [
+        {
+          "mediaKey": "movie:272",
+          "mediaType": "movie",
+          "tmdbId": 272,
+          "label": "Batman Begins",
+          "releaseDate": "2005-06-10",
+          "posterPath": "/taKcn26BMWnsUcMFSlr5RfGDtFB.jpg"
+        },
+        {
+          "mediaKey": "movie:155",
+          "mediaType": "movie",
+          "tmdbId": 155,
+          "label": "The Dark Knight : Le Chevalier noir",
+          "releaseDate": "2008-07-16",
+          "posterPath": "/pyNXnq8QBWoK3b37RS6C3axwUOy.jpg"
+        },
+        {
+          "mediaKey": "movie:49026",
+          "mediaType": "movie",
+          "tmdbId": 49026,
+          "label": "The Dark Knight Rises",
+          "releaseDate": "2012-07-17",
+          "posterPath": "/ApcGBERN0p9I0nDOIwJeEmpnLU5.jpg"
+        }
+      ]
+    },
+    {
+      "groupId": "dc-extended-universe",
+      "relationKind": "universe",
+      "sourceGroupId": "dc-extended-universe",
+      "version": 1,
+      "provenance": {
+        "provider": "seenit-editorial-review",
+        "reference": "https://github.com/julfou7/seenit-app/issues/130",
+        "reviewedAt": "2026-09-06"
+      },
+      "members": [
+        {
+          "mediaKey": "movie:49521",
+          "mediaType": "movie",
+          "tmdbId": 49521,
+          "label": "Man of Steel",
+          "releaseDate": "2013-06-12",
+          "posterPath": "/3HGq0BI0ukKr53oPiTAgOXQprzc.jpg"
+        },
+        {
+          "mediaKey": "movie:209112",
+          "mediaType": "movie",
+          "tmdbId": 209112,
+          "label": "Batman v Superman : L'Aube de la Justice",
+          "releaseDate": "2016-03-23",
+          "posterPath": "/krEWtXK2K7dg5RyMlx9f5WnI1xd.jpg"
+        },
+        {
+          "mediaKey": "movie:297761",
+          "mediaType": "movie",
+          "tmdbId": 297761,
+          "label": "Suicide Squad",
+          "releaseDate": "2016-08-03",
+          "posterPath": "/5EmbqsAD7lBt5obT1dVwwbR5sra.jpg"
+        },
+        {
+          "mediaKey": "movie:297762",
+          "mediaType": "movie",
+          "tmdbId": 297762,
+          "label": "Wonder Woman",
+          "releaseDate": "2017-05-30",
+          "posterPath": "/oomdTdke7dqffdDoDV1fFBV4fJY.jpg"
+        },
+        {
+          "mediaKey": "movie:141052",
+          "mediaType": "movie",
+          "tmdbId": 141052,
+          "label": "Justice League",
+          "releaseDate": "2017-11-15",
+          "posterPath": "/eMlVBnd5NPHDJ3DkhMzokfnymAB.jpg"
+        },
+        {
+          "mediaKey": "movie:297802",
+          "mediaType": "movie",
+          "tmdbId": 297802,
+          "label": "Aquaman",
+          "releaseDate": "2018-12-07",
+          "posterPath": "/ghbBIweVDjTyx983GQmnCPGlE3U.jpg"
+        },
+        {
+          "mediaKey": "movie:287947",
+          "mediaType": "movie",
+          "tmdbId": 287947,
+          "label": "Shazam!",
+          "releaseDate": "2019-03-29",
+          "posterPath": "/lhQbFsO6rFoUo3kv5X61G6koiR1.jpg"
+        },
+        {
+          "mediaKey": "movie:495764",
+          "mediaType": "movie",
+          "tmdbId": 495764,
+          "label": "Birds of Prey",
+          "releaseDate": "2020-02-05",
+          "posterPath": "/14DRJrjIzUE1ZtExRwTP0wOhPwG.jpg"
+        },
+        {
+          "mediaKey": "movie:464052",
+          "mediaType": "movie",
+          "tmdbId": 464052,
+          "label": "Wonder Woman 1984",
+          "releaseDate": "2020-12-16",
+          "posterPath": "/kdEorjrPno4Cn7HYVN2DA0f3ocr.jpg"
+        },
+        {
+          "mediaKey": "movie:791373",
+          "mediaType": "movie",
+          "tmdbId": 791373,
+          "label": "Zack Snyder's Justice League",
+          "releaseDate": "2021-03-18",
+          "posterPath": "/4EOp3YUSQgzOwVOKrejfKK27bK6.jpg"
+        },
+        {
+          "mediaKey": "movie:436969",
+          "mediaType": "movie",
+          "tmdbId": 436969,
+          "label": "The Suicide Squad",
+          "releaseDate": "2021-07-28",
+          "posterPath": "/3c8y65VwyFp3pcNtOsrdOoWm8Um.jpg"
+        },
+        {
+          "mediaKey": "movie:436270",
+          "mediaType": "movie",
+          "tmdbId": 436270,
+          "label": "Black Adam",
+          "releaseDate": "2022-10-19",
+          "posterPath": "/hYALH5NPM7xk2XQd2J8wrfmliIW.jpg"
+        },
+        {
+          "mediaKey": "movie:594767",
+          "mediaType": "movie",
+          "tmdbId": 594767,
+          "label": "Shazam! La Rage des Dieux",
+          "releaseDate": "2023-03-15",
+          "posterPath": "/iz2V6Wc5eVVBbUqlTIkY4SrS5nW.jpg"
+        },
+        {
+          "mediaKey": "movie:298618",
+          "mediaType": "movie",
+          "tmdbId": 298618,
+          "label": "The Flash",
+          "releaseDate": "2023-06-13",
+          "posterPath": "/azio74W2qw7bNg7ePqzkWywwK1n.jpg"
+        },
+        {
+          "mediaKey": "movie:565770",
+          "mediaType": "movie",
+          "tmdbId": 565770,
+          "label": "Blue Beetle",
+          "releaseDate": "2023-08-16",
+          "posterPath": "/xSVtl6ZF7fNuZIoXkZbzI2EzoAD.jpg"
+        },
+        {
+          "mediaKey": "movie:572802",
+          "mediaType": "movie",
+          "tmdbId": 572802,
+          "label": "Aquaman et le Royaume perdu",
+          "releaseDate": "2023-12-20",
+          "posterPath": "/w8r7NAEIGLPH5r3NhiMobEO80PS.jpg"
+        }
+      ]
+    },
+    {
+      "groupId": "arrowverse",
+      "relationKind": "universe",
+      "sourceGroupId": "arrowverse",
+      "version": 1,
+      "provenance": {
+        "provider": "seenit-editorial-review",
+        "reference": "https://github.com/julfou7/seenit-app/issues/130",
+        "reviewedAt": "2026-09-06"
+      },
+      "members": [
+        {
+          "mediaKey": "tv:1412",
+          "mediaType": "tv",
+          "tmdbId": 1412,
+          "label": "Arrow",
+          "releaseDate": "2012-10-10",
+          "posterPath": "/4DVLTc7oVCzHOSmZzlDHefCKyqq.jpg"
+        },
+        {
+          "mediaKey": "tv:60735",
+          "mediaType": "tv",
+          "tmdbId": 60735,
+          "label": "Flash",
+          "releaseDate": "2014-10-07",
+          "posterPath": "/Hrta0iq8KEQbdOpSnki2gUMowk.jpg"
+        },
+        {
+          "mediaKey": "tv:62688",
+          "mediaType": "tv",
+          "tmdbId": 62688,
+          "label": "Supergirl",
+          "releaseDate": "2015-10-26",
+          "posterPath": "/90mSQajf4STPROA6H7Hh8OvyWdK.jpg"
+        },
+        {
+          "mediaKey": "tv:62643",
+          "mediaType": "tv",
+          "tmdbId": 62643,
+          "label": "DC's Legends of Tomorrow",
+          "releaseDate": "2016-01-21",
+          "posterPath": "/tAwfCIwA2BHR4H6j5hENvI3dbAl.jpg"
+        },
+        {
+          "mediaKey": "tv:71663",
+          "mediaType": "tv",
+          "tmdbId": 71663,
+          "label": "Black Lightning",
+          "releaseDate": "2018-01-16",
+          "posterPath": "/yWeviNV5vF3lXlFQJSxYo6ozInF.jpg"
+        },
+        {
+          "mediaKey": "tv:89247",
+          "mediaType": "tv",
+          "tmdbId": 89247,
+          "label": "Batwoman",
+          "releaseDate": "2019-10-06",
+          "posterPath": "/pBpxKiitMuYXvtsXNSzya8DKKzV.jpg"
+        }
+      ]
+    },
+    {
+      "groupId": "the-batman-epic-crime-saga",
+      "relationKind": "universe",
+      "sourceGroupId": "the-batman-epic-crime-saga",
+      "version": 1,
+      "provenance": {
+        "provider": "seenit-editorial-review",
+        "reference": "https://github.com/julfou7/seenit-app/issues/130",
+        "reviewedAt": "2026-09-06"
+      },
+      "members": [
+        {
+          "mediaKey": "movie:414906",
+          "mediaType": "movie",
+          "tmdbId": 414906,
+          "label": "The Batman",
+          "releaseDate": "2022-03-01",
+          "posterPath": "/t9JGg10CW1DzXEdWL54ewkUko6N.jpg"
+        },
+        {
+          "mediaKey": "tv:194764",
+          "mediaType": "tv",
+          "tmdbId": 194764,
+          "label": "The Penguin",
+          "releaseDate": "2024-09-19",
+          "posterPath": "/eV8TTHJOR8AJqPLm9uSLjnItgiU.jpg"
+        },
+        {
+          "mediaKey": "movie:806704",
+          "mediaType": "movie",
+          "tmdbId": 806704,
+          "label": "The Batman : PART II",
+          "releaseDate": "2028-02-17",
+          "posterPath": "/caeBJHLNld1h14uvcLvzyHf3Rlk.jpg"
+        }
+      ]
+    },
+    {
+      "groupId": "dc-universe",
+      "relationKind": "universe",
+      "sourceGroupId": "dc-universe",
+      "version": 1,
+      "provenance": {
+        "provider": "seenit-editorial-review",
+        "reference": "https://github.com/julfou7/seenit-app/issues/130",
+        "reviewedAt": "2026-09-06"
+      },
+      "members": [
+        {
+          "mediaKey": "tv:219543",
+          "mediaType": "tv",
+          "tmdbId": 219543,
+          "label": "Creature Commandos",
+          "releaseDate": "2024-12-05",
+          "posterPath": "/bB3G6Ug1jfsOUptb0RJsqrgMVta.jpg"
+        },
+        {
+          "mediaKey": "movie:1061474",
+          "mediaType": "movie",
+          "tmdbId": 1061474,
+          "label": "Superman",
+          "releaseDate": "2025-07-09",
+          "posterPath": "/bL1U8TDb2ZiThIBFAdKHOfpv8lk.jpg"
+        }
+      ]
+    }
+  ]
+}
