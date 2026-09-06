@@ -1,7 +1,7 @@
 # SeenIt — Référence fonctionnelle canonique
 
-Dernière vérification : 5 septembre 2026  
-Baseline observée : **1.4.114**, `main` `7335c2447cf5c77dc6b7f954192754d3c2a8e549`  
+Dernière vérification : 6 septembre 2026  
+Baseline observée : **1.4.118**, `main` `3c3055dad08210132cc6e427a469836f1a85a403`  
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : composante obligatoire de la SPEC SeenIt
 
@@ -210,8 +210,9 @@ Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, 
 
 Depuis une carte, l'utilisateur peut ouvrir la fiche, suivre/retirer, ou marquer un film vu. Les cartes
 qui disposent de la preuve détaillée utilisent le même résolveur parental que la fiche et Explorer.
-Toute création de suivi sans progression doit converger vers `plan_to_watch` ; l'écart actuel entre
-points d'entrée est suivi par #93.
+Toute création de suivi sans progression converge vers `plan_to_watch`, quel que soit le point d'entrée.
+Les anciens documents `watching` sans progression sont normalisés de façon bornée et idempotente sans
+réécrire les favoris, notes, rappels ni l'archive ; le parcours explicite « Revoir » reste préservé.
 
 ## 8. Fiche média et détails associés
 
@@ -461,7 +462,6 @@ elle est nécessaire à la plateforme et explicitement documentée.
 
 | Priorité | Écart observé | Décision / issue |
 |---|---|---|
-| P1 | Les points d'entrée d'ajout créent tantôt `plan_to_watch`, tantôt `watching` sans progression. | Normaliser selon la machine d'états : [#93](https://github.com/julfou7/seenit-app/issues/93). |
 | P1 | La classification d’âge actuelle peut préférer une valeur FR permissive, sous-classer des certifications US et inventer un TP par genre. | Appliquer `SEENIT-PARENTAL-001` : [#98](https://github.com/julfou7/seenit-app/issues/98). |
 | P1 | Les sagas/univers peuvent dépendre du point d’entrée, accepter des listes ou titres non probants et afficher un groupe auto-référent. | Appliquer `SEENIT-RELATION-001` et ses TNR cross-media : [#130](https://github.com/julfou7/seenit-app/issues/130). |
 | P1 | Les personnes favorites restent locales et font diverger les recommandations PWA/APK. | Rendre Firestore autoritatif : [#95](https://github.com/julfou7/seenit-app/issues/95). |
