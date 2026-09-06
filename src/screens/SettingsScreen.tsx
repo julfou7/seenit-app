@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Cloud, LogIn, LogOut, FileText, CheckCircle2, MonitorPlay, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronDown, ChevronUp, ChevronRight, Check, AlertCircle, Info, Bug, Sparkles, Download, X, UploadCloud, DownloadCloud } from 'lucide-react';
-import { auth, db, googleAuthProvider, requestNotificationPermission, revokeCurrentDeviceNotifications, sendNativeNotification } from '../lib/firebase';
+import { auth, db, googleAuthProvider, requestNotificationPermission, revokeCurrentDeviceNotifications } from '../lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
@@ -35,6 +35,9 @@ import {
 } from '../features/plex/plexStorage';
 import { usePlexAvailabilityStore } from '../features/plex/plexAvailability';
 import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
+import { resolveNotificationMediaVisual } from '../features/notifications/notificationMedia';
+import { sendMediaReminderNotification } from '../features/notifications/mediaReminderNotification';
+import { buildNotificationTestSample, type NotificationTestType } from '../features/notifications/notificationTestSample';
 const DEFAULT_NOTIFICATION_PREFS = {
   release_today_tv: true,
   season_d7: true,
@@ -481,47 +484,41 @@ export function SettingsScreen() {
     await signOut(auth);
   };
 
-  const triggerTestNotif = (type: string) => {
-    showToast("🔔 Test envoyé à votre téléphone !", "info");
+  const triggerTestNotif = async (type: NotificationTestType) => {
+    const sample = buildNotificationTestSample(shows, type);
+    if (!sample) {
+      showToast("Aucun média du bon type n'est disponible pour ce test.", "info");
+      return;
+    }
 
-    const activeShows = shows.filter(s => !s.isArchived && s.status !== 'dropped');
-    const targetShow = activeShows.find(s => s.mediaType === 'tv' && s.nextEpisodeToWatch)
-      || activeShows.find(s => s.mediaType === 'tv')
-      || shows.find(s => !s.isArchived)
-      || shows[0];
-      
-    let notifBody = "L'alerte a bien été déclenchée !";
-    if (type === 'release_today_tv') notifBody = "L'épisode S01E01 est disponible aujourd'hui !";
-    if (type === 'season_d7') notifBody = "La nouvelle saison sort dans 7 jours ! Préparez-vous !";
-    if (type === 'movie_theater') notifBody = "Sortie Cinéma : Le film est dans les salles aujourd'hui !";
-    if (type === 'movie_dvd_vod') notifBody = "Sortie DVD / VOD : Le film est désormais disponible !";
-
-    if (targetShow) {
-      const iconUrl = targetShow.posterPath 
-        ? (targetShow.posterPath.startsWith('http') ? targetShow.posterPath : `https://image.tmdb.org/t/p/w185${targetShow.posterPath}`)
-        : '/icon-192.png';
-      const imageUrl = targetShow.backdropPath 
-        ? (targetShow.backdropPath.startsWith('http') ? targetShow.backdropPath : `https://image.tmdb.org/t/p/w780${targetShow.backdropPath}`)
-        : undefined;
-
-      sendNativeNotification(targetShow.title, {
-        body: notifBody,
-        icon: iconUrl,
-        badge: '/icon-192.png',
-        image: imageUrl,
-        tag: 'test_notification_' + type,
+    try {
+      const mediaVisual = await resolveNotificationMediaVisual(sample.posterUrl, sample.richImageUrl);
+      await sendMediaReminderNotification(sample.notificationTitle, {
+        body: sample.body,
+        badge: 'https://seenit.app/icon-192.png',
+        ...mediaVisual,
+        summaryText: sample.summaryText,
+        allowMarkWatched: sample.allowMarkWatched,
+        showId: sample.show.id,
+        tmdbId: sample.show.tmdbId,
+        mediaType: sample.show.mediaType,
+        season: sample.season,
+        episode: sample.episode,
+        tag: `test_notification_${type}`,
         renotify: true,
-        vibrate: [150, 80, 150, 80, 250]
+        vibrate: [150, 80, 150, 80, 250],
+        data: sample.data,
       } as any);
-    } else {
-      sendNativeNotification("Test Notification", {
-        body: notifBody,
-        icon: "/icon-192.png",
-        badge: "/icon-192.png",
-        tag: "test_notification_" + type,
-        renotify: true,
-        vibrate: [150, 80, 150, 80, 250]
-      } as any);
+
+      showToast(
+        sample.isUpcoming
+          ? `🔔 Test avec le prochain événement : ${sample.show.title}`
+          : `🔔 Aucun événement à venir : exemple de rendu avec ${sample.show.title}`,
+        "info"
+      );
+    } catch (error) {
+      console.warn('[Settings] Notification test failed:', error);
+      showToast("Impossible d'envoyer la notification de test.", "error");
     }
   };
 
