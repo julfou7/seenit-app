@@ -350,6 +350,20 @@ fin de `dmesg` pour distinguer un kill QEMU sous pression d'un défaut applicati
 contrôle Retour n'est pas supprimé. Depuis #135, le build et ce smoke partagent le même runner à droits
 de lecture ; seul le job de publication séparé conserve `contents: write`.
 
+### Distribution hors Play et Play Protect
+
+SeenIt reste distribuée directement par APK. Le dialogue Android « Analyse d'appli recommandée »
+signifie que Play Protect ne connaît pas encore les octets de cette APK sideloadée ; il n'est pas un
+état produit par SeenIt et ne peut pas être masqué par son code. Le parcours autorisé conserve la clé
+release stable, le contrôle SHA-256 et les permissions minimales, puis laisse l'utilisateur demander
+l'analyse système. Aucun workflow, manifeste ou écran SeenIt ne désactive ou ne contourne Play Protect.
+
+Pour améliorer la reconnaissance sans publier sur le Play Store, le propriétaire peut enregistrer son
+identité, `com.seenit.app` et le certificat release dans l'Android Developer Console pour la distribution
+hors Play, puis soumettre une demande officielle seulement si Google classe à tort l'application comme
+potentiellement dangereuse. Une simple demande d'analyse d'une application inconnue n'est pas une telle
+classification et aucune disparition du dialogue ne doit être promise pour chaque nouvel APK.
+
 ## Gestion et récupération des clés de signature
 
 `android/app/seenit-release.p12` est un **artefact généré**, pas une source Git. Les sources de confiance

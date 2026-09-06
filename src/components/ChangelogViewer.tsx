@@ -1,6 +1,7 @@
 import React from 'react';
 import Markdown from 'react-markdown';
 import { cn } from '../lib/utils';
+import type { SeenItReleaseInfo } from '../features/release/releasePolicy';
 
 interface ChangelogViewerProps {
   content: string;
@@ -197,6 +198,34 @@ export function ChangelogViewer({ content }: ChangelogViewerProps) {
       >
         {formattedContent}
       </Markdown>
+    </div>
+  );
+}
+
+export function ReleaseChangelogViewer({ release }: { release: SeenItReleaseInfo }) {
+  const history = release.releaseNotesHistory?.length
+    ? release.releaseNotesHistory
+    : [{
+        version: release.version,
+        releaseNotes: release.releaseNotes,
+        publishedAt: release.publishedAt,
+        htmlUrl: release.htmlUrl
+      }];
+
+  if (history.length === 1) {
+    return <ChangelogViewer content={history[0].releaseNotes} />;
+  }
+
+  return (
+    <div className="space-y-4">
+      {history.map(entry => (
+        <section key={entry.version} className="space-y-1.5">
+          <div className="sticky top-0 z-10 w-fit rounded-full border border-amber-500/25 bg-zinc-950/95 px-2.5 py-1 text-[10px] font-black text-amber-300 shadow-sm">
+            Version {entry.version}
+          </div>
+          <ChangelogViewer content={entry.releaseNotes} />
+        </section>
+      ))}
     </div>
   );
 }

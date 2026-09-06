@@ -9,6 +9,7 @@ const notifyScript = readFileSync('scripts/notify-release-update.cjs', 'utf8');
 const server = readFileSync('server.ts', 'utf8');
 const app = readFileSync('src/App.tsx', 'utf8');
 const firebase = readFileSync('src/lib/firebase.ts', 'utf8');
+const updateStore = readFileSync('src/store/updateStore.ts', 'utf8');
 const require = createRequire(import.meta.url);
 const {
   EVENT_TYPE,
@@ -133,4 +134,11 @@ test('SEENIT-UPDATE-003 branche le clic Android sur le contrôle de mise à jour
   assert.match(app, /useUpdateStore\.getState\(\)\.checkForUpdates/);
   assert.match(firebase, /queueAppUpdateAvailablePush\(payload\)/);
   assert.match(app, /consumeAppUpdateAvailablePush\(\)/);
+});
+
+test('SEENIT-UPDATE-004 conserve le tap pendant le contrôle de démarrage concurrent', () => {
+  assert.match(app, /handleTabChange\('watchlist'\)/);
+  assert.match(app, /requestUpdateModal\(\)/);
+  assert.match(updateStore, /inFlightUpdateCheck/);
+  assert.doesNotMatch(updateStore, /if \(isChecking\) return get\(\)\.hasUpdate/);
 });

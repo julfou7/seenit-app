@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useUpdateStore } from '../store/updateStore';
 import { downloadAndInstallApk, UpdateProgress } from '../services/appUpdater';
-import { ChangelogViewer } from './ChangelogViewer';
+import { ReleaseChangelogViewer } from './ChangelogViewer';
 import { 
   Download, 
   Sparkles, 
@@ -17,7 +17,7 @@ import {
 import { cn } from '../lib/utils';
 
 export function AppUpdateBanner() {
-  const { latestRelease, hasUpdate, checkForUpdates, dismissUpdate } = useUpdateStore();
+  const { latestRelease, hasUpdate, checkForUpdates, dismissUpdate, updateModalRequestId } = useUpdateStore();
   const [showModal, setShowModal] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<UpdateProgress | null>(null);
 
@@ -30,6 +30,12 @@ export function AppUpdateBanner() {
   useEffect(() => {
     checkForUpdates(true);
   }, [checkForUpdates]);
+
+  useEffect(() => {
+    if (updateModalRequestId > 0 && hasUpdate && latestRelease) {
+      setShowModal(true);
+    }
+  }, [hasUpdate, latestRelease, updateModalRequestId]);
 
   if (!hasUpdate || !latestRelease) {
     return null;
@@ -202,7 +208,7 @@ export function AppUpdateBanner() {
               </div>
               
               <div className="bg-black/40 border border-white/5 rounded-2xl p-4 max-h-80 sm:max-h-[28rem] md:max-h-[32rem] overflow-y-auto custom-scrollbar">
-                <ChangelogViewer content={latestRelease.releaseNotes} />
+                <ReleaseChangelogViewer release={latestRelease} />
               </div>
 
               {/* Download Progress / Status Bar if active */}
@@ -222,6 +228,9 @@ export function AppUpdateBanner() {
                         <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0" />
                       )}
                       {downloadProgress.status === 'installing' && (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      )}
+                      {downloadProgress.status === 'done' && (
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                       )}
                       {downloadProgress.status === 'error' && (

@@ -31,10 +31,13 @@ export function consumeAppUpdateAvailablePush(): AppUpdateAvailablePushData | nu
   return pending;
 }
 
-export async function handleAppUpdateAvailablePush(  data: unknown,
-  checkForUpdates: (force?: boolean) => Promise<boolean>
+export async function handleAppUpdateAvailablePush(
+  data: unknown,
+  checkForUpdates: (force?: boolean) => Promise<boolean>,
+  onUpdateAvailable?: () => void
 ): Promise<boolean> {
   if (!isAppUpdateAvailablePush(data)) return false;
-  await checkForUpdates(true);
+  const hasUpdate = await checkForUpdates(true);
+  if (hasUpdate) onUpdateAvailable?.();
   return true;
 }

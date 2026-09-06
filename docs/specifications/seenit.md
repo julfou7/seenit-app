@@ -572,6 +572,18 @@ pour le cache des sagas et univers.
   `julfou7/seenit-app`, tag sémantique `vX.Y.Z`, asset exact `SeenIt-vX.Y.Z.apk` et empreinte
   SHA-256 officielle. La première version cible uniquement les installations Android enregistrées et
   autorisées ; la PWA n'est pas destinataire afin d'éviter un doublon sur le même compte.
+- **SEENIT-UPDATE-004** — Dans l'APK, un appui sur une notification de nouvelle version revient sur
+  l'accueil « À voir », ferme la fiche éventuellement ouverte, force le contrôle canonique puis ouvre
+  la fenêtre de mise à jour uniquement si une version plus récente est réellement disponible. Cette
+  fenêtre agrège, dans l'ordre croissant, les notes de chaque release officielle strictement supérieure
+  à la version installée et inférieure ou égale à la cible. Une pagination ou une source d'historique
+  indisponible ne bloque jamais l'installation et retombe sur les seules notes de la cible.
+- Après téléchargement et vérification, l'ouverture réussie du Package Installer est un succès
+  observable nommé « Installeur lancé » à 100 %. Elle ne doit jamais être rendue comme une erreur,
+  même si Android conserve SeenIt visible derrière sa boîte de dialogue système.
+- Le dialogue Play Protect d'une APK installée hors Play appartient à Android/Google. SeenIt conserve
+  sa signature stable, limite ses permissions et peut faire enregistrer/analyser son package par les
+  dispositifs officiels, mais ne désactive, ne masque et ne contourne jamais Play Protect.
 - Le déclencheur post-release ne fait confiance à aucune preuve fournie par son appelant : le backend
   revalide auprès de GitHub le run `Validate & Release SeenIt` terminé avec succès sur `main`, son SHA,
   le tag correspondant, la release officielle et la paire APK/SHA-256 avant toute diffusion FCM.
