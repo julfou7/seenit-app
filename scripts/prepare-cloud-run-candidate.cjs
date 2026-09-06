@@ -124,10 +124,16 @@ function normalizeTraffic(lines, trafficIndex, trafficEnd, previousRevision, can
     const entryText = entryLines.join('\n');
     const percentMatch = entryText.match(/(?:^|\n)\s*(?:-\s*)?percent:\s*(\d+)(?:\s|$)/);
     const revisionMatch = entryText.match(/(?:^|\n)\s*(?:-\s*)?revisionName:\s*([^\s]+)(?:\s|$)/);
-    if (!percentMatch) throw new Error(`Cible de trafic sans pourcentage explicite: ${entryText.replace(/\s+/g, ' ').trim()}`);
+    const tagMatch = entryText.match(/(?:^|\n)\s*(?:-\s*)?tag:\s*([^\s]+)(?:\s|$)/);
+    const revisionName = revisionMatch?.[1] || '';
+    const tag = tagMatch?.[1] || '';
+    if (!percentMatch && (!revisionName || !tag)) {
+      throw new Error(`Cible de trafic sans pourcentage explicite: ${entryText.replace(/\s+/g, ' ').trim()}`);
+    }
     return {
-      percent: Number(percentMatch[1]),
-      revisionName: revisionMatch?.[1] || ''
+      percent: percentMatch ? Number(percentMatch[1]) : 0,
+      revisionName,
+      tag
     };
   });
 
