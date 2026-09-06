@@ -53,6 +53,13 @@ test('SEENIT-RELATION-001 sépare MCU, DCEU, DCU, Arrowverse et Batman', () => {
   assert.notEqual(keysFor('tv:1412')[0], keysFor('movie:414906')[0]);
 });
 
+test('SEENIT-RELATION-001 relie The Punisher 2017 à One Last Kill sans fusionner le film 2004', () => {
+  const punisher = keysFor('tv:67178');
+  assert.ok(punisher.includes('movie:1439930'));
+  assert.deepEqual(keysFor('movie:1439930'), punisher);
+  assert.ok(!punisher.includes('movie:7220'), 'Le film The Punisher de 2004 reste une continuité distincte');
+});
+
 test('SEENIT-RELATION-001 masque les auto-relations et qualifie les IDs par type', () => {
   assert.equal(getManifestRelationSnapshot('tv:250988'), null);
   assert.notEqual(toMediaKey('movie', 42), toMediaKey('tv', 42));
