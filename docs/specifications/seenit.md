@@ -338,6 +338,13 @@ fournisseur ne déclenche donc aucun fallback par titre. Wikidata peut uniquemen
 un manifeste à partir d'identifiants exacts et validés ; son endpoint public n'est pas une dépendance
 synchrone de la fiche.
 
+Un cas nommé dans un signalement, tel que Punisher, Harry Potter ou House of Guinness, est un scénario
+de TNR et jamais une condition de production. Les branches, exceptions, regex et tables de correspondance
+fondées sur le titre ou une variante de nom sont interdites. La correction admissible porte soit sur le
+mécanisme commun, soit sur les `mediaKey` exactes d'un groupe versionné à provenance validée ; dans ce
+dernier cas, le même résolveur doit restituer le groupe complet depuis chacun de ses membres. Un résultat
+qui ne corrige que l'exemple sans renforcer cet invariant global est refusé.
+
 #### Réciprocité, continuités et affichage
 
 - Une relation saga/univers est normalisée par groupId. Si A et B appartiennent au même groupe,
@@ -373,8 +380,9 @@ lorsqu'un film et une série partagent le même ID numérique.
 - Une relation incomplète ou incertaine est masquée plutôt que complétée par supposition.
 
 Les TNR minimales couvrent les parcours réciproques Yellowstone, Breaking Bad/Better Call Saul/El
-Camino, Wizarding World / Harry Potter films+série, la séparation des continuités Marvel et DC, House of Guinness
-sans section auto-référente, la collision movie:42/tv:42 et l'exclusion saga/univers des similaires.
+Camino, Wizarding World / Harry Potter films+série, Punisher/One Last Kill, la séparation des continuités
+Marvel et DC, House of Guinness sans section auto-référente, la collision movie:42/tv:42, la réciprocité
+générique de chaque groupe du manifeste et l'exclusion saga/univers des similaires.
 L'écart courant et le plan de correction sont suivis dans
 [#130](https://github.com/julfou7/seenit-app/issues/130).
 
