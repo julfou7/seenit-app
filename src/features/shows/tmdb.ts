@@ -98,16 +98,17 @@ tmdbClient.discoverWithFilters = (async (options) => {
 
 const strictFrenchNowPlaying = async (page: number = 1) => {
   const { pastCutoff, futureCutoff } = getCinemaWindow();
-  const url = new URL(resolveSeenItApiUrl('/api/media/tmdb/discover/movie'));
-  url.searchParams.set('language', 'fr-FR');
-  url.searchParams.set('region', 'FR');
-  url.searchParams.set('sort_by', 'popularity.desc');
-  url.searchParams.set('with_release_type', '2|3');
-  url.searchParams.set('release_date.gte', pastCutoff.toISOString().split('T')[0]);
-  url.searchParams.set('release_date.lte', futureCutoff.toISOString().split('T')[0]);
-  url.searchParams.set('page', String(page));
+  const params = new URLSearchParams();
+  params.set('language', 'fr-FR');
+  params.set('region', 'FR');
+  params.set('sort_by', 'popularity.desc');
+  params.set('with_release_type', '2|3');
+  params.set('release_date.gte', pastCutoff.toISOString().split('T')[0]);
+  params.set('release_date.lte', futureCutoff.toISOString().split('T')[0]);
+  params.set('page', String(page));
+  const url = `${resolveSeenItApiUrl('/api/media/tmdb/discover/movie')}?${params.toString()}`;
 
-  const response = await tryCatch(authenticatedFetch(url.toString()));
+  const response = await tryCatch(authenticatedFetch(url));
   if (!response.ok) return err((response as any).error);
   if (!response.value.ok) return err(new Error(`TMDB Error: ${response.value.status}`));
   const jsonResult = await tryCatch(response.value.json() as Promise<any>);
