@@ -1,7 +1,7 @@
 # SeenIt — Référence fonctionnelle canonique
 
 Dernière vérification : 6 septembre 2026  
-Baseline observée : **1.4.120**, `main` `374b93197168db6844346bcd046cc46390895abd`
+Baseline observée : **1.4.120**, `main` `ec707bd971673b5bd7f2c10aaea70b7e592dca61`
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : composante obligatoire de la SPEC SeenIt
 
@@ -36,13 +36,15 @@ compte et du même backend.
 Hiérarchie des sources :
 
 1. **Firestore `default` sous le Firebase UID** est autoritatif pour les données durables du compte.
-2. **TMDB** fournit l'identité canonique, les fiches, saisons, épisodes, personnes, dates et
-   disponibilités éditoriales.
-3. **Plex** fournit seulement des preuves de watchlist, visionnage/non-vu et disponibilité, jamais
+2. **TMDB** fournit l'identité canonique, les fiches, saisons, épisodes, personnes, dates,
+   disponibilités éditoriales et l'**Ordre de visionnage des films** via ses collections explicites.
+3. **TVDB** fournit la relation **franchise / univers** des fiches Film et Série, uniquement après
+   résolution par identifiant externe exact depuis TMDB et selon `SEENIT-RELATION-001`.
+4. **Plex** fournit seulement des preuves de watchlist, visionnage/non-vu et disponibilité, jamais
    l'identité finale par titre ou année.
-4. **Sonarr, Radarr et qBittorrent** fournissent l'état réel des téléchargements ; C411 fournit les
+5. **Sonarr, Radarr et qBittorrent** fournissent l'état réel des téléchargements ; C411 fournit les
    résultats de recherche.
-5. Les stockages locaux servent à accélérer, fonctionner hors-ligne ou porter un état propre à
+6. Les stockages locaux servent à accélérer, fonctionner hors-ligne ou porter un état propre à
    l'installation. Ils ne doivent pas devenir une seconde base métier divergente.
 
 ## 2. Architecture fonctionnelle en une vue
@@ -208,7 +210,8 @@ Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, 
 - Tri Populaires, Mieux notés, Plus récents ou Ordre alphabétique.
 - Hero Top 10, chargement infini, aperçu long-press et cache utilisable lors d'une panne réseau.
 - Les recommandations combinent genres regardés et personnes favorites, puis excluent les médias
-  déjà vus/terminés ou abandonnés.
+  déjà vus/terminés ou abandonnés. **Explorer reste le lieu de la découverte approximative** ; ces
+  recommandations ne sont pas réinjectées dans les fiches média comme relations.
 - « Au cinéma » exige une sortie théâtrale française TMDB type 2/3 dans la fenêtre J-75 à J+10 ; une
   sortie streaming/VOD seule n'est jamais « au cinéma ».
 
@@ -223,8 +226,9 @@ réécrire les favoris, notes, rappels ni l'archive ; le parcours explicite « R
 ### 8.1 Contenu commun
 
 La fiche combine les détails TMDB, notes TMDB/IMDb (OMDb), disponibilité streaming en France,
-présence Plex/Arr, bande-annonce, âge conseillé, casting, recommandations, collection/franchise
-et discussions Reddit. Les modals personne et épisode restent dans la pile Retour.
+présence Plex/Arr, bande-annonce, âge conseillé, casting, ordre de visionnage/franchise et discussions
+Reddit. Les recommandations contextuelles restent dans Explorer. Les modals personne et épisode restent
+dans la pile Retour.
 
 Le titre affiché privilégie le `title`/`name` de la fiche TMDB récupérée en `fr-FR`. Un ancien titre
 enregistré dans la bibliothèque sert seulement de fallback avant ou hors hydratation. Lorsqu'un média
@@ -268,36 +272,45 @@ swipes de suppression/abandon sur les cartes.
 - Les téléchargements Sonarr existent au niveau série, saison ou épisode ; le détail affiche aussi
   la disponibilité par saison/épisode.
 
-### 8.4 Sagas, univers cross-media et médias similaires
+### 8.4 Ordre de visionnage et franchise / univers
 
-La fiche peut afficher trois sections distinctes, dans cet ordre de priorité :
+La cible produit des fiches est volontairement simple :
 
-1. **Ordre de visionnage** pour une saga explicite et ordonnée ;
-2. **Dans le même univers** pour une continuité narrative vérifiée, y compris entre films, séries et
-   spin-off ;
-3. **Séries similaires** ou **Films similaires** pour les recommandations contextuelles TMDB.
+- **Film** : **Ordre de visionnage** via TMDB, puis **Dans la même franchise** ou **Dans le même univers** via TVDB ;
+- **Série** : uniquement **Dans la même franchise** ou **Dans le même univers** via TVDB ;
+- les sections **Films similaires** et **Séries similaires** sont supprimées des fiches. Les recommandations contextuelles restent dans Explorer.
 
-Une œuvre déjà affichée dans une section prioritaire n'est pas répétée dans les suivantes. Les sagas
-et univers sont bidirectionnels : entrer par n'importe lequel de leurs membres restitue le même groupe
-et le même ordre, avec seulement le badge « actuel » déplacé. La fiche courante peut servir de repère
-dans un vrai groupe, mais une section contenant uniquement ce média est masquée.
+Pour un film, « Ordre de visionnage » provient exclusivement de sa collection TMDB explicite. Aucune
+série, liste TVDB, entrée SeenIt ou source secondaire ne complète cette section lorsqu'une collection
+TMDB est absente.
 
-SeenIt ne déduit jamais une saga ou un univers d'un titre, d'une année, de la popularité ou d'une
-marque. Marvel et DC sont séparés par continuité narrative explicite. Les similaires ne sont pas une
-preuve de franchise et ne sont pas nécessairement réciproques.
+Pour la franchise / l'univers, SeenIt part de l'identité exacte `mediaType + TMDB ID`, récupère les
+identifiants externes TMDB, puis rejoint TVDB sans recherche du média par titre. Le résolveur examine
+uniquement les listes rattachées à l'œuvre TVDB exacte : aucune recherche globale de listes n'est
+admise. Il retient au maximum une liste officielle admissible ; plusieurs listes ne sont jamais fusionnées.
+Une ambiguïté entre plusieurs listes admissibles masque la section au lieu de choisir arbitrairement.
 
-Un titre cité dans un bug sert uniquement d'exemple de test. Il est interdit d'ajouter dans le résolveur
-une condition, une regex ou une exception portant ce nom. Une relation manquante est corrigée dans le
-mécanisme commun ou par des identités Film/Série + TMDB exactes dans un groupe versionné et validé ; le
-résultat doit alors être identique et réciproque depuis tous les membres du groupe.
+Le libellé d'une liste TVDB déjà atteinte par identité exacte sert seulement à qualifier l'interface :
+**« Dans la même franchise »** pour une franchise et **« Dans le même univers »** lorsqu'il s'agit
+explicitement d'un univers. Il ne sert jamais à identifier une œuvre, retrouver un membre ou lancer
+une recherche globale. Chaque membre est résolu vers son `movie:<tmdbId>` ou `tv:<tmdbId>` exact avant
+affichage.
 
-L'identité utilisée dans chaque carte et chaque navigation combine toujours le type Film/Série et
-l'ID TMDB. Le contrat exhaustif, les sources admises, les budgets de performance et la matrice
-Yellowstone, Breaking Bad, Harry Potter, Marvel, DC et House of Guinness sont définis par
-SEENIT-RELATION-001. Le catalogue éditorial est séparé du code et génère un snapshot identique dans la
-PWA et l'APK. Une détection hors ligne peut proposer de nouveaux groupes exacts ; ils restent invisibles
-tant qu'ils ne sont pas revus et approuvés. L'évolution de ce mécanisme est tracée dans
-[#130](https://github.com/julfou7/seenit-app/issues/130).
+Sur un film, la priorité est Ordre de visionnage puis section TVDB. **Un média déjà présent dans l'Ordre
+de visionnage est retiré de la section TVDB** par `mediaType + tmdbId`, afin d'éviter tout doublon. Une
+section qui ne laisserait aucun autre média affichable est masquée.
+
+Wikidata, Kometa, MDBList et les autres pipelines multi-sources ne font plus partie de la stratégie
+normale de relations de fiche. Le catalogue relationnel SeenIt actuel est legacy pendant la migration ;
+un éventuel override futur reste exceptionnel, versionné, exact et tracé. Les cas House of the Dragon,
+Breaking Bad, Yellowstone, Harry Potter, MCU ou Punisher servent de TNR, jamais de conditions nominatives.
+
+La décision durable complète est figée dans
+[`docs/decisions/media-relations-2026-09-06.md`](../decisions/media-relations-2026-09-06.md) et dans
+`SEENIT-RELATION-001`. **Le runtime actuel conserve encore le catalogue relationnel SeenIt**, son
+pipeline hors ligne et les sections Films/Séries similaires ; TVDB n'est donc pas encore le résolveur
+normal de franchise/univers. Cet écart de mise en œuvre reste suivi dans l'**issue #130** et ne remet pas
+en cause la décision produit.
 
 Une fiche déjà ouverte pendant la session doit se réafficher depuis le cache chaud, sans repasser par
 un skeleton de deux à trois secondes. Détails et relations sont indexés par `movie:<id>` / `tv:<id>`,
@@ -488,7 +501,7 @@ elle est nécessaire à la plateforme et explicitement documentée.
 | Priorité | Écart observé | Décision / issue |
 |---|---|---|
 | P1 | La classification d’âge actuelle peut préférer une valeur FR permissive, sous-classer des certifications US et inventer un TP par genre. | Appliquer `SEENIT-PARENTAL-001` : [#98](https://github.com/julfou7/seenit-app/issues/98). |
-| P2 | La couverture des univers dépend de la qualité et de la revue des propositions hors ligne ; une relation réelle absente des sources exactes reste volontairement masquée. | Maintenir le catalogue et son détecteur selon `SEENIT-RELATION-001` ; ne jamais compenser par titre : [#130](https://github.com/julfou7/seenit-app/issues/130). |
+| P1 | Le runtime actuel conserve encore le catalogue relationnel SeenIt, le détecteur/pipeline hors ligne et les sections Films/Séries similaires ; TVDB n'est pas encore le résolveur normal de franchise/univers. | Migrer vers la décision TMDB + TVDB de `SEENIT-RELATION-001` et supprimer les similaires des fiches : [#130](https://github.com/julfou7/seenit-app/issues/130). |
 | P1 | Les personnes favorites restent locales et font diverger les recommandations PWA/APK. | Rendre Firestore autoritatif : [#95](https://github.com/julfou7/seenit-app/issues/95). |
 | P1 | Le retrait de Watchlist Plex ne retire pas encore un suivi créé uniquement par cette Watchlist. | Implémentation avec provenance : [#68](https://github.com/julfou7/seenit-app/issues/68). |
 | P2 | Partager une fiche ou le profil ne garantit pas encore un lien réouvrable conforme. | Décider/corriger : [#96](https://github.com/julfou7/seenit-app/issues/96). |
