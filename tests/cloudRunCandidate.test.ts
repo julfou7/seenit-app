@@ -72,6 +72,36 @@ test('SEENIT-RUNTIME-001 prépare une candidate image en conservant la configura
   assert.match(prepared, /percent: 0\n    revisionName: seenit-app-gh-12345\n    tag: candidate-12345/);
 });
 
+test('SEENIT-RUNTIME-001 retire command et args hérités quand ils portent la puce du conteneur', () => {
+  const inheritedLaunch = exportedService.replace(
+    '      - env:\n',
+    `      - command:\n        - /bin/sh\n        args:\n        - -c\n        - npm run dev\n        env:\n`
+  );
+  const prepared = prepareCandidateService(inheritedLaunch, baseOptions);
+
+  assert.doesNotMatch(prepared, /command:/);
+  assert.doesNotMatch(prepared, /args:/);
+  assert.doesNotMatch(prepared, /npm run dev/);
+  assert.match(prepared, /      - env:\n/);
+  assert.match(prepared, /KEEP_ENV/);
+  assert.match(prepared, /image: .*@sha256:/);
+  assert.match(prepared, /memory: 512Mi/);
+});
+
+test('SEENIT-RUNTIME-001 retire command et args secondaires sans perdre les ports du conteneur', () => {
+  const inheritedLaunch = exportedService.replace(
+    `      - env:\n        - name: NODE_ENV\n          value: development\n        - name: KEEP_ENV\n          value: keep-value\n        image:`,
+    `      - ports:\n        - containerPort: 3000\n          name: http1\n        command:\n        - legacy-launcher\n        args:\n        - --serve\n        env:\n        - name: NODE_ENV\n          value: development\n        - name: KEEP_ENV\n          value: keep-value\n        image:`
+  );
+  const prepared = prepareCandidateService(inheritedLaunch, baseOptions);
+
+  assert.doesNotMatch(prepared, /legacy-launcher|--serve|command:|args:/);
+  assert.match(prepared, /      - ports:\n/);
+  assert.match(prepared, /containerPort: 3000/);
+  assert.match(prepared, /name: http1/);
+  assert.match(prepared, /name: NODE_ENV\n\s+value: production/);
+});
+
 test('SEENIT-RUNTIME-001 retire les anciennes cibles à 0 % avant de créer la candidate', () => {
   const stale = exportedService.replace(
     '  - percent: 100\n    revisionName: seenit-app-00014-wjw\n',
