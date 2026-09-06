@@ -30,14 +30,12 @@ function deriveCandidateTag(service, candidateRevision) {
   return tag;
 }
 
-function forceSingleContainerEnv(lines, imageIndex, name, value) {
-  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
+function getSingleContainerBounds(lines, imageIndex) {
   let containerStart = imageIndex;
   while (containerStart >= 0 && !/^      - [A-Za-z0-9_-]+:\s*/.test(lines[containerStart] || '')) {
     containerStart -= 1;
   }
-  if (containerStart < 0) throw new Error(`Début du conteneur introuvable pour forcer ${name}.`);
+  if (containerStart < 0) throw new Error('Début du conteneur Cloud Run introuvable.');
 
   let containerEnd = lines.length;
   for (let index = containerStart + 1; index < lines.length; index += 1) {
@@ -47,6 +45,37 @@ function forceSingleContainerEnv(lines, imageIndex, name, value) {
       break;
     }
   }
+  return { containerStart, containerEnd };
+}
+
+function normalizeSingleContainerLaunch(lines, imageIndex) {
+  const { containerStart, containerEnd } = getSingleContainerBounds(lines, imageIndex);
+  const containerLines = lines.slice(containerStart, containerEnd);
+  containerLines[0] = containerLines[0].replace(/^      - /, '        ');
+
+  const fields = [];
+  for (let index = 0; index < containerLines.length; index += 1) {
+    const match = containerLines[index].match(/^        ([A-Za-z0-9_-]+):\s*/);
+    if (match) fields.push({ index, key: match[1] });
+  }
+  if (!fields.length) throw new Error('Aucun champ du conteneur Cloud Run détecté.');
+
+  const kept = [];
+  for (let fieldIndex = 0; fieldIndex < fields.length; fieldIndex += 1) {
+    const field = fields[fieldIndex];
+    const end = fields[fieldIndex + 1]?.index ?? containerLines.length;
+    if (field.key === 'command' || field.key === 'args') continue;
+    kept.push(...containerLines.slice(field.index, end));
+  }
+  if (!kept.length) throw new Error('Le conteneur Cloud Run serait vide après normalisation du lancement.');
+
+  kept[0] = kept[0].replace(/^        /, '      - ');
+  lines.splice(containerStart, containerEnd - containerStart, ...kept);
+}
+
+function forceSingleContainerEnv(lines, imageIndex, name, value) {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const { containerStart, containerEnd } = getSingleContainerBounds(lines, imageIndex);
 
   const envIndex = lines.findIndex((line, index) => (
     index >= containerStart
@@ -186,13 +215,20 @@ function prepareCandidateService(source, { image, service, previousRevision, can
     return true;
   });
 
-  const imageIndexes = [];
+  let imageIndexes = [];
   lines.forEach((line, index) => {
     if (/^\s*(?:-\s*)?image:\s*\S+\s*$/.test(line)) imageIndexes.push(index);
   });
   if (imageIndexes.length !== 1) {
     throw new Error(`Configuration Cloud Run inattendue: ${imageIndexes.length} ligne(s) image détectée(s), 1 attendue.`);
   }
+
+  normalizeSingleContainerLaunch(lines, imageIndexes[0]);
+  imageIndexes = [];
+  lines.forEach((line, index) => {
+    if (/^\s*(?:-\s*)?image:\s*\S+\s*$/.test(line)) imageIndexes.push(index);
+  });
+  if (imageIndexes.length !== 1) throw new Error('Ligne image perdue pendant la normalisation du lancement.');
 
   forceSingleContainerEnv(lines, imageIndexes[0], 'NODE_ENV', 'production');
   const refreshedImageIndex = lines.findIndex(line => /^\s*(?:-\s*)?image:\s*\S+\s*$/.test(line));
@@ -232,10 +268,10 @@ function main() {
     candidateRevision: args['candidate-revision']
   });
   fs.writeFileSync(args.output, prepared, 'utf8');
-  console.log(`[CloudRunCandidate] Service préparé: ${args['candidate-revision']} sur ${args.image}, NODE_ENV=production, trafic normalisé et cible 0 %=${deriveCandidateTag(args.service, args['candidate-revision'])}`);
+  console.log(`[CloudRunCandidate] Service préparé: ${args['previous-revision']} -> ${args['candidate-revision']} sur ${args.image}, entrypoint image conservé, NODE_ENV=production, trafic normalisé et cible 0 %=${deriveCandidateTag(args.service, args['candidate-revision'])}`);
 }
 
-module.exports = { deriveCandidateTag, forceSingleContainerEnv, normalizeTraffic, parseArgs, prepareCandidateService, validateRevisionName };
+module.exports = { deriveCandidateTag, forceSingleContainerEnv, getSingleContainerBounds, normalizeSingleContainerLaunch, normalizeTraffic, parseArgs, prepareCandidateService, validateRevisionName };
 
 if (require.main === module) {
   try {
