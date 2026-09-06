@@ -1,6 +1,6 @@
 import { db } from '../../db/dexie';
-
-const OMDB_API_KEY = 'eadd4829';
+import { authenticatedFetch } from '../../lib/apiAuth';
+import { resolveSeenItApiUrl } from '../../lib/seenitApi';
 
 export interface EpisodeImdbData {
   rating: number;
@@ -13,20 +13,19 @@ export interface SeriesImdbData {
   updatedAt: number;
 }
 
-// 4 hours for ongoing or partially rated seasons / pending titles
 const FOUR_HOURS = 4 * 60 * 60 * 1000;
-// 1 day in milliseconds for recently ended or settled titles
 const ONE_DAY = 24 * 60 * 60 * 1000;
-// 14 days in milliseconds for fully completed past seasons
 const FOURTEEN_DAYS = 14 * 24 * 60 * 60 * 1000;
 
+async function fetchOmdb(imdbId: string, seasonNumber?: number): Promise<Response> {
+  const params = new URLSearchParams({ i: imdbId });
+  if (seasonNumber !== undefined) params.set('Season', String(seasonNumber));
+  return authenticatedFetch(`${resolveSeenItApiUrl('/api/media/omdb')}?${params.toString()}`);
+}
+
 /**
- * Récupère les notes IMDb d'une saison.
- * Stratégie CACHE-FIRST avec Expiration Intelligente & Récupération Dynamique :
- * - Si les données sont en cache et encore valides, retourne le cache.
- * - Si une saison est en cours ou a des épisodes avec note 0 / N/A (non encore parues sur IMDb),
- *   la durée de cache est raccourcie à 4h pour basculer automatiquement vers les vraies notes IMDb dès publication.
- * - Si forceRefresh est activé, interroge immédiatement l'API OMDb pour récupérer les dernières notes.
+ * Récupère les notes IMDb d'une saison avec la stratégie de cache historique.
+ * Le client ne possède plus la clé OMDb : tout accès réseau passe par le backend SeenIt.
  */
 export async function getSeasonImdbRatings(
   imdbId: string | null | undefined,
@@ -34,123 +33,92 @@ export async function getSeasonImdbRatings(
   forceRefresh: boolean = false
 ): Promise<Record<number, EpisodeImdbData>> {
   if (!imdbId) return {};
-
   const cacheKey = `${imdbId}-S${seasonNumber}`;
 
   try {
-    // 1. CHERCHER EN LOCAL DANS DEXIE
     const cachedData = await db.omdbRatingsCache.get(cacheKey);
     let normalizedCache: Record<number, EpisodeImdbData> | null = null;
 
-    if (cachedData && cachedData.ratings) {
+    if (cachedData?.ratings) {
       normalizedCache = {};
-      Object.entries(cachedData.ratings).forEach(([epNumStr, val]) => {
+      Object.entries(cachedData.ratings).forEach(([epNumStr, value]) => {
         const epNum = parseInt(epNumStr, 10);
-        if (typeof val === 'number') {
-          normalizedCache![epNum] = { rating: val, imdbId: '' };
-        } else if (val && typeof val === 'object' && typeof val.rating === 'number') {
-          normalizedCache![epNum] = { rating: val.rating, imdbId: val.imdbId || '' };
+        if (typeof value === 'number') {
+          normalizedCache![epNum] = { rating: value, imdbId: '' };
+        } else if (value && typeof value === 'object' && typeof (value as any).rating === 'number') {
+          normalizedCache![epNum] = {
+            rating: (value as any).rating,
+            imdbId: (value as any).imdbId || '',
+          };
         }
       });
 
-      // Calculer l'âge du cache
       const age = Date.now() - (cachedData.updatedAt || 0);
       const hasMissingRatings = Object.values(normalizedCache).some(ep => !ep || ep.rating === 0);
       const isOngoing = cachedData.isOngoing || hasMissingRatings;
-      
-      // Si la saison a des épisodes sans note (ou en cours), cache très court (4h) pour capter les nouvelles notes IMDb
       const cacheLifetime = hasMissingRatings ? FOUR_HOURS : isOngoing ? ONE_DAY : FOURTEEN_DAYS;
-
-      // Si le cache est récent et sans demande de forceRefresh, on l'utilise sans appel réseau
-      if (!forceRefresh && age < cacheLifetime) {
-        return normalizedCache;
-      }
+      if (!forceRefresh && age < cacheLifetime) return normalizedCache;
     }
 
-    // 2. SI ABSENT, EXPIRÉ OU FORCE_REFRESH -> APPEL RÉSEAU OMDB
-    const res = await fetch(
-      `https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&i=${imdbId}&Season=${seasonNumber}`
-    );
-    if (!res.ok) {
-      // Fallback au cache expiré si le réseau échoue
+    const response = await fetchOmdb(imdbId, seasonNumber);
+    if (!response.ok) return normalizedCache || {};
+    const data = await response.json();
+    if (data.Response === 'False' || !Array.isArray(data.Episodes) || data.Episodes.length === 0) {
       return normalizedCache || {};
     }
 
-    const data = await res.json();
-    if (data.Response === 'False' || !data.Episodes || !Array.isArray(data.Episodes) || data.Episodes.length === 0) {
-      return normalizedCache || {};
-    }
-
-    // Déterminer si la saison est toujours en cours de diffusion (présence de notes 'N/A' ou d'épisodes futurs)
     let hasNAs = false;
     let hasFutureEpisodes = false;
     const thirtyDaysAgo = Date.now() - 30 * ONE_DAY;
-
     const ratingsMap: Record<number, EpisodeImdbData> = {};
     const missingEpisodesToFetch: { epNum: number; epImdbId: string }[] = [];
 
-    data.Episodes.forEach((ep: any) => {
-      const epNum = parseInt(ep.Episode, 10);
-      const rating = parseFloat(ep.imdbRating);
-      const epImdbId = ep.imdbID || ep.imdbId || '';
-
-      if (ep.imdbRating === 'N/A' || !ep.imdbRating || isNaN(rating) || rating <= 0) {
+    data.Episodes.forEach((episode: any) => {
+      const epNum = parseInt(episode.Episode, 10);
+      const rating = parseFloat(episode.imdbRating);
+      const epImdbId = episode.imdbID || episode.imdbId || '';
+      if (episode.imdbRating === 'N/A' || !episode.imdbRating || Number.isNaN(rating) || rating <= 0) {
         hasNAs = true;
-        if (epImdbId && !isNaN(epNum)) {
-          missingEpisodesToFetch.push({ epNum, epImdbId });
-        }
+        if (epImdbId && !Number.isNaN(epNum)) missingEpisodesToFetch.push({ epNum, epImdbId });
       }
-
-      if (ep.Released && ep.Released !== 'N/A') {
-        const releaseTime = new Date(ep.Released).getTime();
-        if (!isNaN(releaseTime) && releaseTime > thirtyDaysAgo) {
-          hasFutureEpisodes = true;
-        }
+      if (episode.Released && episode.Released !== 'N/A') {
+        const releaseTime = new Date(episode.Released).getTime();
+        if (!Number.isNaN(releaseTime) && releaseTime > thirtyDaysAgo) hasFutureEpisodes = true;
       } else {
         hasFutureEpisodes = true;
       }
-
-      if (!isNaN(epNum)) {
+      if (!Number.isNaN(epNum)) {
         ratingsMap[epNum] = {
-          rating: !isNaN(rating) && rating > 0 ? rating : 0,
-          imdbId: epImdbId
+          rating: !Number.isNaN(rating) && rating > 0 ? rating : 0,
+          imdbId: epImdbId,
         };
       }
     });
 
-    // Si certains épisodes ont une note 'N/A' dans la liste de la saison OMDb mais un imdbID valide,
-    // tenter de les récupérer individuellement (car l'API OMDb a parfois les notes par épisode individuel)
     if (missingEpisodesToFetch.length > 0 && missingEpisodesToFetch.length <= 25) {
-      await Promise.all(
-        missingEpisodesToFetch.map(async ({ epNum, epImdbId }) => {
-          try {
-            const epRes = await fetch(`https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&i=${epImdbId}`);
-            if (epRes.ok) {
-              const epData = await epRes.json();
-              const epRating = parseFloat(epData.imdbRating);
-              if (!isNaN(epRating) && epRating > 0) {
-                ratingsMap[epNum] = { rating: epRating, imdbId: epImdbId };
-              }
-            }
-          } catch (e) {
-            // Ignorer l'erreur d'un appel individuel
+      await Promise.all(missingEpisodesToFetch.map(async ({ epNum, epImdbId }) => {
+        try {
+          const epResponse = await fetchOmdb(epImdbId);
+          if (!epResponse.ok) return;
+          const epData = await epResponse.json();
+          const epRating = parseFloat(epData.imdbRating);
+          if (!Number.isNaN(epRating) && epRating > 0) {
+            ratingsMap[epNum] = { rating: epRating, imdbId: epImdbId };
           }
-        })
-      );
+        } catch {
+          // Un épisode indisponible ne doit pas invalider toute la saison.
+        }
+      }));
     }
 
-    const isOngoing = hasNAs || hasFutureEpisodes;
-
-    // 4. SAUVEGARDER DANS DEXIE POUR LES PROCHAINES OUVERTURES
     await db.omdbRatingsCache.put({
       id: cacheKey,
       imdbId,
       seasonNumber,
       ratings: ratingsMap,
-      isOngoing,
-      updatedAt: Date.now()
+      isOngoing: hasNAs || hasFutureEpisodes,
+      updatedAt: Date.now(),
     });
-
     return ratingsMap;
   } catch (error) {
     console.warn('[OMDb] Erreur lors de la récupération des notes de la saison:', error);
@@ -158,13 +126,7 @@ export async function getSeasonImdbRatings(
   }
 }
 
-/**
- * Récupère la note globale d'une série ou d'un film sur IMDb.
- * Stratégie CACHE-FIRST avec Expiration Intelligente :
- * - Cache de 4h si note manquante/0 (pour mise à niveau rapide dès que IMDb la publie)
- * - Cache de 1 jour pour les séries en cours de production/diffusion.
- * - Cache de 14 jours pour les séries et films terminés.
- */
+/** Récupère la note globale IMDb d'une série ou d'un film via la façade backend. */
 export async function getSeriesImdbData(
   imdbId: string | null | undefined,
   forceRefresh: boolean = false
@@ -172,64 +134,47 @@ export async function getSeriesImdbData(
   if (!imdbId) return null;
 
   try {
-    // 1. Chercher d'abord dans le cache
     const cached = await db.omdbEpisodesCache.get(imdbId);
-    
     if (cached) {
       const age = Date.now() - (cached.updatedAt || 0);
       const isOngoing = (cached as any).isOngoing;
       const hasValidRating = typeof cached.rating === 'number' && cached.rating > 0;
-      
       const cacheLifetime = !hasValidRating ? FOUR_HOURS : isOngoing ? ONE_DAY : FOURTEEN_DAYS;
-
       if (!forceRefresh && age < cacheLifetime && cached.rating !== undefined) {
-        return {
-          rating: cached.rating,
-          votes: cached.votes,
-          updatedAt: cached.updatedAt
-        };
-      }
-    }
-
-    // 2. Appel réseau si absent, expiré ou forcé
-    const res = await fetch(`https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&i=${imdbId}`);
-    if (!res.ok) {
-      if (cached && cached.rating !== undefined) {
         return { rating: cached.rating, votes: cached.votes, updatedAt: cached.updatedAt };
       }
-      return null;
     }
 
-    const data = await res.json();
+    const response = await fetchOmdb(imdbId);
+    if (!response.ok) {
+      return cached?.rating !== undefined
+        ? { rating: cached.rating, votes: cached.votes, updatedAt: cached.updatedAt }
+        : null;
+    }
+    const data = await response.json();
     if (data.Response === 'False' || !data.imdbRating || data.imdbRating === 'N/A') {
-      if (cached && cached.rating !== undefined) {
-        return { rating: cached.rating, votes: cached.votes, updatedAt: cached.updatedAt };
-      }
-      return null;
+      return cached?.rating !== undefined
+        ? { rating: cached.rating, votes: cached.votes, updatedAt: cached.updatedAt }
+        : null;
     }
 
     const rating = parseFloat(data.imdbRating);
     const votes = data.imdbVotes && data.imdbVotes !== 'N/A' ? data.imdbVotes : '0';
-    
-    // Vérifier si la série est en cours
-    const yearStr = data.Year || '';
-    const isOngoing = yearStr.endsWith('–') || yearStr.endsWith('-') || (yearStr.includes('–') && !yearStr.split('–')[1]?.trim());
-
+    const year = data.Year || '';
+    const isOngoing = year.endsWith('–') || year.endsWith('-') || (year.includes('–') && !year.split('–')[1]?.trim());
     const result: SeriesImdbData = {
-      rating: !isNaN(rating) && rating > 0 ? rating : 0,
+      rating: !Number.isNaN(rating) && rating > 0 ? rating : 0,
       votes,
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
     };
 
-    // Sauvegarder dans le cache
     await db.omdbEpisodesCache.put({
       imdbId,
       votes,
       rating: result.rating,
       isOngoing,
-      updatedAt: Date.now()
+      updatedAt: result.updatedAt,
     } as any);
-
     return result;
   } catch (error) {
     console.warn('[OMDb] Erreur lors de la récupération de la note globale:', error);
@@ -237,34 +182,22 @@ export async function getSeriesImdbData(
   }
 }
 
-/**
- * Récupère le nombre de votes IMDb pour un épisode spécifique.
- * Stratégie CACHE-FIRST :
- * 1. Vérifie la table `omdbEpisodesCache`.
- * 2. Si absent -> Effectue 1 appel API pour cet épisode unique.
- */
+/** Récupère le nombre de votes IMDb d'un épisode spécifique via le backend SeenIt. */
 export async function getEpisodeImdbVotes(episodeImdbId: string): Promise<string | null> {
   if (!episodeImdbId) return null;
-
   try {
-    // 1. Check cache
     const cached = await db.omdbEpisodesCache.get(episodeImdbId);
     if (cached) return cached.votes;
-
-    // 2. Fetch API
-    const res = await fetch(`https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&i=${episodeImdbId}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-
-    if (data.imdbVotes && data.imdbVotes !== 'N/A') {
-      await db.omdbEpisodesCache.put({
-        imdbId: episodeImdbId,
-        votes: data.imdbVotes,
-        updatedAt: Date.now()
-      });
-      return data.imdbVotes;
-    }
-    return null;
+    const response = await fetchOmdb(episodeImdbId);
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (!data.imdbVotes || data.imdbVotes === 'N/A') return null;
+    await db.omdbEpisodesCache.put({
+      imdbId: episodeImdbId,
+      votes: data.imdbVotes,
+      updatedAt: Date.now(),
+    });
+    return data.imdbVotes;
   } catch {
     return null;
   }
