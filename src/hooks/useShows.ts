@@ -1,10 +1,17 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { db, auth } from '../lib/firebase';
 import { collection, query, doc, setDoc, updateDoc, deleteDoc, getDocs, where } from 'firebase/firestore';
 import { type Show } from '../types';
 import { useShowsStore } from '../store/showsStore';
 import { handleFirestoreError, OperationType } from '../lib/firebaseErrors';
 import { useSyncStore } from '../store/syncStore';
+import {
+  normalizeTrackedMediaState,
+  shouldNormalizeInitialTrackingState,
+} from '../features/shows/mediaTrackingState';
+
+const LEGACY_NORMALIZATION_BATCH_SIZE = 20;
+const scheduledLegacyNormalizations = new Set<string>();
 
 export function useShows() {
   const shows = useShowsStore(state => state.shows);
@@ -13,6 +20,41 @@ export function useShows() {
   const updateShowOptimistic = useShowsStore(state => state.updateShowOptimistic);
   const removeShowOptimistic = useShowsStore(state => state.removeShowOptimistic);
   const fetchShows = useShowsStore(state => state.fetchShows);
+
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user || loading) return;
+
+    const candidates = shows
+      .filter(show => Boolean(show.id) && shouldNormalizeInitialTrackingState(show))
+      .filter(show => !scheduledLegacyNormalizations.has(`${user.uid}:${show.id}`))
+      .slice(0, LEGACY_NORMALIZATION_BATCH_SIZE);
+
+    if (candidates.length === 0) return;
+
+    for (const show of candidates) {
+      const key = `${user.uid}:${show.id}`;
+      scheduledLegacyNormalizations.add(key);
+      const updatedAt = Date.now();
+      updateShowOptimistic(show.id, { status: 'plan_to_watch', updatedAt });
+
+      const docRef = doc(db, 'users', user.uid, 'shows', show.id);
+      void updateDoc(docRef, { status: 'plan_to_watch', updatedAt }).catch((err: any) => {
+        fetchShows();
+        const errStr = err?.message || String(err);
+        if (
+          err?.code === 'resource-exhausted' ||
+          errStr.toLowerCase().includes('quota exceeded') ||
+          errStr.toLowerCase().includes('quota-exceeded') ||
+          errStr.toLowerCase().includes('resource-exhausted') ||
+          errStr.toLowerCase().includes('resource_exhausted')
+        ) {
+          useSyncStore.getState().setQuotaExceeded(true);
+        }
+        handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/shows/${show.id}`);
+      });
+    }
+  }, [shows, loading, updateShowOptimistic, fetchShows]);
 
   const addShow = useCallback(async (showData: Omit<Show, 'id' | 'userId'>) => {
     if (!auth.currentUser) throw new Error("Not authenticated");
@@ -26,11 +68,15 @@ export function useShows() {
     );
 
     if (existingShow && existingShow.id) {
-      // Mettre à jour le document existant plutôt que créer un doublon
+      // Mettre à jour le document existant plutôt que créer un doublon.
+      // La progression déjà connue participe à la décision d'état canonique.
+      const normalized = normalizeTrackedMediaState({ ...existingShow, ...showData });
       const cleanData: any = {};
       Object.entries(showData).forEach(([key, val]) => {
         cleanData[key] = val === undefined ? null : val;
       });
+      if (normalized.status !== showData.status) cleanData.status = normalized.status;
+
       updateShowOptimistic(existingShow.id, cleanData);
       const docRef = doc(db, 'users', auth.currentUser.uid, 'shows', existingShow.id);
       await updateDoc(docRef, cleanData);
@@ -39,9 +85,10 @@ export function useShows() {
 
     const showsRef = collection(db, 'users', auth.currentUser.uid, 'shows');
     const docRef = doc(showsRef);
+    const normalizedShowData = normalizeTrackedMediaState(showData);
     
     const cleanData: any = {};
-    Object.entries(showData).forEach(([key, val]) => {
+    Object.entries(normalizedShowData).forEach(([key, val]) => {
       cleanData[key] = val === undefined ? null : val;
     });
 
@@ -70,14 +117,22 @@ export function useShows() {
 
   const updateShow = useCallback(async (id: string, updates: Partial<Show>) => {
     if (!auth.currentUser) throw new Error("Not authenticated");
+
+    const currentShow = useShowsStore.getState().shows.find(show => show.id === id);
+    const normalized = currentShow
+      ? normalizeTrackedMediaState({ ...currentShow, ...updates })
+      : null;
+    const normalizedUpdates: Partial<Show> = normalized && normalized.status !== updates.status
+      ? { ...updates, status: normalized.status }
+      : updates;
     
     // Perform optimistic update
-    updateShowOptimistic(id, updates);
+    updateShowOptimistic(id, normalizedUpdates);
     
     const docRef = doc(db, 'users', auth.currentUser.uid, 'shows', id);
     
     const cleanUpdates: any = {};
-    Object.entries(updates).forEach(([key, val]) => {
+    Object.entries(normalizedUpdates).forEach(([key, val]) => {
       cleanUpdates[key] = val === undefined ? null : val;
     });
 
