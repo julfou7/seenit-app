@@ -1,7 +1,7 @@
 # SeenIt — Référence fonctionnelle canonique
 
 Dernière vérification : 6 septembre 2026  
-Baseline observée : **1.4.120**, `main` `374b93197168db6844346bcd046cc46390895abd`
+Baseline observée : **1.4.120**, `main` `6865195a4ea2ebe89cffd5bd6137ecfc25b969de`
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : composante obligatoire de la SPEC SeenIt
 
@@ -41,7 +41,7 @@ Hiérarchie des sources :
 3. **Plex** fournit seulement des preuves de watchlist, visionnage/non-vu et disponibilité, jamais
    l'identité finale par titre ou année.
 4. **Sonarr, Radarr et qBittorrent** fournissent l'état réel des téléchargements ; C411 fournit les
-   résultats de recherche.
+   résultats de recherche lorsque la fonctionnalité personnelle Téléchargements est activée.
 5. Les stockages locaux servent à accélérer, fonctionner hors-ligne ou porter un état propre à
    l'installation. Ils ne doivent pas devenir une seconde base métier divergente.
 
@@ -107,6 +107,7 @@ prévues ; ce dernier n'accorde aucune confiance à l'appelant et exige les preu
 | Plateformes de streaming et préférences de notification | Compte, partagées PWA/APK |
 | Corrections personnelles d’âge conseillé (`mediaType + TMDB ID`) | Compte, partagées PWA/APK |
 | Jeton/curseur Plex et réglages C411/Arr/qBit | Compte, partagés PWA/APK, isolés par UID |
+| Activation de la fonctionnalité Téléchargements | Compte, partagée PWA/APK, désactivée par défaut et isolée par UID |
 | Intentions de téléchargement | Compte, partagées PWA/APK |
 | News lues et rappels métier | Compte, partagés PWA/APK |
 | Token FCM, permission système, installation notification | Appareil, rattachés au UID courant |
@@ -124,16 +125,19 @@ Les gestes et leur portée exacte sont inventoriés dans la [référence UX](./u
 Le reset de navigation actuel présente des écarts (#178) : reconnaissance après changement d'onglet
 et remontée globale des conteneurs, y compris cachés. Ne pas les prendre comme conventions à reproduire.
 
-La barre basse possède quatre destinations stables, dans cet ordre :
+La barre basse possède trois destinations toujours visibles, dans cet ordre :
 
 1. **À Voir** : accueil opérationnel ;
 2. **Profil** : statistiques, Ma Liste et accès Réglages ;
-3. **Explorer** : recherche et découverte TMDB ;
-4. **Télécharger** : suivi et lancement des téléchargements.
+3. **Explorer** : recherche et découverte TMDB.
 
-L'onglet actif et ses glyphes utilisent l'or SeenIt. Le badge Télécharger compte les transferts actifs
-ou qui demandent une attention. Un appui sur l'onglet actif ferme le niveau courant ; un double appui
-réinitialise/ramène le contenu en haut lorsque l'écran l'implémente.
+La quatrième destination **Télécharger** n'apparaît que lorsque le compte courant a explicitement activé
+la fonctionnalité personnelle Téléchargements dans Réglages. Son badge compte alors les transferts actifs
+ou qui demandent une attention. Une navigation historique ou directe vers `downloads` alors que la
+fonctionnalité est désactivée revient sur « À Voir ».
+
+L'onglet actif et ses glyphes utilisent l'or SeenIt. Un appui sur l'onglet actif ferme le niveau courant ;
+un double appui réinitialise/ramène le contenu en haut lorsque l'écran l'implémente.
 
 L'ouverture d'une fiche est un niveau de navigation au-dessus de l'onglet courant. Le Retour Android
 ferme dans l'ordre : dialogue ou modal, fiche, historique interne, retour à À Voir, puis application.
@@ -239,16 +243,23 @@ explicite le prouve ; sinon SeenIt affiche « Âge à vérifier ». Une correcti
 être choisie ; elle est synchronisée par UID, prioritaire, et clairement marquée « Choix personnel ».
 Cette correction est identifiée uniquement par type de média + TMDB ID et ne réécrit pas TMDB.
 
-Actions transverses : suivre/retirer, favori, note utilisateur, partage, archive lorsque disponible,
-ouverture fournisseur et téléchargement. Un favori active les notifications du média sans créer de
-progression. Une note/favorite/archive est une intention distincte du statut de visionnage.
+Actions transverses : suivre/retirer, favori, note utilisateur, partage et archive lorsque disponible.
+Les actions de téléchargement n'existent dans la fiche que lorsque la fonctionnalité Téléchargements est
+activée pour le compte courant. Un favori active les notifications du média sans créer de progression.
+Une note/favorite/archive est une intention distincte du statut de visionnage.
+
+Quand Téléchargements est désactivé, la fiche Film/Série ne montre aucune mention de cette fonction :
+le bouton bleu principal/annexe, le fallback « Où regarder », le mode « Téléchargement 1-Clic », les
+boutons saison/épisode, les statuts de transfert et surtout l'action **« Téléchargement » du menu « … »
+en haut de la fiche** sont tous absents.
 
 ### 8.2 Films
 
 - Ajouter à « Films à voir » suit sans marquer vu.
 - « Film vu » crée `seenEpisodes=['movie']`, un `episodeRecords.movie.watchedAt` et `completed`.
 - Repasser non vu retire cette progression et revient à « À voir ».
-- Le téléchargement rapide privilégie Radarr ; C411/magnet sert de parcours manuel de repli.
+- Lorsque Téléchargements est activé, le téléchargement rapide privilégie Radarr ; C411/magnet sert de
+  parcours manuel de repli. Quand il est désactivé, aucun bouton ou statut de téléchargement n'est affiché.
 
 ### 8.3 Séries et épisodes
 
@@ -265,8 +276,11 @@ swipes de suppression/abandon sur les cartes.
   automatiquement.
 - Abandonner conserve l'historique ; Reprendre le conserve et recalcule l'état actif.
 - Revoir réinitialise la progression et propose S1E1 comme prochain épisode.
-- Les téléchargements Sonarr existent au niveau série, saison ou épisode ; le détail affiche aussi
-  la disponibilité par saison/épisode.
+- Lorsque Téléchargements est activé, Sonarr existe au niveau série, saison ou épisode et le détail
+  affiche sa disponibilité par saison/épisode.
+- Lorsque Téléchargements est désactivé, le détail d'épisode ne montre ni « Télécharger », ni
+  « Télécharger à nouveau », ni badge « Téléchargé », ni bannière de transfert, ni modal de téléchargement.
+  La disponibilité Plex reste indépendante et continue d'être affichée normalement.
 
 ### 8.4 Sagas, univers cross-media et médias similaires
 
@@ -339,9 +353,26 @@ ambiguë ne doit être interprétée en attendant.
 
 ## 10. Téléchargements
 
-L'onglet Télécharger possède deux modes : **Mes téléchargements** et **Recherche C411**. L'icône
-Réglages de son en-tête ouvre la configuration C411/Sonarr/Radarr/qBittorrent et webhooks, qui ne doit
-pas être dupliquée dans les réglages généraux.
+La fonctionnalité Téléchargements média est **personnelle et masquée par défaut**. Après hydratation du
+compte courant, elle n'est active que si la préférence `downloadsEnabled` vaut explicitement `true`.
+Une préférence absente, invalide ou non encore hydratée échoue fermée. Le commutateur se trouve dans les
+Réglages généraux, sans exposer à cet endroit C411, Sonarr, Radarr ou qBittorrent.
+
+Quand la fonctionnalité est désactivée :
+
+- l'onglet et le badge Télécharger sont absents ;
+- l'écran Téléchargements n'est pas affiché et une navigation directe/historique revient à « À Voir » ;
+- la fiche Film et la fiche Série n'affichent aucun bouton, libellé, statut ou disponibilité Arr liée
+  au téléchargement, y compris l'action **Téléchargement du menu « … »** ;
+- le détail d'épisode n'affiche ni bouton Télécharger/re-télécharger, ni badge « Téléchargé », ni
+  bannière de transfert, ni modal de téléchargement ;
+- le mode téléchargement des épisodes et les boutons saison/épisode sont absents ;
+- le polling C411/Sonarr/Radarr/qBittorrent et l'état live de téléchargement sont arrêtés/vidés ;
+- Plex et les téléchargements de mise à jour SeenIt restent hors de ce gate.
+
+Quand elle est activée, l'onglet Télécharger possède deux modes : **Mes téléchargements** et
+**Recherche C411**. L'icône Réglages de son en-tête ouvre la configuration C411/Sonarr/Radarr/qBittorrent
+et webhooks, qui ne doit pas être dupliquée dans les réglages généraux.
 
 ### 10.1 Mes téléchargements
 
@@ -371,7 +402,8 @@ pas être dupliquée dans les réglages généraux.
 
 ### 10.4 Configuration personnelle
 
-Chaque compte possède ses URL et identifiants C411, Sonarr, Radarr et qBittorrent. Les boutons de test
+Chaque compte possède ses URL et identifiants C411, Sonarr, Radarr et qBittorrent. Ils restent conservés
+lorsque la fonctionnalité est masquée et réapparaissent inchangés après réactivation. Les boutons de test
 emploient le même transport que l'action réelle. Sonarr/Radarr disposent de profils qualité séparés
 1080p/4K. Les webhooks personnels exposent une URL par service et un secret envoyé dans l'en-tête
 `x-seenit-webhook-secret`; la rotation invalide l'ancien secret. Aucun secret n'est affiché dans les logs.
@@ -419,6 +451,8 @@ Les réglages généraux contiennent :
   Arte ;
 - préférences et autorisation de notifications ;
 - association/déconnexion Plex, synchro Rapide/Complète et purge des slugs Plex ;
+- **Fonctionnalité personnelle → Téléchargements**, simple interrupteur désactivé par défaut ; aucune
+  URL ni clé C411/Sonarr/Radarr/qBittorrent n'est exposée dans les Réglages généraux ;
 - import TV Time CSV avec progression, correction des échecs et reprise ;
 - actualisation forcée des détails TMDB ;
 - version, changelog, recherche et installation d'une mise à jour APK ;
@@ -470,7 +504,7 @@ et #178 à #181 ; la preuve visuelle/tactile PWA/APK reste à produire avec #15.
 | Retour | Historique navigateur | Modals → fiche → historique → À Voir → quitter |
 | Plex | Nouvel onglet Web | Intent application Plex, puis fallback Web |
 | Reddit/autres liens | Nouvel onglet | Application associée, puis Custom Tab |
-| Magnet | Gestionnaire navigateur/système | Intent Android compatible |
+| Magnet | Gestionnaire navigateur/système si Téléchargements est activé | Intent Android compatible si Téléchargements est activé |
 | Notifications | Web Push/service worker | Push + notifications locales Capacitor |
 | Mise à jour | Bannière/rechargement PWA | Téléchargement, SHA-256, installateur Android |
 | Hors-ligne | Shell/cache et dernier état UID | Même logique dans la WebView |

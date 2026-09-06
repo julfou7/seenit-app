@@ -526,8 +526,12 @@ pour le cache des sagas et univers.
 
 ### 7.1 Configuration et sécurité
 
+- **SEENIT-DOWNLOAD-VISIBILITY-001** — La fonctionnalité de téléchargements média est un outil personnel **désactivé et masqué par défaut pour chaque Firebase UID**. Elle n'est considérée active qu'après hydratation du réglage du compte et uniquement si `downloadsEnabled === true`; une préférence absente, invalide ou provenant d'un autre UID échoue fermée. Les Réglages généraux exposent uniquement l'interrupteur permettant d'afficher cette fonctionnalité, sans y révéler la configuration C411/Sonarr/Radarr/qBittorrent.
+- Quand cette option est désactivée, SeenIt ne montre ni destination/badge Télécharger, ni écran Téléchargements, ni bouton, modal, statut ou disponibilité provenant des clients de téléchargement sur les fiches Film/Série/Épisode. Une navigation historique ou directe vers `downloads` revient sur « À Voir ». Le polling client vers C411/Sonarr/Radarr/qBittorrent n'est pas démarré et un polling déjà actif est arrêté.
+- Activer l'option restaure l'expérience Téléchargements existante et sa configuration technique dans l'écran dédié. La désactiver n'efface ni identifiants/configuration enregistrés, ni historique, ni transfert externe déjà lancé ; elle retire seulement la surface et l'usage client SeenIt. Cette préférence reste isolée sous le même UID comme les autres réglages de téléchargement et ne remplace aucune protection d'authentification/backend.
+- Le téléchargement et l'installation des **mises à jour SeenIt** (`SEENIT-UPDATE-*`) sont explicitement hors de ce gate et restent accessibles indépendamment de `downloadsEnabled`.
 - Les URL et secrets C411/Sonarr/Radarr/qBittorrent appartiennent au compte SeenIt et sont
-  modifiables depuis l'onglet Téléchargements.
+  modifiables depuis l'onglet Téléchargements lorsque la fonctionnalité est activée.
 - **SEENIT-SECURITY-001** — Le proxy backend n'autorise qu'une liste minimale de chemins et de
   méthodes nécessaires. La cible réseau est validée contre SSRF et DNS rebinding.
 - Le SID qBittorrent est indexé par UID, URL et utilisateur, puis invalidé uniquement sur une
