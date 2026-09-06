@@ -1357,7 +1357,7 @@
     },
     {
       "id": "SEENIT-RELATION-001",
-      "title": "Sagas et univers cross-media exacts, réciproques et distincts des similaires",
+      "title": "Relations de fiche simplifiées : TMDB pour l’ordre, TVDB pour les franchises, sans similaires",
       "targets": [
         "pwa",
         "apk",
@@ -1366,39 +1366,27 @@
       "tests": [
         {
           "file": "tests/mediaRelationsSpecification.test.ts",
-          "contains": "SEENIT-RELATION-001 sépare saga univers et médias similaires"
+          "contains": "SEENIT-RELATION-001 limite les fiches aux relations utiles"
         },
         {
           "file": "tests/mediaRelationsSpecification.test.ts",
-          "contains": "SEENIT-RELATION-001 interdit tout univers déduit du titre ou de la popularité"
+          "contains": "SEENIT-RELATION-001 réserve l’ordre de visionnage aux collections TMDB"
         },
         {
           "file": "tests/mediaRelationsSpecification.test.ts",
-          "contains": "SEENIT-RELATION-001 impose une identité mediaType plus TMDB et des groupes bidirectionnels"
+          "contains": "SEENIT-RELATION-001 résout TVDB sans recherche par titre ni fusion de listes"
         },
         {
           "file": "tests/mediaRelationsSpecification.test.ts",
-          "contains": "SEENIT-RELATION-001 fixe les TNR Yellowstone Breaking Bad Harry Potter Marvel DC et House of Guinness"
+          "contains": "SEENIT-RELATION-001 déduplique la franchise après la saga"
         },
         {
           "file": "tests/mediaRelationsSpecification.test.ts",
-          "contains": "SEENIT-RELATION-001 borne les sources distantes et les performances"
+          "contains": "SEENIT-RELATION-001 retire les similaires des fiches et garde la découverte dans Explorer"
         },
         {
           "file": "tests/mediaRelationsSpecification.test.ts",
-          "contains": "SEENIT-RELATION-001 impose un catalogue généré et une revue des candidats hors ligne"
-        },
-        {
-          "file": "tests/mediaRelationsCatalog.test.ts",
-          "contains": "SEENIT-RELATION-001 génère un snapshot déterministe depuis le catalogue éditorial"
-        },
-        {
-          "file": "tests/mediaRelationsCatalog.test.ts",
-          "contains": "SEENIT-RELATION-001 rejette les identités, conflits et champs heuristiques"
-        },
-        {
-          "file": "tests/mediaRelationsCatalog.test.ts",
-          "contains": "SEENIT-RELATION-001 découvre des candidats exacts sans les publier"
+          "contains": "SEENIT-RELATION-001 trace la décision durable et l’écart runtime"
         }
       ]
     },
