@@ -18,10 +18,9 @@ const ONE_DAY = 24 * 60 * 60 * 1000;
 const FOURTEEN_DAYS = 14 * 24 * 60 * 60 * 1000;
 
 async function fetchOmdb(imdbId: string, seasonNumber?: number): Promise<Response> {
-  const url = new URL(resolveSeenItApiUrl('/api/media/omdb'));
-  url.searchParams.set('i', imdbId);
-  if (seasonNumber !== undefined) url.searchParams.set('Season', String(seasonNumber));
-  return authenticatedFetch(url.toString());
+  const params = new URLSearchParams({ i: imdbId });
+  if (seasonNumber !== undefined) params.set('Season', String(seasonNumber));
+  return authenticatedFetch(`${resolveSeenItApiUrl('/api/media/omdb')}?${params.toString()}`);
 }
 
 /**
