@@ -66,32 +66,49 @@ async function cacheNativeNotificationImage(url: string): Promise<string | undef
   return result.uri || undefined;
 }
 
+async function cacheNativeNotificationImageSafely(url?: string): Promise<string | undefined> {
+  if (!url) return undefined;
+  try {
+    return await cacheNativeNotificationImage(url);
+  } catch (error) {
+    console.warn('Notification media cache failed; keeping notification without this visual:', error);
+    return undefined;
+  }
+}
+
 /**
- * Prépare le visuel d'une notification sans jamais transporter les octets de
- * l'image dans le pont Capacitor. Sur Android, seul un chemin local court est
- * remis à LocalNotifications ; le fichier est téléchargé nativement depuis une
- * URL HTTPS bornée (poster TMDB w154 côté appelant). Sur le Web, les URL restent
+ * Prépare les visuels d'une notification sans jamais transporter les octets de
+ * l'image dans le pont Capacitor. Sur Android, l'affiche compacte et l'image
+ * riche sont téléchargées séparément dans Directory.Data et seuls leurs URI
+ * locaux courts sont remis à LocalNotifications. Chaque téléchargement reste
+ * indépendant : la panne du backdrop/still conserve l'affiche, et la panne de
+ * l'affiche peut encore conserver l'image riche. Sur le Web, les URL restent
  * directement exploitables par l'API Notification/service worker.
  */
 export async function resolveNotificationMediaVisual(
   nativePosterUrl?: string,
-  webImageUrl?: string
+  richImageUrl?: string
 ): Promise<NotificationMediaVisual> {
   if (!Capacitor.isNativePlatform()) {
     return {
       icon: nativePosterUrl,
-      image: webImageUrl || nativePosterUrl
+      image: richImageUrl || nativePosterUrl
     };
   }
 
-  if (!nativePosterUrl) return {};
+  const richCandidate = richImageUrl && richImageUrl !== nativePosterUrl ? richImageUrl : undefined;
+  const [localPoster, localRichImage] = await Promise.all([
+    cacheNativeNotificationImageSafely(nativePosterUrl),
+    cacheNativeNotificationImageSafely(richCandidate)
+  ]);
 
-  try {
-    const localUri = await cacheNativeNotificationImage(nativePosterUrl);
-    if (!localUri) return {};
-    return { icon: localUri, image: localUri };
-  } catch (error) {
-    console.warn('Notification media cache failed; using text-only notification:', error);
+  if (!localPoster && !localRichImage) {
+    console.warn('Notification media unavailable; using text-only notification');
     return {};
   }
+
+  return {
+    icon: localPoster || localRichImage,
+    image: localRichImage || localPoster
+  };
 }
