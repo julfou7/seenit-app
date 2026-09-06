@@ -1,0 +1,65 @@
+name: Temporary release 1.4.120 preparation
+
+on:
+  push:
+    branches:
+      - tmp/release-1.4.120-prep
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    if: github.event.head_commit.message == 'chore: bootstrap release prep 1.4.120'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout preparation branch
+        uses: actions/checkout@v6
+        with:
+          ref: tmp/release-1.4.120-prep
+          fetch-depth: 1
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Generate canonical release surfaces
+        run: node scripts/prepare-release-files.cjs 1.4.120
+
+      - name: Verify exact release-only surface set
+        shell: bash
+        run: |
+          expected=$(printf '%s\n' \
+            android/app/build.gradle \
+            docs/specifications/android-contract.json \
+            docs/specifications/requirements.json \
+            docs/specifications/seenit.md \
+            package-lock.json \
+            package.json \
+            server.ts \
+            src/store/updateStore.ts | sort)
+          actual=$(git diff --name-only | sort)
+          if [ "$actual" != "$expected" ]; then
+            echo 'Unexpected release preparation diff:'
+            git diff --name-only
+            exit 1
+          fi
+
+      - name: Commit generated version surfaces
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            android/app/build.gradle \
+            src/store/updateStore.ts \
+            server.ts \
+            package.json \
+            package-lock.json \
+            docs/specifications/requirements.json \
+            docs/specifications/android-contract.json \
+            docs/specifications/seenit.md
+          git commit -m 'chore(release): prepare v1.4.120'
+          git push origin HEAD:tmp/release-1.4.120-prep
