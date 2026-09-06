@@ -86,6 +86,32 @@ test('SEENIT-RUNTIME-001 retire les anciennes cibles à 0 % avant de créer la c
   assert.match(prepared, /percent: 0\n    revisionName: seenit-app-gh-12345\n    tag: candidate-12345/);
 });
 
+test('SEENIT-RUNTIME-001 retire une ancienne cible taguée dont le 0 % est implicite', () => {
+  const staleImplicitZero = exportedService.replace(
+    '  - percent: 100\n    revisionName: seenit-app-00014-wjw\n',
+    `  - percent: 100\n    revisionName: seenit-app-00014-wjw\n  - revisionName: seenit-app-gh-old-1\n    tag: candidate-old-1\n`
+  );
+  const prepared = prepareCandidateService(staleImplicitZero, baseOptions);
+
+  assert.doesNotMatch(prepared, /seenit-app-gh-old-1/);
+  assert.doesNotMatch(prepared, /candidate-old-1/);
+  assert.equal((prepared.match(/- percent:/g) || []).length, 2);
+  assert.match(prepared, /percent: 100\n    revisionName: seenit-app-00014-wjw/);
+  assert.match(prepared, /percent: 0\n    revisionName: seenit-app-gh-12345\n    tag: candidate-12345/);
+});
+
+test('SEENIT-RUNTIME-001 refuse une cible non taguée sans pourcentage explicite', () => {
+  const unsafe = exportedService.replace(
+    '  - percent: 100\n    revisionName: seenit-app-00014-wjw\n',
+    `  - percent: 100\n    revisionName: seenit-app-00014-wjw\n  - revisionName: seenit-app-other\n`
+  );
+
+  assert.throws(
+    () => prepareCandidateService(unsafe, baseOptions),
+    /sans pourcentage explicite/
+  );
+});
+
 test('SEENIT-RUNTIME-001 refuse toute autre cible de trafic active', () => {
   const unsafe = exportedService.replace(
     '  - percent: 100\n    revisionName: seenit-app-00014-wjw\n',
