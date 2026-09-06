@@ -29,6 +29,7 @@ import { searchAndDownloadInSonarr, searchAndDownloadInRadarr } from '../service
 import { downloadEpisodeWithSeasonPackFallback } from '../features/downloads/episodeSeasonPackFallback';
 import { acceptDownloadRequest, beginDownloadRequest, failDownloadRequest, updateDownloadRequest } from '../features/downloads/downloadLifecycle';
 import { readUserScopedJson } from '../lib/userIsolation';
+import { mediaKeyFrom, relationMediaKeys, toMediaKey } from '../features/shows/mediaRelations';
 
 
 interface ShowDetailScreenProps {
@@ -145,18 +146,24 @@ const getProviderDirectLink = (providerId: number, title: string, fallbackLink: 
 const ASIAN_COUNTRIES = new Set(['KR', 'JP', 'CN', 'TW', 'TH', 'HK']);
 const NON_FICTION_GENRES = [10767, 10763, 10764, 10766]; // Talk, News, Reality, Soap
 
-const getPrioritizedSimilarMedia = (tmdbDetails: any, collectionData?: any) => {
+const getPrioritizedSimilarMedia = (tmdbDetails: any, collectionData?: any, universeData?: any) => {
   if (!tmdbDetails) return [];
 
-  const collectionIds = new Set<number>(
-    (collectionData?.parts || []).map((p: any) => p.id)
-  );
+  const currentType: 'movie' | 'tv' = tmdbDetails.media_type === 'movie' || tmdbDetails.title
+    ? 'movie'
+    : 'tv';
+  const excludedKeys = relationMediaKeys([
+    ...(collectionData?.parts || []),
+    ...(universeData?.parts || []),
+  ]);
+  const currentKey = mediaKeyFrom(tmdbDetails, currentType);
+  if (currentKey) excludedKeys.add(currentKey);
   
-  // Toujours exclure le media actuel et ses spin-offs directs
+  // Toujours exclure le média actuel, sa saga et son univers par identité typée.
   const isDuplicate = (item: any) => {
     if (!item || !item.poster_path) return true;
-    if (item.id === tmdbDetails.id) return true;
-    if (collectionIds.has(item.id)) return true;
+    const itemKey = mediaKeyFrom(item, currentType);
+    if (!itemKey || excludedKeys.has(itemKey)) return true;
     if (isAdultOrParodyMedia(item)) return true;
     if ((item.vote_count || 0) < 50) return true;
     return false;
@@ -199,17 +206,32 @@ const getPrioritizedSimilarMedia = (tmdbDetails: any, collectionData?: any) => {
 
   // Fusionner intelligemment : on garde les recommandations (comportement utilisateur) 
   // et on complète avec les meilleurs "similar" si on manque de recommandations.
-  const seenIds = new Set<number>(recommendations.map((i: any) => i.id));
+  const seenKeys = relationMediaKeys(recommendations, currentType);
   const combined = [...recommendations];
   
   for (const item of similar) {
-    if (!seenIds.has(item.id)) {
+    const itemKey = mediaKeyFrom(item, currentType);
+    if (itemKey && !seenKeys.has(itemKey)) {
       combined.push(item);
-      seenIds.add(item.id);
+      seenKeys.add(itemKey);
     }
   }
 
   return combined;
+};
+
+const getKeywordsFromDetails = (details: any, mediaType: 'tv' | 'movie'): string[] => {
+  const raw = mediaType === 'tv' ? details?.keywords?.results : details?.keywords?.keywords;
+  const blacklist = [
+    'aftercreditsstinger', 'duringcreditsstinger', 'post-credits scene',
+    'mid-credits scene', '3d', 'imax', 'marvel cinematic universe',
+    'dc extended universe', 'cinematic universe', 'anime',
+  ];
+  return (Array.isArray(raw) ? raw : [])
+    .map((keyword: any) => String(keyword?.name || ''))
+    .filter((keyword: string) => keyword.length > 0 && keyword.length < 25)
+    .filter((keyword: string) => !blacklist.some(blocked => keyword.toLowerCase().includes(blocked)))
+    .slice(0, 5);
 };
 
 const getSmartDefaultSeason = (show: any, tmdbDetails: any): number => {
@@ -265,23 +287,46 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   }
 
   const effectiveTmdbId = show?.tmdbId || (externalTmdbId ? Number(externalTmdbId) : undefined) || persistentTmdbIdRef.current;
+  const requestedMediaType: 'tv' | 'movie' = show?.mediaType === 'movie' || externalMediaType === 'movie'
+    ? 'movie'
+    : 'tv';
+  const requestedMediaKey = effectiveTmdbId ? toMediaKey(requestedMediaType, Number(effectiveTmdbId)) : null;
+  const cachedInitialDetails = effectiveTmdbId
+    ? tmdb.peekMediaDetails(Number(effectiveTmdbId), requestedMediaType)
+    : null;
+  const cachedInitialRelations = effectiveTmdbId
+    ? tmdb.peekUniverseAndCollection({
+        ...(cachedInitialDetails || {}),
+        id: Number(effectiveTmdbId),
+        media_type: requestedMediaType,
+      })
+    : null;
 
-  const [tmdbDetails, setTmdbDetails] = useState<any>(null);
+  const [tmdbDetails, setTmdbDetails] = useState<any>(cachedInitialDetails);
   const title = show?.title || tmdbDetails?.name || tmdbDetails?.title || 'Chargement...';
-  const isSeries = (show?.mediaType === 'tv') || (tmdbDetails?.number_of_seasons !== undefined);
+  const isSeries = requestedMediaType === 'tv';
 
   const releaseDateStr = isSeries ? (tmdbDetails?.first_air_date || (show as any)?.first_air_date) : (tmdbDetails?.release_date || (show as any)?.release_date);
   const releaseYear = releaseDateStr ? releaseDateStr.slice(0, 4) : undefined;
   const isUnreleased = releaseDateStr ? new Date(releaseDateStr).getTime() > Date.now() : false;
 
   const [fetchError, setFetchError] = useState<boolean>(false);
-  const [collectionData, setCollectionData] = useState<any>(null);
-  const [universeData, setUniverseData] = useState<any>(null);
-  const [collectionLoading, setCollectionLoading] = useState<boolean>(true);
+  const [collectionData, setCollectionData] = useState<any>(
+    cachedInitialRelations?.collection?.length ? { parts: cachedInitialRelations.collection } : null,
+  );
+  const [universeData, setUniverseData] = useState<any>(
+    cachedInitialRelations?.universe?.length ? { parts: cachedInitialRelations.universe } : null,
+  );
+  const [collectionLoading, setCollectionLoading] = useState<boolean>(!cachedInitialRelations);
   const [imdbData, setImdbData] = useState<any>(null);
   const [imdbLoading, setImdbLoading] = useState<boolean>(false);
-  const [providers, setProviders] = useState<any>(null);
-  const [keywords, setKeywords] = useState<string[]>([]);
+  const [providers, setProviders] = useState<any>(() => {
+    if (!effectiveTmdbId) return null;
+    return tmdb.peekWatchProviders(Number(effectiveTmdbId), requestedMediaType)?.results?.FR || null;
+  });
+  const [keywords, setKeywords] = useState<string[]>(
+    getKeywordsFromDetails(cachedInitialDetails, requestedMediaType),
+  );
   const [activeTab, setActiveTab] = useState<'about' | 'episodes' | 'casting'>('about');
   
   const [seasonsCache, setSeasonsCache] = useState<Record<number, any>>({});
@@ -741,21 +786,29 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     }, 50);
   };
 
-  const lastLoadedTmdbIdRef = useRef<number | undefined>(undefined);
+  const lastLoadedMediaKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!effectiveTmdbId) return;
-    if (lastLoadedTmdbIdRef.current === effectiveTmdbId) return;
-    lastLoadedTmdbIdRef.current = effectiveTmdbId;
+    if (!effectiveTmdbId || !requestedMediaKey) return;
+    if (lastLoadedMediaKeyRef.current === requestedMediaKey) return;
+    lastLoadedMediaKeyRef.current = requestedMediaKey;
 
-    setTmdbDetails(null);
+    const cachedDetails = tmdb.peekMediaDetails(Number(effectiveTmdbId), requestedMediaType);
+    const cachedRelations = tmdb.peekUniverseAndCollection({
+      ...(cachedDetails || {}),
+      id: Number(effectiveTmdbId),
+      media_type: requestedMediaType,
+    });
+    const cachedProviders = tmdb.peekWatchProviders(Number(effectiveTmdbId), requestedMediaType);
+
+    setTmdbDetails(cachedDetails);
     setFetchError(false);
-    setCollectionData(null);
-    setUniverseData(null);
-    setCollectionLoading(true);
+    setCollectionData(cachedRelations?.collection?.length ? { parts: cachedRelations.collection } : null);
+    setUniverseData(cachedRelations?.universe?.length ? { parts: cachedRelations.universe } : null);
+    setCollectionLoading(!cachedRelations);
     setImdbData(null);
-    setProviders(null);
-    setKeywords([]);
+    setProviders(cachedProviders?.results?.FR || null);
+    setKeywords(getKeywordsFromDetails(cachedDetails, requestedMediaType));
     setSeasonsCache({});
     setExpandedSeason(null);
     setSelectedEpisode(null);
@@ -767,82 +820,53 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     if (mainScrollRef.current) {
       mainScrollRef.current.scrollTo({ top: 0, behavior: 'instant' });
     }
-  }, [effectiveTmdbId]);
+  }, [effectiveTmdbId, requestedMediaKey, requestedMediaType]);
 
   useEffect(() => {
-    if (!effectiveTmdbId) return;
+    if (!effectiveTmdbId || !requestedMediaKey) return;
     
     let isMounted = true;
-    const targetMediaType = show?.mediaType || externalMediaType || 'tv';
+    const targetMediaType = requestedMediaType;
+    const requestKey = requestedMediaKey;
+    const isCurrentRequest = () => isMounted && lastLoadedMediaKeyRef.current === requestKey;
     
     const fetchDetails = async () => {
-      let res = await tmdb.getMediaDetails(effectiveTmdbId, targetMediaType);
-      // Fallback si le mediaType passé n'était pas le bon
-      if (!res.ok && isMounted) {
-        const fallbackType = targetMediaType === 'tv' ? 'movie' : 'tv';
-        const fallbackRes = await tmdb.getMediaDetails(effectiveTmdbId, fallbackType);
-        if (fallbackRes.ok) {
-          res = fallbackRes;
-        }
-      }
+      const res = await tmdb.getMediaDetails(Number(effectiveTmdbId), targetMediaType);
 
-      if (!isMounted) return;
+      if (!isCurrentRequest()) return;
 
       if (res.ok) {
         setTmdbDetails(res.value);
         setFetchError(false);
-
-        const realMediaType: 'tv' | 'movie' = (res.value.name || res.value.number_of_seasons !== undefined) ? 'tv' : 'movie';
-        const realTitle = res.value.title || res.value.name;
-        const realOriginal = res.value.original_title || res.value.original_name;
-        const realYear = (res.value.release_date || res.value.first_air_date)?.slice(0, 4);
-        const realImdbId = res.value.imdb_id || res.value.external_ids?.imdb_id;
+        setKeywords(getKeywordsFromDetails(res.value, targetMediaType));
 
         // La disponibilité Plex est gérée une seule fois par useMediaPresence, qui
         // réutilise le cache persisté et préchauffé par le full scan.
 
         tmdb.getUniverseAndCollection(res.value).then(({ collection, universe }) => {
-          if (isMounted) setCollectionLoading(false);
-          if (isMounted) {
-            if (collection && collection.length > 0) setCollectionData({ parts: collection });
-            if (universe && universe.length > 0) setUniverseData({ parts: universe });
-          }
+          if (!isCurrentRequest()) return;
+          setCollectionData(collection.length > 0 ? { parts: collection } : null);
+          setUniverseData(universe.length > 0 ? { parts: universe } : null);
+          setCollectionLoading(false);
+        }).catch(() => {
+          if (isCurrentRequest()) setCollectionLoading(false);
         });
       } else {
         setFetchError(true);
-        if (isMounted) setCollectionLoading(false);
+        setCollectionLoading(false);
       }
     };
 
     fetchDetails();
 
-    tmdb.getWatchProviders(effectiveTmdbId, targetMediaType).then(res => {
-      if (res.ok && isMounted) {
+    tmdb.getWatchProviders(Number(effectiveTmdbId), targetMediaType).then(res => {
+      if (res.ok && isCurrentRequest()) {
          setProviders(res.value.results?.FR || []);
       }
     });
 
-    // Récupération et Nettoyage des thèmes profonds (keywords)
-    tmdb.getMediaKeywords(effectiveTmdbId, targetMediaType).then(res => {
-      if (res.ok && isMounted) {
-        const blacklist = [
-          'aftercreditsstinger', 'duringcreditsstinger', 'post-credits scene', 
-          'mid-credits scene', '3d', 'imax', 'marvel cinematic universe', 
-          'dc extended universe', 'cinematic universe', 'anime'
-        ];
-        
-        const cleanKeywords = res.value.filter((kw: string) => {
-          const lowerKw = kw.toLowerCase();
-          return !blacklist.some(badWord => lowerKw.includes(badWord)) && kw.length < 25;
-        });
-
-        // On garde un maximum de 5 mots-clés qualitatifs
-        setKeywords(cleanKeywords.slice(0, 5));
-      }
-    });
-
     return () => { isMounted = false; };
-  }, [effectiveTmdbId, show?.mediaType, externalMediaType]);
+  }, [effectiveTmdbId, requestedMediaKey, requestedMediaType]);
 
   const resolvedImdbId = useMemo(() => {
     return tmdbDetails?.external_ids?.imdb_id || tmdbDetails?.imdb_id || (show as any)?.imdbId || null;
@@ -2096,7 +2120,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       <div className="relative">
         <div className="absolute top-0 inset-x-0 h-96 z-0">
           {backdropUrl && (
-            <img loading="lazy" decoding="async" 
+            <img loading="eager" decoding="async" fetchPriority="high"
               src={backdropUrl} 
               alt="Backdrop" 
               className="w-full h-full object-cover opacity-60"
@@ -2265,7 +2289,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
           <div className="flex gap-4">
             <div className="w-[120px] shrink-0">
               {posterPath && !posterError ? (
-                <img loading="lazy" decoding="async"
+                <img loading="eager" decoding="async" fetchPriority="high"
                    src={posterPath}
                    alt={title}
                    onError={() => setPosterError(true)}
@@ -2705,7 +2729,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                     <TimelineMediaCard
                       key={`col_part_${part.media_type || 'media'}_${part.id}_${idx}`}
                       media={part}
-                      isActive={part.id === effectiveTmdbId}
+                      isActive={mediaKeyFrom(part) === requestedMediaKey}
                       onClick={() => onShowClick && onShowClick(part.id, part.media_type || (part.title ? 'movie' : 'tv'))}
                     />
                   ))}
@@ -2724,7 +2748,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
                     <TimelineMediaCard
                       key={`univ_part_${part.media_type || 'media'}_${part.id}_${idx}`}
                       media={part}
-                      isActive={part.id === effectiveTmdbId}
+                      isActive={mediaKeyFrom(part) === requestedMediaKey}
                       onClick={() => onShowClick && onShowClick(part.id, part.media_type || (part.title ? 'movie' : 'tv'))}
                     />
                   ))}
@@ -2977,7 +3001,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
 
             {/* Séries / Films similaires remontés dans À Propos */}
             {(() => {
-              const similarList = getPrioritizedSimilarMedia(tmdbDetails, collectionData);
+              const similarList = getPrioritizedSimilarMedia(tmdbDetails, collectionData, universeData);
               if (similarList.length === 0) return null;
 
               return (

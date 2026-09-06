@@ -1313,6 +1313,28 @@
           "contains": "SEENIT-RELATION-001 borne les sources distantes et les performances"
         }
       ]
+    },
+    {
+      "id": "SEENIT-PERF-001",
+      "title": "Cache chaud typé et réouverture instantanée des fiches média",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/mediaDetailPerformance.test.ts",
+          "contains": "SEENIT-PERF-001 réutilise les détails et relations sans nouveau chargement"
+        },
+        {
+          "file": "tests/mediaDetailPerformance.test.ts",
+          "contains": "SEENIT-PERF-001 sépare les caches movie et tv et borne leur taille"
+        },
+        {
+          "file": "tests/mediaDetailPerformance.test.ts",
+          "contains": "SEENIT-PERF-001 réserve les skeletons au chargement réellement froid"
+        }
+      ]
     }
   ]
 }
