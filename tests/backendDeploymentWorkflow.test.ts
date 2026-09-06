@@ -8,10 +8,12 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const workflowPath = path.join(rootDir, '.github', 'workflows', 'deploy-backend.yml');
 const bootstrapPath = path.join(rootDir, 'scripts', 'bootstrap-gcp-backend-deploy.sh');
 const projectTomlPath = path.join(rootDir, 'project.toml');
+const sanitizerPath = path.join(rootDir, 'scripts', 'prepare-cloud-run-candidate.cjs');
 const runbookPath = path.join(rootDir, 'docs', 'runtime-cutover.md');
 const workflow = fs.readFileSync(workflowPath, 'utf8');
 const bootstrap = fs.readFileSync(bootstrapPath, 'utf8');
 const projectToml = fs.readFileSync(projectTomlPath, 'utf8');
+const sanitizer = fs.readFileSync(sanitizerPath, 'utf8');
 const runbook = fs.readFileSync(runbookPath, 'utf8');
 
 test('SEENIT-RUNTIME-001 déploie le backend canonique uniquement après validation de main', () => {
@@ -20,6 +22,7 @@ test('SEENIT-RUNTIME-001 déploie le backend canonique uniquement après validat
   assert.match(workflow, /src\/\*\*/);
   assert.match(workflow, /project\.toml/);
   assert.match(workflow, /backend-runtime-impact\.cjs/);
+  assert.match(workflow, /prepare-cloud-run-candidate\.cjs/);
   assert.match(workflow, /actions\/workflows\/build-apk\.yml\/runs\?head_sha=\$\{GITHUB_SHA\}&event=push/);
   assert.match(workflow, /conclusion[^\n]*success/);
   assert.match(workflow, /SHOULD_DEPLOY/);
@@ -78,29 +81,47 @@ test('SEENIT-RUNTIME-001 suit Cloud Build sans exiger la lecture du bucket de lo
   assert.doesNotMatch(workflow, /gcloud builds log/);
 });
 
-test('SEENIT-RUNTIME-001 sépare le build de l’image du déploiement Cloud Run hérité', () => {
-  const buildImage = workflow.indexOf('gcloud builds submit .');
+test('SEENIT-RUNTIME-001 remplace le service exporté sans réutiliser le déploiement source hérité', () => {
   const resolveDigest = workflow.indexOf('image_summary.digest');
-  const deployImage = workflow.indexOf('image: ${{ steps.image.outputs.uri }}');
+  const pinTraffic = workflow.indexOf('--to-revisions "$PREVIOUS_REVISION=100"', resolveDigest);
+  const exportService = workflow.indexOf('--format=export', pinTraffic);
+  const prepareCandidate = workflow.indexOf('node scripts/prepare-cloud-run-candidate.cjs', exportService);
+  const firstReplace = workflow.indexOf('gcloud run services replace "$candidate_service"', prepareCandidate);
+  const dryRun = workflow.indexOf('--dry-run', firstReplace);
+  const appliedReplace = workflow.indexOf('gcloud run services replace "$candidate_service"', firstReplace + 1);
 
-  assert.ok(buildImage >= 0);
-  assert.ok(resolveDigest > buildImage);
-  assert.ok(deployImage > resolveDigest);
-  assert.match(workflow, /cloud-run-source-deploy/);
-  assert.match(workflow, /image_uri="\$\{image_tag%:\*\}@\$\{digest\}"/);
+  assert.ok(resolveDigest >= 0);
+  assert.ok(pinTraffic > resolveDigest);
+  assert.ok(exportService > pinTraffic);
+  assert.ok(prepareCandidate > exportService);
+  assert.ok(firstReplace > prepareCandidate);
+  assert.ok(dryRun > firstReplace);
+  assert.ok(appliedReplace > dryRun);
+  assert.doesNotMatch(workflow, /google-github-actions\/deploy-cloudrun@v3/);
+  assert.doesNotMatch(workflow, /gcloud run deploy/);
   assert.doesNotMatch(workflow, /^\s*source:\s*\.\s*$/m);
+
+  assert.ok(sanitizer.includes('(?:sources|base-images)'));
+  assert.ok(sanitizer.includes('runtimeClassName: run.googleapis.com/linux-base-image-update'));
+  assert.ok(sanitizer.includes('ligne(s) image détectée(s), 1 attendue'));
 });
 
-test('SEENIT-RUNTIME-001 valide la nouvelle révision avant de basculer le trafic', () => {
-  const deployWithoutTraffic = workflow.indexOf('no_traffic: true');
+test('SEENIT-RUNTIME-001 garde la production sur l’ancienne révision jusqu’au smoke candidat', () => {
+  const pinTraffic = workflow.indexOf('--to-revisions "$PREVIOUS_REVISION=100"');
+  const appliedReplace = workflow.lastIndexOf('gcloud run services replace "$candidate_service"');
+  const tagCandidate = workflow.indexOf('--update-tags "$CANDIDATE_TAG=$candidate_revision"', appliedReplace);
   const candidateCheck = workflow.indexOf("verify_endpoint \"$candidate_url\" 'Révision candidate'");
   const trafficSwitch = workflow.indexOf('--to-revisions "$candidate_revision=100"');
   const productionCheck = workflow.indexOf("verify_endpoint \"$CANONICAL_ORIGIN\" 'Backend canonique'");
 
-  assert.ok(deployWithoutTraffic >= 0);
-  assert.ok(candidateCheck > deployWithoutTraffic);
+  assert.ok(pinTraffic >= 0);
+  assert.ok(appliedReplace > pinTraffic);
+  assert.ok(tagCandidate > appliedReplace);
+  assert.ok(candidateCheck > tagCandidate);
   assert.ok(trafficSwitch > candidateCheck);
   assert.ok(productionCheck > trafficSwitch);
+  assert.match(workflow, /La création de la candidate a modifié le trafic avant smoke/);
+  assert.match(workflow, /Le tag candidat n'a pas été créé sans modifier le trafic/);
   assert.match(workflow, /\.status == "ok" and \.service == "seenit-backend" and \.identity == "canonical"/);
   assert.match(workflow, /x-seenit-backend/);
   assert.match(workflow, /api\/releases\/notify/);
@@ -117,5 +138,7 @@ test('SEENIT-RUNTIME-001 documente que la sync AI Studio ne vaut jamais preuve d
   assert.match(runbook, /ne constitu(?:e|ent) pas un déploiement/i);
   assert.match(runbook, /Cloud Build/i);
   assert.match(runbook, /digest/i);
+  assert.match(runbook, /service exporté/i);
+  assert.match(runbook, /métadonnées source/i);
   assert.match(runbook, /bootstrap-gcp-backend-deploy\.sh/);
 });

@@ -11,7 +11,8 @@ const ALWAYS_RUNTIME_FILES = new Set([
   'package-lock.json',
   'project.toml',
   '.github/workflows/deploy-backend.yml',
-  'scripts/backend-runtime-impact.cjs'
+  'scripts/backend-runtime-impact.cjs',
+  'scripts/prepare-cloud-run-candidate.cjs'
 ]);
 
 function normalizePath(value) {
