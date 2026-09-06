@@ -14,6 +14,10 @@ test('SEENIT-DOWNLOAD-VISIBILITY-001 échoue fermée tant que l’activation n�
   assert.equal(resolveDownloadAwareTab('downloads', false), 'watchlist');
   assert.equal(resolveDownloadAwareTab('downloads', true), 'downloads');
   assert.equal(resolveDownloadAwareTab('discover', false), 'discover');
+
+  const specValidatorSource = readFileSync(new URL('../scripts/validate-specifications.cjs', import.meta.url), 'utf8');
+  assert.match(specValidatorSource, /requirementIdPattern = \/\^SEENIT-\(\?:\[A-Z0-9\]\+-\)\+\\d\{3\}\$\//);
+  assert.match(specValidatorSource, /documentedRequirementPattern/);
 });
 
 test('SEENIT-DOWNLOAD-VISIBILITY-001 masque navigation, actions et runtime tant que la fonctionnalité est désactivée', () => {
