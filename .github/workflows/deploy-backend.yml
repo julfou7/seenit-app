@@ -231,14 +231,8 @@ jobs:
           candidate_service="$(mktemp)"
           trap 'rm -f "$exported_service" "$candidate_service"' EXIT
 
-          # Le routage est rendu explicite avant l'export. Cette commande ne change pas
-          # le trafic effectif : PREVIOUS_REVISION est déjà la seule révision à 100 %.
-          gcloud run services update-traffic "$GCP_SERVICE" \
-            --project "$GCP_PROJECT_ID" \
-            --region "$GCP_REGION" \
-            --to-revisions "$PREVIOUS_REVISION=100" \
-            --quiet
-
+          # Ne pas muter le trafic avant l'export : une ancienne candidate échouée à 0 %
+          # peut rendre update-traffic impossible. L'état courant est seulement lu et borné.
           service_json="$(gcloud run services describe "$GCP_SERVICE" \
             --project "$GCP_PROJECT_ID" \
             --region "$GCP_REGION" \
@@ -317,22 +311,16 @@ jobs:
             exit 1
           fi
 
-          # Un tag fournit une URL directe vers la candidate. Cloud Run conserve les
-          # pourcentages existants lors d'une mise à jour de tags.
-          gcloud run services update-traffic "$GCP_SERVICE" \
-            --project "$GCP_PROJECT_ID" \
-            --region "$GCP_REGION" \
-            --update-tags "$CANDIDATE_TAG=$candidate_revision" \
-            --quiet
-
+          # Le tag a été créé dans le même replace que la cible candidate à 0 %.
+          # On vérifie cet état sans nouvelle mutation Cloud Run avant les smokes.
           service_json="$(gcloud run services describe "$GCP_SERVICE" \
             --project "$GCP_PROJECT_ID" \
             --region "$GCP_REGION" \
             --format=json)"
           if ! jq -e --arg previous "$PREVIOUS_REVISION" --arg candidate "$candidate_revision" --arg tag "$CANDIDATE_TAG" \
-            '([.status.traffic[]? | select((.percent // 0) > 0)] as $active | ($active | length == 1) and ($active[0].revisionName == $previous) and ($active[0].percent == 100)) and any(.status.traffic[]?; .revisionName == $candidate and .tag == $tag)' \
+            '([.status.traffic[]? | select((.percent // 0) > 0)] as $active | ($active | length == 1) and ($active[0].revisionName == $previous) and ($active[0].percent == 100)) and any(.status.traffic[]?; .revisionName == $candidate and .tag == $tag and ((.percent // 0) == 0))' \
             <<<"$service_json" >/dev/null; then
-            echo "Le tag candidat n'a pas été créé sans modifier le trafic."
+            echo "La cible candidate à 0 % avec son tag n'est pas présente sans modifier le trafic."
             exit 1
           fi
 
