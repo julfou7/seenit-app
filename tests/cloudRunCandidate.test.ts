@@ -108,6 +108,34 @@ test('SEENIT-RUNTIME-001 ajoute NODE_ENV=production quand le service exporté n�
   assert.match(prepared, /- env:\n\s+- name: NODE_ENV\n\s+value: production\n\s+image:/);
 });
 
+test('SEENIT-RUNTIME-001 force NODE_ENV quand env et image sont des champs secondaires du conteneur', () => {
+  const secondaryFields = exportedService.replace(
+    `      - env:\n        - name: NODE_ENV\n          value: development\n        - name: KEEP_ENV\n          value: keep-value\n        image:`,
+    `      - ports:\n        - containerPort: 3000\n          name: http1\n        env:\n        - name: NODE_ENV\n          value: development\n        - name: KEEP_ENV\n          value: keep-value\n        image:`
+  );
+  const prepared = prepareCandidateService(secondaryFields, baseOptions);
+
+  assert.match(prepared, /containerPort: 3000/);
+  assert.match(prepared, /name: http1/);
+  assert.match(prepared, /name: NODE_ENV\n\s+value: production/);
+  assert.doesNotMatch(prepared, /name: NODE_ENV\n\s+value: development/);
+  assert.match(prepared, /KEEP_ENV/);
+  assert.equal((prepared.match(/name: NODE_ENV/g) || []).length, 1);
+});
+
+test('SEENIT-RUNTIME-001 ajoute env quand image est un champ secondaire du conteneur', () => {
+  const noEnvSecondaryImage = exportedService.replace(
+    `      - env:\n        - name: NODE_ENV\n          value: development\n        - name: KEEP_ENV\n          value: keep-value\n        image:`,
+    `      - ports:\n        - containerPort: 3000\n          name: http1\n        image:`
+  );
+  const prepared = prepareCandidateService(noEnvSecondaryImage, baseOptions);
+
+  assert.match(prepared, /containerPort: 3000/);
+  assert.match(prepared, /name: http1/);
+  assert.match(prepared, /env:\n\s+- name: NODE_ENV\n\s+value: production\n\s+image:/);
+  assert.equal((prepared.match(/name: NODE_ENV/g) || []).length, 1);
+});
+
 test('SEENIT-RUNTIME-001 dérive le tag candidat attendu par le workflow', () => {
   assert.equal(deriveCandidateTag('seenit-app', 'seenit-app-gh-34014482896-1'), 'candidate-34014482896-1');
   assert.throws(
