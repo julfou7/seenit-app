@@ -246,6 +246,13 @@ Aucun agent ne décide seul de cette migration.
 
 ## 6. PWA et APK
 
+### Référence UX pour toute modification d'interface
+
+Lire `docs/specifications/ux-reference.md` pour les boutons, cartes, en-têtes, dialogues ou gestes.
+Distinguer comportements observés, invariants existants et cibles encore ouvertes. Préserver les
+gestes documentés et leurs effets métier ; décrire pour chaque changement le déclenchement, le résultat,
+l'annulation et l'alternative accessible. Un audit de code ne vaut pas validation visuelle PWA/APK.
+
 SeenIt doit rester fonctionnel en PWA et APK Android. Un comportement natif différent doit être
 explicite (`Capacitor.isNativePlatform()` ou API Capacitor). Les liens externes gardent un fallback Web ;
 Plex privilégie l'application Android dans l'APK.
