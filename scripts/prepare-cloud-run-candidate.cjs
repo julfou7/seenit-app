@@ -32,11 +32,39 @@ function deriveCandidateTag(service, candidateRevision) {
 
 function forceSingleContainerEnv(lines, imageIndex, name, value) {
   const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const envIndex = lines.findLastIndex((line, index) => index < imageIndex && /^      - env:\s*$/.test(line));
+
+  let containerStart = imageIndex;
+  while (containerStart >= 0 && !/^      - [A-Za-z0-9_-]+:\s*/.test(lines[containerStart] || '')) {
+    containerStart -= 1;
+  }
+  if (containerStart < 0) throw new Error(`Début du conteneur introuvable pour forcer ${name}.`);
+
+  let containerEnd = lines.length;
+  for (let index = containerStart + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (/^      - [A-Za-z0-9_-]+:\s*/.test(line) || /^      [A-Za-z0-9_-]+:\s*/.test(line)) {
+      containerEnd = index;
+      break;
+    }
+  }
+
+  const envIndex = lines.findIndex((line, index) => (
+    index >= containerStart
+    && index < containerEnd
+    && /^(?:      - |        )env:\s*$/.test(line)
+  ));
 
   if (envIndex >= 0) {
+    let envEnd = containerEnd;
+    for (let index = envIndex + 1; index < containerEnd; index += 1) {
+      if (/^        [A-Za-z0-9_-]+:\s*/.test(lines[index])) {
+        envEnd = index;
+        break;
+      }
+    }
+
     const nameIndexes = [];
-    for (let index = envIndex + 1; index < imageIndex; index += 1) {
+    for (let index = envIndex + 1; index < envEnd; index += 1) {
       if (new RegExp(`^        - name:\\s*['\"]?${escapedName}['\"]?\\s*$`).test(lines[index])) {
         nameIndexes.push(index);
       }
@@ -56,11 +84,18 @@ function forceSingleContainerEnv(lines, imageIndex, name, value) {
     return;
   }
 
-  if (!/^      - image:\s*/.test(lines[imageIndex])) {
-    throw new Error(`Bloc env du conteneur introuvable pour forcer ${name}.`);
+  if (/^      - image:\s*/.test(lines[imageIndex])) {
+    lines[imageIndex] = lines[imageIndex].replace(/^      - image:/, '        image:');
+    lines.splice(imageIndex, 0, '      - env:', `        - name: ${name}`, `          value: ${value}`);
+    return;
   }
-  lines[imageIndex] = lines[imageIndex].replace(/^      - image:/, '        image:');
-  lines.splice(imageIndex, 0, '      - env:', `        - name: ${name}`, `          value: ${value}`);
+
+  if (/^        image:\s*/.test(lines[imageIndex])) {
+    lines.splice(imageIndex, 0, '        env:', `        - name: ${name}`, `          value: ${value}`);
+    return;
+  }
+
+  throw new Error(`Bloc env du conteneur introuvable pour forcer ${name}.`);
 }
 
 function normalizeTraffic(lines, trafficIndex, trafficEnd, previousRevision, candidateRevision, candidateTag) {
