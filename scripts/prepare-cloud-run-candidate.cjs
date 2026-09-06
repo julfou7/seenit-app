@@ -63,6 +63,55 @@ function forceSingleContainerEnv(lines, imageIndex, name, value) {
   lines.splice(imageIndex, 0, '      - env:', `        - name: ${name}`, `          value: ${value}`);
 }
 
+function normalizeTraffic(lines, trafficIndex, trafficEnd, previousRevision, candidateRevision, candidateTag) {
+  const trafficLines = lines.slice(trafficIndex + 1, trafficEnd);
+  const trafficText = trafficLines.join('\n');
+  if (/latestRevision:\s*true/.test(trafficText)) {
+    throw new Error('Le trafic exporté vise latestRevision=true; la candidate ne peut pas être créée sans risque.');
+  }
+
+  const entries = [];
+  let current = null;
+  for (const line of trafficLines) {
+    if (/^  - /.test(line)) {
+      if (current) entries.push(current);
+      current = [line];
+    } else if (current) {
+      current.push(line);
+    } else if (line.trim()) {
+      throw new Error(`Bloc traffic Cloud Run inattendu: ${line.trim()}`);
+    }
+  }
+  if (current) entries.push(current);
+  if (!entries.length) throw new Error('Aucune cible de trafic Cloud Run exportée.');
+
+  const parsed = entries.map(entryLines => {
+    const entryText = entryLines.join('\n');
+    const percentMatch = entryText.match(/(?:^|\n)\s*(?:-\s*)?percent:\s*(\d+)(?:\s|$)/);
+    const revisionMatch = entryText.match(/(?:^|\n)\s*(?:-\s*)?revisionName:\s*([^\s]+)(?:\s|$)/);
+    if (!percentMatch) throw new Error(`Cible de trafic sans pourcentage explicite: ${entryText.replace(/\s+/g, ' ').trim()}`);
+    return {
+      percent: Number(percentMatch[1]),
+      revisionName: revisionMatch?.[1] || ''
+    };
+  });
+
+  const active = parsed.filter(entry => entry.percent > 0);
+  if (active.length !== 1 || active[0].percent !== 100 || active[0].revisionName !== previousRevision) {
+    throw new Error(`Le trafic exporté n'est pas exclusivement fixé à ${previousRevision} à 100 %.`);
+  }
+
+  const normalized = [
+    '  traffic:',
+    '  - percent: 100',
+    `    revisionName: ${previousRevision}`,
+    '  - percent: 0',
+    `    revisionName: ${candidateRevision}`,
+    `    tag: ${candidateTag}`
+  ];
+  lines.splice(trafficIndex, trafficEnd - trafficIndex, ...normalized);
+}
+
 function prepareCandidateService(source, { image, service, previousRevision, candidateRevision }) {
   if (!image || !/@sha256:[0-9a-f]{64}$/.test(image)) throw new Error(`Image immuable invalide: ${image || 'absente'}`);
   if (!/^[a-z][a-z0-9-]{0,48}$/.test(service)) throw new Error(`Nom de service Cloud Run invalide: ${service}`);
@@ -113,20 +162,7 @@ function prepareCandidateService(source, { image, service, previousRevision, can
   if (trafficIndex < 0) throw new Error('Bloc spec.traffic introuvable: déploiement sans garantie de trafic refusé.');
   const trafficEndCandidate = lines.findIndex((line, index) => index > trafficIndex && /^  [A-Za-z0-9_-]+:\s*/.test(line));
   const trafficEnd = trafficEndCandidate < 0 ? lines.length : trafficEndCandidate;
-  const trafficText = lines.slice(trafficIndex + 1, trafficEnd).join('\n');
-  if (/latestRevision:\s*true/.test(trafficText)) throw new Error('Le trafic exporté vise latestRevision=true; la candidate ne peut pas être créée sans risque.');
-  if (!new RegExp(`revisionName:\\s*${previousRevision.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|$)`).test(trafficText)) {
-    throw new Error(`Le trafic exporté ne référence pas la révision servie ${previousRevision}.`);
-  }
-  if (!/percent:\s*100(?:\s|$)/.test(trafficText)) throw new Error('Le trafic exporté n’est pas explicitement fixé à 100 %.');
-
-  lines.splice(
-    trafficEnd,
-    0,
-    '  - percent: 0',
-    `    revisionName: ${candidateRevision}`,
-    `    tag: ${candidateTag}`
-  );
+  normalizeTraffic(lines, trafficIndex, trafficEnd, previousRevision, candidateRevision, candidateTag);
 
   const prepared = lines.join('\n');
   if (/run\.googleapis\.com\/(?:sources|base-images)/.test(prepared)) throw new Error('Une métadonnée source Cloud Run incompatible subsiste.');
@@ -155,10 +191,10 @@ function main() {
     candidateRevision: args['candidate-revision']
   });
   fs.writeFileSync(args.output, prepared, 'utf8');
-  console.log(`[CloudRunCandidate] Service préparé: ${args['candidate-revision']} sur ${args.image}, NODE_ENV=production, cible 0 %=${deriveCandidateTag(args.service, args['candidate-revision'])}`);
+  console.log(`[CloudRunCandidate] Service préparé: ${args['candidate-revision']} sur ${args.image}, NODE_ENV=production, trafic normalisé et cible 0 %=${deriveCandidateTag(args.service, args['candidate-revision'])}`);
 }
 
-module.exports = { deriveCandidateTag, forceSingleContainerEnv, parseArgs, prepareCandidateService, validateRevisionName };
+module.exports = { deriveCandidateTag, forceSingleContainerEnv, normalizeTraffic, parseArgs, prepareCandidateService, validateRevisionName };
 
 if (require.main === module) {
   try {
