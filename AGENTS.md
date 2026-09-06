@@ -214,6 +214,24 @@ SeenIt doit rester fonctionnel en PWA et APK Android. Un comportement natif diff
 explicite (`Capacitor.isNativePlatform()` ou API Capacitor). Les liens externes gardent un fallback Web ;
 Plex privilégie l'application Android dans l'APK.
 
+### AI Studio n'est pas une voie de production
+
+- **Aucun pull/sync AI Studio n'est requis pour déployer SeenIt.** La synchronisation native depuis
+  GitHub reste facultative et sert uniquement à charger le code dans l'éditeur ou la preview AI Studio.
+  Toute modification voulue repart ensuite vers une branche/PR GitHub ; ne jamais réintroduire un pull,
+  refresh ou publish « maison » dans l'application ou le backend.
+- **Ne jamais présenter `Publish` dans AI Studio comme une étape normale ou nécessaire.** Le backend
+  canonique est construit et déployé sur Cloud Run depuis `main` par GitHub Actions ; l'APK est construite,
+  signée et publiée exclusivement par le workflow de release GitHub.
+- L'image Cloud Run canonique contient aussi le frontend PWA. Un changement exclusivement frontend peut
+  être différé par la détection d'impact backend : pour le publier immédiatement, attendre/déclencher une
+  reconstruction canonique via `.github/workflows/deploy-backend.yml`, qui force l'image complète, plutôt
+  que d'utiliser `Publish` dans AI Studio comme raccourci.
+- Un agent ne déclenche jamais seul une publication AI Studio vers la production. Une utilisation
+  exceptionnelle n'est admissible qu'après demande explicite du propriétaire, indisponibilité prouvée du
+  chemin GitHub canonique, analyse du risque et plan de réconciliation/rollback. Elle reste une intervention
+  non canonique à retracer ; la preview AI Studio, elle, peut être utilisée librement sans publication.
+
 Le rapport final précise ce qui a été validé en PWA et/ou APK et ce qui attend volontairement la
 prochaine release groupée.
 

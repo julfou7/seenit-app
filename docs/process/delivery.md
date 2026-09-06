@@ -12,6 +12,23 @@ ce document prévaut pour les déclencheurs CI, la classification de livraison e
 Un push doit prouver rapidement que le dépôt reste sain. Il ne doit pas être transformé automatiquement
 en nouvelle release APK. Les releases Android sont des jalons explicites et regroupés.
 
+## GitHub, Cloud Run et AI Studio
+
+GitHub `main` est l'unique source de production. Le workflow `Deploy Canonical Backend` construit une
+image Cloud Run complète — serveur et frontend PWA — puis ne bascule le trafic qu'après validation et
+smoke. Le workflow de release GitHub construit et publie séparément l'APK signée.
+
+AI Studio reste facultatif : sa synchronisation Git native peut charger GitHub pour éditer ou prévisualiser
+SeenIt, mais elle n'est jamais un prérequis de déploiement. Les changements voulus reviennent par une
+branche/PR GitHub. Aucun script de pull/refresh intégré à SeenIt ne doit être réintroduit.
+
+Le bouton `Publish` d'AI Studio ne fait pas partie du parcours normal de production et ne doit jamais être
+proposé comme raccourci. Pour une modification exclusivement frontend que la détection d'impact backend
+diffère, lancer manuellement `Deploy Canonical Backend` sur `main` afin de forcer la reconstruction de
+l'image complète, ou attendre la prochaine reconstruction canonique. Une publication AI Studio vers la
+production exige une demande explicite du propriétaire, un blocage prouvé du chemin GitHub et un plan de
+réconciliation/rollback ; elle est alors retracée comme intervention non canonique.
+
 ## Trois classes de changement
 
 ### `light`
