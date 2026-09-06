@@ -1,244 +1,37 @@
+import { authenticatedFetch } from '../lib/apiAuth';
+import { resolveSeenItApiUrl } from '../lib/seenitApi';
+
 export interface TVDBFranchiseItem {
   id: number;
   media_type: 'tv' | 'movie';
 }
 
-let tvdbTokenCache: { token: string; expiresAt: number } | null = null;
-
-const TVDB_API_KEY = '003b4e7b-87b7-4756-b227-bb241093216f';
-const BASE_URL = 'https://api4.thetvdb.com/v4';
-
-async function getTVDBToken(): Promise<string | null> {
-  const now = Date.now();
-  if (tvdbTokenCache && tvdbTokenCache.expiresAt > now) {
-    return tvdbTokenCache.token;
-  }
-
-  try {
-    const response = await fetch(`${BASE_URL}/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apikey: TVDB_API_KEY }),
-    });
-
-    if (!response.ok) {
-      console.error('[TVDB] Erreur lors de l’authentification:', response.statusText);
-      return null;
-    }
-
-    const json = await response.json();
-    const token = json.data?.token;
-    if (token) {
-      // Token valide pour 24h
-      tvdbTokenCache = {
-        token,
-        expiresAt: now + 24 * 60 * 60 * 1000,
-      };
-      return token;
-    }
-  } catch (err) {
-    console.error('[TVDB] Erreur de connexion:', err);
-  }
-
-  return null;
-}
-
 /**
- * Récupère la liste des œuvres rattachées à la franchise / univers d'une série via TVDB.
+ * TVDB n'est jamais contacté directement par le client. La façade backend SeenIt
+ * possède la clé fournisseur, le token TVDB et le rate-limit. Cette fonction garde
+ * le contrat historique pour les éventuels consommateurs encore présents.
  */
 export async function getTVDBFranchiseTimeline(
   tvdbId?: number | null,
   mediaTitle?: string | null,
-  imdbId?: string | null,
+  _imdbId?: string | null,
   mediaType: 'tv' | 'movie' = 'tv'
 ): Promise<TVDBFranchiseItem[]> {
-  const token = await getTVDBToken();
-  if (!token) return [];
+  const url = new URL(resolveSeenItApiUrl('/api/media/tvdb/franchise'));
+  if (Number(tvdbId) > 0) url.searchParams.set('tvdbId', String(Number(tvdbId)));
+  if (mediaTitle?.trim()) url.searchParams.set('mediaTitle', mediaTitle.trim());
+  url.searchParams.set('mediaType', mediaType);
 
-  let activeTvdbId = tvdbId;
-  let listIds: (number | string)[] = [];
-
-  // A. Si aucun ID TVDB fourni, rechercher par titre sur TVDB
-  if (!activeTvdbId && mediaTitle) {
-    try {
-      const typeParam = mediaType === 'movie' ? 'movie' : 'series';
-      const searchRes = await fetch(
-        `${BASE_URL}/search?query=${encodeURIComponent(mediaTitle)}&type=${typeParam}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (searchRes.ok) {
-        const sData = await searchRes.json();
-        if (sData.data && sData.data.length > 0) {
-          activeTvdbId = parseInt(sData.data[0].tvdb_id || sData.data[0].id, 10);
-        }
-      }
-    } catch (e) {
-      console.error('[TVDB] Erreur recherche série/film:', e);
-    }
-  }
-
-  // B. Chercher une liste officielle/franchise rattachée à la série/film sur TVDB
-  if (activeTvdbId) {
-    try {
-      const endpoint = mediaType === 'movie' ? 'movies' : 'series';
-      const seriesRes = await fetch(`${BASE_URL}/${endpoint}/${activeTvdbId}/extended`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (seriesRes.ok) {
-        const seriesData = (await seriesRes.json()).data;
-        const lists = seriesData?.lists || [];
-
-        const validLists = lists.filter(
-          (l: any) =>
-            l.isOfficial ||
-            l.name.toLowerCase().includes('franchise') ||
-            l.name.toLowerCase().includes('universe') ||
-            l.name.toLowerCase().includes('whoniverse') ||
-            l.name.toLowerCase().includes('arrowverse') ||
-            l.name.toLowerCase().includes('world') ||
-            l.name.toLowerCase().includes('saga') ||
-            l.name.toLowerCase().includes('one chicago')
-        );
-
-        if (validLists.length > 0) {
-          validLists.sort((a: any, b: any) => {
-            let aScore = 0; let bScore = 0;
-            if (a.isOfficial) aScore += 10;
-            if (b.isOfficial) bScore += 10;
-            
-            const aName = a.name.toLowerCase();
-            const bName = b.name.toLowerCase();
-            if (aName.includes('universe') || aName.includes('world') || aName.includes('whoniverse') || aName.includes('franchise')) aScore += 5;
-            if (bName.includes('universe') || bName.includes('world') || bName.includes('whoniverse') || bName.includes('franchise')) bScore += 5;
-
-            // Prendre en compte le score de popularité TVDB pour départager les listes communautaires
-            if (a.score) aScore += Math.log10(a.score + 1);
-            if (b.score) bScore += Math.log10(b.score + 1);
-            
-            return bScore - aScore;
-          });
-          // Récupérer jusqu'aux 5 meilleures listes pour fusionner les spin-offs
-          listIds = validLists.slice(0, 5).map((l: any) => l.id);
-        }
-      }
-    } catch (e) {
-      console.error('[TVDB] Erreur récupération détails:', e);
-    }
-  }
-
-  // C. Recherche de liste par le titre principal de la franchise si aucune liste directe
-  if (listIds.length === 0 && mediaTitle) {
-    try {
-      const cleanTitle = mediaTitle.replace(/:(.*)/, '').trim();
-      const searchListRes = await fetch(
-        `${BASE_URL}/search?query=${encodeURIComponent(cleanTitle)}&type=list`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (searchListRes.ok) {
-        const sListData = await searchListRes.json();
-        const validLists = (sListData.data || []).filter(
-          (l: any) =>
-            l.isOfficial ||
-            l.name.toLowerCase().includes('franchise') ||
-            l.name.toLowerCase().includes('universe') ||
-            l.name.toLowerCase().includes('whoniverse') ||
-            l.name.toLowerCase().includes('arrowverse') ||
-            l.name.toLowerCase().includes('world') ||
-            l.name.toLowerCase().includes('saga') ||
-            l.name.toLowerCase().includes('one chicago')
-        );
-
-        if (validLists.length > 0) {
-          validLists.sort((a: any, b: any) => {
-            let aScore = 0; let bScore = 0;
-            if (a.isOfficial) aScore += 10;
-            if (b.isOfficial) bScore += 10;
-            
-            const aName = a.name.toLowerCase();
-            const bName = b.name.toLowerCase();
-            if (aName.includes('universe') || aName.includes('world') || aName.includes('whoniverse') || aName.includes('franchise')) aScore += 5;
-            if (bName.includes('universe') || bName.includes('world') || bName.includes('whoniverse') || bName.includes('franchise')) bScore += 5;
-
-            if (a.score) aScore += Math.log10(a.score + 1);
-            if (b.score) bScore += Math.log10(b.score + 1);
-            
-            return bScore - aScore;
-          });
-          listIds = validLists.slice(0, 5).map((l: any) => l.tvdb_id || l.id);
-        }
-      }
-    } catch (e) {
-      console.error('[TVDB] Erreur recherche liste:', e);
-    }
-  }
-
-  if (listIds.length === 0) return [];
-
-  // D. Récupérer et fusionner les entités composant les listes de franchise
   try {
-    const entitiesMap = new Map();
-    for (const listId of listIds) {
-      const listRes = await fetch(`${BASE_URL}/lists/${listId}/extended`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (listRes.ok) {
-        const listData = (await listRes.json()).data;
-        const entities = listData?.entities || [];
-        entities.forEach((entity: any) => {
-          const key = entity.seriesId ? `tv_${entity.seriesId}` : `movie_${entity.movieId}`;
-          if (!entitiesMap.has(key)) {
-            entitiesMap.set(key, entity);
-          }
-        });
-      }
-    }
-
-    const mergedEntities = Array.from(entitiesMap.values());
-
-    // E. Extraire les identifiants TMDB de chaque entité en parallèle
-    const promises = mergedEntities.map(async (entity: any) => {
-      let url: string | null = null;
-      let media_type: 'tv' | 'movie' = 'tv';
-
-      if (entity.seriesId) {
-        url = `${BASE_URL}/series/${entity.seriesId}/extended`;
-        media_type = 'tv';
-      } else if (entity.movieId) {
-        url = `${BASE_URL}/movies/${entity.movieId}/extended`;
-        media_type = 'movie';
-      }
-
-      if (!url) return null;
-
-      const itemRes = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!itemRes.ok) return null;
-
-      const itemData = (await itemRes.json()).data;
-      const remoteIds = itemData?.remoteIds || [];
-      const tmdbRemote = remoteIds.find(
-        (r: any) =>
-          r.type === 12 ||
-          (r.sourceName && r.sourceName.toLowerCase().includes('themoviedb')) ||
-          (r.sourceName && r.sourceName.toLowerCase().includes('tmdb'))
-      );
-
-      if (tmdbRemote?.id) {
-        const parsedId = parseInt(tmdbRemote.id, 10);
-        if (!isNaN(parsedId)) {
-          return { id: parsedId, media_type };
-        }
-      }
-
-      return null;
-    });
-
-    const results = await Promise.all(promises);
-    return results.filter((r): r is TVDBFranchiseItem => r !== null);
-  } catch (e) {
-    console.error('[TVDB] Erreur récupération entités de liste:', e);
+    const response = await authenticatedFetch(url.toString());
+    if (!response.ok) return [];
+    const payload = await response.json();
+    return Array.isArray(payload?.results)
+      ? payload.results.filter((item: any): item is TVDBFranchiseItem =>
+          Number.isFinite(Number(item?.id)) && (item?.media_type === 'tv' || item?.media_type === 'movie'))
+      : [];
+  } catch (error) {
+    console.warn('[TVDB] Façade backend indisponible:', error);
+    return [];
   }
-
-  return [];
 }
