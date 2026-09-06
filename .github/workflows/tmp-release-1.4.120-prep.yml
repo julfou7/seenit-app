@@ -4,13 +4,14 @@ on:
   push:
     branches:
       - tmp/release-1.4.120-prep
+    paths:
+      - .github/workflows/tmp-release-1.4.120-prep.yml
 
 permissions:
   contents: write
 
 jobs:
   prepare:
-    if: github.event.head_commit.message == 'chore: bootstrap release prep 1.4.120'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
