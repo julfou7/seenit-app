@@ -106,6 +106,26 @@ test('SEENIT-RUNTIME-001 remplace le service exporté sans réutiliser le déplo
   assert.ok(sanitizer.includes('ligne(s) image détectée(s), 1 attendue'));
 });
 
+test('SEENIT-RUNTIME-001 attend la readiness candidate sans exposer la production', () => {
+  const replace = workflow.lastIndexOf('gcloud run services replace "$candidate_service"');
+  const deadline = workflow.indexOf('candidate_deadline=$((SECONDS + 120))', replace);
+  const readyFlag = workflow.indexOf('candidate_ready=false', deadline);
+  const trafficGuard = workflow.indexOf('La création de la candidate a modifié le trafic avant smoke.', readyFlag);
+  const readyGate = workflow.indexOf('"$latest_ready" == "$candidate_revision"', trafficGuard);
+  const timeoutDiagnostic = workflow.indexOf('gcloud run revisions describe "$candidate_revision"', readyGate);
+  const tagCandidate = workflow.indexOf('--update-tags "$CANDIDATE_TAG=$candidate_revision"', readyGate);
+
+  assert.ok(replace >= 0);
+  assert.ok(deadline > replace);
+  assert.ok(readyFlag > deadline);
+  assert.ok(trafficGuard > readyFlag);
+  assert.ok(readyGate > trafficGuard);
+  assert.ok(timeoutDiagnostic > readyGate);
+  assert.ok(tagCandidate > timeoutDiagnostic);
+  assert.match(workflow, /Candidate en attente de readiness/);
+  assert.match(workflow, /sleep 5/);
+});
+
 test('SEENIT-RUNTIME-001 garde la production sur l’ancienne révision jusqu’au smoke candidat', () => {
   const pinTraffic = workflow.indexOf('--to-revisions "$PREVIOUS_REVISION=100"');
   const appliedReplace = workflow.lastIndexOf('gcloud run services replace "$candidate_service"');
@@ -140,5 +160,6 @@ test('SEENIT-RUNTIME-001 documente que la sync AI Studio ne vaut jamais preuve d
   assert.match(runbook, /digest/i);
   assert.match(runbook, /service exporté/i);
   assert.match(runbook, /métadonnées source/i);
+  assert.match(runbook, /readiness/i);
   assert.match(runbook, /bootstrap-gcp-backend-deploy\.sh/);
 });

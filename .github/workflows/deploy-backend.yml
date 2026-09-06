@@ -274,20 +274,46 @@ jobs:
             --region "$GCP_REGION" \
             --quiet >/dev/null
 
-          service_json="$(gcloud run services describe "$GCP_SERVICE" \
-            --project "$GCP_PROJECT_ID" \
-            --region "$GCP_REGION" \
-            --format=json)"
-          latest_created="$(jq -r '.status.latestCreatedRevisionName // empty' <<<"$service_json")"
-          latest_ready="$(jq -r '.status.latestReadyRevisionName // empty' <<<"$service_json")"
-          if [[ "$latest_created" != "$candidate_revision" || "$latest_ready" != "$candidate_revision" ]]; then
-            echo "La révision candidate n'est pas prête: expected=$candidate_revision created=${latest_created:-absent} ready=${latest_ready:-absent}."
-            exit 1
-          fi
-          if ! jq -e --arg previous "$PREVIOUS_REVISION" \
-            '[.status.traffic[]? | select((.percent // 0) > 0)] as $active | ($active | length == 1) and ($active[0].revisionName == $previous) and ($active[0].percent == 100)' \
-            <<<"$service_json" >/dev/null; then
-            echo "La création de la candidate a modifié le trafic avant smoke."
+          candidate_deadline=$((SECONDS + 120))
+          candidate_ready=false
+          latest_created=''
+          latest_ready=''
+          while (( SECONDS < candidate_deadline )); do
+            service_json="$(gcloud run services describe "$GCP_SERVICE" \
+              --project "$GCP_PROJECT_ID" \
+              --region "$GCP_REGION" \
+              --format=json)"
+            latest_created="$(jq -r '.status.latestCreatedRevisionName // empty' <<<"$service_json")"
+            latest_ready="$(jq -r '.status.latestReadyRevisionName // empty' <<<"$service_json")"
+
+            if [[ -n "$latest_created" && "$latest_created" != "$candidate_revision" ]]; then
+              echo "Une autre révision a été créée pendant la préparation: expected=$candidate_revision created=$latest_created."
+              exit 1
+            fi
+
+            if ! jq -e --arg previous "$PREVIOUS_REVISION" \
+              '[.status.traffic[]? | select((.percent // 0) > 0)] as $active | ($active | length == 1) and ($active[0].revisionName == $previous) and ($active[0].percent == 100)' \
+              <<<"$service_json" >/dev/null; then
+              echo "La création de la candidate a modifié le trafic avant smoke."
+              exit 1
+            fi
+
+            if [[ "$latest_created" == "$candidate_revision" && "$latest_ready" == "$candidate_revision" ]]; then
+              candidate_ready=true
+              break
+            fi
+
+            echo "Candidate en attente de readiness: expected=$candidate_revision created=${latest_created:-absent} ready=${latest_ready:-absent}."
+            sleep 5
+          done
+
+          if [[ "$candidate_ready" != 'true' ]]; then
+            echo "La révision candidate n'est pas devenue prête dans la fenêtre autorisée."
+            gcloud run revisions describe "$candidate_revision" \
+              --project "$GCP_PROJECT_ID" \
+              --region "$GCP_REGION" \
+              --format=json \
+              | jq '{metadata: {name: .metadata.name}, status: {conditions: .status.conditions, logUrl: .status.logUrl}}' || true
             exit 1
           fi
 
