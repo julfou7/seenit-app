@@ -1,7 +1,7 @@
 # SeenIt — Référence fonctionnelle canonique
 
 Dernière vérification : 6 septembre 2026  
-Baseline observée : **1.4.118**, `main` `3c3055dad08210132cc6e427a469836f1a85a403`  
+Baseline observée : **1.4.118**, `main` `620c4a4e41682257da05efa625bb6a8898108947`
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : composante obligatoire de la SPEC SeenIt
 
@@ -278,7 +278,9 @@ résultat doit alors être identique et réciproque depuis tous les membres du g
 L'identité utilisée dans chaque carte et chaque navigation combine toujours le type Film/Série et
 l'ID TMDB. Le contrat exhaustif, les sources admises, les budgets de performance et la matrice
 Yellowstone, Breaking Bad, Harry Potter, Marvel, DC et House of Guinness sont définis par
-SEENIT-RELATION-001. L'écart de l'implémentation actuelle reste suivi dans
+SEENIT-RELATION-001. Le catalogue éditorial est séparé du code et génère un snapshot identique dans la
+PWA et l'APK. Une détection hors ligne peut proposer de nouveaux groupes exacts ; ils restent invisibles
+tant qu'ils ne sont pas revus et approuvés. L'évolution de ce mécanisme est tracée dans
 [#130](https://github.com/julfou7/seenit-app/issues/130).
 
 Une fiche déjà ouverte pendant la session doit se réafficher depuis le cache chaud, sans repasser par
@@ -463,7 +465,7 @@ elle est nécessaire à la plateforme et explicitement documentée.
 | Priorité | Écart observé | Décision / issue |
 |---|---|---|
 | P1 | La classification d’âge actuelle peut préférer une valeur FR permissive, sous-classer des certifications US et inventer un TP par genre. | Appliquer `SEENIT-PARENTAL-001` : [#98](https://github.com/julfou7/seenit-app/issues/98). |
-| P1 | Les sagas/univers peuvent dépendre du point d’entrée, accepter des listes ou titres non probants et afficher un groupe auto-référent. | Appliquer `SEENIT-RELATION-001` et ses TNR cross-media : [#130](https://github.com/julfou7/seenit-app/issues/130). |
+| P2 | La couverture des univers dépend de la qualité et de la revue des propositions hors ligne ; une relation réelle absente des sources exactes reste volontairement masquée. | Maintenir le catalogue et son détecteur selon `SEENIT-RELATION-001` ; ne jamais compenser par titre : [#130](https://github.com/julfou7/seenit-app/issues/130). |
 | P1 | Les personnes favorites restent locales et font diverger les recommandations PWA/APK. | Rendre Firestore autoritatif : [#95](https://github.com/julfou7/seenit-app/issues/95). |
 | P1 | Le retrait de Watchlist Plex ne retire pas encore un suivi créé uniquement par cette Watchlist. | Implémentation avec provenance : [#68](https://github.com/julfou7/seenit-app/issues/68). |
 | P2 | Partager une fiche ou le profil ne garantit pas encore un lien réouvrable conforme. | Décider/corriger : [#96](https://github.com/julfou7/seenit-app/issues/96). |

@@ -86,6 +86,7 @@ test('SEENIT-RELATION-001 interdit tout matching nominatif dans les résolveurs 
   assert.match(lookupSource, /groupsByMediaKey\.get\(mediaKey\)/);
   assert.doesNotMatch(lookupSource, /title|name|label|year|popularity|startsWith|includes|RegExp/i);
   assert.doesNotMatch(snapshotSource, /title|name|label|year|popularity|startsWith|includes|RegExp/i);
+  assert.doesNotMatch(mediaRelationsSource, /Punisher|Yellowstone|Harry Potter|House of Guinness/);
 });
 
 test('SEENIT-RELATION-001 masque les auto-relations et qualifie les IDs par type', () => {
@@ -108,6 +109,8 @@ test('SEENIT-RELATION-001 n’accepte que des groupes versionnés à provenance 
     assert.ok(relation.groupId);
     assert.ok(relation.sourceGroupId);
     assert.ok(relation.version >= 1);
+    assert.ok(relation.provenance.reference.startsWith('https://'));
+    assert.match(relation.provenance.reviewedAt, /^\d{4}-\d{2}-\d{2}$/);
     assert.ok(relation.members.length > 1);
     assert.equal(new Set(relation.members.map(member => member.mediaKey)).size, relation.members.length);
   }

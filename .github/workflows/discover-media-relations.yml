@@ -1,0 +1,46 @@
+name: Discover Media Relation Candidates
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 4 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seenit-media-relations-discovery
+  cancel-in-progress: true
+
+jobs:
+  discover:
+    name: Discover exact candidates (offline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Checkout canonical catalogue
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Validate committed snapshot
+        run: node scripts/media-relations-catalog.cjs check
+
+      - name: Discover Wikidata candidates
+        run: npm run relations:discover
+
+      - name: Summarize candidates
+        run: |
+          node -e "const fs=require('node:fs');const p=JSON.parse(fs.readFileSync('build/media-relations-candidates.json'));fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '## Relations médias\n\n- Candidats à revoir : '+p.candidates.length+'\n- Identités rejetées : '+p.rejected.length+'\n- Publication automatique : aucune\n')"
+
+      - name: Upload review artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: seenit-media-relation-candidates
+          path: build/media-relations-candidates.json
+          if-no-files-found: error
+          retention-days: 30

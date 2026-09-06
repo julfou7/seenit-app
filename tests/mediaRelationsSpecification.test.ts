@@ -52,14 +52,22 @@ test('SEENIT-RELATION-001 borne les sources distantes et les performances', () =
   assert.match(audit, /#12/);
 });
 
+test('SEENIT-RELATION-001 impose un catalogue généré et une revue des candidats hors ligne', () => {
+  assert.match(specification, /catalogue éditorial séparé du code/);
+  assert.match(specification, /générateur déterministe/);
+  assert.match(specification, /pending-review/);
+  assert.match(specification, /ne publie[\s\n]+rien directement/);
+  assert.match(functionalReference, /génère un snapshot identique dans la[\s\S]*PWA et l'APK/);
+  assert.match(registry, /USR-2026-09-06-005/);
+});
+
 test('SEENIT-RELATION-001 reste reliée au registre et au manifeste de tests', () => {
   assert.match(registry, /USR-2026-09-05-002/);
   assert.match(registry, /SEENIT-RELATION-001/);
   assert.match(registry, /issue #130/);
   const requirement = requirements.requirements.find((entry: { id: string }) => entry.id === 'SEENIT-RELATION-001');
   assert.ok(requirement, 'SEENIT-RELATION-001 doit rester déclarée dans requirements.json');
-  assert.equal(requirement.tests.length, 5);
-  for (const expected of requirement.tests) {
-    assert.equal(expected.file, 'tests/mediaRelationsSpecification.test.ts');
-  }
+  assert.equal(requirement.tests.length, 9);
+  assert.ok(requirement.tests.some((expected: { file: string }) => expected.file === 'tests/mediaRelationsSpecification.test.ts'));
+  assert.ok(requirement.tests.some((expected: { file: string }) => expected.file === 'tests/mediaRelationsCatalog.test.ts'));
 });
