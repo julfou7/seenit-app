@@ -275,6 +275,12 @@ Yellowstone, Breaking Bad, Harry Potter, Marvel, DC et House of Guinness sont d�
 SEENIT-RELATION-001. L'écart de l'implémentation actuelle reste suivi dans
 [#130](https://github.com/julfou7/seenit-app/issues/130).
 
+Une fiche déjà ouverte pendant la session doit se réafficher depuis le cache chaud, sans repasser par
+un skeleton de deux à trois secondes. Détails et relations sont indexés par `movie:<id>` / `tv:<id>`,
+les images principales gardent une URL stable et les actualisations distantes restent silencieuses.
+Le contrat complet est `SEENIT-PERF-001` et son suivi est
+[#146](https://github.com/julfou7/seenit-app/issues/146).
+
 La machine d'états exhaustive et le mapping Plex sont autoritatifs dans `seenit.md` §5.3 à §5.5.
 
 ## 9. Plex

@@ -378,6 +378,30 @@ sans section auto-référente, la collision movie:42/tv:42 et l'exclusion saga/u
 L'écart courant et le plan de correction sont suivis dans
 [#130](https://github.com/julfou7/seenit-app/issues/130).
 
+### 5.7 Réouverture et cache chaud d'une fiche média
+
+- **SEENIT-PERF-001** — Une fiche Film ou Série déjà résolue pendant la session est rendue
+  immédiatement depuis un cache borné indexé par `mediaType + tmdbId`. SeenIt ne vide jamais les
+  détails, relations ou URLs d'images avant d'avoir consulté ce cache.
+- Le skeleton de page est réservé au premier chargement réellement froid. Le parcours A → B → A
+  restitue A sans skeleton ni placeholder intermédiaire, puis peut actualiser silencieusement les
+  données. En cas d'échec réseau, la dernière valeur complète reste affichable (`stale-if-error`).
+- Les réponses asynchrones sont rattachées à la clé typée demandée. Une réponse de `movie:42` ne peut
+  ni renseigner `tv:42`, ni remplacer une autre fiche ouverte entre-temps.
+- Les détails et requêtes identiques en vol sont dédupliqués. Les caches mémoire sont bornés afin de
+  ne pas dégrader une longue session APK/PWA.
+- Le backdrop et le poster visibles au-dessus de la ligne de flottaison sont prioritaires ; les
+  carrousels hors écran restent paresseux. Les URLs restent stables lors d'une réouverture afin que le
+  cache HTTP/WebView puisse être réutilisé.
+- Budget du chemin chaud : contenu principal et relations déjà connus disponibles en moins de 150 ms,
+  sans nouvel appel fournisseur. Le chargement froid reste progressif et ne bloque pas les actions
+  essentielles.
+
+Les TNR couvrent la réouverture A → B → A, la collision `movie:42`/`tv:42`, la déduplication des
+requêtes en vol, le cache chaud des relations et la conservation du contenu après une panne réseau.
+Le suivi est assuré dans [#146](https://github.com/julfou7/seenit-app/issues/146), en lien avec #130
+pour le cache des sagas et univers.
+
 ## 6. Synchronisation Plex
 
 - **SEENIT-PLEX-001** — Les événements Plex sont normalisés et résolus sans utiliser leur titre

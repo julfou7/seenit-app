@@ -1,6 +1,14 @@
 import { type Result, ok, err, tryCatch } from '../../core/Result';
-import { getTVDBFranchiseTimeline } from '../../services/tvdb';
 import { adjustTMDBShowDataForEurope, adjustTMDBSeasonDataForEurope } from '../../lib/utils';
+import {
+  BoundedCache,
+  getManifestRelationSnapshot,
+  mediaKeyFrom,
+  relationMediaKeys,
+  type MediaKey,
+  type MediaRelationSnapshot,
+  type RelationMediaType,
+} from './mediaRelations';
 
 export interface TMDBMedia {
   id: number;
@@ -131,7 +139,7 @@ interface SearchResponse {
  * Utilise un Singleton avec une file d'attente (Queue) et un "Rate Limiter" 
  * pour ne jamais dépasser 40 requêtes par 10 secondes (limite TMDB classique).
  */
-class TMDBClient {
+export class TMDBClient {
   private getApiKey(): string | null {
     return localStorage.getItem('TMDB_API_KEY') || (import.meta.env.VITE_TMDB_API_KEY as string) || '677711df46484bc7129492d4a9267a65';
   }
@@ -334,210 +342,166 @@ class TMDBClient {
 
     return err(new Error(`No media found on TMDB for external ID ${externalId}`));
   }
-  private detailsCache = new Map<string, any>();
+  private detailsCache = new BoundedCache<string, any>(80);
+  private detailsInFlight = new Map<string, Promise<Result<any>>>();
+
+  peekMediaDetails(id: number, type: RelationMediaType = 'tv'): any | null {
+    return this.detailsCache.get(`${type}_${Number(id)}`) || null;
+  }
+
+  private async getCachedMediaDetails(id: number, type: RelationMediaType): Promise<Result<any>> {
+    const cacheKey = `${type}_${Number(id)}`;
+    const cached = this.detailsCache.get(cacheKey);
+    if (cached) return ok(cached);
+
+    const existingRequest = this.detailsInFlight.get(cacheKey);
+    if (existingRequest) return existingRequest;
+
+    const request = (async (): Promise<Result<any>> => {
+      const apiKey = this.getApiKey();
+      if (!apiKey) return err(new Error('Missing API Key'));
+      const appended = type === 'tv'
+        ? 'credits,aggregate_credits,similar,recommendations,videos,content_ratings,external_ids,images,keywords'
+        : 'credits,similar,recommendations,videos,release_dates,external_ids,images,keywords';
+      const url = new URL(`${this.baseUrl}/${type}/${id}?api_key=${apiKey}&language=fr-FR&append_to_response=${appended}&include_video_language=fr,en,null&include_image_language=fr,en,null,de,es,it,ja,ko`);
+      const res = await tryCatch(fetch(url.toString()));
+      if (!res.ok) return err((res as any).error);
+      if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
+      const data = await tryCatch(res.value.json());
+      if (!data.ok) return err((data as any).error);
+      if (data.value && data.value.status_code) return err(new Error(data.value.status_message || 'TMDB Error'));
+
+      if (data.value) {
+        data.value.media_type = type;
+        if (data.value.similar?.results) {
+          data.value.similar.results = data.value.similar.results.filter((item: any) => !isAdultOrParodyMedia(item));
+        }
+        if (data.value.recommendations?.results) {
+          data.value.recommendations.results = data.value.recommendations.results.filter((item: any) => !isAdultOrParodyMedia(item));
+        }
+        if (type === 'tv') adjustTMDBShowDataForEurope(data.value);
+        this.detailsCache.set(cacheKey, data.value);
+      }
+      return data;
+    })();
+
+    this.detailsInFlight.set(cacheKey, request);
+    try {
+      return await request;
+    } finally {
+      this.detailsInFlight.delete(cacheKey);
+    }
+  }
 
   async getShowDetails(id: number): Promise<Result<any>> {
-    const cacheKey = `tv_${id}`;
-    if (this.detailsCache.has(cacheKey)) {
-      return ok(this.detailsCache.get(cacheKey));
-    }
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing API Key'));
-    const url = new URL(`${this.baseUrl}/tv/${id}?api_key=${apiKey}&language=fr-FR&append_to_response=credits,aggregate_credits,similar,recommendations,videos,content_ratings,external_ids,images,keywords&include_video_language=fr,en,null&include_image_language=fr,en,null,de,es,it,ja,ko`);
-    const res = await tryCatch(fetch(url.toString()));
-    if (!res.ok) return err((res as any).error);
-    if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
-    const data = await tryCatch(res.value.json());
-    if (!data.ok) return err((data as any).error);
-    if (data.value && data.value.status_code) return err(new Error(data.value.status_message || 'TMDB Error'));
-    
-    if (data.value) {
-      if (data.value.similar?.results) {
-        data.value.similar.results = data.value.similar.results.filter((m: any) => !isAdultOrParodyMedia(m));
-      }
-      if (data.value.recommendations?.results) {
-        data.value.recommendations.results = data.value.recommendations.results.filter((m: any) => !isAdultOrParodyMedia(m));
-      }
-      adjustTMDBShowDataForEurope(data.value);
-      this.detailsCache.set(cacheKey, data.value);
-    }
-    return data;
+    return this.getCachedMediaDetails(id, 'tv');
   }
 
   async getMovieDetails(id: number): Promise<Result<any>> {
-    const cacheKey = `movie_${id}`;
-    if (this.detailsCache.has(cacheKey)) {
-      return ok(this.detailsCache.get(cacheKey));
-    }
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing API Key'));
-    const url = new URL(`${this.baseUrl}/movie/${id}?api_key=${apiKey}&language=fr-FR&append_to_response=credits,similar,recommendations,videos,release_dates,external_ids,images,keywords&include_video_language=fr,en,null&include_image_language=fr,en,null,de,es,it,ja,ko`);
-    const res = await tryCatch(fetch(url.toString()));
-    if (!res.ok) return err((res as any).error);
-    if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
-    const data = await tryCatch(res.value.json());
-    if (!data.ok) return err((data as any).error);
-    if (data.value && data.value.status_code) return err(new Error(data.value.status_message || 'TMDB Error'));
-
-    if (data.value) {
-      if (data.value.similar?.results) {
-        data.value.similar.results = data.value.similar.results.filter((m: any) => !isAdultOrParodyMedia(m));
-      }
-      if (data.value.recommendations?.results) {
-        data.value.recommendations.results = data.value.recommendations.results.filter((m: any) => !isAdultOrParodyMedia(m));
-      }
-      this.detailsCache.set(cacheKey, data.value);
-    }
-    return data;
+    return this.getCachedMediaDetails(id, 'movie');
   }
 
   async getMediaDetails(id: number, type: 'tv' | 'movie' = 'tv'): Promise<Result<any>> {
     return type === 'movie' ? this.getMovieDetails(id) : this.getShowDetails(id);
   }
 
-  async getUniverseAndCollection(media: any): Promise<{ collection: any[], universe: any[] }> {
-    if (!media) return { collection: [], universe: [] };
+  private relationCache = new BoundedCache<MediaKey, MediaRelationSnapshot>(120);
+  private collectionCache = new BoundedCache<number, any>(40);
+  private collectionInFlight = new Map<number, Promise<Result<any>>>();
 
-    const mediaType = media.media_type || (media.title ? 'movie' : 'tv');
-    let universe: any[] = [];
-    let collection: any[] = [];
+  peekUniverseAndCollection(media: any): MediaRelationSnapshot | null {
+    const mediaKey = mediaKeyFrom(media);
+    if (!mediaKey) return null;
+    return this.relationCache.get(mediaKey) || getManifestRelationSnapshot(mediaKey);
+  }
 
-    // A. POUR LES FILMS : Récupérer l'Ordre de Visionnage direct (Collection TMDB)
-    if (mediaType === 'movie' && media.belongs_to_collection?.id) {
-      const collectionRes = await this.getCollectionDetails(media.belongs_to_collection.id);
-      if (collectionRes.ok && collectionRes.value?.parts) {
+  async getUniverseAndCollection(media: any): Promise<MediaRelationSnapshot> {
+    const mediaKey = mediaKeyFrom(media);
+    if (!mediaKey) return { collection: [], universe: [] };
+
+    const cached = this.relationCache.get(mediaKey);
+    if (cached) return cached;
+
+    const manifest = getManifestRelationSnapshot(mediaKey);
+    let collection = manifest?.collection || [];
+    let universe = manifest?.universe || [];
+    const mediaType = mediaKey.split(':')[0] as RelationMediaType;
+
+    // Une collection TMDB est une preuve de saga exacte. Le manifeste reste prioritaire
+    // lorsqu'il définit déjà un ordre validé (par exemple la trilogie Nolan).
+    if (collection.length === 0 && mediaType === 'movie' && media.belongs_to_collection?.id) {
+      const collectionRes = await this.getCollectionDetails(Number(media.belongs_to_collection.id));
+      if (collectionRes.ok && Array.isArray(collectionRes.value?.parts)) {
         const parts = collectionRes.value.parts
-          .filter((p: any) => (p.release_date || p.first_air_date) && !isAdultOrParodyMedia(p))
-          .map((p: any) => ({ ...p, media_type: 'movie' }));
-
+          .filter((part: any) => (part.release_date || part.first_air_date) && !isAdultOrParodyMedia(part))
+          .map((part: any) => ({ ...part, media_type: 'movie' as const }))
+          .sort((a: any, b: any) => String(a.release_date || '').localeCompare(String(b.release_date || '')));
         if (parts.length > 1) {
-          parts.sort((a: any, b: any) => {
-            const dateA = new Date(a.release_date || a.first_air_date || 0).getTime();
-            const dateB = new Date(b.release_date || b.first_air_date || 0).getTime();
-            return dateA - dateB;
-          });
-
-          collection = parts.map((item: any, index: number) => ({
-            ...item,
-            sagaOrder: index + 1
-          }));
+          collection = parts.map((part: any, index: number) => ({ ...part, sagaOrder: index + 1 }));
         }
       }
     }
 
-    // B. POUR TOUT LE MONDE : Utiliser l'API TVDB v4 pour les préquelles, spin-offs et franchises (univers complet)
-    const tvdbId = media.external_ids?.tvdb_id || media.tvdb_id;
-    // On priorise l'original_title (en anglais) car la recherche textuelle TVDB est plus efficace qu'avec les titres traduits
-    const mediaTitle = media.original_title || media.original_name || media.title || media.name;
-    const imdbId = media.external_ids?.imdb_id || media.imdb_id;
+    // Priorité saga > univers : une clé typée ne s'affiche que dans la première section.
+    const collectionKeys = relationMediaKeys(collection, 'movie');
+    universe = universe.filter(item => {
+      const key = mediaKeyFrom(item);
+      return key !== null && !collectionKeys.has(key);
+    });
 
-    const franchiseItems = await getTVDBFranchiseTimeline(tvdbId, mediaTitle, imdbId, mediaType);
+    // Une auto-relation seule n'a aucune valeur et reste invisible.
+    if (collection.length === 1 && mediaKeyFrom(collection[0]) === mediaKey) collection = [];
+    if (universe.length === 1 && mediaKeyFrom(universe[0]) === mediaKey) universe = [];
 
-    if (franchiseItems && franchiseItems.length > 1) {
-      // Récupérer les détails TMDB de chaque média de la franchise
-      const detailsPromises = franchiseItems.map(async (item) => {
-        const res = await this.getMediaDetails(item.id, item.media_type);
-        if (res.ok && res.value) {
-          return {
-            ...res.value,
-            media_type: item.media_type,
-          };
-        }
-        return null;
-      });
-
-      const tvdbResults = await Promise.all(detailsPromises);
-      const validMedia = tvdbResults.filter((r): r is any => r !== null && !isAdultOrParodyMedia(r));
-
-      // Déduplication par ID & type
-      const map = new Map<string, any>();
-      validMedia.forEach((item) => {
-        const type = item.media_type || (item.title ? 'movie' : 'tv');
-        const key = `${type}_${item.id}`;
-        if (!map.has(key)) {
-          map.set(key, { ...item, media_type: type });
-        }
-      });
-
-      const combined = Array.from(map.values());
-
-      if (combined.length > 1) {
-        universe = combined;
-      }
-    }
-
-    // C. Homonymes et correspondances exactes TMDB (Suites directes, reboots, cross-media)
-    // Permet de forcer la liaison entre œuvres de même nom (ex: The Punisher série -> film, Daredevil Netflix -> Disney+)
-    // sans dépendre uniquement des listes communautaires TVDB parfois incomplètes.
-    let cleanTitle = (mediaTitle || '').split(':')[0].split('-')[0].replace(/^(Marvel's |DC's )/i, '').trim();
-    if (cleanTitle && cleanTitle.length > 2) {
-      const searchRes = await this.searchMulti(cleanTitle);
-      if (searchRes.ok && searchRes.value?.results) {
-        const exactMatches = searchRes.value.results.filter((res: any) => {
-          if (isAdultOrParodyMedia(res)) return false;
-          
-          // Exclure les faux positifs (comme les vieux films obscurs) basés sur la popularité/votes
-          if ((res.vote_count || 0) < 50 && (res.popularity || 0) < 15) return false;
-          
-          const resTitle = res.title || res.name || res.original_title || res.original_name;
-          if (!resTitle) return false;
-          
-          let titleLower = resTitle.toLowerCase().replace(/^(marvel's |dc's )/i, '');
-          const cleanTitleLower = cleanTitle.toLowerCase();
-          
-          // On accepte si le titre commence par le nom (ex: "Daredevil: Born Again") ou contient strictement le nom avec des espaces/ponctuations
-          return titleLower.startsWith(cleanTitleLower) || titleLower === cleanTitleLower || titleLower.includes(` ${cleanTitleLower} `) || titleLower.includes(`${cleanTitleLower}:`);
-        });
-
-        const currentUniverseIds = new Set(universe.map(u => `${u.media_type || (u.title ? 'movie' : 'tv')}_${u.id}`));
-        exactMatches.forEach((match: any) => {
-          const type = match.media_type || (match.title ? 'movie' : 'tv');
-          const key = `${type}_${match.id}`;
-          if (!currentUniverseIds.has(key)) {
-            universe.push({ ...match, media_type: type });
-            currentUniverseIds.add(key);
-          }
-        });
-      }
-    }
-
-    // Tri chronologique final de l'univers
-    if (universe.length > 0) {
-      universe.sort((a, b) => {
-        const dateA = new Date(a.release_date || a.first_air_date || 0).getTime();
-        const dateB = new Date(b.release_date || b.first_air_date || 0).getTime();
-        return dateA - dateB;
-      });
-    }
-    
-    // Fallback: Si l'univers trouvé est identique à la collection (mêmes IDs), ne garder que l'un ou l'autre pour ne pas polluer l'UI.
-    // Filtrer de l'univers tout ce qui est DÉJÀ dans la collection
-    if (universe.length > 0 && collection.length > 0) {
-      const collectionSet = new Set(collection.map(c => `${c.media_type}_${c.id}`));
-      universe = universe.filter(u => !collectionSet.has(`${u.media_type}_${u.id}`));
-    }
-
-    // On n'exclut plus l'élément courant, car l'utilisateur veut le voir avec le badge 'FILM ACTUEL'
-    // pour se repérer dans la chronologie.
-
-    return { collection, universe };
+    const snapshot = { collection, universe };
+    this.relationCache.set(mediaKey, snapshot);
+    return snapshot;
   }
 
   async getCollectionDetails(collectionId: number): Promise<Result<any>> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing API Key'));
-    const url = new URL(`${this.baseUrl}/collection/${collectionId}?api_key=${apiKey}&language=fr-FR`);
-    const res = await tryCatch(fetch(url.toString()));
-    if (!res.ok) return err((res as any).error);
-    if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
-    const data = await tryCatch(res.value.json());
-    if (!data.ok) return err((data as any).error);
-    if (data.value && data.value.status_code) return err(new Error(data.value.status_message || 'TMDB Error'));
-    return data;
+    const normalizedId = Number(collectionId);
+    const cached = this.collectionCache.get(normalizedId);
+    if (cached) return ok(cached);
+
+    const existingRequest = this.collectionInFlight.get(normalizedId);
+    if (existingRequest) return existingRequest;
+
+    const request = (async (): Promise<Result<any>> => {
+      const apiKey = this.getApiKey();
+      if (!apiKey) return err(new Error('Missing API Key'));
+      const url = new URL(`${this.baseUrl}/collection/${normalizedId}?api_key=${apiKey}&language=fr-FR`);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000);
+      try {
+        const res = await tryCatch(fetch(url.toString(), { signal: controller.signal }));
+        if (!res.ok) return err((res as any).error);
+        if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
+        const data = await tryCatch(res.value.json());
+        if (!data.ok) return err((data as any).error);
+        if (data.value && data.value.status_code) return err(new Error(data.value.status_message || 'TMDB Error'));
+        if (data.value) this.collectionCache.set(normalizedId, data.value);
+        return data;
+      } finally {
+        clearTimeout(timeout);
+      }
+    })();
+
+    this.collectionInFlight.set(normalizedId, request);
+    try {
+      return await request;
+    } finally {
+      this.collectionInFlight.delete(normalizedId);
+    }
   }
 
-  private watchProvidersCache = new Map<string, { data: any; timestamp: number }>();
+  private watchProvidersCache = new BoundedCache<string, { data: any; timestamp: number }>(80);
   private episodeDetailsCache = new Map<string, { data: any; timestamp: number }>();
+
+  peekWatchProviders(id: number, type: 'tv' | 'movie' = 'tv'): any | null {
+    const cached = this.watchProvidersCache.get(`${type}:${Number(id)}`);
+    if (!cached || Date.now() - cached.timestamp >= 30 * 60 * 1000) return null;
+    return cached.data;
+  }
 
   async getWatchProviders(id: number, type: 'tv' | 'movie' = 'tv'): Promise<Result<any>> {
     const cacheKey = `${type}:${id}`;
