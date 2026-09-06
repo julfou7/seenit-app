@@ -385,8 +385,11 @@ Android autorisées du compte :
 
 Chaque média est évalué indépendamment : un média archivé/abandonné, sans date exploitable ou sans
 prochain épisode est ignoré sans interrompre la programmation des suivants. Aucun rappel n'est programmé
-pour l'élément inéligible. Les tests « Tester » des réglages valident l'autorisation et le rendu, pas
-l'arrivée future d'une donnée TMDB ou d'un webhook réel.
+pour l'élément inéligible. Les tests « Tester » des réglages réutilisent le même pipeline de rendu média
+que les vrais rappels (visuel, libellé avec emoji et action adaptée au type). Ils prennent en priorité le
+prochain événement réel éligible de la bibliothèque ; à défaut, un média actif du bon type sert seulement
+d'exemple de rendu. Ils valident l'autorisation et le rendu, pas l'arrivée future d'une donnée TMDB ou
+d'un webhook réel.
 
 ## 12. Réglages et maintenance utilisateur
 
