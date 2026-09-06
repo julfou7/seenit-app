@@ -17,12 +17,26 @@ function validateRevisionName(service, revision, label) {
   }
 }
 
+function deriveCandidateTag(service, candidateRevision) {
+  const prefix = `${service}-gh-`;
+  if (!candidateRevision.startsWith(prefix)) {
+    throw new Error(`Révision candidate hors convention ${prefix}*: ${candidateRevision}`);
+  }
+  const suffix = candidateRevision.slice(prefix.length);
+  const tag = `candidate-${suffix}`;
+  if (!/^[a-z][a-z0-9-]{0,62}$/.test(tag) || tag.endsWith('-')) {
+    throw new Error(`Tag candidat Cloud Run invalide: ${tag}`);
+  }
+  return tag;
+}
+
 function prepareCandidateService(source, { image, service, previousRevision, candidateRevision }) {
   if (!image || !/@sha256:[0-9a-f]{64}$/.test(image)) throw new Error(`Image immuable invalide: ${image || 'absente'}`);
   if (!/^[a-z][a-z0-9-]{0,48}$/.test(service)) throw new Error(`Nom de service Cloud Run invalide: ${service}`);
   validateRevisionName(service, previousRevision, 'Révision précédente');
   validateRevisionName(service, candidateRevision, 'Révision candidate');
   if (previousRevision === candidateRevision) throw new Error('La révision candidate doit être distincte de la révision servie.');
+  const candidateTag = deriveCandidateTag(service, candidateRevision);
 
   const newline = source.includes('\r\n') ? '\r\n' : '\n';
   let lines = source.replace(/\r\n/g, '\n').split('\n');
@@ -69,11 +83,22 @@ function prepareCandidateService(source, { image, service, previousRevision, can
   }
   if (!/percent:\s*100(?:\s|$)/.test(trafficText)) throw new Error('Le trafic exporté n’est pas explicitement fixé à 100 %.');
 
+  lines.splice(
+    trafficEnd,
+    0,
+    '  - percent: 0',
+    `    revisionName: ${candidateRevision}`,
+    `    tag: ${candidateTag}`
+  );
+
   const prepared = lines.join('\n');
   if (/run\.googleapis\.com\/(?:sources|base-images)/.test(prepared)) throw new Error('Une métadonnée source Cloud Run incompatible subsiste.');
   if (/runtimeClassName:\s*run\.googleapis\.com\/linux-base-image-update/.test(prepared)) throw new Error('Le runtimeClassName de mise à jour source subsiste.');
   if (!prepared.includes(`name: ${candidateRevision}`)) throw new Error('Le nom de révision candidate n’a pas été injecté.');
   if (!prepared.includes(image)) throw new Error('Le digest d’image candidate n’a pas été injecté.');
+  if (!prepared.includes(`revisionName: ${candidateRevision}`) || !prepared.includes(`tag: ${candidateTag}`)) {
+    throw new Error('La cible candidate à 0 % n’a pas été injectée dans le trafic Cloud Run.');
+  }
 
   return prepared.replace(/\n/g, newline);
 }
@@ -92,10 +117,10 @@ function main() {
     candidateRevision: args['candidate-revision']
   });
   fs.writeFileSync(args.output, prepared, 'utf8');
-  console.log(`[CloudRunCandidate] Service préparé: ${args['candidate-revision']} sur ${args.image}`);
+  console.log(`[CloudRunCandidate] Service préparé: ${args['candidate-revision']} sur ${args.image}, cible 0 %=${deriveCandidateTag(args.service, args['candidate-revision'])}`);
 }
 
-module.exports = { parseArgs, prepareCandidateService, validateRevisionName };
+module.exports = { deriveCandidateTag, parseArgs, prepareCandidateService, validateRevisionName };
 
 if (require.main === module) {
   try {
