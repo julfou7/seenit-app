@@ -10,6 +10,7 @@ on:
       - package-lock.json
       - project.toml
       - scripts/backend-runtime-impact.cjs
+      - scripts/prepare-cloud-run-candidate.cjs
       - .github/workflows/deploy-backend.yml
   workflow_dispatch:
 
@@ -217,21 +218,107 @@ jobs:
           echo "PREVIOUS_REVISION=$previous_revision" >> "$GITHUB_ENV"
           echo "Révision actuellement servie: $previous_revision"
 
-      - name: Deploy the candidate image without traffic
+      - name: Create the candidate revision from the exported service without shifting traffic
         id: deploy
         if: steps.impact.outputs.SHOULD_DEPLOY == 'true'
-        uses: google-github-actions/deploy-cloudrun@v3
-        with:
-          service: ${{ env.GCP_SERVICE }}
-          region: ${{ env.GCP_REGION }}
-          image: ${{ steps.image.outputs.uri }}
-          no_traffic: true
-          tag: candidate-${{ github.run_id }}
+        env:
+          CANDIDATE_IMAGE: ${{ steps.image.outputs.uri }}
+          CANDIDATE_TAG: candidate-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          candidate_revision="${GCP_SERVICE}-gh-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          exported_service="$(mktemp)"
+          candidate_service="$(mktemp)"
+          trap 'rm -f "$exported_service" "$candidate_service"' EXIT
+
+          # Le routage est rendu explicite avant l'export. Cette commande ne change pas
+          # le trafic effectif : PREVIOUS_REVISION est déjà la seule révision à 100 %.
+          gcloud run services update-traffic "$GCP_SERVICE" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
+            --to-revisions "$PREVIOUS_REVISION=100" \
+            --quiet
+
+          service_json="$(gcloud run services describe "$GCP_SERVICE" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
+            --format=json)"
+          if ! jq -e --arg previous "$PREVIOUS_REVISION" \
+            '[.status.traffic[]? | select((.percent // 0) > 0)] as $active | ($active | length == 1) and ($active[0].revisionName == $previous) and ($active[0].percent == 100)' \
+            <<<"$service_json" >/dev/null; then
+            echo "Le trafic n'est pas exclusivement fixé à $PREVIOUS_REVISION avant création de la candidate."
+            exit 1
+          fi
+
+          gcloud run services describe "$GCP_SERVICE" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
+            --format=export > "$exported_service"
+
+          node scripts/prepare-cloud-run-candidate.cjs \
+            --input "$exported_service" \
+            --output "$candidate_service" \
+            --image "$CANDIDATE_IMAGE" \
+            --service "$GCP_SERVICE" \
+            --previous-revision "$PREVIOUS_REVISION" \
+            --candidate-revision "$candidate_revision"
+
+          gcloud run services replace "$candidate_service" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
+            --dry-run \
+            --quiet >/dev/null
+
+          gcloud run services replace "$candidate_service" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
+            --quiet >/dev/null
+
+          service_json="$(gcloud run services describe "$GCP_SERVICE" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
+            --format=json)"
+          latest_created="$(jq -r '.status.latestCreatedRevisionName // empty' <<<"$service_json")"
+          latest_ready="$(jq -r '.status.latestReadyRevisionName // empty' <<<"$service_json")"
+          if [[ "$latest_created" != "$candidate_revision" || "$latest_ready" != "$candidate_revision" ]]; then
+            echo "La révision candidate n'est pas prête: expected=$candidate_revision created=${latest_created:-absent} ready=${latest_ready:-absent}."
+            exit 1
+          fi
+          if ! jq -e --arg previous "$PREVIOUS_REVISION" \
+            '[.status.traffic[]? | select((.percent // 0) > 0)] as $active | ($active | length == 1) and ($active[0].revisionName == $previous) and ($active[0].percent == 100)' \
+            <<<"$service_json" >/dev/null; then
+            echo "La création de la candidate a modifié le trafic avant smoke."
+            exit 1
+          fi
+
+          # Un tag fournit une URL directe vers la candidate. Cloud Run conserve les
+          # pourcentages existants lors d'une mise à jour de tags.
+          gcloud run services update-traffic "$GCP_SERVICE" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
+            --update-tags "$CANDIDATE_TAG=$candidate_revision" \
+            --quiet
+
+          service_json="$(gcloud run services describe "$GCP_SERVICE" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
+            --format=json)"
+          if ! jq -e --arg previous "$PREVIOUS_REVISION" --arg candidate "$candidate_revision" --arg tag "$CANDIDATE_TAG" \
+            '([.status.traffic[]? | select((.percent // 0) > 0)] as $active | ($active | length == 1) and ($active[0].revisionName == $previous) and ($active[0].percent == 100)) and any(.status.traffic[]?; .revisionName == $candidate and .tag == $tag)' \
+            <<<"$service_json" >/dev/null; then
+            echo "Le tag candidat n'a pas été créé sans modifier le trafic."
+            exit 1
+          fi
+
+          echo "revision=$candidate_revision" >> "$GITHUB_OUTPUT"
+          echo "tag=$CANDIDATE_TAG" >> "$GITHUB_OUTPUT"
+          echo "Candidate créée sans trafic: revision=$candidate_revision tag=$CANDIDATE_TAG"
 
       - name: Health-check candidate, promote, and verify production
         if: steps.impact.outputs.SHOULD_DEPLOY == 'true'
         env:
-          CANDIDATE_TAG: candidate-${{ github.run_id }}
+          CANDIDATE_TAG: ${{ steps.deploy.outputs.tag }}
+          CANDIDATE_REVISION: ${{ steps.deploy.outputs.revision }}
         run: |
           set -euo pipefail
 
@@ -282,16 +369,15 @@ jobs:
             return 1
           }
 
-          candidate_revision=''
+          candidate_revision="$CANDIDATE_REVISION"
           candidate_url=''
           for attempt in $(seq 1 12); do
             service_json="$(gcloud run services describe "$GCP_SERVICE" \
               --project "$GCP_PROJECT_ID" \
               --region "$GCP_REGION" \
               --format=json)"
-            candidate_revision="$(jq -r --arg tag "$CANDIDATE_TAG" '.status.traffic[]? | select(.tag == $tag) | .revisionName // empty' <<<"$service_json" | head -n 1)"
-            candidate_url="$(jq -r --arg tag "$CANDIDATE_TAG" '.status.traffic[]? | select(.tag == $tag) | .url // empty' <<<"$service_json" | head -n 1)"
-            if [[ -n "$candidate_revision" && -n "$candidate_url" ]]; then
+            candidate_url="$(jq -r --arg tag "$CANDIDATE_TAG" --arg revision "$candidate_revision" '.status.traffic[]? | select(.tag == $tag and .revisionName == $revision) | .url // empty' <<<"$service_json" | head -n 1)"
+            if [[ -n "$candidate_url" ]]; then
               break
             fi
             sleep 2
