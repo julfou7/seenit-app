@@ -17,13 +17,14 @@ export async function getTVDBFranchiseTimeline(
   _imdbId?: string | null,
   mediaType: 'tv' | 'movie' = 'tv'
 ): Promise<TVDBFranchiseItem[]> {
-  const url = new URL(resolveSeenItApiUrl('/api/media/tvdb/franchise'));
-  if (Number(tvdbId) > 0) url.searchParams.set('tvdbId', String(Number(tvdbId)));
-  if (mediaTitle?.trim()) url.searchParams.set('mediaTitle', mediaTitle.trim());
-  url.searchParams.set('mediaType', mediaType);
+  const params = new URLSearchParams();
+  if (Number(tvdbId) > 0) params.set('tvdbId', String(Number(tvdbId)));
+  if (mediaTitle?.trim()) params.set('mediaTitle', mediaTitle.trim());
+  params.set('mediaType', mediaType);
+  const url = `${resolveSeenItApiUrl('/api/media/tvdb/franchise')}?${params.toString()}`;
 
   try {
-    const response = await authenticatedFetch(url.toString());
+    const response = await authenticatedFetch(url);
     if (!response.ok) return [];
     const payload = await response.json();
     return Array.isArray(payload?.results)
