@@ -224,6 +224,27 @@ autrement.
 | REL-08 secrets et appels fournisseurs client | P1 sécurité | #12 | ouvert |
 | REL-09 Wikidata synchrone non fiable | P2 | #130 | ouvert |
 
+## Addendum du 6 septembre 2026 — couverture du manifeste
+
+### REL-10 — P1 — Le résolveur exact repose sur un catalogue statique incomplet
+
+Le correctif #165 a ajouté `tv:67178` et `movie:1439930` au groupe MCU pour relier The Punisher à
+One Last Kill. Il n'introduit aucun matching par titre et utilise correctement le résolveur générique
+par `mediaKey`. Il reste néanmoins une **correction locale de données** : toute œuvre absente de
+`MEDIA_RELATION_GROUPS` demeure inconnue, même si sa relation narrative est réelle. Le même symptôme
+peut donc concerner un nombre non borné de nouveaux films, séries et spin-off.
+
+La cause systémique est la maintenance manuelle du catalogue, pas le lookup runtime. La protection
+contre les faux positifs doit être conservée ; réintroduire recherche par titre, marque, popularité ou
+premier résultat serait une régression. La direction globale est un pipeline hors ligne qui agrège des
+sources/groupes explicitement approuvés, convertit leurs membres vers des identités TMDB typées et
+univoques, conserve une provenance vérifiable, rejette les ambiguïtés puis génère un snapshot versionné
+et revu pour la PWA et l'APK. Les nouvelles relations peuvent être proposées automatiquement, jamais
+acceptées sur une simple ressemblance.
+
+L'issue #130 est rouverte. #165 reste une donnée exacte utile, mais ne clôt ni REL-10 ni la couverture
+globale des univers.
+
 ## Décision
 
 La correction doit être menée comme un chantier de modèle de données et de contrat, pas comme une

@@ -48,6 +48,27 @@ entre code, SPEC et décision produit sort immédiatement de ce fast path.
 Ce chemin ne réduit aucun contrôle de sécurité, d'identité média/Plex, de données, d'APK, de signature,
 de test terrain ou de release. Il réduit uniquement la lecture et les validations redondantes.
 
+## 0.2 Culture obligatoire — cause racine avant correctif
+
+Pour tout bug, incident ou exemple utilisateur, l'agent distingue explicitement avant de coder :
+
+1. le **symptôme observé** et son exemple reproductible ;
+2. la **cause racine prouvée** ;
+3. la **classe complète affectée** au-delà de l'exemple ;
+4. le correctif global recherché et les risques résiduels.
+
+Le correctif attendu traite la cause pour toute la classe affectée. Le cas signalé devient un TNR,
+complété par au moins un invariant générique et, lorsque pertinent, un cas voisin ou négatif. Un ajout
+de ligne dans un manifeste, une exception de données ou un traitement nominatif est qualifié honnêtement
+de **correction locale** : il ne devient jamais une preuve de correction globale et ne ferme pas l'issue
+systémique qui l'a rendu nécessaire.
+
+Si aucun correctif global sûr n'est possible avec les sources ou l'autorité disponibles, l'agent ne le
+remplace pas par une heuristique fragile. Il documente la limite, conserve l'issue racine ouverte et
+propose une architecture ou un backlog borné. L'issue et la PR indiquent systématiquement « cause racine »,
+« portée globale ou locale » et « risque résiduel ». Une pure copie d'interface, documentation ou tâche
+sans anomalie peut indiquer « sans objet » afin de conserver le chemin light.
+
 ## 0. Avant toute analyse, proposition ou modification
 
 **Hors fast paths des sections 0.0 et 0.1 :**

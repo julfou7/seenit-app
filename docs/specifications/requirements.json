@@ -1287,6 +1287,30 @@
       ]
     },
     {
+      "id": "SEENIT-QUALITY-010",
+      "title": "Cause racine et portée globale avant toute correction",
+      "targets": [
+        "ci",
+        "pwa",
+        "apk",
+        "backend"
+      ],
+      "tests": [
+        {
+          "file": "tests/rootCauseGovernance.test.ts",
+          "contains": "SEENIT-QUALITY-010 impose la cause racine et la classe affectée avant le correctif"
+        },
+        {
+          "file": "tests/rootCauseGovernance.test.ts",
+          "contains": "SEENIT-QUALITY-010 ne laisse pas une correction locale clore une cause systémique"
+        },
+        {
+          "file": "tests/rootCauseGovernance.test.ts",
+          "contains": "SEENIT-QUALITY-010 exige une preuve générique sans alourdir les tâches sans anomalie"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-AUTH-001",
       "title": "Connexion Google Android native via Credential Manager sans changer le Firebase UID",
       "targets": [
