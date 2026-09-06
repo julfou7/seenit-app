@@ -30,6 +30,39 @@ function deriveCandidateTag(service, candidateRevision) {
   return tag;
 }
 
+function forceSingleContainerEnv(lines, imageIndex, name, value) {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const envIndex = lines.findLastIndex((line, index) => index < imageIndex && /^      - env:\s*$/.test(line));
+
+  if (envIndex >= 0) {
+    const nameIndexes = [];
+    for (let index = envIndex + 1; index < imageIndex; index += 1) {
+      if (new RegExp(`^        - name:\\s*['\"]?${escapedName}['\"]?\\s*$`).test(lines[index])) {
+        nameIndexes.push(index);
+      }
+    }
+    if (nameIndexes.length > 1) throw new Error(`Variable runtime ${name} dupliquée dans l'export Cloud Run.`);
+    if (nameIndexes.length === 1) {
+      const nameIndex = nameIndexes[0];
+      const valueIndex = nameIndex + 1;
+      if (!/^          value:\s*/.test(lines[valueIndex] || '')) {
+        throw new Error(`Valeur runtime ${name} introuvable dans l'export Cloud Run.`);
+      }
+      lines[valueIndex] = `          value: ${value}`;
+      return;
+    }
+
+    lines.splice(envIndex + 1, 0, `        - name: ${name}`, `          value: ${value}`);
+    return;
+  }
+
+  if (!/^      - image:\s*/.test(lines[imageIndex])) {
+    throw new Error(`Bloc env du conteneur introuvable pour forcer ${name}.`);
+  }
+  lines[imageIndex] = lines[imageIndex].replace(/^      - image:/, '        image:');
+  lines.splice(imageIndex, 0, '      - env:', `        - name: ${name}`, `          value: ${value}`);
+}
+
 function prepareCandidateService(source, { image, service, previousRevision, candidateRevision }) {
   if (!image || !/@sha256:[0-9a-f]{64}$/.test(image)) throw new Error(`Image immuable invalide: ${image || 'absente'}`);
   if (!/^[a-z][a-z0-9-]{0,48}$/.test(service)) throw new Error(`Nom de service Cloud Run invalide: ${service}`);
@@ -70,7 +103,11 @@ function prepareCandidateService(source, { image, service, previousRevision, can
   if (imageIndexes.length !== 1) {
     throw new Error(`Configuration Cloud Run inattendue: ${imageIndexes.length} ligne(s) image détectée(s), 1 attendue.`);
   }
-  lines[imageIndexes[0]] = lines[imageIndexes[0]].replace(/^(\s*(?:-\s*)?image:\s*)\S+\s*$/, `$1${image}`);
+
+  forceSingleContainerEnv(lines, imageIndexes[0], 'NODE_ENV', 'production');
+  const refreshedImageIndex = lines.findIndex(line => /^\s*(?:-\s*)?image:\s*\S+\s*$/.test(line));
+  if (refreshedImageIndex < 0) throw new Error('Ligne image perdue pendant la préparation du runtime.');
+  lines[refreshedImageIndex] = lines[refreshedImageIndex].replace(/^(\s*(?:-\s*)?image:\s*)\S+\s*$/, `$1${image}`);
 
   const trafficIndex = lines.findIndex(line => /^  traffic:\s*$/.test(line));
   if (trafficIndex < 0) throw new Error('Bloc spec.traffic introuvable: déploiement sans garantie de trafic refusé.');
@@ -96,6 +133,7 @@ function prepareCandidateService(source, { image, service, previousRevision, can
   if (/runtimeClassName:\s*run\.googleapis\.com\/linux-base-image-update/.test(prepared)) throw new Error('Le runtimeClassName de mise à jour source subsiste.');
   if (!prepared.includes(`name: ${candidateRevision}`)) throw new Error('Le nom de révision candidate n’a pas été injecté.');
   if (!prepared.includes(image)) throw new Error('Le digest d’image candidate n’a pas été injecté.');
+  if (!/name:\s*NODE_ENV\s*\n\s*value:\s*production/.test(prepared)) throw new Error('NODE_ENV=production n’a pas été forcé sur le runtime candidat.');
   if (!prepared.includes(`revisionName: ${candidateRevision}`) || !prepared.includes(`tag: ${candidateTag}`)) {
     throw new Error('La cible candidate à 0 % n’a pas été injectée dans le trafic Cloud Run.');
   }
@@ -117,10 +155,10 @@ function main() {
     candidateRevision: args['candidate-revision']
   });
   fs.writeFileSync(args.output, prepared, 'utf8');
-  console.log(`[CloudRunCandidate] Service préparé: ${args['candidate-revision']} sur ${args.image}, cible 0 %=${deriveCandidateTag(args.service, args['candidate-revision'])}`);
+  console.log(`[CloudRunCandidate] Service préparé: ${args['candidate-revision']} sur ${args.image}, NODE_ENV=production, cible 0 %=${deriveCandidateTag(args.service, args['candidate-revision'])}`);
 }
 
-module.exports = { deriveCandidateTag, parseArgs, prepareCandidateService, validateRevisionName };
+module.exports = { deriveCandidateTag, forceSingleContainerEnv, parseArgs, prepareCandidateService, validateRevisionName };
 
 if (require.main === module) {
   try {
