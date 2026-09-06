@@ -319,95 +319,93 @@ Une action répétée qui ne change pas l'état final est idempotente. Les mises
 Full et Delta peuvent collecter différemment mais n'ont pas deux sémantiques métier : avec les mêmes
 preuves complètes, ils doivent converger vers la même bibliothèque.
 
-### 5.6 Relations entre médias : saga, univers et similaires
+### 5.6 Relations entre médias : ordre de visionnage et franchise / univers
 
-- **SEENIT-RELATION-001** — SeenIt distingue trois relations qui n'ont ni la même source ni la
-  même promesse :
-  - **Ordre de visionnage / saga** : groupe explicite, potentiellement ordonné, fourni par une
-    collection TMDB ou une relation SeenIt validée ;
-  - **Même univers narratif** : continuité explicite pouvant réunir films, séries et spin-off ;
-  - **Similaires** : recommandations contextuelles TMDB, sans valeur de preuve d'appartenance à une
-    saga ou un univers et sans obligation de réciprocité.
+- **SEENIT-RELATION-001** — SeenIt limite volontairement les relations visibles sur une fiche aux
+  liens réellement utiles :
+  - **Film** : **Ordre de visionnage** depuis TMDB, puis **Franchise / univers** depuis TVDB ;
+  - **Série** : **Franchise / univers** depuis TVDB uniquement ;
+  - les sections **Films similaires** et **Séries similaires** sont supprimées des fiches. Les
+    recommandations contextuelles et la découverte restent dans **Explorer**.
 
-L'identité d'une œuvre est toujours le couple mediaType + tmdbId, sérialisé sous la forme
-movie:<tmdbId> ou tv:<tmdbId>. Les espaces d'identifiants Film et Série sont distincts : movie:42 et
-tv:42 ne sont jamais fusionnés, y compris dans la navigation, les badges, l'historique, les caches et
-la déduplication.
+L'identité d'une œuvre est toujours le couple `mediaType + tmdbId`, sérialisé sous la forme
+`movie:<tmdbId>` ou `tv:<tmdbId>`. Les espaces d'identifiants Film et Série sont distincts : `movie:42`
+et `tv:42` ne sont jamais fusionnés, y compris dans la navigation, les badges, les caches et la
+déduplication.
 
-Une saga ou un univers n'est accepté qu'avec une provenance explicite et reproductible : collection
-TMDB, manifeste SeenIt versionné de clés exactes, ou groupe TVDB épinglé/approuvé atteint depuis un
-identifiant externe exact. Chaque groupe porte groupId, relationKind, source, sourceGroupId, version,
-membres typés et ordre éventuel. Une liste dite officielle, son nom ou son score ne suffisent jamais.
-Tout identifiant IMDb, TVDB ou Plex est d'abord résolu vers un TMDB et son type exact.
+#### Ordre de visionnage des films — TMDB uniquement
 
-Le manifeste SeenIt est produit hors ligne à partir d'un **catalogue éditorial séparé du code**. Ce
-catalogue porte pour chaque groupe une provenance vérifiable, une date de revue et uniquement des
-identités `movie:<tmdbId>` / `tv:<tmdbId>`. Un générateur déterministe valide les schémas, l'unicité,
-les conflits de type/relation, la réciprocité implicite du groupe et l'intégrité des métadonnées, puis
-fabrique le snapshot embarqué commun à la PWA et à l'APK. Le snapshot généré n'est jamais modifié à la
-main et la CI refuse tout écart avec sa source.
+L'**Ordre de visionnage** provient exclusivement d'une **collection TMDB explicite** rattachée au
+film. TMDB est l'autorité normale et suffisante de cette section.
 
-La découverte globale de nouvelles relations est un traitement hors ligne distinct du runtime. Elle
-peut proposer des groupes Wikidata portant les propriétés explicites `narrative universe` ou
-`part of the series`, ainsi que des groupes fournisseurs préalablement approuvés, mais elle ne publie
-rien directement. Un candidat reste en
-`pending-review` tant qu'un humain n'a pas confirmé la continuité, la complétude, le type de relation
-et chaque identité TMDB. Les titres, labels et dates sont des métadonnées d'affichage et ne peuvent
-ni créer ni fusionner un candidat. Un fournisseur indisponible conserve le dernier snapshot validé.
+- L'ordre de la collection TMDB devient l'ordre de la saga affichée.
+- Aucune série n'est ajoutée dans cette section.
+- Aucun catalogue SeenIt, groupe TVDB, Wikidata ou rapprochement par titre ne complète une collection
+  TMDB absente ou incomplète.
+- Si TMDB ne fournit aucune collection exploitable, la section est masquée.
 
-Le titre, l'année, la popularité, les genres, les mots-clés, le casting, le studio, la marque ou le
-premier résultat d'une recherche ne prouvent **jamais** une relation. L'indisponibilité d'un
-fournisseur ne déclenche donc aucun fallback par titre. Wikidata peut uniquement enrichir hors ligne
-un manifeste à partir d'identifiants exacts et validés ; son endpoint public n'est pas une dépendance
-synchrone de la fiche.
+#### Franchise / univers — TVDB comme source normale
 
-Un cas nommé dans un signalement, tel que Punisher, Harry Potter ou House of Guinness, est un scénario
-de TNR et jamais une condition de production. Les branches, exceptions, regex et tables de correspondance
-fondées sur le titre ou une variante de nom sont interdites. La correction admissible porte soit sur le
-mécanisme commun, soit sur les `mediaKey` exactes d'un groupe versionné à provenance validée ; dans ce
-dernier cas, le même résolveur doit restituer le groupe complet depuis chacun de ses membres. Un résultat
-qui ne corrige que l'exemple sans renforcer cet invariant global est refusé.
+**TVDB devient la source normale des relations de franchise / univers pour les films comme pour les
+séries.** La résolution part toujours de l'identité SeenIt exacte et respecte le chemin suivant :
 
-#### Réciprocité, continuités et affichage
+1. obtenir depuis TMDB les identifiants externes exacts du média, en priorité le TVDB ID lorsqu'il
+   existe et l'IMDb ID comme pont technique si nécessaire ;
+2. rejoindre TVDB uniquement par cet identifiant externe exact : **aucune recherche du média par titre** ;
+3. examiner uniquement les listes déjà rattachées à cette œuvre TVDB : **aucune recherche globale de listes** ;
+4. retenir **au maximum une liste officielle** admissible représentant une franchise ou un univers ;
+   il n'y a **plus aucune fusion de plusieurs listes** pour élargir artificiellement un groupe ;
+5. si plusieurs listes officielles admissibles restent réellement ambiguës, ne rien afficher plutôt
+   que choisir arbitrairement ;
+6. résoudre chaque membre de la liste vers un `movie:<tmdbId>` ou `tv:<tmdbId>` exact avant affichage.
 
-- Une relation saga/univers est normalisée par groupId. Si A et B appartiennent au même groupe,
-  chaque point d'entrée retourne le même ensemble et le même ordre ; seul le média marqué « actuel »
-  change.
-- La fiche courante peut apparaître pour montrer sa position, mais toute section ne contenant qu'elle
-  est masquée.
-- Les continuités Marvel et DC sont séparées. MCU, Sony/Fox/X-Men, DCEU, DCU, Arrowverse, trilogie
-  Nolan et autres adaptations ne sont jamais regroupés sur la seule marque.
-- Reboot, remake, adaptation parallèle et œuvre homonyme ne sont pas « même univers » sans preuve
-  explicite ; ils peuvent rester de simples similaires.
-- Une panne de relation masque seulement la section concernée et ne bloque ni la fiche, ni ses autres
-  actions.
+Le **libellé d'une liste TVDB déjà atteinte depuis l'identité exacte** peut uniquement **qualifier sa
+nature** pour l'interface : une franchise s'affiche sous **« Dans la même franchise »**, un univers
+explicite sous **« Dans le même univers »**. Le nom de liste ne sert jamais à identifier une œuvre, à
+chercher une liste globale ou à rattacher un membre.
 
-#### Priorité, déduplication et navigation
+Titre, titre original, année, popularité, genres, mots-clés, casting, studio, marque et premier résultat
+d'une recherche ne prouvent jamais l'identité ou l'appartenance d'un membre. Une panne ou une ambiguïté
+TVDB masque seulement la section relationnelle ; elle ne déclenche aucun fallback par titre.
 
-L'ordre de priorité est : saga/ordre de visionnage, puis même univers, puis similaires. Un média
-n'apparaît que dans la première section qui le possède, selon sa clé mediaType + tmdbId. Les
-similaires excluent donc la fiche courante, sa saga et son univers. Leurs filtres restent identiques
-sur PWA et APK, mais leur classement peut évoluer côté TMDB et n'est pas soumis à la réciprocité.
+#### Priorité et déduplication
 
-Toute navigation entre cartes transmet mediaType et tmdbId. Une réponse asynchrone d'une ancienne
-fiche est annulée ou ignorée ; elle ne peut jamais remplacer l'état de la fiche courante, notamment
-lorsqu'un film et une série partagent le même ID numérique.
+Pour un film, la priorité est **Ordre de visionnage** puis **Franchise / univers**. La section TVDB est
+**dédupliquée** après la collection TMDB par `mediaType + tmdbId` : un média déjà présent dans la saga
+n'est pas répété dans la franchise. Pour une série, seule la section TVDB existe.
+
+La fiche courante peut apparaître comme repère dans un vrai groupe, mais toute section qui ne laisse
+aucun autre média affichable est masquée. Toute navigation transmet explicitement `mediaType` et
+`tmdbId`, et une réponse obsolète d'une fiche précédente ne peut pas remplacer la fiche courante.
+
+#### Sources retirées du chemin normal
+
+Wikidata, Kometa, MDBList, AniList/AniDB et tout pipeline multi-source destiné à construire une
+encyclopédie SeenIt des univers ne font plus partie de la stratégie normale des fiches. Le catalogue
+relationnel SeenIt existant est **legacy pendant la migration**. Un éventuel override futur ne peut
+être qu'une exception rare, versionnée, fondée sur des `mediaKey` exactes et tracée dans une issue ; il
+ne redevient jamais une stratégie d'enrichissement continu.
+
+Un cas nommé dans un signalement — House of the Dragon, Yellowstone, Breaking Bad, Harry Potter,
+Punisher ou MCU — sert uniquement de scénario de TNR. Aucune branche, regex, table par titre ou exception
+nominative n'est admise dans le résolveur de production.
 
 #### Performance et résilience
 
-- Cache normalisé par mediaKey et groupId, partagé entre les membres et réutilisable en
-  stale-if-error.
-- Concurrence distante bornée, timeout et annulation lors de la navigation ; aucun fan-out non borné.
-- Objectifs mesurés sur la logique de relation : cache chaud inférieur ou égal à 150 ms ; résolution
-  froide ciblée à 2,5 s ; timeout dur à 4 s.
-- Une relation incomplète ou incertaine est masquée plutôt que complétée par supposition.
+- Le résultat TVDB peut être mis en cache par identifiant de liste/groupe et réutilisé pour ses membres.
+- Les requêtes distantes restent bornées, annulables lors de la navigation et compatibles avec le cache
+  chaud de `SEENIT-PERF-001`.
+- Une relation absente, ambiguë ou indisponible est masquée plutôt que complétée par supposition.
 
-Les TNR minimales couvrent les parcours réciproques Yellowstone, Breaking Bad/Better Call Saul/El
-Camino, Wizarding World / Harry Potter films+série, Punisher/One Last Kill, la séparation des continuités
-Marvel et DC, House of Guinness sans section auto-référente, la collision movie:42/tv:42, la réciprocité
-générique de chaque groupe du manifeste, la génération déterministe, le rejet des candidats ambigus ou
-heuristiques et l'exclusion saga/univers des similaires. Le catalogue n'est pas une encyclopédie
-magiquement complète : la détection hors ligne réduit cet écart sans sacrifier la règle zéro faux positif.
+Les TNR de contrat couvrent au minimum : House of the Dragon / Game of Thrones, Breaking Bad,
+Yellowstone, Harry Potter avec ordre TMDB puis franchise TVDB sans doublons, MCU, un média indépendant
+sans section, la collision `movie:42` / `tv:42`, l'absence de recherche par titre, l'absence de fusion de
+plusieurs listes TVDB et la suppression des similaires des fiches.
+
+La décision produit complète et les décisions remplacées sont figées dans
+[`docs/decisions/media-relations-2026-09-06.md`](../decisions/media-relations-2026-09-06.md). La migration
+du runtime est suivie dans [#130](https://github.com/julfou7/seenit-app/issues/130) ; cette architecture
+n'est rouverte que par une nouvelle décision produit explicite.
 
 ### 5.7 Réouverture et cache chaud d'une fiche média
 

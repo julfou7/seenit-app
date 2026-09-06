@@ -18,6 +18,8 @@ import {
 } from './parentalRating';
 import { getParentalRatingOverride } from '../../store/parentalRatingStore';
 import { convergeTrackedMediaTitleFromTmdb } from './trackedMediaTitle';
+import { mediaKeyFrom } from './mediaRelations';
+import { getTVDBFranchiseTimeline } from '../../services/tvdb';
 
 export * from './tmdbClient';
 
@@ -33,14 +35,21 @@ export function isMovieAtCinema(media: any): boolean {
   return hasFrenchTheatricalCinemaEvidence(media);
 }
 
+const withoutDetailRecommendations = (details: any) => {
+  if (!details) return details;
+  const { similar: _similar, recommendations: _recommendations, ...rest } = details;
+  return rest;
+};
+
 const originalGetShowDetails = tmdbClient.getShowDetails.bind(tmdbClient);
 tmdbClient.getShowDetails = (async (id: number) => {
   const result = await originalGetShowDetails(id);
   if (!result.ok || !result.value) return result;
-  convergeTrackedMediaTitleFromTmdb('tv', Number(id), result.value);
+  const details = withoutDetailRecommendations(result.value);
+  convergeTrackedMediaTitleFromTmdb('tv', Number(id), details);
   const decorated = decorateParentalRatingDetails(
     'tv',
-    result.value,
+    details,
     getParentalRatingOverride('tv', Number(id)),
   );
   return ok(decorated);
@@ -50,14 +59,15 @@ const originalGetMovieDetails = tmdbClient.getMovieDetails.bind(tmdbClient);
 tmdbClient.getMovieDetails = (async (id: number) => {
   const result = await originalGetMovieDetails(id);
   if (result.ok && result.value) {
-    convergeTrackedMediaTitleFromTmdb('movie', Number(id), result.value);
+    const details = withoutDetailRecommendations(result.value);
+    convergeTrackedMediaTitleFromTmdb('movie', Number(id), details);
     const checkedAt = Date.now();
-    const isTheatrical = hasCurrentFrenchTheatricalRelease(result.value);
+    const isTheatrical = hasCurrentFrenchTheatricalRelease(details);
     if (isTheatrical) rememberFrenchTheatricalEvidence(Number(id), checkedAt);
     else clearFrenchTheatricalEvidence(Number(id));
 
     const withCinemaEvidence = {
-      ...result.value,
+      ...details,
       seenitFrenchTheatrical: isTheatrical,
       seenitFrenchTheatricalCheckedAt: checkedAt,
     };
@@ -69,6 +79,97 @@ tmdbClient.getMovieDetails = (async (id: number) => {
   }
   return result;
 }) as typeof tmdbClient.getMovieDetails;
+
+const mediaRelationRuntimeCache = new Map<string, { collection: any[]; universe: any[] }>();
+const MAX_MEDIA_RELATION_CACHE = 120;
+
+const cacheMediaRelations = (mediaKey: string, snapshot: { collection: any[]; universe: any[] }) => {
+  if (mediaRelationRuntimeCache.has(mediaKey)) mediaRelationRuntimeCache.delete(mediaKey);
+  mediaRelationRuntimeCache.set(mediaKey, snapshot);
+  while (mediaRelationRuntimeCache.size > MAX_MEDIA_RELATION_CACHE) {
+    const oldest = mediaRelationRuntimeCache.keys().next().value;
+    if (!oldest) break;
+    mediaRelationRuntimeCache.delete(oldest);
+  }
+};
+
+const resolveExactTmdbCollection = async (media: any, mediaType: 'tv' | 'movie'): Promise<any[]> => {
+  if (mediaType !== 'movie') return [];
+  const collectionId = Number(media?.belongs_to_collection?.id);
+  if (!Number.isInteger(collectionId) || collectionId <= 0) return [];
+
+  const result = await tmdbClient.getCollectionDetails(collectionId);
+  if (!result.ok || !Array.isArray(result.value?.parts)) return [];
+
+  const parts = result.value.parts
+    .filter((part: any) => Number.isInteger(Number(part?.id)) && Number(part.id) > 0 && !isAdultOrParodyMedia(part))
+    .map((part: any) => ({ ...part, id: Number(part.id), media_type: 'movie' as const }))
+    .sort((left: any, right: any) => {
+      const leftDate = String(left.release_date || '9999-12-31');
+      const rightDate = String(right.release_date || '9999-12-31');
+      return leftDate.localeCompare(rightDate);
+    });
+
+  return parts.length > 1
+    ? parts.map((part: any, index: number) => ({ ...part, sagaOrder: index + 1 }))
+    : [];
+};
+
+const hydrateExactTvdbItems = async (items: Array<{ id: number; media_type: 'tv' | 'movie' }>): Promise<any[]> => {
+  const hydrated: any[] = [];
+  const concurrency = 6;
+
+  for (let index = 0; index < items.length; index += concurrency) {
+    const batch = items.slice(index, index + concurrency);
+    const results = await Promise.all(batch.map(async item => {
+      const details = item.media_type === 'movie'
+        ? await tmdbClient.getMovieDetails(item.id)
+        : await tmdbClient.getShowDetails(item.id);
+      return details.ok && details.value
+        ? { ...details.value, id: item.id, media_type: item.media_type }
+        : null;
+    }));
+    for (const item of results) if (item) hydrated.push(item);
+  }
+
+  return hydrated;
+};
+
+tmdbClient.peekUniverseAndCollection = ((media: any) => {
+  const mediaKey = mediaKeyFrom(media);
+  return mediaKey ? mediaRelationRuntimeCache.get(mediaKey) || null : null;
+}) as typeof tmdbClient.peekUniverseAndCollection;
+
+tmdbClient.getUniverseAndCollection = (async (media: any) => {
+  const mediaKey = mediaKeyFrom(media);
+  if (!mediaKey) return { collection: [], universe: [] };
+
+  const cached = mediaRelationRuntimeCache.get(mediaKey);
+  if (cached) return cached;
+
+  const mediaType: 'tv' | 'movie' = mediaKey.startsWith('movie:') ? 'movie' : 'tv';
+  const collection = await resolveExactTmdbCollection(media, mediaType);
+  const collectionKeys = new Set(collection.map(item => mediaKeyFrom(item)).filter(Boolean));
+
+  const tvdbId = Number(media?.external_ids?.tvdb_id);
+  const tvdbItems = Number.isInteger(tvdbId) && tvdbId > 0
+    ? await getTVDBFranchiseTimeline(tvdbId, null, null, mediaType)
+    : [];
+  const hydratedTvdbItems = await hydrateExactTvdbItems(tvdbItems);
+
+  const universeSeen = new Set<string>();
+  let universe = hydratedTvdbItems.filter(item => {
+    const itemKey = mediaKeyFrom(item);
+    if (!itemKey || collectionKeys.has(itemKey) || universeSeen.has(itemKey)) return false;
+    universeSeen.add(itemKey);
+    return true;
+  });
+
+  if (universe.length === 1 && mediaKeyFrom(universe[0]) === mediaKey) universe = [];
+  const snapshot = { collection, universe };
+  cacheMediaRelations(mediaKey, snapshot);
+  return snapshot;
+}) as typeof tmdbClient.getUniverseAndCollection;
 
 const originalDiscoverWithFilters = tmdbClient.discoverWithFilters.bind(tmdbClient);
 tmdbClient.discoverWithFilters = (async (options) => {
@@ -160,7 +261,7 @@ const strictFrenchNowPlaying = async (page: number = 1) => {
 };
 
 // Façade stable : tous les consommateurs historiques gardent le même singleton,
-// seules les politiques « Au cinéma », « Âge conseillé » et le titre localisé sont durcies ici.
+// seules les politiques « Au cinéma », « Âge conseillé », titre localisé et relations exactes sont durcies ici.
 tmdbClient.getNowPlaying = strictFrenchNowPlaying as typeof tmdbClient.getNowPlaying;
 
 export const tmdb = tmdbClient;
