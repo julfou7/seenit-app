@@ -119,10 +119,9 @@ export function useShows() {
     if (!auth.currentUser) throw new Error("Not authenticated");
 
     const currentShow = useShowsStore.getState().shows.find(show => show.id === id);
-    const normalized = currentShow
-      ? normalizeTrackedMediaState({ ...currentShow, ...updates })
-      : null;
-    const normalizedUpdates: Partial<Show> = normalized && normalized.status !== updates.status
+    const mergedShow = currentShow ? { ...currentShow, ...updates } : null;
+    const normalized = mergedShow ? normalizeTrackedMediaState(mergedShow) : null;
+    const normalizedUpdates: Partial<Show> = normalized && mergedShow && normalized.status !== mergedShow.status
       ? { ...updates, status: normalized.status }
       : updates;
     
