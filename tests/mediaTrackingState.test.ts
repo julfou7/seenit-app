@@ -21,7 +21,7 @@ const base = {
   userRating: 8,
 };
 
-test('SEENIT-LIBRARY-001 normalise tout suivi sans progression vers plan_to_watch', () => {
+test('#93 normalise tout suivi sans progression vers plan_to_watch', () => {
   assert.equal(shouldNormalizeInitialTrackingState(base), true);
   assert.equal(normalizeTrackedMediaState(base).status, 'plan_to_watch');
 
@@ -29,7 +29,7 @@ test('SEENIT-LIBRARY-001 normalise tout suivi sans progression vers plan_to_watc
   assert.equal(movie.status, 'plan_to_watch');
 });
 
-test('SEENIT-LIBRARY-001 conserve watching dès qu’une progression existe', () => {
+test('#93 conserve watching dès qu’une progression existe', () => {
   const withSeenEpisode = { ...base, seenEpisodes: ['S01E01'] };
   assert.equal(hasRecordedMediaProgress(withSeenEpisode), true);
   assert.equal(normalizeTrackedMediaState(withSeenEpisode).status, 'watching');
@@ -39,7 +39,7 @@ test('SEENIT-LIBRARY-001 conserve watching dès qu’une progression existe', ()
   assert.equal(normalizeTrackedMediaState(withRecord).status, 'watching');
 });
 
-test('SEENIT-LIBRARY-001 conserve le Revoir explicite avant S1E1', () => {
+test('#93 conserve le Revoir explicite avant S1E1', () => {
   const rewatch = {
     ...base,
     lastWatchedAt: 123,
@@ -49,7 +49,7 @@ test('SEENIT-LIBRARY-001 conserve le Revoir explicite avant S1E1', () => {
   assert.equal(normalizeTrackedMediaState(rewatch).status, 'watching');
 });
 
-test('SEENIT-LIBRARY-001 préserve les intentions orthogonales et reste idempotent', () => {
+test('#93 préserve les intentions orthogonales et reste idempotent', () => {
   const once = normalizeTrackedMediaState(base);
   const twice = normalizeTrackedMediaState(once);
 
@@ -61,7 +61,7 @@ test('SEENIT-LIBRARY-001 préserve les intentions orthogonales et reste idempote
   assert.deepEqual(twice, once);
 });
 
-test('SEENIT-LIBRARY-001 applique la même normalisation partagée aux créations, mises à jour et legacy', () => {
+test('#93 applique la même normalisation partagée aux créations, mises à jour et legacy', () => {
   const normalizerUses = useShowsSource.match(/normalizeTrackedMediaState/g) || [];
   assert.ok(normalizerUses.length >= 2, 'addShow et updateShow doivent partager le normaliseur');
   assert.match(useShowsSource, /shouldNormalizeInitialTrackingState/);
