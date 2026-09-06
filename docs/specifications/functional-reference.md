@@ -120,6 +120,10 @@ ces boutons sont des actions de récupération explicites.
 
 ## 4. Navigation globale
 
+Les gestes et leur portée exacte sont inventoriés dans la [référence UX](./ux-reference.md).
+Le reset de navigation actuel présente des écarts (#178) : reconnaissance après changement d'onglet
+et remontée globale des conteneurs, y compris cachés. Ne pas les prendre comme conventions à reproduire.
+
 La barre basse possède quatre destinations stables, dans cet ordre :
 
 1. **À Voir** : accueil opérationnel ;
@@ -240,6 +244,11 @@ progression. Une note/favorite/archive est une intention distincte du statut de 
 - Le téléchargement rapide privilégie Radarr ; C411/magnet sert de parcours manuel de repli.
 
 ### 8.3 Séries et épisodes
+
+Dans le détail d'épisode, le swipe gauche consulte le suivant et le swipe droit le précédent, avec
+passage de saison lorsque disponible ; ce geste ne marque jamais vu. Les alternatives précédent/suivant
+au bouton et au clavier restent à ajouter dans #179. La référence UX distingue cette consultation des
+swipes de suppression/abandon sur les cartes.
 
 - Suivre sans visionner crée « À voir ».
 - Marquer un épisode vu/non vu met à jour `seenEpisodes`, `episodeRecords`, `lastWatchedAt` et le
@@ -426,6 +435,10 @@ modifiable ; il n'est pas inventé. Les actions de maintenance ne changent jamai
 le databaseId ou la signature APK.
 
 ## 13. Résilience, UX et limites assumées
+
+Le cadrage transversal [UX](./ux-reference.md) couvre les boutons, cartes, en-têtes, superpositions et
+gestes spécifiques. Les constats du code sont suivis dans [l'audit UX](../audits/audit-ux-2026-09-06.md)
+et #178 à #181 ; la preuve visuelle/tactile PWA/APK reste à produire avec #15.
 
 - Le rendu mobile respecte les safe areas ; la barre basse ne masque ni contenu ni toast.
 - Les écrans lourds sont lazy-loadés et préchargés après connexion ; l'écran courant reste visible

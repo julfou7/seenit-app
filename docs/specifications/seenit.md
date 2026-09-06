@@ -631,6 +631,10 @@ pour le cache des sagas et univers.
 
 ## 9. UX, accessibilité et cohérence visuelle
 
+La [référence UX](./ux-reference.md) complète cette section : cartes des gestes réellement présents,
+rôles de boutons/cartes/en-têtes et propositions de normalisation. Les écarts et les cibles non encore
+implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas validation visuelle terrain.
+
 - L'or `#E5A93D` représente l'action principale SeenIt. Les couleurs Plex/Sonarr/Radarr/
   qBittorrent et les badges Film/Série restent des accents secondaires cohérents.
 - Les actions essentielles ont une cible tactile d'environ 44 × 44 px, un libellé accessible et
