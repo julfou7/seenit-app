@@ -832,6 +832,14 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   notamment un churn massif du catalogue sans changement sémantique proportionné, est bloquée. Après dix
   minutes sans artefact concret, l'agent publie un blocage précis au lieu d'enchaîner une nouvelle passe
   silencieuse. Ce fast path ne réduit aucune preuve sensible, validation terrain ou protection de release.
+- **SEENIT-QUALITY-010** — Pour tout bug ou incident, un exemple reproductible reste un symptôme et
+  ne prouve jamais une correction globale. Avant le code, l'agent identifie la cause racine, la classe
+  complète affectée, la portée globale ou locale du changement et le risque résiduel. Le cas signalé
+  devient un TNR complété par un invariant générique et, lorsque pertinent, un voisin ou contre-exemple.
+  Une modification limitée à une entrée de données ou de manifeste est explicitement qualifiée de
+  correction locale : elle ne ferme pas l'issue systémique. Quand une généralisation sûre est impossible,
+  l'agent documente la limite des sources, garde l'issue racine ouverte et propose une suite bornée sans
+  introduire d'heuristique fragile. Les tâches sans anomalie peuvent déclarer cette analyse sans objet.
 
 Une modification est terminée lorsque les validations applicables à sa classe sont vertes, son test
 ciblé existe si le comportement change, toute règle durable/zone sensible est reflétée dans la SPEC et

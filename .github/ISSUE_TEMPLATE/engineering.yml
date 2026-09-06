@@ -18,6 +18,28 @@ body:
     validations:
       required: true
   - type: textarea
+    id: root_cause
+    attributes:
+      label: Symptôme, cause racine et classe affectée
+      description: Distinguer l'exemple observé de la cause prouvée et préciser tous les cas susceptibles d'être concernés. Pour une évolution sans anomalie, indiquer « sans objet ».
+      placeholder: |
+        Symptôme :
+        Cause racine :
+        Classe affectée :
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Portée du correctif et risque résiduel
+      description: Dire si le changement traite globalement la cause ou constitue une correction locale. Une correction locale ne ferme pas une issue systémique.
+      placeholder: |
+        Portée : globale / locale / sans objet
+        Invariant générique et contre-exemple :
+        Risque résiduel ou suite nécessaire :
+    validations:
+      required: true
+  - type: textarea
     id: risk
     attributes:
       label: Risque utilisateur

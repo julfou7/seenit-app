@@ -139,6 +139,22 @@ administratifs. Le test ciblé et l'issue éventuelle suffisent.
 Les décisions de processus sont tracées ici, dans les audits et les issues d'architecture plutôt que
 d'être dupliquées dans chaque fiche produit.
 
+## Cause racine et portée d'un correctif
+
+Un exemple reproductible prouve un symptôme, pas la portée du correctif. Avant toute implémentation,
+l'issue ou la PR sépare le symptôme, la cause racine prouvée, la classe complète affectée et le risque
+résiduel. Le cas utilisateur devient un TNR ; au moins un invariant générique et, lorsque pertinent, un
+cas voisin ou négatif prouvent que le changement dépasse cet exemple.
+
+Une correction de donnée, de manifeste ou de configuration limitée à une entrée est annoncée comme
+**locale**. Elle peut être livrée si elle est exacte et sûre, mais elle ne ferme jamais à elle seule une
+issue systémique. Si aucune généralisation fiable n'est possible, l'issue racine reste ouverte avec la
+limite des sources et la prochaine étape architecturale. Une heuristique incertaine n'est pas une solution
+globale acceptable.
+
+Les modèles GitHub demandent ces informations pour les changements comportementaux. Documentation,
+copie d'interface et maintenance sans anomalie peuvent répondre « sans objet » et garder le chemin light.
+
 ## Fast path de correctif ciblé
 
 Ce chemin s'applique à une issue existante dont la cause racine est confirmée et le périmètre borné.
