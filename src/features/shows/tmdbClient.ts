@@ -47,15 +47,19 @@ export interface SearchResponse {
 export function isMovieAtCinema(media: any): boolean {
   if (!media) return false;
   const isTv = media.media_type === 'tv' || media.first_air_date !== undefined;
-  if (isTv || isAdultOrParodyMedia(media)) return false;
+  if (isTv) return false;
+  if (isAdultOrParodyMedia(media)) return false;
+
   const dateStr = media.release_date || media.releaseDate || media.firstAirDate || media.first_air_date;
   if (!dateStr) return false;
+
   const releaseDate = new Date(dateStr);
-  if (Number.isNaN(releaseDate.getTime())) return false;
+  if (isNaN(releaseDate.getTime())) return false;
+
   const now = new Date();
-  const pastCutoff = new Date(now);
+  const pastCutoff = new Date();
   pastCutoff.setDate(now.getDate() - 75);
-  const futureCutoff = new Date(now);
+  const futureCutoff = new Date();
   futureCutoff.setDate(now.getDate() + 10);
   return releaseDate >= pastCutoff && releaseDate <= futureCutoff;
 }
@@ -63,19 +67,24 @@ export function isMovieAtCinema(media: any): boolean {
 export function isMovieUpcoming(media: any): boolean {
   if (!media) return false;
   const isTv = media.media_type === 'tv' || media.first_air_date !== undefined;
-  if (isTv || isAdultOrParodyMedia(media)) return false;
+  if (isTv) return false;
+  if (isAdultOrParodyMedia(media)) return false;
+
   const dateStr = media.release_date || media.releaseDate || media.firstAirDate || media.first_air_date;
   if (!dateStr) return false;
+
   const releaseDate = new Date(dateStr);
-  if (Number.isNaN(releaseDate.getTime())) return false;
+  if (isNaN(releaseDate.getTime())) return false;
+
   const futureCutoff = new Date();
-  futureCutoff.setDate(futureCutoff.getDate() + 10);
+  futureCutoff.setDate(new Date().getDate() + 10);
   return releaseDate > futureCutoff;
 }
 
 export function isAdultOrParodyMedia(item: any): boolean {
   if (!item) return false;
   if (item.adult === true) return true;
+
   const title = (item.title || item.name || item.original_title || item.original_name || '').toLowerCase();
   const adultTerms = [
     'porn', 'porno', 'xxx', 'hentai', 'erotic', 'erotique', 'érotique',
@@ -83,11 +92,12 @@ export function isAdultOrParodyMedia(item: any): boolean {
     'jedi hunter', 'cum join', 'sex parody', 'porno parody', 'adults only'
   ];
   if (adultTerms.some(term => title.includes(term))) return true;
+
   if (Array.isArray(item.genres)) {
-    return item.genres.some((genre: any) => {
-      const name = String(genre?.name || '').toLowerCase();
-      return name.includes('erotic') || name.includes('érotique') || name.includes('adult') || name.includes('porno');
-    });
+    if (item.genres.some((g: any) => {
+      const gName = (g.name || '').toLowerCase();
+      return gName.includes('erotic') || gName.includes('érotique') || gName.includes('adult') || gName.includes('porno');
+    })) return true;
   }
   return false;
 }
@@ -95,9 +105,11 @@ export function isAdultOrParodyMedia(item: any): boolean {
 const filterCredibleMedia = (results: TMDBMedia[], minVoteCount: number = 50): TMDBMedia[] => {
   if (!Array.isArray(results)) return [];
   return results.filter((item: any) => {
-    if (!item || isAdultOrParodyMedia(item)) return false;
+    if (!item) return false;
+    if (isAdultOrParodyMedia(item)) return false;
     if (item.media_type === 'person' || item.known_for_department) return true;
-    return (typeof item.vote_count === 'number' ? item.vote_count : 0) >= minVoteCount;
+    const count = typeof item.vote_count === 'number' ? item.vote_count : 0;
+    return count >= minVoteCount;
   });
 };
 
@@ -136,8 +148,9 @@ function addWatchProviders(params: URLSearchParams, providers?: string[]): boole
 
 /**
  * Client TMDB SeenIt. Les secrets fournisseurs ne sont jamais présents dans ce module :
- * tous les appels passent par la façade authentifiée `/api/media/tmdb/*`, qui injecte
- * la clé TMDB exclusivement côté backend.
+ * tous les appels TMDB passent par la façade authentifiée `/api/media/tmdb/*`, qui injecte
+ * la clé fournisseur exclusivement côté backend. Les fallbacks Wikipedia/Wikidata restent
+ * des sources publiques sans secret et conservent le comportement historique de recherche.
  */
 export class TMDBClient {
   private readonly baseUrl = resolveSeenItApiUrl('/api/media/tmdb');
@@ -183,55 +196,114 @@ export class TMDBClient {
 
   async searchMedia(query: string, year?: string, type?: 'movie' | 'tv', page: number = 1): Promise<Result<TMDBMedia>> {
     await this.throttle();
-    const endpoint = type === 'movie' ? '/search/movie' : type === 'tv' ? '/search/tv' : '/search/multi';
+    const endpoint = type === 'movie' ? '/search/movie' : (type === 'tv' ? '/search/tv' : '/search/multi');
+
     const fetchResultsForYear = async (searchYear?: string): Promise<TMDBMedia[]> => {
       const params: Record<string, string | number | undefined> = {
         query,
         language: 'fr-FR',
         page,
       };
-      if (searchYear) {
-        if (type === 'movie') params.year = searchYear;
-        else if (type === 'tv') params.first_air_date_year = searchYear;
-      }
+      // Conserver le comportement historique : ne jamais imposer first_air_date_year aux séries.
+      if (searchYear && type === 'movie') params.primary_release_year = searchYear;
       const result = await this.fetchJson<SearchResponse>(this.buildUrl(endpoint, params));
       return result.ok ? result.value.results || [] : [];
     };
 
     let rawResults = await fetchResultsForYear(year);
-    if (!rawResults.length && year) rawResults = await fetchResultsForYear();
-    rawResults = rawResults.filter(item => !isAdultOrParodyMedia(item));
-    if (!rawResults.length) return err(new Error('Media not found'));
+    if (rawResults.length === 0 && year) rawResults = await fetchResultsForYear(undefined);
+    if (rawResults.length === 0) return err(new Error('Media not found'));
 
-    const normalize = (value?: string) => (value || '')
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    const removeArticles = (value: string) => value.replace(/^(le|la|les|l|un|une|des|the|a|an)\s+/i, '').trim();
-    const target = normalize(query);
-    const targetNoArticle = removeArticles(target);
-    const targetYear = year ? Number(year) : undefined;
+    const normalize = (t?: string) =>
+      (t || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const removeArticles = (t: string) => t.replace(/^(le|la|les|l|un|une|des|the|a|an)\s+/i, '').trim();
 
-    let best = rawResults[0];
-    let bestScore = Number.NEGATIVE_INFINITY;
+    const targetNorm = normalize(query);
+    const targetNoArticle = removeArticles(targetNorm);
+    const targetYearNum = year ? parseInt(year, 10) : undefined;
+    const targetTokens = targetNorm.split(' ').filter(w => w.length >= 2);
+
+    let bestCandidate: TMDBMedia = rawResults[0];
+    let bestScore = -99999;
+
     for (const candidate of rawResults) {
-      const title = normalize(candidate.title || candidate.name);
-      const original = normalize(candidate.original_title || candidate.original_name);
-      const titleNoArticle = removeArticles(title);
-      const originalNoArticle = removeArticles(original);
+      if (isAdultOrParodyMedia(candidate)) continue;
+
       let score = 0;
-      if ([title, original, titleNoArticle, originalNoArticle].includes(target) || [titleNoArticle, originalNoArticle].includes(targetNoArticle)) score += 150;
-      else if (title.includes(target) || original.includes(target) || target.includes(title) || target.includes(original)) score += 60;
-      const candidateYear = Number((candidate.release_date || candidate.first_air_date || '').slice(0, 4));
-      if (targetYear && candidateYear) score += type === 'tv' && candidateYear <= targetYear ? Math.max(0, 100 - (targetYear - candidateYear) * 6) : Math.max(0, 100 - Math.abs(targetYear - candidateYear) * 30);
-      score += Math.min(50, Math.log10((candidate.popularity || 0) + 1) * 10);
-      score += Math.min(30, Math.log10((candidate.vote_count || 0) + 1) * 6);
-      if (score > bestScore) { best = candidate; bestScore = score; }
+      const candTitle = normalize(candidate.title || candidate.name);
+      const candOriginal = normalize(candidate.original_title || candidate.original_name);
+      const candTitleNoArticle = removeArticles(candTitle);
+      const candOriginalNoArticle = removeArticles(candOriginal);
+      const candDate = candidate.release_date || candidate.first_air_date || '';
+      const candYear = candDate ? parseInt(candDate.slice(0, 4), 10) : undefined;
+      const pop = candidate.popularity || 0;
+      const votes = candidate.vote_count || 0;
+
+      if (
+        candTitle === targetNorm ||
+        candOriginal === targetNorm ||
+        candTitleNoArticle === targetNoArticle ||
+        candOriginalNoArticle === targetNoArticle
+      ) {
+        score += 150;
+      } else if (
+        candTitle.startsWith(targetNorm) ||
+        candOriginal.startsWith(targetNorm) ||
+        targetNorm.startsWith(candTitle) ||
+        targetNorm.startsWith(candOriginal) ||
+        candTitleNoArticle.startsWith(targetNoArticle) ||
+        candOriginalNoArticle.startsWith(targetNoArticle)
+      ) {
+        score += 90;
+      } else if (
+        candTitle.includes(targetNorm) ||
+        candOriginal.includes(targetNorm) ||
+        targetNorm.includes(candTitle) ||
+        targetNorm.includes(candOriginal)
+      ) {
+        score += 60;
+      } else if (targetTokens.length > 0) {
+        const candTokens = `${candTitle} ${candOriginal}`.split(' ');
+        const matchedTokens = targetTokens.filter(t => candTokens.includes(t));
+        const tokenRatio = matchedTokens.length / targetTokens.length;
+        if (tokenRatio >= 0.5) score += Math.round(tokenRatio * 50);
+      }
+
+      if (targetYearNum && candYear && !isNaN(targetYearNum) && !isNaN(candYear)) {
+        if (type === 'tv') {
+          if (candYear <= targetYearNum) {
+            const diff = targetYearNum - candYear;
+            if (diff === 0) score += 100;
+            else if (diff <= 10) score += 40;
+          } else {
+            const diff = candYear - targetYearNum;
+            if (diff <= 1) score += 20;
+            else score -= 30;
+          }
+        } else {
+          const diff = Math.abs(candYear - targetYearNum);
+          if (diff === 0) score += 120;
+          else if (diff === 1) score += 70;
+          else if (diff <= 3) score += 30;
+          else score -= 30;
+        }
+      }
+
+      score += Math.min(Math.log10(votes + 1) * 10, 40);
+      score += Math.min(pop * 0.3, 15);
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestCandidate = candidate;
+      }
     }
-    return ok(best);
+    return ok(bestCandidate);
   }
 
   async findByExternalId(
@@ -288,7 +360,11 @@ export class TMDBClient {
     })();
 
     this.detailsInFlight.set(cacheKey, request);
-    try { return await request; } finally { this.detailsInFlight.delete(cacheKey); }
+    try {
+      return await request;
+    } finally {
+      this.detailsInFlight.delete(cacheKey);
+    }
   }
 
   async getShowDetails(id: number): Promise<Result<any>> { return this.getCachedMediaDetails(id, 'tv'); }
@@ -308,10 +384,12 @@ export class TMDBClient {
     if (!mediaKey) return { collection: [], universe: [] };
     const cached = this.relationCache.get(mediaKey);
     if (cached) return cached;
+
     const manifest = getManifestRelationSnapshot(mediaKey);
     let collection = manifest?.collection || [];
     let universe = manifest?.universe || [];
     const mediaType = mediaKey.split(':')[0] as RelationMediaType;
+
     if (!collection.length && mediaType === 'movie' && media.belongs_to_collection?.id) {
       const collectionResult = await this.getCollectionDetails(Number(media.belongs_to_collection.id));
       if (collectionResult.ok && Array.isArray(collectionResult.value?.parts)) {
@@ -322,6 +400,7 @@ export class TMDBClient {
         if (parts.length > 1) collection = parts.map((part: any, index: number) => ({ ...part, sagaOrder: index + 1 }));
       }
     }
+
     const collectionKeys = relationMediaKeys(collection, 'movie');
     universe = universe.filter(item => {
       const key = mediaKeyFrom(item);
@@ -329,6 +408,7 @@ export class TMDBClient {
     });
     if (collection.length === 1 && mediaKeyFrom(collection[0]) === mediaKey) collection = [];
     if (universe.length === 1 && mediaKeyFrom(universe[0]) === mediaKey) universe = [];
+
     const snapshot = { collection, universe };
     this.relationCache.set(mediaKey, snapshot);
     return snapshot;
@@ -340,15 +420,27 @@ export class TMDBClient {
     if (cached) return ok(cached);
     const inFlight = this.collectionInFlight.get(normalizedId);
     if (inFlight) return inFlight;
-    const request = (async () => {
-      const result = await this.fetchJson<any>(this.buildUrl(`/collection/${normalizedId}`, { language: 'fr-FR' }), {
-        signal: AbortSignal.timeout(4000),
-      });
-      if (result.ok && result.value) this.collectionCache.set(normalizedId, result.value);
-      return result;
+
+    const request = (async (): Promise<Result<any>> => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000);
+      try {
+        const result = await this.fetchJson<any>(this.buildUrl(`/collection/${normalizedId}`, { language: 'fr-FR' }), {
+          signal: controller.signal,
+        });
+        if (result.ok && result.value) this.collectionCache.set(normalizedId, result.value);
+        return result;
+      } finally {
+        clearTimeout(timeout);
+      }
     })();
+
     this.collectionInFlight.set(normalizedId, request);
-    try { return await request; } finally { this.collectionInFlight.delete(normalizedId); }
+    try {
+      return await request;
+    } finally {
+      this.collectionInFlight.delete(normalizedId);
+    }
   }
 
   peekWatchProviders(id: number, type: 'tv' | 'movie' = 'tv'): any | null {
@@ -390,6 +482,7 @@ export class TMDBClient {
     const cacheKey = `${id}:${seasonNumber}:${episodeNumber}`;
     const cached = this.episodeDetailsCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < 30 * 60 * 1000) return ok(cached.data);
+
     const result = await this.fetchJson<any>(this.buildUrl(`/tv/${id}/season/${seasonNumber}/episode/${episodeNumber}`, {
       language: 'fr-FR',
       append_to_response: 'videos',
@@ -429,43 +522,166 @@ export class TMDBClient {
   async searchCharacterFallback(query: string, cleaned: string): Promise<{ extraMedia: TMDBMedia[]; extraPersons: TMDBMedia[] }> {
     const extraMedia: TMDBMedia[] = [];
     const extraPersons: TMDBMedia[] = [];
-    const base = await this.searchMulti(query, 1);
-    if (!base.ok) return { extraMedia, extraPersons };
-    const words = cleaned.split(' ').filter(word => word.length >= 3);
-    const candidates = (base.value.results || []).filter(item => item.media_type === 'tv' || item.media_type === 'movie').slice(0, 5);
-    const details = await Promise.all(candidates.map(item => item.media_type === 'movie'
-      ? this.getMovieDetails(item.id)
-      : this.getShowDetails(item.id)));
-    const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    for (const detail of details) {
-      if (!detail.ok || !detail.value) continue;
-      const mediaDetails = detail.value;
-      extraMedia.push(mediaDetails);
-      const cast = mediaDetails.aggregate_credits?.cast || mediaDetails.credits?.cast || [];
-      for (const member of cast) {
-        const character = String(member.character || member.roles?.[0]?.character || '');
-        const normalizedCharacter = normalize(character);
-        if (character && (normalizedCharacter.includes(cleaned) || words.some(word => normalizedCharacter.includes(word)))) {
-          extraPersons.push({
-            id: member.id,
-            media_type: 'person',
-            name: member.name,
-            profile_path: member.profile_path,
-            poster_path: null,
-            known_for_department: 'Acting',
-            character,
-            characterShow: mediaDetails.name || mediaDetails.title || '',
-            popularity: (member.popularity || 10) + 150,
-            known_for: [mediaDetails],
-          });
+
+    const cleanStr = (str: string) =>
+      str.normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/['’\-_]/g, ' ')
+        .toLowerCase()
+        .trim();
+
+    const foundTvIds = new Set<number>();
+    const foundMovieIds = new Set<number>();
+    const foundPersonIds = new Set<number>();
+    const showNamesToQuery = new Set<string>();
+
+    // Les recherches Wikipedia/Wikidata sont des fallbacks publics sans secret fournisseur.
+    try {
+      const wikiUrls = [
+        `https://fr.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*`,
+        `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*`,
+        `https://fr.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query + ' série film')}&format=json&origin=*`,
+        `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query + ' TV series movie')}&format=json&origin=*`
+      ];
+      const wikiResponses = await Promise.all(wikiUrls.map(u => fetch(u).then(r => r.ok ? r.json() : null).catch(() => null)));
+
+      for (const data of wikiResponses) {
+        if (!data?.query?.search) continue;
+        for (const item of data.query.search) {
+          const title = item.title || '';
+          const snippet = item.snippet || '';
+          const titleShowMatch = title.match(/\(([^)]+)\)/);
+          if (titleShowMatch) {
+            const insideParens = titleShowMatch[1].replace(/série télévisée|film|TV series|character|personnage/gi, '').trim();
+            if (insideParens.length >= 2) showNamesToQuery.add(insideParens);
+          }
+
+          const cleanTitle = title.replace(/\([^)]+\)/g, '').trim();
+          if (cleanTitle.length >= 3 && cleanStr(cleanTitle) !== cleaned) showNamesToQuery.add(cleanTitle);
+
+          const snippetText = snippet.replace(/<[^>]+>/g, '');
+          const showMatches = snippetText.match(/(?:série|film|series|movie|show|drama)\s+(?:télévisée\s+)?(?:intitulée\s+|nommée\s+|de\s+|in\s+)?([A-ZÉÈÀÙA-Za-z0-9\s'’-]{2,30})/gi);
+          if (showMatches) {
+            showMatches.forEach((match: string) => {
+              const cleanedName = match.replace(/série|film|series|movie|show|drama|télévisée|intitulée|nommée|de|in/gi, '').trim();
+              if (cleanedName.length >= 3) showNamesToQuery.add(cleanedName);
+            });
+          }
         }
       }
+    } catch (error) {
+      console.error('Wikipedia fallback error:', error);
     }
+
+    try {
+      const sparqlQuery = `
+        SELECT DISTINCT ?work ?tmdbTv ?tmdbMovie ?actor ?tmdbPerson ?workLabel WHERE {
+          SERVICE wikibase:mwapi {
+            bd:serviceParam wikibase:endpoint "www.wikidata.org";
+                            wikibase:api "EntitySearch";
+                            mwapi:search "${query.replace(/"/g, '')}";
+                            mwapi:language "en".
+            ?item wikibase:apiOutputItem ?item.
+          }
+          {
+            ?item wdt:P1441 ?work .
+            OPTIONAL { ?item wdt:P175 ?actor . }
+          } UNION {
+            ?work wdt:P674 ?item .
+            OPTIONAL { ?item wdt:P175 ?actor . }
+          } UNION {
+            ?item wdt:P175 ?actor .
+            OPTIONAL { ?item wdt:P1441 ?work . }
+          } UNION {
+            BIND(?item AS ?work)
+          }
+          OPTIONAL { ?work wdt:P4983 ?tmdbTv . }
+          OPTIONAL { ?work wdt:P4947 ?tmdbMovie . }
+          OPTIONAL { ?actor wdt:P3987 ?tmdbPerson . }
+          SERVICE wikibase:label { bd:serviceParam wikibase:language "fr,en". }
+        } LIMIT 10
+      `;
+      const sparqlUrl = `https://query.wikidata.org/sparql?query=${encodeURIComponent(sparqlQuery)}&format=json`;
+      const response = await fetch(sparqlUrl, {
+        headers: { Accept: 'application/json', 'User-Agent': 'SeriesApp/1.0' }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        data?.results?.bindings?.forEach((row: any) => {
+          if (row.tmdbTv?.value) foundTvIds.add(parseInt(row.tmdbTv.value, 10));
+          if (row.tmdbMovie?.value) foundMovieIds.add(parseInt(row.tmdbMovie.value, 10));
+          if (row.tmdbPerson?.value) foundPersonIds.add(parseInt(row.tmdbPerson.value, 10));
+          if (row.workLabel?.value) {
+            const label = row.workLabel.value.trim();
+            if (label.length >= 3 && !label.startsWith('Q')) showNamesToQuery.add(label);
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Wikidata SPARQL character fallback error:', error);
+    }
+
+    const showNamesList = Array.from(showNamesToQuery).slice(0, 3);
+    const searchResults = await Promise.all(showNamesList.map(name => this.searchMulti(name, 1)));
+    for (const result of searchResults) {
+      if (!result.ok || !result.value?.results) continue;
+      for (const item of result.value.results) {
+        if (item.media_type === 'tv' || item.first_air_date) foundTvIds.add(item.id);
+        else if (item.media_type === 'movie' || item.release_date) foundMovieIds.add(item.id);
+        else if (item.media_type === 'person') foundPersonIds.add(item.id);
+      }
+    }
+
+    const tvIdsList = Array.from(foundTvIds).slice(0, 3);
+    const movieIdsList = Array.from(foundMovieIds).slice(0, 3);
+    const detailsList = await Promise.all([
+      ...tvIdsList.map(id => this.getShowDetails(id).then(result => result.ok ? { ...result.value, media_type: 'tv' as const } : null)),
+      ...movieIdsList.map(id => this.getMovieDetails(id).then(result => result.ok ? { ...result.value, media_type: 'movie' as const } : null))
+    ]);
+
+    const queryWords = cleaned.split(' ').filter(word => word.length >= 3);
+    for (const mediaDetails of detailsList) {
+      if (!mediaDetails) continue;
+      extraMedia.push(mediaDetails);
+
+      const castList = mediaDetails.aggregate_credits?.cast || mediaDetails.credits?.cast || [];
+      const mediaName = mediaDetails.name || mediaDetails.title || mediaDetails.original_name || mediaDetails.original_title || '';
+      for (const member of castList) {
+        const charName = (member.character || (Array.isArray(member.roles) && member.roles[0]?.character) || '').toString();
+        if (!charName) continue;
+        const charClean = cleanStr(charName);
+        const matchesChar = charClean.includes(cleaned) || cleaned.includes(charClean) || queryWords.some(word => charClean.includes(word));
+        if (!matchesChar) continue;
+
+        const personObj: any = {
+          id: member.id,
+          media_type: 'person',
+          name: member.name,
+          profile_path: member.profile_path,
+          known_for_department: 'Acting',
+          character: charName,
+          characterShow: mediaName,
+          popularity: (member.popularity || 10) + 150,
+          known_for: [mediaDetails]
+        };
+        extraPersons.push(personObj);
+      }
+    }
+
+    if (extraPersons.length === 0 && foundPersonIds.size > 0) {
+      const personDetailsList = await Promise.all(
+        Array.from(foundPersonIds).slice(0, 3).map(id => this.getPersonDetails(id).then(result => result.ok ? result.value : null))
+      );
+      for (const person of personDetailsList) {
+        if (person) extraPersons.push({ ...person, media_type: 'person' });
+      }
+    }
+
     return { extraMedia, extraPersons };
   }
 
   async smartSearchMulti(query: string, page: number = 1, watchProviders?: string[]): Promise<Result<SearchResponse>> {
-    if (!query?.trim()) return ok({ results: [] });
+    if (!query || !query.trim()) return ok({ results: [] });
     const result = await this.searchMulti(query, page, watchProviders);
     if (!result.ok) return result;
     return ok({ ...result.value, results: filterCredibleMedia(result.value.results || [], 0) });
@@ -476,18 +692,27 @@ export class TMDBClient {
   }
 
   async getTopRatedRecent(type: 'tv' | 'movie' | 'all', page: number = 1, watchProviders?: string[]): Promise<Result<SearchResponse>> {
+    const today = new Date();
     const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    oneYearAgo.setFullYear(today.getFullYear() - 1);
     const date = oneYearAgo.toISOString().split('T')[0];
+    const hasProviders = Boolean(watchProviders?.length);
+    const minVotes = hasProviders ? 5 : 50;
+
     const fetchType = (mediaType: 'tv' | 'movie') => this.discover(mediaType, page, {
       sort_by: 'vote_average.desc',
-      'vote_count.gte': watchProviders?.length ? '5' : '100',
+      'vote_count.gte': hasProviders ? '5' : '100',
       'vote_average.gte': '7.0',
       [mediaType === 'tv' ? 'first_air_date.gte' : 'primary_release_date.gte']: date,
-    }, watchProviders?.length ? 5 : 50, watchProviders);
+    }, minVotes, watchProviders);
+
     if (type !== 'all') return fetchType(type);
     const [tv, movie] = await Promise.all([fetchType('tv'), fetchType('movie')]);
-    if (tv.ok && movie.ok) return ok({ results: [...tv.value.results, ...movie.value.results].sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0)) });
+    if (tv.ok && movie.ok) {
+      const results = filterCredibleMedia([...tv.value.results, ...movie.value.results], minVotes)
+        .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
+      return ok({ results });
+    }
     return tv.ok ? tv : movie;
   }
 
@@ -498,11 +723,15 @@ export class TMDBClient {
           this.discover('tv', page, { sort_by: 'popularity.desc' }, 5, watchProviders),
           this.discover('movie', page, { sort_by: 'popularity.desc' }, 5, watchProviders),
         ]);
-        if (tv.ok && movie.ok) return ok({ results: [...tv.value.results, ...movie.value.results].sort((a, b) => (b.popularity || 0) - (a.popularity || 0)) });
+        if (tv.ok && movie.ok) {
+          const combined = [...tv.value.results, ...movie.value.results].sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+          return ok({ results: filterCredibleMedia(combined, 5) });
+        }
         return tv.ok ? tv : movie;
       }
       return this.discover(type, page, { sort_by: 'popularity.desc' }, 5, watchProviders);
     }
+
     const result = await this.fetchJson<SearchResponse>(this.buildUrl(`/trending/${type}/week`, { language: 'fr-FR', page }));
     if (result.ok && Array.isArray(result.value.results)) result.value.results = filterCredibleMedia(result.value.results, 50);
     return result;
@@ -519,15 +748,16 @@ export class TMDBClient {
   }
 
   async getPopularPersons(page: number = 1): Promise<Result<SearchResponse>> {
-    const result = await this.fetchJson<SearchResponse>(this.buildUrl('/person/popular', { language: 'fr-FR', page }));
-    if (result.ok && Array.isArray(result.value.results)) result.value.results = result.value.results.map(item => ({ ...item, media_type: 'person' }));
-    return result;
+    return this.fetchJson<SearchResponse>(this.buildUrl('/person/popular', { language: 'fr-FR', page }));
   }
 
   async getNowPlaying(page: number = 1): Promise<Result<SearchResponse>> {
     const now = new Date();
-    const past = new Date(now); past.setDate(now.getDate() - 75);
-    const future = new Date(now); future.setDate(now.getDate() + 10);
+    const past = new Date();
+    past.setDate(now.getDate() - 75);
+    const future = new Date();
+    future.setDate(now.getDate() + 10);
+
     const result = await this.discover('movie', page, {
       sort_by: 'popularity.desc',
       'primary_release_date.gte': past.toISOString().split('T')[0],
@@ -549,26 +779,33 @@ export class TMDBClient {
     sortOrder?: 'asc' | 'desc';
   }): Promise<Result<SearchResponse>> {
     const {
-      type = 'all', page = 1, watchProviders = [], genres = [], pegi = 'Tous',
-      minRating = 'Toutes', sortBy = 'popular', sortOrder = 'desc'
+      type = 'all',
+      page = 1,
+      watchProviders = [],
+      genres = [],
+      pegi = 'Tous',
+      minRating = 'Toutes',
+      sortBy = 'popular',
+      sortOrder = 'desc'
     } = options;
 
-    const buildExtra = (mediaType: 'tv' | 'movie') => {
-      const extra: Record<string, string> = {};
-      if (sortBy === 'rating' || sortBy === 'top100') extra.sort_by = `vote_average.${sortOrder}`;
-      else if (sortBy === 'date') extra.sort_by = `${mediaType === 'tv' ? 'first_air_date' : 'primary_release_date'}.${sortOrder}`;
-      else if (sortBy === 'title') extra.sort_by = `${mediaType === 'tv' ? 'name' : 'title'}.${sortOrder}`;
-      else extra.sort_by = `popularity.${sortOrder}`;
-      if (genres.length) {
-        const ids = Array.from(new Set(genres.flatMap(genre => GENRE_MAP[genre]?.[mediaType] || [])));
-        if (ids.length) extra.with_genres = ids.join('|');
+    const buildExtra = (mediaType: 'tv' | 'movie'): { extra: Record<string, string>; minVotes: number } => {
+      let sortParam = 'popularity.desc';
+      if (sortBy === 'rating') {
+        sortParam = sortOrder === 'asc' ? 'vote_average.asc' : 'vote_average.desc';
+      } else if (sortBy === 'date') {
+        const dateKey = mediaType === 'tv' ? 'first_air_date' : 'primary_release_date';
+        sortParam = sortOrder === 'asc' ? `${dateKey}.asc` : `${dateKey}.desc`;
       }
-      if (minRating !== 'Toutes') {
-        const value = Number(minRating.replace('+', ''));
-        if (Number.isFinite(value)) extra['vote_average.gte'] = String(value);
+
+      const minVotes = watchProviders.length > 0 ? 5 : (sortBy === 'rating' ? 100 : 20);
+      const extra: Record<string, string> = { sort_by: sortParam, 'vote_count.gte': String(minVotes) };
+
+      if (genres.length > 0) {
+        const genreIds = Array.from(new Set(genres.flatMap(genre => GENRE_MAP[genre]?.[mediaType] || [])));
+        if (genreIds.length > 0) extra.with_genres = genreIds.join('|');
       }
-      // Compatibilité des anciens tokens : la politique parentale canonique dans tmdb.ts
-      // neutralise ce filtre puis hydrate les vraies classifications.
+
       if (pegi === '16' || pegi === '-16' || pegi === '16+') {
         extra.without_genres = '10762,10751';
         extra.certification_country = 'US';
@@ -577,34 +814,75 @@ export class TMDBClient {
         extra.without_genres = '27';
         extra.certification_country = 'US';
         extra.certification = mediaType === 'movie' ? 'PG-13' : 'TV-14';
+      } else if (pegi === '10' || pegi === '-10' || pegi === '10+') {
+        extra.without_genres = '27,53,80,10752,10768';
+        extra.certification_country = 'US';
+        extra.certification = mediaType === 'movie' ? 'PG' : 'TV-PG';
+      } else if (pegi === 'TP' || pegi === 'Tout Public') {
+        extra.without_genres = '27,53,80,10752,10768';
+        extra.certification_country = 'US';
+        extra.certification = mediaType === 'movie' ? 'G' : 'TV-G';
       }
-      return extra;
+
+      if (minRating !== 'Toutes') {
+        const minValue = parseFloat(minRating.replace('+', ''));
+        if (!isNaN(minValue)) extra['vote_average.gte'] = String(minValue);
+      }
+
+      return { extra, minVotes };
     };
 
-    const fetchType = (mediaType: 'tv' | 'movie') => this.discover(
-      mediaType,
-      page,
-      buildExtra(mediaType),
-      watchProviders.length ? 5 : sortBy === 'rating' ? 100 : 20,
-      watchProviders,
-    );
+    const fetchType = (mediaType: 'tv' | 'movie') => {
+      const { extra, minVotes } = buildExtra(mediaType);
+      return this.discover(mediaType, page, extra, minVotes, watchProviders);
+    };
+
     if (type !== 'all') return fetchType(type);
+
     const [tv, movie] = await Promise.all([fetchType('tv'), fetchType('movie')]);
     if (!tv.ok) return tv;
     if (!movie.ok) return movie;
-    const results = [...tv.value.results, ...movie.value.results];
-    if (sortBy === 'rating' || sortBy === 'top100') results.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
-    else if (sortBy === 'date') results.sort((a, b) => String(b.first_air_date || b.release_date || '').localeCompare(String(a.first_air_date || a.release_date || '')));
-    else results.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
-    return ok({ results });
+
+    const combined = [...tv.value.results, ...movie.value.results];
+    if (sortBy === 'rating') {
+      combined.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
+    } else if (sortBy === 'date') {
+      combined.sort((a, b) => {
+        const dateA = a.first_air_date || a.release_date || '';
+        const dateB = b.first_air_date || b.release_date || '';
+        return new Date(dateB).getTime() - new Date(dateA).getTime();
+      });
+    } else {
+      combined.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+    }
+
+    return ok({ results: filterCredibleMedia(combined, watchProviders.length > 0 ? 5 : 20) });
   }
 
   async getPersonDetails(personId: number): Promise<Result<any>> {
-    return this.fetchJson<any>(this.buildUrl(`/person/${personId}`, { language: 'fr-FR' }));
+    const data = await this.fetchJson<any>(this.buildUrl(`/person/${personId}`, { language: 'fr-FR' }));
+    if (!data.ok) return data;
+
+    if (data.value && !data.value.biography) {
+      try {
+        const english = await this.fetchJson<any>(this.buildUrl(`/person/${personId}`, { language: 'en-US' }));
+        if (english.ok && english.value?.biography) data.value.biography = english.value.biography;
+      } catch {
+        // Le fallback anglais est non bloquant, comme dans le client historique.
+      }
+    }
+    return data;
   }
 
   async getPersonCredits(personId: number): Promise<Result<any>> {
-    return this.fetchJson<any>(this.buildUrl(`/person/${personId}/combined_credits`, { language: 'fr-FR' }));
+    const data = await this.fetchJson<any>(this.buildUrl(`/person/${personId}/combined_credits`, { language: 'fr-FR' }));
+    if (!data.ok) return data;
+
+    if (data.value) {
+      if (Array.isArray(data.value.cast)) data.value.cast = data.value.cast.filter((media: any) => !isAdultOrParodyMedia(media));
+      if (Array.isArray(data.value.crew)) data.value.crew = data.value.crew.filter((media: any) => !isAdultOrParodyMedia(media));
+    }
+    return data;
   }
 
   private async discover(
@@ -620,11 +898,13 @@ export class TMDBClient {
     params.set('vote_count.gte', extra['vote_count.gte'] || String(minVotes));
     Object.entries(extra).forEach(([key, value]) => params.set(key, value));
     addWatchProviders(params, watchProviders);
-    const result = await this.fetchJson<SearchResponse>(
-      `${this.baseUrl}/discover/${type}?${params.toString()}`
-    );
+
+    const result = await this.fetchJson<SearchResponse>(`${this.baseUrl}/discover/${type}?${params.toString()}`);
     if (result.ok && Array.isArray(result.value.results)) {
-      result.value.results = filterCredibleMedia(result.value.results.map(item => ({ ...item, media_type: type })), minVotes);
+      result.value.results = filterCredibleMedia(
+        result.value.results.map(item => ({ ...item, media_type: type })),
+        minVotes,
+      );
     }
     return result;
   }
