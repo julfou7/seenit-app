@@ -1,7 +1,7 @@
 # SeenIt — Référence fonctionnelle canonique
 
 Dernière vérification : 6 septembre 2026  
-Baseline observée : **1.4.118**, `main` `620c4a4e41682257da05efa625bb6a8898108947`
+Baseline observée : **1.4.120**, `main` `374b93197168db6844346bcd046cc46390895abd`
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : composante obligatoire de la SPEC SeenIt
 
@@ -225,6 +225,13 @@ réécrire les favoris, notes, rappels ni l'archive ; le parcours explicite « R
 La fiche combine les détails TMDB, notes TMDB/IMDb (OMDb), disponibilité streaming en France,
 présence Plex/Arr, bande-annonce, âge conseillé, casting, recommandations, collection/franchise
 et discussions Reddit. Les modals personne et épisode restent dans la pile Retour.
+
+Le titre affiché privilégie le `title`/`name` de la fiche TMDB récupérée en `fr-FR`. Un ancien titre
+enregistré dans la bibliothèque sert seulement de fallback avant ou hors hydratation. Lorsqu'un média
+suivi est hydraté par son identité exacte `mediaType + TMDB ID`, SeenIt fait converger uniquement son
+champ `title` vers la valeur localisée ; progression, statut, favori, note, provenance et timestamps
+métier restent intacts. Sans titre localisé exploitable, aucun nom n'est inventé et aucun matching par
+titre n'est introduit.
 
 L'âge conseillé automatique affiche la certification US TMDB originale, sa provenance et sa traduction
 lisible, par exemple `PG-13 · US · 13+`. « Tous publics » n'est affiché que lorsqu'une certification US

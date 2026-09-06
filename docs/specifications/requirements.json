@@ -288,6 +288,28 @@
       ]
     },
     {
+      "id": "SEENIT-METADATA-001",
+      "title": "Titre TMDB français prioritaire avec convergence bornée du suivi",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/mediaTitle.test.ts",
+          "contains": "SEENIT-METADATA-001 préfère le titre TMDB fr-FR et conserve le titre persisté en fallback"
+        },
+        {
+          "file": "tests/mediaTitle.test.ts",
+          "contains": "SEENIT-METADATA-001 converge uniquement par mediaType et TMDB ID exacts"
+        },
+        {
+          "file": "tests/mediaTitle.test.ts",
+          "contains": "SEENIT-METADATA-001 persiste uniquement le titre localisé après hydratation TMDB"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-DISCOVER-001",
       "title": "Au cinéma limité aux sorties théâtrales françaises TMDB",
       "targets": [

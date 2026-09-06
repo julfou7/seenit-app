@@ -157,6 +157,14 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   TVDB/IMDb peuvent exister comme métadonnées techniques, mais doivent être résolus vers TMDB avant
   toute association média. Le titre, le titre original, l'année, la popularité, le nom de fichier,
   le nom de release ou la position d'un résultat ne sont jamais une preuve d'identité.
+- **SEENIT-METADATA-001** — Le titre éditorial d'un film ou d'une série privilégie le `title`/`name`
+  de la fiche TMDB demandée en `fr-FR`. Un `title` déjà persisté dans le suivi reste un fallback avant
+  ou hors hydratation TMDB, jamais une autorité supérieure à la métadonnée localisée fraîche. Après
+  résolution du média exact par `mediaType + TMDB ID`, SeenIt peut faire converger uniquement le champ
+  `title` du document suivi et de son cache UID vers cette valeur ; cette convergence ne réécrit ni
+  progression, statut, favori, note, provenance, ni timestamp métier. Si TMDB ne fournit aucun titre
+  localisé exploitable, SeenIt conserve le meilleur titre disponible sans traduction inventée et sans
+  utiliser un titre pour retrouver ou désambiguïser l'identité.
 - Pour les téléchargements, un transfert physique ne se fusionne que par `requestId`, infohash/downloadId
   ou alias exact, ou chemin de transfert exact. Une taille, un titre ou un nom de release, même combinés,
   ne suffisent jamais ; une ambiguïté reste non résolue.
