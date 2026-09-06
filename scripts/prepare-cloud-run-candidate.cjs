@@ -87,8 +87,8 @@ function normalizeTraffic(lines, trafficIndex, trafficEnd, previousRevision, can
 
   const parsed = entries.map(entryLines => {
     const entryText = entryLines.join('\n');
-    const percentMatch = entryText.match(/(?:^|\n)\s*percent:\s*(\d+)(?:\s|$)/);
-    const revisionMatch = entryText.match(/(?:^|\n)\s*revisionName:\s*([^\s]+)(?:\s|$)/);
+    const percentMatch = entryText.match(/(?:^|\n)\s*(?:-\s*)?percent:\s*(\d+)(?:\s|$)/);
+    const revisionMatch = entryText.match(/(?:^|\n)\s*(?:-\s*)?revisionName:\s*([^\s]+)(?:\s|$)/);
     if (!percentMatch) throw new Error(`Cible de trafic sans pourcentage explicite: ${entryText.replace(/\s+/g, ' ').trim()}`);
     return {
       percent: Number(percentMatch[1]),
