@@ -157,7 +157,7 @@ test('SEENIT-RUNTIME-001 documente que la sync AI Studio ne vaut jamais preuve d
   assert.match(runbook, /ne constitu(?:e|ent) pas un déploiement/i);
   assert.match(runbook, /Cloud Build/i);
   assert.match(runbook, /digest/i);
-  assert.match(runbook, /service exporté/i);
+  assert.match(runbook, /(?:service exporté|exporter le service)/i);
   assert.match(runbook, /métadonnées source/i);
   assert.match(runbook, /readiness/i);
   assert.match(runbook, /0 %/i);
