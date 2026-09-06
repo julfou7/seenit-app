@@ -369,7 +369,8 @@ Android autorisées du compte :
 
 - l'envoi vise Android uniquement dans la première version ; la PWA ne reçoit pas ce push ;
 - une même installation reçoit au plus une notification par version, y compris après une reprise ;
-- toucher la notification ouvre SeenIt et déclenche son contrôle canonique de mise à jour ;
+- toucher la notification revient sur l'accueil « À voir », déclenche le contrôle canonique et ouvre
+  la fenêtre de mise à jour seulement si une version plus récente est effectivement disponible ;
 - la notification ne constitue jamais une source d'installation : l'application revalide la release,
   l'asset exact et son SHA-256 avant tout téléchargement ;
 - une panne FCM reste observable et rejouable sans annuler ni altérer la release déjà publiée.
@@ -396,10 +397,18 @@ Les réglages généraux contiennent :
 - version, changelog, recherche et installation d'une mise à jour APK ;
 - logs techniques filtrables, copiables/exportables et effaçables.
 
-Le changelog présenté dans la fenêtre de mise à jour résume les effets visibles de la version sous un
-titre unique et quelques phrases courtes. Il emploie les mots compris dans l'interface et ne montre
-pas les identifiants Plex, UID, noms de cache, fichiers, tests ou détails de CI réservés aux preuves
-techniques. Les corrections liées sont regroupées afin que la lecture reste rapide sur mobile.
+Le changelog présenté dans la fenêtre de mise à jour résume les effets visibles sous un titre unique
+et quelques phrases courtes par version. Lors d'un saut, il affiche dans l'ordre chaque release
+officielle postérieure à la version installée jusqu'à la cible incluse ; un saut d'une seule version
+conserve l'affichage compact habituel. Si cet historique n'est pas récupérable, les notes de la cible
+restent disponibles et l'installation n'est pas bloquée. Les textes emploient les mots compris dans
+l'interface et ne montrent pas les identifiants Plex, UID, noms de cache, fichiers, tests ou détails
+de CI réservés aux preuves techniques.
+
+Une fois l'APK téléchargée et vérifiée, SeenIt affiche « Installeur lancé » pendant que le Package
+Installer Android prend le relais. Le dialogue Play Protect des applications distribuées hors Play
+reste sous le contrôle du système : SeenIt ne le masque pas et ne demande jamais de désactiver cette
+protection.
 
 L'import TV Time résout les entrées vers TMDB avant écriture. Un résultat introuvable reste en échec
 modifiable ; il n'est pas inventé. Les actions de maintenance ne changent jamais l'identité Firebase,

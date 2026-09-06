@@ -41,3 +41,17 @@ test('SEENIT-UPDATE-003 conserve le clic Android reçu avant le montage de MainA
   });
   assert.equal(consumeAppUpdateAvailablePush(), null);
 });
+
+test('SEENIT-UPDATE-004 ouvre l’accueil et la modale seulement pour une mise à jour réelle', async () => {
+  let opened = 0;
+  const payload = { type: 'APP_UPDATE_AVAILABLE', version: '1.4.118' };
+
+  assert.equal(await handleAppUpdateAvailablePush(payload, async () => false, () => { opened += 1; }), true);
+  assert.equal(opened, 0);
+
+  assert.equal(await handleAppUpdateAvailablePush(payload, async force => force === true, () => { opened += 1; }), true);
+  assert.equal(opened, 1);
+
+  assert.equal(await handleAppUpdateAvailablePush({ type: 'DOWNLOAD_EVENT', version: '1.4.118' }, async () => true, () => { opened += 1; }), false);
+  assert.equal(opened, 1);
+});

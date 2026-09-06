@@ -338,7 +338,11 @@ function MainApp() {
         consumeAppUpdateAvailablePush();
         void handleAppUpdateAvailablePush(
           data,
-          useUpdateStore.getState().checkForUpdates
+          useUpdateStore.getState().checkForUpdates,
+          () => {
+            handleTabChange('watchlist');
+            useUpdateStore.getState().requestUpdateModal();
+          }
         );
         return;
       }
@@ -428,7 +432,7 @@ function MainApp() {
       window.removeEventListener('focus', handleVisibilityOrFocus);
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
     };
-  }, [openShowSmooth, updateShow, showToast]);
+  }, [handleTabChange, openShowSmooth, updateShow, showToast]);
 
   const handleActiveTabClick = () => {
     window.dispatchEvent(new CustomEvent('app-close-modals'));

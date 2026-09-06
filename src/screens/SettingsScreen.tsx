@@ -24,8 +24,8 @@ import {
 } from '../services/plex';
 import { performPlexSync, purgeAllPlexSlugsInDb } from '../features/plex/syncPlex';
 import { SeenItLogo } from '../components/SeenItLogo';
-import { ChangelogViewer } from '../components/ChangelogViewer';
-import { downloadAndInstallApk, UpdateProgress } from '../services/appUpdater';
+import { ReleaseChangelogViewer } from '../components/ChangelogViewer';
+import { downloadAndInstallApk, getUpdateProgressPresentation, UpdateProgress } from '../services/appUpdater';
 import {
   activatePlexUserScope,
   clearPlexCredentials,
@@ -66,6 +66,9 @@ export function SettingsScreen() {
   const { logs, clearLogs, getLogsAsText } = useLogStore();
   const { currentVersion, latestRelease, hasUpdate, isChecking: isCheckingUpdates, lastChecked, checkForUpdates } = useUpdateStore();
   const [apkUpdateProgress, setApkUpdateProgress] = useState<UpdateProgress | null>(null);
+  const apkUpdatePresentation = apkUpdateProgress
+    ? getUpdateProgressPresentation(apkUpdateProgress)
+    : null;
   const [showVersionNotesModal, setShowVersionNotesModal] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [userPlatforms, setUserPlatforms] = useState<number[]>([]);
@@ -1020,17 +1023,31 @@ export function SettingsScreen() {
 
               {/* Updater Progress */}
               {apkUpdateProgress && (
-                <div className="mt-3 p-4 bg-[#E5A93D]/10 border border-[#E5A93D]/20 rounded-xl flex flex-col gap-3">
-                  <div className="flex items-center justify-between text-xs font-bold text-[#E5A93D]">
+                <div className={cn(
+                  "mt-3 p-4 border rounded-xl flex flex-col gap-3",
+                  apkUpdatePresentation?.tone === 'error'
+                    ? "bg-red-500/10 border-red-500/25"
+                    : apkUpdatePresentation?.tone === 'success'
+                      ? "bg-emerald-500/10 border-emerald-500/25"
+                      : "bg-[#E5A93D]/10 border-[#E5A93D]/20"
+                )}>
+                  <div className={cn(
+                    "flex items-center justify-between text-xs font-bold",
+                    apkUpdatePresentation?.tone === 'error'
+                      ? "text-red-300"
+                      : apkUpdatePresentation?.tone === 'success'
+                        ? "text-emerald-300"
+                        : "text-[#E5A93D]"
+                  )}>
                     <span className="flex items-center gap-2">
                       {apkUpdateProgress.status === 'downloading' ? (
                         <Loader2 size={14} className="animate-spin" />
+                      ) : apkUpdateProgress.status === 'done' ? (
+                        <CheckCircle2 size={14} />
                       ) : (
                         <Download size={14} />
                       )}
-                      {apkUpdateProgress.status === 'downloading' ? 'Téléchargement...' : 
-                       apkUpdateProgress.status === 'installing' ? 'Installation prête...' : 
-                       'Erreur'}
+                      {apkUpdatePresentation?.label}
                     </span>
                     <span>{apkUpdateProgress.percent}%</span>
                   </div>
@@ -1038,7 +1055,11 @@ export function SettingsScreen() {
                     <div 
                       className={cn(
                         "h-full transition-all duration-300",
-                        apkUpdateProgress.status === 'error' ? "bg-red-500" : "bg-[#E5A93D]"
+                        apkUpdatePresentation?.tone === 'error'
+                          ? "bg-red-500"
+                          : apkUpdatePresentation?.tone === 'success'
+                            ? "bg-emerald-500"
+                            : "bg-[#E5A93D]"
                       )}
                       style={{ width: `${apkUpdateProgress.percent}%` }}
                     />
@@ -1203,7 +1224,7 @@ export function SettingsScreen() {
                     <span>Chargement des notes de version...</span>
                   </div>
                 ) : latestRelease?.releaseNotes ? (
-                  <ChangelogViewer content={latestRelease.releaseNotes} />
+                  <ReleaseChangelogViewer release={latestRelease} />
                 ) : (
                   <div className="py-6 text-center text-zinc-400 text-xs">
                     <p>Aucune note de version détaillée disponible pour le moment.</p>
@@ -1229,6 +1250,9 @@ export function SettingsScreen() {
                         <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0" />
                       )}
                       {apkUpdateProgress.status === 'installing' && (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      )}
+                      {apkUpdateProgress.status === 'done' && (
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                       )}
                       {apkUpdateProgress.status === 'error' && (

@@ -896,6 +896,32 @@
       ]
     },
     {
+      "id": "SEENIT-UPDATE-004",
+      "title": "Parcours de mise à jour APK contextualisé et changelog cumulatif",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/releaseUpdatePushClient.test.ts",
+          "contains": "SEENIT-UPDATE-004 ouvre l’accueil et la modale seulement pour une mise à jour réelle"
+        },
+        {
+          "file": "tests/updateReleasePolicy.test.ts",
+          "contains": "SEENIT-UPDATE-004 agrège les releases officielles entre la version installée et la cible"
+        },
+        {
+          "file": "tests/updateReleasePolicy.test.ts",
+          "contains": "SEENIT-UPDATE-004 retombe sur la cible si l’historique paginé échoue"
+        },
+        {
+          "file": "tests/appUpdaterPresentation.test.ts",
+          "contains": "SEENIT-UPDATE-004 conserve le succès après ouverture de l’installeur Android"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-UX-001",
       "title": "Actions de swipe accessibles au clavier",
       "targets": [

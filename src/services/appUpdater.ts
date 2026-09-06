@@ -7,12 +7,10 @@ import {
   normalizeSha256Digest,
   type SeenItReleaseInfo
 } from '../features/release/releasePolicy';
+import type { UpdateProgress } from '../features/release/updateProgress';
 
-export interface UpdateProgress {
-  percent: number;
-  status: 'idle' | 'downloading' | 'installing' | 'error' | 'done';
-  message: string;
-}
+export { getUpdateProgressPresentation } from '../features/release/updateProgress';
+export type { UpdateProgress } from '../features/release/updateProgress';
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');

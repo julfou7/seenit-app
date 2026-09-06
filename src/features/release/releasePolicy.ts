@@ -2,6 +2,14 @@ import { resolveSeenItApiUrl } from '../../lib/seenitApi.ts';
 
 export const SEENIT_GITHUB_REPOSITORY = 'julfou7/seenit-app';
 export const SEENIT_GITHUB_RELEASE_API = `https://api.github.com/repos/${SEENIT_GITHUB_REPOSITORY}/releases/latest`;
+export const SEENIT_GITHUB_RELEASES_API = `https://api.github.com/repos/${SEENIT_GITHUB_REPOSITORY}/releases`;
+
+export interface SeenItReleaseNotesEntry {
+  version: string;
+  releaseNotes: string;
+  publishedAt: string;
+  htmlUrl: string;
+}
 
 export interface SeenItReleaseInfo {
   version: string;
@@ -13,6 +21,7 @@ export interface SeenItReleaseInfo {
   apkSha256: string | null;
   browserDownloadUrl: string;
   htmlUrl: string;
+  releaseNotesHistory: SeenItReleaseNotesEntry[];
 }
 
 interface GitHubReleaseAsset {
@@ -91,17 +100,94 @@ export function parseSeenItRelease(payload: unknown): SeenItReleaseInfo | null {
     ? release.html_url
     : `https://github.com/${SEENIT_GITHUB_REPOSITORY}/releases/tag/v${version}`;
 
-  return {
+  const releaseNotes = typeof release.body === 'string' ? release.body : '';
+  const publishedAt = typeof release.published_at === 'string' ? release.published_at : '';
+  const releaseInfo: SeenItReleaseInfo = {
     version,
     tagName: `v${version}`,
     name: typeof release.name === 'string' && release.name.trim() ? release.name : `SeenIt v${version}`,
-    releaseNotes: typeof release.body === 'string' ? release.body : '',
-    publishedAt: typeof release.published_at === 'string' ? release.published_at : '',
+    releaseNotes,
+    publishedAt,
     apkDownloadUrl,
     apkSha256: normalizeSha256Digest(apkAsset?.digest),
     browserDownloadUrl: apkDownloadUrl,
-    htmlUrl
+    htmlUrl,
+    releaseNotesHistory: []
   };
+
+  releaseInfo.releaseNotesHistory = [{ version, releaseNotes, publishedAt, htmlUrl }];
+  return releaseInfo;
+}
+
+function toReleaseNotesEntry(release: SeenItReleaseInfo): SeenItReleaseNotesEntry {
+  return {
+    version: release.version,
+    releaseNotes: release.releaseNotes,
+    publishedAt: release.publishedAt,
+    htmlUrl: release.htmlUrl
+  };
+}
+
+export function selectSeenItReleaseHistory(
+  payloads: unknown[],
+  installedVersion: string,
+  targetVersion: string
+): SeenItReleaseNotesEntry[] {
+  if (!normalizeSemanticVersion(installedVersion) || !normalizeSemanticVersion(targetVersion)) return [];
+
+  const releasesByVersion = new Map<string, SeenItReleaseNotesEntry>();
+  for (const payload of payloads) {
+    const release = parseSeenItRelease(payload);
+    if (!release) continue;
+    if (compareSemanticVersions(release.version, installedVersion) <= 0) continue;
+    if (compareSemanticVersions(release.version, targetVersion) > 0) continue;
+    releasesByVersion.set(release.version, toReleaseNotesEntry(release));
+  }
+
+  return [...releasesByVersion.values()].sort((left, right) =>
+    compareSemanticVersions(left.version, right.version)
+  );
+}
+
+export async function resolveSeenItReleaseHistory(
+  installedVersion: string,
+  targetRelease: SeenItReleaseInfo,
+  fetchImpl: typeof fetch = fetch,
+  maxPages = 10
+): Promise<SeenItReleaseNotesEntry[]> {
+  const fallback = [toReleaseNotesEntry(targetRelease)];
+  const collected: unknown[] = [];
+  let historyIsComplete = false;
+
+  try {
+    for (let page = 1; page <= maxPages; page += 1) {
+      const response = await fetchImpl(`${SEENIT_GITHUB_RELEASES_API}?per_page=100&page=${page}`, {
+        headers: { Accept: 'application/vnd.github.v3+json' }
+      });
+      const contentType = response.headers.get('content-type') || '';
+      if (!response.ok || !contentType.includes('application/json')) return fallback;
+
+      const payload = await response.json();
+      if (!Array.isArray(payload)) return fallback;
+      collected.push(...payload);
+
+      const reachedInstalledBoundary = payload.some(item => {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
+        const version = normalizeSemanticVersion((item as GitHubReleasePayload).tag_name);
+        return Boolean(version && compareSemanticVersions(version, installedVersion) <= 0);
+      });
+      if (reachedInstalledBoundary || payload.length < 100) {
+        historyIsComplete = true;
+        break;
+      }
+    }
+
+    if (!historyIsComplete) return fallback;
+    const history = selectSeenItReleaseHistory(collected, installedVersion, targetRelease.version);
+    return history.some(entry => entry.version === targetRelease.version) ? history : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 export interface UpdateMetadataEndpoint {
