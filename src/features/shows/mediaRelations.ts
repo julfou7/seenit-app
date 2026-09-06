@@ -98,6 +98,7 @@ export const MEDIA_RELATION_GROUPS: readonly MediaRelationGroup[] = [
     member('movie:283995', 'Les Gardiens de la Galaxie Vol. 2', '2017-04-25', '/brgkPEPQJNGLuKRy8omRTcDfDuL.jpg'),
     member('movie:315635', 'Spider-Man : Homecoming', '2017-07-05', '/wFNNv1ZHglNdXJLYiEgpLY5sa9S.jpg'),
     member('movie:284053', 'Thor : Ragnarok', '2017-10-02', '/mAA8RXkgF87jSWWMSf6hgLl73mk.jpg'),
+    member('tv:67178', "Marvel's The Punisher", '2017-11-17', '/tM6xqRKXoloH9UchaJEyyRE9O1w.jpg'),
     member('movie:284054', 'Black Panther', '2018-02-13', '/g94IcdzPswTYl1ISdgn2EwvaZtt.jpg'),
     member('movie:299536', 'Avengers : Infinity War', '2018-04-25', '/hSfuKPtyEryeFzapZ8UgZd4aESu.jpg'),
     member('movie:363088', 'Ant-Man et la Guêpe', '2018-07-04', '/r3Vapr4sdXOhHBThTNtfuijKe5V.jpg'),
@@ -134,6 +135,7 @@ export const MEDIA_RELATION_GROUPS: readonly MediaRelationGroup[] = [
     member('tv:114471', 'Ironheart', '2025-06-24', '/dtpiECNwAeLnGJSU3HTWhcQGHk1.jpg'),
     member('movie:617126', 'Les 4 Fantastiques : Premiers Pas', '2025-07-23', '/rNc4KARs6fVa4axzvuv3NfUiNy1.jpg'),
     member('tv:198178', 'Wonder Man', '2026-01-27', '/5uHI0TCde9YDGY7Fm54L3mBNILK.jpg'),
+    member('movie:1439930', 'The Punisher: One Last Kill', '2026-05-12', '/qQclTgLMDvGBuUBFGHRipxkEwWR.jpg'),
   ]),
   group('the-dark-knight-trilogy', 'saga', [
     member('movie:272', 'Batman Begins', '2005-06-10', '/taKcn26BMWnsUcMFSlr5RfGDtFB.jpg'),
