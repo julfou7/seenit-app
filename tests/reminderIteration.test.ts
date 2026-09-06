@@ -63,5 +63,5 @@ test('issue #94 conserve les rappels à 09:00 et leurs clés anti-doublon', () =
   assert.match(loop, /scheduled_9am_\$\{s\.id\}_\$\{tag\}_\$\{targetStr\}/);
   assert.match(loop, /scheduled_9am_\$\{s\.id\}_\$\{tagPrefix\}_S\$\{sNum\}E\$\{eNum\}_\$\{targetStr\}/);
   assert.match(loop, /notified_today_\$\{s\.id\}_\$\{tag\}_\$\{todayStr\}/);
-  assert.match(loop, /notified_today_\$\{s\.id\}_\$\{tagPrefix\}_S\$\{sNum\}E\$\{eNum\}_\$\{targetStr\}/);
+  assert.match(loop, /notified_today_\$\{s\.id\}_\$\{tagPrefix\}_S\$\{sNum\}E\$\{eNum\}_\$\{todayStr\}/);
 });
