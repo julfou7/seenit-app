@@ -7,6 +7,7 @@ const functionalReference = readFileSync(new URL('../docs/specifications/functio
 const requirements = JSON.parse(readFileSync(new URL('../docs/specifications/requirements.json', import.meta.url), 'utf8'));
 const audit = readFileSync(new URL('../docs/audits/audit-media-relations-2026-09-05.md', import.meta.url), 'utf8');
 const registry = readFileSync(new URL('../docs/requests/registry.md', import.meta.url), 'utf8');
+const agentInstructions = readFileSync(new URL('../AGENTS.md', import.meta.url), 'utf8');
 
 test('SEENIT-RELATION-001 sépare saga univers et médias similaires', () => {
   assert.match(specification, /Ordre de visionnage \/ saga/);
@@ -20,6 +21,10 @@ test('SEENIT-RELATION-001 interdit tout univers déduit du titre ou de la popula
   assert.match(specification, /Le titre, l'année, la popularité[\s\S]*ne prouvent \*\*jamais\*\* une relation/);
   assert.match(specification, /aucun fallback par titre/);
   assert.match(specification, /Une liste dite officielle, son nom ou son score ne suffisent jamais/);
+  assert.match(specification, /cas nommé[\s\S]*scénario[\s\S]*TNR et jamais une condition de production/);
+  assert.match(functionalReference, /titre cité dans un bug sert uniquement d'exemple de test/);
+  assert.match(agentInstructions, /Relations médias : aucune rustine nominative/);
+  assert.match(agentInstructions, /aucun code spécial ne porte le nom du cas corrigé/);
 });
 
 test('SEENIT-RELATION-001 impose une identité mediaType plus TMDB et des groupes bidirectionnels', () => {

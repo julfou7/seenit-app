@@ -208,6 +208,21 @@ Aucun agent ne décide seul de cette migration.
 - Titre, titre original, année, nom de fichier et nom de release ne sont **jamais** des clés de matching.
 - Un même transfert physique se reconnaît uniquement par `requestId`, infohash/downloadId/alias exact ou chemin de transfert exact ; en cas d'ambiguïté, ne pas fusionner.
 
+## 5.2 Relations médias : aucune rustine nominative
+
+- Une saga ou un univers est résolu uniquement par le mécanisme commun et des identités typées exactes
+  `movie:<tmdbId>` / `tv:<tmdbId>`. Un exemple utilisateur nommé (Punisher, Harry Potter, House of
+  Guinness, etc.) peut devenir une fixture/TNR, **jamais** une condition, branche, regex ou exception de
+  production fondée sur son titre.
+- Il est interdit de corriger un univers par comparaison de titre, titre original, année, popularité,
+  casting, studio, marque, mot-clé, nom de liste ou premier résultat d'une recherche, même si cela résout
+  le cas signalé. Sans preuve exacte, masquer la relation.
+- Une correction de données ciblée n'est admissible que dans un groupe versionné à provenance validée,
+  avec des `mediaKey` exactes et un TNR générique prouvant la réciprocité depuis **tous** ses membres. Le
+  résolveur reste identique pour toutes les œuvres ; aucun code spécial ne porte le nom du cas corrigé.
+- Tout correctif qui ferait réussir uniquement l'exemple signalé sans renforcer l'invariant global est
+  refusé en revue, même si son résultat visuel semble correct.
+
 ## 6. PWA et APK
 
 SeenIt doit rester fonctionnel en PWA et APK Android. Un comportement natif différent doit être

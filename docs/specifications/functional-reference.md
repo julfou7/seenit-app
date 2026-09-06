@@ -269,6 +269,11 @@ SeenIt ne déduit jamais une saga ou un univers d'un titre, d'une année, de la 
 marque. Marvel et DC sont séparés par continuité narrative explicite. Les similaires ne sont pas une
 preuve de franchise et ne sont pas nécessairement réciproques.
 
+Un titre cité dans un bug sert uniquement d'exemple de test. Il est interdit d'ajouter dans le résolveur
+une condition, une regex ou une exception portant ce nom. Une relation manquante est corrigée dans le
+mécanisme commun ou par des identités Film/Série + TMDB exactes dans un groupe versionné et validé ; le
+résultat doit alors être identique et réciproque depuis tous les membres du groupe.
+
 L'identité utilisée dans chaque carte et chaque navigation combine toujours le type Film/Série et
 l'ID TMDB. Le contrat exhaustif, les sources admises, les budgets de performance et la matrice
 Yellowstone, Breaking Bad, Harry Potter, Marvel, DC et House of Guinness sont définis par

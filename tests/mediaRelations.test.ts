@@ -13,6 +13,7 @@ import {
 
 const tmdbClientSource = readFileSync(new URL('../src/features/shows/tmdbClient.ts', import.meta.url), 'utf8');
 const detailSource = readFileSync(new URL('../src/screens/ShowDetailScreen.tsx', import.meta.url), 'utf8');
+const mediaRelationsSource = readFileSync(new URL('../src/features/shows/mediaRelations.ts', import.meta.url), 'utf8');
 
 const keysFor = (mediaKey: MediaKey, kind: 'saga' | 'universe' = 'universe') => {
   const relation = getManifestGroupsForMedia(mediaKey).find(group => group.relationKind === kind);
@@ -58,6 +59,33 @@ test('SEENIT-RELATION-001 relie The Punisher 2017 à One Last Kill sans fusionne
   assert.ok(punisher.includes('movie:1439930'));
   assert.deepEqual(keysFor('movie:1439930'), punisher);
   assert.ok(!punisher.includes('movie:7220'), 'Le film The Punisher de 2004 reste une continuité distincte');
+  assert.equal(getManifestRelationSnapshot('movie:7220'), null);
+});
+
+test('SEENIT-RELATION-001 applique le même résolveur réciproque à tous les groupes du manifeste', () => {
+  for (const relation of MEDIA_RELATION_GROUPS) {
+    const expected = relation.members.map(member => member.mediaKey);
+    for (const member of relation.members) {
+      const resolved = getManifestGroupsForMedia(member.mediaKey)
+        .find(candidate => candidate.groupId === relation.groupId);
+      assert.ok(resolved, `${member.mediaKey} doit retrouver le groupe ${relation.groupId}`);
+      assert.deepEqual(resolved.members.map(candidate => candidate.mediaKey), expected);
+    }
+  }
+});
+
+test('SEENIT-RELATION-001 interdit tout matching nominatif dans les résolveurs de manifeste', () => {
+  const lookupSource = mediaRelationsSource.slice(
+    mediaRelationsSource.indexOf('export function getManifestGroupsForMedia'),
+    mediaRelationsSource.indexOf('export function materializeRelationGroup'),
+  );
+  const snapshotSource = mediaRelationsSource.slice(
+    mediaRelationsSource.indexOf('export function getManifestRelationSnapshot'),
+    mediaRelationsSource.indexOf('export function relationMediaKeys'),
+  );
+  assert.match(lookupSource, /groupsByMediaKey\.get\(mediaKey\)/);
+  assert.doesNotMatch(lookupSource, /title|name|label|year|popularity|startsWith|includes|RegExp/i);
+  assert.doesNotMatch(snapshotSource, /title|name|label|year|popularity|startsWith|includes|RegExp/i);
 });
 
 test('SEENIT-RELATION-001 masque les auto-relations et qualifie les IDs par type', () => {
