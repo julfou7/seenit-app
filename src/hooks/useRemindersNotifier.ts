@@ -2,10 +2,11 @@ import { useEffect } from 'react';
 import { useShowsStore } from '../store/showsStore';
 import { useToastStore } from '../store/toastStore';
 import { getUpcomingEpisodeInfo } from '../components/cards/UpcomingShowCard';
-import { auth, sendNativeNotification } from '../lib/firebase';
+import { auth } from '../lib/firebase';
 import { getTodayStr } from '../lib/utils';
 import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
 import { resolveNotificationMediaVisual } from '../features/notifications/notificationMedia';
+import { sendMediaReminderNotification } from '../features/notifications/mediaReminderNotification';
 
 export function useRemindersNotifier() {
   const shows = useShowsStore(state => state.shows);
@@ -38,14 +39,14 @@ export function useRemindersNotifier() {
         if (!isShowNotification && s.notificationsEnabled === false) continue;
 
         const title = s.title;
-        // w154 keeps the Android decoded bitmap comfortably below Binder limits.
-        // The richer image remains available to Web notifications separately.
+        // w154 keeps the Android largeIcon compact. The richer visual remains a
+        // separate local file and is decoded natively with bounded dimensions.
         const iconUrl = s.posterPath
           ? (s.posterPath.startsWith('http') ? s.posterPath : `https://image.tmdb.org/t/p/w154${s.posterPath}`)
           : 'https://seenit.app/icon-192.png';
 
         const imageUrl = s.backdropPath
-          ? (s.backdropPath.startsWith('http') ? s.backdropPath : `https://image.tmdb.org/t/p/w780${s.backdropPath}`)
+          ? (s.backdropPath.startsWith('http') ? s.backdropPath : `https://image.tmdb.org/t/p/w500${s.backdropPath}`)
           : (s.posterPath ? (s.posterPath.startsWith('http') ? s.posterPath : `https://image.tmdb.org/t/p/w500${s.posterPath}`) : iconUrl);
 
         // --- FILMS ---
@@ -62,6 +63,7 @@ export function useRemindersNotifier() {
             targetDate: Date,
             tag: string,
             notificationTitle: string,
+            summaryText: string,
             msgBody: string
           ) => {
             const targetStr = targetDate.toISOString().split('T')[0];
@@ -85,9 +87,10 @@ export function useRemindersNotifier() {
 
             const send = async (scheduleDate?: Date) => {
               const mediaVisual = await resolveNotificationMediaVisual(iconUrl, imageUrl);
-              await sendNativeNotification(notificationTitle, {
+              await sendMediaReminderNotification(notificationTitle, {
                 ...notificationPayload,
                 ...mediaVisual,
+                summaryText,
                 scheduleDate
               } as any);
             };
@@ -113,6 +116,7 @@ export function useRemindersNotifier() {
               releaseDate,
               'theater',
               `🎬 ${title}`,
+              '🎬 Sortie cinéma',
               `Sortie Cinéma : ${title} est dans les salles aujourd'hui !`
             );
           }
@@ -121,6 +125,7 @@ export function useRemindersNotifier() {
               dvdDate,
               'vod',
               `📺 ${title}`,
+              '📺 Sortie DVD / VOD',
               `Sortie DVD / VOD : ${title} est désormais disponible !`
             );
           }
@@ -145,7 +150,7 @@ export function useRemindersNotifier() {
 
         const episodeStill = upcoming.still_path || s.nextEpisodeToAir?.still_path || s.nextEpisodeToWatch?.still_path;
         const tvImageUrl = episodeStill
-          ? (episodeStill.startsWith('http') ? episodeStill : `https://image.tmdb.org/t/p/w780${episodeStill}`)
+          ? (episodeStill.startsWith('http') ? episodeStill : `https://image.tmdb.org/t/p/w500${episodeStill}`)
           : imageUrl;
 
         const tvPayload = {
@@ -171,6 +176,7 @@ export function useRemindersNotifier() {
           targetDate: Date,
           tagPrefix: string,
           notificationTitle: string,
+          summaryText: string,
           msgBody: string,
           addActions: boolean = false
         ) => {
@@ -178,15 +184,16 @@ export function useRemindersNotifier() {
           const fullPayload = {
             ...tvPayload,
             body: msgBody,
-            tag: `notif_${s.id}_${tagPrefix}_S${sNum}E${eNum}_${targetStr}`,
-            actions: addActions ? [{ action: 'mark_watched', title: '✓ Marquer comme vu' }] : undefined
+            tag: `notif_${s.id}_${tagPrefix}_S${sNum}E${eNum}_${targetStr}`
           };
 
           const send = async (scheduleDate?: Date) => {
             const mediaVisual = await resolveNotificationMediaVisual(iconUrl, tvImageUrl);
-            await sendNativeNotification(notificationTitle, {
+            await sendMediaReminderNotification(notificationTitle, {
               ...fullPayload,
               ...mediaVisual,
+              summaryText,
+              allowMarkWatched: addActions,
               scheduleDate
             } as any);
           };
@@ -212,6 +219,7 @@ export function useRemindersNotifier() {
             d7Date9Am,
             'd7',
             `📅 ${title}`,
+            '📅 Nouvelle saison',
             `La saison ${upcoming.season_number} de ${title} sort dans 7 jours ! Préparez-vous !`
           );
         }
@@ -221,6 +229,7 @@ export function useRemindersNotifier() {
             airDate9Am,
             'today',
             `🆕 ${title}`,
+            '🆕 Nouvel épisode',
             `L'épisode S${sNum}E${eNum} ${upcoming.name ? `« ${upcoming.name} » ` : ''}est disponible aujourd'hui !`,
             true
           );

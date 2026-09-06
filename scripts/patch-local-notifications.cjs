@@ -20,9 +20,13 @@ const pluginDir = path.join(
 const localNotificationPath = path.join(pluginDir, 'LocalNotification.kt');
 const localNotificationManagerPath = path.join(pluginDir, 'LocalNotificationManager.kt');
 const PATCH_MARKER = 'SEENIT_LOCAL_NOTIFICATION_FILE_ICON_PATCH';
+const BIG_PICTURE_MARKER = 'SEENIT_LOCAL_NOTIFICATION_BOUNDED_BIG_PICTURE_PATCH';
 
 if (!fs.existsSync(localNotificationPath)) {
   throw new Error(`LocalNotifications Android source not found: ${localNotificationPath}`);
+}
+if (!fs.existsSync(localNotificationManagerPath)) {
+  throw new Error(`LocalNotifications Android manager source not found: ${localNotificationManagerPath}`);
 }
 
 let localNotification = fs.readFileSync(localNotificationPath, 'utf8');
@@ -40,9 +44,71 @@ const stockResolver = `fun resolveLargeIcon(context: Context): Bitmap? {
         return null
     }`;
 
+const patchedSetter = `// ${PATCH_MARKER}: preserve only short local file paths.
+    // Remote/base64 image bytes must never cross the Capacitor/Binder payload.
+    var largeIcon: String? = null
+        set(value) {
+            field = if (value != null && (value.startsWith("/") || value.startsWith("file://"))) {
+                value
+            } else {
+                AssetUtil.getResourceBaseName(value)
+            }
+        }`;
+
+const patchedResolver = `private fun decodeSeenItLocalBitmap(value: String, maxWidth: Int, maxHeight: Int): Bitmap? {
+        if (!(value.startsWith("/") || value.startsWith("file://"))) return null
+        val filePath = value.removePrefix("file://")
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(filePath, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+        var sampleSize = 1
+        while (bounds.outWidth / sampleSize > maxWidth || bounds.outHeight / sampleSize > maxHeight) {
+            sampleSize *= 2
+        }
+
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sampleSize
+            inPreferredConfig = Bitmap.Config.RGB_565
+        }
+        return BitmapFactory.decodeFile(filePath, options)
+    }
+
+    fun resolveLargeIcon(context: Context): Bitmap? {
+        val icon = largeIcon ?: return null
+        return try {
+            if (icon.startsWith("/") || icon.startsWith("file://")) {
+                decodeSeenItLocalBitmap(icon, 192, 288)
+            } else {
+                val resId = AssetUtil.getResourceID(context, icon, "drawable")
+                if (resId != AssetUtil.RESOURCE_ID_ZERO_VALUE) {
+                    BitmapFactory.decodeResource(context.resources, resId)
+                } else {
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("LocalNotification", "Failed to resolve SeenIt local large icon: " + e.message)
+            null
+        }
+    }
+
+    // ${BIG_PICTURE_MARKER}: only the dedicated local attachment is accepted.
+    // It is sampled before NotificationCompat sees it so the scheduled Notification
+    // stays comfortably below the historical Binder transaction limit.
+    fun resolveSeenItBigPicture(): Bitmap? {
+        val value = attachments?.firstOrNull { it.id == "seenit-media" }?.url ?: return null
+        return try {
+            decodeSeenItLocalBitmap(value, 512, 288)
+        } catch (e: Exception) {
+            android.util.Log.w("LocalNotification", "Failed to resolve SeenIt local big picture: " + e.message)
+            null
+        }
+    }`;
+
 // Migrate an already-installed node_modules tree from the historical SeenIt
-// patch before applying the new contract. Fresh npm ci installations never
-// enter this branch, but local npm install remains deterministic as well.
+// Base64 patch before applying the current file-only contract. Fresh npm ci
+// installations never enter this branch, but local npm install remains deterministic.
 if (!localNotification.includes(PATCH_MARKER) && localNotification.includes('android.util.Base64.decode')) {
   const legacySetter = `var largeIcon: String? = null
         set(value) {
@@ -79,18 +145,17 @@ if (!localNotification.includes(PATCH_MARKER) && localNotification.includes('and
 }
 
 if (!localNotification.includes(PATCH_MARKER)) {
-  const patchedSetter = `// ${PATCH_MARKER}: preserve only short local file paths.
-    // Remote/base64 image bytes must never cross the Capacitor/Binder payload.
-    var largeIcon: String? = null
-        set(value) {
-            field = if (value != null && (value.startsWith("/") || value.startsWith("file://"))) {
-                value
-            } else {
-                AssetUtil.getResourceBaseName(value)
-            }
-        }`;
-
-  const patchedResolver = `fun resolveLargeIcon(context: Context): Bitmap? {
+  if (!localNotification.includes(stockSetter) || !localNotification.includes(stockResolver)) {
+    throw new Error(
+      'Unsupported @capacitor/local-notifications source: expected largeIcon blocks were not found. ' +
+      'Refusing to apply a partial notification patch.'
+    );
+  }
+  localNotification = localNotification
+    .replace(stockSetter, patchedSetter)
+    .replace(stockResolver, patchedResolver);
+} else if (!localNotification.includes(BIG_PICTURE_MARKER)) {
+  const oldPatchedResolver = `fun resolveLargeIcon(context: Context): Bitmap? {
         val icon = largeIcon ?: return null
         return try {
             if (icon.startsWith("/") || icon.startsWith("file://")) {
@@ -108,36 +173,25 @@ if (!localNotification.includes(PATCH_MARKER)) {
             null
         }
     }`;
-
-  if (!localNotification.includes(stockSetter) || !localNotification.includes(stockResolver)) {
-    throw new Error(
-      'Unsupported @capacitor/local-notifications source: expected largeIcon blocks were not found. ' +
-      'Refusing to apply a partial notification patch.'
-    );
+  if (!localNotification.includes(oldPatchedResolver)) {
+    throw new Error('Existing SeenIt local-file icon patch cannot be upgraded safely.');
   }
-
-  localNotification = localNotification
-    .replace(stockSetter, patchedSetter)
-    .replace(stockResolver, patchedResolver);
-
-  fs.writeFileSync(localNotificationPath, localNotification, 'utf8');
-  console.log('✅ Patched LocalNotification.kt for safe local-file large icons.');
-} else {
-  console.log('ℹ️ LocalNotification.kt already contains the SeenIt local-file icon patch.');
+  localNotification = localNotification.replace(oldPatchedResolver, patchedResolver);
 }
 
-// Older SeenIt builds patched LocalNotificationManager.kt to decode Base64 and
-// attachments as BigPictureStyle. Besides being brittle across plugin updates,
-// that path was involved in the historical TransactionTooLargeException / Kotlin
-// regressions. A clean npm ci already restores the stock manager; this cleanup
-// also makes repeated local installs converge to the same safe state.
-if (fs.existsSync(localNotificationManagerPath)) {
-  let manager = fs.readFileSync(localNotificationManagerPath, 'utf8');
-  const hasLegacyBigPicturePatch = manager.includes('var bigPictureBitmap: Bitmap? = null');
+if (!localNotification.includes(PATCH_MARKER) || !localNotification.includes(BIG_PICTURE_MARKER)) {
+  throw new Error('SeenIt LocalNotification image patch markers are incomplete after patching.');
+}
+fs.writeFileSync(localNotificationPath, localNotification, 'utf8');
+console.log('✅ Patched LocalNotification.kt for bounded local-file media visuals.');
 
-  if (hasLegacyBigPicturePatch) {
-    const legacyStyleBlock = /\s*val largeIconBitmap = localNotification\.resolveLargeIcon\(context\)[\s\S]*?localNotification\.inboxList\?\.let \{ lines ->[\s\S]*?mBuilder\.setStyle\(inboxStyle\)\s*\}/m;
-    const stockStyleBlock = `
+let manager = fs.readFileSync(localNotificationManagerPath, 'utf8');
+
+// Remove only the obsolete historical SeenIt patch that decoded arbitrary
+// Base64/attachment bitmaps. The current patch is file-only and dimension-bounded.
+if (manager.includes('var bigPictureBitmap: Bitmap? = null')) {
+  const legacyStyleBlock = /\s*val largeIconBitmap = localNotification\.resolveLargeIcon\(context\)[\s\S]*?localNotification\.inboxList\?\.let \{ lines ->[\s\S]*?mBuilder\.setStyle\(inboxStyle\)\s*\}/m;
+  const stockStyleBlock = `
 
         if (localNotification.largeBody != null) {
             mBuilder.setStyle(
@@ -155,23 +209,54 @@ if (fs.existsSync(localNotificationManagerPath)) {
             mBuilder.setStyle(inboxStyle)
         }`;
 
-    if (!legacyStyleBlock.test(manager)) {
-      throw new Error('Legacy SeenIt BigPicture patch detected but its style block could not be safely removed.');
-    }
-
-    manager = manager.replace(legacyStyleBlock, stockStyleBlock);
-    manager = manager.replace(
-      /if \(largeIconBitmap != null\) \{\s*mBuilder\.setLargeIcon\(largeIconBitmap\)\s*\}/g,
-      'mBuilder.setLargeIcon(localNotification.resolveLargeIcon(context))'
-    );
-    manager = manager.replace('import android.graphics.Bitmap\n', '');
-    manager = manager.replace('import android.graphics.BitmapFactory\n', '');
-
-    if (manager.includes('largeIconBitmap') || manager.includes('bigPictureBitmap')) {
-      throw new Error('Legacy notification bitmap patch cleanup left unexpected bitmap variables behind.');
-    }
-
-    fs.writeFileSync(localNotificationManagerPath, manager, 'utf8');
-    console.log('✅ Removed legacy SeenIt BigPicture/Base64 patch from LocalNotificationManager.kt.');
+  if (!legacyStyleBlock.test(manager)) {
+    throw new Error('Legacy SeenIt BigPicture patch detected but its style block could not be safely removed.');
   }
+  manager = manager.replace(legacyStyleBlock, stockStyleBlock);
+  manager = manager.replace(
+    /if \(largeIconBitmap != null\) \{\s*mBuilder\.setLargeIcon\(largeIconBitmap\)\s*\}/g,
+    'mBuilder.setLargeIcon(localNotification.resolveLargeIcon(context))'
+  );
+  manager = manager.replace('import android.graphics.Bitmap\n', '');
+  manager = manager.replace('import android.graphics.BitmapFactory\n', '');
 }
+
+if (!manager.includes(BIG_PICTURE_MARKER)) {
+  const stockStyleBlock = `if (localNotification.largeBody != null) {
+            mBuilder.setStyle(
+                NotificationCompat.BigTextStyle()
+                    .bigText(localNotification.largeBody)
+                    .setSummaryText(localNotification.summaryText)
+            )
+        }`;
+  const boundedStyleBlock = `// ${BIG_PICTURE_MARKER}: render only the pre-cached, sampled local attachment.
+        val seenItBigPicture = localNotification.resolveSeenItBigPicture()
+        if (seenItBigPicture != null) {
+            mBuilder.setStyle(
+                NotificationCompat.BigPictureStyle()
+                    .bigPicture(seenItBigPicture)
+                    .setSummaryText(localNotification.summaryText)
+            )
+        } else if (localNotification.largeBody != null) {
+            mBuilder.setStyle(
+                NotificationCompat.BigTextStyle()
+                    .bigText(localNotification.largeBody)
+                    .setSummaryText(localNotification.summaryText)
+            )
+        }`;
+
+  if (!manager.includes(stockStyleBlock)) {
+    throw new Error('Unsupported LocalNotificationManager style block; refusing partial BigPicture patch.');
+  }
+  manager = manager.replace(stockStyleBlock, boundedStyleBlock);
+}
+
+if (manager.includes('android.util.Base64.decode') || manager.includes('data:image/')) {
+  throw new Error('Unsafe Base64 notification image code remains in LocalNotificationManager.kt.');
+}
+if (!manager.includes(BIG_PICTURE_MARKER)) {
+  throw new Error('SeenIt bounded BigPicture patch marker is missing after patching.');
+}
+
+fs.writeFileSync(localNotificationManagerPath, manager, 'utf8');
+console.log('✅ Patched LocalNotificationManager.kt for bounded local-file BigPictureStyle.');

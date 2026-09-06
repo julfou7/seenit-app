@@ -24,6 +24,18 @@ function extractShowsLoop(): string {
 
 const loop = extractShowsLoop();
 
+function firstNotificationScheduleIndex(): number {
+  const candidates = [
+    'sendMediaReminderNotification(',
+    'sendNativeNotification('
+  ]
+    .map(marker => loop.indexOf(marker))
+    .filter(index => index >= 0);
+
+  assert.ok(candidates.length > 0, 'un appel de planification de notification doit exister dans la boucle');
+  return Math.min(...candidates);
+}
+
 test('issue #94 ignore chaque média inéligible sans interrompre les suivants', () => {
   assert.doesNotMatch(loop, /\breturn\s*;/, 'aucun média ne doit pouvoir quitter processReminders depuis la boucle');
 
@@ -36,9 +48,9 @@ test('issue #94 ignore chaque média inéligible sans interrompre les suivants',
 });
 
 test('issue #94 ne programme rien avant les garde-fous d’éligibilité', () => {
-  const firstNativeNotification = loop.indexOf('sendNativeNotification(');
-  assert.ok(firstNativeNotification > loop.indexOf("if (s.isArchived || s.status === 'dropped') continue;"));
-  assert.ok(firstNativeNotification > loop.indexOf("if (s.mediaType === 'movie' && !s.firstAirDate) continue;"));
+  const firstNotificationSchedule = firstNotificationScheduleIndex();
+  assert.ok(firstNotificationSchedule > loop.indexOf("if (s.isArchived || s.status === 'dropped') continue;"));
+  assert.ok(firstNotificationSchedule > loop.indexOf("if (s.mediaType === 'movie' && !s.firstAirDate) continue;"));
 
   const tvSchedule = loop.indexOf('const scheduleTvAlert');
   assert.ok(tvSchedule > loop.indexOf('if (!upcoming || !upcoming.air_date) continue;'));
