@@ -5,69 +5,59 @@ import test from 'node:test';
 const specification = readFileSync(new URL('../docs/specifications/seenit.md', import.meta.url), 'utf8');
 const functionalReference = readFileSync(new URL('../docs/specifications/functional-reference.md', import.meta.url), 'utf8');
 const requirements = JSON.parse(readFileSync(new URL('../docs/specifications/requirements.json', import.meta.url), 'utf8'));
-const audit = readFileSync(new URL('../docs/audits/audit-media-relations-2026-09-05.md', import.meta.url), 'utf8');
 const registry = readFileSync(new URL('../docs/requests/registry.md', import.meta.url), 'utf8');
+const decision = readFileSync(new URL('../docs/decisions/media-relations-2026-09-06.md', import.meta.url), 'utf8');
 const agentInstructions = readFileSync(new URL('../AGENTS.md', import.meta.url), 'utf8');
 
-test('SEENIT-RELATION-001 sépare saga univers et médias similaires', () => {
-  assert.match(specification, /Ordre de visionnage \/ saga/);
-  assert.match(specification, /Même univers narratif/);
-  assert.match(specification, /Similaires[^\n]*recommandations contextuelles TMDB/);
-  assert.match(specification, /saga\/ordre de visionnage, puis même univers, puis similaires/);
-  assert.match(functionalReference, /### 8\.4 Sagas, univers cross-media et médias similaires/);
+test('SEENIT-RELATION-001 limite les fiches aux relations utiles', () => {
+  assert.match(specification, /Film[^\n]*Ordre de visionnage[\s\S]*Franchise \/ univers/);
+  assert.match(specification, /Série[^\n]*Franchise \/ univers/);
+  assert.match(specification, /Films similaires[\s\S]*Séries similaires[\s\S]*supprim/);
+  assert.match(functionalReference, /### 8\.4 Ordre de visionnage et franchise \/ univers/);
+  assert.match(decision, /Une fiche média sert à répondre[\s\S]*réellement lié/);
 });
 
-test('SEENIT-RELATION-001 interdit tout univers déduit du titre ou de la popularité', () => {
-  assert.match(specification, /Le titre, l'année, la popularité[\s\S]*ne prouvent \*\*jamais\*\* une relation/);
-  assert.match(specification, /aucun fallback par titre/);
-  assert.match(specification, /Une liste dite officielle, son nom ou son score ne suffisent jamais/);
-  assert.match(specification, /cas nommé[\s\S]*scénario[\s\S]*TNR et jamais une condition de production/);
-  assert.match(functionalReference, /titre cité dans un bug sert uniquement d'exemple de test/);
-  assert.match(agentInstructions, /Relations médias : aucune rustine nominative/);
-  assert.match(agentInstructions, /aucun code spécial ne porte le nom du cas corrigé/);
+test('SEENIT-RELATION-001 réserve l’ordre de visionnage aux collections TMDB', () => {
+  assert.match(specification, /Ordre de visionnage[\s\S]*exclusivement[\s\S]*collection TMDB/);
+  assert.match(specification, /Aucune série n'est ajoutée dans cette section/);
+  assert.match(functionalReference, /Pour un film, « Ordre de visionnage » provient exclusivement de sa collection TMDB explicite/);
+  assert.match(decision, /Aucun catalogue SeenIt, TVDB, Wikidata ou rapprochement par titre ne complète une collection TMDB manquante/);
 });
 
-test('SEENIT-RELATION-001 impose une identité mediaType plus TMDB et des groupes bidirectionnels', () => {
-  assert.match(specification, /couple mediaType \+ tmdbId/);
-  assert.match(specification, /movie:42 et[\s\S]*tv:42 ne sont jamais fusionnés/);
-  assert.match(specification, /chaque point d'entrée retourne le même ensemble et le même ordre/);
-  assert.match(functionalReference, /Les sagas[\s\S]*univers sont bidirectionnels/);
+test('SEENIT-RELATION-001 résout TVDB sans recherche par titre ni fusion de listes', () => {
+  assert.match(specification, /TVDB devient la source normale[\s\S]*films comme[\s\S]*séries/);
+  assert.match(specification, /aucune recherche du média par titre/);
+  assert.match(specification, /aucune recherche globale de listes/);
+  assert.match(specification, /au maximum une liste officielle/);
+  assert.match(specification, /plus aucune fusion de plusieurs listes/);
+  assert.match(specification, /libellé d'une liste[\s\S]*uniquement[\s\S]*qualifier sa nature/);
+  assert.match(agentInstructions, /Le libellé d'une liste TVDB déjà atteinte depuis l'identité exacte/);
 });
 
-test('SEENIT-RELATION-001 fixe les TNR Yellowstone Breaking Bad Harry Potter Marvel DC et House of Guinness', () => {
-  for (const fixture of ['Yellowstone', 'Breaking Bad', 'Harry Potter', 'Marvel', 'DC', 'House of Guinness']) {
-    assert.match(audit, new RegExp(fixture));
-    assert.match(specification, new RegExp(fixture));
-  }
-  assert.match(audit, /Better Call Saul \| \*\*42 membres\*\*/);
-  assert.match(audit, /aucune section si elle ne contiendrait que soi/);
+test('SEENIT-RELATION-001 déduplique la franchise après la saga', () => {
+  assert.match(specification, /priorité[\s\S]*Ordre de visionnage[\s\S]*Franchise \/ univers/);
+  assert.match(specification, /dédupliqu(?:é|ée)[\s\S]*mediaType \+ tmdbId/);
+  assert.match(functionalReference, /Un média déjà présent dans l'Ordre de visionnage est retiré de la section TVDB/);
+  assert.match(decision, /ne répète pas ces films/);
 });
 
-test('SEENIT-RELATION-001 borne les sources distantes et les performances', () => {
-  assert.match(specification, /Cache normalisé par mediaKey et groupId/);
-  assert.match(specification, /cache chaud inférieur ou égal à 150 ms/);
-  assert.match(specification, /résolution[\s\n]+froide ciblée à 2,5 s/);
-  assert.match(specification, /timeout dur à 4 s/);
-  assert.match(audit, /Wikidata[\s\S]*hors ligne/);
-  assert.match(audit, /#12/);
+test('SEENIT-RELATION-001 retire les similaires des fiches et garde la découverte dans Explorer', () => {
+  assert.match(specification, /Les sections « Films similaires » et « Séries similaires » sont supprimées des fiches/);
+  assert.match(specification, /Explorer[\s\S]*découverte/);
+  assert.match(functionalReference, /Les recommandations contextuelles restent dans Explorer/);
+  assert.match(decision, /recommendations[\s\S]*similar[\s\S]*ne sont plus utilisés pour remplir le bas d'une fiche/);
 });
 
-test('SEENIT-RELATION-001 impose un catalogue généré et une revue des candidats hors ligne', () => {
-  assert.match(specification, /catalogue éditorial séparé du code/);
-  assert.match(specification, /générateur déterministe/);
-  assert.match(specification, /pending-review/);
-  assert.match(specification, /ne publie[\s\n]+rien directement/);
-  assert.match(functionalReference, /génère un snapshot identique dans la[\s\S]*PWA et l'APK/);
-  assert.match(registry, /USR-2026-09-06-005/);
-});
+test('SEENIT-RELATION-001 trace la décision durable et l’écart runtime', () => {
+  assert.match(registry, /USR-2026-09-05-002[\s\S]*superseded/);
+  assert.match(registry, /USR-2026-09-06-005[\s\S]*superseded/);
+  assert.match(registry, /USR-2026-09-06-008[\s\S]*SEENIT-RELATION-001[\s\S]*active/);
+  assert.match(functionalReference, /runtime actuel conserve encore le catalogue relationnel SeenIt/);
+  assert.match(functionalReference, /issue #130/);
+  assert.match(decision, /issue #130 reste donc \*\*ouverte\*\*/);
 
-test('SEENIT-RELATION-001 reste reliée au registre et au manifeste de tests', () => {
-  assert.match(registry, /USR-2026-09-05-002/);
-  assert.match(registry, /SEENIT-RELATION-001/);
-  assert.match(registry, /issue #130/);
   const requirement = requirements.requirements.find((entry: { id: string }) => entry.id === 'SEENIT-RELATION-001');
   assert.ok(requirement, 'SEENIT-RELATION-001 doit rester déclarée dans requirements.json');
-  assert.equal(requirement.tests.length, 9);
-  assert.ok(requirement.tests.some((expected: { file: string }) => expected.file === 'tests/mediaRelationsSpecification.test.ts'));
-  assert.ok(requirement.tests.some((expected: { file: string }) => expected.file === 'tests/mediaRelationsCatalog.test.ts'));
+  assert.equal(requirement.tests.length, 6);
+  assert.ok(requirement.tests.every((expected: { file: string }) => expected.file === 'tests/mediaRelationsSpecification.test.ts'));
 });
