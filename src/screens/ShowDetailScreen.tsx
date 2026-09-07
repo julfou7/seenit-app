@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { type Show } from '../types';
-import { tmdb, isAdultOrParodyMedia, isMovieAtCinema, isMovieUpcoming } from '../features/shows/tmdb';
+import { tmdb, isMovieAtCinema, isMovieUpcoming } from '../features/shows/tmdb';
 import { ChevronLeft, Star, Heart, CheckCircle2, Circle, Tv, Zap, X, EyeOff, Archive, Trash2, MoreVertical, Plus, Check, Share, Share2, Play, Calendar, ChevronUp, ChevronDown, ArchiveRestore, Ban, RotateCcw, MonitorPlay, Ticket, Youtube, Clapperboard, ExternalLink, Clock, RefreshCw, Download } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getBestLogoPath, getTodayStr, getCalendarDaysDiff, getEpisodeRelativeAirDate, scrollAllCarouselsToStart, openExternalUrl, checkIsUpToDate } from '../lib/utils';
@@ -29,7 +29,7 @@ import { searchAndDownloadInSonarr, searchAndDownloadInRadarr } from '../service
 import { downloadEpisodeWithSeasonPackFallback } from '../features/downloads/episodeSeasonPackFallback';
 import { acceptDownloadRequest, beginDownloadRequest, failDownloadRequest, updateDownloadRequest } from '../features/downloads/downloadLifecycle';
 import { readUserScopedJson } from '../lib/userIsolation';
-import { mediaKeyFrom, relationMediaKeys, toMediaKey } from '../features/shows/mediaRelations';
+import { mediaKeyFrom, toMediaKey } from '../features/shows/mediaRelations';
 
 
 interface ShowDetailScreenProps {
@@ -141,83 +141,6 @@ const getProviderDirectLink = (providerId: number, title: string, fallbackLink: 
     case 239: return `https://www.arte.tv/fr/search/?q=${query}`;
     default: return fallbackLink || '#';
   }
-};
-
-const ASIAN_COUNTRIES = new Set(['KR', 'JP', 'CN', 'TW', 'TH', 'HK']);
-const NON_FICTION_GENRES = [10767, 10763, 10764, 10766]; // Talk, News, Reality, Soap
-
-const getPrioritizedSimilarMedia = (tmdbDetails: any, collectionData?: any, universeData?: any) => {
-  if (!tmdbDetails) return [];
-
-  const currentType: 'movie' | 'tv' = tmdbDetails.media_type === 'movie' || tmdbDetails.title
-    ? 'movie'
-    : 'tv';
-  const excludedKeys = relationMediaKeys([
-    ...(collectionData?.parts || []),
-    ...(universeData?.parts || []),
-  ]);
-  const currentKey = mediaKeyFrom(tmdbDetails, currentType);
-  if (currentKey) excludedKeys.add(currentKey);
-  
-  // Toujours exclure le média actuel, sa saga et son univers par identité typée.
-  const isDuplicate = (item: any) => {
-    if (!item || !item.poster_path) return true;
-    const itemKey = mediaKeyFrom(item, currentType);
-    if (!itemKey || excludedKeys.has(itemKey)) return true;
-    if (isAdultOrParodyMedia(item)) return true;
-    if ((item.vote_count || 0) < 50) return true;
-    return false;
-  };
-
-  const currentGenreIds = new Set<number>(
-    (tmdbDetails.genres || []).map((g: any) => g.id)
-  );
-  const forbiddenGenres = new Set<number>(
-    NON_FICTION_GENRES.filter(gId => !currentGenreIds.has(gId))
-  );
-
-  const filterItem = (item: any, isSimilarFallback: boolean = false) => {
-    if (isDuplicate(item)) return false;
-    
-    const itemGenres: number[] = item.genre_ids || [];
-    if (itemGenres.some(gId => forbiddenGenres.has(gId))) return false;
-    
-    const countries = item.origin_country || [];
-    const isAsian = countries.some((c: string) => ASIAN_COUNTRIES.has(c));
-    if (isAsian) {
-      const isGlobalHit = (item.vote_count || 0) >= 1000 || (item.popularity || 0) >= 80;
-      if (!isGlobalHit) return false;
-    }
-    
-    // Si ça vient de "similar" (basé sur mots clés), on est plus strict sur la qualité
-    if (isSimilarFallback) {
-      if ((item.vote_average || 0) < 6.5) return false;
-      if ((item.vote_count || 0) < 300) return false;
-    }
-    
-    return true;
-  };
-
-  let recommendations = (tmdbDetails.recommendations?.results || []).filter((i: any) => filterItem(i, false));
-  let similar = (tmdbDetails.similar?.results || []).filter((i: any) => filterItem(i, true));
-  
-  // Trier le fallback similar par popularité pour éviter les résultats obscurs
-  similar.sort((a: any, b: any) => (b.vote_count || 0) - (a.vote_count || 0));
-
-  // Fusionner intelligemment : on garde les recommandations (comportement utilisateur) 
-  // et on complète avec les meilleurs "similar" si on manque de recommandations.
-  const seenKeys = relationMediaKeys(recommendations, currentType);
-  const combined = [...recommendations];
-  
-  for (const item of similar) {
-    const itemKey = mediaKeyFrom(item, currentType);
-    if (itemKey && !seenKeys.has(itemKey)) {
-      combined.push(item);
-      seenKeys.add(itemKey);
-    }
-  }
-
-  return combined;
 };
 
 const getKeywordsFromDetails = (details: any, mediaType: 'tv' | 'movie'): string[] => {
@@ -558,7 +481,6 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
 
 
   const [visibleSeasons, setVisibleSeasons] = useState(5);
-  const [visibleSimilar, setVisibleSimilar] = useState(10);
   const [visibleCast, setVisibleCast] = useState(12);
   const [showAllCast, setShowAllCast] = useState(false);
   const [trailerModalVideos, setTrailerModalVideos] = useState<any[] | null>(null);
@@ -977,7 +899,6 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   }, [initialSeason, initialEpisode, effectiveTmdbId]);
 
   const seasonObserverRef = useRef<HTMLDivElement>(null);
-  const similarObserverRef = useRef<HTMLDivElement>(null);
   const castObserverRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -989,16 +910,6 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     if (seasonObserverRef.current) observer.observe(seasonObserverRef.current);
     return () => observer.disconnect();
   }, [activeTab]);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting) {
-        setVisibleSimilar(prev => prev + 10);
-      }
-    }, { rootMargin: '100px' });
-    if (similarObserverRef.current) observer.observe(similarObserverRef.current);
-    return () => observer.disconnect();
-  }, []);
 
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
@@ -2741,7 +2652,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
             {(universeData && universeData.parts && universeData.parts.length > 0) && (
               <div className={collectionData?.parts?.length > 0 ? "mt-6" : ""}>
                 <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-3">
-                  Dans le même univers
+                  {universeData.parts[0]?.seenitRelationKind === 'franchise' ? 'Dans la même franchise' : 'Dans le même univers'}
                 </h3>
                 <div className="flex overflow-x-auto gap-3.5 hide-scrollbar py-2 px-1 -mx-1">
                   {universeData.parts.map((part: any, idx: number) => (
@@ -2760,7 +2671,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
             {collectionLoading && (
               <div>
                 <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-3">
-                  {isSeries ? "Dans le même univers" : "Ordre de visionnage"}
+                  Relations
                 </h3>
                 <div className="flex overflow-x-auto gap-3.5 hide-scrollbar py-2 px-1 -mx-1">
                   {[1, 2, 3, 4].map(i => (
@@ -2999,50 +2910,6 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
               />
             </div>
 
-            {/* Séries / Films similaires remontés dans À Propos */}
-            {(() => {
-              const similarList = getPrioritizedSimilarMedia(tmdbDetails, collectionData, universeData);
-              if (similarList.length === 0) return null;
-
-              return (
-                <div className="pt-2">
-                  <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-3">
-                    {isSeries ? "Séries similaires" : "Films similaires"}
-                  </h3>
-                  <div className="flex gap-3.5 overflow-x-auto pb-2 snap-x snap-mandatory hide-scrollbar">
-                    {similarList.slice(0, 15).map((item: any, idx: number) => {
-                      const title = item.title || item.name;
-
-                      return (
-                        <div
-                          key={`similar_${item.media_type || 'media'}_${item.id}_${idx}`}
-                          onClick={() => onShowClick?.(item.id, item.media_type || (item.title ? 'movie' : (isSeries ? 'tv' : 'movie')))}
-                          className="w-[115px] shrink-0 snap-start flex flex-col gap-1.5 cursor-pointer group active:scale-95 transition-transform"
-                        >
-                          <div className="w-full aspect-[2/3] bg-zinc-900 rounded-xl overflow-hidden relative shadow-md border border-white/5">
-                            {item.poster_path ? (
-                              <img loading="lazy" decoding="async"
-                                src={`https://image.tmdb.org/t/p/w185${item.poster_path}`}
-                                alt={title}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center p-2 text-center text-xs text-zinc-600 font-bold">
-                                {title}
-                              </div>
-                            )}
-                          </div>
-
-                          <span className="text-[11px] font-bold text-zinc-300 line-clamp-1 group-hover:text-[#E5A93D] transition-colors">
-                            {title}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
           </div>
 
         {isSeries && (
