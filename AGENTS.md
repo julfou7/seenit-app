@@ -69,17 +69,51 @@ propose une architecture ou un backlog borné. L'issue et la PR indiquent systé
 « portée globale ou locale » et « risque résiduel ». Une pure copie d'interface, documentation ou tâche
 sans anomalie peut indiquer « sans objet » afin de conserver le chemin light.
 
+## 0.3 Politique obligatoire — API-first, workspace unique et reprise
+
+La vérification du `main` GitHub canonique est une **lecture d'état distante**. Elle n'impose à elle seule
+ni clone, ni checkout, ni installation de dépendances.
+
+1. Commencer **API-first** : lire `main`, l'issue, la PR, les commits et les fichiers canoniques via le
+   connecteur/API GitHub tant qu'aucune commande locale n'est réellement nécessaire. Une demande
+   read-only se traite sans clone et sans matérialiser de workspace.
+2. Avant toute acquisition locale, rechercher un workspace SeenIt déjà présent dans l'environnement.
+   S'il existe, vérifier son état, confronter son HEAD/sa branche au `main` ou à la branche du chantier,
+   puis le réutiliser. **Un nouveau prompt n'est jamais une raison de recloner.**
+3. Si aucun workspace n'existe et qu'une exécution locale est nécessaire, acquérir le dépôt **une seule
+   fois par environnement** depuis le SHA/branche canonique, avec le mode minimal compatible
+   (`--depth`, clone partiel ou checkout partiel) plutôt qu'un historique complet par défaut.
+4. Ne lancer `npm ci` que si les dépendances sont absentes ou incompatibles avec la version Node et le
+   `package-lock.json` du chantier. Un `node_modules` ou cache exact compatible est réutilisé.
+5. Lors d'une reprise, repartir d'abord de l'issue, de la PR ou de la branche existante et du dernier
+   jalon contenant la **prochaine action exacte**. Ne pas reconstruire l'historique complet si ce jalon
+   et les index canoniques bornent déjà le travail restant. **Reprise identifiée : pas de recherche globale.**
+   Si l'issue, la PR ou la branche du chantier et un checkpoint exploitable sont déjà connus, vérifier
+   `main`, lire ces références et exécuter la prochaine action exacte sans relancer la recherche générale
+   des issues ouvertes/fermées, PR, commits ou audits. Relancer cette recherche seulement si le périmètre
+   change, si le checkpoint est absent ou ambigu, si `main` révèle une contradiction pertinente ou si une
+   nouvelle anomalie hors périmètre apparaît.
+6. Si une demande initiale reste incomplète lors d'un handoff inévitable, mettre l'issue à jour avec le
+   SHA/branche/PR, les fichiers modifiés, les tests déjà verts, le blocage éventuel et la prochaine action
+   exacte afin que la reprise suivante commence par une action utile.
+7. Laisser les opérations distantes longues — CI, release et déploiement — à GitHub Actions. Ne pas
+   consommer une fenêtre d'exécution en polling rapproché, sauf demande explicite de suivi synchrone.
+
+Cette politique ne suppose jamais qu'un sandbox soit persistant : si la plateforme fournit réellement
+un environnement neuf, l'acquisition minimale peut être répétée. Elle interdit seulement de confondre
+cette contrainte de runtime avec une obligation SeenIt de recloner ou de reconstruire le contexte.
+
 ## 0. Avant toute analyse, proposition ou modification
 
 **Hors fast paths des sections 0.0 et 0.1 :**
 
 1. Lire intégralement ce fichier.
-2. Récupérer l'état courant de la branche GitHub `main` et son commit de tête. **GitHub `main` est la source de vérité** : ne jamais analyser ou modifier SeenIt à partir d'un workspace supposé à jour sans l'avoir confronté au `main` courant.
+2. Récupérer l'état courant de la branche GitHub `main` et son commit de tête. **GitHub `main` est la source de vérité** : ne jamais analyser ou modifier SeenIt à partir d'un workspace supposé à jour sans l'avoir confronté au `main` courant. Cette vérification n'impose aucun clone local ; appliquer la politique de la section 0.3.
 3. Lire intégralement `docs/specifications/seenit.md`, `docs/specifications/functional-reference.md`,
    `docs/specifications/README.md` et toute documentation pertinente pour le sujet ; pour toute
    livraison, lire aussi `docs/process/delivery.md`. La référence fonctionnelle est obligatoire :
    elle décrit les écrans, parcours, responsabilités des sources, différences PWA/APK et écarts connus.
-4. Rechercher systématiquement les issues GitHub **ouvertes et fermées liées au sujet**, ainsi que les PR, commits, audits et documents pertinents, afin de reprendre l'historique existant. Réutiliser ou rouvrir l'issue pertinente lorsqu'elle existe et éviter les doublons.
+4. Pour un nouveau chantier, ou lorsqu'aucune issue/PR/branche n'est déjà identifiée, rechercher systématiquement les issues GitHub **ouvertes et fermées liées au sujet**, ainsi que les PR, commits, audits et documents pertinents, afin de reprendre l'historique existant. Réutiliser ou rouvrir l'issue pertinente lorsqu'elle existe et éviter les doublons. Pour une reprise identifiée, appliquer la section 0.3 et ne pas rejouer cette recherche globale sauf si le périmètre change, si le checkpoint est absent ou ambigu, si `main` révèle une contradiction pertinente ou si une nouvelle anomalie hors périmètre apparaît.
 5. Dès qu'une issue est concernée, la maintenir à jour aux jalons significatifs de l'intervention : diagnostic, décisions, modifications, validations, merge/release ou blocage.
 6. Vérifier la branche GitHub de référence avant d'accepter un diff provenant d'AI Studio.
 
@@ -229,20 +263,20 @@ Aucun agent ne décide seul de cette migration.
 - Titre, titre original, année, nom de fichier et nom de release ne sont **jamais** des clés de matching.
 - Un même transfert physique se reconnaît uniquement par `requestId`, infohash/downloadId/alias exact ou chemin de transfert exact ; en cas d'ambiguïté, ne pas fusionner.
 
-## 5.2 Relations médias : aucune rustine nominative
+## 5.2 Relations médias : TMDB pour les sagas, TVDB pour les franchises
 
-- Une saga ou un univers est résolu uniquement par le mécanisme commun et des identités typées exactes
-  `movie:<tmdbId>` / `tv:<tmdbId>`. Un exemple utilisateur nommé (Punisher, Harry Potter, House of
-  Guinness, etc.) peut devenir une fixture/TNR, **jamais** une condition, branche, regex ou exception de
-  production fondée sur son titre.
-- Il est interdit de corriger un univers par comparaison de titre, titre original, année, popularité,
-  casting, studio, marque, mot-clé, nom de liste ou premier résultat d'une recherche, même si cela résout
-  le cas signalé. Sans preuve exacte, masquer la relation.
-- Une correction de données ciblée n'est admissible que dans un groupe versionné à provenance validée,
-  avec des `mediaKey` exactes et un TNR générique prouvant la réciprocité depuis **tous** ses membres. Le
-  résolveur reste identique pour toutes les œuvres ; aucun code spécial ne porte le nom du cas corrigé.
-- Tout correctif qui ferait réussir uniquement l'exemple signalé sans renforcer l'invariant global est
-  refusé en revue, même si son résultat visuel semble correct.
+La décision produit canonique est détaillée dans `docs/decisions/media-relations-2026-09-06.md` et suivie dans #130.
+
+- Sur une fiche **Film**, l'**Ordre de visionnage** provient exclusivement d'une collection TMDB explicite. Ne jamais compléter une collection absente avec TVDB, un catalogue SeenIt, Wikidata ou une heuristique.
+- Sur les fiches **Film et Série**, la relation **franchise / univers** provient normalement de TVDB à partir d'une identité externe exacte résolue depuis TMDB. Aucune recherche du média par titre et aucune recherche globale de listes n'est admise.
+- Examiner uniquement les listes TVDB réellement rattachées à l'œuvre exacte, retenir au maximum une liste officielle admissible et **ne jamais fusionner plusieurs listes** pour élargir artificiellement une franchise.
+- Le libellé d'une liste TVDB déjà atteinte depuis l'identité exacte peut seulement qualifier la liste pour l'interface (`franchise` ou `univers`). Il ne constitue jamais une clé de matching d'œuvre ou de membre.
+- Chaque membre TVDB doit être résolu vers `movie:<tmdbId>` ou `tv:<tmdbId>` avant affichage. Titre, titre original, année, popularité, casting, studio, marque, mot-clé ou premier résultat ne servent jamais à rattacher un membre.
+- Pour un film, la section TVDB est dédupliquée après l'Ordre de visionnage par `mediaType + tmdbId`. Une section sans autre média affichable est masquée.
+- Les sections **Films similaires** et **Séries similaires** n'appartiennent plus aux fiches média. La découverte approximative reste dans Explorer et ne devient jamais un fallback d'une relation TVDB manquante.
+- Wikidata, Kometa, MDBList et autres sources niche ne font plus partie de la stratégie normale de relations de fiche. Le catalogue SeenIt historique est hors du chemin runtime normal ; un éventuel override futur reste exceptionnel, versionné, exact et tracé, jamais une encyclopédie entretenue au cas par cas.
+- Un exemple utilisateur nommé (Punisher, Harry Potter, House of the Dragon, etc.) peut devenir une fixture/TNR, **jamais** une condition, branche, regex ou exception de production fondée sur son titre.
+- En cas d'ambiguïté ou de panne fournisseur, masquer la relation plutôt que rechercher par titre. Le reste de la fiche reste utilisable.
 
 ## 6. PWA et APK
 

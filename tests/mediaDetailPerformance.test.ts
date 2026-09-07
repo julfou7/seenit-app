@@ -7,7 +7,7 @@ import {
 } from '../src/features/shows/mediaRelations.ts';
 
 const tmdbClientSource = readFileSync(new URL('../src/features/shows/tmdbClient.ts', import.meta.url), 'utf8');
-const detailSource = readFileSync(new URL('../src/screens/ShowDetailScreen.tsx', import.meta.url), 'utf8');
+const detailSource = readFileSync(new URL('../src/screens/ShowDetailScreenCore.tsx', import.meta.url), 'utf8');
 
 test('SEENIT-PERF-001 réutilise les détails et relations sans nouveau chargement', () => {
   const startedAt = performance.now();

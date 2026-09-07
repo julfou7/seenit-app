@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const source = readFileSync('src/screens/SettingsScreen.tsx', 'utf8');
+const source = readFileSync('src/screens/SettingsScreenCore.tsx', 'utf8');
 const start = source.indexOf('const handleLogout = async () => {');
 const end = source.indexOf('const triggerTestNotif', start);
 const handler = source.slice(start, end);

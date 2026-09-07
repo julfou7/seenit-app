@@ -180,7 +180,7 @@ test('TNR #106 : sans événement futur, Tester garde un fallback média explici
 });
 
 test('TNR #106 : Settings réutilise exactement le pipeline média natif des vrais rappels', () => {
-  const source = readFileSync('src/screens/SettingsScreen.tsx', 'utf8');
+  const source = readFileSync('src/screens/SettingsScreenCore.tsx', 'utf8');
 
   assert.match(source, /buildNotificationTestSample\(shows, type\)/,
     'le bouton Tester doit choisir un exemple via le sélecteur dédié');

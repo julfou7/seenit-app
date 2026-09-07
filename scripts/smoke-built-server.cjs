@@ -1,11 +1,14 @@
 const http = require('node:http');
 const { spawn } = require('node:child_process');
 
-const child = spawn(process.execPath, ['dist/server.cjs'], {
+const child = spawn(process.execPath, ['build/server.cjs'], {
   env: {
     ...process.env,
     NODE_ENV: 'production',
-    PORT: '3000'
+    PORT: '3000',
+    TMDB_API_KEY: 'smoke-tmdb',
+    OMDB_API_KEY: 'smoke-omdb',
+    TVDB_API_KEY: 'smoke-tvdb'
   },
   stdio: ['ignore', 'pipe', 'pipe']
 });
@@ -66,7 +69,7 @@ async function stopChild() {
         && health.body?.identity === 'canonical'
         && String(health.headers['x-seenit-backend'] || '').toLowerCase() === 'canonical'
       ) {
-        console.log('[BackendProductionSmoke] dist/server.cjs démarre et /api/health est canonique.');
+        console.log('[BackendProductionSmoke] build/server.cjs démarre et /api/health est canonique.');
         await stopChild();
         process.exit(0);
       }

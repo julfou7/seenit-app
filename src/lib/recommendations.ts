@@ -1,3 +1,5 @@
+import { authenticatedFetch } from './apiAuth';
+import { resolveSeenItApiUrl } from './seenitApi';
 import { useShowsStore } from '../store/showsStore';
 import { useFavoritePeopleStore } from '../store/favoritePeopleStore';
 import { tmdb } from '../features/shows/tmdb';
@@ -35,7 +37,6 @@ export async function getRecommendations(limit: number = 20) {
   const peopleIds = favPeople.map(p => p.id).join('|');
 
   let rawResults: any[] = [];
-  const apiKey = import.meta.env.VITE_TMDB_API_KEY || '677711df46484bc7129492d4a9267a65';
   const minReleaseDate = '2016-01-01';
 
   const promises: Promise<{ type: 'tv' | 'movie', res: any }>[] = [];
@@ -43,15 +44,15 @@ export async function getRecommendations(limit: number = 20) {
   if (topGenreIds.length > 0) {
     const genreStr = topGenreIds.join('|');
     promises.push(
-      fetch(`${tmdb['baseUrl']}/discover/tv?api_key=${apiKey}&language=fr-FR&sort_by=popularity.desc&vote_count.gte=50&vote_average.gte=6.5&first_air_date.gte=${minReleaseDate}&with_genres=${genreStr}`).then(r => r.json()).then(res => ({ type: 'tv' as const, res })).catch(() => ({ type: 'tv' as const, res: {} })),
-      fetch(`${tmdb['baseUrl']}/discover/movie?api_key=${apiKey}&language=fr-FR&sort_by=popularity.desc&vote_count.gte=50&vote_average.gte=6.5&primary_release_date.gte=${minReleaseDate}&with_genres=${genreStr}`).then(r => r.json()).then(res => ({ type: 'movie' as const, res })).catch(() => ({ type: 'movie' as const, res: {} }))
+      authenticatedFetch(`${resolveSeenItApiUrl('/api/media/tmdb')}/discover/tv?language=fr-FR&sort_by=popularity.desc&vote_count.gte=50&vote_average.gte=6.5&first_air_date.gte=${minReleaseDate}&with_genres=${genreStr}`).then(r => r.json()).then(res => ({ type: 'tv' as const, res })).catch(() => ({ type: 'tv' as const, res: {} })),
+      authenticatedFetch(`${resolveSeenItApiUrl('/api/media/tmdb')}/discover/movie?language=fr-FR&sort_by=popularity.desc&vote_count.gte=50&vote_average.gte=6.5&primary_release_date.gte=${minReleaseDate}&with_genres=${genreStr}`).then(r => r.json()).then(res => ({ type: 'movie' as const, res })).catch(() => ({ type: 'movie' as const, res: {} }))
     );
   }
 
   if (peopleIds.length > 0) {
     promises.push(
-      fetch(`${tmdb['baseUrl']}/discover/tv?api_key=${apiKey}&language=fr-FR&sort_by=popularity.desc&with_people=${peopleIds}`).then(r => r.json()).then(res => ({ type: 'tv' as const, res })).catch(() => ({ type: 'tv' as const, res: {} })),
-      fetch(`${tmdb['baseUrl']}/discover/movie?api_key=${apiKey}&language=fr-FR&sort_by=popularity.desc&with_people=${peopleIds}`).then(r => r.json()).then(res => ({ type: 'movie' as const, res })).catch(() => ({ type: 'movie' as const, res: {} }))
+      authenticatedFetch(`${resolveSeenItApiUrl('/api/media/tmdb')}/discover/tv?language=fr-FR&sort_by=popularity.desc&with_people=${peopleIds}`).then(r => r.json()).then(res => ({ type: 'tv' as const, res })).catch(() => ({ type: 'tv' as const, res: {} })),
+      authenticatedFetch(`${resolveSeenItApiUrl('/api/media/tmdb')}/discover/movie?language=fr-FR&sort_by=popularity.desc&with_people=${peopleIds}`).then(r => r.json()).then(res => ({ type: 'movie' as const, res })).catch(() => ({ type: 'movie' as const, res: {} }))
     );
   }
 
@@ -66,8 +67,8 @@ export async function getRecommendations(limit: number = 20) {
 
   if (rawResults.length < 15) {
     const [tvPop, moviePop] = await Promise.all([
-      fetch(`${tmdb['baseUrl']}/discover/tv?api_key=${apiKey}&language=fr-FR&sort_by=popularity.desc&vote_count.gte=50&vote_average.gte=7.0&first_air_date.gte=${minReleaseDate}`).then(r => r.json()).catch(() => ({})),
-      fetch(`${tmdb['baseUrl']}/discover/movie?api_key=${apiKey}&language=fr-FR&sort_by=popularity.desc&vote_count.gte=50&vote_average.gte=7.0&primary_release_date.gte=${minReleaseDate}`).then(r => r.json()).catch(() => ({}))
+      authenticatedFetch(`${resolveSeenItApiUrl('/api/media/tmdb')}/discover/tv?language=fr-FR&sort_by=popularity.desc&vote_count.gte=50&vote_average.gte=7.0&first_air_date.gte=${minReleaseDate}`).then(r => r.json()).catch(() => ({})),
+      authenticatedFetch(`${resolveSeenItApiUrl('/api/media/tmdb')}/discover/movie?language=fr-FR&sort_by=popularity.desc&vote_count.gte=50&vote_average.gte=7.0&primary_release_date.gte=${minReleaseDate}`).then(r => r.json()).catch(() => ({}))
     ]);
     if (tvPop.results) rawResults.push(...(tvPop.results || []).map((r: any) => ({ ...r, media_type: 'tv' })));
     if (moviePop.results) rawResults.push(...(moviePop.results || []).map((r: any) => ({ ...r, media_type: 'movie' })));

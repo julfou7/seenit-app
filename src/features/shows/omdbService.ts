@@ -1,6 +1,7 @@
+import { authenticatedFetch } from '../../lib/apiAuth';
+import { resolveSeenItApiUrl } from '../../lib/seenitApi';
 import { db } from '../../db/dexie';
 
-const OMDB_API_KEY = 'eadd4829';
 
 export interface EpisodeImdbData {
   rating: number;
@@ -57,7 +58,7 @@ export async function getSeasonImdbRatings(
       const age = Date.now() - (cachedData.updatedAt || 0);
       const hasMissingRatings = Object.values(normalizedCache).some(ep => !ep || ep.rating === 0);
       const isOngoing = cachedData.isOngoing || hasMissingRatings;
-      
+
       // Si la saison a des épisodes sans note (ou en cours), cache très court (4h) pour capter les nouvelles notes IMDb
       const cacheLifetime = hasMissingRatings ? FOUR_HOURS : isOngoing ? ONE_DAY : FOURTEEN_DAYS;
 
@@ -68,8 +69,8 @@ export async function getSeasonImdbRatings(
     }
 
     // 2. SI ABSENT, EXPIRÉ OU FORCE_REFRESH -> APPEL RÉSEAU OMDB
-    const res = await fetch(
-      `https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&i=${imdbId}&Season=${seasonNumber}`
+    const res = await authenticatedFetch(
+      `${resolveSeenItApiUrl('/api/media/omdb')}?i=${imdbId}&Season=${seasonNumber}`
     );
     if (!res.ok) {
       // Fallback au cache expiré si le réseau échoue
@@ -124,7 +125,7 @@ export async function getSeasonImdbRatings(
       await Promise.all(
         missingEpisodesToFetch.map(async ({ epNum, epImdbId }) => {
           try {
-            const epRes = await fetch(`https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&i=${epImdbId}`);
+            const epRes = await authenticatedFetch(`${resolveSeenItApiUrl('/api/media/omdb')}?i=${epImdbId}`);
             if (epRes.ok) {
               const epData = await epRes.json();
               const epRating = parseFloat(epData.imdbRating);
@@ -174,12 +175,12 @@ export async function getSeriesImdbData(
   try {
     // 1. Chercher d'abord dans le cache
     const cached = await db.omdbEpisodesCache.get(imdbId);
-    
+
     if (cached) {
       const age = Date.now() - (cached.updatedAt || 0);
       const isOngoing = (cached as any).isOngoing;
       const hasValidRating = typeof cached.rating === 'number' && cached.rating > 0;
-      
+
       const cacheLifetime = !hasValidRating ? FOUR_HOURS : isOngoing ? ONE_DAY : FOURTEEN_DAYS;
 
       if (!forceRefresh && age < cacheLifetime && cached.rating !== undefined) {
@@ -192,7 +193,7 @@ export async function getSeriesImdbData(
     }
 
     // 2. Appel réseau si absent, expiré ou forcé
-    const res = await fetch(`https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&i=${imdbId}`);
+    const res = await authenticatedFetch(`${resolveSeenItApiUrl('/api/media/omdb')}?i=${imdbId}`);
     if (!res.ok) {
       if (cached && cached.rating !== undefined) {
         return { rating: cached.rating, votes: cached.votes, updatedAt: cached.updatedAt };
@@ -210,7 +211,7 @@ export async function getSeriesImdbData(
 
     const rating = parseFloat(data.imdbRating);
     const votes = data.imdbVotes && data.imdbVotes !== 'N/A' ? data.imdbVotes : '0';
-    
+
     // Vérifier si la série est en cours
     const yearStr = data.Year || '';
     const isOngoing = yearStr.endsWith('–') || yearStr.endsWith('-') || (yearStr.includes('–') && !yearStr.split('–')[1]?.trim());
@@ -252,7 +253,7 @@ export async function getEpisodeImdbVotes(episodeImdbId: string): Promise<string
     if (cached) return cached.votes;
 
     // 2. Fetch API
-    const res = await fetch(`https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&i=${episodeImdbId}`);
+    const res = await authenticatedFetch(`${resolveSeenItApiUrl('/api/media/omdb')}?i=${episodeImdbId}`);
     if (!res.ok) return null;
     const data = await res.json();
 

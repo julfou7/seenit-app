@@ -77,7 +77,7 @@ test('SEENIT-DOWNLOAD-VISIBILITY-001 verrouille toutes les mentions de télécha
   assert.match(liveStoreSource, /downloads:\s*\[\]/);
 
   // Détail épisode : bouton Télécharger, re-téléchargement, badge Téléchargé et bannière live.
-  assert.match(episodeCoreSource, /Télécharger S\$\{String\(currentSeason\)/);
+  assert.match(episodeCoreSource, /Télécharger S\{String\(currentSeason\)/);
   assert.match(episodeCoreSource, /Télécharger à nouveau/);
   assert.match(episodeCoreSource, /<span>Téléchargé<\/span>/);
   assert.match(episodeCoreSource, /<LiveDownloadBanner items=\{\[epDownload\]\}/);
