@@ -32,7 +32,7 @@ replaceOnce(
 replaceOnce(
   'docs/specifications/functional-reference.md',
   'Dernière vérification : 6 septembre 2026  \nBaseline observée : **1.4.120**, `main` `ec707bd971673b5bd7f2c10aaea70b7e592dca61`',
-  'Dernière vérification : 7 septembre 2026  \nBaseline observée : **1.4.120**, `main` `4923896aa68225021cf7e12d5df30d10f2c7f4a4`',
+  'Dernière vérification : 7 septembre 2026\nBaseline observée : **1.4.120**, `main` `4923896aa68225021cf7e12d5df30d10f2c7f4a4`',
   'baseline fonctionnelle',
 );
 replaceOnce(
