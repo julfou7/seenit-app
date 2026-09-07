@@ -66,3 +66,5 @@ jobs:
           git rm .github/workflows/finalize-relations-contract-130.yml scripts/finalize-relations-130.cjs scripts/finalize-relations-130-v2.cjs
           git commit -m "chore(media): retirer l'outillage temporaire #130"
           git push origin HEAD:fix/media-relations-tvdb-exact-130
+
+# rerun après alignement du TNR SPEC sur le Markdown canonique
