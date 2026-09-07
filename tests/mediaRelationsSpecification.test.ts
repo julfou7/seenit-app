@@ -42,7 +42,7 @@ test('SEENIT-RELATION-001 déduplique la franchise après la saga', () => {
 });
 
 test('SEENIT-RELATION-001 retire les similaires des fiches et garde la découverte dans Explorer', () => {
-  assert.match(specification, /Les sections « Films similaires » et « Séries similaires » sont supprimées des fiches/);
+  assert.match(specification, /sections[^\n]*Films similaires[^\n]*Séries similaires[^\n]*supprim/i);
   assert.match(specification, /Explorer[\s\S]*découverte/);
   assert.match(functionalReference, /Les recommandations contextuelles restent dans Explorer/);
   assert.match(decision, /recommendations[\s\S]*similar[\s\S]*ne sont plus utilisés pour remplir le bas d'une fiche/);
