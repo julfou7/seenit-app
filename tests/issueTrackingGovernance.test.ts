@@ -18,12 +18,16 @@ test('SEENIT-QUALITY-004 impose le contexte GitHub complet avant toute intervent
 
   assert.match(agents, /Avant toute analyse, proposition ou modification/i);
   assert.match(agents, /branche GitHub `main`[\s\S]*source de vérité/i);
-  assert.match(agents, /issues GitHub \*\*ouvertes et fermées liées au sujet\*\*/i);
+  assert.match(agents, /nouveau chantier[\s\S]*issues GitHub \*\*ouvertes et fermées liées au sujet\*\*/i);
   assert.match(agents, /Réutiliser ou rouvrir l'issue pertinente[\s\S]*éviter les doublons/i);
+  assert.match(agents, /Reprise identifiée : pas de recherche globale/i);
+  assert.match(agents, /sans relancer la recherche générale[\s\S]*périmètre[\s\S]*checkpoint[\s\S]*contradiction pertinente/is);
 
   assert.match(bootstrap, /branche GitHub `main`[\s\S]*canonique/i);
-  assert.match(bootstrap, /issues GitHub \*\*ouvertes et fermées liées au sujet\*\*/i);
+  assert.match(bootstrap, /nouveau chantier[\s\S]*issues GitHub \*\*ouvertes et fermées liées au sujet\*\*/i);
   assert.match(bootstrap, /réutiliser ou rouvrir l'issue adéquate[\s\S]*éviter les doublons/i);
+  assert.match(bootstrap, /Reprise identifiée : pas de recherche globale/i);
+  assert.match(bootstrap, /reprise identifiée[\s\S]*sans rejouer cette recherche globale/i);
 
   assert.match(spec, /SEENIT-QUALITY-004[\s\S]*issues GitHub ouvertes et fermées liées au sujet/i);
 });
@@ -38,7 +42,9 @@ test('SEENIT-QUALITY-004 reprend API-first sans clone obligatoire ni bootstrap r
   assert.match(agents, /read-only[\s\S]*sans clone/is);
   assert.match(agents, /nouveau prompt[\s\S]*jamais une raison de recloner/is);
   assert.match(agents, /issue[\s\S]*PR[\s\S]*branche[\s\S]*prochaine action exacte/is);
-  assert.match(agents, /SHA\/branche\/PR[\s\S]*tests déjà verts[\s\S]*prochaine action exacte/is);
+  assert.match(agents, /SHA\/branche\/PR/i);
+  assert.match(agents, /tests déjà verts/i);
+  assert.match(agents, /prochaine action exacte/i);
 
   assert.match(bootstrap, /API-first/);
   assert.match(bootstrap, /nouveau prompt[\s\S]*jamais une raison de recloner/is);

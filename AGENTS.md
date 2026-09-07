@@ -87,7 +87,12 @@ ni clone, ni checkout, ni installation de dépendances.
    `package-lock.json` du chantier. Un `node_modules` ou cache exact compatible est réutilisé.
 5. Lors d'une reprise, repartir d'abord de l'issue, de la PR ou de la branche existante et du dernier
    jalon contenant la **prochaine action exacte**. Ne pas reconstruire l'historique complet si ce jalon
-   et les index canoniques bornent déjà le travail restant.
+   et les index canoniques bornent déjà le travail restant. **Reprise identifiée : pas de recherche globale.**
+   Si l'issue, la PR ou la branche du chantier et un checkpoint exploitable sont déjà connus, vérifier
+   `main`, lire ces références et exécuter la prochaine action exacte sans relancer la recherche générale
+   des issues ouvertes/fermées, PR, commits ou audits. Relancer cette recherche seulement si le périmètre
+   change, si le checkpoint est absent ou ambigu, si `main` révèle une contradiction pertinente ou si une
+   nouvelle anomalie hors périmètre apparaît.
 6. Si une demande initiale reste incomplète lors d'un handoff inévitable, mettre l'issue à jour avec le
    SHA/branche/PR, les fichiers modifiés, les tests déjà verts, le blocage éventuel et la prochaine action
    exacte afin que la reprise suivante commence par une action utile.
@@ -108,7 +113,7 @@ cette contrainte de runtime avec une obligation SeenIt de recloner ou de reconst
    `docs/specifications/README.md` et toute documentation pertinente pour le sujet ; pour toute
    livraison, lire aussi `docs/process/delivery.md`. La référence fonctionnelle est obligatoire :
    elle décrit les écrans, parcours, responsabilités des sources, différences PWA/APK et écarts connus.
-4. Rechercher systématiquement les issues GitHub **ouvertes et fermées liées au sujet**, ainsi que les PR, commits, audits et documents pertinents, afin de reprendre l'historique existant. Réutiliser ou rouvrir l'issue pertinente lorsqu'elle existe et éviter les doublons.
+4. Pour un nouveau chantier, ou lorsqu'aucune issue/PR/branche n'est déjà identifiée, rechercher systématiquement les issues GitHub **ouvertes et fermées liées au sujet**, ainsi que les PR, commits, audits et documents pertinents, afin de reprendre l'historique existant. Réutiliser ou rouvrir l'issue pertinente lorsqu'elle existe et éviter les doublons. Pour une reprise identifiée, appliquer la section 0.3 et ne pas rejouer cette recherche globale sauf si le périmètre change, si le checkpoint est absent ou ambigu, si `main` révèle une contradiction pertinente ou si une nouvelle anomalie hors périmètre apparaît.
 5. Dès qu'une issue est concernée, la maintenir à jour aux jalons significatifs de l'intervention : diagnostic, décisions, modifications, validations, merge/release ou blocage.
 6. Vérifier la branche GitHub de référence avant d'accepter un diff provenant d'AI Studio.
 
