@@ -1,3 +1,5 @@
+import { authenticatedFetch } from '../../lib/apiAuth';
+import { resolveSeenItApiUrl } from '../../lib/seenitApi';
 import { type Result, ok, err, tryCatch } from '../../core/Result';
 import { adjustTMDBShowDataForEurope, adjustTMDBSeasonDataForEurope } from '../../lib/utils';
 import {
@@ -47,7 +49,7 @@ export function isMovieAtCinema(media: any): boolean {
   if (isNaN(releaseDate.getTime())) return false;
 
   const now = new Date();
-  
+
   // Cutoff for films released in the last 75 days
   const pastCutoff = new Date();
   pastCutoff.setDate(now.getDate() - 75);
@@ -83,10 +85,10 @@ export function isAdultOrParodyMedia(item: any): boolean {
   if (item.adult === true) return true;
 
   const title = (
-    item.title || 
-    item.name || 
-    item.original_title || 
-    item.original_name || 
+    item.title ||
+    item.name ||
+    item.original_title ||
+    item.original_name ||
     ''
   ).toLowerCase();
 
@@ -136,23 +138,21 @@ interface SearchResponse {
 /**
  * Staff Engineer Note:
  * API Client avec pattern "Resilience".
- * Utilise un Singleton avec une file d'attente (Queue) et un "Rate Limiter" 
+ * Utilise un Singleton avec une file d'attente (Queue) et un "Rate Limiter"
  * pour ne jamais dépasser 40 requêtes par 10 secondes (limite TMDB classique).
  */
 export class TMDBClient {
-  private getApiKey(): string | null {
-    return localStorage.getItem('TMDB_API_KEY') || (import.meta.env.VITE_TMDB_API_KEY as string) || '677711df46484bc7129492d4a9267a65';
-  }
 
-  private baseUrl = 'https://api.themoviedb.org/3';
+  private get baseUrl(): string {
+    return new URL(resolveSeenItApiUrl('/api/media/tmdb'), globalThis.location?.origin || 'http://localhost').toString();
+  }
 
   // Basic rate limiter state
   private lastRequestTime = 0;
   private readonly MIN_MS_BETWEEN_REQUESTS = 250; // 4 req/sec pour être conservateur et éviter le 429
 
   async searchMedia(query: string, year?: string, type?: 'movie' | 'tv', page: number = 1): Promise<Result<TMDBMedia>> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing TMDB API Key. Please add it in settings.'));
+
 
     // Throttling synchrone
     const now = Date.now();
@@ -166,7 +166,6 @@ export class TMDBClient {
 
     const fetchResultsForYear = async (searchYear?: string): Promise<TMDBMedia[]> => {
       const url = new URL(`${this.baseUrl}${endpoint}`);
-      url.searchParams.append('api_key', apiKey);
       url.searchParams.append('query', query);
       url.searchParams.append('language', 'fr-FR');
       url.searchParams.append('page', page.toString());
@@ -175,7 +174,7 @@ export class TMDBClient {
         url.searchParams.append('primary_release_year', searchYear);
       }
 
-      const res = await tryCatch(fetch(url.toString()));
+      const res = await tryCatch(authenticatedFetch(url.toString()));
       if (!res.ok || !res.value.ok) return [];
       const data = await tryCatch(res.value.json() as Promise<SearchResponse>);
       if (!data.ok) return [];
@@ -300,11 +299,10 @@ export class TMDBClient {
 
   async findByExternalId(
     externalId: string,
-    externalSource: 'imdb_id' | 'tvdb_id' | 'freebase_mid' | 'freebase_id' | 'tvrage_id',
+    externalSource: 'imdb_id' | 'tvdb_id',
     type?: 'movie' | 'tv'
   ): Promise<Result<TMDBMedia>> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing TMDB API Key'));
+
 
     const now = Date.now();
     const timeSinceLast = now - this.lastRequestTime;
@@ -314,9 +312,9 @@ export class TMDBClient {
     this.lastRequestTime = Date.now();
 
     const cleanId = encodeURIComponent(externalId.trim());
-    const url = new URL(`${this.baseUrl}/find/${cleanId}?api_key=${apiKey}&external_source=${externalSource}&language=fr-FR`);
+    const url = new URL(`${this.baseUrl}/find/${cleanId}?external_source=${externalSource}&language=fr-FR`);
 
-    const result = await tryCatch(fetch(url.toString()));
+    const result = await tryCatch(authenticatedFetch(url.toString()));
     if (!result.ok) return err((result as any).error);
     if (!result.value.ok) return err(new Error(`TMDB Error: ${result.value.status}`));
 
@@ -358,13 +356,12 @@ export class TMDBClient {
     if (existingRequest) return existingRequest;
 
     const request = (async (): Promise<Result<any>> => {
-      const apiKey = this.getApiKey();
-      if (!apiKey) return err(new Error('Missing API Key'));
+
       const appended = type === 'tv'
         ? 'credits,aggregate_credits,similar,recommendations,videos,content_ratings,external_ids,images,keywords'
         : 'credits,similar,recommendations,videos,release_dates,external_ids,images,keywords';
-      const url = new URL(`${this.baseUrl}/${type}/${id}?api_key=${apiKey}&language=fr-FR&append_to_response=${appended}&include_video_language=fr,en,null&include_image_language=fr,en,null,de,es,it,ja,ko`);
-      const res = await tryCatch(fetch(url.toString()));
+      const url = new URL(`${this.baseUrl}/${type}/${id}?language=fr-FR&append_to_response=${appended}&include_video_language=fr,en,null&include_image_language=fr,en,null,de,es,it,ja,ko`);
+      const res = await tryCatch(authenticatedFetch(url.toString()));
       if (!res.ok) return err((res as any).error);
       if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
       const data = await tryCatch(res.value.json());
@@ -467,13 +464,12 @@ export class TMDBClient {
     if (existingRequest) return existingRequest;
 
     const request = (async (): Promise<Result<any>> => {
-      const apiKey = this.getApiKey();
-      if (!apiKey) return err(new Error('Missing API Key'));
-      const url = new URL(`${this.baseUrl}/collection/${normalizedId}?api_key=${apiKey}&language=fr-FR`);
+
+      const url = new URL(`${this.baseUrl}/collection/${normalizedId}?language=fr-FR`);
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 4000);
       try {
-        const res = await tryCatch(fetch(url.toString(), { signal: controller.signal }));
+        const res = await tryCatch(authenticatedFetch(url.toString(), { signal: controller.signal }));
         if (!res.ok) return err((res as any).error);
         if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
         const data = await tryCatch(res.value.json());
@@ -511,10 +507,8 @@ export class TMDBClient {
       return ok(cached.data);
     }
 
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing API Key'));
-    const url = new URL(`${this.baseUrl}/${type}/${id}/watch/providers?api_key=${apiKey}`);
-    const res = await tryCatch(fetch(url.toString()));
+    const url = new URL(`${this.baseUrl}/${type}/${id}/watch/providers`);
+    const res = await tryCatch(authenticatedFetch(url.toString()));
     if (!res.ok) return err((res as any).error);
     if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
     const data = await tryCatch(res.value.json());
@@ -526,13 +520,12 @@ export class TMDBClient {
   }
 
   async getMediaKeywords(id: number, type: 'tv' | 'movie' = 'tv'): Promise<Result<string[]>> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing API Key'));
-    
-    const url = new URL(`${this.baseUrl}/${type}/${id}/keywords?api_key=${apiKey}`);
-    const res = await tryCatch(fetch(url.toString()));
+
+
+    const url = new URL(`${this.baseUrl}/${type}/${id}/keywords`);
+    const res = await tryCatch(authenticatedFetch(url.toString()));
     if (!res.ok) return err((res as any).error);
-    
+
     const data = await tryCatch(res.value.json());
     if (!data.ok) return err((data as any).error);
 
@@ -542,22 +535,21 @@ export class TMDBClient {
   }
 
   async getSeasonDetails(id: number, seasonNumber: number): Promise<Result<any>> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing API Key'));
-    const url = new URL(`${this.baseUrl}/tv/${id}/season/${seasonNumber}?api_key=${apiKey}&language=fr-FR&append_to_response=videos&include_video_language=fr,en,null`);
-    const res = await tryCatch(fetch(url.toString()));
+
+    const url = new URL(`${this.baseUrl}/tv/${id}/season/${seasonNumber}?language=fr-FR&append_to_response=videos&include_video_language=fr,en,null`);
+    const res = await tryCatch(authenticatedFetch(url.toString()));
     if (!res.ok) return err((res as any).error);
     if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
     const data = await tryCatch(res.value.json());
     if (!data.ok) return err((data as any).error);
     if (data.value && data.value.status_code) return err(new Error(data.value.status_message || 'TMDB Error'));
-    
+
     // Globally adjust season dates for European viewers if the show belongs to an offset network
     if (data.value) {
       const tvDetails = this.detailsCache.get(`tv_${id}`);
       adjustTMDBSeasonDataForEurope(data.value, tvDetails?.networks);
     }
-    
+
     return data;
   }
 
@@ -568,35 +560,32 @@ export class TMDBClient {
       return ok(cached.data);
     }
 
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing API Key'));
-    const url = new URL(`${this.baseUrl}/tv/${id}/season/${seasonNumber}/episode/${episodeNumber}?api_key=${apiKey}&language=fr-FR&append_to_response=videos&include_video_language=fr,en,null`);
-    const res = await tryCatch(fetch(url.toString()));
+    const url = new URL(`${this.baseUrl}/tv/${id}/season/${seasonNumber}/episode/${episodeNumber}?language=fr-FR&append_to_response=videos&include_video_language=fr,en,null`);
+    const res = await tryCatch(authenticatedFetch(url.toString()));
     if (!res.ok) return err((res as any).error);
     if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
     const data = await tryCatch(res.value.json());
     if (!data.ok) return err((data as any).error);
     if (data.value && data.value.status_code) return err(new Error(data.value.status_message || 'TMDB Error'));
-    
+
     if (data.value) {
       const tvDetails = this.detailsCache.get(`tv_${id}`);
       adjustTMDBSeasonDataForEurope({ episodes: [data.value] }, tvDetails?.networks);
       this.episodeDetailsCache.set(cacheKey, { data: data.value, timestamp: Date.now() });
     }
-    
+
     return data;
   }
   async searchMulti(query: string, page: number = 1, watchProviders?: string[]): Promise<Result<SearchResponse>> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing API Key'));
-    let urlStr = `${this.baseUrl}/search/multi?api_key=${apiKey}&query=${encodeURIComponent(query)}&language=fr-FR&page=${page}`;
+
+    let urlStr = `${this.baseUrl}/search/multi?query=${encodeURIComponent(query)}&language=fr-FR&page=${page}`;
 
     // Note: TMDB search/multi doesn't technically support with_watch_providers,
     // but if we are passing it down we might want to filter client-side later,
     // or just let it be. We will not modify the URL for search/multi as it ignores it.
 
     const url = new URL(urlStr);
-    const res = await tryCatch(fetch(url.toString()));
+    const res = await tryCatch(authenticatedFetch(url.toString()));
     if (!res.ok) return err((res as any).error);
     if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
     const data = await tryCatch(res.value.json() as Promise<SearchResponse>);
@@ -609,14 +598,13 @@ export class TMDBClient {
   }
 
   async searchTV(query: string, page: number = 1, watchProviders?: string[]): Promise<Result<SearchResponse>> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing API Key'));
-    let urlStr = `${this.baseUrl}/search/tv?api_key=${apiKey}&query=${encodeURIComponent(query)}&language=fr-FR&page=${page}`;
+
+    let urlStr = `${this.baseUrl}/search/tv?query=${encodeURIComponent(query)}&language=fr-FR&page=${page}`;
 
     // Note: TMDB search/tv doesn't support with_watch_providers.
 
     const url = new URL(urlStr);
-    const res = await tryCatch(fetch(url.toString()));
+    const res = await tryCatch(authenticatedFetch(url.toString()));
     if (!res.ok) return err((res as any).error);
     if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
     const data = await tryCatch(res.value.json() as Promise<SearchResponse>);
@@ -629,14 +617,13 @@ export class TMDBClient {
   }
 
   async searchMovie(query: string, page: number = 1, watchProviders?: string[]): Promise<Result<SearchResponse>> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing API Key'));
-    let urlStr = `${this.baseUrl}/search/movie?api_key=${apiKey}&query=${encodeURIComponent(query)}&language=fr-FR&page=${page}`;
+
+    let urlStr = `${this.baseUrl}/search/movie?query=${encodeURIComponent(query)}&language=fr-FR&page=${page}`;
 
     // Note: TMDB search/movie doesn't support with_watch_providers.
 
     const url = new URL(urlStr);
-    const res = await tryCatch(fetch(url.toString()));
+    const res = await tryCatch(authenticatedFetch(url.toString()));
     if (!res.ok) return err((res as any).error);
     if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
     const data = await tryCatch(res.value.json() as Promise<SearchResponse>);
@@ -649,10 +636,9 @@ export class TMDBClient {
   }
 
   async searchPerson(query: string, page: number = 1): Promise<Result<SearchResponse>> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing API Key'));
-    const url = new URL(`${this.baseUrl}/search/person?api_key=${apiKey}&query=${encodeURIComponent(query)}&language=fr-FR&page=${page}`);
-    const res = await tryCatch(fetch(url.toString()));
+
+    const url = new URL(`${this.baseUrl}/search/person?query=${encodeURIComponent(query)}&language=fr-FR&page=${page}`);
+    const res = await tryCatch(authenticatedFetch(url.toString()));
     if (!res.ok) return err((res as any).error);
     if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
     const data = await tryCatch(res.value.json() as Promise<SearchResponse>);
@@ -668,7 +654,7 @@ export class TMDBClient {
     const extraMedia: TMDBMedia[] = [];
     const extraPersons: TMDBMedia[] = [];
 
-    const cleanStr = (str: string) => 
+    const cleanStr = (str: string) =>
       str.normalize("NFD")
          .replace(/[\u0300-\u036f]/g, "")
          .replace(/['’\-_]/g, " ")
@@ -689,7 +675,7 @@ export class TMDBClient {
         `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query + ' TV series movie')}&format=json&origin=*`
       ];
       const wikiResponses = await Promise.all(wikiUrls.map(u => fetch(u).then(r => r.ok ? r.json() : null).catch(() => null)));
-      
+
       for (const data of wikiResponses) {
         if (data?.query?.search) {
           for (const item of data.query.search) {
@@ -805,7 +791,7 @@ export class TMDBClient {
 
     for (const mediaDetails of detailsList) {
       if (!mediaDetails) continue;
-      
+
       extraMedia.push(mediaDetails);
 
       const castList = mediaDetails.aggregate_credits?.cast || mediaDetails.credits?.cast || [];
@@ -815,7 +801,7 @@ export class TMDBClient {
         const charName = (member.character || (Array.isArray(member.roles) && member.roles[0]?.character) || '').toString();
         if (charName) {
           const charClean = cleanStr(charName);
-          const matchesChar = charClean.includes(cleaned) || cleaned.includes(charClean) || 
+          const matchesChar = charClean.includes(cleaned) || cleaned.includes(charClean) ||
                               queryWords.some(qw => charClean.includes(qw));
           if (matchesChar) {
             const personObj: any = {
@@ -866,12 +852,11 @@ export class TMDBClient {
   }
 
   async getTopRated(type: 'tv' | 'movie', page: number = 1): Promise<Result<SearchResponse>> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing API Key'));
-    
+
+
     // Pour simuler un Top 100 IMDb, on prend les mieux notés avec au moins 3000 votes
-    const url = `${this.baseUrl}/discover/${type}?api_key=${apiKey}&language=fr-FR&sort_by=vote_average.desc&vote_count.gte=3000&page=${page}`;
-    const res = await tryCatch(fetch(url));
+    const url = `${this.baseUrl}/discover/${type}?language=fr-FR&sort_by=vote_average.desc&vote_count.gte=3000&page=${page}`;
+    const res = await tryCatch(authenticatedFetch(url));
     if (!res.ok) return err((res as any).error);
     if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
     const data = await tryCatch(res.value.json());
@@ -883,10 +868,9 @@ export class TMDBClient {
     const today = new Date();
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(today.getFullYear() - 1);
-    
+
     const dateStr = oneYearAgo.toISOString().split('T')[0];
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing API Key'));
+
 
     const hasProviders = watchProviders && watchProviders.length > 0;
     const minVotes = hasProviders ? 5 : 50;
@@ -895,8 +879,8 @@ export class TMDBClient {
       const endpoint = `discover/${t}`;
       const dateParam = t === 'tv' ? `first_air_date.gte=${dateStr}` : `primary_release_date.gte=${dateStr}`;
       const voteParam = hasProviders ? 'vote_count.gte=5' : 'vote_count.gte=100';
-      let urlStr = `${this.baseUrl}/${endpoint}?api_key=${apiKey}&language=fr-FR&sort_by=vote_average.desc&${voteParam}&vote_average.gte=7.0&${dateParam}&page=${page}`;
-      
+      let urlStr = `${this.baseUrl}/${endpoint}?language=fr-FR&sort_by=vote_average.desc&${voteParam}&vote_average.gte=7.0&${dateParam}&page=${page}`;
+
       if (hasProviders) {
         const PLATFORM_ID_MAP: Record<string, string> = {
           'netflix': '8',
@@ -912,8 +896,8 @@ export class TMDBClient {
           urlStr += `&watch_region=FR&with_watch_providers=${tmdbProviderIds.join('|')}`;
         }
       }
-      
-      const res = await tryCatch(fetch(urlStr));
+
+      const res = await tryCatch(authenticatedFetch(urlStr));
       if (!res.ok) return err((res as any).error);
       const jsonRes = await tryCatch(res.value.json());
       if (jsonRes.ok && jsonRes.value && Array.isArray(jsonRes.value.results)) {
@@ -935,9 +919,8 @@ export class TMDBClient {
   }
 
   async getTrending(type: 'tv' | 'movie' | 'all' = 'tv', page: number = 1, watchProviders?: string[]): Promise<Result<SearchResponse>> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing API Key'));
-    
+
+
     if (watchProviders && watchProviders.length > 0) {
       const PLATFORM_ID_MAP: Record<string, string> = {
         'netflix': '8',
@@ -953,8 +936,8 @@ export class TMDBClient {
         const providersStr = tmdbProviderIds.join('|');
         if (type === 'all') {
           const [resTv, resMov] = await Promise.all([
-            tryCatch(fetch(`${this.baseUrl}/discover/tv?api_key=${apiKey}&language=fr-FR&sort_by=popularity.desc&watch_region=FR&with_watch_providers=${providersStr}&page=${page}`)),
-            tryCatch(fetch(`${this.baseUrl}/discover/movie?api_key=${apiKey}&language=fr-FR&sort_by=popularity.desc&watch_region=FR&with_watch_providers=${providersStr}&page=${page}`))
+            tryCatch(authenticatedFetch(`${this.baseUrl}/discover/tv?language=fr-FR&sort_by=popularity.desc&watch_region=FR&with_watch_providers=${providersStr}&page=${page}`)),
+            tryCatch(authenticatedFetch(`${this.baseUrl}/discover/movie?language=fr-FR&sort_by=popularity.desc&watch_region=FR&with_watch_providers=${providersStr}&page=${page}`))
           ]);
           let tvResults: TMDBMedia[] = [];
           let movResults: TMDBMedia[] = [];
@@ -969,8 +952,8 @@ export class TMDBClient {
           const combined = [...tvResults, ...movResults].sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
           return ok({ results: filterCredibleMedia(combined, 5) });
         } else {
-          const urlStr = `${this.baseUrl}/discover/${type}?api_key=${apiKey}&language=fr-FR&sort_by=popularity.desc&watch_region=FR&with_watch_providers=${providersStr}&page=${page}`;
-          const res = await tryCatch(fetch(urlStr));
+          const urlStr = `${this.baseUrl}/discover/${type}?language=fr-FR&sort_by=popularity.desc&watch_region=FR&with_watch_providers=${providersStr}&page=${page}`;
+          const res = await tryCatch(authenticatedFetch(urlStr));
           if (!res.ok) return err((res as any).error);
           const jsonRes = await tryCatch(res.value.json());
           if (jsonRes.ok && jsonRes.value && Array.isArray(jsonRes.value.results)) {
@@ -980,10 +963,10 @@ export class TMDBClient {
         }
       }
     }
-    
-    let urlStr = `${this.baseUrl}/trending/${type}/week?api_key=${apiKey}&language=fr-FR&page=${page}`;
+
+    let urlStr = `${this.baseUrl}/trending/${type}/week?language=fr-FR&page=${page}`;
     const url = new URL(urlStr);
-    const res = await tryCatch(fetch(url.toString()));
+    const res = await tryCatch(authenticatedFetch(url.toString()));
     if (!res.ok) return err((res as any).error);
     const jsonRes = await tryCatch(res.value.json());
     if (jsonRes.ok && jsonRes.value && Array.isArray(jsonRes.value.results)) {
@@ -993,12 +976,11 @@ export class TMDBClient {
   }
 
   async discoverByGenre(type: 'tv' | 'movie', genreId: number, page: number = 1, watchProviders?: string[]): Promise<Result<SearchResponse>> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing API Key'));
+
     const hasProviders = watchProviders && watchProviders.length > 0;
     const minVotes = hasProviders ? 5 : 50;
-    let urlStr = `${this.baseUrl}/discover/${type}?api_key=${apiKey}&language=fr-FR&with_genres=${genreId}&vote_count.gte=${minVotes}&page=${page}`;
-    
+    let urlStr = `${this.baseUrl}/discover/${type}?language=fr-FR&with_genres=${genreId}&vote_count.gte=${minVotes}&page=${page}`;
+
     if (hasProviders) {
       const PLATFORM_ID_MAP: Record<string, string> = {
         'netflix': '8',
@@ -1014,9 +996,9 @@ export class TMDBClient {
         urlStr += `&watch_region=FR&with_watch_providers=${tmdbProviderIds.join('|')}`;
       }
     }
-    
+
     const url = new URL(urlStr);
-    const res = await tryCatch(fetch(url.toString()));
+    const res = await tryCatch(authenticatedFetch(url.toString()));
     if (!res.ok) return err((res as any).error);
     const jsonRes = await tryCatch(res.value.json());
     if (jsonRes.ok && jsonRes.value && Array.isArray(jsonRes.value.results)) {
@@ -1026,16 +1008,15 @@ export class TMDBClient {
   }
 
   async getPopular(type: 'tv' | 'movie' = 'tv', page: number = 1, watchProviders?: string[]): Promise<Result<SearchResponse>> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing API Key'));
+
     const hasProviders = watchProviders && watchProviders.length > 0;
     const minVotes = hasProviders ? 5 : 50;
     const minDateParam = type === 'tv' ? 'first_air_date.gte=2016-01-01' : 'primary_release_date.gte=2016-01-01';
-    let urlStr = `${this.baseUrl}/discover/${type}?api_key=${apiKey}&language=fr-FR&sort_by=popularity.desc&vote_count.gte=${minVotes}&page=${page}`;
+    let urlStr = `${this.baseUrl}/discover/${type}?language=fr-FR&sort_by=popularity.desc&vote_count.gte=${minVotes}&page=${page}`;
     if (!hasProviders) {
       urlStr += `&${minDateParam}`;
     }
-    
+
     if (hasProviders) {
       const PLATFORM_ID_MAP: Record<string, string> = {
         'netflix': '8',
@@ -1051,9 +1032,9 @@ export class TMDBClient {
         urlStr += `&watch_region=FR&with_watch_providers=${tmdbProviderIds.join('|')}`;
       }
     }
-    
+
     const url = new URL(urlStr);
-    const res = await tryCatch(fetch(url.toString()));
+    const res = await tryCatch(authenticatedFetch(url.toString()));
     if (!res.ok) return err((res as any).error);
     const jsonRes = await tryCatch(res.value.json());
     if (jsonRes.ok && jsonRes.value && Array.isArray(jsonRes.value.results)) {
@@ -1063,17 +1044,15 @@ export class TMDBClient {
   }
 
   async getPopularPersons(page: number = 1): Promise<Result<SearchResponse>> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing API Key'));
-    const url = new URL(`${this.baseUrl}/person/popular?api_key=${apiKey}&language=fr-FR&page=${page}`);
-    const res = await tryCatch(fetch(url.toString()));
+
+    const url = new URL(`${this.baseUrl}/person/popular?language=fr-FR&page=${page}`);
+    const res = await tryCatch(authenticatedFetch(url.toString()));
     if (!res.ok) return err((res as any).error);
     return await tryCatch(res.value.json());
   }
 
   async getNowPlaying(page: number = 1): Promise<Result<SearchResponse>> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing API Key'));
+
 
     const now = new Date();
     const pastCutoff = new Date();
@@ -1085,9 +1064,9 @@ export class TMDBClient {
     const pastStr = pastCutoff.toISOString().split('T')[0];
     const futureStr = futureCutoff.toISOString().split('T')[0];
 
-    const discoverUrl = `${this.baseUrl}/discover/movie?api_key=${apiKey}&language=fr-FR&region=FR&sort_by=popularity.desc&primary_release_date.gte=${pastStr}&primary_release_date.lte=${futureStr}&page=${page}`;
+    const discoverUrl = `${this.baseUrl}/discover/movie?language=fr-FR&region=FR&sort_by=popularity.desc&primary_release_date.gte=${pastStr}&primary_release_date.lte=${futureStr}&page=${page}`;
 
-    const res = await tryCatch(fetch(discoverUrl));
+    const res = await tryCatch(authenticatedFetch(discoverUrl));
     if (!res.ok) return err((res as any).error);
     const jsonRes = await tryCatch(res.value.json());
 
@@ -1111,8 +1090,7 @@ export class TMDBClient {
     sortBy?: 'popular' | 'rating' | 'date' | 'title' | 'top100';
     sortOrder?: 'asc' | 'desc';
   }): Promise<Result<SearchResponse>> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing API Key'));
+
 
     const {
       type = 'all',
@@ -1158,7 +1136,7 @@ export class TMDBClient {
         sortParam = sortOrder === 'asc' ? `${dateKey}.asc` : `${dateKey}.desc`;
       }
 
-      let urlStr = `${this.baseUrl}/discover/${mediaType}?api_key=${apiKey}&language=fr-FR&sort_by=${sortParam}&page=${page}`;
+      let urlStr = `${this.baseUrl}/discover/${mediaType}?language=fr-FR&sort_by=${sortParam}&page=${page}`;
 
       const minVotes = watchProviders.length > 0 ? 5 : (sortBy === 'rating' ? 100 : 20);
       urlStr += `&vote_count.gte=${minVotes}`;
@@ -1223,8 +1201,8 @@ export class TMDBClient {
 
     if (type === 'all') {
       const [resTv, resMov] = await Promise.all([
-        tryCatch(fetch(buildUrl('tv'))),
-        tryCatch(fetch(buildUrl('movie')))
+        tryCatch(authenticatedFetch(buildUrl('tv'))),
+        tryCatch(authenticatedFetch(buildUrl('movie')))
       ]);
 
       let tvResults: TMDBMedia[] = [];
@@ -1255,7 +1233,7 @@ export class TMDBClient {
       return ok({ results: filterCredibleMedia(combined, watchProviders.length > 0 ? 5 : 20) });
     } else {
       const urlStr = buildUrl(type);
-      const res = await tryCatch(fetch(urlStr));
+      const res = await tryCatch(authenticatedFetch(urlStr));
       if (!res.ok) return err((res as any).error);
       const jsonRes = await tryCatch(res.value.json());
       if (jsonRes.ok && jsonRes.value && Array.isArray(jsonRes.value.results)) {
@@ -1265,36 +1243,34 @@ export class TMDBClient {
     }
   }
   async getPersonDetails(personId: number): Promise<Result<any>> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing API Key'));
-    const url = new URL(`${this.baseUrl}/person/${personId}?api_key=${apiKey}&language=fr-FR`);
-    const res = await tryCatch(fetch(url.toString()));
+
+    const url = new URL(`${this.baseUrl}/person/${personId}?language=fr-FR`);
+    const res = await tryCatch(authenticatedFetch(url.toString()));
     if (!res.ok) return err((res as any).error);
     if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
     const data = await tryCatch(res.value.json());
     if (!data.ok) return err((data as any).error);
     if (data.value && data.value.status_code) return err(new Error(data.value.status_message || 'TMDB Error'));
-    
+
     // Fallback to English if no French biography
     if (data.value && !data.value.biography) {
        try {
-         const enUrl = new URL(`${this.baseUrl}/person/${personId}?api_key=${apiKey}&language=en-US`);
-         const enRes = await fetch(enUrl.toString());
+         const enUrl = new URL(`${this.baseUrl}/person/${personId}?language=en-US`);
+         const enRes = await authenticatedFetch(enUrl.toString());
          if (enRes.ok) {
            const enData = await enRes.json();
            if (enData.biography) data.value.biography = enData.biography;
          }
        } catch (e) {}
     }
-    
+
     return data;
   }
 
   async getPersonCredits(personId: number): Promise<Result<any>> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) return err(new Error('Missing API Key'));
-    const url = new URL(`${this.baseUrl}/person/${personId}/combined_credits?api_key=${apiKey}&language=fr-FR`);
-    const res = await tryCatch(fetch(url.toString()));
+
+    const url = new URL(`${this.baseUrl}/person/${personId}/combined_credits?language=fr-FR`);
+    const res = await tryCatch(authenticatedFetch(url.toString()));
     if (!res.ok) return err((res as any).error);
     if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
     const data = await tryCatch(res.value.json());

@@ -23,6 +23,7 @@ import {
 import { buildC411SearchParams } from "./src/features/downloads/c411Query.ts";
 import { executeIdempotentMutation, type TimedMutationResult } from "./src/features/downloads/downloadIdempotency.ts";
 import { apiErrorMiddleware, backendHealthHandler, installAsyncRouteForwarding } from "./src/features/runtime/backendRuntime.ts";
+import { assertMediaProviderSecrets, registerMediaProviderRoutes } from './src/features/providers/mediaProviderBackend.ts';
 import {
   buildPlexParentShowIdentityItem,
   extractPlexExternalIds,
@@ -466,6 +467,7 @@ async function getPlexServers(
 }
 
 async function startServer() {
+  if (process.env.NODE_ENV === 'production') assertMediaProviderSecrets();
   const app = express();
   installAsyncRouteForwarding(app);
   const PORT = 3000;
@@ -483,6 +485,7 @@ async function startServer() {
 
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  registerMediaProviderRoutes(app, { authenticate: requireAuth });
   const upload = multer();
 
   const handleResolveSlug = async (req: express.Request, res: express.Response) => {

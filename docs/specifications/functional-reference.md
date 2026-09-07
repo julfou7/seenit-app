@@ -60,6 +60,9 @@ Hiérarchie des sources :
 Les routes backend produit sont :
 
 - `GET /api/health` : identité et santé du backend canonique ;
+- `GET /api/media/tmdb/...` et `GET /api/media/omdb` : métadonnées authentifiées sans clé côté
+  client ; [contrat et inventaire #12](./media-providers.md). Le module TVDB legacy inutilisé est
+  supprimé ; les sources et les règles d'univers ne changent pas avec cette migration.
 - `POST /api/plex/history` (`/api/plex-sync` alias) : full/delta Plex ;
 - `POST /api/plex/availability` et `GET|POST /api/plex/resolve-slug` : disponibilité et ouverture ;
 - `POST /api/c411/test` et `POST /api/c411/search` : test/recherche C411 ;

@@ -34,7 +34,8 @@ npm run build
 npm run preview
 ```
 
-Le build Web est produit dans `dist/`. En production, le backend compilé est `dist/server.cjs`.
+Le build Web embarquable est produit seul dans `dist/`. Le backend compilé reste hors de l'APK dans
+`build/server.cjs`.
 
 ## APK Android
 
