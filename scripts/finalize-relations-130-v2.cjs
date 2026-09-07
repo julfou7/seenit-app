@@ -43,8 +43,8 @@ replaceOnce(
 );
 replaceOnce(
   'docs/specifications/seenit.md',
-  'Le catalogue relationnel SeenIt existant est **legacy pendant la migration**. Un éventuel override futur ne peut\nêtre qu\'une exception rare, versionnée, fondée sur des `mediaKey` exactes et tracée dans une issue ; il\nne redevient jamais une stratégie d\'enrichissement continu.',
-  'Le catalogue relationnel SeenIt historique est **hors du chemin runtime normal**. Un éventuel override futur ne peut\nêtre qu\'une exception rare, versionnée, fondée sur des `mediaKey` exactes et tracée dans une issue ; il\nne redevient jamais une stratégie d\'enrichissement continu.',
+  'encyclopédie SeenIt des univers ne font plus partie de la stratégie normale des fiches. Le catalogue\nrelationnel SeenIt existant est **legacy pendant la migration**. Un éventuel override futur ne peut\nêtre qu\'une exception rare, versionnée, fondée sur des `mediaKey` exactes et tracée dans une issue ; il\nne redevient jamais une stratégie d\'enrichissement continu.',
+  'encyclopédie SeenIt des univers ne font plus partie de la stratégie normale des fiches. Le catalogue\nrelationnel SeenIt historique est **hors du chemin runtime normal**. Un éventuel override futur ne peut\nêtre qu\'une exception rare, versionnée, fondée sur des `mediaKey` exactes et tracée dans une issue ; il\nne redevient jamais une stratégie d\'enrichissement continu.',
   'statut catalogue relationnel',
 );
 
