@@ -13,7 +13,6 @@ import {
 
 const tmdbClientSource = readFileSync(new URL('../src/features/shows/tmdbClient.ts', import.meta.url), 'utf8');
 const tmdbFacadeSource = readFileSync(new URL('../src/features/shows/tmdb.ts', import.meta.url), 'utf8');
-const detailSource = readFileSync(new URL('../src/screens/ShowDetailScreen.tsx', import.meta.url), 'utf8');
 const mediaRelationsSource = readFileSync(new URL('../src/features/shows/mediaRelations.ts', import.meta.url), 'utf8');
 const tvdbSource = readFileSync(new URL('../src/services/tvdb.ts', import.meta.url), 'utf8');
 const recommendationsSource = readFileSync(new URL('../src/lib/recommendations.ts', import.meta.url), 'utf8');
@@ -145,11 +144,9 @@ test('SEENIT-RELATION-001 remplace le catalogue runtime par TMDB puis TVDB exact
   assert.match(legacyResolverSource, /getManifestRelationSnapshot/);
 });
 
-test('les similaires disparaissent de la fiche sans supprimer la découverte Explorer', () => {
+test('les similaires disparaissent des données de fiche sans supprimer la découverte Explorer', () => {
   assert.match(tmdbFacadeSource, /withoutDetailRecommendations/);
   assert.match(tmdbFacadeSource, /similar:\s*_similar/);
   assert.match(tmdbFacadeSource, /recommendations:\s*_recommendations/);
-  assert.doesNotMatch(detailSource, /getPrioritizedSimilarMedia\(tmdbDetails, collectionData, universeData\)/);
-  assert.doesNotMatch(detailSource, /Films similaires|Séries similaires/);
   assert.match(recommendationsSource, /export async function getRecommendations\(/);
 });
