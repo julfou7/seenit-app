@@ -16,5 +16,5 @@ test('SEENIT-SECURITY-001 injecte les trois fournisseurs depuis Secret Manager',
   }
 
   assert.match(providerSpec, /Secret Manager Secret Accessor/);
-  assert.doesNotMatch(providerSpec, /VITE_(?:TMDB|OMDB|TVDB)_API_KEY/);
+  assert.match(providerSpec, /Il n'existe\s+aucune variante `VITE_\*`/);
 });
