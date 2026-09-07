@@ -29,25 +29,22 @@ jobs:
         run: npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
 
       - name: Appliquer la finalisation #130
-        run: |
-          set +e
-          node scripts/finalize-relations-130.cjs
-          echo "$?" > /tmp/finalize-status
-          exit 0
+        run: node scripts/finalize-relations-130-v2.cjs
 
-      - name: Persister les transformations atteintes
+      - name: Persister le diff réel sur la branche
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A -- ':!.github/workflows/finalize-relations-contract-130.yml' ':!scripts/finalize-relations-130.cjs'
+          git add -A -- ':!.github/workflows/finalize-relations-contract-130.yml' ':!scripts/finalize-relations-130.cjs' ':!scripts/finalize-relations-130-v2.cjs'
           if ! git diff --cached --quiet; then
-            git commit -m "fix(media): appliquer la migration TMDB TVDB #130" -m "Changelog:
-            - Migre les fiches vers les relations structurelles TMDB et TVDB.
-            - Prépare le backend sécurisé et les TNR associés.
+            git commit -m "fix(media): appliquer le runtime TMDB TVDB exact #130" -m "Changelog:
+            - Les fiches utilisent l'ordre TMDB et les franchises/univers TVDB exacts, sans contenus similaires.
+            - Le backend relie les trois fournisseurs à Secret Manager sans secret dans l'application.
 
             Détails techniques:
-            - état intermédiaire persistant pour diagnostiquer puis terminer la validation sur la branche #130."
+            - verrouille les TNR d'identité, de déduplication et d'absence de fallback par titre ;
+            - injecte les références Secret Manager Cloud Run pour TMDB, OMDb et TVDB."
             git push origin HEAD:fix/media-relations-tvdb-exact-130
           fi
 
@@ -69,6 +66,6 @@ jobs:
       - name: Retirer l'outillage temporaire après validation
         run: |
           set -euo pipefail
-          git rm .github/workflows/finalize-relations-contract-130.yml scripts/finalize-relations-130.cjs
+          git rm .github/workflows/finalize-relations-contract-130.yml scripts/finalize-relations-130.cjs scripts/finalize-relations-130-v2.cjs
           git commit -m "chore(media): retirer l'outillage temporaire #130"
           git push origin HEAD:fix/media-relations-tvdb-exact-130
