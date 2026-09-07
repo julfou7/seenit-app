@@ -229,20 +229,20 @@ Aucun agent ne décide seul de cette migration.
 - Titre, titre original, année, nom de fichier et nom de release ne sont **jamais** des clés de matching.
 - Un même transfert physique se reconnaît uniquement par `requestId`, infohash/downloadId/alias exact ou chemin de transfert exact ; en cas d'ambiguïté, ne pas fusionner.
 
-## 5.2 Relations médias : aucune rustine nominative
+## 5.2 Relations médias : TMDB pour les sagas, TVDB pour les franchises
 
-- Une saga ou un univers est résolu uniquement par le mécanisme commun et des identités typées exactes
-  `movie:<tmdbId>` / `tv:<tmdbId>`. Un exemple utilisateur nommé (Punisher, Harry Potter, House of
-  Guinness, etc.) peut devenir une fixture/TNR, **jamais** une condition, branche, regex ou exception de
-  production fondée sur son titre.
-- Il est interdit de corriger un univers par comparaison de titre, titre original, année, popularité,
-  casting, studio, marque, mot-clé, nom de liste ou premier résultat d'une recherche, même si cela résout
-  le cas signalé. Sans preuve exacte, masquer la relation.
-- Une correction de données ciblée n'est admissible que dans un groupe versionné à provenance validée,
-  avec des `mediaKey` exactes et un TNR générique prouvant la réciprocité depuis **tous** ses membres. Le
-  résolveur reste identique pour toutes les œuvres ; aucun code spécial ne porte le nom du cas corrigé.
-- Tout correctif qui ferait réussir uniquement l'exemple signalé sans renforcer l'invariant global est
-  refusé en revue, même si son résultat visuel semble correct.
+La décision produit canonique est détaillée dans `docs/decisions/media-relations-2026-09-06.md` et suivie dans #130.
+
+- Sur une fiche **Film**, l'**Ordre de visionnage** provient exclusivement d'une collection TMDB explicite. Ne jamais compléter une collection absente avec TVDB, un catalogue SeenIt, Wikidata ou une heuristique.
+- Sur les fiches **Film et Série**, la relation **franchise / univers** provient normalement de TVDB à partir d'une identité externe exacte résolue depuis TMDB. Aucune recherche du média par titre et aucune recherche globale de listes n'est admise.
+- Examiner uniquement les listes TVDB réellement rattachées à l'œuvre exacte, retenir au maximum une liste officielle admissible et **ne jamais fusionner plusieurs listes** pour élargir artificiellement une franchise.
+- Le libellé d'une liste TVDB déjà atteinte depuis l'identité exacte peut seulement qualifier la liste pour l'interface (`franchise` ou `univers`). Il ne constitue jamais une clé de matching d'œuvre ou de membre.
+- Chaque membre TVDB doit être résolu vers `movie:<tmdbId>` ou `tv:<tmdbId>` avant affichage. Titre, titre original, année, popularité, casting, studio, marque, mot-clé ou premier résultat ne servent jamais à rattacher un membre.
+- Pour un film, la section TVDB est dédupliquée après l'Ordre de visionnage par `mediaType + tmdbId`. Une section sans autre média affichable est masquée.
+- Les sections **Films similaires** et **Séries similaires** n'appartiennent plus aux fiches média. La découverte approximative reste dans Explorer et ne devient jamais un fallback d'une relation TVDB manquante.
+- Wikidata, Kometa, MDBList et autres sources niche ne font plus partie de la stratégie normale de relations de fiche. Le catalogue SeenIt existant est legacy pendant la migration ; un éventuel override futur reste exceptionnel, versionné, exact et tracé, jamais une encyclopédie entretenue au cas par cas.
+- Un exemple utilisateur nommé (Punisher, Harry Potter, House of the Dragon, etc.) peut devenir une fixture/TNR, **jamais** une condition, branche, regex ou exception de production fondée sur son titre.
+- En cas d'ambiguïté ou de panne fournisseur, masquer la relation plutôt que rechercher par titre. Le reste de la fiche reste utilisable.
 
 ## 6. PWA et APK
 
