@@ -19,6 +19,7 @@ import {
   resolveParentalRating,
 } from './parentalRating';
 import { getParentalRatingOverride } from '../../store/parentalRatingStore';
+import { convergeTrackedMediaTitleFromTmdb } from './trackedMediaTitle';
 
 export * from './tmdbClient';
 
@@ -38,6 +39,7 @@ const originalGetShowDetails = tmdbClient.getShowDetails.bind(tmdbClient);
 tmdbClient.getShowDetails = (async (id: number) => {
   const result = await originalGetShowDetails(id);
   if (!result.ok || !result.value) return result;
+  convergeTrackedMediaTitleFromTmdb('tv', Number(id), result.value);
   const decorated = decorateParentalRatingDetails(
     'tv',
     result.value,
@@ -50,6 +52,7 @@ const originalGetMovieDetails = tmdbClient.getMovieDetails.bind(tmdbClient);
 tmdbClient.getMovieDetails = (async (id: number) => {
   const result = await originalGetMovieDetails(id);
   if (result.ok && result.value) {
+    convergeTrackedMediaTitleFromTmdb('movie', Number(id), result.value);
     const checkedAt = Date.now();
     const isTheatrical = hasCurrentFrenchTheatricalRelease(result.value);
     if (isTheatrical) rememberFrenchTheatricalEvidence(Number(id), checkedAt);
@@ -133,7 +136,7 @@ const strictFrenchNowPlaying = async (page: number = 1) => {
 };
 
 // Façade stable : tous les consommateurs historiques gardent le même singleton,
-// seules les politiques « Au cinéma » et « Âge conseillé » sont durcies ici.
+// seules les politiques « Au cinéma », « Âge conseillé » et le titre localisé sont durcies ici.
 tmdbClient.getNowPlaying = strictFrenchNowPlaying as typeof tmdbClient.getNowPlaying;
 
 export const tmdb = tmdbClient;

@@ -1,5 +1,9 @@
 # Spécifications vivantes SeenIt
 
+Pour toute interface ou geste, la [référence UX](./ux-reference.md) précise les comportements observés,
+les conventions et les cibles de normalisation encore ouvertes. Elle complète les invariants de la
+SPEC sans annoncer comme corrigé un écart uniquement documenté.
+
 La source de vérité fonctionnelle et technique est composée de [`seenit.md`](./seenit.md), qui porte
 les invariants et machines d'états, et de la
 [`référence fonctionnelle`](./functional-reference.md), qui décrit le produit écran par écran.

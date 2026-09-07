@@ -1,7 +1,7 @@
 # SeenIt — Référence fonctionnelle canonique
 
 Dernière vérification : 6 septembre 2026  
-Baseline observée : **1.4.118**, `main` `620c4a4e41682257da05efa625bb6a8898108947`
+Baseline observée : **1.4.120**, `main` `374b93197168db6844346bcd046cc46390895abd`
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : composante obligatoire de la SPEC SeenIt
 
@@ -123,6 +123,10 @@ ces boutons sont des actions de récupération explicites.
 
 ## 4. Navigation globale
 
+Les gestes et leur portée exacte sont inventoriés dans la [référence UX](./ux-reference.md).
+Le reset de navigation actuel présente des écarts (#178) : reconnaissance après changement d'onglet
+et remontée globale des conteneurs, y compris cachés. Ne pas les prendre comme conventions à reproduire.
+
 La barre basse possède quatre destinations stables, dans cet ordre :
 
 1. **À Voir** : accueil opérationnel ;
@@ -225,6 +229,13 @@ La fiche combine les détails TMDB, notes TMDB/IMDb (OMDb), disponibilité strea
 présence Plex/Arr, bande-annonce, âge conseillé, casting, recommandations, collection/franchise
 et discussions Reddit. Les modals personne et épisode restent dans la pile Retour.
 
+Le titre affiché privilégie le `title`/`name` de la fiche TMDB récupérée en `fr-FR`. Un ancien titre
+enregistré dans la bibliothèque sert seulement de fallback avant ou hors hydratation. Lorsqu'un média
+suivi est hydraté par son identité exacte `mediaType + TMDB ID`, SeenIt fait converger uniquement son
+champ `title` vers la valeur localisée ; progression, statut, favori, note, provenance et timestamps
+métier restent intacts. Sans titre localisé exploitable, aucun nom n'est inventé et aucun matching par
+titre n'est introduit.
+
 L'âge conseillé automatique affiche la certification US TMDB originale, sa provenance et sa traduction
 lisible, par exemple `PG-13 · US · 13+`. « Tous publics » n'est affiché que lorsqu'une certification US
 explicite le prouve ; sinon SeenIt affiche « Âge à vérifier ». Une correction personnelle par média peut
@@ -243,6 +254,11 @@ progression. Une note/favorite/archive est une intention distincte du statut de 
 - Le téléchargement rapide privilégie Radarr ; C411/magnet sert de parcours manuel de repli.
 
 ### 8.3 Séries et épisodes
+
+Dans le détail d'épisode, le swipe gauche consulte le suivant et le swipe droit le précédent, avec
+passage de saison lorsque disponible ; ce geste ne marque jamais vu. Les alternatives précédent/suivant
+au bouton et au clavier restent à ajouter dans #179. La référence UX distingue cette consultation des
+swipes de suppression/abandon sur les cartes.
 
 - Suivre sans visionner crée « À voir ».
 - Marquer un épisode vu/non vu met à jour `seenEpisodes`, `episodeRecords`, `lastWatchedAt` et le
@@ -429,6 +445,10 @@ modifiable ; il n'est pas inventé. Les actions de maintenance ne changent jamai
 le databaseId ou la signature APK.
 
 ## 13. Résilience, UX et limites assumées
+
+Le cadrage transversal [UX](./ux-reference.md) couvre les boutons, cartes, en-têtes, superpositions et
+gestes spécifiques. Les constats du code sont suivis dans [l'audit UX](../audits/audit-ux-2026-09-06.md)
+et #178 à #181 ; la preuve visuelle/tactile PWA/APK reste à produire avec #15.
 
 - Le rendu mobile respecte les safe areas ; la barre basse ne masque ni contenu ni toast.
 - Les écrans lourds sont lazy-loadés et préchargés après connexion ; l'écran courant reste visible

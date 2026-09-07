@@ -157,6 +157,14 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   TVDB/IMDb peuvent exister comme métadonnées techniques, mais doivent être résolus vers TMDB avant
   toute association média. Le titre, le titre original, l'année, la popularité, le nom de fichier,
   le nom de release ou la position d'un résultat ne sont jamais une preuve d'identité.
+- **SEENIT-METADATA-001** — Le titre éditorial d'un film ou d'une série privilégie le `title`/`name`
+  de la fiche TMDB demandée en `fr-FR`. Un `title` déjà persisté dans le suivi reste un fallback avant
+  ou hors hydratation TMDB, jamais une autorité supérieure à la métadonnée localisée fraîche. Après
+  résolution du média exact par `mediaType + TMDB ID`, SeenIt peut faire converger uniquement le champ
+  `title` du document suivi et de son cache UID vers cette valeur ; cette convergence ne réécrit ni
+  progression, statut, favori, note, provenance, ni timestamp métier. Si TMDB ne fournit aucun titre
+  localisé exploitable, SeenIt conserve le meilleur titre disponible sans traduction inventée et sans
+  utiliser un titre pour retrouver ou désambiguïser l'identité.
 - Pour les téléchargements, un transfert physique ne se fusionne que par `requestId`, infohash/downloadId
   ou alias exact, ou chemin de transfert exact. Une taille, un titre ou un nom de release, même combinés,
   ne suffisent jamais ; une ambiguïté reste non résolue.
@@ -630,6 +638,10 @@ pour le cache des sagas et univers.
   laisse l'application courante utilisable et propose le lien officiel comme solution de secours.
 
 ## 9. UX, accessibilité et cohérence visuelle
+
+La [référence UX](./ux-reference.md) complète cette section : cartes des gestes réellement présents,
+rôles de boutons/cartes/en-têtes et propositions de normalisation. Les écarts et les cibles non encore
+implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas validation visuelle terrain.
 
 - L'or `#E5A93D` représente l'action principale SeenIt. Les couleurs Plex/Sonarr/Radarr/
   qBittorrent et les badges Film/Série restent des accents secondaires cohérents.

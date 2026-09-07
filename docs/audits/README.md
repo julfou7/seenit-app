@@ -21,6 +21,9 @@ rapport existant et son historique.
 
 ## Index
 
+- [AUDIT-2026-09-06-UX — boutons, cartes, en-têtes et gestes](./audit-ux-2026-09-06.md) : baseline
+  1.4.120 (`cf6e617`), revue du code et cadrage ; corrections #178 à #181, preuves de rendu #15.
+
 | ID | Date | Baseline | Périmètre | Rapport | Backlog |
 |---|---|---|---|---|---|
 | AUDIT-2026-08-31-GLOBAL | 2026-08-31 | 1.4.80 (`75ec2f1` après durcissement 1.4.81) | application, PWA, APK, backend, sécurité, structure, tests et CI/CD | [Audit global](./audit-global-2026-08-31.md) | [Issues #9 à #19](../backlog/README.md) |
