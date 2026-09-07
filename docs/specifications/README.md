@@ -17,6 +17,8 @@ de release vivent désormais dans [`../process/delivery.md`](../process/delivery
 processus prévaut sur les anciennes descriptions procédurales de la SPEC lorsqu'elles détaillent des
 triggers ou des jobs de CI ; `release-control.md` complète cette mécanique pour le déclencheur
 `issue_comment` natif, tandis que la SPEC reste autoritative pour le comportement produit et les invariants.
+Pour `SEENIT-QUALITY-004`, le même processus formalise aussi l'acquisition API-first du workspace et la
+reprise déterministe d'un chantier : vérifier `main` n'implique jamais de recloner le dépôt.
 
 ## Qualifier la demande avant de modifier
 

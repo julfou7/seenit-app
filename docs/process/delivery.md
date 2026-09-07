@@ -139,6 +139,44 @@ administratifs. Le test ciblé et l'issue éventuelle suffisent.
 Les décisions de processus sont tracées ici, dans les audits et les issues d'architecture plutôt que
 d'être dupliquées dans chaque fiche produit.
 
+## Acquisition du workspace et reprise d'intervention
+
+La vérification du `main` GitHub canonique et la matérialisation d'un dépôt local sont deux opérations
+distinctes. `SEENIT-QUALITY-004` impose la première à chaque intervention ; elle n'impose pas la seconde.
+
+1. **Préflight API-first.** Lire `main`, l'issue, la PR, les commits et les fichiers nécessaires via le
+   connecteur/API GitHub tant qu'aucune commande locale n'est nécessaire. Une demande read-only se
+   traite sans clone, checkout local ou installation de dépendances.
+2. **Réutiliser avant d'acquérir.** Si un workspace SeenIt existe déjà dans l'environnement, contrôler
+   son état, sa branche/HEAD et son rapport au SHA canonique, puis le réutiliser. Un nouveau prompt ou une
+   reprise conversationnelle n'est jamais, à lui seul, une raison de recloner le dépôt.
+3. **Acquisition minimale.** Si aucun workspace n'existe et qu'une commande locale est réellement
+   nécessaire, acquérir une seule fois par environnement la branche/SHA utile. Préférer le mode minimal
+   compatible (`git clone --depth 1`, clone partiel ou checkout partiel) à l'historique complet, sauf si
+   le diagnostic exige cet historique.
+4. **Dépendances conditionnelles.** Réutiliser `node_modules` ou un cache exact lorsqu'il correspond à
+   la version Node et au `package-lock.json` du chantier. Ne lancer `npm ci` que lorsque les dépendances
+   sont absentes ou incompatibles ; un nouveau prompt ne déclenche jamais à lui seul une réinstallation.
+5. **Reprise déterministe.** Commencer par l'issue, la PR ou la branche existante et par le dernier jalon
+   qui donne la prochaine action exacte. Ne relire que les sections canoniques nécessaires à cette action ;
+   ne pas reconstruire l'historique complet déjà capturé par l'issue/PR.
+6. **Checkpoint exploitable.** Si un handoff est inévitable alors que la demande initiale reste
+   incomplète, publier avant de rendre la main : SHA de référence, branche, PR éventuelle, fichiers
+   modifiés, tests déjà exécutés/verts, blocage éventuel et prochaine action exacte. Une reprise dans un
+   environnement neuf utilise ce checkpoint avant toute nouvelle exploration.
+7. **Travail distant.** CI, release et déploiement sont exécutés par GitHub Actions. L'agent n'occupe pas
+   sa fenêtre d'exécution avec des polls rapprochés ; il suit synchroniquement uniquement sur demande
+   explicite ou pour diagnostiquer un échec précis.
+
+Cette politique ne promet aucune persistance du sandbox. Lorsqu'un environnement neuf est réellement
+fourni, l'acquisition locale peut devoir être répétée ; elle reste minimale et n'entraîne pas une
+reconstruction du contexte déjà présent dans GitHub.
+
+La métrique de pilotage est **« prompt de reprise → première action utile »** (lecture canonique ciblée,
+modification, test, commit/PR ou blocage précis). La cible est **moins de 2 minutes**, hors téléchargement
+initial réellement nécessaire. Les preuves réelles sont consignées dans #195 et les chantiers qui
+mesurent ce délai ; aucune mesure synthétique n'est fabriquée pour fermer le critère.
+
 ## Cause racine et portée d'un correctif
 
 Un exemple reproductible prouve un symptôme, pas la portée du correctif. Avant toute implémentation,

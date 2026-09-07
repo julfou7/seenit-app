@@ -69,12 +69,41 @@ propose une architecture ou un backlog borné. L'issue et la PR indiquent systé
 « portée globale ou locale » et « risque résiduel ». Une pure copie d'interface, documentation ou tâche
 sans anomalie peut indiquer « sans objet » afin de conserver le chemin light.
 
+## 0.3 Politique obligatoire — API-first, workspace unique et reprise
+
+La vérification du `main` GitHub canonique est une **lecture d'état distante**. Elle n'impose à elle seule
+ni clone, ni checkout, ni installation de dépendances.
+
+1. Commencer **API-first** : lire `main`, l'issue, la PR, les commits et les fichiers canoniques via le
+   connecteur/API GitHub tant qu'aucune commande locale n'est réellement nécessaire. Une demande
+   read-only se traite sans clone et sans matérialiser de workspace.
+2. Avant toute acquisition locale, rechercher un workspace SeenIt déjà présent dans l'environnement.
+   S'il existe, vérifier son état, confronter son HEAD/sa branche au `main` ou à la branche du chantier,
+   puis le réutiliser. **Un nouveau prompt n'est jamais une raison de recloner.**
+3. Si aucun workspace n'existe et qu'une exécution locale est nécessaire, acquérir le dépôt **une seule
+   fois par environnement** depuis le SHA/branche canonique, avec le mode minimal compatible
+   (`--depth`, clone partiel ou checkout partiel) plutôt qu'un historique complet par défaut.
+4. Ne lancer `npm ci` que si les dépendances sont absentes ou incompatibles avec la version Node et le
+   `package-lock.json` du chantier. Un `node_modules` ou cache exact compatible est réutilisé.
+5. Lors d'une reprise, repartir d'abord de l'issue, de la PR ou de la branche existante et du dernier
+   jalon contenant la **prochaine action exacte**. Ne pas reconstruire l'historique complet si ce jalon
+   et les index canoniques bornent déjà le travail restant.
+6. Si une demande initiale reste incomplète lors d'un handoff inévitable, mettre l'issue à jour avec le
+   SHA/branche/PR, les fichiers modifiés, les tests déjà verts, le blocage éventuel et la prochaine action
+   exacte afin que la reprise suivante commence par une action utile.
+7. Laisser les opérations distantes longues — CI, release et déploiement — à GitHub Actions. Ne pas
+   consommer une fenêtre d'exécution en polling rapproché, sauf demande explicite de suivi synchrone.
+
+Cette politique ne suppose jamais qu'un sandbox soit persistant : si la plateforme fournit réellement
+un environnement neuf, l'acquisition minimale peut être répétée. Elle interdit seulement de confondre
+cette contrainte de runtime avec une obligation SeenIt de recloner ou de reconstruire le contexte.
+
 ## 0. Avant toute analyse, proposition ou modification
 
 **Hors fast paths des sections 0.0 et 0.1 :**
 
 1. Lire intégralement ce fichier.
-2. Récupérer l'état courant de la branche GitHub `main` et son commit de tête. **GitHub `main` est la source de vérité** : ne jamais analyser ou modifier SeenIt à partir d'un workspace supposé à jour sans l'avoir confronté au `main` courant.
+2. Récupérer l'état courant de la branche GitHub `main` et son commit de tête. **GitHub `main` est la source de vérité** : ne jamais analyser ou modifier SeenIt à partir d'un workspace supposé à jour sans l'avoir confronté au `main` courant. Cette vérification n'impose aucun clone local ; appliquer la politique de la section 0.3.
 3. Lire intégralement `docs/specifications/seenit.md`, `docs/specifications/functional-reference.md`,
    `docs/specifications/README.md` et toute documentation pertinente pour le sujet ; pour toute
    livraison, lire aussi `docs/process/delivery.md`. La référence fonctionnelle est obligatoire :
