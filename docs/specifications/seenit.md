@@ -678,9 +678,16 @@ pour le cache des sagas et univers.
 - **SEENIT-SECURITY-003** — Avant toute persistance ou export de log, les champs sensibles et les
   secrets reconnaissables dans les chaînes sont masqués. La profondeur, la taille et le nombre
   d'éléments sérialisés sont bornés.
-- Les clés de service TVDB/OMDb/TMDB actuellement nécessaires au client sont considérées comme des
-  identifiants exposés : elles ne doivent disposer d'aucun privilège d'écriture. Leur migration vers
-  le backend est suivie comme dette de sécurité prioritaire.
+- **SEENIT-SECURITY-001**, façade métadonnées (#12) : TMDB et OMDb sont appelés exclusivement par
+  le backend authentifié ; aucune clé fournisseur, variable VITE de clé ou fallback localStorage
+  n'est embarqué dans PWA/APK. Les recherches, caches chauds, résolutions exactes, notes et politiques
+  cinéma/âge restent inchangés. Voir [contrat fournisseurs](./media-providers.md).
+- Le module TVDB legacy sans consommateur est retiré : aucune route de franchise par titre ou nom
+  de liste n'est créée. Les univers restent le catalogue validé de SEENIT-RELATION-001 ; TVDB ne
+  devient pas un nouveau fournisseur runtime au prétexte de déplacer un secret.
+- Toute ancienne clé embarquée reste compromise jusqu'à rotation (#30). La mise en production de
+  #12 exige la preuve du provisionnement serveur TMDB/OMDb et des vérifications authentifiées ;
+  les secrets ne sont jamais affichés dans les preuves.
 - La clé PKCS12 `seenit`, générée hors dépôt et matérialisée depuis GitHub Secrets, est l'unique clé
   de signature opérationnelle. Ses octets, son alias, son type et son certificat sont verrouillés par
   le contrat ; les mots de passe ne sont jamais stockés dans Git, la SPEC, les issues ou les logs.

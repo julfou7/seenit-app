@@ -608,6 +608,10 @@
         {
           "file": "tests/downloadBackendSecurity.test.ts",
           "contains": "le proxy n’accepte que les chemins Sonarr Radarr et qBittorrent nécessaires"
+        },
+        {
+          "file": "tests/mediaProviderSecurity.test.ts",
+          "contains": "SEENIT-SECURITY-001 authentifie la façade et refuse les routes hors contrat"
         }
       ]
     },
