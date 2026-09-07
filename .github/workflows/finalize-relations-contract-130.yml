@@ -28,28 +28,23 @@ jobs:
       - name: Installer les dépendances
         run: npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
 
-      - name: Appliquer la finalisation #130
-        run: node scripts/finalize-relations-130-v2.cjs
+      - name: TNR SPEC relations
+        run: node --test tests/mediaRelationsSpecification.test.ts
 
-      - name: Persister le diff réel sur la branche
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A -- ':!.github/workflows/finalize-relations-contract-130.yml' ':!scripts/finalize-relations-130.cjs' ':!scripts/finalize-relations-130-v2.cjs'
-          if ! git diff --cached --quiet; then
-            git commit -m "fix(media): appliquer le runtime TMDB TVDB exact #130" -m "Changelog:
-            - Les fiches utilisent l'ordre TMDB et les franchises/univers TVDB exacts, sans contenus similaires.
-            - Le backend relie les trois fournisseurs à Secret Manager sans secret dans l'application.
+      - name: TNR runtime relations
+        run: node --test tests/mediaRelations.test.ts
 
-            Détails techniques:
-            - verrouille les TNR d'identité, de déduplication et d'absence de fallback par titre ;
-            - injecte les références Secret Manager Cloud Run pour TMDB, OMDb et TVDB."
-            git push origin HEAD:fix/media-relations-tvdb-exact-130
-          fi
+      - name: TNR TVDB exact
+        run: node --test tests/tvdbRelations.test.ts
 
-      - name: Tests ciblés relations et sécurité
-        run: node --test tests/mediaRelationsSpecification.test.ts tests/mediaRelations.test.ts tests/tvdbRelations.test.ts tests/mediaProviderSecurity.test.ts tests/backendDeploymentWorkflow.test.ts tests/providerSecretDeployment.test.ts
+      - name: TNR sécurité fournisseurs
+        run: node --test tests/mediaProviderSecurity.test.ts
+
+      - name: TNR déploiement backend
+        run: node --test tests/backendDeploymentWorkflow.test.ts
+
+      - name: TNR Secret Manager
+        run: node --test tests/providerSecretDeployment.test.ts
 
       - name: Contrat de changement
         run: npm run test:spec:changes
@@ -66,6 +61,8 @@ jobs:
       - name: Retirer l'outillage temporaire après validation
         run: |
           set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm .github/workflows/finalize-relations-contract-130.yml scripts/finalize-relations-130.cjs scripts/finalize-relations-130-v2.cjs
           git commit -m "chore(media): retirer l'outillage temporaire #130"
           git push origin HEAD:fix/media-relations-tvdb-exact-130
