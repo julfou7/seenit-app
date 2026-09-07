@@ -80,4 +80,4 @@ jobs:
           git commit -m "chore(media): retirer l'outillage temporaire #130" -m "Changelog: aucun."
           git push origin HEAD:fix/media-relations-tvdb-exact-130
 
-# relance finale après correction du patch SeenIt
+# relance après correction du whitespace Markdown
