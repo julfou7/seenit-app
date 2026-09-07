@@ -29,13 +29,23 @@ jobs:
         run: npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
 
       - name: Appliquer la finalisation #130
+        run: node scripts/finalize-relations-130.cjs
+
+      - name: Persister le diff réel sur la branche
         run: |
-          set +e
-          node scripts/finalize-relations-130.cjs
-          script_status=$?
-          set -e
-          if [ "$script_status" -ne 0 ]; then
-            echo "Le script s'est arrêté après ses transformations déjà appliquées ; les TNR ci-dessous déterminent si l'état obtenu est complet."
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -- ':!.github/workflows/finalize-relations-contract-130.yml' ':!scripts/finalize-relations-130.cjs'
+          if ! git diff --cached --quiet; then
+            git commit -m "fix(media): appliquer le runtime TMDB TVDB exact #130" -m "Changelog:
+            - Les fiches utilisent l'ordre TMDB et les franchises/univers TVDB exacts, sans contenus similaires.
+            - Le backend relie les fournisseurs aux secrets serveur sans les exposer au client.
+
+            Détails techniques:
+            - ajoute les TNR d'identité, de déduplication et d'absence de fallback par titre ;
+            - prépare les références Secret Manager Cloud Run pour les trois fournisseurs."
+            git push origin HEAD:fix/media-relations-tvdb-exact-130
           fi
 
       - name: Tests ciblés relations et sécurité
@@ -53,18 +63,9 @@ jobs:
       - name: Vérifier le diff
         run: git diff --check
 
-      - name: Committer la migration validée et retirer l'outillage temporaire
+      - name: Retirer l'outillage temporaire après validation
         run: |
           set -euo pipefail
           git rm .github/workflows/finalize-relations-contract-130.yml scripts/finalize-relations-130.cjs
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "fix(media): finaliser les relations TMDB et TVDB #130" -m "Changelog:
-          - Les fiches utilisent désormais l'ordre TMDB et les franchises/univers TVDB exacts, sans contenus similaires.
-          - Les trois fournisseurs sont reliés au backend via Secret Manager sans secret dans l'application.
-
-          Détails techniques:
-          - verrouille les TNR d'identité, de déduplication et d'absence de fallback par titre ;
-          - lie les secrets Cloud Run par secretKeyRef et documente l'accès runtime minimal."
+          git commit -m "chore(media): retirer l'outillage temporaire #130"
           git push origin HEAD:fix/media-relations-tvdb-exact-130
