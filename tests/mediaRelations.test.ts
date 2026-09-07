@@ -125,18 +125,20 @@ test('SEENIT-RELATION-001 remplace le catalogue runtime par TMDB puis TVDB exact
     tmdbClientSource.indexOf('async getCollectionDetails'),
   );
 
-  assert.match(tmdbFacadeSource, /getTVDBFranchiseTimeline\(tvdbId, null, null, mediaType\)/);
+  assert.match(tmdbFacadeSource, /getTVDBFranchiseRelation\(tvdbId, null, imdbId, mediaType\)/);
   assert.match(tmdbFacadeSource, /external_ids\?\.tvdb_id/);
+  assert.match(tmdbFacadeSource, /external_ids\?\.imdb_id/);
   assert.match(tmdbFacadeSource, /getCollectionDetails\(collectionId\)/);
   assert.match(tmdbFacadeSource, /collectionKeys\.has\(itemKey\)/);
   assert.match(tmdbFacadeSource, /peekUniverseAndCollection/);
   assert.doesNotMatch(tmdbFacadeSource, /getManifestRelationSnapshot/);
 
+  assert.match(tvdbSource, /\/search\/remoteid\/\$\{encodeURIComponent\(exactImdbId\)\}/);
   assert.doesNotMatch(tvdbSource, /\/search\?query=/);
   assert.doesNotMatch(tvdbSource, /slice\(0,\s*5\)|Math\.log10|popularity/i);
-  assert.doesNotMatch(tvdbSource, /includes\(['"](?:franchise|universe|world|saga)/i);
   assert.match(tvdbSource, /selectSingleOfficialTVDBList/);
   assert.match(tvdbSource, /extractExactTMDBRemoteId/);
+  assert.match(tvdbSource, /extractExactTVDBSearchIdentity/);
 
   // Le résolveur legacy reste présent dans la classe pour compatibilité interne,
   // mais la façade publique canonique le remplace désormais intégralement.
@@ -147,6 +149,7 @@ test('les similaires disparaissent de la fiche sans supprimer la découverte Exp
   assert.match(tmdbFacadeSource, /withoutDetailRecommendations/);
   assert.match(tmdbFacadeSource, /similar:\s*_similar/);
   assert.match(tmdbFacadeSource, /recommendations:\s*_recommendations/);
-  assert.match(detailSource, /getPrioritizedSimilarMedia\(tmdbDetails, collectionData, universeData\)/);
-  assert.match(recommendationsSource, /getMediaRecommendations\(/);
+  assert.doesNotMatch(detailSource, /getPrioritizedSimilarMedia\(tmdbDetails, collectionData, universeData\)/);
+  assert.doesNotMatch(detailSource, /Films similaires|Séries similaires/);
+  assert.match(recommendationsSource, /export async function getRecommendations\(/);
 });
