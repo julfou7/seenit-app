@@ -1,0 +1,264 @@
+name: Finalize relations contract 130
+
+on:
+  push:
+    branches: [fix/media-relations-tvdb-exact-130]
+    paths:
+      - .github/workflows/finalize-relations-contract-130.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: fix/media-relations-tvdb-exact-130
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
+
+      - name: Align final contract and tests
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, label):
+              p = Path(path)
+              s = p.read_text()
+              count = s.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path} {label}: expected 1 occurrence, got {count}')
+              p.write_text(s.replace(old, new, 1))
+
+          replace(
+              'src/features/providers/mediaProviderBackend.ts',
+              "const REQUIRED_SECRET_NAMES = ['TMDB_API_KEY', 'OMDB_API_KEY'] as const;",
+              "const REQUIRED_SECRET_NAMES = ['TMDB_API_KEY', 'OMDB_API_KEY', 'TVDB_API_KEY'] as const;",
+              'required secrets',
+          )
+
+          replace(
+              'docs/specifications/media-providers.md',
+              "TMDB et OMDb restent obligatoires au démarrage du backend canonique. TVDB est requis pour que la section\nfranchise/univers fonctionne ; si sa configuration est absente ou indisponible, la route relationnelle\néchoue fermée et la fiche masque seulement cette section. Pour considérer #130 déployée, la révision\nproduction doit néanmoins être validée avec TVDB configuré.",
+              "TMDB, OMDb et TVDB sont obligatoires au démarrage d'une nouvelle révision du backend canonique. Une\ncandidate à laquelle manque l'un de ces trois secrets est refusée avant promotion. Une panne TVDB après\ndémarrage masque seulement la section franchise/univers ; elle ne provoque aucun fallback par titre.",
+              'provider deployment contract',
+          )
+
+          replace(
+              'docs/specifications/functional-reference.md',
+              "- `GET /api/health` : identité et santé du backend canonique ;\n- `POST /api/plex/history`",
+              "- `GET /api/health` : identité et santé du backend canonique ;\n- `GET /api/media/tmdb/...`, `GET /api/media/omdb` et `GET /api/media/tvdb/franchise` : façade métadonnées authentifiée ; TVDB ne reçoit que des identifiants externes exacts ;\n- `POST /api/plex/history`",
+              'provider routes',
+          )
+          replace(
+              'docs/specifications/functional-reference.md',
+              "Le catalogue relationnel SeenIt actuel est legacy pendant la migration ;\nun éventuel override futur reste exceptionnel, versionné, exact et tracé.",
+              "Le catalogue relationnel SeenIt historique est hors du chemin runtime normal ;\nun éventuel override futur reste exceptionnel, versionné, exact et tracé.",
+              'legacy wording',
+          )
+          old_gap = """La décision durable complète est figée dans
+[`docs/decisions/media-relations-2026-09-06.md`](../decisions/media-relations-2026-09-06.md) et dans
+`SEENIT-RELATION-001`. **Le runtime actuel conserve encore le catalogue relationnel SeenIt**, son
+pipeline hors ligne et les sections Films/Séries similaires ; TVDB n'est donc pas encore le résolveur
+normal de franchise/univers. Cet écart de mise en œuvre reste suivi dans l'**issue #130** et ne remet pas
+en cause la décision produit.
+"""
+          new_gap = """La décision durable complète est figée dans
+[`docs/decisions/media-relations-2026-09-06.md`](../decisions/media-relations-2026-09-06.md) et dans
+`SEENIT-RELATION-001`. Le runtime normal applique désormais ce contrat : collections TMDB pour l'ordre,
+TVDB exact pour franchise/univers et aucune section similaire sur les fiches. Le pipeline relationnel
+historique n'est plus une source runtime de la fiche.
+"""
+          replace('docs/specifications/functional-reference.md', old_gap, new_gap, 'runtime gap')
+
+          replace(
+              'docs/decisions/media-relations-2026-09-06.md',
+              "L'issue #130 reste donc **ouverte** jusqu'à la migration runtime, aux TNR PWA/APK et à la suppression du chemin legacy devenu inutile.",
+              "Cet écart décrit l'état historique au moment de la décision. La migration #130 remplace le chemin runtime normal par TMDB + TVDB, retire les similaires des fiches et conserve ce paragraphe uniquement comme trace de la raison du changement.",
+              'decision status',
+          )
+
+          replace(
+              'tests/mediaRelationsSpecification.test.ts',
+              "test('SEENIT-RELATION-001 trace la décision durable et l’écart runtime', () => {",
+              "test('SEENIT-RELATION-001 fige la décision durable après migration runtime', () => {",
+              'spec test name',
+          )
+          replace(
+              'tests/mediaRelationsSpecification.test.ts',
+              "  assert.match(functionalReference, /runtime actuel conserve encore le catalogue relationnel SeenIt/);\n  assert.match(functionalReference, /issue #130/);\n  assert.match(decision, /issue #130 reste donc \\*\\*ouverte\\*\\*/);",
+              "  assert.match(functionalReference, /runtime normal applique désormais ce contrat/);\n  assert.match(functionalReference, /pipeline relationnel historique n'est plus une source runtime/);\n  assert.match(decision, /migration #130 remplace le chemin runtime normal par TMDB \\+ TVDB/);",
+              'spec assertions',
+          )
+          replace(
+              'docs/specifications/requirements.json',
+              'SEENIT-RELATION-001 trace la décision durable et l’écart runtime',
+              'SEENIT-RELATION-001 fige la décision durable après migration runtime',
+              'requirements test name',
+          )
+
+          p = Path('tests/mediaProviderSecurity.test.ts')
+          s = p.read_text()
+          s = s.replace(
+              "secrets: () => ({ TMDB_API_KEY: 'test-tmdb-private', OMDB_API_KEY: 'test-omdb-private' }),",
+              "secrets: () => ({ TMDB_API_KEY: 'test-tmdb-private', OMDB_API_KEY: 'test-omdb-private', TVDB_API_KEY: 'test-tvdb-private' }),",
+          )
+          s = s.replace(
+              "assert.equal((await send('tvdb/franchise?mediaTitle=Example')).status, 404);",
+              "assert.equal((await send('tvdb/franchise?mediaTitle=Example')).status, 400);",
+          )
+          old_secret_test = """  assert.doesNotThrow(() => assertMediaProviderSecrets({
+    TMDB_API_KEY: 'configured-tmdb',
+    OMDB_API_KEY: 'configured-omdb',
+  }));
+  assert.throws(
+    () => assertMediaProviderSecrets({ TMDB_API_KEY: 'configured-tmdb' }),
+    /OMDB_API_KEY/,
+  );
+  assert.throws(
+    () => assertMediaProviderSecrets({ OMDB_API_KEY: 'configured-omdb' }),
+    /TMDB_API_KEY/,
+  );"""
+          new_secret_test = """  assert.doesNotThrow(() => assertMediaProviderSecrets({
+    TMDB_API_KEY: 'configured-tmdb',
+    OMDB_API_KEY: 'configured-omdb',
+    TVDB_API_KEY: 'configured-tvdb',
+  }));
+  assert.throws(
+    () => assertMediaProviderSecrets({ TMDB_API_KEY: 'configured-tmdb', TVDB_API_KEY: 'configured-tvdb' }),
+    /OMDB_API_KEY/,
+  );
+  assert.throws(
+    () => assertMediaProviderSecrets({ OMDB_API_KEY: 'configured-omdb', TVDB_API_KEY: 'configured-tvdb' }),
+    /TMDB_API_KEY/,
+  );
+  assert.throws(
+    () => assertMediaProviderSecrets({ TMDB_API_KEY: 'configured-tmdb', OMDB_API_KEY: 'configured-omdb' }),
+    /TVDB_API_KEY/,
+  );"""
+          if old_secret_test not in s:
+              raise SystemExit('security secret test block not found')
+          s = s.replace(old_secret_test, new_secret_test, 1)
+          s = s.replace(
+              "  assert.equal(fs.existsSync(path.join(root, 'src/services/tvdb.ts')), false);",
+              "  assert.equal(fs.existsSync(path.join(root, 'src/services/tvdb.ts')), true);\n  const tvdbClient = fs.readFileSync(path.join(root, 'src/services/tvdb.ts'), 'utf8');\n  assert.match(tvdbClient, /\\/api\\/media\\/tvdb\\/franchise/);\n  assert.doesNotMatch(tvdbClient, /TVDB_API_KEY|api4\\.thetvdb\\.com|search\\/remoteid/);",
+          )
+          p.write_text(s)
+
+          Path('tests/mediaRelations.test.ts').write_text("""import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import test from 'node:test';
+import { toMediaKey } from '../src/features/shows/mediaRelations.ts';
+
+const tmdbSource = readFileSync(new URL('../src/features/shows/tmdb.ts', import.meta.url), 'utf8');
+const tvdbClientSource = readFileSync(new URL('../src/services/tvdb.ts', import.meta.url), 'utf8');
+const detailSource = readFileSync(new URL('../src/screens/ShowDetailScreen.tsx', import.meta.url), 'utf8');
+const explorerSource = readFileSync(new URL('../src/lib/recommendations.ts', import.meta.url), 'utf8');
+
+test('SEENIT-RELATION-001 conserve une identité typée movie et tv', () => {
+  assert.equal(toMediaKey('movie', 42), 'movie:42');
+  assert.equal(toMediaKey('tv', 42), 'tv:42');
+  assert.notEqual(toMediaKey('movie', 42), toMediaKey('tv', 42));
+});
+
+test('SEENIT-RELATION-001 réserve la saga film à la collection TMDB exacte', () => {
+  assert.match(tmdbSource, /mediaType !== 'movie'\) return \[\]/);
+  assert.match(tmdbSource, /belongs_to_collection\?\.id/);
+  assert.match(tmdbSource, /getCollectionDetails\(collectionId\)/);
+  assert.doesNotMatch(tmdbSource, /getManifestRelationSnapshot/);
+});
+
+test('SEENIT-RELATION-001 appelle TVDB uniquement avec les identifiants externes exacts', () => {
+  assert.match(tmdbSource, /external_ids\?\.tvdb_id/);
+  assert.match(tmdbSource, /external_ids\?\.imdb_id/);
+  assert.match(tmdbSource, /getTVDBFranchiseRelation/);
+  assert.match(tvdbClientSource, /authenticatedFetch/);
+  assert.match(tvdbClientSource, /\/api\/media\/tvdb\/franchise/);
+  assert.doesNotMatch(tvdbClientSource, /mediaTitle|original_title|popularity|api4\.thetvdb\.com|TVDB_API_KEY/);
+});
+
+test('SEENIT-RELATION-001 déduplique TVDB après la collection par clé typée', () => {
+  assert.match(tmdbSource, /collectionKeys\.has\(itemKey\)/);
+  assert.match(tmdbSource, /universeSeen\.has\(itemKey\)/);
+  assert.match(tmdbSource, /seenitRelationKind: relationKind/);
+});
+
+test('SEENIT-RELATION-001 retire les similaires de la fiche mais pas la découverte Explorer', () => {
+  assert.match(tmdbSource, /const \{ similar: _similar, recommendations: _recommendations, \.\.\.rest \} = details/);
+  assert.doesNotMatch(detailSource, /getPrioritizedSimilarMedia|Films similaires|Séries similaires|visibleSimilar|similarObserverRef/);
+  assert.match(detailSource, /Dans la même franchise/);
+  assert.match(detailSource, /seenitRelationKind === 'franchise'/);
+  assert.match(explorerSource, /recommend/i);
+});
+""")
+
+          Path('tests/tvdbRelations.test.ts').write_text("""import assert from 'node:assert/strict';
+import test from 'node:test';
+import {
+  classifyTVDBList,
+  extractExactTMDBRemoteId,
+  extractExactTVDBSearchIdentity,
+  getTVDBEntityIdentity,
+  selectSingleOfficialTVDBList,
+} from '../src/features/providers/mediaProviderBackend.ts';
+
+test('SEENIT-RELATION-001 qualifie uniquement franchise ou univers explicites', () => {
+  assert.equal(classifyTVDBList({ name: 'Game of Thrones Franchise' }), 'franchise');
+  assert.equal(classifyTVDBList({ name: 'Marvel Cinematic Universe' }), 'universe');
+  assert.equal(classifyTVDBList({ name: 'Award Winners' }), null);
+});
+
+test('SEENIT-RELATION-001 retient une seule liste officielle admissible', () => {
+  const franchise = { id: 7038, isOfficial: true, name: 'Game of Thrones Franchise' };
+  assert.deepEqual(selectSingleOfficialTVDBList([franchise]), franchise);
+  assert.equal(selectSingleOfficialTVDBList([franchise, { id: 2, isOfficial: true, name: 'Other Franchise' }]), null);
+  assert.equal(selectSingleOfficialTVDBList([{ id: 1, isOfficial: true, name: 'Award Winners' }]), null);
+  assert.equal(selectSingleOfficialTVDBList([{ id: 1, isOfficial: false, name: 'Example Franchise' }]), null);
+});
+
+test('SEENIT-RELATION-001 conserve le type exact des membres TVDB', () => {
+  assert.deepEqual(getTVDBEntityIdentity({ seriesId: 121361 }), { id: 121361, media_type: 'tv' });
+  assert.deepEqual(getTVDBEntityIdentity({ movieId: 603 }), { id: 603, media_type: 'movie' });
+  assert.equal(getTVDBEntityIdentity({ seriesId: 1, movieId: 2 }), null);
+});
+
+test('SEENIT-RELATION-001 remappe un membre TVDB vers un unique TMDB exact', () => {
+  assert.equal(extractExactTMDBRemoteId([{ type: 12, id: '94997' }]), 94997);
+  assert.equal(extractExactTMDBRemoteId([{ sourceName: 'TMDB', id: '94997' }]), 94997);
+  assert.equal(extractExactTMDBRemoteId([{ type: 12, id: '1' }, { type: 12, id: '2' }]), null);
+});
+
+test('SEENIT-RELATION-001 résout le pont IMDb remoteid sans premier résultat arbitraire', () => {
+  assert.equal(extractExactTVDBSearchIdentity([{ type: 'movie', tvdb_id: '123' }], 'movie'), 123);
+  assert.equal(extractExactTVDBSearchIdentity([{ type: 'series', tvdb_id: '456' }], 'tv'), 456);
+  assert.equal(extractExactTVDBSearchIdentity([{ type: 'movie', tvdb_id: '123' }, { type: 'movie', tvdb_id: '456' }], 'movie'), null);
+  assert.equal(extractExactTVDBSearchIdentity([{ type: 'series', tvdb_id: '456' }], 'movie'), null);
+});
+""")
+          PY
+
+      - name: Targeted tests
+        run: node --test tests/mediaRelationsSpecification.test.ts tests/mediaRelations.test.ts tests/tvdbRelations.test.ts tests/mediaProviderSecurity.test.ts
+
+      - name: TypeScript
+        run: npm run lint
+
+      - name: Commit final contracts and remove temporary workflow
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/finalize-relations-contract-130.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/features/providers/mediaProviderBackend.ts docs/specifications/media-providers.md docs/specifications/functional-reference.md docs/decisions/media-relations-2026-09-06.md docs/specifications/requirements.json tests/mediaRelationsSpecification.test.ts tests/mediaProviderSecurity.test.ts tests/mediaRelations.test.ts tests/tvdbRelations.test.ts
+          git commit -m "test(media): verrouiller le contrat TMDB TVDB #130" -m "Changelog: aucun.\n\nDétails techniques:\n- exige les trois secrets fournisseur pour une nouvelle révision backend ;\n- couvre la résolution TVDB exacte, l'ambiguïté, la déduplication et l'absence de similaires ;\n- marque l'ancien écart runtime comme historique."
+          git push origin HEAD:fix/media-relations-tvdb-exact-130
