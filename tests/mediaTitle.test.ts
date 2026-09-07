@@ -42,9 +42,8 @@ test('SEENIT-METADATA-001 converge uniquement par mediaType et TMDB ID exacts', 
 });
 
 test('SEENIT-METADATA-001 persiste uniquement le titre localisé après hydratation TMDB', () => {
-  assert.match(tmdbFacadeSource, /const details = withoutDetailRecommendations\(result\.value\)/);
-  assert.match(tmdbFacadeSource, /convergeTrackedMediaTitleFromTmdb\('tv', Number\(id\), details\)/);
-  assert.match(tmdbFacadeSource, /convergeTrackedMediaTitleFromTmdb\('movie', Number\(id\), details\)/);
+  assert.match(tmdbFacadeSource, /convergeTrackedMediaTitleFromTmdb\('tv', Number\(id\), result\.value\)/);
+  assert.match(tmdbFacadeSource, /convergeTrackedMediaTitleFromTmdb\('movie', Number\(id\), result\.value\)/);
   assert.match(trackedTitleSource, /updateDoc\(doc\(db, 'users', userId, 'shows', convergence\.showId\), \{\s*title: convergence\.title,\s*\}\)/s);
   assert.doesNotMatch(trackedTitleSource, /updatedAt|seenEpisodes|episodeRecords|isFavorite|userRating|status:/);
 });
