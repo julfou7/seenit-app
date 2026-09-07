@@ -133,8 +133,7 @@ le lot est prêt à publier : modifier `android/app/build.gradle`, puis lancer `
 La release est ensuite déclenchée explicitement depuis `main` avec `release_apk=true`, directement ou via le contrôleur natif de `SEENIT-RELEASE-005`.
 
 Une candidate non publiée peut recevoir plusieurs commits sans consommer un nouveau numéro. Une
-version déjà publiée est immuable : tout correctif ultérieur exige un nouveau patch et un
-`versionCode` supérieur.
+version déjà publiée est immuable : tout correctif ultérieur exige un nouveau patch et un `versionCode` supérieur.
 
 Le job Android cible (API courante) reste bloquant à chaque release. Android 12 est un TNR optionnel
 manuel/périodique, à activer notamment lors d'un changement natif à risque.
@@ -175,57 +174,68 @@ mettre à jour une issue priorisée, puis corriger le code ou obtenir une décis
 
 ## 4. Contrat APK immuable
 
-### Contrat APK immuable
+- `applicationId` et `namespace` doivent rester `com.seenit.app`.
+- Capacitor doit rester `appId = com.seenit.app` et `appName = SeenIt`.
+- Firebase Android attendu : `project_id = studio-6309767709-8a75a`,
+  `project_number = 799043440232`, `mobilesdk_app_id = 1:799043440232:android:201a0369cb7e1c5c230ebd`.
+- `google-services.json` est un artefact Android généré par `scripts/materialize-android-config.cjs` à
+  partir de `config/firebase-android.canonical.json` et n'est plus une source canonique éditable. Toute
+  copie absente ou dérivée est rematérialisée avant Gradle ; elle ne doit jamais être reprise depuis un
+  import AI Studio.
+- Les fingerprints du certificat de signature **actif** sont déclarés dans
+  `config/android-signing.canonical.json`. Après chaque rotation explicitement approuvée, ce fichier et
+  les clients OAuth associés doivent être mis à jour ensemble ; `npm run verify:android` et la CI les
+  vérifient.
+- La clé privée de signature release n'est jamais versionnée. Elle est reconstruite depuis les GitHub
+  Secrets au moment de la release et supprimée du runner après usage.
+- Tant qu'une décision produit explicite ne l'a pas demandé, un changement de clé est **bloqué**.
+- Après la bascule validée en `1.4.112`, l'APK active utilise uniquement la nouvelle clé PKCS12 `seenit`.
+  Les secrets de l'ancienne clé et son ancien client OAuth Android ont été supprimés : aucun rollback de
+  signature historique n'est autorisé et toutes les versions `1.4.113+` doivent conserver les
+  fingerprints actifs pour permettre les mises à jour sur place.
+- Une release doit échouer si la clé de signature active est absente ou si son certificat ne correspond pas
+  aux fingerprints canoniques.
 
-Ne modifiez jamais silencieusement :
+## 5. Invariants d'identité média, Plex et téléchargements
 
-- `applicationId=com.seenit.app` ;
-- nom SeenIt, deep link et launcher ;
-- certificat et empreinte de la clé de signature release active ;
-- icônes Android ;
-- identité Firebase Android.
+### 5.1 Identité média
 
-La rotation de signature validée avec la release 1.4.112 a définitivement remplacé la clé historique
-par la clé release PKCS12 privée, alias `seenit`. `android/app/seenit-release.p12` est git-ignoré et ne
-doit jamais être (re)généré par AI Studio, Android Studio ou un agent. Pour une release, la CI
-matérialise exactement ses octets depuis `SEENIT_ANDROID_RELEASE_KEYSTORE_B64`, puis vérifie leur
-SHA-256 contre `docs/specifications/android-contract.json`. Les mots de passe proviennent exclusivement
-de `SEENIT_ANDROID_RELEASE_STORE_PASSWORD` et `SEENIT_ANDROID_RELEASE_KEY_PASSWORD`. Un secret absent,
-un Base64 invalide, une empreinte différente, un alias/type inattendu ou des identifiants de signature
-manquants bloquent la release. Remplacer cette clé est une nouvelle rotation et reste interdit sans
-migration explicite.
+- L'identité d'une œuvre est `mediaType + tmdbId`. Un même identifiant numérique TMDB n'est jamais
+  fusionné entre `movie` et `tv`.
+- Le format de clé canonique d'une relation média est `movie:<tmdbId>` ou `tv:<tmdbId>`.
+- Un groupe de saga/univers est défini par une source autoritative (TMDB collection, TVDB liste officielle déjà rattachée à l'identité exacte, ou override SeenIt explicitement validé), jamais par le titre, l'année, la popularité ou le premier résultat d'une recherche.
+- Un changement Film/Série ou une collision d'identifiants doit être traité comme une identité distincte.
 
-Une modification Android intentionnelle doit être couverte par un test et, si elle touche un invariant,
-par la SPEC/contrat Android. Lors d'une release APK, matérialiser d'abord la clé release, exécuter
-`npm run test:android`, puis `npx cap sync android`, puis de nouveau `npm run test:android` avant Gradle.
+### 5.2 Identité Plex
 
-Depuis la baseline officielle 1.4.112, le smoke Android exige la **même signature release active** sur
-N et N+1, installe N+1 par-dessus N avec `adb install -r` et conserve package, données/session, launcher,
-permission notification et deep link. Toute divergence de signature ou toute branche de désinstallation
-est bloquante. L'APK publiée reste `assembleDebug`, signée par la clé release `seenit`, tant qu'un
-changement de canal de build n'a pas été explicitement conçu et validé.
+- La résolution Plex repose exclusivement sur ses GUIDs techniques (`tmdb://`, `imdb://`, `tvdb://`) et
+  les identifiants vérifiés auprès des fournisseurs.
+- Le titre et l'année ne sont pas des clés de matching.
+- En cas de collision ou de metadata insuffisante, le système doit conserver l'identité courante et ne
+  jamais fusionner silencieusement deux œuvres.
 
-## 5. Firebase / Firestore immuables
+### 5.3 Synchronisation Plex
 
-- Base Firestore canonique : **`default`**, exactement.
-- Client et Firebase Admin la sélectionnent explicitement ; pas de `getFirestore()` implicite.
-- `firebase-applet-config.json` ne contient aucun `firestoreDatabaseId` pilotant le runtime.
-- Firestore Delete Protection reste activée.
-- Projet Firebase canonique : `gen-lang-client-0201895414`.
-- `android/app/google-services.json` est un artefact généré et git-ignoré, matérialisé depuis
-  `docs/specifications/android-contract.json` ; AI Studio ne doit jamais en être la source.
-- Le contrat Firebase contient **un unique client OAuth Android actif**, lié au certificat release
-  `seenit` ; le client OAuth Web utilisé par Credential Manager reste inchangé.
-- `android/gradlew` est normalisé exécutable par le matérialiseur Android avant les contrôles/builds.
+- Une entrée `watchlist` ou une activité ambiguë ne doit jamais créer un état « vu ».
+- Le `Watch History` de compte n'est pas une preuve suffisante sans `userState.viewCount` courant.
+- La présence seule d'un GUID dans une source Plex n'implique aucun état de visionnage.
+- Les baselines DELTA persistées doivent mémoriser au minimum `serverId + ratingKey` pour chaque entrée
+  techniquement vue, indépendamment de la résolution TMDB, avec provenance et horodatage nécessaires pour
+  réconcilier ensuite les suppressions/non-vus sans titre ni année.
+- La preuve d'un état `non vu` DELTA est bornée au `ratingKey` exact du même serveur : après disparition
+  d'un locator précédemment vu d'un snapshot watched complet, une réponse metadata exacte de ce même
+  `ratingKey` confirme le zéro si elle expose `viewCount = 0`, ou si Plex omet `viewCount` tout en
+  retournant bien l'objet exact sans compteur positif. Un `404`, timeout, serveur ignoré ou simple
+  silence ne confirme jamais le zéro.
+- Full et Delta doivent converger vers le même état lorsque les mêmes preuves complètes sont disponibles ;
+  aucune suppression n'est inférée depuis une collecte incomplète.
+- La synchronisation Plex ne retire jamais un état manuel ou une provenance non Plex ; elle ne peut
+  révoquer que ses propres progressions `plexImported` dont la preuve contraire est techniquement exacte.
 
-Toute modification de projet Firebase, databaseId, signature ou identité Android est une migration :
-validation utilisateur explicite, sauvegarde/inventaire, plan de migration, rollback et tests PWA+APK.
-Aucun agent ne décide seul de cette migration.
+### 5.4 Téléchargements : identité et déduplication
 
-## 5.1 Identité média des téléchargements
-
-- **TMDB ID est l’unique identité canonique** pour rattacher une fiche SeenIt à un téléchargement.
-- TVDB/IMDb peuvent être transportés comme métadonnées, mais doivent être résolus vers TMDB avant toute association média.
+- Une identité média de téléchargement utilise uniquement le TMDB ID et le type Film/Série ; si le type
+  n'est pas disponible, l'action doit rester bloquée plutôt que deviner.
 - Titre, titre original, année, nom de fichier et nom de release ne sont **jamais** des clés de matching.
 - Un même transfert physique se reconnaît uniquement par `requestId`, infohash/downloadId/alias exact ou chemin de transfert exact ; en cas d'ambiguïté, ne pas fusionner.
 
@@ -240,61 +250,84 @@ La décision produit canonique est détaillée dans `docs/decisions/media-relati
 - Chaque membre TVDB doit être résolu vers `movie:<tmdbId>` ou `tv:<tmdbId>` avant affichage. Titre, titre original, année, popularité, casting, studio, marque, mot-clé ou premier résultat ne servent jamais à rattacher un membre.
 - Pour un film, la section TVDB est dédupliquée après l'Ordre de visionnage par `mediaType + tmdbId`. Une section sans autre média affichable est masquée.
 - Les sections **Films similaires** et **Séries similaires** n'appartiennent plus aux fiches média. La découverte approximative reste dans Explorer et ne devient jamais un fallback d'une relation TVDB manquante.
-- Wikidata, Kometa, MDBList et autres sources niche ne font plus partie de la stratégie normale de relations de fiche. Le catalogue SeenIt existant est legacy pendant la migration ; un éventuel override futur reste exceptionnel, versionné, exact et tracé, jamais une encyclopédie entretenue au cas par cas.
+- Wikidata, Kometa, MDBList et autres sources niche ne font plus partie de la stratégie normale de relations de fiche. Le catalogue SeenIt historique est hors du chemin runtime normal ; un éventuel override futur reste exceptionnel, versionné, exact et tracé, jamais une encyclopédie entretenue au cas par cas.
 - Un exemple utilisateur nommé (Punisher, Harry Potter, House of the Dragon, etc.) peut devenir une fixture/TNR, **jamais** une condition, branche, regex ou exception de production fondée sur son titre.
 - En cas d'ambiguïté ou de panne fournisseur, masquer la relation plutôt que rechercher par titre. Le reste de la fiche reste utilisable.
 
 ## 6. PWA et APK
 
-### Référence UX pour toute modification d'interface
+Toute modification fonctionnelle doit être évaluée sur les deux plateformes.
 
-Lire `docs/specifications/ux-reference.md` pour les boutons, cartes, en-têtes, dialogues ou gestes.
-Distinguer comportements observés, invariants existants et cibles encore ouvertes. Préserver les
-gestes documentés et leurs effets métier ; décrire pour chaque changement le déclenchement, le résultat,
-l'annulation et l'alternative accessible. Un audit de code ne vaut pas validation visuelle PWA/APK.
+### 6.1 PWA
 
-SeenIt doit rester fonctionnel en PWA et APK Android. Un comportement natif différent doit être
-explicite (`Capacitor.isNativePlatform()` ou API Capacitor). Les liens externes gardent un fallback Web ;
-Plex privilégie l'application Android dans l'APK.
+- Firebase Auth doit rester compatible navigateur.
+- Les accès distants doivent passer par HTTPS/CORS compatibles navigateur.
+- Les fonctionnalités natives doivent avoir un fallback web clair.
 
-### AI Studio n'est pas une voie de production
+### 6.2 APK
 
-- **Aucun pull/sync AI Studio n'est requis pour déployer SeenIt.** La synchronisation native depuis
-  GitHub reste facultative et sert uniquement à charger le code dans l'éditeur ou la preview AI Studio.
-  Toute modification voulue repart ensuite vers une branche/PR GitHub ; ne jamais réintroduire un pull,
-  refresh ou publish « maison » dans l'application ou le backend.
-- **Ne jamais présenter `Publish` dans AI Studio comme une étape normale ou nécessaire.** Le backend
-  canonique est construit et déployé sur Cloud Run depuis `main` par GitHub Actions ; l'APK est construite,
-  signée et publiée exclusivement par le workflow de release GitHub.
-- L'image Cloud Run canonique contient aussi le frontend PWA. Un changement exclusivement frontend peut
-  être différé par la détection d'impact backend : pour le publier immédiatement, attendre/déclencher une
-  reconstruction canonique via `.github/workflows/deploy-backend.yml`, qui force l'image complète, plutôt
-  que d'utiliser `Publish` dans AI Studio comme raccourci.
-- Un agent ne déclenche jamais seul une publication AI Studio vers la production. Une utilisation
-  exceptionnelle n'est admissible qu'après demande explicite du propriétaire, indisponibilité prouvée du
-  chemin GitHub canonique, analyse du risque et plan de réconciliation/rollback. Elle reste une intervention
-  non canonique à retracer ; la preview AI Studio, elle, peut être utilisée librement sans publication.
+- Les plugins Capacitor ne doivent être appelés qu'après `Capacitor.isNativePlatform()` ou garde équivalente.
+- Les intents Android, notifications, partages et accès fichiers doivent conserver un fallback ou une erreur utilisateur propre.
+- Les plugins natifs non disponibles ne doivent jamais casser le chargement de l'application.
 
-Le rapport final précise ce qui a été validé en PWA et/ou APK et ce qui attend volontairement la
-prochaine release groupée.
+### 6.3 Parité fonctionnelle
 
-## 7. Audits, issues et traçabilité
+- Une feature partagée doit utiliser la même source de données et le même contrat d'identité sur PWA et APK.
+- Une différence de comportement volontaire doit être documentée dans la SPEC.
 
-**Tout audit doit être enregistré** dans `docs/audits/`, indexé dans `docs/audits/README.md` et contenir
-baseline, périmètre, preuves, décisions et matrice exhaustive. Un constat ouvert pointe vers une
-**issue GitHub priorisée** ou un risque accepté explicitement.
+## 7. Changements de données, migrations et suppression
 
-Une issue active est mise à jour aux jalons utiles : implémentation prête, validation/CI, merge,
-release ou blocage. Ne mettez pas à jour le corps après chaque micro-commit. Cochez un critère seulement
-quand il est réellement prouvé.
+- Une migration Firestore destructive exige validation explicite et sauvegarde ou stratégie de rollback.
+- Une suppression de collection, document, champ ou base ne doit jamais être implicite.
+- Les imports AI Studio ne sont jamais une autorité de migration.
+- Toute migration de schéma doit être réentrante ou protégée contre une double exécution.
 
-Une issue de code peut être fermée avec commit + tests + validation applicable. Une release n'est
-requise pour la fermeture que si le critère de l'issue exige explicitement un binaire publié ; les
-changements `light/backend` ne doivent plus attendre artificiellement une APK.
+## 8. Sécurité et secrets
 
-## 8. Rapport de fin d'intervention
+- Aucun secret de production ne doit être commité.
+- Les secrets GitHub sont injectés uniquement dans les jobs qui en ont besoin.
+- Aucun log ne doit imprimer un token, une URL contenant un token ou un secret complet.
+- Toute variable `VITE_*` est considérée comme **publique** et doit être absente pour les clés serveur TMDB, OMDb et TVDB.
+- `TMDB_API_KEY`, `OMDB_API_KEY` et `TVDB_API_KEY` sont des secrets **serveur uniquement** ; la PWA/APK n'appelle que la façade SeenIt authentifiée.
+- Le backend fournisseur utilise des hôtes HTTPS en allowlist, refuse les redirections et limite les corps/réponses ; un token Firebase ne doit jamais être transmis à un fournisseur tiers.
+- Les routes fournisseur sont protégées par Firebase Auth, quotas par UID et cache borné. Le backend ne devient jamais un proxy ouvert.
+- Cloud Run doit référencer les trois secrets fournisseur depuis **Secret Manager** (`secretKeyRef`, version explicite ou `latest`) et le compte de service runtime doit disposer de `roles/secretmanager.secretAccessor` ; aucune valeur fournisseur n'est copiée dans GitHub ou l'export Cloud Run.
+- L'injection de secret doit rester fail-closed : une nouvelle révision sans les trois clés ou sans accès Secret Manager ne doit jamais recevoir le trafic de production.
+- Les logs de synchronisation visibles côté app doivent masquer les secrets et limiter les identifiants sensibles.
+- La configuration locale de développement doit utiliser `.env.local` ou variables de shell ignorées par Git.
 
-Après chaque modification, conclure exactement avec :
+## 9. Notifications
+
+- Une notification liée à un média utilise le `tmdbId` et le type du média comme référence canonique.
+- L'image du média utilise la chaîne de fallback documentée ; une absence d'image ne doit jamais provoquer de crash.
+- Les worklets/tasks natives de notification ne doivent pas accéder à un état React volatile.
+- Toute API native pouvant lever une exception doit être contenue et journalisée sans crash du processus.
+
+## 10. Tests et TNR
+
+- Les cas ayant déjà causé une régression ou un crash deviennent des TNR permanents.
+- Les tests nommés ne doivent pas introduire de branche spéciale en production.
+- Les tests de relation vérifient systématiquement `movie:<id>` vs `tv:<id>` et l'absence de fallback par titre.
+- Les tests d'identité ne doivent jamais passer uniquement parce qu'une fixture possède un titre unique.
+- Un correctif de notification vérifie au minimum notification sans image, image distante valide et image locale invalide.
+- Les tests de sécurité scannent les artefacts client pour interdire clés, hôtes fournisseur et variantes `VITE_*` côté bundle.
+
+## 11. Processus d'exécution
+
+- Le repo doit rester compilable après chaque commit significatif.
+- Ne pas pousser un changement qui n'a pas de test ciblé lorsqu'un comportement est modifié.
+- Une issue n'est fermée qu'après validation CI ou preuve terrain adaptée.
+- Pour tout bug, les sections cause racine / portée / risque résiduel de l'issue ou de la PR sont obligatoires avant fermeture.
+- Une correction locale de données ne ferme pas une issue systémique tant que la cause globale subsiste.
+- Après un merge, vérifier le `main` distant et l'état de déploiement/release concerné.
+- Une issue fermée par une PR n'est pas considérée terminée tant que l'état observé en production ou dans l'artefact demandé n'est pas cohérent avec le résultat attendu.
+- Un workflow temporaire auto-modifiant est interdit. Si un besoin de migration nécessite un outil ponctuel, utilisez un script local non versionné ou un workflow existant borné ; ne commitez pas un workflow qui pousse sa propre branche ou supprime ses propres fichiers.
+- Lorsque la demande utilisateur inclut explicitement une **publication**, ne rendez jamais la main avant d'avoir déclenché la release prévue ou identifié un blocage extérieur concret.
+- Lorsque la demande n'inclut pas de publication, ne déclenchez pas de release APK automatiquement.
+
+## 12. Format de retour après modification
+
+Le dernier message de l'agent après modification doit se terminer par les trois sections ci-dessous :
 
 ### 🛠️ Ce qui a été fait
 - Résumé des changements et validations.
