@@ -48,7 +48,7 @@ test('SEENIT-RELATION-001 retire les similaires des fiches et garde la découver
   assert.match(decision, /recommendations[\s\S]*similar[\s\S]*ne sont plus utilisés pour remplir le bas d'une fiche/);
 });
 
-test('SEENIT-RELATION-001 trace la décision durable et son état initial de migration', () => {
+test('SEENIT-RELATION-001 trace la décision durable et l’écart runtime', () => {
   assert.match(registry, /USR-2026-09-05-002[\s\S]*superseded/);
   assert.match(registry, /USR-2026-09-06-005[\s\S]*superseded/);
   assert.match(registry, /USR-2026-09-06-008[\s\S]*SEENIT-RELATION-001[\s\S]*active/);
