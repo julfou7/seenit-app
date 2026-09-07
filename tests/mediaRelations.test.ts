@@ -5,7 +5,7 @@ import { toMediaKey } from '../src/features/shows/mediaRelations.ts';
 
 const tmdbSource = readFileSync(new URL('../src/features/shows/tmdb.ts', import.meta.url), 'utf8');
 const tvdbClientSource = readFileSync(new URL('../src/services/tvdb.ts', import.meta.url), 'utf8');
-const detailSource = readFileSync(new URL('../src/screens/ShowDetailScreen.tsx', import.meta.url), 'utf8');
+const detailSource = readFileSync(new URL('../src/screens/ShowDetailScreenCore.tsx', import.meta.url), 'utf8');
 const explorerSource = readFileSync(new URL('../src/lib/recommendations.ts', import.meta.url), 'utf8');
 
 test('SEENIT-RELATION-001 conserve une identité typée movie et tv', () => {

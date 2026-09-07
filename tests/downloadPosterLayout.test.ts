@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const downloadsScreen = readFileSync('src/screens/DownloadsScreen.tsx', 'utf8');
+const downloadsScreen = readFileSync('src/screens/DownloadsScreenCore.tsx', 'utf8');
 const css = readFileSync('src/index.css', 'utf8');
 
 test('TNR téléchargements : le badge Film/Série reste sous l’affiche sans réduire son ratio 2:3', () => {

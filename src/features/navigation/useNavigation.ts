@@ -1,7 +1,14 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useShowsStore } from '../../store/showsStore';
+import { useDownloadConfigStore } from '../../store/downloadConfigStore';
+import { isDownloadFeatureEnabled, resolveDownloadAwareTab } from '../downloads/downloadFeatureVisibility';
+
+type AppTab = 'watchlist' | 'library' | 'discover' | 'downloads' | 'settings' | 'profile';
 
 export function useNavigation() {
+  const downloadsEnabled = useDownloadConfigStore(isDownloadFeatureEnabled);
+  const downloadsEnabledRef = useRef(downloadsEnabled);
+
   const getInitialState = () => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
@@ -13,8 +20,9 @@ export function useNavigation() {
       if (effectiveId) {
         const season = urlParams.get('season');
         const episode = urlParams.get('episode');
+        const requestedTab = (urlParams.get('tab') as AppTab) || 'watchlist';
         return {
-          tab: (urlParams.get('tab') as any) || 'watchlist',
+          tab: resolveDownloadAwareTab(requestedTab, downloadsEnabled) as AppTab,
           selectedShow: {
             id: effectiveId,
             type: 'local' as const,
@@ -28,17 +36,26 @@ export function useNavigation() {
 
       if (window.history.state) {
         return {
-          tab: window.history.state.tab || 'watchlist',
+          tab: resolveDownloadAwareTab((window.history.state.tab || 'watchlist') as AppTab, downloadsEnabled) as AppTab,
           selectedShow: window.history.state.selectedShow || null
         };
       }
     }
-    return { tab: 'watchlist', selectedShow: null };
+    return { tab: 'watchlist' as AppTab, selectedShow: null };
   };
 
   const initialState = getInitialState();
-  const [currentTab, setCurrentTab] = useState<'watchlist' | 'library' | 'discover' | 'downloads' | 'settings' | 'profile'>(initialState.tab);
+  const [currentTab, setCurrentTab] = useState<AppTab>(initialState.tab);
   const [selectedShow, setSelectedShow] = useState<{ id: any, type: 'local' | 'tmdb', mediaType?: 'tv' | 'movie', tmdbId?: number, initialSeason?: number, initialEpisode?: number } | null>(initialState.selectedShow);
+
+  useEffect(() => {
+    downloadsEnabledRef.current = downloadsEnabled;
+    if (!downloadsEnabled && currentTab === 'downloads') {
+      setCurrentTab('watchlist');
+      setSelectedShow(null);
+      window.history.replaceState({ tab: 'watchlist', selectedShow: null, isRoot: true }, '');
+    }
+  }, [downloadsEnabled, currentTab]);
 
   useEffect(() => {
     if (!window.history.state) {
@@ -47,6 +64,8 @@ export function useNavigation() {
         selectedShow: initialState.selectedShow,
         isRoot: !initialState.selectedShow 
       }, '');
+    } else if (window.history.state.tab === 'downloads' && !downloadsEnabledRef.current) {
+      window.history.replaceState({ tab: 'watchlist', selectedShow: null, isRoot: true }, '');
     }
 
     const handlePopState = (e: PopStateEvent) => {
@@ -57,7 +76,12 @@ export function useNavigation() {
       }
       
       if (e.state && e.state.tab) {
-        setCurrentTab(e.state.tab);
+        const resolvedTab = resolveDownloadAwareTab(e.state.tab as AppTab, downloadsEnabledRef.current) as AppTab;
+        setCurrentTab(resolvedTab);
+        if (resolvedTab !== e.state.tab) {
+          setSelectedShow(null);
+          window.history.replaceState({ tab: 'watchlist', selectedShow: null, isRoot: true }, '');
+        }
       }
     };
 
@@ -65,12 +89,13 @@ export function useNavigation() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const changeTab = useCallback((tab: 'watchlist' | 'library' | 'discover' | 'downloads' | 'settings' | 'profile') => {
+  const changeTab = useCallback((tab: AppTab) => {
     window.dispatchEvent(new CustomEvent('app-close-modals'));
-    setCurrentTab(tab);
+    const resolvedTab = resolveDownloadAwareTab(tab, downloadsEnabled) as AppTab;
+    setCurrentTab(resolvedTab);
     setSelectedShow(null);
-    window.history.pushState({ tab, selectedShow: null, isRoot: tab === 'watchlist' }, '');
-  }, []);
+    window.history.pushState({ tab: resolvedTab, selectedShow: null, isRoot: resolvedTab === 'watchlist' }, '');
+  }, [downloadsEnabled]);
 
   const openShow = useCallback((id: any, type: 'local' | 'tmdb' = 'local', mediaType?: 'tv' | 'movie', tmdbId?: number, initialSeason?: number, initialEpisode?: number) => {
     let resolvedTmdbId = tmdbId;
@@ -93,8 +118,6 @@ export function useNavigation() {
     }
 
     const showState = { id, type, mediaType: resolvedMediaType, tmdbId: resolvedTmdbId, initialSeason, initialEpisode };
-    
-    // Check if the show is already the currently selected show in history
     const currentSelected = window.history.state?.selectedShow;
     if (
       currentSelected &&
@@ -110,11 +133,8 @@ export function useNavigation() {
     }
 
     setSelectedShow(showState);
-    
     (window as any).isNavigatingForward = true;
-    
     window.history.pushState({ tab: currentTab, selectedShow: showState, isRoot: false }, '');
-    
     setTimeout(() => {
        (window as any).isNavigatingForward = false;
     }, 100);

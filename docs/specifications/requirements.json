@@ -824,6 +824,32 @@
       ]
     },
     {
+      "id": "SEENIT-DOWNLOAD-VISIBILITY-001",
+      "title": "Téléchargements média masqués par défaut avec opt-in explicite par UID",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/downloadFeatureVisibility.test.ts",
+          "contains": "SEENIT-DOWNLOAD-VISIBILITY-001 échoue fermée tant que l’activation n’est pas explicite"
+        },
+        {
+          "file": "tests/downloadFeatureVisibility.test.ts",
+          "contains": "SEENIT-DOWNLOAD-VISIBILITY-001 masque navigation, actions et runtime tant que la fonctionnalité est désactivée"
+        },
+        {
+          "file": "tests/downloadFeatureVisibility.test.ts",
+          "contains": "SEENIT-DOWNLOAD-VISIBILITY-001 verrouille toutes les mentions de téléchargement dans les fiches média et le détail épisode"
+        },
+        {
+          "file": "tests/downloadFeatureVisibility.test.ts",
+          "contains": "SEENIT-DOWNLOAD-VISIBILITY-001 ne masque jamais la mise à jour de l’application"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-NOTIFICATION-001",
       "title": "Notifications isolées par UID et appareil",
       "targets": [

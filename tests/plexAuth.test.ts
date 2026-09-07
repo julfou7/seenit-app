@@ -215,14 +215,14 @@ test('SEENIT-PLEX-008 valide le jeton avant de déclarer l’association réussi
 });
 
 test('SEENIT-PLEX-008 interdit les secrets de l’association Plex dans les logs', () => {
-  const settingsSource = readFileSync('src/screens/SettingsScreen.tsx', 'utf8');
+  const settingsSource = readFileSync('src/screens/SettingsScreenCore.tsx', 'utf8');
   assert.doesNotMatch(settingsSource, /TV Time Sync/);
   assert.doesNotMatch(settingsSource, /appLogger\.(?:info|warn|error|success)\([^\n]+authUrl/);
   assert.doesNotMatch(settingsSource, /openExternalUrl\(authUrl\)/);
 });
 
 test('le parcours UI Plex utilise un poller unique annulable et reste lié au Firebase UID', () => {
-  const settingsSource = readFileSync('src/screens/SettingsScreen.tsx', 'utf8');
+  const settingsSource = readFileSync('src/screens/SettingsScreenCore.tsx', 'utf8');
   assert.match(settingsSource, /pollPlexAuthAttempt\(attempt, \{ signal: controller\.signal \}\)/);
   assert.match(settingsSource, /const controller = new AbortController\(\)/);
   assert.match(settingsSource, /controller\.abort\(\)/);
@@ -232,7 +232,7 @@ test('le parcours UI Plex utilise un poller unique annulable et reste lié au Fi
 });
 
 test('la première synchro Plex ne part qu’après persistance locale et cloud du token validé', () => {
-  const settingsSource = readFileSync('src/screens/SettingsScreen.tsx', 'utf8');
+  const settingsSource = readFileSync('src/screens/SettingsScreenCore.tsx', 'utf8');
   const persistCloudIndex = settingsSource.indexOf("await setDoc(plexRef, { authToken: res.authToken, username }, { merge: true })");
   const persistLocalIndex = settingsSource.indexOf('storePlexCredentials(uid, res.authToken, username)');
   const syncIndex = settingsSource.indexOf('await performPlexSync({ delta: false, silent: false, ignoreCooldown: true })');

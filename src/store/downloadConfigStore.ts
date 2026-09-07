@@ -5,6 +5,7 @@ import { auth, db } from '../lib/firebase';
 import { invalidateQbitCache } from '../services/sonarrRadarr';
 
 export interface DownloadClientConfig {
+  downloadsEnabled: boolean;
   c411ApiKey: string;
   sonarrUrl: string;
   sonarrApiKey: string;
@@ -33,6 +34,7 @@ interface DownloadConfigState extends DownloadClientConfig {
 }
 
 const DEFAULT_CONFIG: DownloadClientConfig = {
+  downloadsEnabled: false,
   c411ApiKey: '',
   sonarrUrl: '',
   sonarrApiKey: '',
@@ -135,6 +137,7 @@ export const useDownloadConfigStore = create<DownloadConfigState>()((set, get) =
     try {
       const current = get();
       const dataToSave: DownloadClientConfig = {
+        downloadsEnabled: current.downloadsEnabled === true,
         c411ApiKey: current.c411ApiKey || '',
         sonarrUrl: current.sonarrUrl || '',
         sonarrApiKey: current.sonarrApiKey || '',
