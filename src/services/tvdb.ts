@@ -3,9 +3,18 @@ export interface TVDBFranchiseItem {
   media_type: 'tv' | 'movie';
 }
 
+export type TVDBRelationKind = 'franchise' | 'universe';
+
+export interface TVDBFranchiseRelation {
+  kind: TVDBRelationKind;
+  items: TVDBFranchiseItem[];
+}
+
 interface TVDBAttachedList {
   id?: number | string;
   isOfficial?: boolean;
+  name?: string;
+  nameTranslated?: string;
 }
 
 interface TVDBListEntity {
@@ -19,6 +28,11 @@ interface TVDBRemoteId {
   id?: number | string;
   type?: number | string;
   sourceName?: string;
+}
+
+interface TVDBSearchByRemoteIdResult {
+  series?: { id?: number | string };
+  movie?: { id?: number | string };
 }
 
 const BASE_URL = 'https://api4.thetvdb.com/v4';
@@ -37,12 +51,24 @@ function toPositiveInteger(value: unknown): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+export function classifyTVDBList(list: unknown): TVDBRelationKind | null {
+  if (!list || typeof list !== 'object') return null;
+  const candidate = list as TVDBAttachedList;
+  const label = String(candidate.nameTranslated || candidate.name || '').trim().toLowerCase();
+  if (!label) return null;
+  if (/\buniverse\b/.test(label)) return 'universe';
+  if (/\bfranchise\b/.test(label)) return 'franchise';
+  return null;
+}
+
 export function selectSingleOfficialTVDBList(lists: unknown): TVDBAttachedList | null {
   if (!Array.isArray(lists)) return null;
   const official = lists.filter((list): list is TVDBAttachedList => {
     if (!list || typeof list !== 'object') return false;
-    return (list as TVDBAttachedList).isOfficial === true
-      && toPositiveInteger((list as TVDBAttachedList).id) !== null;
+    const candidate = list as TVDBAttachedList;
+    return candidate.isOfficial === true
+      && toPositiveInteger(candidate.id) !== null
+      && classifyTVDBList(candidate) !== null;
   });
   return official.length === 1 ? official[0] : null;
 }
@@ -68,6 +94,24 @@ export function extractExactTMDBRemoteId(remoteIds: unknown): number | null {
     const sourceName = String(remote.sourceName || '').trim().toLowerCase();
     if (sourceType !== 12 && !TMDB_REMOTE_SOURCE_NAMES.has(sourceName)) continue;
     const id = toPositiveInteger(remote.id);
+    if (id !== null) matches.add(id);
+  }
+
+  return matches.size === 1 ? [...matches][0] : null;
+}
+
+export function extractExactTVDBSearchIdentity(
+  results: unknown,
+  mediaType: 'tv' | 'movie',
+): number | null {
+  if (!Array.isArray(results)) return null;
+  const matches = new Set<number>();
+
+  for (const result of results as TVDBSearchByRemoteIdResult[]) {
+    if (!result || typeof result !== 'object') continue;
+    const id = mediaType === 'movie'
+      ? toPositiveInteger(result.movie?.id)
+      : toPositiveInteger(result.series?.id);
     if (id !== null) matches.add(id);
   }
 
@@ -121,6 +165,21 @@ async function fetchTVDB(path: string): Promise<any | null> {
   }
 }
 
+async function resolveExactTVDBMediaId(
+  tvdbId: number | null | undefined,
+  imdbId: string | null | undefined,
+  mediaType: 'tv' | 'movie',
+): Promise<number | null> {
+  const exactTvdbId = toPositiveInteger(tvdbId);
+  if (exactTvdbId !== null) return exactTvdbId;
+
+  const exactImdbId = String(imdbId || '').trim();
+  if (!/^tt\d+$/.test(exactImdbId)) return null;
+
+  const payload = await fetchTVDB(`/search/remoteid/${encodeURIComponent(exactImdbId)}`);
+  return extractExactTVDBSearchIdentity(payload?.data, mediaType);
+}
+
 async function resolveTVDBEntityToTMDB(entity: unknown): Promise<TVDBFranchiseItem | null> {
   const identity = getTVDBEntityIdentity(entity);
   if (!identity) return null;
@@ -151,19 +210,19 @@ async function resolveEntitiesInOrder(entities: unknown[]): Promise<TVDBFranchis
 }
 
 /**
- * Résout une franchise/univers TVDB sans aucun rapprochement nominatif.
- * Contrat SEENIT-RELATION-001 : ID TVDB exact obligatoire, une seule liste officielle
- * attachée à l'œuvre, aucun score/mot-clé/fusion, puis remappage TMDB exact et typé.
- * Les paramètres historiques de titre/IMDb restent uniquement pour compatibilité de signature.
+ * Résout une franchise/univers TVDB sans aucun rapprochement nominatif d'œuvre.
+ * Contrat SEENIT-RELATION-001 : identité externe exacte obligatoire, une seule liste officielle
+ * attachée et explicitement qualifiable, aucun score/fusion, puis remappage TMDB exact et typé.
+ * Le libellé de la liste déjà atteinte sert uniquement à qualifier l'UI franchise/univers.
  */
-export async function getTVDBFranchiseTimeline(
+export async function getTVDBFranchiseRelation(
   tvdbId?: number | null,
   _mediaTitle?: string | null,
-  _imdbId?: string | null,
+  imdbId?: string | null,
   mediaType: 'tv' | 'movie' = 'tv',
-): Promise<TVDBFranchiseItem[]> {
-  const exactTvdbId = toPositiveInteger(tvdbId);
-  if (exactTvdbId === null) return [];
+): Promise<TVDBFranchiseRelation | null> {
+  const exactTvdbId = await resolveExactTVDBMediaId(tvdbId, imdbId, mediaType);
+  if (exactTvdbId === null) return null;
 
   const mediaEndpoint = mediaType === 'movie'
     ? `/movies/${exactTvdbId}/extended`
@@ -171,18 +230,29 @@ export async function getTVDBFranchiseTimeline(
   const mediaPayload = await fetchTVDB(mediaEndpoint);
   const selectedList = selectSingleOfficialTVDBList(mediaPayload?.data?.lists);
   const listId = toPositiveInteger(selectedList?.id);
-  if (listId === null) return [];
+  const kind = classifyTVDBList(selectedList);
+  if (listId === null || kind === null) return null;
 
   const listPayload = await fetchTVDB(`/lists/${listId}/extended`);
   const entities = Array.isArray(listPayload?.data?.entities) ? listPayload.data.entities : [];
-  if (entities.length < 2) return [];
+  if (entities.length < 2) return null;
 
   const containsCurrentMedia = entities.some((entity: unknown) => {
     const identity = getTVDBEntityIdentity(entity);
     return identity?.id === exactTvdbId && identity.media_type === mediaType;
   });
-  if (!containsCurrentMedia) return [];
+  if (!containsCurrentMedia) return null;
 
-  const timeline = await resolveEntitiesInOrder(entities);
-  return timeline.length > 1 ? timeline : [];
+  const items = await resolveEntitiesInOrder(entities);
+  return items.length > 1 ? { kind, items } : null;
+}
+
+export async function getTVDBFranchiseTimeline(
+  tvdbId?: number | null,
+  mediaTitle?: string | null,
+  imdbId?: string | null,
+  mediaType: 'tv' | 'movie' = 'tv',
+): Promise<TVDBFranchiseItem[]> {
+  const relation = await getTVDBFranchiseRelation(tvdbId, mediaTitle, imdbId, mediaType);
+  return relation?.items || [];
 }
