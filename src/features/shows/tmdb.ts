@@ -19,7 +19,7 @@ import {
 import { getParentalRatingOverride } from '../../store/parentalRatingStore';
 import { convergeTrackedMediaTitleFromTmdb } from './trackedMediaTitle';
 import { mediaKeyFrom } from './mediaRelations';
-import { getTVDBFranchiseTimeline } from '../../services/tvdb';
+import { getTVDBFranchiseRelation, type TVDBRelationKind } from '../../services/tvdb';
 
 export * from './tmdbClient';
 
@@ -80,10 +80,16 @@ tmdbClient.getMovieDetails = (async (id: number) => {
   return result;
 }) as typeof tmdbClient.getMovieDetails;
 
-const mediaRelationRuntimeCache = new Map<string, { collection: any[]; universe: any[] }>();
+type RuntimeRelationSnapshot = {
+  collection: any[];
+  universe: any[];
+  universeKind?: TVDBRelationKind;
+};
+
+const mediaRelationRuntimeCache = new Map<string, RuntimeRelationSnapshot>();
 const MAX_MEDIA_RELATION_CACHE = 120;
 
-const cacheMediaRelations = (mediaKey: string, snapshot: { collection: any[]; universe: any[] }) => {
+const cacheMediaRelations = (mediaKey: string, snapshot: RuntimeRelationSnapshot) => {
   if (mediaRelationRuntimeCache.has(mediaKey)) mediaRelationRuntimeCache.delete(mediaKey);
   mediaRelationRuntimeCache.set(mediaKey, snapshot);
   while (mediaRelationRuntimeCache.size > MAX_MEDIA_RELATION_CACHE) {
@@ -151,11 +157,11 @@ tmdbClient.getUniverseAndCollection = (async (media: any) => {
   const collection = await resolveExactTmdbCollection(media, mediaType);
   const collectionKeys = new Set(collection.map(item => mediaKeyFrom(item)).filter(Boolean));
 
-  const tvdbId = Number(media?.external_ids?.tvdb_id);
-  const tvdbItems = Number.isInteger(tvdbId) && tvdbId > 0
-    ? await getTVDBFranchiseTimeline(tvdbId, null, null, mediaType)
-    : [];
-  const hydratedTvdbItems = await hydrateExactTvdbItems(tvdbItems);
+  const rawTvdbId = Number(media?.external_ids?.tvdb_id);
+  const tvdbId = Number.isInteger(rawTvdbId) && rawTvdbId > 0 ? rawTvdbId : null;
+  const imdbId = String(media?.external_ids?.imdb_id || media?.imdb_id || '').trim() || null;
+  const tvdbRelation = await getTVDBFranchiseRelation(tvdbId, null, imdbId, mediaType);
+  const hydratedTvdbItems = await hydrateExactTvdbItems(tvdbRelation?.items || []);
 
   const universeSeen = new Set<string>();
   let universe = hydratedTvdbItems.filter(item => {
@@ -166,7 +172,11 @@ tmdbClient.getUniverseAndCollection = (async (media: any) => {
   });
 
   if (universe.length === 1 && mediaKeyFrom(universe[0]) === mediaKey) universe = [];
-  const snapshot = { collection, universe };
+  const snapshot: RuntimeRelationSnapshot = {
+    collection,
+    universe,
+    ...(universe.length > 0 && tvdbRelation?.kind ? { universeKind: tvdbRelation.kind } : {}),
+  };
   cacheMediaRelations(mediaKey, snapshot);
   return snapshot;
 }) as typeof tmdbClient.getUniverseAndCollection;
