@@ -382,7 +382,7 @@ aucun autre média affichable est masquée. Toute navigation transmet explicitem
 
 Wikidata, Kometa, MDBList, AniList/AniDB et tout pipeline multi-source destiné à construire une
 encyclopédie SeenIt des univers ne font plus partie de la stratégie normale des fiches. Le catalogue
-relationnel SeenIt existant est **legacy pendant la migration**. Un éventuel override futur ne peut
+relationnel SeenIt historique est **hors du chemin runtime normal**. Un éventuel override futur ne peut
 être qu'une exception rare, versionnée, fondée sur des `mediaKey` exactes et tracée dans une issue ; il
 ne redevient jamais une stratégie d'enrichissement continu.
 

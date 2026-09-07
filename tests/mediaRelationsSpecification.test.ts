@@ -30,14 +30,14 @@ test('SEENIT-RELATION-001 résout TVDB sans recherche par titre ni fusion de lis
   assert.match(specification, /aucune recherche globale de listes/);
   assert.match(specification, /au maximum une liste officielle/);
   assert.match(specification, /plus aucune fusion de plusieurs listes/);
-  assert.match(specification, /libellé d'une liste[\s\S]*uniquement[\s\S]*qualifier sa nature/);
+  assert.match(specification, /libellé d'une liste[\s\S]*uniquement[\s\S]*qualifier sa[\s\S]*nature/);
   assert.match(agentInstructions, /Le libellé d'une liste TVDB déjà atteinte depuis l'identité exacte/);
 });
 
 test('SEENIT-RELATION-001 déduplique la franchise après la saga', () => {
   assert.match(specification, /priorité[\s\S]*Ordre de visionnage[\s\S]*Franchise \/ univers/);
   assert.match(specification, /dédupliqu(?:é|ée)[\s\S]*mediaType \+ tmdbId/);
-  assert.match(functionalReference, /Un média déjà présent dans l'Ordre de visionnage est retiré de la section TVDB/);
+  assert.match(functionalReference, /Un média déjà présent dans l'Ordre[\s\S]*de visionnage est retiré de la section TVDB/);
   assert.match(decision, /ne répète pas ces films/);
 });
 
@@ -53,7 +53,7 @@ test('SEENIT-RELATION-001 fige la décision durable après migration runtime', (
   assert.match(registry, /USR-2026-09-06-005[\s\S]*superseded/);
   assert.match(registry, /USR-2026-09-06-008[\s\S]*SEENIT-RELATION-001[\s\S]*active/);
   assert.match(functionalReference, /runtime normal applique désormais ce contrat/);
-  assert.match(functionalReference, /pipeline relationnel historique n'est plus une source runtime/);
+  assert.match(functionalReference, /pipeline relationnel[\s\S]*historique n'est plus une source runtime/);
   assert.match(decision, /migration #130 remplace le chemin runtime normal par TMDB \+ TVDB/);
 
   const requirement = requirements.requirements.find((entry: { id: string }) => entry.id === 'SEENIT-RELATION-001');

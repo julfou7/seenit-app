@@ -1,7 +1,7 @@
 # SeenIt — Référence fonctionnelle canonique
 
-Dernière vérification : 6 septembre 2026  
-Baseline observée : **1.4.120**, `main` `ec707bd971673b5bd7f2c10aaea70b7e592dca61`
+Dernière vérification : 7 septembre 2026
+Baseline observée : **1.4.120**, `main` `4923896aa68225021cf7e12d5df30d10f2c7f4a4`
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : composante obligatoire de la SPEC SeenIt
 
@@ -501,7 +501,6 @@ elle est nécessaire à la plateforme et explicitement documentée.
 | Priorité | Écart observé | Décision / issue |
 |---|---|---|
 | P1 | La classification d’âge actuelle peut préférer une valeur FR permissive, sous-classer des certifications US et inventer un TP par genre. | Appliquer `SEENIT-PARENTAL-001` : [#98](https://github.com/julfou7/seenit-app/issues/98). |
-| P1 | Le runtime actuel conserve encore le catalogue relationnel SeenIt, le détecteur/pipeline hors ligne et les sections Films/Séries similaires ; TVDB n'est pas encore le résolveur normal de franchise/univers. | Migrer vers la décision TMDB + TVDB de `SEENIT-RELATION-001` et supprimer les similaires des fiches : [#130](https://github.com/julfou7/seenit-app/issues/130). |
 | P1 | Les personnes favorites restent locales et font diverger les recommandations PWA/APK. | Rendre Firestore autoritatif : [#95](https://github.com/julfou7/seenit-app/issues/95). |
 | P1 | Le retrait de Watchlist Plex ne retire pas encore un suivi créé uniquement par cette Watchlist. | Implémentation avec provenance : [#68](https://github.com/julfou7/seenit-app/issues/68). |
 | P2 | Partager une fiche ou le profil ne garantit pas encore un lien réouvrable conforme. | Décider/corriger : [#96](https://github.com/julfou7/seenit-app/issues/96). |
