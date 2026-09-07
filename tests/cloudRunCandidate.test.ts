@@ -161,7 +161,13 @@ test('SEENIT-RUNTIME-001 ajoute NODE_ENV=production quand le service exporté n�
   );
   const prepared = prepareCandidateService(noEnv, baseOptions);
 
-  assert.match(prepared, /- env:\n\s+- name: NODE_ENV\n\s+value: production\n\s+image:/);
+  const envIndex = prepared.indexOf('      - env:');
+  const nodeEnvIndex = prepared.indexOf('- name: NODE_ENV');
+  const imageIndex = prepared.indexOf('        image:');
+  assert.ok(envIndex >= 0, 'le bloc env doit être ajouté au conteneur');
+  assert.ok(nodeEnvIndex > envIndex, 'NODE_ENV doit appartenir au bloc env ajouté');
+  assert.ok(imageIndex > nodeEnvIndex, 'le bloc env doit précéder le champ image');
+  assert.match(prepared, /name: NODE_ENV\n\s+value: production/);
 });
 
 test('SEENIT-RUNTIME-001 force NODE_ENV quand env et image sont des champs secondaires du conteneur', () => {
@@ -188,7 +194,13 @@ test('SEENIT-RUNTIME-001 ajoute env quand image est un champ secondaire du conte
 
   assert.match(prepared, /containerPort: 3000/);
   assert.match(prepared, /name: http1/);
-  assert.match(prepared, /env:\n\s+- name: NODE_ENV\n\s+value: production\n\s+image:/);
+  const envIndex = prepared.indexOf('        env:');
+  const nodeEnvIndex = prepared.indexOf('- name: NODE_ENV');
+  const imageIndex = prepared.indexOf('        image:');
+  assert.ok(envIndex >= 0, 'le bloc env secondaire doit être ajouté au conteneur');
+  assert.ok(nodeEnvIndex > envIndex, 'NODE_ENV doit appartenir au bloc env ajouté');
+  assert.ok(imageIndex > nodeEnvIndex, 'le bloc env doit précéder le champ image secondaire');
+  assert.match(prepared, /name: NODE_ENV\n\s+value: production/);
   assert.equal((prepared.match(/name: NODE_ENV/g) || []).length, 1);
 });
 
