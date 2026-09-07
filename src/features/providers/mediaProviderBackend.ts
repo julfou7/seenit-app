@@ -2,6 +2,7 @@ import type { Application, Request, RequestHandler } from 'express';
 
 type Provider = 'tmdb' | 'omdb';
 type Secrets = Partial<Record<'TMDB_API_KEY' | 'OMDB_API_KEY', string>>;
+const REQUIRED_SECRET_NAMES = ['TMDB_API_KEY', 'OMDB_API_KEY'] as const;
 interface Dependencies {
   authenticate: RequestHandler;
   fetch?: typeof fetch;
@@ -38,6 +39,13 @@ const APPEND = new Set([
   'recommendations', 'similar', 'release_dates', 'content_ratings', 'watch/providers',
 ]);
 const OMDB_QUERY = new Set(['i', 'Season']);
+
+export function assertMediaProviderSecrets(secrets: Secrets = process.env): void {
+  const missing = REQUIRED_SECRET_NAMES.filter(name => !secrets[name]?.trim());
+  if (missing.length > 0) {
+    throw new Error(`Configuration fournisseurs manquante : ${missing.join(', ')}`);
+  }
+}
 
 export function buildProviderRequest(provider: Provider, path: string, query: Request['query']): URL | null {
   if (path.length > 160 || (provider === 'tmdb' && !TMDB_PATHS.some(rule => rule.test(path)))) return null;

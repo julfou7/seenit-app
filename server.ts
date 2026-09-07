@@ -23,7 +23,7 @@ import {
 import { buildC411SearchParams } from "./src/features/downloads/c411Query.ts";
 import { executeIdempotentMutation, type TimedMutationResult } from "./src/features/downloads/downloadIdempotency.ts";
 import { apiErrorMiddleware, backendHealthHandler, installAsyncRouteForwarding } from "./src/features/runtime/backendRuntime.ts";
-import { registerMediaProviderRoutes } from './src/features/providers/mediaProviderBackend.ts';
+import { assertMediaProviderSecrets, registerMediaProviderRoutes } from './src/features/providers/mediaProviderBackend.ts';
 import {
   buildPlexParentShowIdentityItem,
   extractPlexExternalIds,
@@ -467,6 +467,7 @@ async function getPlexServers(
 }
 
 async function startServer() {
+  if (process.env.NODE_ENV === 'production') assertMediaProviderSecrets();
   const app = express();
   installAsyncRouteForwarding(app);
   const PORT = 3000;

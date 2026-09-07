@@ -39,6 +39,8 @@ TMDB restent chargées directement sans secret.
 
 TMDB_API_KEY et OMDB_API_KEY sont des variables serveur uniquement (pas VITE). Aucun secret TVDB
 n'est requis par le runtime sans opération TVDB utilisée. Ne pas recopier les anciennes clés exposées.
+Une révision de production sans l'une de ces deux variables refuse de démarrer : Cloud Run ne peut
+donc pas lui attribuer le trafic et conserve la révision précédente.
 
 1. Provisionner les valeurs renouvelées via le gestionnaire de secrets/variables Cloud Run, sans
    les copier dans Git, un ticket, un export de logs ou une commande visible.

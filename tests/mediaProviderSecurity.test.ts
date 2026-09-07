@@ -3,7 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import express, { type RequestHandler } from 'express';
-import { buildProviderRequest, registerMediaProviderRoutes } from '../src/features/providers/mediaProviderBackend.ts';
+import {
+  assertMediaProviderSecrets,
+  buildProviderRequest,
+  registerMediaProviderRoutes,
+} from '../src/features/providers/mediaProviderBackend.ts';
 
 const root = path.resolve(import.meta.dirname, '..');
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
@@ -58,6 +62,21 @@ test('SEENIT-SECURITY-001 authentifie la façade et refuse les routes hors contr
   for (const unsafe of ['//example.org/a', '../movie/42', 'movie/42/../../account/1', 'movie%2f42']) {
     assert.equal(buildProviderRequest('tmdb', unsafe, {}), null);
   }
+});
+
+test('SEENIT-SECURITY-001 bloque une révision de production sans les secrets requis', () => {
+  assert.doesNotThrow(() => assertMediaProviderSecrets({
+    TMDB_API_KEY: 'configured-tmdb',
+    OMDB_API_KEY: 'configured-omdb',
+  }));
+  assert.throws(
+    () => assertMediaProviderSecrets({ TMDB_API_KEY: 'configured-tmdb' }),
+    /OMDB_API_KEY/,
+  );
+  assert.throws(
+    () => assertMediaProviderSecrets({ OMDB_API_KEY: 'configured-omdb' }),
+    /TMDB_API_KEY/,
+  );
 });
 
 test('SEENIT-SECURITY-001 conserve les paramètres utiles et ne transmet aucun token utilisateur au fournisseur', async t => {

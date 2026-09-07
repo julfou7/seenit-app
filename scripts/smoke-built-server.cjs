@@ -5,7 +5,9 @@ const child = spawn(process.execPath, ['build/server.cjs'], {
   env: {
     ...process.env,
     NODE_ENV: 'production',
-    PORT: '3000'
+    PORT: '3000',
+    TMDB_API_KEY: 'smoke-tmdb',
+    OMDB_API_KEY: 'smoke-omdb'
   },
   stdio: ['ignore', 'pipe', 'pipe']
 });
