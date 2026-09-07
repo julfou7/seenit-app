@@ -120,7 +120,7 @@ Au 6 septembre 2026, le runtime `main` ne respecte pas encore cette cible :
 - le service TVDB legacy n'est plus appelé par la fiche et contient d'anciennes heuristiques interdites ;
 - les sections Films/Séries similaires sont encore présentes.
 
-L'issue #130 reste donc **ouverte** jusqu'à la migration runtime, aux TNR PWA/APK et à la suppression du chemin legacy devenu inutile.
+Cet écart décrit l'état historique au moment de la décision. La migration #130 remplace le chemin runtime normal par TMDB + TVDB, retire les similaires des fiches et conserve ce paragraphe uniquement comme trace de la raison du changement.
 
 ## 9. Décisions remplacées
 

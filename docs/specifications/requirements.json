@@ -1386,7 +1386,7 @@
         },
         {
           "file": "tests/mediaRelationsSpecification.test.ts",
-          "contains": "SEENIT-RELATION-001 trace la décision durable et l’écart runtime"
+          "contains": "SEENIT-RELATION-001 fige la décision durable après migration runtime"
         }
       ]
     },

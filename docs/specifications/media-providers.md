@@ -48,17 +48,20 @@ hors de cette façade et ne deviennent aucune preuve de relation ou d'identité 
 aucune variante `VITE_*`. Les anciennes valeurs qui ont pu être exposées dans un client ne doivent
 jamais être recopiées depuis Git, un ticket ou des logs.
 
-TMDB et OMDb restent obligatoires au démarrage du backend canonique. TVDB est requis pour que la section
-franchise/univers fonctionne ; si sa configuration est absente ou indisponible, la route relationnelle
-échoue fermée et la fiche masque seulement cette section. Pour considérer #130 déployée, la révision
-production doit néanmoins être validée avec TVDB configuré.
+TMDB, OMDb et TVDB sont obligatoires au démarrage d'une nouvelle révision du backend canonique. Une
+candidate à laquelle manque l'un de ces trois secrets est refusée avant promotion. Les trois variables
+sont injectées depuis Secret Manager par référence de secret ; aucune valeur fournisseur n'est copiée
+dans GitHub, le workflow ou l'export Cloud Run. Une panne fournisseur après démarrage reste fail-closed.
 
-1. Provisionner/renouveler les trois secrets via l'infrastructure Cloud Run autorisée, sans les exposer
-   dans GitHub ou une commande visible.
-2. Vérifier les appels serveur TMDB/OMDb et une résolution TVDB exacte dans un environnement autorisé.
-3. Déployer le backend canonique avant l'APK qui dépend de ces routes ; la révision candidate doit
-   réussir sa readiness avant de recevoir du trafic.
-4. Publier ensuite l'APK groupée. Une rotation future de secret ne nécessite pas de nouvelle APK.
+1. Provisionner/renouveler les trois secrets dans Secret Manager, sans exposer leurs valeurs.
+2. Accorder au compte de service runtime Cloud Run le rôle `Secret Manager Secret Accessor` sur chacun
+   des trois secrets. Le rôle projet `Editor` ne donne pas accès au payload d'un secret.
+3. Le préparateur de candidate remplace toute ancienne variable en clair par une référence
+   `secretKeyRef` vers `TMDB_API_KEY`, `OMDB_API_KEY` et `TVDB_API_KEY`, version `latest`.
+4. Vérifier les appels serveur TMDB/OMDb et une résolution TVDB exacte dans un environnement autorisé.
+5. Déployer le backend canonique avant l'APK qui dépend de ces routes ; la candidate doit réussir sa
+   readiness et ses smokes avant de recevoir du trafic.
+6. Publier ensuite l'APK groupée. Une rotation future de secret ne nécessite pas de nouvelle APK.
 
 Ne pas contourner un échec de déploiement en réintroduisant une clé ou un hôte fournisseur dans le
 frontend. Une ancienne révision Cloud Run reste préférable à une candidate incomplète, mais une APK

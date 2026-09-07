@@ -62,6 +62,7 @@ Hiérarchie des sources :
 Les routes backend produit sont :
 
 - `GET /api/health` : identité et santé du backend canonique ;
+- `GET /api/media/tmdb/...`, `GET /api/media/omdb` et `GET /api/media/tvdb/franchise` : façade métadonnées authentifiée ; TVDB ne reçoit que des identifiants externes exacts ;
 - `POST /api/plex/history` (`/api/plex-sync` alias) : full/delta Plex ;
 - `POST /api/plex/availability` et `GET|POST /api/plex/resolve-slug` : disponibilité et ouverture ;
 - `POST /api/c411/test` et `POST /api/c411/search` : test/recherche C411 ;
@@ -301,16 +302,15 @@ de visionnage est retiré de la section TVDB** par `mediaType + tmdbId`, afin d'
 section qui ne laisserait aucun autre média affichable est masquée.
 
 Wikidata, Kometa, MDBList et les autres pipelines multi-sources ne font plus partie de la stratégie
-normale de relations de fiche. Le catalogue relationnel SeenIt actuel est legacy pendant la migration ;
+normale de relations de fiche. Le catalogue relationnel SeenIt historique est hors du chemin runtime normal ;
 un éventuel override futur reste exceptionnel, versionné, exact et tracé. Les cas House of the Dragon,
 Breaking Bad, Yellowstone, Harry Potter, MCU ou Punisher servent de TNR, jamais de conditions nominatives.
 
 La décision durable complète est figée dans
 [`docs/decisions/media-relations-2026-09-06.md`](../decisions/media-relations-2026-09-06.md) et dans
-`SEENIT-RELATION-001`. **Le runtime actuel conserve encore le catalogue relationnel SeenIt**, son
-pipeline hors ligne et les sections Films/Séries similaires ; TVDB n'est donc pas encore le résolveur
-normal de franchise/univers. Cet écart de mise en œuvre reste suivi dans l'**issue #130** et ne remet pas
-en cause la décision produit.
+`SEENIT-RELATION-001`. Le runtime normal applique désormais ce contrat : collections TMDB pour l'ordre,
+TVDB exact pour franchise/univers et aucune section similaire sur les fiches. Le pipeline relationnel
+historique n'est plus une source runtime de la fiche.
 
 Une fiche déjà ouverte pendant la session doit se réafficher depuis le cache chaud, sans repasser par
 un skeleton de deux à trois secondes. Détails et relations sont indexés par `movie:<id>` / `tv:<id>`,

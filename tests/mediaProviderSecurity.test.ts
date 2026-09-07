@@ -24,7 +24,7 @@ async function harness(t: any, options: any = {}) {
   const app = express();
   registerMediaProviderRoutes(app, {
     authenticate,
-    secrets: () => ({ TMDB_API_KEY: 'test-tmdb-private', OMDB_API_KEY: 'test-omdb-private' }),
+    secrets: () => ({ TMDB_API_KEY: 'test-tmdb-private', OMDB_API_KEY: 'test-omdb-private', TVDB_API_KEY: 'test-tvdb-private' }),
     ...options,
     fetch: async (url: any, init: any) => {
       calls.push({ url: new URL(String(url)), init });
@@ -56,7 +56,7 @@ test('SEENIT-SECURITY-001 authentifie la façade et refuse les routes hors contr
     'tmdb/discover/movie?page=501', 'omdb?i=title', 'omdb?i=tt1234567&Season=-1',
     'omdb?i=tt1234567&t=Title', 'tmdb/find/tt1234567',
   ]) assert.equal((await send(suffix)).status, 400, suffix);
-  assert.equal((await send('tvdb/franchise?mediaTitle=Example')).status, 404);
+  assert.equal((await send('tvdb/franchise?mediaTitle=Example')).status, 400);
   assert.equal((await send('tmdb/movie/42', 'a', { method: 'POST' })).status, 404);
   assert.equal(calls.length, 0);
   for (const unsafe of ['//example.org/a', '../movie/42', 'movie/42/../../account/1', 'movie%2f42']) {
@@ -68,14 +68,19 @@ test('SEENIT-SECURITY-001 bloque une révision de production sans les secrets re
   assert.doesNotThrow(() => assertMediaProviderSecrets({
     TMDB_API_KEY: 'configured-tmdb',
     OMDB_API_KEY: 'configured-omdb',
+    TVDB_API_KEY: 'configured-tvdb',
   }));
   assert.throws(
-    () => assertMediaProviderSecrets({ TMDB_API_KEY: 'configured-tmdb' }),
+    () => assertMediaProviderSecrets({ TMDB_API_KEY: 'configured-tmdb', TVDB_API_KEY: 'configured-tvdb' }),
     /OMDB_API_KEY/,
   );
   assert.throws(
-    () => assertMediaProviderSecrets({ OMDB_API_KEY: 'configured-omdb' }),
+    () => assertMediaProviderSecrets({ OMDB_API_KEY: 'configured-omdb', TVDB_API_KEY: 'configured-tvdb' }),
     /TMDB_API_KEY/,
+  );
+  assert.throws(
+    () => assertMediaProviderSecrets({ TMDB_API_KEY: 'configured-tmdb', OMDB_API_KEY: 'configured-omdb' }),
+    /TVDB_API_KEY/,
   );
 });
 
@@ -188,7 +193,10 @@ test('SEENIT-SECURITY-001 ne conserve aucune clé fournisseur dans tout le sourc
     }
   }
   scan(path.join(root, 'src'));
-  assert.equal(fs.existsSync(path.join(root, 'src/services/tvdb.ts')), false);
+  assert.equal(fs.existsSync(path.join(root, 'src/services/tvdb.ts')), true);
+  const tvdbClient = fs.readFileSync(path.join(root, 'src/services/tvdb.ts'), 'utf8');
+  assert.match(tvdbClient, /\/api\/media\/tvdb\/franchise/);
+  assert.doesNotMatch(tvdbClient, /TVDB_API_KEY|api4\.thetvdb\.com|search\/remoteid/);
 });
 
 test('SEENIT-SECURITY-001 exclut le backend du paquet web et APK', () => {

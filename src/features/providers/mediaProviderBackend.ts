@@ -2,7 +2,7 @@ import type { Application, Request, RequestHandler } from 'express';
 
 type Provider = 'tmdb' | 'omdb';
 type Secrets = Partial<Record<'TMDB_API_KEY' | 'OMDB_API_KEY' | 'TVDB_API_KEY', string>>;
-const REQUIRED_SECRET_NAMES = ['TMDB_API_KEY', 'OMDB_API_KEY'] as const;
+const REQUIRED_SECRET_NAMES = ['TMDB_API_KEY', 'OMDB_API_KEY', 'TVDB_API_KEY'] as const;
 interface Dependencies {
   authenticate: RequestHandler;
   fetch?: typeof fetch;

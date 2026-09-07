@@ -48,13 +48,13 @@ test('SEENIT-RELATION-001 retire les similaires des fiches et garde la découver
   assert.match(decision, /recommendations[\s\S]*similar[\s\S]*ne sont plus utilisés pour remplir le bas d'une fiche/);
 });
 
-test('SEENIT-RELATION-001 trace la décision durable et l’écart runtime', () => {
+test('SEENIT-RELATION-001 fige la décision durable après migration runtime', () => {
   assert.match(registry, /USR-2026-09-05-002[\s\S]*superseded/);
   assert.match(registry, /USR-2026-09-06-005[\s\S]*superseded/);
   assert.match(registry, /USR-2026-09-06-008[\s\S]*SEENIT-RELATION-001[\s\S]*active/);
-  assert.match(functionalReference, /runtime actuel conserve encore le catalogue relationnel SeenIt/);
-  assert.match(functionalReference, /issue #130/);
-  assert.match(decision, /issue #130 reste donc \*\*ouverte\*\*/);
+  assert.match(functionalReference, /runtime normal applique désormais ce contrat/);
+  assert.match(functionalReference, /pipeline relationnel historique n'est plus une source runtime/);
+  assert.match(decision, /migration #130 remplace le chemin runtime normal par TMDB \+ TVDB/);
 
   const requirement = requirements.requirements.find((entry: { id: string }) => entry.id === 'SEENIT-RELATION-001');
   assert.ok(requirement, 'SEENIT-RELATION-001 doit rester déclarée dans requirements.json');

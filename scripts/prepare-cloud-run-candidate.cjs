@@ -127,6 +127,50 @@ function forceSingleContainerEnv(lines, imageIndex, name, value) {
   throw new Error(`Bloc env du conteneur introuvable pour forcer ${name}.`);
 }
 
+function forceSingleContainerSecretEnv(lines, imageIndex, name, secretName, version = 'latest') {
+  const { containerStart, containerEnd } = getSingleContainerBounds(lines, imageIndex);
+  const envIndex = lines.findIndex((line, index) => index >= containerStart && index < containerEnd && /^(?:      - |        )env:\s*$/.test(line));
+  const entry = [
+    '        - name: ' + name,
+    '          valueFrom:',
+    '            secretKeyRef:',
+    '              key: ' + version,
+    '              name: ' + secretName,
+  ];
+
+  if (envIndex < 0) {
+    if (/^      - image:\s*/.test(lines[imageIndex])) {
+      lines[imageIndex] = lines[imageIndex].replace(/^      - image:/, '        image:');
+      lines.splice(imageIndex, 0, '      - env:', ...entry);
+      return;
+    }
+    if (/^        image:\s*/.test(lines[imageIndex])) {
+      lines.splice(imageIndex, 0, '        env:', ...entry);
+      return;
+    }
+    throw new Error('Bloc env du conteneur introuvable pour lier ' + name + '.');
+  }
+
+  let envEnd = containerEnd;
+  for (let index = envIndex + 1; index < containerEnd; index += 1) {
+    if (/^        [A-Za-z0-9_-]+:\s*/.test(lines[index])) { envEnd = index; break; }
+  }
+  const expectedName = '- name: ' + name;
+  let start = -1;
+  for (let index = envIndex + 1; index < envEnd; index += 1) {
+    if (lines[index].trim() === expectedName) {
+      if (start >= 0) throw new Error('Variable runtime ' + name + ' dupliquée dans l export Cloud Run.');
+      start = index;
+    }
+  }
+  if (start < 0) { lines.splice(envIndex + 1, 0, ...entry); return; }
+  let end = envEnd;
+  for (let index = start + 1; index < envEnd; index += 1) {
+    if (/^        - name:\s*/.test(lines[index])) { end = index; break; }
+  }
+  lines.splice(start, end - start, ...entry);
+}
+
 function normalizeTraffic(lines, trafficIndex, trafficEnd, previousRevision, candidateRevision, candidateTag) {
   const trafficLines = lines.slice(trafficIndex + 1, trafficEnd);
   const trafficText = trafficLines.join('\n');
@@ -231,6 +275,11 @@ function prepareCandidateService(source, { image, service, previousRevision, can
   if (imageIndexes.length !== 1) throw new Error('Ligne image perdue pendant la normalisation du lancement.');
 
   forceSingleContainerEnv(lines, imageIndexes[0], 'NODE_ENV', 'production');
+  for (const secretName of ['TMDB_API_KEY', 'OMDB_API_KEY', 'TVDB_API_KEY']) {
+    const secretImageIndex = lines.findIndex(line => /^\s*(?:-\s*)?image:\s*\S+\s*$/.test(line));
+    if (secretImageIndex < 0) throw new Error('Ligne image perdue avant injection Secret Manager.');
+    forceSingleContainerSecretEnv(lines, secretImageIndex, secretName, secretName, 'latest');
+  }
   const refreshedImageIndex = lines.findIndex(line => /^\s*(?:-\s*)?image:\s*\S+\s*$/.test(line));
   if (refreshedImageIndex < 0) throw new Error('Ligne image perdue pendant la préparation du runtime.');
   lines[refreshedImageIndex] = lines[refreshedImageIndex].replace(/^(\s*(?:-\s*)?image:\s*)\S+\s*$/, `$1${image}`);
@@ -247,6 +296,10 @@ function prepareCandidateService(source, { image, service, previousRevision, can
   if (!prepared.includes(`name: ${candidateRevision}`)) throw new Error('Le nom de révision candidate n’a pas été injecté.');
   if (!prepared.includes(image)) throw new Error('Le digest d’image candidate n’a pas été injecté.');
   if (!/name:\s*NODE_ENV\s*\n\s*value:\s*production/.test(prepared)) throw new Error('NODE_ENV=production n’a pas été forcé sur le runtime candidat.');
+  for (const secretName of ['TMDB_API_KEY', 'OMDB_API_KEY', 'TVDB_API_KEY']) {
+    const marker = '- name: ' + secretName + '\n          valueFrom:\n            secretKeyRef:\n              key: latest\n              name: ' + secretName;
+    if (!prepared.includes(marker)) throw new Error('Référence Secret Manager absente pour ' + secretName + '.');
+  }
   if (!prepared.includes(`revisionName: ${candidateRevision}`) || !prepared.includes(`tag: ${candidateTag}`)) {
     throw new Error('La cible candidate à 0 % n’a pas été injectée dans le trafic Cloud Run.');
   }
@@ -271,7 +324,7 @@ function main() {
   console.log(`[CloudRunCandidate] Service préparé: ${args['previous-revision']} -> ${args['candidate-revision']} sur ${args.image}, entrypoint image conservé, NODE_ENV=production, trafic normalisé et cible 0 %=${deriveCandidateTag(args.service, args['candidate-revision'])}`);
 }
 
-module.exports = { deriveCandidateTag, forceSingleContainerEnv, getSingleContainerBounds, normalizeSingleContainerLaunch, normalizeTraffic, parseArgs, prepareCandidateService, validateRevisionName };
+module.exports = { deriveCandidateTag, forceSingleContainerEnv, forceSingleContainerSecretEnv, getSingleContainerBounds, normalizeSingleContainerLaunch, normalizeTraffic, parseArgs, prepareCandidateService, validateRevisionName };
 
 if (require.main === module) {
   try {
