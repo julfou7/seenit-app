@@ -1,7 +1,7 @@
 # SeenIt — Référence fonctionnelle canonique
 
-Dernière vérification : 7 septembre 2026
-Baseline observée : **1.4.120**, `main` `9ffc3ef41b57deeacb659fbd2fef7919aaed39ee`
+Dernière vérification : 8 septembre 2026
+Baseline observée avant correction : **1.4.122**, `main` `24dc43437e7fb9cef23148d3d2ca21fb618901ff`
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : composante obligatoire de la SPEC SeenIt
 
@@ -131,16 +131,23 @@ et remontée globale des conteneurs, y compris cachés. Ne pas les prendre comme
 La barre basse possède trois destinations toujours visibles, dans cet ordre :
 
 1. **À Voir** : accueil opérationnel ;
-2. **Profil** : statistiques, Ma Liste et accès Réglages ;
-3. **Explorer** : recherche et découverte TMDB.
+2. **Explorer** : recherche et découverte TMDB ;
+3. **Profil** : statistiques, Ma Liste et accès Réglages.
 
-La quatrième destination **Télécharger** n'apparaît que lorsque le compte courant a explicitement activé
-la fonctionnalité personnelle Téléchargements dans Réglages. Son badge compte alors les transferts actifs
-ou qui demandent une attention. Une navigation historique ou directe vers `downloads` alors que la
-fonctionnalité est désactivée revient sur « À Voir ».
+La destination **Télécharger** n'apparaît que lorsque le compte courant a explicitement activé la
+fonctionnalité personnelle Téléchargements dans Réglages. Lorsqu'elle est visible, elle s'insère en
+**troisième position**, ce qui donne **À Voir → Explorer → Télécharger → Profil** : Profil reste donc
+toujours la destination la plus à droite. Son badge compte alors les transferts actifs ou qui demandent
+une attention. Une navigation historique ou directe vers `downloads` alors que la fonctionnalité est
+désactivée revient sur « À Voir ».
 
-L'onglet actif et ses glyphes utilisent l'or SeenIt. Un appui sur l'onglet actif ferme le niveau courant ;
-un double appui réinitialise/ramène le contenu en haut lorsque l'écran l'implémente.
+Les destinations se partagent toute la largeur utile de la barre au lieu d'être limitées à une petite
+largeur fixe. Les glyphes de navigation sont rendus à 28 px, les libellés mobiles à 10 px et chaque
+contrôle conserve une cible tactile d'au moins 44 × 44 CSS px ainsi que la safe area basse.
+
+L'onglet actif et ses glyphes utilisent l'or SeenIt et son bouton expose `aria-current="page"`. Un appui
+sur l'onglet actif ferme le niveau courant ; un double appui réinitialise/ramène le contenu en haut lorsque
+l'écran l'implémente. Les écarts de reconnaissance et de portée du reset restent suivis dans #178.
 
 L'ouverture d'une fiche est un niveau de navigation au-dessus de l'onglet courant. Le Retour Android
 ferme dans l'ordre : dialogue ou modal, fiche, historique interne, retour à À Voir, puis application.
