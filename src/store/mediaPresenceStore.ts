@@ -116,6 +116,7 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
 
     const plexPromise = checkPlexAvailability({
       tmdbId,
+      tvdbId,
       imdbId,
       title,
       originalTitle,
