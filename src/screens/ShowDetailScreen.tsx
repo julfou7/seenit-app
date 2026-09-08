@@ -32,6 +32,24 @@ const STABLE_DETAIL_LOADING_CSS = `
   overflow-anchor: none;
 }
 
+/* Le titre relationnel exact n'est connu qu'après résolution TVDB. Le libellé
+   transitoire historique reste donc visuellement neutre au lieu de se transformer
+   de « Relations » vers « Dans la même franchise / univers ». */
+[data-seenit-detail-shell="stable"] h3:has(+ .flex > .animate-pulse) {
+  font-size: 0;
+  min-height: 0.75rem;
+}
+
+[data-seenit-detail-shell="stable"] h3:has(+ .flex > .animate-pulse)::after {
+  content: '';
+  display: block;
+  width: 8rem;
+  height: 0.75rem;
+  border-radius: 0.25rem;
+  background: rgb(39 39 42 / 0.8);
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
 [data-seenit-detail-warmup="cold"] {
   min-height: 100%;
   contain: layout paint;

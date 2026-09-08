@@ -481,43 +481,55 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
   const upcomingRef = useRef<HTMLDivElement>(null);
   const historyRef = useRef<HTMLDivElement>(null);
   const hasSeededNightAgent = useRef(false);
+  const openingEpisodeRef = useRef(false);
+  const episodeRequestRef = useRef(0);
 
-  const [isOpeningEpisode, setIsOpeningEpisode] = useState<boolean>(false);
+  const handleEpisodeClick = useCallback((show: Show, seasonNumber: number, episodeNumber: number) => {
+    if (openingEpisodeRef.current || selectedEpisodeModal) return;
+    openingEpisodeRef.current = true;
 
-  const handleEpisodeClick = useCallback(async (show: Show, seasonNumber: number, episodeNumber: number) => {
-    if (isOpeningEpisode || selectedEpisodeModal) return;
-    setIsOpeningEpisode(true);
-    try {
-      let epData: any = { season_number: seasonNumber, episode_number: episodeNumber };
-      if (show.tmdbId) {
-        const res = await tmdb.getEpisodeDetails(show.tmdbId, seasonNumber, episodeNumber);
-        if (res.ok) {
-          epData = res.value;
-        } else {
-          const upcomingEp = getUpcomingEpisodeInfo(show);
-          epData = {
-            season_number: seasonNumber,
-            episode_number: episodeNumber,
-            name: upcomingEp?.name || `Épisode ${episodeNumber}`,
-            air_date: upcomingEp?.air_date || null
-          };
-        }
-      } else {
-        const upcomingEp = getUpcomingEpisodeInfo(show);
-        epData = {
-          season_number: seasonNumber,
-          episode_number: episodeNumber,
-          name: upcomingEp?.name || `Épisode ${episodeNumber}`,
-          air_date: upcomingEp?.air_date || null
-        };
-      }
-      setSelectedEpisodeModal({ show, season: seasonNumber, episode: epData });
-      const currentState = window.history.state || {};
+    const upcomingEp = getUpcomingEpisodeInfo(show);
+    const candidates = [show.nextEpisodeToWatch, upcomingEp].filter(Boolean) as any[];
+    const knownEpisode = candidates.find(ep =>
+      Number(ep?.season_number) === Number(seasonNumber)
+      && Number(ep?.episode_number) === Number(episodeNumber)
+    );
+    const epData = {
+      season_number: seasonNumber,
+      episode_number: episodeNumber,
+      name: knownEpisode?.name || `Épisode ${episodeNumber}`,
+      air_date: knownEpisode?.air_date || null,
+      still_path: knownEpisode?.still_path || null,
+    };
+
+    // Feedback immédiat : la modale s'ouvre avant tout appel fournisseur. Elle sait
+    // déjà hydrater ses données manquantes et la réponse TMDB ci-dessous ne fait
+    // qu'enrichir l'épisode si cette même modale est toujours ouverte.
+    setSelectedEpisodeModal({ show, season: seasonNumber, episode: epData });
+    const currentState = window.history.state || {};
+    if (!currentState.isEpisodeDetailModal) {
       window.history.pushState({ ...currentState, isModal: true, isEpisodeDetailModal: true }, '');
-    } finally {
-      setIsOpeningEpisode(false);
     }
-  }, [isOpeningEpisode, selectedEpisodeModal]);
+
+    const requestId = ++episodeRequestRef.current;
+    requestAnimationFrame(() => {
+      openingEpisodeRef.current = false;
+    });
+
+    if (!show.tmdbId) return;
+    void tmdb.getEpisodeDetails(show.tmdbId, seasonNumber, episodeNumber).then(res => {
+      if (!res.ok || !res.value || requestId !== episodeRequestRef.current) return;
+      setSelectedEpisodeModal(current => {
+        if (!current) return current;
+        const sameShow = String(current.show.id || current.show.tmdbId || '')
+          === String(show.id || show.tmdbId || '');
+        const sameEpisode = current.season === seasonNumber
+          && Number(current.episode?.episode_number) === Number(episodeNumber);
+        if (!sameShow || !sameEpisode) return current;
+        return { ...current, episode: res.value };
+      });
+    }).catch(() => {});
+  }, [selectedEpisodeModal]);
 
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
