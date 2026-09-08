@@ -263,18 +263,19 @@ function pruneResourceCache(now: number): void {
   while (resourceCache.size > RESOURCE_CACHE_MAX) resourceCache.delete(resourceCache.keys().next().value!);
 }
 
-async function getPlexServers(
+export async function getPlexServers(
   request: typeof fetch,
   token: string,
   clientId: string,
   uid: string,
-  now: () => number
+  now: () => number,
+  forceRefresh = false
 ): Promise<PlexServerResource[] | null> {
   const cacheKey = `${uid}:${createHash('sha256').update(token).digest('hex')}`;
   const timestamp = now();
   pruneResourceCache(timestamp);
   const cached = resourceCache.get(cacheKey);
-  if (cached && timestamp - cached.timestamp < RESOURCE_CACHE_TTL_MS) return cached.servers;
+  if (!forceRefresh && cached && timestamp - cached.timestamp < RESOURCE_CACHE_TTL_MS) return cached.servers;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 1400);
@@ -314,12 +315,13 @@ export function registerPlexAvailabilityRoute(app: Application, dependencies: Re
       ? req.body.clientId.trim()
       : 'tv-time-ai-studio';
     const uid = String(req.user?.uid || 'anonymous');
+    const refreshServers = req.body?.refreshServers === true;
 
     if (!token || !Number.isInteger(tmdbId) || tmdbId <= 0) {
       return res.json({ available: false });
     }
 
-    const servers = await getPlexServers(request, token, clientId, uid, now);
+    const servers = await getPlexServers(request, token, clientId, uid, now, refreshServers);
     if (servers === null) {
       return res.status(502).json({ error: 'Plex est momentanément indisponible.' });
     }
