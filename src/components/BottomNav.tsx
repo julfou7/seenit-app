@@ -25,9 +25,9 @@ export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveT
 
   const tabs: readonly TabItem[] = [
     { id: 'watchlist', label: 'À Voir', symbol: 'watch' },
-    { id: 'profile', label: 'Profil', symbol: 'profile' },
     { id: 'discover', label: 'Explorer', symbol: 'discover' },
     { id: 'downloads', label: 'Télécharger', symbol: 'download' },
+    { id: 'profile', label: 'Profil', symbol: 'profile' },
   ] as const;
 
   const visibleTabs = downloadsEnabled ? tabs : tabs.filter(tab => tab.id !== 'downloads');
@@ -57,7 +57,7 @@ export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveT
   };
 
   return (
-    <div className="absolute bottom-0 inset-x-0 bg-zinc-950/95 backdrop-blur-2xl border-t border-white/10 pt-1.5 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] px-1 sm:px-4 flex justify-around items-center z-[160]">
+    <div className="absolute bottom-0 inset-x-0 bg-zinc-950/95 backdrop-blur-2xl border-t border-white/10 pt-1.5 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] px-2 sm:px-4 flex items-center gap-1 z-[160]">
       {visibleTabs.map((tab) => {
         const isActive = currentTab === tab.id;
         const isDownloadTab = tab.id === 'downloads';
@@ -66,15 +66,16 @@ export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveT
           <button
             key={tab.id}
             type="button"
+            aria-current={isActive ? 'page' : undefined}
             onClick={(e) => handleTabClick(e, tab.id)}
             className={cn(
-              "flex flex-col items-center gap-0.5 transition-all duration-200 py-1 px-0.5 flex-1 max-w-[72px] sm:max-w-[80px] rounded-xl touch-manipulation active:scale-95 cursor-pointer relative",
+              "flex flex-col items-center justify-center gap-0.5 transition-all duration-200 py-1 px-1 min-h-[52px] min-w-[44px] flex-1 rounded-xl touch-manipulation active:scale-95 cursor-pointer relative",
               isActive ? "text-[#E5A93D]" : "text-zinc-500 hover:text-zinc-400"
             )}
           >
             <div className={cn("p-1 rounded-xl transition-all flex items-center justify-center relative", isActive ? "bg-[#E5A93D]/12" : "bg-transparent")}>
               <SeenItGlyph
-                size={22}
+                size={28}
                 symbol={tab.symbol}
                 active={isActive}
                 glow={isActive}
@@ -88,7 +89,7 @@ export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveT
               )}
             </div>
             <span className={cn(
-              "text-[8px] sm:text-[9px] font-bold tracking-tight truncate max-w-full text-center block", 
+              "text-[10px] sm:text-[11px] font-bold tracking-tight truncate max-w-full text-center block", 
               isActive ? "text-[#E5A93D]" : "text-zinc-500"
             )}>
               {tab.label}

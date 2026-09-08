@@ -1,12 +1,13 @@
 # SeenIt — Référence UX
 
-Date : 6 septembre 2026. Baseline inspectée : 1.4.120, `cf6e617e4776ade7d5f8913cac20931e58df4f55`.
+Date : 8 septembre 2026. Baseline inspectée : 1.4.122, `24dc43437e7fb9cef23148d3d2ca21fb618901ff`.
 
 Ce document complète `seenit.md` §9 et `functional-reference.md`. Il distingue les comportements
 observés des cibles de normalisation encore ouvertes. Il ne certifie ni le rendu sur appareil ni la
 conformité accessibilité. Les exigences existantes `SEENIT-UX-001..004`, `SEENIT-FUNCTIONAL-001`,
-`SEENIT-QUALITY-002/003` et les règles métier restent autoritatives. Les cibles nouvelles ci-dessous
-sont des propositions de réalisation dans les issues liées, pas des fonctionnalités déjà livrées.
+`SEENIT-QUALITY-002/003` et les règles métier restent autoritatives. Les cibles non encore livrées
+ci-dessous restent des propositions de réalisation dans les issues liées ; les règles explicitement
+marquées comme livrées décrivent le comportement attendu du runtime courant.
 
 ## 1. Principes à préserver
 
@@ -43,7 +44,20 @@ sont des propositions de réalisation dans les issues liées, pas des fonctionna
 Le reset actuel scrolle tous les éléments scrollables du document, y compris les onglets cachés.
 Cette portée est un écart (#178), pas une règle produit à reproduire.
 
-## 3. Navigation cible — proposition #178
+## 3. Navigation — ordre livré et cible #178
+
+L'organisation de la barre basse est désormais explicite et stable :
+
+- sans la fonctionnalité Téléchargements : **À Voir → Explorer → Profil** ;
+- avec Téléchargements activés : **À Voir → Explorer → Télécharger → Profil** ;
+- **Profil reste toujours à droite** et **Télécharger occupe toujours la troisième position** lorsqu'il
+  est visible ; son masquage continue de dépendre exclusivement du réglage personnel déjà défini ;
+- chaque destination se partage la largeur utile au lieu d'être enfermée dans une largeur maximale
+  étroite ; le contrôle conserve au moins **44 × 44 CSS px**, les glyphes de la barre sont rendus à
+  **28 px** et les libellés mobiles à **10 px** afin de rester lisibles sans agrandir inutilement la barre ;
+- l'onglet actif est annoncé par `aria-current` en plus de son état visuel or.
+
+Le contrat d'appui/reset de #178 reste distinct de cet ordre visuel et doit encore être finalisé :
 
 - Une activation d'un autre onglet change de destination sans reset.
 - Un appui sur l'onglet actif revient d'un seul niveau visible ; à la racine il n'efface rien.
@@ -119,7 +133,7 @@ conformément à `SEENIT-UPDATE-004`.
 
 ## 7. Preuves UX et ordre de réalisation
 
-1. #178 : contrat d'appui/reset et tests à horloge contrôlée.
+1. #178 : ordre et dimensions de la barre livrés ; contrat d'appui/reset et tests à horloge contrôlée encore ouverts.
 2. #179 : épisode précédent/suivant accessible avec TNR aux frontières des saisons.
 3. #180 : composants pilotes puis migration des cartes/boutons par écran.
 4. #181 : pile Retour, dialogues et en-têtes partagés.
