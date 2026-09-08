@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Application, RequestHandler } from 'express';
-import { extractPlexExternalIds } from '../features/plex/plexIdentity.ts';
+import { isStrictPlexIdentityMatch } from '../features/plex/plexIdentity.ts';
 
 export type PlexAvailabilityMediaType = 'movie' | 'tv';
 
@@ -33,6 +33,8 @@ interface FindOptions {
   servers: PlexServerResource[];
   accountToken: string;
   tmdbId: number;
+  imdbId?: string | null;
+  tvdbId?: number | null;
   mediaType: PlexAvailabilityMediaType;
   request?: typeof fetch;
   fastTimeoutMs?: number;
@@ -48,6 +50,12 @@ interface RegisterDependencies {
   now?: () => number;
 }
 
+interface StrongPlexIdentity {
+  tmdbId: number;
+  imdbId?: string | null;
+  tvdbId?: number | null;
+}
+
 const RESOURCE_CACHE_TTL_MS = 5 * 60_000;
 const RESOURCE_CACHE_MAX = 100;
 const resourceCache = new Map<string, { servers: PlexServerResource[]; timestamp: number }>();
@@ -60,13 +68,46 @@ function extractItems(data: any): any[] {
   return hubs.flatMap((hub: any) => Array.isArray(hub?.Metadata) ? hub.Metadata : []);
 }
 
-function isExactTmdbMatch(item: any, tmdbId: number, mediaType: PlexAvailabilityMediaType): boolean {
+function normalizeImdbId(value: unknown): string | null {
+  const imdbId = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return /^tt\d{5,12}$/.test(imdbId) ? imdbId : null;
+}
+
+function normalizeTvdbId(value: unknown): number | null {
+  const tvdbId = Number(value);
+  return Number.isInteger(tvdbId) && tvdbId > 0 ? tvdbId : null;
+}
+
+function buildStrongGuidCandidates(identity: StrongPlexIdentity): string[] {
+  const candidates = [
+    `tmdb://${identity.tmdbId}`,
+    `com.plexapp.agents.themoviedb://${identity.tmdbId}`
+  ];
+  const imdbId = normalizeImdbId(identity.imdbId);
+  if (imdbId) {
+    candidates.push(`imdb://${imdbId}`, `com.plexapp.agents.imdb://${imdbId}`);
+  }
+  const tvdbId = normalizeTvdbId(identity.tvdbId);
+  if (tvdbId) {
+    candidates.push(`tvdb://${tvdbId}`, `thetvdb://${tvdbId}`, `com.plexapp.agents.thetvdb://${tvdbId}`);
+  }
+  return [...new Set(candidates)];
+}
+
+function isExactIdentityMatch(
+  item: any,
+  identity: StrongPlexIdentity,
+  mediaType: PlexAvailabilityMediaType
+): boolean {
   if (!item) return false;
   const type = String(item.type || '').toLowerCase();
   if (['episode', 'season', 'track'].includes(type)) return false;
-  if (mediaType === 'movie' && type && type !== 'movie') return false;
-  if (mediaType === 'tv' && type && type !== 'show' && type !== 'series') return false;
-  return Number(extractPlexExternalIds(item).tmdbId) === tmdbId;
+  return isStrictPlexIdentityMatch(item, {
+    tmdbId: identity.tmdbId,
+    imdbId: normalizeImdbId(identity.imdbId),
+    tvdbId: normalizeTvdbId(identity.tvdbId),
+    mediaType
+  });
 }
 
 function formatResult(server: PlexServerResource, item: any): PlexAvailabilityResult | null {
@@ -129,11 +170,45 @@ async function fetchPlexJson(
   }
 }
 
+async function findFastExactMatch(options: {
+  server: PlexServerResource;
+  baseUri: string;
+  serverToken: string;
+  identity: StrongPlexIdentity;
+  mediaType: PlexAvailabilityMediaType;
+  request: typeof fetch;
+  outerSignal: AbortSignal;
+  fastTimeoutMs: number;
+}): Promise<PlexAvailabilityResult | null> {
+  const { server, baseUri, serverToken, identity, mediaType, request, outerSignal, fastTimeoutMs } = options;
+  const endpoints = new Set<string>();
+  for (const guid of buildStrongGuidCandidates(identity)) {
+    endpoints.add(`${baseUri}/library/all?guid=${encodeURIComponent(guid)}&includeGuids=1`);
+    endpoints.add(`${baseUri}/hubs/search?query=${encodeURIComponent(guid)}&limit=5&includeGuids=1`);
+  }
+
+  const attempts = [...endpoints].map(async endpoint => {
+    const payload = await fetchPlexJson(request, endpoint, serverToken, fastTimeoutMs, outerSignal);
+    for (const item of extractItems(payload)) {
+      if (!isExactIdentityMatch(item, identity, mediaType)) continue;
+      const result = formatResult(server, item);
+      if (result) return result;
+    }
+    throw new Error('PLEX_FAST_IDENTITY_MISS');
+  });
+
+  try {
+    return await Promise.any(attempts);
+  } catch {
+    return null;
+  }
+}
+
 async function queryConnection(options: {
   server: PlexServerResource;
   uri: string;
   serverToken: string;
-  tmdbId: number;
+  identity: StrongPlexIdentity;
   mediaType: PlexAvailabilityMediaType;
   request: typeof fetch;
   outerSignal: AbortSignal;
@@ -144,27 +219,22 @@ async function queryConnection(options: {
   maxInventoryPages: number;
 }): Promise<PlexAvailabilityResult | null> {
   const {
-    server, uri, serverToken, tmdbId, mediaType, request, outerSignal,
+    server, uri, serverToken, identity, mediaType, request, outerSignal,
     fastTimeoutMs, inventoryTimeoutMs, inventoryBudgetMs, inventoryPageSize, maxInventoryPages
   } = options;
   const baseUri = uri.replace(/\/+$/, '');
-  const exactGuid = `tmdb://${tmdbId}`;
-  const fastEndpoints = [
-    `${baseUri}/library/all?guid=${encodeURIComponent(exactGuid)}&includeGuids=1`,
-    `${baseUri}/hubs/search?query=${encodeURIComponent(exactGuid)}&limit=5&includeGuids=1`,
-    `${baseUri}/library/all?guid=${encodeURIComponent(`com.plexapp.agents.themoviedb://${tmdbId}`)}&includeGuids=1`
-  ];
 
-  const fastPayloads = await Promise.all(fastEndpoints.map(endpoint =>
-    fetchPlexJson(request, endpoint, serverToken, fastTimeoutMs, outerSignal)
-  ));
-  for (const payload of fastPayloads) {
-    for (const item of extractItems(payload)) {
-      if (!isExactTmdbMatch(item, tmdbId, mediaType)) continue;
-      const result = formatResult(server, item);
-      if (result) return result;
-    }
-  }
+  const fastResult = await findFastExactMatch({
+    server,
+    baseUri,
+    serverToken,
+    identity,
+    mediaType,
+    request,
+    outerSignal,
+    fastTimeoutMs
+  });
+  if (fastResult) return fastResult;
 
   if (outerSignal.aborted) return null;
   const deadline = Date.now() + inventoryBudgetMs;
@@ -197,7 +267,7 @@ async function queryConnection(options: {
       if (!payload) break;
       const items = extractItems(payload);
       for (const item of items) {
-        if (!isExactTmdbMatch(item, tmdbId, mediaType)) continue;
+        if (!isExactIdentityMatch(item, identity, mediaType)) continue;
         const result = formatResult(server, item);
         if (result) return result;
       }
@@ -217,25 +287,48 @@ async function queryServer(
 ): Promise<PlexAvailabilityResult | null> {
   const request = options.request || fetch;
   const serverToken = server.accessToken || options.accountToken;
-  for (const connection of rankConnections(server.connections || [])) {
-    if (outerSignal.aborted) return null;
-    const result = await queryConnection({
+  const connections = rankConnections(server.connections || []);
+  if (connections.length === 0 || outerSignal.aborted) return null;
+
+  // Les URL distantes/relay d'un même PMS sont des chemins alternatifs vers la même
+  // bibliothèque. Les essayer en parallèle évite qu'une URL lente consomme tout le
+  // budget avant d'atteindre la connexion fonctionnelle suivante.
+  const connectionController = new AbortController();
+  const abort = () => connectionController.abort();
+  outerSignal.addEventListener('abort', abort, { once: true });
+  const identity: StrongPlexIdentity = {
+    tmdbId: options.tmdbId,
+    imdbId: normalizeImdbId(options.imdbId),
+    tvdbId: normalizeTvdbId(options.tvdbId)
+  };
+
+  try {
+    const attempts = connections.map(connection => queryConnection({
       server,
       uri: String(connection.uri),
       serverToken,
-      tmdbId: options.tmdbId,
+      identity,
       mediaType: options.mediaType,
       request,
-      outerSignal,
+      outerSignal: connectionController.signal,
       fastTimeoutMs: options.fastTimeoutMs ?? 1000,
-      inventoryTimeoutMs: options.inventoryTimeoutMs ?? 1100,
-      inventoryBudgetMs: options.inventoryBudgetMs ?? 4700,
+      inventoryTimeoutMs: options.inventoryTimeoutMs ?? 3500,
+      inventoryBudgetMs: options.inventoryBudgetMs ?? 6000,
       inventoryPageSize: options.inventoryPageSize ?? 1000,
       maxInventoryPages: options.maxInventoryPages ?? 8
-    });
-    if (result) return result;
+    }).then(result => {
+      if (!result) throw new Error('PLEX_CONNECTION_MISS');
+      return result;
+    }));
+    const found = await Promise.any(attempts);
+    connectionController.abort();
+    return found;
+  } catch {
+    return null;
+  } finally {
+    connectionController.abort();
+    outerSignal.removeEventListener('abort', abort);
   }
-  return null;
 }
 
 export async function findPlexAvailabilityOnServers(options: FindOptions): Promise<PlexAvailabilityResult | null> {
@@ -310,6 +403,8 @@ export function registerPlexAvailabilityRoute(app: Application, dependencies: Re
     res.setHeader('Cache-Control', 'no-store');
     const token = typeof req.headers['x-plex-token'] === 'string' ? req.headers['x-plex-token'].trim() : '';
     const tmdbId = Number(req.body?.tmdbId);
+    const imdbId = normalizeImdbId(req.body?.imdbId);
+    const tvdbId = normalizeTvdbId(req.body?.tvdbId);
     const mediaType: PlexAvailabilityMediaType = req.body?.mediaType === 'tv' ? 'tv' : 'movie';
     const clientId = typeof req.body?.clientId === 'string' && req.body.clientId.trim()
       ? req.body.clientId.trim()
@@ -331,12 +426,14 @@ export function registerPlexAvailabilityRoute(app: Application, dependencies: Re
       servers,
       accountToken: token,
       tmdbId,
+      imdbId,
+      tvdbId,
       mediaType,
       request
     });
 
     if (found) {
-      console.log(`[Plex Availability] TMDB exact ${mediaType}:${tmdbId} trouvé sur « ${found.serverName} »`);
+      console.log(`[Plex Availability] Identité exacte ${mediaType}:${tmdbId} trouvée sur « ${found.serverName} »`);
       return res.json(found);
     }
     return res.json({ available: false });
