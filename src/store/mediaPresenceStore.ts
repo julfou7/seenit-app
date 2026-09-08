@@ -33,6 +33,7 @@ interface MediaPresenceStore {
     year?: number | string;
     mediaType: 'movie' | 'tv';
     forceRefresh?: boolean;
+    refreshPlexServers?: boolean;
   }) => Promise<MediaPresenceData>;
 }
 
@@ -65,7 +66,8 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
       originalTitle,
       year,
       mediaType,
-      forceRefresh = false
+      forceRefresh = false,
+      refreshPlexServers = false
     } = params;
 
     const config = useDownloadConfigStore.getState();
@@ -120,6 +122,7 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
       year,
       mediaType,
       forceRefresh,
+      refreshServers: refreshPlexServers,
       networkMode: 'active'
     }).catch(() => ({ available: false, lastChecked: now } as PlexMediaInfo));
 
