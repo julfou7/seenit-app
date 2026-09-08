@@ -160,7 +160,7 @@ test('SEENIT-SECURITY-001 borne le cache et le quota fournisseur par UID sans co
 });
 
 test('SEENIT-SECURITY-001 borne aussi le trafic authentifié même lorsque le cache répond', async t => {
-  const { send, calls } = await harness(t);
+  const { send, calls } = await harness(t, { now: () => 0 });
   assert.equal((await send('omdb?i=tt1234567', 'request-user')).status, 200);
   for (let i = 1; i < 360; i++) {
     assert.equal((await send('omdb?i=tt1234567', 'request-user')).status, 200);
