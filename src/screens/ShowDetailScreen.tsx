@@ -186,8 +186,11 @@ function ProviderAvailabilityControls({
     if (!tmdbId || isRefreshing) return;
     setIsRefreshing(true);
     try {
+      const details = tmdb.peekMediaDetails(tmdbId, mediaType);
       await useMediaPresenceStore.getState().checkPresence({
         tmdbId,
+        tvdbId: details?.external_ids?.tvdb_id,
+        imdbId: details?.external_ids?.imdb_id || details?.imdb_id,
         mediaType,
         forceRefresh: true,
         refreshPlexServers: true,
