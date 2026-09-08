@@ -8,6 +8,7 @@ import {
 
 const tmdbClientSource = readFileSync(new URL('../src/features/shows/tmdbClient.ts', import.meta.url), 'utf8');
 const detailSource = readFileSync(new URL('../src/screens/ShowDetailScreenCore.tsx', import.meta.url), 'utf8');
+const detailWrapperSource = readFileSync(new URL('../src/screens/ShowDetailScreen.tsx', import.meta.url), 'utf8');
 
 test('SEENIT-PERF-001 réutilise les détails et relations sans nouveau chargement', () => {
   const startedAt = performance.now();
@@ -40,4 +41,22 @@ test('SEENIT-PERF-001 réserve les skeletons au chargement réellement froid', (
   assert.match(detailSource, /peekUniverseAndCollection/);
   assert.match(detailSource, /setCollectionLoading\(!cachedRelations\)/);
   assert.match(detailSource, /loading="eager" decoding="async"[\s\S]{0,120}fetchPriority="high"/);
+});
+
+test('SEENIT-PERF-001 regroupe le chargement froid avant de monter la fiche complète', () => {
+  assert.match(detailWrapperSource, /DETAIL_WARMUP_GRACE_MS = 300/);
+  assert.match(detailWrapperSource, /tmdb\.peekMediaDetails\(tmdbId, mediaType\)/,
+    'un cache détail chaud doit court-circuiter le gate');
+  assert.match(detailWrapperSource, /const providersPromise = tmdb\.getWatchProviders\(tmdbId, mediaType\)/,
+    'les plateformes doivent partir en parallèle du détail principal');
+  assert.match(detailWrapperSource, /await tmdb\.getMediaDetails\(tmdbId, mediaType\)/,
+    'le détail principal doit être chaud avant de monter la fiche complète');
+  assert.match(detailWrapperSource, /getSeriesImdbData\(imdbId\)/,
+    'IMDb doit être préchauffé pendant la courte fenêtre secondaire');
+  assert.match(detailWrapperSource, /Promise\.race\(/,
+    'les enrichissements secondaires ne doivent jamais bloquer la fiche sans borne');
+  assert.match(detailWrapperSource, /data-seenit-detail-warmup="cold"/,
+    'le chargement froid doit utiliser un shell unique et stable');
+  assert.match(detailWrapperSource, /overflow-anchor: none/,
+    'les placeholders ne doivent pas devenir des ancres de scroll pendant leur remplacement');
 });
