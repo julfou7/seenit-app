@@ -84,6 +84,7 @@ const availabilityNetworkLimiter = createAsyncRequestLimiter(PLEX_AVAILABILITY_M
 
 export async function checkPlexAvailability(params: {
   tmdbId?: number | string | null;
+  tvdbId?: number | string | null;
   imdbId?: string | null;
   title?: string;
   originalTitle?: string;
@@ -112,6 +113,7 @@ export async function checkPlexAvailability(params: {
 
 async function performPlexAvailabilityCheck(params: {
   tmdbId?: number | string | null;
+  tvdbId?: number | string | null;
   imdbId?: string | null;
   title?: string;
   originalTitle?: string;
@@ -123,6 +125,8 @@ async function performPlexAvailabilityCheck(params: {
 }, uid: string): Promise<PlexMediaInfo> {
   const {
     tmdbId,
+    tvdbId,
+    imdbId,
     mediaType = 'movie',
     forceRefresh = false,
     refreshServers = false,
@@ -170,9 +174,18 @@ async function performPlexAvailabilityCheck(params: {
     try {
       let data: any = null;
       let status = 0;
+      const normalizedImdbId = typeof imdbId === 'string' && /^tt\d{5,12}$/i.test(imdbId.trim())
+        ? imdbId.trim().toLowerCase()
+        : undefined;
+      const parsedTvdbId = Number(tvdbId);
+      const normalizedTvdbId = Number.isInteger(parsedTvdbId) && parsedTvdbId > 0
+        ? parsedTvdbId
+        : undefined;
       const payload = {
         clientId,
         tmdbId: Number(tmdbId),
+        ...(normalizedImdbId ? { imdbId: normalizedImdbId } : {}),
+        ...(normalizedTvdbId ? { tvdbId: normalizedTvdbId } : {}),
         mediaType,
         refreshServers
       };
