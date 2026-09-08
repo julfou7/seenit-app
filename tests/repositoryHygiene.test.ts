@@ -35,8 +35,8 @@ test('SEENIT-QUALITY-001 retire uniquement la pile Drizzle PostgreSQL sans usage
 });
 
 test('SEENIT-NOTIFICATION-001 documente les webhooks personnels sans secret global', () => {
-  assert.match(envExample, /PUBLIC_APP_URL=/);
   assert.match(envExample, /x-seenit-webhook-secret/);
+  assert.doesNotMatch(envExample, /^PUBLIC_APP_URL=/m);
   assert.doesNotMatch(envExample, /^WEBHOOK_SECRET=/m);
   assert.doesNotMatch(envExample, /^APP_URL=/m);
   assert.doesNotMatch(envExample, /^GEMINI_API_KEY=/m);
