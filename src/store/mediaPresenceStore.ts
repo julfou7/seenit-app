@@ -119,7 +119,8 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
       originalTitle,
       year,
       mediaType,
-      forceRefresh
+      forceRefresh,
+      networkMode: 'active'
     }).catch(() => ({ available: false, lastChecked: now } as PlexMediaInfo));
 
     let radarrHasFile = false;
