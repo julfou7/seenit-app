@@ -367,6 +367,12 @@ La machine d'états exhaustive et le mapping Plex sont autoritatifs dans `seenit
 - Un non-vu Plex ne retire qu'une progression portant encore `plexImported=true`; une action SeenIt
   ou legacy sans provenance prouvée gagne.
 - Le cache de disponibilité est reconstruit atomiquement et isolé par UID.
+- Les cartes et grilles réutilisent ce cache de disponibilité ; leur simple entrée dans le viewport
+  ne déclenche pas un inventaire Plex réseau par média.
+- Un contrôle actif de présence, notamment depuis une fiche, peut rafraîchir la disponibilité via le
+  backend. Ces vérifications sont bornées à deux appels réseau simultanés et à un budget de 20 secondes.
+- Un timeout, une panne réseau, un `401` ou un `5xx` conserve l’état connu et ne devient jamais une
+  absence Plex. Seul un `2xx` explicite contenant `available:false` peut alimenter le cache négatif.
 
 Le retrait de Watchlist vers « non suivi » reste volontairement ouvert dans #68 ; aucune absence
 ambiguë ne doit être interprétée en attendant.

@@ -1,6 +1,6 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
-Dernière mise à jour : 6 septembre 2026
+Dernière mise à jour : 8 septembre 2026
 Version applicative : **1.4.123**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
@@ -441,7 +441,12 @@ pour le cache des sagas et univers.
   effectivement scannés ainsi que le nombre de vus et de non vus appliqués, sans exposer URL ou jeton.
   Une panne DNS entre l'APK et le backend SeenIt n'est pas confondue avec un serveur Plex hors ligne :
   la synchro rapide, la synchro complète et la disponibilité essaient les origines SeenIt approuvées
-  selon `SEENIT-PLATFORM-001`, en conservant strictement la même requête authentifiée.
+  selon `SEENIT-PLATFORM-001`, en conservant strictement la même requête authentifiée. Les affichages
+  passifs, notamment les cartes et grilles, consomment le cache de disponibilité et ne déclenchent pas
+  d'inventaire réseau par média. Un contrôle actif peut contacter le backend avec un budget borné de
+  20 secondes et au plus deux vérifications Availability réseau simultanées. Un timeout, une panne
+  réseau, un `401` ou un `5xx` conserve l'état connu et ne devient jamais `available:false` ; seul un
+  `2xx` explicite contenant `available:false` autorise l'alimentation du cache négatif.
 - **SEENIT-PLEX-003** — Le curseur n'est validé qu'après collecte suffisamment complète,
   résolution sans échec transitoire et écritures Firestore réussies.
 - **SEENIT-PLEX-004** — Jeton Plex, curseur et caches de résolution/disponibilité sont cloisonnés
