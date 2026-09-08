@@ -90,7 +90,7 @@ GitHub est canonique. AI Studio est un mécanisme de transport : une modificatio
 ## 1. Langue et commits
 
 - Réponses, commits, changelog et release notes : **français**.
-- Commits : Conventional Commits (`fix:`, `feat:`, `perf:`, `ci:`, `docs:`…), avec un corps court en puces lorsque plusieurs changements sont inclus.
+- Commits : Conventional Commits (`fix:`, `feat:`, `perf:`, `style:`, `chore:`, `refactor:`, `docs:`, `build:`, `ci:`, `test:`…), avec un corps court en puces lorsque plusieurs changements sont inclus.
 - Lorsqu'un commit apporte un changement visible, son corps contient une section `Changelog:` avec **une à deux phrases destinées à l'utilisateur**, puis, si nécessaire, une section séparée `Détails techniques:`. Un commit sans effet visible porte `Changelog: aucun`. Le générateur ne doit jamais confondre ces détails internes avec les notes publiques.
 - Le changelog public conserve exactement le titre `### 🛠️ Ce qui a été fait` et vise **deux à cinq puces courtes** pour l'ensemble d'une version. Chaque puce commence par une majuscule, se termine par une ponctuation et décrit un résultat concret avec les mots de l'interface. Regroupez les changements liés au lieu d'énumérer leur implémentation. Sauf nécessité pour comprendre l'usage, n'y exposez ni nom de fichier, fonction, variable, `ratingKey`, UID, cache/baseline, test, CI, commit, PR ou issue.
 - Évitez les formulations vagues (« améliorations générales », « diverses corrections ») lorsqu'un bénéfice précis peut être nommé. Les preuves techniques restent dans le commit, la PR ou l'issue.
@@ -230,6 +230,7 @@ Après chaque modification, conclure exactement avec :
 
 ### 🛠️ Ce qui a été fait
 - Résumé des changements et validations.
+- Ajouter dans cette section un sous-bloc **Difficultés rencontrées / amélioration continue** : y consigner uniquement les blocages, détours, limites d'outillage, échecs de CI/TNR ou hypothèses invalidées réellement rencontrés pendant le chantier, avec l'enseignement concret ou l'amélioration durable associée. Ne jamais inventer de difficulté ; écrire « Aucune difficulté notable » lorsqu'il n'y en a pas.
 
 ### 📌 Impact & Mode de déploiement
 - Classe `light`, `backend` ou `apk`, et préciser si l'APK attend la prochaine release groupée.

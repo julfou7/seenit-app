@@ -123,7 +123,7 @@ Lors d’une reprise dans un nouveau chat, ce checkpoint est la première preuve
 
 ## Retour après déclenchement
 
-Une demande « publie l’APK » seule autorise l’agent à laisser GitHub Actions terminer après identification du run exact. Si l’utilisateur demande explicitement d’attendre le résultat, le suivi reste ciblé sur ce run jusqu’à l’APK signée, au smoke et à la publication.
+Une demande « publie l’APK » seule autorise l’agent à laisser GitHub Actions terminer après identification du run exact : il **rend la main par défaut** une fois le run précis identifié et tracé. Si l’utilisateur demande explicitement d’attendre le résultat — notamment avec une formulation comme « publie et attends le résultat » — le suivi reste ciblé sur ce run jusqu’à l’APK signée, au smoke et à la publication.
 
 Lorsqu’une candidate doit d’abord être préparée, l’agent utilise `/prepare-release-apk`, attend uniquement la CI de la PR créée/réutilisée, fusionne si elle est verte, puis enchaîne `/release-apk`. Il ne relit pas l’historique fonctionnel complet entre ces étapes.
 
