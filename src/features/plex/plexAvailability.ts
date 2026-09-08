@@ -90,6 +90,7 @@ export async function checkPlexAvailability(params: {
   year?: number | string;
   mediaType?: 'movie' | 'tv';
   forceRefresh?: boolean;
+  refreshServers?: boolean;
   networkMode?: PlexAvailabilityNetworkMode;
 }): Promise<PlexMediaInfo> {
   const uid = auth.currentUser?.uid;
@@ -98,7 +99,7 @@ export async function checkPlexAvailability(params: {
   }
 
   const requestKey = getPlexMediaKey(params.tmdbId, params.mediaType || 'movie', uid);
-  const activeKey = `${requestKey}:${params.forceRefresh ? 'force' : 'cached'}:${params.networkMode || 'cache-only'}`;
+  const activeKey = `${requestKey}:${params.forceRefresh ? 'force' : 'cached'}:${params.refreshServers ? 'servers-fresh' : 'servers-cached'}:${params.networkMode || 'cache-only'}`;
   const active = activeAvailabilityChecks.get(activeKey);
   if (active) return active;
 
@@ -117,12 +118,14 @@ async function performPlexAvailabilityCheck(params: {
   year?: number | string;
   mediaType?: 'movie' | 'tv';
   forceRefresh?: boolean;
+  refreshServers?: boolean;
   networkMode?: PlexAvailabilityNetworkMode;
 }, uid: string): Promise<PlexMediaInfo> {
   const {
     tmdbId,
     mediaType = 'movie',
     forceRefresh = false,
+    refreshServers = false,
     networkMode = 'cache-only'
   } = params;
 
@@ -170,7 +173,8 @@ async function performPlexAvailabilityCheck(params: {
       const payload = {
         clientId,
         tmdbId: Number(tmdbId),
-        mediaType
+        mediaType,
+        refreshServers
       };
 
       if (isNative) {
