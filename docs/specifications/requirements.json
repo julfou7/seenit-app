@@ -382,7 +382,7 @@
     },
     {
       "id": "SEENIT-PLEX-002",
-      "title": "Serveur Plex hors ligne non bloquant et bilan centré sur les serveurs scannés",
+      "title": "Serveur Plex hors ligne non bloquant et disponibilité bornée sans faux négatif",
       "targets": [
         "backend",
         "pwa",
@@ -400,6 +400,22 @@
         {
           "file": "tests/toastQueueScope.test.ts",
           "contains": "SEENIT-UX-004 le bilan Plex conserve uniquement les serveurs scannés et compte les vus et non vus"
+        },
+        {
+          "file": "tests/plexAvailabilityRequestPolicy.test.ts",
+          "contains": "SEENIT-PLEX-002 borne les requêtes Availability à deux exécutions simultanées"
+        },
+        {
+          "file": "tests/plexAvailabilityRequestPolicy.test.ts",
+          "contains": "SEENIT-PLEX-002 réserve le réseau aux vérifications explicitement actives"
+        },
+        {
+          "file": "tests/plexAvailabilityRequestPolicy.test.ts",
+          "contains": "SEENIT-PLEX-002 ne considère comme négatif confirmé qu’un contrat 2xx explicite"
+        },
+        {
+          "file": "tests/plexAvailabilityRequestPolicy.test.ts",
+          "contains": "SEENIT-PLEX-002 laisse au fallback partagé le budget nécessaire et verrouille les consommateurs"
         }
       ]
     },
