@@ -14,6 +14,9 @@ import { buildFinalReleaseSummary } from '../scripts/notify-release-update.cjs';
 
 const workflow = readFileSync(new URL('../.github/workflows/release-control.yml', import.meta.url), 'utf8');
 const notificationWorkflow = readFileSync(new URL('../.github/workflows/release-update-push.yml', import.meta.url), 'utf8');
+const agents = readFileSync(new URL('../AGENTS.md', import.meta.url), 'utf8');
+const bootstrapAgents = readFileSync(new URL('../.agents/AGENTS.md', import.meta.url), 'utf8');
+const releaseControlSpec = readFileSync(new URL('../docs/specifications/release-control.md', import.meta.url), 'utf8');
 
 function event(body = PREPARE_COMMAND) {
   return {
@@ -85,6 +88,16 @@ test('workflow de contrôle sépare les permissions préparation et publication'
   assert.match(workflow, /prepare_candidate:[\s\S]*?contents: write[\s\S]*?pull-requests: write/);
   assert.match(workflow, /release_control:[\s\S]*?actions: write[\s\S]*?contents: read/);
   assert.doesNotMatch(workflow.match(/release_control:[\s\S]*$/)?.[0] || '', /pull-requests: write/);
+});
+
+test('les consignes interdisent le fallback manuel tant que #102 sait préparer la candidate', () => {
+  for (const source of [agents, bootstrapAgents, releaseControlSpec]) {
+    assert.match(source, /\/prepare-release-apk/);
+  }
+  assert.match(agents, /ne justifie plus la reproduction manuelle des huit fichiers/);
+  assert.match(bootstrapAgents, /n'est jamais un motif pour reproduire manuellement les huit fichiers/);
+  assert.match(releaseControlSpec, /n’est pas un blocage/);
+  assert.match(releaseControlSpec, /seenit-release-summary:<runId>/);
 });
 
 test('notification post-release peut écrire le checkpoint final sur #102', () => {
