@@ -132,19 +132,44 @@ test('SEENIT-SECURITY-001 cache et déduplique sans contourner auth, TTL ou rota
   assert.equal((await send('tmdb/movie/42?language=fr')).status, 503);
 });
 
-test('SEENIT-SECURITY-001 borne le cache et les quotas par UID', async t => {
+test('SEENIT-SECURITY-001 borne le cache et le quota fournisseur par UID sans compter les hits', async t => {
   let time = 0;
   const { send, calls } = await harness(t, { now: () => time });
+
   for (let id = 1; id <= 201; id++) assert.equal((await send('tmdb/movie/' + id)).status, 200);
   await send('tmdb/movie/1');
   assert.equal(calls.length, 202, 'la plus ancienne entrée doit être évincée');
-  for (let i = 0; i < 90; i++) assert.equal((await send('omdb?i=tt1234567')).status, 200);
-  const limited = await send('omdb?i=tt1234567');
+
+  assert.equal((await send('omdb?i=tt1234567')).status, 200);
+  const callsAfterFirstOmdb = calls.length;
+  for (let i = 0; i < 300; i++) assert.equal((await send('omdb?i=tt1234567')).status, 200);
+  assert.equal(calls.length, callsAfterFirstOmdb, 'un hit cache ne doit pas consommer un nouvel appel fournisseur');
+
+  for (let i = 0; i < 90; i++) {
+    assert.equal((await send(`omdb?i=tt${2000000 + i}`, 'quota-user')).status, 200);
+  }
+  const beforeLimit = calls.length;
+  const limited = await send('omdb?i=tt2999999', 'quota-user');
   assert.equal(limited.status, 429);
   assert.equal(limited.headers.get('retry-after'), '60');
-  assert.equal((await send('omdb?i=tt1234567', 'b')).status, 200);
+  assert.equal(calls.length, beforeLimit, 'le quota doit bloquer avant un nouvel appel fournisseur');
+  assert.equal((await send('omdb?i=tt2999999', 'other-user')).status, 200);
+
   time = 60_001;
-  assert.equal((await send('omdb?i=tt1234567')).status, 200);
+  assert.equal((await send('omdb?i=tt3000000', 'quota-user')).status, 200);
+});
+
+test('SEENIT-SECURITY-001 borne aussi le trafic authentifié même lorsque le cache répond', async t => {
+  const { send, calls } = await harness(t);
+  assert.equal((await send('omdb?i=tt1234567', 'request-user')).status, 200);
+  for (let i = 1; i < 360; i++) {
+    assert.equal((await send('omdb?i=tt1234567', 'request-user')).status, 200);
+  }
+  assert.equal(calls.length, 1, 'les 360 requêtes utilisent une seule réponse fournisseur mise en cache');
+  const limited = await send('omdb?i=tt1234567', 'request-user');
+  assert.equal(limited.status, 429);
+  assert.equal(limited.headers.get('retry-after'), '60');
+  assert.equal(calls.length, 1);
 });
 
 test('SEENIT-SECURITY-001 masque les erreurs fournisseur et refuse les réponses non sûres', async t => {
