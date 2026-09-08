@@ -22,6 +22,7 @@ import { getParentalRatingOverride } from '../../store/parentalRatingStore';
 import { convergeTrackedMediaTitleFromTmdb } from './trackedMediaTitle';
 import { mediaKeyFrom } from './mediaRelations';
 import { getTVDBFranchiseRelation } from '../../services/tvdb';
+import { readWatchProviderCache, writeWatchProviderCache } from '../providers/watchProviderCache';
 
 export * from './tmdbClient';
 
@@ -81,6 +82,35 @@ tmdbClient.getMovieDetails = (async (id: number) => {
   }
   return result;
 }) as typeof tmdbClient.getMovieDetails;
+
+// Les diffuseurs FR sont des métadonnées publiques. Leur cache mémoire historique
+// reste prioritaire, mais une copie bornée et persistante évite de refaire le même
+// appel TMDB après chaque redémarrage de la PWA/WebView. Une valeur périmée reste
+// utilisable uniquement comme stale-if-error ; elle ne masque jamais un succès neuf.
+const originalPeekWatchProviders = tmdbClient.peekWatchProviders.bind(tmdbClient);
+const originalGetWatchProviders = tmdbClient.getWatchProviders.bind(tmdbClient);
+
+tmdbClient.peekWatchProviders = ((id: number, type: 'tv' | 'movie' = 'tv') => {
+  const memory = originalPeekWatchProviders(id, type);
+  if (memory) return memory;
+  return readWatchProviderCache(Number(id), type)?.data || null;
+}) as typeof tmdbClient.peekWatchProviders;
+
+tmdbClient.getWatchProviders = (async (id: number, type: 'tv' | 'movie' = 'tv') => {
+  const memory = originalPeekWatchProviders(id, type);
+  if (memory) return ok(memory);
+
+  const freshPersistent = readWatchProviderCache(Number(id), type);
+  if (freshPersistent) return ok(freshPersistent.data);
+
+  const stalePersistent = readWatchProviderCache(Number(id), type, { allowStale: true });
+  const result = await originalGetWatchProviders(id, type);
+  if (result.ok) {
+    writeWatchProviderCache(Number(id), type, result.value);
+    return result;
+  }
+  return stalePersistent ? ok(stalePersistent.data) : result;
+}) as typeof tmdbClient.getWatchProviders;
 
 const mediaRelationRuntimeCache = new Map<string, { collection: any[]; universe: any[] }>();
 const MAX_MEDIA_RELATION_CACHE = 120;

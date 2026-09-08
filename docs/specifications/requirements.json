@@ -416,6 +416,18 @@
         {
           "file": "tests/plexAvailabilityRequestPolicy.test.ts",
           "contains": "SEENIT-PLEX-002 laisse au fallback partagé le budget nécessaire et verrouille les consommateurs"
+        },
+        {
+          "file": "tests/plexAvailabilityBackend.test.ts",
+          "contains": "SEENIT-PLEX-002 accélère la disponibilité par un identifiant IMDb exact sans inventaire"
+        },
+        {
+          "file": "tests/plexAvailabilityBackend.test.ts",
+          "contains": "SEENIT-PLEX-002 une connexion lente ne bloque plus une connexion PMS exacte disponible"
+        },
+        {
+          "file": "tests/plexAvailabilityBackend.test.ts",
+          "contains": "SEENIT-PLEX-002 force la redécouverte des serveurs sans affaiblir le cache normal"
         }
       ]
     },

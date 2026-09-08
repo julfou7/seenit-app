@@ -1,7 +1,7 @@
 # SeenIt — Référence fonctionnelle canonique
 
 Dernière vérification : 8 septembre 2026
-Baseline observée avant correction : **1.4.122**, `main` `24dc43437e7fb9cef23148d3d2ca21fb618901ff`
+Baseline observée avant correction : **1.4.124**, `main` `a25621dde1ae3301f83dbec6a3aac77b48fa0810`
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : composante obligatoire de la SPEC SeenIt
 
@@ -260,6 +260,13 @@ Les actions de téléchargement n'existent dans la fiche que lorsque la fonction
 activée pour le compte courant. Un favori active les notifications du média sans créer de progression.
 Une note/favorite/archive est une intention distincte du statut de visionnage.
 
+La section **« Où regarder »** est un repère stable : son titre reste toujours affiché et n'est jamais
+remplacé par un skeleton. Tant que Plex et/ou les diffuseurs TMDB sont en résolution, la fiche utilise le
+libellé unique **« Recherche Plex & streaming… »**. Les diffuseurs résolus sont conservés dans un cache
+borné (120 médias, 6 h frais, réutilisable jusqu'à 7 jours en cas d'indisponibilité du fournisseur).
+Une action **« Actualiser Plex »** force la redécouverte des serveurs Plex puis revérifie le média courant,
+sans effacer le dernier inventaire de serveurs utilisable si la redécouverte échoue.
+
 Quand Téléchargements est désactivé, la fiche Film/Série ne montre aucune mention de cette fonction :
 le bouton bleu principal/annexe, le fallback « Où regarder », le mode « Téléchargement 1-Clic », les
 boutons saison/épisode, les statuts de transfert et surtout l'action **« Téléchargement » du menu « … »
@@ -371,6 +378,11 @@ La machine d'états exhaustive et le mapping Plex sont autoritatifs dans `seenit
   ne déclenche pas un inventaire Plex réseau par média.
 - Un contrôle actif de présence, notamment depuis une fiche, peut rafraîchir la disponibilité via le
   backend. Ces vérifications sont bornées à deux appels réseau simultanés et à un budget de 20 secondes.
+- Pour réduire le temps de réponse, le backend essaie d'abord les identifiants techniques exacts déjà
+  connus (`TMDB`, puis ponts `IMDb`/`TVDB` vérifiés) et rend le premier match exact sans attendre les
+  autres recherches rapides. Les connexions alternatives d'un même serveur PMS sont essayées en parallèle
+  et arrêtées au premier match exact. L'inventaire paginé `includeGuids=1` reste uniquement le fallback
+  borné lorsque Plex n'indexe pas ces GUIDs ; aucun titre ou année n'est ajouté comme raccourci.
 - Un timeout, une panne réseau, un `401` ou un `5xx` conserve l’état connu et ne devient jamais une
   absence Plex. Seul un `2xx` explicite contenant `available:false` peut alimenter le cache négatif.
 

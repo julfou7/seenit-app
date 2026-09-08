@@ -84,12 +84,14 @@ const availabilityNetworkLimiter = createAsyncRequestLimiter(PLEX_AVAILABILITY_M
 
 export async function checkPlexAvailability(params: {
   tmdbId?: number | string | null;
+  tvdbId?: number | string | null;
   imdbId?: string | null;
   title?: string;
   originalTitle?: string;
   year?: number | string;
   mediaType?: 'movie' | 'tv';
   forceRefresh?: boolean;
+  refreshServers?: boolean;
   networkMode?: PlexAvailabilityNetworkMode;
 }): Promise<PlexMediaInfo> {
   const uid = auth.currentUser?.uid;
@@ -98,7 +100,7 @@ export async function checkPlexAvailability(params: {
   }
 
   const requestKey = getPlexMediaKey(params.tmdbId, params.mediaType || 'movie', uid);
-  const activeKey = `${requestKey}:${params.forceRefresh ? 'force' : 'cached'}:${params.networkMode || 'cache-only'}`;
+  const activeKey = `${requestKey}:${params.forceRefresh ? 'force' : 'cached'}:${params.refreshServers ? 'servers-fresh' : 'servers-cached'}:${params.networkMode || 'cache-only'}`;
   const active = activeAvailabilityChecks.get(activeKey);
   if (active) return active;
 
@@ -111,18 +113,23 @@ export async function checkPlexAvailability(params: {
 
 async function performPlexAvailabilityCheck(params: {
   tmdbId?: number | string | null;
+  tvdbId?: number | string | null;
   imdbId?: string | null;
   title?: string;
   originalTitle?: string;
   year?: number | string;
   mediaType?: 'movie' | 'tv';
   forceRefresh?: boolean;
+  refreshServers?: boolean;
   networkMode?: PlexAvailabilityNetworkMode;
 }, uid: string): Promise<PlexMediaInfo> {
   const {
     tmdbId,
+    tvdbId,
+    imdbId,
     mediaType = 'movie',
     forceRefresh = false,
+    refreshServers = false,
     networkMode = 'cache-only'
   } = params;
 
@@ -167,10 +174,20 @@ async function performPlexAvailabilityCheck(params: {
     try {
       let data: any = null;
       let status = 0;
+      const normalizedImdbId = typeof imdbId === 'string' && /^tt\d{5,12}$/i.test(imdbId.trim())
+        ? imdbId.trim().toLowerCase()
+        : undefined;
+      const parsedTvdbId = Number(tvdbId);
+      const normalizedTvdbId = Number.isInteger(parsedTvdbId) && parsedTvdbId > 0
+        ? parsedTvdbId
+        : undefined;
       const payload = {
         clientId,
         tmdbId: Number(tmdbId),
-        mediaType
+        ...(normalizedImdbId ? { imdbId: normalizedImdbId } : {}),
+        ...(normalizedTvdbId ? { tvdbId: normalizedTvdbId } : {}),
+        mediaType,
+        refreshServers
       };
 
       if (isNative) {

@@ -1,10 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { RefreshCw } from 'lucide-react';
 import { ShowDetailScreen as ShowDetailScreenCore } from './ShowDetailScreenCore';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { isDownloadFeatureEnabled } from '../features/downloads/downloadFeatureVisibility';
 import { tmdb } from '../features/shows/tmdb';
 import { getSeriesImdbData } from '../features/shows/omdbService';
 import { useShowsStore } from '../store/showsStore';
+import { useMediaPresenceStore } from '../store/mediaPresenceStore';
 
 interface ShowDetailScreenProps {
   key?: string;
@@ -18,6 +21,7 @@ interface ShowDetailScreenProps {
 }
 
 const DETAIL_WARMUP_GRACE_MS = 300;
+const PROVIDER_LOADING_LABEL = 'Recherche Plex & streaming…';
 
 const HIDDEN_DOWNLOAD_SURFACE_CSS = `
 [data-seenit-download-surface="hidden"] button:has(svg.lucide-download),
@@ -32,15 +36,15 @@ const STABLE_DETAIL_LOADING_CSS = `
   overflow-anchor: none;
 }
 
-/* Le titre relationnel exact n'est connu qu'après résolution TVDB. Le libellé
-   transitoire historique reste donc visuellement neutre au lieu de se transformer
-   de « Relations » vers « Dans la même franchise / univers ». */
-[data-seenit-detail-shell="stable"] h3:has(+ .flex > .animate-pulse) {
+/* Le titre relationnel exact n'est connu qu'après résolution TVDB. Le sélecteur
+   reste volontairement limité aux headings relationnels mb-3 : « Où regarder »
+   (mb-2) est un titre produit stable et ne doit jamais devenir un skeleton. */
+[data-seenit-detail-shell="stable"] h3.mb-3:has(+ .flex > .animate-pulse) {
   font-size: 0;
   min-height: 0.75rem;
 }
 
-[data-seenit-detail-shell="stable"] h3:has(+ .flex > .animate-pulse)::after {
+[data-seenit-detail-shell="stable"] h3.mb-3:has(+ .flex > .animate-pulse)::after {
   content: '';
   display: block;
   width: 8rem;
@@ -112,6 +116,103 @@ function StableColdDetailSkeleton({ onBack }: Pick<ShowDetailScreenProps, 'onBac
         <div className="h-20 bg-zinc-900/60 rounded-2xl border border-white/5 animate-pulse" />
       </div>
     </div>
+  );
+}
+
+function ProviderAvailabilityControls({
+  detailIdentity,
+  tmdbId,
+  mediaType,
+}: {
+  detailIdentity: string | null;
+  tmdbId?: number;
+  mediaType: 'tv' | 'movie';
+}) {
+  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const hostRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const shell = document.querySelector<HTMLElement>('[data-seenit-detail-shell="stable"]');
+    if (!shell) return;
+
+    const ensureProviderUi = () => {
+      const heading = Array.from(shell.querySelectorAll('h3'))
+        .find(node => node.textContent?.trim() === 'Où regarder');
+      if (!heading?.parentElement) {
+        if (hostRef.current && !hostRef.current.isConnected) {
+          hostRef.current = null;
+          setPortalHost(null);
+        }
+        return;
+      }
+
+      // Les deux chemins historiques (« Vérification… » et libellé complet)
+      // deviennent une seule formulation courte et non tronquée, y compris pour
+      // les lecteurs d'écran puisque le vrai texte DOM est normalisé.
+      for (const pulse of heading.parentElement.querySelectorAll<HTMLElement>('.animate-pulse')) {
+        if (!pulse.querySelector('img[alt="Plex"]')) continue;
+        const label = pulse.querySelector<HTMLElement>('span');
+        if (label && label.textContent !== PROVIDER_LOADING_LABEL) label.textContent = PROVIDER_LOADING_LABEL;
+        if (label) label.style.whiteSpace = 'nowrap';
+      }
+
+      let host = heading.parentElement.querySelector<HTMLElement>(':scope > [data-seenit-provider-refresh-host="true"]');
+      if (!host) {
+        host = document.createElement('div');
+        host.dataset.seenitProviderRefreshHost = 'true';
+        host.className = 'flex justify-end -mt-1 mb-2';
+        heading.insertAdjacentElement('afterend', host);
+      }
+      if (hostRef.current !== host) {
+        hostRef.current = host;
+        setPortalHost(host);
+      }
+    };
+
+    ensureProviderUi();
+    const observer = new MutationObserver(ensureProviderUi);
+    observer.observe(shell, { childList: true, subtree: true });
+
+    return () => {
+      observer.disconnect();
+      hostRef.current?.remove();
+      hostRef.current = null;
+      setPortalHost(null);
+    };
+  }, [detailIdentity]);
+
+  const refreshPlexServers = async () => {
+    if (!tmdbId || isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      const details = tmdb.peekMediaDetails(tmdbId, mediaType);
+      await useMediaPresenceStore.getState().checkPresence({
+        tmdbId,
+        tvdbId: details?.external_ids?.tvdb_id,
+        imdbId: details?.external_ids?.imdb_id || details?.imdb_id,
+        mediaType,
+        forceRefresh: true,
+        refreshPlexServers: true,
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  if (!portalHost || !tmdbId) return null;
+  return createPortal(
+    <button
+      type="button"
+      onClick={() => void refreshPlexServers()}
+      disabled={isRefreshing}
+      aria-label="Actualiser les serveurs Plex"
+      className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/10 bg-zinc-900/80 px-3 text-xs font-semibold text-zinc-300 transition hover:text-white disabled:opacity-60"
+    >
+      <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+      <span>{isRefreshing ? 'Actualisation Plex…' : 'Actualiser Plex'}</span>
+    </button>,
+    portalHost,
   );
 }
 
@@ -218,7 +319,14 @@ export function ShowDetailScreen(props: ShowDetailScreenProps) {
       {isColdWarmup ? (
         <StableColdDetailSkeleton onBack={props.onBack} />
       ) : (
-        <ShowDetailScreenCore key={downloadsEnabled ? 'downloads-visible' : 'downloads-hidden'} {...props} />
+        <>
+          <ShowDetailScreenCore key={downloadsEnabled ? 'downloads-visible' : 'downloads-hidden'} {...props} />
+          <ProviderAvailabilityControls
+            detailIdentity={detailIdentity}
+            tmdbId={resolvedMedia.tmdbId}
+            mediaType={resolvedMedia.mediaType}
+          />
+        </>
       )}
     </div>
   );

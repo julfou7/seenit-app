@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { findPlexAvailabilityOnServers, type PlexServerResource } from '../src/backend/plexAvailabilityBackend.ts';
+import {
+  findPlexAvailabilityOnServers,
+  getPlexServers,
+  type PlexServerResource,
+} from '../src/backend/plexAvailabilityBackend.ts';
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
   status,
@@ -61,6 +65,40 @@ test('SEENIT-PLEX-002 détecte un film partagé via inventaire quand les lookups
   assert.ok(calls.every(call => call.token === 'friend-server-token'), 'le jeton propre au serveur partagé doit être utilisé');
 });
 
+test('SEENIT-PLEX-002 accélère la disponibilité par un identifiant IMDb exact sans inventaire', async () => {
+  const calls: string[] = [];
+  const request: typeof fetch = async input => {
+    const url = String(input);
+    calls.push(url);
+    if (decodeURIComponent(url).includes('imdb://tt0133093')) {
+      return json({ MediaContainer: { Metadata: [{
+        type: 'movie',
+        title: 'Film exact',
+        ratingKey: 'matrix',
+        Guid: [{ id: 'imdb://tt0133093' }]
+      }] } });
+    }
+    if (fastMiss(url)) return json({ MediaContainer: { Metadata: [] } });
+    throw new Error('le chemin rapide ne doit pas atteindre l’inventaire');
+  };
+
+  const result = await findPlexAvailabilityOnServers({
+    servers: [sharedServer()],
+    accountToken: 'account-token',
+    tmdbId: 603,
+    imdbId: 'tt0133093',
+    mediaType: 'movie',
+    request,
+    fastTimeoutMs: 50,
+    inventoryTimeoutMs: 50,
+    inventoryBudgetMs: 500
+  });
+
+  assert.equal(result?.ratingKey, 'matrix');
+  assert.equal(calls.some(url => url.endsWith('/library/sections')), false);
+  assert.equal(calls.some(url => url.includes('/library/sections/')), false);
+});
+
 test('SEENIT-IDENTITY-001 refuse un homonyme Plex dont le TMDB diffère', async () => {
   const request: typeof fetch = async input => {
     const url = String(input);
@@ -85,6 +123,37 @@ test('SEENIT-IDENTITY-001 refuse un homonyme Plex dont le TMDB diffère', async 
     fastTimeoutMs: 50,
     inventoryTimeoutMs: 50,
     inventoryBudgetMs: 500
+  });
+
+  assert.equal(result, null);
+});
+
+test('SEENIT-IDENTITY-001 refuse un résultat rapide dont les identifiants externes exacts diffèrent', async () => {
+  const request: typeof fetch = async input => {
+    const url = String(input);
+    if (fastMiss(url)) {
+      return json({ MediaContainer: { Metadata: [{
+        type: 'movie',
+        title: 'Même titre',
+        year: 1999,
+        ratingKey: 'wrong',
+        Guid: [{ id: 'imdb://tt9999999' }, { id: 'tmdb://999' }]
+      }] } });
+    }
+    if (url.endsWith('/library/sections')) return json({ MediaContainer: { Directory: [] } });
+    return json({ MediaContainer: { Metadata: [] } });
+  };
+
+  const result = await findPlexAvailabilityOnServers({
+    servers: [sharedServer()],
+    accountToken: 'account-token',
+    tmdbId: 603,
+    imdbId: 'tt0133093',
+    mediaType: 'movie',
+    request,
+    fastTimeoutMs: 20,
+    inventoryTimeoutMs: 20,
+    inventoryBudgetMs: 100
   });
 
   assert.equal(result, null);
@@ -164,4 +233,75 @@ test('un serveur Plex inaccessible ne masque pas un match exact sur un autre ser
 
   assert.equal(result?.serverName, 'Plex Ami');
   assert.equal(result?.ratingKey, '77');
+});
+
+test('SEENIT-PLEX-002 une connexion lente ne bloque plus une connexion PMS exacte disponible', async () => {
+  const server = sharedServer('https://slow.example.test');
+  server.connections = [
+    { uri: 'https://slow.example.test', local: false, relay: false },
+    { uri: 'https://fast.example.test', local: false, relay: true }
+  ];
+
+  const request: typeof fetch = async input => {
+    const url = String(input);
+    if (url.startsWith('https://slow.example.test')) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return json({ MediaContainer: { Metadata: [] } });
+    }
+    if (url.startsWith('https://fast.example.test') && fastMiss(url)) {
+      return json({ MediaContainer: { Metadata: [{
+        type: 'movie',
+        ratingKey: 'fast-603',
+        Guid: [{ id: 'tmdb://603' }]
+      }] } });
+    }
+    return json({ MediaContainer: { Metadata: [] } });
+  };
+
+  const startedAt = Date.now();
+  const result = await findPlexAvailabilityOnServers({
+    servers: [server],
+    accountToken: 'account-token',
+    tmdbId: 603,
+    mediaType: 'movie',
+    request,
+    fastTimeoutMs: 800,
+    inventoryTimeoutMs: 50,
+    inventoryBudgetMs: 100
+  });
+  const elapsedMs = Date.now() - startedAt;
+
+  assert.equal(result?.ratingKey, 'fast-603');
+  assert.ok(elapsedMs < 300, `la connexion valide doit gagner sans attendre 500 ms (reçu ${elapsedMs} ms)`);
+});
+
+test('SEENIT-PLEX-002 force la redécouverte des serveurs sans affaiblir le cache normal', async () => {
+  const resourceCalls: string[] = [];
+  let generation = 0;
+  const request: typeof fetch = async input => {
+    const url = String(input);
+    resourceCalls.push(url);
+    generation += 1;
+    return json([{
+      name: `Serveur ${generation}`,
+      clientIdentifier: `server-${generation}`,
+      provides: 'server',
+      connections: [{ uri: `https://server-${generation}.example.test`, local: false }]
+    }]);
+  };
+  let now = 10_000;
+  const clock = () => now;
+  const token = 'refresh-test-token';
+  const uid = 'refresh-test-user';
+
+  const first = await getPlexServers(request, token, 'client', uid, clock);
+  now += 1000;
+  const cached = await getPlexServers(request, token, 'client', uid, clock);
+  now += 1000;
+  const refreshed = await getPlexServers(request, token, 'client', uid, clock, true);
+
+  assert.equal(resourceCalls.length, 2, 'le chemin normal réutilise le cache mais le refresh explicite refait resources');
+  assert.equal(first?.[0].clientIdentifier, 'server-1');
+  assert.equal(cached?.[0].clientIdentifier, 'server-1');
+  assert.equal(refreshed?.[0].clientIdentifier, 'server-2');
 });

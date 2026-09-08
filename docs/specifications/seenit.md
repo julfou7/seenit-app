@@ -415,6 +415,12 @@ n'est rouverte que par une nouvelle décision produit explicite.
 - Le skeleton de page est réservé au premier chargement réellement froid. Le parcours A → B → A
   restitue A sans skeleton ni placeholder intermédiaire, puis peut actualiser silencieusement les
   données. En cas d'échec réseau, la dernière valeur complète reste affichable (`stale-if-error`).
+- Le titre **« Où regarder »** est un libellé produit stable : il reste toujours rendu et n'est jamais
+  remplacé par un skeleton pendant la résolution. Le chargement de cette zone emploie un seul libellé
+  lisible, puis aboutit à un diffuseur, à Plex ou à un état d'indisponibilité explicite.
+- Les diffuseurs TMDB publics sont persistés par `mediaType + tmdbId` dans un cache borné à 120 entrées,
+  frais pendant 6 heures et réutilisable en `stale-if-error` pendant 7 jours au maximum. Le cache mémoire
+  de session reste prioritaire et aucune donnée utilisateur ou secret Plex n'est stocké dans ce cache.
 - Les réponses asynchrones sont rattachées à la clé typée demandée. Une réponse de `movie:42` ne peut
   ni renseigner `tv:42`, ni remplacer une autre fiche ouverte entre-temps.
 - Les détails et requêtes identiques en vol sont dédupliqués. Les caches mémoire sont bornés afin de
@@ -444,8 +450,11 @@ pour le cache des sagas et univers.
   selon `SEENIT-PLATFORM-001`, en conservant strictement la même requête authentifiée. Les affichages
   passifs, notamment les cartes et grilles, consomment le cache de disponibilité et ne déclenchent pas
   d'inventaire réseau par média. Un contrôle actif peut contacter le backend avec un budget borné de
-  20 secondes et au plus deux vérifications Availability réseau simultanées. Un timeout, une panne
-  réseau, un `401` ou un `5xx` conserve l'état connu et ne devient jamais `available:false` ; seul un
+  20 secondes et au plus deux vérifications Availability réseau simultanées. L'action explicite
+  **« Actualiser Plex »** d'une fiche force la vérification du média courant et une nouvelle découverte
+  des ressources/serveurs Plex, en contournant une fois le cache serveur normal de 5 minutes ; si cette
+  redécouverte forcée échoue, la dernière liste de serveurs connue reste le fallback. Un timeout, une
+  panne réseau, un `401` ou un `5xx` conserve l'état connu et ne devient jamais `available:false` ; seul un
   `2xx` explicite contenant `available:false` autorise l'alimentation du cache négatif.
 - **SEENIT-PLEX-003** — Le curseur n'est validé qu'après collecte suffisamment complète,
   résolution sans échec transitoire et écritures Firestore réussies.
