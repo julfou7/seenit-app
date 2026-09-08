@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { findPlexAvailabilityOnServers, type PlexServerResource } from '../src/backend/plexAvailabilityBackend.ts';
+import {
+  findPlexAvailabilityOnServers,
+  getPlexServers,
+  type PlexServerResource,
+} from '../src/backend/plexAvailabilityBackend.ts';
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
   status,
@@ -164,4 +168,35 @@ test('un serveur Plex inaccessible ne masque pas un match exact sur un autre ser
 
   assert.equal(result?.serverName, 'Plex Ami');
   assert.equal(result?.ratingKey, '77');
+});
+
+test('SEENIT-PLEX-002 force la redécouverte des serveurs sans affaiblir le cache normal', async () => {
+  const resourceCalls: string[] = [];
+  let generation = 0;
+  const request: typeof fetch = async input => {
+    const url = String(input);
+    resourceCalls.push(url);
+    generation += 1;
+    return json([{
+      name: `Serveur ${generation}`,
+      clientIdentifier: `server-${generation}`,
+      provides: 'server',
+      connections: [{ uri: `https://server-${generation}.example.test`, local: false }]
+    }]);
+  };
+  let now = 10_000;
+  const clock = () => now;
+  const token = 'refresh-test-token';
+  const uid = 'refresh-test-user';
+
+  const first = await getPlexServers(request, token, 'client', uid, clock);
+  now += 1000;
+  const cached = await getPlexServers(request, token, 'client', uid, clock);
+  now += 1000;
+  const refreshed = await getPlexServers(request, token, 'client', uid, clock, true);
+
+  assert.equal(resourceCalls.length, 2, 'le chemin normal réutilise le cache mais le refresh explicite refait resources');
+  assert.equal(first?.[0].clientIdentifier, 'server-1');
+  assert.equal(cached?.[0].clientIdentifier, 'server-1');
+  assert.equal(refreshed?.[0].clientIdentifier, 'server-2');
 });
