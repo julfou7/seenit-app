@@ -1,4 +1,5 @@
 import type { Application, Request, RequestHandler } from 'express';
+import { registerPlexAvailabilityRoute } from '../../backend/plexAvailabilityBackend.ts';
 
 type Provider = 'tmdb' | 'omdb';
 type QuotaProvider = Provider | 'tvdb';
@@ -204,6 +205,7 @@ async function readBoundedJson(response: Response, secrets: string[]): Promise<s
 /** Authentification injectée depuis server.ts : ce module pur ne charge pas Firebase Admin. */
 export function registerMediaProviderRoutes(app: Application, dependencies: Dependencies): void {
   const request = dependencies.fetch || fetch;
+  registerPlexAvailabilityRoute(app, { authenticate: dependencies.authenticate, fetch: request, now: dependencies.now });
   const now = dependencies.now || Date.now;
   const readSecrets = dependencies.secrets || (() => ({
     TMDB_API_KEY: process.env.TMDB_API_KEY,
