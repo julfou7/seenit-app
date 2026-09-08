@@ -9,6 +9,7 @@ import {
 const tmdbClientSource = readFileSync(new URL('../src/features/shows/tmdbClient.ts', import.meta.url), 'utf8');
 const detailSource = readFileSync(new URL('../src/screens/ShowDetailScreenCore.tsx', import.meta.url), 'utf8');
 const detailWrapperSource = readFileSync(new URL('../src/screens/ShowDetailScreen.tsx', import.meta.url), 'utf8');
+const watchListSource = readFileSync(new URL('../src/screens/WatchListScreen.tsx', import.meta.url), 'utf8');
 
 test('SEENIT-PERF-001 réutilise les détails et relations sans nouveau chargement', () => {
   const startedAt = performance.now();
@@ -59,4 +60,39 @@ test('SEENIT-PERF-001 regroupe le chargement froid avant de monter la fiche comp
     'le chargement froid doit utiliser un shell unique et stable');
   assert.match(detailWrapperSource, /overflow-anchor: none/,
     'les placeholders ne doivent pas devenir des ancres de scroll pendant leur remplacement');
+});
+
+test('SEENIT-PERF-001 garde le titre relationnel neutre pendant sa résolution', () => {
+  assert.match(
+    detailWrapperSource,
+    /h3:has\(\+ \.flex > \.animate-pulse\)[\s\S]{0,120}font-size: 0/,
+    'le libellé provisoire Relations doit être remplacé visuellement par un skeleton neutre',
+  );
+  assert.match(
+    detailWrapperSource,
+    /h3:has\(\+ \.flex > \.animate-pulse\)::after[\s\S]{0,220}animation: pulse/,
+    'le titre relationnel froid doit conserver une géométrie de skeleton stable',
+  );
+});
+
+test('SEENIT-PERF-001 ouvre un épisode avant de charger ses détails distants', () => {
+  const handlerStart = watchListSource.indexOf('const handleEpisodeClick');
+  const handlerEnd = watchListSource.indexOf('\n\n  useEffect(() => {', handlerStart);
+  assert.ok(handlerStart >= 0 && handlerEnd > handlerStart, 'le handler épisode doit être détectable');
+
+  const handlerSource = watchListSource.slice(handlerStart, handlerEnd);
+  const modalOpenIndex = handlerSource.indexOf('setSelectedEpisodeModal({ show, season: seasonNumber, episode: epData })');
+  const historyIndex = handlerSource.indexOf('window.history.pushState');
+  const remoteFetchIndex = handlerSource.indexOf('tmdb.getEpisodeDetails');
+
+  assert.ok(modalOpenIndex >= 0 && remoteFetchIndex >= 0 && modalOpenIndex < remoteFetchIndex,
+    'la modale doit être visible avant le chargement TMDB');
+  assert.ok(historyIndex >= 0 && historyIndex < remoteFetchIndex,
+    'l’état de navigation doit être engagé avant le chargement TMDB');
+  assert.doesNotMatch(handlerSource, /await\s+tmdb\.getEpisodeDetails/,
+    'le réseau ne doit plus être dans le chemin critique du clic');
+  assert.match(handlerSource, /openingEpisodeRef\.current/,
+    'une garde synchrone doit absorber un double tap avant le prochain rendu React');
+  assert.match(handlerSource, /episodeRequestRef\.current/,
+    'une réponse obsolète ne doit jamais remplacer une autre modale épisode');
 });
