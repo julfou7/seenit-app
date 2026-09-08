@@ -7,9 +7,12 @@ import {
 } from '../src/features/shows/mediaRelations.ts';
 
 const tmdbClientSource = readFileSync(new URL('../src/features/shows/tmdbClient.ts', import.meta.url), 'utf8');
+const tmdbFacadeSource = readFileSync(new URL('../src/features/shows/tmdb.ts', import.meta.url), 'utf8');
 const detailSource = readFileSync(new URL('../src/screens/ShowDetailScreenCore.tsx', import.meta.url), 'utf8');
 const detailWrapperSource = readFileSync(new URL('../src/screens/ShowDetailScreen.tsx', import.meta.url), 'utf8');
 const watchListSource = readFileSync(new URL('../src/screens/WatchListScreen.tsx', import.meta.url), 'utf8');
+const presenceStoreSource = readFileSync(new URL('../src/store/mediaPresenceStore.ts', import.meta.url), 'utf8');
+const plexAvailabilitySource = readFileSync(new URL('../src/features/plex/plexAvailability.ts', import.meta.url), 'utf8');
 
 test('SEENIT-PERF-001 réutilise les détails et relations sans nouveau chargement', () => {
   const startedAt = performance.now();
@@ -62,17 +65,33 @@ test('SEENIT-PERF-001 regroupe le chargement froid avant de monter la fiche comp
     'les placeholders ne doivent pas devenir des ancres de scroll pendant leur remplacement');
 });
 
-test('SEENIT-PERF-001 garde le titre relationnel neutre pendant sa résolution', () => {
+test('SEENIT-PERF-001 garde le titre relationnel neutre sans transformer Où regarder en skeleton', () => {
   assert.match(
     detailWrapperSource,
-    /h3:has\(\+ \.flex > \.animate-pulse\)[\s\S]{0,120}font-size: 0/,
-    'le libellé provisoire Relations doit être remplacé visuellement par un skeleton neutre',
+    /h3\.mb-3:has\(\+ \.flex > \.animate-pulse\)[\s\S]{0,120}font-size: 0/,
+    'le skeleton de titre doit rester limité au heading relationnel mb-3',
   );
   assert.match(
     detailWrapperSource,
-    /h3:has\(\+ \.flex > \.animate-pulse\)::after[\s\S]{0,220}animation: pulse/,
+    /h3\.mb-3:has\(\+ \.flex > \.animate-pulse\)::after[\s\S]{0,220}animation: pulse/,
     'le titre relationnel froid doit conserver une géométrie de skeleton stable',
   );
+  assert.doesNotMatch(
+    detailWrapperSource,
+    /h3:has\(\+ \.flex > \.animate-pulse\)/,
+    'un sélecteur global ne doit plus masquer le titre stable Où regarder',
+  );
+});
+
+test('SEENIT-PERF-001 unifie le chargement des disponibilités et expose un refresh Plex explicite', () => {
+  assert.match(detailWrapperSource, /PROVIDER_LOADING_LABEL = 'Recherche Plex & streaming…'/);
+  assert.match(detailWrapperSource, /node\.textContent\?\.trim\(\) === 'Où regarder'/);
+  assert.match(detailWrapperSource, /aria-label="Actualiser les serveurs Plex"/);
+  assert.match(detailWrapperSource, /refreshPlexServers: true/);
+  assert.match(presenceStoreSource, /refreshServers: refreshPlexServers/);
+  assert.match(plexAvailabilitySource, /refreshServers/);
+  assert.match(tmdbFacadeSource, /readWatchProviderCache/);
+  assert.match(tmdbFacadeSource, /writeWatchProviderCache/);
 });
 
 test('SEENIT-PERF-001 ouvre un épisode avant de charger ses détails distants', () => {
