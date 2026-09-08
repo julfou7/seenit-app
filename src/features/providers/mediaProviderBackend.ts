@@ -1,8 +1,12 @@
 import type { Application, Request, RequestHandler } from 'express';
 
 type Provider = 'tmdb' | 'omdb';
+type QuotaProvider = Provider | 'tvdb';
+type QuotaScope = 'request' | 'upstream';
 type Secrets = Partial<Record<'TMDB_API_KEY' | 'OMDB_API_KEY' | 'TVDB_API_KEY', string>>;
 const REQUIRED_SECRET_NAMES = ['TMDB_API_KEY', 'OMDB_API_KEY', 'TVDB_API_KEY'] as const;
+const REQUEST_LIMITS: Record<QuotaProvider, number> = { tmdb: 1800, omdb: 360, tvdb: 120 };
+const UPSTREAM_LIMITS: Record<QuotaProvider, number> = { tmdb: 600, omdb: 90, tvdb: 30 };
 interface Dependencies {
   authenticate: RequestHandler;
   fetch?: typeof fetch;
@@ -216,10 +220,10 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
   let currentSecrets: Secrets = {};
   const evict = (key: string) => { cacheBytes -= cache.get(key)?.bytes || 0; cache.delete(key); };
 
-  const takeQuota = (provider: 'tmdb' | 'omdb' | 'tvdb', uid: string, limit: number, res: any): boolean => {
+  const takeQuota = (scope: QuotaScope, provider: QuotaProvider, uid: string, limit: number, res: any): boolean => {
     const time = now();
     for (const [key, bucket] of buckets) if (bucket.reset <= time) buckets.delete(key);
-    const subject = `${provider}:${uid}`;
+    const subject = `${scope}:${provider}:${uid}`;
     let bucket = buckets.get(subject);
     if (!bucket) {
       if (buckets.size >= 5000) { res.status(503).json({ error: 'Service occupé.' }); return false; }
@@ -249,7 +253,7 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
     res.setHeader('Cache-Control', 'no-store');
     const uid = (req as Request & { user?: { uid?: string } }).user?.uid;
     if (!uid) { res.status(401).json({ error: 'Authentification requise.' }); return; }
-    if (!takeQuota(provider, uid, provider === 'tmdb' ? 240 : 90, res)) return;
+    if (!takeQuota('request', provider, uid, REQUEST_LIMITS[provider], res)) return;
 
     const path = provider === 'tmdb' ? String(req.params[0] || '') : '';
     const target = buildProviderRequest(provider, path, req.query);
@@ -266,6 +270,7 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
     let pending = inFlight.get(key);
     if (!pending) {
       if (inFlight.size >= 48) { res.setHeader('Retry-After', '1'); res.status(429).json({ error: 'Service occupé, réessayez.' }); return; }
+      if (!takeQuota('upstream', provider, uid, UPSTREAM_LIMITS[provider], res)) return;
       target.searchParams.set(provider === 'tmdb' ? 'api_key' : 'apikey', credential);
       pending = (async () => {
         const upstream = await request(target, { method: 'GET', headers: { Accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(timeoutMs) });
@@ -367,7 +372,7 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
     res.setHeader('Cache-Control', 'no-store');
     const uid = (req as Request & { user?: { uid?: string } }).user?.uid;
     if (!uid) { res.status(401).json({ error: 'Authentification requise.' }); return; }
-    if (!takeQuota('tvdb', uid, 30, res)) return;
+    if (!takeQuota('request', 'tvdb', uid, REQUEST_LIMITS.tvdb, res)) return;
     const mediaType = req.query.mediaType === 'movie' ? 'movie' : req.query.mediaType === 'tv' ? 'tv' : null;
     const tvdbRaw = typeof req.query.tvdbId === 'string' ? req.query.tvdbId : '';
     const imdbRaw = typeof req.query.imdbId === 'string' ? req.query.imdbId.trim() : '';
@@ -387,6 +392,7 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
       const value = cached.value;
       res.json(value ? { kind: value.kind, results: value.results } : { kind: null, results: [] }); return;
     }
+    if (!takeQuota('upstream', 'tvdb', uid, UPSTREAM_LIMITS.tvdb, res)) return;
     try {
       const value = await resolveTVDBRelation(apiKey, tvdbId, imdbId, mediaType);
       tvdbRelationCache.delete(key);

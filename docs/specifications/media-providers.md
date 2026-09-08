@@ -34,8 +34,12 @@ hors de cette façade et ne deviennent aucune preuve de relation ou d'identité 
   remappe chaque membre vers un TMDB ID + type exact avant de répondre.
 - Hôtes HTTPS fournisseurs constants, redirections refusées, timeout 10 s incluant lecture ; réponse
   JSON bornée à 4 Mio. Aucun secret, token ou erreur brute fournisseur n'est relayé au client.
-- Limites par UID : 240 TMDB / 90 OMDb / 30 TVDB par minute. Les limites sont locales à chaque instance
-  Cloud Run, avec `Retry-After` sur 429.
+- La limitation par UID distingue le trafic vers SeenIt des départs réels fournisseur. Les plafonds
+  anti-abus sont de 1 800 requêtes TMDB, 360 OMDb et 120 TVDB par minute et par UID. Le quota
+  fournisseur n'est consommé que lorsqu'un cache miss crée effectivement un nouvel appel upstream :
+  600 TMDB, 90 OMDb et 30 résolutions TVDB par minute et par UID. Un hit du cache ou une requête
+  dédupliquée déjà en vol ne consomme pas ce quota fournisseur. Les compteurs restent locaux à chaque
+  instance Cloud Run et toute limitation renvoie `Retry-After` avec un HTTP 429.
 - Cache serveur des succès TMDB/OMDb : 5 min, 200 entrées/16 Mio maximum avec déduplication des requêtes
   en vol. Les relations TVDB ont un cache borné à 120 entrées pendant 5 min ; le token TVDB reste
   uniquement côté serveur et est renouvelé indépendamment des clients.
