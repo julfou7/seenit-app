@@ -12,6 +12,37 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  prepare_candidate:
+    name: Prepare Release Candidate
+    if: >-
+      github.event.issue.number == 102 &&
+      github.event.comment.user.login == github.event.repository.owner.login &&
+      github.event.comment.author_association == 'OWNER' &&
+      github.event.comment.body == '/prepare-release-apk'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout canonical main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Prepare or reuse immutable release candidate
+        run: node scripts/prepare-release-control.cjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   release_control:
     name: Release Control
     if: >-

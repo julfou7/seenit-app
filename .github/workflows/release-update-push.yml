@@ -17,6 +17,7 @@ on:
 permissions:
   actions: read
   contents: read
+  issues: write
 
 concurrency:
   group: seenit-release-update-${{ github.event.client_payload.release_run_id || inputs.release_run_id }}
@@ -40,7 +41,7 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Wait for source workflow and notify registered Android installations
+      - name: Wait for source workflow, notify installations and checkpoint release
         run: node scripts/notify-release-update.cjs
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
