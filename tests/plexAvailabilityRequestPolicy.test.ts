@@ -69,6 +69,10 @@ test('SEENIT-PLEX-002 laisse au fallback partagé le budget nécessaire et verro
     path.join(root, 'src/store/mediaPresenceStore.ts'),
     'utf8'
   );
+  const backendSource = fs.readFileSync(
+    path.join(root, 'src/backend/plexAvailabilityBackend.ts'),
+    'utf8'
+  );
   const gridSource = fs.readFileSync(
     path.join(root, 'src/components/GridMediaCard.tsx'),
     'utf8'
@@ -76,6 +80,12 @@ test('SEENIT-PLEX-002 laisse au fallback partagé le budget nécessaire et verro
 
   assert.match(availabilitySource, /PLEX_AVAILABILITY_REQUEST_TIMEOUT_MS/);
   assert.doesNotMatch(availabilitySource, /connectTimeout:\s*5000|readTimeout:\s*5000|AbortSignal\.timeout\(5000\)/);
+  assert.match(availabilitySource, /imdbId:\s*normalizedImdbId/);
+  assert.match(availabilitySource, /tvdbId:\s*normalizedTvdbId/);
+  assert.match(presenceSource, /tvdbId,[\s\S]{0,80}imdbId,/);
   assert.match(presenceSource, /networkMode:\s*['"]active['"]/);
+  assert.match(backendSource, /buildStrongGuidCandidates/);
+  assert.match(backendSource, /Promise\.any\(attempts\)/);
+  assert.doesNotMatch(backendSource, /title\s*===|originalTitle\s*===|year\s*===/);
   assert.doesNotMatch(gridSource, /networkMode:\s*['"]active['"]/);
 });
