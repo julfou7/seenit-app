@@ -1522,6 +1522,14 @@
         {
           "file": "tests/mediaDetailPerformance.test.ts",
           "contains": "SEENIT-PERF-001 réserve les skeletons au chargement réellement froid"
+        },
+        {
+          "file": "tests/explorerPerformance.test.ts",
+          "contains": "SEENIT-PERF-001 regroupe la persistance des diffuseurs hors du scroll"
+        },
+        {
+          "file": "tests/explorerPerformance.test.ts",
+          "contains": "SEENIT-PERF-001 borne le fan-out diffuseurs et stabilise les cartes Explorer"
         }
       ]
     }

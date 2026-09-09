@@ -11,6 +11,7 @@ import {
   type MediaRelationSnapshot,
   type RelationMediaType,
 } from './mediaRelations';
+import { createWatchProviderRequestLimiter } from '../providers/watchProviderRequestPolicy';
 
 export interface TMDBMedia {
   id: number;
@@ -491,6 +492,8 @@ export class TMDBClient {
   }
 
   private watchProvidersCache = new BoundedCache<string, { data: any; timestamp: number }>(80);
+  private watchProvidersInFlight = new Map<string, Promise<Result<any>>>();
+  private watchProviderRequestLimiter = createWatchProviderRequestLimiter();
   private episodeDetailsCache = new Map<string, { data: any; timestamp: number }>();
 
   peekWatchProviders(id: number, type: 'tv' | 'movie' = 'tv'): any | null {
@@ -507,16 +510,35 @@ export class TMDBClient {
       return ok(cached.data);
     }
 
-    const url = new URL(`${this.baseUrl}/${type}/${id}/watch/providers`);
-    const res = await tryCatch(authenticatedFetch(url.toString()));
-    if (!res.ok) return err((res as any).error);
-    if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
-    const data = await tryCatch(res.value.json());
-    if (!data.ok) return err((data as any).error);
-    if (data.value && data.value.status_code) return err(new Error(data.value.status_message || 'TMDB Error'));
+    const existingRequest = this.watchProvidersInFlight.get(cacheKey);
+    if (existingRequest) return existingRequest;
 
-    this.watchProvidersCache.set(cacheKey, { data: data.value, timestamp: Date.now() });
-    return data;
+    const request = this.watchProviderRequestLimiter.run(async (): Promise<Result<any>> => {
+      const queuedCache = this.watchProvidersCache.get(cacheKey);
+      if (queuedCache && Date.now() - queuedCache.timestamp < 30 * 60 * 1000) {
+        return ok(queuedCache.data);
+      }
+
+      const url = new URL(`${this.baseUrl}/${type}/${id}/watch/providers`);
+      const res = await tryCatch(authenticatedFetch(url.toString()));
+      if (!res.ok) return err((res as any).error);
+      if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
+      const data = await tryCatch(res.value.json());
+      if (!data.ok) return err((data as any).error);
+      if (data.value && data.value.status_code) return err(new Error(data.value.status_message || 'TMDB Error'));
+
+      this.watchProvidersCache.set(cacheKey, { data: data.value, timestamp: Date.now() });
+      return data;
+    });
+
+    this.watchProvidersInFlight.set(cacheKey, request);
+    try {
+      return await request;
+    } finally {
+      if (this.watchProvidersInFlight.get(cacheKey) === request) {
+        this.watchProvidersInFlight.delete(cacheKey);
+      }
+    }
   }
 
   async getMediaKeywords(id: number, type: 'tv' | 'movie' = 'tv'): Promise<Result<string[]>> {

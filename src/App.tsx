@@ -226,6 +226,14 @@ function MainApp() {
     });
   }, [openShow]);
 
+  const openLocalMedia = useCallback((id: any, mediaType?: 'tv' | 'movie') => {
+    openShowSmooth(id, 'local', mediaType);
+  }, [openShowSmooth]);
+
+  const openTmdbMedia = useCallback((id: any, mediaType?: 'tv' | 'movie') => {
+    openShowSmooth(id, 'tmdb', mediaType);
+  }, [openShowSmooth]);
+
   useEffect(() => {
     setMountedTabs(previous => {
       if (previous.has(currentTab)) return previous;
@@ -483,7 +491,7 @@ function MainApp() {
             <Suspense fallback={<div className="flex-1 bg-premium-ambient" aria-label="Chargement de l’écran" />}>
               {mountedTabs.has('watchlist') && (
                 <div className={cn("flex-1 min-h-0 flex flex-col", currentTab !== 'watchlist' && "hidden")}>
-                  <WatchListScreen onShowClick={(id, mediaType) => openShowSmooth(id, 'local', mediaType)} />
+                  <WatchListScreen onShowClick={openLocalMedia} />
                 </div>
               )}
 
@@ -491,20 +499,20 @@ function MainApp() {
                 <div className={cn("flex-1 min-h-0 flex flex-col", (currentTab !== 'profile' && currentTab !== 'settings') && "hidden")}>
                   <ProfileScreen
                     initialShowSettings={currentTab === 'settings'}
-                    onShowClick={(id, mediaType) => openShowSmooth(id, 'tmdb', mediaType)}
+                    onShowClick={openTmdbMedia}
                   />
                 </div>
               )}
 
               {mountedTabs.has('discover') && (
                 <div className={cn("flex-1 min-h-0 flex flex-col", currentTab !== 'discover' && "hidden")}>
-                  <DiscoverScreen onShowClick={(id, mediaType) => openShowSmooth(id, 'tmdb', mediaType)} />
+                  <DiscoverScreen onShowClick={openTmdbMedia} />
                 </div>
               )}
 
               {mountedTabs.has('downloads') && (
                 <div className={cn("flex-1 min-h-0 flex flex-col", currentTab !== 'downloads' && "hidden")}>
-                  <DownloadsScreen onShowClick={(id, mediaType) => openShowSmooth(id, 'tmdb', mediaType)} />
+                  <DownloadsScreen onShowClick={openTmdbMedia} />
                 </div>
               )}
             </Suspense>
@@ -524,7 +532,7 @@ function MainApp() {
                   initialSeason={selectedShow.initialSeason}
                   initialEpisode={selectedShow.initialEpisode}
                   onBack={closeShow}
-                  onShowClick={(id, mediaType) => openShowSmooth(id, 'tmdb', mediaType)}
+                  onShowClick={openTmdbMedia}
                 />
               </Suspense>
               <ParentalRatingEditor

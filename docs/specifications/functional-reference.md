@@ -221,6 +221,10 @@ Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, 
 - Le panneau « Type de contenu » permet notamment de choisir **Top 100** ; ce choix change de catégorie et ne constitue pas un tri.
 - Tri Populaires, Mieux notés, Plus récents ou Ordre alphabétique.
 - Hero Top 10, chargement infini, aperçu long-press et cache utilisable lors d'une panne réseau.
+- Le scroll infini conserve des clés de cartes stables, évite de rerendre les cartes déjà chargées pour
+  un simple changement d'en-tête et isole le rendu hors écran. L'enrichissement diffuseur d'une carte est
+  différé hors des frames actives lorsque possible, dédupliqué et borné à quatre requêtes simultanées ;
+  le cache persistant regroupe ses écritures au lieu de sérialiser tout son snapshot par carte.
 - Les recommandations combinent genres regardés et personnes favorites, puis excluent les médias
   déjà vus/terminés ou abandonnés. **Explorer reste le lieu de la découverte approximative** ; ces
   recommandations ne sont pas réinjectées dans les fiches média comme relations.
