@@ -64,7 +64,8 @@ test('issue #94 conserve les rappels à 09:00 et leurs clés anti-doublon versio
   assert.match(loop, /new Date\(year, month - 1, day, 9, 0, 0, 0\)/,
     'les épisodes restent programmés à 09:00 locale');
 
-  assert.match(source, /const REMINDER_SCHEDULE_SCHEMA = 'v2';/);
+  assert.match(source, /const REMINDER_SCHEDULE_SCHEMA = 'v\d+';/,
+    'le TNR #94 verrouille le principe de versionnement sans figer une version de migration historique');
   assert.match(loop, /scheduled_9am_\$\{REMINDER_SCHEDULE_SCHEMA\}_\$\{s\.id\}_\$\{tag\}_\$\{targetStr\}/);
   assert.match(loop, /scheduled_9am_\$\{REMINDER_SCHEDULE_SCHEMA\}_\$\{s\.id\}_\$\{tagPrefix\}_S\$\{sNum\}E\$\{eNum\}_\$\{targetStr\}/);
   assert.match(loop, /notified_today_\$\{s\.id\}_\$\{tag\}_\$\{todayStr\}/);
