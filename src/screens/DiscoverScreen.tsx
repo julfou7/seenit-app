@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { 
   Search, Plus, Check, WifiOff, Star, X, 
   SlidersHorizontal, ArrowUp, ArrowDown, Film, Tv, Users, User,
@@ -154,11 +154,11 @@ export function DiscoverScreen({ onShowClick }: Props) {
   const heroCarouselRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const openPersonModal = (personId: number) => {
+  const openPersonModal = useCallback((personId: number) => {
     setSelectedPersonId(personId);
     const currentState = window.history.state || {};
     window.history.pushState({ ...currentState, isModal: true, isPersonDetailModal: true, personId }, '');
-  };
+  }, []);
 
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
@@ -224,6 +224,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
   }, [showToast]);
 
   const [previewMedia, setPreviewMedia] = useState<TMDBMedia | null>(null);
+  const handleLongPress = useCallback((media: TMDBMedia) => setPreviewMedia(media), []);
 
   const [isSearchVisible, setIsSearchVisible] = useState(true);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -283,7 +284,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
     return [...prev, ...newItems];
   };
 
-  const handleToggleWatched = async (media: TMDBMedia) => {
+  const handleToggleWatched = useCallback(async (media: TMDBMedia) => {
     const isTv = media.media_type === 'tv' || activeCategory === 'Séries' || media.first_air_date !== undefined;
     const titleToUse = media.name || media.title || media.original_name || media.original_title || '';
     const numId = Number(media.id);
@@ -411,9 +412,9 @@ export function DiscoverScreen({ onShowClick }: Props) {
         }
       );
     }
-  };
+  }, [activeCategory, addShow, deleteShow, showsByTmdbId, showToast, updateShow]);
 
-  const handleAddMedia = async (media: TMDBMedia) => {
+  const handleAddMedia = useCallback(async (media: TMDBMedia) => {
     const isTv = media.media_type === 'tv' || activeCategory === 'Séries';
     const titleToUse = media.name || media.title || media.original_name || media.original_title || '';
     
@@ -450,7 +451,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
         }
       }
     );
-  };
+  }, [activeCategory, addShow, deleteShow, showsByTmdbId, showToast]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     if (isSearchFocused) return;
@@ -1469,11 +1470,11 @@ export function DiscoverScreen({ onShowClick }: Props) {
                       )}
                     </div>
                     <div className="flex gap-1.5 sm:gap-1.5 overflow-x-auto pb-2 pt-0.5 px-0.5 scrollbar-none snap-x">
-                      {personResults.map((item, idx) => (
+                      {personResults.map((item) => (
                         <PersonCard 
-                          key={`search_person_${item.id}_${idx}`} 
-                          person={item} 
-                          onClick={id => openPersonModal(id)} 
+                          key={`search_person_${item.id}`}
+                          person={item}
+                          onClick={openPersonModal}
                           isRowItem
                         />
                       ))}
@@ -1504,15 +1505,15 @@ export function DiscoverScreen({ onShowClick }: Props) {
                       )}
                     </div>
                     <div className="flex gap-1.5 sm:gap-1.5 overflow-x-auto pb-2 pt-0.5 px-0.5 scrollbar-none snap-x">
-                      {seriesResults.map((item, idx) => (
-                        <div key={`search_tv_${item.id}_${idx}`} className="w-[calc((100vw-0.5rem-12px)/3)] sm:w-[calc((100vw-0.5rem-18px)/4)] shrink-0 snap-start">
+                      {seriesResults.map((item) => (
+                        <div key={`search_tv_${item.id}`} className="w-[calc((100vw-0.5rem-12px)/3)] sm:w-[calc((100vw-0.5rem-18px)/4)] shrink-0 snap-start">
                           <GridMediaCard 
                             media={item} 
                             onShowClick={onShowClick}
                             show={showsByTmdbId.get(Number(item.id))}
                             onAddClick={handleAddMedia}
                             onToggleWatched={handleToggleWatched}
-                            onLongPress={(media) => setPreviewMedia(media)}
+                            onLongPress={handleLongPress}
                           />
                         </div>
                       ))}
@@ -1543,15 +1544,15 @@ export function DiscoverScreen({ onShowClick }: Props) {
                       )}
                     </div>
                     <div className="flex gap-1.5 sm:gap-1.5 overflow-x-auto pb-2 pt-0.5 px-0.5 scrollbar-none snap-x">
-                      {movieResults.map((item, idx) => (
-                        <div key={`search_movie_${item.id}_${idx}`} className="w-[calc((100vw-0.5rem-12px)/3)] sm:w-[calc((100vw-0.5rem-18px)/4)] shrink-0 snap-start">
+                      {movieResults.map((item) => (
+                        <div key={`search_movie_${item.id}`} className="w-[calc((100vw-0.5rem-12px)/3)] sm:w-[calc((100vw-0.5rem-18px)/4)] shrink-0 snap-start">
                           <GridMediaCard 
                             media={item} 
                             onShowClick={onShowClick}
                             show={showsByTmdbId.get(Number(item.id))}
                             onAddClick={handleAddMedia}
                             onToggleWatched={handleToggleWatched}
-                            onLongPress={(media) => setPreviewMedia(media)}
+                            onLongPress={handleLongPress}
                           />
                         </div>
                       ))}
@@ -1578,20 +1579,20 @@ export function DiscoverScreen({ onShowClick }: Props) {
                     visibleProcessedResults).map((item, idx) => (
                     item.media_type === 'person' ? (
                       <PersonCard 
-                        key={`person_${item.id}_${idx}`} 
-                        person={item} 
-                        onClick={id => openPersonModal(id)} 
+                        key={`person_${item.id}`}
+                        person={item}
+                        onClick={openPersonModal}
                       />
                     ) : (
                       <GridMediaCard 
-                        key={`grid_${item.media_type || 'media'}_${item.id}_${idx}`} 
-                        media={item} 
+                        key={`grid_${item.media_type || 'media'}_${item.id}`}
+                        media={item}
                         onShowClick={onShowClick}
                         show={showsByTmdbId.get(Number(item.id))}
                         isNewlyLoaded={prevLoadedCount > 0 && idx >= prevLoadedCount}
                         onAddClick={handleAddMedia}
                         onToggleWatched={handleToggleWatched}
-                        onLongPress={(media) => setPreviewMedia(media)}
+                        onLongPress={handleLongPress}
                       />
                     )
                   ))}

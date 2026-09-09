@@ -8,6 +8,10 @@ import { cn, checkIsUpToDate, computeAutoArchiveStatus, getTodayStr, getCalendar
 import { useShowsStore } from '../store/showsStore';
 import { getFormattedProviderLogo, extractOfficialStreamingProvider, PLEX_LOGO_SVG } from '../utils/providerLogos';
 import { checkPlexAvailability } from '../features/plex/plexAvailability';
+import {
+  observeWatchProviderCard,
+  scheduleWatchProviderCardEnrichment,
+} from '../features/providers/watchProviderRequestPolicy';
 
 export interface GridMediaCardProps {
   media: TMDBMedia;
@@ -128,50 +132,49 @@ export const GridMediaCard = React.memo(function GridMediaCard({
 
   useEffect(() => {
     let isMounted = true;
-    let hasFetched = false;
+    let cancelScheduledEnrichment = () => {};
+    let stopObserving = () => {};
 
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && !hasFetched && media.id) {
-        hasFetched = true;
-        observer.disconnect();
+    const enrichProvider = () => {
+      tmdb.getWatchProviders(Number(media.id), mediaType).then(res => {
+        if (!isMounted) return;
+        let officialFound = false;
+        if (res.ok && res.value?.results) {
+          const stream = extractOfficialStreamingProvider(res.value.results);
+          if (stream) {
+            setProviderLogo(stream.logo_path);
+            setProviderName(stream.provider_name);
+            officialFound = true;
+          }
+        }
 
-        tmdb.getWatchProviders(Number(media.id), mediaType).then(res => {
-          if (!isMounted) return;
-          let officialFound = false;
-          if (res.ok && res.value?.results) {
-            const stream = extractOfficialStreamingProvider(res.value.results);
-            if (stream) {
-              setProviderLogo(stream.logo_path);
-              setProviderName(stream.provider_name);
-              officialFound = true;
+        if (!officialFound && (!show || !show.networks?.length)) {
+          checkPlexAvailability({
+            tmdbId: Number(media.id),
+            title: displayTitle,
+            originalTitle: (media as any).original_title || (media as any).original_name,
+            year,
+            mediaType
+          }).then(plexInfo => {
+            if (isMounted && plexInfo.available) {
+              setProviderLogo(PLEX_LOGO_SVG);
+              setProviderName(plexInfo.serverName ? `Plex (${plexInfo.serverName})` : 'Plex');
             }
-          }
+          }).catch(() => {});
+        }
+      }).catch(() => {});
+    };
 
-          if (!officialFound && (!show || !show.networks?.length)) {
-            checkPlexAvailability({
-              tmdbId: Number(media.id),
-              title: displayTitle,
-              originalTitle: (media as any).original_title || (media as any).original_name,
-              year,
-              mediaType
-            }).then(plexInfo => {
-              if (isMounted && plexInfo.available) {
-                setProviderLogo(PLEX_LOGO_SVG);
-                setProviderName(plexInfo.serverName ? `Plex (${plexInfo.serverName})` : 'Plex');
-              }
-            }).catch(() => {});
-          }
-        }).catch(() => {});
-      }
-    }, { rootMargin: '200px' });
-
-    if (cardRef.current) {
-      observer.observe(cardRef.current);
+    if (cardRef.current && media.id) {
+      stopObserving = observeWatchProviderCard(cardRef.current, () => {
+        cancelScheduledEnrichment = scheduleWatchProviderCardEnrichment(enrichProvider);
+      });
     }
 
     return () => {
       isMounted = false;
-      observer.disconnect();
+      stopObserving();
+      cancelScheduledEnrichment();
     };
   }, [media.id, mediaType, displayTitle, year, show]);
 
@@ -206,7 +209,7 @@ export const GridMediaCard = React.memo(function GridMediaCard({
           onLongPress(media);
         }
       }}
-      className={cn("flex flex-col gap-2 w-full cursor-pointer group transition-all duration-300 touch-manipulation active:scale-[0.98]", isNewlyLoaded && "animate-in fade-in slide-in-from-bottom-2 duration-500")}
+      className={cn("media-grid-card flex flex-col gap-2 w-full cursor-pointer group transition-all duration-300 touch-manipulation active:scale-[0.98]", isNewlyLoaded && "animate-in fade-in slide-in-from-bottom-2 duration-500")}
     >
       {/* 1. BLOC AFFICHE AVEC BANDEAU OU BARRE DE PROGRESSION */}
       <div className="w-full rounded-xl overflow-hidden bg-[#1C1C1E] border border-white/5 shadow-md group-hover:scale-[1.02] transition-transform duration-200">

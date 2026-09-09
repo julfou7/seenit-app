@@ -434,6 +434,15 @@ n'est rouverte que par une nouvelle décision produit explicite.
 - Les diffuseurs TMDB publics sont persistés par `mediaType + tmdbId` dans un cache borné à 120 entrées,
   frais pendant 6 heures et réutilisable en `stale-if-error` pendant 7 jours au maximum. Le cache mémoire
   de session reste prioritaire et aucune donnée utilisateur ou secret Plex n'est stocké dans ce cache.
+- Le snapshot persistant des diffuseurs n'est désérialisé qu'une fois par contexte de stockage. Les
+  réponses rapprochées mettent à jour ce snapshot en mémoire puis regroupent sa persistance hors du
+  chemin critique du scroll ; une mise en arrière-plan force un unique flush borné. Les TTL, la limite
+  de 120 entrées et le comportement `stale-if-error` restent inchangés.
+- Dans les cartes et grilles, les requêtes diffuseurs identiques en vol sont dédupliquées, leur
+  concurrence globale est bornée à quatre et l'enrichissement d'une carte proche du viewport attend une
+  période idle lorsque la plateforme le permet. Les cartes déjà chargées conservent une clé stable et ne
+  sont pas rerendues pour un simple changement d'UI parent sans rapport ; le rendu hors écran est isolé
+  afin qu'une longue session Explorer n'augmente pas continuellement le coût de style, layout et paint.
 - Les réponses asynchrones sont rattachées à la clé typée demandée. Une réponse de `movie:42` ne peut
   ni renseigner `tv:42`, ni remplacer une autre fiche ouverte entre-temps.
 - Les détails et requêtes identiques en vol sont dédupliqués. Les caches mémoire sont bornés afin de
@@ -447,7 +456,8 @@ n'est rouverte que par une nouvelle décision produit explicite.
 
 Les TNR couvrent la réouverture A → B → A, la collision `movie:42`/`tv:42`, la déduplication des
 requêtes en vol, le cache chaud des relations et la conservation du contenu après une panne réseau.
-Le suivi est assuré dans [#146](https://github.com/julfou7/seenit-app/issues/146), en lien avec #130
+Le suivi est assuré dans [#146](https://github.com/julfou7/seenit-app/issues/146) pour les fiches et
+[#229](https://github.com/julfou7/seenit-app/issues/229) pour les cartes/Explorer, en lien avec #130
 pour le cache des sagas et univers.
 
 ## 6. Synchronisation Plex
