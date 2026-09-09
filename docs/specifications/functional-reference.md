@@ -166,9 +166,11 @@ le fil d'actualités des médias suivis.
 - **Pas vu depuis un moment** reçoit les autres séries encore regardables ;
 - **Films à voir** reçoit les films suivis non vus dont la sortie n'est pas future.
 
-Les règles exactes de frontière sont dans `seenit.md` §5.1. Chaque carrousel affiche un premier lot,
-peut être étendu par « Voir tout » puis paginé par lots de huit. Les médias abandonnés, archivés ou
-terminés ne reviennent pas dans le parcours actif.
+Les règles exactes de frontière sont dans `seenit.md` §5.1. Chaque carrousel matérialise un premier lot
+de huit cartes. Le scroll horizontal utilise un snap de proximité pour guider sans freiner le geste ;
+en continuant jusqu'au bout du lot, un marqueur terminal **« Voir tout »** indique explicitement l'action
+disponible dans l'en-tête. Cette action ouvre la vue verticale exhaustive, paginée par lots de huit.
+Les médias abandonnés, archivés ou terminés ne reviennent pas dans le parcours actif.
 
 Sur une carte série, un swipe permet de retirer le suivi (avec confirmation) ou d'abandonner la
 série ; les actions sont aussi accessibles au clavier. Une action destructive possède un toast avec
