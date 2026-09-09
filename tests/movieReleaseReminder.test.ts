@@ -47,7 +47,8 @@ test('issue #106 refuse une date générique et ne recrée jamais une disponibil
 
   assert.equal(resolveFrenchMovieReleaseReminderDate(withoutFrenchEvidence, 'home'), null);
   assert.equal(resolveFrenchMovieReleaseReminderDate(withoutFrenchEvidence, 'theater'), null);
-  assert.doesNotMatch(reminderSource, /120\s*\*\s*24|120\s*jours|\+\s*120/i);
+  assert.doesNotMatch(reminderSource, /const\s+dvdDate\s*=|releaseDate\.getTime\(\)\s*\+\s*120\s*\*/,
+    'aucun calcul exécutable de disponibilité à +120 jours ne doit subsister');
   assert.match(reminderSource, /tmdb\.getMovieDetails\(tmdbId\)/);
   assert.match(reminderSource, /resolveFrenchMovieReleaseReminderDate\(detailsResult\.value, 'home'\)/);
 });
