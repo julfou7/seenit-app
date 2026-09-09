@@ -1,13 +1,13 @@
 import type { Application, Request, RequestHandler } from 'express';
 import { registerPlexAvailabilityRoute } from '../../backend/plexAvailabilityBackend.ts';
 
-type Provider = 'tmdb' | 'omdb';
+type Provider = 'tmdb';
 type QuotaProvider = Provider | 'tvdb';
 type QuotaScope = 'request' | 'upstream';
-type Secrets = Partial<Record<'TMDB_API_KEY' | 'OMDB_API_KEY' | 'TVDB_API_KEY', string>>;
-const REQUIRED_SECRET_NAMES = ['TMDB_API_KEY', 'OMDB_API_KEY', 'TVDB_API_KEY'] as const;
-const REQUEST_LIMITS: Record<QuotaProvider, number> = { tmdb: 1800, omdb: 360, tvdb: 120 };
-const UPSTREAM_LIMITS: Record<QuotaProvider, number> = { tmdb: 600, omdb: 90, tvdb: 30 };
+type Secrets = Partial<Record<'TMDB_API_KEY' | 'TVDB_API_KEY', string>>;
+const REQUIRED_SECRET_NAMES = ['TMDB_API_KEY', 'TVDB_API_KEY'] as const;
+const REQUEST_LIMITS: Record<QuotaProvider, number> = { tmdb: 1800, tvdb: 120 };
+const UPSTREAM_LIMITS: Record<QuotaProvider, number> = { tmdb: 600, tvdb: 30 };
 interface Dependencies {
   authenticate: RequestHandler;
   fetch?: typeof fetch;
@@ -15,7 +15,7 @@ interface Dependencies {
   now?: () => number;
   timeoutMs?: number;
 }
-const ORIGINS = { tmdb: 'https://api.themoviedb.org/3/', omdb: 'https://www.omdbapi.com/' };
+const TMDB_ORIGIN = 'https://api.themoviedb.org/3/';
 const TVDB_ORIGIN = 'https://api4.thetvdb.com/v4/';
 const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
 const MAX_CACHE_BYTES = 16 * 1024 * 1024;
@@ -46,7 +46,6 @@ const APPEND = new Set([
   'external_ids', 'credits', 'aggregate_credits', 'images', 'videos', 'keywords',
   'recommendations', 'similar', 'release_dates', 'content_ratings', 'watch/providers',
 ]);
-const OMDB_QUERY = new Set(['i', 'Season']);
 const TMDB_REMOTE_SOURCE_NAMES = new Set(['themoviedb.com', 'themoviedb', 'tmdb']);
 
 export type TVDBRelationKind = 'franchise' | 'universe';
@@ -130,24 +129,17 @@ export function assertMediaProviderSecrets(secrets: Secrets = process.env): void
 }
 
 export function buildProviderRequest(provider: Provider, path: string, query: Request['query']): URL | null {
-  if (path.length > 160 || (provider === 'tmdb' && !TMDB_PATHS.some(rule => rule.test(path)))) return null;
-  if (provider === 'omdb' && path !== '') return null;
-  const url = new URL(path, ORIGINS[provider]);
-  const allowed = provider === 'tmdb' ? TMDB_QUERY : OMDB_QUERY;
+  if (provider !== 'tmdb' || path.length > 160 || !TMDB_PATHS.some(rule => rule.test(path))) return null;
+  const url = new URL(path, TMDB_ORIGIN);
   if (Object.keys(query).length > 30) return null;
   for (const [key, value] of Object.entries(query)) {
-    if (!allowed.has(key) || typeof value !== 'string' || value.length > 2048) return null;
+    if (!TMDB_QUERY.has(key) || typeof value !== 'string' || value.length > 2048) return null;
     if (key === 'page' && (!/^[1-9]\d{0,2}$/.test(value) || Number(value) > 500)) return null;
     if (key === 'append_to_response' && !value.split(',').every(part => APPEND.has(part))) return null;
     if (key === 'external_source' && !['imdb_id', 'tvdb_id'].includes(value)) return null;
     url.searchParams.set(key, value);
   }
-  if (provider === 'tmdb' && path.startsWith('find/') && !url.searchParams.has('external_source')) return null;
-  if (provider === 'omdb') {
-    if (!/^tt\d{5,12}$/.test(url.searchParams.get('i') || '')) return null;
-    const season = url.searchParams.get('Season');
-    if (season !== null && !/^\d{1,3}$/.test(season)) return null;
-  }
+  if (path.startsWith('find/') && !url.searchParams.has('external_source')) return null;
   url.searchParams.sort();
   return url;
 }
@@ -198,7 +190,7 @@ async function readBoundedJson(response: Response, secrets: string[]): Promise<s
   const canonical = JSON.stringify(data);
   if (secrets.some(secret => secret && (canonical.includes(secret) || canonical.includes(encodeURIComponent(secret))))
       || /"(api_key|apikey|access_token|authorization|token)"\s*:/i.test(canonical)) throw new ProviderFailure(502);
-  if (data.Response === 'False' || data.success === false || data.status_code) throw new ProviderFailure(502);
+  if (data.success === false || data.status_code) throw new ProviderFailure(502);
   return canonical;
 }
 
@@ -209,7 +201,6 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
   const now = dependencies.now || Date.now;
   const readSecrets = dependencies.secrets || (() => ({
     TMDB_API_KEY: process.env.TMDB_API_KEY,
-    OMDB_API_KEY: process.env.OMDB_API_KEY,
     TVDB_API_KEY: process.env.TVDB_API_KEY,
   }));
   const timeoutMs = dependencies.timeoutMs ?? 10_000;
@@ -244,27 +235,26 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
   const syncSecrets = () => {
     const secrets = readSecrets();
     if (secrets.TMDB_API_KEY !== currentSecrets.TMDB_API_KEY
-      || secrets.OMDB_API_KEY !== currentSecrets.OMDB_API_KEY
       || secrets.TVDB_API_KEY !== currentSecrets.TVDB_API_KEY) {
       cache.clear(); cacheBytes = 0; inFlight.clear(); tvdbRelationCache.clear(); tvdbToken = null; currentSecrets = { ...secrets };
     }
     return secrets;
   };
 
-  const handler = (provider: Provider): RequestHandler => async (req, res) => {
+  const tmdbHandler: RequestHandler = async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     const uid = (req as Request & { user?: { uid?: string } }).user?.uid;
     if (!uid) { res.status(401).json({ error: 'Authentification requise.' }); return; }
-    if (!takeQuota('request', provider, uid, REQUEST_LIMITS[provider], res)) return;
+    if (!takeQuota('request', 'tmdb', uid, REQUEST_LIMITS.tmdb, res)) return;
 
-    const path = provider === 'tmdb' ? String(req.params[0] || '') : '';
-    const target = buildProviderRequest(provider, path, req.query);
+    const path = String(req.params[0] || '');
+    const target = buildProviderRequest('tmdb', path, req.query);
     if (!target) { res.status(400).json({ error: 'Requête métadonnées refusée.' }); return; }
     const secrets = syncSecrets();
-    const credential = secrets[provider === 'tmdb' ? 'TMDB_API_KEY' : 'OMDB_API_KEY']?.trim();
+    const credential = secrets.TMDB_API_KEY?.trim();
     if (!credential) { res.status(503).json({ error: 'Fournisseur non configuré.' }); return; }
     const generation = currentSecrets;
-    const key = provider + ':' + target.pathname + target.search;
+    const key = 'tmdb:' + target.pathname + target.search;
     const time = now();
     const cached = cache.get(key);
     if (cached && cached.expires > time) { cache.delete(key); cache.set(key, cached); res.type('json').send(cached.body); return; }
@@ -272,15 +262,15 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
     let pending = inFlight.get(key);
     if (!pending) {
       if (inFlight.size >= 48) { res.setHeader('Retry-After', '1'); res.status(429).json({ error: 'Service occupé, réessayez.' }); return; }
-      if (!takeQuota('upstream', provider, uid, UPSTREAM_LIMITS[provider], res)) return;
-      target.searchParams.set(provider === 'tmdb' ? 'api_key' : 'apikey', credential);
+      if (!takeQuota('upstream', 'tmdb', uid, UPSTREAM_LIMITS.tmdb, res)) return;
+      target.searchParams.set('api_key', credential);
       pending = (async () => {
         const upstream = await request(target, { method: 'GET', headers: { Accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(timeoutMs) });
         if (!upstream.ok) {
           await upstream.body?.cancel();
           throw new ProviderFailure(upstream.status === 404 ? 404 : upstream.status === 429 ? 429 : 502);
         }
-        const body = await readBoundedJson(upstream, [(secrets.TMDB_API_KEY || '').trim(), (secrets.OMDB_API_KEY || '').trim(), (secrets.TVDB_API_KEY || '').trim()]);
+        const body = await readBoundedJson(upstream, [(secrets.TMDB_API_KEY || '').trim(), (secrets.TVDB_API_KEY || '').trim()]);
         if (generation === currentSecrets) {
           const bytes = Buffer.byteLength(body);
           while (cache.size >= 200 || cacheBytes + bytes > MAX_CACHE_BYTES) evict(cache.keys().next().value!);
@@ -407,8 +397,7 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
     }
   };
 
-  app.get('/api/media/tmdb/*', dependencies.authenticate, handler('tmdb'));
-  app.get('/api/media/omdb', dependencies.authenticate, handler('omdb'));
+  app.get('/api/media/tmdb/*', dependencies.authenticate, tmdbHandler);
   app.get('/api/media/tvdb/franchise', dependencies.authenticate, tvdbHandler);
   app.all('/api/media/*', dependencies.authenticate, (_req, res) => res.status(404).json({ error: 'Opération inconnue.' }));
 }
