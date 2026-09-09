@@ -2,10 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const reminderSource = readFileSync('src/hooks/useRemindersNotifier.ts', 'utf8');
-const notificationMediaSource = readFileSync('src/features/notifications/notificationMedia.ts', 'utf8');
-const mediaReminderSource = readFileSync('src/features/notifications/mediaReminderNotification.ts', 'utf8');
-const nativePatchSource = readFileSync('scripts/patch-local-notifications.cjs', 'utf8');
+const readSource = (file: string) => readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
+const reminderSource = readSource('src/hooks/useRemindersNotifier.ts');
+const notificationMediaSource = readSource('src/features/notifications/notificationMedia.ts');
+const mediaReminderSource = readSource('src/features/notifications/mediaReminderNotification.ts');
+const nativePatchSource = readSource('scripts/patch-local-notifications.cjs');
 
 test('SEENIT-NOTIFICATION-002 affiche un visuel média et un seul emoji par événement', () => {
   assert.match(reminderSource, /https:\/\/image\.tmdb\.org\/t\/p\/w154/,
