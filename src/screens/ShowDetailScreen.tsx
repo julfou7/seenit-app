@@ -222,6 +222,12 @@ function DetailUxNormalizer({ detailIdentity }: { detailIdentity: string | null 
           button.setAttribute('aria-label', title);
           button.classList.add('px-2');
         }
+
+        if (/^Saison\s+\d+/.test(button.textContent?.trim() || '')) {
+          const card = button.closest<HTMLElement>('.rounded-2xl');
+          const expanded = Boolean(card && Array.from(card.children).some(child => child.classList.contains('border-t')));
+          button.setAttribute('aria-expanded', String(expanded));
+        }
       }
 
       const categoriesHeading = Array.from(shell.querySelectorAll<HTMLElement>('span')).find(node => node.textContent?.trim() === 'Catégories & Thèmes');
@@ -241,7 +247,7 @@ function DetailUxNormalizer({ detailIdentity }: { detailIdentity: string | null 
             toggle = document.createElement('button');
             toggle.type = 'button';
             toggle.dataset.seenitThemeToggle = 'true';
-            toggle.className = 'min-h-8 px-2.5 py-1 rounded-full border border-white/10 text-zinc-400 text-[10px] font-semibold hover:text-white';
+            toggle.className = 'min-h-11 px-2.5 py-1 rounded-full border border-white/10 text-zinc-400 text-[10px] font-semibold hover:text-white';
             toggle.addEventListener('click', () => {
               chipRow.dataset.seenitThemesExpanded = String(chipRow.dataset.seenitThemesExpanded !== 'true');
               normalize();
