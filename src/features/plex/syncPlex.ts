@@ -54,13 +54,18 @@ import {
 import { buildLibraryStateSignature } from '../../lib/userIsolation';
 import { applyPlexLibraryWatchState, mergePlexProgressMutation } from './plexProgressMerge';
 import type { PlexLibraryWatchState } from './plexLibraryWatchState';
+import {
+  buildPlexWatchlistTrackingProvenance,
+  getPlexWatchlistMediaIdentity,
+  selectPlexWatchlistTrackingRemovals
+} from './plexWatchlistTracking';
 
 export interface PlexSyncResult {
   success: boolean;
   syncedCount: number;
   moviesCount: number;
   episodesCount: number;
-  syncedItems: Array<{ title: string; subtitle?: string; isWatchlist?: boolean; posterPath?: string | null; mediaType: 'tv' | 'movie'; show: Show }>;
+  syncedItems: Array<{ title: string; subtitle?: string; isWatchlist?: boolean; isWatchlistRemoval?: boolean; posterPath?: string | null; mediaType: 'tv' | 'movie'; show: Show }>;
   error?: string;
 }
 
@@ -807,8 +812,9 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       const hasHistory = Array.isArray(history) && history.length > 0;
       const hasWatchlist = Array.isArray(watchlist) && watchlist.length > 0;
       const hasLibraryWatchStates = Array.isArray(libraryWatchStates) && libraryWatchStates.length > 0;
+      const watchlistSnapshotComplete = plexData?.integrity?.watchlistCollectionComplete === true;
 
-      if (!hasHistory && !hasWatchlist && !hasLibraryWatchStates) {
+      if (!hasHistory && !hasWatchlist && !hasLibraryWatchStates && !watchlistSnapshotComplete) {
         const sourcesMsg = visitedSources && visitedSources.length > 0 ? ` (${visitedSources.join(', ')})` : '';
         // // appLogger.info('plex', `Plex vérifié : aucun nouveau média ni watchlist${sourcesMsg}`);
         const canCommitCursor = shouldCommitPlexCursor({
@@ -942,11 +948,13 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       let retryableUnresolvedCount = 0;
       let repairedCount = 0;
       let unwatchedCount = 0;
+      let watchlistUnresolvedItemCount = 0;
       const syncedItems: PlexSyncResult['syncedItems'] = [];
       const unresolvedItems: PlexUnresolvedLogItem[] = [];
       const syncedIdentityKeys = new Set<string>();
 
       const mutatedShows: Record<string, Show> = {};
+      const currentWatchlistIdentities = new Set<string>();
 
       const queueSyncedItem = (
         identity: string,
@@ -1383,10 +1391,14 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           const cleanTitle = rawTitle.replace(/\(\d{4}\)/g, '').trim();
           const guidTmdbId = extractTmdbIdFromPlex(wlItem);
           const cacheKey = buildPlexResolutionCacheKey(mediaType, wlItem);
+          const directIdentity = getPlexWatchlistMediaIdentity(mediaType, guidTmdbId);
+          if (directIdentity) currentWatchlistIdentities.add(directIdentity);
 
           // 1. Check if already in user's local library by TMDB ID
           let matchedShow = findShowInLocalLibrary(showsList, guidTmdbId, mediaType);
           if (matchedShow) {
+            const matchedIdentity = getPlexWatchlistMediaIdentity(mediaType, matchedShow.tmdbId);
+            if (matchedIdentity) currentWatchlistIdentities.add(matchedIdentity);
             continue;
           }
 
@@ -1394,28 +1406,38 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           let tmdbData: any = null;
           if (cacheKey && resolutionCache[cacheKey]) {
             tmdbData = resolutionCache[cacheKey];
-            matchedShow = showsList.find(
-              (s) => Number(s.tmdbId) === Number(tmdbData.id) && (s.mediaType === mediaType || (mediaType === 'tv' && !s.mediaType))
-            );
-            if (matchedShow) continue;
+            const cachedIdentity = getPlexWatchlistMediaIdentity(mediaType, tmdbData.id);
+            if (cachedIdentity) {
+              currentWatchlistIdentities.add(cachedIdentity);
+              matchedShow = showsList.find(
+                (s) => Number(s.tmdbId) === Number(tmdbData.id) && (s.mediaType === mediaType || (mediaType === 'tv' && !s.mediaType))
+              );
+              if (matchedShow) continue;
+            } else {
+              delete resolutionCache[cacheKey];
+              cacheModified = true;
+              tmdbData = null;
+            }
           }
 
           // 3. Resolve TMDB data for Watchlist item
           if (!tmdbData) {
             tmdbData = await resolveAndCachePlexItem(cacheKey, wlItem);
-
-            if (!tmdbData) {
-              unresolvedCount++;
-              recordUnresolvedItem(wlItem, 'watchlist');
-              appLogger.info('plex', `[Plex Sync] Item Watchlist "${cleanTitle}" ignoré (impossible de résoudre l'ID TMDB).`);
-              continue;
-            }
-
-            matchedShow = showsList.find(
-              (s) => Number(s.tmdbId) === Number(tmdbData.id) && (s.mediaType === mediaType || (mediaType === 'tv' && !s.mediaType))
-            );
-            if (matchedShow) continue;
           }
+
+          const resolvedIdentity = getPlexWatchlistMediaIdentity(mediaType, tmdbData?.id);
+          if (!resolvedIdentity) {
+            unresolvedCount++;
+            watchlistUnresolvedItemCount++;
+            recordUnresolvedItem(wlItem, 'watchlist');
+            appLogger.info('plex', `[Plex Sync] Item Watchlist "${cleanTitle}" ignoré (impossible de résoudre l'ID TMDB).`);
+            continue;
+          }
+          currentWatchlistIdentities.add(resolvedIdentity);
+          matchedShow = showsList.find(
+            (s) => Number(s.tmdbId) === Number(tmdbData.id) && (s.mediaType === mediaType || (mediaType === 'tv' && !s.mediaType))
+          );
+          if (matchedShow) continue;
 
           // 4. Create new show in 'plan_to_watch' status ("À Voir" / "Ma Liste")
           if (tmdbData && tmdbData.id) {
@@ -1446,7 +1468,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               networks: [],
               seenEpisodes: [],
               episodeRecords: {},
-              isArchived: false
+              isArchived: false,
+              trackingProvenance: buildPlexWatchlistTrackingProvenance(mediaType, tmdbData.id)
             };
 
             mutatedShows[showId] = newShowData;
@@ -1467,6 +1490,22 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         }
       }
 
+      const watchlistRemovalSnapshot = {
+        mode: delta ? 'delta' as const : 'full' as const,
+        complete: watchlistSnapshotComplete,
+        unresolvedItemCount: watchlistUnresolvedItemCount,
+        mediaIdentities: currentWatchlistIdentities
+      };
+      const watchlistRemovalCandidates = selectPlexWatchlistTrackingRemovals(
+        showsList,
+        watchlistRemovalSnapshot
+      );
+      if (!watchlistSnapshotComplete) {
+        appLogger.info('plex', '[Plex Watchlist] Retraits ignorés : snapshot non exhaustif ou indisponible.');
+      } else if (watchlistUnresolvedItemCount > 0) {
+        appLogger.warn('plex', `[Plex Watchlist] Retraits différés : ${watchlistUnresolvedItemCount} identité(s) non résolue(s).`);
+      }
+
       if (unwatchedCount > 0) {
         appLogger.info('plex', `[Plex Sync] ${unwatchedCount} dé-vu explicite(s) réconcilié(s) depuis l’inventaire courant.`);
       }
@@ -1478,7 +1517,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         });
       }
 
-      if (syncCount > 0 || Object.keys(mutatedShows).length > 0) {
+      if (syncCount > 0 || Object.keys(mutatedShows).length > 0 || watchlistRemovalCandidates.length > 0) {
         // 2. Save all mutated and new shows to Firestore in safe chunks of 250
         const showEntries = Object.entries(mutatedShows);
         const BATCH_SIZE = 250;
@@ -1508,15 +1547,62 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           });
         }
 
+        // Le snapshot de départ ne suffit pas pour une suppression : la transaction
+        // relit chaque document et laisse gagner toute intention SeenIt concurrente.
+        const removedWatchlistShows: Show[] = [];
+        for (let i = 0; i < watchlistRemovalCandidates.length; i += BATCH_SIZE) {
+          const chunk = watchlistRemovalCandidates.slice(i, i + BATCH_SIZE);
+          const removedChunk = await runTransaction(db, async (transaction) => {
+            const refs = chunk.map(show => ({
+              show,
+              ref: doc(db, `users/${user.uid}/shows`, show.id)
+            }));
+            const currentSnapshots = await Promise.all(refs.map(({ ref }) => transaction.get(ref)));
+            const removed: Show[] = [];
+
+            for (let index = 0; index < refs.length; index++) {
+              const { ref, show } = refs[index];
+              const currentSnapshot = currentSnapshots[index];
+              if (!currentSnapshot.exists()) continue;
+              const currentShow = { ...currentSnapshot.data(), id: show.id } as Show;
+              const [eligible] = selectPlexWatchlistTrackingRemovals(
+                [currentShow],
+                watchlistRemovalSnapshot
+              );
+              if (!eligible) continue;
+              transaction.delete(ref);
+              removed.push(currentShow);
+            }
+
+            return removed;
+          });
+          removedWatchlistShows.push(...removedChunk);
+        }
+
+        for (const removedShow of removedWatchlistShows) {
+          syncCount++;
+          if (removedShow.mediaType === 'movie') moviesCount++;
+          queueSyncedItem(`watchlist-removal:${getPlexWatchlistMediaIdentity(removedShow.mediaType, removedShow.tmdbId)}`, {
+            title: removedShow.title,
+            subtitle: removedShow.mediaType === 'movie' ? 'Film' : 'Série',
+            isWatchlistRemoval: true,
+            posterPath: removedShow.posterPath,
+            mediaType: removedShow.mediaType,
+            show: removedShow
+          });
+        }
+
         // 3. Relire le serveur après les commits : le même UID obtient ainsi le
         // même état final sur PWA et APK, sans fusion locale implicite.
         await useShowsStore.getState().fetchShows();
 
         // Queue sequential toasts for each synced item (5s each)
         syncedItems.forEach((item) => {
-          const actionText = item.isWatchlist
-            ? 'Watchlist Plex • Ajouté à voir'
-            : 'Vu sur Plex • Synchronisé';
+          const actionText = item.isWatchlistRemoval
+            ? 'Watchlist Plex • Retiré du suivi'
+            : item.isWatchlist
+              ? 'Watchlist Plex • Ajouté à voir'
+              : 'Vu sur Plex • Synchronisé';
 
           useToastStore.getState().showToast(
             {
@@ -1532,7 +1618,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           );
         });
 
-        clearPlexSyncStatusDelayed(`Synchro terminée (${syncCount} nouveau(x))`, 3500);
+        clearPlexSyncStatusDelayed(`Synchro terminée (${syncCount} changement(s))`, 3500);
       } else {
         // // appLogger.info('plex', 'Synchronisation terminée : 0 nouveau média (votre bibliothèque est déjà à jour)');
         clearPlexSyncStatusDelayed('Sync Plex terminée (à jour)', 3500);
@@ -1540,7 +1626,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
       appLogger.success(
         'plex',
-        `[Plex Sync] Bilan : ${syncCount} nouveau(x), ${alreadyWatchedCount} déjà vu(s) ignoré(s), ${unresolvedCount} non résolu(s), ${repairedCount} index vu(s) réparé(s) sans notification.`
+        `[Plex Sync] Bilan : ${syncCount} changement(s), ${alreadyWatchedCount} déjà vu(s) ignoré(s), ${unresolvedCount} non résolu(s), ${repairedCount} index vu(s) réparé(s) sans notification.`
       );
       if (unresolvedItems.length > 0) {
         appLogger.warn(

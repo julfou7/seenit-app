@@ -8,6 +8,7 @@ export interface PlexServerSyncEntry {
 
 export interface PlexCollectionIntegrity {
   collectionComplete?: boolean;
+  watchlistCollectionComplete?: boolean;
   libraryInventoryScanSucceeded?: boolean;
   libraryInventoryScanComplete?: boolean;
   incompleteSources?: string[];

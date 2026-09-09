@@ -386,8 +386,11 @@ La machine d'états exhaustive et le mapping Plex sont autoritatifs dans `seenit
 - Un timeout, une panne réseau, un `401` ou un `5xx` conserve l’état connu et ne devient jamais une
   absence Plex. Seul un `2xx` explicite contenant `available:false` peut alimenter le cache négatif.
 
-Le retrait de Watchlist vers « non suivi » reste volontairement ouvert dans #68 ; aucune absence
-ambiguë ne doit être interprétée en attendant.
+Le retrait d’un média de la Watchlist le ramène à « non suivi » uniquement si SeenIt prouve que cette
+Watchlist avait seule créé le document et qu’aucune progression, note, favori, rappel, archive ou autre
+intention SeenIt ne s’y est ajoutée. Le full et la delta appliquent la même règle à partir d’un snapshot
+Watchlist explicitement complet. Un endpoint partiel, une panne, un timeout, une identité non résolue ou
+une provenance absente conserve toujours le suivi.
 
 ## 10. Téléchargements
 
@@ -567,7 +570,6 @@ elle est nécessaire à la plateforme et explicitement documentée.
 |---|---|---|
 | P1 | La classification d’âge actuelle peut préférer une valeur FR permissive, sous-classer des certifications US et inventer un TP par genre. | Appliquer `SEENIT-PARENTAL-001` : [#98](https://github.com/julfou7/seenit-app/issues/98). |
 | P1 | Les personnes favorites restent locales et font diverger les recommandations PWA/APK. | Rendre Firestore autoritatif : [#95](https://github.com/julfou7/seenit-app/issues/95). |
-| P1 | Le retrait de Watchlist Plex ne retire pas encore un suivi créé uniquement par cette Watchlist. | Implémentation avec provenance : [#68](https://github.com/julfou7/seenit-app/issues/68). |
 | P2 | Partager une fiche ou le profil ne garantit pas encore un lien réouvrable conforme. | Décider/corriger : [#96](https://github.com/julfou7/seenit-app/issues/96). |
 | P2 | Les parcours fonctionnels réels ne sont pas encore couverts de bout en bout. | Programme E2E/accessibilité/performance : [#15](https://github.com/julfou7/seenit-app/issues/15). |
 
