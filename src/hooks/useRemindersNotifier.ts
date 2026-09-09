@@ -18,7 +18,7 @@ import {
   toLocalReminderDate,
 } from '../features/notifications/movieReleaseReminder';
 
-const REMINDER_SCHEDULE_SCHEMA = 'v2';
+const REMINDER_SCHEDULE_SCHEMA = 'v3';
 
 function toLocalDateKey(date: Date): string {
   const year = date.getFullYear();
