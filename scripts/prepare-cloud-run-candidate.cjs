@@ -171,6 +171,32 @@ function forceSingleContainerSecretEnv(lines, imageIndex, name, secretName, vers
   lines.splice(start, end - start, ...entry);
 }
 
+function removeSingleContainerEnv(lines, imageIndex, name) {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const { containerStart, containerEnd } = getSingleContainerBounds(lines, imageIndex);
+  const envIndex = lines.findIndex((line, index) => index >= containerStart && index < containerEnd && /^(?:      - |        )env:\s*$/.test(line));
+  if (envIndex < 0) return;
+
+  let envEnd = containerEnd;
+  for (let index = envIndex + 1; index < containerEnd; index += 1) {
+    if (/^        [A-Za-z0-9_-]+:\s*/.test(lines[index])) { envEnd = index; break; }
+  }
+
+  const starts = [];
+  for (let index = envIndex + 1; index < envEnd; index += 1) {
+    if (new RegExp(`^        - name:\\s*['\"]?${escapedName}['\"]?\\s*$`).test(lines[index])) starts.push(index);
+  }
+  if (starts.length > 1) throw new Error(`Variable runtime ${name} dupliquée dans l'export Cloud Run.`);
+  if (!starts.length) return;
+
+  const start = starts[0];
+  let end = envEnd;
+  for (let index = start + 1; index < envEnd; index += 1) {
+    if (/^        - name:\s*/.test(lines[index])) { end = index; break; }
+  }
+  lines.splice(start, end - start);
+}
+
 function normalizeTraffic(lines, trafficIndex, trafficEnd, previousRevision, candidateRevision, candidateTag) {
   const trafficLines = lines.slice(trafficIndex + 1, trafficEnd);
   const trafficText = trafficLines.join('\n');
@@ -275,7 +301,10 @@ function prepareCandidateService(source, { image, service, previousRevision, can
   if (imageIndexes.length !== 1) throw new Error('Ligne image perdue pendant la normalisation du lancement.');
 
   forceSingleContainerEnv(lines, imageIndexes[0], 'NODE_ENV', 'production');
-  for (const secretName of ['TMDB_API_KEY', 'OMDB_API_KEY', 'TVDB_API_KEY']) {
+  let currentImageIndex = lines.findIndex(line => /^\s*(?:-\s*)?image:\s*\S+\s*$/.test(line));
+  if (currentImageIndex < 0) throw new Error('Ligne image perdue avant retrait des variables obsolètes.');
+  removeSingleContainerEnv(lines, currentImageIndex, 'OMDB_API_KEY');
+  for (const secretName of ['TMDB_API_KEY', 'TVDB_API_KEY']) {
     const secretImageIndex = lines.findIndex(line => /^\s*(?:-\s*)?image:\s*\S+\s*$/.test(line));
     if (secretImageIndex < 0) throw new Error('Ligne image perdue avant injection Secret Manager.');
     forceSingleContainerSecretEnv(lines, secretImageIndex, secretName, secretName, 'latest');
@@ -296,7 +325,8 @@ function prepareCandidateService(source, { image, service, previousRevision, can
   if (!prepared.includes(`name: ${candidateRevision}`)) throw new Error('Le nom de révision candidate n’a pas été injecté.');
   if (!prepared.includes(image)) throw new Error('Le digest d’image candidate n’a pas été injecté.');
   if (!/name:\s*NODE_ENV\s*\n\s*value:\s*production/.test(prepared)) throw new Error('NODE_ENV=production n’a pas été forcé sur le runtime candidat.');
-  for (const secretName of ['TMDB_API_KEY', 'OMDB_API_KEY', 'TVDB_API_KEY']) {
+  if (/name:\s*OMDB_API_KEY\b/.test(prepared)) throw new Error('La variable OMDB_API_KEY obsolète subsiste dans la candidate.');
+  for (const secretName of ['TMDB_API_KEY', 'TVDB_API_KEY']) {
     const marker = '- name: ' + secretName + '\n          valueFrom:\n            secretKeyRef:\n              key: latest\n              name: ' + secretName;
     if (!prepared.includes(marker)) throw new Error('Référence Secret Manager absente pour ' + secretName + '.');
   }
@@ -321,10 +351,10 @@ function main() {
     candidateRevision: args['candidate-revision']
   });
   fs.writeFileSync(args.output, prepared, 'utf8');
-  console.log(`[CloudRunCandidate] Service préparé: ${args['previous-revision']} -> ${args['candidate-revision']} sur ${args.image}, entrypoint image conservé, NODE_ENV=production, trafic normalisé et cible 0 %=${deriveCandidateTag(args.service, args['candidate-revision'])}`);
+  console.log(`[CloudRunCandidate] Service préparé: ${args['previous-revision']} -> ${args['candidate-revision']} sur ${args.image}, entrypoint image conservé, NODE_ENV=production, secrets TMDB/TVDB liés, trafic normalisé et cible 0 %=${deriveCandidateTag(args.service, args['candidate-revision'])}`);
 }
 
-module.exports = { deriveCandidateTag, forceSingleContainerEnv, forceSingleContainerSecretEnv, getSingleContainerBounds, normalizeSingleContainerLaunch, normalizeTraffic, parseArgs, prepareCandidateService, validateRevisionName };
+module.exports = { deriveCandidateTag, forceSingleContainerEnv, forceSingleContainerSecretEnv, getSingleContainerBounds, normalizeSingleContainerLaunch, normalizeTraffic, parseArgs, prepareCandidateService, removeSingleContainerEnv, validateRevisionName };
 
 if (require.main === module) {
   try {
