@@ -648,6 +648,41 @@
       ]
     },
     {
+      "id": "SEENIT-PLEX-009",
+      "title": "Retrait Watchlist Plex limité aux suivis explicitement créés par cette Watchlist",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/plexWatchlistTracking.test.ts",
+          "contains": "SEENIT-PLEX-009 retire un film et une série créés uniquement par la Watchlist"
+        },
+        {
+          "file": "tests/plexWatchlistTracking.test.ts",
+          "contains": "SEENIT-PLEX-009 conserve les suivis manuels et toute intention SeenIt"
+        },
+        {
+          "file": "tests/plexWatchlistTracking.test.ts",
+          "contains": "SEENIT-PLEX-009 refuse toute suppression sur un snapshot incomplet ou ambigu"
+        },
+        {
+          "file": "tests/plexWatchlistTracking.test.ts",
+          "contains": "SEENIT-PLEX-009 partage la même décision en full et en delta"
+        },
+        {
+          "file": "tests/plexWatchlistTracking.test.ts",
+          "contains": "SEENIT-PLEX-009 n’accorde l’autorité qu’aux endpoints Watchlist exhaustifs"
+        },
+        {
+          "file": "tests/plexWatchlistTracking.test.ts",
+          "contains": "SEENIT-PLEX-009 le runtime persiste la provenance et relit avant suppression"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-SECURITY-001",
       "title": "Allowlist minimale du proxy de services",
       "targets": [

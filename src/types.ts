@@ -8,6 +8,12 @@ export interface ImportTask {
   error?: string;
 }
 
+export interface TrackingProvenance {
+  source: 'plex-watchlist';
+  mediaIdentity: string;
+  importedAt: number;
+}
+
 export interface Show {
   id: string; // Document ID from Firestore
   userId: string;
@@ -45,4 +51,5 @@ export interface Show {
   userRating?: number;
   seriesEnded?: boolean;
   tmdbStatus?: string;
+  trackingProvenance?: TrackingProvenance;
 }
