@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { type Show } from '../types';
 import { tmdb } from '../features/shows/tmdb';
 import { checkIsUpToDate } from '../lib/utils';
+import { auth } from '../lib/firebase';
 
 export interface PersonStat {
   id: number;
@@ -29,6 +30,305 @@ export interface AnalyticsData {
   topDirectors: PersonStat[];
   bingeTime: { title: string; remainingMinutes: number } | null;
 }
+
+type PersonAccumulator = {
+  name: string;
+  movieWorks: Set<number>;
+  tvWorks: Set<number>;
+  profile_path: string | null;
+  popularity: number;
+};
+
+type AnalyticsPersonContribution = {
+  id: number;
+  name: string;
+  profile_path: string | null;
+  popularity: number;
+};
+
+type AnalyticsMediaContribution = {
+  genres: string[];
+  actors: AnalyticsPersonContribution[];
+  directors: AnalyticsPersonContribution[];
+};
+
+// Cache de session volontairement compact : contrairement au cache TMDB complet,
+// il ne conserve que les quelques champs nécessaires aux statistiques. Il permet
+// de reprendre un calcul interrompu (navigation/Réglages) sans retélécharger les
+// crédits déjà analysés. Les données contenues ici sont uniquement des métadonnées
+// TMDB publiques ; aucune progression utilisateur n'y est stockée.
+const analyticsContributionCache = new Map<string, AnalyticsMediaContribution>();
+const MAX_ANALYTICS_CONTRIBUTIONS = 512;
+
+// Le résultat final contient des données propres au compte : il est donc cloisonné
+// par UID dans sa clé et reste uniquement en mémoire pendant la session WebView/PWA.
+const analyticsResultCache = new Map<string, AnalyticsData>();
+const MAX_ANALYTICS_RESULTS = 8;
+
+const getMediaContributionKey = (show: Show): string =>
+  `${show.mediaType === 'movie' ? 'movie' : 'tv'}:${Number(show.tmdbId)}`;
+
+const readContributionCache = (key: string): AnalyticsMediaContribution | null => {
+  const cached = analyticsContributionCache.get(key);
+  if (!cached) return null;
+  analyticsContributionCache.delete(key);
+  analyticsContributionCache.set(key, cached);
+  return cached;
+};
+
+const writeContributionCache = (key: string, contribution: AnalyticsMediaContribution) => {
+  if (analyticsContributionCache.has(key)) analyticsContributionCache.delete(key);
+  analyticsContributionCache.set(key, contribution);
+  while (analyticsContributionCache.size > MAX_ANALYTICS_CONTRIBUTIONS) {
+    const oldest = analyticsContributionCache.keys().next().value;
+    if (!oldest) break;
+    analyticsContributionCache.delete(oldest);
+  }
+};
+
+const readResultCache = (key: string): AnalyticsData | null => {
+  const cached = analyticsResultCache.get(key);
+  if (!cached) return null;
+  analyticsResultCache.delete(key);
+  analyticsResultCache.set(key, cached);
+  return cached;
+};
+
+const writeResultCache = (key: string, data: AnalyticsData) => {
+  if (analyticsResultCache.has(key)) analyticsResultCache.delete(key);
+  analyticsResultCache.set(key, data);
+  while (analyticsResultCache.size > MAX_ANALYTICS_RESULTS) {
+    const oldest = analyticsResultCache.keys().next().value;
+    if (!oldest) break;
+    analyticsResultCache.delete(oldest);
+  }
+};
+
+const isDirectingJob = (jobStr: string) => {
+  const job = (jobStr || '').toLowerCase();
+  return job.includes('director')
+    || job.includes('réalisat')
+    || job.includes('creator')
+    || job.includes('créat')
+    || job === 'showrunner';
+};
+
+const toPersonContribution = (person: any): AnalyticsPersonContribution => ({
+  id: Number(person.id),
+  name: person.name || '',
+  profile_path: person.profile_path || null,
+  popularity: person.popularity || 0,
+});
+
+const extractAnalyticsContribution = (show: Show, details: any): AnalyticsMediaContribution => {
+  const genres = Array.from(new Set(
+    (Array.isArray(details?.genres) ? details.genres : [])
+      .map((genre: any) => String(genre?.name || '').trim())
+      .filter(Boolean),
+  ));
+
+  let castList: any[] = [];
+  if (show.mediaType === 'tv') {
+    if (Array.isArray(details?.aggregate_credits?.cast) && details.aggregate_credits.cast.length > 0) {
+      castList = [...details.aggregate_credits.cast].sort((left: any, right: any) => {
+        const episodeDiff = (right.total_episode_count || 0) - (left.total_episode_count || 0);
+        if (episodeDiff !== 0) return episodeDiff;
+        return (left.order || 0) - (right.order || 0);
+      });
+    } else if (Array.isArray(details?.credits?.cast)) {
+      castList = details.credits.cast;
+    }
+  } else if (Array.isArray(details?.credits?.cast)) {
+    castList = details.credits.cast;
+  }
+
+  const actorsById = new Map<number, AnalyticsPersonContribution>();
+  // On conserve le même périmètre que l'implémentation historique : tout le casting
+  // dédupliqué par média, afin que le classement reste cohérent avec la filmographie.
+  for (const cast of castList) {
+    const id = Number(cast?.id);
+    if (!id || actorsById.has(id)) continue;
+    actorsById.set(id, toPersonContribution(cast));
+  }
+
+  const directorsById = new Map<number, AnalyticsPersonContribution>();
+  const addDirector = (person: any) => {
+    const id = Number(person?.id);
+    if (!id || directorsById.has(id)) return;
+    directorsById.set(id, toPersonContribution(person));
+  };
+
+  if (show.mediaType === 'tv') {
+    if (Array.isArray(details?.created_by)) {
+      details.created_by.forEach(addDirector);
+    }
+
+    const crew = details?.aggregate_credits?.crew || details?.credits?.crew || [];
+    if (Array.isArray(crew)) {
+      for (const member of crew) {
+        const directing = Array.isArray(member?.jobs)
+          ? member.jobs.some((job: any) => isDirectingJob(job?.job))
+          : isDirectingJob(member?.job);
+        if (directing) addDirector(member);
+      }
+    }
+  } else {
+    const crew = details?.credits?.crew || [];
+    if (Array.isArray(crew)) {
+      for (const member of crew) {
+        if (isDirectingJob(member?.job)) addDirector(member);
+      }
+    }
+  }
+
+  return {
+    genres,
+    actors: Array.from(actorsById.values()),
+    directors: Array.from(directorsById.values()),
+  };
+};
+
+const ensureAccumulator = (
+  target: Record<number, PersonAccumulator>,
+  person: AnalyticsPersonContribution,
+): PersonAccumulator => {
+  if (!target[person.id]) {
+    target[person.id] = {
+      name: person.name,
+      movieWorks: new Set<number>(),
+      tvWorks: new Set<number>(),
+      profile_path: person.profile_path,
+      popularity: person.popularity,
+    };
+  }
+
+  const accumulator = target[person.id];
+  if (person.profile_path && !accumulator.profile_path) accumulator.profile_path = person.profile_path;
+  if (person.popularity > accumulator.popularity) accumulator.popularity = person.popularity;
+  return accumulator;
+};
+
+const applyContribution = (
+  show: Show,
+  contribution: AnalyticsMediaContribution,
+  genreCounts: Record<string, number>,
+  actorCounts: Record<number, PersonAccumulator>,
+  directorCounts: Record<number, PersonAccumulator>,
+) => {
+  contribution.genres.forEach((genre) => {
+    genreCounts[genre] = (genreCounts[genre] || 0) + 1;
+  });
+
+  const tmdbId = Number(show.tmdbId);
+  contribution.actors.forEach((actor) => {
+    const accumulator = ensureAccumulator(actorCounts, actor);
+    if (show.mediaType === 'movie') accumulator.movieWorks.add(tmdbId);
+    else accumulator.tvWorks.add(tmdbId);
+  });
+
+  contribution.directors.forEach((director) => {
+    const accumulator = ensureAccumulator(directorCounts, director);
+    if (show.mediaType === 'movie') accumulator.movieWorks.add(tmdbId);
+    else accumulator.tvWorks.add(tmdbId);
+  });
+};
+
+const buildPersonStats = (
+  counts: Record<number, PersonAccumulator>,
+  role: 'actor' | 'director',
+): PersonStat[] => Object.entries(counts)
+  .map(([id, person]) => {
+    const movieCount = person.movieWorks.size;
+    const tvCount = person.tvWorks.size;
+    const totalCount = movieCount + tvCount;
+
+    let subtitle = '';
+    if (role === 'director') {
+      if (tvCount > 0 && movieCount === 0) {
+        subtitle = `${tvCount} ${tvCount > 1 ? 'séries créées' : 'série créée'}`;
+      } else if (movieCount > 0 && tvCount === 0) {
+        subtitle = `${movieCount} ${movieCount > 1 ? 'films vus' : 'film vu'}`;
+      } else {
+        subtitle = `${tvCount} ${tvCount > 1 ? 'séries créées' : 'série créée'} · ${movieCount} ${movieCount > 1 ? 'films vus' : 'film vu'}`;
+      }
+    } else if (tvCount > 0 && movieCount === 0) {
+      subtitle = `${tvCount} ${tvCount > 1 ? 'séries vues' : 'série vue'}`;
+    } else if (movieCount > 0 && tvCount === 0) {
+      subtitle = `${movieCount} ${movieCount > 1 ? 'films vus' : 'film vu'}`;
+    } else {
+      subtitle = `${movieCount} ${movieCount > 1 ? 'films' : 'film'} · ${tvCount} ${tvCount > 1 ? 'séries' : 'série'} vus`;
+    }
+
+    return {
+      id: Number(id),
+      name: person.name,
+      count: totalCount,
+      movieCount,
+      tvCount,
+      subtitle,
+      profile_path: person.profile_path,
+      popularity: person.popularity,
+    };
+  })
+  .filter((person) => person.count > 0)
+  .sort((left, right) => {
+    if (right.count !== left.count) return right.count - left.count;
+    return (right.popularity || 0) - (left.popularity || 0);
+  })
+  .slice(0, 20);
+
+const buildAdvancedData = (
+  baseData: AnalyticsData,
+  genreCounts: Record<string, number>,
+  actorCounts: Record<number, PersonAccumulator>,
+  directorCounts: Record<number, PersonAccumulator>,
+): AnalyticsData => {
+  const totalGenreWeight = Object.values(genreCounts).reduce((sum, count) => sum + count, 0) || 1;
+  const genres = Object.entries(genreCounts)
+    .map(([name, count]) => ({
+      name,
+      count: Math.round(count),
+      percentage: Math.round((count / totalGenreWeight) * 100),
+    }))
+    .sort((left, right) => right.count - left.count)
+    .slice(0, 4);
+
+  const dominantGenre = genres[0]?.name || 'Général';
+  return {
+    ...baseData,
+    dominantGenre,
+    cinephileArchetype: getArchetypeForGenre(dominantGenre),
+    genres,
+    topActors: buildPersonStats(actorCounts, 'actor'),
+    topDirectors: buildPersonStats(directorCounts, 'director'),
+  };
+};
+
+const buildAnalyticsSignature = (shows: Show[]): string => shows
+  .map((show) => {
+    const value = show as any;
+    const next = value.nextEpisodeToWatch || {};
+    return [
+      String(show.id || ''),
+      String(Number(show.tmdbId) || 0),
+      show.mediaType || 'tv',
+      value.status || '',
+      value.isFavorite ? '1' : '0',
+      value.isArchived ? '1' : '0',
+      (value.seenEpisodes || []).join(','),
+      String(value.totalEpisodes || 0),
+      String(value.totalAiredEpisodes || 0),
+      String(next.season_number || ''),
+      String(next.episode_number || ''),
+      String(next.air_date || ''),
+      value.seriesEnded ? '1' : '0',
+      value.tmdbStatus || '',
+      value.networks?.[0]?.name || '',
+      value.title || '',
+    ].join('~');
+  })
+  .sort()
+  .join('|');
 
 export function getArchetypeForGenre(genreName: string): string {
   const g = (genreName || '').toLowerCase();
@@ -77,35 +377,46 @@ export function isShowWatched(show: Show | undefined): boolean {
 export function useProAnalytics(shows: Show[]) {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(false);
+  const analyticsSignature = buildAnalyticsSignature(shows || []);
+  const analyticsCacheKey = `${auth.currentUser?.uid || 'anonymous'}:${analyticsSignature}`;
 
   useEffect(() => {
     let isMounted = true;
-    
+
     async function loadStats() {
+      const cachedResult = readResultCache(analyticsCacheKey);
+      if (cachedResult) {
+        setData(cachedResult);
+        setLoading(false);
+        return;
+      }
+
       if (!shows || shows.length === 0) {
+        const emptyData: AnalyticsData = {
+          totalMinutes: 0,
+          totalEpisodesSeen: 0,
+          totalMoviesSeen: 0,
+          completedTvCount: 0,
+          favoritesCount: 0,
+          topShowTitle: 'Aucune',
+          cinephileArchetype: '🍿 Cinéphile Aguerri',
+          dominantGenre: 'Aucun',
+          platforms: [],
+          genres: [],
+          topActors: [],
+          topDirectors: [],
+          bingeTime: null,
+        };
         if (isMounted) {
-          setData({
-            totalMinutes: 0,
-            totalEpisodesSeen: 0,
-            totalMoviesSeen: 0,
-            completedTvCount: 0,
-            favoritesCount: 0,
-            topShowTitle: 'Aucune',
-            cinephileArchetype: '🍿 Cinéphile Aguerri',
-            dominantGenre: 'Aucun',
-            platforms: [],
-            genres: [],
-            topActors: [],
-            topDirectors: [],
-            bingeTime: null
-          });
+          setData(emptyData);
           setLoading(false);
+          writeResultCache(analyticsCacheKey, emptyData);
         }
         return;
       }
 
       setLoading(true);
-      
+
       let totalMinutes = 0;
       let totalEpisodesSeen = 0;
       let totalMoviesSeen = 0;
@@ -114,31 +425,19 @@ export function useProAnalytics(shows: Show[]) {
 
       const platformCounts: Record<string, number> = {};
       const genreCounts: Record<string, number> = {};
-      const actorCounts: Record<number, { 
-        name: string; 
-        movieWorks: Set<number>;
-        tvWorks: Set<number>;
-        profile_path: string | null; 
-        popularity: number;
-      }> = {};
-      const directorCounts: Record<number, { 
-        name: string; 
-        movieWorks: Set<number>;
-        tvWorks: Set<number>;
-        profile_path: string | null; 
-        popularity: number;
-      }> = {};
-      
+      const actorCounts: Record<number, PersonAccumulator> = {};
+      const directorCounts: Record<number, PersonAccumulator> = {};
+
       let bingeCandidate: Show | null = null;
       let maxRemainingEps = 0;
       let topShowTitle = 'Aucune';
       let maxEpsForShow = -1;
-      
+
       shows.forEach(show => {
         const seenEpsCount = (show.seenEpisodes || []).filter(e => e !== 'movie').length;
         if (show.isFavorite) favoritesCount++;
-        
-        let platformName = "Autres";
+
+        let platformName = 'Autres';
         if (show.networks && show.networks.length > 0) {
           const net = show.networks[0].name;
           if (net.includes('Netflix')) platformName = 'Netflix';
@@ -149,10 +448,9 @@ export function useProAnalytics(shows: Show[]) {
           else if (net.includes('Canal')) platformName = 'Canal+';
           else platformName = net;
         }
-        
+
         if (show.mediaType === 'movie') {
-          const isSeenMovie = isShowWatched(show);
-          if (isSeenMovie) {
+          if (isShowWatched(show)) {
             totalMoviesSeen++;
             totalMinutes += 110;
             platformCounts[platformName] = (platformCounts[platformName] || 0) + 1;
@@ -160,9 +458,7 @@ export function useProAnalytics(shows: Show[]) {
         } else {
           totalEpisodesSeen += seenEpsCount;
           totalMinutes += seenEpsCount * 45;
-          if (show.status === 'completed') {
-            completedTvCount++;
-          }
+          if (show.status === 'completed') completedTvCount++;
           if (seenEpsCount > 0 || isShowWatched(show)) {
             platformCounts[platformName] = (platformCounts[platformName] || 0) + 1;
           }
@@ -170,10 +466,9 @@ export function useProAnalytics(shows: Show[]) {
             maxEpsForShow = seenEpsCount;
             topShowTitle = show.title;
           }
-          
+
           if (show.status === 'watching') {
-            const totalEps = show.totalEpisodes || 0;
-            const remaining = totalEps - seenEpsCount;
+            const remaining = (show.totalEpisodes || 0) - seenEpsCount;
             if (remaining > maxRemainingEps) {
               maxRemainingEps = remaining;
               bingeCandidate = show;
@@ -181,15 +476,15 @@ export function useProAnalytics(shows: Show[]) {
           }
         }
       });
-      
-      const totalPlatformItems = Object.values(platformCounts).reduce((a, b) => a + b, 0) || 1;
+
+      const totalPlatformItems = Object.values(platformCounts).reduce((sum, count) => sum + count, 0) || 1;
       const sortedPlatforms = Object.entries(platformCounts)
         .map(([name, count]) => ({
           name,
           count,
-          percentage: Math.round((count / totalPlatformItems) * 100)
+          percentage: Math.round((count / totalPlatformItems) * 100),
         }))
-        .sort((a, b) => b.count - a.count)
+        .sort((left, right) => right.count - left.count)
         .slice(0, 4);
 
       const initialData: AnalyticsData = {
@@ -205,302 +500,69 @@ export function useProAnalytics(shows: Show[]) {
         genres: [],
         topActors: [],
         topDirectors: [],
-        bingeTime: bingeCandidate ? { title: bingeCandidate.title, remainingMinutes: maxRemainingEps * 45 } : null
+        bingeTime: bingeCandidate ? { title: bingeCandidate.title, remainingMinutes: maxRemainingEps * 45 } : null,
       };
 
-      if (isMounted) {
-        setData(initialData);
-      }
-      
+      if (isMounted) setData(initialData);
+
       const watchedItems = shows.filter(isShowWatched);
-      
       if (watchedItems.length > 0) {
-        try {
-          // Lots volontairement petits : le profil reste réactif et une navigation
-          // n'abandonne au maximum qu'une poignée de requêtes déjà parties.
-          const batchSize = 6;
-          for (let b = 0; b < watchedItems.length; b += batchSize) {
-            if (!isMounted) return;
-            const batch = watchedItems.slice(b, b + batchSize);
-            const promises = batch.map(s => 
-              s.mediaType === 'movie' ? tmdb.getMovieDetails(s.tmdbId) : tmdb.getShowDetails(s.tmdbId)
-            );
-            const results = await Promise.all(promises);
-            if (!isMounted) return;
-            
-            results.forEach((res, i) => {
-              if (!res.ok || !res.value) return;
-              const details = res.value;
-              const show = batch[i];
-              
-              // 1. Genres count
-              if (details.genres && Array.isArray(details.genres)) {
-                details.genres.forEach((g: any) => {
-                  if (g.name) {
-                    genreCounts[g.name] = (genreCounts[g.name] || 0) + 1;
-                  }
-                });
-              }
-              
-              // 2. Cast count (Deduplicated per show/movie, taking top billed & recurring stars)
-              let castList: any[] = [];
-              if (show.mediaType === 'tv') {
-                if (details.aggregate_credits?.cast && details.aggregate_credits.cast.length > 0) {
-                  // Sort by total episodes in series or billing order
-                  castList = [...details.aggregate_credits.cast].sort((a: any, b: any) => {
-                    const epA = a.total_episode_count || 0;
-                    const epB = b.total_episode_count || 0;
-                    if (epB !== epA) return epB - epA;
-                    return (a.order || 0) - (b.order || 0);
-                  });
-                } else if (details.credits?.cast) {
-                  castList = details.credits.cast;
-                }
-              } else {
-                castList = details.credits?.cast || [];
-              }
-              
-              const seenActorIdsInMedia = new Set<number>();
-              // Take all cast to match the full credits shown in the PersonDetailModal
-              castList.forEach((cast: any) => {
-                if (!cast || !cast.id || seenActorIdsInMedia.has(cast.id)) return;
-                seenActorIdsInMedia.add(cast.id);
-                
-                if (!actorCounts[cast.id]) {
-                  actorCounts[cast.id] = { 
-                    name: cast.name, 
-                    movieWorks: new Set<number>(),
-                    tvWorks: new Set<number>(),
-                    profile_path: cast.profile_path || null,
-                    popularity: cast.popularity || 0
-                  };
-                }
-                if (show.mediaType === 'movie') {
-                  actorCounts[cast.id].movieWorks.add(show.tmdbId);
-                } else {
-                  actorCounts[cast.id].tvWorks.add(show.tmdbId);
-                }
-                if (cast.profile_path && !actorCounts[cast.id].profile_path) {
-                  actorCounts[cast.id].profile_path = cast.profile_path;
-                }
-                if ((cast.popularity || 0) > actorCounts[cast.id].popularity) {
-                  actorCounts[cast.id].popularity = cast.popularity;
-                }
-              });
-              
-              // 3. Créateurs (Séries TV) & Réalisateurs (Films)
-              const isDirectingJob = (jobStr: string) => {
-                const j = (jobStr || '').toLowerCase();
-                return j.includes('director') || j.includes('réalisat') || j.includes('creator') || j.includes('créat') || j === 'showrunner';
-              };
+        // 12 requêtes au maximum par lot : assez pour terminer une grosse bibliothèque
+        // rapidement, puis on rend explicitement la main au navigateur entre les lots.
+        // Les contributions déjà vues sont relues du cache compact sans requête réseau.
+        const batchSize = 12;
+        for (let offset = 0; offset < watchedItems.length; offset += batchSize) {
+          if (!isMounted) return;
+          const batch = watchedItems.slice(offset, offset + batchSize);
 
-              if (show.mediaType === 'tv') {
-                // SÉRIES TV : created_by + crew (pour inclure les réalisateurs d'épisodes)
-                const seenCreators = new Set<number>();
-                
-                if (details.created_by && Array.isArray(details.created_by)) {
-                  details.created_by.forEach((creator: any) => {
-                    if (!creator || !creator.id || seenCreators.has(creator.id)) return;
-                    seenCreators.add(creator.id);
-                    
-                    if (!directorCounts[creator.id]) {
-                      directorCounts[creator.id] = { 
-                        name: creator.name, 
-                        movieWorks: new Set<number>(),
-                        tvWorks: new Set<number>(),
-                        profile_path: creator.profile_path || null,
-                        popularity: creator.popularity || 0
-                      };
-                    }
-                    directorCounts[creator.id].tvWorks.add(show.tmdbId);
-                    if (creator.profile_path && !directorCounts[creator.id].profile_path) {
-                      directorCounts[creator.id].profile_path = creator.profile_path;
-                    }
-                    if ((creator.popularity || 0) > directorCounts[creator.id].popularity) {
-                      directorCounts[creator.id].popularity = creator.popularity;
-                    }
-                  });
-                }
+          const contributions = await Promise.all(batch.map(async (show) => {
+            const cacheKey = getMediaContributionKey(show);
+            const cached = readContributionCache(cacheKey);
+            if (cached) return cached;
 
-                const tvCrew = details.aggregate_credits?.crew || details.credits?.crew || [];
-                if (Array.isArray(tvCrew)) {
-                  tvCrew.forEach((member: any) => {
-                    if (!member || !member.id) return;
-                    // For aggregate_credits, jobs are in `jobs` array
-                    let isDir = false;
-                    if (Array.isArray(member.jobs)) {
-                      isDir = member.jobs.some((j: any) => isDirectingJob(j.job));
-                    } else {
-                      isDir = isDirectingJob(member.job);
-                    }
-                    
-                    if (isDir) {
-                      if (seenCreators.has(member.id)) return;
-                      seenCreators.add(member.id);
+            try {
+              const result = show.mediaType === 'movie'
+                ? await tmdb.getMovieDetails(show.tmdbId)
+                : await tmdb.getShowDetails(show.tmdbId);
+              if (!result.ok || !result.value) return null;
+              const contribution = extractAnalyticsContribution(show, result.value);
+              writeContributionCache(cacheKey, contribution);
+              return contribution;
+            } catch (error) {
+              console.warn('[Analytics] Impossible de charger une contribution TMDB', error);
+              return null;
+            }
+          }));
 
-                      if (!directorCounts[member.id]) {
-                        directorCounts[member.id] = { 
-                          name: member.name, 
-                          movieWorks: new Set<number>(),
-                          tvWorks: new Set<number>(),
-                          profile_path: member.profile_path || null,
-                          popularity: member.popularity || 0
-                        };
-                      }
-                      directorCounts[member.id].tvWorks.add(show.tmdbId);
-                      if (member.profile_path && !directorCounts[member.id].profile_path) {
-                        directorCounts[member.id].profile_path = member.profile_path;
-                      }
-                      if ((member.popularity || 0) > directorCounts[member.id].popularity) {
-                        directorCounts[member.id].popularity = member.popularity;
-                      }
-                    }
-                  });
-                }
+          if (!isMounted) return;
+          contributions.forEach((contribution, index) => {
+            if (!contribution) return;
+            applyContribution(batch[index], contribution, genreCounts, actorCounts, directorCounts);
+          });
 
-              } else {
-                // POUR LES FILMS : Conserver les membres du crew ayant un job de réalisation
-                const movieCrew = details.credits?.crew || [];
-                if (Array.isArray(movieCrew)) {
-                  const seenDirectors = new Set<number>();
-                  movieCrew.forEach((member: any) => {
-                    if (!member || !member.id) return;
-                    const isDir = isDirectingJob(member.job);
-                    if (isDir) {
-                      if (seenDirectors.has(member.id)) return;
-                      seenDirectors.add(member.id);
-
-                      if (!directorCounts[member.id]) {
-                        directorCounts[member.id] = { 
-                          name: member.name, 
-                          movieWorks: new Set<number>(),
-                          tvWorks: new Set<number>(),
-                          profile_path: member.profile_path || null,
-                          popularity: member.popularity || 0
-                        };
-                      }
-                      directorCounts[member.id].movieWorks.add(show.tmdbId);
-                      if (member.profile_path && !directorCounts[member.id].profile_path) {
-                        directorCounts[member.id].profile_path = member.profile_path;
-                      }
-                      if ((member.popularity || 0) > directorCounts[member.id].popularity) {
-                        directorCounts[member.id].popularity = member.popularity;
-                      }
-                    }
-                  });
-                }
-              }
-            });
+          const batchIndex = Math.floor(offset / batchSize);
+          const isLastBatch = offset + batch.length >= watchedItems.length;
+          // Dès le premier lot, « Vos Stars » affiche de vraies données au lieu de
+          // rester en skeleton jusqu'à la toute dernière fiche. Ensuite on actualise
+          // tous les quatre lots pour limiter le coût des tris pendant le scroll.
+          if (isMounted && (batchIndex === 0 || (batchIndex + 1) % 4 === 0 || isLastBatch)) {
+            setData(buildAdvancedData(initialData, genreCounts, actorCounts, directorCounts));
           }
-        } catch (err) {
-          console.error("Error fetching TMDB analytics details:", err);
+
+          await new Promise<void>(resolve => setTimeout(resolve, 0));
         }
       }
 
       if (!isMounted) return;
-
-      const totalGenreWeight = Object.values(genreCounts).reduce((a, b) => a + b, 0) || 1;
-      const sortedGenres = Object.entries(genreCounts)
-        .map(([name, count]) => ({
-          name,
-          count: Math.round(count),
-          percentage: Math.round((count / totalGenreWeight) * 100)
-        }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 4);
-
-      const dominantGenre = sortedGenres[0]?.name || 'Général';
-      const cinephileArchetype = getArchetypeForGenre(dominantGenre);
-
-      const topActors: PersonStat[] = Object.entries(actorCounts)
-        .map(([id, d]) => {
-          const movieCount = d.movieWorks.size;
-          const tvCount = d.tvWorks.size;
-          const totalCount = movieCount + tvCount;
-
-          let subtitle = '';
-          if (tvCount > 0 && movieCount === 0) {
-            subtitle = `${tvCount} ${tvCount > 1 ? 'séries vues' : 'série vue'}`;
-          } else if (movieCount > 0 && tvCount === 0) {
-            subtitle = `${movieCount} ${movieCount > 1 ? 'films vus' : 'film vu'}`;
-          } else {
-            subtitle = `${movieCount} ${movieCount > 1 ? 'films' : 'film'} · ${tvCount} ${tvCount > 1 ? 'séries' : 'série'} vus`;
-          }
-
-          return { 
-            id: Number(id), 
-            name: d.name, 
-            count: totalCount, 
-            movieCount,
-            tvCount,
-            subtitle,
-            profile_path: d.profile_path,
-            popularity: d.popularity 
-          };
-        })
-        .filter(a => a.count > 0)
-        .sort((a, b) => {
-          if (b.count !== a.count) return b.count - a.count;
-          return (b.popularity || 0) - (a.popularity || 0);
-        })
-        .slice(0, 20);
-
-      const topDirectors: PersonStat[] = Object.entries(directorCounts)
-        .map(([id, d]) => {
-          const movieCount = d.movieWorks.size;
-          const tvCount = d.tvWorks.size;
-          const totalCount = movieCount + tvCount;
-
-          let subtitle = '';
-          if (tvCount > 0 && movieCount === 0) {
-            subtitle = `${tvCount} ${tvCount > 1 ? 'séries créées' : 'série créée'}`;
-          } else if (movieCount > 0 && tvCount === 0) {
-            subtitle = `${movieCount} ${movieCount > 1 ? 'films vus' : 'film vu'}`;
-          } else {
-            subtitle = `${tvCount} ${tvCount > 1 ? 'séries créées' : 'série créée'} · ${movieCount} ${movieCount > 1 ? 'films vus' : 'film vu'}`;
-          }
-
-          return { 
-            id: Number(id), 
-            name: d.name, 
-            count: totalCount, 
-            movieCount,
-            tvCount,
-            subtitle,
-            profile_path: d.profile_path,
-            popularity: d.popularity 
-          };
-        })
-        .filter(d => d.count > 0)
-        .sort((a, b) => {
-          if (b.count !== a.count) return b.count - a.count;
-          return (b.popularity || 0) - (a.popularity || 0);
-        })
-        .slice(0, 20);
-      
-      if (isMounted) {
-        setData({
-          totalMinutes,
-          totalEpisodesSeen,
-          totalMoviesSeen,
-          completedTvCount,
-          favoritesCount,
-          topShowTitle,
-          cinephileArchetype,
-          dominantGenre,
-          platforms: sortedPlatforms,
-          genres: sortedGenres,
-          topActors,
-          topDirectors,
-          bingeTime: bingeCandidate ? { title: bingeCandidate.title, remainingMinutes: maxRemainingEps * 45 } : null
-        });
-        setLoading(false);
-      }
+      const finalData = buildAdvancedData(initialData, genreCounts, actorCounts, directorCounts);
+      setData(finalData);
+      setLoading(false);
+      writeResultCache(analyticsCacheKey, finalData);
     }
-    
-    loadStats();
+
+    void loadStats();
     return () => { isMounted = false; };
-  }, [shows]);
-  
+  }, [analyticsCacheKey]);
+
   return { data, loading };
 }
