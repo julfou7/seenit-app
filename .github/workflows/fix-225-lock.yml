@@ -33,6 +33,10 @@ jobs:
           node-version: '22'
           cache: npm
 
+      - name: Use repository npm version
+        if: steps.guard.outputs.needed == 'true'
+        run: npm install --global npm@10.9.3
+
       - name: Apply security dependency cleanup
         if: steps.guard.outputs.needed == 'true'
         shell: bash
@@ -54,8 +58,8 @@ jobs:
           fs.writeFileSync(serverPath, server);
           NODE
 
-          npm install --package-lock-only --ignore-scripts --audit=false --fund=false
-          npm ci --ignore-scripts --audit=false --fund=false
+          npm install --package-lock-only --ignore-scripts --audit=false --fund=false --legacy-peer-deps
+          npm ci --ignore-scripts --audit=false --fund=false --legacy-peer-deps
           npm audit --omit=dev --audit-level=high
           npm run lint
           git diff --check
