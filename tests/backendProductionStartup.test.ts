@@ -26,7 +26,7 @@ test('SEENIT-RUNTIME-001 smoke le bundle serveur compilé en NODE_ENV=production
   assert.ok(smokeIndex > esbuildIndex);
   assert.match(smoke, /NODE_ENV: 'production'/);
   assert.match(smoke, /TMDB_API_KEY: 'smoke-tmdb'/);
-  assert.match(smoke, /OMDB_API_KEY: 'smoke-omdb'/);
+  assert.doesNotMatch(smoke, /OMDB_API_KEY/);
   assert.match(smoke, /TVDB_API_KEY: 'smoke-tvdb'/);
   assert.match(smoke, /127\.0\.0\.1:3000\/api\/health/);
   assert.match(smoke, /seenit-backend/);

@@ -173,7 +173,7 @@ test('SEENIT-RATING-001 interdit tout runtime OMDb tout en conservant les identi
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) scan(full);
-      else if (/\.(ts|tsx)$/.test(entry.name) && !full.endsWith('omdbService.ts')) {
+      else if (/\.(ts|tsx)$/.test(entry.name)) {
         assert.doesNotMatch(fs.readFileSync(full, 'utf8'), forbiddenRuntime, path.relative(root, full));
       }
     }

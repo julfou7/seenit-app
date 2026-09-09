@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { type Show } from '../types';
 import { tmdb, isMovieAtCinema, isMovieUpcoming } from '../features/shows/tmdb';
-import { ChevronLeft, Star, Heart, CheckCircle2, Circle, Tv, Zap, X, EyeOff, Archive, Trash2, MoreVertical, Plus, Check, Share, Share2, Play, Calendar, ChevronUp, ChevronDown, ArchiveRestore, Ban, RotateCcw, MonitorPlay, Ticket, Youtube, Clapperboard, ExternalLink, Clock, RefreshCw, Download } from 'lucide-react';
+import { ChevronLeft, Star, Heart, CheckCircle2, Circle, Tv, Zap, X, EyeOff, Archive, Trash2, MoreVertical, Plus, Check, Share, Share2, Play, Calendar, ArchiveRestore, Ban, RotateCcw, MonitorPlay, Ticket, Youtube, Clapperboard, ExternalLink, Clock, RefreshCw, Download } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getBestLogoPath, getTodayStr, getCalendarDaysDiff, getEpisodeRelativeAirDate, scrollAllCarouselsToStart, openExternalUrl, checkIsUpToDate } from '../lib/utils';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
@@ -29,6 +29,7 @@ import { downloadEpisodeWithSeasonPackFallback } from '../features/downloads/epi
 import { acceptDownloadRequest, beginDownloadRequest, failDownloadRequest, updateDownloadRequest } from '../features/downloads/downloadLifecycle';
 import { readUserScopedJson } from '../lib/userIsolation';
 import { mediaKeyFrom, toMediaKey } from '../features/shows/mediaRelations';
+import { getParentalRatingColorClass, resolveParentalRating } from '../features/shows/parentalRating';
 
 
 interface ShowDetailScreenProps {
@@ -83,30 +84,6 @@ const getEpisodeAirDateLabel = (airDate?: string | null) => {
 
   return `Le ${formatAirDateSafe(airDate, 'short')}`;
 };
-
-function formatAgeRating(rating: string | undefined | null): { label: string; color: string } {
-  if (!rating) return { label: 'Non classé', color: 'bg-zinc-800 text-zinc-400 border-zinc-700' };
-
-  const r = rating.trim().toUpperCase();
-
-  if (r === '18' || r === '-18' || r === 'TV-MA' || r === 'R' || r === 'NC-17') {
-    return { label: '-16 ANS', color: 'bg-red-500/15 border-red-500/30 text-red-400' };
-  }
-  if (r === '16' || r === '-16') {
-    return { label: '-16 ANS', color: 'bg-red-500/15 border-red-500/30 text-red-400' };
-  }
-  if (r === '12' || r === '-12' || r === 'TV-14' || r === 'PG-13') {
-    return { label: '-12 ANS', color: 'bg-amber-500/15 border-amber-500/30 text-amber-400' };
-  }
-  if (r === '10' || r === '-10' || r === 'TV-PG' || r === 'PG') {
-    return { label: '-10 ANS', color: 'bg-amber-500/15 border-amber-500/30 text-amber-400' };
-  }
-  if (r === 'U' || r === 'G' || r === 'TV-G' || r === 'TV-Y' || r === 'TV-Y7' || r.includes('TOUS')) {
-    return { label: 'TOUS PUBLICS', color: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' };
-  }
-
-  return { label: r.startsWith('-') ? `${r} ANS` : r, color: 'bg-amber-500/15 border-amber-500/30 text-amber-400' };
-}
 
 const getCleanProviderName = (provider: any) => {
   const name = (provider.provider_name || '').toLowerCase();
@@ -223,8 +200,10 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const [logoError, setLogoError] = useState(false);
   const [posterError, setPosterError] = useState(false);
   const [isSyncingSingle, setIsSyncingSingle] = useState(false);
+  const [isRefreshingPlex, setIsRefreshingPlex] = useState(false);
   const [isDownloadMode, setIsDownloadMode] = useState(false);
   const [is1ClickDownloading, setIs1ClickDownloading] = useState<Record<string, boolean>>({});
+  const [areThemesExpanded, setAreThemesExpanded] = useState(false);
 
   const handle1ClickDownloadEpisode = async (e: React.MouseEvent, seasonNumber: number, episodeNumber: number) => {
     e.stopPropagation();
@@ -388,6 +367,26 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     mediaType: isSeries ? 'tv' : 'movie'
   });
   const plexMediaInfo = presence.plexInfo || null;
+
+  const refreshPlexAvailability = async () => {
+    if (!effectiveTmdbId || isRefreshingPlex) return;
+    setIsRefreshingPlex(true);
+    try {
+      await useMediaPresenceStore.getState().checkPresence({
+        tmdbId: effectiveTmdbId,
+        tvdbId: tmdbDetails?.external_ids?.tvdb_id || (show as any)?.tvdbId,
+        imdbId: tmdbDetails?.external_ids?.imdb_id || tmdbDetails?.imdb_id || (show as any)?.imdbId,
+        title,
+        originalTitle: tmdbDetails?.original_title || tmdbDetails?.original_name || (show as any)?.originalTitle,
+        year: releaseYear ? parseInt(releaseYear, 10) : undefined,
+        mediaType: isSeries ? 'tv' : 'movie',
+        forceRefresh: true,
+        refreshPlexServers: true,
+      });
+    } finally {
+      setIsRefreshingPlex(false);
+    }
+  };
 
   useEffect(() => {
     if (!hasCompletedDownload || hasActiveDownload || !effectiveTmdbId || plexMediaInfo?.available) return;
@@ -1071,30 +1070,19 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const mainProviderLink = mainProvider ? (mainProvider.isPlex ? (mainProvider.plexUrl || 'https://app.plex.tv/desktop') : getProviderDirectLink(mainProvider.provider_id, title, watchLink)) : (watchLink || `https://www.google.com/search?q=${encodeURIComponent(title + ' ' + (mainProviderName || ''))}`);
 
   const getRatingInfo = () => {
-    if (!tmdbDetails) return { label: 'Non classé', colorClass: 'bg-zinc-800/80 border-white/10 text-zinc-400' };
-    let raw = '';
-    if (isSeries) {
-      const results = tmdbDetails.content_ratings?.results || [];
-      const fr = results.find((r: any) => r.iso_3166_1 === 'FR');
-      if (fr?.rating) raw = fr.rating;
-      else { const us = results.find((r: any) => r.iso_3166_1 === 'US'); if (us?.rating) raw = us.rating; }
-    } else {
-      const results = tmdbDetails.release_dates?.results || [];
-      const fr = results.find((r: any) => r.iso_3166_1 === 'FR');
-      if (fr?.release_dates) {
-        const cert = fr.release_dates.find((d: any) => d.certification && d.certification.trim() !== '');
-        if (cert) raw = cert.certification;
-      }
-      if (!raw) {
-        const us = results.find((r: any) => r.iso_3166_1 === 'US');
-        if (us?.release_dates) {
-          const cert = us.release_dates.find((d: any) => d.certification && d.certification.trim() !== '');
-          if (cert) raw = cert.certification;
-        }
-      }
-    }
-    const info = formatAgeRating(raw);
-    return { label: info.label, colorClass: info.color };
+    if (!tmdbDetails) return { label: 'Non classé', provenance: null, colorClass: 'bg-zinc-800/80 border-white/10 text-zinc-400' };
+    const resolved = tmdbDetails.seenitParentalRating
+      || resolveParentalRating(requestedMediaType, tmdbDetails);
+    const provenance = resolved.source === 'personal'
+      ? 'Choix personnel'
+      : resolved.original && resolved.country
+        ? `${resolved.original} · ${resolved.country}`
+        : null;
+    return {
+      label: resolved.shortLabel || resolved.label,
+      provenance,
+      colorClass: getParentalRatingColorClass(resolved),
+    };
   };
   const ratingInfo = getRatingInfo();
   const mediaTarget = tmdbDetails || show || (effectiveTmdbId ? { id: effectiveTmdbId } : null);
@@ -1115,6 +1103,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
             {showMenu && (
               <><div className="fixed inset-0 z-40 bg-black/20" onClick={(e) => { e.stopPropagation(); setShowMenu(false); }} />
               <div className="absolute right-0 top-12 w-56 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col py-1 animate-in fade-in duration-150">
+                {/* Action Téléchargement */}
                 <button type="button" onClick={(e) => { e.stopPropagation(); setShowMenu(false); setDownloadTargetSeason(undefined); setDownloadTargetEpisode(undefined); setIsDownloadModalOpen(true); }} className="w-full px-4 py-3 text-left text-sm text-blue-400 hover:bg-zinc-800 transition-colors flex items-center gap-3 font-semibold cursor-pointer active:bg-zinc-800"><Download size={16} className="text-blue-400 shrink-0" /><span>Téléchargement</span></button>
                 <div className="h-px bg-white/5 my-0.5" />
                 {show && <button type="button" onClick={(e) => { e.stopPropagation(); setShowMenu(false); handleSyncSingle(); }} disabled={isSyncingSingle} className="w-full px-4 py-3 text-left text-sm text-[#E5A93D] hover:bg-zinc-800 transition-colors flex items-center gap-3 font-semibold cursor-pointer active:bg-zinc-800 disabled:opacity-50"><RefreshCw size={16} className={cn(isSyncingSingle && "animate-spin")} /><span>Synchroniser {isSeries ? 'la série' : 'le film'}</span></button>}
@@ -1138,7 +1127,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
             <div className="flex-1 min-w-0 flex flex-col justify-end pb-1">
               <div className="mb-2 flex items-center gap-2 flex-wrap min-h-[24px]">
                 {!tmdbDetails ? <><div className="h-5 w-28 bg-zinc-800/80 rounded-md border border-white/5 animate-pulse" /><div className="h-5 w-16 bg-zinc-800/80 rounded-md border border-white/5 animate-pulse" /></>
-                : <><span className="inline-flex items-center gap-1.5 px-2 py-1 bg-[#E5A93D]/20 text-[10px] font-bold tracking-widest text-[#E5A93D] uppercase rounded-md border border-[#E5A93D]/30">{isSeries ? <>📺 SÉRIE • {tmdbDetails?.number_of_seasons || '?'} {tmdbDetails?.number_of_seasons === 1 ? 'SAISON' : 'SAISONS'}</> : <>🎬 FILM • {formatRuntime(tmdbDetails?.runtime)}</>}</span><span className={cn("inline-flex items-center px-2 py-1 text-[10px] font-bold tracking-wider uppercase rounded-md border shrink-0", ratingInfo.colorClass)}>{ratingInfo.label}</span></>}
+                : <><span className="inline-flex items-center gap-1.5 px-2 py-1 bg-[#E5A93D]/20 text-[10px] font-bold tracking-widest text-[#E5A93D] uppercase rounded-md border border-[#E5A93D]/30">{isSeries ? <>📺 SÉRIE</> : <>🎬 FILM • {formatRuntime(tmdbDetails?.runtime)}</>}</span><span className={cn("inline-flex items-center gap-1.5 px-2 py-1 text-[10px] font-bold tracking-wider uppercase rounded-md border shrink-0", ratingInfo.colorClass)} aria-label={ratingInfo.provenance ? `${ratingInfo.label}, classification ${ratingInfo.provenance}` : ratingInfo.label} title={ratingInfo.provenance ? `${ratingInfo.provenance} · ${ratingInfo.label}` : ratingInfo.label}><strong>{ratingInfo.label}</strong>{ratingInfo.provenance && <small className="text-[8px] normal-case font-semibold opacity-65">{ratingInfo.provenance}</small>}</span></>}
               </div>
               <div className="my-2 min-h-[64px] flex items-center">
                 {logoPath ? <img src={`https://image.tmdb.org/t/p/w500${logoPath}`} alt={title} className="h-16 sm:h-20 w-auto max-w-full object-contain object-left filter drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)]" loading="eager" decoding="async" onError={() => setLogoError(true)} />
@@ -1199,9 +1188,9 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
           {collectionLoading && <div><h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-3">Relations</h3><div className="flex overflow-x-auto gap-3.5 hide-scrollbar py-2 px-1 -mx-1">{[1,2,3,4].map(i => <div key={`saga_loader_${i}`} className="flex-none w-[110px] animate-pulse"><div className="w-full aspect-[2/3] bg-zinc-800/80 rounded-xl mb-2" /><div className="h-3 bg-zinc-800/80 rounded w-3/4 mx-auto" /></div>)}</div></div>}
 
           {!tmdbDetails ? <div className="col-span-2 bg-zinc-900/40 border border-white/5 p-4 rounded-2xl mt-1"><span className="block text-xs font-bold uppercase text-zinc-500 tracking-wider mb-3">Catégories & Thèmes</span><div className="flex flex-wrap gap-2 animate-pulse"><div className="h-7 w-20 bg-zinc-800/80 rounded-full" /><div className="h-7 w-24 bg-zinc-800/80 rounded-full" /><div className="h-7 w-16 bg-zinc-800/80 rounded-full" /></div></div>
-          : (tmdbDetails?.genres?.length > 0 || keywords.length > 0) ? <div className="col-span-2 bg-zinc-900/40 border border-white/5 p-4 rounded-2xl mt-1"><span className="block text-xs font-bold uppercase text-zinc-500 tracking-wider mb-3">Catégories & Thèmes</span><div className="flex flex-wrap gap-2">{tmdbDetails?.genres?.map((g: any, idx: number) => <span key={`genre_${g.id}_${idx}`} className="px-3 py-1.5 bg-white/10 border border-white/15 text-white text-[11px] font-bold uppercase tracking-wide rounded-full backdrop-blur-md shadow-sm">{g.name}</span>)}{keywords.map((kw: string, idx: number) => <span key={idx} className="px-3 py-1.5 bg-zinc-800/60 border border-zinc-700/50 text-zinc-300 hover:text-white transition-colors text-[11px] font-medium rounded-full capitalize">{kw}</span>)}</div></div> : null}
+          : (tmdbDetails?.genres?.length > 0 || keywords.length > 0) ? <div className="col-span-2 bg-zinc-900/40 border border-white/5 p-4 rounded-2xl mt-1"><span className="block text-xs font-bold uppercase text-zinc-500 tracking-wider mb-3">Catégories & Thèmes</span><div className="flex flex-wrap gap-2">{tmdbDetails?.genres?.map((g: any, idx: number) => <span key={`genre_${g.id}_${idx}`} className="px-3 py-1.5 bg-white/10 border border-white/15 text-white text-[11px] font-bold uppercase tracking-wide rounded-full backdrop-blur-md shadow-sm">{g.name}</span>)}<span id="series-theme-keywords" className="contents">{areThemesExpanded && keywords.map((kw: string, idx: number) => <span key={idx} className="px-3 py-1.5 bg-zinc-800/60 border border-zinc-700/50 text-zinc-300 hover:text-white transition-colors text-[11px] font-medium rounded-full capitalize">{kw}</span>)}</span>{keywords.length > 0 && <button type="button" onClick={() => setAreThemesExpanded(expanded => !expanded)} aria-expanded={areThemesExpanded} aria-controls="series-theme-keywords" className="min-h-11 px-2.5 py-1 rounded-full border border-white/10 text-zinc-400 text-[10px] font-semibold hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E5A93D]">{areThemesExpanded ? 'Masquer les thèmes' : `+${keywords.length} thèmes`}</button>}</div></div> : null}
 
-          <div><h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-2">Où regarder</h3>{(() => {
+          <div><div className="flex items-center gap-1.5 mb-2"><h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider">Où regarder</h3><button type="button" onClick={() => void refreshPlexAvailability()} disabled={!effectiveTmdbId || isRefreshingPlex} aria-label="Actualiser Plex" title="Actualiser Plex" className="inline-flex w-11 h-11 items-center justify-center rounded-full text-zinc-500 transition hover:text-white hover:bg-white/5 active:scale-95 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E5A93D]"><RefreshCw size={16} className={cn(isRefreshingPlex && "animate-spin")} /></button></div>{(() => {
             const hasProviders = sortedProviders.length > 0;
             const isLoadingPlex = plexMediaInfo === null;
             const isLoadingProviders = providers === null;
@@ -1211,17 +1200,17 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
               const directLink = getProviderDirectLink(provider.provider_id, title, providers?.link || '#');
               const logoUrl = getFormattedProviderLogo(provider.logo_path, provider.provider_name);
               return <a key={`provider_${provider.provider_id}_${idx}`} href={directLink} target="_blank" rel="noopener noreferrer" onClick={(e) => { if (directLink && directLink !== '#') { e.preventDefault(); openExternalUrl(directLink); } }} className={cn("inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all active:scale-95 cursor-pointer", isSubscribed ? "bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 hover:border-amber-400/50 shadow-[0_0_10px_rgba(245,158,11,0.15)]" : "bg-zinc-900/80 border-white/10 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800")} title={`Ouvrir ${provider.provider_name}`}>{logoUrl ? <img loading="lazy" decoding="async" src={logoUrl} alt={provider.provider_name} className="w-4 h-4 object-cover rounded shrink-0" /> : <MonitorPlay size={14} className={cn("shrink-0", isSubscribed ? "text-amber-400" : "text-zinc-400")} />}<span>{provider.provider_name}</span></a>;
-            })}{(isLoadingPlex || isLoadingProviders) && <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-zinc-900/60 border border-white/5 text-zinc-400 text-xs animate-pulse"><img src={PLEX_LOGO_SVG} alt="Plex" className="w-3.5 h-3.5 object-contain rounded shrink-0" /><span>Vérification...</span></div>}</div>;
-            if (isLoadingPlex || isLoadingProviders) return <div className="flex items-center gap-2 flex-wrap"><div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/10 bg-zinc-900/80 text-zinc-400 text-xs font-medium animate-pulse"><img src={PLEX_LOGO_SVG} alt="Plex" className="w-4 h-4 object-contain rounded shrink-0" /><span>Recherche des disponibilités (Plex & Streaming)...</span></div></div>;
+            })}{(isLoadingPlex || isLoadingProviders) && <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-zinc-900/60 border border-white/5 text-zinc-400 text-xs animate-pulse"><img src={PLEX_LOGO_SVG} alt="Plex" className="w-3.5 h-3.5 object-contain rounded shrink-0" /><span className="whitespace-nowrap">Recherche Plex & streaming…</span></div>}</div>;
+            if (isLoadingPlex || isLoadingProviders) return <div className="flex items-center gap-2 flex-wrap"><div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/10 bg-zinc-900/80 text-zinc-400 text-xs font-medium animate-pulse"><img src={PLEX_LOGO_SVG} alt="Plex" className="w-4 h-4 object-contain rounded shrink-0" /><span className="whitespace-nowrap">Recherche Plex & streaming…</span></div></div>;
             return <div className="flex items-center gap-3 flex-wrap">{isUnreleased ? <p className="text-xs text-zinc-500 italic font-medium flex items-center gap-1.5"><Clock size={14} /><span>Bientôt disponible</span></p> : <div className="flex items-center gap-2 flex-wrap">{!isSeries ? <button type="button" onClick={(e) => handle1ClickDownloadMovie(e)} disabled={is1ClickDownloading.movie} className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-blue-500/40 bg-blue-500/15 hover:bg-blue-500/25 active:scale-95 text-xs font-bold text-blue-300 transition-all cursor-pointer shadow-[0_0_15px_rgba(59,130,246,0.25)]" title="Télécharger le film en 1 clic dans Radarr"><Download size={14} className={cn("text-blue-300 stroke-[2.5]", is1ClickDownloading.movie && "animate-spin")} /><span>{is1ClickDownloading.movie ? "Lancement Radarr..." : "Télécharger le film (1 Clic)"}</span></button> : <button type="button" onClick={() => setIsDownloadModalOpen(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-500/40 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 active:scale-95 text-xs font-bold transition-all cursor-pointer shadow-[0_0_12px_rgba(59,130,246,0.2)]" title="Rechercher et télécharger sur Sonarr / C411"><Download size={14} className="shrink-0" /><span>Télécharger</span></button>}</div>}</div>;
           })()}</div>
 
-          {isSeries && tmdbDetails?.seasons && tmdbDetails.seasons.length > 0 && <div className="pt-2"><EpisodeRatingsChart effectiveTmdbId={effectiveTmdbId} seasons={tmdbDetails.seasons} seasonsCache={seasonsCache} onLoadSeason={async (sNum) => { if (!effectiveTmdbId || seasonsCache[sNum]) return; const res = await tmdb.getSeasonDetails(effectiveTmdbId, sNum); if (res.ok) setSeasonsCache(prev => ({ ...prev, [sNum]: res.value })); }} onSelectEpisode={(seasonNum, ep) => openEpisodeModal(seasonNum, ep)} defaultSeasonNumber={expandedSeason || 1} /></div>}
           <div className="pt-1"><RedditSection query={`${tmdbDetails?.name || tmdbDetails?.title || show?.title || ''} ${isSeries ? 'series discussion' : 'movie discussion'}`} isLocked={false} title="Discussions Reddit" description="Retrouvez les avis, théories et spoilers de la communauté." /></div>
         </div>
 
         {isSeries && <div id="section-episodes" className="scroll-mt-40 mt-12 space-y-4 animate-in fade-in duration-200">
           <div className="flex items-center justify-between gap-2 mb-2"><h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider">Épisodes</h3><button type="button" onClick={() => setIsDownloadMode(!isDownloadMode)} className={cn("px-2.5 py-1 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer", isDownloadMode ? "bg-blue-500/20 border-blue-500/40 text-blue-300 shadow-[0_0_12px_rgba(59,130,246,0.25)]" : "bg-zinc-800/80 border-white/10 text-zinc-400 hover:text-white")} title="Activer le mode téléchargement 1-clic direct vers Sonarr"><Download size={12} className={cn(isDownloadMode && "text-blue-400 animate-pulse")} /><span>{isDownloadMode ? "Mode Téléchargement (Actif)" : "Téléchargement 1-Clic"}</span></button></div>
+          {tmdbDetails?.seasons?.length > 0 && <EpisodeRatingsChart effectiveTmdbId={effectiveTmdbId} seasons={tmdbDetails.seasons} seasonsCache={seasonsCache} onLoadSeason={async (sNum) => { if (!effectiveTmdbId || seasonsCache[sNum]) return; const res = await tmdb.getSeasonDetails(effectiveTmdbId, sNum); if (res.ok) setSeasonsCache(prev => ({ ...prev, [sNum]: res.value })); }} onSelectEpisode={(seasonNum, ep) => openEpisodeModal(seasonNum, ep)} defaultSeasonNumber={expandedSeason || getSmartDefaultSeason(show, tmdbDetails)} />}
           {tmdbDetails?.seasons?.filter((s: any) => s.season_number > 0).slice(0, visibleSeasons).map((season: any, idx: number) => {
             const seasonNum = season.season_number;
             const seasonEpCount = season.episode_count || 0;
@@ -1236,12 +1225,11 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
             const isFullyWatched = seasonEpCount > 0 && watchedInSeason >= seasonEpCount;
             return <div key={`season_${season.id || season.season_number}_${idx}`} className={cn("bg-[#1a1b26] border border-white/5 rounded-2xl overflow-hidden transition-all", isFutureSeason && "opacity-75")}>
               <div className="w-full p-4 flex items-center gap-3">
-                <button onClick={() => loadSeason(seasonNum)} className="flex-1 flex items-center text-left touch-manipulation py-1"><div className="flex items-center gap-3 w-full"><h3 className="font-bold text-white text-[15px]">Saison {seasonNum}{seasonEpCount > 0 && <span className="text-zinc-400 font-semibold text-xs ml-1.5">({watchedInSeason}/{seasonEpCount})</span>}</h3>{!isFutureSeason && seasonEpCount > 0 && show?.status !== 'dropped' && <div className="w-12 h-1 bg-zinc-800 rounded-full overflow-hidden flex items-center shrink-0"><div className="h-full bg-emerald-500" style={{ width: `${(watchedInSeason / seasonEpCount) * 100}%` }} /></div>}{isFutureSeason && displayAirDate && <span className="inline-block bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md">PROCHAINEMENT • {formatAirDateSafe(displayAirDate, 'long')}</span>}</div></button>
-                {!isFutureSeason && seasonEpCount > 0 && <button onClick={(e) => toggleSeasonSeen(e, seasonNum, seasonEpCount)} className={cn("px-3 py-1 rounded-full border text-[10px] font-bold flex items-center gap-1 transition-colors active:scale-95 touch-manipulation uppercase tracking-wider shrink-0", isFullyWatched ? "border-emerald-500 bg-emerald-500/15 text-emerald-400 font-bold" : "border-[#E5A93D]/30 text-[#E5A93D] hover:bg-[#E5A93D]/5 font-bold")} title={isFullyWatched ? "Marquer toute la saison comme non vue" : "Marquer toute la saison comme vue"}>{isFullyWatched ? "✓ Tout vu" : "Tout marquer"}</button>}
+                <button type="button" onClick={() => loadSeason(seasonNum)} aria-expanded={expandedSeason === seasonNum} aria-controls={`season-panel-${seasonNum}`} className="flex-1 min-h-11 flex items-center text-left touch-manipulation py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E5A93D] rounded-lg"><div className="flex items-center gap-3 w-full min-w-0"><h3 className="font-bold text-white text-[15px] whitespace-nowrap">Saison {seasonNum}{seasonEpCount > 0 && <span className="text-zinc-400 font-semibold text-xs ml-1.5">({watchedInSeason}/{seasonEpCount})</span>}</h3>{!isFutureSeason && seasonEpCount > 0 && show?.status !== 'dropped' && <div className="w-12 h-1 bg-zinc-800 rounded-full overflow-hidden flex items-center shrink-0"><div className="h-full bg-emerald-500" style={{ width: `${(watchedInSeason / seasonEpCount) * 100}%` }} /></div>}{isFutureSeason && displayAirDate && <span className="inline-block bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md truncate">PROCHAINEMENT • {formatAirDateSafe(displayAirDate, 'long')}</span>}</div></button>
+                {!isFutureSeason && seasonEpCount > 0 && <button type="button" onClick={(e) => toggleSeasonSeen(e, seasonNum, seasonEpCount)} className={cn("min-h-11 px-2 py-1 rounded-full border text-[10px] font-bold flex items-center gap-1 transition-colors active:scale-95 touch-manipulation shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E5A93D]", isFullyWatched ? "border-emerald-500 bg-emerald-500/15 text-emerald-400 font-bold" : "border-[#E5A93D]/30 text-[#E5A93D] hover:bg-[#E5A93D]/5 font-bold")} aria-label={isFullyWatched ? "Marquer toute la saison comme non vue" : "Marquer toute la saison comme vue"} title={isFullyWatched ? "Marquer toute la saison comme non vue" : "Marquer toute la saison comme vue"}>{isFullyWatched ? "Tout marquer non vu" : "Tout marquer vu"}</button>}
                 {!isFutureSeason && <button type="button" onClick={(e) => handle1ClickDownloadSeason(e, seasonNum)} disabled={is1ClickDownloading[`S${seasonNum}`]} className="p-1.5 px-2.5 rounded-full border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 text-[10px] font-bold flex items-center gap-1 transition-colors active:scale-95 touch-manipulation uppercase tracking-wider shrink-0 cursor-pointer disabled:opacity-50" title={`Télécharger la saison ${seasonNum} en 1 clic dans Sonarr`}><Download size={12} className={cn("text-blue-400", is1ClickDownloading[`S${seasonNum}`] && "animate-spin")} /><span className="hidden sm:inline">S{seasonNum}</span></button>}
-                <button onClick={() => loadSeason(seasonNum)} className="text-zinc-500 hover:text-white transition-colors shrink-0 px-2">{expandedSeason === season.season_number ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</button>
               </div>
-              {expandedSeason === season.season_number && <div className="bg-[#1a1b26] border-t border-white/5 divide-y divide-white/5 animate-in fade-in duration-200">
+              {expandedSeason === season.season_number && <div id={`season-panel-${seasonNum}`} className="bg-[#1a1b26] border-t border-white/5 divide-y divide-white/5 animate-in fade-in duration-200">
                 {!seasonsCache[season.season_number] ? <div className="p-4 space-y-3 animate-pulse">{[1,2,3].map(i => <div key={i} className="flex items-center gap-3"><div className="w-24 h-16 rounded-xl bg-zinc-800/80 shrink-0" /><div className="flex-1 space-y-2"><div className="h-4 bg-zinc-800/80 rounded w-3/4" /><div className="h-3 bg-zinc-800/60 rounded w-1/2" /></div></div>)}</div>
                 : <>{(() => {
                   const seasonVideos = seasonsCache[season.season_number].videos?.results?.filter((v: any) => v.site === 'YouTube') || [];
@@ -1268,7 +1256,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
           {tmdbDetails?.seasons?.filter((s: any) => s.season_number > 0).length > visibleSeasons && <div ref={seasonObserverRef} className="h-10 w-full flex items-center justify-center"><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#E5A93D]" /></div>}
         </div>}
 
-        {((tmdbDetails?.aggregate_credits?.cast || tmdbDetails?.credits?.cast)?.length > 0) && <div id="section-casting" className="scroll-mt-40 mt-12 animate-in fade-in duration-200"><h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-3">Casting</h3><div className="grid grid-cols-3 sm:grid-cols-4 gap-4 py-2">{(tmdbDetails?.aggregate_credits?.cast || tmdbDetails?.credits?.cast)?.map((actor: any, actorIdx: number) => <div key={`actor_${actor.id}_${actorIdx}`} onClick={() => openPersonModal(actor.id)} className="flex flex-col items-center cursor-pointer group active:scale-95 transition-transform"><div className="relative mb-2"><div className="w-20 h-20 rounded-full overflow-hidden bg-zinc-800 border border-white/10 shadow-md">{actor.profile_path ? <img loading="lazy" decoding="async" src={`https://image.tmdb.org/t/p/w185${actor.profile_path}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" alt={actor.name} /> : <div className="w-full h-full flex items-center justify-center text-xs font-bold text-zinc-600">{actor.name?.charAt(0)}</div>}</div>{(actor.total_episode_count || actor.episode_count) ? <div className="absolute bottom-0 left-0 bg-black/70 backdrop-blur-md px-1.5 py-0.5 rounded-full text-[9px] font-bold text-white border border-white/10 shadow-sm pointer-events-none">{actor.total_episode_count || actor.episode_count} ép.</div> : null}</div><p className="text-xs font-bold text-zinc-100 text-center line-clamp-1 w-full">{actor.name}</p><p className="text-[10px] text-zinc-500 text-center line-clamp-1 w-full mt-0.5">{actor.roles && actor.roles.length > 0 ? actor.roles.map((r: any) => r.character).filter(Boolean).join(' / ') || 'Rôle inconnu' : (actor.character || 'Rôle inconnu')}</p></div>)}</div></div>}
+        {((tmdbDetails?.aggregate_credits?.cast || tmdbDetails?.credits?.cast)?.length > 0) && <div id="section-casting" className="scroll-mt-40 mt-12 animate-in fade-in duration-200"><h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-3">Casting</h3><div className="grid grid-cols-3 sm:grid-cols-4 gap-4 py-2">{(tmdbDetails?.aggregate_credits?.cast || tmdbDetails?.credits?.cast)?.map((actor: any, actorIdx: number) => <button type="button" key={`actor_${actor.id}_${actorIdx}`} onClick={() => openPersonModal(actor.id)} aria-label={`Ouvrir la fiche de ${actor.name}`} className="min-h-11 flex flex-col items-center cursor-pointer group active:scale-95 transition-transform rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E5A93D]"><div className="w-20 h-20 rounded-full overflow-hidden bg-zinc-800 border border-white/10 shadow-md mb-2">{actor.profile_path ? <img loading="lazy" decoding="async" src={`https://image.tmdb.org/t/p/w185${actor.profile_path}`} className="w-full h-full object-cover object-[50%_25%] group-hover:scale-105 transition-transform duration-300" alt="" /> : <div className="w-full h-full flex items-center justify-center text-xs font-bold text-zinc-600">{actor.name?.charAt(0)}</div>}</div><p className="text-xs font-bold text-zinc-100 text-center line-clamp-2 min-h-[2.2em] w-full">{actor.name}</p><p className="text-[10px] text-zinc-500 text-center line-clamp-2 min-h-[2.2em] w-full mt-0.5">{actor.roles && actor.roles.length > 0 ? actor.roles.map((r: any) => r.character).filter(Boolean).join(' / ') || 'Rôle inconnu' : (actor.character || 'Rôle inconnu')}</p>{Number(actor.total_episode_count || actor.episode_count || 0) > 1 && <span className="mt-1 text-[9px] font-medium text-zinc-600">{actor.total_episode_count || actor.episode_count} ép.</span>}</button>)}</div></div>}
       </div>
 
       {selectedEpisode && <EpisodeDetailModal show={show} season={selectedEpisode.season} episode={selectedEpisode.episode} tmdbShowTitle={tmdbDetails?.name || tmdbDetails?.title} tmdbShowId={effectiveTmdbId}

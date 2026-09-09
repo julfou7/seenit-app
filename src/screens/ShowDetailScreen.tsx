@@ -1,12 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { RefreshCw } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ShowDetailScreen as ShowDetailScreenCore } from './ShowDetailScreenCore';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { isDownloadFeatureEnabled } from '../features/downloads/downloadFeatureVisibility';
 import { tmdb } from '../features/shows/tmdb';
 import { useShowsStore } from '../store/showsStore';
-import { useMediaPresenceStore } from '../store/mediaPresenceStore';
 
 interface ShowDetailScreenProps {
   key?: string;
@@ -20,8 +17,6 @@ interface ShowDetailScreenProps {
 }
 
 const DETAIL_WARMUP_GRACE_MS = 300;
-const PROVIDER_LOADING_LABEL = 'Recherche Plex & streaming…';
-
 const HIDDEN_DOWNLOAD_SURFACE_CSS = `
 [data-seenit-download-surface="hidden"] button:has(svg.lucide-download),
 [data-seenit-download-surface="hidden"] button[title*="télécharg" i],
@@ -48,26 +43,6 @@ const DETAIL_UX_CSS = `
 [data-seenit-detail-warmup="cold"] {
   min-height: 100%;
   contain: layout paint;
-}
-[data-seenit-detail-shell="stable"] #section-episodes button:has(svg.lucide-chevron-up),
-[data-seenit-detail-shell="stable"] #section-episodes button:has(svg.lucide-chevron-down) {
-  display: none !important;
-}
-[data-seenit-detail-shell="stable"] #section-casting img {
-  object-position: 50% 25%;
-}
-[data-seenit-detail-shell="stable"] #section-casting p.line-clamp-1 {
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  min-height: 2.2em;
-}
-[data-seenit-detail-shell="stable"] #section-casting .absolute.bottom-0.left-0 {
-  opacity: .72;
-  font-size: 8px;
-  padding-inline: .3rem;
-}
-[data-seenit-theme-extra="true"][data-seenit-theme-visible="false"] {
-  display: none !important;
 }
 `;
 
@@ -99,173 +74,6 @@ function StableColdDetailSkeleton({ onBack }: Pick<ShowDetailScreenProps, 'onBac
       </div>
     </div>
   );
-}
-
-function ProviderAvailabilityControls({ detailIdentity, tmdbId, mediaType }: { detailIdentity: string | null; tmdbId?: number; mediaType: 'tv' | 'movie' }) {
-  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const hostRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    const shell = document.querySelector<HTMLElement>('[data-seenit-detail-shell="stable"]');
-    if (!shell) return;
-
-    const ensureProviderUi = () => {
-      const heading = Array.from(shell.querySelectorAll('h3')).find(node => node.textContent?.trim() === 'Où regarder');
-      if (!heading?.parentElement) return;
-
-      for (const pulse of heading.parentElement.querySelectorAll<HTMLElement>('.animate-pulse')) {
-        if (!pulse.querySelector('img[alt="Plex"]')) continue;
-        const label = pulse.querySelector<HTMLElement>('span');
-        if (label && label.textContent !== PROVIDER_LOADING_LABEL) label.textContent = PROVIDER_LOADING_LABEL;
-        if (label) label.style.whiteSpace = 'nowrap';
-      }
-
-      let row = heading.parentElement.querySelector<HTMLElement>(':scope > [data-seenit-provider-heading-row="true"]');
-      if (!row) {
-        row = document.createElement('div');
-        row.dataset.seenitProviderHeadingRow = 'true';
-        row.className = 'flex items-center gap-1.5 mb-2';
-        heading.insertAdjacentElement('beforebegin', row);
-        heading.classList.remove('mb-2');
-        row.appendChild(heading);
-      }
-
-      let host = row.querySelector<HTMLElement>('[data-seenit-provider-refresh-host="true"]');
-      if (!host) {
-        host = document.createElement('span');
-        host.dataset.seenitProviderRefreshHost = 'true';
-        host.className = 'inline-flex shrink-0';
-        row.appendChild(host);
-      }
-      if (hostRef.current !== host) {
-        hostRef.current = host;
-        setPortalHost(host);
-      }
-    };
-
-    ensureProviderUi();
-    const observer = new MutationObserver(ensureProviderUi);
-    observer.observe(shell, { childList: true, subtree: true });
-    return () => {
-      observer.disconnect();
-      hostRef.current = null;
-      setPortalHost(null);
-    };
-  }, [detailIdentity]);
-
-  const refreshPlexServers = async () => {
-    if (!tmdbId || isRefreshing) return;
-    setIsRefreshing(true);
-    try {
-      const details = tmdb.peekMediaDetails(tmdbId, mediaType);
-      await useMediaPresenceStore.getState().checkPresence({
-        tmdbId,
-        tvdbId: details?.external_ids?.tvdb_id,
-        imdbId: details?.external_ids?.imdb_id || details?.imdb_id,
-        mediaType,
-        forceRefresh: true,
-        refreshPlexServers: true,
-      });
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
-  if (!portalHost || !tmdbId) return null;
-  return createPortal(
-    <button
-      type="button"
-      onClick={() => void refreshPlexServers()}
-      disabled={isRefreshing}
-      aria-label="Actualiser Plex"
-      title="Actualiser Plex"
-      className="inline-flex w-11 h-11 items-center justify-center rounded-full text-zinc-500 transition hover:text-white hover:bg-white/5 active:scale-95 disabled:opacity-60"
-    >
-      <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
-    </button>,
-    portalHost,
-  );
-}
-
-function DetailUxNormalizer({ detailIdentity }: { detailIdentity: string | null }) {
-  useEffect(() => {
-    const shell = document.querySelector<HTMLElement>('[data-seenit-detail-shell="stable"]');
-    if (!shell) return;
-
-    const normalize = () => {
-      for (const span of Array.from(shell.querySelectorAll<HTMLElement>('span'))) {
-        const text = span.textContent?.trim() || '';
-        if (text.startsWith('📺 SÉRIE •')) span.textContent = '📺 SÉRIE';
-
-        if (text.includes('· US ·') && !span.dataset.seenitAgeCompact) {
-          const parts = text.split('·').map(part => part.trim()).filter(Boolean);
-          if (parts.length >= 3) {
-            const readableAge = parts.at(-1)!;
-            const provenance = parts.slice(0, -1).join(' · ');
-            span.dataset.seenitAgeCompact = 'true';
-            span.setAttribute('aria-label', `${readableAge}, classification ${provenance}`);
-            span.title = `${provenance} · ${readableAge}`;
-            span.innerHTML = `<strong>${readableAge}</strong><small style="font-size:8px;opacity:.62;margin-left:5px;font-weight:600;text-transform:none">${provenance}</small>`;
-          }
-        }
-      }
-
-      for (const button of Array.from(shell.querySelectorAll<HTMLButtonElement>('#section-episodes button'))) {
-        const title = button.title || '';
-        if (title === 'Marquer toute la saison comme vue' && button.textContent?.trim() !== 'Tout marquer vu') {
-          button.textContent = 'Tout marquer vu';
-          button.setAttribute('aria-label', title);
-          button.classList.add('px-2');
-        } else if (title === 'Marquer toute la saison comme non vue' && button.textContent?.trim() !== 'Tout marquer non vu') {
-          button.textContent = 'Tout marquer non vu';
-          button.setAttribute('aria-label', title);
-          button.classList.add('px-2');
-        }
-
-        if (/^Saison\s+\d+/.test(button.textContent?.trim() || '')) {
-          const card = button.closest<HTMLElement>('.rounded-2xl');
-          const expanded = Boolean(card && Array.from(card.children).some(child => child.classList.contains('border-t')));
-          button.setAttribute('aria-expanded', String(expanded));
-        }
-      }
-
-      const categoriesHeading = Array.from(shell.querySelectorAll<HTMLElement>('span')).find(node => node.textContent?.trim() === 'Catégories & Thèmes');
-      const chipRow = categoriesHeading?.parentElement?.querySelector<HTMLElement>(':scope > .flex.flex-wrap');
-      if (chipRow) {
-        const extras = Array.from(chipRow.children).filter((node): node is HTMLElement =>
-          node instanceof HTMLElement && node.className.includes('bg-zinc-800/60') && !node.dataset.seenitThemeToggle,
-        );
-        if (extras.length) {
-          const expanded = chipRow.dataset.seenitThemesExpanded === 'true';
-          extras.forEach(node => {
-            node.dataset.seenitThemeExtra = 'true';
-            node.dataset.seenitThemeVisible = String(expanded);
-          });
-          let toggle = chipRow.querySelector<HTMLButtonElement>('[data-seenit-theme-toggle="true"]');
-          if (!toggle) {
-            toggle = document.createElement('button');
-            toggle.type = 'button';
-            toggle.dataset.seenitThemeToggle = 'true';
-            toggle.className = 'min-h-11 px-2.5 py-1 rounded-full border border-white/10 text-zinc-400 text-[10px] font-semibold hover:text-white';
-            toggle.addEventListener('click', () => {
-              chipRow.dataset.seenitThemesExpanded = String(chipRow.dataset.seenitThemesExpanded !== 'true');
-              normalize();
-            });
-            chipRow.appendChild(toggle);
-          }
-          toggle.textContent = expanded ? 'Masquer les thèmes' : `+${extras.length} thèmes`;
-          toggle.setAttribute('aria-expanded', String(expanded));
-        }
-      }
-    };
-
-    normalize();
-    const observer = new MutationObserver(normalize);
-    observer.observe(shell, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, [detailIdentity]);
-  return null;
 }
 
 export function ShowDetailScreen(props: ShowDetailScreenProps) {
@@ -321,11 +129,7 @@ export function ShowDetailScreen(props: ShowDetailScreenProps) {
       {isColdWarmup ? (
         <StableColdDetailSkeleton onBack={props.onBack} />
       ) : (
-        <>
-          <ShowDetailScreenCore key={downloadsEnabled ? 'downloads-visible' : 'downloads-hidden'} {...props} />
-          <ProviderAvailabilityControls detailIdentity={detailIdentity} tmdbId={resolvedMedia.tmdbId} mediaType={resolvedMedia.mediaType} />
-          <DetailUxNormalizer detailIdentity={detailIdentity} />
-        </>
+        <ShowDetailScreenCore key={downloadsEnabled ? 'downloads-visible' : 'downloads-hidden'} {...props} />
       )}
     </div>
   );

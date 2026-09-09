@@ -133,6 +133,22 @@ conformément à `SEENIT-UPDATE-004`.
 
 ## 7. Preuves UX et ordre de réalisation
 
+### Fiche Série — comportement livré avec #216
+
+- **Où regarder** expose une icône `Actualiser Plex` adjacente au titre avec une cible 44 × 44 px, un
+  focus visible et un état animé pendant la redécouverte, sans modifier le contrat Plex.
+- Le titre de saison est le seul contrôle de repli, annonce `aria-expanded` et conserve toute la largeur
+  utile. L'action de masse distincte annonce toujours l'effet inverse explicite : `Tout marquer vu` ou
+  `Tout marquer non vu`.
+- Les genres principaux restent visibles, les thèmes secondaires sont repliables, l'âge lisible précède
+  sa preuve US et les portraits du casting privilégient le haut du visage avec nom/rôle sur deux lignes.
+- Le graphique TMDB complet vit uniquement dans **Épisodes**. Les notes numériques restent lisibles,
+  chaque épisode offre une cible de 44 px et une saison longue défile horizontalement. **À propos** ne
+  conserve aucun résumé de notes.
+
+Ces règles décrivent désormais le runtime attendu commun PWA/APK. Les captures 360/412 px, le clavier,
+le texte agrandi et TalkBack restent des preuves à produire sur la candidate, pas des règles alternatives.
+
 1. #178 : ordre et dimensions de la barre livrés ; contrat d'appui/reset et tests à horloge contrôlée encore ouverts.
 2. #179 : épisode précédent/suivant accessible avec TNR aux frontières des saisons.
 3. #180 : composants pilotes puis migration des cartes/boutons par écran.

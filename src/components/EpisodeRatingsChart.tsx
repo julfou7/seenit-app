@@ -1,12 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { Check, ChevronDown, Star, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface EpisodeRatingsChartProps {
   effectiveTmdbId: number | string | null;
-  /** Identifiant technique conservé pour compatibilité d'appel ; aucune note IMDb n'est chargée. */
-  imdbId?: string | null;
   seasons: any[];
   seasonsCache: Record<number, any>;
   onLoadSeason: (seasonNumber: number) => Promise<void>;
@@ -39,7 +36,6 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
   defaultSeasonNumber,
 }) => {
   const validSeasons = useMemoSeasons(seasons);
-  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const [selectedSeasonNum, setSelectedSeasonNum] = useState<number>(() => {
     if (defaultSeasonNumber !== undefined && validSeasons.some(s => s.season_number === defaultSeasonNumber)) {
       return defaultSeasonNumber;
@@ -49,38 +45,6 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
   const [activeEpisode, setActiveEpisode] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSeasonPickerOpen, setIsSeasonPickerOpen] = useState(false);
-
-  useEffect(() => {
-    let host: HTMLElement | null = null;
-    const place = () => {
-      const section = document.getElementById('section-episodes');
-      if (!section) return false;
-      const headingRow = section.firstElementChild as HTMLElement | null;
-      host = section.querySelector<HTMLElement>(':scope > [data-seenit-ratings-host="true"]');
-      if (!host) {
-        host = document.createElement('div');
-        host.dataset.seenitRatingsHost = 'true';
-        host.className = 'w-full';
-        if (headingRow?.nextSibling) section.insertBefore(host, headingRow.nextSibling);
-        else section.appendChild(host);
-      }
-      setPortalHost(host);
-      return true;
-    };
-
-    if (!place()) {
-      const observer = new MutationObserver(() => {
-        if (place()) observer.disconnect();
-      });
-      observer.observe(document.body, { childList: true, subtree: true });
-      return () => {
-        observer.disconnect();
-        host?.remove();
-      };
-    }
-
-    return () => host?.remove();
-  }, [effectiveTmdbId]);
 
   useEffect(() => {
     if (validSeasons.length > 0 && !validSeasons.some(s => s.season_number === selectedSeasonNum)) {
@@ -119,7 +83,7 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
     };
   }, [episodes]);
 
-  if (!validSeasons.length || !portalHost) return null;
+  if (!validSeasons.length) return null;
 
   const chart = (
     <section className="bg-zinc-900/90 border border-white/10 rounded-2xl p-3.5 space-y-3 shadow-xl w-full overflow-hidden" aria-label="Notes des épisodes">
@@ -272,7 +236,7 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
     </section>
   );
 
-  return createPortal(chart, portalHost);
+  return chart;
 });
 
 function useMemoSeasons(seasons: any[]) {

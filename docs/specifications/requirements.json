@@ -366,6 +366,29 @@
       ]
     },
     {
+      "id": "SEENIT-RATING-001",
+      "title": "Notes publiques TMDB uniquement et graphique d’épisodes accessible",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/mediaProviderSecurity.test.ts",
+          "contains": "SEENIT-RATING-001 interdit tout runtime OMDb tout en conservant les identifiants IMDb techniques"
+        },
+        {
+          "file": "tests/mediaProviderClients.test.ts",
+          "contains": "SEENIT-RATING-001 supprime le client et les caches OMDb"
+        },
+        {
+          "file": "tests/seriesDetailUx.test.ts",
+          "contains": "SEENIT-RATING-001 affiche le graphe uniquement dans Épisodes et uniquement depuis TMDB"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-PLEX-001",
       "title": "Historique Plex résolu sans titre",
       "targets": [

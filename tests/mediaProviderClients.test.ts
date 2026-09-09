@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { build } from 'esbuild';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
@@ -96,10 +96,12 @@ test('issue #12 permet de réessayer un détail après échec sans cacher une er
   assert.equal(attempt, 2);
 });
 
-test('SEENIT-RATING-001 ne garde aucun appel ni cache OMDb dans le reliquat de compatibilité', () => {
-  const source = readFileSync(new URL('../src/features/shows/omdbService.ts', import.meta.url), 'utf8');
-  assert.doesNotMatch(source, /authenticatedFetch|resolveSeenItApiUrl|\/api\/media\/omdb|omdbRatingsCache|omdbEpisodesCache|Dexie|indexedDB/);
-  assert.match(source, /return null/);
+test('SEENIT-RATING-001 supprime le client et les caches OMDb', () => {
+  assert.equal(
+    existsSync(new URL('../src/features/shows/omdbService.ts', import.meta.url)),
+    false,
+    'le service OMDb ne doit plus exister dans le runtime client',
+  );
 });
 
 test('issue #12 migre aussi les recommandations sans clé et conserve leurs filtres', async () => {
