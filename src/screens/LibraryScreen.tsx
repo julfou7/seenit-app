@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShows } from '../hooks/useShows';
 import { GridMediaCard, PreviewModal } from '../components/GridMediaCard';
 import { type TMDBMedia, isMovieAtCinema } from '../features/shows/tmdb';
-import { Bookmark, Play, CheckCircle2, Heart, Inbox, Ticket, Calendar, Film } from 'lucide-react';
+import { Inbox } from 'lucide-react';
 import { checkIsUpToDate, getTodayStr } from '../lib/utils';
 import { useShowsStore } from '../store/showsStore';
 import { useToastStore } from '../store/toastStore';
@@ -15,14 +15,65 @@ interface Props {
   isEmbedded?: boolean;
 }
 
-const LIBRARY_ROW_BATCH_SIZE = 12;
+const LIBRARY_ROW_BATCH_SIZE = 6;
+const LIBRARY_GRID_BATCH_SIZE = 12;
+const LIBRARY_ROW_ROOT_MARGIN = '320px 0px';
 
 const getMediaKey = (mediaType: string | undefined, id: string | number) =>
   `${mediaType === 'movie' ? 'movie' : 'tv'}:${Number(id)}`;
 
+interface LibraryItem {
+  media: TMDBMedia;
+  show: Show;
+}
+
+interface LibrarySectionData {
+  id: string;
+  title: string;
+  emoji: string;
+  data: LibraryItem[];
+}
+
+const libraryItemCache = new WeakMap<Show, LibraryItem>();
+
+function getLibraryItem(show: Show): LibraryItem {
+  const cached = libraryItemCache.get(show);
+  if (cached) return cached;
+
+  const item: LibraryItem = {
+    show,
+    media: {
+      id: Number(show.tmdbId),
+      name: show.title,
+      title: show.title,
+      poster_path: show.posterPath,
+      backdrop_path: show.backdropPath,
+      first_air_date: show.mediaType === 'tv' ? (show.firstAirDate || '2000-01-01') : undefined,
+      release_date: show.mediaType === 'movie' ? (show.firstAirDate || '2000-01-01') : undefined,
+      media_type: show.mediaType,
+      vote_average: show.userRating || 0,
+    },
+  };
+  libraryItemCache.set(show, item);
+  return item;
+}
+
+function areLibraryItemsEqual(left: LibraryItem[], right: LibraryItem[]): boolean {
+  return left === right || (
+    left.length === right.length && left.every((item, index) => item === right[index])
+  );
+}
+
+function findCurrentShow(media: TMDBMedia): Show | undefined {
+  const mediaType = media.media_type === 'movie' ? 'movie' : 'tv';
+  const mediaKey = getMediaKey(mediaType, media.id);
+  return useShowsStore.getState().shows.find(show =>
+    show.tmdbId != null && getMediaKey(show.mediaType, show.tmdbId) === mediaKey
+  );
+}
+
 interface LibraryRowProps {
-  data: TMDBMedia[];
-  showsByMediaKey: Map<string, Show>;
+  data: LibraryItem[];
   onShowClick: (id: any, mediaType?: 'tv' | 'movie') => void;
   onToggleWatched: (media: TMDBMedia) => void;
   onLongPress: (media: TMDBMedia) => void;
@@ -31,7 +82,6 @@ interface LibraryRowProps {
 
 const LibraryRow = React.memo(function LibraryRow({
   data,
-  showsByMediaKey,
   onShowClick,
   onToggleWatched,
   onLongPress,
@@ -48,7 +98,9 @@ const LibraryRow = React.memo(function LibraryRow({
     const element = event.currentTarget;
     const preloadDistance = Math.max(element.clientWidth, 1);
     if (element.scrollLeft + element.clientWidth >= element.scrollWidth - preloadDistance) {
-      setVisibleCount(current => Math.min(data.length, current + LIBRARY_ROW_BATCH_SIZE));
+      startTransition(() => {
+        setVisibleCount(current => Math.min(data.length, current + LIBRARY_ROW_BATCH_SIZE));
+      });
     }
   }, [data.length, visibleCount]);
 
@@ -57,8 +109,7 @@ const LibraryRow = React.memo(function LibraryRow({
       className="flex overflow-x-auto hide-scrollbar px-4 sm:px-6 scroll-px-4 sm:scroll-px-6 gap-1.5 sm:gap-1.5 pb-2 snap-x snap-mandatory"
       onScroll={handleHorizontalScroll}
     >
-      {data.slice(0, visibleCount).map(media => {
-        const show = showsByMediaKey.get(getMediaKey(media.media_type, media.id));
+      {data.slice(0, visibleCount).map(({ media, show }) => {
         return (
           <div
             key={getMediaKey(media.media_type, media.id)}
@@ -80,25 +131,164 @@ const LibraryRow = React.memo(function LibraryRow({
       <div className="w-2 shrink-0" />
     </div>
   );
-});
+}, (previous, next) =>
+  areLibraryItemsEqual(previous.data, next.data) &&
+  previous.onShowClick === next.onShowClick &&
+  previous.onToggleWatched === next.onToggleWatched &&
+  previous.onLongPress === next.onLongPress &&
+  previous.onAddClick === next.onAddClick
+);
 
-export function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
+interface DeferredLibraryRowProps extends LibraryRowProps {
+  eager?: boolean;
+}
+
+const DeferredLibraryRow = React.memo(function DeferredLibraryRow({
+  eager = false,
+  ...rowProps
+}: DeferredLibraryRowProps) {
+  const [shouldRender, setShouldRender] = useState(eager);
+  const placeholderRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (shouldRender) return;
+    const element = placeholderRef.current;
+    if (!element || typeof IntersectionObserver === 'undefined') {
+      setShouldRender(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(entries => {
+      if (!entries.some(entry => entry.isIntersecting)) return;
+      observer.disconnect();
+      startTransition(() => setShouldRender(true));
+    }, { rootMargin: LIBRARY_ROW_ROOT_MARGIN });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [shouldRender]);
+
+  return (
+    <div ref={placeholderRef} className={shouldRender ? undefined : 'min-h-[220px]'}>
+      {shouldRender ? <LibraryRow {...rowProps} /> : null}
+    </div>
+  );
+}, (previous, next) =>
+  previous.eager === next.eager &&
+  areLibraryItemsEqual(previous.data, next.data) &&
+  previous.onShowClick === next.onShowClick &&
+  previous.onToggleWatched === next.onToggleWatched &&
+  previous.onLongPress === next.onLongPress &&
+  previous.onAddClick === next.onAddClick
+);
+
+const ExpandedLibraryGrid = React.memo(function ExpandedLibraryGrid(props: LibraryRowProps) {
+  const { data, onShowClick, onToggleWatched, onLongPress, onAddClick } = props;
+  const [visibleCount, setVisibleCount] = useState(() => Math.min(LIBRARY_GRID_BATCH_SIZE, data.length));
+
+  useEffect(() => {
+    setVisibleCount(current => Math.min(Math.max(current, LIBRARY_GRID_BATCH_SIZE), data.length));
+  }, [data.length]);
+
+  return (
+    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-x-1.5 gap-y-4 px-4 sm:px-6">
+      {data.slice(0, visibleCount).map(({ media, show }) => (
+        <GridMediaCard
+          key={getMediaKey(media.media_type, media.id)}
+          media={media}
+          show={show}
+          hideBadges={true}
+          showProgress={true}
+          onShowClick={onShowClick}
+          onToggleWatched={onToggleWatched}
+          onLongPress={onLongPress}
+          onAddClick={onAddClick}
+        />
+      ))}
+      {visibleCount < data.length && (
+        <button
+          type="button"
+          onClick={() => startTransition(() => {
+            setVisibleCount(current => Math.min(data.length, current + LIBRARY_GRID_BATCH_SIZE));
+          })}
+          className="col-span-full w-full py-3 rounded-xl bg-zinc-900 border border-white/10 text-xs font-bold text-zinc-300 hover:bg-zinc-800 active:scale-[0.98] transition-transform"
+        >
+          Charger plus
+        </button>
+      )}
+    </div>
+  );
+}, (previous, next) =>
+  areLibraryItemsEqual(previous.data, next.data) &&
+  previous.onShowClick === next.onShowClick &&
+  previous.onToggleWatched === next.onToggleWatched &&
+  previous.onLongPress === next.onLongPress &&
+  previous.onAddClick === next.onAddClick
+);
+
+interface LibrarySectionProps extends Omit<LibraryRowProps, 'data'> {
+  section: LibrarySectionData;
+  expanded: boolean;
+  eager?: boolean;
+  onToggleExpanded: (sectionId: string) => void;
+}
+
+const LibrarySection = React.memo(function LibrarySection({
+  section,
+  expanded,
+  eager,
+  onToggleExpanded,
+  ...rowProps
+}: LibrarySectionProps) {
+  const contentProps = { ...rowProps, data: section.data };
+
+  return (
+    <div className="space-y-3">
+      <div className="px-4 sm:px-6 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+            <span className="text-base">{section.emoji}</span>
+            <span>{section.title}</span>
+          </h2>
+        </div>
+        {section.data.length > 3 && (
+          <button
+            type="button"
+            onClick={() => onToggleExpanded(section.id)}
+            className="text-xs font-bold text-[#E5A93D] hover:underline cursor-pointer"
+          >
+            {expanded ? 'Réduire' : 'Voir tout'}
+          </button>
+        )}
+      </div>
+
+      {expanded ? (
+        <ExpandedLibraryGrid {...contentProps} />
+      ) : (
+        <DeferredLibraryRow {...contentProps} eager={eager} />
+      )}
+    </div>
+  );
+}, (previous, next) =>
+  previous.section.id === next.section.id &&
+  previous.section.title === next.section.title &&
+  previous.section.emoji === next.section.emoji &&
+  areLibraryItemsEqual(previous.section.data, next.section.data) &&
+  previous.expanded === next.expanded &&
+  previous.eager === next.eager &&
+  previous.onToggleExpanded === next.onToggleExpanded &&
+  previous.onShowClick === next.onShowClick &&
+  previous.onToggleWatched === next.onToggleWatched &&
+  previous.onLongPress === next.onLongPress &&
+  previous.onAddClick === next.onAddClick
+);
+
+export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
   const { shows, addShow, deleteShow } = useShows();
   const updateShow = useShowsStore(state => state.updateShowOptimistic);
   const showToast = useToastStore(state => state.showToast);
 
   const [previewMedia, setPreviewMedia] = useState<TMDBMedia | null>(null);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
-
-  const showsByMediaKey = useMemo(() => {
-    const map = new Map<string, Show>();
-    for (const show of shows) {
-      if (show.tmdbId != null) {
-        map.set(getMediaKey(show.mediaType, show.tmdbId), show);
-      }
-    }
-    return map;
-  }, [shows]);
 
   const handleShowClick = useCallback((id: any, mediaType?: 'tv' | 'movie') => {
     onShowClick(String(id), mediaType);
@@ -108,10 +298,14 @@ export function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
     setPreviewMedia(media);
   }, []);
 
+  const handleToggleExpanded = useCallback((sectionId: string) => {
+    setExpandedSection(current => current === sectionId ? null : sectionId);
+  }, []);
+
   const handleAddMedia = useCallback(async (media: TMDBMedia) => {
     const isTv = media.media_type === 'tv' || media.first_air_date !== undefined;
     const mediaType = isTv ? 'tv' : 'movie';
-    const existing = showsByMediaKey.get(getMediaKey(mediaType, media.id));
+    const existing = findCurrentShow(media);
     if (existing) return;
 
     const titleToUse = media.name || media.title || media.original_name || media.original_title || '';
@@ -146,12 +340,11 @@ export function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
         }
       }
     );
-  }, [addShow, deleteShow, showToast, showsByMediaKey]);
+  }, [addShow, deleteShow, showToast]);
 
   const handleToggleWatched = useCallback(async (media: TMDBMedia) => {
     const isTv = media.media_type === 'tv' || media.first_air_date !== undefined;
-    const mediaType = isTv ? 'tv' : 'movie';
-    const existingShow = showsByMediaKey.get(getMediaKey(mediaType, media.id));
+    const existingShow = findCurrentShow(media);
     if (!existingShow) return;
 
     const titleToUse = media.name || media.title || '';
@@ -232,21 +425,9 @@ export function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
         }
       );
     }
-  }, [showToast, showsByMediaKey, updateShow]);
+  }, [showToast, updateShow]);
 
   const sections = useMemo(() => {
-    const toMedia = (s: any): TMDBMedia => ({
-      id: s.tmdbId,
-      name: s.title,
-      title: s.title,
-      poster_path: s.posterPath,
-      backdrop_path: s.backdropPath,
-      first_air_date: s.mediaType === 'tv' ? (s.firstAirDate || '2000-01-01') : undefined,
-      release_date: s.mediaType === 'movie' ? (s.firstAirDate || '2000-01-01') : undefined,
-      media_type: s.mediaType,
-      vote_average: s.userRating || 0,
-    });
-
     const todayStr = getTodayStr();
 
     const favorites = shows.filter(s => s.isFavorite);
@@ -281,7 +462,7 @@ export function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
     const isCinemaMovie = (s: any) => {
       if (s.mediaType !== 'movie') return false;
       if (s.status === 'completed' || s.seenEpisodes?.includes('movie')) return false;
-      return isMovieAtCinema(s) || isMovieAtCinema(toMedia(s));
+      return isMovieAtCinema(s) || isMovieAtCinema(getLibraryItem(s).media);
     };
 
     const toWatchCinema = shows.filter(isCinemaMovie);
@@ -305,16 +486,27 @@ export function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
     );
 
     return [
-      { id: 'favorites', title: 'Mes Favoris', emoji: '❤️', icon: Heart, data: favorites.map(toMedia) },
-      { id: 'watching', title: 'Séries en cours', emoji: '▶️', icon: Play, data: watching.map(toMedia) },
-      { id: 'toStartTv', title: 'Séries à commencer', emoji: '🔖', icon: Bookmark, data: toStartTv.map(toMedia) },
-      { id: 'upcomingTv', title: 'Séries à venir', emoji: '📅', icon: Calendar, data: upcomingTv.map(toMedia) },
-      { id: 'toWatchCinema', title: 'Films au cinéma', emoji: '🎟️', icon: Ticket, data: toWatchCinema.map(toMedia) },
-      { id: 'toWatchMovie', title: 'Films à voir', emoji: '🎬', icon: Film, data: toWatchMovie.map(toMedia) },
-      { id: 'upToDate', title: 'Séries à jour', emoji: '✅', icon: CheckCircle2, data: upToDate.map(toMedia) },
-      { id: 'completedMovies', title: 'Films vus', emoji: '🍿', icon: CheckCircle2, data: completedMovies.map(toMedia) },
+      { id: 'favorites', title: 'Mes Favoris', emoji: '❤️', data: favorites.map(getLibraryItem) },
+      { id: 'watching', title: 'Séries en cours', emoji: '▶️', data: watching.map(getLibraryItem) },
+      { id: 'toStartTv', title: 'Séries à commencer', emoji: '🔖', data: toStartTv.map(getLibraryItem) },
+      { id: 'upcomingTv', title: 'Séries à venir', emoji: '📅', data: upcomingTv.map(getLibraryItem) },
+      { id: 'toWatchCinema', title: 'Films au cinéma', emoji: '🎟️', data: toWatchCinema.map(getLibraryItem) },
+      { id: 'toWatchMovie', title: 'Films à voir', emoji: '🎬', data: toWatchMovie.map(getLibraryItem) },
+      { id: 'upToDate', title: 'Séries à jour', emoji: '✅', data: upToDate.map(getLibraryItem) },
+      { id: 'completedMovies', title: 'Films vus', emoji: '🍿', data: completedMovies.map(getLibraryItem) },
     ].filter(s => s.data.length > 0);
   }, [shows]);
+
+  const previewShow = previewMedia ? findCurrentShow(previewMedia) : undefined;
+
+  const closePreview = useCallback(() => {
+    setPreviewMedia(null);
+  }, []);
+
+  const handlePreviewShowClick = useCallback((id: any, mediaType?: 'tv' | 'movie') => {
+    setPreviewMedia(null);
+    handleShowClick(id, mediaType);
+  }, [handleShowClick]);
 
   return (
     <div className={cn("flex-1 text-white", !isEmbedded && "overflow-y-auto bg-transparent pb-nav")}>
@@ -339,55 +531,18 @@ export function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
         </div>
       ) : (
         <div className="space-y-8 pb-2">
-          {sections.map(section => (
-            <div key={section.id} className="space-y-3">
-              <div className="px-4 sm:px-6 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-                    <span className="text-base">{section.emoji}</span>
-                    <span>{section.title}</span>
-                  </h2>
-                </div>
-                {section.data.length > 3 && (
-                  <button
-                    onClick={() => setExpandedSection(expandedSection === section.id ? null : section.id)}
-                    className="text-xs font-bold text-[#E5A93D] hover:underline cursor-pointer"
-                  >
-                    {expandedSection === section.id ? 'Réduire' : 'Voir tout'}
-                  </button>
-                )}
-              </div>
-
-              {expandedSection === section.id ? (
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-x-1.5 gap-y-4 px-4 sm:px-6">
-                  {section.data.map(media => {
-                    const show = showsByMediaKey.get(getMediaKey(media.media_type, media.id));
-                    return (
-                      <GridMediaCard
-                        key={getMediaKey(media.media_type, media.id)}
-                        media={media}
-                        show={show}
-                        hideBadges={true}
-                        showProgress={true}
-                        onShowClick={handleShowClick}
-                        onToggleWatched={handleToggleWatched}
-                        onLongPress={handleLongPress}
-                        onAddClick={handleAddMedia}
-                      />
-                    );
-                  })}
-                </div>
-              ) : (
-                <LibraryRow
-                  data={section.data}
-                  showsByMediaKey={showsByMediaKey}
-                  onShowClick={handleShowClick}
-                  onToggleWatched={handleToggleWatched}
-                  onLongPress={handleLongPress}
-                  onAddClick={handleAddMedia}
-                />
-              )}
-            </div>
+          {sections.map((section, index) => (
+            <LibrarySection
+              key={section.id}
+              section={section}
+              expanded={expandedSection === section.id}
+              eager={index === 0}
+              onToggleExpanded={handleToggleExpanded}
+              onShowClick={handleShowClick}
+              onToggleWatched={handleToggleWatched}
+              onLongPress={handleLongPress}
+              onAddClick={handleAddMedia}
+            />
           ))}
         </div>
       )}
@@ -395,20 +550,18 @@ export function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
       {previewMedia && (
         <PreviewModal
           media={previewMedia}
-          isAdded={showsByMediaKey.has(getMediaKey(previewMedia.media_type, previewMedia.id))}
-          isWatched={(() => {
-            const show = showsByMediaKey.get(getMediaKey(previewMedia.media_type, previewMedia.id));
-            return Boolean(show && (show.status === 'completed' || checkIsUpToDate(show) || show.seenEpisodes?.includes('movie')));
-          })()}
-          onClose={() => setPreviewMedia(null)}
+          isAdded={Boolean(previewShow)}
+          isWatched={Boolean(previewShow && (
+            previewShow.status === 'completed' ||
+            checkIsUpToDate(previewShow) ||
+            previewShow.seenEpisodes?.includes('movie')
+          ))}
+          onClose={closePreview}
           onAddClick={handleAddMedia}
           onToggleWatched={handleToggleWatched}
-          onShowClick={(id, mediaType) => {
-            setPreviewMedia(null);
-            handleShowClick(id, mediaType);
-          }}
+          onShowClick={handlePreviewShowClick}
         />
       )}
     </div>
   );
-}
+});

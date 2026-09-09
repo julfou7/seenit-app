@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { Activity, startTransition, useCallback, useState, useEffect, useRef } from 'react';
 import { Settings, Share2, Calendar, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { auth } from '../lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
@@ -10,7 +10,16 @@ import { ProAnalyticsDashboard } from '../components/ProAnalyticsDashboard';
 import { SeenItLogo } from '../components/SeenItLogo';
 import { LibraryScreen } from './LibraryScreen';
 
-export function ProfileScreen({ 
+const ProfileStatsContent = React.memo(function ProfileStatsContent({
+  onPersonClick,
+}: {
+  onPersonClick: (personId: number) => void;
+}) {
+  const { shows } = useShows();
+  return <ProAnalyticsDashboard shows={shows} onPersonClick={onPersonClick} />;
+});
+
+export const ProfileScreen = React.memo(function ProfileScreen({
   initialShowSettings = false,
   onShowClick
 }: { 
@@ -22,6 +31,7 @@ export function ProfileScreen({
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'stats' | 'library'>('stats');
+  const [mountedProfileTabs, setMountedProfileTabs] = useState(() => new Set<'stats' | 'library'>(['stats']));
   const [isProfileVisible, setIsProfileVisible] = useState(true);
 
   const [isExitingSettings, setIsExitingSettings] = useState(false);
@@ -34,11 +44,27 @@ export function ProfileScreen({
   const isEdgeSwipeRefSettings = useRef<boolean>(false);
   const isHorizontalSwipeRefSettings = useRef<boolean | null>(null);
 
-  const openPersonModal = (personId: number) => {
+  const openPersonModal = useCallback((personId: number) => {
     setSelectedPersonId(personId);
     const currentState = window.history.state || {};
     window.history.pushState({ ...currentState, isModal: true, isPersonDetailModal: true, personId }, '');
-  };
+  }, []);
+
+  const handleProfileTabChange = useCallback((tab: 'stats' | 'library') => {
+    startTransition(() => {
+      setMountedProfileTabs(previous => {
+        if (previous.has(tab)) return previous;
+        const next = new Set(previous);
+        next.add(tab);
+        return next;
+      });
+      setActiveTab(tab);
+    });
+  }, []);
+
+  const handleLibraryShowClick = useCallback((id: string, mediaType?: 'tv' | 'movie') => {
+    onShowClick?.(id, mediaType);
+  }, [onShowClick]);
 
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
@@ -133,8 +159,6 @@ export function ProfileScreen({
     return onAuthStateChanged(auth, setUser);
   }, []);
 
-  const { shows } = useShows();
-
   const handleShare = async () => {
     const text = `Découvre mon Profil Cinéphile sur l'application !`;
     if (navigator.share) {
@@ -157,7 +181,7 @@ export function ProfileScreen({
   const creationYear = user?.metadata?.creationTime 
     ? new Date(user.metadata.creationTime).getFullYear() 
     : 2024;
-  const renderHeavyContent = isProfileVisible && !showSettings;
+  const profileContentVisible = isProfileVisible && !showSettings;
 
   return (
     <div ref={rootRef} className="flex-1 overflow-y-auto bg-transparent text-white pb-nav custom-scrollbar">
@@ -216,13 +240,13 @@ export function ProfileScreen({
       <div className="px-4 pb-4">
         <div className="flex bg-zinc-900/80 rounded-xl p-1 border border-white/5">
            <button 
-             onClick={() => setActiveTab('stats')}
+             onClick={() => handleProfileTabChange('stats')}
              className={cn("flex-1 text-sm font-bold py-2 rounded-lg transition-colors cursor-pointer", activeTab === 'stats' ? "bg-zinc-800 text-white shadow-sm" : "text-zinc-500")}
            >
              Statistiques
            </button>
            <button 
-             onClick={() => setActiveTab('library')}
+             onClick={() => handleProfileTabChange('library')}
              className={cn("flex-1 text-sm font-bold py-2 rounded-lg transition-colors cursor-pointer", activeTab === 'library' ? "bg-zinc-800 text-white shadow-sm" : "text-zinc-500")}
            >
              Ma Liste
@@ -230,16 +254,21 @@ export function ProfileScreen({
         </div>
       </div>
 
-      {/* 3. CONTENT — démonté dès que Profil est caché ou que Réglages le recouvre */}
-      {renderHeavyContent && (activeTab === 'stats' ? (
-        <div className="px-4 pb-2">
-          <ProAnalyticsDashboard shows={shows} onPersonClick={openPersonModal} />
-        </div>
-      ) : (
-        <div className="flex-1 pb-2 flex flex-col">
-          <LibraryScreen onShowClick={(id, mediaType) => onShowClick && onShowClick(id, mediaType)} isEmbedded={true} />
-        </div>
-      ))}
+      {/* 3. CONTENT — état conservé, Effects suspendus lorsque la sous-vue est masquée */}
+      {mountedProfileTabs.has('stats') && (
+        <Activity mode={profileContentVisible && activeTab === 'stats' ? 'visible' : 'hidden'}>
+          <div className="px-4 pb-2">
+            <ProfileStatsContent onPersonClick={openPersonModal} />
+          </div>
+        </Activity>
+      )}
+      {mountedProfileTabs.has('library') && (
+        <Activity mode={profileContentVisible && activeTab === 'library' ? 'visible' : 'hidden'}>
+          <div className="flex-1 pb-2 flex flex-col">
+            <LibraryScreen onShowClick={handleLibraryShowClick} isEmbedded={true} />
+          </div>
+        </Activity>
+      )}
 
       {/* MODAL DÉTAILS PERSONNE (ACTEUR / RÉALISATEUR) */}
       {selectedPersonId && (
@@ -291,4 +320,4 @@ export function ProfileScreen({
       )}
     </div>
   );
-}
+});

@@ -202,6 +202,11 @@ venir, Films au cinéma, Films à voir, Séries à jour et Films vus. Une même 
 les favoris et dans sa section métier. Les grilles sont extensibles et les cartes permettent les
 actions rapides de suivi/visionnage.
 
+Pour préserver la navigation sur les grandes bibliothèques, seules les rangées proches de la zone
+visible sont matérialisées. Les rangées horizontales et les grilles « Voir tout » progressent par lots
+bornés sans masquer les médias restants. Statistiques et Ma Liste conservent leur état après leur
+première ouverture, tandis que leurs traitements sont suspendus lorsqu'elles sont cachées.
+
 Le bouton Réglages ouvre un écran superposé refermable par Retour ou swipe depuis le bord gauche.
 Le bouton Partager ne doit promettre qu'un lien réellement réouvrable ; l'écart actuel est suivi par
 #96.

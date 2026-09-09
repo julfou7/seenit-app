@@ -1530,6 +1530,14 @@
         {
           "file": "tests/explorerPerformance.test.ts",
           "contains": "SEENIT-PERF-001 borne le fan-out diffuseurs et stabilise les cartes Explorer"
+        },
+        {
+          "file": "tests/activityScrollPerformance.test.ts",
+          "contains": "SEENIT-PERF-001 borne le montage visible de Ma Liste"
+        },
+        {
+          "file": "tests/activityScrollPerformance.test.ts",
+          "contains": "SEENIT-PERF-001 préserve les cartes inchangées et la sous-vue Profil"
         }
       ]
     }
