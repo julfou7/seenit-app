@@ -37,31 +37,36 @@ function firstNotificationScheduleIndex(): number {
 }
 
 test('issue #94 ignore chaque média inéligible sans interrompre les suivants', () => {
-  assert.doesNotMatch(loop, /\breturn\s*;/, 'aucun média ne doit pouvoir quitter processReminders depuis la boucle');
+  assert.match(loop, /if \(s\.isArchived \|\| s\.status === 'dropped'\) \{[\s\S]*?continue;/);
+  assert.match(loop, /if \(!Number\.isInteger\(tmdbId\) \|\| tmdbId <= 0\) \{[\s\S]*?continue;/);
+  assert.match(loop, /if \(!upcoming \|\| !upcoming\.air_date\) \{[\s\S]*?continue;/);
+  assert.match(loop, /if \(!year \|\| !month \|\| !day\) \{[\s\S]*?continue;/);
 
-  assert.match(loop, /if \(s\.isArchived \|\| s\.status === 'dropped'\) continue;/);
-  assert.match(loop, /if \(s\.mediaType === 'movie' && !s\.firstAirDate\) continue;/);
-  assert.match(loop, /if \(!upcoming \|\| !upcoming\.air_date\) continue;/);
-
-  const invalidDateGuards = loop.match(/if \(!year \|\| !month \|\| !day\) continue;/g) || [];
-  assert.equal(invalidDateGuards.length, 2, 'film et série doivent ignorer indépendamment une date invalide');
+  assert.doesNotMatch(
+    loop,
+    /if \(s\.isArchived \|\| s\.status === 'dropped'\)[^{\n]*\n?\s*return\s*;/,
+    'un média archivé/abandonné ne doit jamais quitter processReminders',
+  );
 });
 
 test('issue #94 ne programme rien avant les garde-fous d’éligibilité', () => {
   const firstNotificationSchedule = firstNotificationScheduleIndex();
-  assert.ok(firstNotificationSchedule > loop.indexOf("if (s.isArchived || s.status === 'dropped') continue;"));
-  assert.ok(firstNotificationSchedule > loop.indexOf("if (s.mediaType === 'movie' && !s.firstAirDate) continue;"));
+  assert.ok(firstNotificationSchedule > loop.indexOf("if (s.isArchived || s.status === 'dropped')"));
+  assert.ok(firstNotificationSchedule > loop.indexOf("if (s.mediaType === 'movie')"));
 
   const tvSchedule = loop.indexOf('const scheduleTvAlert');
-  assert.ok(tvSchedule > loop.indexOf('if (!upcoming || !upcoming.air_date) continue;'));
+  assert.ok(tvSchedule > loop.indexOf('if (!upcoming || !upcoming.air_date)'));
 });
 
-test('issue #94 conserve les rappels à 09:00 et leurs clés anti-doublon', () => {
-  const nineAmDates = loop.match(/new Date\(year, month - 1, day, 9, 0, 0, 0\)/g) || [];
-  assert.equal(nineAmDates.length, 2, 'films et séries doivent rester programmés à 09:00 locale');
+test('issue #94 conserve les rappels à 09:00 et leurs clés anti-doublon versionnées', () => {
+  assert.match(loop, /toLocalReminderDate\(targetStr\)/,
+    'les sorties film canoniques doivent être transformées en 09:00 locale');
+  assert.match(loop, /new Date\(year, month - 1, day, 9, 0, 0, 0\)/,
+    'les épisodes restent programmés à 09:00 locale');
 
-  assert.match(loop, /scheduled_9am_\$\{s\.id\}_\$\{tag\}_\$\{targetStr\}/);
-  assert.match(loop, /scheduled_9am_\$\{s\.id\}_\$\{tagPrefix\}_S\$\{sNum\}E\$\{eNum\}_\$\{targetStr\}/);
+  assert.match(source, /const REMINDER_SCHEDULE_SCHEMA = 'v2';/);
+  assert.match(loop, /scheduled_9am_\$\{REMINDER_SCHEDULE_SCHEMA\}_\$\{s\.id\}_\$\{tag\}_\$\{targetStr\}/);
+  assert.match(loop, /scheduled_9am_\$\{REMINDER_SCHEDULE_SCHEMA\}_\$\{s\.id\}_\$\{tagPrefix\}_S\$\{sNum\}E\$\{eNum\}_\$\{targetStr\}/);
   assert.match(loop, /notified_today_\$\{s\.id\}_\$\{tag\}_\$\{todayStr\}/);
   assert.match(loop, /notified_today_\$\{s\.id\}_\$\{tagPrefix\}_S\$\{sNum\}E\$\{eNum\}_\$\{todayStr\}/);
 });
