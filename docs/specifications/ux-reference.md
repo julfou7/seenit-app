@@ -1,6 +1,6 @@
 # SeenIt — Référence UX
 
-Date : 8 septembre 2026. Baseline inspectée : 1.4.122, `24dc43437e7fb9cef23148d3d2ca21fb618901ff`.
+Date : 9 septembre 2026. Baseline inspectée : 1.4.125.
 
 Ce document complète `seenit.md` §9 et `functional-reference.md`. Il distingue les comportements
 observés des cibles de normalisation encore ouvertes. Il ne certifie ni le rendu sur appareil ni la
@@ -156,3 +156,31 @@ Les fixtures des tests sont locales et ne sollicitent pas les services personnel
 rapides suivent les PR concernées ; les validations Android lourdes restent groupées avec les releases.
 Une capture initiale n'est pas automatiquement une baseline approuvée : corriger les défauts connus
 avant de verrouiller les images. Les tests de présence de chaînes dans la SPEC ne prouvent pas l'UX.
+## 8. Fiche série — cible livrée #216 / #217
+
+La fiche série privilégie une lecture courte et utile sur mobile. Les quatre captures terrain du
+9 septembre 2026 ont servi de référence de cadrage ; la règle durable est le comportement ci-dessous,
+pas les pixels d'une capture particulière.
+
+- **Où regarder** conserve son titre stable. L'actualisation Plex est une icône attenante au titre,
+  avec pictogramme discret mais cible de **44 × 44 CSS px**, nom accessible, `title`, état désactivé
+  et rotation pendant l'actualisation. Le comportement réseau reste celui de #214/#206.
+- L'en-tête d'une saison est lui-même le contrôle d'ouverture/fermeture. La flèche dédiée disparaît
+  afin de libérer la largeur ; l'état reste annoncé par `aria-expanded`.
+- L'action de masse emploie **Tout marquer vu** ou **Tout marquer non vu** selon l'intention réelle.
+  Elle reste secondaire et compacte visuellement sans réduire sa compréhension.
+- Les portraits du casting gardent `object-fit: cover` avec un cadrage vertical orienté vers le haut
+  (`50% 25%`) plutôt qu'une détection de visage. Noms et rôles peuvent occuper deux lignes ; le compteur
+  d'épisodes est visuellement secondaire.
+- Les genres TMDB restent visibles en premier. Les mots-clés/thèmes supplémentaires sont repliés par
+  défaut derrière **+N thèmes** et le contrôle de dépliage conserve une cible d'au moins 44 px.
+- Une classification d'âge courte reste l'information principale. Lorsqu'une provenance US doit être
+  conservée pour audit, elle est affichée en information secondaire et reste disponible au lecteur
+  d'écran ; elle n'est jamais présentée comme une certification française.
+- Les notes visibles utilisent **TMDB uniquement** conformément à `SEENIT-RATING-001`. La fiche ne
+  préchauffe plus IMDb/OMDb et n'affiche plus de badge IMDb. Le graphique détaillé des épisodes vit dans
+  l'onglet **Épisodes**, utilise `vote_average` TMDB, se parcourt horizontalement pour les longues saisons
+  et conserve des cibles de 44 px. L'onglet **À propos** n'affiche pas un second résumé de ces notes.
+
+Ces règles décrivent le runtime commun PWA/APK. Les captures 360/412 px, le clavier, le texte agrandi
+et TalkBack restent des preuves à produire sur la candidate de release, pas des règles alternatives.

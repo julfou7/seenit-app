@@ -310,6 +310,30 @@
       ]
     },
     {
+      "id": "SEENIT-RATING-001",
+      "title": "Notes SeenIt exclusivement alimentées par TMDB, sans OMDb",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/mediaProviderSecurity.test.ts",
+          "contains": "SEENIT-RATING-001 interdit tout runtime OMDb tout en conservant les identifiants IMDb techniques"
+        },
+        {
+          "file": "tests/mediaProviderClients.test.ts",
+          "contains": "SEENIT-RATING-001 supprime le client et les caches OMDb"
+        },
+        {
+          "file": "tests/seriesDetailUx.test.ts",
+          "contains": "SEENIT-RATING-001 affiche le graphe uniquement dans Épisodes et uniquement depuis TMDB"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-DISCOVER-001",
       "title": "Au cinéma limité aux sorties théâtrales françaises TMDB",
       "targets": [

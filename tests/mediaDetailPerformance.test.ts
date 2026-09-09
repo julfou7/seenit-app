@@ -47,7 +47,7 @@ test('SEENIT-PERF-001 réserve les skeletons au chargement réellement froid', (
   assert.match(detailSource, /loading="eager" decoding="async"[\s\S]{0,120}fetchPriority="high"/);
 });
 
-test('SEENIT-PERF-001 regroupe le chargement froid avant de monter la fiche complète', () => {
+test('SEENIT-PERF-001 regroupe le chargement froid sans dépendance IMDb', () => {
   assert.match(detailWrapperSource, /DETAIL_WARMUP_GRACE_MS = 300/);
   assert.match(detailWrapperSource, /tmdb\.peekMediaDetails\(tmdbId, mediaType\)/,
     'un cache détail chaud doit court-circuiter le gate');
@@ -55,8 +55,8 @@ test('SEENIT-PERF-001 regroupe le chargement froid avant de monter la fiche comp
     'les plateformes doivent partir en parallèle du détail principal');
   assert.match(detailWrapperSource, /await tmdb\.getMediaDetails\(tmdbId, mediaType\)/,
     'le détail principal doit être chaud avant de monter la fiche complète');
-  assert.match(detailWrapperSource, /getSeriesImdbData\(imdbId\)/,
-    'IMDb doit être préchauffé pendant la courte fenêtre secondaire');
+  assert.doesNotMatch(detailWrapperSource, /getSeriesImdbData|omdbService|\/api\/media\/omdb/,
+    'le chargement froid ne doit plus dépendre d’IMDb ou OMDb');
   assert.match(detailWrapperSource, /Promise\.race\(/,
     'les enrichissements secondaires ne doivent jamais bloquer la fiche sans borne');
   assert.match(detailWrapperSource, /data-seenit-detail-warmup="cold"/,
@@ -83,11 +83,12 @@ test('SEENIT-PERF-001 garde le titre relationnel neutre sans transformer Où reg
   );
 });
 
-test('SEENIT-PERF-001 unifie le chargement des disponibilités et expose un refresh Plex explicite', () => {
-  assert.match(detailWrapperSource, /PROVIDER_LOADING_LABEL = 'Recherche Plex & streaming…'/);
-  assert.match(detailWrapperSource, /node\.textContent\?\.trim\(\) === 'Où regarder'/);
-  assert.match(detailWrapperSource, /aria-label="Actualiser les serveurs Plex"/);
-  assert.match(detailWrapperSource, /refreshPlexServers: true/);
+test('SEENIT-PERF-001 unifie le chargement des disponibilités et expose un refresh Plex compact', () => {
+  assert.match(detailSource, /Recherche Plex & streaming…/);
+  assert.match(detailSource, /<h3[^>]*>Où regarder<\/h3><button/);
+  assert.match(detailSource, /aria-label="Actualiser Plex"/);
+  assert.match(detailSource, /className="inline-flex w-11 h-11/);
+  assert.match(detailSource, /refreshPlexServers: true/);
   assert.match(presenceStoreSource, /refreshServers: refreshPlexServers/);
   assert.match(plexAvailabilitySource, /refreshServers/);
   assert.match(tmdbFacadeSource, /readWatchProviderCache/);
@@ -96,7 +97,8 @@ test('SEENIT-PERF-001 unifie le chargement des disponibilités et expose un refr
 
 test('SEENIT-PERF-001 ouvre un épisode avant de charger ses détails distants', () => {
   const handlerStart = watchListSource.indexOf('const handleEpisodeClick');
-  const handlerEnd = watchListSource.indexOf('\n\n  useEffect(() => {', handlerStart);
+  const handlerEndMatch = /\r?\n\r?\n  useEffect\(\(\) => \{/.exec(watchListSource.slice(handlerStart));
+  const handlerEnd = handlerEndMatch ? handlerStart + handlerEndMatch.index : -1;
   assert.ok(handlerStart >= 0 && handlerEnd > handlerStart, 'le handler épisode doit être détectable');
 
   const handlerSource = watchListSource.slice(handlerStart, handlerEnd);

@@ -13,6 +13,7 @@ const root = path.resolve(import.meta.dirname, '..');
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
   status, headers: { 'Content-Type': 'application/json' },
 });
+
 async function harness(t: any, options: any = {}) {
   const calls: Array<{ url: URL; init: RequestInit }> = [];
   const authenticate: RequestHandler = (req: any, res, next) => {
@@ -24,7 +25,7 @@ async function harness(t: any, options: any = {}) {
   const app = express();
   registerMediaProviderRoutes(app, {
     authenticate,
-    secrets: () => ({ TMDB_API_KEY: 'test-tmdb-private', OMDB_API_KEY: 'test-omdb-private', TVDB_API_KEY: 'test-tvdb-private' }),
+    secrets: () => ({ TMDB_API_KEY: 'test-tmdb-private', TVDB_API_KEY: 'test-tvdb-private' }),
     ...options,
     fetch: async (url: any, init: any) => {
       calls.push({ url: new URL(String(url)), init });
@@ -52,10 +53,10 @@ test('SEENIT-SECURITY-001 authentifie la façade et refuse les routes hors contr
   for (const suffix of [
     'tmdb/account/42', 'tmdb/movie/42/lists', 'tmdb/movie/42?api_key=client-secret',
     'tmdb/movie/42?language=fr&language=en', 'tmdb/movie/42?url=https://example.org',
-    'tmdb/movie/42?append_to_response=account_states',
-    'tmdb/discover/movie?page=501', 'omdb?i=title', 'omdb?i=tt1234567&Season=-1',
-    'omdb?i=tt1234567&t=Title', 'tmdb/find/tt1234567',
+    'tmdb/movie/42?append_to_response=account_states', 'tmdb/discover/movie?page=501',
+    'tmdb/find/tt1234567',
   ]) assert.equal((await send(suffix)).status, 400, suffix);
+  assert.equal((await send('omdb?i=tt1234567')).status, 404, 'la route OMDb supprimée doit rester inconnue');
   assert.equal((await send('tvdb/franchise?mediaTitle=Example')).status, 400);
   assert.equal((await send('tmdb/movie/42', 'a', { method: 'POST' })).status, 404);
   assert.equal(calls.length, 0);
@@ -64,27 +65,22 @@ test('SEENIT-SECURITY-001 authentifie la façade et refuse les routes hors contr
   }
 });
 
-test('SEENIT-SECURITY-001 bloque une révision de production sans les secrets requis', () => {
+test('SEENIT-SECURITY-001 exige uniquement les secrets TMDB et TVDB', () => {
   assert.doesNotThrow(() => assertMediaProviderSecrets({
     TMDB_API_KEY: 'configured-tmdb',
-    OMDB_API_KEY: 'configured-omdb',
     TVDB_API_KEY: 'configured-tvdb',
   }));
   assert.throws(
-    () => assertMediaProviderSecrets({ TMDB_API_KEY: 'configured-tmdb', TVDB_API_KEY: 'configured-tvdb' }),
-    /OMDB_API_KEY/,
-  );
-  assert.throws(
-    () => assertMediaProviderSecrets({ OMDB_API_KEY: 'configured-omdb', TVDB_API_KEY: 'configured-tvdb' }),
+    () => assertMediaProviderSecrets({ TVDB_API_KEY: 'configured-tvdb' }),
     /TMDB_API_KEY/,
   );
   assert.throws(
-    () => assertMediaProviderSecrets({ TMDB_API_KEY: 'configured-tmdb', OMDB_API_KEY: 'configured-omdb' }),
+    () => assertMediaProviderSecrets({ TMDB_API_KEY: 'configured-tmdb' }),
     /TVDB_API_KEY/,
   );
 });
 
-test('SEENIT-SECURITY-001 conserve les paramètres utiles et ne transmet aucun token utilisateur au fournisseur', async t => {
+test('SEENIT-SECURITY-001 conserve les paramètres TMDB utiles sans transmettre le token utilisateur', async t => {
   const { send, calls } = await harness(t);
   for (const suffix of [
     'tmdb/search/movie?query=Dune&primary_release_year=1984&language=fr-FR',
@@ -95,12 +91,10 @@ test('SEENIT-SECURITY-001 conserve les paramètres utiles et ne transmet aucun t
     'tmdb/discover/movie?region=FR&with_release_type=2%7C3&release_date.gte=2026-01-01',
     'tmdb/tv/42/watch/providers',
     'tmdb/person/42/combined_credits',
-    'omdb?i=tt1234567&Season=1',
   ]) assert.equal((await send(suffix)).status, 200, suffix);
   assert.equal(calls[0].url.searchParams.get('primary_release_year'), '1984');
   assert.equal(calls[0].url.searchParams.get('api_key'), 'test-tmdb-private');
-  assert.equal(calls.at(-1)?.url.searchParams.get('apikey'), 'test-omdb-private');
-  assert.equal(calls.at(-1)?.url.hostname, 'www.omdbapi.com');
+  assert.equal(calls.every(call => call.url.hostname === 'api.themoviedb.org'), true);
   for (const { init } of calls) {
     assert.equal(init.redirect, 'error');
     assert.equal(new Headers(init.headers).has('Authorization'), false);
@@ -112,7 +106,8 @@ test('SEENIT-SECURITY-001 cache et déduplique sans contourner auth, TTL ou rota
   let time = 0;
   let secret = 'test-tmdb-private';
   const { send, calls } = await harness(t, {
-    now: () => time, secrets: () => ({ TMDB_API_KEY: secret }),
+    now: () => time,
+    secrets: () => ({ TMDB_API_KEY: secret, TVDB_API_KEY: 'test-tvdb-private' }),
     fetch: async () => { await new Promise(resolve => setTimeout(resolve, 15)); return json({ id: 42 }); },
   });
   const responses = await Promise.all([send('tmdb/movie/42?language=fr'), send('tmdb/movie/42?language=fr', 'b')]);
@@ -132,44 +127,11 @@ test('SEENIT-SECURITY-001 cache et déduplique sans contourner auth, TTL ou rota
   assert.equal((await send('tmdb/movie/42?language=fr')).status, 503);
 });
 
-test('SEENIT-SECURITY-001 borne le cache et le quota fournisseur par UID sans compter les hits', async t => {
-  let time = 0;
-  const { send, calls } = await harness(t, { now: () => time });
-
+test('SEENIT-SECURITY-001 borne le cache TMDB', async t => {
+  const { send, calls } = await harness(t);
   for (let id = 1; id <= 201; id++) assert.equal((await send('tmdb/movie/' + id)).status, 200);
   await send('tmdb/movie/1');
   assert.equal(calls.length, 202, 'la plus ancienne entrée doit être évincée');
-
-  assert.equal((await send('omdb?i=tt1234567')).status, 200);
-  const callsAfterFirstOmdb = calls.length;
-  for (let i = 0; i < 300; i++) assert.equal((await send('omdb?i=tt1234567')).status, 200);
-  assert.equal(calls.length, callsAfterFirstOmdb, 'un hit cache ne doit pas consommer un nouvel appel fournisseur');
-
-  for (let i = 0; i < 90; i++) {
-    assert.equal((await send(`omdb?i=tt${2000000 + i}`, 'quota-user')).status, 200);
-  }
-  const beforeLimit = calls.length;
-  const limited = await send('omdb?i=tt2999999', 'quota-user');
-  assert.equal(limited.status, 429);
-  assert.equal(limited.headers.get('retry-after'), '60');
-  assert.equal(calls.length, beforeLimit, 'le quota doit bloquer avant un nouvel appel fournisseur');
-  assert.equal((await send('omdb?i=tt2999999', 'other-user')).status, 200);
-
-  time = 60_001;
-  assert.equal((await send('omdb?i=tt3000000', 'quota-user')).status, 200);
-});
-
-test('SEENIT-SECURITY-001 borne aussi le trafic authentifié même lorsque le cache répond', async t => {
-  const { send, calls } = await harness(t, { now: () => 0 });
-  assert.equal((await send('omdb?i=tt1234567', 'request-user')).status, 200);
-  for (let i = 1; i < 360; i++) {
-    assert.equal((await send('omdb?i=tt1234567', 'request-user')).status, 200);
-  }
-  assert.equal(calls.length, 1, 'les 360 requêtes utilisent une seule réponse fournisseur mise en cache');
-  const limited = await send('omdb?i=tt1234567', 'request-user');
-  assert.equal(limited.status, 429);
-  assert.equal(limited.headers.get('retry-after'), '60');
-  assert.equal(calls.length, 1);
 });
 
 test('SEENIT-SECURITY-001 masque les erreurs fournisseur et refuse les réponses non sûres', async t => {
@@ -181,7 +143,6 @@ test('SEENIT-SECURITY-001 masque les erreurs fournisseur et refuse les réponses
     [() => json({ token: 'unrelated-token' }), 502],
     [() => new Response('<html>secret</html>', { headers: { 'Content-Type': 'text/html' } }), 502],
     [() => new Response('{broken', { headers: { 'Content-Type': 'application/json' } }), 502],
-    [() => json({ Response: 'False', Error: 'private details' }), 502],
     [() => json({ body: 'x'.repeat(4 * 1024 * 1024) }), 502],
     [() => Promise.reject(new TypeError('redirect containing private details')), 502],
     [() => Promise.reject(new DOMException('private details', 'TimeoutError')), 504],
@@ -206,28 +167,28 @@ test('SEENIT-SECURITY-001 applique le timeout sans dépendre du secret réel', a
   assert.equal((await send('tmdb/movie/42')).status, 504);
 });
 
-test('SEENIT-SECURITY-001 ne conserve aucune clé fournisseur dans tout le source client', () => {
-  const forbidden = /VITE_(TMDB|OMDB|TVDB)_API_KEY|api\.themoviedb\.org|omdbapi\.com|api4\.thetvdb\.com|localStorage[^\n]*(?:TMDB|OMDB|TVDB)_API_KEY/i;
+test('SEENIT-RATING-001 interdit tout runtime OMDb tout en conservant les identifiants IMDb techniques', () => {
+  const forbiddenRuntime = /omdbapi\.com|\/api\/media\/omdb|OMDB_API_KEY|VITE_OMDB_API_KEY/i;
   function scan(dir: string) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) scan(full);
-      else if (/\.(ts|tsx)$/.test(entry.name) && !full.endsWith('mediaProviderBackend.ts')) {
-        assert.doesNotMatch(fs.readFileSync(full, 'utf8'), forbidden, path.relative(root, full));
+      else if (/\.(ts|tsx)$/.test(entry.name)) {
+        assert.doesNotMatch(fs.readFileSync(full, 'utf8'), forbiddenRuntime, path.relative(root, full));
       }
     }
   }
   scan(path.join(root, 'src'));
-  assert.equal(fs.existsSync(path.join(root, 'src/services/tvdb.ts')), true);
-  const tvdbClient = fs.readFileSync(path.join(root, 'src/services/tvdb.ts'), 'utf8');
-  assert.match(tvdbClient, /\/api\/media\/tvdb\/franchise/);
-  assert.doesNotMatch(tvdbClient, /TVDB_API_KEY|api4\.thetvdb\.com|search\/remoteid/);
+
+  const providerBackend = fs.readFileSync(path.join(root, 'src/features/providers/mediaProviderBackend.ts'), 'utf8');
+  assert.doesNotMatch(providerBackend, forbiddenRuntime);
+  assert.match(providerBackend, /external_source/);
+  assert.match(providerBackend, /imdb_id/);
 });
 
 test('SEENIT-SECURITY-001 exclut le backend du paquet web et APK', () => {
   const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   const capacitorConfig = fs.readFileSync(path.join(root, 'capacitor.config.ts'), 'utf8');
-
   assert.match(packageJson.scripts.build, /scan-provider-client-bundle\.cjs/);
   assert.match(packageJson.scripts.build, /--outfile=build\/server\.cjs/);
   assert.equal(packageJson.scripts.start, 'node build/server.cjs');

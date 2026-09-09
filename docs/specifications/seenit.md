@@ -248,6 +248,19 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
 - La fiche, les cartes et Explorer réutilisent le même résolveur ; aucune copie locale de mapping ou
   heuristique de genre n'est autorisée.
 
+### 5.2.2 Notes TMDB uniques
+
+- **SEENIT-RATING-001** — Les notes publiques affichées par SeenIt proviennent exclusivement de TMDB :
+  `vote_average` / `vote_count` du film, de la série ou de l'épisode exact. SeenIt ne normalise et ne
+  substitue jamais une note IMDb à une note TMDB.
+- Le graphique d'une série compare les épisodes d'une seule saison avec les valeurs TMDB disponibles.
+  Il vit uniquement dans l'onglet **Épisodes**, conserve les nombres comme information principale et
+  utilise la couleur seulement comme renfort. Une saison longue reste consultable horizontalement avec
+  une cible accessible d'au moins 44 × 44 CSS px par épisode.
+- OMDb n'est plus un fournisseur SeenIt : aucune route, clé, requête ou cache OMDb/IMDb ne participe au
+  runtime. Un identifiant IMDb peut continuer à transiter comme identifiant technique exact pour les
+  résolutions Plex ou TVDB autorisées ; il ne produit jamais une note.
+
 ### 5.3 Machine d'états canonique
 
 Le statut, la progression et les intentions secondaires sont des dimensions différentes :
@@ -716,9 +729,8 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
 - **SEENIT-SECURITY-003** — Avant toute persistance ou export de log, les champs sensibles et les
   secrets reconnaissables dans les chaînes sont masqués. La profondeur, la taille et le nombre
   d'éléments sérialisés sont bornés.
-- Les clés de service TVDB/OMDb/TMDB actuellement nécessaires au client sont considérées comme des
-  identifiants exposés : elles ne doivent disposer d'aucun privilège d'écriture. Leur migration vers
-  le backend est suivie comme dette de sécurité prioritaire.
+- Les clés TMDB et TVDB restent exclusivement côté backend et sont injectées depuis Secret Manager.
+  OMDb et `OMDB_API_KEY` ne font plus partie du runtime ni du déploiement SeenIt.
 - La clé PKCS12 `seenit`, générée hors dépôt et matérialisée depuis GitHub Secrets, est l'unique clé
   de signature opérationnelle. Ses octets, son alias, son type et son certificat sont verrouillés par
   le contrat ; les mots de passe ne sont jamais stockés dans Git, la SPEC, les issues ou les logs.

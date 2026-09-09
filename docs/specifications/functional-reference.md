@@ -62,7 +62,7 @@ Hiérarchie des sources :
 Les routes backend produit sont :
 
 - `GET /api/health` : identité et santé du backend canonique ;
-- `GET /api/media/tmdb/...`, `GET /api/media/omdb` et `GET /api/media/tvdb/franchise` : façade métadonnées authentifiée ; TVDB ne reçoit que des identifiants externes exacts ;
+- `GET /api/media/tmdb/...` et `GET /api/media/tvdb/franchise` : façade métadonnées authentifiée ; TVDB ne reçoit que des identifiants externes exacts ;
 - `POST /api/plex/history` (`/api/plex-sync` alias) : full/delta Plex ;
 - `POST /api/plex/availability` et `GET|POST /api/plex/resolve-slug` : disponibilité et ouverture ;
 - `POST /api/c411/test` et `POST /api/c411/search` : test/recherche C411 ;
@@ -114,7 +114,7 @@ prévues ; ce dernier n'accorde aucune confiance à l'appelant et exige les preu
 | Intentions de téléchargement | Compte, partagées PWA/APK |
 | News lues et rappels métier | Compte, partagés PWA/APK |
 | Token FCM, permission système, installation notification | Appareil, rattachés au UID courant |
-| Cache TMDB/OMDb/Plex, clés anti-doublon de notification | Appareil et UID |
+| Cache TMDB/Plex, clés anti-doublon de notification | Appareil et UID |
 | Logs techniques | Appareil et UID ; export volontaire seulement |
 | Personnes favorites | Doivent être partagées ; écart actuel suivi par #95 |
 
@@ -237,7 +237,7 @@ réécrire les favoris, notes, rappels ni l'archive ; le parcours explicite « R
 
 ### 8.1 Contenu commun
 
-La fiche combine les détails TMDB, notes TMDB/IMDb (OMDb), disponibilité streaming en France,
+La fiche combine les détails et notes TMDB, disponibilité streaming en France,
 présence Plex/Arr, bande-annonce, âge conseillé, casting, ordre de visionnage/franchise et discussions
 Reddit. Les recommandations contextuelles restent dans Explorer. Les modals personne et épisode restent
 dans la pile Retour.
@@ -249,8 +249,9 @@ champ `title` vers la valeur localisée ; progression, statut, favori, note, pro
 métier restent intacts. Sans titre localisé exploitable, aucun nom n'est inventé et aucun matching par
 titre n'est introduit.
 
-L'âge conseillé automatique affiche la certification US TMDB originale, sa provenance et sa traduction
-lisible, par exemple `PG-13 · US · 13+`. « Tous publics » n'est affiché que lorsqu'une certification US
+L'âge conseillé automatique met la traduction lisible au premier plan, par exemple `13+`, et conserve
+la certification originale et sa provenance sous une forme secondaire comme `PG-13 · US`, accessible
+au lecteur d'écran et au survol. « Tous publics » n'est affiché que lorsqu'une certification US
 explicite le prouve ; sinon SeenIt affiche « Âge à vérifier ». Une correction personnelle par média peut
 être choisie ; elle est synchronisée par UID, prioritaire, et clairement marquée « Choix personnel ».
 Cette correction est identifiée uniquement par type de média + TMDB ID et ne réécrit pas TMDB.
@@ -264,8 +265,10 @@ La section **« Où regarder »** est un repère stable : son titre reste toujou
 remplacé par un skeleton. Tant que Plex et/ou les diffuseurs TMDB sont en résolution, la fiche utilise le
 libellé unique **« Recherche Plex & streaming… »**. Les diffuseurs résolus sont conservés dans un cache
 borné (120 médias, 6 h frais, réutilisable jusqu'à 7 jours en cas d'indisponibilité du fournisseur).
-Une action **« Actualiser Plex »** force la redécouverte des serveurs Plex puis revérifie le média courant,
-sans effacer le dernier inventaire de serveurs utilisable si la redécouverte échoue.
+Une icône **« Actualiser Plex »** adjacente au titre force la redécouverte des serveurs Plex puis revérifie
+le média courant, sans effacer le dernier inventaire de serveurs utilisable si la redécouverte échoue.
+Le glyph reste compact mais sa cible tactile mesure au moins 44 × 44 CSS px, avec nom accessible, focus
+visible et état de chargement.
 
 Quand Téléchargements est désactivé, la fiche Film/Série ne montre aucune mention de cette fonction :
 le bouton bleu principal/annexe, le fallback « Où regarder », le mode « Téléchargement 1-Clic », les
@@ -300,6 +303,17 @@ swipes de suppression/abandon sur les cartes.
 - Lorsque Téléchargements est désactivé, le détail d'épisode ne montre ni « Télécharger », ni
   « Télécharger à nouveau », ni badge « Téléchargé », ni bannière de transfert, ni modal de téléchargement.
   La disponibilité Plex reste indépendante et continue d'être affichée normalement.
+- Le badge hero ne répète pas le nombre de saisons déjà présent dans la ligne de métadonnées.
+- Le titre d'une saison porte lui-même le repli/dépliage avec `aria-expanded`; aucun chevron séparé ne
+  réduit sa largeur. L'action de progression reste distincte et se nomme explicitement **« Tout marquer
+  vu »** ou **« Tout marquer non vu »**.
+- Les genres TMDB restent visibles. Les mots-clés secondaires sont repliés derrière **« +N thèmes »** et
+  peuvent être masqués à nouveau sans perdre les genres.
+- Les portraits du casting utilisent un cadrage orienté vers le haut, conservent leur fallback et laissent
+  le nom et le rôle occuper deux lignes. Le nombre d'épisodes reste une information discrète.
+- Les notes d'épisodes utilisent uniquement TMDB. Le graphique complet est affiché exclusivement dans
+  l'onglet **Épisodes**, sans légende permanente ni répétition de source/votes, avec nombres visibles,
+  scroll horizontal pour les saisons longues et ouverture du détail par une cible de 44 px.
 
 ### 8.4 Ordre de visionnage et franchise / univers
 
