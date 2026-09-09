@@ -377,6 +377,7 @@ function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMa
 }
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+const WATCHLIST_BATCH_SIZE = 8;
 
 const parseTimestamp = (val: any): number => {
   if (!val) return 0;
@@ -459,7 +460,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
   const [selectedEpisodeModal, setSelectedEpisodeModal] = useState<{ show: Show; season: number; episode: any } | null>(null);
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
-  const [visibleCount, setVisibleCount] = useState<number>(8);
+  const [visibleCount, setVisibleCount] = useState<number>(WATCHLIST_BATCH_SIZE);
 
   const openPersonModal = useCallback((personId: number) => {
     setSelectedPersonId(personId);
@@ -470,10 +471,10 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
   const handleToggleVoirTout = useCallback((sectionKey: string) => {
     if (expandedSection === sectionKey) {
       setExpandedSection(null);
-      setVisibleCount(8);
+      setVisibleCount(WATCHLIST_BATCH_SIZE);
     } else {
       setExpandedSection(sectionKey);
-      setVisibleCount(8);
+      setVisibleCount(WATCHLIST_BATCH_SIZE);
     }
   }, [expandedSection]);
 
@@ -502,9 +503,6 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
       still_path: knownEpisode?.still_path || null,
     };
 
-    // Feedback immédiat : la modale s'ouvre avant tout appel fournisseur. Elle sait
-    // déjà hydrater ses données manquantes et la réponse TMDB ci-dessous ne fait
-    // qu'enrichir l'épisode si cette même modale est toujours ouverte.
     setSelectedEpisodeModal({ show, season: seasonNumber, episode: epData });
     const currentState = window.history.state || {};
     if (!currentState.isEpisodeDetailModal) {
@@ -660,7 +658,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
         const upcomingRect = upcomingRef.current?.getBoundingClientRect();
         const historyRect = historyRef.current?.getBoundingClientRect();
         
-        const offset = 250; // Threshold from top of viewport
+        const offset = 250;
 
         let newTab: 'watch_next' | 'upcoming' | 'history' = 'watch_next';
         if (historyRect && historyRect.top < offset) {
@@ -726,13 +724,10 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
       if (checkIsUpToDate(s)) return false;
 
       const watchedCount = s.seenEpisodes ? s.seenEpisodes.length : 0;
-      
-      // Si l'utilisateur a vu des épisodes et qu'il n'y a plus d'épisodes suivants enregistrés : considéré comme à jour !
       if (watchedCount > 0 && !s.nextEpisodeToWatch) {
         return false;
       }
 
-      // Si la progression de diffusion est à 100%
       const progress = getAiredProgress(s);
       if (progress >= 100) return false;
 
@@ -773,7 +768,6 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
     };
 
     const isNouveaute = (s: Show): boolean => {
-      // 1. Nouvelle saison (catégorie NEW_SEASON ou S2+ ép 1 avec air_date <= 60 jours)
       const cat = getUpToDateOrNewSeasonCategory(s);
       if (cat?.type === 'NEW_SEASON') return true;
 
@@ -786,7 +780,6 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
         }
       }
 
-      // 2. Pas commencé du tout (0 épisode vu) avec une date de sortie ou d'ajout <= 60 jours
       const watchedCount = s.seenEpisodes ? s.seenEpisodes.length : 0;
       if (watchedCount === 0) {
         const releaseDateStr = s.firstAirDate || s.nextEpisodeToWatch?.air_date;
@@ -802,7 +795,6 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
       return false;
     };
 
-    // Nouveautés : nouvelle saison ou pas commencé avec sortie/ajout < 60 jours
     const nouveautesShows = candidateWatchShows
       .filter(isNouveaute)
       .sort((a, b) => {
@@ -815,7 +807,6 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
 
     const nouveautesIds = new Set(nouveautesShows.map(s => s.id));
 
-    // Continuer à regarder : séries commencées et vues dans les 60 derniers jours (et pas dans nouveautés)
     const continueWatchingShows = candidateWatchShows
       .filter(s => !nouveautesIds.has(s.id) && (s.seenEpisodes?.length || 0) > 0 && isWatchedRecently(s))
       .sort((a, b) => {
@@ -828,7 +819,6 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
 
     const continueWatchingIds = new Set(continueWatchingShows.map(s => s.id));
 
-    // Pas vu depuis un moment : rien vu depuis plus de 60 jours
     const pasVuDepuisUnMomentShows = candidateWatchShows
       .filter(s => !continueWatchingIds.has(s.id) && !nouveautesIds.has(s.id))
       .sort((a, b) => {
@@ -841,7 +831,6 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
 
     const todayIso = new Date().toISOString().slice(0, 10);
 
-    // Films à voir : films non archivés, non abandonnés, non vus et DÉJÀ DISPONIBLES (date de sortie <= aujourd'hui)
     const filmsAVoirShows = allShows
       .filter(s => {
         if (s.mediaType !== 'movie' || s.isArchived || s.status === 'dropped' || s.status === 'completed') {
@@ -850,7 +839,6 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
         if (s.seenEpisodes && s.seenEpisodes.includes('movie')) {
           return false;
         }
-        // Ne pas afficher les films non encore disponibles/sortis (ex: date de sortie > aujourd'hui)
         if (s.firstAirDate && s.firstAirDate > todayIso) {
           return false;
         }
@@ -859,7 +847,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
       .sort((a, b) => {
         const addedA = a.updatedAt || a.createdAt || 0;
         const addedB = b.updatedAt || b.createdAt || 0;
-        const diff = addedB - addedA; // Plus récent d'abord
+        const diff = addedB - addedA;
         if (diff !== 0) return diff;
         return a.title.localeCompare(b.title);
       });
@@ -890,10 +878,8 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
     const { season_number, episode_number } = show.nextEpisodeToWatch;
     const wasInPasVu = pasVuDepuisUnMomentShows.some(s => s.id === show.id);
 
-    // Appel de la fonction atomique sécurisée
     await markEpisodeWatched(show, season_number, episode_number);
 
-    // Conservation stricte de la logique de scroll Android native
     if (wasInPasVu) {
       setTimeout(() => {
         const container = document.getElementById('watchlist-container');
@@ -936,7 +922,6 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
       episodeTitle: show.title || 'Film'
     };
 
-    // Update optimiste local
     useShowsStore.getState().updateShowOptimistic(show.id, {
       seenEpisodes: [...(show.seenEpisodes || []), 'movie'],
       status: 'completed',
@@ -944,7 +929,6 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
       updatedAt: Date.now()
     });
 
-    // Update réseau atomique
     if (auth.currentUser && show.id) {
       try {
         const stringId = String(show.id);
@@ -1053,7 +1037,6 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
 
         {loading ? (
           <div className="space-y-6 pt-2 pb-nav">
-            {/* ShowNewsFeed Skeleton */}
             <div className="mb-8 mt-4">
               <div className="flex items-center gap-2 mb-4 px-4 sm:px-6">
                 <div className="h-6 w-6 bg-zinc-800 rounded-full animate-pulse" />
@@ -1066,7 +1049,6 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
               </div>
             </div>
 
-            {/* Continuer à regarder Skeleton */}
             <div className="mb-6 mt-1">
               <div className="flex items-center justify-between mb-4 px-4 sm:px-6">
                 <div className="h-7 w-48 bg-zinc-800 rounded animate-pulse" />
@@ -1083,7 +1065,6 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
               </div>
             </div>
 
-            {/* Nouveautés Skeleton */}
             <div className="mb-6 mt-1">
               <div className="flex items-center justify-between mb-4 px-4 sm:px-6">
                 <div className="h-7 w-48 bg-zinc-800 rounded animate-pulse" />
@@ -1102,7 +1083,6 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
           </div>
         ) : (
           <>
-            {/* Section A: À Regarder */}
             <div ref={watchNextRef} className="scroll-mt-36">
           <ShowNewsFeed onShowClick={onShowClickProp} onNavigateToShow={onShowClickProp} />
 
@@ -1123,9 +1103,9 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
 
               {expandedSection === 'continueWatching' ? (
                 <div className="flex flex-col gap-3 my-2 px-4 sm:px-6">
-                  {continueWatchingShows.slice(0, visibleCount).map((show, idx) => (
+                  {continueWatchingShows.slice(0, visibleCount).map((show) => (
                     <SwipeableCard
-                      key={`cw_exp_${show.id}_${idx}`}
+                      key={`cw_exp_${show.id}`}
                       onSwipeLeft={() => setPendingAction({ type: 'unfollow', item: show })}
                       onSwipeRight={() => setPendingAction({ type: 'drop', item: show })}
                     >
@@ -1141,7 +1121,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                   ))}
                   {visibleCount < continueWatchingShows.length && (
                     <button 
-                      onClick={() => setVisibleCount(prev => prev + 8)}
+                      onClick={() => setVisibleCount(prev => prev + WATCHLIST_BATCH_SIZE)}
                       className="w-full py-3.5 mt-2 bg-zinc-900 border border-white/10 rounded-2xl text-xs font-bold text-zinc-300 hover:bg-zinc-800 active:scale-[0.98] transition-all"
                     >
                       Charger plus
@@ -1150,9 +1130,9 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                 </div>
               ) : (
                 <div id="continue-watching-carousel" className="flex overflow-x-auto gap-4 px-4 sm:px-6 scroll-px-4 sm:scroll-px-6 scrollbar-none snap-x snap-mandatory pb-1">
-                  {continueWatchingShows.map((show, idx) => (
+                  {continueWatchingShows.slice(0, WATCHLIST_BATCH_SIZE).map((show) => (
                     <ContinueWatchingCard 
-                      key={`cw_${show.id}_${idx}`}
+                      key={`cw_${show.id}`}
                       show={show}
                       onShowClick={onShowClick}
                       onEpisodeClick={handleEpisodeClick}
@@ -1181,9 +1161,9 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
 
               {expandedSection === 'nouveautes' ? (
                 <div className="flex flex-col gap-3 my-2 px-4 sm:px-6">
-                  {nouveautesShows.slice(0, visibleCount).map((show, idx) => (
+                  {nouveautesShows.slice(0, visibleCount).map((show) => (
                     <SwipeableCard
-                      key={`nouveautes_swipe_${show.id}_${idx}`}
+                      key={`nouveautes_swipe_${show.id}`}
                       onSwipeLeft={() => setPendingAction({ type: 'unfollow', item: show })}
                       onSwipeRight={() => setPendingAction({ type: 'drop', item: show })}
                     >
@@ -1199,7 +1179,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                   ))}
                   {visibleCount < nouveautesShows.length && (
                     <button 
-                      onClick={() => setVisibleCount(prev => prev + 8)}
+                      onClick={() => setVisibleCount(prev => prev + WATCHLIST_BATCH_SIZE)}
                       className="w-full py-3.5 mt-2 bg-zinc-900 border border-white/10 rounded-2xl text-xs font-bold text-zinc-300 hover:bg-zinc-800 active:scale-[0.98] transition-all"
                     >
                       Charger plus
@@ -1208,9 +1188,9 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                 </div>
               ) : (
                 <div id="nouveautes-carousel" className="flex overflow-x-auto gap-4 px-4 sm:px-6 scroll-px-4 sm:scroll-px-6 scrollbar-none snap-x snap-mandatory pb-1">
-                  {nouveautesShows.map((show, idx) => (
+                  {nouveautesShows.slice(0, WATCHLIST_BATCH_SIZE).map((show) => (
                     <ContinueWatchingCard 
-                      key={`nouveautes_card_${show.id}_${idx}`}
+                      key={`nouveautes_card_${show.id}`}
                       show={show}
                       onShowClick={onShowClick}
                       onEpisodeClick={handleEpisodeClick}
@@ -1239,9 +1219,9 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
 
               {expandedSection === 'notWatched' ? (
                 <div className="flex flex-col gap-3 my-2 px-4 sm:px-6">
-                  {pasVuDepuisUnMomentShows.slice(0, visibleCount).map((show, idx) => (
+                  {pasVuDepuisUnMomentShows.slice(0, visibleCount).map((show) => (
                     <SwipeableCard
-                      key={`notwatched_swipe_${show.id}_${idx}`}
+                      key={`notwatched_swipe_${show.id}`}
                       onSwipeLeft={() => setPendingAction({ type: 'unfollow', item: show })}
                       onSwipeRight={() => setPendingAction({ type: 'drop', item: show })}
                     >
@@ -1257,7 +1237,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                   ))}
                   {visibleCount < pasVuDepuisUnMomentShows.length && (
                     <button 
-                      onClick={() => setVisibleCount(prev => prev + 8)}
+                      onClick={() => setVisibleCount(prev => prev + WATCHLIST_BATCH_SIZE)}
                       className="w-full py-3.5 mt-2 bg-zinc-900 border border-white/10 rounded-2xl text-xs font-bold text-zinc-300 hover:bg-zinc-800 active:scale-[0.98] transition-all"
                     >
                       Charger plus
@@ -1266,9 +1246,9 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                 </div>
               ) : (
                 <div id="pas-vu-depuis-un-moment-carousel" className="flex overflow-x-auto gap-4 px-4 sm:px-6 scroll-px-4 sm:scroll-px-6 scrollbar-none snap-x snap-mandatory pb-1">
-                  {pasVuDepuisUnMomentShows.map((show, idx) => (
+                  {pasVuDepuisUnMomentShows.slice(0, WATCHLIST_BATCH_SIZE).map((show) => (
                     <ContinueWatchingCard 
-                      key={`notwatched_card_${show.id}_${idx}`}
+                      key={`notwatched_card_${show.id}`}
                       show={show}
                       onShowClick={onShowClick}
                       onEpisodeClick={handleEpisodeClick}
@@ -1297,9 +1277,9 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
 
               {expandedSection === 'filmsAVoir' ? (
                 <div className="flex flex-col gap-3 my-2 px-4 sm:px-6">
-                  {filmsAVoirShows.slice(0, visibleCount).map((show, idx) => (
+                  {filmsAVoirShows.slice(0, visibleCount).map((show) => (
                     <SwipeableCard
-                      key={`films_swipe_${show.id}_${idx}`}
+                      key={`films_swipe_${show.id}`}
                       onSwipeLeft={() => setPendingAction({ type: 'unfollow', item: show })}
                       onSwipeRight={() => setPendingAction({ type: 'drop', item: show })}
                     >
@@ -1315,7 +1295,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                   ))}
                   {visibleCount < filmsAVoirShows.length && (
                     <button 
-                      onClick={() => setVisibleCount(prev => prev + 8)}
+                      onClick={() => setVisibleCount(prev => prev + WATCHLIST_BATCH_SIZE)}
                       className="w-full py-3.5 mt-2 bg-zinc-900 border border-white/10 rounded-2xl text-xs font-bold text-zinc-300 hover:bg-zinc-800 active:scale-[0.98] transition-all"
                     >
                       Charger plus
@@ -1324,9 +1304,9 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                 </div>
               ) : (
                 <div id="films-a-voir-carousel" className="flex overflow-x-auto gap-4 px-4 sm:px-6 scroll-px-4 sm:scroll-px-6 scrollbar-none snap-x snap-mandatory pb-1">
-                  {filmsAVoirShows.map((show, idx) => (
+                  {filmsAVoirShows.slice(0, WATCHLIST_BATCH_SIZE).map((show) => (
                     <MovieWatchCard 
-                      key={`films_card_${show.id}_${idx}`}
+                      key={`films_card_${show.id}`}
                       show={show}
                       onShowClick={onShowClick}
                       onMarkAsSeen={markMovieAsSeen}
@@ -1344,7 +1324,6 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
           )}
         </div>
 
-        {/* Section B: À Venir */}
         <div ref={upcomingRef} className="scroll-mt-36 px-4 sm:px-6 mt-8">
           <h2 className="text-xl font-bold text-white mb-2 tracking-tight flex items-center gap-2">
             <span className="text-lg">📅</span>
@@ -1373,7 +1352,6 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
           )}
         </div>
 
-        {/* Section C: Historique */}
         <div ref={historyRef} className="scroll-mt-36 px-4 sm:px-6 mt-8">
           <h2 className="text-xl font-bold text-white mb-2 tracking-tight flex items-center gap-2">
             <span className="text-lg">📜</span>

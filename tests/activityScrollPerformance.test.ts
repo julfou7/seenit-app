@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const discoverSource = readFileSync(new URL('../src/screens/DiscoverScreen.tsx', import.meta.url), 'utf8');
 const librarySource = readFileSync(new URL('../src/screens/LibraryScreen.tsx', import.meta.url), 'utf8');
+const watchListSource = readFileSync(new URL('../src/screens/WatchListScreen.tsx', import.meta.url), 'utf8');
 
 test('#229 réarme le scroll infini Explorer après Activity hidden → visible', () => {
   assert.match(discoverSource, /const observerTargetNodeRef = useRef<HTMLDivElement \| null>\(null\)/);
@@ -36,4 +37,19 @@ test('#229 borne le montage initial des rangées de Ma Liste sans masquer les m�
   assert.match(librarySource, /key=\{getMediaKey\(media\.media_type, media\.id\)\}/);
   assert.match(librarySource, /onShowClick=\{handleShowClick\}/);
   assert.doesNotMatch(librarySource, /key=\{`\$\{media\.id\}_\$\{idx\}`\}/);
+});
+
+test('#229 borne aussi les carrousels réduits de À voir tout en conservant Voir tout paginé', () => {
+  assert.match(watchListSource, /const WATCHLIST_BATCH_SIZE = 8/);
+  assert.match(watchListSource, /continueWatchingShows\.slice\(0, WATCHLIST_BATCH_SIZE\)\.map/);
+  assert.match(watchListSource, /nouveautesShows\.slice\(0, WATCHLIST_BATCH_SIZE\)\.map/);
+  assert.match(watchListSource, /pasVuDepuisUnMomentShows\.slice\(0, WATCHLIST_BATCH_SIZE\)\.map/);
+  assert.match(watchListSource, /filmsAVoirShows\.slice\(0, WATCHLIST_BATCH_SIZE\)\.map/);
+
+  assert.match(watchListSource, /continueWatchingShows\.slice\(0, visibleCount\)\.map/);
+  assert.match(watchListSource, /setVisibleCount\(prev => prev \+ WATCHLIST_BATCH_SIZE\)/);
+  assert.doesNotMatch(watchListSource, /\{continueWatchingShows\.map\(/);
+  assert.doesNotMatch(watchListSource, /\{nouveautesShows\.map\(/);
+  assert.doesNotMatch(watchListSource, /\{pasVuDepuisUnMomentShows\.map\(/);
+  assert.doesNotMatch(watchListSource, /\{filmsAVoirShows\.map\(/);
 });

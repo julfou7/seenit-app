@@ -28,6 +28,9 @@ interface ShowsState {
 }
 
 const SHOWS_CACHE_FIELD = 'shows_v2';
+const REALTIME_SNAPSHOT_COALESCE_MS = 750;
+const REALTIME_IDLE_TIMEOUT_MS = 1200;
+const showSignatureCache = new WeakMap<object, string>();
 
 const loadUserCache = (uid: string): Show[] => {
   const cached = readUserScopedJson<Show[]>(uid, SHOWS_CACHE_FIELD, []);
@@ -37,6 +40,71 @@ const loadUserCache = (uid: string): Show[] => {
 const saveToLocalStorage = (uid: string | null | undefined, shows: Show[]) => {
   writeUserScopedJson(uid, SHOWS_CACHE_FIELD, shows);
 };
+
+const getShowReferenceKey = (show: Show): string => {
+  const tmdbId = Number(show.tmdbId);
+  if (tmdbId && !isNaN(tmdbId)) {
+    return `${show.mediaType || 'tv'}_${tmdbId}`;
+  }
+  return `${show.mediaType || 'tv'}_doc_${show.id || 'unknown'}`;
+};
+
+const getShowStateSignature = (show: Show): string => {
+  const objectRef = show as unknown as object;
+  const cached = showSignatureCache.get(objectRef);
+  if (cached) return cached;
+  const signature = buildLibraryStateSignature([show as unknown as Record<string, any>]);
+  showSignatureCache.set(objectRef, signature);
+  return signature;
+};
+
+function preserveUnchangedShowReferences(currentShows: Show[], nextShows: Show[]): Show[] {
+  if (currentShows.length === 0 || nextShows.length === 0) return nextShows;
+  const currentByKey = new Map(currentShows.map(show => [getShowReferenceKey(show), show]));
+
+  return nextShows.map(nextShow => {
+    const currentShow = currentByKey.get(getShowReferenceKey(nextShow));
+    if (!currentShow) return nextShow;
+    return getShowStateSignature(currentShow) === getShowStateSignature(nextShow)
+      ? currentShow
+      : nextShow;
+  });
+}
+
+function applyMergedShowsState(userId: string, mergedShows: Show[]): boolean {
+  if (auth.currentUser?.uid !== userId) return false;
+
+  const currentState = useShowsStore.getState();
+  const stableShows = preserveUnchangedShowReferences(currentState.shows, mergedShows);
+  const isSameLibrary = stableShows.length === currentState.shows.length
+    && stableShows.every((show, index) => show === currentState.shows[index]);
+
+  if (isSameLibrary) {
+    if (currentState.loading || !currentState.initialized) {
+      useShowsStore.setState({ loading: false, initialized: true });
+    }
+    return false;
+  }
+
+  saveToLocalStorage(userId, stableShows);
+  useShowsStore.setState({ shows: stableShows, loading: false, initialized: true });
+  return true;
+}
+
+function scheduleWhenIdle(callback: () => void): () => void {
+  const idleWindow = window as any;
+  if (typeof idleWindow.requestIdleCallback === 'function') {
+    const handle = idleWindow.requestIdleCallback(callback, { timeout: REALTIME_IDLE_TIMEOUT_MS });
+    return () => {
+      if (typeof idleWindow.cancelIdleCallback === 'function') {
+        idleWindow.cancelIdleCallback(handle);
+      }
+    };
+  }
+
+  const handle = window.setTimeout(callback, 16);
+  return () => window.clearTimeout(handle);
+}
 
 /**
  * Envoie une liste de séries vers Firestore par lots (batches de 250 docs)
@@ -234,18 +302,63 @@ export function setupRealtimeShowsListener(userId: string) {
   }
   try {
     const showsRef = collection(db, 'users', userId, 'shows');
-    unsubscribeRealtimeListener = onSnapshot(showsRef, (snapshot) => {
+    let latestSnapshot: any = null;
+    let coalesceHandle: number | null = null;
+    let cancelIdleWork: (() => void) | null = null;
+    let hasAppliedInitialSnapshot = false;
+
+    const cancelScheduledWork = () => {
+      if (coalesceHandle !== null) {
+        window.clearTimeout(coalesceHandle);
+        coalesceHandle = null;
+      }
+      if (cancelIdleWork) {
+        cancelIdleWork();
+        cancelIdleWork = null;
+      }
+    };
+
+    const applySnapshot = (snapshot: any) => {
       if (auth.currentUser?.uid !== userId) return;
       const remoteShows: Show[] = [];
-      snapshot.forEach((docSnap) => {
+      snapshot.forEach((docSnap: any) => {
         remoteShows.push({ ...docSnap.data(), id: String(docSnap.id) } as Show);
       });
       const { mergedShows } = deduplicateAndMergeShows(remoteShows);
-      saveToLocalStorage(userId, mergedShows);
-      useShowsStore.setState({ shows: mergedShows, loading: false, initialized: true });
-    }, (err) => {
+      applyMergedShowsState(userId, mergedShows);
+    };
+
+    const scheduleSnapshot = (snapshot: any) => {
+      latestSnapshot = snapshot;
+
+      if (!hasAppliedInitialSnapshot) {
+        hasAppliedInitialSnapshot = true;
+        applySnapshot(snapshot);
+        return;
+      }
+
+      cancelScheduledWork();
+      coalesceHandle = window.setTimeout(() => {
+        coalesceHandle = null;
+        const snapshotToApply = latestSnapshot;
+        cancelIdleWork = scheduleWhenIdle(() => {
+          cancelIdleWork = null;
+          if (snapshotToApply) {
+            applySnapshot(snapshotToApply);
+          }
+        });
+      }, REALTIME_SNAPSHOT_COALESCE_MS);
+    };
+
+    const firestoreUnsubscribe = onSnapshot(showsRef, scheduleSnapshot, (err) => {
       console.warn('[showsStore] Realtime listener error:', err);
     });
+
+    unsubscribeRealtimeListener = () => {
+      firestoreUnsubscribe();
+      cancelScheduledWork();
+      latestSnapshot = null;
+    };
   } catch (err) {
     console.warn('[showsStore] Failed to setup realtime listener:', err);
   }
@@ -321,8 +434,7 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
           });
           if (auth.currentUser?.uid === user.uid) {
             const { mergedShows } = deduplicateAndMergeShows(cachedShows, get().shows);
-            saveToLocalStorage(user.uid, mergedShows);
-            set({ shows: mergedShows, loading: false, initialized: true });
+            applyMergedShowsState(user.uid, mergedShows);
           }
         }
       } catch (cacheErr: any) {
@@ -370,8 +482,7 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
       }
 
       if (auth.currentUser?.uid !== user.uid) return;
-      saveToLocalStorage(user.uid, mergedShows);
-      set({ shows: mergedShows, loading: false, initialized: true });
+      applyMergedShowsState(user.uid, mergedShows);
     } catch (err: any) {
       if (auth.currentUser?.uid !== user.uid) return;
       const errStr = err?.message || String(err);
