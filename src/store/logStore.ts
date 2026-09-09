@@ -23,7 +23,10 @@ interface LogState {
 
 const LEGACY_STORAGE_KEY = 'app_activity_logs_v1';
 const MAX_LOGS = 150;
+const LOG_FLUSH_DELAY_MS = 250;
 let activeLogUid: string | null = null;
+let pendingLogEntries: AppLogEntry[] = [];
+let pendingLogFlushTimer: ReturnType<typeof setTimeout> | null = null;
 
 function normalizeVisibleLogMessage(category: LogCategory, message: unknown): string {
   const value = String(message || '');
@@ -53,6 +56,34 @@ const saveLogs = (logs: AppLogEntry[]) => {
     // ignore quota error
   }
 };
+
+function cancelPendingLogFlush() {
+  if (pendingLogFlushTimer !== null) {
+    clearTimeout(pendingLogFlushTimer);
+    pendingLogFlushTimer = null;
+  }
+}
+
+function flushPendingLogs() {
+  cancelPendingLogFlush();
+  if (pendingLogEntries.length === 0) return;
+
+  const entries = pendingLogEntries;
+  pendingLogEntries = [];
+  useLogStore.setState((state) => {
+    const updated = [...entries, ...state.logs].slice(0, MAX_LOGS);
+    saveLogs(updated);
+    return { logs: updated };
+  });
+}
+
+function scheduleLogFlush() {
+  if (pendingLogFlushTimer !== null) return;
+  pendingLogFlushTimer = setTimeout(() => {
+    pendingLogFlushTimer = null;
+    flushPendingLogs();
+  }, LOG_FLUSH_DELAY_MS);
+}
 
 export const useLogStore = create<LogState>((set, get) => ({
   logs: [],
@@ -86,7 +117,8 @@ export const useLogStore = create<LogState>((set, get) => ({
       details: actualDetails ? sanitizeLogDetails(actualDetails) : undefined
     };
 
-    // Also mirror to browser console for easy inspection
+    // Le miroir console reste immédiat, mais l'état React + localStorage sont
+    // regroupés afin qu'une rafale Plex ne monopolise pas le thread UI.
     const prefix = `[${category.toUpperCase()}]`;
     if (actualLevel === 'error') {
       console.error(prefix, newEntry.message, newEntry.details || '');
@@ -96,14 +128,17 @@ export const useLogStore = create<LogState>((set, get) => ({
       console.log(prefix, newEntry.message, newEntry.details || '');
     }
 
-    set((state) => {
-      const updated = [newEntry, ...state.logs].slice(0, MAX_LOGS);
-      saveLogs(updated);
-      return { logs: updated };
-    });
+    pendingLogEntries.unshift(newEntry);
+    if (pendingLogEntries.length >= MAX_LOGS) {
+      flushPendingLogs();
+    } else {
+      scheduleLogFlush();
+    }
   },
 
   clearLogs: () => {
+    cancelPendingLogFlush();
+    pendingLogEntries = [];
     try {
       if (activeLogUid) localStorage.removeItem(getUserLogStorageKey(activeLogUid));
     } catch {}
@@ -111,6 +146,7 @@ export const useLogStore = create<LogState>((set, get) => ({
   },
 
   getLogsAsText: () => {
+    flushPendingLogs();
     const { logs } = get();
     return logs
       .map((l) => {
@@ -128,11 +164,16 @@ export const useLogStore = create<LogState>((set, get) => ({
 export function activateLogUserScope(uid?: string | null): void {
   const nextUid = String(uid || '').trim() || null;
   if (nextUid === activeLogUid) return;
+  flushPendingLogs();
   activeLogUid = nextUid;
   try {
     localStorage.removeItem(LEGACY_STORAGE_KEY);
   } catch {}
   useLogStore.setState({ logs: nextUid ? loadUserLogs(nextUid) : [] });
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', flushPendingLogs);
 }
 
 // Quick helper function for easy logging anywhere

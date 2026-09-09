@@ -22,11 +22,13 @@ export function ProfileScreen({
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'stats' | 'library'>('stats');
+  const [isProfileVisible, setIsProfileVisible] = useState(true);
 
   const [isExitingSettings, setIsExitingSettings] = useState(false);
   const [dragXSettings, setDragXSettings] = useState(0);
   const [isDraggingSettings, setIsDraggingSettings] = useState(false);
 
+  const rootRef = useRef<HTMLDivElement>(null);
   const startXRefSettings = useRef<number | null>(null);
   const startYRefSettings = useRef<number | null>(null);
   const isEdgeSwipeRefSettings = useRef<boolean>(false);
@@ -56,6 +58,17 @@ export function ProfileScreen({
       window.removeEventListener('popstate', handlePopState);
       window.removeEventListener('profile-reset-all', handleResetAll);
     };
+  }, []);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(([entry]) => {
+      setIsProfileVisible(entry.isIntersecting && entry.intersectionRatio > 0);
+    });
+    observer.observe(root);
+    return () => observer.disconnect();
   }, []);
 
   const handleAnimatedBackSettings = () => {
@@ -144,9 +157,10 @@ export function ProfileScreen({
   const creationYear = user?.metadata?.creationTime 
     ? new Date(user.metadata.creationTime).getFullYear() 
     : 2024;
+  const renderHeavyContent = isProfileVisible && !showSettings;
 
   return (
-    <div className="flex-1 overflow-y-auto bg-transparent text-white pb-nav custom-scrollbar">
+    <div ref={rootRef} className="flex-1 overflow-y-auto bg-transparent text-white pb-nav custom-scrollbar">
       
       {/* 1. HERO SECTION */}
       <div className="px-6 pt-12 pb-6 relative">
@@ -216,8 +230,8 @@ export function ProfileScreen({
         </div>
       </div>
 
-      {/* 3. CONTENT */}
-      {activeTab === 'stats' ? (
+      {/* 3. CONTENT — démonté dès que Profil est caché ou que Réglages le recouvre */}
+      {renderHeavyContent && (activeTab === 'stats' ? (
         <div className="px-4 pb-2">
           <ProAnalyticsDashboard shows={shows} onPersonClick={openPersonModal} />
         </div>
@@ -225,7 +239,7 @@ export function ProfileScreen({
         <div className="flex-1 pb-2 flex flex-col">
           <LibraryScreen onShowClick={(id, mediaType) => onShowClick && onShowClick(id, mediaType)} isEmbedded={true} />
         </div>
-      )}
+      ))}
 
       {/* MODAL DÉTAILS PERSONNE (ACTEUR / RÉALISATEUR) */}
       {selectedPersonId && (
@@ -246,7 +260,7 @@ export function ProfileScreen({
       )}
 
       {/* SETTINGS OVERLAY MODAL */}
-      {showSettings && (
+      {showSettings && isProfileVisible && (
         <div 
           className={cn(
             "fixed inset-0 bg-black z-50 flex flex-col transition-transform duration-300 ease-out",

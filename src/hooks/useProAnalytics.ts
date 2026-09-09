@@ -216,14 +216,17 @@ export function useProAnalytics(shows: Show[]) {
       
       if (watchedItems.length > 0) {
         try {
-          // Process in batches of 15 to balance performance and avoid API rate spikes
-          const batchSize = 15;
+          // Lots volontairement petits : le profil reste réactif et une navigation
+          // n'abandonne au maximum qu'une poignée de requêtes déjà parties.
+          const batchSize = 6;
           for (let b = 0; b < watchedItems.length; b += batchSize) {
+            if (!isMounted) return;
             const batch = watchedItems.slice(b, b + batchSize);
             const promises = batch.map(s => 
               s.mediaType === 'movie' ? tmdb.getMovieDetails(s.tmdbId) : tmdb.getShowDetails(s.tmdbId)
             );
             const results = await Promise.all(promises);
+            if (!isMounted) return;
             
             results.forEach((res, i) => {
               if (!res.ok || !res.value) return;
@@ -393,6 +396,8 @@ export function useProAnalytics(shows: Show[]) {
           console.error("Error fetching TMDB analytics details:", err);
         }
       }
+
+      if (!isMounted) return;
 
       const totalGenreWeight = Object.values(genreCounts).reduce((a, b) => a + b, 0) || 1;
       const sortedGenres = Object.entries(genreCounts)
