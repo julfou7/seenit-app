@@ -58,8 +58,8 @@ export function installMediaNotificationColdStartReplay(): () => void {
   const onAction = (event: Event) => {
     const payload = (event as CustomEvent<MediaNotificationActionPayload>).detail;
     if (buffer.capture(payload)) {
-      // Le bridge est importé avant App : il empêche donc le listener React de
-      // voir l'original, puis lui livre exactement le replay après montage.
+      // Ce module est évalué avant App/firebase depuis main.tsx : le bridge est
+      // donc en place avant que Capacitor puisse redispatcher l'action native.
       event.stopImmediatePropagation();
     }
   };
@@ -83,3 +83,8 @@ export function installMediaNotificationColdStartReplay(): () => void {
     buffer.flush();
   };
 }
+
+// L'installation au moment de l'évaluation du module est volontaire : main.tsx
+// importe ce module avant App, donc le clic natif ne peut plus se glisser entre
+// l'enregistrement Firebase et le montage du listener React.
+export const disposeMediaNotificationColdStartReplay = installMediaNotificationColdStartReplay();
