@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   createMediaNotificationColdStartBuffer,
   type MediaNotificationActionPayload,
-} from '../src/features/notifications/mediaNotificationActionColdStart';
+} from '../src/features/notifications/mediaNotificationActionColdStart.ts';
 
 const mainSource = readFileSync('src/main.tsx', 'utf8');
 
