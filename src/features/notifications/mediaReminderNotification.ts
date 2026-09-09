@@ -11,13 +11,61 @@ export interface MediaReminderNotificationOptions extends NativeNotificationOpti
   allowMarkWatched?: boolean;
 }
 
+export function getMediaReminderNotificationId(tag: string): number {
+  return generateNotificationNumericId(tag);
+}
+
 function resolveNotificationId(options: MediaReminderNotificationOptions): number {
   if (options.notificationId !== undefined) return options.notificationId;
-  if (options.tag) return generateNotificationNumericId(options.tag);
+  if (options.tag) return getMediaReminderNotificationId(options.tag);
   if (options.showId && options.season !== undefined && options.episode !== undefined) {
     return generateNotificationNumericId(`ep_${options.showId}_S${options.season}E${options.episode}`);
   }
   return Math.floor(Math.random() * 1_000_000);
+}
+
+export async function cancelMediaReminderNotificationByTag(tag: string): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    await LocalNotifications.cancel({
+      notifications: [{ id: getMediaReminderNotificationId(tag) }],
+    });
+  } catch (error) {
+    console.warn('Media reminder native cancellation failed safely:', error);
+  }
+}
+
+/**
+ * Supprime les anciens rappels locaux du même média qui ne correspondent plus
+ * aux identifiants autorisés par les dates canoniques courantes. Cela permet de
+ * retirer notamment les alarmes film historiques calculées avec une estimation
+ * et les payloads planifiés avant une évolution du contrat de notification.
+ */
+export async function prunePendingMediaReminderNotifications(
+  showId: string | number,
+  mediaType: 'tv' | 'movie',
+  allowedNotificationIds: Iterable<number> = [],
+): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+
+  try {
+    const allowed = new Set(allowedNotificationIds);
+    const pending = await LocalNotifications.getPending();
+    const notifications = (pending.notifications || [])
+      .filter((notification: any) => (
+        String(notification?.extra?.showId ?? '') === String(showId)
+        && String(notification?.extra?.mediaType ?? 'tv') === mediaType
+        && !allowed.has(Number(notification?.id))
+      ))
+      .map((notification: any) => ({ id: Number(notification.id) }))
+      .filter(notification => Number.isInteger(notification.id));
+
+    if (notifications.length > 0) {
+      await LocalNotifications.cancel({ notifications });
+    }
+  } catch (error) {
+    console.warn('Media reminder native pruning failed safely:', error);
+  }
 }
 
 /**
@@ -29,17 +77,17 @@ function resolveNotificationId(options: MediaReminderNotificationOptions): numbe
 export async function sendMediaReminderNotification(
   title: string,
   options: MediaReminderNotificationOptions
-): Promise<void> {
+): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) {
     await sendNativeNotification(title, options);
-    return;
+    return true;
   }
 
   try {
     const permission = await LocalNotifications.checkPermissions();
     if (permission.display !== 'granted') {
       const requested = await LocalNotifications.requestPermissions();
-      if (requested.display !== 'granted') return;
+      if (requested.display !== 'granted') return false;
     }
 
     if (options.allowMarkWatched) {
@@ -97,7 +145,9 @@ export async function sendMediaReminderNotification(
         },
       }],
     });
+    return true;
   } catch (error) {
     console.warn('Media reminder native schedule failed; notification skipped safely:', error);
+    return false;
   }
 }
