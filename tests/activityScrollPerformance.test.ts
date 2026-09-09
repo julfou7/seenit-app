@@ -37,7 +37,7 @@ test('SEENIT-PERF-001 borne le montage visible de Ma Liste', () => {
   assert.match(
     librarySource,
     /setVisibleCount\(current => Math\.min\(data\.length, current \+ LIBRARY_ROW_BATCH_SIZE\)\)/,
-    'la rangée réduite doit étendre progressivement son lot quand le scroll horizontal approche de la fin',
+    'la rangée réduite doit étendre progressivement son lot sans monter toute la bibliothèque',
   );
   assert.match(librarySource, /setVisibleCount\(current => Math\.min\(data\.length, current \+ LIBRARY_GRID_BATCH_SIZE\)\)/);
   assert.match(librarySource, />\s*Charger plus\s*<\/button>/);
@@ -45,6 +45,21 @@ test('SEENIT-PERF-001 borne le montage visible de Ma Liste', () => {
   assert.match(librarySource, /onShowClick=\{handleShowClick\}/);
   assert.doesNotMatch(librarySource, /section\.data\.map\(/);
   assert.doesNotMatch(librarySource, /key=\{`\$\{media\.id\}_\$\{idx\}`\}/);
+});
+
+test('SEENIT-PERF-001 garde le scroll horizontal de Ma Liste libre et précharge avant la fin', () => {
+  assert.match(librarySource, /const LIBRARY_ROW_PRELOAD_MARGIN = '0px 50% 0px 0px'/);
+  assert.match(librarySource, /const scrollContainerRef = useRef<HTMLDivElement>\(null\)/);
+  assert.match(librarySource, /const preloadSentinelRef = useRef<HTMLDivElement>\(null\)/);
+  assert.match(librarySource, /root: container,\s*rootMargin: LIBRARY_ROW_PRELOAD_MARGIN,\s*threshold: 0/);
+  assert.match(librarySource, /observer\.observe\(sentinel\)/);
+  assert.match(librarySource, /ref=\{scrollContainerRef\}/);
+  assert.match(librarySource, /ref=\{preloadSentinelRef\}/);
+  assert.match(librarySource, /const preloadDistance = Math\.max\(element\.clientWidth \* 0\.5, 1\)/);
+  assert.doesNotMatch(librarySource, /snap-x/);
+  assert.doesNotMatch(librarySource, /snap-mandatory/);
+  assert.doesNotMatch(librarySource, /snap-start/);
+  assert.doesNotMatch(librarySource, /scroll-px-/);
 });
 
 test('SEENIT-PERF-001 préserve les cartes inchangées et la sous-vue Profil', () => {
