@@ -202,10 +202,7 @@ export function useRemindersNotifier() {
 
         // --- SÉRIES TV ---
         const upcoming = getUpcomingEpisodeInfo(s);
-        if (!upcoming || !upcoming.air_date) {
-          await prunePendingMediaReminderNotifications(s.id, 'tv', []);
-          continue;
-        }
+        if (!upcoming || !upcoming.air_date) continue;
 
         const sNum = String(upcoming.season_number).padStart(2, '0');
         const eNum = String(upcoming.episode_number).padStart(2, '0');
@@ -217,10 +214,7 @@ export function useRemindersNotifier() {
         }
 
         const [year, month, day] = upcoming.air_date.split('-').map(Number);
-        if (!year || !month || !day) {
-          await prunePendingMediaReminderNotifications(s.id, 'tv', []);
-          continue;
-        }
+        if (!year || !month || !day) continue;
 
         const airDate9Am = new Date(year, month - 1, day, 9, 0, 0, 0);
         const d7Date9Am = new Date(airDate9Am);
