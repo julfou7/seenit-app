@@ -1,7 +1,7 @@
 {
   "name": "seenit-app",
   "private": true,
-  "version": "1.4.128",
+  "version": "1.4.129",
   "packageManager": "npm@10.9.3",
   "engines": {
     "node": ">=22 <25"
