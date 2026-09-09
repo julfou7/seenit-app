@@ -25,18 +25,45 @@ test('#229 réarme le scroll infini Explorer après Activity hidden → visible'
   );
 });
 
-test('#229 borne le montage initial des rangées de Ma Liste sans masquer les médias suivants', () => {
-  assert.match(librarySource, /const LIBRARY_ROW_BATCH_SIZE = 12/);
-  assert.match(librarySource, /data\.slice\(0, visibleCount\)\.map\(media =>/);
+test('SEENIT-PERF-001 borne le montage visible de Ma Liste', () => {
+  assert.match(librarySource, /const LIBRARY_ROW_BATCH_SIZE = 6/);
+  assert.match(librarySource, /const LIBRARY_GRID_BATCH_SIZE = 12/);
+  assert.match(librarySource, /const LIBRARY_ROW_ROOT_MARGIN = '320px 0px'/);
+  assert.match(librarySource, /const DeferredLibraryRow = React\.memo/);
+  assert.match(librarySource, /new IntersectionObserver\(entries =>/);
+  assert.match(librarySource, /shouldRender \? <LibraryRow \{\.\.\.rowProps\} \/> : null/);
+  assert.match(librarySource, /eager=\{index === 0\}/);
+  assert.match(librarySource, /data\.slice\(0, visibleCount\)\.map\(\(\{ media, show \}\) =>/);
   assert.match(
     librarySource,
     /setVisibleCount\(current => Math\.min\(data\.length, current \+ LIBRARY_ROW_BATCH_SIZE\)\)/,
     'la rangée réduite doit étendre progressivement son lot quand le scroll horizontal approche de la fin',
   );
-  assert.match(librarySource, /const showsByMediaKey = useMemo\(\(\) => \{/);
+  assert.match(librarySource, /setVisibleCount\(current => Math\.min\(data\.length, current \+ LIBRARY_GRID_BATCH_SIZE\)\)/);
+  assert.match(librarySource, />\s*Charger plus\s*<\/button>/);
   assert.match(librarySource, /key=\{getMediaKey\(media\.media_type, media\.id\)\}/);
   assert.match(librarySource, /onShowClick=\{handleShowClick\}/);
+  assert.doesNotMatch(librarySource, /section\.data\.map\(/);
   assert.doesNotMatch(librarySource, /key=\{`\$\{media\.id\}_\$\{idx\}`\}/);
+});
+
+test('SEENIT-PERF-001 préserve les cartes inchangées et la sous-vue Profil', () => {
+  const profileSource = readFileSync(new URL('../src/screens/ProfileScreen.tsx', import.meta.url), 'utf8');
+
+  assert.match(librarySource, /const libraryItemCache = new WeakMap<Show, LibraryItem>\(\)/);
+  assert.match(librarySource, /const cached = libraryItemCache\.get\(show\)/);
+  assert.match(librarySource, /left\.every\(\(item, index\) => item === right\[index\]\)/);
+  assert.match(librarySource, /useShowsStore\.getState\(\)\.shows\.find/);
+  assert.match(librarySource, /export const LibraryScreen = React\.memo/);
+  assert.doesNotMatch(librarySource, /showsByMediaKey/);
+
+  assert.match(profileSource, /const ProfileStatsContent = React\.memo/);
+  assert.match(profileSource, /const \[mountedProfileTabs, setMountedProfileTabs\]/);
+  assert.match(profileSource, /<Activity mode=\{profileContentVisible && activeTab === 'stats' \? 'visible' : 'hidden'\}>/);
+  assert.match(profileSource, /<Activity mode=\{profileContentVisible && activeTab === 'library' \? 'visible' : 'hidden'\}>/);
+  assert.match(profileSource, /<LibraryScreen onShowClick=\{handleLibraryShowClick\} isEmbedded=\{true\} \/>/);
+  assert.match(profileSource, /export const ProfileScreen = React\.memo/);
+  assert.doesNotMatch(profileSource, /<LibraryScreen onShowClick=\{\(id, mediaType\) =>/);
 });
 
 test('#229 borne aussi les carrousels réduits de À voir tout en conservant Voir tout paginé', () => {

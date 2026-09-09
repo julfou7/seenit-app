@@ -443,6 +443,13 @@ n'est rouverte que par une nouvelle décision produit explicite.
   période idle lorsque la plateforme le permet. Les cartes déjà chargées conservent une clé stable et ne
   sont pas rerendues pour un simple changement d'UI parent sans rapport ; le rendu hors écran est isolé
   afin qu'une longue session Explorer n'augmente pas continuellement le coût de style, layout et paint.
+- Les sous-vues Statistiques et Ma Liste sont chargées à leur première ouverture puis conservent leur
+  état ; lorsqu'elles sont masquées par l'autre sous-vue, Réglages ou un autre onglet, leurs Effects sont
+  suspendus. Leur réouverture ne remonte pas en rafale les cartes déjà visitées.
+- Ma Liste ne monte que les rangées proches du viewport vertical. Une rangée réduite matérialise au plus
+  six cartes à la fois et une grille « Voir tout » au plus douze cartes supplémentaires par action. Les
+  objets de carte issus d'un média inchangé restent référentiellement stables afin qu'une mise à jour
+  isolée de la bibliothèque ne rerende pas toutes les sections.
 - Les réponses asynchrones sont rattachées à la clé typée demandée. Une réponse de `movie:42` ne peut
   ni renseigner `tv:42`, ni remplacer une autre fiche ouverte entre-temps.
 - Les détails et requêtes identiques en vol sont dédupliqués. Les caches mémoire sont bornés afin de

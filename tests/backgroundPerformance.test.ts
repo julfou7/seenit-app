@@ -23,14 +23,17 @@ test('#229 suspend les Effects des onglets montés mais cachés sans perdre leur
   );
 });
 
-test('#229 coupe aussi le travail lourd interne du Profil lorsqu’il est recouvert', () => {
+test('#229 suspend le travail lourd interne du Profil sans remonter ses sous-vues', () => {
+  assert.match(profileSource, /import React, \{ Activity,/);
   assert.match(profileSource, /new IntersectionObserver/);
-  assert.match(profileSource, /const renderHeavyContent = isProfileVisible && !showSettings/);
-  assert.match(profileSource, /renderHeavyContent && \(activeTab === 'stats'/);
+  assert.match(profileSource, /const profileContentVisible = isProfileVisible && !showSettings/);
+  assert.match(profileSource, /const \[mountedProfileTabs, setMountedProfileTabs\]/);
+  assert.match(profileSource, /<Activity mode=\{profileContentVisible && activeTab === 'stats' \? 'visible' : 'hidden'\}>/);
+  assert.match(profileSource, /<Activity mode=\{profileContentVisible && activeTab === 'library' \? 'visible' : 'hidden'\}>/);
   assert.match(profileSource, /showSettings && isProfileVisible/);
   assert.match(
     profileSource,
-    /<LibraryScreen[\s\S]*isEmbedded=\{true\}/,
+    /<LibraryScreen onShowClick=\{handleLibraryShowClick\} isEmbedded=\{true\}/,
     'Ma Liste reste fonctionnellement inchangée lorsqu’elle est réellement visible',
   );
 });
