@@ -10,11 +10,6 @@ html, body {
 
 @import "tailwindcss";
 
-.media-grid-card {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 240px;
-}
-
 @layer utilities {
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom, 20px);
