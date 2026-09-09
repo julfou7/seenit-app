@@ -43,7 +43,7 @@ test('SEENIT-FUNCTIONAL-001 garde la machine d’états et le mapping Plex dans 
   assert.match(spec, /### 5\.5 Événements Plex/);
   assert.match(spec, /Non suivi[^\n]*Absence de document/);
   assert.match(spec, /Watchlist Plex retirée/);
-  assert.match(spec, /#68/);
+  assert.match(spec, /SEENIT-PLEX-009/);
   assert.match(spec, /#93/);
 });
 

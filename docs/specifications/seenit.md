@@ -1,6 +1,6 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
-Dernière mise à jour : 8 septembre 2026
+Dernière mise à jour : 9 septembre 2026
 Version applicative : **1.4.125**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
@@ -308,7 +308,7 @@ Une action répétée qui ne change pas l'état final est idempotente. Les mises
 |---|---|---|---|
 | Watchlist Plex ajoutée, média absent | Crée `plan_to_watch` avec provenance Watchlist | Même état final | Identité non résolue vers TMDB. |
 | Watchlist Plex déjà présente | Aucun doublon | Idempotent | Média déjà suivi : ne remplace ni progression ni intention SeenIt. |
-| Watchlist Plex retirée | Cible : redevient Non suivi seulement si la Watchlist avait seule créé la fiche, sans progression/favori/note/rappel | Doit converger sur collecte complète | Fonction encore ouverte dans [#68](https://github.com/julfou7/seenit-app/issues/68) ; absence/incomplétude = aucun effet. |
+| Watchlist Plex retirée | Redevient Non suivi seulement si la provenance prouve que la Watchlist avait seule créé la fiche, sans progression/favori/note/rappel/archive ni autre intention SeenIt | Même état final sur un snapshot Watchlist complet | Provenance absente, identité non résolue ou collecte incomplète/partielle = aucun effet. |
 | Film `viewCount>0` / userState vu exact | Film `completed`, record `movie` marqué `plexImported` si créé par Plex | Même état final | Watchlist ou activité Cloud ambiguë seule. |
 | Épisode `viewCount>0` exact | Ajoute l'épisode, recalcule `watching`/`completed`, provenance Plex | Même état final | Saison conteneur, épisode sans série parente résolue, identité ambiguë. |
 | Film/épisode exact actuellement non vu | Retire uniquement la progression possédée par Plex et recalcule l'état | Full ou recheck Delta exact | 404, timeout, serveur ignoré, disparition seule, progression SeenIt/legacy. |
@@ -529,6 +529,16 @@ pour le cache des sagas et univers.
   externe puis reprend la même tentative sans créer un second poller. Le flux PIN historique reste le
   contrat courant tant qu’il est accepté ; toute migration JWK/JWT constitue une évolution explicite
   distincte.
+- **SEENIT-PLEX-009** — Chaque suivi créé parce qu’un média absent de SeenIt appartient à la Watchlist
+  Plex porte une provenance persistante `plex-watchlist` liée à son identité exacte
+  `movie:<tmdbId>` ou `tv:<tmdbId>`. Un snapshot complet et autoritatif de la Watchlist, reçu en full
+  comme en delta, supprime le document uniquement si cette identité en est absente et si le document
+  courant est encore un simple `plan_to_watch`, sans progression, favori, note, rappel, archive ni autre
+  intention SeenIt. Un suivi déjà présent ou créé manuellement ne reçoit jamais cette provenance par
+  rétro-déduction. Une réponse partielle (notamment un endpoint de repli non exhaustif), une panne, un
+  timeout, une identité Watchlist non résolue ou l’absence du signal explicite de complétude interdit
+  toute suppression. La décision est relue dans une transaction Firestore afin qu’une action SeenIt
+  concurrente gagne toujours. Aucun titre ou année ne participe à l’identité ou à la suppression.
 - Le full scan est paginé. Un inventaire partiel ne remplace pas un cache complet, sauf si au
   moins un inventaire serveur complet et exploitable a été obtenu conformément à la politique.
 - La déduplication finale utilise `movie:<tmdbId>` ou

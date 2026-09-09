@@ -1,7 +1,7 @@
 # SeenIt — Référence fonctionnelle canonique
 
-Dernière vérification : 8 septembre 2026
-Baseline observée avant correction : **1.4.124**, `main` `a25621dde1ae3301f83dbec6a3aac77b48fa0810`
+Dernière vérification : 9 septembre 2026
+Baseline observée avant correction : **1.4.125**, `main` `98716256fd046f142031ef8f623eba91f3135fbf`
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : composante obligatoire de la SPEC SeenIt
 
@@ -386,8 +386,11 @@ La machine d'états exhaustive et le mapping Plex sont autoritatifs dans `seenit
 - Un timeout, une panne réseau, un `401` ou un `5xx` conserve l’état connu et ne devient jamais une
   absence Plex. Seul un `2xx` explicite contenant `available:false` peut alimenter le cache négatif.
 
-Le retrait de Watchlist vers « non suivi » reste volontairement ouvert dans #68 ; aucune absence
-ambiguë ne doit être interprétée en attendant.
+Le retrait d’un média de la Watchlist le ramène à « non suivi » uniquement si SeenIt prouve que cette
+Watchlist avait seule créé le document et qu’aucune progression, note, favori, rappel, archive ou autre
+intention SeenIt ne s’y est ajoutée. Le full et la delta appliquent la même règle à partir d’un snapshot
+Watchlist explicitement complet. Un endpoint partiel, une panne, un timeout, une identité non résolue ou
+une provenance absente conserve toujours le suivi.
 
 ## 10. Téléchargements
 
@@ -449,14 +452,19 @@ emploient le même transport que l'action réelle. Sonarr/Radarr disposent de pr
 ## 11. Notifications, actualités et appareils
 
 Les préférences globales du compte couvrent : nouvel épisode le jour J, première d'une saison à J-7,
-sortie cinéma le jour J et estimation DVD/VOD à J+120. L'horaire de référence est 09:00 locale.
+sortie cinéma le jour J et sortie DVD/VOD le jour J lorsqu'une date française TMDB explicite existe.
+L'horaire de référence est 09:00 locale. Pour les films, la sortie cinéma utilise `release_dates` FR type
+3 puis 2 ; la sortie vidéo/VOD/physique utilise la première date FR type 4 ou 5. Sans preuve française
+explicite, aucun rappel film n'est programmé et aucune estimation J+120 n'est utilisée.
 
 - L'intention est partagée via Firestore ; chaque installation autorisée possède son propre token.
 - Un téléphone et une PWA du même compte peuvent recevoir l'événement sans partager un token unique.
 - Déconnecter un appareil révoque son installation sans désactiver les autres.
 - Les webhooks Sonarr/Radarr ciblent seulement les installations du propriétaire de l'endpoint.
-- Les notifications profondes ouvrent le média/épisode exact ; l'APK peut exposer « Marquer comme vu ».
-- Les clés locales de programmation évitent le doublon sur une même installation.
+- Les notifications profondes ouvrent le média/épisode exact, y compris après un démarrage à froid de
+  l'APK ; l'APK peut exposer « Marquer comme vu ».
+- Les clés locales de programmation évitent le doublon sur une même installation et leur schéma peut être
+  versionné pour remplacer proprement une alarme persistée quand son payload doit évoluer.
 
 Après qu'une release APK officielle a été publiée et vérifiée, SeenIt peut prévenir les installations
 Android autorisées du compte :
@@ -528,8 +536,9 @@ et #178 à #181 ; la preuve visuelle/tactile PWA/APK reste à produire avec #15.
 - Une indisponibilité d'un serveur Plex/Arr/qBit ne doit pas effacer un état connu.
 - SeenIt est pour l'instant un produit personnel mono-propriétaire logique. Il n'existe pas encore de
   profil public, partage social, administration multi-utilisateur ou catalogue éditorial propre.
-- L'estimation DVD/VOD à 120 jours et la fenêtre « Au cinéma » ne sont pas des programmations temps
-  réel de salles ou de distributeurs.
+- Les rappels film reposent uniquement sur des dates de sortie françaises explicites fournies par TMDB ;
+  une absence de date reste une absence de rappel. La fenêtre « Au cinéma » n'est pas une programmation
+  temps réel de salles ou de distributeurs.
 
 ## 14. Matrice PWA / APK
 
@@ -561,7 +570,6 @@ elle est nécessaire à la plateforme et explicitement documentée.
 |---|---|---|
 | P1 | La classification d’âge actuelle peut préférer une valeur FR permissive, sous-classer des certifications US et inventer un TP par genre. | Appliquer `SEENIT-PARENTAL-001` : [#98](https://github.com/julfou7/seenit-app/issues/98). |
 | P1 | Les personnes favorites restent locales et font diverger les recommandations PWA/APK. | Rendre Firestore autoritatif : [#95](https://github.com/julfou7/seenit-app/issues/95). |
-| P1 | Le retrait de Watchlist Plex ne retire pas encore un suivi créé uniquement par cette Watchlist. | Implémentation avec provenance : [#68](https://github.com/julfou7/seenit-app/issues/68). |
 | P2 | Partager une fiche ou le profil ne garantit pas encore un lien réouvrable conforme. | Décider/corriger : [#96](https://github.com/julfou7/seenit-app/issues/96). |
 | P2 | Les parcours fonctionnels réels ne sont pas encore couverts de bout en bout. | Programme E2E/accessibilité/performance : [#15](https://github.com/julfou7/seenit-app/issues/15). |
 

@@ -40,6 +40,10 @@ import {
 } from "./src/features/plex/plexAccountHistory.ts";
 import { evaluatePlexSourceCompletion } from "./src/features/plex/plexSyncIntegrity.ts";
 import { buildPlexLibraryWatchState, mergePlexLibraryWatchStates } from "./src/features/plex/plexLibraryWatchState.ts";
+import {
+  isAuthoritativePlexWatchlistEndpoint,
+  isRecognizedPlexWatchlistPayload
+} from "./src/features/plex/plexWatchlistTracking.ts";
 import { readExplicitPlexCurrentWatchState } from "./src/features/runtime/plexAccountCurrentState.ts";
 
 export interface AuthRequest extends Request {
@@ -992,7 +996,8 @@ async function startServer() {
         headers: Record<string, string>,
         timeoutMs: number,
         maxPages: number,
-        stopAtTimestamp?: number
+        stopAtTimestamp?: number,
+        validatePage?: (payload: unknown) => boolean
       ): Promise<any[]> => {
         const pageSize = 100;
         const collected: any[] = [];
@@ -1013,6 +1018,9 @@ async function startServer() {
           }
 
           const data = await response.json();
+          if (validatePage && !validatePage(data)) {
+            throw new Error(`Réponse Plex non reconnue (${pageUrl.pathname}, page ${page + 1})`);
+          }
           const items = extractItems(data);
           if (items.length === 0) break;
 
@@ -1178,6 +1186,7 @@ async function startServer() {
       ];
 
       let watchlistCollectionSucceeded = false;
+      let watchlistCollectionComplete = false;
       for (const wlEndpoint of watchlistEndpoints) {
         try {
           const items = await fetchPlexPages(wlEndpoint, {
@@ -1185,14 +1194,17 @@ async function startServer() {
             'Accept': 'application/json',
             'X-Plex-Client-Identifier': plexClientIdentifier,
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          }, delta ? 4000 : 7000, 50);
+          }, delta ? 4000 : 7000, 50, undefined, isRecognizedPlexWatchlistPayload);
           watchlistCollectionSucceeded = true;
+          watchlistCollectionComplete = isAuthoritativePlexWatchlistEndpoint(wlEndpoint);
           if (items.length > 0) {
             console.log(`[Plex Sync] Fetched ${items.length} watchlist items from Plex Watchlist endpoint: ${wlEndpoint}`);
             rawWatchlistItems.push(...items);
             visitedSources.push(`Watchlist Plex (${items.length} éléments)`);
-            break;
           }
+          // Chaque URL est une alternative. Un endpoint exhaustif qui répond vide
+          // prouve une Watchlist vide ; il ne faut pas la remplacer par le hub /today.
+          break;
         } catch (e: any) {
           console.log(`[Plex Sync] Watchlist endpoint skipped (${wlEndpoint}): ${e?.message || e}`);
         }
@@ -2069,10 +2081,13 @@ async function startServer() {
         ...sourceStats,
         rawItems: allRawItems.length,
         normalizedHistoryItems: normalizedHistory.length,
-        availabilitySeedItems: normalizedLibraryAvailability.length
+        availabilitySeedItems: normalizedLibraryAvailability.length,
+        watchlistCollectionSucceeded,
+        watchlistCollectionComplete
       };
       const integrity = {
         collectionComplete: incompleteSources.size === 0,
+        watchlistCollectionComplete,
         libraryInventoryScanSucceeded: sourceStats.libraryInventoryScanSucceeded,
         libraryInventoryScanComplete: sourceStats.libraryInventoryScanComplete,
         incompleteSources: [...incompleteSources],
