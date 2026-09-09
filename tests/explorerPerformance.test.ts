@@ -9,8 +9,10 @@ import {
   writeWatchProviderCache,
 } from '../src/features/providers/watchProviderCache.ts';
 import {
+  WATCH_PROVIDER_CARD_SCROLL_SETTLE_MS,
   WATCH_PROVIDER_MAX_CONCURRENT,
   createWatchProviderRequestLimiter,
+  markWatchProviderCardInteraction,
   scheduleWatchProviderCardEnrichment,
 } from '../src/features/providers/watchProviderRequestPolicy.ts';
 
@@ -112,6 +114,8 @@ test('SEENIT-PERF-001 borne le fan-out diffuseurs et stabilise les cartes Explor
 
   let idleTask: (() => void) | undefined;
   let enrichmentRuns = 0;
+  let now = 10_000;
+  markWatchProviderCardInteraction(0);
   const cancel = scheduleWatchProviderCardEnrichment(
     () => { enrichmentRuns += 1; },
     {
@@ -119,6 +123,7 @@ test('SEENIT-PERF-001 borne le fan-out diffuseurs et stabilise les cartes Explor
       cancelIdleCallback: () => {},
       setTimeout: () => 0,
       clearTimeout: () => {},
+      now: () => now,
     },
   );
   assert.equal(enrichmentRuns, 0, 'le diffuseur ne doit pas être chargé dans la frame d’intersection');
@@ -131,6 +136,7 @@ test('SEENIT-PERF-001 borne le fan-out diffuseurs et stabilise les cartes Explor
   const discoverSource = readFileSync(new URL('../src/screens/DiscoverScreen.tsx', import.meta.url), 'utf8');
   const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
   const cssSource = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
+  const providerPolicySource = readFileSync(new URL('../src/features/providers/watchProviderRequestPolicy.ts', import.meta.url), 'utf8');
 
   assert.match(tmdbClientSource, /watchProvidersInFlight/);
   assert.match(tmdbClientSource, /if \(existingRequest\) return existingRequest/);
@@ -140,6 +146,13 @@ test('SEENIT-PERF-001 borne le fan-out diffuseurs et stabilise les cartes Explor
   assert.match(gridSource, /scheduleWatchProviderCardEnrichment\(enrichProvider\)/);
   assert.doesNotMatch(gridSource, /networkMode:\s*['"]active['"]/);
   assert.match(gridSource, /media-grid-card/);
+  assert.doesNotMatch(
+    providerPolicySource,
+    /requestIdleCallback\([^\n]+timeout/,
+    'un enrichissement décoratif ne doit jamais être forcé par timeout pendant le scroll',
+  );
+  assert.match(providerPolicySource, /addEventListener\('scroll'/);
+  assert.match(providerPolicySource, /WATCH_PROVIDER_CARD_SCROLL_SETTLE_MS/);
   assert.doesNotMatch(
     cssSource,
     /\.media-grid-card\s*\{[\s\S]*?content-visibility:\s*auto/,
@@ -157,4 +170,57 @@ test('SEENIT-PERF-001 borne le fan-out diffuseurs et stabilise les cartes Explor
   assert.ok(!discoverSource.includes("key={`grid_${item.media_type || 'media'}_${item.id}_${idx}`}"));
   assert.match(appSource, /const openTmdbMedia = useCallback/);
   assert.match(appSource, /<DiscoverScreen onShowClick=\{openTmdbMedia\}/);
+});
+
+test('SEENIT-PERF-001 ne force jamais l’enrichissement diffuseur pendant un scroll actif', () => {
+  let now = 20_000;
+  const timeouts: Array<{ callback: () => void; delay: number }> = [];
+  let idleTask: (() => void) | undefined;
+  let enrichmentRuns = 0;
+
+  const scheduler = {
+    requestIdleCallback: (callback: () => void) => {
+      idleTask = callback;
+      return 9;
+    },
+    cancelIdleCallback: () => {},
+    setTimeout: (callback: () => void, delay: number) => {
+      timeouts.push({ callback, delay });
+      return timeouts.length;
+    },
+    clearTimeout: () => {},
+    now: () => now,
+  };
+
+  markWatchProviderCardInteraction(now);
+  const cancel = scheduleWatchProviderCardEnrichment(
+    () => { enrichmentRuns += 1; },
+    scheduler,
+  );
+
+  assert.equal(idleTask, undefined, 'aucune tâche idle ne doit être armée tant que le scroll vient d’avoir lieu');
+  assert.equal(timeouts.length, 1);
+  assert.equal(timeouts[0].delay, WATCH_PROVIDER_CARD_SCROLL_SETTLE_MS);
+
+  now += WATCH_PROVIDER_CARD_SCROLL_SETTLE_MS;
+  timeouts.shift()?.callback();
+  assert.ok(idleTask, 'une tâche idle peut être armée après une vraie fenêtre sans scroll');
+
+  markWatchProviderCardInteraction(now);
+  now += 1;
+  const interruptedIdleTask = idleTask;
+  idleTask = undefined;
+  interruptedIdleTask?.();
+  assert.equal(enrichmentRuns, 0, 'un nouveau scroll doit invalider la fenêtre idle déjà armée');
+  assert.equal(timeouts.length, 1);
+  assert.ok(timeouts[0].delay >= WATCH_PROVIDER_CARD_SCROLL_SETTLE_MS - 1);
+
+  now += WATCH_PROVIDER_CARD_SCROLL_SETTLE_MS;
+  timeouts.shift()?.callback();
+  assert.ok(idleTask);
+  idleTask?.();
+  assert.equal(enrichmentRuns, 1, 'l’enrichissement ne démarre qu’après stabilisation du scroll puis période idle');
+
+  cancel();
+  markWatchProviderCardInteraction(0);
 });
