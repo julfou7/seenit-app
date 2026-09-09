@@ -140,8 +140,16 @@ test('SEENIT-PERF-001 borne le fan-out diffuseurs et stabilise les cartes Explor
   assert.match(gridSource, /scheduleWatchProviderCardEnrichment\(enrichProvider\)/);
   assert.doesNotMatch(gridSource, /networkMode:\s*['"]active['"]/);
   assert.match(gridSource, /media-grid-card/);
-  assert.match(cssSource, /\.media-grid-card\s*\{[\s\S]*content-visibility:\s*auto/);
-  assert.match(cssSource, /contain-intrinsic-size:\s*auto 240px/);
+  assert.doesNotMatch(
+    cssSource,
+    /\.media-grid-card\s*\{[\s\S]*?content-visibility:\s*auto/,
+    'les cartes interactives ne doivent pas réactiver layout/paint juste à l’entrée du viewport',
+  );
+  assert.doesNotMatch(
+    cssSource,
+    /contain-intrinsic-size:\s*auto 240px/,
+    'le placeholder de rendu différé de #230 ne doit pas être réintroduit sans preuve terrain de frame pacing',
+  );
   assert.match(discoverSource, /const handleToggleWatched = useCallback/);
   assert.match(discoverSource, /const handleAddMedia = useCallback/);
   assert.match(discoverSource, /onLongPress=\{handleLongPress\}/);
