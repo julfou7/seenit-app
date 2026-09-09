@@ -1,9 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   createMediaNotificationColdStartBuffer,
   type MediaNotificationActionPayload,
 } from '../src/features/notifications/mediaNotificationActionColdStart';
+
+const mainSource = readFileSync('src/main.tsx', 'utf8');
+
+test('issue #106 charge le buffer de clic avant App et Firebase', () => {
+  const bufferImport = mainSource.indexOf("from './features/notifications/mediaNotificationActionColdStart.ts'");
+  const appImport = mainSource.indexOf("from './App.tsx'");
+  const firebaseImport = mainSource.indexOf("from './lib/firebase.ts'");
+  assert.ok(bufferImport >= 0 && bufferImport < appImport);
+  assert.ok(bufferImport < firebaseImport);
+  assert.match(mainSource, /disposeMediaNotificationColdStartReplay/);
+});
 
 test('issue #106 rejoue exactement une fois un clic média reçu au démarrage à froid', () => {
   const replayed: MediaNotificationActionPayload[] = [];
