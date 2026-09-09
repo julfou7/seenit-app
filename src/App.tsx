@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { lazy, Suspense, startTransition, useCallback, useState, useEffect, useRef } from 'react';
+import { Activity, lazy, Suspense, startTransition, useCallback, useState, useEffect, useRef } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
@@ -31,7 +31,6 @@ import { consumeAppUpdateAvailablePush, handleAppUpdateAvailablePush, isAppUpdat
 import { useParentalRatingStore } from './store/parentalRatingStore';
 import { parentalRatingKey } from './features/shows/parentalRating';
 import { markEpisodeWatched } from './features/shows/markEpisodeWatched';
-import { cn } from './lib/utils';
 import { cleanOldCache } from './db/dexie';
 import './store/showsStore';
 import { activatePlexUserScope } from './features/plex/plexStorage';
@@ -331,7 +330,7 @@ function MainApp() {
           'local', 
           mediaType, 
           tmdbId ? Number(tmdbId) : undefined, 
-          season ? Number(season) : undefined, 
+          season ? Number(season) : undefined,
           episode ? Number(episode) : undefined
         );
       }
@@ -490,30 +489,38 @@ function MainApp() {
           <div className="flex-1 min-h-0 flex flex-col">
             <Suspense fallback={<div className="flex-1 bg-premium-ambient" aria-label="Chargement de l’écran" />}>
               {mountedTabs.has('watchlist') && (
-                <div className={cn("flex-1 min-h-0 flex flex-col", currentTab !== 'watchlist' && "hidden")}>
-                  <WatchListScreen onShowClick={openLocalMedia} />
-                </div>
+                <Activity mode={currentTab === 'watchlist' ? 'visible' : 'hidden'}>
+                  <div className="flex-1 min-h-0 flex flex-col">
+                    <WatchListScreen onShowClick={openLocalMedia} />
+                  </div>
+                </Activity>
               )}
 
               {(mountedTabs.has('profile') || mountedTabs.has('settings')) && (
-                <div className={cn("flex-1 min-h-0 flex flex-col", (currentTab !== 'profile' && currentTab !== 'settings') && "hidden")}>
-                  <ProfileScreen
-                    initialShowSettings={currentTab === 'settings'}
-                    onShowClick={openTmdbMedia}
-                  />
-                </div>
+                <Activity mode={(currentTab === 'profile' || currentTab === 'settings') ? 'visible' : 'hidden'}>
+                  <div className="flex-1 min-h-0 flex flex-col">
+                    <ProfileScreen
+                      initialShowSettings={currentTab === 'settings'}
+                      onShowClick={openTmdbMedia}
+                    />
+                  </div>
+                </Activity>
               )}
 
               {mountedTabs.has('discover') && (
-                <div className={cn("flex-1 min-h-0 flex flex-col", currentTab !== 'discover' && "hidden")}>
-                  <DiscoverScreen onShowClick={openTmdbMedia} />
-                </div>
+                <Activity mode={currentTab === 'discover' ? 'visible' : 'hidden'}>
+                  <div className="flex-1 min-h-0 flex flex-col">
+                    <DiscoverScreen onShowClick={openTmdbMedia} />
+                  </div>
+                </Activity>
               )}
 
               {mountedTabs.has('downloads') && (
-                <div className={cn("flex-1 min-h-0 flex flex-col", currentTab !== 'downloads' && "hidden")}>
-                  <DownloadsScreen onShowClick={openTmdbMedia} />
-                </div>
+                <Activity mode={currentTab === 'downloads' ? 'visible' : 'hidden'}>
+                  <div className="flex-1 min-h-0 flex flex-col">
+                    <DownloadsScreen onShowClick={openTmdbMedia} />
+                  </div>
+                </Activity>
               )}
             </Suspense>
           </div>
