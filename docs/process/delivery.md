@@ -65,7 +65,7 @@ La classe `apk` signifie seulement « devra entrer dans la prochaine APK ». Ell
 Chaque push ou pull request exécute, dans cet ordre :
 
 1. configuration de Node sans installation applicative ;
-2. préflight sans dépendances : intégrité du catalogue SPEC ;
+2. préflight sans dépendances : garde des imports ESM des TNR Node, puis intégrité du catalogue SPEC ;
 3. restauration éventuelle d'un cache `node_modules` exact ;
 4. sur cache absent seulement, `npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund` ;
 5. rematérialisation systématique de la configuration Android canonique, y compris sur cache trouvé ;
@@ -75,6 +75,12 @@ Chaque push ou pull request exécute, dans cet ordre :
 9. audit de dépendances lorsqu'il est applicable ;
 10. build Web + serveur ;
 11. résumé du mode, du cache et des durées principales.
+
+Le préflight commence par un garde Node sans dépendances qui inspecte uniquement les TNR
+`tests/**/*.test.ts` exécutés directement par `node --test`. Lorsqu'un import relatif local cible un
+module TypeScript existant, son extension (`.ts`, `.tsx`, etc.) doit être explicite ; les imports de
+packages et le code applicatif bundlé par Vite restent hors de ce garde. L'erreur indique fichier, ligne,
+import fautif et chemin attendu, avant restauration du cache `node_modules` ou installation npm.
 
 L'intégrité SPEC est volontairement exécutée avant le cache et l'installation : son validateur utilise
 uniquement Node et les fichiers du dépôt. Une erreur de catalogue, de version ou de référence de test
@@ -120,8 +126,10 @@ Un push sur `main` **ne publie jamais automatiquement une APK**.
 
 Le test `tests/ciValidationPerformance.test.ts` bloque automatiquement toute régression de l'ordre
 fail-fast, de la clé de cache exacte, de la confiance d'écriture, des options d'installation, de la
-rematérialisation Android, de la séparation des contrôles, du résumé et du plafond. La preuve du SLO
-est maintenue dans l'issue #84 à partir de 20 validations réelles consécutives ; elle n'est pas simulée
+rematérialisation Android, de la séparation des contrôles, du résumé et du plafond. Le test
+`tests/testEsmImportsGuard.test.ts` verrouille le garde ESM : imports statiques, side-effect et dynamiques,
+extensions explicites, packages ignorés et absence d'impact sur le code Vite. La preuve du SLO est
+maintenue dans l'issue #84 à partir de 20 validations réelles consécutives ; elle n'est pas simulée
 par des runs artificiels.
 
 ## Gouvernance proportionnée
