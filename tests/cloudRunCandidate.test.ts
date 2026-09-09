@@ -35,6 +35,8 @@ spec:
       - env:
         - name: NODE_ENV
           value: development
+        - name: OMDB_API_KEY
+          value: legacy-omdb-secret-reference
         - name: KEEP_ENV
           value: keep-value
         image: us-west1-docker.pkg.dev/legacy/source/app:old
@@ -68,6 +70,9 @@ test('SEENIT-RUNTIME-001 prépare une candidate image en conservant la configura
   assert.match(prepared, /name: NODE_ENV\n\s+value: production/);
   assert.doesNotMatch(prepared, /name: NODE_ENV\n\s+value: development/);
   assert.equal((prepared.match(/name: NODE_ENV/g) || []).length, 1);
+  assert.doesNotMatch(prepared, /OMDB_API_KEY|legacy-omdb-secret-reference/);
+  assert.match(prepared, /name: TMDB_API_KEY[\s\S]*name: TMDB_API_KEY/);
+  assert.match(prepared, /name: TVDB_API_KEY[\s\S]*name: TVDB_API_KEY/);
   assert.match(prepared, /percent: 100\n    revisionName: seenit-app-00014-wjw/);
   assert.match(prepared, /percent: 0\n    revisionName: seenit-app-gh-12345\n    tag: candidate-12345/);
 });
@@ -90,8 +95,8 @@ test('SEENIT-RUNTIME-001 retire command et args hérités quand ils portent la p
 
 test('SEENIT-RUNTIME-001 retire command et args secondaires sans perdre les ports du conteneur', () => {
   const inheritedLaunch = exportedService.replace(
-    `      - env:\n        - name: NODE_ENV\n          value: development\n        - name: KEEP_ENV\n          value: keep-value\n        image:`,
-    `      - ports:\n        - containerPort: 3000\n          name: http1\n        command:\n        - legacy-launcher\n        args:\n        - --serve\n        env:\n        - name: NODE_ENV\n          value: development\n        - name: KEEP_ENV\n          value: keep-value\n        image:`
+    `      - env:\n        - name: NODE_ENV\n          value: development\n        - name: OMDB_API_KEY\n          value: legacy-omdb-secret-reference\n        - name: KEEP_ENV\n          value: keep-value\n        image:`,
+    `      - ports:\n        - containerPort: 3000\n          name: http1\n        command:\n        - legacy-launcher\n        args:\n        - --serve\n        env:\n        - name: NODE_ENV\n          value: development\n        - name: OMDB_API_KEY\n          value: legacy-omdb-secret-reference\n        - name: KEEP_ENV\n          value: keep-value\n        image:`
   );
   const prepared = prepareCandidateService(inheritedLaunch, baseOptions);
 
@@ -100,6 +105,7 @@ test('SEENIT-RUNTIME-001 retire command et args secondaires sans perdre les port
   assert.match(prepared, /containerPort: 3000/);
   assert.match(prepared, /name: http1/);
   assert.match(prepared, /name: NODE_ENV\n\s+value: production/);
+  assert.doesNotMatch(prepared, /OMDB_API_KEY/);
 });
 
 test('SEENIT-RUNTIME-001 retire les anciennes cibles à 0 % avant de créer la candidate', () => {
@@ -136,10 +142,7 @@ test('SEENIT-RUNTIME-001 refuse une cible non taguée sans pourcentage explicite
     `  - percent: 100\n    revisionName: seenit-app-00014-wjw\n  - revisionName: seenit-app-other\n`
   );
 
-  assert.throws(
-    () => prepareCandidateService(unsafe, baseOptions),
-    /sans pourcentage explicite/
-  );
+  assert.throws(() => prepareCandidateService(unsafe, baseOptions), /sans pourcentage explicite/);
 });
 
 test('SEENIT-RUNTIME-001 refuse toute autre cible de trafic active', () => {
@@ -148,15 +151,12 @@ test('SEENIT-RUNTIME-001 refuse toute autre cible de trafic active', () => {
     `  - percent: 100\n    revisionName: seenit-app-00014-wjw\n  - percent: 1\n    revisionName: seenit-app-other\n`
   );
 
-  assert.throws(
-    () => prepareCandidateService(unsafe, baseOptions),
-    /exclusivement fixé/
-  );
+  assert.throws(() => prepareCandidateService(unsafe, baseOptions), /exclusivement fixé/);
 });
 
 test('SEENIT-RUNTIME-001 ajoute NODE_ENV=production quand le service exporté n’a pas de bloc env', () => {
   const noEnv = exportedService.replace(
-    `      - env:\n        - name: NODE_ENV\n          value: development\n        - name: KEEP_ENV\n          value: keep-value\n        image:`,
+    `      - env:\n        - name: NODE_ENV\n          value: development\n        - name: OMDB_API_KEY\n          value: legacy-omdb-secret-reference\n        - name: KEEP_ENV\n          value: keep-value\n        image:`,
     '      - image:'
   );
   const prepared = prepareCandidateService(noEnv, baseOptions);
@@ -172,8 +172,8 @@ test('SEENIT-RUNTIME-001 ajoute NODE_ENV=production quand le service exporté n�
 
 test('SEENIT-RUNTIME-001 force NODE_ENV quand env et image sont des champs secondaires du conteneur', () => {
   const secondaryFields = exportedService.replace(
-    `      - env:\n        - name: NODE_ENV\n          value: development\n        - name: KEEP_ENV\n          value: keep-value\n        image:`,
-    `      - ports:\n        - containerPort: 3000\n          name: http1\n        env:\n        - name: NODE_ENV\n          value: development\n        - name: KEEP_ENV\n          value: keep-value\n        image:`
+    `      - env:\n        - name: NODE_ENV\n          value: development\n        - name: OMDB_API_KEY\n          value: legacy-omdb-secret-reference\n        - name: KEEP_ENV\n          value: keep-value\n        image:`,
+    `      - ports:\n        - containerPort: 3000\n          name: http1\n        env:\n        - name: NODE_ENV\n          value: development\n        - name: OMDB_API_KEY\n          value: legacy-omdb-secret-reference\n        - name: KEEP_ENV\n          value: keep-value\n        image:`
   );
   const prepared = prepareCandidateService(secondaryFields, baseOptions);
 
@@ -182,12 +182,13 @@ test('SEENIT-RUNTIME-001 force NODE_ENV quand env et image sont des champs secon
   assert.match(prepared, /name: NODE_ENV\n\s+value: production/);
   assert.doesNotMatch(prepared, /name: NODE_ENV\n\s+value: development/);
   assert.match(prepared, /KEEP_ENV/);
+  assert.doesNotMatch(prepared, /OMDB_API_KEY/);
   assert.equal((prepared.match(/name: NODE_ENV/g) || []).length, 1);
 });
 
 test('SEENIT-RUNTIME-001 ajoute env quand image est un champ secondaire du conteneur', () => {
   const noEnvSecondaryImage = exportedService.replace(
-    `      - env:\n        - name: NODE_ENV\n          value: development\n        - name: KEEP_ENV\n          value: keep-value\n        image:`,
+    `      - env:\n        - name: NODE_ENV\n          value: development\n        - name: OMDB_API_KEY\n          value: legacy-omdb-secret-reference\n        - name: KEEP_ENV\n          value: keep-value\n        image:`,
     `      - ports:\n        - containerPort: 3000\n          name: http1\n        image:`
   );
   const prepared = prepareCandidateService(noEnvSecondaryImage, baseOptions);
@@ -206,30 +207,15 @@ test('SEENIT-RUNTIME-001 ajoute env quand image est un champ secondaire du conte
 
 test('SEENIT-RUNTIME-001 dérive le tag candidat attendu par le workflow', () => {
   assert.equal(deriveCandidateTag('seenit-app', 'seenit-app-gh-34014482896-1'), 'candidate-34014482896-1');
-  assert.throws(
-    () => deriveCandidateTag('seenit-app', 'seenit-app-blue'),
-    /hors convention seenit-app-gh-/
-  );
+  assert.throws(() => deriveCandidateTag('seenit-app', 'seenit-app-blue'), /hors convention seenit-app-gh-/);
 });
 
 test('SEENIT-RUNTIME-001 refuse un export dont le trafic suit latestRevision', () => {
-  const unsafe = exportedService
-    .replace('  - percent: 100\n    revisionName: seenit-app-00014-wjw', '  - latestRevision: true\n    percent: 100');
-
-  assert.throws(
-    () => prepareCandidateService(unsafe, baseOptions),
-    /latestRevision=true/
-  );
+  const unsafe = exportedService.replace('  - percent: 100\n    revisionName: seenit-app-00014-wjw', '  - latestRevision: true\n    percent: 100');
+  assert.throws(() => prepareCandidateService(unsafe, baseOptions), /latestRevision=true/);
 });
 
 test('SEENIT-RUNTIME-001 refuse une configuration multi-conteneurs ambiguë', () => {
-  const ambiguous = exportedService.replace(
-    '        resources:\n',
-    `        resources:\n      - image: us-west1-docker.pkg.dev/sidecar/image:latest\n`
-  );
-
-  assert.throws(
-    () => prepareCandidateService(ambiguous, baseOptions),
-    /2 ligne\(s\) image détectée\(s\)/
-  );
+  const ambiguous = exportedService.replace('        resources:\n', `        resources:\n      - image: us-west1-docker.pkg.dev/sidecar/image:latest\n`);
+  assert.throws(() => prepareCandidateService(ambiguous, baseOptions), /2 ligne\(s\) image détectée\(s\)/);
 });
