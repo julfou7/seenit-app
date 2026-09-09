@@ -74,6 +74,8 @@ La vérification du `main` GitHub canonique est une **lecture d'état distante**
 
 Cette politique ne suppose jamais qu'un sandbox soit persistant : si la plateforme fournit réellement un environnement neuf, l'acquisition minimale peut être répétée. Elle interdit seulement de confondre cette contrainte de runtime avec une obligation SeenIt de recloner ou de reconstruire le contexte.
 
+Lorsqu'un chantier est entièrement réalisable via le connecteur/API GitHub, l'absence de clone local, de `gh` ou de token shell n'est **ni un blocage ni une difficulté notable à remonter**. Le rapport final ne la mentionne comme difficulté que si elle a réellement empêché une action requise après épuisement du chemin connector-only prévu.
+
 ## 0. Avant toute analyse, proposition ou modification
 
 **Hors fast paths des sections 0.0, 0.0a et 0.1 :**
@@ -143,6 +145,12 @@ Dans ces cas : mettre à jour `docs/specifications/seenit.md`, `requirements.jso
 Pour une correction locale ordinaire (petit bug d'affichage, mise en page, détail visuel, backend non sensible) qui n'introduit aucune nouvelle règle durable, ne créez pas artificiellement une nouvelle exigence. Un **test automatisé** ciblé suffit pour tout changement comportemental.
 
 `npm run test:spec:changes` applique cette règle : tests pour le comportement ; SPEC + catalogue en plus pour les zones sensibles. Une pure copie d'interface reconnue `light` peut rester sans nouveau test.
+
+### Imports ESM des TNR Node
+
+Les TNR `tests/**/*.test.ts` sont exécutés directement par `node --test`. Tout import relatif local qui cible un module TypeScript doit donc être explicitement résolvable par Node ESM : écrire l'extension `.ts` / `.tsx` (ou l'extension réelle du module) au lieu d'un chemin relatif sans extension. Les imports de packages ne sont pas concernés et cette règle ne s'applique pas artificiellement au code applicatif bundlé par Vite.
+
+Le préflight sans dépendances bloque cette classe d'erreur avant le cache `node_modules`, l'installation npm, TypeScript et les tests unitaires. Un agent qui ajoute un TNR vérifie cette résolution avant le premier push ; la CI confirme la règle mais ne sert pas à découvrir un `ERR_MODULE_NOT_FOUND` déterministe.
 
 `docs/specifications/functional-reference.md` est la carte produit vivante. Toute fonction ajoutée, retirée, déplacée ou dont le résultat observable change doit y être répercutée dans la même livraison. Un comportement du code qui contredit la SPEC n'est pas une nouvelle règle implicite : ouvrir ou mettre à jour une issue priorisée, puis corriger le code ou obtenir une décision produit explicite.
 
