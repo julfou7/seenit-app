@@ -121,10 +121,10 @@ const toPersonContribution = (person: any): AnalyticsPersonContribution => ({
 });
 
 const extractAnalyticsContribution = (show: Show, details: any): AnalyticsMediaContribution => {
-  const genres = Array.from(new Set(
+  const genres: string[] = Array.from(new Set<string>(
     (Array.isArray(details?.genres) ? details.genres : [])
       .map((genre: any) => String(genre?.name || '').trim())
-      .filter(Boolean),
+      .filter((name: string) => name.length > 0),
   ));
 
   let castList: any[] = [];
