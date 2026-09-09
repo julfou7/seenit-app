@@ -39,8 +39,8 @@ function firstNotificationScheduleIndex(): number {
 test('issue #94 ignore chaque média inéligible sans interrompre les suivants', () => {
   assert.match(loop, /if \(s\.isArchived \|\| s\.status === 'dropped'\) \{[\s\S]*?continue;/);
   assert.match(loop, /if \(!Number\.isInteger\(tmdbId\) \|\| tmdbId <= 0\) \{[\s\S]*?continue;/);
-  assert.match(loop, /if \(!upcoming \|\| !upcoming\.air_date\) \{[\s\S]*?continue;/);
-  assert.match(loop, /if \(!year \|\| !month \|\| !day\) \{[\s\S]*?continue;/);
+  assert.match(loop, /if \(!upcoming \|\| !upcoming\.air_date\) continue;/);
+  assert.match(loop, /if \(!year \|\| !month \|\| !day\) continue;/);
 
   assert.doesNotMatch(
     loop,
