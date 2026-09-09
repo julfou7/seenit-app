@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { buildNotificationTestSample } from '../src/features/notifications/notificationTestSample.ts';
-import type { Show } from '../src/types';
+import type { Show } from '../src/types.ts';
 
 function makeShow(overrides: Partial<Show> & Pick<Show, 'id' | 'title' | 'tmdbId' | 'mediaType'>): Show {
   return {

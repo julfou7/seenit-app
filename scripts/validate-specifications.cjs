@@ -1,7 +1,15 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { assertNoImplicitTestEsmImports } = require('./validate-test-esm-imports.cjs');
 
 const root = path.resolve(__dirname, '..');
+try {
+  assertNoImplicitTestEsmImports(root);
+} catch (error) {
+  console.error(`[SPEC] ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
+}
+
 const cataloguePath = path.join(root, 'docs/specifications/requirements.json');
 const allowedTargets = new Set(['backend', 'pwa', 'apk', 'ci']);
 const requirementIdPattern = /^SEENIT-(?:[A-Z0-9]+-)+\d{3}$/;
