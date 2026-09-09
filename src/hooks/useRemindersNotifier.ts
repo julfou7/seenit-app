@@ -183,7 +183,7 @@ export function useRemindersNotifier() {
             await scheduleMovieAlert(
               theaterDateKey,
               'theater',
-              `🎬 ${title}`,
+              title,
               '🎬 Sortie cinéma',
               `Sortie Cinéma : ${title} est dans les salles aujourd'hui !`
             );
@@ -192,7 +192,7 @@ export function useRemindersNotifier() {
             await scheduleMovieAlert(
               homeDateKey,
               'vod',
-              `📺 ${title}`,
+              title,
               '📺 Sortie DVD / VOD',
               `Sortie DVD / VOD : ${title} est disponible aujourd'hui !`
             );
@@ -312,7 +312,7 @@ export function useRemindersNotifier() {
           await scheduleTvAlert(
             d7Date9Am,
             'd7',
-            `📅 ${title}`,
+            title,
             '📅 Nouvelle saison',
             `La saison ${upcoming.season_number} de ${title} sort dans 7 jours ! Préparez-vous !`
           );
@@ -322,7 +322,7 @@ export function useRemindersNotifier() {
           await scheduleTvAlert(
             airDate9Am,
             'today',
-            `🆕 ${title}`,
+            title,
             '🆕 Nouvel épisode',
             `L'épisode S${sNum}E${eNum} ${upcoming.name ? `« ${upcoming.name} » ` : ''}est disponible aujourd'hui !`,
             true
