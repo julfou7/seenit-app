@@ -193,7 +193,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
       setShowAffinityInfo(false);
       setIsSearchFocused(false);
       
-      // Remettre le Top 10 à la 1ère position
       setActiveHeroIndex(0);
       if (heroCarouselRef.current) {
         try {
@@ -245,7 +244,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
     }
   };
 
-  // Réinitialiser la position du Top 10 si la catégorie change
   useEffect(() => {
     setActiveHeroIndex(0);
     if (heroCarouselRef.current) {
@@ -263,7 +261,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Snapshot des films/séries vus au chargement ou changement de catégorie/recherche/filtre
   useEffect(() => {
     const completed = new Set<number>();
     for (const s of shows) {
@@ -292,7 +289,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
 
     if (existingShow) {
       if (isTv) {
-        // TV Show specific logic
         const isUpToDate = checkIsUpToDate(existingShow);
         const isDropped = existingShow.status === 'dropped';
         const isArchived = existingShow.isArchived;
@@ -302,7 +298,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
         const oldIsArchived = existingShow.isArchived;
 
         if (isUpToDate || isDropped || isArchived || existingShow.status === 'completed') {
-          // Revert to 'plan_to_watch' (not seen)
           await updateShow(existingShow.id, {
             status: 'plan_to_watch',
             seenEpisodes: [],
@@ -323,13 +318,9 @@ export function DiscoverScreen({ onShowClick }: Props) {
             }
           );
         } else {
-          // Mark all available episodes as seen?
-          // Usually we don't want to auto-complete all episodes on toggle, 
-          // but if they click the action button (which is Continuer/Commencer), 
-          // it opens the modal, so this is just a fallback.
           await updateShow(existingShow.id, {
             status: 'plan_to_watch',
-            seenEpisodes: [], // they shouldn't hit this since GridMediaCard redirects to modal
+            seenEpisodes: [],
             updatedAt: Date.now()
           });
           showToast(
@@ -346,7 +337,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
           );
         }
       } else {
-        // Movie logic
         const isCurrentlySeen = existingShow.status === 'completed' || existingShow.seenEpisodes?.includes('movie');
         const newStatus = isCurrentlySeen ? 'plan_to_watch' : 'completed';
         const newSeenEpisodes = isCurrentlySeen 
@@ -417,8 +407,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
   const handleAddMedia = useCallback(async (media: TMDBMedia) => {
     const isTv = media.media_type === 'tv' || activeCategory === 'Séries';
     const titleToUse = media.name || media.title || media.original_name || media.original_title || '';
-    
-    // Si c'est déjà dans la liste, on ne fait rien (ou on pourrait le retirer, mais l'UI le bloque normalement)
     if (showsByTmdbId.has(media.id)) return;
 
     const newShowData: any = {
@@ -457,18 +445,13 @@ export function DiscoverScreen({ onShowClick }: Props) {
     if (isSearchFocused) return;
     const currentScrollY = e.currentTarget.scrollTop;
     
-    // Si on est proche du haut, on affiche toujours la recherche et on masque la flèche
     if (currentScrollY < 300) {
       setIsSearchVisible(true);
       setShowScrollTop(false);
-    } 
-    // Si on scrolle vers le BAS de plus de 10px -> On cache la recherche et la flèche
-    else if (currentScrollY > lastScrollY.current + 10) {
+    } else if (currentScrollY > lastScrollY.current + 10) {
       setIsSearchVisible(false);
       setShowScrollTop(false);
-    } 
-    // Si on scrolle vers le HAUT de plus de 10px -> On affiche la recherche et la flèche
-    else if (currentScrollY < lastScrollY.current - 10) {
+    } else if (currentScrollY < lastScrollY.current - 10) {
       setIsSearchVisible(true);
       if (currentScrollY > 300) {
         setShowScrollTop(true);
@@ -505,13 +488,10 @@ export function DiscoverScreen({ onShowClick }: Props) {
   const handleTouchMove = (e: React.TouchEvent) => {
     if (touchStartY.current !== null) {
       const diff = e.touches[0].clientY - touchStartY.current;
-      // Swipe vers le bas -> Masquer la barre
       if (diff > 25 && isSearchVisible) {
         setIsSearchVisible(false);
         touchStartY.current = null;
-      }
-      // Swipe vers le haut -> Faire revenir la barre
-      else if (diff < -25 && !isSearchVisible) {
+      } else if (diff < -25 && !isSearchVisible) {
         setIsSearchVisible(true);
         touchStartY.current = null;
       }
@@ -660,7 +640,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
           ...(topMovRes?.ok ? topMovRes.value.results.map((r: any) => ({ ...r, media_type: 'movie' })) : []),
           ...(topTvRes?.ok ? topTvRes.value.results.map((r: any) => ({ ...r, media_type: 'tv' })) : [])
         ];
-        // Sort globally by vote average descending
         tops.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
         
         setPopular(prev => {
@@ -679,7 +658,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
             }
           }
         }
-        if (tops.length === 0 || page >= 5) { // 5 pages max for top 100 (20 results per page)
+        if (tops.length === 0 || page >= 5) {
           setHasMore(false);
         }
       } else if (activeCategory === 'Au cinéma') {
@@ -883,7 +862,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
     let list = [...rawList];
     const qClean = debouncedQuery.trim().toLowerCase();
 
-    // Filtre sur le nombre d'avis
     list = list.filter((item: any) => {
       if (qClean) return true;
       if (activeCategory === 'Personnes' || item.media_type === 'person') return true;
@@ -1052,7 +1030,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
       }
     }
 
-    // Exclure les contenus vus au dernier refresh (seulement hors recherche active)
     if (watchedIdsSnapshot.size > 0 && !qClean) {
       list = list.filter(item => {
         const numId = Number(item.id);
@@ -1072,7 +1049,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
     const list: TMDBMedia[] = [];
     for (const item of processedResults) {
       if (activeCategory === 'Au cinéma' && !isMovieAtCinema(item)) continue;
-      // Pour le Top 100 on ne filtre pas le top10
       if (activeCategory === 'Top 100' && !item.vote_average) continue;
       if (item.media_type === 'person') continue;
       const type = item.media_type || (item.first_air_date ? 'tv' : 'movie');
@@ -1142,44 +1118,41 @@ export function DiscoverScreen({ onShowClick }: Props) {
   const visibleMovieResults = movieResults;
   const visibleProcessedResults = uniqueProcessedResults;
 
-  const handleLoadMore = () => {
+  const handleLoadMore = useCallback(() => {
     if (isLoadingMore || loading || !hasMore || debouncedQuery.trim()) return;
     setPrevLoadedCount(uniqueProcessedResults.length);
     setIsLoadingMore(true);
     setPage(p => p + 1);
-  };
+  }, [debouncedQuery, hasMore, isLoadingMore, loading, uniqueProcessedResults.length]);
 
-  const observerRef = useRef<IntersectionObserver | null>(null);
+  const observerTargetNodeRef = useRef<HTMLDivElement | null>(null);
 
-  const observerTargetRef = React.useCallback((node: HTMLDivElement | null) => {
-    if (observerRef.current) {
-      observerRef.current.disconnect();
-    }
-    if (node && !isLoadingMore && !loading && hasMore) {
-      observerRef.current = new IntersectionObserver(
-        (entries) => {
-          if (entries[0].isIntersecting && !isLoadingMore && !loading && hasMore) {
-            handleLoadMore();
-          }
-        },
-        { root: containerRef.current || undefined, rootMargin: '400px' }
-      );
-      observerRef.current.observe(node);
-    }
-  }, [isLoadingMore, loading, hasMore, uniqueProcessedResults.length]);
+  const observerTargetRef = useCallback((node: HTMLDivElement | null) => {
+    observerTargetNodeRef.current = node;
+  }, []);
 
   useEffect(() => {
-    return () => {
-      if (observerRef.current) observerRef.current.disconnect();
-    };
-  }, []);
+    const node = observerTargetNodeRef.current;
+    if (!node || isLoadingMore || loading || !hasMore || debouncedQuery.trim()) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          handleLoadMore();
+        }
+      },
+      { root: containerRef.current || undefined, rootMargin: '400px' }
+    );
+    observer.observe(node);
+
+    return () => observer.disconnect();
+  }, [debouncedQuery, handleLoadMore, hasMore, isLoadingMore, loading]);
 
   const searchQuery = query;
   const setSearchQuery = setQuery;
 
   return (
     <div className="relative flex-1 h-full bg-transparent text-white max-w-2xl mx-auto w-full overflow-hidden flex flex-col">
-      {/* Scroll to Top Button */}
       <button
         onClick={() => {
           containerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1197,7 +1170,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
         <ArrowUp size={18} className="text-white stroke-[2.5]" />
       </button>
 
-      {/* Offline Banner */}
       {isOffline && (
         <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center gap-2 text-amber-400 text-xs font-medium">
           <WifiOff size={14} />
@@ -1205,7 +1177,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
         </div>
       )}
 
-      {/* Main Content */}
       <div 
         ref={containerRef}
         className={cn(
@@ -1217,7 +1188,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Section Top 10 (Full Width Hero Cards Carousel) */}
         {!debouncedQuery.trim() && top10.length > 0 && (activeCategory === 'Tout' || activeCategory === 'Séries' || activeCategory === 'Films' || activeCategory === 'Pépites' || activeCategory === 'Au cinéma') && (
           <div>
             <div className="relative w-full">
@@ -1243,7 +1213,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
                 ))}
               </div>
 
-              {/* Carousel Pagination Dots */}
               {top10.length > 1 && (
                 <div className="flex justify-center items-center gap-1.5 mt-3 mb-2">
                   {top10.map((_, idx) => (
@@ -1271,7 +1240,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
           </div>
         )}
 
-        {/* Categories Bar (Explore Mode Only) */}
         {!debouncedQuery.trim() && (
           <div className="px-2.5 sm:px-4">
             <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none px-0.5">
@@ -1293,7 +1261,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
           </div>
         )}
 
-        {/* Section Résultats */}
         <div className="px-2.5 sm:px-4 space-y-4">
           <div className="flex items-center justify-between mb-2 px-1">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
@@ -1447,7 +1414,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
           ) : processedResults.length > 0 ? (
             debouncedQuery.trim() && activeCategory === 'Tout' ? (
               <div className="space-y-6">
-                {/* Section Personnes */}
                 {personResults.length > 0 && (
                   <div className="space-y-2.5">
                     <div className="flex items-center justify-between px-1">
@@ -1482,7 +1448,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
                   </div>
                 )}
 
-                {/* Section Séries */}
                 {seriesResults.length > 0 && (
                   <div className="space-y-2.5">
                     <div className="flex items-center justify-between px-1">
@@ -1521,7 +1486,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
                   </div>
                 )}
 
-                {/* Section Films */}
                 {movieResults.length > 0 && (
                   <div className="space-y-2.5">
                     <div className="flex items-center justify-between px-1">
@@ -1634,7 +1598,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
         </div>
       </div>
 
-      {/* FLOATING BOTTOM SEARCH BAR */}
       <div 
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -1645,7 +1608,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
         )}
       >
         <div className="flex flex-col gap-3 pointer-events-auto px-4 max-w-md mx-auto w-full">
-          
           <div className="bg-[#1C1C1E]/95 backdrop-blur-xl border border-white/5 rounded-[1.75rem] p-1.5 flex items-center gap-2 shadow-[0_8px_30px_rgb(0,0,0,0.5)]">
             <div className={cn("flex items-center gap-1", (hasActiveFilters || activeCategory !== 'Tout') ? "bg-[#E5A93D]/20" : "bg-white/5", "rounded-full transition-colors shrink-0")}>
               <button 
@@ -1691,11 +1653,9 @@ export function DiscoverScreen({ onShowClick }: Props) {
               </button>
             )}
           </div>
-
         </div>
       </div>
 
-      {/* Swipe up gesture receiver when search bar is hidden */}
       {!isSearchVisible && (
         <div
           onTouchStart={handleTouchStart}
@@ -1706,7 +1666,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
         />
       )}
 
-      {/* Modal Preview Rapide */}
       {previewMedia && (
         <PreviewModal 
           media={previewMedia}
@@ -1723,7 +1682,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
         />
       )}
 
-      {/* Modal Détails Personne */}
       {selectedPersonId && (
         <PersonDetailModal
           personId={selectedPersonId}
@@ -1741,7 +1699,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
         />
       )}
 
-      {/* Modal Trailer */}
       {trailerModalVideos && (
         <TrailerModal 
           videos={trailerModalVideos} 
@@ -1749,7 +1706,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
         />
       )}
 
-      {/* Modal Filtres */}
       {showGenreMenu && (
         <FilterModal 
           onClose={() => setShowGenreMenu(false)} 
@@ -1778,15 +1734,12 @@ const HeroCard = React.memo(function HeroCard({ media, details, onShowClick, onO
   const { showToast } = useToastStore();
 
   const isTv = media.media_type === 'tv' || (!media.media_type && activeCategory !== 'Films');
-  
-  // Logique de disponibilité des films
   const isAtCinema = !isTv && (isMovieAtCinema(media) || isMovieAtCinema(details));
   const isUpcoming = !isTv && (isMovieUpcoming(media) || isMovieUpcoming(details));
 
   const title = media.name || media.title || '';
   const rating = media.vote_average ? media.vote_average.toFixed(1) : details?.vote_average ? details.vote_average.toFixed(1) : null;
   const genres = details?.genres?.slice(0, 2).map((g: any) => g.name).join(' · ');
-  
   const providerName = isTv ? details?.networks?.[0]?.name : details?.production_companies?.[0]?.name;
   const overview = media.overview || details?.overview;
 
@@ -1887,7 +1840,6 @@ const HeroCard = React.memo(function HeroCard({ media, details, onShowClick, onO
         buttonStyleClass = "bg-[#E5A93D] text-black hover:bg-[#f3b94c] shadow-[0_4px_15px_rgba(229,169,61,0.25)]";
       }
     } else {
-      // Movie
       const hasSeenMovie = seenCount > 0;
       if (hasSeenMovie) {
         isCompleted = true;
@@ -1911,27 +1863,19 @@ const HeroCard = React.memo(function HeroCard({ media, details, onShowClick, onO
       onClick={() => onShowClick(media.id, isTv ? 'tv' : 'movie')}
       className="relative w-full aspect-[4/3] sm:aspect-video overflow-hidden cursor-pointer group snap-center shrink-0 bg-zinc-900"
     >
-      {/* Image de fond */}
       <img
         src={`https://image.tmdb.org/t/p/w780${media.backdrop_path || media.poster_path}`}
         alt={title}
         className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
       />
-      
-      {/* DÉGRADÉ AJUSTÉ : Monte un peu plus haut (75%) avec un 'via-black/75' pour bien contraster le texte clair sans assombrir brutalement */}
       <div className="absolute bottom-0 inset-x-0 h-[75%] bg-gradient-to-t from-black via-black/75 to-transparent pointer-events-none" />
 
-      {/* RUBAN TOP 10 */}
       <div className="absolute top-0 right-0 bg-[#E5A93D] text-black px-4 py-2.5 rounded-bl-[24px] shadow-[-4px_4px_20px_rgba(229,169,61,0.3)] flex flex-col items-center justify-center z-20">
         <span className="text-xl sm:text-2xl font-black leading-none tracking-tighter">#{rank}</span>
       </div>
 
-      {/* CONTENU */}
       <div className="absolute bottom-0 inset-x-0 px-5 pb-2 flex flex-col justify-end z-10 w-full">
-        
-        {/* Ligne des Badges Colorés */}
         <div className="flex flex-wrap items-center gap-2 mb-1.5">
-          {/* Badge Type (Série/Film) */}
           <span className={cn(
             "text-[10px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1.5 uppercase tracking-wider shadow-sm",
             isTv ? "bg-indigo-600 text-white" : "bg-rose-600 text-white"
@@ -1940,15 +1884,14 @@ const HeroCard = React.memo(function HeroCard({ media, details, onShowClick, onO
             {isTv ? 'Série' : 'Film'}
           </span>
 
-          {/* Badge Disponibilité (Uniquement pour les films) */}
           {!isTv && (
             <span className={cn(
               "text-[9px] font-extrabold px-2 py-1 rounded-md flex items-center gap-1 uppercase tracking-widest shadow-sm",
               isAtCinema 
-                ? "bg-[#E5A93D] text-black" // Doré pour le cinéma
+                ? "bg-[#E5A93D] text-black"
                 : isUpcoming
-                ? "bg-purple-600 text-white" // Violet pour À venir
-                : "bg-emerald-600 text-white" // Vert pour dispo canapé
+                ? "bg-purple-600 text-white"
+                : "bg-emerald-600 text-white"
             )}>
               {isAtCinema ? <Ticket size={10} className="text-black" /> : isUpcoming ? <Calendar size={10} className="text-white" /> : <MonitorPlay size={10} />}
               {isAtCinema ? 'Au Cinéma' : isUpcoming ? 'À Venir' : 'Disponible'}
@@ -1956,12 +1899,10 @@ const HeroCard = React.memo(function HeroCard({ media, details, onShowClick, onO
           )}
         </div>
 
-        {/* Titre (Taille réduite : text-2xl au lieu de 3xl) */}
         <h2 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight leading-[1.05] mb-1 line-clamp-2 drop-shadow-xl">
           {title}
         </h2>
         
-        {/* SYNOPSIS INLINE (Compacté, mb-2) */}
         {overview && (
           <div 
             onClick={(e) => {
@@ -1981,7 +1922,6 @@ const HeroCard = React.memo(function HeroCard({ media, details, onShowClick, onO
           </div>
         )}
 
-        {/* Rangée Métadonnées */}
         <div className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-400 mb-2 w-full overflow-hidden">
           {rating && (
             <div className="flex items-center gap-1 shrink-0">
@@ -1999,7 +1939,6 @@ const HeroCard = React.memo(function HeroCard({ media, details, onShowClick, onO
           )}
         </div>
 
-        {/* BOUTONS D'ACTION (Ancrés sur toute la largeur) */}
         <div className="flex items-center gap-3 w-full mt-1">
           <button 
             onClick={(e) => {
@@ -2034,7 +1973,6 @@ const HeroCard = React.memo(function HeroCard({ media, details, onShowClick, onO
             <span className="truncate">Trailer</span>
           </button>
         </div>
-
       </div>
     </div>
   );

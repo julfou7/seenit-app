@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useShows } from '../hooks/useShows';
 import { GridMediaCard, PreviewModal } from '../components/GridMediaCard';
 import { type TMDBMedia, isMovieAtCinema } from '../features/shows/tmdb';
@@ -15,6 +15,73 @@ interface Props {
   isEmbedded?: boolean;
 }
 
+const LIBRARY_ROW_BATCH_SIZE = 12;
+
+const getMediaKey = (mediaType: string | undefined, id: string | number) =>
+  `${mediaType === 'movie' ? 'movie' : 'tv'}:${Number(id)}`;
+
+interface LibraryRowProps {
+  data: TMDBMedia[];
+  showsByMediaKey: Map<string, Show>;
+  onShowClick: (id: any, mediaType?: 'tv' | 'movie') => void;
+  onToggleWatched: (media: TMDBMedia) => void;
+  onLongPress: (media: TMDBMedia) => void;
+  onAddClick: (media: TMDBMedia) => void;
+}
+
+const LibraryRow = React.memo(function LibraryRow({
+  data,
+  showsByMediaKey,
+  onShowClick,
+  onToggleWatched,
+  onLongPress,
+  onAddClick,
+}: LibraryRowProps) {
+  const [visibleCount, setVisibleCount] = useState(() => Math.min(LIBRARY_ROW_BATCH_SIZE, data.length));
+
+  useEffect(() => {
+    setVisibleCount(current => Math.min(Math.max(current, LIBRARY_ROW_BATCH_SIZE), data.length));
+  }, [data.length]);
+
+  const handleHorizontalScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    if (visibleCount >= data.length) return;
+    const element = event.currentTarget;
+    const preloadDistance = Math.max(element.clientWidth, 1);
+    if (element.scrollLeft + element.clientWidth >= element.scrollWidth - preloadDistance) {
+      setVisibleCount(current => Math.min(data.length, current + LIBRARY_ROW_BATCH_SIZE));
+    }
+  }, [data.length, visibleCount]);
+
+  return (
+    <div
+      className="flex overflow-x-auto hide-scrollbar px-4 sm:px-6 scroll-px-4 sm:scroll-px-6 gap-1.5 sm:gap-1.5 pb-2 snap-x snap-mandatory"
+      onScroll={handleHorizontalScroll}
+    >
+      {data.slice(0, visibleCount).map(media => {
+        const show = showsByMediaKey.get(getMediaKey(media.media_type, media.id));
+        return (
+          <div
+            key={getMediaKey(media.media_type, media.id)}
+            className="w-[calc((100vw-2rem-12px)/3)] sm:w-[calc((100vw-3rem-18px)/4)] md:w-[calc((100vw-3rem-24px)/5)] lg:w-[calc((100vw-3rem-30px)/6)] xl:w-[calc((100vw-3rem-36px)/7)] 2xl:w-[calc((100vw-3rem-42px)/8)] shrink-0 snap-start"
+          >
+            <GridMediaCard
+              media={media}
+              show={show}
+              hideBadges={true}
+              showProgress={true}
+              onShowClick={onShowClick}
+              onToggleWatched={onToggleWatched}
+              onLongPress={onLongPress}
+              onAddClick={onAddClick}
+            />
+          </div>
+        );
+      })}
+      <div className="w-2 shrink-0" />
+    </div>
+  );
+});
+
 export function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
   const { shows, addShow, deleteShow } = useShows();
   const updateShow = useShowsStore(state => state.updateShowOptimistic);
@@ -23,11 +90,30 @@ export function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
   const [previewMedia, setPreviewMedia] = useState<TMDBMedia | null>(null);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
-  const handleAddMedia = async (media: TMDBMedia) => {
-    const existing = shows.find(s => s.tmdbId === media.id);
+  const showsByMediaKey = useMemo(() => {
+    const map = new Map<string, Show>();
+    for (const show of shows) {
+      if (show.tmdbId != null) {
+        map.set(getMediaKey(show.mediaType, show.tmdbId), show);
+      }
+    }
+    return map;
+  }, [shows]);
+
+  const handleShowClick = useCallback((id: any, mediaType?: 'tv' | 'movie') => {
+    onShowClick(String(id), mediaType);
+  }, [onShowClick]);
+
+  const handleLongPress = useCallback((media: TMDBMedia) => {
+    setPreviewMedia(media);
+  }, []);
+
+  const handleAddMedia = useCallback(async (media: TMDBMedia) => {
+    const isTv = media.media_type === 'tv' || media.first_air_date !== undefined;
+    const mediaType = isTv ? 'tv' : 'movie';
+    const existing = showsByMediaKey.get(getMediaKey(mediaType, media.id));
     if (existing) return;
 
-    const isTv = media.media_type === 'tv' || media.first_air_date !== undefined;
     const titleToUse = media.name || media.title || media.original_name || media.original_title || '';
 
     const newShowData: any = {
@@ -37,7 +123,7 @@ export function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
       backdropPath: media.backdrop_path,
       year: (media.first_air_date || media.release_date || '').substring(0, 4),
       rating: media.vote_average,
-      mediaType: isTv ? 'tv' : 'movie',
+      mediaType,
       seasonRecords: {},
       episodeRecords: {},
       status: isTv ? 'plan_to_watch' : 'watching',
@@ -60,13 +146,14 @@ export function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
         }
       }
     );
-  };
+  }, [addShow, deleteShow, showToast, showsByMediaKey]);
 
-  const handleToggleWatched = async (media: TMDBMedia) => {
-    const existingShow = shows.find(s => s.tmdbId === media.id);
+  const handleToggleWatched = useCallback(async (media: TMDBMedia) => {
+    const isTv = media.media_type === 'tv' || media.first_air_date !== undefined;
+    const mediaType = isTv ? 'tv' : 'movie';
+    const existingShow = showsByMediaKey.get(getMediaKey(mediaType, media.id));
     if (!existingShow) return;
 
-    const isTv = media.media_type === 'tv' || media.first_air_date !== undefined;
     const titleToUse = media.name || media.title || '';
 
     if (isTv) {
@@ -86,8 +173,8 @@ export function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
           updatedAt: Date.now()
         });
         showToast(
-          `« ${titleToUse} » remis dans "À voir"`, 
-          'success', 
+          `« ${titleToUse} » remis dans "À voir"`,
+          'success',
           existingShow,
           async () => {
             await updateShow(existingShow.id, {
@@ -105,8 +192,8 @@ export function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
           updatedAt: Date.now()
         });
         showToast(
-          `« ${titleToUse} » remis dans "À voir"`, 
-          'success', 
+          `« ${titleToUse} » remis dans "À voir"`,
+          'success',
           existingShow,
           async () => {
             await updateShow(existingShow.id, {
@@ -120,10 +207,10 @@ export function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
     } else {
       const isCurrentlySeen = existingShow.status === 'completed' || existingShow.seenEpisodes?.includes('movie');
       const newStatus = isCurrentlySeen ? 'plan_to_watch' : 'completed';
-      const newSeenEpisodes = isCurrentlySeen 
+      const newSeenEpisodes = isCurrentlySeen
         ? (existingShow.seenEpisodes || []).filter((e: string) => e !== 'movie')
         : Array.from(new Set([...(existingShow.seenEpisodes || []), 'movie']));
-      
+
       const oldStatus = existingShow.status;
       const oldSeenEpisodes = existingShow.seenEpisodes || [];
 
@@ -133,8 +220,8 @@ export function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
         updatedAt: Date.now()
       });
       showToast(
-        isCurrentlySeen ? `« ${titleToUse} » marqué comme non vu` : `« ${titleToUse} » marqué comme vu`, 
-        'success', 
+        isCurrentlySeen ? `« ${titleToUse} » marqué comme non vu` : `« ${titleToUse} » marqué comme vu`,
+        'success',
         existingShow,
         async () => {
           await updateShow(existingShow.id, {
@@ -145,7 +232,7 @@ export function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
         }
       );
     }
-  };
+  }, [showToast, showsByMediaKey, updateShow]);
 
   const sections = useMemo(() => {
     const toMedia = (s: any): TMDBMedia => ({
@@ -162,18 +249,15 @@ export function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
 
     const todayStr = getTodayStr();
 
-    // 1. Mes Favoris (EN PREMIER)
     const favorites = shows.filter(s => s.isFavorite);
 
-    // 2. Séries en cours (au moins 1 épisode vu, et non terminées/à jour)
     const watching = shows.filter(
-      s => s.mediaType === 'tv' && 
-      (s.seenEpisodes?.length || 0) > 0 && 
-      !checkIsUpToDate(s) && 
+      s => s.mediaType === 'tv' &&
+      (s.seenEpisodes?.length || 0) > 0 &&
+      !checkIsUpToDate(s) &&
       s.status !== 'dropped'
     );
 
-    // Séries pas encore sorties (première diffusion future ou 0 épisode diffusé)
     const isTvUpcoming = (s: any) => {
       if (s.mediaType !== 'tv') return false;
       if ((s.seenEpisodes?.length || 0) > 0) return false;
@@ -182,48 +266,41 @@ export function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
       return false;
     };
 
-    // 3. Séries à commencer (déjà sorties, 0 épisode vu)
     const toStartTv = shows.filter(
-      s => s.mediaType === 'tv' && 
-      (s.seenEpisodes?.length || 0) === 0 && 
-      !checkIsUpToDate(s) && 
+      s => s.mediaType === 'tv' &&
+      (s.seenEpisodes?.length || 0) === 0 &&
+      !checkIsUpToDate(s) &&
       !isTvUpcoming(s) &&
       s.status !== 'dropped'
     );
 
-    // 4. Séries à venir (pas encore sorties)
     const upcomingTv = shows.filter(
       s => isTvUpcoming(s) && s.status !== 'dropped'
     );
 
-    // Films actuellement à voir au cinéma
     const isCinemaMovie = (s: any) => {
       if (s.mediaType !== 'movie') return false;
       if (s.status === 'completed' || s.seenEpisodes?.includes('movie')) return false;
       return isMovieAtCinema(s) || isMovieAtCinema(toMedia(s));
     };
 
-    // 5. Films au cinéma
     const toWatchCinema = shows.filter(isCinemaMovie);
 
-    // 6. Autres films à voir (streaming / VOD / maison)
     const toWatchMovie = shows.filter(
-      s => s.mediaType === 'movie' && 
-      s.status !== 'completed' && 
+      s => s.mediaType === 'movie' &&
+      s.status !== 'completed' &&
       !(s.seenEpisodes?.includes('movie')) &&
       !isCinemaMovie(s)
     );
 
-    // 7. Séries à jour (tous les épisodes sortis ont été vus)
     const upToDate = shows.filter(
-      s => s.mediaType === 'tv' && 
-      (checkIsUpToDate(s) || s.status === 'completed') && 
+      s => s.mediaType === 'tv' &&
+      (checkIsUpToDate(s) || s.status === 'completed') &&
       s.status !== 'dropped'
     );
 
-    // 8. Films vus
     const completedMovies = shows.filter(
-      s => s.mediaType === 'movie' && 
+      s => s.mediaType === 'movie' &&
       (s.status === 'completed' || s.seenEpisodes?.includes('movie'))
     );
 
@@ -262,86 +339,73 @@ export function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
         </div>
       ) : (
         <div className="space-y-8 pb-2">
-          {sections.map(section => {
-            const Icon = section.icon;
-            return (
-              <div key={section.id} className="space-y-3">
-                <div className="px-4 sm:px-6 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-                      <span className="text-base">{section.emoji}</span>
-                      <span>{section.title}</span>
-                    </h2>
-                  </div>
-                  {section.data.length > 3 && (
-                    <button 
-                      onClick={() => setExpandedSection(expandedSection === section.id ? null : section.id)}
-                      className="text-xs font-bold text-[#E5A93D] hover:underline cursor-pointer"
-                    >
-                      {expandedSection === section.id ? 'Réduire' : 'Voir tout'}
-                    </button>
-                  )}
+          {sections.map(section => (
+            <div key={section.id} className="space-y-3">
+              <div className="px-4 sm:px-6 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+                    <span className="text-base">{section.emoji}</span>
+                    <span>{section.title}</span>
+                  </h2>
                 </div>
-                
-                {expandedSection === section.id ? (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-x-1.5 gap-y-4 px-4 sm:px-6">
-                    {section.data.map((media, idx) => {
-                      const show = shows.find(s => s.tmdbId === media.id);
-                      return (
-                        <GridMediaCard
-                          key={`${media.id}_${idx}`}
-                          media={media}
-                          show={show}
-                          hideBadges={true}
-                          showProgress={true}
-                          onShowClick={(id) => onShowClick(String(id), media.media_type as any)}
-                          onToggleWatched={handleToggleWatched}
-                          onLongPress={(m) => setPreviewMedia(m)}
-                          onAddClick={handleAddMedia}
-                        />
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="flex overflow-x-auto hide-scrollbar px-4 sm:px-6 scroll-px-4 sm:scroll-px-6 gap-1.5 sm:gap-1.5 pb-2 snap-x snap-mandatory">
-                    {section.data.map((media, idx) => {
-                      const show = shows.find(s => s.tmdbId === media.id);
-                      return (
-                        <div key={`${media.id}_${idx}`} className="w-[calc((100vw-2rem-12px)/3)] sm:w-[calc((100vw-3rem-18px)/4)] md:w-[calc((100vw-3rem-24px)/5)] lg:w-[calc((100vw-3rem-30px)/6)] xl:w-[calc((100vw-3rem-36px)/7)] 2xl:w-[calc((100vw-3rem-42px)/8)] shrink-0 snap-start">
-                          <GridMediaCard
-                            media={media}
-                            show={show}
-                            hideBadges={true}
-                            showProgress={true}
-                            onShowClick={(id) => onShowClick(String(id), media.media_type as any)}
-                            onToggleWatched={handleToggleWatched}
-                            onLongPress={(m) => setPreviewMedia(m)}
-                            onAddClick={handleAddMedia}
-                          />
-                        </div>
-                      );
-                    })}
-                    <div className="w-2 shrink-0" />
-                  </div>
+                {section.data.length > 3 && (
+                  <button
+                    onClick={() => setExpandedSection(expandedSection === section.id ? null : section.id)}
+                    className="text-xs font-bold text-[#E5A93D] hover:underline cursor-pointer"
+                  >
+                    {expandedSection === section.id ? 'Réduire' : 'Voir tout'}
+                  </button>
                 )}
               </div>
-            );
-          })}
+
+              {expandedSection === section.id ? (
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-x-1.5 gap-y-4 px-4 sm:px-6">
+                  {section.data.map(media => {
+                    const show = showsByMediaKey.get(getMediaKey(media.media_type, media.id));
+                    return (
+                      <GridMediaCard
+                        key={getMediaKey(media.media_type, media.id)}
+                        media={media}
+                        show={show}
+                        hideBadges={true}
+                        showProgress={true}
+                        onShowClick={handleShowClick}
+                        onToggleWatched={handleToggleWatched}
+                        onLongPress={handleLongPress}
+                        onAddClick={handleAddMedia}
+                      />
+                    );
+                  })}
+                </div>
+              ) : (
+                <LibraryRow
+                  data={section.data}
+                  showsByMediaKey={showsByMediaKey}
+                  onShowClick={handleShowClick}
+                  onToggleWatched={handleToggleWatched}
+                  onLongPress={handleLongPress}
+                  onAddClick={handleAddMedia}
+                />
+              )}
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Modal de prévisualisation au clic long */}
       {previewMedia && (
         <PreviewModal
           media={previewMedia}
-          isAdded={shows.some(s => s.tmdbId === previewMedia.id)}
-          isWatched={shows.some(s => s.tmdbId === previewMedia.id && (s.status === 'completed' || checkIsUpToDate(s) || s.seenEpisodes?.includes('movie')))}
+          isAdded={showsByMediaKey.has(getMediaKey(previewMedia.media_type, previewMedia.id))}
+          isWatched={(() => {
+            const show = showsByMediaKey.get(getMediaKey(previewMedia.media_type, previewMedia.id));
+            return Boolean(show && (show.status === 'completed' || checkIsUpToDate(show) || show.seenEpisodes?.includes('movie')));
+          })()}
           onClose={() => setPreviewMedia(null)}
           onAddClick={handleAddMedia}
           onToggleWatched={handleToggleWatched}
           onShowClick={(id, mediaType) => {
             setPreviewMedia(null);
-            onShowClick(String(id), mediaType);
+            handleShowClick(id, mediaType);
           }}
         />
       )}
