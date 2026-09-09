@@ -70,9 +70,10 @@ export async function prunePendingMediaReminderNotifications(
 
 /**
  * Programme un rappel média Android sans faire transiter d'octets d'image dans
- * le pont Capacitor. L'affiche locale sert de largeIcon ; une seconde URI locale
- * distincte est transmise comme attachment SeenIt et le patch natif la rend en
- * BigPictureStyle après décodage borné. La PWA conserve le chemin générique.
+ * le pont Capacitor. L'affiche locale sert de largeIcon ; l'URI locale du visuel
+ * disponible est aussi transmise comme attachment SeenIt afin que le poster de
+ * fallback puisse lui aussi être rendu en BigPictureStyle. Le patch natif garde
+ * un décodage borné et la PWA conserve le chemin générique.
  */
 export async function sendMediaReminderNotification(
   title: string,
@@ -105,7 +106,9 @@ export async function sendMediaReminderNotification(
 
     const imageUrl = options.image;
     const iconUrl = options.icon;
-    const attachments = imageUrl && imageUrl !== iconUrl
+    // imageUrl peut volontairement être le même fichier local que largeIcon :
+    // dans ce cas il constitue le poster de fallback du BigPicture natif.
+    const attachments = imageUrl
       ? [{ id: 'seenit-media', url: imageUrl }]
       : undefined;
     const extraData = options.data || {

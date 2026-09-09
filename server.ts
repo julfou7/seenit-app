@@ -7,7 +7,6 @@ import { getMessaging } from "firebase-admin/messaging";
 import { adminAuth, adminDb } from "./src/lib/firebase-admin.ts";
 import { processReleaseUpdateNotificationRequest } from "./src/features/release/releaseUpdatePushBackend.ts";
 import { DecodedIdToken } from "firebase-admin/auth";
-import multer from "multer";
 import dns from "node:dns/promises";
 import net from "node:net";
 import http from "node:http";
@@ -490,7 +489,6 @@ async function startServer() {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   registerMediaProviderRoutes(app, { authenticate: requireAuth });
-  const upload = multer();
 
   const handleResolveSlug = async (req: express.Request, res: express.Response) => {
     console.log('[Plex Resolve Backend] --- DÉBUT DE LA RÉSOLUTION DU SLUG PLEX ---');
@@ -579,7 +577,7 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.125',
+        'X-Plex-Version': '1.4.126',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
