@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, ChevronDown, Star, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface EpisodeRatingsChartProps {
   effectiveTmdbId: number | string | null;
-  /** Conservé comme identifiant technique de compatibilité ; aucune note IMDb n'est chargée. */
+  /** Identifiant technique conservé pour compatibilité d'appel ; aucune note IMDb n'est chargée. */
   imdbId?: string | null;
   seasons: any[];
   seasonsCache: Record<number, any>;
@@ -15,48 +16,18 @@ interface EpisodeRatingsChartProps {
 
 export const getRatingColor = (voteAverage: number | undefined | null) => {
   if (voteAverage === undefined || voteAverage === null || voteAverage === 0) {
-    return {
-      bg: 'bg-zinc-700/80',
-      text: 'text-zinc-500',
-      border: 'border-zinc-700',
-      fill: '#52525b',
-      label: 'Non noté',
-    };
+    return { bg: 'bg-zinc-700/80', text: 'text-zinc-500', border: 'border-zinc-700', fill: '#52525b', label: 'Non noté' };
   }
   if (voteAverage >= 8.5) {
-    return {
-      bg: 'bg-[#34d399]',
-      text: 'text-[#34d399]',
-      border: 'border-[#34d399]/40',
-      fill: '#34d399',
-      label: 'Excellent',
-    };
+    return { bg: 'bg-[#34d399]', text: 'text-[#34d399]', border: 'border-[#34d399]/40', fill: '#34d399', label: 'Excellent' };
   }
   if (voteAverage >= 7.5) {
-    return {
-      bg: 'bg-emerald-600/80',
-      text: 'text-emerald-400',
-      border: 'border-emerald-500/30',
-      fill: '#059669',
-      label: 'Très bon',
-    };
+    return { bg: 'bg-emerald-600/80', text: 'text-emerald-400', border: 'border-emerald-500/30', fill: '#059669', label: 'Très bon' };
   }
   if (voteAverage >= 6.5) {
-    return {
-      bg: 'bg-amber-500/70',
-      text: 'text-amber-400',
-      border: 'border-amber-500/30',
-      fill: '#f59e0b',
-      label: 'Bon',
-    };
+    return { bg: 'bg-amber-500/70', text: 'text-amber-400', border: 'border-amber-500/30', fill: '#f59e0b', label: 'Bon' };
   }
-  return {
-    bg: 'bg-rose-950/80 border border-rose-500/40',
-    text: 'text-rose-400/90',
-    border: 'border-rose-500/30',
-    fill: '#881337',
-    label: 'Faible',
-  };
+  return { bg: 'bg-rose-950/80 border border-rose-500/40', text: 'text-rose-400/90', border: 'border-rose-500/30', fill: '#881337', label: 'Faible' };
 };
 
 export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.memo(({
@@ -68,6 +39,7 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
   defaultSeasonNumber,
 }) => {
   const validSeasons = useMemoSeasons(seasons);
+  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const [selectedSeasonNum, setSelectedSeasonNum] = useState<number>(() => {
     if (defaultSeasonNumber !== undefined && validSeasons.some(s => s.season_number === defaultSeasonNumber)) {
       return defaultSeasonNumber;
@@ -77,6 +49,38 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
   const [activeEpisode, setActiveEpisode] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSeasonPickerOpen, setIsSeasonPickerOpen] = useState(false);
+
+  useEffect(() => {
+    let host: HTMLElement | null = null;
+    const place = () => {
+      const section = document.getElementById('section-episodes');
+      if (!section) return false;
+      const headingRow = section.firstElementChild as HTMLElement | null;
+      host = section.querySelector<HTMLElement>(':scope > [data-seenit-ratings-host="true"]');
+      if (!host) {
+        host = document.createElement('div');
+        host.dataset.seenitRatingsHost = 'true';
+        host.className = 'w-full';
+        if (headingRow?.nextSibling) section.insertBefore(host, headingRow.nextSibling);
+        else section.appendChild(host);
+      }
+      setPortalHost(host);
+      return true;
+    };
+
+    if (!place()) {
+      const observer = new MutationObserver(() => {
+        if (place()) observer.disconnect();
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+      return () => {
+        observer.disconnect();
+        host?.remove();
+      };
+    }
+
+    return () => host?.remove();
+  }, [effectiveTmdbId]);
 
   useEffect(() => {
     if (validSeasons.length > 0 && !validSeasons.some(s => s.season_number === selectedSeasonNum)) {
@@ -115,10 +119,10 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
     };
   }, [episodes]);
 
-  if (!validSeasons.length) return null;
+  if (!validSeasons.length || !portalHost) return null;
 
-  return (
-    <section className="bg-zinc-900/90 border border-white/10 rounded-2xl p-3.5 space-y-3 shadow-xl w-full overflow-hidden">
+  const chart = (
+    <section className="bg-zinc-900/90 border border-white/10 rounded-2xl p-3.5 space-y-3 shadow-xl w-full overflow-hidden" aria-label="Notes des épisodes">
       <div className="flex items-center justify-between gap-3 pb-2 border-b border-white/5">
         <div className="min-w-0">
           <h3 className="text-xs font-extrabold text-white uppercase tracking-wider">Notes par épisode</h3>
@@ -146,9 +150,7 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
                   onClick={() => setSelectedSeasonNum(season.season_number)}
                   className={cn(
                     'min-w-11 min-h-11 px-2 rounded-xl text-[11px] font-bold transition-all shrink-0',
-                    selected
-                      ? 'bg-amber-500 text-zinc-950 font-black'
-                      : 'bg-zinc-800/80 text-zinc-400 border border-white/5 hover:text-white',
+                    selected ? 'bg-amber-500 text-zinc-950 font-black' : 'bg-zinc-800/80 text-zinc-400 border border-white/5 hover:text-white',
                   )}
                   aria-pressed={selected}
                 >
@@ -186,8 +188,7 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
                 const validRating = Number.isFinite(rating) && rating > 0 ? rating : 0;
                 const height = validRating > 0 ? Math.max(12, (validRating / 10) * 86) : 10;
                 const color = getRatingColor(validRating);
-                const active = activeEpisode?.id === episode.id
-                  || activeEpisode?.episode_number === episode.episode_number;
+                const active = activeEpisode?.id === episode.id || activeEpisode?.episode_number === episode.episode_number;
                 const episodeLabel = `E${String(episode.episode_number ?? 0).padStart(2, '0')}`;
 
                 return (
@@ -212,9 +213,7 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
                         style={{ height: `${height}%` }}
                       />
                     </span>
-                    <span className={cn('text-[10px] font-semibold', active ? 'text-white' : 'text-zinc-500')}>
-                      {episodeLabel}
-                    </span>
+                    <span className={cn('text-[10px] font-semibold', active ? 'text-white' : 'text-zinc-500')}>{episodeLabel}</span>
                   </button>
                 );
               })}
@@ -228,12 +227,8 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
               className="w-full min-h-11 bg-zinc-800/60 border border-white/10 hover:border-amber-500/30 hover:bg-zinc-800/90 rounded-xl px-3 py-2.5 flex items-center justify-between gap-3 text-left transition-all"
             >
               <div className="min-w-0">
-                <span className="text-[10px] font-bold uppercase text-amber-400">
-                  Épisode {activeEpisode.episode_number}
-                </span>
-                <p className="text-xs font-semibold text-white truncate mt-0.5">
-                  {activeEpisode.name || `Épisode ${activeEpisode.episode_number}`}
-                </p>
+                <span className="text-[10px] font-bold uppercase text-amber-400">Épisode {activeEpisode.episode_number}</span>
+                <p className="text-xs font-semibold text-white truncate mt-0.5">{activeEpisode.name || `Épisode ${activeEpisode.episode_number}`}</p>
               </div>
               <span className="text-xs font-bold text-blue-300 shrink-0">
                 {Number(activeEpisode.vote_average || 0) > 0 ? Number(activeEpisode.vote_average).toFixed(1) : '–'}
@@ -244,26 +239,11 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
       )}
 
       {isSeasonPickerOpen && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-          onClick={() => setIsSeasonPickerOpen(false)}
-          role="presentation"
-        >
-          <div
-            className="bg-zinc-900 border border-white/10 rounded-2xl w-full max-w-xs p-4 space-y-3 shadow-2xl"
-            onClick={event => event.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Sélectionner une saison"
-          >
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setIsSeasonPickerOpen(false)} role="presentation">
+          <div className="bg-zinc-900 border border-white/10 rounded-2xl w-full max-w-xs p-4 space-y-3 shadow-2xl" onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Sélectionner une saison">
             <div className="flex items-center justify-between pb-2 border-b border-white/10">
               <h4 className="text-sm font-extrabold text-white">Sélectionner une saison</h4>
-              <button
-                type="button"
-                onClick={() => setIsSeasonPickerOpen(false)}
-                className="w-11 h-11 inline-flex items-center justify-center text-zinc-400 hover:text-white rounded-xl hover:bg-white/10"
-                aria-label="Fermer"
-              >
+              <button type="button" onClick={() => setIsSeasonPickerOpen(false)} className="w-11 h-11 inline-flex items-center justify-center text-zinc-400 hover:text-white rounded-xl hover:bg-white/10" aria-label="Fermer">
                 <X size={18} />
               </button>
             </div>
@@ -278,10 +258,7 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
                       setSelectedSeasonNum(season.season_number);
                       setIsSeasonPickerOpen(false);
                     }}
-                    className={cn(
-                      'w-full min-h-11 flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold text-left',
-                      selected ? 'bg-amber-500 text-zinc-950 font-black' : 'text-zinc-300 hover:bg-white/5',
-                    )}
+                    className={cn('w-full min-h-11 flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold text-left', selected ? 'bg-amber-500 text-zinc-950 font-black' : 'text-zinc-300 hover:bg-white/5')}
                   >
                     <span>Saison {season.season_number}</span>
                     {selected && <Check size={16} />}
@@ -294,6 +271,8 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
       )}
     </section>
   );
+
+  return createPortal(chart, portalHost);
 });
 
 function useMemoSeasons(seasons: any[]) {
