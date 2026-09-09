@@ -7,6 +7,7 @@ import { db, FIRESTORE_DATABASE_ID } from './lib/firebase.ts';
 import { installFirestoreIndexedDbRecovery } from './lib/firestoreRecovery.ts';
 import firebaseConfig from '../firebase-applet-config.json';
 import './index.css';
+import './styles/watchlistCarouselUx.css';
 
 import.meta.hot?.dispose(disposeMediaNotificationColdStartReplay);
 

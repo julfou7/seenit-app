@@ -32,6 +32,7 @@ marquées comme livrées décrivent le comportement attendu du runtime courant.
 | Double appui Explorer | Reset + remontée | Recherche vide, catégorie Tout, plateformes/genres vides, âge Tous, note Toutes, tri populaire descendant, hero première carte | Préserver ce raccourci volontaire, montrer son effet ; jamais effacer les préférences du compte. |
 | Double appui Profil | Ferme Réglages/personne + remontée | Le sous-onglet Statistiques/Ma Liste reste inchangé | Ne pas annoncer un retour à Statistiques comme déjà réalisé. Cible à décider dans #178. |
 | Double appui À voir/Télécharger | Remontée | Aucun événement local de reset métier | Préserver filtres/choix de ces écrans. |
+| Carrousel réduit « À Regarder » | Glissement horizontal | Parcourt le lot borné de cartes ; en continuant jusqu'au bout, un marqueur « Voir tout » rend la suite explicite | Snap de proximité seulement, jamais obligatoire. Le vrai bouton « Voir tout » de l'en-tête reste l'alternative accessible vers la liste verticale. |
 | Modal épisode | Glisser vers la gauche | Épisode suivant, puis saison suivante si disponible | Aucune progression vue ajoutée par la navigation. |
 | Modal épisode | Glisser vers la droite | Épisode précédent, puis fin de saison précédente si disponible | Même série exacte ; limites sans bouclage. |
 | Modal épisode | Déplacement > 60 px ou vitesse > 200 | Déclenche précédent/suivant si disponible, sinon retour en place | Seuils observés, pas une certification de confort. Alternatives absentes : #179. |
