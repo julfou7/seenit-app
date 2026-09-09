@@ -1,11 +1,14 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import { terminate } from 'firebase/firestore';
+import { disposeMediaNotificationColdStartReplay } from './features/notifications/mediaNotificationActionColdStart.ts';
 import App from './App.tsx';
 import { db, FIRESTORE_DATABASE_ID } from './lib/firebase.ts';
 import { installFirestoreIndexedDbRecovery } from './lib/firestoreRecovery.ts';
 import firebaseConfig from '../firebase-applet-config.json';
 import './index.css';
+
+import.meta.hot?.dispose(disposeMediaNotificationColdStartReplay);
 
 if (typeof window !== 'undefined') {
   const disposeFirestoreRecovery = installFirestoreIndexedDbRecovery({
