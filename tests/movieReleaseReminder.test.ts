@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   resolveFrenchMovieReleaseReminderDate,
   toLocalReminderDate,
-} from '../src/features/notifications/movieReleaseReminder';
+} from '../src/features/notifications/movieReleaseReminder.ts';
 
 const reminderSource = readFileSync('src/hooks/useRemindersNotifier.ts', 'utf8');
 
