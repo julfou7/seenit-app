@@ -7,7 +7,7 @@ const notificationMediaSource = readFileSync('src/features/notifications/notific
 const mediaReminderSource = readFileSync('src/features/notifications/mediaReminderNotification.ts', 'utf8');
 const nativePatchSource = readFileSync('scripts/patch-local-notifications.cjs', 'utf8');
 
-test('SEENIT-NOTIFICATION-002 affiche un visuel média et un emoji par événement', () => {
+test('SEENIT-NOTIFICATION-002 affiche un visuel média et un seul emoji par événement', () => {
   assert.match(reminderSource, /https:\/\/image\.tmdb\.org\/t\/p\/w154/,
     'l’APK doit utiliser un poster TMDB compact pour le largeIcon');
   assert.match(reminderSource, /https:\/\/image\.tmdb\.org\/t\/p\/w500/,
@@ -17,14 +17,16 @@ test('SEENIT-NOTIFICATION-002 affiche un visuel média et un emoji par événeme
   assert.match(reminderSource, /resolveNotificationMediaVisual\(iconUrl, tvImageUrl\)/,
     'les séries doivent préparer affiche et visuel épisode avant la notification');
 
-  assert.match(reminderSource, /`🆕 \$\{title\}`/);
-  assert.match(reminderSource, /'🆕 Nouvel épisode'/);
-  assert.match(reminderSource, /`📅 \$\{title\}`/);
-  assert.match(reminderSource, /'📅 Nouvelle saison'/);
-  assert.match(reminderSource, /`🎬 \$\{title\}`/);
-  assert.match(reminderSource, /'🎬 Sortie cinéma'/);
-  assert.match(reminderSource, /`📺 \$\{title\}`/);
-  assert.match(reminderSource, /'📺 Sortie DVD \/ VOD'/);
+  assert.match(reminderSource, /title,\n\s+'🆕 Nouvel épisode'/,
+    'le titre média reste sans emoji et le contexte porte l’emoji épisode');
+  assert.match(reminderSource, /title,\n\s+'📅 Nouvelle saison'/,
+    'le titre média reste sans emoji et le contexte porte l’emoji saison');
+  assert.match(reminderSource, /title,\n\s+'🎬 Sortie cinéma'/,
+    'le titre média reste sans emoji et le contexte porte l’emoji cinéma');
+  assert.match(reminderSource, /title,\n\s+'📺 Sortie DVD \/ VOD'/,
+    'le titre média reste sans emoji et le contexte porte l’emoji VOD');
+  assert.doesNotMatch(reminderSource, /`(?:🆕|📅|🎬|📺) \$\{title\}`/,
+    'aucun rappel ne doit dupliquer l’emoji de contexte dans le titre média');
   assert.match(mediaReminderSource, /title: '✓ Marquer comme vu'/,
     'l’action rapide épisode doit rester disponible');
   assert.match(reminderSource, /allowMarkWatched: addActions/,
@@ -43,10 +45,12 @@ test('SEENIT-NOTIFICATION-002 sépare affiche et image riche sans bloquer le fal
 
   assert.match(mediaReminderSource, /largeIcon: iconUrl \|\| undefined/,
     'le largeIcon utilise l’affiche locale compacte');
-  assert.match(mediaReminderSource, /imageUrl && imageUrl !== iconUrl/,
-    'BigPicture n’est demandé que pour une image locale distincte');
+  assert.match(mediaReminderSource, /const attachments = imageUrl\s*\? \[\{ id: 'seenit-media', url: imageUrl \}\]/,
+    'tout visuel local disponible, y compris le poster fallback, doit alimenter BigPicture');
+  assert.doesNotMatch(mediaReminderSource, /imageUrl !== iconUrl/,
+    'un poster partagé avec largeIcon ne doit plus supprimer le BigPicture');
   assert.match(mediaReminderSource, /\{ id: 'seenit-media', url: imageUrl \}/,
-    'le visuel riche traverse uniquement sous forme d’URI locale courte');
+    'le visuel traverse uniquement sous forme d’URI locale courte');
   assert.match(mediaReminderSource, /summaryText: options\.summaryText/,
     'le libellé secondaire Android doit être spécifique à l’événement');
 });
