@@ -4,6 +4,7 @@ import { Browser } from '@capacitor/browser';
 import { AppLauncher } from '@capacitor/app-launcher';
 import { Capacitor } from '@capacitor/core';
 import { appLogger } from '../store/logStore';
+import { buildPlexAndroidPmsDeepLinkFromWebUrl } from './plexExternalUrl';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -39,8 +40,36 @@ export async function openExternalUrl(
     // 1. Gestion Plex : Deep Link Universel via AppLauncher / Browser au lieu de location.href
     if ((targetUrl.includes('plex.tv') || targetUrl.startsWith('plex://')) && !targetUrl.includes('/auth')) {
       appLogger.info('plex', `[Plex DeepLink] Redirection via intent système : ${targetUrl}`);
-      // Sur Android, cibler explicitement Plex avant l’URL universelle évite
-      // que certains appareils ouvrent watch.plex.tv dans le navigateur.
+
+      // Une route app.plex.tv contenant serverId + ratingKey est déjà un locator PMS exact.
+      // Sur Android on la convertit en vrai schéma Plex avant tout intent universel ; si
+      // l'application ne l'accepte pas, le fallback conserve exactement la route Web PMS.
+      const exactPmsAndroidUrl = Capacitor.getPlatform() === 'android'
+        ? buildPlexAndroidPmsDeepLinkFromWebUrl(targetUrl)
+        : null;
+      if (exactPmsAndroidUrl) {
+        try {
+          const nativePlex = await AppLauncher.openUrl({ url: exactPmsAndroidUrl });
+          if (nativePlex?.completed) return true;
+        } catch (err) {
+          appLogger.warn('plex', '[Plex DeepLink] Deep link PMS Android indisponible, fallback Web PMS exact.');
+        }
+
+        try {
+          await Browser.open({ url: targetUrl, windowName: '_system' });
+          return true;
+        } catch (e) {
+          try {
+            window.location.href = targetUrl;
+            return true;
+          } catch {
+            return false;
+          }
+        }
+      }
+
+      // Pour les URL Plex universelles sans locator PMS exact, conserver le comportement
+      // historique qui tente explicitement le package Android avant le navigateur.
       if (Capacitor.getPlatform() === 'android' && /^https?:\/\//i.test(targetUrl)) {
         const plexIntentUrl = `intent://${targetUrl.replace(/^https?:\/\//i, '')}#Intent;scheme=https;package=com.plexapp.android;end`;
         try {
@@ -50,7 +79,7 @@ export async function openExternalUrl(
           appLogger.warn('plex', '[Plex DeepLink] Intent Plex Android indisponible, fallback URL universelle.');
         }
       }
-                    try {
+      try {
         const res = await AppLauncher.openUrl({ url: targetUrl });
         if (res && res.completed) return true;
       } catch (err) {
@@ -490,5 +519,4 @@ export function scrollAllCarouselsToStart() {
   setTimeout(scroll, 250);
   setTimeout(scroll, 500);
 }
-
 
