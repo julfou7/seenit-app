@@ -68,9 +68,10 @@ test('TNR #106 : Tester choisit le prochain épisode réel plutôt que le premie
   assert.equal(sample.isUpcoming, true);
   assert.equal(sample.eventDate, '2026-09-07');
   assert.equal(sample.summaryText, '🆕 Nouvel épisode');
-  assert.equal(sample.notificationTitle, '🆕 Série la plus proche');
+  assert.equal(sample.notificationTitle, 'Série la plus proche');
   assert.match(sample.body, /S03E04/);
-  assert.match(sample.body, /« Demain »/);
+  assert.match(sample.body, /· Demain/);
+  assert.doesNotMatch(sample.body, /Série la plus proche/);
   assert.equal(sample.richImageUrl, 'https://image.tmdb.org/t/p/w500/nearest-still.jpg');
   assert.equal(sample.allowMarkWatched, true);
 });
@@ -107,12 +108,12 @@ test('TNR #106 : Tester Nouvelle saison prend une vraie première de saison et r
   assert.equal(sample.season, 5);
   assert.equal(sample.episode, 1);
   assert.equal(sample.summaryText, '📅 Nouvelle saison');
-  assert.equal(sample.notificationTitle, '📅 Première réelle');
-  assert.match(sample.body, /saison 5/);
+  assert.equal(sample.notificationTitle, 'Première réelle');
+  assert.equal(sample.body, 'Saison 5 dans 7 jours.');
   assert.equal(sample.allowMarkWatched, false);
 });
 
-test('TNR #106 : les tests film respectent les prochaines dates cinéma et VOD calculées', () => {
+test('TNR #106 : cinéma garde une date réelle mais le test VOD reste un aperçu sans date inventée', () => {
   const oldMovie = makeShow({
     id: 'old',
     title: 'Film déjà sorti',
@@ -127,26 +128,21 @@ test('TNR #106 : les tests film respectent les prochaines dates cinéma et VOD c
     mediaType: 'movie',
     firstAirDate: '2026-09-08',
   });
-  const nextVod = makeShow({
-    id: 'vod',
-    title: 'Film VOD proche',
-    tmdbId: 303,
-    mediaType: 'movie',
-    firstAirDate: '2026-05-12',
-  });
 
-  const theaterSample = buildNotificationTestSample([oldMovie, nextTheater, nextVod], 'movie_theater', NOW);
+  const theaterSample = buildNotificationTestSample([oldMovie, nextTheater], 'movie_theater', NOW);
   assert.ok(theaterSample);
   assert.equal(theaterSample.show.title, 'Film cinéma proche');
   assert.equal(theaterSample.eventDate, '2026-09-08');
   assert.equal(theaterSample.summaryText, '🎬 Sortie cinéma');
+  assert.equal(theaterSample.notificationTitle, 'Film cinéma proche');
   assert.equal(theaterSample.allowMarkWatched, false);
 
-  const vodSample = buildNotificationTestSample([oldMovie, nextTheater, nextVod], 'movie_dvd_vod', NOW);
+  const vodSample = buildNotificationTestSample([oldMovie, nextTheater], 'movie_dvd_vod', NOW);
   assert.ok(vodSample);
-  assert.equal(vodSample.show.title, 'Film VOD proche');
-  assert.equal(vodSample.eventDate, '2026-09-09');
+  assert.equal(vodSample.isUpcoming, false);
+  assert.equal(vodSample.eventDate, undefined);
   assert.equal(vodSample.summaryText, '📺 Sortie DVD / VOD');
+  assert.equal(vodSample.notificationTitle, vodSample.show.title);
   assert.equal(vodSample.allowMarkWatched, false);
 });
 
@@ -179,16 +175,34 @@ test('TNR #106 : sans événement futur, Tester garde un fallback média explici
   assert.equal(sample.summaryText, '🆕 Nouvel épisode');
 });
 
-test('TNR #106 : Settings réutilise exactement le pipeline média natif des vrais rappels', () => {
+test('TNR #106 : une affiche absente reste absente et n’est pas remplacée par le logo SeenIt', () => {
+  const noVisual = makeShow({
+    id: 'no-visual',
+    title: 'Sans visuel',
+    tmdbId: 501,
+    mediaType: 'movie',
+    posterPath: undefined,
+    backdropPath: undefined,
+  });
+
+  const sample = buildNotificationTestSample([noVisual], 'movie_dvd_vod', NOW);
+  assert.ok(sample);
+  assert.equal(sample.posterUrl, undefined);
+  assert.equal(sample.richImageUrl, undefined);
+});
+
+test('TNR #106 : Settings réutilise le pipeline natif et distingue succès visuel/fallback/échec', () => {
   const source = readFileSync('src/screens/SettingsScreenCore.tsx', 'utf8');
 
   assert.match(source, /buildNotificationTestSample\(shows, type\)/,
-    'le bouton Tester doit choisir un exemple via le sélecteur dédié');
+    'le bouton de test doit choisir un exemple via le sélecteur dédié');
   assert.match(source, /resolveNotificationMediaVisual\(sample\.posterUrl, sample\.richImageUrl\)/,
-    'le test doit préparer les mêmes URI locales bornées que les vrais rappels');
-  assert.match(source, /sendMediaReminderNotification\(sample\.notificationTitle/,
-    'le test doit passer par le même ordonnanceur média que les vrais rappels');
-  assert.match(source, /summaryText: sample\.summaryText/);
+    'le test doit préparer les mêmes références privées que les vrais rappels');
+  assert.match(source, /const sent = await sendMediaReminderNotification\(sample\.notificationTitle/,
+    'le test doit vérifier le résultat de l’ordonnanceur média');
+  assert.match(source, /const hasVisual = Boolean\(mediaVisual\.icon \|\| mediaVisual\.image\)/);
+  assert.match(source, /🧪 Test ·/);
+  assert.match(source, /fallback texte/);
   assert.match(source, /allowMarkWatched: sample\.allowMarkWatched/,
     'seul le test nouvel épisode doit recevoir l’action Marquer comme vu');
   assert.doesNotMatch(source, /\bsendNativeNotification\b/,
