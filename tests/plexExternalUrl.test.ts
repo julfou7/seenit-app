@@ -4,6 +4,8 @@ import test from 'node:test';
 import { isExactPlexPmsWebUrl } from '../src/lib/plexExternalUrl.ts';
 
 const utilsSource = readFileSync('src/lib/utils.ts', 'utf8');
+const syncPlexSource = readFileSync('src/features/plex/syncPlex.ts', 'utf8');
+const availabilitySource = readFileSync('src/features/plex/plexAvailability.ts', 'utf8');
 const plexExternalUrlSource = readFileSync('src/lib/plexExternalUrl.ts', 'utf8');
 
 test('SEENIT-PLATFORM-001 reconnaît une route PMS Web exacte sans fabriquer de deep link Android', () => {
@@ -33,20 +35,30 @@ test('SEENIT-IDENTITY-001 refuse de fabriquer un locator depuis Discover ou une 
   );
 });
 
-test('SEENIT-PLATFORM-001 ne confond pas lancement de Plex et navigation PMS exacte', () => {
-  const exactLocatorBranch = utilsSource.indexOf("const exactPmsWebUrl");
-  const universalIntentBranch = utilsSource.indexOf('const plexIntentUrl');
+test('SEENIT-PLATFORM-001 ouvre le CTA Plex via Discover vérifié plutôt que le locator PMS', () => {
+  assert.match(availabilitySource, /function toPlexAvailabilityEvidence/);
+  assert.match(availabilitySource, /delete evidence\.plexUrl/);
+  assert.match(availabilitySource, /delete evidence\.watchUrl/);
+  assert.match(availabilitySource, /serverId\?: string/);
+  assert.match(availabilitySource, /ratingKey\?: string/);
+  assert.equal(availabilitySource.includes('buildPlexMediaUrl(info.serverId, info.ratingKey)'), false);
 
-  assert.ok(exactLocatorBranch >= 0, 'la branche locator PMS exacte doit exister');
-  assert.ok(universalIntentBranch > exactLocatorBranch, 'le locator PMS exact doit être traité avant le pseudo-intent universel');
+  const openFunctionStart = syncPlexSource.indexOf('export const openPlexWatchUrl');
+  const purgeFunctionStart = syncPlexSource.indexOf('export const purgeAllPlexSlugsInDb');
+  assert.ok(openFunctionStart >= 0 && purgeFunctionStart > openFunctionStart, 'le parcours d’ouverture Plex doit rester identifiable');
 
-  const exactBranchSource = utilsSource.slice(exactLocatorBranch, universalIntentBranch);
-  assert.match(exactBranchSource, /isExactPlexPmsWebUrl\(targetUrl\)/);
-  assert.match(exactBranchSource, /Browser\.open\(\{ url: targetUrl, windowName: '_system' \}\)/);
-  assert.equal(exactBranchSource.includes('AppLauncher.openUrl'), false);
-  assert.equal(exactBranchSource.includes('completed'), false);
-  assert.equal(exactBranchSource.includes('watch.plex.tv'), false);
-  assert.equal(exactBranchSource.includes('title='), false);
-  assert.equal(exactBranchSource.includes('year='), false);
-  assert.equal(exactBranchSource.includes('autoPlay'), false);
+  const openFunctionSource = syncPlexSource.slice(openFunctionStart, purgeFunctionStart);
+  assert.match(openFunctionSource, /const expectedResolvedFrom = `tmdb:\$\{tmdbId\}`/);
+  assert.match(openFunctionSource, /show\?\.plexResolvedFrom === expectedResolvedFrom/);
+  assert.match(openFunctionSource, /isStrictPlexIdentityMatch\(item, \{ tmdbId, mediaType: type \}\)/);
+  assert.match(openFunctionSource, /data\?\.slug && data\?\.resolvedFrom === expectedResolvedFrom/);
+  assert.match(openFunctionSource, /https:\/\/watch\.plex\.tv\/\$\{type\}\/\$\{resolvedSlug\}/);
+  assert.match(openFunctionSource, /Redirection annulée pour éviter l'accueil/);
+  assert.equal(openFunctionSource.includes("title='"), false);
+  assert.equal(openFunctionSource.includes('year='), false);
+
+  // Le transport générique sait toujours ouvrir une URL PMS explicite lorsqu'une autre
+  // fonctionnalité la lui fournit ; le CTA média, lui, ne reçoit plus cette URL depuis
+  // la disponibilité et poursuit donc vers le slug Discover vérifié.
+  assert.match(utilsSource, /isExactPlexPmsWebUrl\(targetUrl\)/);
 });
