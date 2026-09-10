@@ -1,7 +1,7 @@
 # SeenIt — Référence fonctionnelle canonique
 
-Dernière vérification : 9 septembre 2026
-Baseline observée avant correction : **1.4.125**, `main` `98716256fd046f142031ef8f623eba91f3135fbf`
+Dernière vérification : 10 septembre 2026
+Baseline observée avant correction : **1.4.134**, `main` `575c02c6b520add641d51840abedf90dd7099628`
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : composante obligatoire de la SPEC SeenIt
 
@@ -167,9 +167,10 @@ le fil d'actualités des médias suivis.
 - **Films à voir** reçoit les films suivis non vus dont la sortie n'est pas future.
 
 Les règles exactes de frontière sont dans `seenit.md` §5.1. Chaque carrousel matérialise un premier lot
-de huit cartes. Le scroll horizontal utilise un snap de proximité pour guider sans freiner le geste ;
-en continuant jusqu'au bout du lot, un marqueur terminal **« Voir tout »** indique explicitement l'action
-disponible dans l'en-tête. Cette action ouvre la vue verticale exhaustive, paginée par lots de huit.
+de huit cartes, puis précharge automatiquement la suite par lots lorsque le rail approche de sa fin.
+Le glissement horizontal conserve l'inertie native du geste : aucun scroll-snap n'est appliqué et aucun
+marqueur terminal **« Voir tout »** n'est injecté dans le rail. Le vrai bouton **« Voir tout »** de
+l'en-tête reste l'alternative accessible et ouvre la vue verticale exhaustive, paginée par lots de huit.
 Les médias abandonnés, archivés ou terminés ne reviennent pas dans le parcours actif.
 
 Sur une carte série, un swipe permet de retirer le suivi (avec confirmation) ou d'abandonner la
