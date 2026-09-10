@@ -5,6 +5,8 @@ import { readFileSync } from 'node:fs';
 const watchListSource = readFileSync(new URL('../src/screens/WatchListScreen.tsx', import.meta.url), 'utf8');
 const mainSource = readFileSync(new URL('../src/main.tsx', import.meta.url), 'utf8');
 const carouselUxCss = readFileSync(new URL('../src/styles/watchlistCarouselUx.css', import.meta.url), 'utf8');
+const continueCardSource = readFileSync(new URL('../src/components/cards/ContinueWatchingCard.tsx', import.meta.url), 'utf8');
+const movieCardSource = readFileSync(new URL('../src/components/cards/MovieWatchCard.tsx', import.meta.url), 'utf8');
 
 const WATCHLIST_CAROUSEL_IDS = [
   'continue-watching-carousel',
@@ -63,5 +65,20 @@ test('#229 retire le faux Voir tout terminal et conserve le vrai bouton d’en-t
   assert.ok(
     (watchListSource.match(/'Voir tout'/g) || []).length >= 4,
     'chaque section conserve son vrai bouton Voir tout dans l’en-tête'
+  );
+});
+
+test('#269 stabilise la hauteur des rails quand un titre passe d’une à deux lignes', () => {
+  assert.match(continueCardSource, /line-clamp-2/);
+  assert.match(movieCardSource, /line-clamp-2/);
+  assert.match(
+    carouselUxCss,
+    /\) \.line-clamp-2\s*\{\s*min-block-size:\s*2lh;/,
+    'les titres des quatre rails doivent toujours réserver deux hauteurs de ligne'
+  );
+  assert.doesNotMatch(
+    carouselUxCss,
+    /min-(?:block-size|height):\s*\d+(?:\.\d+)?px/,
+    'la stabilisation ne doit pas reposer sur une hauteur fixe en pixels'
   );
 });

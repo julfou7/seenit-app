@@ -1,9 +1,11 @@
 /*
  * À Voir — carrousels réduits.
  *
- * Le rail doit conserver l'inertie native du geste, sans aucun scroll snap.
- * React monte un premier lot borné puis précharge la suite progressivement
- * avant d'atteindre la fin du carrousel.
+ * Le rail conserve l'inertie native du geste, sans aucun scroll snap.
+ * React ne garde qu'une fenêtre DOM bornée et les espaceurs préservent
+ * la position horizontale. Les titres réservent toujours leurs deux lignes
+ * possibles pour que le recyclage des cartes ne fasse jamais varier
+ * l'espacement vertical entre deux sections pendant le scroll.
  */
 :is(
   #continue-watching-carousel,
@@ -12,4 +14,13 @@
   #films-a-voir-carousel
 ) {
   scroll-snap-type: none !important;
+}
+
+:is(
+  #continue-watching-carousel,
+  #nouveautes-carousel,
+  #pas-vu-depuis-un-moment-carousel,
+  #films-a-voir-carousel
+) .line-clamp-2 {
+  min-block-size: 2lh;
 }
