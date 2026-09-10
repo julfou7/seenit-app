@@ -8,6 +8,7 @@ const { CONTROL_ISSUE, MAIN_BRANCH, createGitHubRequester } = require('./release
 const PREPARE_COMMAND = '/prepare-release-apk';
 const BOT_NAME = 'github-actions[bot]';
 const BOT_EMAIL = '41898282+github-actions[bot]@users.noreply.github.com';
+const ACTIONS_PR_POLICY_MESSAGE = 'GitHub Actions is not permitted to create or approve pull requests.';
 
 function runGit(args, options = {}) {
   return execFileSync('git', args, {
@@ -86,6 +87,11 @@ function evaluateRemoteCandidate({ mainSha, branchSha, compare, branchVersion })
   return { reusable: true };
 }
 
+function isActionsPrCreationPolicyError(error) {
+  const message = String(error?.message || error || '');
+  return message.includes('GitHub API POST /pulls -> 403:') && message.includes(ACTIONS_PR_POLICY_MESSAGE);
+}
+
 function buildCandidateBranchName(version) {
   if (!parseSemver(version)) throw new Error(`Version candidate invalide : ${version}`);
   return `release/v${version}`;
@@ -140,6 +146,15 @@ async function createCandidatePr(request, { branchName, version, mainSha }) {
   });
 }
 
+async function createCandidatePrWithPolicyHandoff(request, options) {
+  try {
+    return { pr: await createCandidatePr(request, options), prHandoff: false };
+  } catch (error) {
+    if (!isActionsPrCreationPolicyError(error)) throw error;
+    return { pr: null, prHandoff: true };
+  }
+}
+
 async function reuseExistingCandidate({ request, owner, mainSha, branchName, targetVersion, branchRef }) {
   const branchSha = branchRef?.object?.sha;
   const [compare, branchVersion] = await Promise.all([
@@ -150,9 +165,10 @@ async function reuseExistingCandidate({ request, owner, mainSha, branchName, tar
   const evaluation = evaluateRemoteCandidate({ mainSha, branchSha, compare, branchVersion });
   if (!evaluation.reusable) throw new Error(`Candidate ${branchName} incompatible : ${evaluation.reason}`);
 
-  let pr = await findOpenCandidatePr(request, owner, branchName);
-  if (!pr) pr = await createCandidatePr(request, { branchName, version: targetVersion, mainSha });
-  return { branchSha, pr, reused: true };
+  const existingPr = await findOpenCandidatePr(request, owner, branchName);
+  if (existingPr) return { branchSha, pr: existingPr, prHandoff: false, reused: true };
+  const prResult = await createCandidatePrWithPolicyHandoff(request, { branchName, version: targetVersion, mainSha });
+  return { branchSha, ...prResult, reused: true };
 }
 
 function prepareLocalCandidate({ targetVersion, branchName, mainSha }) {
@@ -227,32 +243,39 @@ async function runPrepareReleaseControl({ event, token = process.env.GITHUB_TOKE
     candidate = await reuseExistingCandidate({ request, owner: validatedEvent.owner, mainSha, branchName, targetVersion, branchRef });
   } else {
     const prepared = prepareLocalCandidate({ targetVersion, branchName, mainSha });
-    const pr = await createCandidatePr(request, { branchName, version: targetVersion, mainSha });
-    candidate = { branchSha: prepared.commitSha, pr, reused: false };
+    const prResult = await createCandidatePrWithPolicyHandoff(request, { branchName, version: targetVersion, mainSha });
+    candidate = { branchSha: prepared.commitSha, ...prResult, reused: false };
   }
 
   const seconds = metric();
+  const requiresConnectorPr = candidate.prHandoff === true;
   await addControlComment(request, [
     `${candidate.reused ? '♻️ Candidate réutilisée' : '🧩 Candidate créée'} pour **v${targetVersion}**.`,
     '',
     `- Base main : \`${mainSha}\``,
     `- Branche : \`${branchName}\``,
     `- Commit release-only : \`${candidate.branchSha}\``,
-    `- PR : ${candidate.pr?.html_url || `#${candidate.pr?.number || '?'}`}`,
+    requiresConnectorPr
+      ? `- PR : non créée par \`GITHUB_TOKEN\` car la policy du dépôt interdit aux GitHub Actions de créer des pull requests.`
+      : `- PR : ${candidate.pr?.html_url || `#${candidate.pr?.number || '?'}`}`,
     '- Portée : exactement 8 surfaces de version, 1 commit, aucun fichier métier.',
-    '- Prochaine action exacte : attendre la CI de cette PR, fusionner si verte, puis `/release-apk` sur #102.',
-    seconds === null ? null : `- Demande → PR : **${seconds} s**`
+    requiresConnectorPr
+      ? `- Prochaine action exacte : ouvrir via le connecteur GitHub une PR \`${branchName}\` → \`${MAIN_BRANCH}\`, sans modifier ni recréer la candidate ; attendre sa CI, fusionner si verte, puis \`/release-apk\` sur #102.`
+      : '- Prochaine action exacte : attendre la CI de cette PR, fusionner si verte, puis `/release-apk` sur #102.',
+    seconds === null ? null : `- Demande → ${requiresConnectorPr ? 'handoff PR' : 'PR'} : **${seconds} s**`
   ].filter(Boolean).join('\n'));
 
   return {
-    action: candidate.reused ? 'reused' : 'created',
+    action: requiresConnectorPr ? 'connector_pr_required' : candidate.reused ? 'reused' : 'created',
     version: targetVersion,
     mainSha,
     branch: branchName,
     commitSha: candidate.branchSha,
     prNumber: candidate.pr?.number || null,
     prUrl: candidate.pr?.html_url || null,
-    requestToPrSeconds: seconds
+    prHandoff: requiresConnectorPr,
+    requestToPrSeconds: requiresConnectorPr ? null : seconds,
+    requestToDecisionSeconds: requiresConnectorPr ? seconds : null
   };
 }
 
@@ -270,12 +293,14 @@ async function main() {
 }
 
 module.exports = {
+  ACTIONS_PR_POLICY_MESSAGE,
   BOT_EMAIL,
   BOT_NAME,
   PREPARE_COMMAND,
   buildCandidateBranchName,
   buildCandidatePrBody,
   evaluateRemoteCandidate,
+  isActionsPrCreationPolicyError,
   resolvePreparationTarget,
   runPrepareReleaseControl,
   sameReleaseFiles,
