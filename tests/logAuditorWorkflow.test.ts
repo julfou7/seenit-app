@@ -27,3 +27,15 @@ test('SEENIT-OBSERVABILITY-001 exécute un batch Cloud Run en dry-run désactiva
   assert.match(processDoc, /trois issues par run et trois issues/);
   assert.match(processDoc, /ne ferme jamais une issue/);
 });
+
+test('SEENIT-OBSERVABILITY-001 réutilise le provider WIF canonique sans le recréer', () => {
+  assert.doesNotMatch(
+    bootstrap,
+    /gcloud iam workload-identity-pools(?: providers)? create/,
+  );
+  assert.match(bootstrap, /--project="\$PROJECT_ID"/);
+  assert.match(
+    bootstrap,
+    /principalSet:\/\/iam\.googleapis\.com\/projects\/\$\{PROJECT_NUMBER\}\/locations\/global\/workloadIdentityPools\/\$\{POOL_ID\}\/attribute\.repository_id\/\$\{REPOSITORY_ID\}/,
+  );
+});

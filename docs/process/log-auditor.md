@@ -33,6 +33,11 @@ Le bootstrap doit être rejoué une fois par un opérateur GCP autorisé après 
 bash scripts/bootstrap-gcp-log-auditor.sh
 ```
 
+Le pool/provider WIF canonique `seenit-github/seenit-main` est un prérequis déjà administré par le
+bootstrap du déploiement backend. Le bootstrap de l'auditeur ne tente pas de le recréer : il cible
+explicitement le projet canonique, crée le compte read-only si nécessaire et ajoute seulement sa
+liaison au principal GitHub existant. Il peut ainsi être rejoué sans collision `ALREADY_EXISTS`.
+
 ## Contrat de confidentialité
 
 Le backend n'émet que domaine, niveau, code stable, timestamp, UUID de corrélation et contexte
