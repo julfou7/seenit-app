@@ -271,10 +271,11 @@ export const ContinueWatchingCard = React.memo(function ContinueWatchingCard({ s
     hasKnownProvider: Boolean(show.networks?.length),
   });
 
+  const currentSeasonArtwork = cachedSeason?.poster_path || null;
   const showBackdrop = show.backdropPath;
   const showPoster = show.posterPath;
 
-  const rawPath = episodeStill || showBackdrop || showPoster;
+  const rawPath = episodeStill || currentSeasonArtwork || showBackdrop || showPoster;
   const imgSrc = rawPath ? (rawPath.startsWith('http') ? rawPath : `https://image.tmdb.org/t/p/w500${rawPath}`) : null;
 
   const handleCardClick = (e: React.MouseEvent) => {

@@ -39,6 +39,7 @@ interface Props {
 
 const DISCOVER_GRID_INITIAL_ITEMS = 30;
 const DISCOVER_GRID_OVERSCAN_ROWS = 3;
+const DISCOVER_CRITICAL_GRID_ITEMS = 6;
 
 interface BoundedDiscoverGridProps {
   items: TMDBMedia[];
@@ -194,6 +195,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
   const [recommendations, setRecommendations] = useState<TMDBMedia[]>([]);
   const [heroDetails, setHeroDetails] = useState<Record<number, any>>({});
   const [loading, setLoading] = useState(true);
+  const [homeEnrichmentReady, setHomeEnrichmentReady] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   
   const [activeCategory, setActiveCategory] = useState("Tout");
@@ -606,6 +608,9 @@ export function DiscoverScreen({ onShowClick }: Props) {
   useEffect(() => {
     setPage(1);
     setHasMore(true);
+    if (!debouncedQuery.trim() && activeCategory === 'Tout') {
+      setHomeEnrichmentReady(false);
+    }
   }, [activeCategory, debouncedQuery, selectedPlatforms, selectedGenres, pegi, minRating]);
 
   useEffect(() => {
@@ -623,11 +628,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
     if (isOffline || debouncedQuery.trim()) return;
     async function fetchHome() {
       if (page === 1) setLoading(true);
-      
-      if (page === 1) {
-        const recs = await getRecommendations(20);
-        setRecommendations(recs);
-      }
 
       if (activeCategory === 'Personnes') {
         const personRes = await tmdb.getPopularPersons(page);
@@ -775,19 +775,39 @@ export function DiscoverScreen({ onShowClick }: Props) {
         });
         if (docs.length === 0) setHasMore(false);
       } else if (activeCategory === 'Tout') {
-        const [trendAllRes, popTvRes, popMovRes, personRes] = await Promise.all([
-          page <= 5 ? tmdb.getTrending('all', page, selectedPlatforms) : Promise.resolve({ ok: false } as any),
-          tmdb.getPopular('tv', page, selectedPlatforms),
-          tmdb.getPopular('movie', page, selectedPlatforms),
-          page <= 3 ? tmdb.getPopularPersons(page) : Promise.resolve({ ok: false } as any)
-        ]);
         const isRecent = (r: TMDBMedia) => {
           const date = r.first_air_date || r.release_date;
           if (!date) return true;
           const yr = parseInt(date.split('-')[0], 10);
           return !yr || yr >= 2016;
         };
+
+        // Le trending est le chemin critique : il suffit à afficher le hero #1 et
+        // les premières cartes. Les autres sources partent en parallèle mais ne
+        // bloquent plus le premier contenu utile.
+        const trendAllPromise = page <= 5
+          ? tmdb.getTrending('all', page, selectedPlatforms)
+          : Promise.resolve({ ok: false } as any);
+        const popTvPromise = tmdb.getPopular('tv', page, selectedPlatforms);
+        const popMovPromise = tmdb.getPopular('movie', page, selectedPlatforms);
+        const personPromise = page <= 3
+          ? tmdb.getPopularPersons(page)
+          : Promise.resolve({ ok: false } as any);
+
+        const trendAllRes = await trendAllPromise;
         const trendingList = trendAllRes?.ok ? trendAllRes.value.results.filter(isRecent) : [];
+
+        if (trendingList.length > 0) {
+          setTrending(prev => page === 1 ? trendingList : mergeMedia(prev, trendingList));
+          setPopular(prev => page === 1 ? trendingList : mergeMedia(prev, trendingList));
+          if (page === 1) setLoading(false);
+        }
+
+        const [popTvRes, popMovRes, personRes] = await Promise.all([
+          popTvPromise,
+          popMovPromise,
+          personPromise,
+        ]);
         const popularList = [
           ...(popTvRes?.ok ? popTvRes.value.results.filter(isRecent).map(r => ({ ...r, media_type: 'tv' as const })) : []),
           ...(popMovRes?.ok ? popMovRes.value.results.filter(isRecent).map(r => ({ ...r, media_type: 'movie' as const })) : [])
@@ -798,12 +818,8 @@ export function DiscoverScreen({ onShowClick }: Props) {
           setPopularPersons(prev => page === 1 ? persons : mergeMedia(prev, persons));
         }
 
-        if (trendingList.length > 0) {
-          setTrending(prev => page === 1 ? trendingList : mergeMedia(prev, trendingList));
-        }
-
         setPopular(prev => {
-          const combined = [...trendingList, ...popularList];
+          const combined = mergeMedia(trendingList, popularList);
           const toAdd = combined.length > 0 ? combined : popularList;
           const updated = page === 1 ? toAdd : mergeMedia(prev, toAdd);
           if (page > 1 && updated.length === prev.length) setHasMore(false);
@@ -811,14 +827,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
         });
 
         if (page === 1) {
-          const top10 = (trendingList.length > 0 ? trendingList : popularList).slice(0, 10);
-          for (const item of top10) {
-            if (item.media_type === 'tv') {
-              tmdb.getShowDetails(item.id).then(res => { if (res.ok) setHeroDetails(prev => ({ ...prev, [item.id]: res.value })); });
-            } else {
-              tmdb.getMovieDetails(item.id).then(res => { if (res.ok) setHeroDetails(prev => ({ ...prev, [item.id]: res.value })); });
-            }
-          }
+          setHomeEnrichmentReady(true);
         }
         if (popularList.length === 0 && trendingList.length === 0) setHasMore(false);
       } else {
@@ -863,8 +872,17 @@ export function DiscoverScreen({ onShowClick }: Props) {
         }
         if (popList.length === 0 && trendList.length === 0) setHasMore(false);
       }
+
       setLoading(false);
       setIsLoadingMore(false);
+
+      // Les recommandations n'alimentent pas le premier viewport : elles sont
+      // calculées seulement après le flux principal pour ne plus retarder Explorer.
+      if (page === 1) {
+        void getRecommendations(20)
+          .then(recs => setRecommendations(recs))
+          .catch(() => {});
+      }
     }
     if (!debouncedQuery) fetchHome();
   }, [debouncedQuery, isOffline, activeCategory, page, selectedPlatforms, selectedGenres, pegi, minRating, sortBy]);
@@ -1136,8 +1154,17 @@ export function DiscoverScreen({ onShowClick }: Props) {
     return list;
   }, [processedResults, activeCategory, debouncedQuery]);
 
+  const criticalHomeSliceActive = !debouncedQuery.trim()
+    && activeCategory === 'Tout'
+    && !homeEnrichmentReady
+    && top10.length > 0;
+  const visibleHeroItems = criticalHomeSliceActive ? top10.slice(0, 1) : top10;
+
   useEffect(() => {
-    for (const item of top10) {
+    const heroItemsToHydrate = activeCategory === 'Tout' && !homeEnrichmentReady
+      ? top10.slice(0, 1)
+      : top10;
+    for (const item of heroItemsToHydrate) {
       if (item?.id && !heroDetails[item.id]) {
         const type = item.media_type === 'movie' || item.release_date ? 'movie' : 'tv';
         if (type === 'tv') {
@@ -1147,7 +1174,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
         }
       }
     }
-  }, [top10, heroDetails]);
+  }, [top10, heroDetails, activeCategory, homeEnrichmentReady]);
 
   useEffect(() => {
     setActiveHeroIndex(0);
@@ -1190,13 +1217,15 @@ export function DiscoverScreen({ onShowClick }: Props) {
   const visiblePersonResults = personResults;
   const visibleSeriesResults = seriesResults;
   const visibleMovieResults = movieResults;
-  const visibleProcessedResults = uniqueProcessedResults;
+  const visibleProcessedResults = criticalHomeSliceActive
+    ? uniqueProcessedResults.slice(0, DISCOVER_CRITICAL_GRID_ITEMS)
+    : uniqueProcessedResults;
 
   const handleLoadMore = useCallback(() => {
-    if (isLoadingMore || loading || !hasMore || debouncedQuery.trim()) return;
+    if (isLoadingMore || loading || criticalHomeSliceActive || !hasMore || debouncedQuery.trim()) return;
     setIsLoadingMore(true);
     setPage(p => p + 1);
-  }, [debouncedQuery, hasMore, isLoadingMore, loading]);
+  }, [criticalHomeSliceActive, debouncedQuery, hasMore, isLoadingMore, loading]);
 
   const observerTargetNodeRef = useRef<HTMLDivElement | null>(null);
 
@@ -1206,7 +1235,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
 
   useEffect(() => {
     const node = observerTargetNodeRef.current;
-    if (!node || isLoadingMore || loading || !hasMore || debouncedQuery.trim()) return;
+    if (!node || isLoadingMore || loading || criticalHomeSliceActive || !hasMore || debouncedQuery.trim()) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -1219,10 +1248,12 @@ export function DiscoverScreen({ onShowClick }: Props) {
     observer.observe(node);
 
     return () => observer.disconnect();
-  }, [debouncedQuery, handleLoadMore, hasMore, isLoadingMore, loading]);
+  }, [criticalHomeSliceActive, debouncedQuery, handleLoadMore, hasMore, isLoadingMore, loading]);
 
   const searchQuery = query;
   const setSearchQuery = setQuery;
+  const showHeroSurface = !debouncedQuery.trim()
+    && (activeCategory === 'Tout' || activeCategory === 'Séries' || activeCategory === 'Films' || activeCategory === 'Pépites' || activeCategory === 'Au cinéma');
 
   return (
     <div className="relative flex-1 h-full bg-transparent text-white max-w-2xl mx-auto w-full overflow-hidden flex flex-col">
@@ -1261,7 +1292,9 @@ export function DiscoverScreen({ onShowClick }: Props) {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {!debouncedQuery.trim() && top10.length > 0 && (activeCategory === 'Tout' || activeCategory === 'Séries' || activeCategory === 'Films' || activeCategory === 'Pépites' || activeCategory === 'Au cinéma') && (
+        {showHeroSurface && loading && top10.length === 0 && <HeroSkeleton />}
+
+        {!debouncedQuery.trim() && visibleHeroItems.length > 0 && (activeCategory === 'Tout' || activeCategory === 'Séries' || activeCategory === 'Films' || activeCategory === 'Pépites' || activeCategory === 'Au cinéma') && (
           <div>
             <div className="relative w-full">
               <div 
@@ -1269,7 +1302,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
                 onScroll={handleHeroScroll}
                 className="flex w-full overflow-x-auto snap-x snap-mandatory hide-scrollbar"
               >
-                {top10.map((item, index) => (
+                {visibleHeroItems.map((item, index) => (
                   <div key={`top10_${item.media_type || 'media'}_${item.id}_${index}`} className="w-full shrink-0 snap-center">
                     <HeroCard 
                       media={item} 
@@ -1286,9 +1319,9 @@ export function DiscoverScreen({ onShowClick }: Props) {
                 ))}
               </div>
 
-              {top10.length > 1 && (
+              {visibleHeroItems.length > 1 && (
                 <div className="flex justify-center items-center gap-1.5 mt-3 mb-2">
-                  {top10.map((_, idx) => (
+                  {visibleHeroItems.map((_, idx) => (
                     <button
                       key={idx}
                       onClick={(e) => {
@@ -2058,10 +2091,27 @@ const HeroCard = React.memo(function HeroCard({ media, details, onShowClick, onO
   );
 });
 
+function HeroSkeleton() {
+  return (
+    <div aria-hidden="true" className="relative w-full aspect-[4/3] sm:aspect-video overflow-hidden bg-zinc-900 animate-pulse">
+      <div className="absolute inset-0 bg-zinc-900" />
+      <div className="absolute bottom-0 inset-x-0 px-5 pb-4 space-y-3">
+        <div className="h-5 w-16 rounded-md bg-zinc-800" />
+        <div className="h-7 w-2/3 rounded-lg bg-zinc-800" />
+        <div className="h-3 w-5/6 rounded bg-zinc-800" />
+        <div className="flex gap-3 pt-1">
+          <div className="h-10 flex-1 rounded-xl bg-zinc-800" />
+          <div className="h-10 flex-1 rounded-xl bg-zinc-800" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function GridSkeletons() {
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-4 gap-x-1.5 gap-y-4 px-1">
-      {Array.from({ length: 12 }).map((_, i) => (
+    <div aria-hidden="true" className="grid grid-cols-3 sm:grid-cols-4 gap-x-1.5 gap-y-4 px-1">
+      {Array.from({ length: DISCOVER_CRITICAL_GRID_ITEMS }).map((_, i) => (
         <div key={i} className="animate-pulse space-y-2">
           <div className="w-full aspect-[2/3] bg-zinc-800 rounded-2xl" />
           <div className="h-3 bg-zinc-800 rounded w-3/4" />
