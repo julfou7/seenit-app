@@ -22,6 +22,7 @@ import {
 import { buildC411SearchParams } from "./src/features/downloads/c411Query.ts";
 import { executeIdempotentMutation, type TimedMutationResult } from "./src/features/downloads/downloadIdempotency.ts";
 import { apiErrorMiddleware, backendHealthHandler, installAsyncRouteForwarding } from "./src/features/runtime/backendRuntime.ts";
+import { emitOperationalEvent } from "./src/features/runtime/operationalEvent.ts";
 import { assertMediaProviderSecrets, registerMediaProviderRoutes } from './src/features/providers/mediaProviderBackend.ts';
 import {
   buildPlexParentShowIdentityItem,
@@ -2100,6 +2101,15 @@ async function startServer() {
       );
       if (!integrity.collectionComplete) {
         console.warn(`[Plex Sync] Collecte incomplète, curseur non validable : ${integrity.incompleteSources.join(', ')}`);
+        emitOperationalEvent({
+          code: 'PLEX_SYNC_PARTIAL',
+          context: {
+            mode: delta ? 'delta' : 'full',
+            incompleteSourceCount: integrity.incompleteSources.length
+          },
+          domain: 'plex',
+          level: 'warn'
+        });
       }
 
       return res.status(200).json({ 
@@ -2652,6 +2662,11 @@ async function startServer() {
 }
 
 void startServer().catch((error: any) => {
-  console.error('[Backend Startup Error]', String(error?.code ?? error?.name ?? 'StartupError').slice(0, 80));
+  emitOperationalEvent({
+    code: 'BACKEND_STARTUP_FAILED',
+    context: { errorCode: String(error?.code ?? error?.name ?? 'StartupError').slice(0, 80) },
+    domain: 'runtime',
+    level: 'error'
+  });
   process.exitCode = 1;
 });

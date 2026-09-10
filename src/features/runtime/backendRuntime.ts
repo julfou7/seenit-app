@@ -1,6 +1,7 @@
 import type { Application, ErrorRequestHandler, RequestHandler } from 'express';
 import dns from 'node:dns/promises';
 import net from 'node:net';
+import { emitOperationalEvent } from './operationalEvent.ts';
 import { sanitizePlexSyncWatchEvidence } from '../plex/plexWatchEvidence.ts';
 import {
   buildPlexParentShowIdentityItem,
@@ -934,8 +935,14 @@ export const apiErrorMiddleware: ErrorRequestHandler = (error: any, req, res, ne
   }
 
   const code = String(error?.code ?? error?.name ?? 'API_ERROR').slice(0, 80);
-  // Ne jamais journaliser le message ou les entêtes : ils peuvent contenir une URL ou un secret tiers.
-  console.error('[API Error]', { method: req.method, code });
+  // Ne jamais journaliser le message, la route ou les entêtes : ils peuvent contenir une URL,
+  // une identité ou un secret tiers. Le contrat d'événement ne conserve que des champs allowlistés.
+  emitOperationalEvent({
+    code: 'API_UNHANDLED_ERROR',
+    context: { method: req.method, errorCode: code },
+    domain: 'runtime',
+    level: 'error'
+  });
   res.status(500).json({
     error: 'BACKEND_REQUEST_FAILED',
     message: 'Le backend SeenIt a rencontré une erreur.'
