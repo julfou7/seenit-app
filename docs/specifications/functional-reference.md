@@ -556,6 +556,11 @@ et #178 à #181 ; la preuve visuelle/tactile PWA/APK reste à produire avec #15.
 - Les écrans lourds sont lazy-loadés et préchargés après connexion ; l'écran courant reste visible
   pendant un chargement afin d'éviter un flash noir.
 - Les erreurs réseau privées deviennent des messages ou logs bornés, sans secret.
+- Les erreurs backend qualifiées produisent un événement opérationnel structuré sans route, message,
+  en-tête, UID ni payload utilisateur. Un lot GitHub Actions les audite périodiquement : il reste en
+  `dry-run` par défaut et n'ouvre ou n'enrichit une issue que pour une règle haute confiance ayant
+  dépassé son seuil. Les autres événements restent dans un rapport redigé ; l'application ne dépend
+  jamais de GitHub pour répondre aux requêtes.
 - Une indisponibilité TMDB peut laisser un écran partiel ou un cache ; elle ne justifie aucun matching
   par titre et ne transforme jamais une classification d'âge inconnue en « Tous publics ».
 - Une indisponibilité d'un serveur Plex/Arr/qBit ne doit pas effacer un état connu.

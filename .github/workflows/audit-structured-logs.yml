@@ -1,0 +1,109 @@
+name: Audit Structured SeenIt Logs
+
+on:
+  schedule:
+    - cron: '23 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+
+concurrency:
+  group: seenit-structured-log-auditor
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT_ID: gen-lang-client-0201895414
+  GCP_SERVICE: seenit-app
+  GCP_WORKLOAD_IDENTITY_PROVIDER: projects/799043440232/locations/global/workloadIdentityPools/seenit-github/providers/seenit-main
+  GCP_AUDIT_SERVICE_ACCOUNT: seenit-log-auditor@gen-lang-client-0201895414.iam.gserviceaccount.com
+  SEENIT_LOG_AUDITOR_MODE: ${{ vars.SEENIT_LOG_AUDITOR_MODE || 'dry-run' }}
+
+jobs:
+  audit:
+    name: Audit redacted operational events
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Checkout canonical rules
+        uses: actions/checkout@v6
+
+      - name: Initialize bounded input
+        run: printf '[]\n' > "$RUNNER_TEMP/seenit-structured-logs.json"
+
+      - name: Authenticate read-only log collector
+        id: auth
+        if: env.SEENIT_LOG_AUDITOR_MODE != 'off'
+        continue-on-error: true
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_AUDIT_SERVICE_ACCOUNT }}
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Set up gcloud
+        id: gcloud
+        if: env.SEENIT_LOG_AUDITOR_MODE != 'off'
+        continue-on-error: true
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Collect only SeenIt structured events
+        id: collect
+        if: env.SEENIT_LOG_AUDITOR_MODE != 'off'
+        shell: bash
+        run: |
+          set -euo pipefail
+          filter='resource.type="cloud_run_revision" AND resource.labels.service_name="'"$GCP_SERVICE"'" AND jsonPayload.seenitEvent.schemaVersion=1'
+          set +e
+          gcloud logging read "$filter" \
+            --project "$GCP_PROJECT_ID" \
+            --freshness=6h \
+            --limit=5000 \
+            --order=asc \
+            --format=json \
+            > "$RUNNER_TEMP/seenit-structured-logs.json"
+          status=$?
+          set -e
+
+          if [ "$status" -ne 0 ]; then
+            printf '[]\n' > "$RUNNER_TEMP/seenit-structured-logs.json"
+            echo 'source_status=unavailable' >> "$GITHUB_OUTPUT"
+            echo 'La source Cloud Logging est indisponible ; aucun log brut ne sera conservé.'
+          else
+            echo 'source_status=ok' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Analyze, deduplicate and optionally update GitHub
+        id: auditor
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SEENIT_LOG_AUDITOR_SOURCE_STATUS: ${{ steps.collect.outputs.source_status || 'off' }}
+        run: >-
+          node scripts/audit-structured-logs.cjs
+          --input=${{ runner.temp }}/seenit-structured-logs.json
+          --report=${{ runner.temp }}/seenit-log-audit-report.json
+
+      - name: Remove temporary source logs
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/seenit-structured-logs.json"
+
+      - name: Archive only the redacted aggregate report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: seenit-log-audit-${{ github.run_id }}
+          path: ${{ runner.temp }}/seenit-log-audit-report.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Fail observably after preserving the report
+        if: steps.auditor.outcome != 'success'
+        run: |
+          echo 'L’auditeur a terminé en état dégradé. Le backend SeenIt reste indépendant de ce job.'
+          exit 1

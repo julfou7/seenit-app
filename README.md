@@ -61,7 +61,9 @@ Le processus n'est pas dupliqué ici. Les sources de vérité sont :
 - [`docs/specifications/functional-reference.md`](./docs/specifications/functional-reference.md) pour la
   **référence fonctionnelle** écran par écran ;
 - [`docs/process/delivery.md`](./docs/process/delivery.md) pour les parcours `light`, `backend`, `apk`
-  et la release APK groupée.
+  et la release APK groupée ;
+- [`docs/process/log-auditor.md`](./docs/process/log-auditor.md) pour le batch redigé qui transforme les
+  anomalies backend à haute confiance en issues.
 
 Un push valide le changement mais ne publie jamais automatiquement une APK. La version Android est
 incrémentée une seule fois lorsque le lot APK est prêt, puis la release est déclenchée manuellement.
