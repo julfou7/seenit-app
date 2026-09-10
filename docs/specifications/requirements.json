@@ -26,7 +26,7 @@
         },
         {
           "file": "tests/plexExternalUrl.test.ts",
-          "contains": "SEENIT-PLATFORM-001 ne confond pas lancement de Plex et navigation PMS exacte"
+          "contains": "SEENIT-PLATFORM-001 ouvre le CTA Plex via Discover vérifié plutôt que le locator PMS"
         }
       ]
     },
