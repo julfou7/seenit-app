@@ -1,6 +1,6 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
-Dernière mise à jour : 9 septembre 2026
+Dernière mise à jour : 10 septembre 2026
 Version applicative : **1.4.134**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
@@ -746,6 +746,16 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
 - **SEENIT-SECURITY-003** — Avant toute persistance ou export de log, les champs sensibles et les
   secrets reconnaissables dans les chaînes sont masqués. La profondeur, la taille et le nombre
   d'éléments sérialisés sont bornés.
+- **SEENIT-OBSERVABILITY-001** — Le backend peut émettre des événements opérationnels JSON à code
+  stable, sans message libre ni donnée utilisateur. Un lot CI périodique peut transformer uniquement
+  les anomalies appartenant à une allowlist haute confiance en issues GitHub : il applique une
+  redaction défensive, un seuil par fingerprint déterministe, la déduplication avec les issues
+  ouvertes, un cooldown et un plafond global. Le mode par défaut est `dry-run`, `off` coupe
+  immédiatement toute écriture GitHub sans couper les logs, et une panne de la source ou de GitHub
+  n'affecte jamais le backend. Les événements inconnus ou non autorisés restent dans le rapport
+  redigé ; aucune issue n'est fermée automatiquement. Le compte de lecture dédié réutilise le
+  provider WIF canonique déjà administré pour GitHub Actions : son bootstrap cible explicitement le
+  projet SeenIt et ne tente jamais de recréer le pool ou le provider partagé après un échec de lecture.
 - Les clés TMDB et TVDB restent exclusivement côté backend et sont injectées depuis Secret Manager.
   OMDb et `OMDB_API_KEY` ne font plus partie du runtime ni du déploiement SeenIt.
 - La clé PKCS12 `seenit`, générée hors dépôt et matérialisée depuis GitHub Secrets, est l'unique clé

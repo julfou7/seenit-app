@@ -736,6 +736,36 @@
       ]
     },
     {
+      "id": "SEENIT-OBSERVABILITY-001",
+      "title": "Anomalies de logs transformées en backlog sans secret ni spam",
+      "targets": [
+        "backend",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/logAuditor.test.ts",
+          "contains": "SEENIT-OBSERVABILITY-001 agrège les anomalies et applique les seuils déterministes"
+        },
+        {
+          "file": "tests/logAuditor.test.ts",
+          "contains": "SEENIT-OBSERVABILITY-001 déduplique et borne les écritures GitHub"
+        },
+        {
+          "file": "tests/logAuditor.test.ts",
+          "contains": "SEENIT-OBSERVABILITY-001 exclut secrets UID emails et chemins privés des rapports"
+        },
+        {
+          "file": "tests/logAuditorWorkflow.test.ts",
+          "contains": "SEENIT-OBSERVABILITY-001 exécute un batch Cloud Run en dry-run désactivable"
+        },
+        {
+          "file": "tests/logAuditorWorkflow.test.ts",
+          "contains": "SEENIT-OBSERVABILITY-001 réutilise le provider WIF canonique sans le recréer"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-C411-001",
       "title": "Filtres C411 exacts et année non dupliquée",
       "targets": [
