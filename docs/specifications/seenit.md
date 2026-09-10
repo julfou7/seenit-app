@@ -36,7 +36,11 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 - La PWA doit fonctionner installée ou dans un navigateur mobile/desktop.
 - L'APK doit gérer explicitement reprise d'activité, bouton Retour Android, safe areas,
   notifications FCM et intents vers les applications natives.
-- Les liens Plex privilégient Plex Android dans l'APK et conservent un fallback Web dans la PWA.
+- Les liens Plex universels privilégient Plex Android dans l'APK. Lorsqu'une disponibilité personnelle
+  fournit déjà un locator PMS exact `serverId + ratingKey`, l'exactitude de destination prime : tant
+  que Plex Android ne garantit pas un deep link de fiche personnelle, l'APK ouvre la route Web PMS
+  exacte. Le simple lancement de l'application Plex ne vaut jamais preuve de navigation vers la copie
+  personnelle. La PWA conserve l'URL Web officielle.
 - La status bar Android est edge-to-edge : la WebView s'étend derrière une barre transparente avec
   icônes claires, tandis que le contenu principal et le login respectent `env(safe-area-inset-top)`.
   Avec `@capacitor/status-bar`, ce rendu clair sur fond sombre exige explicitement `Style.Dark` / `DARK` ;
@@ -412,7 +416,7 @@ nominative n'est admise dans le résolveur de production.
 
 Les TNR de contrat couvrent au minimum : House of the Dragon / Game of Thrones, Breaking Bad,
 Yellowstone, Harry Potter avec ordre TMDB puis franchise TVDB sans doublons, MCU, un média indépendant
-sans section, la collision `movie:42` / `tv:42`, l'absence de recherche par titre, l'absence de fusion de
+sans section, la collision `movie:42`/`tv:42`, l'absence de recherche par titre, l'absence de fusion de
 plusieurs listes TVDB et la suppression des similaires des fiches.
 
 La décision produit complète et les décisions remplacées sont figées dans
@@ -974,7 +978,9 @@ l'identité de l'APK et ses actifs.
 - Tester un client BitTorrent installé puis absent sur Android pour le fallback Magnet.
 - Tester une annulation active, un échec distant et deux téléchargements simultanés.
 - Parcourir les cartes et dialogues au clavier en PWA, puis avec TalkBack dans l'APK.
-- Vérifier l'ouverture de l'élément exact dans Plex Android, puis le fallback Web.
+- Vérifier qu'une disponibilité PMS exacte ouvre la copie `serverId + ratingKey` sans retomber sur
+  Home/Discover ; une ouverture native de fiche ne redevient prioritaire que lorsqu'un contrat Plex
+  Android vérifiable la garantit.
 - Pour toute nouvelle release APK, installer N+1 par-dessus N et confirmer que compte, données locales,
   icône, raccourci, notifications et deep links sont conservés. Une désinstallation ne fait plus partie
   du parcours normal de validation après la baseline `v1.4.112`.

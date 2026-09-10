@@ -23,6 +23,10 @@
         {
           "file": "tests/seenitApi.test.ts",
           "contains": "SEENIT-PLATFORM-001 fournit à l’APK une origine de secours indépendante pour le même backend"
+        },
+        {
+          "file": "tests/plexExternalUrl.test.ts",
+          "contains": "SEENIT-PLATFORM-001 ne confond pas lancement de Plex et navigation PMS exacte"
         }
       ]
     },

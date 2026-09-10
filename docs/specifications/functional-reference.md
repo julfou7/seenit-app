@@ -381,8 +381,10 @@ La machine d'états exhaustive et le mapping Plex sont autoritatifs dans `seenit
 - L'association utilise le PIN Plex dans une page externe, sondée toutes les trois secondes jusqu'au
   jeton ou à l'arrêt du parcours.
 - Le jeton est sauvegardé pour le même UID ; une synchronisation complète démarre après association.
-- Dans l'APK, une fiche Plex cible d'abord l'application Android Plex, puis l'URL universelle et le
-  navigateur. Dans la PWA, elle ouvre l'URL Web officielle.
+- Dans l'APK, les liens Plex universels peuvent cibler l'application Android Plex. Une disponibilité
+  personnelle déjà résolue par `serverId + ratingKey` conserve en revanche la route Web PMS exacte tant
+  que Plex Android ne fournit pas un contrat vérifiable de navigation vers la fiche ; un simple lancement
+  de l'application n'est pas considéré comme un succès. Dans la PWA, l'URL Web officielle reste utilisée.
 - Si le TMDB ID ne peut pas résoudre exactement une fiche Plex, SeenIt n'ouvre pas aveuglément
   l'accueil Plex.
 
@@ -580,7 +582,7 @@ et #178 à #181 ; la preuve visuelle/tactile PWA/APK reste à produire avec #15.
 | Âge conseillé personnel | Firestore du même UID | Même Firestore et même UID |
 | Backend | Même origine canonique | `https://seenit.ai.studio` explicite |
 | Retour | Historique navigateur | Modals → fiche → historique → À Voir → quitter |
-| Plex | Nouvel onglet Web | Intent application Plex, puis fallback Web |
+| Plex | Nouvel onglet Web | Liens universels : application Plex puis Web ; locator PMS exact : route Web exacte |
 | Reddit/autres liens | Nouvel onglet | Application associée, puis Custom Tab |
 | Magnet | Gestionnaire navigateur/système si Téléchargements est activé | Intent Android compatible si Téléchargements est activé |
 | Notifications | Web Push/service worker | Push + notifications locales Capacitor |

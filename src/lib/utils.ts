@@ -4,7 +4,7 @@ import { Browser } from '@capacitor/browser';
 import { AppLauncher } from '@capacitor/app-launcher';
 import { Capacitor } from '@capacitor/core';
 import { appLogger } from '../store/logStore';
-import { buildPlexAndroidPmsDeepLinkFromWebUrl } from './plexExternalUrl';
+import { isExactPlexPmsWebUrl } from './plexExternalUrl';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -42,19 +42,11 @@ export async function openExternalUrl(
       appLogger.info('plex', `[Plex DeepLink] Redirection via intent système : ${targetUrl}`);
 
       // Une route app.plex.tv contenant serverId + ratingKey est déjà un locator PMS exact.
-      // Sur Android on la convertit en vrai schéma Plex avant tout intent universel ; si
-      // l'application ne l'accepte pas, le fallback conserve exactement la route Web PMS.
-      const exactPmsAndroidUrl = Capacitor.getPlatform() === 'android'
-        ? buildPlexAndroidPmsDeepLinkFromWebUrl(targetUrl)
-        : null;
-      if (exactPmsAndroidUrl) {
-        try {
-          const nativePlex = await AppLauncher.openUrl({ url: exactPmsAndroidUrl });
-          if (nativePlex?.completed) return true;
-        } catch (err) {
-          appLogger.warn('plex', '[Plex DeepLink] Deep link PMS Android indisponible, fallback Web PMS exact.');
-        }
-
+      // Les versions Plex Android actuelles peuvent accepter l'ancien schéma plex:// tout en
+      // ignorant sa destination et en arrivant sur Home. Pour ce locator exact, l'identité
+      // prime donc sur le lancement de l'app : on ouvre directement la route Web PMS exacte.
+      const exactPmsWebUrl = Capacitor.getPlatform() === 'android' && isExactPlexPmsWebUrl(targetUrl);
+      if (exactPmsWebUrl) {
         try {
           await Browser.open({ url: targetUrl, windowName: '_system' });
           return true;
@@ -519,4 +511,3 @@ export function scrollAllCarouselsToStart() {
   setTimeout(scroll, 250);
   setTimeout(scroll, 500);
 }
-
