@@ -166,11 +166,15 @@ le fil d'actualités des médias suivis.
 - **Pas vu depuis un moment** reçoit les autres séries encore regardables ;
 - **Films à voir** reçoit les films suivis non vus dont la sortie n'est pas future.
 
-Les règles exactes de frontière sont dans `seenit.md` §5.1. Chaque carrousel matérialise un premier lot
-de huit cartes, puis précharge automatiquement la suite par lots lorsque le rail approche de sa fin.
-Le glissement horizontal conserve l'inertie native du geste : aucun scroll-snap n'est appliqué et aucun
-marqueur terminal **« Voir tout »** n'est injecté dans le rail. Le vrai bouton **« Voir tout »** de
-l'en-tête reste l'alternative accessible et ouvre la vue verticale exhaustive, paginée par lots de huit.
+Les règles exactes de frontière sont dans `seenit.md` §5.1. Chaque carrousel matérialise une fenêtre d'au
+moins huit cartes et recycle celles qui quittent largement le viewport ; des espaceurs transparents
+préservent la largeur totale et la position du rail. Le glissement horizontal conserve l'inertie native du
+geste : aucun scroll-snap n'est appliqué et aucun marqueur terminal **« Voir tout »** n'est injecté dans le
+rail. Le vrai bouton **« Voir tout »** de l'en-tête reste l'alternative accessible et ouvre la vue verticale
+exhaustive, paginée par lots de huit. Une carte passive conserve son visuel initial et reporte tout
+enrichissement diffuseur jusqu'à l'arrêt du scroll. Les cartes film réduites réutilisent les détails déjà
+en cache sans déclencher de chargement décoratif supplémentaire ; la vue exhaustive complète ces détails
+après stabilisation du geste, avec une concurrence bornée.
 Les médias abandonnés, archivés ou terminés ne reviennent pas dans le parcours actif.
 
 Sur une carte série, un swipe permet de retirer le suivi (avec confirmation) ou d'abandonner la
@@ -206,9 +210,10 @@ les favoris et dans sa section métier. Les grilles sont extensibles et les cart
 actions rapides de suivi/visionnage.
 
 Pour préserver la navigation sur les grandes bibliothèques, seules les rangées proches de la zone
-visible sont matérialisées. Les rangées horizontales et les grilles « Voir tout » progressent par lots
-bornés sans masquer les médias restants. Statistiques et Ma Liste conservent leur état après leur
-première ouverture, tandis que leurs traitements sont suspendus lorsqu'elles sont cachées.
+visible sont matérialisées. Les rangées horizontales recyclent les cartes hors écran dans une fenêtre
+bornée sans masquer les médias restants ; les grilles « Voir tout » progressent par lots bornés.
+Statistiques et Ma Liste conservent leur état après leur première ouverture, tandis que leurs traitements
+sont suspendus lorsqu'elles sont cachées.
 
 Le bouton Réglages ouvre un écran superposé refermable par Retour ou swipe depuis le bord gauche.
 Le bouton Partager ne doit promettre qu'un lien réellement réouvrable ; l'écart actuel est suivi par
@@ -230,9 +235,10 @@ Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, 
 - Tri Populaires, Mieux notés, Plus récents ou Ordre alphabétique.
 - Hero Top 10, chargement infini, aperçu long-press et cache utilisable lors d'une panne réseau.
 - Le scroll infini conserve des clés de cartes stables, évite de rerendre les cartes déjà chargées pour
-  un simple changement d'en-tête et isole le rendu hors écran. L'enrichissement diffuseur d'une carte est
-  différé hors des frames actives lorsque possible, dédupliqué et borné à quatre requêtes simultanées ;
-  le cache persistant regroupe ses écritures au lieu de sérialiser tout son snapshot par carte.
+  un simple changement d'en-tête et ne matérialise que les lignes visibles avec un débord borné. Des
+  espaceurs conservent la hauteur logique des pages déjà chargées. L'enrichissement diffuseur d'une carte
+  est différé hors des frames actives, dédupliqué et borné à quatre requêtes simultanées ; le cache
+  persistant regroupe ses écritures au lieu de sérialiser tout son snapshot par carte.
 - Les recommandations combinent genres regardés et personnes favorites, puis excluent les médias
   déjà vus/terminés ou abandonnés. **Explorer reste le lieu de la découverte approximative** ; ces
   recommandations ne sont pas réinjectées dans les fiches média comme relations.

@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import type { MouseEvent } from 'react';
 import { Check, Calendar, Circle } from 'lucide-react';
 import { SeenItCheckButton } from './SeenItCheckButton';
 import { cn, getCalendarDaysDiff, formatAirDateSafe } from '../lib/utils';
 import type { Show } from '../types';
-import { tmdb } from '../features/shows/tmdb';
 import { getFormattedProviderLogo } from '../utils/providerLogos';
+import { usePassiveWatchProvider } from '../hooks/usePassiveWatchProvider';
 
 interface EpisodeCardProps {
   key?: React.Key;
@@ -75,25 +75,14 @@ export function EpisodeCard({ show, type, onShowClick, onMarkAsSeen }: EpisodeCa
     contextualClass = "text-emerald-400 font-semibold";
   }
 
-  const [providerLogo, setProviderLogo] = useState<string | null>(null);
-  const [providerName, setProviderName] = useState<string | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    if (show.tmdbId) {
-      tmdb.getWatchProviders(show.tmdbId, show.mediaType === 'movie' ? 'movie' : 'tv').then(res => {
-        if (isMounted && res.ok && res.value?.results) {
-          const fr = res.value.results.FR || res.value.results.US || res.value.results.BE || res.value.results.CH || res.value.results.CA || Object.values(res.value.results)[0];
-          const topProv = fr?.flatrate?.[0] || fr?.free?.[0] || fr?.ads?.[0] || fr?.buy?.[0] || fr?.rent?.[0];
-          if (topProv?.logo_path) {
-            setProviderLogo(topProv.logo_path);
-            if (topProv.provider_name) setProviderName(topProv.provider_name);
-          }
-        }
-      }).catch(() => {});
-    }
-    return () => { isMounted = false; };
-  }, [show.tmdbId, show.mediaType]);
+  const { cardRef, providerLogo, providerName } = usePassiveWatchProvider({
+    tmdbId: show.tmdbId,
+    mediaType: show.mediaType === 'movie' ? 'movie' : 'tv',
+    title: show.title,
+    originalTitle: (show as any).originalTitle || (show as any).original_title,
+    year: show.firstAirDate?.slice(0, 4),
+    hasKnownProvider: Boolean(show.networks?.length),
+  });
 
   const networkLogo = getFormattedProviderLogo(
     providerLogo || (show.networks && show.networks.length > 0 ? show.networks[0].logo_path : null),
@@ -102,6 +91,7 @@ export function EpisodeCard({ show, type, onShowClick, onMarkAsSeen }: EpisodeCa
 
   return (
     <div 
+      ref={cardRef}
       onClick={() => show.id && onShowClick(show.id)}
       className="w-full flex items-stretch justify-between gap-3 bg-zinc-900/60 hover:bg-zinc-900/80 rounded-2xl overflow-hidden relative isolate transition-all active:scale-[0.98] cursor-pointer mb-3 group shadow-xl"
     >

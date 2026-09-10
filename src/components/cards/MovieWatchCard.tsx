@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { SeenItCheckButton } from '../SeenItCheckButton';
 import { type Show } from '../../types';
 import { tmdb, isMovieAtCinema, isMovieUpcoming } from '../../features/shows/tmdb';
-import { getFormattedProviderLogo, extractOfficialStreamingProvider, PLEX_LOGO_SVG } from '../../utils/providerLogos';
-import { checkPlexAvailability } from '../../features/plex/plexAvailability';
+import { getFormattedProviderLogo } from '../../utils/providerLogos';
+import { usePassiveWatchProvider } from '../../hooks/usePassiveWatchProvider';
 
 interface Props {
   key?: React.Key;
@@ -21,66 +21,22 @@ function formatRuntime(minutes?: number) {
 }
 
 export const MovieWatchCard = React.memo(function MovieWatchCard({ show, onShowClick, onMarkAsSeen }: Props) {
-  const [runtime, setRuntime] = useState<number | null>((show as any).runtime || null);
-  const [releaseYear, setReleaseYear] = useState<string | null>(
+  const movieDetails = show.tmdbId ? tmdb.peekMediaDetails(show.tmdbId, 'movie') || show : show;
+  const runtime = (show as any).runtime || movieDetails?.runtime || null;
+  const releaseYear = (
     show.firstAirDate 
       ? show.firstAirDate.slice(0, 4) 
-      : ((show as any).release_date ? (show as any).release_date.slice(0, 4) : ((show as any).year ? String((show as any).year) : null))
+      : (movieDetails?.release_date ? movieDetails.release_date.slice(0, 4) : ((show as any).year ? String((show as any).year) : null))
   );
-  const [fullReleaseDate, setFullReleaseDate] = useState<string | null>(
-    show.firstAirDate || (show as any).release_date || (show as any).releaseDate || null
-  );
-  const [movieDetails, setMovieDetails] = useState<any>(null);
-  const [providerLogo, setProviderLogo] = useState<string | null>(null);
-  const [providerName, setProviderName] = useState<string | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    if (show.tmdbId) {
-      tmdb.getMovieDetails(show.tmdbId).then(res => {
-        if (isMounted && res.ok && res.value) {
-          setMovieDetails(res.value);
-          if (res.value.runtime && !runtime) {
-            setRuntime(res.value.runtime);
-          }
-          if (res.value.release_date) {
-            if (!releaseYear) setReleaseYear(res.value.release_date.slice(0, 4));
-            if (fullReleaseDate !== res.value.release_date) setFullReleaseDate(res.value.release_date);
-          }
-        }
-      }).catch(() => {});
-
-      tmdb.getWatchProviders(show.tmdbId, 'movie').then(res => {
-        if (!isMounted) return;
-        let officialFound = false;
-        if (res.ok && res.value?.results) {
-          const stream = extractOfficialStreamingProvider(res.value.results);
-          if (stream) {
-            setProviderLogo(stream.logo_path);
-            setProviderName(stream.provider_name);
-            officialFound = true;
-          }
-        }
-
-        // Si aucun diffuseur officiel SVOD/Streaming n'est disponible, on vérifie la disponibilité sur Plex
-        if (!officialFound) {
-          checkPlexAvailability({
-            tmdbId: show.tmdbId,
-            title: show.title,
-            originalTitle: (show as any).originalTitle || (show as any).original_title,
-            year: releaseYear || show.firstAirDate?.slice(0, 4),
-            mediaType: 'movie'
-          }).then(plexInfo => {
-            if (isMounted && plexInfo.available) {
-              setProviderLogo(PLEX_LOGO_SVG);
-              setProviderName(plexInfo.serverName ? `Plex (${plexInfo.serverName})` : 'Plex');
-            }
-          }).catch(() => {});
-        }
-      }).catch(() => {});
-    }
-    return () => { isMounted = false; };
-  }, [show.tmdbId, runtime, releaseYear, fullReleaseDate, show.title]);
+  const fullReleaseDate = show.firstAirDate || movieDetails?.release_date || (show as any).releaseDate || null;
+  const { cardRef, providerLogo, providerName } = usePassiveWatchProvider({
+    tmdbId: show.tmdbId,
+    mediaType: 'movie',
+    title: show.title,
+    originalTitle: (show as any).originalTitle || (show as any).original_title,
+    year: releaseYear || show.firstAirDate?.slice(0, 4),
+    hasKnownProvider: Boolean(show.networks?.length),
+  });
 
   const rawPath = show.posterPath || show.backdropPath;
   const imgSrc = rawPath ? (rawPath.startsWith('http') ? rawPath : `https://image.tmdb.org/t/p/w500${rawPath}`) : null;
@@ -163,6 +119,7 @@ export const MovieWatchCard = React.memo(function MovieWatchCard({ show, onShowC
 
   return (
     <div 
+      ref={cardRef}
       className="flex-shrink-0 w-36 sm:w-40 flex flex-col cursor-pointer snap-start group" 
       onClick={() => {
         if (onShowClick && show.id) {

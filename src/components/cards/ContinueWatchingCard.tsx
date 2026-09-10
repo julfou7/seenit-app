@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { SeenItCheckButton } from '../SeenItCheckButton';
 import { type Show } from '../../types';
 import { getAiredProgress, cn, getTodayStr } from '../../lib/utils';
-import { tmdb } from '../../features/shows/tmdb';
-import { getFormattedProviderLogo, extractOfficialStreamingProvider, PLEX_LOGO_SVG } from '../../utils/providerLogos';
-import { checkPlexAvailability } from '../../features/plex/plexAvailability';
+import { getFormattedProviderLogo } from '../../utils/providerLogos';
+import { usePassiveWatchProvider } from '../../hooks/usePassiveWatchProvider';
 
 interface Props {
   key?: React.Key;
@@ -241,10 +240,7 @@ export const ContinueWatchingCard = React.memo(function ContinueWatchingCard({ s
     extraAvailableEpisodes = Math.max(0, airedInSeason - eNum);
   }
 
-  const [fetchedStillMap, setFetchedStillMap] = useState<Record<string, string>>({});
-
-  const currentEpKey = `${sNum}x${eNum}`;
-  let episodeStill: string | null = fetchedStillMap[currentEpKey] || null;
+  let episodeStill: string | null = null;
 
   if (!episodeStill) {
     if (nextEpNum && nextEpNum.season_number === sNum && nextEpNum.episode_number === eNum && nextEpNum.still_path) {
@@ -266,54 +262,14 @@ export const ContinueWatchingCard = React.memo(function ContinueWatchingCard({ s
     }
   }
 
-  const [providerLogo, setProviderLogo] = useState<string | null>(null);
-  const [providerName, setProviderName] = useState<string | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    if (show.tmdbId) {
-      tmdb.getWatchProviders(show.tmdbId, show.mediaType === 'movie' ? 'movie' : 'tv').then(res => {
-        if (!isMounted) return;
-        let officialFound = false;
-        if (res.ok && res.value?.results) {
-          const stream = extractOfficialStreamingProvider(res.value.results);
-          if (stream) {
-            setProviderLogo(stream.logo_path);
-            setProviderName(stream.provider_name);
-            officialFound = true;
-          }
-        }
-
-        if (!officialFound && !show.networks?.length) {
-          checkPlexAvailability({
-            tmdbId: show.tmdbId,
-            title: show.title,
-            originalTitle: (show as any).originalTitle || (show as any).original_title,
-            year: show.firstAirDate?.slice(0, 4),
-            mediaType: show.mediaType === 'movie' ? 'movie' : 'tv'
-          }).then(plexInfo => {
-            if (isMounted && plexInfo.available) {
-              setProviderLogo(PLEX_LOGO_SVG);
-              setProviderName(plexInfo.serverName ? `Plex (${plexInfo.serverName})` : 'Plex');
-            }
-          }).catch(() => {});
-        }
-      }).catch(() => {});
-    }
-    return () => { isMounted = false; };
-  }, [show.tmdbId, show.mediaType, show.title]);
-
-  useEffect(() => {
-    let isMounted = true;
-    if (!episodeStill && show.tmdbId) {
-      tmdb.getEpisodeDetails(show.tmdbId, sNum, eNum).then(res => {
-        if (isMounted && res.ok && res.value?.still_path) {
-          setFetchedStillMap(prev => ({ ...prev, [`${sNum}x${eNum}`]: res.value.still_path }));
-        }
-      });
-    }
-    return () => { isMounted = false; };
-  }, [show.tmdbId, sNum, eNum, episodeStill]);
+  const { cardRef, providerLogo, providerName } = usePassiveWatchProvider({
+    tmdbId: show.tmdbId,
+    mediaType: show.mediaType === 'movie' ? 'movie' : 'tv',
+    title: show.title,
+    originalTitle: (show as any).originalTitle || (show as any).original_title,
+    year: show.firstAirDate?.slice(0, 4),
+    hasKnownProvider: Boolean(show.networks?.length),
+  });
 
   const showBackdrop = show.backdropPath;
   const showPoster = show.posterPath;
@@ -336,7 +292,7 @@ export const ContinueWatchingCard = React.memo(function ContinueWatchingCard({ s
   );
 
   return (
-    <div className="flex-shrink-0 w-64 flex flex-col cursor-pointer snap-start group" onClick={handleCardClick}>
+    <div ref={cardRef} className="flex-shrink-0 w-64 flex flex-col cursor-pointer snap-start group" onClick={handleCardClick}>
       <div className="w-full aspect-video rounded-2xl overflow-hidden relative mb-2 bg-zinc-900 shadow-lg">
         {/* OVERLAY PREMIUM */}
         <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/10 group-hover:ring-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] transition-all z-20" />

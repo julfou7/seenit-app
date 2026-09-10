@@ -6,6 +6,13 @@ import { tmdb } from '../features/shows/tmdb';
 import { getFormattedProviderLogo } from '../utils/providerLogos';
 import { useToastStore } from '../store/toastStore';
 import { cn, scrollAllCarouselsToStart } from '../lib/utils';
+import { usePassiveWatchProvider } from '../hooks/usePassiveWatchProvider';
+import {
+  createWatchProviderRequestLimiter,
+  scheduleWatchProviderCardEnrichment,
+} from '../features/providers/watchProviderRequestPolicy';
+
+const historyDetailRequestLimiter = createWatchProviderRequestLimiter(2);
 
 interface HistoryItem {
   showId: string;
@@ -50,25 +57,12 @@ function HistoryRowItem({
   onEpisodeClick?: (showId: string, season: number, episode: number) => void;
   setUnseenModalItem: (item: HistoryItem) => void;
 }) {
-  const [providerLogo, setProviderLogo] = useState<string | null>(null);
-  const [providerName, setProviderName] = useState<string | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    if (item.tmdbId) {
-      tmdb.getWatchProviders(item.tmdbId, item.mediaType === 'movie' ? 'movie' : 'tv').then(res => {
-        if (isMounted && res.ok && res.value?.results) {
-          const fr = res.value.results.FR || res.value.results.US || res.value.results.BE || res.value.results.CH || res.value.results.CA || Object.values(res.value.results)[0];
-          const topProv = fr?.flatrate?.[0] || fr?.free?.[0] || fr?.ads?.[0] || fr?.buy?.[0] || fr?.rent?.[0];
-          if (topProv?.logo_path) {
-            setProviderLogo(topProv.logo_path);
-            if (topProv.provider_name) setProviderName(topProv.provider_name);
-          }
-        }
-      }).catch(() => {});
-    }
-    return () => { isMounted = false; };
-  }, [item.tmdbId, item.mediaType]);
+  const { cardRef, providerLogo, providerName } = usePassiveWatchProvider({
+    tmdbId: item.tmdbId,
+    mediaType: item.mediaType === 'movie' ? 'movie' : 'tv',
+    title: item.showTitle,
+    hasKnownProvider: Boolean(item.showNetworks?.length),
+  });
 
   const networkLogo = getFormattedProviderLogo(
     providerLogo || (item.showNetworks && item.showNetworks.length > 0 ? item.showNetworks[0].logo_path : null),
@@ -89,6 +83,7 @@ function HistoryRowItem({
 
   return (
     <div 
+      ref={cardRef}
       key={`${item.showId}-${item.season}x${item.episode}-${idx}`} 
       onClick={handleRowClick}
       className="w-full flex items-stretch justify-between gap-3 bg-zinc-900/60 hover:bg-zinc-900/80 rounded-2xl overflow-hidden relative isolate transition-all active:scale-[0.98] cursor-pointer mb-3 group shadow-xl"
@@ -289,23 +284,33 @@ export function HistoryFeed({
 
   useEffect(() => {
     let isMounted = true;
-
-    displayedItems.forEach(async (item) => {
-      if (item.mediaType === 'movie') return;
+    const missingItems = displayedItems.filter(item => {
+      if (item.mediaType === 'movie') return false;
       const key = `${item.tmdbId || item.showId}-${item.season}x${item.episode}`;
-      if (item.episodeTitle || fetchedEpisodeTitles[key] || !item.tmdbId) return;
+      return !item.episodeTitle && !fetchedEpisodeTitles[key] && Boolean(item.tmdbId);
+    });
 
-      const res = await tmdb.getEpisodeDetails(item.tmdbId, item.season, item.episode);
-      if (isMounted && res.ok && res.value?.name) {
-        setFetchedEpisodeTitles(prev => ({
-          ...prev,
-          [key]: res.value.name
-        }));
-      }
+    if (missingItems.length === 0) return () => { isMounted = false; };
+
+    const cancel = scheduleWatchProviderCardEnrichment(() => {
+      void Promise.all(missingItems.map(item => historyDetailRequestLimiter.run(async () => {
+        const res = await tmdb.getEpisodeDetails(item.tmdbId!, item.season, item.episode);
+        return {
+          key: `${item.tmdbId || item.showId}-${item.season}x${item.episode}`,
+          title: res.ok ? res.value?.name : null,
+        };
+      }))).then(results => {
+        if (!isMounted) return;
+        const titles = Object.fromEntries(results.filter(result => result.title).map(result => [result.key, result.title]));
+        if (Object.keys(titles).length > 0) {
+          setFetchedEpisodeTitles(previous => ({ ...previous, ...titles }));
+        }
+      });
     });
 
     return () => {
       isMounted = false;
+      cancel();
     };
   }, [displayedItems, fetchedEpisodeTitles]);
 

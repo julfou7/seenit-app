@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Circle, CheckCircle2, Sparkles, Tv, Calendar } from 'lucide-react';
 import { SeenItCheckButton } from '../SeenItCheckButton';
 import { type Show } from '../../types';
 import { getNextEpisodeNumber, getAiredProgress, cn, getTodayStr } from '../../lib/utils';
-import { tmdb } from '../../features/shows/tmdb';
-import { getFormattedProviderLogo, extractOfficialStreamingProvider, PLEX_LOGO_SVG } from '../../utils/providerLogos';
-import { checkPlexAvailability } from '../../features/plex/plexAvailability';
+import { getFormattedProviderLogo } from '../../utils/providerLogos';
+import { usePassiveWatchProvider } from '../../hooks/usePassiveWatchProvider';
 
 interface Props {
   key?: React.Key;
@@ -100,42 +99,14 @@ export function getUpToDateOrNewSeasonCategory(show: Show): UpToDateCategoryInfo
 export const UpToDateShowCard = React.memo(function UpToDateShowCard({ show, onShowClick, onEpisodeClick, onMarkAsSeen }: Props) {
   const categoryInfo = getUpToDateOrNewSeasonCategory(show);
 
-  const [providerLogo, setProviderLogo] = useState<string | null>(null);
-  const [providerName, setProviderName] = useState<string | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    if (show.tmdbId) {
-      tmdb.getWatchProviders(show.tmdbId, show.mediaType === 'movie' ? 'movie' : 'tv').then(res => {
-        if (!isMounted) return;
-        let officialFound = false;
-        if (res.ok && res.value?.results) {
-          const stream = extractOfficialStreamingProvider(res.value.results);
-          if (stream) {
-            setProviderLogo(stream.logo_path);
-            setProviderName(stream.provider_name);
-            officialFound = true;
-          }
-        }
-
-        if (!officialFound && !show.networks?.length) {
-          checkPlexAvailability({
-            tmdbId: show.tmdbId,
-            title: show.title,
-            originalTitle: (show as any).originalTitle || (show as any).original_title,
-            year: show.firstAirDate?.slice(0, 4),
-            mediaType: show.mediaType === 'movie' ? 'movie' : 'tv'
-          }).then(plexInfo => {
-            if (isMounted && plexInfo.available) {
-              setProviderLogo(PLEX_LOGO_SVG);
-              setProviderName(plexInfo.serverName ? `Plex (${plexInfo.serverName})` : 'Plex');
-            }
-          }).catch(() => {});
-        }
-      }).catch(() => {});
-    }
-    return () => { isMounted = false; };
-  }, [show.tmdbId, show.mediaType, show.title]);
+  const { cardRef, providerLogo, providerName } = usePassiveWatchProvider({
+    tmdbId: show.tmdbId,
+    mediaType: show.mediaType === 'movie' ? 'movie' : 'tv',
+    title: show.title,
+    originalTitle: (show as any).originalTitle || (show as any).original_title,
+    year: show.firstAirDate?.slice(0, 4),
+    hasKnownProvider: Boolean(show.networks?.length),
+  });
 
   if (!categoryInfo) return null;
 
@@ -185,6 +156,7 @@ export const UpToDateShowCard = React.memo(function UpToDateShowCard({ show, onS
 
   return (
     <div 
+      ref={cardRef}
       className="flex-shrink-0 w-64 flex flex-col cursor-pointer snap-start" 
       onClick={handleCardClick}
     >

@@ -133,6 +133,7 @@ test('SEENIT-PERF-001 borne le fan-out diffuseurs et stabilise les cartes Explor
 
   const tmdbClientSource = readFileSync(new URL('../src/features/shows/tmdbClient.ts', import.meta.url), 'utf8');
   const gridSource = readFileSync(new URL('../src/components/GridMediaCard.tsx', import.meta.url), 'utf8');
+  const passiveProviderSource = readFileSync(new URL('../src/hooks/usePassiveWatchProvider.ts', import.meta.url), 'utf8');
   const discoverSource = readFileSync(new URL('../src/screens/DiscoverScreen.tsx', import.meta.url), 'utf8');
   const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
   const cssSource = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
@@ -141,9 +142,10 @@ test('SEENIT-PERF-001 borne le fan-out diffuseurs et stabilise les cartes Explor
   assert.match(tmdbClientSource, /watchProvidersInFlight/);
   assert.match(tmdbClientSource, /if \(existingRequest\) return existingRequest/);
   assert.match(tmdbClientSource, /watchProviderRequestLimiter\.run/);
-  assert.match(gridSource, /observeWatchProviderCard\(cardRef\.current/);
+  assert.match(gridSource, /usePassiveWatchProvider/);
+  assert.match(passiveProviderSource, /observeWatchProviderCard\(cardRef\.current/);
   assert.doesNotMatch(gridSource, /new IntersectionObserver/);
-  assert.match(gridSource, /scheduleWatchProviderCardEnrichment\(enrichProvider\)/);
+  assert.match(passiveProviderSource, /scheduleWatchProviderCardEnrichment\(enrichProvider\)/);
   assert.doesNotMatch(gridSource, /networkMode:\s*['"]active['"]/);
   assert.match(gridSource, /media-grid-card/);
   assert.doesNotMatch(
@@ -166,8 +168,10 @@ test('SEENIT-PERF-001 borne le fan-out diffuseurs et stabilise les cartes Explor
   assert.match(discoverSource, /const handleToggleWatched = useCallback/);
   assert.match(discoverSource, /const handleAddMedia = useCallback/);
   assert.match(discoverSource, /onLongPress=\{handleLongPress\}/);
-  assert.ok(discoverSource.includes("key={`grid_${item.media_type || 'media'}_${item.id}`}"));
-  assert.ok(!discoverSource.includes("key={`grid_${item.media_type || 'media'}_${item.id}_${idx}`}"));
+  assert.match(discoverSource, /useGridVirtualWindow/);
+  assert.match(discoverSource, /debouncedQuery\.trim\(\) \? \(/);
+  assert.match(discoverSource, /<BoundedDiscoverGrid/);
+  assert.ok(discoverSource.includes("`grid_${item.media_type || 'media'}_${item.id}`"));
   assert.match(appSource, /const openTmdbMedia = useCallback/);
   assert.match(appSource, /<DiscoverScreen onShowClick=\{openTmdbMedia\}/);
 });

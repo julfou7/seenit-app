@@ -6,12 +6,8 @@ import {
 import { tmdb, isMovieAtCinema, isMovieUpcoming, type TMDBMedia } from '../features/shows/tmdb';
 import { cn, checkIsUpToDate, computeAutoArchiveStatus, getTodayStr, getCalendarDaysDiff, formatAirDateSafe } from '../lib/utils';
 import { useShowsStore } from '../store/showsStore';
-import { getFormattedProviderLogo, extractOfficialStreamingProvider, PLEX_LOGO_SVG } from '../utils/providerLogos';
-import { checkPlexAvailability } from '../features/plex/plexAvailability';
-import {
-  observeWatchProviderCard,
-  scheduleWatchProviderCardEnrichment,
-} from '../features/providers/watchProviderRequestPolicy';
+import { getFormattedProviderLogo } from '../utils/providerLogos';
+import { usePassiveWatchProvider } from '../hooks/usePassiveWatchProvider';
 
 export interface GridMediaCardProps {
   media: TMDBMedia;
@@ -126,57 +122,14 @@ export const GridMediaCard = React.memo(function GridMediaCard({
     }
   };
 
-  const [providerLogo, setProviderLogo] = useState<string | null>(null);
-  const [providerName, setProviderName] = useState<string | null>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    let cancelScheduledEnrichment = () => {};
-    let stopObserving = () => {};
-
-    const enrichProvider = () => {
-      tmdb.getWatchProviders(Number(media.id), mediaType).then(res => {
-        if (!isMounted) return;
-        let officialFound = false;
-        if (res.ok && res.value?.results) {
-          const stream = extractOfficialStreamingProvider(res.value.results);
-          if (stream) {
-            setProviderLogo(stream.logo_path);
-            setProviderName(stream.provider_name);
-            officialFound = true;
-          }
-        }
-
-        if (!officialFound && (!show || !show.networks?.length)) {
-          checkPlexAvailability({
-            tmdbId: Number(media.id),
-            title: displayTitle,
-            originalTitle: (media as any).original_title || (media as any).original_name,
-            year,
-            mediaType
-          }).then(plexInfo => {
-            if (isMounted && plexInfo.available) {
-              setProviderLogo(PLEX_LOGO_SVG);
-              setProviderName(plexInfo.serverName ? `Plex (${plexInfo.serverName})` : 'Plex');
-            }
-          }).catch(() => {});
-        }
-      }).catch(() => {});
-    };
-
-    if (cardRef.current && media.id) {
-      stopObserving = observeWatchProviderCard(cardRef.current, () => {
-        cancelScheduledEnrichment = scheduleWatchProviderCardEnrichment(enrichProvider);
-      });
-    }
-
-    return () => {
-      isMounted = false;
-      stopObserving();
-      cancelScheduledEnrichment();
-    };
-  }, [media.id, mediaType, displayTitle, year, show]);
+  const { cardRef, providerLogo, providerName } = usePassiveWatchProvider({
+    tmdbId: Number(media.id),
+    mediaType,
+    title: displayTitle,
+    originalTitle: (media as any).original_title || (media as any).original_name,
+    year,
+    hasKnownProvider: Boolean(show?.networks?.length),
+  });
 
   const networkLogo = getFormattedProviderLogo(
     providerLogo || (show?.networks && show.networks.length > 0 ? show.networks[0].logo_path : null),

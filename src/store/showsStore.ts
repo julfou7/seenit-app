@@ -369,8 +369,14 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
   loading: true,
   initialized: false,
   setShows: (shows) => {
-    saveToLocalStorage(auth.currentUser?.uid, shows);
-    set({ shows });
+    set(state => {
+      const stableShows = preserveUnchangedShowReferences(state.shows, shows);
+      const isSameLibrary = stableShows.length === state.shows.length
+        && stableShows.every((show, index) => show === state.shows[index]);
+      if (isSameLibrary) return state;
+      saveToLocalStorage(auth.currentUser?.uid, stableShows);
+      return { shows: stableShows };
+    });
   },
   setLoading: (loading) => set({ loading }),
   setInitialized: (initialized) => set({ initialized }),

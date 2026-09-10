@@ -15,8 +15,10 @@ const WATCHLIST_CAROUSEL_IDS = [
 
 test('#229 conserve un premier lot borné puis rend les quatre carrousels progressifs', () => {
   assert.match(watchListSource, /const WATCHLIST_BATCH_SIZE = 8;/);
-  assert.match(watchListSource, /const WATCHLIST_CAROUSEL_PRELOAD_MARGIN = '0px 50% 0px 0px';/);
-  assert.match(watchListSource, /data\.slice\(0, visibleCount\)\.map\(renderCard\)/);
+  assert.match(watchListSource, /const WATCHLIST_CAROUSEL_OVERSCAN = 3;/);
+  assert.match(watchListSource, /data\.slice\(range\.start, range\.end\)/);
+  assert.match(watchListSource, /leadingSpacerSize/);
+  assert.match(watchListSource, /trailingSpacerSize/);
 
   for (const id of WATCHLIST_CAROUSEL_IDS) {
     assert.match(
@@ -48,17 +50,11 @@ test('#229 rend le scroll horizontal réellement libre, sans snap obligatoire ni
   }
 });
 
-test('#229 précharge la suite avant la fin du geste avec un fallback sans IntersectionObserver', () => {
-  assert.match(watchListSource, /typeof IntersectionObserver === 'undefined'/);
-  assert.match(watchListSource, /root:\s*container/);
-  assert.match(watchListSource, /rootMargin:\s*WATCHLIST_CAROUSEL_PRELOAD_MARGIN/);
-  assert.match(watchListSource, /preloadSentinelRef/);
-  assert.match(watchListSource, /element\.clientWidth \* 0\.5/);
-  assert.match(
-    watchListSource,
-    /setVisibleCount\(current => Math\.min\(data\.length, current \+ WATCHLIST_BATCH_SIZE\)\)/
-  );
-  assert.match(watchListSource, /startTransition\(\(\) =>/);
+test('#229 recycle les cartes hors écran au lieu d’accumuler le DOM', () => {
+  assert.match(watchListSource, /useHorizontalVirtualWindow/);
+  assert.match(watchListSource, /ref=\{index === 0 \? itemMeasureRef : undefined\}/);
+  assert.doesNotMatch(watchListSource, /data\.slice\(0, visibleCount\)\.map\(renderCard\)/);
+  assert.doesNotMatch(watchListSource, /preloadSentinelRef/);
 });
 
 test('#229 retire le faux Voir tout terminal et conserve le vrai bouton d’en-tête', () => {

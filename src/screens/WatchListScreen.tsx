@@ -11,8 +11,7 @@ import { EpisodeDetailModal } from './EpisodeDetailModal';
 import { PersonDetailModal } from './PersonDetailModal';
 import { tmdb } from '../features/shows/tmdb';
 import { markEpisodeWatched } from '../features/shows/markEpisodeWatched';
-import { getFormattedProviderLogo, extractOfficialStreamingProvider, PLEX_LOGO_SVG } from '../utils/providerLogos';
-import { checkPlexAvailability } from '../features/plex/plexAvailability';
+import { getFormattedProviderLogo } from '../utils/providerLogos';
 import { User, Circle, CheckCircle2, Trash2, Archive, X, Clock, Ban } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
 import { doc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
@@ -26,6 +25,11 @@ import { useLogStore } from '../store/logStore';
 import { SwipeableCard } from '../components/cards/SwipeableCard';
 import { SeenItLogo } from '../components/SeenItLogo';
 import { SeenItCheckButton } from '../components/SeenItCheckButton';
+import { useHorizontalVirtualWindow } from '../hooks/useBoundedVirtualWindow';
+import { usePassiveWatchProvider } from '../hooks/usePassiveWatchProvider';
+import { createWatchProviderRequestLimiter } from '../features/providers/watchProviderRequestPolicy';
+
+const watchlistMovieDetailLimiter = createWatchProviderRequestLimiter(2);
 
 interface ExpandedItemCardProps {
   key?: React.Key;
@@ -47,60 +51,46 @@ function formatRuntime(minutes?: number) {
 
 function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMarkAsSeen, onPersonClick }: ExpandedItemCardProps) {
   const isMovie = show.mediaType === 'movie';
-  const [movieRuntime, setMovieRuntime] = useState<number | null>((show as any).runtime || null);
-  const [movieDetails, setMovieDetails] = useState<any>(null);
-  const [providerLogo, setProviderLogo] = useState<string | null>(
-    show.networks && show.networks.length > 0 && show.networks[0].logo_path
-      ? show.networks[0].logo_path
-      : null
-  );
-  const [providerName, setProviderName] = useState<string | null>(
-    show.networks && show.networks.length > 0 ? show.networks[0].name : null
-  );
+  const cachedMovieDetails = isMovie && show.tmdbId
+    ? tmdb.peekMediaDetails(show.tmdbId, 'movie')
+    : null;
+  const [movieRuntime, setMovieRuntime] = useState<number | null>((show as any).runtime || cachedMovieDetails?.runtime || null);
+  const [movieDetails, setMovieDetails] = useState<any>(cachedMovieDetails);
+  const isMountedRef = useRef(true);
+  const requestedMovieDetailsRef = useRef<number | null>(cachedMovieDetails ? show.tmdbId : null);
 
   useEffect(() => {
-    let isMounted = true;
-    if (show.tmdbId) {
-      if (isMovie) {
-        tmdb.getMovieDetails(show.tmdbId).then(res => {
-          if (isMounted && res.ok && res.value) {
-            setMovieDetails(res.value);
-            if (res.value.runtime && !movieRuntime) {
-              setMovieRuntime(res.value.runtime);
-            }
-          }
-        }).catch(() => {});
-      }
-      tmdb.getWatchProviders(show.tmdbId, isMovie ? 'movie' : 'tv').then(res => {
-        if (!isMounted) return;
-        let officialFound = false;
-        if (res.ok && res.value?.results) {
-          const stream = extractOfficialStreamingProvider(res.value.results);
-          if (stream) {
-            setProviderLogo(stream.logo_path);
-            setProviderName(stream.provider_name);
-            officialFound = true;
-          }
-        }
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
 
-        if (!officialFound && !show.networks?.length) {
-          checkPlexAvailability({
-            tmdbId: show.tmdbId,
-            title: show.title,
-            originalTitle: (show as any).originalTitle || (show as any).original_title,
-            year: show.firstAirDate?.slice(0, 4),
-            mediaType: isMovie ? 'movie' : 'tv'
-          }).then(plexInfo => {
-            if (isMounted && plexInfo.available) {
-              setProviderLogo(PLEX_LOGO_SVG);
-              setProviderName(plexInfo.serverName ? `Plex (${plexInfo.serverName})` : 'Plex');
-            }
-          }).catch(() => {});
-        }
-      }).catch(() => {});
-    }
-    return () => { isMounted = false; };
-  }, [isMovie, show.tmdbId, movieRuntime, show.title]);
+  const enrichMovieDetails = useCallback(() => {
+    if (!isMovie || !show.tmdbId || requestedMovieDetailsRef.current === show.tmdbId) return;
+    requestedMovieDetailsRef.current = show.tmdbId;
+    void watchlistMovieDetailLimiter.run(() => tmdb.getMovieDetails(show.tmdbId)).then(res => {
+      if (!isMountedRef.current) return;
+      if (!res.ok || !res.value) {
+        requestedMovieDetailsRef.current = null;
+        return;
+      }
+      setMovieDetails(res.value);
+      if (res.value.runtime) {
+        setMovieRuntime(current => current || res.value.runtime);
+      }
+    }).catch(() => {
+      if (isMountedRef.current) requestedMovieDetailsRef.current = null;
+    });
+  }, [isMovie, show.tmdbId]);
+
+  const { cardRef, providerLogo, providerName } = usePassiveWatchProvider({
+    tmdbId: show.tmdbId,
+    mediaType: isMovie ? 'movie' : 'tv',
+    title: show.title,
+    originalTitle: (show as any).originalTitle || (show as any).original_title,
+    year: show.firstAirDate?.slice(0, 4),
+    hasKnownProvider: Boolean(show.networks?.length),
+    onEnrich: enrichMovieDetails,
+  });
 
   let nextEp = show.nextEpisodeToWatch;
   const seen = show.seenEpisodes || [];
@@ -254,6 +244,7 @@ function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMa
 
   return (
     <div 
+      ref={cardRef}
       onClick={handleCardClick}
       className="w-full flex items-stretch justify-between gap-3 bg-zinc-900/60 hover:bg-zinc-900/80 rounded-2xl overflow-hidden relative isolate transition-all active:scale-[0.98] cursor-pointer group"
     >
@@ -378,7 +369,7 @@ function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMa
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 const WATCHLIST_BATCH_SIZE = 8;
-const WATCHLIST_CAROUSEL_PRELOAD_MARGIN = '0px 50% 0px 0px';
+const WATCHLIST_CAROUSEL_OVERSCAN = 3;
 
 interface ProgressiveWatchlistCarouselProps {
   id: string;
@@ -387,57 +378,32 @@ interface ProgressiveWatchlistCarouselProps {
 }
 
 function ProgressiveWatchlistCarousel({ id, data, renderCard }: ProgressiveWatchlistCarouselProps) {
-  const [visibleCount, setVisibleCount] = useState(() => Math.min(WATCHLIST_BATCH_SIZE, data.length));
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const preloadSentinelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setVisibleCount(current => Math.min(data.length, Math.max(current, WATCHLIST_BATCH_SIZE)));
-  }, [data.length]);
-
-  useEffect(() => {
-    if (visibleCount >= data.length) return;
-
-    const container = scrollContainerRef.current;
-    const sentinel = preloadSentinelRef.current;
-    if (!container || !sentinel || typeof IntersectionObserver === 'undefined') return;
-
-    const observer = new IntersectionObserver(entries => {
-      if (!entries.some(entry => entry.isIntersecting)) return;
-      observer.disconnect();
-      startTransition(() => {
-        setVisibleCount(current => Math.min(data.length, current + WATCHLIST_BATCH_SIZE));
-      });
-    }, {
-      root: container,
-      rootMargin: WATCHLIST_CAROUSEL_PRELOAD_MARGIN,
-      threshold: 0,
-    });
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [data.length, visibleCount]);
-
-  const handleHorizontalScrollFallback = useCallback((event: React.UIEvent<HTMLDivElement>) => {
-    if (typeof IntersectionObserver !== 'undefined' || visibleCount >= data.length) return;
-    const element = event.currentTarget;
-    const preloadDistance = Math.max(element.clientWidth * 0.5, 1);
-    if (element.scrollLeft + element.clientWidth >= element.scrollWidth - preloadDistance) {
-      startTransition(() => {
-        setVisibleCount(current => Math.min(data.length, current + WATCHLIST_BATCH_SIZE));
-      });
-    }
-  }, [data.length, visibleCount]);
+  const {
+    containerRef: scrollContainerRef,
+    itemMeasureRef,
+    range,
+    leadingSpacerSize,
+    trailingSpacerSize,
+  } = useHorizontalVirtualWindow(data.length, WATCHLIST_BATCH_SIZE, WATCHLIST_CAROUSEL_OVERSCAN);
+  const visibleItems = data.slice(range.start, range.end);
 
   return (
     <div
       ref={scrollContainerRef}
       id={id}
       className="flex overflow-x-auto gap-4 px-4 sm:px-6 scrollbar-none pb-1"
-      onScroll={handleHorizontalScrollFallback}
     >
-      {data.slice(0, visibleCount).map(renderCard)}
-      <div ref={preloadSentinelRef} aria-hidden="true" className="w-2 shrink-0" />
+      {leadingSpacerSize > 0 && (
+        <div aria-hidden="true" className="shrink-0" style={{ width: leadingSpacerSize }} />
+      )}
+      {visibleItems.map((show, index) => (
+        <div key={show.id || `${show.mediaType}_${show.tmdbId}`} ref={index === 0 ? itemMeasureRef : undefined} className="shrink-0">
+          {renderCard(show)}
+        </div>
+      ))}
+      {trailingSpacerSize > 0 && (
+        <div aria-hidden="true" className="shrink-0" style={{ width: trailingSpacerSize }} />
+      )}
     </div>
   );
 }
