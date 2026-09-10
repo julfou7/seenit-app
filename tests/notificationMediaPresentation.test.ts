@@ -50,10 +50,20 @@ test('SEENIT-NOTIFICATION-002 sépare affiche et image riche sans bloquer le fal
     'tout visuel local disponible, y compris le poster fallback, doit alimenter BigPicture');
   assert.doesNotMatch(mediaReminderSource, /imageUrl !== iconUrl/,
     'un poster partagé avec largeIcon ne doit plus supprimer le BigPicture');
-  assert.match(mediaReminderSource, /\{ id: 'seenit-media', url: imageUrl \}/,
-    'le visuel traverse uniquement sous forme d’URI locale courte');
   assert.match(mediaReminderSource, /summaryText: options\.summaryText/,
     'le libellé secondaire Android doit être spécifique à l’événement');
+});
+
+test('SEENIT-NOTIFICATION-002 utilise une référence privée stable et jamais getUri', () => {
+  assert.match(notificationMediaSource, /SEENIT_DATA_SCHEME = 'seenit-data:\/\/'/);
+  assert.match(notificationMediaSource, /return `\$\{SEENIT_DATA_SCHEME\}\$\{notificationMediaCachePath\(url\)\}`/);
+  assert.doesNotMatch(notificationMediaSource, /Filesystem\.getUri\(/,
+    'un rappel planifié ne doit pas dépendre d’une URI Capacitor variable');
+  assert.match(nativePatchSource, /SEENIT_LOCAL_NOTIFICATION_PRIVATE_DATA_V2_PATCH/);
+  assert.match(nativePatchSource, /context\.filesDir\.canonicalFile/,
+    'Android doit repartir exclusivement de son stockage privé');
+  assert.match(nativePatchSource, /candidate\.path\.startsWith\(rootPrefix\)/,
+    'le chemin canonique doit rester confiné sous filesDir');
 });
 
 test('SEENIT-NOTIFICATION-002 garde les images hors du pont Binder et borne le bitmap Android', () => {
@@ -63,16 +73,15 @@ test('SEENIT-NOTIFICATION-002 garde les images hors du pont Binder et borne le b
   assert.match(notificationMediaSource, /connectTimeout: NATIVE_IMAGE_CONNECT_TIMEOUT_MS/);
   assert.match(notificationMediaSource, /readTimeout: NATIVE_IMAGE_READ_TIMEOUT_MS/);
   assert.match(notificationMediaSource, /MAX_NATIVE_IMAGE_FILE_BYTES = 512 \* 1024/,
-    'la taille de chaque fichier image doit rester bornée');
-  assert.match(notificationMediaSource, /image\.tmdb\.org/);
-  assert.match(notificationMediaSource, /seenit\.app/);
+    'la taille de chaque fichier image doit rester bornée côté JS');
   assert.doesNotMatch(notificationMediaSource, /FileReader|readAsDataURL|data:image/i,
     'le chemin natif ne doit jamais matérialiser l’image en Data URL');
   assert.doesNotMatch(mediaReminderSource, /FileReader|readAsDataURL|Base64|data:image/i,
     'LocalNotifications.schedule ne doit recevoir aucun octet encodé');
 
-  assert.match(nativePatchSource, /SEENIT_LOCAL_NOTIFICATION_BOUNDED_BIG_PICTURE_PATCH/);
-  assert.match(nativePatchSource, /decodeSeenItLocalBitmap\(value, 512, 288\)/,
+  assert.match(nativePatchSource, /candidate\.length\(\) > 512L \* 1024L/,
+    'Android doit refaire la borne de taille avant décodage');
+  assert.match(nativePatchSource, /decodeSeenItLocalBitmap\(context, value, 512, 288\)/,
     'le BigPicture doit être décodé avec une dimension maximale explicite');
   assert.match(nativePatchSource, /inPreferredConfig = Bitmap\.Config\.RGB_565/,
     'le bitmap de notification utilise une représentation mémoire bornée');
