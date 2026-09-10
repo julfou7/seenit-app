@@ -116,6 +116,9 @@
     const preplay = `plex://preplay/?metadataKey=/library/metadata/${ratingKey}&metadataType=1&server=${serverId}`;
     const legacyIntent = `intent://${serverId}/movie//library/metadata/${ratingKey}#Intent;scheme=plex;package=com.plexapp.android;end`;
     const preplayIntent = `intent://preplay/?metadataKey=/library/metadata/${ratingKey}&metadataType=1&server=${serverId}#Intent;scheme=plex;package=com.plexapp.android;end`;
+    const exactIntentFalse = `intent://server://${serverId}/com.plexapp.plugins.library/library/metadata/${ratingKey}#Intent;scheme=plex;package=com.plexapp.android;action=android.intent.action.VIEW;B.android.intent.extra.START_PLAYBACK=false;end`;
+    const exactIntentAutoPlayFalse = `intent://server://${serverId}/com.plexapp.plugins.library/library/metadata/${ratingKey}?autoPlay=0#Intent;scheme=plex;package=com.plexapp.android;action=android.intent.action.VIEW;B.android.intent.extra.START_PLAYBACK=false;end`;
+    const exactIntentTrue = `intent://server://${serverId}/com.plexapp.plugins.library/library/metadata/${ratingKey}#Intent;scheme=plex;package=com.plexapp.android;action=android.intent.action.VIEW;B.android.intent.extra.START_PLAYBACK=true;end`;
 
     addTest('1 — Témoin Web PMS exact', exactWebUrl, 'Doit ouvrir la bonne copie dans Plex Web.');
     addTest('2 — plex://server historique', classic, 'Ancien deep link exact serverId + ratingKey.');
@@ -125,6 +128,9 @@
     addTest('6 — plex://preplay', preplay, 'Variante pre-play basée sur metadataKey + server.');
     addTest('7 — Intent Android explicite / variante movie', legacyIntent, 'Même destination, package com.plexapp.android forcé.');
     addTest('8 — Intent Android explicite / preplay', preplayIntent, 'Preplay avec package Plex Android forcé.');
+    addTest('9 — Intent PMS exact + START_PLAYBACK=false', exactIntentFalse, 'Contrat Android historique exact pour ouvrir la fiche sans lecture.');
+    addTest('10 — Intent PMS exact + autoPlay=0 + START_PLAYBACK=false', exactIntentAutoPlayFalse, 'Variante moderne sans lecture + extra historique.');
+    addTest('11 — Intent PMS exact + START_PLAYBACK=true', exactIntentTrue, 'ATTENTION : témoin de contrôle, peut démarrer directement la lecture.', true);
 
     results.hidden = false;
   }
