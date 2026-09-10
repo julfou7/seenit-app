@@ -753,7 +753,9 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   ouvertes, un cooldown et un plafond global. Le mode par défaut est `dry-run`, `off` coupe
   immédiatement toute écriture GitHub sans couper les logs, et une panne de la source ou de GitHub
   n'affecte jamais le backend. Les événements inconnus ou non autorisés restent dans le rapport
-  redigé ; aucune issue n'est fermée automatiquement.
+  redigé ; aucune issue n'est fermée automatiquement. Le compte de lecture dédié réutilise le
+  provider WIF canonique déjà administré pour GitHub Actions : son bootstrap cible explicitement le
+  projet SeenIt et ne tente jamais de recréer le pool ou le provider partagé après un échec de lecture.
 - Les clés TMDB et TVDB restent exclusivement côté backend et sont injectées depuis Secret Manager.
   OMDb et `OMDB_API_KEY` ne font plus partie du runtime ni du déploiement SeenIt.
 - La clé PKCS12 `seenit`, générée hors dépôt et matérialisée depuis GitHub Secrets, est l'unique clé

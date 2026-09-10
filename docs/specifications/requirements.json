@@ -758,6 +758,10 @@
         {
           "file": "tests/logAuditorWorkflow.test.ts",
           "contains": "SEENIT-OBSERVABILITY-001 exécute un batch Cloud Run en dry-run désactivable"
+        },
+        {
+          "file": "tests/logAuditorWorkflow.test.ts",
+          "contains": "SEENIT-OBSERVABILITY-001 réutilise le provider WIF canonique sans le recréer"
         }
       ]
     },
