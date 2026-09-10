@@ -487,13 +487,13 @@ export function SettingsScreen() {
   const triggerTestNotif = async (type: NotificationTestType) => {
     const sample = buildNotificationTestSample(shows, type);
     if (!sample) {
-      showToast("Aucun média du bon type n'est disponible pour ce test.", "info");
+      showToast("🧪 Test · Aucun média du bon type n'est disponible.", "info");
       return;
     }
 
     try {
       const mediaVisual = await resolveNotificationMediaVisual(sample.posterUrl, sample.richImageUrl);
-      await sendMediaReminderNotification(sample.notificationTitle, {
+      const sent = await sendMediaReminderNotification(sample.notificationTitle, {
         body: sample.body,
         badge: 'https://seenit.app/icon-192.png',
         ...mediaVisual,
@@ -510,15 +510,22 @@ export function SettingsScreen() {
         data: sample.data,
       } as any);
 
+      if (!sent) {
+        showToast("🧪 Test · Échec d'envoi de la notification.", "error");
+        return;
+      }
+
+      const hasVisual = Boolean(mediaVisual.icon || mediaVisual.image);
+      const testMode = sample.isUpcoming ? 'prochain événement' : 'Aperçu';
       showToast(
-        sample.isUpcoming
-          ? `🔔 Test avec le prochain événement : ${sample.show.title}`
-          : `🔔 Aucun événement à venir : exemple de rendu avec ${sample.show.title}`,
-        "info"
+        hasVisual
+          ? `🧪 Test · ${testMode} avec visuel : ${sample.show.title}`
+          : `🧪 Test · ${testMode} · fallback texte : ${sample.show.title}`,
+        hasVisual ? 'success' : 'info'
       );
     } catch (error) {
       console.warn('[Settings] Notification test failed:', error);
-      showToast("Impossible d'envoyer la notification de test.", "error");
+      showToast("🧪 Test · Impossible d'envoyer la notification.", "error");
     }
   };
 
@@ -712,7 +719,7 @@ export function SettingsScreen() {
                   <span className="text-[10px] text-zinc-500">Le jour de la diffusion</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button onClick={() => triggerTestNotif('release_today_tv')} className="text-[10px] font-bold text-zinc-400 hover:text-white px-2 py-1 bg-zinc-800 rounded-md transition-colors">Tester</button>
+                  <button onClick={() => triggerTestNotif('release_today_tv')} className="text-[10px] font-bold text-zinc-400 hover:text-white px-2 py-1 bg-zinc-800 rounded-md transition-colors">🧪 Test</button>
                   <input 
                     type="checkbox" 
                     className="w-4 h-4 rounded text-[#E5A93D] focus:ring-[#E5A93D] bg-zinc-800 border-zinc-700 cursor-pointer"
@@ -728,7 +735,7 @@ export function SettingsScreen() {
                   <span className="text-[10px] text-zinc-500">Rappel J-7</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button onClick={() => triggerTestNotif('season_d7')} className="text-[10px] font-bold text-zinc-400 hover:text-white px-2 py-1 bg-zinc-800 rounded-md transition-colors">Tester</button>
+                  <button onClick={() => triggerTestNotif('season_d7')} className="text-[10px] font-bold text-zinc-400 hover:text-white px-2 py-1 bg-zinc-800 rounded-md transition-colors">🧪 Test</button>
                   <input 
                     type="checkbox" 
                     className="w-4 h-4 rounded text-[#E5A93D] focus:ring-[#E5A93D] bg-zinc-800 border-zinc-700 cursor-pointer"
@@ -744,7 +751,7 @@ export function SettingsScreen() {
                   <span className="text-[10px] text-zinc-500">Le jour J</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button onClick={() => triggerTestNotif('movie_theater')} className="text-[10px] font-bold text-zinc-400 hover:text-white px-2 py-1 bg-zinc-800 rounded-md transition-colors">Tester</button>
+                  <button onClick={() => triggerTestNotif('movie_theater')} className="text-[10px] font-bold text-zinc-400 hover:text-white px-2 py-1 bg-zinc-800 rounded-md transition-colors">🧪 Test</button>
                   <input 
                     type="checkbox" 
                     className="w-4 h-4 rounded text-[#E5A93D] focus:ring-[#E5A93D] bg-zinc-800 border-zinc-700 cursor-pointer"
@@ -757,10 +764,10 @@ export function SettingsScreen() {
               <div className="flex items-center justify-between group">
                 <div className="flex flex-col">
                   <span className="text-xs text-zinc-200 font-bold group-hover:text-white transition-colors">Sortie DVD / VOD (Films)</span>
-                  <span className="text-[10px] text-zinc-500">~4 mois après le cinéma</span>
+                  <span className="text-[10px] text-zinc-500">Aperçu — aucune date VOD inventée</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button onClick={() => triggerTestNotif('movie_dvd_vod')} className="text-[10px] font-bold text-zinc-400 hover:text-white px-2 py-1 bg-zinc-800 rounded-md transition-colors">Tester</button>
+                  <button onClick={() => triggerTestNotif('movie_dvd_vod')} className="text-[10px] font-bold text-zinc-400 hover:text-white px-2 py-1 bg-zinc-800 rounded-md transition-colors">🧪 Test</button>
                   <input 
                     type="checkbox" 
                     className="w-4 h-4 rounded text-[#E5A93D] focus:ring-[#E5A93D] bg-zinc-800 border-zinc-700 cursor-pointer"
