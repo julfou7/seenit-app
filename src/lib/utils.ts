@@ -313,7 +313,7 @@ export function getAiredProgress(show: any) {
 
   // 1. Explicit totalAiredEpisodes
   if (typeof show.totalAiredEpisodes === 'number' && show.totalAiredEpisodes > 0) {
-    return Math.min(100, Math.max(0, Math.round((seenEpisodesCount / show.totalAiredEpisodes) * 100));
+    return Math.min(100, Math.max(0, Math.round((seenEpisodesCount / show.totalAiredEpisodes) * 100)));
   }
 
   // 2. Seasons cache aired episodes
@@ -335,7 +335,7 @@ export function getAiredProgress(show: any) {
 
   // 3. Total episodes
   if (typeof show.totalEpisodes === 'number' && show.totalEpisodes > 0) {
-    return Math.min(100, Math.max(0, Math.round((seenEpisodesCount / show.totalEpisodes) * 100));
+    return Math.min(100, Math.max(0, Math.round((seenEpisodesCount / show.totalEpisodes) * 100)));
   }
 
   // 4. Fallback when total count is unknown: return 0 so progress bar starts empty and completes smoothly once data is loaded
