@@ -36,11 +36,11 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 - La PWA doit fonctionner installée ou dans un navigateur mobile/desktop.
 - L'APK doit gérer explicitement reprise d'activité, bouton Retour Android, safe areas,
   notifications FCM et intents vers les applications natives.
-- Les liens Plex universels privilégient Plex Android dans l'APK. Lorsqu'une disponibilité personnelle
-  fournit déjà un locator PMS exact `serverId + ratingKey`, l'exactitude de destination prime : tant
-  que Plex Android ne garantit pas un deep link de fiche personnelle, l'APK ouvre la route Web PMS
-  exacte. Le simple lancement de l'application Plex ne vaut jamais preuve de navigation vers la copie
-  personnelle. La PWA conserve l'URL Web officielle.
+- Le CTA Plex ouvre la fiche universelle Plex Discover strictement résolue depuis le TMDB ID,
+  sous la forme `https://watch.plex.tv/movie|show/<slug>`. Dans l'APK, ce lien universel privilégie
+  l'application Android Plex puis retombe sur le Web ; la PWA ouvre la même fiche Web officielle.
+  Une disponibilité personnelle `serverId + ratingKey` reste une preuve de présence/couverture mais
+  ne pilote plus la navigation. Aucun titre, année ou accueil Plex n'est utilisé comme fallback.
 - La status bar Android est edge-to-edge : la WebView s'étend derrière une barre transparente avec
   icônes claires, tandis que le contenu principal et le login respectent `env(safe-area-inset-top)`.
   Avec `@capacitor/status-bar`, ce rendu clair sur fond sombre exige explicitement `Style.Dark` / `DARK` ;
@@ -329,7 +329,7 @@ Une action répétée qui ne change pas l'état final est idempotente. Les mises
 | Film `viewCount>0` / userState vu exact | Film `completed`, record `movie` marqué `plexImported` si créé par Plex | Même état final | Watchlist ou activité Cloud ambiguë seule. |
 | Épisode `viewCount>0` exact | Ajoute l'épisode, recalcule `watching`/`completed`, provenance Plex | Même état final | Saison conteneur, épisode sans série parente résolue, identité ambiguë. |
 | Film/épisode exact actuellement non vu | Retire uniquement la progression possédée par Plex et recalcule l'état | Full ou recheck Delta exact | 404, timeout, serveur ignoré, disparition seule, progression SeenIt/legacy. |
-| Inventaire de bibliothèque | Reconstruit la disponibilité et l'URL Plex exactes | Full ; cache réutilisé ensuite | La présence ne marque jamais vu. |
+| Inventaire de bibliothèque | Reconstruit la disponibilité et les locators PMS exacts servant de preuve/couverture | Full ; cache réutilisé ensuite | La présence ne marque jamais vu. |
 | Serveur hors ligne | Continue avec les autres serveurs | Full/Delta | Aucun état connu n'est supprimé ; serveur journalisé comme ignoré. |
 | Source/cursor incomplet | Conserve le curseur pertinent pour nouvel essai | Full/Delta | Aucune suppression ou non-vu dérivé. |
 
@@ -921,7 +921,7 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   releases via `/api/update` tant que ce fallback existe.
 - **SEENIT-QUALITY-008** — La validation continue échoue vite sans retirer de contrôle :
   l’intégrité de la SPEC s’exécute avant tout accès aux dépendances, puis un cache `node_modules` exact
-  est restauré avant l’installation conditionnelle. Sa clé dépend du système, de l’architecture, de la
+  est restauré avant l’installation conditionnelle. Sa clé dépend du système, de l'architecture, de la
   version Node, du lockfile et des scripts de patch ; seul `main` alimente le cache de référence et une
   PR ne peut pas l'empoisonner. Sur cache trouvé, aucune installation n'a lieu et la classification
   comme le contrat de changement s'exécutent directement. Un cache absent déclenche une installation
@@ -990,9 +990,9 @@ l'identité de l'APK et ses actifs.
 - Tester un client BitTorrent installé puis absent sur Android pour le fallback Magnet.
 - Tester une annulation active, un échec distant et deux téléchargements simultanés.
 - Parcourir les cartes et dialogues au clavier en PWA, puis avec TalkBack dans l'APK.
-- Vérifier qu'une disponibilité PMS exacte ouvre la copie `serverId + ratingKey` sans retomber sur
-  Home/Discover ; une ouverture native de fiche ne redevient prioritaire que lorsqu'un contrat Plex
-  Android vérifiable la garantit.
+- Vérifier que le CTA Plex ouvre la fiche Discover du média TMDB attendu dans Plex Android puis, si
+  l'application ne traite pas le lien universel, dans le navigateur ; aucun locator PMS personnel,
+  titre/année ou accueil Plex ne doit être utilisé comme destination de repli.
 - Pour toute nouvelle release APK, installer N+1 par-dessus N et confirmer que compte, données locales,
   icône, raccourci, notifications et deep links sont conservés. Une désinstallation ne fait plus partie
   du parcours normal de validation après la baseline `v1.4.112`.

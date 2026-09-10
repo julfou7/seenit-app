@@ -286,7 +286,9 @@ borné (120 médias, 6 h frais, réutilisable jusqu'à 7 jours en cas d'indispon
 Une icône **« Actualiser Plex »** adjacente au titre force la redécouverte des serveurs Plex puis revérifie
 le média courant, sans effacer le dernier inventaire de serveurs utilisable si la redécouverte échoue.
 Le glyph reste compact mais sa cible tactile mesure au moins 44 × 44 CSS px, avec nom accessible, focus
-visible et état de chargement.
+visible et état de chargement. Quand la présence Plex est confirmée, le CTA Plex ouvre la fiche universelle
+Discover dont le slug a été résolu strictement depuis le TMDB ID exact ; les locators PMS servent à la
+preuve de disponibilité mais ne pilotent plus la navigation.
 
 Quand Téléchargements est désactivé, la fiche Film/Série ne montre aucune mention de cette fonction :
 le bouton bleu principal/annexe, le fallback « Où regarder », le mode « Téléchargement 1-Clic », les
@@ -387,12 +389,14 @@ La machine d'états exhaustive et le mapping Plex sont autoritatifs dans `seenit
 - L'association utilise le PIN Plex dans une page externe, sondée toutes les trois secondes jusqu'au
   jeton ou à l'arrêt du parcours.
 - Le jeton est sauvegardé pour le même UID ; une synchronisation complète démarre après association.
-- Dans l'APK, les liens Plex universels peuvent cibler l'application Android Plex. Une disponibilité
-  personnelle déjà résolue par `serverId + ratingKey` conserve en revanche la route Web PMS exacte tant
-  que Plex Android ne fournit pas un contrat vérifiable de navigation vers la fiche ; un simple lancement
-  de l'application n'est pas considéré comme un succès. Dans la PWA, l'URL Web officielle reste utilisée.
-- Si le TMDB ID ne peut pas résoudre exactement une fiche Plex, SeenIt n'ouvre pas aveuglément
-  l'accueil Plex.
+- Le CTA Plex résout strictement le slug Discover depuis le TMDB ID exact puis ouvre
+  `https://watch.plex.tv/movie/<slug>` ou `https://watch.plex.tv/show/<slug>`. Dans l'APK, Android peut
+  remettre ce lien universel à l'application Plex ; si elle ne le traite pas, le parcours Web reste le
+  repli. Dans la PWA, la même fiche Discover s'ouvre sur le Web.
+- Une disponibilité personnelle `serverId + ratingKey` reste une preuve de présence/couverture PMS ;
+  elle n'est plus utilisée comme destination de navigation et aucune URL PMS n'est priorisée par le CTA.
+- Si le TMDB ID ne peut pas résoudre exactement une fiche Plex, SeenIt n'utilise ni titre/année ni
+  redirection aveugle vers l'accueil Plex.
 
 ### 9.2 Synchronisation
 
@@ -436,7 +440,7 @@ Réglages généraux, sans exposer à cet endroit C411, Sonarr, Radarr ou qBitto
 Quand la fonctionnalité est désactivée :
 
 - l'onglet et le badge Télécharger sont absents ;
-- l'écran Téléchargements n'est pas affiché et une navigation directe/historique revient à « À Voir » ;
+- l'écran Téléchargements n'est pas affiché et une navigation directe/historique revient sur « À Voir » ;
 - la fiche Film et la fiche Série n'affichent aucun bouton, libellé, statut ou disponibilité Arr liée
   au téléchargement, y compris l'action **Téléchargement du menu « … »** ;
 - le détail d'épisode n'affiche ni bouton Télécharger/re-télécharger, ni badge « Téléchargé », ni
@@ -588,7 +592,7 @@ et #178 à #181 ; la preuve visuelle/tactile PWA/APK reste à produire avec #15.
 | Âge conseillé personnel | Firestore du même UID | Même Firestore et même UID |
 | Backend | Même origine canonique | `https://seenit.ai.studio` explicite |
 | Retour | Historique navigateur | Modals → fiche → historique → À Voir → quitter |
-| Plex | Nouvel onglet Web | Liens universels : application Plex puis Web ; locator PMS exact : route Web exacte |
+| Plex | Fiche Discover Web vérifiée par TMDB | Lien Discover vérifié : application Plex puis Web ; locators PMS réservés à la disponibilité |
 | Reddit/autres liens | Nouvel onglet | Application associée, puis Custom Tab |
 | Magnet | Gestionnaire navigateur/système si Téléchargements est activé | Intent Android compatible si Téléchargements est activé |
 | Notifications | Web Push/service worker | Push + notifications locales Capacitor |

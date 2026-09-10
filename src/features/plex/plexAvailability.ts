@@ -9,7 +9,7 @@ import { authenticatedFetch, getAuthenticatedHeaders } from '../../lib/apiAuth';
 import { buildNativeBackendAttempts, executeBackendAttempts } from '../../lib/nativeBackendRetry';
 import { resolveSeenItApiCandidates } from '../../lib/seenitApi';
 import { getStoredPlexToken } from './plexStorage';
-import { buildPlexMediaUrl, replacePlexUserCache } from './plexAvailabilityCache';
+import { replacePlexUserCache } from './plexAvailabilityCache';
 import {
   createAsyncRequestLimiter,
   isConfirmedPlexAvailabilityResponse,
@@ -29,6 +29,20 @@ export interface PlexMediaInfo {
   title?: string;
   year?: number;
   lastChecked: number;
+}
+
+/**
+ * La disponibilité PMS et la navigation Plex sont deux contrats distincts.
+ * Les locators serverId/ratingKey restent disponibles comme preuve technique,
+ * tandis que les URL PMS éventuelles restent internes au cache et ne sont
+ * jamais exposées au CTA. L'ouverture publique est résolue séparément par
+ * TMDB -> slug Plex Discover dans openPlexWatchUrl().
+ */
+export function toPlexAvailabilityEvidence(info: PlexMediaInfo): PlexMediaInfo {
+  const evidence = { ...info };
+  delete evidence.plexUrl;
+  delete evidence.watchUrl;
+  return evidence;
 }
 
 interface PlexAvailabilityState {
@@ -54,9 +68,7 @@ export const usePlexAvailabilityStore = create<PlexAvailabilityState>()(
         })),
       getMediaAvailability: (key) => {
         const info = get().cache[key];
-        if (!info || info.plexUrl || !info.serverId || !info.ratingKey) return info;
-        const plexUrl = buildPlexMediaUrl(info.serverId, info.ratingKey);
-        return { ...info, plexUrl, watchUrl: info.watchUrl || plexUrl };
+        return info ? toPlexAvailabilityEvidence(info) : undefined;
       },
       clearCache: () => set({ cache: {} }),
       clearUserCache: (uid) =>
@@ -273,7 +285,7 @@ async function performPlexAvailabilityCheck(params: {
             lastChecked: Date.now()
           };
           store.setMediaAvailability(key, info);
-          return info;
+          return toPlexAvailabilityEvidence(info);
         }
 
         const confirmedUnavailable: PlexMediaInfo = {
