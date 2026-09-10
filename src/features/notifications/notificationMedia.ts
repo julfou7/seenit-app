@@ -2,6 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 
 const NOTIFICATION_MEDIA_DIR = 'notification-media';
+const SEENIT_DATA_SCHEME = 'seenit-data://';
 const NATIVE_IMAGE_CONNECT_TIMEOUT_MS = 2_500;
 const NATIVE_IMAGE_READ_TIMEOUT_MS = 2_500;
 const MAX_NATIVE_IMAGE_FILE_BYTES = 512 * 1024;
@@ -29,6 +30,10 @@ export function notificationMediaCachePath(url: string): string {
     hash = Math.imul(hash, 16777619);
   }
   return `${NOTIFICATION_MEDIA_DIR}/${(hash >>> 0).toString(16)}.img`;
+}
+
+export function notificationMediaPrivateRef(url: string): string {
+  return `${SEENIT_DATA_SCHEME}${notificationMediaCachePath(url)}`;
 }
 
 async function hasUsableCachedImage(path: string): Promise<boolean> {
@@ -62,8 +67,9 @@ async function cacheNativeNotificationImage(url: string): Promise<string | undef
     }
   }
 
-  const result = await Filesystem.getUri({ path, directory: Directory.Data });
-  return result.uri || undefined;
+  // Do not expose Capacitor's runtime-specific file/content URI in a scheduled
+  // notification. Android resolves this stable, app-private reference itself.
+  return notificationMediaPrivateRef(url);
 }
 
 async function cacheNativeNotificationImageSafely(url?: string): Promise<string | undefined> {
@@ -78,12 +84,12 @@ async function cacheNativeNotificationImageSafely(url?: string): Promise<string 
 
 /**
  * Prépare les visuels d'une notification sans jamais transporter les octets de
- * l'image dans le pont Capacitor. Sur Android, l'affiche compacte et l'image
- * riche sont téléchargées séparément dans Directory.Data et seuls leurs URI
- * locaux courts sont remis à LocalNotifications. Chaque téléchargement reste
- * indépendant : la panne du backdrop/still conserve l'affiche, et la panne de
- * l'affiche peut encore conserver l'image riche. Sur le Web, les URL restent
- * directement exploitables par l'API Notification/service worker.
+ * l'image dans le pont Capacitor. Sur Android, les fichiers sont téléchargés
+ * dans Directory.Data puis référencés par une URI privée stable seenit-data://,
+ * résolue nativement à l'affichage. Chaque téléchargement reste indépendant :
+ * la panne du backdrop/still conserve l'affiche, et la panne de l'affiche peut
+ * encore conserver l'image riche. Sur le Web, les URL restent directement
+ * exploitables par l'API Notification/service worker.
  */
 export async function resolveNotificationMediaVisual(
   nativePosterUrl?: string,
