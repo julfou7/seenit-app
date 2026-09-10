@@ -20,6 +20,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { useShowsStore } from '../store/showsStore';
 import { getRecommendations } from '../lib/recommendations';
 import { SeenItGlyph } from '../components/SeenItLogo';
+import { useGridVirtualWindow } from '../hooks/useBoundedVirtualWindow';
 
 function useDebounce<T>(value: T, delay: number): [T] {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
@@ -35,6 +36,70 @@ function useDebounce<T>(value: T, delay: number): [T] {
 interface Props {
   onShowClick: (id: any, mediaType?: 'tv' | 'movie') => void;
 }
+
+const DISCOVER_GRID_INITIAL_ITEMS = 30;
+const DISCOVER_GRID_OVERSCAN_ROWS = 3;
+
+interface BoundedDiscoverGridProps {
+  items: TMDBMedia[];
+  scrollRootRef: React.RefObject<HTMLDivElement | null>;
+  showsByTmdbId: Map<number, Show>;
+  onShowClick: Props['onShowClick'];
+  onAddClick: (media: TMDBMedia) => void;
+  onToggleWatched: (media: TMDBMedia) => void;
+  onLongPress: (media: TMDBMedia) => void;
+}
+
+const BoundedDiscoverGrid = React.memo(function BoundedDiscoverGrid({
+  items,
+  scrollRootRef,
+  showsByTmdbId,
+  onShowClick,
+  onAddClick,
+  onToggleWatched,
+  onLongPress,
+}: BoundedDiscoverGridProps) {
+  const {
+    gridRef,
+    itemMeasureRef,
+    range,
+    leadingSpacerSize,
+    trailingSpacerSize,
+  } = useGridVirtualWindow(
+    items.length,
+    scrollRootRef,
+    DISCOVER_GRID_INITIAL_ITEMS,
+    DISCOVER_GRID_OVERSCAN_ROWS,
+  );
+  const visibleItems = items.slice(range.start, range.end);
+
+  return (
+    <div ref={gridRef} className="grid grid-cols-3 sm:grid-cols-4 gap-x-1.5 gap-y-4 px-1">
+      {leadingSpacerSize > 0 && (
+        <div aria-hidden="true" className="col-span-full" style={{ height: leadingSpacerSize }} />
+      )}
+      {visibleItems.map((item, index) => (
+        <div
+          key={`grid_${item.media_type || 'media'}_${item.id}`}
+          ref={index === 0 ? itemMeasureRef : undefined}
+          className="min-w-0"
+        >
+          <GridMediaCard
+            media={item}
+            onShowClick={onShowClick}
+            show={showsByTmdbId.get(Number(item.id))}
+            onAddClick={onAddClick}
+            onToggleWatched={onToggleWatched}
+            onLongPress={onLongPress}
+          />
+        </div>
+      ))}
+      {trailingSpacerSize > 0 && (
+        <div aria-hidden="true" className="col-span-full" style={{ height: trailingSpacerSize }} />
+      )}
+    </div>
+  );
+});
 
 const CATEGORIES = [
   { id: "Tout", label: "Tout" },
@@ -228,7 +293,11 @@ export function DiscoverScreen({ onShowClick }: Props) {
   const [isSearchVisible, setIsSearchVisible] = useState(true);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const lastScrollY = useRef(0);
+  const pendingScrollY = useRef(0);
+  const scrollFrame = useRef<number | null>(null);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const isSearchFocusedRef = useRef(false);
+  isSearchFocusedRef.current = isSearchFocused;
   const [cols, setCols] = useState(() => (typeof window !== 'undefined' && window.innerWidth >= 640 ? 4 : 3));
 
   const handleHeroScroll = () => {
@@ -441,25 +510,32 @@ export function DiscoverScreen({ onShowClick }: Props) {
     );
   }, [activeCategory, addShow, deleteShow, showsByTmdbId, showToast]);
 
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    if (isSearchFocused) return;
-    const currentScrollY = e.currentTarget.scrollTop;
-    
-    if (currentScrollY < 300) {
-      setIsSearchVisible(true);
-      setShowScrollTop(false);
-    } else if (currentScrollY > lastScrollY.current + 10) {
-      setIsSearchVisible(false);
-      setShowScrollTop(false);
-    } else if (currentScrollY < lastScrollY.current - 10) {
-      setIsSearchVisible(true);
-      if (currentScrollY > 300) {
-        setShowScrollTop(true);
+  const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    pendingScrollY.current = event.currentTarget.scrollTop;
+    if (scrollFrame.current !== null) return;
+    scrollFrame.current = requestAnimationFrame(() => {
+      scrollFrame.current = null;
+      if (isSearchFocusedRef.current) return;
+      const currentScrollY = pendingScrollY.current;
+
+      if (currentScrollY < 300) {
+        setIsSearchVisible(current => current ? current : true);
+        setShowScrollTop(current => current ? false : current);
+      } else if (currentScrollY > lastScrollY.current + 10) {
+        setIsSearchVisible(current => current ? false : current);
+        setShowScrollTop(current => current ? false : current);
+      } else if (currentScrollY < lastScrollY.current - 10) {
+        setIsSearchVisible(current => current ? current : true);
+        setShowScrollTop(current => current ? current : true);
       }
-    }
-    
-    lastScrollY.current = currentScrollY;
-  };
+
+      lastScrollY.current = currentScrollY;
+    });
+  }, []);
+
+  useEffect(() => () => {
+    if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);
+  }, []);
 
   const hasActiveFilters = selectedPlatforms.length > 0 || selectedGenres.length > 0 || pegi !== 'Tous' || minRating !== 'Toutes';
 
@@ -477,7 +553,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
   const [page, setPage] = useState(1);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [prevLoadedCount, setPrevLoadedCount] = useState(0);
 
   const touchStartY = useRef<number | null>(null);
 
@@ -531,7 +606,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
   useEffect(() => {
     setPage(1);
     setHasMore(true);
-    setPrevLoadedCount(0);
   }, [activeCategory, debouncedQuery, selectedPlatforms, selectedGenres, pegi, minRating]);
 
   useEffect(() => {
@@ -1120,10 +1194,9 @@ export function DiscoverScreen({ onShowClick }: Props) {
 
   const handleLoadMore = useCallback(() => {
     if (isLoadingMore || loading || !hasMore || debouncedQuery.trim()) return;
-    setPrevLoadedCount(uniqueProcessedResults.length);
     setIsLoadingMore(true);
     setPage(p => p + 1);
-  }, [debouncedQuery, hasMore, isLoadingMore, loading, uniqueProcessedResults.length]);
+  }, [debouncedQuery, hasMore, isLoadingMore, loading]);
 
   const observerTargetNodeRef = useRef<HTMLDivElement | null>(null);
 
@@ -1536,31 +1609,38 @@ export function DiscoverScreen({ onShowClick }: Props) {
               </div>
             ) : (
               <div>
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-x-1.5 gap-y-4 px-1">
-                  {(debouncedQuery.trim() && activeCategory === 'Personnes' ? visiblePersonResults :
-                    debouncedQuery.trim() && activeCategory === 'Séries' ? visibleSeriesResults :
-                    debouncedQuery.trim() && activeCategory === 'Films' ? visibleMovieResults :
-                    visibleProcessedResults).map((item, idx) => (
-                    item.media_type === 'person' ? (
-                      <PersonCard 
-                        key={`person_${item.id}`}
-                        person={item}
-                        onClick={openPersonModal}
-                      />
-                    ) : (
-                      <GridMediaCard 
-                        key={`grid_${item.media_type || 'media'}_${item.id}`}
-                        media={item}
-                        onShowClick={onShowClick}
-                        show={showsByTmdbId.get(Number(item.id))}
-                        isNewlyLoaded={prevLoadedCount > 0 && idx >= prevLoadedCount}
-                        onAddClick={handleAddMedia}
-                        onToggleWatched={handleToggleWatched}
-                        onLongPress={handleLongPress}
-                      />
-                    )
-                  ))}
-                </div>
+                {debouncedQuery.trim() ? (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-x-1.5 gap-y-4 px-1">
+                    {(activeCategory === 'Personnes' ? visiblePersonResults :
+                      activeCategory === 'Séries' ? visibleSeriesResults :
+                      activeCategory === 'Films' ? visibleMovieResults :
+                      visibleProcessedResults).map(item => (
+                      item.media_type === 'person' ? (
+                        <PersonCard key={`person_${item.id}`} person={item} onClick={openPersonModal} />
+                      ) : (
+                        <GridMediaCard
+                          key={`grid_${item.media_type || 'media'}_${item.id}`}
+                          media={item}
+                          onShowClick={onShowClick}
+                          show={showsByTmdbId.get(Number(item.id))}
+                          onAddClick={handleAddMedia}
+                          onToggleWatched={handleToggleWatched}
+                          onLongPress={handleLongPress}
+                        />
+                      )
+                    ))}
+                  </div>
+                ) : (
+                  <BoundedDiscoverGrid
+                    items={visibleProcessedResults}
+                    scrollRootRef={containerRef}
+                    showsByTmdbId={showsByTmdbId}
+                    onShowClick={onShowClick}
+                    onAddClick={handleAddMedia}
+                    onToggleWatched={handleToggleWatched}
+                    onLongPress={handleLongPress}
+                  />
+                )}
 
                 {!loading && (
                   <div className="w-full flex items-center justify-center mt-2 mb-1">

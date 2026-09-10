@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Calendar, Bell } from 'lucide-react';
 import { type Show } from '../../types';
 import { requestNotificationPermission, auth, db, sendNativeNotification } from '../../lib/firebase';
@@ -6,9 +6,8 @@ import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { useToastStore } from '../../store/toastStore';
 import { useShows } from '../../hooks/useShows';
 import { cn, getTodayStr, getCalendarDaysDiff, formatAirDateSafe, getEpisodeRelativeAirDate } from '../../lib/utils';
-import { tmdb } from '../../features/shows/tmdb';
-import { getFormattedProviderLogo, extractOfficialStreamingProvider, PLEX_LOGO_SVG } from '../../utils/providerLogos';
-import { checkPlexAvailability } from '../../features/plex/plexAvailability';
+import { getFormattedProviderLogo } from '../../utils/providerLogos';
+import { usePassiveWatchProvider } from '../../hooks/usePassiveWatchProvider';
 import { readUserScopedJson, removeUserScopedValue, writeUserScopedJson } from '../../lib/userIsolation';
 
 export interface UpcomingEpisodeInfo {
@@ -228,42 +227,14 @@ export const UpcomingShowCard = React.memo(function UpcomingShowCard({ show, onS
     ? (poster.startsWith('http') ? poster : `https://image.tmdb.org/t/p/w300${poster}`)
     : null;
 
-  const [providerLogo, setProviderLogo] = useState<string | null>(null);
-  const [providerName, setProviderName] = useState<string | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    if (show.tmdbId) {
-      tmdb.getWatchProviders(show.tmdbId, show.mediaType === 'movie' ? 'movie' : 'tv').then(res => {
-        if (!isMounted) return;
-        let officialFound = false;
-        if (res.ok && res.value?.results) {
-          const stream = extractOfficialStreamingProvider(res.value.results);
-          if (stream) {
-            setProviderLogo(stream.logo_path);
-            setProviderName(stream.provider_name);
-            officialFound = true;
-          }
-        }
-
-        if (!officialFound && !show.networks?.length) {
-          checkPlexAvailability({
-            tmdbId: show.tmdbId,
-            title: show.title,
-            originalTitle: (show as any).originalTitle || (show as any).original_title,
-            year: show.firstAirDate?.slice(0, 4),
-            mediaType: show.mediaType === 'movie' ? 'movie' : 'tv'
-          }).then(plexInfo => {
-            if (isMounted && plexInfo.available) {
-              setProviderLogo(PLEX_LOGO_SVG);
-              setProviderName(plexInfo.serverName ? `Plex (${plexInfo.serverName})` : 'Plex');
-            }
-          }).catch(() => {});
-        }
-      }).catch(() => {});
-    }
-    return () => { isMounted = false; };
-  }, [show.mediaType, show.tmdbId, show.title]);
+  const { cardRef, providerLogo, providerName } = usePassiveWatchProvider({
+    tmdbId: show.tmdbId,
+    mediaType: show.mediaType === 'movie' ? 'movie' : 'tv',
+    title: show.title,
+    originalTitle: (show as any).originalTitle || (show as any).original_title,
+    year: show.firstAirDate?.slice(0, 4),
+    hasKnownProvider: Boolean(show.networks?.length),
+  });
 
   const networkLogo = getFormattedProviderLogo(
     providerLogo || (show.networks && show.networks.length > 0 ? show.networks[0].logo_path : null),
@@ -272,6 +243,7 @@ export const UpcomingShowCard = React.memo(function UpcomingShowCard({ show, onS
 
   return (
     <div 
+      ref={cardRef}
       onClick={() => {
         if (show.mediaType === 'movie') {
           if (onShowClick && show.id) onShowClick(show.id, 'movie');

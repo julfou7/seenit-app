@@ -442,31 +442,43 @@ n'est rouverte que par une nouvelle décision produit explicite.
   réponses rapprochées mettent à jour ce snapshot en mémoire puis regroupent sa persistance hors du
   chemin critique du scroll ; une mise en arrière-plan force un unique flush borné. Les TTL, la limite
   de 120 entrées et le comportement `stale-if-error` restent inchangés.
-- Dans les cartes et grilles, les requêtes diffuseurs identiques en vol sont dédupliquées, leur
-  concurrence globale est bornée à quatre et l'enrichissement d'une carte proche du viewport attend une
-  période idle lorsque la plateforme le permet. Les cartes déjà chargées conservent une clé stable et ne
-  sont pas rerendues pour un simple changement d'UI parent sans rapport ; le rendu hors écran est isolé
-  afin qu'une longue session Explorer n'augmente pas continuellement le coût de style, layout et paint.
+- Dans toutes les cartes et grilles passives, les requêtes diffuseurs identiques en vol sont dédupliquées,
+  leur concurrence globale est bornée à quatre et l'enrichissement d'une carte proche du viewport attend
+  une période sans scroll puis une période idle lorsque la plateforme le permet. La vérification Plex
+  passive reste strictement cache-only. Une carte qui dispose déjà d'un diffuseur métier ne lance pas
+  d'enrichissement diffuseur supplémentaire. Les détails décoratifs d'un film sont lus depuis le cache
+  lorsqu'il existe ; dans une vue exhaustive qui doit les compléter, la lecture distante attend la même
+  période calme et reste bornée à deux requêtes simultanées.
+- Les cartes déjà chargées conservent une clé stable et ne sont pas rerendues pour un simple changement
+  d'UI parent sans rapport. Explorer matérialise trente cartes au premier rendu puis uniquement les lignes
+  visibles avec trois lignes de débord de chaque côté ; des espaceurs conservent la hauteur et la position
+  exactes du scroll infini sans garder tout son DOM, ses images décodées et ses Effects.
 - Les sous-vues Statistiques et Ma Liste sont chargées à leur première ouverture puis conservent leur
   état ; lorsqu'elles sont masquées par l'autre sous-vue, Réglages ou un autre onglet, leurs Effects sont
   suspendus. Leur réouverture ne remonte pas en rafale les cartes déjà visitées.
-- Ma Liste ne monte que les rangées proches du viewport vertical. Une rangée réduite matérialise au plus
-  six cartes à la fois et une grille « Voir tout » au plus douze cartes supplémentaires par action. Les
-  objets de carte issus d'un média inchangé restent référentiellement stables afin qu'une mise à jour
-  isolée de la bibliothèque ne rerende pas toutes les sections.
+- Ma Liste ne monte que les rangées proches du viewport vertical. Une rangée réduite matérialise une
+  fenêtre d'au moins six cartes, complétée seulement par les cartes visibles et trois cartes de débord de
+  chaque côté ; À Regarder applique la même règle avec un minimum de huit cartes. Les cartes sorties de la
+  fenêtre sont démontées et remplacées par des espaceurs qui préservent la largeur, l'inertie et la position
+  du rail. Une grille « Voir tout » monte au plus douze cartes supplémentaires par action. Les objets de
+  carte issus d'un média inchangé restent référentiellement stables, y compris après une synchronisation
+  distante, afin qu'une mise à jour isolée de la bibliothèque ne rerende pas toutes les sections.
 - Les réponses asynchrones sont rattachées à la clé typée demandée. Une réponse de `movie:42` ne peut
   ni renseigner `tv:42`, ni remplacer une autre fiche ouverte entre-temps.
 - Les détails et requêtes identiques en vol sont dédupliqués. Les caches mémoire sont bornés afin de
   ne pas dégrader une longue session APK/PWA.
 - Le backdrop et le poster visibles au-dessus de la ligne de flottaison sont prioritaires ; les
-  carrousels hors écran restent paresseux. Les URLs restent stables lors d'une réouverture afin que le
-  cache HTTP/WebView puisse être réutilisé.
+  carrousels hors écran restent paresseux. Une carte passive n'appelle pas les détails d'un épisode pour
+  remplacer après coup une image déjà peinte : elle utilise le still déjà persisté, sinon le backdrop ou le
+  poster stable. Les URLs restent stables lors d'une réouverture afin que le cache HTTP/WebView puisse être
+  réutilisé.
 - Budget du chemin chaud : contenu principal et relations déjà connus disponibles en moins de 150 ms,
   sans nouvel appel fournisseur. Le chargement froid reste progressif et ne bloque pas les actions
   essentielles.
 
 Les TNR couvrent la réouverture A → B → A, la collision `movie:42`/`tv:42`, la déduplication des
-requêtes en vol, le cache chaud des relations et la conservation du contenu après une panne réseau.
+requêtes en vol, le cache chaud des relations, la conservation du contenu après une panne réseau, le
+fenêtrage borné des rails/grilles et l'absence de remplacement asynchrone de l'image d'une carte passive.
 Le suivi est assuré dans [#146](https://github.com/julfou7/seenit-app/issues/146) pour les fiches et
 [#229](https://github.com/julfou7/seenit-app/issues/229) pour les cartes/Explorer, en lien avec #130
 pour le cache des sagas et univers.

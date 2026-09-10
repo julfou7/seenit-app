@@ -9,6 +9,7 @@ import { useToastStore } from '../store/toastStore';
 import { Show } from '../types';
 import { SeenItLogo } from '../components/SeenItLogo';
 import { cn } from '../lib/utils';
+import { useHorizontalVirtualWindow } from '../hooks/useBoundedVirtualWindow';
 
 interface Props {
   onShowClick: (id: string, mediaType?: 'tv' | 'movie') => void;
@@ -18,7 +19,7 @@ interface Props {
 const LIBRARY_ROW_BATCH_SIZE = 6;
 const LIBRARY_GRID_BATCH_SIZE = 12;
 const LIBRARY_ROW_ROOT_MARGIN = '320px 0px';
-const LIBRARY_ROW_PRELOAD_MARGIN = '0px 50% 0px 0px';
+const LIBRARY_ROW_OVERSCAN = 3;
 
 const getMediaKey = (mediaType: string | undefined, id: string | number) =>
   `${mediaType === 'movie' ? 'movie' : 'tv'}:${Number(id)}`;
@@ -88,58 +89,28 @@ const LibraryRow = React.memo(function LibraryRow({
   onLongPress,
   onAddClick,
 }: LibraryRowProps) {
-  const [visibleCount, setVisibleCount] = useState(() => Math.min(LIBRARY_ROW_BATCH_SIZE, data.length));
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const preloadSentinelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setVisibleCount(current => Math.min(Math.max(current, LIBRARY_ROW_BATCH_SIZE), data.length));
-  }, [data.length]);
-
-  useEffect(() => {
-    if (visibleCount >= data.length) return;
-
-    const container = scrollContainerRef.current;
-    const sentinel = preloadSentinelRef.current;
-    if (!container || !sentinel || typeof IntersectionObserver === 'undefined') return;
-
-    const observer = new IntersectionObserver(entries => {
-      if (!entries.some(entry => entry.isIntersecting)) return;
-      observer.disconnect();
-      startTransition(() => {
-        setVisibleCount(current => Math.min(data.length, current + LIBRARY_ROW_BATCH_SIZE));
-      });
-    }, {
-      root: container,
-      rootMargin: LIBRARY_ROW_PRELOAD_MARGIN,
-      threshold: 0,
-    });
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [data.length, visibleCount]);
-
-  const handleHorizontalScrollFallback = useCallback((event: React.UIEvent<HTMLDivElement>) => {
-    if (typeof IntersectionObserver !== 'undefined' || visibleCount >= data.length) return;
-    const element = event.currentTarget;
-    const preloadDistance = Math.max(element.clientWidth * 0.5, 1);
-    if (element.scrollLeft + element.clientWidth >= element.scrollWidth - preloadDistance) {
-      startTransition(() => {
-        setVisibleCount(current => Math.min(data.length, current + LIBRARY_ROW_BATCH_SIZE));
-      });
-    }
-  }, [data.length, visibleCount]);
+  const {
+    containerRef: scrollContainerRef,
+    itemMeasureRef,
+    range,
+    leadingSpacerSize,
+    trailingSpacerSize,
+  } = useHorizontalVirtualWindow(data.length, LIBRARY_ROW_BATCH_SIZE, LIBRARY_ROW_OVERSCAN);
+  const visibleItems = data.slice(range.start, range.end);
 
   return (
     <div
       ref={scrollContainerRef}
       className="flex overflow-x-auto hide-scrollbar px-4 sm:px-6 gap-1.5 sm:gap-1.5 pb-2"
-      onScroll={handleHorizontalScrollFallback}
     >
-      {data.slice(0, visibleCount).map(({ media, show }) => {
+      {leadingSpacerSize > 0 && (
+        <div aria-hidden="true" className="shrink-0" style={{ width: leadingSpacerSize }} />
+      )}
+      {visibleItems.map(({ media, show }, index) => {
         return (
           <div
             key={getMediaKey(media.media_type, media.id)}
+            ref={index === 0 ? itemMeasureRef : undefined}
             className="w-[calc((100vw-2rem-12px)/3)] sm:w-[calc((100vw-3rem-18px)/4)] md:w-[calc((100vw-3rem-24px)/5)] lg:w-[calc((100vw-3rem-30px)/6)] xl:w-[calc((100vw-3rem-36px)/7)] 2xl:w-[calc((100vw-3rem-42px)/8)] shrink-0"
           >
             <GridMediaCard
@@ -155,7 +126,9 @@ const LibraryRow = React.memo(function LibraryRow({
           </div>
         );
       })}
-      <div ref={preloadSentinelRef} aria-hidden="true" className="w-2 shrink-0" />
+      {trailingSpacerSize > 0 && (
+        <div aria-hidden="true" className="shrink-0" style={{ width: trailingSpacerSize }} />
+      )}
     </div>
   );
 }, (previous, next) =>

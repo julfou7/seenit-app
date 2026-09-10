@@ -5,6 +5,7 @@ import test from 'node:test';
 const discoverSource = readFileSync(new URL('../src/screens/DiscoverScreen.tsx', import.meta.url), 'utf8');
 const librarySource = readFileSync(new URL('../src/screens/LibraryScreen.tsx', import.meta.url), 'utf8');
 const watchListSource = readFileSync(new URL('../src/screens/WatchListScreen.tsx', import.meta.url), 'utf8');
+const virtualWindowSource = readFileSync(new URL('../src/hooks/useBoundedVirtualWindow.ts', import.meta.url), 'utf8');
 
 test('#229 réarme le scroll infini Explorer après Activity hidden → visible', () => {
   assert.match(discoverSource, /const observerTargetNodeRef = useRef<HTMLDivElement \| null>\(null\)/);
@@ -29,16 +30,15 @@ test('SEENIT-PERF-001 borne le montage visible de Ma Liste', () => {
   assert.match(librarySource, /const LIBRARY_ROW_BATCH_SIZE = 6/);
   assert.match(librarySource, /const LIBRARY_GRID_BATCH_SIZE = 12/);
   assert.match(librarySource, /const LIBRARY_ROW_ROOT_MARGIN = '320px 0px'/);
+  assert.match(librarySource, /useHorizontalVirtualWindow\(data\.length, LIBRARY_ROW_BATCH_SIZE, LIBRARY_ROW_OVERSCAN\)/);
   assert.match(librarySource, /const DeferredLibraryRow = React\.memo/);
   assert.match(librarySource, /new IntersectionObserver\(entries =>/);
   assert.match(librarySource, /shouldRender \? <LibraryRow \{\.\.\.rowProps\} \/> : null/);
   assert.match(librarySource, /eager=\{index === 0\}/);
-  assert.match(librarySource, /data\.slice\(0, visibleCount\)\.map\(\(\{ media, show \}\) =>/);
-  assert.match(
-    librarySource,
-    /setVisibleCount\(current => Math\.min\(data\.length, current \+ LIBRARY_ROW_BATCH_SIZE\)\)/,
-    'la rangée réduite doit étendre progressivement son lot sans monter toute la bibliothèque',
-  );
+  assert.match(librarySource, /data\.slice\(range\.start, range\.end\)/);
+  assert.match(librarySource, /leadingSpacerSize/);
+  assert.match(librarySource, /trailingSpacerSize/);
+  assert.match(virtualWindowSource, /calculateHorizontalWindow/);
   assert.match(librarySource, /setVisibleCount\(current => Math\.min\(data\.length, current \+ LIBRARY_GRID_BATCH_SIZE\)\)/);
   assert.match(librarySource, />\s*Charger plus\s*<\/button>/);
   assert.match(librarySource, /key=\{getMediaKey\(media\.media_type, media\.id\)\}/);
@@ -47,15 +47,11 @@ test('SEENIT-PERF-001 borne le montage visible de Ma Liste', () => {
   assert.doesNotMatch(librarySource, /key=\{`\$\{media\.id\}_\$\{idx\}`\}/);
 });
 
-test('SEENIT-PERF-001 garde le scroll horizontal de Ma Liste libre et précharge avant la fin', () => {
-  assert.match(librarySource, /const LIBRARY_ROW_PRELOAD_MARGIN = '0px 50% 0px 0px'/);
-  assert.match(librarySource, /const scrollContainerRef = useRef<HTMLDivElement>\(null\)/);
-  assert.match(librarySource, /const preloadSentinelRef = useRef<HTMLDivElement>\(null\)/);
-  assert.match(librarySource, /root: container,\s*rootMargin: LIBRARY_ROW_PRELOAD_MARGIN,\s*threshold: 0/);
-  assert.match(librarySource, /observer\.observe\(sentinel\)/);
+test('SEENIT-PERF-001 garde le scroll horizontal de Ma Liste libre avec une fenêtre DOM bornée', () => {
   assert.match(librarySource, /ref=\{scrollContainerRef\}/);
-  assert.match(librarySource, /ref=\{preloadSentinelRef\}/);
-  assert.match(librarySource, /const preloadDistance = Math\.max\(element\.clientWidth \* 0\.5, 1\)/);
+  assert.match(librarySource, /ref=\{index === 0 \? itemMeasureRef : undefined\}/);
+  assert.match(virtualWindowSource, /container\.addEventListener\('scroll', scheduleRefresh, \{ passive: true \}\)/);
+  assert.match(virtualWindowSource, /requestAnimationFrame/);
   assert.doesNotMatch(librarySource, /snap-x/);
   assert.doesNotMatch(librarySource, /snap-mandatory/);
   assert.doesNotMatch(librarySource, /snap-start/);
@@ -83,8 +79,10 @@ test('SEENIT-PERF-001 préserve les cartes inchangées et la sous-vue Profil', (
 
 test('#229 borne le rendu initial des carrousels progressifs et conserve Voir tout paginé', () => {
   assert.match(watchListSource, /const WATCHLIST_BATCH_SIZE = 8/);
-  assert.match(watchListSource, /Math\.min\(WATCHLIST_BATCH_SIZE, data\.length\)/);
-  assert.match(watchListSource, /data\.slice\(0, visibleCount\)\.map\(renderCard\)/);
+  assert.match(watchListSource, /useHorizontalVirtualWindow\(data\.length, WATCHLIST_BATCH_SIZE, WATCHLIST_CAROUSEL_OVERSCAN\)/);
+  assert.match(watchListSource, /data\.slice\(range\.start, range\.end\)/);
+  assert.match(watchListSource, /leadingSpacerSize/);
+  assert.match(watchListSource, /trailingSpacerSize/);
   assert.match(watchListSource, /data=\{continueWatchingShows\}/);
   assert.match(watchListSource, /data=\{nouveautesShows\}/);
   assert.match(watchListSource, /data=\{pasVuDepuisUnMomentShows\}/);
