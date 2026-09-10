@@ -565,11 +565,11 @@ export function DiscoverScreen({ onShowClick }: Props) {
   const handleTouchMove = (e: React.TouchEvent) => {
     if (touchStartY.current !== null) {
       const diff = e.touches[0].clientY - touchStartY.current;
-      if (diff > 25 && isSearchVisible) {
-        setIsSearchVisible(false);
-        touchStartY.current = null;
-      } else if (diff < -25 && !isSearchVisible) {
+      if (diff > 25 && !isSearchVisible) {
         setIsSearchVisible(true);
+        touchStartY.current = null;
+      } else if (diff < -25 && isSearchVisible) {
+        setIsSearchVisible(false);
         touchStartY.current = null;
       }
     }
@@ -782,9 +782,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
           return !yr || yr >= 2016;
         };
 
-        // Le trending est le chemin critique : il suffit à afficher le hero #1 et
-        // les premières cartes. Les autres sources partent en parallèle mais ne
-        // bloquent plus le premier contenu utile.
         const trendAllPromise = page <= 5
           ? tmdb.getTrending('all', page, selectedPlatforms)
           : Promise.resolve({ ok: false } as any);
@@ -876,8 +873,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
       setLoading(false);
       setIsLoadingMore(false);
 
-      // Les recommandations n'alimentent pas le premier viewport : elles sont
-      // calculées seulement après le flux principal pour ne plus retarder Explorer.
       if (page === 1) {
         void getRecommendations(20)
           .then(recs => setRecommendations(recs))
