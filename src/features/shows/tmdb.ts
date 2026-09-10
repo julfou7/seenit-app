@@ -20,6 +20,7 @@ import {
 } from './parentalRating';
 import { getParentalRatingOverride } from '../../store/parentalRatingStore';
 import { convergeTrackedMediaTitleFromTmdb } from './trackedMediaTitle';
+import { convergeTrackedMediaArtworkFromTmdb } from './trackedMediaArtwork';
 import { mediaKeyFrom } from './mediaRelations';
 import { getTVDBFranchiseRelation } from '../../services/tvdb';
 import { readWatchProviderCache, writeWatchProviderCache } from '../providers/watchProviderCache';
@@ -50,6 +51,7 @@ tmdbClient.getShowDetails = (async (id: number) => {
   if (!result.ok || !result.value) return result;
   const details = withoutDetailRecommendations(result.value);
   convergeTrackedMediaTitleFromTmdb('tv', Number(id), details);
+  convergeTrackedMediaArtworkFromTmdb('tv', Number(id), details);
   const decorated = decorateParentalRatingDetails(
     'tv',
     details,
@@ -64,6 +66,7 @@ tmdbClient.getMovieDetails = (async (id: number) => {
   if (result.ok && result.value) {
     const details = withoutDetailRecommendations(result.value);
     convergeTrackedMediaTitleFromTmdb('movie', Number(id), details);
+    convergeTrackedMediaArtworkFromTmdb('movie', Number(id), details);
     const checkedAt = Date.now();
     const isTheatrical = hasCurrentFrenchTheatricalRelease(details);
     if (isTheatrical) rememberFrenchTheatricalEvidence(Number(id), checkedAt);
@@ -280,7 +283,7 @@ const strictFrenchNowPlaying = async (page: number = 1) => {
 };
 
 // Façade stable : tous les consommateurs historiques gardent le même singleton,
-// seules les politiques « Au cinéma », « Âge conseillé », titre localisé et relations exactes sont durcies ici.
+// seules les politiques « Au cinéma », « Âge conseillé », titre/visuels localisés et relations exactes sont durcies ici.
 tmdbClient.getNowPlaying = strictFrenchNowPlaying as typeof tmdbClient.getNowPlaying;
 
 export const tmdb = tmdbClient;
