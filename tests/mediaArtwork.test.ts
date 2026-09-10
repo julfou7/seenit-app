@@ -8,6 +8,7 @@ import {
 
 const tmdbFacadeSource = readFileSync(new URL('../src/features/shows/tmdb.ts', import.meta.url), 'utf8');
 const trackedArtworkSource = readFileSync(new URL('../src/features/shows/trackedMediaArtwork.ts', import.meta.url), 'utf8');
+const continueWatchingSource = readFileSync(new URL('../src/components/cards/ContinueWatchingCard.tsx', import.meta.url), 'utf8');
 const productionArtworkSource = `${tmdbFacadeSource}\n${trackedArtworkSource}\n${readFileSync(new URL('../src/features/shows/mediaArtwork.ts', import.meta.url), 'utf8')}`;
 
 test('SEENIT-METADATA-002 conserve le dernier visuel si TMDB ne fournit pas de remplaçant exploitable', () => {
@@ -63,4 +64,10 @@ test('SEENIT-METADATA-002 persiste uniquement posterPath et backdropPath après 
   assert.match(tmdbFacadeSource, /convergeTrackedMediaArtworkFromTmdb\('movie', Number\(id\), details\)/);
   assert.match(trackedArtworkSource, /updateDoc\(doc\(db, 'users', userId, 'shows', convergence\.showId\), convergence\.updates\)/);
   assert.doesNotMatch(trackedArtworkSource, /updatedAt|seenEpisodes|episodeRecords|isFavorite|userRating|status:/);
+});
+
+test('SEENIT-METADATA-002 privilégie l’épisode puis la saison courante avant le visuel global', () => {
+  assert.match(continueWatchingSource, /const currentSeasonArtwork = cachedSeason\?\.poster_path \|\| null/);
+  assert.match(continueWatchingSource, /const rawPath = episodeStill \|\| currentSeasonArtwork \|\| showBackdrop \|\| showPoster/);
+  assert.doesNotMatch(continueWatchingSource, /getSeasonDetails\(|getShowDetails\(|getMovieDetails\(/);
 });
