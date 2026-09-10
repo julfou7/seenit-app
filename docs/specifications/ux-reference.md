@@ -1,6 +1,6 @@
 # SeenIt — Référence UX
 
-Date : 9 septembre 2026. Baseline inspectée : 1.4.125.
+Date : 10 septembre 2026. Baseline inspectée : 1.4.134.
 
 Ce document complète `seenit.md` §9 et `functional-reference.md`. Il distingue les comportements
 observés des cibles de normalisation encore ouvertes. Il ne certifie ni le rendu sur appareil ni la
@@ -32,7 +32,7 @@ marquées comme livrées décrivent le comportement attendu du runtime courant.
 | Double appui Explorer | Reset + remontée | Recherche vide, catégorie Tout, plateformes/genres vides, âge Tous, note Toutes, tri populaire descendant, hero première carte | Préserver ce raccourci volontaire, montrer son effet ; jamais effacer les préférences du compte. |
 | Double appui Profil | Ferme Réglages/personne + remontée | Le sous-onglet Statistiques/Ma Liste reste inchangé | Ne pas annoncer un retour à Statistiques comme déjà réalisé. Cible à décider dans #178. |
 | Double appui À voir/Télécharger | Remontée | Aucun événement local de reset métier | Préserver filtres/choix de ces écrans. |
-| Carrousel réduit « À Regarder » | Glissement horizontal | Parcourt le lot borné de cartes ; en continuant jusqu'au bout, un marqueur « Voir tout » rend la suite explicite | Snap de proximité seulement, jamais obligatoire. Le vrai bouton « Voir tout » de l'en-tête reste l'alternative accessible vers la liste verticale. |
+| Carrousel réduit « À Regarder » | Glissement horizontal | Parcourt librement les cartes ; la suite est préchargée automatiquement par lots avant la fin du rail, sans marqueur terminal | Aucun scroll-snap. Le vrai bouton « Voir tout » de l'en-tête reste l'alternative accessible vers la liste verticale exhaustive. |
 | Modal épisode | Glisser vers la gauche | Épisode suivant, puis saison suivante si disponible | Aucune progression vue ajoutée par la navigation. |
 | Modal épisode | Glisser vers la droite | Épisode précédent, puis fin de saison précédente si disponible | Même série exacte ; limites sans bouclage. |
 | Modal épisode | Déplacement > 60 px ou vitesse > 200 | Déclenche précédent/suivant si disponible, sinon retour en place | Seuils observés, pas une certification de confort. Alternatives absentes : #179. |
