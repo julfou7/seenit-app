@@ -2,9 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
+  ACTIONS_PR_POLICY_MESSAGE,
   PREPARE_COMMAND,
   buildCandidateBranchName,
   evaluateRemoteCandidate,
+  isActionsPrCreationPolicyError,
   resolvePreparationTarget,
   sameReleaseFiles,
   validatePrepareControlEvent
@@ -83,6 +85,22 @@ test('SEENIT-RELEASE-005 ne réutilise qu’une candidate exactement à +1 commi
   assert.equal(sameReleaseFiles([...files, { filename: 'src/App.tsx' }]), false);
 });
 
+test('SEENIT-RELEASE-005 traite uniquement le 403 policy GitHub Actions comme handoff PR connector-only', () => {
+  const policyError = new Error(
+    `GitHub API POST /pulls -> 403: {"message":"${ACTIONS_PR_POLICY_MESSAGE}","status":"403"}`
+  );
+  assert.equal(isActionsPrCreationPolicyError(policyError), true);
+  assert.equal(
+    isActionsPrCreationPolicyError(new Error('GitHub API POST /pulls -> 403: {"message":"Resource not accessible by integration"}')),
+    false
+  );
+  assert.equal(
+    isActionsPrCreationPolicyError(new Error(`GitHub API POST /issues -> 403: {"message":"${ACTIONS_PR_POLICY_MESSAGE}"}`)),
+    false
+  );
+  assert.equal(isActionsPrCreationPolicyError(new Error('GitHub API POST /pulls -> 500: server error')), false);
+});
+
 test('workflow de contrôle sépare les permissions préparation et publication', () => {
   assert.match(workflow, /github\.event\.comment\.body == '\/prepare-release-apk'/);
   assert.match(workflow, /prepare_candidate:[\s\S]*?contents: write[\s\S]*?pull-requests: write/);
@@ -97,6 +115,7 @@ test('les consignes interdisent le fallback manuel tant que #102 sait préparer 
   assert.match(agents, /ne justifie plus la reproduction manuelle des huit fichiers/);
   assert.match(bootstrapAgents, /n'est jamais un motif pour reproduire manuellement les huit fichiers/);
   assert.match(releaseControlSpec, /n’est pas un blocage/);
+  assert.match(releaseControlSpec, /handoff connector-only/);
   assert.match(releaseControlSpec, /seenit-release-summary:<runId>/);
 });
 

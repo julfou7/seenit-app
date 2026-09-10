@@ -62,6 +62,21 @@ Une branche existante est réutilisable uniquement si :
 
 Le contrôleur poste sur #102 la version, la base `main`, la branche, le commit, la PR, la portée release-only et la mesure « demande → PR » lorsqu’elle est disponible.
 
+### Policy du dépôt interdisant la création de PR par GitHub Actions
+
+GitHub peut accorder `pull-requests: write` au `GITHUB_TOKEN` du job tout en refusant `POST /pulls` lorsque le réglage du dépôt **« Allow GitHub Actions to create and approve pull requests »** est désactivé. Le message API canonique est alors :
+
+`GitHub Actions is not permitted to create or approve pull requests.`
+
+Ce cas précis n’invalide pas une candidate déjà préparée. Après preuve que la branche respecte strictement les invariants ci-dessus (base exacte, version cible, un commit, huit surfaces et aucun fichier métier), le contrôleur effectue un **handoff connector-only** :
+
+- il conserve la branche telle quelle et ne reproduit jamais les huit fichiers ;
+- il publie sur #102 la branche, le SHA de candidate et la prochaine action exacte ;
+- il termine sans faux échec avec l’action machine-readable `connector_pr_required` ;
+- le client connecté ouvre alors la PR `release/vX.Y.Z` → `main` via le connecteur GitHub, puis reprend la CI/merge normale.
+
+La tolérance est volontairement étroite : un autre `403`, une erreur d’API différente ou une candidate incompatible restent bloquants. Le contrôleur ne doit jamais convertir une panne générique en succès ni affaiblir les validations de candidate.
+
 ## Huit surfaces canoniques de version
 
 `npm run release:prepare:files -- X.Y.Z` et le contrôleur natif alignent exactement :
@@ -125,7 +140,7 @@ Lors d’une reprise dans un nouveau chat, ce checkpoint est la première preuve
 
 Une demande « publie l’APK » seule autorise l’agent à laisser GitHub Actions terminer après identification du run exact : il **rend la main par défaut** une fois le run précis identifié et tracé. Si l’utilisateur demande explicitement d’attendre le résultat — notamment avec une formulation comme « publie et attends le résultat » — le suivi reste ciblé sur ce run jusqu’à l’APK signée, au smoke et à la publication.
 
-Lorsqu’une candidate doit d’abord être préparée, l’agent utilise `/prepare-release-apk`, attend uniquement la CI de la PR créée/réutilisée, fusionne si elle est verte, puis enchaîne `/release-apk`. Il ne relit pas l’historique fonctionnel complet entre ces étapes.
+Lorsqu’une candidate doit d’abord être préparée, l’agent utilise `/prepare-release-apk`, attend uniquement la CI de la PR créée/réutilisée — ou ouvre via le connecteur la PR demandée par un handoff policy explicite —, fusionne si elle est verte, puis enchaîne `/release-apk`. Il ne relit pas l’historique fonctionnel complet entre ces étapes.
 
 ## Bruit `issue_comment`
 
@@ -141,6 +156,7 @@ Les TNR de release couvrent réellement :
 - compatibilité stricte d’une candidate distante : base exacte, un commit, huit surfaces ;
 - séparation des permissions préparation/publication ;
 - préparation atomique N → N+1 et conservation du format des catalogues JSON ;
+- reconnaissance stricte du seul `403` de policy GitHub Actions pour le handoff PR, tout autre échec restant bloquant ;
 - dispatch natif et anti-doublon ;
 - format du checkpoint final en succès et en échec de notification ;
 - permission `issues: write` limitée au workflow post-release qui produit ce checkpoint.
@@ -151,4 +167,5 @@ Les assertions documentaires seules ne suffisent pas : les helpers de décision 
 
 - v1.4.114 : validation du parcours de publication connector-only sans GitHub CLI, token shell ni navigateur authentifié ;
 - v1.4.115 : dispatch en 17,9 s ; le problème distinct d’attente runner a été traité par #135 ;
-- v1.4.122 : dispatch `/release-apk` en 20,5 s, build/signature, upgrade smoke Android 36, publication et notification tous verts. Cette release a révélé le dernier trou « candidate absente », désormais couvert par `/prepare-release-apk`.
+- v1.4.122 : dispatch `/release-apk` en 20,5 s, build/signature, upgrade smoke Android 36, publication et notification tous verts. Cette release a révélé le dernier trou « candidate absente », désormais couvert par `/prepare-release-apk` ;
+- v1.4.123 : premier `/prepare-release-apk` terrain ; génération et push de la candidate réussis, puis `POST /pulls` refusé par la policy GitHub malgré `pull-requests: write`. Ce cas est désormais couvert par le handoff connector-only strict sans recréation des huit surfaces.
