@@ -40,7 +40,10 @@ test('#229 garde l’image des cartes À Regarder stable au montage', () => {
   const source = readFileSync(new URL('../src/components/cards/ContinueWatchingCard.tsx', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /getEpisodeDetails/);
   assert.doesNotMatch(source, /setFetchedStillMap/);
-  assert.match(source, /const rawPath = episodeStill \|\| showBackdrop \|\| showPoster/);
+  // #268 a ajouté le poster de saison déjà en cache comme fallback purement local,
+  // sans réintroduire de fetch au montage. Le TNR #229 doit donc couvrir l’ordre
+  // actuel complet plutôt que l’ancienne expression devenue obsolète.
+  assert.match(source, /const rawPath = episodeStill \|\| currentSeasonArtwork \|\| showBackdrop \|\| showPoster/);
 });
 
 test('#229 applique le même enrichissement diffuseur passif aux cartes hors Explorer', () => {

@@ -24,8 +24,8 @@ export interface NotificationTestSample {
   notificationTitle: string;
   summaryText: string;
   body: string;
-  posterUrl: string;
-  richImageUrl: string;
+  posterUrl?: string;
+  richImageUrl?: string;
   allowMarkWatched: boolean;
   data: {
     url: string;
@@ -37,8 +37,6 @@ export interface NotificationTestSample {
   };
 }
 
-const SEENIT_ICON_URL = 'https://seenit.app/icon-192.png';
-
 function todayLocal(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -48,21 +46,6 @@ function todayLocal(date: Date): string {
 
 function isIsoDate(value: unknown): value is string {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
-}
-
-function addUtcDays(value: string, days: number): string | null {
-  if (!isIsoDate(value)) return null;
-  const [year, month, day] = value.split('-').map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  if (
-    date.getUTCFullYear() !== year
-    || date.getUTCMonth() !== month - 1
-    || date.getUTCDate() !== day
-  ) {
-    return null;
-  }
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
 }
 
 function mediaImageUrl(path: string | null | undefined, size: 'w154' | 'w500'): string | undefined {
@@ -120,17 +103,14 @@ function selectUpcomingTv(
   return candidates[0] || null;
 }
 
-function selectUpcomingMovie(
+function selectUpcomingTheaterMovie(
   shows: Show[],
-  today: string,
-  vod: boolean
+  today: string
 ): { show: Show; eventDate: string } | null {
   const candidates: Array<{ show: Show; eventDate: string }> = [];
   for (const show of shows) {
-    if (show.mediaType !== 'movie' || !isIsoDate(show.firstAirDate)) continue;
-    const eventDate = vod ? addUtcDays(show.firstAirDate, 120) : show.firstAirDate;
-    if (!eventDate || eventDate < today) continue;
-    candidates.push({ show, eventDate });
+    if (show.mediaType !== 'movie' || !isIsoDate(show.firstAirDate) || show.firstAirDate < today) continue;
+    candidates.push({ show, eventDate: show.firstAirDate });
   }
   candidates.sort((a, b) => a.eventDate.localeCompare(b.eventDate) || a.show.title.localeCompare(b.show.title, 'fr'));
   return candidates[0] || null;
@@ -143,10 +123,9 @@ function buildSample(
   eventDate?: string,
   episode?: EpisodeSample
 ): NotificationTestSample {
-  const posterUrl = mediaImageUrl(show.posterPath, 'w154') || SEENIT_ICON_URL;
+  const posterUrl = mediaImageUrl(show.posterPath, 'w154');
   const fallbackRich = mediaImageUrl(show.backdropPath, 'w500')
-    || mediaImageUrl(show.posterPath, 'w500')
-    || SEENIT_ICON_URL;
+    || mediaImageUrl(show.posterPath, 'w500');
   const episodeRich = mediaImageUrl(episode?.still_path, 'w500') || fallbackRich;
   const season = episode ? Number(episode.season_number) : undefined;
   const episodeNumber = episode ? Number(episode.episode_number) : undefined;
@@ -154,7 +133,7 @@ function buildSample(
   const eNum = String(episodeNumber || 1).padStart(2, '0');
 
   if (type === 'release_today_tv') {
-    const episodeName = episode?.name ? `« ${episode.name} » ` : '';
+    const episodeName = episode?.name ? ` · ${episode.name}` : '';
     return {
       type,
       show,
@@ -162,9 +141,9 @@ function buildSample(
       eventDate,
       season,
       episode: episodeNumber,
-      notificationTitle: `🆕 ${show.title}`,
+      notificationTitle: show.title,
       summaryText: '🆕 Nouvel épisode',
-      body: `L'épisode S${sNum}E${eNum} ${episodeName}est disponible aujourd'hui !`,
+      body: `S${sNum}E${eNum}${episodeName} disponible aujourd'hui.`,
       posterUrl,
       richImageUrl: episodeRich,
       allowMarkWatched: true,
@@ -187,9 +166,9 @@ function buildSample(
       eventDate,
       season,
       episode: episodeNumber,
-      notificationTitle: `📅 ${show.title}`,
+      notificationTitle: show.title,
       summaryText: '📅 Nouvelle saison',
-      body: `La saison ${season || 1} de ${show.title} sort dans 7 jours ! Préparez-vous !`,
+      body: `Saison ${season || 1} dans 7 jours.`,
       posterUrl,
       richImageUrl: episodeRich,
       allowMarkWatched: false,
@@ -210,9 +189,9 @@ function buildSample(
       show,
       isUpcoming,
       eventDate,
-      notificationTitle: `🎬 ${show.title}`,
+      notificationTitle: show.title,
       summaryText: '🎬 Sortie cinéma',
-      body: `Sortie Cinéma : ${show.title} est dans les salles aujourd'hui !`,
+      body: "Dans les salles aujourd'hui.",
       posterUrl,
       richImageUrl: fallbackRich,
       allowMarkWatched: false,
@@ -230,9 +209,9 @@ function buildSample(
     show,
     isUpcoming,
     eventDate,
-    notificationTitle: `📺 ${show.title}`,
+    notificationTitle: show.title,
     summaryText: '📺 Sortie DVD / VOD',
-    body: `Sortie DVD / VOD : ${show.title} est désormais disponible !`,
+    body: 'Disponible en DVD / VOD.',
     posterUrl,
     richImageUrl: fallbackRich,
     allowMarkWatched: false,
@@ -246,10 +225,11 @@ function buildSample(
 }
 
 /**
- * Choisit d'abord un vrai événement à venir du type testé. Si la bibliothèque
- * n'en contient aucun, le bouton reste utilisable avec un média actif du bon
- * type afin de tester le rendu (notamment l'affiche), sans prétendre que cet
- * événement fallback est réellement programmé.
+ * Choisit d'abord un vrai événement à venir du type testé quand la bibliothèque
+ * contient une date fiable. Si elle n'en contient aucun, le bouton reste
+ * utilisable comme aperçu de rendu avec un média actif du bon type. Le test VOD
+ * est toujours un aperçu : la bibliothèque locale ne porte pas la date FR TMDB
+ * autoritative utilisée par le vrai planificateur, donc aucune date n'est inventée.
  */
 export function buildNotificationTestSample(
   shows: Show[],
@@ -272,8 +252,10 @@ export function buildNotificationTestSample(
     return buildSample(fallbackShow, type, false, undefined, fallbackEpisode);
   }
 
-  const upcoming = selectUpcomingMovie(activeShows, today, type === 'movie_dvd_vod');
-  if (upcoming) return buildSample(upcoming.show, type, true, upcoming.eventDate);
+  if (type === 'movie_theater') {
+    const upcoming = selectUpcomingTheaterMovie(activeShows, today);
+    if (upcoming) return buildSample(upcoming.show, type, true, upcoming.eventDate);
+  }
 
   const fallbackShow = stableFallback(activeShows, 'movie');
   return fallbackShow ? buildSample(fallbackShow, type, false) : null;
