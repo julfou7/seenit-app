@@ -81,12 +81,14 @@ test('SEENIT-PERF-001 préserve les cartes inchangées et la sous-vue Profil', (
   assert.doesNotMatch(profileSource, /<LibraryScreen onShowClick=\{\(id, mediaType\) =>/);
 });
 
-test('#229 borne aussi les carrousels réduits de À voir tout en conservant Voir tout paginé', () => {
+test('#229 borne le rendu initial des carrousels progressifs et conserve Voir tout paginé', () => {
   assert.match(watchListSource, /const WATCHLIST_BATCH_SIZE = 8/);
-  assert.match(watchListSource, /continueWatchingShows\.slice\(0, WATCHLIST_BATCH_SIZE\)\.map/);
-  assert.match(watchListSource, /nouveautesShows\.slice\(0, WATCHLIST_BATCH_SIZE\)\.map/);
-  assert.match(watchListSource, /pasVuDepuisUnMomentShows\.slice\(0, WATCHLIST_BATCH_SIZE\)\.map/);
-  assert.match(watchListSource, /filmsAVoirShows\.slice\(0, WATCHLIST_BATCH_SIZE\)\.map/);
+  assert.match(watchListSource, /Math\.min\(WATCHLIST_BATCH_SIZE, data\.length\)/);
+  assert.match(watchListSource, /data\.slice\(0, visibleCount\)\.map\(renderCard\)/);
+  assert.match(watchListSource, /data=\{continueWatchingShows\}/);
+  assert.match(watchListSource, /data=\{nouveautesShows\}/);
+  assert.match(watchListSource, /data=\{pasVuDepuisUnMomentShows\}/);
+  assert.match(watchListSource, /data=\{filmsAVoirShows\}/);
 
   assert.match(watchListSource, /continueWatchingShows\.slice\(0, visibleCount\)\.map/);
   assert.match(watchListSource, /setVisibleCount\(prev => prev \+ WATCHLIST_BATCH_SIZE\)/);

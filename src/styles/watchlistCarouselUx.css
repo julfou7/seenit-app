@@ -1,9 +1,9 @@
 /*
  * À Voir — carrousels réduits.
  *
- * Le premier lot reste borné par React (8 cartes). Le snap de proximité
- * conserve un léger guidage sans freiner le geste, et le marqueur terminal
- * explique immédiatement comment accéder à la liste complète.
+ * Le rail doit conserver l'inertie native du geste, sans aucun scroll snap.
+ * React monte un premier lot borné puis précharge la suite progressivement
+ * avant d'atteindre la fin du carrousel.
  */
 :is(
   #continue-watching-carousel,
@@ -11,34 +11,5 @@
   #pas-vu-depuis-un-moment-carousel,
   #films-a-voir-carousel
 ) {
-  scroll-snap-type: x proximity !important;
-}
-
-:is(
-  #continue-watching-carousel,
-  #nouveautes-carousel,
-  #pas-vu-depuis-un-moment-carousel,
-  #films-a-voir-carousel
-)::after {
-  content: "Suite\A« Voir tout » ↑";
-  white-space: pre-line;
-  display: flex;
-  flex: 0 0 108px;
-  align-self: stretch;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  min-height: 96px;
-  margin-right: 4px;
-  padding: 14px 10px;
-  border: 1px dashed rgb(255 255 255 / 12%);
-  border-radius: 16px;
-  background: rgb(24 24 27 / 55%);
-  color: rgb(161 161 170);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.35;
-  text-align: center;
-  scroll-snap-align: none;
-  pointer-events: none;
+  scroll-snap-type: none !important;
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback, type RefObject } from 'react';
+import React, { startTransition, useState, useEffect, useRef, useMemo, useCallback, type RefObject } from 'react';
 import { type Show } from '../types';
 import { cn, getNextEpisodeNumber, scrollAllCarouselsToStart, checkIsUpToDate, getAiredProgress } from '../lib/utils';
 import { ContinueWatchingCard } from '../components/cards/ContinueWatchingCard';
@@ -378,6 +378,69 @@ function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMa
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 const WATCHLIST_BATCH_SIZE = 8;
+const WATCHLIST_CAROUSEL_PRELOAD_MARGIN = '0px 50% 0px 0px';
+
+interface ProgressiveWatchlistCarouselProps {
+  id: string;
+  data: Show[];
+  renderCard: (show: Show) => React.ReactNode;
+}
+
+function ProgressiveWatchlistCarousel({ id, data, renderCard }: ProgressiveWatchlistCarouselProps) {
+  const [visibleCount, setVisibleCount] = useState(() => Math.min(WATCHLIST_BATCH_SIZE, data.length));
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const preloadSentinelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setVisibleCount(current => Math.min(data.length, Math.max(current, WATCHLIST_BATCH_SIZE)));
+  }, [data.length]);
+
+  useEffect(() => {
+    if (visibleCount >= data.length) return;
+
+    const container = scrollContainerRef.current;
+    const sentinel = preloadSentinelRef.current;
+    if (!container || !sentinel || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(entries => {
+      if (!entries.some(entry => entry.isIntersecting)) return;
+      observer.disconnect();
+      startTransition(() => {
+        setVisibleCount(current => Math.min(data.length, current + WATCHLIST_BATCH_SIZE));
+      });
+    }, {
+      root: container,
+      rootMargin: WATCHLIST_CAROUSEL_PRELOAD_MARGIN,
+      threshold: 0,
+    });
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [data.length, visibleCount]);
+
+  const handleHorizontalScrollFallback = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    if (typeof IntersectionObserver !== 'undefined' || visibleCount >= data.length) return;
+    const element = event.currentTarget;
+    const preloadDistance = Math.max(element.clientWidth * 0.5, 1);
+    if (element.scrollLeft + element.clientWidth >= element.scrollWidth - preloadDistance) {
+      startTransition(() => {
+        setVisibleCount(current => Math.min(data.length, current + WATCHLIST_BATCH_SIZE));
+      });
+    }
+  }, [data.length, visibleCount]);
+
+  return (
+    <div
+      ref={scrollContainerRef}
+      id={id}
+      className="flex overflow-x-auto gap-4 px-4 sm:px-6 scrollbar-none pb-1"
+      onScroll={handleHorizontalScrollFallback}
+    >
+      {data.slice(0, visibleCount).map(renderCard)}
+      <div ref={preloadSentinelRef} aria-hidden="true" className="w-2 shrink-0" />
+    </div>
+  );
+}
 
 const parseTimestamp = (val: any): number => {
   if (!val) return 0;
@@ -624,8 +687,8 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
     const savedShow = { ...show };
     await deleteShow(show.id);
     showToast(
-      `« ${show.title} » a été supprimée de votre suivi.`, 
-      'unfollow', 
+      `« ${show.title} » a été supprimée de votre suivi.`,
+      'unfollow',
       show,
       async () => {
         if (auth.currentUser && savedShow.id) {
@@ -1129,8 +1192,10 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                   )}
                 </div>
               ) : (
-                <div id="continue-watching-carousel" className="flex overflow-x-auto gap-4 px-4 sm:px-6 scroll-px-4 sm:scroll-px-6 scrollbar-none snap-x snap-mandatory pb-1">
-                  {continueWatchingShows.slice(0, WATCHLIST_BATCH_SIZE).map((show) => (
+                <ProgressiveWatchlistCarousel
+                  id="continue-watching-carousel"
+                  data={continueWatchingShows}
+                  renderCard={(show) => (
                     <ContinueWatchingCard 
                       key={`cw_${show.id}`}
                       show={show}
@@ -1138,8 +1203,8 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                       onEpisodeClick={handleEpisodeClick}
                       onMarkAsSeen={markNextEpisodeAsSeen}
                     />
-                  ))}
-                </div>
+                  )}
+                />
               )}
             </div>
           )}
@@ -1187,8 +1252,10 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                   )}
                 </div>
               ) : (
-                <div id="nouveautes-carousel" className="flex overflow-x-auto gap-4 px-4 sm:px-6 scroll-px-4 sm:scroll-px-6 scrollbar-none snap-x snap-mandatory pb-1">
-                  {nouveautesShows.slice(0, WATCHLIST_BATCH_SIZE).map((show) => (
+                <ProgressiveWatchlistCarousel
+                  id="nouveautes-carousel"
+                  data={nouveautesShows}
+                  renderCard={(show) => (
                     <ContinueWatchingCard 
                       key={`nouveautes_card_${show.id}`}
                       show={show}
@@ -1196,8 +1263,8 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                       onEpisodeClick={handleEpisodeClick}
                       onMarkAsSeen={markNextEpisodeAsSeen}
                     />
-                  ))}
-                </div>
+                  )}
+                />
               )}
             </div>
           )}
@@ -1245,8 +1312,10 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                   )}
                 </div>
               ) : (
-                <div id="pas-vu-depuis-un-moment-carousel" className="flex overflow-x-auto gap-4 px-4 sm:px-6 scroll-px-4 sm:scroll-px-6 scrollbar-none snap-x snap-mandatory pb-1">
-                  {pasVuDepuisUnMomentShows.slice(0, WATCHLIST_BATCH_SIZE).map((show) => (
+                <ProgressiveWatchlistCarousel
+                  id="pas-vu-depuis-un-moment-carousel"
+                  data={pasVuDepuisUnMomentShows}
+                  renderCard={(show) => (
                     <ContinueWatchingCard 
                       key={`notwatched_card_${show.id}`}
                       show={show}
@@ -1254,8 +1323,8 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                       onEpisodeClick={handleEpisodeClick}
                       onMarkAsSeen={markNextEpisodeAsSeen}
                     />
-                  ))}
-                </div>
+                  )}
+                />
               )}
             </div>
           )}
@@ -1303,16 +1372,18 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
                   )}
                 </div>
               ) : (
-                <div id="films-a-voir-carousel" className="flex overflow-x-auto gap-4 px-4 sm:px-6 scroll-px-4 sm:scroll-px-6 scrollbar-none snap-x snap-mandatory pb-1">
-                  {filmsAVoirShows.slice(0, WATCHLIST_BATCH_SIZE).map((show) => (
+                <ProgressiveWatchlistCarousel
+                  id="films-a-voir-carousel"
+                  data={filmsAVoirShows}
+                  renderCard={(show) => (
                     <MovieWatchCard 
                       key={`films_card_${show.id}`}
                       show={show}
                       onShowClick={onShowClick}
                       onMarkAsSeen={markMovieAsSeen}
                     />
-                  ))}
-                </div>
+                  )}
+                />
               )}
             </div>
           )}
