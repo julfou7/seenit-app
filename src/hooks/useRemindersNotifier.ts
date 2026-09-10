@@ -18,7 +18,7 @@ import {
   toLocalReminderDate,
 } from '../features/notifications/movieReleaseReminder';
 
-const REMINDER_SCHEDULE_SCHEMA = 'v3';
+const REMINDER_SCHEDULE_SCHEMA = 'v4';
 
 function toLocalDateKey(date: Date): string {
   const year = date.getFullYear();
@@ -65,15 +65,15 @@ export function useRemindersNotifier() {
         }
 
         const title = s.title;
-        // w154 keeps the Android largeIcon compact. The richer visual remains a
-        // separate local file and is decoded natively with bounded dimensions.
+        // Le logo SeenIt n'est jamais substitué à une affiche absente : le
+        // résolveur natif doit pouvoir choisir explicitement le fallback texte.
         const iconUrl = s.posterPath
           ? (s.posterPath.startsWith('http') ? s.posterPath : `https://image.tmdb.org/t/p/w154${s.posterPath}`)
-          : 'https://seenit.app/icon-192.png';
+          : undefined;
 
         const imageUrl = s.backdropPath
           ? (s.backdropPath.startsWith('http') ? s.backdropPath : `https://image.tmdb.org/t/p/w500${s.backdropPath}`)
-          : (s.posterPath ? (s.posterPath.startsWith('http') ? s.posterPath : `https://image.tmdb.org/t/p/w500${s.posterPath}`) : iconUrl);
+          : (s.posterPath ? (s.posterPath.startsWith('http') ? s.posterPath : `https://image.tmdb.org/t/p/w500${s.posterPath}`) : undefined);
 
         // --- FILMS ---
         if (s.mediaType === 'movie') {
@@ -185,7 +185,7 @@ export function useRemindersNotifier() {
               'theater',
               title,
               '🎬 Sortie cinéma',
-              `Sortie Cinéma : ${title} est dans les salles aujourd'hui !`
+              "Dans les salles aujourd'hui."
             );
           }
           if (homeDateKey) {
@@ -194,7 +194,7 @@ export function useRemindersNotifier() {
               'vod',
               title,
               '📺 Sortie DVD / VOD',
-              `Sortie DVD / VOD : ${title} est disponible aujourd'hui !`
+              'Disponible en DVD / VOD aujourd’hui.'
             );
           }
           continue;
@@ -314,7 +314,7 @@ export function useRemindersNotifier() {
             'd7',
             title,
             '📅 Nouvelle saison',
-            `La saison ${upcoming.season_number} de ${title} sort dans 7 jours ! Préparez-vous !`
+            `Saison ${upcoming.season_number} dans 7 jours.`
           );
         }
 
@@ -324,7 +324,7 @@ export function useRemindersNotifier() {
             'today',
             title,
             '🆕 Nouvel épisode',
-            `L'épisode S${sNum}E${eNum} ${upcoming.name ? `« ${upcoming.name} » ` : ''}est disponible aujourd'hui !`,
+            `S${sNum}E${eNum}${upcoming.name ? ` · ${upcoming.name}` : ''} disponible aujourd'hui.`,
             true
           );
         }
