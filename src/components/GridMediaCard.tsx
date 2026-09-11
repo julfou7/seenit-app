@@ -128,7 +128,6 @@ export const GridMediaCard = React.memo(function GridMediaCard({
     title: displayTitle,
     originalTitle: (media as any).original_title || (media as any).original_name,
     year,
-    hasKnownProvider: Boolean(show?.networks?.length),
   });
 
   const networkLogo = getFormattedProviderLogo(
@@ -181,10 +180,8 @@ export const GridMediaCard = React.memo(function GridMediaCard({
             </div>
           )}
 
-          {/* Dégradé très léger juste en haut pour lire les notes */}
           <div className="absolute inset-x-0 top-0 h-1/4 bg-gradient-to-b from-black/60 to-transparent pointer-events-none" />
 
-          {/* En-tête : Note en haut à gauche */}
           {rating && (
             <div className="absolute top-0 left-0 bg-black/60 backdrop-blur-md px-1.5 py-1 rounded-br-lg text-[10px] font-bold text-white flex items-center gap-1 shadow-sm border-b border-r border-white/10">
               <Star size={10} className="text-[#E5A93D] fill-[#E5A93D]" />
@@ -192,14 +189,12 @@ export const GridMediaCard = React.memo(function GridMediaCard({
             </div>
           )}
 
-          {/* Logo du provider en haut à droite */}
           {networkLogo && (
             <div className="absolute top-0 right-0 z-30 bg-white/95 backdrop-blur-md w-7 h-7 rounded-bl-lg flex items-center justify-center shrink-0 p-1 shadow-sm pointer-events-none">
               <img src={networkLogo} alt="" className="w-5 h-5 object-contain rounded-[3px]" />
             </div>
           )}
 
-          {/* Barre d'avancement pour les séries dans Ma Liste */}
           {(hideBadges || showProgress) && isTv && show && (
             <div className="absolute bottom-0 inset-x-0 h-1.5 bg-black/70 backdrop-blur-xs z-10 overflow-hidden">
               <div 
@@ -213,7 +208,6 @@ export const GridMediaCard = React.memo(function GridMediaCard({
           )}
         </div>
 
-        {/* Bandeau d'action sous l'image (masqué si hideBadges) */}
         {!hideBadges && (
           <div 
             onClick={(e) => {
@@ -248,7 +242,6 @@ export const GridMediaCard = React.memo(function GridMediaCard({
         )}
       </div>
 
-      {/* 2. BLOC INFOS */}
       <div className="flex flex-col px-0.5 min-w-0">
         <h3 className="text-xs font-bold text-white truncate w-full" title={displayTitle}>
           {displayTitle}
@@ -261,7 +254,6 @@ export const GridMediaCard = React.memo(function GridMediaCard({
         )}
 
         {hideBadges ? (
-          /* Mode épuré sans badges avec progression précise */
           <div className="mt-0.5">
             {isTv ? (
               <div className="flex items-center justify-between text-[10px] min-w-0 text-zinc-400">
@@ -308,7 +300,6 @@ export const GridMediaCard = React.memo(function GridMediaCard({
             )}
           </div>
         ) : (
-          /* Mode standard avec badges */
           <div className="flex flex-wrap items-center gap-1.5 mt-1">
             {!isTv && isAtCinema ? (
               <span className="bg-[#E5A93D] text-black text-[9px] font-extrabold px-1.5 py-0.5 rounded flex items-center gap-1 uppercase tracking-wider shadow-sm">
@@ -417,7 +408,6 @@ export function PreviewModal({
   const shows = useShowsStore((state) => state.shows);
   const show = shows.find((s) => s.tmdbId === Number(media.id));
 
-  // Determine main action button logic matching ShowDetailScreen
   let buttonLabel = isTv ? "Suivre la série" : "Ajouter aux films à voir";
   let ButtonIcon: React.ElementType = Plus;
   let buttonStyle = "bg-[#E5A93D] text-black hover:bg-[#F5B94D] shadow-lg";
@@ -468,7 +458,6 @@ export function PreviewModal({
       const fullEpCode = `S${sCode} | E${eCode}`;
 
       let airDate = nextEp.air_date;
-      const todayStr = getTodayStr();
 
       if (airDate) {
         const diffDays = getCalendarDaysDiff(airDate);
@@ -517,7 +506,6 @@ export function PreviewModal({
       };
     }
   } else {
-    // Movie
     const isSeenMovie = show.seenEpisodes?.includes('movie') || (show.status as string) === 'completed' || isWatched;
     if (isSeenMovie) {
       buttonLabel = "Revoir le film";
@@ -542,7 +530,6 @@ export function PreviewModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-sm max-h-[85vh] bg-[#1a1a1a] rounded-[24px] overflow-hidden shadow-2xl border border-white/10 animate-in fade-in zoom-in-95 duration-200 flex flex-col">
-        {/* En-tête Vidéo / Backdrop */}
         <div className="relative aspect-video w-full rounded-t-[24px] overflow-hidden bg-black shrink-0">
           {trailerKey ? (
             <iframe
@@ -583,7 +570,6 @@ export function PreviewModal({
           </button>
         </div>
         
-        {/* Corps d'informations & Synopsis */}
         <div className="p-6 bg-[#1a1a1a] rounded-b-[24px] flex flex-col gap-4 overflow-y-auto min-h-0">
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-2">
