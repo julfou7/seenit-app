@@ -36,3 +36,27 @@ test('SEENIT-PERF-001 rend les libellés stables pendant le chargement froid', (
   assert.match(discoverSource, /showHeroSurface && loading && top10\.length === 0 && <HeroSkeleton \/>/);
   assert.doesNotMatch(discoverSource, /ExplorerSkeleton|CategorySkeleton|SortSkeleton/);
 });
+
+test('#279 réserve la progression du HERO du skeleton au carrousel complet', () => {
+  assert.match(discoverSource, /const HERO_PROGRESS_LAYOUT_CLASS = "flex h-1\.5 items-center justify-center gap-1\.5 mt-3 mb-2"/);
+  assert.match(discoverSource, /function HeroProgressSkeleton\(\)/);
+  assert.match(
+    discoverSource,
+    /function HeroSkeleton\(\)[\s\S]*?<HeroProgressSkeleton \/>[\s\S]*?function HeroProgressSkeleton\(\)/,
+  );
+  assert.match(
+    discoverSource,
+    /visibleHeroItems\.length > 1 \? \([\s\S]*?className=\{HERO_PROGRESS_LAYOUT_CLASS\}[\s\S]*?: \([\s\S]*?<HeroProgressSkeleton \/>/,
+  );
+  assert.doesNotMatch(discoverSource, /\{visibleHeroItems\.length > 1 && \(/);
+});
+
+test('#279 garde le placeholder de progression neutre et non interactif', () => {
+  const placeholder = discoverSource.match(
+    /function HeroProgressSkeleton\(\)[\s\S]*?(?=function GridSkeletons\(\))/,
+  )?.[0] ?? '';
+
+  assert.match(placeholder, /Array\.from\(\{ length: 9 \}\)/);
+  assert.match(placeholder, /<span className="h-1\.5 w-6 rounded-full bg-zinc-700" \/>/);
+  assert.doesNotMatch(placeholder, /<button/);
+});

@@ -40,6 +40,7 @@ interface Props {
 const DISCOVER_GRID_INITIAL_ITEMS = 30;
 const DISCOVER_GRID_OVERSCAN_ROWS = 3;
 const DISCOVER_CRITICAL_GRID_ITEMS = 6;
+const HERO_PROGRESS_LAYOUT_CLASS = "flex h-1.5 items-center justify-center gap-1.5 mt-3 mb-2";
 
 interface BoundedDiscoverGridProps {
   items: TMDBMedia[];
@@ -1314,8 +1315,8 @@ export function DiscoverScreen({ onShowClick }: Props) {
                 ))}
               </div>
 
-              {visibleHeroItems.length > 1 && (
-                <div className="flex justify-center items-center gap-1.5 mt-3 mb-2">
+              {visibleHeroItems.length > 1 ? (
+                <div className={HERO_PROGRESS_LAYOUT_CLASS}>
                   {visibleHeroItems.map((_, idx) => (
                     <button
                       key={idx}
@@ -1336,6 +1337,8 @@ export function DiscoverScreen({ onShowClick }: Props) {
                     />
                   ))}
                 </div>
+              ) : (
+                <HeroProgressSkeleton />
               )}
             </div>
           </div>
@@ -2088,17 +2091,31 @@ const HeroCard = React.memo(function HeroCard({ media, details, onShowClick, onO
 
 function HeroSkeleton() {
   return (
-    <div aria-hidden="true" className="relative w-full aspect-[4/3] sm:aspect-video overflow-hidden bg-zinc-900 animate-pulse">
-      <div className="absolute inset-0 bg-zinc-900" />
-      <div className="absolute bottom-0 inset-x-0 px-5 pb-4 space-y-3">
-        <div className="h-5 w-16 rounded-md bg-zinc-800" />
-        <div className="h-7 w-2/3 rounded-lg bg-zinc-800" />
-        <div className="h-3 w-5/6 rounded bg-zinc-800" />
-        <div className="flex gap-3 pt-1">
-          <div className="h-10 flex-1 rounded-xl bg-zinc-800" />
-          <div className="h-10 flex-1 rounded-xl bg-zinc-800" />
+    <div aria-hidden="true">
+      <div className="relative w-full aspect-[4/3] sm:aspect-video overflow-hidden bg-zinc-900 animate-pulse">
+        <div className="absolute inset-0 bg-zinc-900" />
+        <div className="absolute bottom-0 inset-x-0 px-5 pb-4 space-y-3">
+          <div className="h-5 w-16 rounded-md bg-zinc-800" />
+          <div className="h-7 w-2/3 rounded-lg bg-zinc-800" />
+          <div className="h-3 w-5/6 rounded bg-zinc-800" />
+          <div className="flex gap-3 pt-1">
+            <div className="h-10 flex-1 rounded-xl bg-zinc-800" />
+            <div className="h-10 flex-1 rounded-xl bg-zinc-800" />
+          </div>
         </div>
       </div>
+      <HeroProgressSkeleton />
+    </div>
+  );
+}
+
+function HeroProgressSkeleton() {
+  return (
+    <div aria-hidden="true" className={`${HERO_PROGRESS_LAYOUT_CLASS} animate-pulse`}>
+      <span className="h-1.5 w-6 rounded-full bg-zinc-700" />
+      {Array.from({ length: 9 }).map((_, index) => (
+        <span key={index} className="h-1.5 w-1.5 rounded-full bg-zinc-800" />
+      ))}
     </div>
   );
 }
