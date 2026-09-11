@@ -234,6 +234,8 @@ Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, 
 - Le panneau « Type de contenu » permet notamment de choisir **Top 100** ; ce choix change de catégorie et ne constitue pas un tri.
 - Tri Populaires, Mieux notés, Plus récents ou Ordre alphabétique.
 - Hero Top 10, chargement infini, aperçu long-press et cache utilisable lors d'une panne réseau.
+- Le chargement du Hero réserve immédiatement la rangée de progression ; son remplacement par les
+  indicateurs interactifs ne décale ni les catégories, ni le titre Explorer, ni la grille.
 - La barre de recherche se masque pendant la descente et ne se réaffiche que lorsque le défilement repart réellement vers le haut ; le geste tactile et le `scrollTop` utilisent la même sémantique de direction.
 - Le scroll infini conserve des clés de cartes stables, évite de rerendre les cartes déjà chargées pour
   un simple changement d'en-tête et ne matérialise que les lignes visibles avec un débord borné. Des
