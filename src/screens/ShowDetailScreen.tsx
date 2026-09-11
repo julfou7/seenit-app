@@ -16,7 +16,6 @@ interface ShowDetailScreenProps {
   onShowClick?: (tmdbId: number, mediaType?: 'tv' | 'movie') => void;
 }
 
-const DETAIL_WARMUP_GRACE_MS = 300;
 const HIDDEN_DOWNLOAD_SURFACE_CSS = `
 [data-seenit-download-surface="hidden"] button:has(svg.lucide-download),
 [data-seenit-download-surface="hidden"] button[title*="télécharg" i],
@@ -46,11 +45,15 @@ const DETAIL_UX_CSS = `
 }
 `;
 
-const wait = (delayMs: number) => new Promise<void>(resolve => setTimeout(resolve, delayMs));
+interface StableColdDetailSkeletonProps extends Pick<ShowDetailScreenProps, 'onBack'> {
+  mediaType: 'tv' | 'movie';
+  knownTitle?: string | null;
+}
 
-function StableColdDetailSkeleton({ onBack }: Pick<ShowDetailScreenProps, 'onBack'>) {
+function StableColdDetailSkeleton({ onBack, mediaType, knownTitle }: StableColdDetailSkeletonProps) {
+  const isSeries = mediaType === 'tv';
   return (
-    <div data-seenit-detail-warmup="cold" className="flex-1 overflow-hidden bg-black text-white relative w-full h-full">
+    <div data-seenit-detail-warmup="cold" className="flex-1 overflow-y-auto bg-black text-white relative w-full h-full pb-nav">
       <div className="relative min-h-[420px]">
         <div className="absolute top-0 inset-x-0 h-96 bg-zinc-900/60 animate-pulse" />
         <div className="relative z-10 pt-10 px-4">
@@ -58,19 +61,58 @@ function StableColdDetailSkeleton({ onBack }: Pick<ShowDetailScreenProps, 'onBac
           <div className="flex gap-4 mt-8">
             <div className="w-[120px] shrink-0 aspect-[2/3] bg-zinc-800/80 rounded-xl border border-white/10 animate-pulse" />
             <div className="flex-1 min-w-0 flex flex-col justify-end gap-3 pb-1">
-              <div className="flex gap-2"><div className="h-5 w-24 bg-zinc-800/80 rounded-md animate-pulse" /><div className="h-5 w-16 bg-zinc-800/80 rounded-md animate-pulse" /></div>
-              <div className="h-9 w-4/5 max-w-56 bg-zinc-800/80 rounded-lg animate-pulse" />
+              <div className="flex gap-2">
+                <span className="inline-flex items-center px-2 py-1 bg-[#E5A93D]/20 text-[10px] font-bold tracking-widest text-[#E5A93D] uppercase rounded-md border border-[#E5A93D]/30">
+                  {isSeries ? '📺 SÉRIE' : '🎬 FILM'}
+                </span>
+                <div className="h-5 w-16 bg-zinc-800/80 rounded-md animate-pulse" />
+              </div>
+              {knownTitle ? (
+                <h1 className="text-xl sm:text-2xl font-extrabold leading-tight text-white line-clamp-2">{knownTitle}</h1>
+              ) : (
+                <div className="h-9 w-4/5 max-w-56 bg-zinc-800/80 rounded-lg animate-pulse" />
+              )}
               <div className="h-4 w-32 bg-zinc-800/80 rounded animate-pulse" />
-              <div className="flex gap-2 min-h-[26px]"><div className="h-6 w-16 bg-zinc-800/80 rounded-lg animate-pulse" /><div className="h-6 w-16 bg-zinc-800/80 rounded-lg animate-pulse" /></div>
+              <div className="flex gap-2 min-h-[26px]"><div className="h-6 w-16 bg-zinc-800/80 rounded-lg animate-pulse" /></div>
             </div>
           </div>
           <div className="h-12 w-full bg-zinc-800/80 rounded-2xl mt-5 animate-pulse" />
         </div>
       </div>
-      <div className="px-4 mt-4"><div className="h-10 bg-zinc-900 rounded-full animate-pulse border border-white/5" /></div>
+
+      <div className="px-4 mt-4">
+        <div className="h-10 bg-zinc-900 rounded-full border border-white/5 p-1 flex items-center gap-1">
+          <span className="flex-1 py-2 text-center text-xs font-bold tracking-wider uppercase rounded-full bg-zinc-800 text-[#E5A93D]">À propos</span>
+          {isSeries && <span className="flex-1 py-2 text-center text-xs font-bold tracking-wider uppercase text-zinc-500">Épisodes</span>}
+        </div>
+      </div>
+
       <div className="p-4 space-y-6">
-        <div className="space-y-2"><div className="h-3 w-20 bg-zinc-800 rounded animate-pulse" /><div className="h-3.5 bg-zinc-800/80 rounded w-full animate-pulse" /><div className="h-3.5 bg-zinc-800/80 rounded w-11/12 animate-pulse" /><div className="h-3.5 bg-zinc-800/80 rounded w-4/5 animate-pulse" /></div>
-        <div className="h-20 bg-zinc-900/60 rounded-2xl border border-white/5 animate-pulse" />
+        <section>
+          <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-3">Synopsis</h3>
+          <div className="space-y-2 animate-pulse">
+            <div className="h-3.5 bg-zinc-800/80 rounded w-full" />
+            <div className="h-3.5 bg-zinc-800/80 rounded w-11/12" />
+            <div className="h-3.5 bg-zinc-800/80 rounded w-4/5" />
+          </div>
+        </section>
+
+        <section className="bg-zinc-900/40 border border-white/5 p-4 rounded-2xl">
+          <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-3">Catégories & Thèmes</h3>
+          <div className="flex flex-wrap gap-2 animate-pulse">
+            <div className="h-7 w-20 bg-zinc-800/80 rounded-full" />
+            <div className="h-7 w-24 bg-zinc-800/80 rounded-full" />
+            <div className="h-7 w-16 bg-zinc-800/80 rounded-full" />
+          </div>
+        </section>
+
+        <section>
+          <h3 className="text-xs font-bold uppercase text-zinc-500 tracking-wider mb-3">Où regarder</h3>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/10 bg-zinc-900/80 text-zinc-400 text-xs font-medium">
+            <span className="w-4 h-4 rounded bg-zinc-700/80 animate-pulse" aria-hidden="true" />
+            <span>Recherche Plex & streaming…</span>
+          </div>
+        </section>
       </div>
     </div>
   );
@@ -88,7 +130,11 @@ export function ShowDetailScreen(props: ShowDetailScreenProps) {
     const numericShowId = props.showId && /^\d+$/.test(props.showId) ? Number(props.showId) : undefined;
     const tmdbId = matchingShow?.tmdbId ? Number(matchingShow.tmdbId) : props.tmdbId ? Number(props.tmdbId) : numericShowId;
     const mediaType: 'tv' | 'movie' = matchingShow?.mediaType === 'movie' || props.mediaType === 'movie' ? 'movie' : 'tv';
-    return { tmdbId: Number.isFinite(tmdbId) && Number(tmdbId) > 0 ? Number(tmdbId) : undefined, mediaType };
+    return {
+      tmdbId: Number.isFinite(tmdbId) && Number(tmdbId) > 0 ? Number(tmdbId) : undefined,
+      mediaType,
+      knownTitle: matchingShow?.title || null,
+    };
   }, [shows, props.showId, props.tmdbId, props.mediaType]);
 
   const detailIdentity = resolvedMedia.tmdbId ? `${resolvedMedia.mediaType}:${resolvedMedia.tmdbId}` : null;
@@ -107,14 +153,12 @@ export function ShowDetailScreen(props: ShowDetailScreenProps) {
     let cancelled = false;
     setColdWarmupIdentity(identity);
     const warmColdDetail = async () => {
-      const providersPromise = tmdb.getWatchProviders(tmdbId, mediaType);
+      // Les disponibilités démarrent en parallèle, mais elles ne bloquent jamais
+      // l'affichage du cœur de fiche une fois les détails TMDB connus.
+      void tmdb.getWatchProviders(tmdbId, mediaType).catch(() => undefined);
       const detailsResult = await tmdb.getMediaDetails(tmdbId, mediaType);
-      if (!detailsResult.ok || !detailsResult.value) {
-        if (!cancelled) setColdWarmupIdentity(null);
-        return;
-      }
-      await Promise.race([providersPromise.catch(() => undefined), wait(DETAIL_WARMUP_GRACE_MS)]);
       if (!cancelled) setColdWarmupIdentity(null);
+      if (!detailsResult.ok || !detailsResult.value) return;
     };
     void warmColdDetail();
     return () => { cancelled = true; };
@@ -127,7 +171,7 @@ export function ShowDetailScreen(props: ShowDetailScreenProps) {
       {!downloadsEnabled && <style>{HIDDEN_DOWNLOAD_SURFACE_CSS}</style>}
       <style>{DETAIL_UX_CSS}</style>
       {isColdWarmup ? (
-        <StableColdDetailSkeleton onBack={props.onBack} />
+        <StableColdDetailSkeleton onBack={props.onBack} mediaType={resolvedMedia.mediaType} knownTitle={resolvedMedia.knownTitle} />
       ) : (
         <ShowDetailScreenCore key={downloadsEnabled ? 'downloads-visible' : 'downloads-hidden'} {...props} />
       )}
