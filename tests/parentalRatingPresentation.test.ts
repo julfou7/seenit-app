@@ -19,6 +19,8 @@ test('SEENIT-PARENTAL-001 supprime PEGI et les heuristiques parentales de genre'
   assert.match(tmdbFacade, /originalDiscoverWithFilters\(\{[\s\S]*pegi:\s*'Tous'/,
     'la façade neutralise systématiquement le filtre parental historique du client TMDB');
   assert.match(tmdbFacade, /resolveParentalRating\(/);
+  assert.match(tmdbFacade, /detailsResult\.value\.seenitParentalRating\s*\|\|\s*resolveParentalRating\(/,
+    'Explorer doit réutiliser le rating canonique déjà résolu plutôt que relire la valeur de présentation décorée');
   assert.match(tmdbFacade, /matchesMaxRecommendedAge\(rating, maxAge\)/);
   assert.doesNotMatch(tmdbFacade, /without_genres/,
     'la décision parentale canonique ne doit jamais reposer sur une exclusion de genres');

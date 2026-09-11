@@ -7,19 +7,30 @@ const profileSource = readFileSync(new URL('../src/screens/ProfileScreen.tsx', i
 const analyticsSource = readFileSync(new URL('../src/hooks/useProAnalytics.ts', import.meta.url), 'utf8');
 const logStoreSource = readFileSync(new URL('../src/store/logStore.ts', import.meta.url), 'utf8');
 
-test('#229 suspend les Effects des onglets montés mais cachés sans perdre leur état', () => {
+test('#229 suspend les Effects des onglets cachés, sauf Explorer qui doit rester actif (#289)', () => {
   assert.match(appSource, /import \{ Activity,/);
   assert.match(appSource, /<Activity mode=\{currentTab === 'watchlist' \? 'visible' : 'hidden'\}>/);
-  assert.match(appSource, /<Activity mode=\{currentTab === 'discover' \? 'visible' : 'hidden'\}>/);
   assert.match(appSource, /<Activity mode=\{currentTab === 'downloads' \? 'visible' : 'hidden'\}>/);
   assert.match(
     appSource,
     /<Activity mode=\{\(currentTab === 'profile' \|\| currentTab === 'settings'\) \? 'visible' : 'hidden'\}>/,
   );
+
+  const discoverStart = appSource.indexOf("mountedTabs.has('discover')");
+  const downloadsStart = appSource.indexOf("mountedTabs.has('downloads')", discoverStart);
+  assert.ok(discoverStart >= 0 && downloadsStart > discoverStart, 'le bloc Explorer doit être détectable');
+  const discoverBlock = appSource.slice(discoverStart, downloadsStart);
+  assert.doesNotMatch(
+    discoverBlock,
+    /<Activity\b/,
+    'Explorer est l’exception : Activity recréerait ses Effects et relancerait son chargement au retour d’onglet',
+  );
+  assert.match(discoverBlock, /aria-hidden=\{currentTab !== 'discover'\}/);
+
   assert.doesNotMatch(
     appSource,
     /currentTab !== 'watchlist' && "hidden"/,
-    'display:none seul laisserait les abonnements/effects du contenu caché actifs',
+    'display:none seul ne doit pas remplacer Activity sur les autres onglets lourds',
   );
 });
 

@@ -100,13 +100,13 @@ tmdbClient.getWatchProviders = (async (id: number, type: 'tv' | 'movie' = 'tv') 
   const memory = originalPeekWatchProviders(id, type);
   if (memory) return ok(memory);
 
-  const freshPersistent = readWatchProviderCache(Number(id), type);
+  const freshPersistent = readWatchProviderCache(id, type);
   if (freshPersistent) return ok(freshPersistent.data);
 
-  const stalePersistent = readWatchProviderCache(Number(id), type, { allowStale: true });
+  const stalePersistent = readWatchProviderCache(id, type, { allowStale: true });
   const result = await originalGetWatchProviders(id, type);
   if (result.ok) {
-    writeWatchProviderCache(Number(id), type, result.value);
+    writeWatchProviderCache(id, type, result.value);
     return result;
   }
   return stalePersistent ? ok(stalePersistent.data) : result;
@@ -228,7 +228,7 @@ tmdbClient.discoverWithFilters = (async (options) => {
       ? await tmdbClient.getMovieDetails(Number(item.id))
       : await tmdbClient.getShowDetails(Number(item.id));
     if (!detailsResult.ok || !detailsResult.value) return null;
-    const rating = resolveParentalRating(
+    const rating = detailsResult.value.seenitParentalRating || resolveParentalRating(
       mediaType,
       detailsResult.value,
       getParentalRatingOverride(mediaType, Number(item.id)),
