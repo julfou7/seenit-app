@@ -239,9 +239,15 @@ Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, 
 - La barre de recherche se masque pendant la descente et ne se réaffiche que lorsque le défilement repart réellement vers le haut ; le geste tactile et le `scrollTop` utilisent la même sémantique de direction.
 - Le scroll infini conserve des clés de cartes stables, évite de rerendre les cartes déjà chargées pour
   un simple changement d'en-tête et ne matérialise que les lignes visibles avec un débord borné. Des
-  espaceurs conservent la hauteur logique des pages déjà chargées. L'enrichissement diffuseur d'une carte
-  est différé hors des frames actives, dédupliqué et borné à quatre requêtes simultanées ; le cache
-  persistant regroupe ses écritures au lieu de sérialiser tout son snapshot par carte.
+  espaceurs conservent la hauteur logique des pages déjà chargées. La fin de pagination suit les
+  métadonnées brutes TMDB (`total_pages` ou, à défaut, la présence d'une page brute) : une page dont tous
+  les médias sont déjà connus après dédoublonnage ne termine jamais à elle seule le flux.
+- L'enrichissement diffuseur d'une carte est différé hors des frames actives, dédupliqué et borné à quatre
+  requêtes simultanées ; Explorer et Ma Liste réutilisent le même cache public de diffuseurs. En l'absence
+  de valeur affichable, une carte montre un skeleton compact uniquement pendant une résolution réellement
+  armée. Un diffuseur déjà en cache reste affiché pendant un rafraîchissement ; une résolution terminée
+  sans diffuseur retire le skeleton sans afficher de faux logo. Le cache persistant regroupe ses écritures
+  au lieu de sérialiser tout son snapshot par carte.
 - Les recommandations combinent genres regardés et personnes favorites, puis excluent les médias
   déjà vus/terminés ou abandonnés. **Explorer reste le lieu de la découverte approximative** ; ces
   recommandations ne sont pas réinjectées dans les fiches média comme relations.
