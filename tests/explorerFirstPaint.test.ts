@@ -60,3 +60,30 @@ test('#279 garde le placeholder de progression neutre et non interactif', () => 
   assert.match(placeholder, /<span className="h-1\.5 w-6 rounded-full bg-zinc-700" \/>/);
   assert.doesNotMatch(placeholder, /<button/);
 });
+
+test('#282 adoucit skeleton → cartes au niveau de la grille sans animation individuelle', () => {
+  assert.match(cssSource, /@keyframes explorerGridReveal[\s\S]*?opacity:\s*0\.25[\s\S]*?opacity:\s*1/);
+  assert.match(
+    cssSource,
+    /animation:\s*explorerGridReveal 180ms cubic-bezier\(0\.22, 1, 0\.36, 1\) both/,
+  );
+  assert.match(
+    cssSource,
+    /:not\(\[aria-hidden="true"\]\)/,
+    'le skeleton aria-hidden doit rester stable pendant le chargement',
+  );
+  assert.match(
+    cssSource,
+    /@media \(prefers-reduced-motion: reduce\)[\s\S]*?animation:\s*none/,
+  );
+  assert.doesNotMatch(
+    cssSource,
+    /\.media-grid-card\s*\{[^}]*animation:/,
+    'le fondu ne doit pas être appliqué à chaque carte virtualisée',
+  );
+  assert.doesNotMatch(
+    discoverSource,
+    /isNewlyLoaded/,
+    'Explorer ne doit pas activer l’ancienne animation individuelle des GridMediaCard',
+  );
+});
