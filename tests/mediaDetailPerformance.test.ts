@@ -47,22 +47,34 @@ test('SEENIT-PERF-001 réserve les skeletons au chargement réellement froid', (
   assert.match(detailSource, /loading="eager" decoding="async"[\s\S]{0,120}fetchPriority="high"/);
 });
 
-test('SEENIT-PERF-001 regroupe le chargement froid sans dépendance IMDb', () => {
-  assert.match(detailWrapperSource, /DETAIL_WARMUP_GRACE_MS = 300/);
+test('SEENIT-PERF-001 charge le détail principal sans attendre les disponibilités secondaires', () => {
   assert.match(detailWrapperSource, /tmdb\.peekMediaDetails\(tmdbId, mediaType\)/,
     'un cache détail chaud doit court-circuiter le gate');
-  assert.match(detailWrapperSource, /const providersPromise = tmdb\.getWatchProviders\(tmdbId, mediaType\)/,
-    'les plateformes doivent partir en parallèle du détail principal');
+  assert.match(detailWrapperSource, /void tmdb\.getWatchProviders\(tmdbId, mediaType\)\.catch/,
+    'les plateformes doivent partir en parallèle sans bloquer le cœur de fiche');
   assert.match(detailWrapperSource, /await tmdb\.getMediaDetails\(tmdbId, mediaType\)/,
-    'le détail principal doit être chaud avant de monter la fiche complète');
+    'le détail principal reste la seule donnée distante du chemin critique');
   assert.doesNotMatch(detailWrapperSource, /getSeriesImdbData|omdbService|\/api\/media\/omdb/,
     'le chargement froid ne doit plus dépendre d’IMDb ou OMDb');
-  assert.match(detailWrapperSource, /Promise\.race\(/,
-    'les enrichissements secondaires ne doivent jamais bloquer la fiche sans borne');
+  assert.doesNotMatch(detailWrapperSource, /DETAIL_WARMUP_GRACE_MS|Promise\.race\(/,
+    'une disponibilité secondaire ne doit plus prolonger artificiellement le skeleton de page');
   assert.match(detailWrapperSource, /data-seenit-detail-warmup="cold"/,
     'le chargement froid doit utiliser un shell unique et stable');
   assert.match(detailWrapperSource, /overflow-anchor: none/,
     'les placeholders ne doivent pas devenir des ancres de scroll pendant leur remplacement');
+});
+
+test('SEENIT-PERF-001 affiche les repères déterministes pendant le skeleton froid', () => {
+  assert.match(detailWrapperSource, /knownTitle/,
+    'un titre local déjà connu doit être affiché immédiatement');
+  assert.match(detailWrapperSource, /📺 SÉRIE/);
+  assert.match(detailWrapperSource, /🎬 FILM/);
+  assert.match(detailWrapperSource, />À propos</);
+  assert.match(detailWrapperSource, />Épisodes</);
+  assert.match(detailWrapperSource, />Synopsis</);
+  assert.match(detailWrapperSource, />Catégories & Thèmes</);
+  assert.match(detailWrapperSource, />Où regarder</);
+  assert.match(detailWrapperSource, /Recherche Plex & streaming…/);
 });
 
 test('SEENIT-PERF-001 garde le titre relationnel neutre sans transformer Où regarder en skeleton', () => {
