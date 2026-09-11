@@ -35,6 +35,11 @@ type ProviderState = {
   name: string | null;
 };
 
+type ProviderLoadingState = {
+  key: string;
+  loading: boolean;
+};
+
 function getProviderKey(tmdbId: number, mediaType: 'movie' | 'tv'): string {
   return `${mediaType}:${tmdbId}`;
 }
@@ -88,18 +93,54 @@ export function usePassiveWatchProvider({
     : null;
   const renderProviderState = toProviderState(providerKey, renderSnapshot?.provider || null);
   const [providerState, setProviderState] = useState<ProviderState>(() => renderProviderState);
+  const [loadingState, setLoadingState] = useState<ProviderLoadingState>(() => ({
+    key: providerKey,
+    loading: false,
+  }));
 
   const currentProviderState = providerState.key === providerKey
     ? providerState
     : renderProviderState;
+  const isProviderLoading = loadingState.key === providerKey && loadingState.loading;
+
+  useEffect(() => {
+    const node = cardRef.current;
+    if (!node) return;
+
+    if (isProviderLoading && !currentProviderState.logo) {
+      node.dataset.providerLoading = 'true';
+      node.setAttribute('aria-busy', 'true');
+    } else {
+      delete node.dataset.providerLoading;
+      node.removeAttribute('aria-busy');
+    }
+
+    return () => {
+      delete node.dataset.providerLoading;
+      node.removeAttribute('aria-busy');
+    };
+  }, [currentProviderState.logo, isProviderLoading, providerKey]);
 
   useEffect(() => {
     let isMounted = true;
     let cancelScheduledEnrichment = () => {};
     let stopObserving = () => {};
 
+    const finishLoading = () => {
+      if (isMounted) setLoadingState({ key: providerKey, loading: false });
+    };
+
+    const startLoadingIfNeeded = () => {
+      if (!isMounted || hasKnownProvider) return;
+      const latestSnapshot = readCachedProviderSnapshot(numericTmdbId, mediaType);
+      if (!latestSnapshot?.provider) {
+        setLoadingState({ key: providerKey, loading: true });
+      }
+    };
+
     if (!cardRef.current || !validTmdbId) {
       setProviderState(toProviderState(providerKey, null));
+      finishLoading();
       return () => { isMounted = false; };
     }
 
@@ -107,58 +148,81 @@ export function usePassiveWatchProvider({
       ? null
       : readCachedProviderSnapshot(numericTmdbId, mediaType);
     setProviderState(toProviderState(providerKey, initialSnapshot?.provider || null));
+    finishLoading();
 
-    const showPlexFromCache = () => {
-      checkPlexAvailability({
-        tmdbId: numericTmdbId,
-        title,
-        originalTitle,
-        year,
-        mediaType,
-      }).then(plexInfo => {
+    const showPlexFromCache = async () => {
+      try {
+        const plexInfo = await checkPlexAvailability({
+          tmdbId: numericTmdbId,
+          title,
+          originalTitle,
+          year,
+          mediaType,
+        });
         if (!isMounted || !plexInfo.available) return;
         setProviderState({
           key: providerKey,
           logo: PLEX_LOGO_SVG,
           name: plexInfo.serverName ? `Plex (${plexInfo.serverName})` : 'Plex',
         });
-      }).catch(() => {});
+      } catch {
+        // Une disponibilité Plex passive est cache-only : une erreur termine simplement l'état de recherche.
+      } finally {
+        finishLoading();
+      }
     };
 
-    const applyAuthoritativeTmdbPayload = (payload: any) => {
+    const applyAuthoritativeTmdbPayload = async (payload: any) => {
       if (!isMounted) return;
       const stream = payload?.results
         ? extractOfficialStreamingProvider(payload.results)
         : null;
       setProviderState(toProviderState(providerKey, stream));
-      if (!stream) showPlexFromCache();
+      if (stream) {
+        finishLoading();
+      } else {
+        await showPlexFromCache();
+      }
     };
 
     const enrichProvider = () => {
       onEnrich?.();
-      if (hasKnownProvider) return;
+      if (hasKnownProvider) {
+        finishLoading();
+        return;
+      }
 
       const latestSnapshot = readCachedProviderSnapshot(numericTmdbId, mediaType);
       if (latestSnapshot?.fresh) {
         if (latestSnapshot.provider) {
           if (isMounted) setProviderState(toProviderState(providerKey, latestSnapshot.provider));
+          finishLoading();
         } else {
-          showPlexFromCache();
+          startLoadingIfNeeded();
+          void showPlexFromCache();
         }
         return;
       }
 
-      tmdb.getWatchProviders(numericTmdbId, mediaType).then(res => {
-        if (!res.ok || !res.value) return;
+      if (!latestSnapshot?.provider) startLoadingIfNeeded();
+
+      tmdb.getWatchProviders(numericTmdbId, mediaType).then(async res => {
+        if (!res.ok || !res.value) {
+          finishLoading();
+          return;
+        }
 
         // Le payload TMDB public est stable et peut survivre aux démontages de cartes.
         // La disponibilité Plex reste dans son cache UID séparé et n'est jamais persistée ici.
         writeWatchProviderCache(numericTmdbId, mediaType, res.value);
-        applyAuthoritativeTmdbPayload(res.value);
-      }).catch(() => {});
+        await applyAuthoritativeTmdbPayload(res.value);
+      }).catch(() => {
+        finishLoading();
+      });
     };
 
     stopObserving = observeWatchProviderCard(cardRef.current, () => {
+      startLoadingIfNeeded();
       cancelScheduledEnrichment = scheduleWatchProviderCardEnrichment(enrichProvider);
     });
 
@@ -173,5 +237,6 @@ export function usePassiveWatchProvider({
     cardRef,
     providerLogo: currentProviderState.logo,
     providerName: currentProviderState.name,
+    isProviderLoading,
   };
 }
