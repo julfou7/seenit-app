@@ -3,7 +3,9 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   WATCH_PROVIDER_CACHE_MAX_ENTRIES,
+  WATCH_PROVIDER_CACHE_STALE_MAX_AGE_MS,
   WATCH_PROVIDER_CACHE_STORAGE_KEY,
+  WATCH_PROVIDER_CACHE_TTL_MS,
   flushWatchProviderCache,
   readWatchProviderCache,
   writeWatchProviderCache,
@@ -89,6 +91,48 @@ test('SEENIT-PERF-001 regroupe la persistance des diffuseurs hors du scroll', ()
   assert.equal(WATCH_PROVIDER_CACHE_STORAGE_KEY, 'seenit_watch_providers_v1');
 });
 
+test('SEENIT-PERF-001 réhydrate un diffuseur quand une carte virtualisée est remontée', () => {
+  const writtenAt = 5_000_000;
+  const storage = new InstrumentedStorage();
+  writeWatchProviderCache(42, 'movie', providerPayload, {
+    storage,
+    now: writtenAt,
+    defer: false,
+  });
+
+  const firstMount = readWatchProviderCache(42, 'movie', {
+    storage,
+    now: writtenAt + 1,
+    allowStale: true,
+  });
+  const recycledMount = readWatchProviderCache(42, 'movie', {
+    storage,
+    now: writtenAt + 2,
+    allowStale: true,
+  });
+
+  assert.equal(firstMount?.data, providerPayload);
+  assert.equal(recycledMount?.data, providerPayload);
+  assert.equal(recycledMount?.fresh, true, 'un remontage dans le TTL doit réutiliser immédiatement le diffuseur');
+  assert.equal(storage.gets, 1, 'les remontages ne doivent pas reparcourir localStorage');
+
+  const stale = readWatchProviderCache(42, 'movie', {
+    storage,
+    now: writtenAt + WATCH_PROVIDER_CACHE_TTL_MS + 1,
+    allowStale: true,
+  });
+  assert.equal(stale?.fresh, false, 'une valeur ancienne reste affichable pendant le rafraîchissement passif');
+  assert.equal(
+    readWatchProviderCache(42, 'movie', {
+      storage,
+      now: writtenAt + WATCH_PROVIDER_CACHE_STALE_MAX_AGE_MS,
+      allowStale: true,
+    }),
+    null,
+    'le stale-if-error reste borné à sept jours',
+  );
+});
+
 test('SEENIT-PERF-001 borne le fan-out diffuseurs et stabilise les cartes Explorer', async () => {
   const limiter = createWatchProviderRequestLimiter();
   let active = 0;
@@ -146,6 +190,15 @@ test('SEENIT-PERF-001 borne le fan-out diffuseurs et stabilise les cartes Explor
   assert.match(passiveProviderSource, /observeWatchProviderCard\(cardRef\.current/);
   assert.doesNotMatch(gridSource, /new IntersectionObserver/);
   assert.match(passiveProviderSource, /scheduleWatchProviderCardEnrichment\(enrichProvider\)/);
+  assert.match(passiveProviderSource, /readWatchProviderCache\(tmdbId, mediaType, \{ allowStale: true \}\)/);
+  assert.match(passiveProviderSource, /tmdb\.peekWatchProviders\(tmdbId, mediaType\)/);
+  assert.match(passiveProviderSource, /if \(latestSnapshot\?\.fresh\)/);
+  assert.match(passiveProviderSource, /writeWatchProviderCache\(numericTmdbId, mediaType, res\.value\)/);
+  assert.doesNotMatch(
+    passiveProviderSource,
+    /writeWatchProviderCache\([^\n]*PLEX_LOGO_SVG/,
+    'Plex ne doit jamais être persisté dans le cache public des diffuseurs TMDB',
+  );
   assert.doesNotMatch(gridSource, /networkMode:\s*['"]active['"]/);
   assert.match(gridSource, /media-grid-card/);
   assert.doesNotMatch(
