@@ -23,6 +23,12 @@ import { convergeTrackedMediaTitleFromTmdb } from './trackedMediaTitle';
 import { mediaKeyFrom } from './mediaRelations';
 import { getTVDBFranchiseRelation } from '../../services/tvdb';
 import { readWatchProviderCache, writeWatchProviderCache } from '../providers/watchProviderCache';
+import {
+  DISCOVER_PLATFORM_ID_MAP,
+  getGenreIdsForMediaType,
+  matchesSelectedGenres,
+  parseMinimumRating,
+} from '../discover/filterPolicy';
 
 export * from './tmdbClient';
 
@@ -242,6 +248,194 @@ tmdbClient.discoverWithFilters = (async (options) => {
     results: hydrated.filter((item): item is NonNullable<typeof item> => item !== null),
   });
 }) as typeof tmdbClient.discoverWithFilters;
+
+export interface SeenItDiscoverOptions {
+  type?: 'tv' | 'movie' | 'all';
+  category?: string;
+  page?: number;
+  watchProviders?: string[];
+  genres?: string[];
+  pegi?: string;
+  minRating?: string;
+  sortBy?: 'popular' | 'rating' | 'date' | 'title';
+  sortOrder?: 'asc' | 'desc';
+}
+
+const sortCombinedDiscoverResults = (
+  items: any[],
+  sortBy: 'popular' | 'rating' | 'date' | 'title',
+  sortOrder: 'asc' | 'desc',
+) => {
+  const direction = sortOrder === 'asc' ? 1 : -1;
+  return items.sort((left, right) => {
+    if (sortBy === 'rating') return direction * ((Number(left.vote_average) || 0) - (Number(right.vote_average) || 0));
+    if (sortBy === 'date') {
+      const leftDate = Date.parse(left.first_air_date || left.release_date || '') || 0;
+      const rightDate = Date.parse(right.first_air_date || right.release_date || '') || 0;
+      return direction * (leftDate - rightDate);
+    }
+    if (sortBy === 'title') {
+      const leftTitle = String(left.title || left.name || left.original_title || left.original_name || '');
+      const rightTitle = String(right.title || right.name || right.original_title || right.original_name || '');
+      return direction * leftTitle.localeCompare(rightTitle, 'fr', { sensitivity: 'base' });
+    }
+    return direction * ((Number(left.popularity) || 0) - (Number(right.popularity) || 0));
+  });
+};
+
+const applyCanonicalAgeFilter = async (items: any[], pegi: string): Promise<any[]> => {
+  const maxAge = parseMaxAgeFilter(pegi || 'Tous');
+  if (maxAge === null) return items;
+
+  const hydrated = await Promise.all(items.map(async item => {
+    const mediaType: 'movie' | 'tv' = item.media_type === 'movie' || Boolean(item.release_date) ? 'movie' : 'tv';
+    const detailsResult = mediaType === 'movie'
+      ? await tmdbClient.getMovieDetails(Number(item.id))
+      : await tmdbClient.getShowDetails(Number(item.id));
+    if (!detailsResult.ok || !detailsResult.value) return null;
+    const rating = detailsResult.value.seenitParentalRating || resolveParentalRating(
+      mediaType,
+      detailsResult.value,
+      getParentalRatingOverride(mediaType, Number(item.id)),
+    );
+    return matchesMaxRecommendedAge(rating, maxAge)
+      ? { ...item, seenitParentalRating: rating }
+      : null;
+  }));
+
+  return hydrated.filter((item): item is NonNullable<typeof item> => item !== null);
+};
+
+/**
+ * Moteur canonique d'Explorer : les valeurs d'une même famille (genres ou
+ * plateformes) sont en OU ; les familles distinctes sont combinées en ET.
+ * La pagination reste celle de la requête TMDB brute afin qu'une page devenue
+ * clairsemée après résolution parentale n'interrompe jamais la suite.
+ */
+export async function discoverSeenIt(options: SeenItDiscoverOptions) {
+  const {
+    type = 'all',
+    category = 'Tout',
+    page = 1,
+    watchProviders = [],
+    genres = [],
+    pegi = 'Tous',
+    minRating = 'Toutes',
+    sortBy = 'popular',
+    sortOrder = 'desc',
+  } = options;
+
+  const categoryDefaultSort: 'popular' | 'rating' | 'date' | 'title' =
+    (category === 'Top 100' || category === 'Pépites') && sortBy === 'popular' ? 'rating' : sortBy;
+
+  const fetchType = async (mediaType: 'tv' | 'movie') => {
+    const params = new URLSearchParams();
+    params.set('language', 'fr-FR');
+    params.set('page', String(page));
+
+    let sortParam = `popularity.${sortOrder}`;
+    if (categoryDefaultSort === 'rating') sortParam = `vote_average.${sortOrder}`;
+    else if (categoryDefaultSort === 'date') {
+      sortParam = `${mediaType === 'tv' ? 'first_air_date' : 'primary_release_date'}.${sortOrder}`;
+    } else if (categoryDefaultSort === 'title') {
+      sortParam = `${mediaType === 'tv' ? 'name' : 'original_title'}.${sortOrder}`;
+    }
+    params.set('sort_by', sortParam);
+
+    let minVotes = watchProviders.length > 0 ? 5 : (categoryDefaultSort === 'rating' ? 100 : 20);
+    if (category === 'Top 100') minVotes = 3000;
+    else if (category === 'Pépites') minVotes = 100;
+    else if (category === 'Au cinéma') minVotes = 5;
+    params.set('vote_count.gte', String(minVotes));
+
+    const selectedMinRating = parseMinimumRating(minRating);
+    const categoryMinRating = category === 'Pépites' ? 7.5 : null;
+    const effectiveMinRating = Math.max(selectedMinRating ?? 0, categoryMinRating ?? 0);
+    if (effectiveMinRating > 0) params.set('vote_average.gte', String(effectiveMinRating));
+
+    if (category === 'Pépites') {
+      const oneYearAgo = new Date();
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+      params.set(mediaType === 'tv' ? 'first_air_date.gte' : 'primary_release_date.gte', oneYearAgo.toISOString().split('T')[0]);
+    }
+
+    if (category === 'Au cinéma' && mediaType === 'movie') {
+      const { pastCutoff, futureCutoff } = getCinemaWindow();
+      params.set('region', 'FR');
+      params.set('with_release_type', '2|3');
+      params.set('release_date.gte', pastCutoff.toISOString().split('T')[0]);
+      params.set('release_date.lte', futureCutoff.toISOString().split('T')[0]);
+    }
+
+    const genreIds = getGenreIdsForMediaType(genres, mediaType);
+    if (category === 'Documentaires') {
+      params.set('with_genres', '99');
+    } else if (genreIds.length > 0) {
+      params.set('with_genres', genreIds.join('|'));
+    }
+
+    const providerIds = watchProviders.map(provider => DISCOVER_PLATFORM_ID_MAP[provider]).filter(Boolean);
+    if (providerIds.length > 0) {
+      params.set('watch_region', 'FR');
+      params.set('with_watch_providers', providerIds.join('|'));
+    }
+
+    const url = `${resolveSeenItApiUrl(`/api/media/tmdb/discover/${mediaType}`)}?${params.toString()}`;
+    const response = await tryCatch(authenticatedFetch(url));
+    if (!response.ok) return err((response as any).error);
+    if (!response.value.ok) return err(new Error(`TMDB Error: ${response.value.status}`));
+    const json = await tryCatch(response.value.json() as Promise<any>);
+    if (!json.ok) return err((json as any).error);
+
+    const checkedAt = Date.now();
+    let results = Array.isArray(json.value?.results)
+      ? json.value.results
+          .map((item: any) => ({ ...item, media_type: mediaType }))
+          .filter((item: any) => !isAdultOrParodyMedia(item))
+      : [];
+
+    if (category === 'Documentaires' && genres.length > 0) {
+      results = results.filter((item: any) => matchesSelectedGenres(item, genres));
+    }
+
+    if (category === 'Au cinéma' && mediaType === 'movie') {
+      results = results.map((movie: any) => {
+        rememberFrenchTheatricalEvidence(Number(movie.id), checkedAt);
+        return {
+          ...movie,
+          seenitFrenchTheatrical: true,
+          seenitFrenchTheatricalCheckedAt: checkedAt,
+        };
+      });
+    }
+
+    return ok({ ...json.value, results });
+  };
+
+  let rawResult: any;
+  if (type === 'all') {
+    const [tvResult, movieResult] = await Promise.all([fetchType('tv'), fetchType('movie')]);
+    if (!tvResult.ok && !movieResult.ok) return tvResult;
+    const tvValue = tvResult.ok ? tvResult.value : { results: [], total_pages: 0, total_results: 0 };
+    const movieValue = movieResult.ok ? movieResult.value : { results: [], total_pages: 0, total_results: 0 };
+    rawResult = {
+      results: sortCombinedDiscoverResults(
+        [...(tvValue.results || []), ...(movieValue.results || [])],
+        categoryDefaultSort,
+        sortOrder,
+      ),
+      total_pages: Math.max(Number(tvValue.total_pages || 0), Number(movieValue.total_pages || 0)),
+      total_results: Number(tvValue.total_results || 0) + Number(movieValue.total_results || 0),
+    };
+  } else {
+    const typedResult = await fetchType(type);
+    if (!typedResult.ok) return typedResult;
+    rawResult = typedResult.value;
+  }
+
+  const filteredByAge = await applyCanonicalAgeFilter(rawResult.results || [], pegi);
+  return ok({ ...rawResult, results: filteredByAge });
+}
 
 const strictFrenchNowPlaying = async (page: number = 1) => {
   const { pastCutoff, futureCutoff } = getCinemaWindow();
