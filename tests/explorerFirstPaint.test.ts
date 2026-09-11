@@ -62,10 +62,15 @@ test('#279 garde le placeholder de progression neutre et non interactif', () => 
 });
 
 test('#282 adoucit skeleton → cartes au niveau de la grille sans animation individuelle', () => {
-  assert.match(cssSource, /@keyframes explorerGridReveal/);
+  assert.match(cssSource, /@keyframes explorerGridReveal[\s\S]*?opacity:\s*0\.25[\s\S]*?opacity:\s*1/);
   assert.match(
     cssSource,
-    /\.max-w-2xl\.mx-auto\.w-full\.overflow-hidden\.flex\.flex-col \.grid\.grid-cols-3\.sm\\:grid-cols-4\.gap-x-1\\\.5\.gap-y-4\.px-1 \{[\s\S]*?animation:\s*explorerGridReveal 180ms cubic-bezier\(0\.22, 1, 0\.36, 1\) both/,
+    /animation:\s*explorerGridReveal 180ms cubic-bezier\(0\.22, 1, 0\.36, 1\) both/,
+  );
+  assert.match(
+    cssSource,
+    /:not\(\[aria-hidden="true"\]\)/,
+    'le skeleton aria-hidden doit rester stable pendant le chargement',
   );
   assert.match(
     cssSource,
