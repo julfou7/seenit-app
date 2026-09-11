@@ -92,6 +92,15 @@ export function FilterModal({
   };
 
   const handleValidate = () => {
+    const discoverRoot = overlayRef.current?.parentElement;
+    const scrollContainer = discoverRoot?.querySelector<HTMLElement>(':scope > .flex-1.overflow-y-auto');
+    if (scrollContainer) {
+      try {
+        scrollContainer.scrollTo({ top: 0, behavior: 'auto' });
+      } catch {
+        scrollContainer.scrollTop = 0;
+      }
+    }
     onApply(selectedPlatforms, selectedGenres, pegi, rating);
   };
 
