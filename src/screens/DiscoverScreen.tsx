@@ -21,6 +21,7 @@ import { useShowsStore } from '../store/showsStore';
 import { getRecommendations } from '../lib/recommendations';
 import { SeenItGlyph } from '../components/SeenItLogo';
 import { useGridVirtualWindow } from '../hooks/useBoundedVirtualWindow';
+import { hasMoreTmdbPages } from '../features/discover/discoverPagination';
 
 function useDebounce<T>(value: T, delay: number): [T] {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
@@ -634,14 +635,8 @@ export function DiscoverScreen({ onShowClick }: Props) {
         const personRes = await tmdb.getPopularPersons(page);
         if (personRes?.ok && personRes.value.results) {
           const persons = personRes.value.results.map(p => ({ ...p, media_type: 'person' }));
-          setPopularPersons(prev => {
-            const updated = page === 1 ? persons : mergeMedia(prev, persons);
-            if (page > 1 && updated.length === prev.length) setHasMore(false);
-            return updated;
-          });
-          if (!personRes.value.results.length || (personRes.value.total_pages && page >= personRes.value.total_pages)) {
-            setHasMore(false);
-          }
+          setPopularPersons(prev => page === 1 ? persons : mergeMedia(prev, persons));
+          setHasMore(hasMoreTmdbPages(page, personRes));
         } else {
           setHasMore(false);
         }
@@ -659,11 +654,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
 
         if (discoverRes?.ok && discoverRes.value.results) {
           const results = discoverRes.value.results;
-          setPopular(prev => {
-            const updated = page === 1 ? results : mergeMedia(prev, results);
-            if (page > 1 && updated.length === prev.length) setHasMore(false);
-            return updated;
-          });
+          setPopular(prev => page === 1 ? results : mergeMedia(prev, results));
           if (page === 1) {
             const top10 = results.slice(0, 10);
             setTrending(top10);
@@ -675,20 +666,14 @@ export function DiscoverScreen({ onShowClick }: Props) {
               }
             }
           }
-          if (results.length === 0 || (discoverRes.value.total_pages && page >= discoverRes.value.total_pages)) {
-            setHasMore(false);
-          }
+          setHasMore(hasMoreTmdbPages(page, discoverRes));
         } else {
           setHasMore(false);
         }
       } else if (activeCategory === 'Pépites') {
         const topRes = await tmdb.getTopRatedRecent('all', page, selectedPlatforms);
         if (topRes?.ok && topRes.value.results) {
-          setPopular(prev => {
-            const updated = page === 1 ? topRes.value.results : mergeMedia(prev, topRes.value.results);
-            if (page > 1 && updated.length === prev.length) setHasMore(false);
-            return updated;
-          });
+          setPopular(prev => page === 1 ? topRes.value.results : mergeMedia(prev, topRes.value.results));
           if (page === 1) {
             const top10 = topRes.value.results.slice(0, 10);
             setTrending(top10);
@@ -700,9 +685,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
               }
             }
           }
-          if (!topRes.value.results.length || (topRes.value.total_pages && page >= topRes.value.total_pages)) {
-            setHasMore(false);
-          }
+          setHasMore(hasMoreTmdbPages(page, topRes));
         } else {
           setHasMore(false);
         }
@@ -717,11 +700,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
         ];
         tops.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
         
-        setPopular(prev => {
-          const updated = page === 1 ? tops : mergeMedia(prev, tops);
-          if (page > 1 && updated.length === prev.length) setHasMore(false);
-          return updated;
-        });
+        setPopular(prev => page === 1 ? tops : mergeMedia(prev, tops));
         if (page === 1) {
           const top10List = tops.slice(0, 10);
           setTrending(top10List);
@@ -733,20 +712,14 @@ export function DiscoverScreen({ onShowClick }: Props) {
             }
           }
         }
-        if (tops.length === 0 || page >= 5) {
-          setHasMore(false);
-        }
+        setHasMore(page < 5 && (hasMoreTmdbPages(page, topMovRes) || hasMoreTmdbPages(page, topTvRes)));
       } else if (activeCategory === 'Au cinéma') {
         const cinemaRes = await tmdb.getNowPlaying(page);
         if (cinemaRes?.ok && cinemaRes.value.results) {
           const movies = cinemaRes.value.results
             .map(r => ({ ...r, media_type: 'movie' as const }))
             .filter(r => isMovieAtCinema(r));
-          setPopular(prev => {
-            const updated = page === 1 ? movies : mergeMedia(prev, movies);
-            if (page > 1 && updated.length === prev.length) setHasMore(false);
-            return updated;
-          });
+          setPopular(prev => page === 1 ? movies : mergeMedia(prev, movies));
           if (page === 1) {
             const top10 = movies.slice(0, 10);
             setTrending(top10);
@@ -754,9 +727,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
               tmdb.getMovieDetails(item.id).then(res => { if (res.ok) setHeroDetails(prev => ({ ...prev, [item.id]: res.value })); });
             }
           }
-          if (movies.length === 0 || !cinemaRes.value.results.length || (cinemaRes.value.total_pages && page >= cinemaRes.value.total_pages)) {
-            setHasMore(false);
-          }
+          setHasMore(hasMoreTmdbPages(page, cinemaRes));
         } else {
           setHasMore(false);
         }
@@ -769,12 +740,8 @@ export function DiscoverScreen({ onShowClick }: Props) {
           ...(docMovRes?.ok ? docMovRes.value.results.map(r => ({ ...r, media_type: 'movie', genre_ids: [...(r.genre_ids || []), 99] })) : []),
           ...(docTvRes?.ok ? docTvRes.value.results.map(r => ({ ...r, media_type: 'tv', genre_ids: [...(r.genre_ids || []), 99] })) : [])
         ];
-        setPopular(prev => {
-          const updated = page === 1 ? docs : mergeMedia(prev, docs);
-          if (page > 1 && updated.length === prev.length) setHasMore(false);
-          return updated;
-        });
-        if (docs.length === 0) setHasMore(false);
+        setPopular(prev => page === 1 ? docs : mergeMedia(prev, docs));
+        setHasMore(hasMoreTmdbPages(page, docMovRes, docTvRes));
       } else if (activeCategory === 'Tout') {
         const isRecent = (r: TMDBMedia) => {
           const date = r.first_air_date || r.release_date;
@@ -819,15 +786,13 @@ export function DiscoverScreen({ onShowClick }: Props) {
         setPopular(prev => {
           const combined = mergeMedia(trendingList, popularList);
           const toAdd = combined.length > 0 ? combined : popularList;
-          const updated = page === 1 ? toAdd : mergeMedia(prev, toAdd);
-          if (page > 1 && updated.length === prev.length) setHasMore(false);
-          return updated;
+          return page === 1 ? toAdd : mergeMedia(prev, toAdd);
         });
 
         if (page === 1) {
           setHomeEnrichmentReady(true);
         }
-        if (popularList.length === 0 && trendingList.length === 0) setHasMore(false);
+        setHasMore(hasMoreTmdbPages(page, popTvRes, popMovRes));
       } else {
         const type = activeCategory === 'Films' ? 'movie' : 'tv';
         const [trendRes, popRes] = await Promise.all([
@@ -851,11 +816,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
           setTrending(prev => page === 1 ? trendList : mergeMedia(prev, trendList));
         }
 
-        setPopular(prev => {
-          const updated = page === 1 ? toAdd : mergeMedia(prev, toAdd);
-          if (page > 1 && updated.length === prev.length) setHasMore(false);
-          return updated;
-        });
+        setPopular(prev => page === 1 ? toAdd : mergeMedia(prev, toAdd));
 
         if (page === 1) {
           const top10 = toAdd.slice(0, 10);
@@ -868,7 +829,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
             }
           }
         }
-        if (popList.length === 0 && trendList.length === 0) setHasMore(false);
+        setHasMore(hasMoreTmdbPages(page, popRes));
       }
 
       setLoading(false);
