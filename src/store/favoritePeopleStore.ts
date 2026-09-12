@@ -39,7 +39,10 @@ function favoritePeopleCollection(uid: string) {
 function persistFavoritePerson(uid: string, person: Person, active: boolean) {
   const ref = doc(favoritePeopleCollection(uid), String(person.id));
   return setDoc(ref, {
-    ...person,
+    id: person.id,
+    name: person.name,
+    profile_path: person.profile_path ?? null,
+    known_for_department: person.known_for_department ?? null,
     active,
     updatedAt: Date.now(),
     schemaVersion: 1,
