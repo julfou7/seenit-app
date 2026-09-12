@@ -10,7 +10,7 @@ import {
   type SeenItReleaseInfo
 } from '../features/release/releasePolicy';
 
-export const CURRENT_APP_VERSION = '1.4.144';
+export const CURRENT_APP_VERSION = '1.4.145';
 export type AppReleaseInfo = SeenItReleaseInfo;
 let inFlightUpdateCheck: Promise<boolean> | null = null;
 
