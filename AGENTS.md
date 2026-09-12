@@ -112,7 +112,11 @@ Il est **interdit de forcer le mode light**. Le doute reste `apk`.
 
 ### Validation continue
 
-Chaque push/PR lance uniquement les validations rapides : classification, contrat de changement, SPEC, TypeScript, tests unitaires, build Web/serveur et contrat Android si la classe est `apk`. Un push sur `main` ne publie jamais automatiquement une APK.
+Pendant la mise au point, exécuter les tests ciblés utiles. **Avant le premier push d'un arbre Git modifié, `npm run validate:change` doit être vert sur cet arbre exact.** Cette commande est le garde local canonique : politique et syntaxe des workflows, SPEC, matérialisation Android, classification, contrat de changement, TypeScript, tests unitaires, contrat Android conditionnel, audit de dépendances applicable et build. Un agent ne pousse pas un changement dont cette validation complète est rouge ; GitHub Actions confirme le même contrat et ne sert pas de boucle de correction distante.
+
+La CI consomme la même orchestration. Elle appelle `npm run validate:change -- --preflight` avant tout cache/installation puis `npm run validate:change -- --postinstall` après restauration ou installation des dépendances uniquement pour préserver le fail-fast et les métriques ; ces deux phases ne constituent pas une logique de validation parallèle. `npm run validate:workflows` impose l'allowlist canonique des workflows, borne leurs permissions `write`, interdit les workflows correctifs qui modifient/commitent/poussent le code et valide leur syntaxe avec **actionlint v1.7.12**. Ajouter/renommer un workflow ou élargir une permission d'écriture exige donc une modification explicite du contrat et de ses TNR.
+
+Chaque push/PR lance uniquement les validations rapides de cette orchestration. Un push sur `main` ne publie jamais automatiquement une APK.
 
 `npm audit` est limité aux changements de dépendances, au contrôle périodique et à la release manuelle. Le cache npm doit rester activé dans la CI.
 
