@@ -14,7 +14,7 @@ function position(label: string): number {
   return index;
 }
 
-test('SEENIT-QUALITY-008 impose le préflight canonique avant dépendances et un cache exact de confiance', () => {
+test('SEENIT-QUALITY-008 impose un préflight sans dépendances et un cache exact de confiance', () => {
   assert.match(validateJob, /timeout-minutes:\s*10/);
 
   const actionlint = position('Install pinned actionlint');
