@@ -118,7 +118,7 @@ test('SEENIT-QUALITY-003 mémorise chaque demande durable dans la SPEC et le reg
 test('SEENIT-QUALITY-006 réserve le pipeline APK aux changements qui le nécessitent', () => {
   assert.match(workflow, /Validate Change Canonical/);
   assert.match(changeValidator, /delivery:classify/);
-  assert.match(workflow, /DELIVERY_MODE == 'apk'/);
+  assert.match(changeValidator, /classification\.mode === 'apk'/);
   assert.match(workflow, /release_apk == true/);
   assert.match(workflow, /android12_smoke:/);
   assert.match(workflow, /api-level: 36/);
