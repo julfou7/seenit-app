@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { collection, doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { collection, doc, onSnapshot, runTransaction, setDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { purgeLegacyUnscopedUserData, readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
 import {
@@ -36,9 +36,8 @@ function favoritePeopleCollection(uid: string) {
   return collection(db, root, userId, child);
 }
 
-function persistFavoritePerson(uid: string, person: Person, active: boolean) {
-  const ref = doc(favoritePeopleCollection(uid), String(person.id));
-  return setDoc(ref, {
+function favoritePersonPayload(person: Person, active: boolean) {
+  return {
     id: person.id,
     name: person.name,
     profile_path: person.profile_path ?? null,
@@ -46,7 +45,21 @@ function persistFavoritePerson(uid: string, person: Person, active: boolean) {
     active,
     updatedAt: Date.now(),
     schemaVersion: 1,
-  }, { merge: true });
+  } as const;
+}
+
+function persistFavoritePerson(uid: string, person: Person, active: boolean) {
+  const ref = doc(favoritePeopleCollection(uid), String(person.id));
+  return setDoc(ref, favoritePersonPayload(person, active), { merge: true });
+}
+
+function migrateFavoritePersonIfMissing(uid: string, person: Person) {
+  const ref = doc(favoritePeopleCollection(uid), String(person.id));
+  return runTransaction(db, async transaction => {
+    const current = await transaction.get(ref);
+    if (current.exists()) return;
+    transaction.set(ref, favoritePersonPayload(person, true));
+  });
 }
 
 export const useFavoritePeopleStore = create<FavoritePeopleState>((set, get) => ({
@@ -108,12 +121,13 @@ function activateFavoritePeopleScope(uid?: string | null) {
 
       // Never migrate from a cache-only snapshot: an unseen cloud tombstone must
       // win over stale local data. Once the server snapshot is authoritative,
-      // only missing TMDB IDs are imported; existing cloud records are untouched.
+      // only missing TMDB IDs are considered. The transaction re-checks absence
+      // at commit time so a concurrent device can never be overwritten.
       if (!snapshot.metadata.fromCache && !authoritativeMigrationStarted) {
         authoritativeMigrationStarted = true;
         const remoteIds = remoteRecords.map(record => record.id);
         const missingLocalPeople = selectLocalFavoritesToMigrate(localSeed, remoteIds);
-        void Promise.all(missingLocalPeople.map(person => persistFavoritePerson(uid, person, true)))
+        void Promise.all(missingLocalPeople.map(person => migrateFavoritePersonIfMissing(uid, person)))
           .catch(error => {
             console.warn('Favorite people migration failed.', error);
           });
