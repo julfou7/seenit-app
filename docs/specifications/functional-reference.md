@@ -1,7 +1,7 @@
 # SeenIt — Référence fonctionnelle canonique
 
-Dernière vérification : 11 septembre 2026
-Baseline observée avant correction : **1.4.139**, `main` `143b7aa854e30f2c00c569d3514aa2b59874ea64`
+Dernière vérification : 12 septembre 2026
+Baseline observée avant correction : **1.4.145**, `main` `b44596c754484a29f5f83f56ad740b964b5917b2`
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : composante obligatoire de la SPEC SeenIt
 
@@ -165,6 +165,14 @@ le fil d'actualités des médias suivis.
 - **Continuer à regarder** reçoit les séries commencées vues dans les 60 derniers jours inclus ;
 - **Pas vu depuis un moment** reçoit les autres séries encore regardables ;
 - **Films à voir** reçoit les films suivis non vus dont la sortie n'est pas future.
+
+Une série n'entre dans **À Regarder** que si SeenIt possède une preuve positive qu'au moins un épisode
+a déjà été diffusé : progression déjà enregistrée, `totalAiredEpisodes > 0`, `firstAirDate` passée ou du
+jour, ou date passée/du jour du prochain épisode à regarder. Une date d'ajout récente, un nombre total
+d'épisodes planifié ou une date d'épisode absente ne prouvent jamais la disponibilité. Une date future
+connue relève de **À Venir** ; sans date exploitable, la série reste suivie sans être présentée comme
+regardable. Les cartes ne fabriquent donc pas `S01 | E01` / « SAISON DISPO » depuis des métadonnées
+inconnues.
 
 Les règles exactes de frontière sont dans `seenit.md` §5.1. Chaque carrousel matérialise une fenêtre d'au
 moins huit cartes et recycle celles qui quittent largement le viewport ; des espaceurs transparents
