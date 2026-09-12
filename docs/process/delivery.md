@@ -100,7 +100,7 @@ l'outil est donc une évolution explicite de la politique : le script, les TNR e
 mis à jour dans le même changement. Un workflow correctif temporaire auto-modifiant n'est jamais un moyen
 autorisé de réparer la CI.
 
-Le préflight conserve également le garde Node sans dépendances qui inspecte uniquement les TNR
+Le préflight conserve également le garde des imports ESM des TNR Node sans dépendances, qui inspecte uniquement les TNR
 `tests/**/*.test.ts` exécutés directement par `node --test`. Lorsqu'un import relatif local cible un
 module TypeScript existant, son extension (`.ts`, `.tsx`, etc.) doit être explicite ; les imports de
 packages et le code applicatif bundlé par Vite restent hors de ce garde. L'erreur indique fichier, ligne,
