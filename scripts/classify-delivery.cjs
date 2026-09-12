@@ -35,7 +35,8 @@ const RELEASE_TOOL_SCRIPTS = new Set([
   'release:status',
   'release:prepare',
   'release:dispatch',
-  'validate:change'
+  'validate:change',
+  'validate:workflows'
 ]);
 
 function normalizePath(file) {
