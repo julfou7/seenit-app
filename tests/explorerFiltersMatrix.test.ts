@@ -66,7 +66,7 @@ test('toute combinaison de filtres ou de tri passe par le moteur canonique', () 
 });
 
 test('un filtre restrictif ne peut plus vider la grille parce que le HERO a pris les résultats', () => {
-  assert.match(discoverSource, /activeCategory === 'Personnes' \|\| hasActiveFilters \|\| sortBy !== 'popular'\) return \[\]/);
+  assert.match(discoverSource, /debouncedQuery\.trim\(\) \|\| activeCategory === 'Personnes' \|\| hasActiveFilters \|\| sortBy !== 'popular'\) return \[\]/);
   assert.match(discoverSource, /showHeroSurface = !debouncedQuery\.trim\(\)\s*&& !hasActiveFilters\s*&& sortBy === 'popular'/s);
 });
 
