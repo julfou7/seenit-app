@@ -57,16 +57,20 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
-      - name: Reject Release Request Outside Main
-        if: github.event_name == 'workflow_dispatch' && inputs.release_apk == true
+      - name: Install pinned actionlint
         run: |
-          if [ "$GITHUB_REF" != "refs/heads/main" ] && [ "$GITHUB_REF" != "refs/heads/master" ]; then
-            echo "Une release APK doit être déclenchée depuis main/master."
-            exit 1
-          fi
+          set -euo pipefail
+          version='1.7.12'
+          archive="$RUNNER_TEMP/actionlint.tar.gz"
+          curl -fsSL "https://github.com/rhysd/actionlint/releases/download/v${version}/actionlint_${version}_linux_amd64.tar.gz" -o "$archive"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $archive" | sha256sum --check --status
+          tar -xzf "$archive" -C "$RUNNER_TEMP" actionlint
+          chmod +x "$RUNNER_TEMP/actionlint"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/actionlint" -version
 
-      - name: Validate Specification Integrity
-        run: npm run test:spec
+      - name: Validate Change Preflight
+        run: npm run validate:change -- --preflight
 
       - name: Complete Preflight Metrics
         if: always()
@@ -99,78 +103,12 @@ jobs:
           echo "SEENIT_INSTALL_SECONDS=$((now-started))" >> "$GITHUB_ENV"
           exit "$status"
 
-      - name: Materialize Android Configuration
-        run: |
-          started=$(date +%s)
-          set +e
-          node scripts/materialize-android-config.cjs
-          status=$?
-          set -e
-          now=$(date +%s)
-          echo "SEENIT_MATERIALIZE_SECONDS=$((now-started))" >> "$GITHUB_ENV"
-          exit "$status"
-
-      - name: Classify Delivery Path
+      - name: Validate Change Canonical
         id: delivery
-        run: npm run delivery:classify
+        run: npm run validate:change -- --postinstall
         env:
-          DELIVERY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          FORCED_DELIVERY_MODE: auto
-
-      - name: Specification Change Contract
-        run: npm run test:spec:changes
-        env:
-          SPEC_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          DELIVERY_MODE: ${{ steps.delivery.outputs.DELIVERY_MODE }}
-
-      - name: TypeScript Check
-        run: |
-          started=$(date +%s)
-          set +e
-          npm run lint
-          status=$?
-          set -e
-          now=$(date +%s)
-          echo "SEENIT_TYPESCRIPT_SECONDS=$((now-started))" >> "$GITHUB_ENV"
-          exit "$status"
-
-      - name: Unit Tests
-        run: |
-          started=$(date +%s)
-          set +e
-          npm run test:unit
-          status=$?
-          set -e
-          now=$(date +%s)
-          echo "SEENIT_UNIT_SECONDS=$((now-started))" >> "$GITHUB_ENV"
-          exit "$status"
-
-      - name: Android Contract for APK-impacting Changes
-        if: steps.delivery.outputs.DELIVERY_MODE == 'apk' || (github.event_name == 'workflow_dispatch' && inputs.release_apk == true)
-        run: |
-          started=$(date +%s)
-          set +e
-          npm run test:android
-          status=$?
-          set -e
-          now=$(date +%s)
-          echo "SEENIT_ANDROID_SECONDS=$((now-started))" >> "$GITHUB_ENV"
-          exit "$status"
-
-      - name: Production Dependency Audit
-        if: steps.delivery.outputs.DEPENDENCIES_CHANGED == 'true' || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.release_apk == true)
-        run: npm audit --omit=dev --audit-level=high
-
-      - name: Build Web and Server Assets
-        run: |
-          started=$(date +%s)
-          set +e
-          npm run build
-          status=$?
-          set -e
-          now=$(date +%s)
-          echo "SEENIT_BUILD_SECONDS=$((now-started))" >> "$GITHUB_ENV"
-          exit "$status"
+          SEENIT_VALIDATE_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          SEENIT_FORCE_DEPENDENCY_AUDIT: ${{ github.event_name == 'schedule' }}
 
       - name: Save Trusted node_modules Cache
         if: >-
@@ -207,7 +145,9 @@ jobs:
             echo "|---|---:|"
             echo "| Mode de livraison | $delivery_mode |"
             echo "| Cache node_modules | $cache_status |"
-            echo "| Préflight SPEC | ${SEENIT_PREFLIGHT_SECONDS:-n/a} s |"
+            echo "| Préflight workflows + SPEC | ${SEENIT_PREFLIGHT_SECONDS:-n/a} s |"
+            echo "| actionlint + politique workflows | ${SEENIT_WORKFLOWS_SECONDS:-n/a} s |"
+            echo "| Intégrité SPEC | ${SEENIT_SPEC_SECONDS:-n/a} s |"
             echo "| Installation npm | ${SEENIT_INSTALL_SECONDS:-0} s |"
             echo "| Matérialisation Android | ${SEENIT_MATERIALIZE_SECONDS:-n/a} s |"
             echo "| TypeScript | ${SEENIT_TYPESCRIPT_SECONDS:-n/a} s |"
