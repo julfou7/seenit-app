@@ -77,6 +77,7 @@ function validateChange() {
   const baseSha = resolveBaseSha();
   console.log(`[Validate Change] Baseline : ${baseSha}`);
 
+  run('npm', ['run', 'validate:workflows'], { label: 'Politique workflows' });
   run('npm', ['run', 'test:spec'], { label: 'Intégrité SPEC' });
   run('node', ['scripts/materialize-android-config.cjs'], { label: 'Matérialisation Android' });
 
@@ -106,7 +107,7 @@ function validateChange() {
     if (classification.mode === 'apk') {
       run('npm', ['run', 'test:android'], { label: 'Contrat Android' });
     }
-    if (classification.dependenciesChanged) {
+    if (classification.dependenciesChanged || process.env.SEENIT_FORCE_DEPENDENCY_AUDIT === 'true') {
       run('npm', ['audit', '--omit=dev', '--audit-level=high'], { label: 'Audit dépendances production' });
     }
     run('npm', ['run', 'build'], { label: 'Build Web + serveur' });
