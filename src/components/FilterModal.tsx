@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { cn } from '../lib/utils';
 import { Tv, Film, X, Sparkles, FileText, User, Ticket, Trophy } from 'lucide-react';
+import { isSearchCompatibleCategory } from '../features/discover/filterPolicy';
 
 interface FilterModalProps {
   onClose: () => void;
@@ -57,6 +58,7 @@ export function FilterModal({
   const overlayRef = useRef<HTMLDivElement>(null);
   const isSearchActive = query.trim().length > 0;
 
+  const [draftCategory, setDraftCategory] = useState(activeCategory);
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(initialSelectedPlatforms);
   const [selectedGenres, setSelectedGenres] = useState<string[]>(initialSelectedGenres);
   const [pegi, setPegi] = useState(initialPegi);
@@ -85,6 +87,7 @@ export function FilterModal({
   }, [onClose]);
 
   const handleReset = () => {
+    setDraftCategory('Tout');
     setSelectedPlatforms([]);
     setSelectedGenres([]);
     setPegi('Tous');
@@ -101,8 +104,19 @@ export function FilterModal({
         scrollContainer.scrollTop = 0;
       }
     }
+    setActiveCategory(draftCategory);
     onApply(selectedPlatforms, selectedGenres, pegi, rating);
   };
+
+  const typeButtonClass = (category: string, disabled = false) => cn(
+    'px-4 py-2 rounded-full text-[13px] font-semibold flex items-center gap-1.5 transition-all border',
+    draftCategory === category
+      ? 'bg-[#E5A93D]/20 text-[#E5A93D] border-[#E5A93D]/50'
+      : 'bg-white/5 border-white/5 text-zinc-300 hover:bg-white/10',
+    disabled && 'opacity-30 pointer-events-none grayscale'
+  );
+
+  const searchDisabled = (category: string) => isSearchActive && !isSearchCompatibleCategory(category);
 
   return (
     <div
@@ -111,11 +125,8 @@ export function FilterModal({
       className="fixed inset-0 z-[200] flex flex-col justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
     >
       <div className="w-full max-w-xl mx-auto bg-[#1C1C1E] rounded-t-[2rem] pt-3 px-5 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] shadow-2xl animate-in slide-in-from-bottom-full duration-300 max-h-[90vh] flex flex-col">
-
-        {/* Handle */}
         <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-4 shrink-0" />
 
-        {/* Header with Reset */}
         <div className="flex justify-between items-center mb-4 shrink-0">
           <button onClick={handleReset} className="text-[13px] font-semibold text-zinc-400 hover:text-white transition-colors">
             Réinitialiser
@@ -126,56 +137,59 @@ export function FilterModal({
         </div>
 
         <div className="flex-1 overflow-y-auto hide-scrollbar pb-6 space-y-6">
-          {/* TYPE DE CONTENU */}
           <div>
-            <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-3">Type de contenu</h3>
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Type de contenu</h3>
+              {isSearchActive && (
+                <span className="text-[10px] text-amber-500 font-medium bg-amber-500/10 px-2 py-0.5 rounded">
+                  Recherche : types simples uniquement
+                </span>
+              )}
+            </div>
             <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setActiveCategory('Séries')}
-                className={cn("px-4 py-2 rounded-full text-[13px] font-semibold flex items-center gap-1.5 transition-all border", activeCategory === 'Séries' ? "bg-[#E5A93D]/20 text-[#E5A93D] border-[#E5A93D]/50" : "bg-white/5 border-white/5 text-zinc-300 hover:bg-white/10")}
-              >
+              <button onClick={() => setDraftCategory('Tout')} className={typeButtonClass('Tout')}>
+                Tout
+              </button>
+              <button onClick={() => setDraftCategory('Séries')} className={typeButtonClass('Séries')}>
                 <Tv size={14}/> Séries
               </button>
-              <button
-                onClick={() => setActiveCategory('Films')}
-                className={cn("px-4 py-2 rounded-full text-[13px] font-semibold flex items-center gap-1.5 transition-all border", activeCategory === 'Films' ? "bg-[#E5A93D]/20 text-[#E5A93D] border-[#E5A93D]/50" : "bg-white/5 border-white/5 text-zinc-300 hover:bg-white/10")}
-              >
+              <button onClick={() => setDraftCategory('Films')} className={typeButtonClass('Films')}>
                 <Film size={14}/> Films
               </button>
               <button
-                onClick={() => setActiveCategory('Top 100')}
-                className={cn("px-4 py-2 rounded-full text-[13px] font-semibold flex items-center gap-1.5 transition-all border", activeCategory === 'Top 100' ? "bg-[#E5A93D]/20 text-[#E5A93D] border-[#E5A93D]/50" : "bg-white/5 border-white/5 text-zinc-300 hover:bg-white/10")}
+                disabled={searchDisabled('Top 100')}
+                onClick={() => setDraftCategory('Top 100')}
+                className={typeButtonClass('Top 100', searchDisabled('Top 100'))}
               >
                 <Trophy size={14}/> Top 100
               </button>
               <button
-                onClick={() => setActiveCategory('Pépites')}
-                className={cn("px-4 py-2 rounded-full text-[13px] font-semibold flex items-center gap-1.5 transition-all border", activeCategory === 'Pépites' ? "bg-[#E5A93D]/20 text-[#E5A93D] border-[#E5A93D]/50" : "bg-white/5 border-white/5 text-zinc-300 hover:bg-white/10")}
+                disabled={searchDisabled('Pépites')}
+                onClick={() => setDraftCategory('Pépites')}
+                className={typeButtonClass('Pépites', searchDisabled('Pépites'))}
               >
                 <Sparkles size={14}/> Pépites
               </button>
               <button
-                onClick={() => setActiveCategory('Au cinéma')}
-                className={cn("px-4 py-2 rounded-full text-[13px] font-semibold flex items-center gap-1.5 transition-all border", activeCategory === 'Au cinéma' ? "bg-[#E5A93D]/20 text-[#E5A93D] border-[#E5A93D]/50" : "bg-white/5 border-white/5 text-zinc-300 hover:bg-white/10")}
+                disabled={searchDisabled('Au cinéma')}
+                onClick={() => setDraftCategory('Au cinéma')}
+                className={typeButtonClass('Au cinéma', searchDisabled('Au cinéma'))}
               >
                 <Ticket size={14}/> Au cinéma
               </button>
               <button
-                onClick={() => setActiveCategory('Documentaires')}
-                className={cn("px-4 py-2 rounded-full text-[13px] font-semibold flex items-center gap-1.5 transition-all border", activeCategory === 'Documentaires' ? "bg-[#E5A93D]/20 text-[#E5A93D] border-[#E5A93D]/50" : "bg-white/5 border-white/5 text-zinc-300 hover:bg-white/10")}
+                disabled={searchDisabled('Documentaires')}
+                onClick={() => setDraftCategory('Documentaires')}
+                className={typeButtonClass('Documentaires', searchDisabled('Documentaires'))}
               >
                 <FileText size={14}/> Documentaires
               </button>
-              <button
-                onClick={() => setActiveCategory('Personnes')}
-                className={cn("px-4 py-2 rounded-full text-[13px] font-semibold flex items-center gap-1.5 transition-all border", activeCategory === 'Personnes' ? "bg-[#E5A93D]/20 text-[#E5A93D] border-[#E5A93D]/50" : "bg-white/5 border-white/5 text-zinc-300 hover:bg-white/10")}
-              >
+              <button onClick={() => setDraftCategory('Personnes')} className={typeButtonClass('Personnes')}>
                 <User size={14}/> Personnes
               </button>
             </div>
           </div>
 
-          {/* PLATEFORME */}
           <div>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Plateforme</h3>
@@ -185,16 +199,17 @@ export function FilterModal({
                 </span>
               )}
             </div>
-            <div className={cn("flex flex-wrap gap-2", isSearchActive && "opacity-30 pointer-events-none grayscale")}>
+            <div className={cn('flex flex-wrap gap-2', isSearchActive && 'opacity-30 pointer-events-none grayscale')}>
               {PLATFORMS.map(platform => (
                 <button
                   key={platform.id}
+                  disabled={isSearchActive}
                   onClick={() => togglePlatform(platform.id)}
                   className={cn(
-                    "px-4 py-2 rounded-full text-[13px] font-semibold transition-all border",
+                    'px-4 py-2 rounded-full text-[13px] font-semibold transition-all border',
                     selectedPlatforms.includes(platform.id)
-                      ? "bg-white/15 border-white/20"
-                      : "bg-transparent border-white/10 hover:border-white/20",
+                      ? 'bg-white/15 border-white/20'
+                      : 'bg-transparent border-white/10 hover:border-white/20',
                     platform.color
                   )}
                 >
@@ -204,7 +219,6 @@ export function FilterModal({
             </div>
           </div>
 
-          {/* GENRE */}
           <div>
             <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-3">Genre</h3>
             <div className="flex flex-wrap gap-2">
@@ -213,10 +227,10 @@ export function FilterModal({
                   key={genre}
                   onClick={() => toggleGenre(genre)}
                   className={cn(
-                    "px-4 py-2 rounded-full text-[13px] font-medium transition-all border",
+                    'px-4 py-2 rounded-full text-[13px] font-medium transition-all border',
                     selectedGenres.includes(genre)
-                      ? "bg-[#E5A93D]/20 border-[#E5A93D]/50 text-[#E5A93D]"
-                      : "bg-transparent border-white/10 text-zinc-300 hover:border-white/20"
+                      ? 'bg-[#E5A93D]/20 border-[#E5A93D]/50 text-[#E5A93D]'
+                      : 'bg-transparent border-white/10 text-zinc-300 hover:border-white/20'
                   )}
                 >
                   {genre}
@@ -225,7 +239,6 @@ export function FilterModal({
             </div>
           </div>
 
-          {/* ÂGE CONSEILLÉ MAXIMUM */}
           <div>
             <div className="flex items-center justify-between gap-3 mb-3">
               <div>
@@ -238,16 +251,17 @@ export function FilterModal({
                 </span>
               )}
             </div>
-            <div className={cn("flex flex-wrap gap-2", isSearchActive && "opacity-30 pointer-events-none grayscale")}>
+            <div className={cn('flex flex-wrap gap-2', isSearchActive && 'opacity-30 pointer-events-none grayscale')}>
               {AGE_OPTIONS.map(opt => (
                 <button
                   key={opt.id}
+                  disabled={isSearchActive}
                   onClick={() => setPegi(opt.id)}
                   className={cn(
-                    "min-w-12 h-11 px-3 flex items-center justify-center rounded-xl text-[13px] font-bold transition-all border",
+                    'min-w-12 h-11 px-3 flex items-center justify-center rounded-xl text-[13px] font-bold transition-all border',
                     pegi === opt.id
-                      ? opt.id === 'Tous' ? "bg-green-500/20 text-green-400 border-green-500/50" : "bg-[#E5A93D]/20 border-[#E5A93D]/50 text-[#E5A93D]"
-                      : "bg-transparent border-white/10 text-zinc-400 hover:border-white/20"
+                      ? opt.id === 'Tous' ? 'bg-green-500/20 text-green-400 border-green-500/50' : 'bg-[#E5A93D]/20 border-[#E5A93D]/50 text-[#E5A93D]'
+                      : 'bg-transparent border-white/10 text-zinc-400 hover:border-white/20'
                   )}
                 >
                   {opt.label}
@@ -256,19 +270,18 @@ export function FilterModal({
             </div>
           </div>
 
-          {/* NOTE MINIMUM */}
           <div>
-            <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-3">Note Minimum — Toutes</h3>
+            <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-3">Note minimum</h3>
             <div className="flex flex-wrap gap-2">
               {RATING_OPTIONS.map(opt => (
                 <button
                   key={opt}
                   onClick={() => setRating(opt)}
                   className={cn(
-                    "px-4 py-2.5 rounded-full text-[13px] font-bold transition-all border",
+                    'px-4 py-2.5 rounded-full text-[13px] font-bold transition-all border',
                     rating === opt
-                      ? "bg-[#E5A93D]/20 text-[#E5A93D] border-[#E5A93D]/50"
-                      : "bg-transparent border-white/10 text-zinc-400 hover:border-white/20"
+                      ? 'bg-[#E5A93D]/20 text-[#E5A93D] border-[#E5A93D]/50'
+                      : 'bg-transparent border-white/10 text-zinc-400 hover:border-white/20'
                   )}
                 >
                   {opt}
@@ -278,7 +291,6 @@ export function FilterModal({
           </div>
         </div>
 
-        {/* Validate Button */}
         <div className="pt-4 border-t border-white/5 shrink-0">
           <button
             onClick={handleValidate}
@@ -287,7 +299,6 @@ export function FilterModal({
             Afficher les résultats
           </button>
         </div>
-
       </div>
     </div>
   );

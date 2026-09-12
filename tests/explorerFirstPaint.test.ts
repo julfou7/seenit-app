@@ -19,7 +19,7 @@ test('SEENIT-PERF-001 libère Explorer dès le trending et borne le premier view
 
 test('SEENIT-PERF-001 ne remet pas les enrichissements secondaires sur le chemin critique ou dans le scroll', () => {
   assert.doesNotMatch(discoverSource, /const recs = await getRecommendations\(20\)/);
-  assert.match(discoverSource, /void getRecommendations\(20\)[\s\S]*?\.then\(recs => setRecommendations\(recs\)\)/);
+  assert.match(discoverSource, /void getRecommendations\(20\)[\s\S]*?\.then\(recs => \{[\s\S]*?setRecommendations\(recs\)/);
   assert.match(discoverSource, /useGridVirtualWindow/);
   assert.match(discoverSource, /criticalHomeSliceActive/);
   assert.doesNotMatch(

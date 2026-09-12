@@ -5,7 +5,7 @@ import {
   Info, Sparkles, ChevronRight, ChevronDown, CheckCircle, CheckCircle2, Play, Archive, XCircle,
   Ticket, MonitorPlay, Flame, Loader2, Calendar
 } from 'lucide-react';
-import { tmdb, isMovieAtCinema, isMovieUpcoming, type TMDBMedia } from '../features/shows/tmdb';
+import { tmdb, discoverSeenIt, isMovieAtCinema, isMovieUpcoming, type TMDBMedia } from '../features/shows/tmdb';
 import { type Show } from '../types';
 import { cn, getNextEpisodeNumber } from '../lib/utils';
 import { useShows } from '../hooks/useShows';
@@ -22,6 +22,12 @@ import { getRecommendations } from '../lib/recommendations';
 import { SeenItGlyph } from '../components/SeenItLogo';
 import { useGridVirtualWindow } from '../hooks/useBoundedVirtualWindow';
 import { hasMoreTmdbPages } from '../features/discover/discoverPagination';
+import {
+  discoverTypeForCategory,
+  isSearchCompatibleCategory,
+  matchesSelectedGenres,
+  parseMinimumRating,
+} from '../features/discover/filterPolicy';
 
 function useDebounce<T>(value: T, delay: number): [T] {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
@@ -542,6 +548,10 @@ export function DiscoverScreen({ onShowClick }: Props) {
   }, []);
 
   const hasActiveFilters = selectedPlatforms.length > 0 || selectedGenres.length > 0 || pegi !== 'Tous' || minRating !== 'Toutes';
+  const activeFilterCount = selectedPlatforms.length
+    + selectedGenres.length
+    + (pegi !== 'Tous' ? 1 : 0)
+    + (minRating !== 'Toutes' ? 1 : 0);
 
   const [expandedRecs, setExpandedRecs] = useState(false);
   const [showAffinityInfo, setShowAffinityInfo] = useState(false);
@@ -557,6 +567,8 @@ export function DiscoverScreen({ onShowClick }: Props) {
   const [page, setPage] = useState(1);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const homeRequestGenerationRef = useRef(0);
+  const searchRequestGenerationRef = useRef(0);
 
   const touchStartY = useRef<number | null>(null);
 
@@ -610,10 +622,12 @@ export function DiscoverScreen({ onShowClick }: Props) {
   useEffect(() => {
     setPage(1);
     setHasMore(true);
+    setPopular([]);
+    setTrending([]);
     if (!debouncedQuery.trim() && activeCategory === 'Tout') {
       setHomeEnrichmentReady(false);
     }
-  }, [activeCategory, debouncedQuery, selectedPlatforms, selectedGenres, pegi, minRating]);
+  }, [activeCategory, debouncedQuery, selectedPlatforms, selectedGenres, pegi, minRating, sortBy, sortOrder]);
 
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
@@ -627,121 +641,92 @@ export function DiscoverScreen({ onShowClick }: Props) {
   }, []);
 
   useEffect(() => {
-    if (isOffline || debouncedQuery.trim()) return;
+    const requestGeneration = ++homeRequestGenerationRef.current;
+    const isCurrentRequest = () => homeRequestGenerationRef.current === requestGeneration;
+    if (isOffline || debouncedQuery.trim()) {
+      return () => {
+        if (isCurrentRequest()) homeRequestGenerationRef.current += 1;
+      };
+    }
+
     async function fetchHome() {
       if (page === 1) setLoading(true);
 
+      let nextPopular: TMDBMedia[] | null = null;
+      let nextTrending: TMDBMedia[] | null = null;
+      let nextPersons: TMDBMedia[] | null = null;
+      let nextHasMore = false;
+
       if (activeCategory === 'Personnes') {
         const personRes = await tmdb.getPopularPersons(page);
+        if (!isCurrentRequest()) return;
         if (personRes?.ok && personRes.value.results) {
-          const persons = personRes.value.results.map(p => ({ ...p, media_type: 'person' }));
-          setPopularPersons(prev => page === 1 ? persons : mergeMedia(prev, persons));
-          setHasMore(hasMoreTmdbPages(page, personRes));
-        } else {
-          setHasMore(false);
+          nextPersons = personRes.value.results.map(p => ({ ...p, media_type: 'person' }));
+          nextHasMore = hasMoreTmdbPages(page, personRes);
         }
-      } else if (selectedGenres.length > 0 || pegi !== 'Tous' || minRating !== 'Toutes') {
-        const filterType = (activeCategory === 'Films' || activeCategory === 'Au cinéma') ? 'movie' : (activeCategory === 'Séries' ? 'tv' : 'all');
-        const discoverRes = await tmdb.discoverWithFilters({
-          type: filterType,
+      } else if (hasActiveFilters || sortBy !== 'popular') {
+        const discoverRes = await discoverSeenIt({
+          type: discoverTypeForCategory(activeCategory),
+          category: activeCategory,
           page,
           watchProviders: selectedPlatforms,
           genres: selectedGenres,
           pegi,
           minRating,
-          sortBy
+          sortBy,
+          sortOrder,
         });
-
+        if (!isCurrentRequest()) return;
         if (discoverRes?.ok && discoverRes.value.results) {
-          const results = discoverRes.value.results;
-          setPopular(prev => page === 1 ? results : mergeMedia(prev, results));
-          if (page === 1) {
-            const top10 = results.slice(0, 10);
-            setTrending(top10);
-            for (const item of top10) {
-              if (item.media_type === 'tv' || item.first_air_date) {
-                tmdb.getShowDetails(item.id).then(res => { if (res.ok) setHeroDetails(prev => ({ ...prev, [item.id]: res.value })); });
-              } else {
-                tmdb.getMovieDetails(item.id).then(res => { if (res.ok) setHeroDetails(prev => ({ ...prev, [item.id]: res.value })); });
-              }
-            }
-          }
-          setHasMore(hasMoreTmdbPages(page, discoverRes));
-        } else {
-          setHasMore(false);
+          nextPopular = discoverRes.value.results;
+          nextHasMore = activeCategory === 'Top 100'
+            ? page < 5 && hasMoreTmdbPages(page, discoverRes)
+            : hasMoreTmdbPages(page, discoverRes);
         }
       } else if (activeCategory === 'Pépites') {
         const topRes = await tmdb.getTopRatedRecent('all', page, selectedPlatforms);
+        if (!isCurrentRequest()) return;
         if (topRes?.ok && topRes.value.results) {
-          setPopular(prev => page === 1 ? topRes.value.results : mergeMedia(prev, topRes.value.results));
-          if (page === 1) {
-            const top10 = topRes.value.results.slice(0, 10);
-            setTrending(top10);
-            for (const item of top10) {
-              if (item.media_type === 'tv' || item.first_air_date) {
-                tmdb.getShowDetails(item.id).then(res => { if (res.ok) setHeroDetails(prev => ({ ...prev, [item.id]: res.value })); });
-              } else {
-                tmdb.getMovieDetails(item.id).then(res => { if (res.ok) setHeroDetails(prev => ({ ...prev, [item.id]: res.value })); });
-              }
-            }
-          }
-          setHasMore(hasMoreTmdbPages(page, topRes));
-        } else {
-          setHasMore(false);
+          nextPopular = topRes.value.results;
+          nextTrending = topRes.value.results.slice(0, 10);
+          nextHasMore = hasMoreTmdbPages(page, topRes);
         }
       } else if (activeCategory === 'Top 100') {
         const [topMovRes, topTvRes] = await Promise.all([
           tmdb.getTopRated('movie', page),
           tmdb.getTopRated('tv', page)
         ]);
+        if (!isCurrentRequest()) return;
         const tops = [
-          ...(topMovRes?.ok ? topMovRes.value.results.map((r: any) => ({ ...r, media_type: 'movie' })) : []),
-          ...(topTvRes?.ok ? topTvRes.value.results.map((r: any) => ({ ...r, media_type: 'tv' })) : [])
+          ...(topMovRes?.ok ? topMovRes.value.results.map((r: any) => ({ ...r, media_type: 'movie' as const })) : []),
+          ...(topTvRes?.ok ? topTvRes.value.results.map((r: any) => ({ ...r, media_type: 'tv' as const })) : [])
         ];
         tops.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
-        
-        setPopular(prev => page === 1 ? tops : mergeMedia(prev, tops));
-        if (page === 1) {
-          const top10List = tops.slice(0, 10);
-          setTrending(top10List);
-          for (const item of top10List) {
-            if (item.media_type === 'tv') {
-              tmdb.getShowDetails(item.id).then(res => { if (res.ok) setHeroDetails(prev => ({ ...prev, [item.id]: res.value })); });
-            } else {
-              tmdb.getMovieDetails(item.id).then(res => { if (res.ok) setHeroDetails(prev => ({ ...prev, [item.id]: res.value })); });
-            }
-          }
-        }
-        setHasMore(page < 5 && (hasMoreTmdbPages(page, topMovRes) || hasMoreTmdbPages(page, topTvRes)));
+        nextPopular = tops;
+        nextTrending = tops.slice(0, 10);
+        nextHasMore = page < 5 && (hasMoreTmdbPages(page, topMovRes) || hasMoreTmdbPages(page, topTvRes));
       } else if (activeCategory === 'Au cinéma') {
         const cinemaRes = await tmdb.getNowPlaying(page);
+        if (!isCurrentRequest()) return;
         if (cinemaRes?.ok && cinemaRes.value.results) {
           const movies = cinemaRes.value.results
             .map(r => ({ ...r, media_type: 'movie' as const }))
             .filter(r => isMovieAtCinema(r));
-          setPopular(prev => page === 1 ? movies : mergeMedia(prev, movies));
-          if (page === 1) {
-            const top10 = movies.slice(0, 10);
-            setTrending(top10);
-            for (const item of top10) {
-              tmdb.getMovieDetails(item.id).then(res => { if (res.ok) setHeroDetails(prev => ({ ...prev, [item.id]: res.value })); });
-            }
-          }
-          setHasMore(hasMoreTmdbPages(page, cinemaRes));
-        } else {
-          setHasMore(false);
+          nextPopular = movies;
+          nextTrending = movies.slice(0, 10);
+          nextHasMore = hasMoreTmdbPages(page, cinemaRes);
         }
       } else if (activeCategory === 'Documentaires') {
         const [docMovRes, docTvRes] = await Promise.all([
           tmdb.discoverByGenre('movie', 99, page, selectedPlatforms),
           tmdb.discoverByGenre('tv', 99, page, selectedPlatforms)
         ]);
-        const docs = [
-          ...(docMovRes?.ok ? docMovRes.value.results.map(r => ({ ...r, media_type: 'movie', genre_ids: [...(r.genre_ids || []), 99] })) : []),
-          ...(docTvRes?.ok ? docTvRes.value.results.map(r => ({ ...r, media_type: 'tv', genre_ids: [...(r.genre_ids || []), 99] })) : [])
+        if (!isCurrentRequest()) return;
+        nextPopular = [
+          ...(docMovRes?.ok ? docMovRes.value.results.map(r => ({ ...r, media_type: 'movie' as const, genre_ids: Array.from(new Set([...(r.genre_ids || []), 99])) })) : []),
+          ...(docTvRes?.ok ? docTvRes.value.results.map(r => ({ ...r, media_type: 'tv' as const, genre_ids: Array.from(new Set([...(r.genre_ids || []), 99])) })) : [])
         ];
-        setPopular(prev => page === 1 ? docs : mergeMedia(prev, docs));
-        setHasMore(hasMoreTmdbPages(page, docMovRes, docTvRes));
+        nextHasMore = hasMoreTmdbPages(page, docMovRes, docTvRes);
       } else if (activeCategory === 'Tout') {
         const isRecent = (r: TMDBMedia) => {
           const date = r.first_air_date || r.release_date;
@@ -760,8 +745,8 @@ export function DiscoverScreen({ onShowClick }: Props) {
           : Promise.resolve({ ok: false } as any);
 
         const trendAllRes = await trendAllPromise;
+        if (!isCurrentRequest()) return;
         const trendingList = trendAllRes?.ok ? trendAllRes.value.results.filter(isRecent) : [];
-
         if (trendingList.length > 0) {
           setTrending(prev => page === 1 ? trendingList : mergeMedia(prev, trendingList));
           setPopular(prev => page === 1 ? trendingList : mergeMedia(prev, trendingList));
@@ -773,92 +758,91 @@ export function DiscoverScreen({ onShowClick }: Props) {
           popMovPromise,
           personPromise,
         ]);
+        if (!isCurrentRequest()) return;
         const popularList = [
           ...(popTvRes?.ok ? popTvRes.value.results.filter(isRecent).map(r => ({ ...r, media_type: 'tv' as const })) : []),
           ...(popMovRes?.ok ? popMovRes.value.results.filter(isRecent).map(r => ({ ...r, media_type: 'movie' as const })) : [])
         ];
-        
+        nextPopular = mergeMedia(trendingList, popularList);
+        nextTrending = trendingList;
         if (personRes?.ok && personRes.value.results) {
-          const persons = personRes.value.results.map((p: any) => ({ ...p, media_type: 'person' }));
-          setPopularPersons(prev => page === 1 ? persons : mergeMedia(prev, persons));
+          nextPersons = personRes.value.results.map((p: any) => ({ ...p, media_type: 'person' as const }));
         }
-
-        setPopular(prev => {
-          const combined = mergeMedia(trendingList, popularList);
-          const toAdd = combined.length > 0 ? combined : popularList;
-          return page === 1 ? toAdd : mergeMedia(prev, toAdd);
-        });
-
-        if (page === 1) {
-          setHomeEnrichmentReady(true);
-        }
-        setHasMore(hasMoreTmdbPages(page, popTvRes, popMovRes));
+        nextHasMore = hasMoreTmdbPages(page, popTvRes, popMovRes);
+        if (page === 1) setHomeEnrichmentReady(true);
       } else {
         const type = activeCategory === 'Films' ? 'movie' : 'tv';
         const [trendRes, popRes] = await Promise.all([
           page <= 5 ? tmdb.getTrending(type, page, selectedPlatforms) : Promise.resolve({ ok: false } as any),
           tmdb.getPopular(type, page, selectedPlatforms)
         ]);
-        
+        if (!isCurrentRequest()) return;
+
         const isRecent = (r: TMDBMedia) => {
           const date = r.first_air_date || r.release_date;
           if (!date) return true;
           const yr = parseInt(date.split('-')[0], 10);
           return !yr || yr >= 2016;
         };
-
         const trendList = trendRes?.ok ? trendRes.value.results.filter(isRecent).map((r: any) => ({ ...r, media_type: type as 'movie' | 'tv' })) : [];
         const popList = popRes?.ok ? popRes.value.results.filter(isRecent).map((r: any) => ({ ...r, media_type: type as 'movie' | 'tv' })) : [];
         const combined = mergeMedia(trendList, popList);
-        const toAdd = combined.length > 0 ? combined : popList;
-
-        if (trendList.length > 0) {
-          setTrending(prev => page === 1 ? trendList : mergeMedia(prev, trendList));
-        }
-
-        setPopular(prev => page === 1 ? toAdd : mergeMedia(prev, toAdd));
-
-        if (page === 1) {
-          const top10 = toAdd.slice(0, 10);
-          setTrending(top10);
-          for (const item of top10) {
-            if (type === 'tv') {
-              tmdb.getShowDetails(item.id).then(res => { if (res.ok) setHeroDetails(prev => ({ ...prev, [item.id]: res.value })); });
-            } else {
-              tmdb.getMovieDetails(item.id).then(res => { if (res.ok) setHeroDetails(prev => ({ ...prev, [item.id]: res.value })); });
-            }
-          }
-        }
-        setHasMore(hasMoreTmdbPages(page, popRes));
+        nextPopular = combined.length > 0 ? combined : popList;
+        nextTrending = nextPopular.slice(0, 10);
+        nextHasMore = hasMoreTmdbPages(page, popRes);
       }
 
+      if (!isCurrentRequest()) return;
+
+      if (nextPopular !== null) {
+        setPopular(prev => page === 1 ? nextPopular! : mergeMedia(prev, nextPopular!));
+      }
+      if (nextTrending !== null) {
+        setTrending(prev => page === 1 ? nextTrending! : mergeMedia(prev, nextTrending!));
+      }
+      if (nextPersons !== null) {
+        setPopularPersons(prev => page === 1 ? nextPersons! : mergeMedia(prev, nextPersons!));
+      }
+      setHasMore(nextHasMore);
       setLoading(false);
       setIsLoadingMore(false);
 
       if (page === 1) {
         void getRecommendations(20)
-          .then(recs => setRecommendations(recs))
+          .then(recs => {
+            if (isCurrentRequest()) setRecommendations(recs);
+          })
           .catch(() => {});
       }
     }
-    if (!debouncedQuery) fetchHome();
-  }, [debouncedQuery, isOffline, activeCategory, page, selectedPlatforms, selectedGenres, pegi, minRating, sortBy]);
+
+    void fetchHome();
+    return () => {
+      if (isCurrentRequest()) homeRequestGenerationRef.current += 1;
+    };
+  }, [debouncedQuery, isOffline, activeCategory, page, selectedPlatforms, selectedGenres, pegi, minRating, sortBy, sortOrder, hasActiveFilters]);
 
   useEffect(() => {
+    const requestGeneration = ++searchRequestGenerationRef.current;
+    const isCurrentRequest = () => searchRequestGenerationRef.current === requestGeneration;
     if (isOffline || !debouncedQuery.trim()) {
       setSearchResults([]);
       setHasMore(true);
-      return;
+      return () => {
+        if (isCurrentRequest()) searchRequestGenerationRef.current += 1;
+      };
     }
+
     async function search() {
       setLoading(true);
       setTotalTvCount(null);
       setTotalMovieCount(null);
 
       const [res1, res2] = await Promise.all([
-        tmdb.smartSearchMulti(debouncedQuery, 1, selectedPlatforms),
-        tmdb.smartSearchMulti(debouncedQuery, 2, selectedPlatforms)
+        tmdb.smartSearchMulti(debouncedQuery, 1),
+        tmdb.smartSearchMulti(debouncedQuery, 2)
       ]);
+      if (!isCurrentRequest()) return;
 
       if (res1?.ok) {
         const combined = [
@@ -878,8 +862,12 @@ export function DiscoverScreen({ onShowClick }: Props) {
       setLoading(false);
       setIsLoadingMore(false);
     }
-    search();
-  }, [debouncedQuery, isOffline, selectedPlatforms]);
+
+    void search();
+    return () => {
+      if (isCurrentRequest()) searchRequestGenerationRef.current += 1;
+    };
+  }, [debouncedQuery, isOffline]);
 
   const rawList = useMemo(() => {
     if (debouncedQuery.trim()) {
@@ -933,18 +921,14 @@ export function DiscoverScreen({ onShowClick }: Props) {
         return true;
       }
 
-      if (!qClean) {
-        const dateStr = item.first_air_date || item.release_date;
-        if (dateStr) {
-          const year = parseInt(dateStr.split('-')[0], 10);
-          if (year && year < 2016) {
-            return false;
-          }
+      const dateStr = item.first_air_date || item.release_date;
+      if (dateStr) {
+        const year = parseInt(dateStr.split('-')[0], 10);
+        if (year && year < 2016) {
+          return false;
         }
-        return count >= 50;
       }
-
-      return true;
+      return count >= 50;
     });
 
     if (selectedGenreIds.length > 0 && !qClean && activeCategory !== 'Personnes') {
@@ -955,92 +939,23 @@ export function DiscoverScreen({ onShowClick }: Props) {
       });
     }
 
-    if (selectedGenres.length > 0 && !qClean && activeCategory !== 'Personnes') {
-      const NEW_GENRE_MAPPING: Record<string, number[]> = {
-        'Action': [28, 10759],
-        'Aventure': [12, 10759],
-        'Animation': [16],
-        'Biopic': [36, 99],
-        'Comédie': [35],
-        'Drame': [18],
-        'Fantastique': [14, 10765],
-        'Horreur': [27],
-        'Romance': [10749],
-        'Sci-Fi': [878, 10765],
-        'Thriller': [53, 80]
-      };
-      const allowedTmdbIds = selectedGenres.flatMap(g => NEW_GENRE_MAPPING[g] || []);
-      list = list.filter((item: any) => {
-        const itemG = item.genre_ids || (item.genres ? item.genres.map((g: any) => g.id) : []);
-        return allowedTmdbIds.some(gId => itemG.includes(gId));
-      });
+    if (selectedGenres.length > 0 && qClean && activeCategory !== 'Personnes') {
+      list = list.filter((item: any) => matchesSelectedGenres(item, selectedGenres));
     }
 
-    if (pegi !== 'Tous' && activeCategory !== 'Personnes') {
-      list = list.filter((item: any) => {
-        const itemG = item.genre_ids || (item.genres ? item.genres.map((g: any) => g.id) : []);
-        const details = heroDetails[item.id];
-        
-        let ratingStr = '';
-        if (details) {
-          if (details.content_ratings?.results) {
-            const fr = details.content_ratings.results.find((r: any) => r.iso_3166_1 === 'FR');
-            const us = details.content_ratings.results.find((r: any) => r.iso_3166_1 === 'US');
-            ratingStr = fr?.rating || us?.rating || '';
-          }
-          if (!ratingStr && details.release_dates?.results) {
-            const fr = details.release_dates.results.find((r: any) => r.iso_3166_1 === 'FR');
-            const us = details.release_dates.results.find((r: any) => r.iso_3166_1 === 'US');
-            const certFr = fr?.release_dates?.find((d: any) => d.certification && d.certification.trim() !== '');
-            const certUs = us?.release_dates?.find((d: any) => d.certification && d.certification.trim() !== '');
-            ratingStr = certFr?.certification || certUs?.certification || '';
-          }
-        }
-
-        const r = (ratingStr || '').trim().toUpperCase();
-        let tier = '';
-        if (item.adult || r === '18' || r === '-18' || r === '16' || r === '-16' || r === 'TV-MA' || r === 'R' || r === 'NC-17') {
-          tier = '16';
-        } else if (r === '12' || r === '-12' || r === 'TV-14' || r === 'PG-13') {
-          tier = '12';
-        } else if (r === '10' || r === '-10' || r === 'TV-PG' || r === 'PG') {
-          tier = '10';
-        } else if (r === 'U' || r === 'G' || r === 'TV-G' || r === 'TV-Y' || r === 'TV-Y7' || r.includes('TOUS')) {
-          tier = 'TP';
-        } else {
-          if (itemG.includes(27)) tier = '16';
-          else if (itemG.includes(10762) || itemG.includes(10751)) tier = 'TP';
-          else if (itemG.includes(53) || itemG.includes(80) || itemG.includes(10752) || itemG.includes(10768)) tier = '12';
-          else if (itemG.includes(28) || itemG.includes(12) || itemG.includes(878)) tier = '12';
-          else tier = 'TP';
-        }
-
-        if (pegi === '16' || pegi === '-16' || pegi === '16+') {
-          return tier === '16';
-        } else if (pegi === '12' || pegi === '-12' || pegi === '12+') {
-          return tier === '12';
-        } else if (pegi === '10' || pegi === '-10' || pegi === '10+') {
-          return tier === '10';
-        } else if (pegi === 'TP' || pegi === 'Tout Public') {
-          return tier === 'TP';
-        }
-        return true;
-      });
-    }
-
-    if (minRating !== 'Toutes' && !qClean && activeCategory !== 'Personnes') {
-      const min = parseFloat(minRating.replace('+', ''));
-      list = list.filter((item: any) => (item.vote_average || 0) >= min);
-    }
-
-    if (!qClean) {
-      if (activeCategory === 'Séries') {
-        list = list.filter((item: any) => item.media_type === 'tv' || item.media_type === 'series' || !!item.first_air_date);
-      } else if (activeCategory === 'Films') {
-        list = list.filter((item: any) => item.media_type === 'movie' || !!item.release_date);
-      } else if (activeCategory === 'Personnes') {
-        list = list.filter((item: any) => item.media_type === 'person');
+    if (minRating !== 'Toutes' && qClean && activeCategory !== 'Personnes') {
+      const minimum = parseMinimumRating(minRating);
+      if (minimum !== null) {
+        list = list.filter((item: any) => (item.vote_average || 0) >= minimum);
       }
+    }
+
+    if (activeCategory === 'Séries') {
+      list = list.filter((item: any) => item.media_type === 'tv' || item.media_type === 'series' || !!item.first_air_date);
+    } else if (activeCategory === 'Films') {
+      list = list.filter((item: any) => item.media_type === 'movie' || !!item.release_date);
+    } else if (activeCategory === 'Personnes') {
+      list = list.filter((item: any) => item.media_type === 'person');
     }
 
     if (qClean && sortBy === 'popular') {
@@ -1054,29 +969,27 @@ export function DiscoverScreen({ onShowClick }: Props) {
         if (matchA !== matchB) return matchB - matchA;
         return (b.popularity || 0) - (a.popularity || 0);
       });
-    } else if (sortBy !== 'popular' || (!qClean && sortBy === 'popular')) {
-      if (sortBy !== 'popular') {
-        list.sort((a: any, b: any) => {
-          let valA = 0;
-          let valB = 0;
+    } else if (sortBy !== 'popular') {
+      list.sort((a: any, b: any) => {
+        let valA = 0;
+        let valB = 0;
 
-          if (sortBy === 'rating') {
-            valA = a.vote_average || 0;
-            valB = b.vote_average || 0;
-          } else if (sortBy === 'date') {
-            const dateA = a.first_air_date || a.release_date || '';
-            const dateB = b.first_air_date || b.release_date || '';
-            valA = dateA ? new Date(dateA).getTime() : 0;
-            valB = dateB ? new Date(dateB).getTime() : 0;
-          } else if (sortBy === 'title') {
-            const titleA = a.title || a.name || '';
-            const titleB = b.title || b.name || '';
-            return sortOrder === 'asc' ? titleA.localeCompare(titleB) : titleB.localeCompare(titleA);
-          }
+        if (sortBy === 'rating') {
+          valA = a.vote_average || 0;
+          valB = b.vote_average || 0;
+        } else if (sortBy === 'date') {
+          const dateA = a.first_air_date || a.release_date || '';
+          const dateB = b.first_air_date || b.release_date || '';
+          valA = dateA ? new Date(dateA).getTime() : 0;
+          valB = dateB ? new Date(dateB).getTime() : 0;
+        } else if (sortBy === 'title') {
+          const titleA = a.title || a.name || '';
+          const titleB = b.title || b.name || '';
+          return sortOrder === 'asc' ? titleA.localeCompare(titleB) : titleB.localeCompare(titleA);
+        }
 
-          return sortOrder === 'desc' ? valB - valA : valA - valB;
-        });
-      }
+        return sortOrder === 'desc' ? valB - valA : valA - valB;
+      });
     }
 
     if (watchedIdsSnapshot.size > 0 && !qClean) {
@@ -1090,10 +1003,10 @@ export function DiscoverScreen({ onShowClick }: Props) {
     }
 
     return list;
-  }, [rawList, debouncedQuery, selectedGenreIds, selectedGenres, minRating, pegi, sortBy, sortOrder, activeCategory, watchedIdsSnapshot]);
+  }, [rawList, debouncedQuery, selectedGenreIds, selectedGenres, minRating, sortBy, sortOrder, activeCategory, watchedIdsSnapshot, selectedPlatforms]);
 
   const top10 = useMemo(() => {
-    if (debouncedQuery.trim() || activeCategory === 'Personnes') return [];
+    if (debouncedQuery.trim() || activeCategory === 'Personnes' || hasActiveFilters || sortBy !== 'popular') return [];
     const seen = new Set<string>();
     const list: TMDBMedia[] = [];
     for (const item of processedResults) {
@@ -1109,7 +1022,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
       if (list.length >= 10) break;
     }
     return list;
-  }, [processedResults, activeCategory, debouncedQuery]);
+  }, [processedResults, activeCategory, debouncedQuery, hasActiveFilters, sortBy]);
 
   const criticalHomeSliceActive = !debouncedQuery.trim()
     && activeCategory === 'Tout'
@@ -1210,6 +1123,8 @@ export function DiscoverScreen({ onShowClick }: Props) {
   const searchQuery = query;
   const setSearchQuery = setQuery;
   const showHeroSurface = !debouncedQuery.trim()
+    && !hasActiveFilters
+    && sortBy === 'popular'
     && (activeCategory === 'Tout' || activeCategory === 'Séries' || activeCategory === 'Films' || activeCategory === 'Pépites' || activeCategory === 'Au cinéma');
 
   return (
@@ -1251,7 +1166,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
       >
         {showHeroSurface && loading && top10.length === 0 && <HeroSkeleton />}
 
-        {!debouncedQuery.trim() && visibleHeroItems.length > 0 && (activeCategory === 'Tout' || activeCategory === 'Séries' || activeCategory === 'Films' || activeCategory === 'Pépites' || activeCategory === 'Au cinéma') && (
+        {showHeroSurface && visibleHeroItems.length > 0 && (
           <div>
             <div className="relative w-full">
               <div 
@@ -1380,6 +1295,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
                             type="button"
                             onClick={() => {
                               setSortBy(opt.id as any);
+                              setSortOrder(opt.id === 'title' ? 'asc' : 'desc');
                               setIsSortPickerOpen(false);
                             }}
                             className={cn(
@@ -1663,7 +1579,9 @@ export function DiscoverScreen({ onShowClick }: Props) {
                 <Search size={24} />
               </div>
               <p className="text-sm font-medium text-zinc-400">
-                Aucun résultat ne correspond à votre recherche.
+                {debouncedQuery.trim()
+                  ? 'Aucun résultat ne correspond à votre recherche.'
+                  : 'Aucun résultat ne correspond à vos critères.'}
               </p>
             </div>
           )}
@@ -1688,7 +1606,11 @@ export function DiscoverScreen({ onShowClick }: Props) {
               >
                 <SlidersHorizontal size={15} className={cn("text-zinc-400", (hasActiveFilters || activeCategory !== 'Tout') && "text-[#E5A93D]")} />
                 <span className={cn("text-[14px] font-semibold text-zinc-300", (hasActiveFilters || activeCategory !== 'Tout') && "text-[#E5A93D]")}>
-                  {activeCategory !== 'Tout' ? activeCategory : 'Filtres'}
+                  {activeCategory !== 'Tout'
+                    ? activeCategory
+                    : activeFilterCount > 0
+                      ? `${activeFilterCount} filtre${activeFilterCount > 1 ? 's' : ''}`
+                      : 'Filtres'}
                 </span>
               </button>
             </div>
@@ -1701,7 +1623,13 @@ export function DiscoverScreen({ onShowClick }: Props) {
                 type="text" 
                 placeholder="Séries, films, acteurs..." 
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                  const nextQuery = e.target.value;
+                  setQuery(nextQuery);
+                  if (nextQuery.trim() && !isSearchCompatibleCategory(activeCategory)) {
+                    setActiveCategory('Tout');
+                  }
+                }}
                 onFocus={() => { setIsSearchFocused(true); setIsSearchVisible(true); }}
                 onBlur={() => setIsSearchFocused(false)}
                 className="bg-transparent border-none outline-none text-white text-[15px] font-medium w-full placeholder:text-zinc-500 min-w-0"
