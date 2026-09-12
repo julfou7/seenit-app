@@ -28,8 +28,10 @@ import { SeenItCheckButton } from '../components/SeenItCheckButton';
 import { useHorizontalVirtualWindow } from '../hooks/useBoundedVirtualWindow';
 import { usePassiveWatchProvider } from '../hooks/usePassiveWatchProvider';
 import { createWatchProviderRequestLimiter } from '../features/providers/watchProviderRequestPolicy';
+import { createPassiveCardEnrichmentGate } from '../features/providers/passiveCardEnrichmentPolicy';
 
 const watchlistMovieDetailLimiter = createWatchProviderRequestLimiter(2);
+const watchlistMovieDetailGate = createPassiveCardEnrichmentGate(240);
 
 interface ExpandedItemCardProps {
   key?: React.Key;
@@ -66,18 +68,23 @@ function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMa
 
   const enrichMovieDetails = useCallback(() => {
     if (!isMovie || !show.tmdbId || requestedMovieDetailsRef.current === show.tmdbId) return;
+    const requestKey = `movie:${show.tmdbId}`;
+    if (!watchlistMovieDetailGate.tryStart(requestKey)) return;
     requestedMovieDetailsRef.current = show.tmdbId;
     void watchlistMovieDetailLimiter.run(() => tmdb.getMovieDetails(show.tmdbId)).then(res => {
-      if (!isMountedRef.current) return;
       if (!res.ok || !res.value) {
-        requestedMovieDetailsRef.current = null;
+        watchlistMovieDetailGate.fail(requestKey);
+        if (isMountedRef.current) requestedMovieDetailsRef.current = null;
         return;
       }
+      watchlistMovieDetailGate.succeed(requestKey);
+      if (!isMountedRef.current) return;
       setMovieDetails(res.value);
       if (res.value.runtime) {
         setMovieRuntime(current => current || res.value.runtime);
       }
     }).catch(() => {
+      watchlistMovieDetailGate.fail(requestKey);
       if (isMountedRef.current) requestedMovieDetailsRef.current = null;
     });
   }, [isMovie, show.tmdbId]);
