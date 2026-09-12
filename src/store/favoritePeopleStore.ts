@@ -1,13 +1,16 @@
 import { create } from 'zustand';
-import { auth } from '../lib/firebase';
+import { collection, doc, onSnapshot, runTransaction, setDoc } from 'firebase/firestore';
+import { auth, db } from '../lib/firebase';
 import { purgeLegacyUnscopedUserData, readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
+import {
+  dedupeFavoritePeople,
+  favoritePeopleCollectionPath,
+  mergeFavoritePeopleForDisplay,
+  selectLocalFavoritesToMigrate,
+  type FavoritePerson as Person,
+} from './favoritePeopleSync';
 
-export interface Person {
-  id: number;
-  name: string;
-  profile_path?: string | null;
-  known_for_department?: string;
-}
+export type { FavoritePerson as Person } from './favoritePeopleSync';
 
 interface FavoritePeopleState {
   people: Person[];
@@ -17,26 +20,124 @@ interface FavoritePeopleState {
 }
 
 const FAVORITE_PEOPLE_FIELD = 'favorite_people';
+let unsubscribeFavoritePeople: (() => void) | null = null;
+
+function loadLocal(uid: string): Person[] {
+  const value = readUserScopedJson<Person[]>(uid, FAVORITE_PEOPLE_FIELD, []);
+  return Array.isArray(value) ? dedupeFavoritePeople(value) : [];
+}
+
+function persistLocal(uid: string, people: Person[]) {
+  writeUserScopedJson(uid, FAVORITE_PEOPLE_FIELD, dedupeFavoritePeople(people));
+}
+
+function favoritePeopleCollection(uid: string) {
+  const [root, userId, child] = favoritePeopleCollectionPath(uid);
+  return collection(db, root, userId, child);
+}
+
+function favoritePersonPayload(person: Person, active: boolean) {
+  return {
+    id: person.id,
+    name: person.name,
+    profile_path: person.profile_path ?? null,
+    known_for_department: person.known_for_department ?? null,
+    active,
+    updatedAt: Date.now(),
+    schemaVersion: 1,
+  } as const;
+}
+
+function persistFavoritePerson(uid: string, person: Person, active: boolean) {
+  const ref = doc(favoritePeopleCollection(uid), String(person.id));
+  return setDoc(ref, favoritePersonPayload(person, active), { merge: true });
+}
+
+function migrateFavoritePersonIfMissing(uid: string, person: Person) {
+  const ref = doc(favoritePeopleCollection(uid), String(person.id));
+  return runTransaction(db, async transaction => {
+    const current = await transaction.get(ref);
+    if (current.exists()) return;
+    transaction.set(ref, favoritePersonPayload(person, true));
+  });
+}
 
 export const useFavoritePeopleStore = create<FavoritePeopleState>((set, get) => ({
   people: [],
-  addPerson: (person) => set((state) => {
-    if (state.people.some(p => p.id === person.id)) return state;
-    const people = [...state.people, person];
-    writeUserScopedJson(auth.currentUser?.uid, FAVORITE_PEOPLE_FIELD, people);
-    return { people };
-  }),
-  removePerson: (id) => set((state) => {
-    const people = state.people.filter(p => p.id !== id);
-    writeUserScopedJson(auth.currentUser?.uid, FAVORITE_PEOPLE_FIELD, people);
-    return { people };
-  }),
-  isFavorite: (id) => get().people.some(p => p.id === id)
+  addPerson: (person) => {
+    const user = auth.currentUser;
+    if (!user || !Number.isInteger(person.id) || person.id <= 0) return;
+    if (get().people.some(candidate => candidate.id === person.id)) return;
+
+    const people = dedupeFavoritePeople([...get().people, person]);
+    persistLocal(user.uid, people);
+    set({ people });
+    void persistFavoritePerson(user.uid, person, true).catch(error => {
+      console.warn('Favorite person cloud write failed; Firestore will retry when possible.', error);
+    });
+  },
+  removePerson: (id) => {
+    const user = auth.currentUser;
+    if (!user) return;
+    const existing = get().people.find(person => person.id === id);
+    if (!existing) return;
+
+    const people = get().people.filter(person => person.id !== id);
+    persistLocal(user.uid, people);
+    set({ people });
+    void persistFavoritePerson(user.uid, existing, false).catch(error => {
+      console.warn('Favorite person tombstone write failed; Firestore will retry when possible.', error);
+    });
+  },
+  isFavorite: (id) => get().people.some(person => person.id === id),
 }));
 
-auth.onAuthStateChanged((user) => {
-  purgeLegacyUnscopedUserData(user?.uid);
-  useFavoritePeopleStore.setState({
-    people: readUserScopedJson<Person[]>(user?.uid, FAVORITE_PEOPLE_FIELD, [])
-  });
-});
+function activateFavoritePeopleScope(uid?: string | null) {
+  if (unsubscribeFavoritePeople) {
+    unsubscribeFavoritePeople();
+    unsubscribeFavoritePeople = null;
+  }
+
+  purgeLegacyUnscopedUserData(uid);
+  const localSeed = uid ? loadLocal(uid) : [];
+  useFavoritePeopleStore.setState({ people: localSeed });
+  if (!uid) return;
+
+  const favoritesRef = favoritePeopleCollection(uid);
+  let authoritativeMigrationStarted = false;
+
+  unsubscribeFavoritePeople = onSnapshot(
+    favoritesRef,
+    { includeMetadataChanges: true },
+    snapshot => {
+      if (auth.currentUser?.uid !== uid) return;
+
+      const remoteRecords = snapshot.docs
+        .map(remoteDoc => ({ id: Number(remoteDoc.id), data: remoteDoc.data() }))
+        .filter(record => Number.isInteger(record.id) && record.id > 0);
+      const visiblePeople = mergeFavoritePeopleForDisplay(localSeed, remoteRecords);
+      persistLocal(uid, visiblePeople);
+      useFavoritePeopleStore.setState({ people: visiblePeople });
+
+      // Never migrate from a cache-only snapshot: an unseen cloud tombstone must
+      // win over stale local data. Once the server snapshot is authoritative,
+      // only missing TMDB IDs are considered. The transaction re-checks absence
+      // at commit time so a concurrent device can never be overwritten.
+      if (!snapshot.metadata.fromCache && !authoritativeMigrationStarted) {
+        authoritativeMigrationStarted = true;
+        const remoteIds = remoteRecords.map(record => record.id);
+        const missingLocalPeople = selectLocalFavoritesToMigrate(localSeed, remoteIds);
+        void Promise.all(missingLocalPeople.map(person => migrateFavoritePersonIfMissing(uid, person)))
+          .catch(error => {
+            console.warn('Favorite people migration failed.', error);
+          });
+      }
+    },
+    error => {
+      if (auth.currentUser?.uid !== uid) return;
+      console.warn('Favorite people realtime sync unavailable; using local cache.', error);
+    },
+  );
+}
+
+auth.onAuthStateChanged(user => activateFavoritePeopleScope(user?.uid));
