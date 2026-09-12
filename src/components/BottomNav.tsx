@@ -20,7 +20,7 @@ interface TabItem {
 }
 
 export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveTabDoubleClick }: Props) {
-  const lastTapRef = useRef<number>(0);
+  const lastActiveTapRef = useRef<{ tabId: string; at: number } | null>(null);
   const downloadsEnabled = useDownloadConfigStore(isDownloadFeatureEnabled);
 
   const tabs: readonly TabItem[] = [
@@ -35,25 +35,31 @@ export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveT
   const handleTabClick = (e: React.MouseEvent, tabId: string) => {
     e.preventDefault();
     const now = Date.now();
-    const timeSinceLastTap = now - lastTapRef.current;
-    
+
     if (currentTab !== tabId) {
+      // Un tap qui change d'onglet n'est jamais le premier tap d'un double-appui.
+      lastActiveTapRef.current = null;
       onTabChange(tabId as any);
-      lastTapRef.current = now;
       return;
     }
 
-    if (timeSinceLastTap > 0 && timeSinceLastTap < 450) {
-      if (onActiveTabDoubleClick) {
-        onActiveTabDoubleClick();
-      }
-      lastTapRef.current = 0;
-    } else {
-      if (onActiveTabClick) {
-        onActiveTabClick();
-      }
-      lastTapRef.current = now;
+    const lastActiveTap = lastActiveTapRef.current;
+    const isDoubleTap = Boolean(
+      lastActiveTap &&
+      lastActiveTap.tabId === tabId &&
+      now - lastActiveTap.at > 0 &&
+      now - lastActiveTap.at < 450
+    );
+
+    if (isDoubleTap) {
+      onActiveTabDoubleClick?.();
+      // Un troisième tap démarre une nouvelle séquence au lieu de rejouer immédiatement l'action.
+      lastActiveTapRef.current = null;
+      return;
     }
+
+    onActiveTabClick?.();
+    lastActiveTapRef.current = { tabId, at: now };
   };
 
   return (
