@@ -61,11 +61,14 @@ test('SEENIT-DISCOVER-001 donne la priorité au payload release_dates sur une an
 
 test('SEENIT-DISCOVER-001 contraint Explorer aux release types TMDB 2 ou 3 en France', () => {
   const source = fs.readFileSync('src/features/shows/tmdb.ts', 'utf8');
-  assert.match(source, /region'\s*,\s*'FR'/);
-  assert.match(source, /with_release_type'\s*,\s*'2\|3'/);
-  assert.match(source, /release_date\.gte/);
-  assert.match(source, /release_date\.lte/);
-  assert.doesNotMatch(source, /primary_release_date\.gte/);
+  const cinemaBlock = source.match(/if \(category === 'Au cinéma' && mediaType === 'movie'\) \{[\s\S]*?\n\s*\}/)?.[0] ?? '';
+
+  assert.ok(cinemaBlock, 'le bloc de requête Au cinéma doit rester identifiable');
+  assert.match(cinemaBlock, /region'\s*,\s*'FR'/);
+  assert.match(cinemaBlock, /with_release_type'\s*,\s*'2\|3'/);
+  assert.match(cinemaBlock, /release_date\.gte/);
+  assert.match(cinemaBlock, /release_date\.lte/);
+  assert.doesNotMatch(cinemaBlock, /primary_release_date\.gte/);
   assert.match(source, /getMovieDetails/,
     'les détails film doivent alimenter la même preuve utilisée par les badges');
 });
