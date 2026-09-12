@@ -28,6 +28,7 @@ import { SeenItCheckButton } from '../components/SeenItCheckButton';
 import { useHorizontalVirtualWindow } from '../hooks/useBoundedVirtualWindow';
 import { usePassiveWatchProvider } from '../hooks/usePassiveWatchProvider';
 import { createWatchProviderRequestLimiter } from '../features/providers/watchProviderRequestPolicy';
+import { hasAiredEpisodeEvidence } from '../features/watchlist/watchAvailability';
 
 const watchlistMovieDetailLimiter = createWatchProviderRequestLimiter(2);
 
@@ -745,11 +746,13 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
     upcomingShows
   } = useMemo(() => {
     const shows = allShows.filter(s => s.mediaType !== 'movie');
+    const todayIso = new Date().toISOString().slice(0, 10);
 
     const isNotUpToDate = (s: Show): boolean => {
       if (s.isArchived) return false;
       if (s.status === 'dropped') return false;
       if (s.status === 'completed') return false;
+      if (!hasAiredEpisodeEvidence(s, todayIso)) return false;
       if (checkIsUpToDate(s)) return false;
 
       const watchedCount = s.seenEpisodes ? s.seenEpisodes.length : 0;
@@ -857,8 +860,6 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
         if (diff !== 0) return diff;
         return a.title.localeCompare(b.title);
       });
-
-    const todayIso = new Date().toISOString().slice(0, 10);
 
     const filmsAVoirShows = allShows
       .filter(s => {
