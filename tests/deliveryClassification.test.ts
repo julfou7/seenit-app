@@ -186,6 +186,30 @@ test('SEENIT-QUALITY-006 classe les scripts npm de release seuls en light sans a
   }).mode, 'apk');
 });
 
+test('SEENIT-QUALITY-006 classe validate:change seul en light sans audit de dépendances', () => {
+  const before = JSON.stringify({
+    name: 'seenit-app',
+    version: '1.4.143',
+    scripts: { build: 'vite build' },
+    dependencies: { react: '^19.0.1' }
+  });
+  const after = JSON.stringify({
+    name: 'seenit-app',
+    version: '1.4.143',
+    scripts: { build: 'vite build', 'validate:change': 'node scripts/validate-change.cjs' },
+    dependencies: { react: '^19.0.1' }
+  });
+  assert.equal(isToolingOnlyPackageChange(before, after), true);
+  const result = classifyDelivery({
+    changes: [{ status: 'M', path: 'package.json' }],
+    readBefore: () => before,
+    readAfter: () => after
+  });
+  assert.equal(result.mode, 'light');
+  assert.equal(result.dependenciesChanged, false);
+  assert.match(result.reasons.join('\n'), /outillage/);
+});
+
 test('SEENIT-QUALITY-006 permet de forcer le parcours complet mais jamais le parcours light', () => {
   const input = {
     changes: [{ status: 'M', path: 'README.md' }],

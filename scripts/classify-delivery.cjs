@@ -34,7 +34,9 @@ const DEPENDENCY_FILES = new Set([
 const RELEASE_TOOL_SCRIPTS = new Set([
   'release:status',
   'release:prepare',
-  'release:dispatch'
+  'release:dispatch',
+  'validate:change',
+  'validate:workflows'
 ]);
 
 function normalizePath(file) {
@@ -200,7 +202,7 @@ function classifyDelivery({ changes, readBefore, readAfter, forcedMode = 'auto' 
       const before = readBefore(file);
       const after = readAfter(file);
       if (isToolingOnlyPackageChange(before, after)) {
-        reasons.push(`${file} : scripts npm de release uniquement`);
+        reasons.push(`${file} : scripts npm d’outillage uniquement`);
         continue;
       }
     }

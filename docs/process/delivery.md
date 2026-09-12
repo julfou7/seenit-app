@@ -62,21 +62,45 @@ La classe `apk` signifie seulement « devra entrer dans la prochaine APK ». Ell
 
 ## Validation continue
 
-Chaque push ou pull request exécute, dans cet ordre :
+### Commande locale canonique
+
+Pendant la mise au point, les tests ciblés peuvent être exécutés autant que nécessaire. **Avant le premier
+push d'un arbre Git modifié, `npm run validate:change` doit être vert sur cet arbre exact.** Cette commande
+constitue la validation complète canonique : elle dérive la baseline PR/`main`, contrôle les workflows et
+la SPEC, rematérialise Android, classe le changement, vérifie le contrat de changement, TypeScript et les
+tests unitaires, ajoute le contrat Android si la classe est `apk`, exécute l'audit de dépendances lorsqu'il
+est requis puis construit les assets Web/serveur.
+
+GitHub Actions réutilise cette même orchestration. Le job `Validate Change` la découpe uniquement en deux
+phases pour conserver le fail-fast et le cache :
 
 1. configuration de Node sans installation applicative ;
-2. préflight sans dépendances : garde des imports ESM des TNR Node, puis intégrité du catalogue SPEC ;
-3. restauration éventuelle d'un cache `node_modules` exact ;
-4. sur cache absent seulement, `npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund` ;
-5. rematérialisation systématique de la configuration Android canonique, y compris sur cache trouvé ;
-6. classification `light` / `backend` / `apk` et contrat de changement ;
-7. TypeScript puis tests unitaires dans deux étapes séparées ;
-8. contrat Android uniquement si le diff touche l'APK ;
-9. audit de dépendances lorsqu'il est applicable ;
-10. build Web + serveur ;
-11. résumé du mode, du cache et des durées principales.
+2. installation de **actionlint v1.7.12** verrouillé par version et SHA-256 ;
+3. `npm run validate:change -- --preflight`, qui exécute la politique/syntaxe des workflows puis l'intégrité SPEC ;
+4. restauration éventuelle d'un cache `node_modules` exact ;
+5. sur cache absent seulement, `npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund` ;
+6. `npm run validate:change -- --postinstall`, qui rematérialise Android, classe `light` / `backend` / `apk`, applique le contrat de changement, TypeScript, les tests unitaires, le contrat Android conditionnel, l'audit applicable et le build ;
+7. résumé du mode, du cache et des durées principales.
 
-Le préflight commence par un garde Node sans dépendances qui inspecte uniquement les TNR
+Les options `--preflight` et `--postinstall` ne définissent aucune logique de validation concurrente : elles
+sont les deux segments du même script `scripts/validate-change.cjs`. L'exécution locale sans option appelle
+successivement les deux segments. La CI confirme donc un contrat local identique au lieu de devenir une
+boucle de mise au point distante.
+
+### Politique et syntaxe des workflows
+
+`npm run validate:workflows` est inclus dans le préflight. Il impose une allowlist exacte des workflows
+canoniques, refuse tout workflow temporaire non déclaré, interdit les commandes/actions qui modifient,
+commitent ou poussent du code et borne chaque permission `write` au workflow qui en a explicitement besoin.
+La syntaxe des YAML GitHub Actions est ensuite vérifiée par **actionlint v1.7.12**. Une autre version est
+refusée afin que le résultat local et le résultat CI restent déterministes.
+
+Ajouter ou renommer un workflow, introduire une nouvelle permission d'écriture ou changer la version de
+l'outil est donc une évolution explicite de la politique : le script, les TNR et cette documentation sont
+mis à jour dans le même changement. Un workflow correctif temporaire auto-modifiant n'est jamais un moyen
+autorisé de réparer la CI.
+
+Le préflight conserve également le garde des imports ESM des TNR Node sans dépendances, qui inspecte uniquement les TNR
 `tests/**/*.test.ts` exécutés directement par `node --test`. Lorsqu'un import relatif local cible un
 module TypeScript existant, son extension (`.ts`, `.tsx`, etc.) doit être explicite ; les imports de
 packages et le code applicatif bundlé par Vite restent hors de ce garde. L'erreur indique fichier, ligne,
@@ -126,11 +150,13 @@ Un push sur `main` **ne publie jamais automatiquement une APK**.
 
 Le test `tests/ciValidationPerformance.test.ts` bloque automatiquement toute régression de l'ordre
 fail-fast, de la clé de cache exacte, de la confiance d'écriture, des options d'installation, de la
-rematérialisation Android, de la séparation des contrôles, du résumé et du plafond. Le test
-`tests/testEsmImportsGuard.test.ts` verrouille le garde ESM : imports statiques, side-effect et dynamiques,
-extensions explicites, packages ignorés et absence d'impact sur le code Vite. La preuve du SLO est
-maintenue dans l'issue #84 à partir de 20 validations réelles consécutives ; elle n'est pas simulée
-par des runs artificiels.
+rematérialisation Android, de l'orchestration `validate:change`, du résumé et du plafond. Le test
+`tests/workflowPolicy.test.ts` verrouille l'allowlist, les permissions d'écriture et les mutations Git
+interdites ; `tests/changeValidationOrchestrator.test.ts` protège les sorties et la classification de
+l'orchestrateur. Le test `tests/testEsmImportsGuard.test.ts` verrouille le garde ESM : imports statiques,
+side-effect et dynamiques, extensions explicites, packages ignorés et absence d'impact sur le code Vite.
+La preuve du SLO est maintenue dans l'issue #84 à partir de 20 validations réelles consécutives ; elle
+n'est pas simulée par des runs artificiels.
 
 ## Gouvernance proportionnée
 

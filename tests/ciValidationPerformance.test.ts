@@ -17,18 +17,30 @@ function position(label: string): number {
 test('SEENIT-QUALITY-008 impose un préflight sans dépendances et un cache exact de confiance', () => {
   assert.match(validateJob, /timeout-minutes:\s*10/);
 
-  const specification = position('Validate Specification Integrity');
+  const actionlint = position('Install pinned actionlint');
+  const preflight = position('Validate Change Preflight');
   const restore = position('Restore Exact node_modules Cache');
   const install = position('Install Dependencies on Cache Miss');
-  const materialize = position('Materialize Android Configuration');
-  const classify = position('Classify Delivery Path');
-  const changeContract = position('Specification Change Contract');
+  const canonical = position('Validate Change Canonical');
 
-  assert.ok(specification < restore, 'l’intégrité SPEC doit précéder le cache et l’installation');
+  assert.ok(actionlint < preflight, 'actionlint verrouillé doit être disponible avant le préflight');
+  assert.ok(preflight < restore, 'le préflight doit précéder le cache et l’installation');
   assert.ok(restore < install, 'la restauration exacte doit précéder l’installation de secours');
-  assert.ok(install < materialize, 'la configuration Android doit suivre la restauration ou l’installation');
-  assert.ok(materialize < classify, 'la classification complète doit disposer du runtime matérialisé');
-  assert.ok(classify < changeContract, 'la classe calculée doit précéder le contrat de changement');
+  assert.ok(install < canonical, 'l’orchestration post-install doit suivre la restauration ou l’installation');
+
+  assert.match(validateJob, /version='1\.7\.12'/);
+  assert.match(validateJob, /8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8/);
+  assert.match(validateJob, /actionlint_\$\{version\}_linux_amd64\.tar\.gz/);
+  assert.match(validateJob, /npm run validate:change -- --preflight/);
+  assert.match(validateJob, /npm run validate:change -- --postinstall/);
+  assert.match(validateJob, /SEENIT_VALIDATE_BASE_SHA/);
+  assert.match(validateJob, /SEENIT_FORCE_DEPENDENCY_AUDIT/);
+
+  assert.doesNotMatch(validateJob, /run:\s*npm run lint\b/);
+  assert.doesNotMatch(validateJob, /run:\s*npm run test:unit\b/);
+  assert.doesNotMatch(validateJob, /run:\s*npm run test:android\b/);
+  assert.doesNotMatch(validateJob, /run:\s*npm run build\b/);
+  assert.doesNotMatch(validateJob, /run:\s*node scripts\/materialize-android-config\.cjs/);
 
   assert.match(validateJob, /uses:\s*actions\/cache\/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9/);
   assert.match(validateJob, /path:\s*node_modules/);
@@ -38,31 +50,13 @@ test('SEENIT-QUALITY-008 impose un préflight sans dépendances et un cache exac
   assert.match(validateJob, /hashFiles\('package\.json', 'package-lock\.json', 'scripts\/patch-local-notifications\.cjs', 'scripts\/materialize-android-config\.cjs'\)/);
   assert.doesNotMatch(validateJob, /restore-keys:/, 'aucune restauration approximative n’est autorisée');
   assert.match(validateJob, /steps\.node_modules_cache\.outputs\.cache-hit != 'true'/);
-
-  assert.match(
-    validateJob,
-    /npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund/
-  );
-  assert.match(
-    validateJob,
-    /Materialize Android Configuration[\s\S]*node scripts\/materialize-android-config\.cjs/
-  );
-
-  const typescript = position('TypeScript Check');
-  const unitTests = position('Unit Tests');
-  const androidContract = position('Android Contract for APK-impacting Changes');
-  const build = position('Build Web and Server Assets');
-  assert.ok(typescript < unitTests && unitTests < androidContract && androidContract < build);
+  assert.match(validateJob, /npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund/);
 
   const save = position('Save Trusted node_modules Cache');
   const summary = position('Publish Validation Summary');
-  assert.ok(save > build, 'le cache de référence ne doit être sauvegardé qu’après un build vert');
+  assert.ok(save > canonical, 'le cache de référence ne doit être sauvegardé qu’après la validation canonique verte');
   assert.ok(summary > save, 'le résumé doit conclure le job même après la sauvegarde');
-  assert.equal(
-    (validateJob.match(/actions\/cache\/save@/g) || []).length,
-    1,
-    'un seul point d’écriture du cache est autorisé'
-  );
+  assert.equal((validateJob.match(/actions\/cache\/save@/g) || []).length, 1, 'un seul point d’écriture du cache est autorisé');
 
   const saveBlock = validateJob.slice(save, summary);
   assert.match(saveBlock, /success\(\)/);
@@ -77,10 +71,9 @@ test('SEENIT-QUALITY-008 impose un préflight sans dépendances et un cache exac
   assert.match(summaryBlock, /GITHUB_STEP_SUMMARY/);
   assert.match(summaryBlock, /Mode de livraison/);
   assert.match(summaryBlock, /Cache node_modules/);
-  assert.match(summaryBlock, /Préflight/);
+  assert.match(summaryBlock, /Préflight workflows \+ SPEC/);
   assert.match(summaryBlock, /TypeScript/);
   assert.match(summaryBlock, /Tests unitaires/);
   assert.match(summaryBlock, /Build Web \+ serveur/);
-
   assert.match(validateJob, /Set up Node\.js 22 with npm cache[\s\S]*cache:\s*npm/);
 });
