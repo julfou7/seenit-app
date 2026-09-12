@@ -69,8 +69,9 @@ La vérification du `main` GitHub canonique est une **lecture d'état distante**
 3. Si aucun workspace n'existe et qu'une exécution locale est nécessaire, acquérir le dépôt **une seule fois par environnement** depuis le SHA/branche canonique, avec le mode minimal compatible (`--depth`, clone partiel ou checkout partiel) plutôt qu'un historique complet par défaut.
 4. Ne lancer `npm ci` que si les dépendances sont absentes ou incompatibles avec la version Node et le `package-lock.json` du chantier. Un `node_modules` ou cache exact compatible est réutilisé.
 5. Lors d'une reprise, repartir d'abord de l'issue, de la PR ou de la branche existante et du dernier jalon contenant la **prochaine action exacte**. Ne pas reconstruire l'historique complet si ce jalon et les index canoniques bornent déjà le travail restant. **Reprise identifiée : pas de recherche globale.** Si l'issue, la PR ou la branche du chantier et un checkpoint exploitable sont déjà connus, vérifier `main`, lire ces références et exécuter la prochaine action exacte sans relancer la recherche générale des issues ouvertes/fermées, PR, commits ou audits. Relancer cette recherche seulement si le périmètre change, si le checkpoint est absent ou ambigu, si `main` révèle une contradiction pertinente ou si une nouvelle anomalie hors périmètre apparaît.
-6. Si une demande initiale reste incomplète lors d'un handoff inévitable, mettre l'issue à jour avec le SHA/branche/PR, les fichiers modifiés, les tests déjà verts, le blocage éventuel et la prochaine action exacte afin que la reprise suivante commence par une action utile.
-7. Laisser les opérations distantes longues — CI, release et déploiement — à GitHub Actions. Ne pas consommer une fenêtre d'exécution en polling rapproché, sauf demande explicite de suivi synchrone.
+6. **Avant chaque fin de session SeenIt**, quelle qu'en soit la cause (chantier terminé, blocage réel, limite de session, handoff volontaire ou involontaire), enregistrer un checkpoint persistant dans l'issue fonctionnelle concernée ; à défaut d'issue fonctionnelle, utiliser l'issue de contrôle appropriée. Le checkpoint contient au minimum : état exact du chantier, SHA/branche/PR ou `main` courant, fichiers ou surfaces modifiés, tests déjà verts, validations rouges avec les numéros de runs/jobs utiles, blocage éventuel, prochaine action exacte et critère de fin. Si le chantier est terminé, écrire explicitement **`Prochaine action : aucune — chantier terminé`** avec les preuves de merge/release/déploiement. La réponse finale à l'utilisateur résume ce même checkpoint ; ne jamais terminer une session SeenIt sur un statut vague ou uniquement sur un message d'erreur.
+7. **Avant de déclarer un blocage GitHub ou un manque d'accès**, distinguer les permissions du token de la surface exposée par le connecteur. Un refus d'un endpoint générique ou une allowlist du connecteur n'est pas une preuve d'insuffisance des droits. Rechercher/inventorier puis tenter les actions GitHub dédiées adaptées à la ressource (par exemple jobs, logs, checks, artifacts, workflows, issues/PR) avant de conclure qu'une information ou une action est inaccessible. Un blocage utilisateur ne peut être déclaré qu'après échec ou absence prouvée de l'action dédiée **et** épuisement du chemin connector-only documenté dans le dépôt.
+8. Laisser les opérations distantes longues — CI, release et déploiement — à GitHub Actions. Ne pas consommer une fenêtre d'exécution en polling rapproché, sauf demande explicite de suivi synchrone.
 
 Cette politique ne suppose jamais qu'un sandbox soit persistant : si la plateforme fournit réellement un environnement neuf, l'acquisition minimale peut être répétée. Elle interdit seulement de confondre cette contrainte de runtime avec une obligation SeenIt de recloner ou de reconstruire le contexte.
 
@@ -242,6 +243,10 @@ Après chaque modification, conclure exactement avec :
 
 ### 📌 Impact & Mode de déploiement
 - Classe `light`, `backend` ou `apk`, et préciser si l'APK attend la prochaine release groupée.
+
+### 💾 Checkpoint de fin
+- Résumer le checkpoint persistant enregistré dans l'issue : état exact, branche/PR/SHA, validations utiles, blocage éventuel, prochaine action exacte et critère de fin.
+- Si le chantier est terminé, écrire exactement : **`Prochaine action : aucune — chantier terminé`**.
 
 ### 🚀 Action requise de ton côté
 - Action concrète attendue, ou « Aucune » si rien n'est nécessaire.
