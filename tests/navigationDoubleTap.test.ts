@@ -8,6 +8,8 @@ import {
 } from '../src/features/navigation/activeTabTap.ts';
 
 const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+const bottomNavSource = readFileSync(new URL('../src/components/BottomNav.tsx', import.meta.url), 'utf8');
+const downloadsScreenSource = readFileSync(new URL('../src/screens/DownloadsScreen.tsx', import.meta.url), 'utf8');
 
 function tap(
   currentTab: string,
@@ -59,7 +61,7 @@ test('la borne temporelle et le triple appui sont déterministes', () => {
   assert.equal(third.action, 'active-single');
 });
 
-test('le retour en haut est limité au root de l’onglet actif', () => {
+test('le retour en haut générique reste limité au root de l’onglet actif', () => {
   assert.doesNotMatch(appSource, /document\.querySelectorAll\(/);
   assert.match(appSource, /document\.querySelector<HTMLElement>\(`\[data-app-tab=/);
   assert.match(appSource, /data-app-tab="discover"/);
@@ -68,13 +70,19 @@ test('le retour en haut est limité au root de l’onglet actif', () => {
   assert.match(appSource, /data-app-tab="profile"/);
 });
 
-test('le double appui ne déclenche aucune action métier de téléchargement', () => {
-  const start = appSource.indexOf('const handleActiveTabDoubleClick = () => {');
-  const end = appSource.indexOf('\n\n  return (', start);
-  assert.ok(start >= 0 && end > start);
-  const handler = appSource.slice(start, end);
+test('Télécharger possède un contrat local explicite de retour en haut', () => {
+  assert.match(bottomNavSource, /tabId === 'downloads'[\s\S]*downloads-scroll-top/);
+  assert.match(downloadsScreenSource, /addEventListener\('downloads-scroll-top'/);
+  assert.match(downloadsScreenSource, /querySelector<HTMLElement>\('\.overflow-y-auto'\)/);
+  assert.match(downloadsScreenSource, /scrollRoot\.scrollTop = 0/);
+});
 
-  assert.doesNotMatch(handler, /fetchDownloads|removeDownload|clearAllDownloads|beginDownloadRequest|pushReleaseDirectly/);
-  assert.match(handler, /currentTab === 'discover'/);
-  assert.doesNotMatch(handler, /currentTab === 'downloads'[\s\S]*dispatchEvent/);
+test('le double appui Télécharger ne déclenche aucun appel métier', () => {
+  const combined = `${bottomNavSource}\n${downloadsScreenSource}`;
+
+  assert.doesNotMatch(
+    combined,
+    /fetchDownloads|removeDownload|clearAllDownloads|beginDownloadRequest|pushReleaseDirectly/,
+  );
+  assert.match(appSource, /currentTab === 'discover'[\s\S]*discover-reset-all/);
 });
