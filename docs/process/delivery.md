@@ -211,6 +211,20 @@ modification, test, commit/PR ou blocage précis). La cible est **moins de 2 min
 initial réellement nécessaire. Les preuves réelles sont consignées dans #195 et les chantiers qui
 mesurent ce délai ; aucune mesure synthétique n'est fabriquée pour fermer le critère.
 
+### Exclusion mutuelle entre conversations
+
+Le workspace et le worktree isolent les fichiers locaux ; GitHub reste partagé. Toute session interactive
+ou planifiée acquiert donc le bail décrit dans la section 0.4 de `AGENTS.md` avant la première écriture.
+Le commentaire `<!-- seenit-agent-lease -->` rend visibles le propriétaire, le périmètre, le SHA attendu,
+l'expiration à 90 minutes et la prochaine action. Un bail concurrent `ACTIVE` rend seulement son périmètre non
+actionnable : l'automatisation peut poursuivre un sujet indépendant, mais ne modifie, ne fusionne, ne
+ferme et ne livre jamais le travail d'une autre conversation.
+
+L'acquisition est relue après écriture ; en cas de course, le plus petit identifiant de commentaire GitHub
+gagne. Le propriétaire rafraîchit le bail aux jalons, revérifie bail + tête distante avant toute opération
+irréversible et le termine en `HANDOFF_READY`, `WAITING` ou `DONE` avec le checkpoint persistant. Ce
+protocole complète les worktrees : il empêche les collisions distantes que Git seul ne peut prévenir.
+
 ## Cause racine et portée d'un correctif
 
 Un exemple reproductible prouve un symptôme, pas la portée du correctif. Avant toute implémentation,

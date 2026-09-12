@@ -8,14 +8,27 @@ import test from 'node:test';
 const require = createRequire(import.meta.url);
 const {
   readClassification,
+  resolveNpmInvocation,
   writeGithubOutput
 } = require('../scripts/validate-change.cjs') as {
   readClassification: (outputPath: string) => { mode: string; dependenciesChanged: boolean };
+  resolveNpmInvocation: (
+    platform?: string,
+    commandInterpreter?: string
+  ) => { command: string; prefix: string[] };
   writeGithubOutput: (
     classification: { mode: string; dependenciesChanged: boolean },
     outputPath?: string
   ) => void;
 };
+
+test('SEENIT-QUALITY-007 lance npm via l’interpréteur natif sous Windows', () => {
+  assert.deepEqual(resolveNpmInvocation('win32', 'C:\\Windows\\System32\\cmd.exe'), {
+    command: 'C:\\Windows\\System32\\cmd.exe',
+    prefix: ['/d', '/s', '/c', 'npm']
+  });
+  assert.deepEqual(resolveNpmInvocation('linux'), { command: 'npm', prefix: [] });
+});
 
 test('SEENIT-QUALITY-007 relit la classification produite par le classificateur', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'seenit-validation-'));
