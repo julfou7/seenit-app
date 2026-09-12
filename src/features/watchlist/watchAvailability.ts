@@ -15,7 +15,7 @@ export function isAiredDate(
 }
 
 /**
- * SEENIT-WATCHLIST-001 — Unknown metadata is never promoted to "available".
+ * Unknown metadata is never promoted to "available".
  * A TV show only has watchable evidence once SeenIt can positively prove that
  * at least one episode has aired. Production status and total episode count are
  * deliberately ignored: an in-production show may have old aired seasons, while
