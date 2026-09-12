@@ -3,6 +3,7 @@ import { SeenItGlyph, type SeenItSymbolType } from './SeenItLogo';
 import { cn } from '../lib/utils';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { isDownloadFeatureEnabled } from '../features/downloads/downloadFeatureVisibility';
+import { resolveActiveTabTap, type ActiveTabTapState } from '../features/navigation/activeTabTap';
 
 const DownloadNavBadge = lazy(() => import('./DownloadNavBadge').then(module => ({ default: module.DownloadNavBadge })));
 
@@ -20,7 +21,7 @@ interface TabItem {
 }
 
 export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveTabDoubleClick }: Props) {
-  const lastActiveTapRef = useRef<{ tabId: string; at: number } | null>(null);
+  const lastActiveTapRef = useRef<ActiveTabTapState | null>(null);
   const downloadsEnabled = useDownloadConfigStore(isDownloadFeatureEnabled);
 
   const tabs: readonly TabItem[] = [
@@ -34,32 +35,26 @@ export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveT
 
   const handleTabClick = (e: React.MouseEvent, tabId: string) => {
     e.preventDefault();
-    const now = Date.now();
 
-    if (currentTab !== tabId) {
-      // Un tap qui change d'onglet n'est jamais le premier tap d'un double-appui.
-      lastActiveTapRef.current = null;
+    const resolution = resolveActiveTabTap(
+      currentTab,
+      tabId,
+      lastActiveTapRef.current,
+      Date.now(),
+    );
+    lastActiveTapRef.current = resolution.nextTap;
+
+    if (resolution.action === 'change-tab') {
       onTabChange(tabId as any);
       return;
     }
 
-    const lastActiveTap = lastActiveTapRef.current;
-    const isDoubleTap = Boolean(
-      lastActiveTap &&
-      lastActiveTap.tabId === tabId &&
-      now - lastActiveTap.at > 0 &&
-      now - lastActiveTap.at < 450
-    );
-
-    if (isDoubleTap) {
+    if (resolution.action === 'active-double') {
       onActiveTabDoubleClick?.();
-      // Un troisième tap démarre une nouvelle séquence au lieu de rejouer immédiatement l'action.
-      lastActiveTapRef.current = null;
       return;
     }
 
     onActiveTabClick?.();
-    lastActiveTapRef.current = { tabId, at: now };
   };
 
   return (
