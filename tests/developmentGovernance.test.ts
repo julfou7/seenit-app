@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 
 const workflow = readFileSync('.github/workflows/build-apk.yml', 'utf8');
+const changeValidator = readFileSync('scripts/validate-change.cjs', 'utf8');
 const agentRules = readFileSync('AGENTS.md', 'utf8');
 const specificationGuide = readFileSync('docs/specifications/README.md', 'utf8');
 const auditIndex = readFileSync('docs/audits/README.md', 'utf8');
@@ -18,10 +19,14 @@ const versionSync = readFileSync('scripts/sync-app-version.cjs', 'utf8');
 test('SEENIT-RELEASE-002 la CI valide puis publie sans modifier automatiquement main', () => {
   assert.doesNotMatch(workflow, /git\s+(commit|push)/);
   assert.match(workflow, /^\s{2}validate:/m);
-  assert.match(workflow, /Validate Specification Integrity/);
-  assert.match(workflow, /TypeScript Check/);
-  assert.match(workflow, /Unit Tests/);
-  assert.match(workflow, /npm run test:spec:changes/);
+  assert.match(workflow, /Validate Change Preflight/);
+  assert.match(workflow, /Validate Change Canonical/);
+  assert.match(workflow, /npm run validate:change -- --preflight/);
+  assert.match(workflow, /npm run validate:change -- --postinstall/);
+  assert.match(changeValidator, /label: 'Intégrité SPEC'/);
+  assert.match(changeValidator, /label: 'TypeScript'/);
+  assert.match(changeValidator, /label: 'Tests unitaires'/);
+  assert.match(changeValidator, /test:spec:changes/);
   assert.match(workflow, /cache: npm/);
   assert.match(workflow, /release_apk:/);
   assert.match(workflow, /github\.event_name == 'workflow_dispatch'/);
@@ -30,7 +35,8 @@ test('SEENIT-RELEASE-002 la CI valide puis publie sans modifier automatiquement 
   assert.doesNotMatch(workflow, /\.\/gradlew\s+--no-daemon\s+assembleDebug\s+assembleDebugAndroidTest/);
   assert.doesNotMatch(workflow, /gradle-version:/);
   assert.match(workflow, /sha256sum "SeenIt-v\$\{VERSION\}\.apk"/);
-  assert.match(workflow, /Production Dependency Audit[\s\S]*DEPENDENCIES_CHANGED/);
+  assert.match(changeValidator, /Audit dépendances production/);
+  assert.match(workflow, /SEENIT_FORCE_DEPENDENCY_AUDIT/);
   assert.match(deliveryProcess, /push.*ne publie.*APK/is);
   assert.match(agentRules, /Fast path prioritaire.*publication APK seule/is);
   assert.match(agentRules, /release:status/);
@@ -42,10 +48,11 @@ test('SEENIT-RELEASE-002 la CI valide puis publie sans modifier automatiquement 
 });
 
 test('SEENIT-APK-004 exécute le contrat Android avant le garde de release', () => {
-  const contractIndex = workflow.indexOf('Android Contract for APK-impacting Changes');
+  const contractIndex = workflow.indexOf('Release Automated Tests');
   const releaseGuardIndex = workflow.indexOf('Validate Unpublished Release Version');
-  assert.ok(contractIndex >= 0, 'le contrat Android doit exister dans la validation');
+  assert.ok(contractIndex >= 0, 'le contrat Android doit exister dans la validation de release');
   assert.ok(releaseGuardIndex > contractIndex, 'le contrat Android doit précéder le garde de release');
+  assert.match(workflow.slice(contractIndex, releaseGuardIndex), /npm run test:android/);
 });
 
 test('SEENIT-APK-001 matérialise la clé release avant les tests de release et Gradle', () => {
@@ -109,8 +116,8 @@ test('SEENIT-QUALITY-003 mémorise chaque demande durable dans la SPEC et le reg
 });
 
 test('SEENIT-QUALITY-006 réserve le pipeline APK aux changements qui le nécessitent', () => {
-  assert.match(workflow, /Classify Delivery Path/);
-  assert.match(workflow, /delivery:classify/);
+  assert.match(workflow, /Validate Change Canonical/);
+  assert.match(changeValidator, /delivery:classify/);
   assert.match(workflow, /DELIVERY_MODE == 'apk'/);
   assert.match(workflow, /release_apk == true/);
   assert.match(workflow, /android12_smoke:/);
