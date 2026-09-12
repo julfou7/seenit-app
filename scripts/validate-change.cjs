@@ -28,6 +28,17 @@ function run(command, args, options = {}) {
   }
 }
 
+function resolveNpmInvocation(platform = process.platform, commandInterpreter = process.env.ComSpec) {
+  return platform === 'win32'
+    ? { command: commandInterpreter || 'cmd.exe', prefix: ['/d', '/s', '/c', 'npm'] }
+    : { command: 'npm', prefix: [] };
+}
+
+function runNpm(args, options = {}) {
+  const invocation = resolveNpmInvocation();
+  run(invocation.command, [...invocation.prefix, ...args], options);
+}
+
 function git(args) {
   return execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
 }
@@ -72,11 +83,11 @@ function writeGithubOutput(classification, outputPath = process.env.GITHUB_OUTPU
 }
 
 function validatePreflight() {
-  run('npm', ['run', 'validate:workflows'], {
+  runNpm(['run', 'validate:workflows'], {
     label: 'Politique et syntaxe workflows',
     metric: 'SEENIT_WORKFLOWS_SECONDS'
   });
-  run('npm', ['run', 'test:spec'], {
+  runNpm(['run', 'test:spec'], {
     label: 'Intégrité SPEC',
     metric: 'SEENIT_SPEC_SECONDS'
   });
@@ -94,7 +105,7 @@ function validatePostinstall() {
   const outputPath = path.join(root, `.seenit-validation-${process.pid}.out`);
   try {
     fs.writeFileSync(outputPath, '', 'utf8');
-    run('npm', ['run', 'delivery:classify'], {
+    runNpm(['run', 'delivery:classify'], {
       label: 'Classification de livraison',
       env: {
         DELIVERY_BASE_SHA: baseSha,
@@ -107,20 +118,20 @@ function validatePostinstall() {
     writeGithubOutput(classification);
     console.log(`[Validate Change] Mode : ${classification.mode}`);
 
-    run('npm', ['run', 'test:spec:changes'], {
+    runNpm(['run', 'test:spec:changes'], {
       label: 'Contrat de changement',
       env: { SPEC_BASE_SHA: baseSha, DELIVERY_MODE: classification.mode }
     });
-    run('npm', ['run', 'lint'], { label: 'TypeScript', metric: 'SEENIT_TYPESCRIPT_SECONDS' });
-    run('npm', ['run', 'test:unit'], { label: 'Tests unitaires', metric: 'SEENIT_UNIT_SECONDS' });
+    runNpm(['run', 'lint'], { label: 'TypeScript', metric: 'SEENIT_TYPESCRIPT_SECONDS' });
+    runNpm(['run', 'test:unit'], { label: 'Tests unitaires', metric: 'SEENIT_UNIT_SECONDS' });
 
     if (classification.mode === 'apk') {
-      run('npm', ['run', 'test:android'], { label: 'Contrat Android', metric: 'SEENIT_ANDROID_SECONDS' });
+      runNpm(['run', 'test:android'], { label: 'Contrat Android', metric: 'SEENIT_ANDROID_SECONDS' });
     }
     if (classification.dependenciesChanged || process.env.SEENIT_FORCE_DEPENDENCY_AUDIT === 'true') {
-      run('npm', ['audit', '--omit=dev', '--audit-level=high'], { label: 'Audit dépendances production' });
+      runNpm(['audit', '--omit=dev', '--audit-level=high'], { label: 'Audit dépendances production' });
     }
-    run('npm', ['run', 'build'], { label: 'Build Web + serveur', metric: 'SEENIT_BUILD_SECONDS' });
+    runNpm(['run', 'build'], { label: 'Build Web + serveur', metric: 'SEENIT_BUILD_SECONDS' });
 
     console.log(`\n[Validate Change] ✅ Validation ${classification.mode} verte.`);
     return classification;
@@ -157,6 +168,7 @@ function main() {
 module.exports = {
   parsePhase,
   readClassification,
+  resolveNpmInvocation,
   resolveBaseSha,
   validateChange,
   validatePostinstall,

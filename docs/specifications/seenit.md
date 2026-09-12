@@ -897,7 +897,12 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   pendant toute l'intervention : l'agent l'actualise aux jalons significatifs prouvés (diagnostic et décisions
   utiles, implémentation prête, validation/CI, intégration sur `main`, release ou blocage), coche chaque
   critère dès qu'il est réellement satisfait et remplace les informations devenues obsolètes. Les
-  micro-commits intermédiaires n'imposent pas une mise à jour administrative séparée.
+  micro-commits intermédiaires n'imposent pas une mise à jour administrative séparée. Avant la première
+  écriture, toute conversation interactive ou planifiée acquiert dans l'issue un bail GitHub visible,
+  borné à 90 minutes et couvrant issue, PR, branche et surfaces prévues. Un bail `ACTIVE` concurrent
+  interdit toute écriture, fusion, fermeture ou livraison sur ce périmètre ; l'agent peut seulement choisir
+  un chantier indépendant. Le bail est relu après acquisition et avant chaque opération distante sensible,
+  puis terminé par un checkpoint `HANDOFF_READY`, `WAITING` ou `DONE`.
 - **SEENIT-QUALITY-005** — Un import, une reconnexion ou une synchronisation AI Studio/GitHub est un
   transport non autoritatif. Avant tout commit depuis un workspace importé, le diff est comparé à la
   branche GitHub source et toute mutation automatique non demandée de Firebase/Firestore, Android,

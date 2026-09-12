@@ -1347,7 +1347,7 @@
     },
     {
       "id": "SEENIT-QUALITY-004",
-      "title": "Contexte GitHub complet avant intervention et issues maintenues à jour",
+      "title": "Contexte GitHub complet, bail inter-conversations et issues maintenues à jour",
       "targets": [
         "ci"
       ],
@@ -1359,6 +1359,10 @@
         {
           "file": "tests/issueTrackingGovernance.test.ts",
           "contains": "SEENIT-QUALITY-004 impose le contexte GitHub complet avant toute intervention"
+        },
+        {
+          "file": "tests/issueTrackingGovernance.test.ts",
+          "contains": "SEENIT-QUALITY-004 sérialise les écritures concurrentes par un bail GitHub"
         }
       ]
     },

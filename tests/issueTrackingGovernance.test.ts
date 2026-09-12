@@ -61,3 +61,25 @@ test('SEENIT-QUALITY-004 reprend API-first sans clone obligatoire ni bootstrap r
   assert.doesNotMatch(delivery, /clon(?:e|er)[^\n]*à chaque intervention/i);
   assert.match(requestRegistry, /USR-2026-09-07-001/);
 });
+
+test('SEENIT-QUALITY-004 sérialise les écritures concurrentes par un bail GitHub', () => {
+  const agents = fs.readFileSync('AGENTS.md', 'utf8');
+  const bootstrap = fs.readFileSync('.agents/AGENTS.md', 'utf8');
+  const delivery = fs.readFileSync('docs/process/delivery.md', 'utf8');
+  const spec = fs.readFileSync('docs/specifications/seenit.md', 'utf8');
+  const requestRegistry = fs.readFileSync('docs/requests/registry.md', 'utf8');
+
+  for (const source of [agents, bootstrap, delivery]) {
+    assert.match(source, /<!-- seenit-agent-lease -->/);
+    assert.match(source, /90 minutes/i);
+  }
+
+  assert.match(agents, /bail `ACTIVE`[\s\S]*autre conversation[\s\S]*non actionnable/i);
+  assert.match(agents, /plus petit[\s\S]*identifiant de commentaire GitHub gagne/i);
+  assert.match(agents, /Avant chaque push, merge, fermeture d'issue ou commande[\s\S]*release/i);
+  assert.match(agents, /HANDOFF_READY[\s\S]*WAITING[\s\S]*DONE/);
+  assert.match(bootstrap, /tâche planifiée[\s\S]*ne concurrence jamais une session interactive/i);
+  assert.match(delivery, /worktree[\s\S]*GitHub reste partagé/i);
+  assert.match(spec, /SEENIT-QUALITY-004[\s\S]*bail GitHub visible[\s\S]*borné à 90 minutes/i);
+  assert.match(requestRegistry, /USR-2026-09-12-001/);
+});

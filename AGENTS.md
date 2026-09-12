@@ -77,6 +77,37 @@ Cette politique ne suppose jamais qu'un sandbox soit persistant : si la platefor
 
 Lorsqu'un chantier est entièrement réalisable via le connecteur/API GitHub, l'absence de clone local, de `gh` ou de token shell n'est **ni un blocage ni une difficulté notable à remonter**. Le rapport final ne la mentionne comme difficulté que si elle a réellement empêché une action requise après épuisement du chemin connector-only prévu.
 
+## 0.4 Politique obligatoire — bail de chantier inter-conversations
+
+Un worktree protège les fichiers locaux, mais il n'empêche pas deux conversations, une tâche planifiée
+et une session manuelle de modifier simultanément la même issue, PR ou branche GitHub. Avant de reprendre
+ou de choisir un chantier, l'agent applique donc un **bail GitHub partagé** :
+
+1. Lire les commentaires récents de l'issue fonctionnelle, de sa PR éventuelle et de l'issue de contrôle
+   concernée. Rechercher le marqueur exact `<!-- seenit-agent-lease -->` ainsi qu'une activité GitHub récente
+   incompatible avec le checkpoint connu.
+2. Un bail `ACTIVE` non expiré appartenant à une autre conversation rend ce **périmètre précis** non
+   actionnable pour l'exécution courante. Ne modifier ni son issue, ni sa PR, ni sa branche, ne pas la
+   fusionner et ne pas lancer sa release. Une tâche autonome peut choisir un autre chantier réellement
+   indépendant ; sinon elle termine silencieusement. `[WAITING]`, `[BLOCKED]` et `Terrain` restent
+   non actionnables tant qu'un événement explicite de déblocage n'est pas observé.
+3. Avant toute écriture, publier dans l'issue un commentaire contenant le marqueur, `Statut: ACTIVE`,
+   un identifiant stable de conversation/tâche, le périmètre (issue, PR, branche et surfaces prévues),
+   le SHA de tête vérifié, une expiration à **+90 minutes** et la prochaine action exacte. Relire ensuite
+   les commentaires : si plusieurs acquisitions concurrentes couvrent le même périmètre, le plus petit
+   identifiant de commentaire GitHub gagne et les autres agents se retirent sans écrire au chantier.
+4. Rafraîchir le bail aux jalons significatifs. Avant chaque push, merge, fermeture d'issue ou commande
+   de release, relire le bail et la tête distante ; si le propriétaire ou le SHA attendu a changé,
+   interrompre l'écriture et publier un checkpoint de conflit. Le force-push est interdit.
+5. Avant de rendre la main, remplacer `ACTIVE` par `HANDOFF_READY`, `WAITING` ou `DONE` et publier le
+   checkpoint obligatoire de la section 0.3. Un bail expiré n'autorise une reprise qu'après relecture de
+   l'état distant ; en l'absence de statut final, toute activité incompatible datant de moins de 90 minutes
+   est traitée comme un chantier potentiellement actif.
+
+Le bail sérialise uniquement les périmètres qui se recouvrent. Deux conversations peuvent travailler en
+parallèle sur des issues et surfaces indépendantes avec des branches ou worktrees distincts. Une tâche
+planifiée ne doit jamais « aider » un chantier déjà loué par une session interactive.
+
 ## 0. Avant toute analyse, proposition ou modification
 
 **Hors fast paths des sections 0.0, 0.0a et 0.1 :**
