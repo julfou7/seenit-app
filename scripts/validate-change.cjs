@@ -63,6 +63,16 @@ function readClassification(outputPath) {
   };
 }
 
+function writeGithubOutput(classification, outputPath = process.env.GITHUB_OUTPUT) {
+  if (!outputPath) return;
+  fs.appendFileSync(outputPath, `DELIVERY_MODE=${classification.mode}\n`, 'utf8');
+  fs.appendFileSync(
+    outputPath,
+    `DEPENDENCIES_CHANGED=${classification.dependenciesChanged ? 'true' : 'false'}\n`,
+    'utf8'
+  );
+}
+
 function validateChange() {
   const baseSha = resolveBaseSha();
   console.log(`[Validate Change] Baseline : ${baseSha}`);
@@ -83,6 +93,7 @@ function validateChange() {
       }
     });
     const classification = readClassification(outputPath);
+    writeGithubOutput(classification);
     console.log(`[Validate Change] Mode : ${classification.mode}`);
 
     run('npm', ['run', 'test:spec:changes'], {
@@ -101,14 +112,26 @@ function validateChange() {
     run('npm', ['run', 'build'], { label: 'Build Web + serveur' });
 
     console.log(`\n[Validate Change] ✅ Validation ${classification.mode} verte.`);
+    return classification;
   } finally {
     fs.rmSync(outputPath, { force: true });
   }
 }
 
-try {
-  validateChange();
-} catch (error) {
-  console.error(`\n[Validate Change] ❌ ${error.message}`);
-  process.exitCode = error.exitCode || 1;
+function main() {
+  try {
+    validateChange();
+  } catch (error) {
+    console.error(`\n[Validate Change] ❌ ${error.message}`);
+    process.exitCode = error.exitCode || 1;
+  }
 }
+
+module.exports = {
+  readClassification,
+  resolveBaseSha,
+  validateChange,
+  writeGithubOutput
+};
+
+if (require.main === module) main();
