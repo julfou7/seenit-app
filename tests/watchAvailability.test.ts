@@ -12,7 +12,7 @@ const baseTv = {
   nextEpisodeToWatch: undefined,
 };
 
-test('SEENIT-WATCHLIST-001 exclut une série en production sans épisode diffusé de À Regarder', () => {
+test('watchlist disponibilité exclut une série en production sans épisode diffusé de À Regarder', () => {
   const prisonBreakBlackCreekLike = {
     ...baseTv,
     nextEpisodeToWatch: {
@@ -25,7 +25,7 @@ test('SEENIT-WATCHLIST-001 exclut une série en production sans épisode diffus�
   assert.equal(hasAiredEpisodeEvidence(prisonBreakBlackCreekLike, TODAY), false);
 });
 
-test('SEENIT-WATCHLIST-001 refuse une date future comme preuve de disponibilité', () => {
+test('watchlist disponibilité refuse une date future comme preuve de disponibilité', () => {
   assert.equal(hasAiredEpisodeEvidence({
     ...baseTv,
     firstAirDate: '2027-01-15',
@@ -37,7 +37,7 @@ test('SEENIT-WATCHLIST-001 refuse une date future comme preuve de disponibilité
   }, TODAY), false);
 });
 
-test('SEENIT-WATCHLIST-001 accepte uniquement une preuve positive de diffusion', () => {
+test('watchlist disponibilité accepte uniquement une preuve positive de diffusion', () => {
   assert.equal(hasAiredEpisodeEvidence({ ...baseTv, totalAiredEpisodes: 1 }, TODAY), true);
   assert.equal(hasAiredEpisodeEvidence({ ...baseTv, firstAirDate: '2026-09-11' }, TODAY), true);
   assert.equal(hasAiredEpisodeEvidence({
@@ -49,13 +49,13 @@ test('SEENIT-WATCHLIST-001 accepte uniquement une preuve positive de diffusion',
   assert.equal(hasAiredEpisodeEvidence({ ...baseTv }, TODAY), false);
 });
 
-test('SEENIT-WATCHLIST-001 branche le garde de disponibilité sur le classement et la carte', () => {
+test('watchlist disponibilité branche le garde de disponibilité sur le classement et la carte', () => {
   const screenSource = fs.readFileSync('src/screens/WatchListScreen.tsx', 'utf8');
   const cardSource = fs.readFileSync('src/components/cards/ContinueWatchingCard.tsx', 'utf8');
 
   assert.match(screenSource, /hasAiredEpisodeEvidence\(s, todayIso\)/,
     'À Regarder doit filtrer les séries sans preuve de diffusion avant le classement');
-  assert.match(cardSource, /hasAiredEpisodeEvidence\(show, todayStr\)/,
+  assert.match(cardSource, /hasAiredEpisodeEvidence\(props\.show, todayStr\)/,
     'la carte doit refuser de fabriquer un épisode disponible sans preuve de diffusion');
   assert.doesNotMatch(cardSource, /!ep\.air_date\s*\|\|\s*ep\.air_date\s*<=\s*todayStr/,
     'une date absente ne prouve jamais qu’un épisode est diffusé');
