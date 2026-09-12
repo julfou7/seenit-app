@@ -3,6 +3,7 @@ import { SeenItGlyph, type SeenItSymbolType } from './SeenItLogo';
 import { cn } from '../lib/utils';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { isDownloadFeatureEnabled } from '../features/downloads/downloadFeatureVisibility';
+import { resolveActiveTabTap, type ActiveTabTapState } from '../features/navigation/activeTabTap';
 
 const DownloadNavBadge = lazy(() => import('./DownloadNavBadge').then(module => ({ default: module.DownloadNavBadge })));
 
@@ -20,7 +21,7 @@ interface TabItem {
 }
 
 export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveTabDoubleClick }: Props) {
-  const lastTapRef = useRef<number>(0);
+  const lastActiveTapRef = useRef<ActiveTabTapState | null>(null);
   const downloadsEnabled = useDownloadConfigStore(isDownloadFeatureEnabled);
 
   const tabs: readonly TabItem[] = [
@@ -34,26 +35,26 @@ export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveT
 
   const handleTabClick = (e: React.MouseEvent, tabId: string) => {
     e.preventDefault();
-    const now = Date.now();
-    const timeSinceLastTap = now - lastTapRef.current;
-    
-    if (currentTab !== tabId) {
+
+    const resolution = resolveActiveTabTap(
+      currentTab,
+      tabId,
+      lastActiveTapRef.current,
+      Date.now(),
+    );
+    lastActiveTapRef.current = resolution.nextTap;
+
+    if (resolution.action === 'change-tab') {
       onTabChange(tabId as any);
-      lastTapRef.current = now;
       return;
     }
 
-    if (timeSinceLastTap > 0 && timeSinceLastTap < 450) {
-      if (onActiveTabDoubleClick) {
-        onActiveTabDoubleClick();
-      }
-      lastTapRef.current = 0;
-    } else {
-      if (onActiveTabClick) {
-        onActiveTabClick();
-      }
-      lastTapRef.current = now;
+    if (resolution.action === 'active-double') {
+      onActiveTabDoubleClick?.();
+      return;
     }
+
+    onActiveTabClick?.();
   };
 
   return (

@@ -321,7 +321,7 @@ function MainApp() {
           'local', 
           mediaType, 
           tmdbId ? Number(tmdbId) : undefined, 
-          season ? Number(season) : undefined, 
+          season ? Number(season) : undefined,
           episode ? Number(episode) : undefined
         );
       } else {
@@ -329,7 +329,7 @@ function MainApp() {
           effectiveId, 
           'local', 
           mediaType, 
-          tmdbId ? Number(tmdbId) : undefined, 
+          tmdbId ? Number(tmdbId) : undefined,
           season ? Number(season) : undefined,
           episode ? Number(episode) : undefined
         );
@@ -457,18 +457,27 @@ function MainApp() {
   };
 
   const handleActiveTabDoubleClick = () => {
-    const scrollableElements = document.querySelectorAll('.overflow-y-auto, .custom-scrollbar, [style*="overflow-y: auto"]');
-    scrollableElements.forEach(el => {
+    const tabRoot = currentTab === 'library'
+      ? 'watchlist'
+      : currentTab === 'settings'
+        ? 'profile'
+        : currentTab;
+    const activeTabRoot = document.querySelector<HTMLElement>(`[data-app-tab="${tabRoot}"]`);
+    const scrollableElement = activeTabRoot?.querySelector<HTMLElement>(
+      '.overflow-y-auto, .custom-scrollbar, [style*="overflow-y: auto"]'
+    );
+
+    if (scrollableElement) {
       try {
-        if (typeof el.scrollTo === 'function') {
-          el.scrollTo({ top: 0, behavior: 'smooth' });
+        if (typeof scrollableElement.scrollTo === 'function') {
+          scrollableElement.scrollTo({ top: 0, behavior: 'smooth' });
         } else {
-          el.scrollTop = 0;
+          scrollableElement.scrollTop = 0;
         }
       } catch (e) {
-        el.scrollTop = 0;
+        scrollableElement.scrollTop = 0;
       }
-    });
+    }
 
     if (currentTab === 'discover') {
       window.dispatchEvent(new CustomEvent('discover-reset-all'));
@@ -490,7 +499,7 @@ function MainApp() {
             <Suspense fallback={<div className="flex-1 bg-premium-ambient" aria-label="Chargement de l’écran" />}>
               {mountedTabs.has('watchlist') && (
                 <Activity mode={currentTab === 'watchlist' ? 'visible' : 'hidden'}>
-                  <div className="flex-1 min-h-0 flex flex-col">
+                  <div data-app-tab="watchlist" className="flex-1 min-h-0 flex flex-col">
                     <WatchListScreen onShowClick={openLocalMedia} />
                   </div>
                 </Activity>
@@ -498,7 +507,7 @@ function MainApp() {
 
               {(mountedTabs.has('profile') || mountedTabs.has('settings')) && (
                 <Activity mode={(currentTab === 'profile' || currentTab === 'settings') ? 'visible' : 'hidden'}>
-                  <div className="flex-1 min-h-0 flex flex-col">
+                  <div data-app-tab="profile" className="flex-1 min-h-0 flex flex-col">
                     <ProfileScreen
                       initialShowSettings={currentTab === 'settings'}
                       onShowClick={openTmdbMedia}
@@ -509,6 +518,7 @@ function MainApp() {
 
               {mountedTabs.has('discover') && (
                 <div
+                  data-app-tab="discover"
                   className={currentTab === 'discover' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}
                   aria-hidden={currentTab !== 'discover'}
                 >
@@ -518,7 +528,7 @@ function MainApp() {
 
               {mountedTabs.has('downloads') && (
                 <Activity mode={currentTab === 'downloads' ? 'visible' : 'hidden'}>
-                  <div className="flex-1 min-h-0 flex flex-col">
+                  <div data-app-tab="downloads" className="flex-1 min-h-0 flex flex-col">
                     <DownloadsScreen onShowClick={openTmdbMedia} />
                   </div>
                 </Activity>
