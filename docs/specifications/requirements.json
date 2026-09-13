@@ -1417,6 +1417,10 @@
         {
           "file": "tests/issueTrackingGovernance.test.ts",
           "contains": "SEENIT-QUALITY-004 sérialise les écritures concurrentes par un bail GitHub"
+        },
+        {
+          "file": "tests/issueTrackingGovernance.test.ts",
+          "contains": "SEENIT-QUALITY-004 conserve les chantiers Codex pendant un arrêt de quota"
         }
       ]
     },

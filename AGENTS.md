@@ -93,8 +93,10 @@ ou de choisir un chantier, l'agent applique donc un **bail GitHub partagé** :
    non actionnables tant qu'un événement explicite de déblocage n'est pas observé.
 3. Avant toute écriture, publier dans l'issue un commentaire contenant le marqueur, `Statut: ACTIVE`,
    un identifiant stable de conversation/tâche, le périmètre (issue, PR, branche et surfaces prévues),
-   le SHA de tête vérifié, une expiration à **+90 minutes** et la prochaine action exacte. Relire ensuite
-   les commentaires : si plusieurs acquisitions concurrentes couvrent le même périmètre, le plus petit
+   le SHA de tête vérifié, une expiration à **+90 minutes** et la prochaine action exacte. Pour une session
+   Codex, ajouter `Origine: CODEX` ; les anciens identifiants `Conversation: codex-*` et
+   `Conversation: codex-interactive-*` restent reconnus comme origine Codex. Relire ensuite les commentaires :
+   si plusieurs acquisitions concurrentes couvrent le même périmètre, le plus petit
    identifiant de commentaire GitHub gagne et les autres agents se retirent sans écrire au chantier.
 4. Rafraîchir le bail aux jalons significatifs. Avant chaque push, merge, fermeture d'issue ou commande
    de release, relire le bail et la tête distante ; si le propriétaire ou le SHA attendu a changé,
@@ -103,10 +105,23 @@ ou de choisir un chantier, l'agent applique donc un **bail GitHub partagé** :
    checkpoint obligatoire de la section 0.3. Un bail expiré n'autorise une reprise qu'après relecture de
    l'état distant ; en l'absence de statut final, toute activité incompatible datant de moins de 90 minutes
    est traitée comme un chantier potentiellement actif.
+6. **Exception Codex — quota.** Si une session Codex doit s'arrêter uniquement parce que son quota n'est
+   plus disponible, cet arrêt **n'est pas un `HANDOFF_READY`** et l'expiration nominale du bail à 90 minutes
+   ne transfère jamais le chantier à une tâche planifiée ChatGPT ni à une autre conversation. Codex conserve
+   `Statut: ACTIVE`, publie un checkpoint avec la raison « quota Codex », la prochaine action exacte et, si
+   elle est connue, l'heure de reset. Si l'environnement Codex expose une fonction Automation/Schedule,
+   Codex programme **avant de rendre la main** sa propre reprise dans le **même thread** : une reprise unique
+   juste après l'heure de reset connue, sinon une reprise périodique au plus une fois par heure jusqu'au
+   retour du quota. Si cette fonction n'est pas disponible, le checkpoint indique qu'une reprise manuelle
+   Codex est requise sans libérer le périmètre. Seul un checkpoint explicite `HANDOFF_READY` ou une
+   instruction utilisateur explicite de transfert autorise une autre tâche à reprendre ; `WAITING` reste
+   non actionnable et `DONE` reste terminal.
 
 Le bail sérialise uniquement les périmètres qui se recouvrent. Deux conversations peuvent travailler en
 parallèle sur des issues et surfaces indépendantes avec des branches ou worktrees distincts. Une tâche
-planifiée ne doit jamais « aider » un chantier déjà loué par une session interactive.
+planifiée ne doit jamais « aider » un chantier déjà loué par une session interactive. Pour un chantier
+Codex interrompu par quota, cette exclusion reste valable même après merge pendant les contrôles post-merge
+ou la livraison encore possédés par Codex.
 
 ## 0. Avant toute analyse, proposition ou modification
 

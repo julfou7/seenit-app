@@ -80,6 +80,26 @@ test('SEENIT-QUALITY-004 sérialise les écritures concurrentes par un bail GitH
   assert.match(agents, /HANDOFF_READY[\s\S]*WAITING[\s\S]*DONE/);
   assert.match(bootstrap, /tâche planifiée[\s\S]*ne concurrence jamais une session interactive/i);
   assert.match(delivery, /worktree[\s\S]*GitHub reste partagé/i);
-  assert.match(spec, /SEENIT-QUALITY-004[\s\S]*bail GitHub visible[\s\S]*borné à 90 minutes/i);
+  assert.match(spec, /SEENIT-QUALITY-004[\s\S]*bail GitHub visible[\s\S]*90 minutes/i);
   assert.match(requestRegistry, /USR-2026-09-12-001/);
+});
+
+test('SEENIT-QUALITY-004 conserve les chantiers Codex pendant un arrêt de quota', () => {
+  const agents = fs.readFileSync('AGENTS.md', 'utf8');
+  const bootstrap = fs.readFileSync('.agents/AGENTS.md', 'utf8');
+  const delivery = fs.readFileSync('docs/process/delivery.md', 'utf8');
+  const spec = fs.readFileSync('docs/specifications/seenit.md', 'utf8');
+  const requestRegistry = fs.readFileSync('docs/requests/registry.md', 'utf8');
+
+  assert.match(agents, /Origine: CODEX/);
+  assert.match(agents, /quota[\s\S]*n'est pas un `HANDOFF_READY`/i);
+  assert.match(agents, /expiration[\s\S]*90 minutes[\s\S]*ne transfère jamais/i);
+  assert.match(agents, /Automation\/Schedule[\s\S]*même thread/i);
+  assert.match(agents, /HANDOFF_READY[\s\S]*instruction utilisateur explicite de transfert/i);
+  assert.match(bootstrap, /quota[\s\S]*expiration des 90 minutes ne vaut jamais transfert/i);
+  assert.match(bootstrap, /Automations\/Schedules[\s\S]*même thread/i);
+  assert.match(delivery, /Quota Codex[\s\S]*même thread/i);
+  assert.match(delivery, /quota[\s\S]*HANDOFF_READY/i);
+  assert.match(spec, /SEENIT-QUALITY-004[\s\S]*quota Codex[\s\S]*HANDOFF_READY/i);
+  assert.match(requestRegistry, /USR-2026-09-13-006/);
 });

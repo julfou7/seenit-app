@@ -216,14 +216,33 @@ mesurent ce délai ; aucune mesure synthétique n'est fabriquée pour fermer le 
 Le workspace et le worktree isolent les fichiers locaux ; GitHub reste partagé. Toute session interactive
 ou planifiée acquiert donc le bail décrit dans la section 0.4 de `AGENTS.md` avant la première écriture.
 Le commentaire `<!-- seenit-agent-lease -->` rend visibles le propriétaire, le périmètre, le SHA attendu,
-l'expiration à 90 minutes et la prochaine action. Un bail concurrent `ACTIVE` rend seulement son périmètre non
-actionnable : l'automatisation peut poursuivre un sujet indépendant, mais ne modifie, ne fusionne, ne
-ferme et ne livre jamais le travail d'une autre conversation.
+l'expiration nominale à 90 minutes et la prochaine action. Un bail concurrent `ACTIVE` rend seulement son
+périmètre non actionnable : l'automatisation peut poursuivre un sujet indépendant, mais ne modifie, ne
+fusionne, ne ferme et ne livre jamais le travail d'une autre conversation.
 
 L'acquisition est relue après écriture ; en cas de course, le plus petit identifiant de commentaire GitHub
 gagne. Le propriétaire rafraîchit le bail aux jalons, revérifie bail + tête distante avant toute opération
 irréversible et le termine en `HANDOFF_READY`, `WAITING` ou `DONE` avec le checkpoint persistant. Ce
 protocole complète les worktrees : il empêche les collisions distantes que Git seul ne peut prévenir.
+
+#### Quota Codex : reprise par le propriétaire
+
+Un arrêt provoqué uniquement par le **quota Codex** ne constitue ni un handoff ni une libération du bail.
+Les chantiers Codex sont marqués `Origine: CODEX` dans leur lease ; les identifiants historiques
+`codex-*` et `codex-interactive-*` restent reconnus. Tant que le dernier checkpoint Codex n'est pas
+`HANDOFF_READY` ou qu'aucun transfert utilisateur explicite n'a été demandé, une tâche ChatGPT planifiée
+ne reprend ni l'issue, ni la PR, ni la branche, ni la release associée, **même après l'expiration nominale
+des 90 minutes** et même après merge pendant des contrôles post-merge encore possédés par Codex.
+
+Avant de rendre la main pour quota, Codex conserve `Statut: ACTIVE` et écrit un checkpoint indiquant la
+raison « quota Codex », la prochaine action exacte et l'heure de reset lorsqu'elle est connue. Si le
+produit Codex utilisé expose une fonction **Automation/Schedule**, le propriétaire programme sa reprise
+dans le **même thread** : une exécution unique juste après le reset connu ; si l'heure n'est pas connue,
+une vérification périodique au plus une fois par heure. Tant que le quota reste indisponible, cette reprise
+ne modifie rien et laisse le chantier réservé. Si la fonction d'automatisation n'est pas disponible dans
+l'environnement Codex courant, le checkpoint le signale et exige une reprise manuelle Codex sans transférer
+le périmètre. `WAITING` reste non actionnable, `DONE` est terminal et seul `HANDOFF_READY` exprime un
+transfert autonome vers une autre exécution.
 
 ## Cause racine et portée d'un correctif
 
