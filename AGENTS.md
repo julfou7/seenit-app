@@ -14,7 +14,7 @@ Objectif : lancer la release en moins de 2 minutes de travail opérateur lorsqu'
 4. Si aucune candidate compatible n'existe, **depuis une conversation connector-only publier exactement `/prepare-release-apk` sur l'issue #102**. Le workflow `SeenIt Release Control` calcule la prochaine version, réutilise une candidate compatible ou exécute le préparateur atomique, crée un seul commit contenant exactement les huit surfaces et ouvre la PR. L'absence de workspace local, de `gh`, de token shell ou de navigateur authentifié **n'est pas un blocage** et ne justifie plus la reproduction manuelle des huit fichiers. Avec un workspace Node, `npm run release:prepare -- X.Y.Z` reste disponible ; la reproduction manuelle/API des surfaces n'est qu'un secours après panne prouvée du contrôleur #102.
 5. Attendre uniquement les checks requis de cette PR. Ne pas rejouer localement TypeScript, les tests complets, Gradle, les smokes ou l'audit déjà garantis par le workflow de release, sauf échec explicite qui exige un diagnostic ciblé.
 6. Après CI verte, fusionner selon les protections du dépôt. Vérifier ensuite que `main` porte exactement la prochaine version attendue et qu'aucune release/tag identique n'existe.
-7. Une demande explicite de publication autorise l'agent à déclencher lui-même `Validate & Release SeenIt` sur `main` avec `release_apk=true`. **Depuis une conversation disposant uniquement du connecteur GitHub, le chemin natif prioritaire est de publier sur l'issue de contrôle #102 la commande exacte `/release-apk`, ou `/release-apk android12_smoke=true` lorsqu'un smoke Android 12 est requis.** Le workflow `SeenIt Release Control` vérifie l'auteur propriétaire, l'issue, `main`, le SHA, la version attendue, l'immuabilité, l'absence de run identique actif et les options de smoke, puis appelle nativement `workflow_dispatch` avec le `GITHUB_TOKEN` du runner. Ce mécanisme ne dépend ni de `gh`, ni d'un token shell, ni d'un navigateur authentifié. Les outils directs de `workflow_dispatch`, `release:dispatch` et le navigateur restent des secours historiques si disponibles ; ils ne sont plus requis pour l'autonomie cross-conversation. **Le connecteur GitHub et ce contrôleur sont suffisants : ne cherchez ni sur le Web ni via des plugins tiers un autre mécanisme de déclenchement.**
+7. Une demande explicite de publication autorise l'agent à déclencher lui-même `Validate & Release SeenIt` sur `main` avec `release_apk=true`. **Depuis une conversation disposant uniquement du connecteur GitHub, le chemin natif prioritaire est de publier sur l'issue de contrôle #102 la commande exacte `/release-apk`, ou `/release-apk android12_smoke=true` lorsqu'un smoke Android 12 est requis.** Le workflow `SeenIt Release Control` vérifie l'auteur propriétaire, l'issue, `main`, le SHA, la version attendue, l'immuabilité, l'absence de run identique actif et les options de smoke, puis appelle nativement le `workflow_dispatch` avec le `GITHUB_TOKEN` du runner. Ce mécanisme ne dépend ni de `gh`, ni d'un token shell, ni d'un navigateur authentifié. Les outils directs de `workflow_dispatch`, `release:dispatch` et le navigateur restent des secours historiques si disponibles ; ils ne sont plus requis pour l'autonomie cross-conversation. **Le connecteur GitHub et ce contrôleur sont suffisants : ne cherchez ni sur le Web ni via des plugins tiers un autre mécanisme de déclenchement.**
 8. Avant tout dispatch, vérifier qu'aucun run de release portant le même SHA/version n'est déjà actif. Le contrôleur natif sérialise les commandes et recherche le nouveau run pendant au plus 30 secondes sans redéclenchement aveugle. Dès que ce run précis est identifié, publier son lien et **rendre la main par défaut** : la CI termine de façon autonome et la notification Android annonce la disponibilité. Le workflow post-release publie ensuite sur #102 un **checkpoint final idempotent** avec version, SHA, run, APK/digest, smoke Android 36 et résultat de notification ; lors d'une reprise, lire ce checkpoint avant toute reconstruction manuelle de l'état. Ne pas conserver la conversation active avec des polls rapprochés. Suivre synchroniquement jusqu'à l'APK signé, son `.sha256` et la release immuable seulement si l'utilisateur demande explicitement d'attendre le résultat ; dans ce cas, espacer les lectures d'état et diagnostiquer tout échec dans le même chantier. Reporter dans tous les cas la mesure « demande → workflow ».
 
 Ce fast path est une exception **bornée à l'orchestration d'une release déjà demandée**. Il ne relit pas l'historique fonctionnel complet, ne lance pas d'audit global et ne réécrit pas la référence fonctionnelle. Il n'affaiblit jamais `SEENIT-APK-001..005`, le smoke Android 36, la signature `seenit`, le garde d'immuabilité ou les protections de branche. Si l'état GitHub révèle une incohérence de code, de version, de signature, de SPEC ou une candidate non basée sur `main`, sortir du fast path et reprendre le préflight général ciblé sur ce blocage.
@@ -93,9 +93,11 @@ ou de choisir un chantier, l'agent applique donc un **bail GitHub partagé** :
    non actionnables tant qu'un événement explicite de déblocage n'est pas observé.
 3. Avant toute écriture, publier dans l'issue un commentaire contenant le marqueur, `Statut: ACTIVE`,
    un identifiant stable de conversation/tâche, le périmètre (issue, PR, branche et surfaces prévues),
-   le SHA de tête vérifié, une expiration à **+90 minutes** et la prochaine action exacte. Relire ensuite
-   les commentaires : si plusieurs acquisitions concurrentes couvrent le même périmètre, le plus petit
-   identifiant de commentaire GitHub gagne et les autres agents se retirent sans écrire au chantier.
+   le SHA de tête vérifié, une expiration à **+90 minutes** et la prochaine action exacte. Pour une session
+   Codex, ajouter `Origine: CODEX` ; les anciens identifiants `Conversation: codex-*` et
+   `Conversation: codex-interactive-*` restent reconnus comme origine Codex. Relire ensuite les commentaires :
+   si plusieurs acquisitions concurrentes couvrent le même périmètre, le plus petit identifiant de
+   commentaire GitHub gagne et les autres agents se retirent sans écrire au chantier.
 4. Rafraîchir le bail aux jalons significatifs. Avant chaque push, merge, fermeture d'issue ou commande
    de release, relire le bail et la tête distante ; si le propriétaire ou le SHA attendu a changé,
    interrompre l'écriture et publier un checkpoint de conflit. Le force-push est interdit.
@@ -103,10 +105,23 @@ ou de choisir un chantier, l'agent applique donc un **bail GitHub partagé** :
    checkpoint obligatoire de la section 0.3. Un bail expiré n'autorise une reprise qu'après relecture de
    l'état distant ; en l'absence de statut final, toute activité incompatible datant de moins de 90 minutes
    est traitée comme un chantier potentiellement actif.
+6. **Exception Codex — quota.** Si une session Codex doit s'arrêter uniquement parce que son quota n'est
+   plus disponible, cet arrêt **n'est pas un `HANDOFF_READY`** et l'expiration nominale du bail à 90 minutes
+   ne transfère jamais le chantier à une tâche planifiée ChatGPT ni à une autre conversation. Codex conserve
+   `Statut: ACTIVE`, publie un checkpoint avec la raison « quota Codex », la prochaine action exacte et, si
+   elle est connue, l'heure de reset. Si l'environnement Codex expose une fonction Automation/Schedule,
+   Codex programme **avant de rendre la main** sa propre reprise dans le **même thread** : une reprise unique
+   juste après l'heure de reset connue, sinon une reprise périodique au plus une fois par heure jusqu'au
+   retour du quota. Si cette fonction n'est pas disponible, le checkpoint indique qu'une reprise manuelle
+   Codex est requise sans libérer le périmètre. Seul un checkpoint explicite `HANDOFF_READY` ou une
+   instruction utilisateur explicite de transfert autorise une autre tâche à reprendre ; `WAITING` reste
+   non actionnable et `DONE` reste terminal.
 
 Le bail sérialise uniquement les périmètres qui se recouvrent. Deux conversations peuvent travailler en
 parallèle sur des issues et surfaces indépendantes avec des branches ou worktrees distincts. Une tâche
-planifiée ne doit jamais « aider » un chantier déjà loué par une session interactive.
+planifiée ne doit jamais « aider » un chantier déjà loué par une session interactive. Pour un chantier
+Codex interrompu par quota, cette exclusion reste valable même après merge pendant les contrôles post-merge
+ou la livraison encore possédés par Codex.
 
 ## 0. Avant toute analyse, proposition ou modification
 
