@@ -50,6 +50,10 @@ export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveT
     }
 
     if (resolution.action === 'active-double') {
+      if (tabId === 'downloads') {
+        window.dispatchEvent(new CustomEvent('downloads-scroll-top'));
+        return;
+      }
       onActiveTabDoubleClick?.();
       return;
     }

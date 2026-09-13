@@ -19,6 +19,6 @@ test('SEENIT-UX-004 les toasts longs reviennent à la ligne sans troncature sur 
 test('SEENIT-UX-004 le toast reste au-dessus de la navigation et de la safe area', () => {
   assert.match(
     toastSource,
-    /bottom-\[calc\(5rem\+env\(safe-area-inset-bottom,0px\)\)\]/
+    /bottom-\[calc\(5\.5rem\+env\(safe-area-inset-bottom,0px\)\)\]/
   );
 });
