@@ -912,6 +912,10 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   une zone sensible est touchée : sécurité/authentification, données/Firestore, identité média/Plex,
   identité APK/Firebase Android ou configuration native critique. Une correction locale ordinaire qui
   n'introduit aucune nouvelle règle durable ne crée pas artificiellement une exigence administrative.
+  Une extraction structurelle d'un grand module conserve ses points d'entrée publics et ses frontières
+  de chargement paresseux, interdit aux modules internes de réimporter leur façade et borne chaque
+  module à 1 000 lignes. Une exception supérieure reste admise uniquement lorsqu'elle est documentée,
+  justifiée par un invariant métier ou transactionnel et plafonnée par un TNR dédié.
 - **SEENIT-QUALITY-002** — Tout audit est conservé comme rapport daté et indexé, avec version,
   commit, périmètre et preuves. Chaque constat ouvert renvoie vers une issue GitHub portant une
   priorité, ou vers une décision de risque accepté justifiée ; aucun point ne reste uniquement dans

@@ -1282,6 +1282,14 @@
         {
           "file": "tests/developmentGovernance.test.ts",
           "contains": "SEENIT-QUALITY-001 les règles imposent SPEC, tests et validation APK à chaque évolution"
+        },
+        {
+          "file": "tests/largeModuleCharacterization.test.ts",
+          "contains": "SEENIT-QUALITY-001 / #14 borne les modules extraits et documente l’exception Plex"
+        },
+        {
+          "file": "tests/largeModuleCharacterization.test.ts",
+          "contains": "SEENIT-QUALITY-001 / #14 interdit aux modules extraits de réimporter leurs façades"
         }
       ]
     },

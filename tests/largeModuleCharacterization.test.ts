@@ -83,7 +83,7 @@ test('issue #14 conserve les points d’entrée React publics', () => {
   assert.match(read('src/screens/WatchListScreen.tsx'), /export function WatchListScreen\b/);
 });
 
-test('issue #14 borne les modules extraits et documente l’exception Plex', () => {
+test('SEENIT-QUALITY-001 / #14 borne les modules extraits et documente l’exception Plex', () => {
   const boundedModules = [
     'src/screens/ShowDetailScreen.tsx',
     'src/screens/ShowDetailScreenCore.tsx',
@@ -118,7 +118,7 @@ test('issue #14 borne les modules extraits et documente l’exception Plex', () 
   );
 });
 
-test('issue #14 interdit aux modules extraits de réimporter leurs façades', () => {
+test('SEENIT-QUALITY-001 / #14 interdit aux modules extraits de réimporter leurs façades', () => {
   for (const path of [
     'src/services/sonarrRadarrTransport.ts',
     'src/services/sonarrRadarrSearch.ts',
