@@ -106,6 +106,7 @@ export const UpToDateShowCard = React.memo(function UpToDateShowCard({ show, onS
     originalTitle: (show as any).originalTitle || (show as any).original_title,
     year: show.firstAirDate?.slice(0, 4),
     hasKnownProvider: Boolean(show.networks?.length),
+    retainInLibraryCache: true,
   });
 
   if (!categoryInfo) return null;

@@ -7,6 +7,7 @@ import {
 } from '../features/providers/watchProviderRequestPolicy';
 import {
   readWatchProviderCache,
+  retainWatchProviderCacheEntry,
   writeWatchProviderCache,
 } from '../features/providers/watchProviderCache';
 import {
@@ -24,6 +25,7 @@ interface PassiveWatchProviderParams {
   originalTitle?: string;
   year?: number | string;
   hasKnownProvider?: boolean;
+  retainInLibraryCache?: boolean;
   onEnrich?: () => void;
 }
 
@@ -71,6 +73,7 @@ export function usePassiveWatchProvider({
   tmdbId,
   mediaType,
   hasKnownProvider = false,
+  retainInLibraryCache = false,
   onEnrich,
 }: PassiveWatchProviderParams) {
   const cardRef = useRef<HTMLDivElement>(null);
@@ -99,6 +102,11 @@ export function usePassiveWatchProvider({
     ? providerState
     : renderProviderState;
   const isProviderLoading = loadingState.key === providerKey && loadingState.loading;
+
+  useEffect(() => {
+    if (!validTmdbId || hasKnownProvider || !retainInLibraryCache) return;
+    retainWatchProviderCacheEntry(numericTmdbId, mediaType);
+  }, [hasKnownProvider, mediaType, numericTmdbId, retainInLibraryCache, validTmdbId]);
 
   useEffect(() => {
     const node = cardRef.current;
@@ -204,7 +212,9 @@ export function usePassiveWatchProvider({
 
         // Le payload TMDB public est stable et peut survivre aux démontages de cartes.
         // La disponibilité Plex reste dans son cache UID séparé et n'est jamais persistée ici.
-        writeWatchProviderCache(numericTmdbId, mediaType, res.value);
+        writeWatchProviderCache(numericTmdbId, mediaType, res.value, {
+          retention: retainInLibraryCache ? 'library' : 'discovery',
+        });
         applyAuthoritativeTmdbPayload(res.value);
       }).catch(() => {
         finishLoading();
@@ -233,7 +243,7 @@ export function usePassiveWatchProvider({
       stopObserving();
       cancelScheduledEnrichment();
     };
-  }, [cachedPlexInfo, hasKnownProvider, mediaType, numericTmdbId, onEnrich, plexMediaKey, providerKey, validTmdbId]);
+  }, [cachedPlexInfo, hasKnownProvider, mediaType, numericTmdbId, onEnrich, plexMediaKey, providerKey, retainInLibraryCache, validTmdbId]);
 
   return {
     cardRef,

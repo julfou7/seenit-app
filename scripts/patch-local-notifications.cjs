@@ -19,15 +19,20 @@ const pluginDir = path.join(
 
 const localNotificationPath = path.join(pluginDir, 'LocalNotification.kt');
 const localNotificationManagerPath = path.join(pluginDir, 'LocalNotificationManager.kt');
+const timedNotificationPublisherPath = path.join(pluginDir, 'TimedNotificationPublisher.kt');
 const LEGACY_FILE_PATCH_MARKER = 'SEENIT_LOCAL_NOTIFICATION_FILE_ICON_PATCH';
 const PATCH_MARKER = 'SEENIT_LOCAL_NOTIFICATION_PRIVATE_DATA_V2_PATCH';
 const BIG_PICTURE_MARKER = 'SEENIT_LOCAL_NOTIFICATION_BOUNDED_BIG_PICTURE_PATCH';
+const DELIVERY_MEDIA_MARKER = 'SEENIT_LOCAL_NOTIFICATION_DELIVERY_MEDIA_V3_PATCH';
 
 if (!fs.existsSync(localNotificationPath)) {
   throw new Error(`LocalNotifications Android source not found: ${localNotificationPath}`);
 }
 if (!fs.existsSync(localNotificationManagerPath)) {
   throw new Error(`LocalNotifications Android manager source not found: ${localNotificationManagerPath}`);
+}
+if (!fs.existsSync(timedNotificationPublisherPath)) {
+  throw new Error(`LocalNotifications Android publisher source not found: ${timedNotificationPublisherPath}`);
 }
 
 let localNotification = fs.readFileSync(localNotificationPath, 'utf8');
@@ -169,8 +174,7 @@ const patchedResolver = `private fun resolveSeenItPrivateFile(context: Context, 
     }
 
     // ${BIG_PICTURE_MARKER}: only the dedicated app-private attachment is accepted.
-    // The file is size-checked and sampled before NotificationCompat sees it so
-    // scheduled notifications stay comfortably below Binder transaction limits.
+    // The file is size-checked and sampled only when the notification is rendered.
     fun resolveSeenItBigPicture(context: Context): Bitmap? {
         val value = attachments?.firstOrNull { it.id == "seenit-media" }?.url ?: return null
         return try {
@@ -323,12 +327,108 @@ if (!manager.includes(BIG_PICTURE_MARKER)) {
   manager = manager.replace(stockStyleBlock, boundedStyleBlock);
 }
 
+if (!manager.includes(DELIVERY_MEDIA_MARKER)) {
+  const eagerBigPicture = 'val seenItBigPicture = localNotification.resolveSeenItBigPicture(context)';
+  const deferredBigPicture = `// ${DELIVERY_MEDIA_MARKER}: a future alarm transports no bitmap.
+        val shouldResolveSeenItMediaNow = !localNotification.isScheduled() || localNotification.isTriggered()
+        val seenItBigPicture = if (shouldResolveSeenItMediaNow) {
+            localNotification.resolveSeenItBigPicture(context)
+        } else {
+            null
+        }`;
+  const eagerLargeIcon = 'mBuilder.setLargeIcon(localNotification.resolveLargeIcon(context))';
+  const deferredLargeIcon = `mBuilder.setLargeIcon(
+            if (shouldResolveSeenItMediaNow) localNotification.resolveLargeIcon(context) else null
+        )`;
+
+  if (!manager.includes(eagerBigPicture) || !manager.includes(eagerLargeIcon)) {
+    throw new Error('Unsupported LocalNotificationManager media calls; refusing partial delivery-time patch.');
+  }
+  manager = manager
+    .replace(eagerBigPicture, deferredBigPicture)
+    .replace(eagerLargeIcon, deferredLargeIcon);
+}
+
 if (manager.includes('android.util.Base64.decode') || manager.includes('data:image/')) {
   throw new Error('Unsafe Base64 notification image code remains in LocalNotificationManager.kt.');
 }
-if (!manager.includes(BIG_PICTURE_MARKER) || !manager.includes('resolveSeenItBigPicture(context)')) {
-  throw new Error('SeenIt bounded private BigPicture V2 patch is incomplete after patching.');
+if (!manager.includes(BIG_PICTURE_MARKER) || !manager.includes(DELIVERY_MEDIA_MARKER)) {
+  throw new Error('SeenIt bounded delivery-time media patch is incomplete after patching.');
 }
 
 fs.writeFileSync(localNotificationManagerPath, manager, 'utf8');
-console.log('✅ Patched LocalNotificationManager.kt for bounded app-private BigPictureStyle.');
+console.log('✅ Patched LocalNotificationManager.kt to keep future alarms bitmap-free.');
+
+let publisher = fs.readFileSync(timedNotificationPublisherPath, 'utf8');
+
+if (!publisher.includes(DELIVERY_MEDIA_MARKER)) {
+  const loggerImport = 'import com.getcapacitor.Logger';
+  const hydratedImport = `import androidx.core.app.NotificationCompat
+import com.getcapacitor.Logger`;
+  const stockDeliveryBlock = `notification.\`when\` = System.currentTimeMillis()
+
+        val id = intent.getIntExtra(LocalNotificationManager.NOTIFICATION_INTENT_KEY, Int.MIN_VALUE)
+        if (id == Int.MIN_VALUE) {
+            Logger.error(Logger.tags("LN"), "No valid id supplied", null)
+        }
+        val storage = NotificationStorage(context)
+        val notificationJson = storage.getSavedNotificationAsJSObject(id.toString())
+        LocalNotificationsPlugin.fireReceived(notificationJson)
+        notificationManager.notify(id, notification)`;
+  const hydratedDeliveryBlock = `val id = intent.getIntExtra(LocalNotificationManager.NOTIFICATION_INTENT_KEY, Int.MIN_VALUE)
+        if (id == Int.MIN_VALUE) {
+            Logger.error(Logger.tags("LN"), "No valid id supplied", null)
+        }
+        val storage = NotificationStorage(context)
+        val notificationJson = storage.getSavedNotificationAsJSObject(id.toString())
+
+        // ${DELIVERY_MEDIA_MARKER}: resolve app-private images only after AlarmManager
+        // delivered its bitmap-free PendingIntent.
+        val deliveredNotification = try {
+            val storedRequest = notificationJson?.let { LocalNotification.buildNotificationFromJSObject(it) }
+            if (storedRequest == null) {
+                notification
+            } else {
+                val builder = NotificationCompat.Builder.recoverBuilder(context, notification)
+                builder.setLargeIcon(storedRequest.resolveLargeIcon(context))
+                val bigPicture = storedRequest.resolveSeenItBigPicture(context)
+                if (bigPicture != null) {
+                    builder.setStyle(
+                        NotificationCompat.BigPictureStyle()
+                            .bigPicture(bigPicture)
+                            .setSummaryText(storedRequest.summaryText)
+                    )
+                } else if (storedRequest.largeBody != null) {
+                    builder.setStyle(
+                        NotificationCompat.BigTextStyle()
+                            .bigText(storedRequest.largeBody)
+                            .setSummaryText(storedRequest.summaryText)
+                    )
+                }
+                builder.build()
+            }
+        } catch (error: Exception) {
+            Logger.warn(Logger.tags("LN"), "Unable to hydrate SeenIt notification media at delivery: " + error.message)
+            notification
+        }
+
+        deliveredNotification.\`when\` = System.currentTimeMillis()
+        LocalNotificationsPlugin.fireReceived(notificationJson)
+        notificationManager.notify(id, deliveredNotification)`;
+
+  if (!publisher.includes(loggerImport) || !publisher.includes(stockDeliveryBlock)) {
+    throw new Error('Unsupported TimedNotificationPublisher delivery block; refusing partial media patch.');
+  }
+  publisher = publisher
+    .replace(loggerImport, hydratedImport)
+    .replace(stockDeliveryBlock, hydratedDeliveryBlock);
+}
+
+if (!publisher.includes(DELIVERY_MEDIA_MARKER)
+  || !publisher.includes('NotificationCompat.Builder.recoverBuilder(context, notification)')
+  || !publisher.includes('notificationManager.notify(id, deliveredNotification)')) {
+  throw new Error('SeenIt delivery-time notification media patch is incomplete after patching.');
+}
+
+fs.writeFileSync(timedNotificationPublisherPath, publisher, 'utf8');
+console.log('✅ Patched TimedNotificationPublisher.kt to hydrate SeenIt media at delivery.');

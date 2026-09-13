@@ -125,8 +125,8 @@ ces boutons sont des actions de récupération explicites.
 ## 4. Navigation globale
 
 Les gestes et leur portée exacte sont inventoriés dans la [référence UX](./ux-reference.md).
-Le reset de navigation actuel présente des écarts (#178) : reconnaissance après changement d'onglet
-et remontée globale des conteneurs, y compris cachés. Ne pas les prendre comme conventions à reproduire.
+Le contrat de navigation est `SEENIT-UX-005` : la reconnaissance ne partage aucun tap avec un changement
+d'onglet et chaque reset reste strictement limité à l'écran actif.
 
 La barre basse possède trois destinations toujours visibles, dans cet ordre :
 
@@ -146,8 +146,10 @@ largeur fixe. Les glyphes de navigation sont rendus à 28 px, les libellés mobi
 contrôle conserve une cible tactile d'au moins 44 × 44 CSS px ainsi que la safe area basse.
 
 L'onglet actif et ses glyphes utilisent l'or SeenIt et son bouton expose `aria-current="page"`. Un appui
-sur l'onglet actif ferme le niveau courant ; un double appui réinitialise/ramène le contenu en haut lorsque
-l'écran l'implémente. Les écarts de reconnaissance et de portée du reset restent suivis dans #178.
+sur l'onglet actif ferme exactement le niveau courant. Un double appui ramène la page en haut, ferme ses
+panneaux et restaure sa sous-vue, ses recherches, filtres et expansions à leurs valeurs initiales. Explorer,
+À Voir, Télécharger et Profil affichent chacun un toast de confirmation propre ; aucune donnée métier
+n'est modifiée.
 
 L'ouverture d'une fiche est un niveau de navigation au-dessus de l'onglet courant. Le Retour Android
 ferme dans l'ordre : dialogue ou modal, fiche, historique interne, retour à À Voir, puis application.
@@ -222,6 +224,10 @@ visible sont matérialisées. Les rangées horizontales recyclent les cartes hor
 bornée sans masquer les médias restants ; les grilles « Voir tout » progressent par lots bornés.
 Statistiques et Ma Liste conservent leur état après leur première ouverture, tandis que leurs traitements
 sont suspendus lorsqu'elles sont cachées.
+
+Les diffuseurs des médias suivis occupent un compartiment persistant dédié et borné. Les navigations
+Explorer et le recyclage des rangées ne peuvent donc pas chasser les résultats positifs ou négatifs déjà
+obtenus pour Ma Liste ; seule l'expiration normale permet leur actualisation silencieuse.
 
 Le bouton Réglages ouvre un écran superposé refermable par Retour ou swipe depuis le bord gauche.
 Le bouton Partager ne doit promettre qu'un lien réellement réouvrable ; l'écart actuel est suivi par
@@ -520,6 +526,9 @@ explicite, aucun rappel film n'est programmé et aucune estimation J+120 n'est u
   l'APK ; l'APK peut exposer « Marquer comme vu ».
 - Les clés locales de programmation évitent le doublon sur une même installation et leur schéma peut être
   versionné pour remplacer proprement une alarme persistée quand son payload doit évoluer.
+- Le receiver Android hydrate le grand pictogramme et le BigPicture depuis le fichier privé borné au
+  moment exact de la livraison. L'alarme planifiée ne transporte jamais le bitmap ; le fallback texte reste
+  valide si le fichier a disparu ou ne peut pas être décodé.
 
 Après qu'une release APK officielle a été publiée et vérifiée, SeenIt peut prévenir les installations
 Android autorisées du compte :
@@ -556,7 +565,7 @@ Les réglages généraux contiennent :
   URL ni clé C411/Sonarr/Radarr/qBittorrent n'est exposée dans les Réglages généraux ;
 - import TV Time CSV avec progression, correction des échecs et reprise ;
 - actualisation forcée des détails TMDB ;
-- version, changelog, recherche et installation d'une mise à jour APK ;
+- version, historique complet des changelogs officiels, recherche et installation d'une mise à jour APK ;
 - logs techniques filtrables, copiables/exportables et effaçables.
 
 Le changelog présenté dans la fenêtre de mise à jour résume les effets visibles sous un titre unique
@@ -566,6 +575,10 @@ conserve l'affichage compact habituel. Si cet historique n'est pas récupérable
 restent disponibles et l'installation n'est pas bloquée. Les textes emploient les mots compris dans
 l'interface et ne montrent pas les identifiants Plex, UID, noms de cache, fichiers, tests ou détails
 de CI réservés aux preuves techniques.
+
+La fiche Version de « À propos & Avancé » charge indépendamment toutes les releases officielles
+disponibles, de la plus récente à la plus ancienne. Cette consultation reste paginée et bornée ; une panne
+partielle conserve l'historique officiel déjà obtenu ou la dernière version connue.
 
 Une fois l'APK téléchargée et vérifiée, SeenIt affiche « Installeur lancé » pendant que le Package
 Installer Android prend le relais. Le dialogue Play Protect des applications distribuées hors Play

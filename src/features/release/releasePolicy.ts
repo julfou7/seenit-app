@@ -149,6 +149,19 @@ export function selectSeenItReleaseHistory(
   );
 }
 
+export function selectSeenItCompleteReleaseHistory(payloads: unknown[]): SeenItReleaseNotesEntry[] {
+  const releasesByVersion = new Map<string, SeenItReleaseNotesEntry>();
+  for (const payload of payloads) {
+    const release = parseSeenItRelease(payload);
+    if (!release) continue;
+    releasesByVersion.set(release.version, toReleaseNotesEntry(release));
+  }
+
+  return [...releasesByVersion.values()].sort((left, right) =>
+    compareSemanticVersions(right.version, left.version)
+  );
+}
+
 export async function resolveSeenItReleaseHistory(
   installedVersion: string,
   targetRelease: SeenItReleaseInfo,
@@ -188,6 +201,32 @@ export async function resolveSeenItReleaseHistory(
   } catch {
     return fallback;
   }
+}
+
+export async function resolveSeenItCompleteReleaseHistory(
+  fetchImpl: typeof fetch = fetch,
+  maxPages = 10
+): Promise<SeenItReleaseNotesEntry[]> {
+  const collected: unknown[] = [];
+
+  try {
+    for (let page = 1; page <= maxPages; page += 1) {
+      const response = await fetchImpl(`${SEENIT_GITHUB_RELEASES_API}?per_page=100&page=${page}`, {
+        headers: { Accept: 'application/vnd.github.v3+json' }
+      });
+      const contentType = response.headers.get('content-type') || '';
+      if (!response.ok || !contentType.includes('application/json')) break;
+
+      const payload = await response.json();
+      if (!Array.isArray(payload)) break;
+      collected.push(...payload);
+      if (payload.length < 100) break;
+    }
+  } catch {
+    // L'historique déjà validé reste consultable si une page tardive échoue.
+  }
+
+  return selectSeenItCompleteReleaseHistory(collected);
 }
 
 export interface UpdateMetadataEndpoint {

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef } from 'react';
+import { lazy, Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { isDownloadFeatureEnabled } from '../features/downloads/downloadFeatureVisibility';
@@ -11,26 +11,11 @@ const DownloadsScreenCore = lazy(() => import('./DownloadsScreenCore').then(modu
 
 export function DownloadsScreen(props: Props) {
   const downloadsEnabled = useDownloadConfigStore(isDownloadFeatureEnabled);
-  const screenRootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!downloadsEnabled) return;
-
-    const handleScrollToTop = () => {
-      const scrollRoot = screenRootRef.current?.querySelector<HTMLElement>('.overflow-y-auto');
-      if (scrollRoot) {
-        scrollRoot.scrollTop = 0;
-      }
-    };
-
-    window.addEventListener('downloads-scroll-top', handleScrollToTop);
-    return () => window.removeEventListener('downloads-scroll-top', handleScrollToTop);
-  }, [downloadsEnabled]);
 
   if (!downloadsEnabled) return null;
 
   return (
-    <div ref={screenRootRef} data-downloads-screen-root className="flex-1 min-h-0 flex flex-col">
+    <div data-downloads-screen-root className="flex-1 min-h-0 flex flex-col">
       <Suspense fallback={(
         <div className="flex-1 min-h-0 flex items-center justify-center bg-premium-ambient text-zinc-400">
           <Loader2 size={24} className="animate-spin" aria-label="Chargement des téléchargements" />
