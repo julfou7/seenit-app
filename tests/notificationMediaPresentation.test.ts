@@ -7,6 +7,7 @@ const reminderSource = readSource('src/hooks/useRemindersNotifier.ts');
 const notificationMediaSource = readSource('src/features/notifications/notificationMedia.ts');
 const mediaReminderSource = readSource('src/features/notifications/mediaReminderNotification.ts');
 const nativePatchSource = readSource('scripts/patch-local-notifications.cjs');
+const androidVariablesSource = readSource('android/variables.gradle');
 
 test('SEENIT-NOTIFICATION-002 affiche un visuel média et un seul emoji par événement', () => {
   assert.match(reminderSource, /https:\/\/image\.tmdb\.org\/t\/p\/w154/,
@@ -104,9 +105,26 @@ test('SEENIT-NOTIFICATION-002 hydrate le bitmap seulement à la livraison Androi
   assert.match(nativePatchSource, /SEENIT_LOCAL_NOTIFICATION_DELIVERY_MEDIA_V3_PATCH/);
   assert.match(nativePatchSource, /shouldResolveSeenItMediaNow/);
   assert.match(nativePatchSource, /if \(shouldResolveSeenItMediaNow\) localNotification\.resolveLargeIcon\(context\) else null/);
-  assert.match(nativePatchSource, /NotificationCompat\.Builder\.recoverBuilder\(context, notification\)/);
-  assert.match(nativePatchSource, /notificationJson\?\.let \{ LocalNotification\.buildNotificationFromJSObject\(it\) \}/);
-  assert.match(nativePatchSource, /notificationManager\.notify\(id, deliveredNotification\)/);
+  assert.match(androidVariablesSource, /minSdkVersion\s*=\s*24/,
+    'Notification.Builder.recoverBuilder exige API 24 et le contrat Android SeenIt doit le garantir');
+
+  const hydratedBlockStart = nativePatchSource.indexOf('const hydratedDeliveryBlock =');
+  const hydratedBlockEnd = nativePatchSource.indexOf('if (!publisher.includes(stockDeliveryBlock))', hydratedBlockStart);
+  assert.ok(hydratedBlockStart >= 0 && hydratedBlockEnd > hydratedBlockStart,
+    'le bloc de livraison hydratée doit rester identifiable dans le patch natif');
+  const hydratedDeliveryBlock = nativePatchSource.slice(hydratedBlockStart, hydratedBlockEnd);
+  assert.match(hydratedDeliveryBlock, /android\.app\.Notification\.Builder\.recoverBuilder\(context, notification\)/,
+    'la reconstruction générée doit utiliser l’API framework disponible à partir du minSdk SeenIt');
+  assert.doesNotMatch(hydratedDeliveryBlock, /NotificationCompat\.Builder\.recoverBuilder\(context, notification\)/,
+    'le code Kotlin généré ne doit jamais utiliser le recoverBuilder inexistant d’AndroidX');
+  assert.match(hydratedDeliveryBlock, /android\.app\.Notification\.BigPictureStyle\(\)/,
+    'le builder framework doit recevoir un style framework compatible');
+  assert.match(hydratedDeliveryBlock, /android\.app\.Notification\.BigTextStyle\(\)/,
+    'le fallback texte doit rester compatible avec le builder framework');
+  assert.match(nativePatchSource, /publisher\.includes\('NotificationCompat\.Builder\.recoverBuilder\(context, notification\)'\)/,
+    'le patch doit refuser explicitement toute réintroduction du recoverBuilder AndroidX');
+  assert.match(hydratedDeliveryBlock, /notificationJson\?\.let \{ LocalNotification\.buildNotificationFromJSObject\(it\) \}/);
+  assert.match(hydratedDeliveryBlock, /notificationManager\.notify\(id, deliveredNotification\)/);
   assert.match(reminderSource, /REMINDER_SCHEDULE_SCHEMA = 'v5'/,
     'les alarmes existantes doivent être recréées sans bitmap dans leur PendingIntent');
 });

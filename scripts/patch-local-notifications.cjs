@@ -362,9 +362,6 @@ console.log('✅ Patched LocalNotificationManager.kt to keep future alarms bitma
 let publisher = fs.readFileSync(timedNotificationPublisherPath, 'utf8');
 
 if (!publisher.includes(DELIVERY_MEDIA_MARKER)) {
-  const loggerImport = 'import com.getcapacitor.Logger';
-  const hydratedImport = `import androidx.core.app.NotificationCompat
-import com.getcapacitor.Logger`;
   const stockDeliveryBlock = `notification.\`when\` = System.currentTimeMillis()
 
         val id = intent.getIntExtra(LocalNotificationManager.NOTIFICATION_INTENT_KEY, Int.MIN_VALUE)
@@ -383,24 +380,24 @@ import com.getcapacitor.Logger`;
         val notificationJson = storage.getSavedNotificationAsJSObject(id.toString())
 
         // ${DELIVERY_MEDIA_MARKER}: resolve app-private images only after AlarmManager
-        // delivered its bitmap-free PendingIntent.
+        // delivered its bitmap-free PendingIntent. minSdk=24 guarantees recoverBuilder.
         val deliveredNotification = try {
             val storedRequest = notificationJson?.let { LocalNotification.buildNotificationFromJSObject(it) }
             if (storedRequest == null) {
                 notification
             } else {
-                val builder = NotificationCompat.Builder.recoverBuilder(context, notification)
+                val builder = android.app.Notification.Builder.recoverBuilder(context, notification)
                 builder.setLargeIcon(storedRequest.resolveLargeIcon(context))
                 val bigPicture = storedRequest.resolveSeenItBigPicture(context)
                 if (bigPicture != null) {
                     builder.setStyle(
-                        NotificationCompat.BigPictureStyle()
+                        android.app.Notification.BigPictureStyle()
                             .bigPicture(bigPicture)
                             .setSummaryText(storedRequest.summaryText)
                     )
                 } else if (storedRequest.largeBody != null) {
                     builder.setStyle(
-                        NotificationCompat.BigTextStyle()
+                        android.app.Notification.BigTextStyle()
                             .bigText(storedRequest.largeBody)
                             .setSummaryText(storedRequest.summaryText)
                     )
@@ -416,16 +413,15 @@ import com.getcapacitor.Logger`;
         LocalNotificationsPlugin.fireReceived(notificationJson)
         notificationManager.notify(id, deliveredNotification)`;
 
-  if (!publisher.includes(loggerImport) || !publisher.includes(stockDeliveryBlock)) {
+  if (!publisher.includes(stockDeliveryBlock)) {
     throw new Error('Unsupported TimedNotificationPublisher delivery block; refusing partial media patch.');
   }
-  publisher = publisher
-    .replace(loggerImport, hydratedImport)
-    .replace(stockDeliveryBlock, hydratedDeliveryBlock);
+  publisher = publisher.replace(stockDeliveryBlock, hydratedDeliveryBlock);
 }
 
 if (!publisher.includes(DELIVERY_MEDIA_MARKER)
-  || !publisher.includes('NotificationCompat.Builder.recoverBuilder(context, notification)')
+  || !publisher.includes('android.app.Notification.Builder.recoverBuilder(context, notification)')
+  || publisher.includes('NotificationCompat.Builder.recoverBuilder(context, notification)')
   || !publisher.includes('notificationManager.notify(id, deliveredNotification)')) {
   throw new Error('SeenIt delivery-time notification media patch is incomplete after patching.');
 }
