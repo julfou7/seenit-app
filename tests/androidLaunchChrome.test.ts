@@ -9,17 +9,30 @@ const webSplash = readFileSync('src/components/SplashScreen.tsx', 'utf8');
 const css = readFileSync('src/index.css', 'utf8');
 const indexHtml = readFileSync('index.html', 'utf8');
 const styles = readFileSync('android/app/src/main/res/values/styles.xml', 'utf8');
+const mainActivity = readFileSync('android/app/src/main/java/com/seenit/app/MainActivity.java', 'utf8');
 
 const legacyNativeSplashIcon = 'android/app/src/main/res/drawable/seenit_splash_icon.xml';
 
 test('SEENIT-APK-005 TNR conserve la status bar transparente avec icônes claires', () => {
+  assert.match(capacitorConfig, /SystemBars:\s*\{[\s\S]*?insetsHandling: 'disable',[\s\S]*?style: 'DARK',[\s\S]*?hidden: false/);
+  assert.doesNotMatch(capacitorConfig, /SystemBars:\s*\{[\s\S]*?insetsHandling: 'css'/);
   assert.match(capacitorConfig, /StatusBar:\s*\{[\s\S]*?overlaysWebView: true,[\s\S]*?backgroundColor: '#00000000',[\s\S]*?style: 'DARK'/);
   assert.match(app, /StatusBar\.setStyle\(\{ style: Style\.Dark \}\)/);
   assert.doesNotMatch(app, /StatusBar\.setStyle\(\{ style: Style\.Light \}\)/);
   assert.match(app, /StatusBar\.setOverlaysWebView\(\{ overlay: true \}\)/);
   assert.match(app, /StatusBar\.setBackgroundColor\(\{ color: '#00000000' \}\)/);
+  assert.match(mainActivity, /WindowCompat\.setDecorFitsSystemWindows\(getWindow\(\), false\)/);
+  assert.match(mainActivity, /setAppearanceLightStatusBars\(false\)/);
+  assert.match(mainActivity, /WindowInsetsCompat\.Type\.systemBars\(\)\s*\|\s*WindowInsetsCompat\.Type\.displayCutout\(\)/);
+  assert.match(mainActivity, /ViewCompat\.setOnApplyWindowInsetsListener/);
+  assert.match(mainActivity, /return windowInsets/);
+  for (const edge of ['top', 'right', 'bottom', 'left']) {
+    assert.match(mainActivity, new RegExp(`--seenit-safe-area-${edge}`));
+  }
   assert.match(styles, /android:statusBarColor">@android:color\/transparent/);
-  assert.match(css, /\.pt-safe\s*\{\s*padding-top: env\(safe-area-inset-top, 0px\)/);
+  assert.match(css, /\.pt-safe\s*\{\s*padding-top: var\(--seenit-safe-area-top, env\(safe-area-inset-top, 0px\)\)/);
+  assert.match(css, /\.pb-safe\s*\{\s*padding-bottom: var\(--seenit-safe-area-bottom, env\(safe-area-inset-bottom, 20px\)\)/);
+  assert.match(css, /\.pb-nav\s*\{\s*padding-bottom: calc\(5\.25rem \+ var\(--seenit-safe-area-bottom, env\(safe-area-inset-bottom, 0px\)\)\)/);
   assert.match(indexHtml, /viewport-fit=cover/);
   assert.match(app, /bg-premium-ambient[^"\n]*pt-safe/);
   assert.match(login, /bg-premium-ambient[^"\n]*pt-safe/);
