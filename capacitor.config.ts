@@ -16,6 +16,11 @@ const config: CapacitorConfig = {
     CapacitorHttp: {
       enabled: false
     },
+    SystemBars: {
+      insetsHandling: 'disable',
+      style: 'DARK',
+      hidden: false
+    },
     StatusBar: {
       overlaysWebView: true,
       backgroundColor: '#00000000',
