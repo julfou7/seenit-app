@@ -30,9 +30,9 @@ test('SEENIT-APK-005 TNR conserve la status bar transparente avec icônes claire
     assert.match(mainActivity, new RegExp(`--seenit-safe-area-${edge}`));
   }
   assert.match(styles, /android:statusBarColor">@android:color\/transparent/);
-  assert.match(css, /\.pt-safe\s*\{\s*padding-top: var\(--seenit-safe-area-top, env\(safe-area-inset-top, 0px\)\)/);
-  assert.match(css, /\.pb-safe\s*\{\s*padding-bottom: var\(--seenit-safe-area-bottom, env\(safe-area-inset-bottom, 20px\)\)/);
-  assert.match(css, /\.pb-nav\s*\{\s*padding-bottom: calc\(5\.25rem \+ var\(--seenit-safe-area-bottom, env\(safe-area-inset-bottom, 0px\)\)\)/);
+  assert.match(css, /\.pt-safe\s*\{[\s\S]*?padding-top: var\(--seenit-safe-area-top, env\(safe-area-inset-top, 0px\)\)/);
+  assert.match(css, /\.pb-safe\s*\{[\s\S]*?padding-bottom: var\(--seenit-safe-area-bottom, env\(safe-area-inset-bottom, 20px\)\)/);
+  assert.match(css, /\.pb-nav\s*\{[\s\S]*?padding-bottom: calc\(5\.25rem \+ var\(--seenit-safe-area-bottom, env\(safe-area-inset-bottom, 0px\)\)\)/);
   assert.match(indexHtml, /viewport-fit=cover/);
   assert.match(app, /bg-premium-ambient[^"\n]*pt-safe/);
   assert.match(login, /bg-premium-ambient[^"\n]*pt-safe/);

@@ -12,12 +12,15 @@ html, body {
 
 @layer utilities {
   .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 20px);
     padding-bottom: var(--seenit-safe-area-bottom, env(safe-area-inset-bottom, 20px));
   }
   .pb-nav {
+    padding-bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px));
     padding-bottom: calc(5.25rem + var(--seenit-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
   }
   .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
     padding-top: var(--seenit-safe-area-top, env(safe-area-inset-top, 0px));
   }
   .hide-scrollbar {
@@ -139,7 +142,7 @@ button.min-h-0.flex-1.overflow-hidden.bg-zinc-950 {
     width: 100%;
   }
   to {
-    width: 0;
+    width: 0%;
   }
 }
 
