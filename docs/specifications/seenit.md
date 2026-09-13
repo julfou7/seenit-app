@@ -932,10 +932,19 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   critère dès qu'il est réellement satisfait et remplace les informations devenues obsolètes. Les
   micro-commits intermédiaires n'imposent pas une mise à jour administrative séparée. Avant la première
   écriture, toute conversation interactive ou planifiée acquiert dans l'issue un bail GitHub visible,
-  borné à 90 minutes et couvrant issue, PR, branche et surfaces prévues. Un bail `ACTIVE` concurrent
-  interdit toute écriture, fusion, fermeture ou livraison sur ce périmètre ; l'agent peut seulement choisir
-  un chantier indépendant. Le bail est relu après acquisition et avant chaque opération distante sensible,
-  puis terminé par un checkpoint `HANDOFF_READY`, `WAITING` ou `DONE`.
+  dont l'horizon nominal est de 90 minutes et couvrant issue, PR, branche et surfaces prévues. Un bail
+  `ACTIVE` concurrent interdit toute écriture, fusion, fermeture ou livraison sur ce périmètre ; l'agent
+  peut seulement choisir un chantier indépendant. Le bail est relu après acquisition et avant chaque
+  opération distante sensible, puis terminé par un checkpoint `HANDOFF_READY`, `WAITING` ou `DONE`.
+  **Un arrêt dû uniquement au quota Codex ne constitue jamais un `HANDOFF_READY`** : un chantier marqué
+  `Origine: CODEX` (ou par les identifiants historiques `codex-*` / `codex-interactive-*`) reste réservé
+  à Codex malgré l'expiration nominale du bail. Codex conserve `ACTIVE`, publie le checkpoint « quota Codex »
+  avec la prochaine action et l'heure de reset connue, puis, si son environnement expose une fonction
+  Automation/Schedule, programme avant de rendre la main sa reprise dans le **même thread**, juste après
+  le reset connu ou au plus une fois par heure si l'heure est inconnue. En l'absence de cette capacité,
+  le checkpoint exige une reprise manuelle Codex sans libérer le périmètre. Seul un `HANDOFF_READY` explicite
+  ou un transfert utilisateur explicite autorise une autre tâche à reprendre ; `WAITING` reste non
+  actionnable et `DONE` reste terminal.
 - **SEENIT-QUALITY-005** — Un import, une reconnexion ou une synchronisation AI Studio/GitHub est un
   transport non autoritatif. Avant tout commit depuis un workspace importé, le diff est comparé à la
   branche GitHub source et toute mutation automatique non demandée de Firebase/Firestore, Android,
