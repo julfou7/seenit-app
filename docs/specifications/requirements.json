@@ -986,6 +986,24 @@
       ]
     },
     {
+      "id": "SEENIT-NOTIFICATION-002",
+      "title": "Rappels média illustrés sans bitmap dans le transport Android planifié",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/notificationMediaPresentation.test.ts",
+          "contains": "SEENIT-NOTIFICATION-002 affiche un visuel média et un seul emoji par événement"
+        },
+        {
+          "file": "tests/notificationMediaPresentation.test.ts",
+          "contains": "SEENIT-NOTIFICATION-002 hydrate le bitmap seulement à la livraison Android"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-UPDATE-001",
       "title": "Métadonnées et asset de mise à jour officiels avec fallback APK",
       "targets": [
@@ -1087,6 +1105,24 @@
         {
           "file": "tests/appUpdaterPresentation.test.ts",
           "contains": "SEENIT-UPDATE-004 conserve le succès après ouverture de l’installeur Android"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-UPDATE-005",
+      "title": "Historique complet des releases officielles dans les réglages",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/updateReleasePolicy.test.ts",
+          "contains": "SEENIT-UPDATE-005 trie tout l'historique officiel du plus récent au plus ancien"
+        },
+        {
+          "file": "tests/updateReleasePolicy.test.ts",
+          "contains": "SEENIT-UPDATE-005 conserve les pages d'historique valides en cas de panne tardive"
         }
       ]
     },
@@ -1310,6 +1346,24 @@
         {
           "file": "tests/plexToastSummary.test.ts",
           "contains": "SEENIT-UX-004 le bilan final Plex utilise un bloc multi-lignes avec identité Plex"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-UX-005",
+      "title": "Appui actif de retour et double appui de reset local à chaque page",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/navigationDoubleTap.test.ts",
+          "contains": "SEENIT-UX-005 adresse un reset local distinct à chaque onglet"
+        },
+        {
+          "file": "tests/navigationDoubleTap.test.ts",
+          "contains": "SEENIT-UX-005 Télécharger efface sa recherche sans appel métier"
         }
       ]
     },
@@ -1576,6 +1630,10 @@
         {
           "file": "tests/explorerPerformance.test.ts",
           "contains": "SEENIT-PERF-001 temporise les enrichissements décoratifs négatifs de Ma Liste"
+        },
+        {
+          "file": "tests/watchProviderCache.test.ts",
+          "contains": "SEENIT-PERF-001 protège les diffuseurs suivis des évictions Explorer"
         },
         {
           "file": "tests/activityScrollPerformance.test.ts",

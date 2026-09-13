@@ -36,6 +36,7 @@ export const MovieWatchCard = React.memo(function MovieWatchCard({ show, onShowC
     originalTitle: (show as any).originalTitle || (show as any).original_title,
     year: releaseYear || show.firstAirDate?.slice(0, 4),
     hasKnownProvider: Boolean(show.networks?.length),
+    retainInLibraryCache: true,
   });
 
   const rawPath = show.posterPath || show.backdropPath;

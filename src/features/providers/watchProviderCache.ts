@@ -2,6 +2,7 @@ export const WATCH_PROVIDER_CACHE_STORAGE_KEY = 'seenit_watch_providers_v1';
 export const WATCH_PROVIDER_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 export const WATCH_PROVIDER_CACHE_STALE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 export const WATCH_PROVIDER_CACHE_MAX_ENTRIES = 120;
+export const WATCH_PROVIDER_LIBRARY_CACHE_MAX_ENTRIES = 240;
 export const WATCH_PROVIDER_CACHE_IDLE_TIMEOUT_MS = 2_000;
 
 export interface WatchProviderCacheEntry {
@@ -18,6 +19,7 @@ interface StorageLike {
 type StoredWatchProviderEntry = {
   data: any;
   timestamp: number;
+  retention?: 'library';
 };
 
 type StoredWatchProviderCache = Record<string, StoredWatchProviderEntry>;
@@ -37,6 +39,17 @@ function getDefaultStorage(): StorageLike | null {
   } catch {
     return null;
   }
+}
+
+function compactWatchProviderPayload(data: any): any {
+  const results = data?.results;
+  if (!results || typeof results !== 'object' || Array.isArray(results)) return data;
+  const countries = Object.keys(results);
+  if (countries.every(country => country === 'FR')) return data;
+  return {
+    ...data,
+    results: results.FR ? { FR: results.FR } : {},
+  };
 }
 
 export function getWatchProviderCacheKey(id: number, type: 'tv' | 'movie'): string {
@@ -65,11 +78,19 @@ function readStore(storage: StorageLike): StoredWatchProviderCache {
 }
 
 function pruneStore(store: StoredWatchProviderCache, now: number): StoredWatchProviderCache {
-  const kept = Object.entries(store)
-    .filter(([, entry]) => entry && Number.isFinite(entry.timestamp) && now - entry.timestamp < WATCH_PROVIDER_CACHE_STALE_MAX_AGE_MS)
-    .sort(([, left], [, right]) => right.timestamp - left.timestamp)
+  const eligible = Object.entries(store)
+    .filter(([, entry]) => entry && Number.isFinite(entry.timestamp) && now - entry.timestamp < WATCH_PROVIDER_CACHE_STALE_MAX_AGE_MS);
+  const newestFirst = ([, left]: [string, StoredWatchProviderEntry], [, right]: [string, StoredWatchProviderEntry]) =>
+    right.timestamp - left.timestamp;
+  const library = eligible
+    .filter(([, entry]) => entry.retention === 'library')
+    .sort(newestFirst)
+    .slice(0, WATCH_PROVIDER_LIBRARY_CACHE_MAX_ENTRIES);
+  const discovery = eligible
+    .filter(([, entry]) => entry.retention !== 'library')
+    .sort(newestFirst)
     .slice(0, WATCH_PROVIDER_CACHE_MAX_ENTRIES);
-  return Object.fromEntries(kept);
+  return Object.fromEntries([...library, ...discovery]);
 }
 
 function persistStore(storage: StorageLike, store: StoredWatchProviderCache, now: number): void {
@@ -156,17 +177,52 @@ export function writeWatchProviderCache(
   id: number,
   type: 'tv' | 'movie',
   data: any,
-  options: { now?: number; storage?: StorageLike | null; defer?: boolean } = {}
+  options: {
+    now?: number;
+    storage?: StorageLike | null;
+    defer?: boolean;
+    retention?: 'library' | 'discovery';
+  } = {}
 ): void {
   const storage = options.storage === undefined ? getDefaultStorage() : options.storage;
   if (!storage) return;
   const now = options.now ?? Date.now();
   const store = readStore(storage);
-  store[getWatchProviderCacheKey(id, type)] = { data, timestamp: now };
+  const key = getWatchProviderCacheKey(id, type);
+  const existingRetention = store[key]?.retention;
+  const retention = options.retention === 'library' || existingRetention === 'library'
+    ? 'library'
+    : undefined;
+  store[key] = {
+    data: compactWatchProviderPayload(data),
+    timestamp: now,
+    ...(retention ? { retention } : {}),
+  };
 
   const defer = options.defer ?? options.storage === undefined;
   if (defer) schedulePersist(storage, store, now);
   else persistStore(storage, store, now);
+}
+
+export function retainWatchProviderCacheEntry(
+  id: number,
+  type: 'tv' | 'movie',
+  options: { now?: number; storage?: StorageLike | null; defer?: boolean } = {}
+): boolean {
+  const storage = options.storage === undefined ? getDefaultStorage() : options.storage;
+  if (!storage) return false;
+  const store = readStore(storage);
+  const key = getWatchProviderCacheKey(id, type);
+  const entry = store[key];
+  if (!entry || !Number.isFinite(entry.timestamp)) return false;
+  if (entry.retention === 'library') return true;
+
+  entry.retention = 'library';
+  const now = options.now ?? Date.now();
+  const defer = options.defer ?? options.storage === undefined;
+  if (defer) schedulePersist(storage, store, now);
+  else persistStore(storage, store, now);
+  return true;
 }
 
 if (typeof window !== 'undefined') {

@@ -97,6 +97,7 @@ function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMa
     originalTitle: (show as any).originalTitle || (show as any).original_title,
     year: show.firstAirDate?.slice(0, 4),
     hasKnownProvider: Boolean(show.networks?.length),
+    retainInLibraryCache: true,
     onEnrich: enrichMovieDetails,
   });
 
@@ -608,6 +609,49 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
   const { showToast } = useToastStore();
   const isQuotaExceeded = useSyncStore(state => state.isQuotaExceeded);
   const [pendingAction, setPendingAction] = useState<{ type: 'archive' | 'unfollow' | 'drop'; item: Show } | null>(null);
+
+  useEffect(() => {
+    const handleBackOneLevel = () => {
+      if (pendingAction) {
+        setPendingAction(null);
+        return;
+      }
+      if (expandedSection) {
+        setExpandedSection(null);
+        setVisibleCount(WATCHLIST_BATCH_SIZE);
+        return;
+      }
+      if (activeTab !== 'watch_next') {
+        setActiveTab('watch_next');
+        requestAnimationFrame(() => {
+          const container = document.getElementById('watchlist-container');
+          if (container) container.scrollTop = 0;
+        });
+      }
+    };
+    const handleResetAll = () => {
+      episodeRequestRef.current += 1;
+      setSelectedEpisodeModal(null);
+      setSelectedPersonId(null);
+      setPendingAction(null);
+      setExpandedSection(null);
+      setVisibleCount(WATCHLIST_BATCH_SIZE);
+      setActiveTab('watch_next');
+      requestAnimationFrame(() => {
+        const container = document.getElementById('watchlist-container');
+        if (container) container.scrollTop = 0;
+        scrollAllCarouselsToStart();
+      });
+      showToast('À Voir réinitialisé : retour à À Regarder.', 'info');
+    };
+
+    window.addEventListener('watchlist-back-one-level', handleBackOneLevel);
+    window.addEventListener('watchlist-reset-all', handleResetAll);
+    return () => {
+      window.removeEventListener('watchlist-back-one-level', handleBackOneLevel);
+      window.removeEventListener('watchlist-reset-all', handleResetAll);
+    };
+  }, [activeTab, expandedSection, pendingAction, showToast]);
 
   useEffect(() => {
     if (pendingAction) {
