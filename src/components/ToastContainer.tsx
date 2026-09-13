@@ -5,6 +5,7 @@ import { useToastStore, ToastMessageObj } from '../store/toastStore';
 import { useShows } from '../hooks/useShows';
 import { cn, scrollAllCarouselsToStart } from '../lib/utils';
 import { SeenItGlyph } from './SeenItLogo';
+import { isDownloadToastPresentation } from '../features/toasts/toastPresentation';
 
 const PlexLogo = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor">
@@ -158,12 +159,11 @@ export function ToastContainer() {
     parsed.action?.toLowerCase().includes('favori')
   );
 
-  const isDownloadToast = Boolean(
-    type === 'download' ||
-    rawMsgStr.toLowerCase().includes('téléchargement') ||
-    rawMsgStr.toLowerCase().includes('recherche') ||
-    parsed.action?.toLowerCase().includes('téléchargement') ||
-    parsed.action?.toLowerCase().includes('recherche')
+  const isDownloadToast = isDownloadToastPresentation(
+    type,
+    rawMsgStr,
+    parsed.action,
+    parsed.title,
   );
 
   const getAccentColor = () => {
@@ -266,7 +266,7 @@ export function ToastContainer() {
           }}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
-          className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 z-[99999] w-full max-w-md px-3 pointer-events-auto touch-pan-y select-none cursor-grab active:cursor-grabbing flex justify-center"
+          className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 z-[99999] w-full max-w-md px-3 pointer-events-auto touch-pan-y select-none cursor-grab active:cursor-grabbing flex justify-center"
         >
           {hasPoster ? (
             /* Rich Media Toast with Poster */
