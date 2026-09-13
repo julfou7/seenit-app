@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { readFeatureSource } from './featureSource.ts';
 
 const filterSource = readFileSync(new URL('../src/components/FilterModal.tsx', import.meta.url), 'utf8');
-const discoverSource = readFileSync(new URL('../src/screens/DiscoverScreen.tsx', import.meta.url), 'utf8');
+const discoverSource = readFeatureSource('discover');
 const bottomNavSource = readFileSync(new URL('../src/components/BottomNav.tsx', import.meta.url), 'utf8');
 
 test('Explorer place Top 100 dans le type de contenu et plus dans les tris', () => {

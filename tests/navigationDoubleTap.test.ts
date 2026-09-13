@@ -6,13 +6,14 @@ import {
   resolveActiveTabTap,
   type ActiveTabTapState,
 } from '../src/features/navigation/activeTabTap.ts';
+import { readFeatureSource } from './featureSource.ts';
 
 const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const bottomNavSource = readFileSync(new URL('../src/components/BottomNav.tsx', import.meta.url), 'utf8');
 const downloadsScreenSource = readFileSync(new URL('../src/screens/DownloadsScreen.tsx', import.meta.url), 'utf8');
 const downloadsCoreSource = readFileSync(new URL('../src/screens/DownloadsScreenCore.tsx', import.meta.url), 'utf8');
-const discoverSource = readFileSync(new URL('../src/screens/DiscoverScreen.tsx', import.meta.url), 'utf8');
-const watchlistSource = readFileSync(new URL('../src/screens/WatchListScreen.tsx', import.meta.url), 'utf8');
+const discoverSource = readFeatureSource('discover');
+const watchlistSource = readFeatureSource('watchList');
 const profileSource = readFileSync(new URL('../src/screens/ProfileScreen.tsx', import.meta.url), 'utf8');
 
 function tap(

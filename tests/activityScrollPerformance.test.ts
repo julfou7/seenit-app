@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { readFeatureSource } from './featureSource.ts';
 
-const discoverSource = readFileSync(new URL('../src/screens/DiscoverScreen.tsx', import.meta.url), 'utf8');
+const discoverSource = readFeatureSource('discover');
 const librarySource = readFileSync(new URL('../src/screens/LibraryScreen.tsx', import.meta.url), 'utf8');
-const watchListSource = readFileSync(new URL('../src/screens/WatchListScreen.tsx', import.meta.url), 'utf8');
+const watchListSource = readFeatureSource('watchList');
 const virtualWindowSource = readFileSync(new URL('../src/hooks/useBoundedVirtualWindow.ts', import.meta.url), 'utf8');
 
 test('#229 réarme le scroll infini Explorer après Activity hidden → visible', () => {

@@ -146,7 +146,7 @@ test('SEENIT-PLEX-009 n’accorde l’autorité qu’aux endpoints Watchlist exh
 });
 
 test('SEENIT-PLEX-009 le runtime persiste la provenance et relit avant suppression', () => {
-  const clientSource = readFileSync(new URL('../src/features/plex/syncPlex.ts', import.meta.url), 'utf8');
+  const clientSource = readFileSync(new URL('../src/features/plex/plexSyncEngine.ts', import.meta.url), 'utf8');
   const backendSource = readFileSync(new URL('../server.ts', import.meta.url), 'utf8');
 
   assert.match(clientSource, /trackingProvenance:\s*buildPlexWatchlistTrackingProvenance/);

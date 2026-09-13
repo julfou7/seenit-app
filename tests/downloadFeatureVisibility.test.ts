@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { readFeatureSource } from './featureSource.ts';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { isDownloadFeatureEnabled, resolveDownloadAwareTab } from '../src/features/downloads/downloadFeatureVisibility.ts';
@@ -52,7 +53,7 @@ test('SEENIT-DOWNLOAD-VISIBILITY-001 masque navigation, actions et runtime tant 
 });
 
 test('SEENIT-DOWNLOAD-VISIBILITY-001 verrouille toutes les mentions de téléchargement dans les fiches média et le détail épisode', () => {
-  const showCoreSource = readFileSync(new URL('../src/screens/ShowDetailScreenCore.tsx', import.meta.url), 'utf8');
+  const showCoreSource = readFeatureSource('showDetail');
   const episodeCoreSource = readFileSync(new URL('../src/screens/EpisodeDetailModalCore.tsx', import.meta.url), 'utf8');
   const showWrapperSource = readFileSync(new URL('../src/screens/ShowDetailScreen.tsx', import.meta.url), 'utf8');
   const episodeWrapperSource = readFileSync(new URL('../src/screens/EpisodeDetailModal.tsx', import.meta.url), 'utf8');

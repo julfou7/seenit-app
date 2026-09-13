@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { readFeatureSource } from './featureSource.ts';
 
 const ratings = readFileSync(new URL('../src/components/EpisodeRatingsChart.tsx', import.meta.url), 'utf8');
-const core = readFileSync(new URL('../src/screens/ShowDetailScreenCore.tsx', import.meta.url), 'utf8');
+const core = readFeatureSource('showDetail');
 const episodeDetail = readFileSync(new URL('../src/screens/EpisodeDetailModalCore.tsx', import.meta.url), 'utf8');
 
 test('issue #216 garde le refresh Plex compact et accessible à côté du titre', () => {

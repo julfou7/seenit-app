@@ -4,7 +4,7 @@ import test from 'node:test';
 import { isExactPlexPmsWebUrl } from '../src/lib/plexExternalUrl.ts';
 
 const utilsSource = readFileSync('src/lib/utils.ts', 'utf8');
-const syncPlexSource = readFileSync('src/features/plex/syncPlex.ts', 'utf8');
+const syncPlexSource = readFileSync('src/features/plex/plexLinks.ts', 'utf8');
 const availabilitySource = readFileSync('src/features/plex/plexAvailability.ts', 'utf8');
 const plexExternalUrlSource = readFileSync('src/lib/plexExternalUrl.ts', 'utf8');
 
