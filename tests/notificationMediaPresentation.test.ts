@@ -7,6 +7,7 @@ const reminderSource = readSource('src/hooks/useRemindersNotifier.ts');
 const notificationMediaSource = readSource('src/features/notifications/notificationMedia.ts');
 const mediaReminderSource = readSource('src/features/notifications/mediaReminderNotification.ts');
 const nativePatchSource = readSource('scripts/patch-local-notifications.cjs');
+const androidVariablesSource = readSource('android/variables.gradle');
 
 test('SEENIT-NOTIFICATION-002 affiche un visuel média et un seul emoji par événement', () => {
   assert.match(reminderSource, /https:\/\/image\.tmdb\.org\/t\/p\/w154/,
@@ -104,7 +105,16 @@ test('SEENIT-NOTIFICATION-002 hydrate le bitmap seulement à la livraison Androi
   assert.match(nativePatchSource, /SEENIT_LOCAL_NOTIFICATION_DELIVERY_MEDIA_V3_PATCH/);
   assert.match(nativePatchSource, /shouldResolveSeenItMediaNow/);
   assert.match(nativePatchSource, /if \(shouldResolveSeenItMediaNow\) localNotification\.resolveLargeIcon\(context\) else null/);
-  assert.match(nativePatchSource, /NotificationCompat\.Builder\.recoverBuilder\(context, notification\)/);
+  assert.match(androidVariablesSource, /minSdkVersion\s*=\s*24/,
+    'Notification.Builder.recoverBuilder exige API 24 et le contrat Android SeenIt doit le garantir');
+  assert.match(nativePatchSource, /android\.app\.Notification\.Builder\.recoverBuilder\(context, notification\)/,
+    'la reconstruction doit utiliser l’API framework disponible à partir du minSdk SeenIt');
+  assert.doesNotMatch(nativePatchSource, /NotificationCompat\.Builder\.recoverBuilder\(context, notification\)/,
+    'AndroidX NotificationCompat.Builder ne fournit pas recoverBuilder');
+  assert.match(nativePatchSource, /android\.app\.Notification\.BigPictureStyle\(\)/,
+    'le builder framework doit recevoir un style framework compatible');
+  assert.match(nativePatchSource, /android\.app\.Notification\.BigTextStyle\(\)/,
+    'le fallback texte doit rester compatible avec le builder framework');
   assert.match(nativePatchSource, /notificationJson\?\.let \{ LocalNotification\.buildNotificationFromJSObject\(it\) \}/);
   assert.match(nativePatchSource, /notificationManager\.notify\(id, deliveredNotification\)/);
   assert.match(reminderSource, /REMINDER_SCHEDULE_SCHEMA = 'v5'/,
