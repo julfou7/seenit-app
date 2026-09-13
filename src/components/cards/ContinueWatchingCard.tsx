@@ -4,6 +4,7 @@ import { type Show } from '../../types';
 import { getAiredProgress, cn, getTodayStr } from '../../lib/utils';
 import { getFormattedProviderLogo } from '../../utils/providerLogos';
 import { usePassiveWatchProvider } from '../../hooks/usePassiveWatchProvider';
+import { hasAiredEpisodeEvidence } from '../../features/watchlist/watchAvailability';
 
 interface Props {
   key?: React.Key;
@@ -23,7 +24,15 @@ function timeAgo(ms: number) {
   return `Il y a ${d} jour${d > 1 ? 's' : ''}`;
 }
 
-export const ContinueWatchingCard = React.memo(function ContinueWatchingCard({ show, onShowClick, onEpisodeClick, onMarkAsSeen }: Props) {
+export const ContinueWatchingCard = React.memo(function ContinueWatchingCard(props: Props) {
+  const todayStr = getTodayStr();
+  if (!hasAiredEpisodeEvidence(props.show, todayStr)) {
+    return null;
+  }
+  return <ContinueWatchingCardContent {...props} />;
+});
+
+function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMarkAsSeen }: Props) {
   let nextEpNum = show.nextEpisodeToWatch;
 
   // 1. Fallback si nextEpisodeToWatch est temporairement null
@@ -145,7 +154,7 @@ export const ContinueWatchingCard = React.memo(function ContinueWatchingCard({ s
   const todayStr = getTodayStr();
 
   if (cachedSeason?.episodes && cachedSeason.episodes.length > 0) {
-    const airedFromCache = cachedSeason.episodes.filter((ep: any) => !ep.air_date || ep.air_date <= todayStr).length;
+    const airedFromCache = cachedSeason.episodes.filter((ep: any) => ep.air_date && ep.air_date <= todayStr).length;
     if (airedFromCache > 0) {
       airedInSeason = airedFromCache;
       isAiringSeason = airedInSeason < totalSeasonEpisodes;
@@ -208,9 +217,7 @@ export const ContinueWatchingCard = React.memo(function ContinueWatchingCard({ s
   // 1. Total des épisodes sortis/disponibles sur l'ensemble de la série
   const totalAiredCount = (typeof show.totalAiredEpisodes === 'number' && show.totalAiredEpisodes > 0)
     ? show.totalAiredEpisodes
-    : (typeof show.totalEpisodes === 'number' && show.totalEpisodes > 0)
-      ? show.totalEpisodes
-      : 0;
+    : 0;
 
   // 2. Épisodes non vus comptés depuis le cache des saisons si disponible
   let cacheUnwatchedCount = 0;
@@ -219,7 +226,7 @@ export const ContinueWatchingCard = React.memo(function ContinueWatchingCard({ s
     for (const s of show.seasonsCache) {
       if (s.season_number > 0 && Array.isArray(s.episodes)) {
         for (const ep of s.episodes) {
-          if (!ep.air_date || ep.air_date <= todayStr) {
+          if (ep.air_date && ep.air_date <= todayStr) {
             const key = `${s.season_number}x${ep.episode_number}`;
             if (!seenSet.has(key)) {
               cacheUnwatchedCount++;
@@ -365,4 +372,4 @@ export const ContinueWatchingCard = React.memo(function ContinueWatchingCard({ s
       </div>
     </div>
   );
-});
+}
