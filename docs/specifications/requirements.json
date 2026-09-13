@@ -1642,6 +1642,22 @@
         {
           "file": "tests/activityScrollPerformance.test.ts",
           "contains": "SEENIT-PERF-001 préserve les cartes inchangées et la sous-vue Profil"
+        },
+        {
+          "file": "tests/profileAnalyticsSnapshot.test.ts",
+          "contains": "SEENIT-PERF-001 persiste une baseline Profil versionnée et isolée par UID"
+        },
+        {
+          "file": "tests/profileAnalyticsSnapshot.test.ts",
+          "contains": "SEENIT-PERF-001 applique les ajouts retraits et progressions par delta"
+        },
+        {
+          "file": "tests/profileAnalyticsSnapshot.test.ts",
+          "contains": "SEENIT-PERF-001 invalide seulement la métadonnée expirée et répare un snapshot"
+        },
+        {
+          "file": "tests/profileAnalyticsSnapshot.test.ts",
+          "contains": "SEENIT-PERF-001 borne le coût incrémental sur une bibliothèque représentative"
         }
       ]
     }

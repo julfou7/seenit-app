@@ -5,6 +5,10 @@ import test from 'node:test';
 const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const profileSource = readFileSync(new URL('../src/screens/ProfileScreen.tsx', import.meta.url), 'utf8');
 const analyticsSource = readFileSync(new URL('../src/hooks/useProAnalytics.ts', import.meta.url), 'utf8');
+const analyticsSnapshotSource = readFileSync(
+  new URL('../src/features/profile/profileAnalyticsSnapshot.ts', import.meta.url),
+  'utf8',
+);
 const logStoreSource = readFileSync(new URL('../src/store/logStore.ts', import.meta.url), 'utf8');
 
 test('#229 suspend les Effects des onglets cachés, sauf Explorer qui doit rester actif (#289)', () => {
@@ -52,19 +56,23 @@ test('#229 suspend le travail lourd interne du Profil sans remonter ses sous-vue
 test('#229 rend les analytics progressifs, stables et reprenables après navigation', () => {
   assert.match(analyticsSource, /const analyticsContributionCache = new Map/);
   assert.match(analyticsSource, /const analyticsResultCache = new Map/);
+  assert.match(analyticsSource, /const analyticsSnapshotCache = new Map/);
   assert.match(analyticsSource, /auth\.currentUser\?\.uid \|\| 'anonymous'/);
-  assert.match(analyticsSource, /const analyticsSignature = buildAnalyticsSignature\(shows \|\| \[\]\)/);
   assert.match(analyticsSource, /const batchSize = 12/);
-  assert.match(analyticsSource, /const cached = readContributionCache\(cacheKey\)/);
-  assert.match(analyticsSource, /writeContributionCache\(cacheKey, contribution\)/);
+  assert.match(analyticsSource, /const cached = readContributionCache\(mediaKey\)/);
+  assert.match(analyticsSource, /writeContributionCache\(mediaKey, contribution\)/);
   assert.match(
     analyticsSource,
     /batchIndex === 0 \|\| \(batchIndex \+ 1\) % 4 === 0 \|\| isLastBatch/,
     'le premier lot doit publier de vraies données sans attendre la fin de toute la bibliothèque',
   );
-  assert.match(analyticsSource, /await new Promise<void>\(resolve => setTimeout\(resolve, 0\)\)/);
-  assert.match(analyticsSource, /writeResultCache\(analyticsCacheKey, finalData\)/);
-  assert.match(analyticsSource, /\}, \[analyticsCacheKey\]\);/);
+  assert.match(analyticsSource, /await new Promise<void>\(\(resolve\) => setTimeout\(resolve, 0\)\)/);
+  assert.match(analyticsSource, /writeResultCache\(resultCacheKey, snapshot\.data\)/);
+  assert.match(analyticsSource, /\}, \[uid, shows, libraryReady\]\);/);
+  assert.match(analyticsSource, /if \(!libraryReady\) \{[\s\S]*?setLoading\(!previous\);[\s\S]*?return;/);
+  assert.match(profileSource, /libraryReady=\{!loading\}/);
+  assert.match(analyticsSnapshotSource, /mode: reusable \? 'snapshot-delta' : 'full-rebuild'/);
+  assert.match(analyticsSnapshotSource, /PROFILE_ANALYTICS_STORAGE_FIELD = 'profile_analytics_snapshot_v1'/);
 });
 
 test('#229 regroupe les rafales de logs hors du chemin synchrone par ligne', () => {

@@ -16,8 +16,8 @@ const ProfileStatsContent = React.memo(function ProfileStatsContent({
 }: {
   onPersonClick: (personId: number) => void;
 }) {
-  const { shows } = useShows();
-  return <ProAnalyticsDashboard shows={shows} onPersonClick={onPersonClick} />;
+  const { shows, loading } = useShows();
+  return <ProAnalyticsDashboard shows={shows} libraryReady={!loading} onPersonClick={onPersonClick} />;
 });
 
 export const ProfileScreen = React.memo(function ProfileScreen({

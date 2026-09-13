@@ -10,12 +10,14 @@ import { cn } from '../lib/utils';
 
 export function ProAnalyticsDashboard({ 
   shows,
+  libraryReady = true,
   onPersonClick
 }: { 
   shows: Show[];
+  libraryReady?: boolean;
   onPersonClick?: (personId: number) => void;
 }) {
-  const { data, loading } = useProAnalytics(shows);
+  const { data, loading } = useProAnalytics(shows, libraryReady);
   const [showAllActors, setShowAllActors] = useState(false);
   const [showAllDirectors, setShowAllDirectors] = useState(false);
 

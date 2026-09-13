@@ -225,6 +225,12 @@ bornée sans masquer les médias restants ; les grilles « Voir tout » progress
 Statistiques et Ma Liste conservent leur état après leur première ouverture, tandis que leurs traitements
 sont suspendus lorsqu'elles sont cachées.
 
+Les statistiques avancées conservent par UID une baseline locale versionnée. Elles réaffichent donc le
+dernier résultat complet dès la réouverture de l'application, puis appliquent les changements de la
+bibliothèque par delta : compteurs pour une progression, contribution typée pour un média vu ajouté ou
+retiré, et rafraîchissement TMDB limité à la seule métadonnée expirée. Firestore reste l'autorité de la
+bibliothèque ; cette baseline n'est qu'un cache dérivé commun au comportement PWA/APK.
+
 Les diffuseurs des médias suivis occupent un compartiment persistant dédié et borné. Les navigations
 Explorer et le recyclage des rangées ne peuvent donc pas chasser les résultats positifs ou négatifs déjà
 obtenus pour Ma Liste ; seule l'expiration normale permet leur actualisation silencieuse.

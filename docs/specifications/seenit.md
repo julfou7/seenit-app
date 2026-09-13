@@ -466,6 +466,14 @@ n'est rouverte que par une nouvelle décision produit explicite.
 - Les sous-vues Statistiques et Ma Liste sont chargées à leur première ouverture puis conservent leur
   état ; lorsqu'elles sont masquées par l'autre sous-vue, Réglages ou un autre onglet, leurs Effects sont
   suspendus. Leur réouverture ne remonte pas en rafale les cartes déjà visitées.
+- Les statistiques avancées du Profil conservent une baseline locale versionnée et cloisonnée par UID,
+  composée du résultat affichable, des compteurs agrégés et des contributions TMDB indexées par
+  `mediaType + tmdbId`. Après redémarrage, cette baseline est restituée immédiatement puis réconciliée
+  silencieusement : un ajout ou retrait de média vu applique uniquement sa contribution, une progression
+  modifie uniquement ses compteurs et une métadonnée expirée ne recharge que l'entrée concernée. Un
+  recalcul complet est réservé à l'absence de baseline, à une migration de version ou à une corruption ;
+  il reste réparable et doit produire le même résultat que l'enchaînement des deltas. Ce cache dérivé ne
+  devient jamais une source métier et n'ajoute aucune écriture Firestore.
 - Ma Liste ne monte que les rangées proches du viewport vertical. Une rangée réduite matérialise une
   fenêtre d'au moins six cartes, complétée seulement par les cartes visibles et trois cartes de débord de
   chaque côté ; À Regarder applique la même règle avec un minimum de huit cartes. Les cartes sorties de la
