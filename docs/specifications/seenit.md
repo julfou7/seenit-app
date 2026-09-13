@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 10 septembre 2026
-Version applicative : **1.4.146**
+Version applicative : **1.4.147**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -449,6 +449,13 @@ n'est rouverte que par une nouvelle décision produit explicite.
   d'enrichissement diffuseur supplémentaire. Les détails décoratifs d'un film sont lus depuis le cache
   lorsqu'il existe ; dans une vue exhaustive qui doit les compléter, la lecture distante attend la même
   période calme et reste bornée à deux requêtes simultanées.
+- Un résultat TMDB public frais, y compris l'absence explicite de diffuseur, termine la résolution passive.
+  Lorsqu'une carte est recyclée ou remontée, son diffuseur public ou sa disponibilité Plex déjà en cache UID
+  est restitué synchroniquement, sans Promise intermédiaire, sans nouveau skeleton et sans transition d'état
+  identique. Seul un snapshot TMDB absent ou périmé peut replanifier l'enrichissement diffuseur.
+- Dans « Ma Liste », un échec d'enrichissement décoratif d'un film est mémorisé cinq minutes au niveau de la
+  session, dans un registre borné à 240 entrées. Le recyclage d'une carte ne duplique ni une requête en vol ni
+  cet échec récent ; un succès ou l'expiration de la temporisation autorise une nouvelle résolution.
 - Les cartes déjà chargées conservent une clé stable et ne sont pas rerendues pour un simple changement
   d'UI parent sans rapport. Explorer matérialise trente cartes au premier rendu puis uniquement les lignes
   visibles avec trois lignes de débord de chaque côté ; des espaceurs conservent la hauteur et la position

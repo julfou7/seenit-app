@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.146",
+  "applicationVersion": "1.4.147",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -1568,6 +1568,14 @@
         {
           "file": "tests/explorerPerformance.test.ts",
           "contains": "SEENIT-PERF-001 borne le fan-out diffuseurs et stabilise les cartes Explorer"
+        },
+        {
+          "file": "tests/explorerPerformance.test.ts",
+          "contains": "SEENIT-PERF-001 conserve les résultats diffuseurs positifs et négatifs au recyclage"
+        },
+        {
+          "file": "tests/explorerPerformance.test.ts",
+          "contains": "SEENIT-PERF-001 temporise les enrichissements décoratifs négatifs de Ma Liste"
         },
         {
           "file": "tests/activityScrollPerformance.test.ts",
