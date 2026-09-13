@@ -96,8 +96,8 @@ ou de choisir un chantier, l'agent applique donc un **bail GitHub partagé** :
    le SHA de tête vérifié, une expiration à **+90 minutes** et la prochaine action exacte. Pour une session
    Codex, ajouter `Origine: CODEX` ; les anciens identifiants `Conversation: codex-*` et
    `Conversation: codex-interactive-*` restent reconnus comme origine Codex. Relire ensuite les commentaires :
-   si plusieurs acquisitions concurrentes couvrent le même périmètre, le plus petit identifiant de
-   commentaire GitHub gagne et les autres agents se retirent sans écrire au chantier.
+   si plusieurs acquisitions concurrentes couvrent le même périmètre, le plus petit
+   identifiant de commentaire GitHub gagne et les autres agents se retirent sans écrire au chantier.
 4. Rafraîchir le bail aux jalons significatifs. Avant chaque push, merge, fermeture d'issue ou commande
    de release, relire le bail et la tête distante ; si le propriétaire ou le SHA attendu a changé,
    interrompre l'écriture et publier un checkpoint de conflit. Le force-push est interdit.
