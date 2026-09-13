@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   ArrowLeft,
@@ -311,6 +311,8 @@ export function DownloadsScreen({ onShowClick }: Props) {
   } = useLiveDownloadStore();
   const config = useDownloadConfigStore();
   const showToast = useToastStore(state => state.showToast);
+  const screenRootRef = useRef<HTMLDivElement>(null);
+  const searchRequestRef = useRef(0);
 
   const [viewMode, setViewMode] = useState<ViewMode>('downloads');
   const [showConfiguration, setShowConfiguration] = useState(false);
@@ -326,6 +328,49 @@ export function DownloadsScreen({ onShowClick }: Props) {
   const [hasSearched, setHasSearched] = useState(false);
   const [sendingTorrentId, setSendingTorrentId] = useState<number | null>(null);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
+
+  useEffect(() => {
+    const scrollToTop = () => {
+      const scrollRoot = screenRootRef.current?.querySelector<HTMLElement>('.overflow-y-auto');
+      if (scrollRoot) scrollRoot.scrollTop = 0;
+    };
+    const handleBackOneLevel = () => {
+      if (pendingCancellation) {
+        setPendingCancellation(null);
+        return;
+      }
+      if (showConfiguration) {
+        setShowConfiguration(false);
+        return;
+      }
+      if (viewMode === 'search') setViewMode('downloads');
+    };
+    const handleResetAll = () => {
+      searchRequestRef.current += 1;
+      setViewMode('downloads');
+      setShowConfiguration(false);
+      setClearingSection(null);
+      setPendingCancellation(null);
+      setSearchQuery('');
+      setSelectedMediaType('all');
+      setSelectedQuality('all');
+      setSortBy('seeders');
+      setTorrents([]);
+      setIsSearching(false);
+      setHasSearched(false);
+      setSendingTorrentId(null);
+      setCopiedHash(null);
+      requestAnimationFrame(scrollToTop);
+      showToast('Télécharger réinitialisé : recherche et filtres effacés.', 'info');
+    };
+
+    window.addEventListener('downloads-back-one-level', handleBackOneLevel);
+    window.addEventListener('downloads-reset-all', handleResetAll);
+    return () => {
+      window.removeEventListener('downloads-back-one-level', handleBackOneLevel);
+      window.removeEventListener('downloads-reset-all', handleResetAll);
+    };
+  }, [pendingCancellation, showConfiguration, showToast, viewMode]);
 
   const isConfigured = Boolean(
     (config.sonarrUrl && config.sonarrApiKey)
@@ -357,20 +402,23 @@ export function DownloadsScreen({ onShowClick }: Props) {
     const query = searchQuery.trim();
     if (!query || isSearching) return;
 
+    const requestId = ++searchRequestRef.current;
     setIsSearching(true);
     try {
       const results = await searchC411Torrents({
         query,
         mediaType: selectedMediaType === 'all' ? undefined : selectedMediaType
       });
+      if (searchRequestRef.current !== requestId) return;
       setTorrents(results);
       setHasSearched(true);
     } catch (error: any) {
+      if (searchRequestRef.current !== requestId) return;
       setTorrents([]);
       setHasSearched(true);
       showToast(error?.message || 'C411 est momentanément indisponible.', 'error');
     } finally {
-      setIsSearching(false);
+      if (searchRequestRef.current === requestId) setIsSearching(false);
     }
   };
 
@@ -533,7 +581,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
 
   if (showConfiguration) {
     return (
-      <div className="flex-1 min-h-0 flex flex-col bg-premium-ambient text-white overflow-hidden">
+      <div ref={screenRootRef} className="flex-1 min-h-0 flex flex-col bg-premium-ambient text-white overflow-hidden">
         <div className="shrink-0 px-4 pt-4 pb-3 border-b border-white/5 bg-zinc-950/70 backdrop-blur-xl flex items-center gap-3">
           <button
             type="button"
@@ -603,7 +651,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
   );
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col bg-premium-ambient text-white overflow-hidden">
+    <div ref={screenRootRef} className="flex-1 min-h-0 flex flex-col bg-premium-ambient text-white overflow-hidden">
       <div className="shrink-0 px-4 pt-4 pb-3 border-b border-white/5 bg-zinc-950/70 backdrop-blur-xl space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div>

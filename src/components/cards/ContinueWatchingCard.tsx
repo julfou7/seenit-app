@@ -276,6 +276,7 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
     originalTitle: (show as any).originalTitle || (show as any).original_title,
     year: show.firstAirDate?.slice(0, 4),
     hasKnownProvider: Boolean(show.networks?.length),
+    retainInLibraryCache: true,
   });
 
   const currentSeasonArtwork = cachedSeason?.poster_path || null;

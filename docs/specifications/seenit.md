@@ -1,6 +1,6 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
-Dernière mise à jour : 10 septembre 2026
+Dernière mise à jour : 13 septembre 2026
 Version applicative : **1.4.147**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
@@ -435,13 +435,16 @@ n'est rouverte que par une nouvelle décision produit explicite.
 - Le titre **« Où regarder »** est un libellé produit stable : il reste toujours rendu et n'est jamais
   remplacé par un skeleton pendant la résolution. Le chargement de cette zone emploie un seul libellé
   lisible, puis aboutit à un diffuseur, à Plex ou à un état d'indisponibilité explicite.
-- Les diffuseurs TMDB publics sont persistés par `mediaType + tmdbId` dans un cache borné à 120 entrées,
-  frais pendant 6 heures et réutilisable en `stale-if-error` pendant 7 jours au maximum. Le cache mémoire
-  de session reste prioritaire et aucune donnée utilisateur ou secret Plex n'est stocké dans ce cache.
+- Les diffuseurs TMDB publics sont persistés par `mediaType + tmdbId` dans deux compartiments bornés :
+  120 entrées de découverte et 240 entrées réservées aux médias suivis. Explorer ne peut donc jamais
+  évincer le diffuseur d'un film de Ma Liste. Une entrée reste fraîche pendant 6 heures et réutilisable
+  en `stale-if-error` pendant 7 jours au maximum. Le cache mémoire de session reste prioritaire et aucune
+  donnée utilisateur ou secret Plex n'est stocké dans ce cache. Seul le territoire `FR` effectivement
+  consommé par SeenIt est persisté ; les autres pays du payload TMDB restent hors du stockage local.
 - Le snapshot persistant des diffuseurs n'est désérialisé qu'une fois par contexte de stockage. Les
   réponses rapprochées mettent à jour ce snapshot en mémoire puis regroupent sa persistance hors du
-  chemin critique du scroll ; une mise en arrière-plan force un unique flush borné. Les TTL, la limite
-  de 120 entrées et le comportement `stale-if-error` restent inchangés.
+  chemin critique du scroll ; une mise en arrière-plan force un unique flush borné. La promotion d'une
+  entrée déjà connue vers le compartiment des médias suivis ne renouvelle pas artificiellement son TTL.
 - Dans toutes les cartes et grilles passives, les requêtes diffuseurs identiques en vol sont dédupliquées,
   leur concurrence globale est bornée à quatre et l'enrichissement d'une carte proche du viewport attend
   une période sans scroll puis une période idle lorsque la plateforme le permet. La vérification Plex
@@ -666,6 +669,11 @@ pour le cache des sagas et univers.
 - Un token FCM invalide est supprimé sans bloquer les appareils valides.
 - Les notifications système de fin de téléchargement proviennent des webhooks Sonarr/Radarr.
   Le polling local affiche uniquement un toast SeenIt afin d'éviter les doublons.
+- **SEENIT-NOTIFICATION-002** — Un rappel Film ou Série utilise, lorsqu'il existe, un visuel TMDB
+  préparé dans le stockage privé et borné de l'application. Pour un rappel Android planifié, aucun bitmap
+  n'est embarqué dans le `PendingIntent` d'AlarmManager : l'image est relue, validée et décodée seulement
+  par le receiver au moment de la livraison. Une image absente, invalide ou trop grande conserve le rappel
+  texte et ne bloque jamais les rappels suivants. Aucun octet/Base64 d'image ne traverse Capacitor/Binder.
 
 ### 8.1 Mise à jour intégrée
 
@@ -688,6 +696,10 @@ pour le cache des sagas et univers.
   fenêtre agrège, dans l'ordre croissant, les notes de chaque release officielle strictement supérieure
   à la version installée et inférieure ou égale à la cible. Une pagination ou une source d'historique
   indisponible ne bloque jamais l'installation et retombe sur les seules notes de la cible.
+- **SEENIT-UPDATE-005** — Depuis Réglages → À propos & Avancé, la fiche Version ouvre l'historique
+  complet des releases SeenIt officielles disposant de leur APK canonique. Les versions sont présentées
+  de la plus récente à la plus ancienne par pagination bornée. Une page distante indisponible conserve les
+  entrées officielles déjà chargées ou, à défaut, la dernière release connue ; elle ne bloque pas l'écran.
 - Après téléchargement et vérification, l'ouverture réussie du Package Installer est un succès
   observable nommé « Installeur lancé » à 100 %. Elle ne doit jamais être rendue comme une erreur,
   même si Android conserve SeenIt visible derrière sa boîte de dialogue système.
@@ -748,6 +760,12 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   logo Plex de taille suffisante pour identifier immédiatement la source. Dans tous les textes français
   destinés à l'utilisateur, l'état inverse de « vu » est nommé **« non vu »** ; le terme « dé-vu » n'est
   plus utilisé.
+- **SEENIT-UX-005** — Sur un onglet déjà actif, un appui simple ferme exactement le niveau visible
+  courant sans effacer l'état racine. Deux appuis sur ce même onglet en moins de 450 ms réinitialisent
+  uniquement sa vue : retour en haut, fermeture des panneaux/modales, sous-vue racine et effacement des
+  recherches, filtres ou expansions locales. Aucun suivi, progression, préférence ou téléchargement n'est
+  modifié. Chaque reset abouti affiche un toast nommant la page réinitialisée. Un trajet A → B → B ne
+  compte jamais le changement d'onglet comme le premier appui du double geste.
 - Les dialogues critiques utilisent un rôle adapté, sont fermables par Échap, placent le focus
   sur une action et ne déclenchent aucune suppression sans confirmation quand le transfert est
   actif.

@@ -284,7 +284,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
           containerRef.current.scrollTop = 0;
         }
       }
-      showToast('Filtres et recherche réinitialisés', 'info');
+      showToast('Explorer réinitialisé : filtres et recherche effacés.', 'info');
     };
 
     window.addEventListener('popstate', handlePopState);

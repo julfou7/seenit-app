@@ -246,7 +246,8 @@ test('SEENIT-PERF-001 borne le fan-out diffuseurs et stabilise les cartes Explor
   assert.match(passiveProviderSource, /scheduleWatchProviderCardEnrichment\(enrichProvider\)/);
   assert.match(passiveProviderSource, /readWatchProviderCache\(tmdbId, mediaType, \{ allowStale: true \}\)/);
   assert.match(passiveProviderSource, /tmdb\.peekWatchProviders\(tmdbId, mediaType\)/);
-  assert.match(passiveProviderSource, /writeWatchProviderCache\(numericTmdbId, mediaType, res\.value\)/);
+  assert.match(passiveProviderSource, /retention: retainInLibraryCache \? 'library' : 'discovery'/);
+  assert.match(gridSource, /retainInLibraryCache: Boolean\(show\)/);
   assert.match(passiveProviderSource, /usePlexAvailabilityStore\(state =>/);
   assert.match(passiveProviderSource, /isPassiveProviderResolutionComplete/);
   assert.doesNotMatch(

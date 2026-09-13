@@ -234,6 +234,7 @@ export const UpcomingShowCard = React.memo(function UpcomingShowCard({ show, onS
     originalTitle: (show as any).originalTitle || (show as any).original_title,
     year: show.firstAirDate?.slice(0, 4),
     hasKnownProvider: Boolean(show.networks?.length),
+    retainInLibraryCache: true,
   });
 
   const networkLogo = getFormattedProviderLogo(

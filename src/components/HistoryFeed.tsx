@@ -62,6 +62,7 @@ function HistoryRowItem({
     mediaType: item.mediaType === 'movie' ? 'movie' : 'tv',
     title: item.showTitle,
     hasKnownProvider: Boolean(item.showNetworks?.length),
+    retainInLibraryCache: true,
   });
 
   const networkLogo = getFormattedProviderLogo(

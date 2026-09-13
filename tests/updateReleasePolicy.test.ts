@@ -6,7 +6,9 @@ import {
   isTrustedSeenItApkUrl,
   normalizeSha256Digest,
   parseSeenItRelease,
+  resolveSeenItCompleteReleaseHistory,
   resolveSeenItReleaseHistory,
+  selectSeenItCompleteReleaseHistory,
   selectSeenItReleaseHistory
 } from '../src/features/release/releasePolicy.ts';
 
@@ -105,5 +107,38 @@ test('SEENIT-UPDATE-004 retombe sur la cible si l’historique paginé échoue',
     2
   );
   assert.deepEqual(history.map(entry => entry.version), ['1.4.118']);
+  assert.equal(page, 2);
+});
+
+test("SEENIT-UPDATE-005 trie tout l'historique officiel du plus récent au plus ancien", () => {
+  const history = selectSeenItCompleteReleaseHistory([
+    releasePayload('1.4.145'),
+    releasePayload('1.4.147'),
+    { ...releasePayload('1.4.146'), assets: [] },
+    releasePayload('1.4.146'),
+    releasePayload('1.4.147', 'doublon remplacé'),
+  ]);
+
+  assert.deepEqual(history.map(entry => entry.version), ['1.4.147', '1.4.146', '1.4.145']);
+  assert.equal(history[0].releaseNotes, 'doublon remplacé');
+});
+
+test("SEENIT-UPDATE-005 conserve les pages d'historique valides en cas de panne tardive", async () => {
+  let page = 0;
+  const fetchImpl = async () => {
+    page += 1;
+    if (page === 1) {
+      return {
+        ok: true,
+        headers: { get: () => 'application/json' },
+        json: async () => Array.from({ length: 100 }, (_, index) =>
+          releasePayload(`1.4.${147 - (index % 3)}`))
+      } as unknown as Response;
+    }
+    throw new Error('page suivante indisponible');
+  };
+
+  const history = await resolveSeenItCompleteReleaseHistory(fetchImpl as typeof fetch, 3);
+  assert.deepEqual(history.map(entry => entry.version), ['1.4.147', '1.4.146', '1.4.145']);
   assert.equal(page, 2);
 });
