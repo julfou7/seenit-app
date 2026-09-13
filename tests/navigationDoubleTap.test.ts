@@ -10,6 +10,10 @@ import {
 const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const bottomNavSource = readFileSync(new URL('../src/components/BottomNav.tsx', import.meta.url), 'utf8');
 const downloadsScreenSource = readFileSync(new URL('../src/screens/DownloadsScreen.tsx', import.meta.url), 'utf8');
+const downloadsCoreSource = readFileSync(new URL('../src/screens/DownloadsScreenCore.tsx', import.meta.url), 'utf8');
+const discoverSource = readFileSync(new URL('../src/screens/DiscoverScreen.tsx', import.meta.url), 'utf8');
+const watchlistSource = readFileSync(new URL('../src/screens/WatchListScreen.tsx', import.meta.url), 'utf8');
+const profileSource = readFileSync(new URL('../src/screens/ProfileScreen.tsx', import.meta.url), 'utf8');
 
 function tap(
   currentTab: string,
@@ -61,28 +65,29 @@ test('la borne temporelle et le triple appui sont déterministes', () => {
   assert.equal(third.action, 'active-single');
 });
 
-test('le retour en haut générique reste limité au root de l’onglet actif', () => {
+test('SEENIT-UX-005 adresse un reset local distinct à chaque onglet', () => {
   assert.doesNotMatch(appSource, /document\.querySelectorAll\(/);
-  assert.match(appSource, /document\.querySelector<HTMLElement>\(`\[data-app-tab=/);
-  assert.match(appSource, /data-app-tab="discover"/);
-  assert.match(appSource, /data-app-tab="downloads"/);
-  assert.match(appSource, /data-app-tab="watchlist"/);
-  assert.match(appSource, /data-app-tab="profile"/);
+  assert.match(appSource, /new CustomEvent\(`\$\{rootTab\}-reset-all`\)/);
+  assert.match(discoverSource, /addEventListener\('discover-reset-all'/);
+  assert.match(watchlistSource, /addEventListener\('watchlist-reset-all'/);
+  assert.match(downloadsCoreSource, /addEventListener\('downloads-reset-all'/);
+  assert.match(profileSource, /addEventListener\('profile-reset-all'/);
+  assert.doesNotMatch(bottomNavSource, /downloads-scroll-top/);
 });
 
-test('Télécharger possède un contrat local explicite de retour en haut', () => {
-  assert.match(bottomNavSource, /tabId === 'downloads'[\s\S]*downloads-scroll-top/);
-  assert.match(downloadsScreenSource, /addEventListener\('downloads-scroll-top'/);
-  assert.match(downloadsScreenSource, /querySelector<HTMLElement>\('\.overflow-y-auto'\)/);
-  assert.match(downloadsScreenSource, /scrollRoot\.scrollTop = 0/);
-});
+test('SEENIT-UX-005 Télécharger efface sa recherche sans appel métier', () => {
+  const combined = `${bottomNavSource}\n${downloadsScreenSource}\n${downloadsCoreSource}`;
 
-test('le double appui Télécharger ne déclenche aucun appel métier', () => {
-  const combined = `${bottomNavSource}\n${downloadsScreenSource}`;
-
-  assert.doesNotMatch(
-    combined,
-    /fetchDownloads|removeDownload|clearAllDownloads|beginDownloadRequest|pushReleaseDirectly/,
-  );
-  assert.match(appSource, /currentTab === 'discover'[\s\S]*discover-reset-all/);
+  const resetStart = downloadsCoreSource.indexOf('const handleResetAll = () =>');
+  const resetEnd = downloadsCoreSource.indexOf("window.addEventListener('downloads-back-one-level'", resetStart);
+  const resetBlock = downloadsCoreSource.slice(resetStart, resetEnd);
+  assert.match(resetBlock, /setSearchQuery\(''\)/);
+  assert.match(resetBlock, /setSelectedMediaType\('all'\)/);
+  assert.match(resetBlock, /setSelectedQuality\('all'\)/);
+  assert.match(resetBlock, /setShowConfiguration\(false\)/);
+  assert.match(resetBlock, /setViewMode\('downloads'\)/);
+  assert.match(resetBlock, /Télécharger réinitialisé/);
+  assert.doesNotMatch(resetBlock, /fetchDownloads|removeDownload|clearAllDownloads|beginDownloadRequest|pushReleaseDirectly/);
+  assert.match(combined, /searchRequestRef\.current \+= 1/,
+    'un résultat C411 lancé avant le reset ne doit pas restaurer la recherche');
 });

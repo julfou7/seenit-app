@@ -99,3 +99,14 @@ test('SEENIT-NOTIFICATION-002 garde les images hors du pont Binder et borne le b
   assert.equal(currentPatchBlock.includes('startsWith("http'), false,
     'le patch Android courant ne télécharge jamais une URL distante');
 });
+
+test('SEENIT-NOTIFICATION-002 hydrate le bitmap seulement à la livraison Android', () => {
+  assert.match(nativePatchSource, /SEENIT_LOCAL_NOTIFICATION_DELIVERY_MEDIA_V3_PATCH/);
+  assert.match(nativePatchSource, /shouldResolveSeenItMediaNow/);
+  assert.match(nativePatchSource, /if \(shouldResolveSeenItMediaNow\) localNotification\.resolveLargeIcon\(context\) else null/);
+  assert.match(nativePatchSource, /NotificationCompat\.Builder\.recoverBuilder\(context, notification\)/);
+  assert.match(nativePatchSource, /notificationJson\?\.let \{ LocalNotification\.buildNotificationFromJSObject\(it\) \}/);
+  assert.match(nativePatchSource, /notificationManager\.notify\(id, deliveredNotification\)/);
+  assert.match(reminderSource, /REMINDER_SCHEDULE_SCHEMA = 'v5'/,
+    'les alarmes existantes doivent être recréées sans bitmap dans leur PendingIntent');
+});

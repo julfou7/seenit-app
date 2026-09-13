@@ -24,7 +24,7 @@ import {
 } from '../services/plex';
 import { performPlexSync, purgeAllPlexSlugsInDb } from '../features/plex/syncPlex';
 import { SeenItLogo } from '../components/SeenItLogo';
-import { ReleaseChangelogViewer } from '../components/ChangelogViewer';
+import { ReleaseHistoryViewer } from '../components/ChangelogViewer';
 import { downloadAndInstallApk, getUpdateProgressPresentation, UpdateProgress } from '../services/appUpdater';
 import {
   activatePlexUserScope,
@@ -67,7 +67,18 @@ export function SettingsScreen() {
   const syncStatus = useSyncStore(state => state.syncStatus);
   const shows = useShowsStore(state => state.shows);
   const { logs, clearLogs, getLogsAsText } = useLogStore();
-  const { currentVersion, latestRelease, hasUpdate, isChecking: isCheckingUpdates, lastChecked, checkForUpdates } = useUpdateStore();
+  const {
+    currentVersion,
+    latestRelease,
+    hasUpdate,
+    isChecking: isCheckingUpdates,
+    lastChecked,
+    checkForUpdates,
+    releaseHistory,
+    isLoadingReleaseHistory,
+    releaseHistoryError,
+    loadReleaseHistory,
+  } = useUpdateStore();
   const [apkUpdateProgress, setApkUpdateProgress] = useState<UpdateProgress | null>(null);
   const apkUpdatePresentation = apkUpdateProgress
     ? getUpdateProgressPresentation(apkUpdateProgress)
@@ -948,6 +959,7 @@ export function SettingsScreen() {
                   if (!latestRelease) {
                     await checkForUpdates(false);
                   }
+                  await loadReleaseHistory(false);
                 }}
                 className="w-full flex items-center justify-between bg-zinc-800/40 hover:bg-zinc-800/80 active:scale-[0.99] p-3 rounded-xl border border-zinc-800 transition-all cursor-pointer group text-left"
               >
@@ -957,7 +969,7 @@ export function SettingsScreen() {
                   </div>
                   <div className="flex flex-col">
                     <span className="text-xs text-zinc-200 font-bold group-hover:text-white transition-colors">Version installée</span>
-                    <span className="text-[10px] text-zinc-400">Appuyez pour voir les notes de version</span>
+                    <span className="text-[10px] text-zinc-400">Appuyez pour voir toutes les versions</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -990,7 +1002,10 @@ export function SettingsScreen() {
 
                   <div className="flex items-center gap-2 pt-1">
                     <button
-                      onClick={() => setShowVersionNotesModal(true)}
+                      onClick={() => {
+                        setShowVersionNotesModal(true);
+                        void loadReleaseHistory(false);
+                      }}
                       className="flex-1 py-2 px-3 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-200 text-xs font-bold rounded-xl transition-all cursor-pointer text-center border border-white/5"
                     >
                       Voir les notes
@@ -1189,10 +1204,10 @@ export function SettingsScreen() {
                 </div>
                 <div>
                   <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-                    Notes de version
+                    Historique des versions
                   </h3>
                   <p className="text-xs text-amber-400/90 font-medium">
-                    SeenIt v{latestRelease?.version || currentVersion}
+                    Version installée : SeenIt v{currentVersion}
                   </p>
                 </div>
               </div>
@@ -1218,20 +1233,20 @@ export function SettingsScreen() {
               }}
             >
               <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
-                Changelog & Nouveautés
+                Tous les changelogs officiels
               </div>
               
               <div className="bg-black/40 border border-white/5 rounded-2xl p-4 max-h-80 sm:max-h-[28rem] md:max-h-[32rem] overflow-y-auto custom-scrollbar">
-                {isCheckingUpdates && !latestRelease ? (
+                {isLoadingReleaseHistory || (isCheckingUpdates && !latestRelease) ? (
                   <div className="py-8 flex flex-col items-center justify-center gap-2 text-zinc-400 text-xs">
                     <Loader2 className="w-5 h-5 animate-spin text-amber-400" />
-                    <span>Chargement des notes de version...</span>
+                    <span>Chargement de l'historique des versions...</span>
                   </div>
-                ) : latestRelease?.releaseNotes ? (
-                  <ReleaseChangelogViewer release={latestRelease} />
+                ) : releaseHistory.length > 0 ? (
+                  <ReleaseHistoryViewer history={releaseHistory} />
                 ) : (
                   <div className="py-6 text-center text-zinc-400 text-xs">
-                    <p>Aucune note de version détaillée disponible pour le moment.</p>
+                    <p>{releaseHistoryError || 'Aucune note de version détaillée disponible pour le moment.'}</p>
                     <p className="text-[11px] text-zinc-500 mt-1">Version installée : v{currentVersion}</p>
                   </div>
                 )}

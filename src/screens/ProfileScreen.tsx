@@ -9,6 +9,7 @@ import { useShows } from '../hooks/useShows';
 import { ProAnalyticsDashboard } from '../components/ProAnalyticsDashboard';
 import { SeenItLogo } from '../components/SeenItLogo';
 import { LibraryScreen } from './LibraryScreen';
+import { useToastStore } from '../store/toastStore';
 
 const ProfileStatsContent = React.memo(function ProfileStatsContent({
   onPersonClick,
@@ -33,6 +34,7 @@ export const ProfileScreen = React.memo(function ProfileScreen({
   const [activeTab, setActiveTab] = useState<'stats' | 'library'>('stats');
   const [mountedProfileTabs, setMountedProfileTabs] = useState(() => new Set<'stats' | 'library'>(['stats']));
   const [isProfileVisible, setIsProfileVisible] = useState(true);
+  const showToast = useToastStore(state => state.showToast);
 
   const [isExitingSettings, setIsExitingSettings] = useState(false);
   const [dragXSettings, setDragXSettings] = useState(0);
@@ -74,17 +76,39 @@ export const ProfileScreen = React.memo(function ProfileScreen({
         setSelectedPersonId(null);
       }
     };
+    const handleBackOneLevel = () => {
+      if (selectedPersonId !== null) {
+        setSelectedPersonId(null);
+        return;
+      }
+      if (showSettings) {
+        setShowSettings(false);
+        return;
+      }
+      if (activeTab === 'library') setActiveTab('stats');
+    };
     const handleResetAll = () => {
       setSelectedPersonId(null);
       setShowSettings(false);
+      setIsExitingSettings(false);
+      setDragXSettings(0);
+      setMountedProfileTabs(previous => previous.has('stats') ? previous : new Set(previous).add('stats'));
+      setActiveTab('stats');
+      window.dispatchEvent(new CustomEvent('library-reset-all'));
+      requestAnimationFrame(() => {
+        if (rootRef.current) rootRef.current.scrollTop = 0;
+      });
+      showToast('Profil réinitialisé : retour aux statistiques.', 'info');
     };
     window.addEventListener('popstate', handlePopState);
+    window.addEventListener('profile-back-one-level', handleBackOneLevel);
     window.addEventListener('profile-reset-all', handleResetAll);
     return () => {
       window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('profile-back-one-level', handleBackOneLevel);
       window.removeEventListener('profile-reset-all', handleResetAll);
     };
-  }, []);
+  }, [activeTab, selectedPersonId, showSettings, showToast]);
 
   useEffect(() => {
     const root = rootRef.current;

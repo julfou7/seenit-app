@@ -1,10 +1,11 @@
 import React from 'react';
 import Markdown from 'react-markdown';
 import { cn } from '../lib/utils';
-import type { SeenItReleaseInfo } from '../features/release/releasePolicy';
+import type { SeenItReleaseInfo, SeenItReleaseNotesEntry } from '../features/release/releasePolicy';
 
 interface ChangelogViewerProps {
   content: string;
+  scrollable?: boolean;
 }
 
 /**
@@ -155,11 +156,14 @@ function cleanReleaseNotes(raw: string): string {
   return result;
 }
 
-export function ChangelogViewer({ content }: ChangelogViewerProps) {
+export function ChangelogViewer({ content, scrollable = true }: ChangelogViewerProps) {
   const formattedContent = cleanReleaseNotes(content);
 
   return (
-    <div className="text-xs text-zinc-300 leading-relaxed max-h-[60vh] overflow-y-auto pr-1">
+    <div className={cn(
+      'text-xs text-zinc-300 leading-relaxed pr-1',
+      scrollable && 'max-h-[60vh] overflow-y-auto'
+    )}>
       <Markdown
         components={{
           h3: ({ children }) => (
@@ -212,9 +216,11 @@ export function ReleaseChangelogViewer({ release }: { release: SeenItReleaseInfo
         htmlUrl: release.htmlUrl
       }];
 
-  if (history.length === 1) {
-    return <ChangelogViewer content={history[0].releaseNotes} />;
-  }
+  return <ReleaseHistoryViewer history={history} />;
+}
+
+export function ReleaseHistoryViewer({ history }: { history: SeenItReleaseNotesEntry[] }) {
+  if (history.length === 1) return <ChangelogViewer content={history[0].releaseNotes} />;
 
   return (
     <div className="space-y-4">
@@ -223,7 +229,7 @@ export function ReleaseChangelogViewer({ release }: { release: SeenItReleaseInfo
           <div className="sticky top-0 z-10 w-fit rounded-full border border-amber-500/25 bg-zinc-950/95 px-2.5 py-1 text-[10px] font-black text-amber-300 shadow-sm">
             Version {entry.version}
           </div>
-          <ChangelogViewer content={entry.releaseNotes} />
+          <ChangelogViewer content={entry.releaseNotes} scrollable={false} />
         </section>
       ))}
     </div>

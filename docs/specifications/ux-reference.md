@@ -1,6 +1,6 @@
 # SeenIt — Référence UX
 
-Date : 10 septembre 2026. Baseline inspectée : 1.4.134.
+Date : 13 septembre 2026. Baseline inspectée : 1.4.147.
 
 Ce document complète `seenit.md` §9 et `functional-reference.md`. Il distingue les comportements
 observés des cibles de normalisation encore ouvertes. Il ne certifie ni le rendu sur appareil ni la
@@ -26,13 +26,14 @@ marquées comme livrées décrivent le comportement attendu du runtime courant.
 
 | Contexte | Geste actuellement codé | Effet | À préserver / écart |
 |---|---|---|---|
-| Navigation basse, autre onglet | Appui | Ouvre l'onglet, ferme les superpositions via l'événement global | Conserver la destination ; le timestamp compte actuellement ce tap dans un futur double appui. |
+| Navigation basse, autre onglet | Appui | Ouvre l'onglet, ferme les superpositions via l'événement global | Le changement de destination ne compte jamais dans le prochain double appui. |
 | Navigation basse, onglet actif | Appui simple | Émet `app-close-modals`, puis recule l'historique si modal, sinon ferme la fiche | Intention de retour utile ; vérifier qu'un seul niveau se ferme. |
-| Navigation basse | Deux taps espacés de moins de 450 ms | Appelle le reset ; le premier appui simple est immédiat | Reconnaissance à fiabiliser et portée à limiter : #178. |
+| Navigation basse | Deux taps espacés de moins de 450 ms | Le premier appui revient d'un niveau, le second réinitialise la page active | Contrat livré par `SEENIT-UX-005`, avec portée locale et toast propre à l'écran. |
 | Double appui Explorer | Reset + remontée | Recherche vide, catégorie Tout, plateformes/genres vides, âge Tous, note Toutes, tri populaire descendant, hero première carte | Préserver ce raccourci volontaire, montrer son effet ; jamais effacer les préférences du compte. |
 | Explorer, liste verticale | Swipe / défilement vertical | La descente masque la barre de recherche ; seule une remontée la réaffiche | Le geste tactile et le `scrollTop` réel gardent la même sémantique ; un swipe de descente ne doit jamais rouvrir la recherche. |
-| Double appui Profil | Ferme Réglages/personne + remontée | Le sous-onglet Statistiques/Ma Liste reste inchangé | Ne pas annoncer un retour à Statistiques comme déjà réalisé. Cible à décider dans #178. |
-| Double appui À voir/Télécharger | Remontée | Aucun événement local de reset métier | Préserver filtres/choix de ces écrans. |
+| Double appui Profil | Reset + remontée | Ferme Réglages/personne, revient à Statistiques et nettoie l'état local de Ma Liste | Ne modifie aucun suivi ni statistique. |
+| Double appui À voir | Reset + remontée | Revient à À Regarder, replie les sections et remet les carrousels au début | Ne modifie aucune progression. |
+| Double appui Télécharger | Reset + remontée | Revient à Mes téléchargements, ferme la configuration, vide recherche/filtres/résultats locaux | N'annule ni n'efface aucun transfert. |
 | Carrousel réduit « À Regarder » | Glissement horizontal | Parcourt librement les cartes ; la suite est préchargée automatiquement par lots avant la fin du rail, sans marqueur terminal | Aucun scroll-snap. Le vrai bouton « Voir tout » de l'en-tête reste l'alternative accessible vers la liste verticale exhaustive. |
 | Modal épisode | Glisser vers la gauche | Épisode suivant, puis saison suivante si disponible | Aucune progression vue ajoutée par la navigation. |
 | Modal épisode | Glisser vers la droite | Épisode précédent, puis fin de saison précédente si disponible | Même série exacte ; limites sans bouclage. |
@@ -43,8 +44,7 @@ marquées comme livrées décrivent le comportement attendu du runtime courant.
 | Réglages et personne | Depuis bord gauche (zone 70 px), glissement droit > 90 px | Ferme le panneau | Conflit avec geste système Android à vérifier ; ne pas généraliser à tous les écrans. |
 | Fiche média | Handlers de bord actuellement vides | Pas de swipe Retour personnalisé actif | Utiliser Retour visible/natif ; ne pas promettre ce geste partout. |
 
-Le reset actuel scrolle tous les éléments scrollables du document, y compris les onglets cachés.
-Cette portée est un écart (#178), pas une règle produit à reproduire.
+Le reset est local à la racine de l'onglet actif. Il ne scrolle jamais un écran caché.
 
 ## 3. Navigation — ordre livré et cible #178
 
@@ -59,14 +59,15 @@ L'organisation de la barre basse est désormais explicite et stable :
   **28 px** et les libellés mobiles à **10 px** afin de rester lisibles sans agrandir inutilement la barre ;
 - l'onglet actif est annoncé par `aria-current` en plus de son état visuel or.
 
-Le contrat d'appui/reset de #178 reste distinct de cet ordre visuel et doit encore être finalisé :
+Le contrat d'appui/reset de #178 est distinct de cet ordre visuel et désormais livré :
 
 - Une activation d'un autre onglet change de destination sans reset.
 - Un appui sur l'onglet actif revient d'un seul niveau visible ; à la racine il n'efface rien.
 - Deux appuis sur le même onglet déjà actif constituent un raccourci de reset de sa vue uniquement.
   Le passage A → B → B ne doit pas consommer le premier tap comme un reset inattendu.
-- Explorer conserve le reset détaillé ci-dessus ; À voir et Télécharger remontent seulement.
-  Pour Profil, la proposition est retour à Statistiques, à intégrer explicitement avec #178.
+- Chaque page restaure sa sous-vue initiale, replie ses panneaux et efface ses recherches, filtres et
+  expansions locales, puis affiche un toast adapté. À voir revient à À Regarder, Profil à Statistiques,
+  Télécharger à Mes téléchargements et Explorer à son filtre Tout.
 - Chaque reset a une alternative visible accessible et ne touche ni bibliothèque, ni progression,
   ni préférences cloud. L'onglet actif est annoncé aux technologies d'assistance.
 - Le double appui applicatif ne remplace pas l'activation standard du lecteur d'écran. Les tests
@@ -135,7 +136,7 @@ conformément à `SEENIT-UPDATE-004`.
 
 ## 7. Preuves UX et ordre de réalisation
 
-1. #178 : ordre et dimensions de la barre livrés ; contrat d'appui/reset et tests à horloge contrôlée encore ouverts.
+1. #178 : ordre, dimensions et contrat d'appui/reset livrés ; validation TalkBack terrain encore suivie.
 2. #179 : épisode précédent/suivant accessible avec TNR aux frontières des saisons.
 3. #180 : composants pilotes puis migration des cartes/boutons par écran.
 4. #181 : pile Retour, dialogues et en-têtes partagés.

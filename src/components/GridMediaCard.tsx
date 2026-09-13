@@ -128,6 +128,7 @@ export const GridMediaCard = React.memo(function GridMediaCard({
     title: displayTitle,
     originalTitle: (media as any).original_title || (media as any).original_name,
     year,
+    retainInLibraryCache: Boolean(show),
   });
 
   const networkLogo = getFormattedProviderLogo(

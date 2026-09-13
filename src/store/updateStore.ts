@@ -6,13 +6,16 @@ import {
   compareSemanticVersions,
   getUpdateMetadataEndpoints,
   parseSeenItRelease,
+  resolveSeenItCompleteReleaseHistory,
   resolveSeenItReleaseHistory,
-  type SeenItReleaseInfo
+  type SeenItReleaseInfo,
+  type SeenItReleaseNotesEntry
 } from '../features/release/releasePolicy';
 
 export const CURRENT_APP_VERSION = '1.4.147';
 export type AppReleaseInfo = SeenItReleaseInfo;
 let inFlightUpdateCheck: Promise<boolean> | null = null;
+let inFlightReleaseHistory: Promise<SeenItReleaseNotesEntry[]> | null = null;
 
 interface UpdateState {
   currentVersion: string;
@@ -23,8 +26,12 @@ interface UpdateState {
   dismissedVersions: string[];
   updateModalRequestId: number;
   error: string | null;
+  releaseHistory: SeenItReleaseNotesEntry[];
+  isLoadingReleaseHistory: boolean;
+  releaseHistoryError: string | null;
 
   checkForUpdates: (force?: boolean) => Promise<boolean>;
+  loadReleaseHistory: (force?: boolean) => Promise<SeenItReleaseNotesEntry[]>;
   dismissUpdate: (version: string) => void;
   requestUpdateModal: () => void;
   resetDismissed: () => void;
@@ -41,6 +48,9 @@ export const useUpdateStore = create<UpdateState>()(
       dismissedVersions: [],
       updateModalRequestId: 0,
       error: null,
+      releaseHistory: [],
+      isLoadingReleaseHistory: false,
+      releaseHistoryError: null,
 
       checkForUpdates: async (force = false) => {
         const now = Date.now();
@@ -126,6 +136,38 @@ export const useUpdateStore = create<UpdateState>()(
           completeSharedCheck(result);
           inFlightUpdateCheck = null;
         }
+      },
+
+      loadReleaseHistory: async (force = false) => {
+        if (!force && get().releaseHistory.length > 0) return get().releaseHistory;
+        if (inFlightReleaseHistory) return inFlightReleaseHistory;
+
+        inFlightReleaseHistory = (async () => {
+          set({ isLoadingReleaseHistory: true, releaseHistoryError: null });
+          try {
+            const resolved = await resolveSeenItCompleteReleaseHistory();
+            const latest = get().latestRelease;
+            const fallback = latest ? [{
+              version: latest.version,
+              releaseNotes: latest.releaseNotes,
+              publishedAt: latest.publishedAt,
+              htmlUrl: latest.htmlUrl
+            }] : [];
+            const releaseHistory = resolved.length > 0 ? resolved : fallback;
+            set({ releaseHistory, isLoadingReleaseHistory: false });
+            return releaseHistory;
+          } catch (err: any) {
+            set({
+              isLoadingReleaseHistory: false,
+              releaseHistoryError: err?.message || 'Historique des versions indisponible.'
+            });
+            return get().releaseHistory;
+          } finally {
+            inFlightReleaseHistory = null;
+          }
+        })();
+
+        return inFlightReleaseHistory;
       },
 
       dismissUpdate: (version: string) => {

@@ -453,38 +453,21 @@ function MainApp() {
       window.history.back();
     } else if (selectedShow) {
       closeShow();
+    } else {
+      const rootTab = currentTab === 'library'
+        ? 'profile'
+        : currentTab === 'settings'
+          ? 'profile'
+          : currentTab;
+      window.dispatchEvent(new CustomEvent(`${rootTab}-back-one-level`));
     }
   };
 
   const handleActiveTabDoubleClick = () => {
-    const tabRoot = currentTab === 'library'
-      ? 'watchlist'
-      : currentTab === 'settings'
-        ? 'profile'
-        : currentTab;
-    const activeTabRoot = document.querySelector<HTMLElement>(`[data-app-tab="${tabRoot}"]`);
-    const scrollableElement = activeTabRoot?.querySelector<HTMLElement>(
-      '.overflow-y-auto, .custom-scrollbar, [style*="overflow-y: auto"]'
-    );
-
-    if (scrollableElement) {
-      try {
-        if (typeof scrollableElement.scrollTo === 'function') {
-          scrollableElement.scrollTo({ top: 0, behavior: 'smooth' });
-        } else {
-          scrollableElement.scrollTop = 0;
-        }
-      } catch (e) {
-        scrollableElement.scrollTop = 0;
-      }
-    }
-
-    if (currentTab === 'discover') {
-      window.dispatchEvent(new CustomEvent('discover-reset-all'));
-    }
-    if (currentTab === 'profile') {
-      window.dispatchEvent(new CustomEvent('profile-reset-all'));
-    }
+    const rootTab = currentTab === 'library' || currentTab === 'settings'
+      ? 'profile'
+      : currentTab;
+    window.dispatchEvent(new CustomEvent(`${rootTab}-reset-all`));
   };
 
   return (
