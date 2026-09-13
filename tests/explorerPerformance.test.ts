@@ -17,6 +17,15 @@ import {
   markWatchProviderCardInteraction,
   scheduleWatchProviderCardEnrichment,
 } from '../src/features/providers/watchProviderRequestPolicy.ts';
+import {
+  arePassiveProviderStatesEqual,
+  isPassiveProviderResolutionComplete,
+  resolvePassiveProviderState,
+} from '../src/features/providers/passiveProviderState.ts';
+import {
+  createPassiveCardEnrichmentGate,
+  PASSIVE_CARD_FAILURE_RETRY_MS,
+} from '../src/features/providers/passiveCardEnrichmentPolicy.ts';
 
 class InstrumentedStorage {
   gets = 0;
@@ -133,6 +142,51 @@ test('SEENIT-PERF-001 réhydrate un diffuseur quand une carte virtualisée est r
   );
 });
 
+test('SEENIT-PERF-001 conserve les résultats diffuseurs positifs et négatifs au recyclage', () => {
+  const publicProvider = { logo_path: '/netflix.png', provider_name: 'Netflix' };
+  const publicState = resolvePassiveProviderState('movie:42', publicProvider, {
+    available: true,
+    serverName: 'Salon',
+  });
+  assert.equal(publicState.logo, '/netflix.png', 'le diffuseur public reste prioritaire sur Plex');
+  assert.equal(publicState.name, 'Netflix');
+
+  const plexState = resolvePassiveProviderState('movie:84', null, {
+    available: true,
+    serverName: 'Salon',
+  });
+  assert.match(plexState.logo || '', /^data:image\/svg\+xml/);
+  assert.equal(plexState.name, 'Plex (Salon)', 'le cache UID Plex est restitué sans Promise intermédiaire');
+
+  const negativeState = resolvePassiveProviderState('movie:126', null, {
+    available: false,
+  });
+  assert.deepEqual(negativeState, { key: 'movie:126', logo: null, name: null });
+  assert.equal(
+    isPassiveProviderResolutionComplete(false, true),
+    true,
+    'une réponse TMDB fraîche sans diffuseur est un résultat final, pas un chargement à relancer',
+  );
+  assert.equal(isPassiveProviderResolutionComplete(false, false), false);
+  assert.equal(arePassiveProviderStatesEqual(negativeState, { ...negativeState }), true);
+});
+
+test('SEENIT-PERF-001 temporise les enrichissements décoratifs négatifs de Ma Liste', () => {
+  const gate = createPassiveCardEnrichmentGate(2);
+  assert.equal(gate.tryStart('movie:1', 1_000), true);
+  assert.equal(gate.tryStart('movie:1', 1_000), false, 'une requête en vol est dédupliquée entre remontages');
+
+  gate.fail('movie:1', 2_000);
+  assert.equal(
+    gate.tryStart('movie:1', 2_000 + PASSIVE_CARD_FAILURE_RETRY_MS - 1),
+    false,
+    'un échec récent ne relance pas le détail décoratif quand la carte revient à l’écran',
+  );
+  assert.equal(gate.tryStart('movie:1', 2_000 + PASSIVE_CARD_FAILURE_RETRY_MS), true);
+  gate.succeed('movie:1');
+  assert.equal(gate.tryStart('movie:1', 2_001), true, 'un succès libère immédiatement le verrou de session');
+});
+
 test('SEENIT-PERF-001 borne le fan-out diffuseurs et stabilise les cartes Explorer', async () => {
   const limiter = createWatchProviderRequestLimiter();
   let active = 0;
@@ -192,8 +246,14 @@ test('SEENIT-PERF-001 borne le fan-out diffuseurs et stabilise les cartes Explor
   assert.match(passiveProviderSource, /scheduleWatchProviderCardEnrichment\(enrichProvider\)/);
   assert.match(passiveProviderSource, /readWatchProviderCache\(tmdbId, mediaType, \{ allowStale: true \}\)/);
   assert.match(passiveProviderSource, /tmdb\.peekWatchProviders\(tmdbId, mediaType\)/);
-  assert.match(passiveProviderSource, /if \(latestSnapshot\?\.fresh\)/);
   assert.match(passiveProviderSource, /writeWatchProviderCache\(numericTmdbId, mediaType, res\.value\)/);
+  assert.match(passiveProviderSource, /usePlexAvailabilityStore\(state =>/);
+  assert.match(passiveProviderSource, /isPassiveProviderResolutionComplete/);
+  assert.doesNotMatch(
+    passiveProviderSource,
+    /checkPlexAvailability/,
+    'une carte passive doit lire le cache Plex synchroniquement sans recréer de Promise à chaque remontage',
+  );
   assert.doesNotMatch(
     passiveProviderSource,
     /writeWatchProviderCache\([^\n]*PLEX_LOGO_SVG/,
