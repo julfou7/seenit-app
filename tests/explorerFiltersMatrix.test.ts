@@ -91,6 +91,13 @@ test('Explorer ne réimplémente plus une classification parentale contradictoir
   assert.doesNotMatch(discoverSource, /itemG\.includes\(27\).*PE?GI/s);
   assert.match(tmdbFacadeSource, /applyCanonicalAgeFilter/);
   assert.match(tmdbFacadeSource, /matchesMaxRecommendedAge/);
+  const ageFilterStart = tmdbFacadeSource.indexOf('const applyCanonicalAgeFilter');
+  const ageFilterEnd = tmdbFacadeSource.indexOf('\n};', ageFilterStart);
+  assert.ok(ageFilterStart >= 0 && ageFilterEnd > ageFilterStart, 'le filtre parental doit être détectable');
+  const ageFilterSource = tmdbFacadeSource.slice(ageFilterStart, ageFilterEnd);
+  assert.match(ageFilterSource, /resolveCanonicalParentalRating/);
+  assert.doesNotMatch(ageFilterSource, /getMovieDetails|getShowDetails/,
+    'le filtre d’âge ne doit jamais hydrater une fiche TMDB complète');
 });
 
 test('les catégories spéciales gardent leurs contraintes avec les filtres', () => {

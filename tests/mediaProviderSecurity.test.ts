@@ -88,6 +88,8 @@ test('SEENIT-SECURITY-001 conserve les paramètres TMDB utiles sans transmettre 
     'tmdb/find/1234?external_source=tvdb_id',
     'tmdb/tv/42/season/0/episode/1?append_to_response=videos',
     'tmdb/movie/42?append_to_response=credits,similar,recommendations,release_dates',
+    'tmdb/movie/42/release_dates',
+    'tmdb/tv/42/content_ratings',
     'tmdb/discover/movie?region=FR&with_release_type=2%7C3&release_date.gte=2026-01-01',
     'tmdb/tv/42/watch/providers',
     'tmdb/person/42/combined_credits',

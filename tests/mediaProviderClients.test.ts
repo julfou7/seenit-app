@@ -72,6 +72,58 @@ for (const native of [false, true]) {
   });
 }
 
+for (const native of [false, true]) {
+  test('issue #326 borne et déduplique le fast path parental ' + (native ? 'APK' : 'PWA'), async () => {
+    let active = 0;
+    let maxActive = 0;
+    const fixture = await loadClient('src/features/shows/tmdbClient.ts', async url => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      await new Promise(resolve => setTimeout(resolve, 5));
+      active -= 1;
+      if (!url.pathname.endsWith('/release_dates') && !url.pathname.endsWith('/content_ratings')) {
+        return json({
+          id: Number(url.pathname.split('/').at(-1)),
+          release_dates: { results: [{ iso_3166_1: 'US', release_dates: [{ certification: 'PG' }] }] },
+        });
+      }
+      return json({
+        id: Number(url.pathname.split('/').at(-2)),
+        results: url.pathname.endsWith('/release_dates')
+          ? [{ iso_3166_1: 'US', release_dates: [{ certification: 'PG' }] }]
+          : [{ iso_3166_1: 'US', rating: 'TV-PG' }],
+      });
+    }, native);
+    const client = new fixture.exports.TMDBClient();
+
+    const duplicate = await Promise.all([
+      client.getParentalRatingDetails(42, 'movie'),
+      client.getParentalRatingDetails(42, 'movie'),
+    ]);
+    assert.ok(duplicate.every((result: any) => result.ok));
+    assert.equal(fixture.calls.length, 1, 'deux résolutions identiques partagent la même requête');
+    assert.ok(duplicate[0].value.release_dates);
+
+    const results = await Promise.all(Array.from({ length: 20 }, (_, index) => (
+      client.getParentalRatingDetails(100 + index, index % 2 === 0 ? 'movie' : 'tv')
+    )));
+    assert.ok(results.every((result: any) => result.ok));
+    assert.equal(maxActive <= fixture.exports.PARENTAL_RATING_MAX_CONCURRENT, true);
+    assert.equal(fixture.exports.PARENTAL_RATING_MAX_CONCURRENT, 8);
+    assert.equal(fixture.calls.every(url => (
+      url.pathname.endsWith('/release_dates') || url.pathname.endsWith('/content_ratings')
+    )), true, 'le fast path doit utiliser uniquement les endpoints de certification');
+    assert.equal(fixture.calls.every(url => !url.searchParams.has('append_to_response')), true);
+
+    await client.getParentalRatingDetails(42, 'movie');
+    assert.equal(fixture.calls.length, 21, 'la classification déjà connue reste en cache');
+
+    await client.getMovieDetails(77);
+    await client.getParentalRatingDetails(77, 'movie');
+    assert.equal(fixture.calls.length, 22, 'une fiche complète déjà en cache fournit directement sa preuve parentale');
+  });
+}
+
 test('issue #12 conserve recherche film/année, ID externe et biographie de secours', async () => {
   const fixture = await loadClient('src/features/shows/tmdbClient.ts', url => {
     if (url.pathname.includes('/search/')) return json({ results: [{ id: 11, title: 'Film Test', vote_count: 500 }] });

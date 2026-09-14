@@ -260,6 +260,9 @@ Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, 
 - La classification automatique provient exclusivement de la certification US explicite TMDB. Une
   certification absente ou inconnue s'affiche **« Âge à vérifier »** ; aucun genre n'est utilisé comme
   fallback et le terme PEGI n'est pas employé pour les films/séries.
+- L'application du filtre d'âge récupère seulement la preuve de classification nécessaire, réutilise les
+  détails ou classifications déjà en cache et borne le fan-out réseau à huit requêtes. Elle ne charge pas
+  les fiches TMDB complètes des résultats Explorer.
 - Le panneau « Type de contenu » permet notamment de choisir **Top 100** ; ce choix change de catégorie et ne constitue pas un tri.
 - Tri Populaires, Mieux notés, Plus récents ou Ordre alphabétique.
 - Hero Top 10, chargement infini, aperçu long-press et cache utilisable lors d'une panne réseau.
