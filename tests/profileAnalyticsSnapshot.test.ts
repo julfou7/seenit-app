@@ -5,9 +5,11 @@ import {
   PROFILE_ANALYTICS_METADATA_TTL_MS,
   PROFILE_ANALYTICS_STORAGE_FIELD,
   applyProfileAnalyticsContributions,
+  readProfileAnalyticsDisplayBaseline,
   readProfileAnalyticsSnapshot,
   reconcileProfileAnalyticsSnapshot,
   repairProfileAnalyticsSnapshot,
+  writeProfileAnalyticsDisplayBaseline,
   writeProfileAnalyticsSnapshot,
   type AnalyticsMediaContribution,
   type ProfileAnalyticsSnapshot,
@@ -16,11 +18,19 @@ import { getUserScopedStorageKey } from '../src/lib/userIsolation.ts';
 import type { Show } from '../src/types.ts';
 
 const storage = new Map<string, string>();
+let storageQuota = Number.POSITIVE_INFINITY;
 Object.defineProperty(globalThis, 'localStorage', {
   configurable: true,
   value: {
     getItem: (key: string) => storage.get(key) ?? null,
-    setItem: (key: string, value: string) => { storage.set(key, value); },
+    setItem: (key: string, value: string) => {
+      const nextSize = Array.from(storage.entries()).reduce(
+        (size, [storedKey, storedValue]) => size + (storedKey === key ? 0 : storedKey.length + storedValue.length),
+        key.length + value.length,
+      );
+      if (nextSize > storageQuota) throw new Error('QuotaExceededError');
+      storage.set(key, value);
+    },
     removeItem: (key: string) => { storage.delete(key); },
     clear: () => { storage.clear(); },
   },
@@ -94,6 +104,7 @@ const reconcile = (
 
 test('SEENIT-PERF-001 persiste une baseline Profil versionnée et isolée par UID', () => {
   storage.clear();
+  storageQuota = Number.POSITIVE_INFINITY;
   const now = 2_000_000_000_000;
   const shows = [makeShow({ id: 1 })];
   const initial = reconcile('user-a', shows, null, now);
@@ -170,6 +181,7 @@ test('SEENIT-PERF-001 applique les ajouts retraits et progressions par delta', (
 
 test('SEENIT-PERF-001 invalide seulement la métadonnée expirée et répare un snapshot', () => {
   storage.clear();
+  storageQuota = Number.POSITIVE_INFINITY;
   const now = 2_000_000_000_000;
   const shows = [makeShow({ id: 1 }), makeShow({ id: 2 })];
   const initial = reconcile('user-a', shows, null, now);
@@ -239,4 +251,59 @@ test('SEENIT-PERF-001 borne le coût incrémental sur une bibliothèque représe
   assert.deepEqual(delta.metadataKeys, []);
   assert.equal(delta.snapshot.data.totalEpisodesSeen, 1_001);
   assert.ok(durationMs < 250, `réconciliation incrémentale trop lente : ${durationMs.toFixed(1)} ms`);
+});
+
+test('SEENIT-PERF-001 sépare la baseline d’affichage du snapshot de travail volumineux', () => {
+  storage.clear();
+  storageQuota = Number.POSITIVE_INFINITY;
+  const now = 2_000_000_000_000;
+  const firstShow = makeShow({ id: 1 });
+  const small = reconcile('quota-user', [firstShow], null, now);
+  applyProfileAnalyticsContributions(small.snapshot, [{
+    mediaKey: 'movie:1',
+    contribution: contribution('Action', 1),
+  }], now);
+
+  storageQuota = 20_000;
+  assert.equal(writeProfileAnalyticsSnapshot(small.snapshot), true);
+
+  const shows = Array.from({ length: 80 }, (_, index) => makeShow({ id: index + 1 }));
+  const large = reconcile('quota-user', shows, null, now + 1);
+  applyProfileAnalyticsContributions(
+    large.snapshot,
+    shows.map((show, showIndex) => ({
+      mediaKey: `movie:${show.tmdbId}`,
+      contribution: {
+        genres: ['Action'],
+        actors: Array.from({ length: 80 }, (_, actorIndex) => ({
+          id: actorIndex + 1,
+          name: `Actor ${actorIndex + 1}`,
+          profile_path: `/actor-${actorIndex + 1}.jpg`,
+          popularity: 100 - actorIndex,
+        })),
+        directors: [{
+          id: 10_000 + showIndex,
+          name: `Director ${showIndex}`,
+          profile_path: null,
+          popularity: showIndex,
+        }],
+      },
+    })),
+    now + 1,
+  );
+
+  assert.equal(writeProfileAnalyticsSnapshot(large.snapshot), false);
+  assert.equal(
+    readProfileAnalyticsSnapshot('quota-user')?.signature,
+    small.snapshot.signature,
+    'localStorage conserve silencieusement une ancienne baseline lorsque le gros snapshot dépasse le quota',
+  );
+  assert.equal(writeProfileAnalyticsDisplayBaseline(large.snapshot), true);
+  assert.deepEqual(readProfileAnalyticsDisplayBaseline('quota-user')?.data, large.snapshot.data);
+  assert.ok(
+    JSON.stringify(readProfileAnalyticsDisplayBaseline('quota-user')).length * 20
+      < JSON.stringify(large.snapshot).length,
+    'la baseline immédiatement affichable doit rester très inférieure au snapshot de travail',
+  );
+  storageQuota = Number.POSITIVE_INFINITY;
 });

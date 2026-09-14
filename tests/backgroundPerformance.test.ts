@@ -9,6 +9,10 @@ const analyticsSnapshotSource = readFileSync(
   new URL('../src/features/profile/profileAnalyticsSnapshot.ts', import.meta.url),
   'utf8',
 );
+const analyticsStorageSource = readFileSync(
+  new URL('../src/features/profile/profileAnalyticsStorage.ts', import.meta.url),
+  'utf8',
+);
 const logStoreSource = readFileSync(new URL('../src/store/logStore.ts', import.meta.url), 'utf8');
 
 test('#229 suspend les Effects des onglets cachés, sauf Explorer qui doit rester actif (#289)', () => {
@@ -69,10 +73,21 @@ test('#229 rend les analytics progressifs, stables et reprenables après navigat
   assert.match(analyticsSource, /await new Promise<void>\(\(resolve\) => setTimeout\(resolve, 0\)\)/);
   assert.match(analyticsSource, /writeResultCache\(resultCacheKey, snapshot\.data\)/);
   assert.match(analyticsSource, /\}, \[uid, shows, libraryReady\]\);/);
-  assert.match(analyticsSource, /if \(!libraryReady\) \{[\s\S]*?setLoading\(!previous\);[\s\S]*?return;/);
+  assert.match(analyticsSource, /if \(!libraryReady\) \{[\s\S]*?setLoading\(!immediateData\);[\s\S]*?return;/);
   assert.match(profileSource, /libraryReady=\{!loading\}/);
   assert.match(analyticsSnapshotSource, /mode: reusable \? 'snapshot-delta' : 'full-rebuild'/);
   assert.match(analyticsSnapshotSource, /PROFILE_ANALYTICS_STORAGE_FIELD = 'profile_analytics_snapshot_v1'/);
+  assert.match(analyticsSnapshotSource, /PROFILE_ANALYTICS_DISPLAY_STORAGE_FIELD = 'profile_analytics_display_v1'/);
+  assert.match(analyticsStorageSource, /class ProfileAnalyticsDatabase extends Dexie/);
+  assert.match(analyticsSource, /readProfileAnalyticsDisplayBaseline\(uid\)/);
+  assert.match(analyticsSource, /await readProfileAnalyticsWorkingSnapshot\(uid\)/);
+  assert.match(analyticsSource, /const publishProgress = !immediateData/);
+  assert.match(analyticsSource, /if \(failedMetadataKeys\.size === 0\)/);
+  assert.doesNotMatch(
+    analyticsSource,
+    /writeProfileAnalyticsSnapshot\(/,
+    'le snapshot volumineux ne doit plus être écrit dans localStorage',
+  );
 });
 
 test('#229 regroupe les rafales de logs hors du chemin synchrone par ligne', () => {

@@ -29,7 +29,9 @@ export const ProfileScreen = React.memo(function ProfileScreen({
 }) {
   const [showSettings, setShowSettings] = useState(initialShowSettings);
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
-  const [user, setUser] = useState<FirebaseUser | null>(null);
+  // App ne monte le Profil qu'après résolution de Firebase Auth : reprendre la
+  // valeur déjà disponible évite une frame « Utilisateur » au redémarrage.
+  const [user, setUser] = useState<FirebaseUser | null>(() => auth.currentUser);
   const [shareCopied, setShareCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'stats' | 'library'>('stats');
   const [mountedProfileTabs, setMountedProfileTabs] = useState(() => new Set<'stats' | 'library'>(['stats']));
