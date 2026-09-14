@@ -9,6 +9,7 @@ const PREPARE_COMMAND = '/prepare-release-apk';
 const BOT_NAME = 'github-actions[bot]';
 const BOT_EMAIL = '41898282+github-actions[bot]@users.noreply.github.com';
 const ACTIONS_PR_POLICY_MESSAGE = 'GitHub Actions is not permitted to create or approve pull requests.';
+const CONTROLLER_COMMIT_MARKER = 'Préparation créée par le contrôleur connector-only #102.';
 
 function runGit(args, options = {}) {
   return execFileSync('git', args, {
@@ -87,6 +88,50 @@ function evaluateRemoteCandidate({ mainSha, branchSha, compare, branchVersion })
   return { reusable: true };
 }
 
+function isControllerGeneratedCandidateCommit(commit, targetVersion) {
+  const message = String(commit?.commit?.message || commit?.message || '');
+  const expectedPrefix = `chore(release): préparer SeenIt ${targetVersion}`;
+  return commit?.author?.login === BOT_NAME
+    && commit?.committer?.login === BOT_NAME
+    && message.startsWith(expectedPrefix)
+    && message.includes('Changelog: aucun')
+    && message.includes(CONTROLLER_COMMIT_MARKER);
+}
+
+function evaluateRecyclableRemoteCandidate({
+  mainSha,
+  branchSha,
+  compare,
+  branchVersion,
+  targetVersion,
+  candidateCommit,
+  candidatePrs = []
+}) {
+  if (!mainSha || !branchSha) return { recyclable: false, reason: 'SHA de candidate absent.' };
+  if (branchVersion !== targetVersion) {
+    return { recyclable: false, reason: `Version candidate ${branchVersion} différente de ${targetVersion}.` };
+  }
+  if (compare?.merge_base_commit?.sha === mainSha) {
+    return { recyclable: false, reason: 'La candidate est toujours basée sur le main courant.' };
+  }
+  if (Number(compare?.ahead_by) !== 1 || Number(compare?.behind_by) <= 0) {
+    return {
+      recyclable: false,
+      reason: `Le recyclage exige exactement 1 commit propre et un main avancé (ahead=${compare?.ahead_by}, behind=${compare?.behind_by}).`
+    };
+  }
+  if (!sameReleaseFiles(compare?.files)) {
+    return { recyclable: false, reason: 'La candidate obsolète modifie des fichiers hors des 8 surfaces de version.' };
+  }
+  if ((candidatePrs || []).length > 0) {
+    return { recyclable: false, reason: 'La candidate possède déjà un historique de pull request et ne peut pas être recyclée automatiquement.' };
+  }
+  if (candidateCommit?.sha !== branchSha || !isControllerGeneratedCandidateCommit(candidateCommit, targetVersion)) {
+    return { recyclable: false, reason: 'Le commit de candidate n’est pas une préparation canonique créée par github-actions[bot].' };
+  }
+  return { recyclable: true };
+}
+
 function isActionsPrCreationPolicyError(error) {
   const message = String(error?.message || error || '');
   return message.includes('GitHub API POST /pulls -> 403:') && message.includes(ACTIONS_PR_POLICY_MESSAGE);
@@ -129,9 +174,9 @@ async function readRemotePackageVersion(request, ref) {
   return JSON.parse(text).version;
 }
 
-async function findOpenCandidatePr(request, owner, branchName) {
-  const prs = await request(`/pulls?state=open&base=${MAIN_BRANCH}&head=${encodeURIComponent(`${owner}:${branchName}`)}&per_page=10`);
-  return Array.isArray(prs) ? prs[0] || null : null;
+async function findCandidatePrs(request, owner, branchName) {
+  const prs = await request(`/pulls?state=all&base=${MAIN_BRANCH}&head=${encodeURIComponent(`${owner}:${branchName}`)}&per_page=10`);
+  return Array.isArray(prs) ? prs : [];
 }
 
 async function createCandidatePr(request, { branchName, version, mainSha }) {
@@ -155,20 +200,61 @@ async function createCandidatePrWithPolicyHandoff(request, options) {
   }
 }
 
-async function reuseExistingCandidate({ request, owner, mainSha, branchName, targetVersion, branchRef }) {
+async function deleteRemoteCandidateRef(request, branchName, expectedSha) {
+  const encodedBranch = encodeURIComponent(branchName);
+  const freshRef = await request(`/git/ref/heads/${encodedBranch}`);
+  const freshSha = freshRef?.object?.sha;
+  if (!freshSha || freshSha !== expectedSha) {
+    throw new Error(`La ref ${branchName} a changé pendant le recyclage (${freshSha || 'absente'} au lieu de ${expectedSha}).`);
+  }
+  await request(`/git/refs/heads/${encodedBranch}`, { method: 'DELETE' });
+}
+
+async function reuseOrRecycleExistingCandidate({ request, owner, mainSha, branchName, targetVersion, branchRef }) {
   const branchSha = branchRef?.object?.sha;
-  const [compare, branchVersion] = await Promise.all([
+  const [compare, branchVersion, candidatePrs] = await Promise.all([
     request(`/compare/${mainSha}...${branchSha}`),
-    readRemotePackageVersion(request, branchName)
+    readRemotePackageVersion(request, branchName),
+    findCandidatePrs(request, owner, branchName)
   ]);
   compare.targetVersion = targetVersion;
   const evaluation = evaluateRemoteCandidate({ mainSha, branchSha, compare, branchVersion });
-  if (!evaluation.reusable) throw new Error(`Candidate ${branchName} incompatible : ${evaluation.reason}`);
+  if (evaluation.reusable) {
+    const existingPr = candidatePrs.find(pr => pr?.state === 'open') || null;
+    if (existingPr) return { branchSha, pr: existingPr, prHandoff: false, reused: true, recycled: false };
+    const prResult = await createCandidatePrWithPolicyHandoff(request, { branchName, version: targetVersion, mainSha });
+    return { branchSha, ...prResult, reused: true, recycled: false };
+  }
 
-  const existingPr = await findOpenCandidatePr(request, owner, branchName);
-  if (existingPr) return { branchSha, pr: existingPr, prHandoff: false, reused: true };
+  const candidateCommit = await request(`/commits/${branchSha}`);
+  const recycling = evaluateRecyclableRemoteCandidate({
+    mainSha,
+    branchSha,
+    compare,
+    branchVersion,
+    targetVersion,
+    candidateCommit,
+    candidatePrs
+  });
+  if (!recycling.recyclable) {
+    throw new Error(`Candidate ${branchName} incompatible : ${evaluation.reason} Recyclage refusé : ${recycling.reason}`);
+  }
+
+  await deleteRemoteCandidateRef(request, branchName, branchSha);
+  await addControlComment(request, [
+    `♻️ Candidate **${branchName}** obsolète recyclée de façon sûre.`,
+    '',
+    `- Ancien commit contrôleur : \`${branchSha}\``,
+    `- Ancienne base : \`${compare?.merge_base_commit?.sha || '?'}\``,
+    `- Main courant : \`${mainSha}\``,
+    '- Preuves : 1 commit release-only, 8 surfaces, auteur/committer github-actions[bot], aucune PR existante.',
+    '- Action : suppression de la ref GitHub après relecture de son SHA ; aucun force-push.',
+    `- Prochaine action du job : recréer \`${branchName}\` depuis le main courant.`
+  ].join('\n'));
+
+  const prepared = prepareLocalCandidate({ targetVersion, branchName, mainSha });
   const prResult = await createCandidatePrWithPolicyHandoff(request, { branchName, version: targetVersion, mainSha });
-  return { branchSha, ...prResult, reused: true };
+  return { branchSha: prepared.commitSha, ...prResult, reused: false, recycled: true };
 }
 
 function prepareLocalCandidate({ targetVersion, branchName, mainSha }) {
@@ -192,7 +278,7 @@ function prepareLocalCandidate({ targetVersion, branchName, mainSha }) {
   runGit([
     'commit',
     '-m', `chore(release): préparer SeenIt ${targetVersion}`,
-    '-m', 'Changelog: aucun\n\nDétails techniques:\n- Aligne atomiquement les 8 surfaces canoniques de version.\n- Préparation créée par le contrôleur connector-only #102.'
+    '-m', `Changelog: aucun\n\nDétails techniques:\n- Aligne atomiquement les 8 surfaces canoniques de version.\n- ${CONTROLLER_COMMIT_MARKER}`
   ]);
   const commitCount = Number(runGit(['rev-list', '--count', `${mainSha}..HEAD`]));
   if (commitCount !== 1) throw new Error(`La candidate doit contenir exactement 1 commit, trouvé ${commitCount}.`);
@@ -240,17 +326,22 @@ async function runPrepareReleaseControl({ event, token = process.env.GITHUB_TOKE
 
   let candidate;
   if (branchRef) {
-    candidate = await reuseExistingCandidate({ request, owner: validatedEvent.owner, mainSha, branchName, targetVersion, branchRef });
+    candidate = await reuseOrRecycleExistingCandidate({ request, owner: validatedEvent.owner, mainSha, branchName, targetVersion, branchRef });
   } else {
     const prepared = prepareLocalCandidate({ targetVersion, branchName, mainSha });
     const prResult = await createCandidatePrWithPolicyHandoff(request, { branchName, version: targetVersion, mainSha });
-    candidate = { branchSha: prepared.commitSha, ...prResult, reused: false };
+    candidate = { branchSha: prepared.commitSha, ...prResult, reused: false, recycled: false };
   }
 
   const seconds = metric();
   const requiresConnectorPr = candidate.prHandoff === true;
+  const candidateLabel = candidate.recycled
+    ? '♻️ Candidate obsolète recréée'
+    : candidate.reused
+      ? '♻️ Candidate réutilisée'
+      : '🧩 Candidate créée';
   await addControlComment(request, [
-    `${candidate.reused ? '♻️ Candidate réutilisée' : '🧩 Candidate créée'} pour **v${targetVersion}**.`,
+    `${candidateLabel} pour **v${targetVersion}**.`,
     '',
     `- Base main : \`${mainSha}\``,
     `- Branche : \`${branchName}\``,
@@ -274,6 +365,7 @@ async function runPrepareReleaseControl({ event, token = process.env.GITHUB_TOKE
     prNumber: candidate.pr?.number || null,
     prUrl: candidate.pr?.html_url || null,
     prHandoff: requiresConnectorPr,
+    recycled: candidate.recycled === true,
     requestToPrSeconds: requiresConnectorPr ? null : seconds,
     requestToDecisionSeconds: requiresConnectorPr ? seconds : null
   };
@@ -296,11 +388,15 @@ module.exports = {
   ACTIONS_PR_POLICY_MESSAGE,
   BOT_EMAIL,
   BOT_NAME,
+  CONTROLLER_COMMIT_MARKER,
   PREPARE_COMMAND,
   buildCandidateBranchName,
   buildCandidatePrBody,
+  deleteRemoteCandidateRef,
+  evaluateRecyclableRemoteCandidate,
   evaluateRemoteCandidate,
   isActionsPrCreationPolicyError,
+  isControllerGeneratedCandidateCommit,
   resolvePreparationTarget,
   runPrepareReleaseControl,
   sameReleaseFiles,

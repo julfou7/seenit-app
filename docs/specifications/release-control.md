@@ -58,7 +58,18 @@ Une branche existante est réutilisable uniquement si :
 - elle est à `ahead_by=1` et `behind_by=0` ;
 - sa version est exactement la cible attendue ;
 - son diff contient exactement les huit surfaces canoniques ;
-- elle possède au plus une PR ouverte vers `main` ; une PR manquante peut être créée, mais une branche incompatible n’est jamais réécrite silencieusement.
+- elle possède au plus une PR ouverte vers `main` ; une PR manquante peut être créée.
+
+Une candidate incompatible reste bloquante par défaut et n’est jamais réécrite silencieusement. Il existe une unique récupération automatique pour la course **candidate créée → handoff PR connector-only → `main` avance** : le contrôleur peut recycler la branche canonique seulement s’il prouve simultanément que :
+
+- la version de branche est exactement la prochaine version attendue et aucun tag/release cible n’existe ;
+- la branche contient exactement **un commit propre** (`ahead_by=1`) et le `main` a avancé (`behind_by>0`) ;
+- le diff propre à cette branche contient exactement les huit surfaces de version et aucun fichier métier ;
+- le commit de tête est auteur **et** committer `github-actions[bot]`, porte le titre canonique `chore(release): préparer SeenIt X.Y.Z`, `Changelog: aucun` et le marqueur `Préparation créée par le contrôleur connector-only #102.` ;
+- aucune PR, ouverte ou fermée, n’existe pour cette branche ;
+- le SHA de la ref distante est relu immédiatement avant mutation et correspond toujours au SHA inspecté.
+
+Quand toutes ces preuves sont réunies, le contrôleur supprime explicitement la ref obsolète avec l’API GitHub, trace l’ancien SHA, l’ancienne base et le nouveau `main` sur #102, puis recrée `release/vX.Y.Z` depuis le `main` courant par le préparateur atomique normal. **Aucun force-push n’est autorisé.** Si une seule preuve manque ou si la ref change entre inspection et suppression, le recyclage est refusé et l’incompatibilité reste bloquante.
 
 Le contrôleur poste sur #102 la version, la base `main`, la branche, le commit, la PR, la portée release-only et la mesure « demande → PR » lorsqu’elle est disponible.
 
@@ -75,7 +86,7 @@ Ce cas précis n’invalide pas une candidate déjà préparée. Après preuve q
 - il termine sans faux échec avec l’action machine-readable `connector_pr_required` ;
 - le client connecté ouvre alors la PR `release/vX.Y.Z` → `main` via le connecteur GitHub, puis reprend la CI/merge normale.
 
-La tolérance est volontairement étroite : un autre `403`, une erreur d’API différente ou une candidate incompatible restent bloquants. Le contrôleur ne doit jamais convertir une panne générique en succès ni affaiblir les validations de candidate.
+La tolérance est volontairement étroite : un autre `403`, une erreur d’API différente ou une candidate incompatible hors du recyclage strict ci-dessus restent bloquants. Le contrôleur ne doit jamais convertir une panne générique en succès ni affaiblir les validations de candidate.
 
 ## Huit surfaces canoniques de version
 
@@ -154,6 +165,7 @@ Les TNR de release couvrent réellement :
 - refus d’un autre auteur, d’une autre issue et des variantes non autorisées ;
 - calcul de la prochaine version et détection « déjà prêt à publier » ;
 - compatibilité stricte d’une candidate distante : base exacte, un commit, huit surfaces ;
+- recyclage strict d’une candidate contrôleur obsolète sans PR, avec relecture du SHA avant `DELETE` ref et refus de tout force-push ;
 - séparation des permissions préparation/publication ;
 - préparation atomique N → N+1 et conservation du format des catalogues JSON ;
 - reconnaissance stricte du seul `403` de policy GitHub Actions pour le handoff PR, tout autre échec restant bloquant ;
