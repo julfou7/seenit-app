@@ -1,7 +1,7 @@
 # SeenIt — Référence fonctionnelle canonique
 
-Dernière vérification : 12 septembre 2026
-Baseline observée avant correction : **1.4.145**, `main` `b44596c754484a29f5f83f56ad740b964b5917b2`
+Dernière vérification : 14 septembre 2026
+Baseline observée avant correction : **1.4.150**, `main` `6189bafed525fb510c1a81c87a04e19c01f92393`
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : composante obligatoire de la SPEC SeenIt
 
@@ -155,6 +155,13 @@ L'ouverture d'une fiche est un niveau de navigation au-dessus de l'onglet couran
 ferme dans l'ordre : dialogue ou modal, fiche, historique interne, retour à À Voir, puis application.
 Les deep links de notification acceptent `showId` ou `tmdbId`, `mediaType`, saison et épisode. Une
 action notification `mark_watched` peut marquer l'épisode exact après résolution de la fiche.
+
+Les toasts internes qui confirment l'ajout à **À voir** ou le passage à **Vu / Terminée** sont aussi des
+raccourcis de navigation : leur surface principale ouvre la fiche Film/Série uniquement avec l'identité
+exacte `mediaType + tmdbId`. Aucun titre, année ou texte du toast ne sert de fallback. Un toast de retrait
+(`unfollow`) reste non navigable ; ses actions internes comme **Annuler**, les actions Plex comme
+**Ignorer les suivants** et un swipe/drag de fermeture ne déclenchent pas la fiche. Le même contrat vaut
+en PWA et APK et un toast navigable s'active au clavier avec Entrée/Espace (`SEENIT-UX-006`).
 
 ## 5. Écran « À Voir »
 
@@ -628,6 +635,7 @@ et #178 à #181 ; la preuve visuelle/tactile PWA/APK reste à produire avec #15.
 | Âge conseillé personnel | Firestore du même UID | Même Firestore et même UID |
 | Backend | Même origine canonique | `https://seenit.ai.studio` explicite |
 | Retour | Historique navigateur | Modals → fiche → historique → À Voir → quitter |
+| Toast média À voir / Vu | Ouvre la fiche exacte par `mediaType + tmdbId` | Même comportement dans la WebView ; retrait/suppression non navigable |
 | Plex | Fiche Discover Web vérifiée par TMDB | Lien Discover vérifié : application Plex puis Web ; locators PMS réservés à la disponibilité |
 | Reddit/autres liens | Nouvel onglet | Application associée, puis Custom Tab |
 | Magnet | Gestionnaire navigateur/système si Téléchargements est activé | Intent Android compatible si Téléchargements est activé |

@@ -1376,6 +1376,32 @@
       ]
     },
     {
+      "id": "SEENIT-UX-006",
+      "title": "Toasts média de changement d’état navigables par identité exacte",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/toastNavigation.test.ts",
+          "contains": "SEENIT-UX-006 les quatre toasts média À voir/Vu résolvent la cible exacte TMDB"
+        },
+        {
+          "file": "tests/toastNavigation.test.ts",
+          "contains": "SEENIT-UX-006 un toast de retrait ne navigue jamais, même avec une fiche associée"
+        },
+        {
+          "file": "tests/toastNavigation.test.ts",
+          "contains": "SEENIT-UX-006 aucune navigation n’est fabriquée sans identité TMDB exacte"
+        },
+        {
+          "file": "tests/toastNavigation.test.ts",
+          "contains": "SEENIT-UX-006 le conteneur protège navigation clavier, actions secondaires et drag"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-QUALITY-002",
       "title": "Audits datés et reliés à un backlog priorisé",
       "targets": [
