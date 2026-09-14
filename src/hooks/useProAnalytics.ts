@@ -4,14 +4,20 @@ import { tmdb } from '../features/shows/tmdb';
 import {
   applyProfileAnalyticsContributions,
   getProfileAnalyticsMediaKey,
+  readProfileAnalyticsDisplayBaseline,
   readProfileAnalyticsSnapshot,
   reconcileProfileAnalyticsSnapshot,
-  writeProfileAnalyticsSnapshot,
+  removeProfileAnalyticsSnapshot,
+  writeProfileAnalyticsDisplayBaseline,
   type AnalyticsData,
   type AnalyticsMediaContribution,
   type AnalyticsPersonContribution,
   type ProfileAnalyticsSnapshot,
 } from '../features/profile/profileAnalyticsSnapshot';
+import {
+  readProfileAnalyticsWorkingSnapshot,
+  writeProfileAnalyticsWorkingSnapshot,
+} from '../features/profile/profileAnalyticsStorage';
 import { checkIsUpToDate } from '../lib/utils';
 import { auth } from '../lib/firebase';
 
@@ -24,7 +30,7 @@ const analyticsContributionCache = new Map<string, AnalyticsMediaContribution>()
 const MAX_ANALYTICS_CONTRIBUTIONS = 512;
 
 // Le snapshot complet permet de reprendre une réconciliation interrompue sans
-// désérialiser localStorage à chaque retour vers le Profil.
+// relire IndexedDB à chaque retour vers le Profil.
 const analyticsSnapshotCache = new Map<string, ProfileAnalyticsSnapshot>();
 const MAX_ANALYTICS_SNAPSHOTS = 4;
 
@@ -180,9 +186,13 @@ const reportPerformance = (
 };
 
 export function useProAnalytics(shows: Show[], libraryReady = true) {
-  const [ownedData, setOwnedData] = useState<{ uid: string; data: AnalyticsData } | null>(null);
-  const [loading, setLoading] = useState(false);
   const uid = auth.currentUser?.uid || 'anonymous';
+  const [ownedData, setOwnedData] = useState<{ uid: string; data: AnalyticsData } | null>(() => {
+    if (uid === 'anonymous') return null;
+    const baseline = readProfileAnalyticsDisplayBaseline(uid);
+    return baseline ? { uid, data: baseline.data } : null;
+  });
+  const [loading, setLoading] = useState(false);
   const data = ownedData?.uid === uid ? ownedData.data : null;
 
   useEffect(() => {
@@ -191,17 +201,53 @@ export function useProAnalytics(shows: Show[], libraryReady = true) {
     async function loadStats() {
       const startedAt = monotonicNow();
       const memorySnapshot = analyticsSnapshotCache.get(uid) || null;
-      const persistedSnapshot = uid === 'anonymous' || memorySnapshot
+      const displayBaseline = uid === 'anonymous'
+        ? null
+        : readProfileAnalyticsDisplayBaseline(uid);
+      let legacySnapshot = uid === 'anonymous' || memorySnapshot || displayBaseline
         ? null
         : readProfileAnalyticsSnapshot(uid);
-      const previous = memorySnapshot || persistedSnapshot;
+      const immediateData = displayBaseline?.data || memorySnapshot?.data || legacySnapshot?.data;
 
       // La baseline UID est affichée avant tout recalcul ou appel TMDB.
-      if (previous && isMounted) setOwnedData({ uid, data: previous.data });
+      if (immediateData && isMounted) setOwnedData({ uid, data: immediateData });
       if (!libraryReady) {
-        if (isMounted) setLoading(!previous);
+        if (isMounted) setLoading(!immediateData);
         return;
       }
+
+      const workingSnapshot = uid === 'anonymous' || memorySnapshot
+        ? null
+        : await readProfileAnalyticsWorkingSnapshot(uid);
+      if (!isMounted) return;
+      if (!workingSnapshot && !legacySnapshot && uid !== 'anonymous') {
+        legacySnapshot = readProfileAnalyticsSnapshot(uid);
+      }
+      const previous = memorySnapshot || workingSnapshot || legacySnapshot;
+      if (!immediateData && previous) setOwnedData({ uid, data: previous.data });
+
+      const persistWorkingSnapshot = async (snapshot: ProfileAnalyticsSnapshot) => {
+        if (uid === 'anonymous') return false;
+        const persisted = await writeProfileAnalyticsWorkingSnapshot(snapshot);
+        if (persisted && legacySnapshot) {
+          removeProfileAnalyticsSnapshot(uid);
+          legacySnapshot = null;
+        }
+        return persisted;
+      };
+
+      const persistCompleteDisplayBaseline = (snapshot: ProfileAnalyticsSnapshot) => {
+        if (uid === 'anonymous') return false;
+        let persisted = writeProfileAnalyticsDisplayBaseline(snapshot);
+        // Une baseline v1 volumineuse peut elle-même occuper le quota local. Le
+        // résultat compact complet la remplace alors, même sans IndexedDB.
+        if (!persisted && legacySnapshot) {
+          removeProfileAnalyticsSnapshot(uid);
+          legacySnapshot = null;
+          persisted = writeProfileAnalyticsDisplayBaseline(snapshot);
+        }
+        return persisted;
+      };
 
       const reconciliation = reconcileProfileAnalyticsSnapshot({
         uid,
@@ -216,16 +262,23 @@ export function useProAnalytics(shows: Show[], libraryReady = true) {
       const exactResult = analyticsResultCache.get(resultCacheKey);
       if (exactResult && reconciliation.mode === 'snapshot-exact') snapshot.data = exactResult;
 
+      // Toute donnée déjà affichable reste stable pendant la réparation. Cela
+      // couvre aussi la première migration d'une ancienne baseline v1 partielle.
+      const publishProgress = !immediateData;
       if (isMounted) {
-        setOwnedData({ uid, data: snapshot.data });
-        setLoading(reconciliation.metadataKeys.length > 0);
+        if (publishProgress || reconciliation.metadataKeys.length === 0) {
+          setOwnedData({ uid, data: snapshot.data });
+        }
+        setLoading(reconciliation.metadataKeys.length > 0 && publishProgress);
       }
 
-      if (uid !== 'anonymous' && reconciliation.mode !== 'snapshot-exact') {
-        writeProfileAnalyticsSnapshot(snapshot);
+      if (!workingSnapshot || reconciliation.mode !== 'snapshot-exact') {
+        await persistWorkingSnapshot(snapshot);
+        if (!isMounted) return;
       }
 
       if (reconciliation.metadataKeys.length === 0) {
+        persistCompleteDisplayBaseline(snapshot);
         writeResultCache(resultCacheKey, snapshot.data);
         reportPerformance(
           reconciliation.mode,
@@ -239,6 +292,7 @@ export function useProAnalytics(shows: Show[], libraryReady = true) {
 
       const batchSize = 12;
       let metadataRequests = 0;
+      const failedMetadataKeys = new Set<string>();
       const showsByMediaKey = new Map(
         shows.map((show) => [getProfileAnalyticsMediaKey(show), show]),
       );
@@ -270,24 +324,36 @@ export function useProAnalytics(shows: Show[], libraryReady = true) {
 
         if (!isMounted) return;
         const fetchedAt = Date.now();
+        const resolvedContributions = contributions.filter(
+          (result): result is NonNullable<typeof result> => Boolean(result),
+        );
+        const resolvedKeys = new Set(resolvedContributions.map(({ mediaKey }) => mediaKey));
+        batch.forEach((mediaKey) => {
+          if (!resolvedKeys.has(mediaKey)) failedMetadataKeys.add(mediaKey);
+        });
         applyProfileAnalyticsContributions(
           snapshot,
-          contributions.filter((result): result is NonNullable<typeof result> => Boolean(result)),
+          resolvedContributions,
           fetchedAt,
         );
 
         const batchIndex = Math.floor(offset / batchSize);
         const isLastBatch = offset + batch.length >= reconciliation.metadataKeys.length;
         if (batchIndex === 0 || (batchIndex + 1) % 4 === 0 || isLastBatch) {
-          setOwnedData({ uid, data: snapshot.data });
-          if (uid !== 'anonymous') writeProfileAnalyticsSnapshot(snapshot);
+          if (publishProgress) setOwnedData({ uid, data: snapshot.data });
+          await persistWorkingSnapshot(snapshot);
+          if (!isMounted) return;
         }
         await new Promise<void>((resolve) => setTimeout(resolve, 0));
       }
 
       if (!isMounted) return;
       setLoading(false);
-      writeResultCache(resultCacheKey, snapshot.data);
+      if (failedMetadataKeys.size === 0) {
+        setOwnedData({ uid, data: snapshot.data });
+        persistCompleteDisplayBaseline(snapshot);
+        writeResultCache(resultCacheKey, snapshot.data);
+      }
       reportPerformance(
         reconciliation.mode,
         startedAt,

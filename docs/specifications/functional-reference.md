@@ -237,6 +237,8 @@ dernier résultat complet dès la réouverture de l'application, puis appliquent
 bibliothèque par delta : compteurs pour une progression, contribution typée pour un média vu ajouté ou
 retiré, et rafraîchissement TMDB limité à la seule métadonnée expirée. Firestore reste l'autorité de la
 bibliothèque ; cette baseline n'est qu'un cache dérivé commun au comportement PWA/APK.
+Le résultat affichable compact est séparé du snapshot de travail IndexedDB : le quota du stockage WebView
+ou un enrichissement interrompu ne peut plus laisser un classement partiel comme baseline du redémarrage.
 
 Les diffuseurs des médias suivis occupent un compartiment persistant dédié et borné. Les navigations
 Explorer et le recyclage des rangées ne peuvent donc pas chasser les résultats positifs ou négatifs déjà

@@ -474,6 +474,10 @@ n'est rouverte que par une nouvelle décision produit explicite.
   recalcul complet est réservé à l'absence de baseline, à une migration de version ou à une corruption ;
   il reste réparable et doit produire le même résultat que l'enchaînement des deltas. Ce cache dérivé ne
   devient jamais une source métier et n'ajoute aucune écriture Firestore.
+- Le résultat complet immédiatement affichable reste un document compact dans `localStorage`. Le snapshot
+  de travail plus volumineux (médias, agrégats et contributions) réside dans IndexedDB : une limite de quota
+  `localStorage`, une interruption de lot ou un échec TMDB ne peuvent donc jamais remplacer la dernière
+  baseline d'affichage complète par un classement partiel. La baseline historique v1 est migrée puis retirée.
 - Ma Liste ne monte que les rangées proches du viewport vertical. Une rangée réduite matérialise une
   fenêtre d'au moins six cartes, complétée seulement par les cartes visibles et trois cartes de débord de
   chaque côté ; À Regarder applique la même règle avec un minimum de huit cartes. Les cartes sorties de la

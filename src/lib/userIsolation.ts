@@ -24,12 +24,14 @@ export function readUserScopedJson<T>(uid: string | null | undefined, field: str
   }
 }
 
-export function writeUserScopedJson(uid: string | null | undefined, field: string, value: unknown): void {
-  if (!uid) return;
+export function writeUserScopedJson(uid: string | null | undefined, field: string, value: unknown): boolean {
+  if (!uid) return false;
   try {
     localStorage.setItem(getUserScopedStorageKey(uid, field), JSON.stringify(value));
+    return true;
   } catch {
     // Le cache local est une optimisation : Firestore reste la source de vérité.
+    return false;
   }
 }
 

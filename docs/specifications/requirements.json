@@ -1696,6 +1696,10 @@
         {
           "file": "tests/profileAnalyticsSnapshot.test.ts",
           "contains": "SEENIT-PERF-001 borne le coût incrémental sur une bibliothèque représentative"
+        },
+        {
+          "file": "tests/profileAnalyticsSnapshot.test.ts",
+          "contains": "SEENIT-PERF-001 sépare la baseline d’affichage du snapshot de travail volumineux"
         }
       ]
     }

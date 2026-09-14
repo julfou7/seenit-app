@@ -99,6 +99,14 @@ export interface ProfileAnalyticsSnapshot {
   updatedAt: number;
 }
 
+export interface ProfileAnalyticsDisplayBaseline {
+  version: number;
+  uid: string;
+  signature: string;
+  data: AnalyticsData;
+  updatedAt: number;
+}
+
 export interface ProfileAnalyticsReconciliation {
   snapshot: ProfileAnalyticsSnapshot;
   mode: 'full-rebuild' | 'snapshot-delta' | 'snapshot-exact';
@@ -110,6 +118,8 @@ export interface ProfileAnalyticsReconciliation {
 export const PROFILE_ANALYTICS_SNAPSHOT_VERSION = 1;
 export const PROFILE_ANALYTICS_ALGORITHM = 'profile-analytics-delta-v1';
 export const PROFILE_ANALYTICS_STORAGE_FIELD = 'profile_analytics_snapshot_v1';
+export const PROFILE_ANALYTICS_DISPLAY_VERSION = 1;
+export const PROFILE_ANALYTICS_DISPLAY_STORAGE_FIELD = 'profile_analytics_display_v1';
 export const PROFILE_ANALYTICS_METADATA_TTL_MS = 30 * 24 * 60 * 60 * 1_000;
 const MAX_PERSISTED_CONTRIBUTIONS = 512;
 
@@ -530,8 +540,37 @@ export const readProfileAnalyticsSnapshot = (uid: string): ProfileAnalyticsSnaps
   return null;
 };
 
-export const writeProfileAnalyticsSnapshot = (snapshot: ProfileAnalyticsSnapshot): void => {
-  writeUserScopedJson(snapshot.uid, PROFILE_ANALYTICS_STORAGE_FIELD, snapshot);
+export const writeProfileAnalyticsSnapshot = (snapshot: ProfileAnalyticsSnapshot): boolean => {
+  return writeUserScopedJson(snapshot.uid, PROFILE_ANALYTICS_STORAGE_FIELD, snapshot);
+};
+
+export const removeProfileAnalyticsSnapshot = (uid: string): void => {
+  removeUserScopedValue(uid, PROFILE_ANALYTICS_STORAGE_FIELD);
+};
+
+export const readProfileAnalyticsDisplayBaseline = (uid: string): ProfileAnalyticsDisplayBaseline | null => {
+  const stored = readUserScopedJson<unknown>(uid, PROFILE_ANALYTICS_DISPLAY_STORAGE_FIELD, null);
+  if (isRecord(stored)
+    && stored.version === PROFILE_ANALYTICS_DISPLAY_VERSION
+    && stored.uid === uid
+    && typeof stored.signature === 'string'
+    && isValidData(stored.data)
+    && Number.isFinite(stored.updatedAt)) {
+    return stored as unknown as ProfileAnalyticsDisplayBaseline;
+  }
+  if (stored !== null) removeUserScopedValue(uid, PROFILE_ANALYTICS_DISPLAY_STORAGE_FIELD);
+  return null;
+};
+
+export const writeProfileAnalyticsDisplayBaseline = (snapshot: ProfileAnalyticsSnapshot): boolean => {
+  const baseline: ProfileAnalyticsDisplayBaseline = {
+    version: PROFILE_ANALYTICS_DISPLAY_VERSION,
+    uid: snapshot.uid,
+    signature: snapshot.signature,
+    data: snapshot.data,
+    updatedAt: snapshot.updatedAt,
+  };
+  return writeUserScopedJson(snapshot.uid, PROFILE_ANALYTICS_DISPLAY_STORAGE_FIELD, baseline);
 };
 
 const createEmptySnapshot = (uid: string, now: number): ProfileAnalyticsSnapshot => ({
