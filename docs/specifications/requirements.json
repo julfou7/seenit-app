@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.150",
+  "applicationVersion": "1.4.151",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
