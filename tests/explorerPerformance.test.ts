@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { readFeatureSource } from './featureSource.ts';
 import {
   WATCH_PROVIDER_CACHE_MAX_ENTRIES,
   WATCH_PROVIDER_CACHE_STALE_MAX_AGE_MS,
@@ -232,7 +233,7 @@ test('SEENIT-PERF-001 borne le fan-out diffuseurs et stabilise les cartes Explor
   const tmdbClientSource = readFileSync(new URL('../src/features/shows/tmdbClient.ts', import.meta.url), 'utf8');
   const gridSource = readFileSync(new URL('../src/components/GridMediaCard.tsx', import.meta.url), 'utf8');
   const passiveProviderSource = readFileSync(new URL('../src/hooks/usePassiveWatchProvider.ts', import.meta.url), 'utf8');
-  const discoverSource = readFileSync(new URL('../src/screens/DiscoverScreen.tsx', import.meta.url), 'utf8');
+  const discoverSource = readFeatureSource('discover');
   const appSource = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
   const cssSource = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
   const providerPolicySource = readFileSync(new URL('../src/features/providers/watchProviderRequestPolicy.ts', import.meta.url), 'utf8');

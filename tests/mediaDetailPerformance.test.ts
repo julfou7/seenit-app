@@ -5,12 +5,13 @@ import {
   BoundedCache,
   getManifestRelationSnapshot,
 } from '../src/features/shows/mediaRelations.ts';
+import { readFeatureSource } from './featureSource.ts';
 
 const tmdbClientSource = readFileSync(new URL('../src/features/shows/tmdbClient.ts', import.meta.url), 'utf8');
 const tmdbFacadeSource = readFileSync(new URL('../src/features/shows/tmdb.ts', import.meta.url), 'utf8');
-const detailSource = readFileSync(new URL('../src/screens/ShowDetailScreenCore.tsx', import.meta.url), 'utf8');
+const detailSource = readFeatureSource('showDetail');
 const detailWrapperSource = readFileSync(new URL('../src/screens/ShowDetailScreen.tsx', import.meta.url), 'utf8');
-const watchListSource = readFileSync(new URL('../src/screens/WatchListScreen.tsx', import.meta.url), 'utf8');
+const watchListSource = readFeatureSource('watchList');
 const presenceStoreSource = readFileSync(new URL('../src/store/mediaPresenceStore.ts', import.meta.url), 'utf8');
 const plexAvailabilitySource = readFileSync(new URL('../src/features/plex/plexAvailability.ts', import.meta.url), 'utf8');
 

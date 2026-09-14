@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { readFeatureSource } from './featureSource.ts';
 
-const discoverSource = readFileSync(new URL('../src/screens/DiscoverScreen.tsx', import.meta.url), 'utf8');
+const discoverSource = readFeatureSource('discover');
 
 test('Explorer garde la recherche masquée pendant une descente tactile', () => {
   const touchHandler = discoverSource.match(/const handleTouchMove = \(e: React\.TouchEvent\) => \{([\s\S]*?)\n  \};/);

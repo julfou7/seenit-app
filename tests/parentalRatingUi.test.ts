@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { readFeatureSource } from './featureSource.ts';
 
 const facade = readFileSync('src/features/shows/tmdb.ts', 'utf8');
 const filterModal = readFileSync('src/components/FilterModal.tsx', 'utf8');
 const editor = readFileSync('src/components/ParentalRatingEditor.tsx', 'utf8');
 const app = readFileSync('src/App.tsx', 'utf8');
-const detail = readFileSync('src/screens/ShowDetailScreenCore.tsx', 'utf8');
+const detail = readFeatureSource('showDetail');
 
 test('SEENIT-PARENTAL-001 unifie fiche, cartes et Explorer sur le résolveur parental', () => {
   assert.match(facade, /decorateParentalRatingDetails\(\s*'tv'/);

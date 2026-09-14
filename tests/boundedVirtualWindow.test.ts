@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { readFeatureSource } from './featureSource.ts';
 import {
   calculateGridWindow,
   calculateHorizontalWindow,
@@ -63,7 +64,7 @@ test('#229 applique le même enrichissement diffuseur passif aux cartes hors Exp
 });
 
 test('#229 ne charge les détails décoratifs des films qu’après stabilisation du geste', () => {
-  const watchListSource = readFileSync(new URL('../src/screens/WatchListScreen.tsx', import.meta.url), 'utf8');
+  const watchListSource = readFeatureSource('watchList');
   const movieCardSource = readFileSync(new URL('../src/components/cards/MovieWatchCard.tsx', import.meta.url), 'utf8');
   const passiveProviderSource = readFileSync(new URL('../src/hooks/usePassiveWatchProvider.ts', import.meta.url), 'utf8');
 

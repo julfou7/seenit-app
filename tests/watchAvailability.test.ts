@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { hasAiredEpisodeEvidence } from '../src/features/watchlist/watchAvailability.ts';
+import { readFeatureSource } from './featureSource.ts';
 
 const TODAY = '2026-09-12';
 const baseTv = {
@@ -50,7 +51,7 @@ test('watchlist disponibilité accepte uniquement une preuve positive de diffusi
 });
 
 test('watchlist disponibilité branche le garde de disponibilité sur le classement et la carte', () => {
-  const screenSource = fs.readFileSync('src/screens/WatchListScreen.tsx', 'utf8');
+  const screenSource = readFeatureSource('watchList');
   const cardSource = fs.readFileSync('src/components/cards/ContinueWatchingCard.tsx', 'utf8');
 
   assert.match(screenSource, /hasAiredEpisodeEvidence\(s, todayIso\)/,

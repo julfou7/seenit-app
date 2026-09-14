@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { readFeatureSource } from './featureSource.ts';
 import {
   discoverTypeForCategory,
   getGenreIdsForMediaType,
@@ -9,7 +10,7 @@ import {
   parseMinimumRating,
 } from '../src/features/discover/filterPolicy.ts';
 
-const discoverSource = readFileSync(new URL('../src/screens/DiscoverScreen.tsx', import.meta.url), 'utf8');
+const discoverSource = readFeatureSource('discover');
 const filterModalSource = readFileSync(new URL('../src/components/FilterModal.tsx', import.meta.url), 'utf8');
 const tmdbFacadeSource = readFileSync(new URL('../src/features/shows/tmdb.ts', import.meta.url), 'utf8');
 const gridCardSource = readFileSync(new URL('../src/components/GridMediaCard.tsx', import.meta.url), 'utf8');

@@ -201,7 +201,7 @@ test('SEENIT-PLEX-006 la transaction conserve une action concurrente SeenIt non 
 
 test('SEENIT-PLEX-006 le runtime marque la provenance Plex et ne notifie qu’un vrai retrait', () => {
   const serverSource = readFileSync(new URL('../server.ts', import.meta.url), 'utf8');
-  const syncSource = readFileSync(new URL('../src/features/plex/syncPlex.ts', import.meta.url), 'utf8');
+  const syncSource = readFileSync(new URL('../src/features/plex/plexSyncEngine.ts', import.meta.url), 'utf8');
   assert.match(serverSource, /supportsPlexOwnedUnwatch/);
   assert.match(serverSource, /state\.watched !== false/);
   assert.match(syncSource, /plexImported:\s*true/);
