@@ -6,6 +6,10 @@ import { useShows } from '../hooks/useShows';
 import { cn, scrollAllCarouselsToStart } from '../lib/utils';
 import { SeenItGlyph } from './SeenItLogo';
 import { isDownloadToastPresentation } from '../features/toasts/toastPresentation';
+import {
+  dispatchToastMediaNavigation,
+  resolveToastMediaNavigationTarget,
+} from '../features/toasts/toastNavigation';
 
 const PlexLogo = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor">
@@ -17,6 +21,7 @@ export function ToastContainer() {
   const { currentToast, queue, message, type, show, visible, onUndo, hideToast, clearQueuedScope } = useToastStore();
   const { updateShow } = useShows();
   const touchStartY = useRef<number | null>(null);
+  const didDragRef = useRef(false);
 
   useEffect(() => {
     if (visible) {
@@ -49,12 +54,16 @@ export function ToastContainer() {
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    didDragRef.current = false;
     touchStartY.current = e.touches[0].clientY;
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (touchStartY.current !== null) {
       const diff = e.changedTouches[0].clientY - touchStartY.current;
+      if (Math.abs(diff) > 5) {
+        didDragRef.current = true;
+      }
       // If swiped downwards by 25px or more, dismiss the toast
       if (Math.abs(diff) > 25) {
         hideToast();
@@ -68,9 +77,29 @@ export function ToastContainer() {
     ? queue.filter((item) => item.scope === 'plex').length
     : 0;
   const canSkipPlexQueue = queuedPlexCount > 0;
+  const navigationTarget = resolveToastMediaNavigationTarget(currentToast);
 
   const handleSkipFollowingPlexToasts = () => {
     clearQueuedScope('plex');
+  };
+
+  const handleToastNavigation = () => {
+    if (!navigationTarget) return;
+    if (didDragRef.current) {
+      didDragRef.current = false;
+      return;
+    }
+
+    dispatchToastMediaNavigation(navigationTarget);
+    hideToast();
+  };
+
+  const handleToastNavigationKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!navigationTarget || e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleToastNavigation();
+    }
   };
 
   // Parse the message into structured data
@@ -259,6 +288,12 @@ export function ToastContainer() {
           drag="y"
           dragConstraints={{ top: 0, bottom: 0 }}
           dragElastic={{ top: 0.05, bottom: 0.8 }}
+          onPointerDown={() => {
+            didDragRef.current = false;
+          }}
+          onDragStart={() => {
+            didDragRef.current = true;
+          }}
           onDragEnd={(_e, info) => {
             if (info.offset.y > 20 || info.velocity.y > 200) {
               hideToast();
@@ -266,7 +301,15 @@ export function ToastContainer() {
           }}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
-          className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 z-[99999] w-full max-w-md px-3 pointer-events-auto touch-pan-y select-none cursor-grab active:cursor-grabbing flex justify-center"
+          onClick={handleToastNavigation}
+          onKeyDown={handleToastNavigationKeyDown}
+          role={navigationTarget ? 'button' : undefined}
+          tabIndex={navigationTarget ? 0 : undefined}
+          aria-label={navigationTarget ? `Ouvrir la fiche ${parsed.title || show?.title || ''}`.trim() : undefined}
+          className={cn(
+            "fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 z-[99999] w-full max-w-md px-3 pointer-events-auto touch-pan-y select-none active:cursor-grabbing flex justify-center",
+            navigationTarget ? "cursor-pointer" : "cursor-grab",
+          )}
         >
           {hasPoster ? (
             /* Rich Media Toast with Poster */
