@@ -390,6 +390,10 @@
         {
           "file": "tests/parentalRatingPresentation.test.ts",
           "contains": "SEENIT-PARENTAL-001 supprime PEGI et les heuristiques parentales de genre"
+        },
+        {
+          "file": "tests/mediaProviderClients.test.ts",
+          "contains": "issue #326 borne et déduplique le fast path parental"
         }
       ]
     },

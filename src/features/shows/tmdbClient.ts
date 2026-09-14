@@ -13,6 +13,8 @@ import {
 } from './mediaRelations';
 import { createWatchProviderRequestLimiter } from '../providers/watchProviderRequestPolicy';
 
+export const PARENTAL_RATING_MAX_CONCURRENT = 8;
+
 export interface TMDBMedia {
   id: number;
   media_type?: string;
@@ -343,6 +345,9 @@ export class TMDBClient {
   }
   private detailsCache = new BoundedCache<string, any>(80);
   private detailsInFlight = new Map<string, Promise<Result<any>>>();
+  private parentalRatingDetailsCache = new BoundedCache<string, any>(240);
+  private parentalRatingDetailsInFlight = new Map<string, Promise<Result<any>>>();
+  private parentalRatingRequestLimiter = createWatchProviderRequestLimiter(PARENTAL_RATING_MAX_CONCURRENT);
 
   peekMediaDetails(id: number, type: RelationMediaType = 'tv'): any | null {
     return this.detailsCache.get(`${type}_${Number(id)}`) || null;
@@ -401,6 +406,56 @@ export class TMDBClient {
 
   async getMediaDetails(id: number, type: 'tv' | 'movie' = 'tv'): Promise<Result<any>> {
     return type === 'movie' ? this.getMovieDetails(id) : this.getShowDetails(id);
+  }
+
+  private toParentalRatingDetails(id: number, type: RelationMediaType, value: any): any {
+    return type === 'movie'
+      ? { id: Number(value?.id || id), media_type: type, release_dates: value?.release_dates || value }
+      : { id: Number(value?.id || id), media_type: type, content_ratings: value?.content_ratings || value };
+  }
+
+  peekParentalRatingDetails(id: number, type: RelationMediaType = 'tv'): any | null {
+    const normalizedId = Number(id);
+    const fullDetails = this.detailsCache.get(`${type}_${normalizedId}`);
+    if (fullDetails) return this.toParentalRatingDetails(normalizedId, type, fullDetails);
+    return this.parentalRatingDetailsCache.get(`${type}_${normalizedId}`) || null;
+  }
+
+  async getParentalRatingDetails(id: number, type: RelationMediaType = 'tv'): Promise<Result<any>> {
+    const normalizedId = Number(id);
+    const cacheKey = `${type}_${normalizedId}`;
+    const cached = this.peekParentalRatingDetails(normalizedId, type);
+    if (cached) return ok(cached);
+
+    const existingRequest = this.parentalRatingDetailsInFlight.get(cacheKey);
+    if (existingRequest) return existingRequest;
+
+    const request = this.parentalRatingRequestLimiter.run(async (): Promise<Result<any>> => {
+      const queuedCache = this.peekParentalRatingDetails(normalizedId, type);
+      if (queuedCache) return ok(queuedCache);
+
+      const endpoint = type === 'movie' ? 'release_dates' : 'content_ratings';
+      const url = new URL(`${this.baseUrl}/${type}/${normalizedId}/${endpoint}`);
+      const response = await tryCatch(authenticatedFetch(url.toString()));
+      if (!response.ok) return err((response as any).error);
+      if (!response.value.ok) return err(new Error(`TMDB Error: ${response.value.status}`));
+      const data = await tryCatch(response.value.json());
+      if (!data.ok) return err((data as any).error);
+      if (data.value && data.value.status_code) return err(new Error(data.value.status_message || 'TMDB Error'));
+
+      const details = this.toParentalRatingDetails(normalizedId, type, data.value || {});
+      this.parentalRatingDetailsCache.set(cacheKey, details);
+      return ok(details);
+    });
+
+    this.parentalRatingDetailsInFlight.set(cacheKey, request);
+    try {
+      return await request;
+    } finally {
+      if (this.parentalRatingDetailsInFlight.get(cacheKey) === request) {
+        this.parentalRatingDetailsInFlight.delete(cacheKey);
+      }
+    }
   }
 
   private relationCache = new BoundedCache<MediaKey, MediaRelationSnapshot>(120);

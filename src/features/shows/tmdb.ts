@@ -223,23 +223,27 @@ tmdbClient.getUniverseAndCollection = (async (media: any) => {
 }) as typeof tmdbClient.getUniverseAndCollection;
 
 const originalDiscoverWithFilters = tmdbClient.discoverWithFilters.bind(tmdbClient);
+
+const resolveCanonicalParentalRating = async (item: any) => {
+  const mediaType: 'movie' | 'tv' = item.media_type === 'movie' || Boolean(item.release_date) ? 'movie' : 'tv';
+  const tmdbId = Number(item.id);
+  const override = getParentalRatingOverride(mediaType, tmdbId);
+  if (override) return resolveParentalRating(mediaType, null, override);
+
+  const detailsResult = await tmdbClient.getParentalRatingDetails(tmdbId, mediaType);
+  return detailsResult.ok && detailsResult.value
+    ? resolveParentalRating(mediaType, detailsResult.value)
+    : null;
+};
+
 tmdbClient.discoverWithFilters = (async (options) => {
   const maxAge = parseMaxAgeFilter(options?.pegi || 'Tous');
   const result = await originalDiscoverWithFilters({ ...options, pegi: 'Tous' });
   if (!result.ok || maxAge === null || !Array.isArray(result.value?.results)) return result;
 
   const hydrated = await Promise.all(result.value.results.map(async (item: any) => {
-    const mediaType: 'movie' | 'tv' = item.media_type === 'movie' || Boolean(item.release_date) ? 'movie' : 'tv';
-    const detailsResult = mediaType === 'movie'
-      ? await tmdbClient.getMovieDetails(Number(item.id))
-      : await tmdbClient.getShowDetails(Number(item.id));
-    if (!detailsResult.ok || !detailsResult.value) return null;
-    const rating = detailsResult.value.seenitParentalRating || resolveParentalRating(
-      mediaType,
-      detailsResult.value,
-      getParentalRatingOverride(mediaType, Number(item.id)),
-    );
-    if (!matchesMaxRecommendedAge(rating, maxAge)) return null;
+    const rating = await resolveCanonicalParentalRating(item);
+    if (!rating || !matchesMaxRecommendedAge(rating, maxAge)) return null;
     return { ...item, seenitParentalRating: rating };
   }));
 
@@ -288,16 +292,8 @@ const applyCanonicalAgeFilter = async (items: any[], pegi: string): Promise<any[
   if (maxAge === null) return items;
 
   const hydrated = await Promise.all(items.map(async item => {
-    const mediaType: 'movie' | 'tv' = item.media_type === 'movie' || Boolean(item.release_date) ? 'movie' : 'tv';
-    const detailsResult = mediaType === 'movie'
-      ? await tmdbClient.getMovieDetails(Number(item.id))
-      : await tmdbClient.getShowDetails(Number(item.id));
-    if (!detailsResult.ok || !detailsResult.value) return null;
-    const rating = detailsResult.value.seenitParentalRating || resolveParentalRating(
-      mediaType,
-      detailsResult.value,
-      getParentalRatingOverride(mediaType, Number(item.id)),
-    );
+    const rating = await resolveCanonicalParentalRating(item);
+    if (!rating) return null;
     return matchesMaxRecommendedAge(rating, maxAge)
       ? { ...item, seenitParentalRating: rating }
       : null;

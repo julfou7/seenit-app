@@ -249,6 +249,9 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
 - Le filtre Explorer est nommé **« Âge conseillé »**. Il représente une borne maximale cumulative :
   par exemple `10 ans` conserve les classifications explicites « Tous publics », `7+` et `10+`, mais
   exclut `13+`, `14+`, `17+`, `18+` et toute valeur « Âge à vérifier ». Le mode « Tous » ne filtre pas.
+- Explorer résout cette preuve via les payloads TMDB minimaux `release_dates` ou `content_ratings`, avec
+  cache et déduplication partagés et au plus huit requêtes simultanées. Une fiche média complète ne doit
+  jamais être hydratée uniquement pour appliquer le filtre d'âge.
 - La fiche, les cartes et Explorer réutilisent le même résolveur ; aucune copie locale de mapping ou
   heuristique de genre n'est autorisée.
 
