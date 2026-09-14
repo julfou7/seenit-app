@@ -1,10 +1,10 @@
 # SeenIt — Référence UX
 
-Date : 13 septembre 2026. Baseline inspectée : 1.4.147.
+Date : 14 septembre 2026. Baseline inspectée : 1.4.150.
 
 Ce document complète `seenit.md` §9 et `functional-reference.md`. Il distingue les comportements
 observés des cibles de normalisation encore ouvertes. Il ne certifie ni le rendu sur appareil ni la
-conformité accessibilité. Les exigences existantes `SEENIT-UX-001..004`, `SEENIT-FUNCTIONAL-001`,
+conformité accessibilité. Les exigences existantes `SEENIT-UX-001..006`, `SEENIT-FUNCTIONAL-001`,
 `SEENIT-QUALITY-002/003` et les règles métier restent autoritatives. Les cibles non encore livrées
 ci-dessous restent des propositions de réalisation dans les issues liées ; les règles explicitement
 marquées comme livrées décrivent le comportement attendu du runtime courant.
@@ -43,6 +43,8 @@ marquées comme livrées décrivent le comportement attendu du runtime courant.
 | Grille Explorer | Appui long 500 ms, ou menu contextuel | Aperçu lorsque `onLongPress` existe ; mouvement annule le timer | Ajouter annulation au démontage/pointercancel et alternative accessible : #180. |
 | Réglages et personne | Depuis bord gauche (zone 70 px), glissement droit > 90 px | Ferme le panneau | Conflit avec geste système Android à vérifier ; ne pas généraliser à tous les écrans. |
 | Fiche média | Handlers de bord actuellement vides | Pas de swipe Retour personnalisé actif | Utiliser Retour visible/natif ; ne pas promettre ce geste partout. |
+| Toast média `À voir` / `Vu` | Appui/clic, Entrée ou Espace | Ouvre la fiche Film/Série exacte | Livré par `SEENIT-UX-006` ; exige `mediaType + tmdbId`, jamais titre/année. |
+| Toast de retrait du suivi | Appui/clic | Aucun effet de navigation | La suppression reste non navigable ; `Annuler` reste une action distincte. |
 
 Le reset est local à la racine de l'onglet actif. Il ne scrolle jamais un écran caché.
 
@@ -133,6 +135,19 @@ padding supérieur fixe `pt-10` comme compensation universelle des barres systè
 Les erreurs inline concernent leur champ/action ; les toasts restent transitoires et lisibles. Une
 annulation utilisateur n'est pas affichée comme une panne. L'installateur lancé garde son succès,
 conformément à `SEENIT-UPDATE-004`.
+
+### 6.1 Toasts média navigables — livré #319
+
+Les toasts internes qui confirment **l'ajout à À voir** ou le passage à **Vu / Terminée** d'un film ou
+d'une série sont des raccourcis de consultation. Leur surface principale ouvre la fiche uniquement si
+le toast transporte une identité complète `mediaType + tmdbId` valide. Le titre, l'année et le texte du
+toast ne participent jamais à la résolution.
+
+Le toast de retrait/suppression (`unfollow`) reste informatif sur sa surface principale. Les actions
+secondaires comme **Annuler** ou **Ignorer les suivants** sont indépendantes et ne déclenchent jamais
+l'ouverture de fiche. Un drag/swipe de fermeture neutralise le clic éventuel du relâchement. La même
+règle vaut en PWA et dans l'APK. Au clavier, un toast navigable est focalisable, nommé et s'active avec
+Entrée/Espace ; TalkBack/tactile restent une preuve terrain de candidate, pas une variante fonctionnelle.
 
 ## 7. Preuves UX et ordre de réalisation
 
