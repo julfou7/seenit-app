@@ -1,6 +1,6 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
-Dernière mise à jour : 13 septembre 2026
+Dernière mise à jour : 14 septembre 2026
 Version applicative : **1.4.150**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
@@ -774,6 +774,13 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   recherches, filtres ou expansions locales. Aucun suivi, progression, préférence ou téléchargement n'est
   modifié. Chaque reset abouti affiche un toast nommant la page réinitialisée. Un trajet A → B → B ne
   compte jamais le changement d'onglet comme le premier appui du double geste.
+- **SEENIT-UX-006** — Un toast interne qui confirme l'ajout d'un film ou d'une série à « À voir »
+  (`follow`) ou son passage à l'état vu/terminé (`success`) ouvre la fiche exacte uniquement lorsque le
+  toast transporte un `mediaType` et un TMDB ID valides. Le titre, l'année et le texte du toast ne servent
+  jamais de fallback d'identité. Un toast de retrait/suppression (`unfollow`) reste non navigable ; les
+  actions secondaires telles que « Annuler » ou « Ignorer les suivants » ne déclenchent jamais la
+  navigation, et un drag/swipe de fermeture neutralise le clic de relâchement. La règle est identique en
+  PWA et APK ; au clavier, un toast navigable est focalisable et s'active avec Entrée ou Espace.
 - Les dialogues critiques utilisent un rôle adapté, sont fermables par Échap, placent le focus
   sur une action et ne déclenchent aucune suppression sans confirmation quand le transfert est
   actif.
