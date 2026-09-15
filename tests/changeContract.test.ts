@@ -6,6 +6,7 @@ import test from 'node:test';
 const require = createRequire(import.meta.url);
 const {
   analyzeRequirementsChurn,
+  isBehavioralFile,
   isVersionOnlyJsonChange,
   isVersionOnlyPatch,
   isPureVersionAlignment,
@@ -17,6 +18,7 @@ const {
     lineBudget: number;
     changedRequirements: string[];
   };
+  isBehavioralFile: (file: string) => boolean;
   isVersionOnlyJsonChange: (file: string, before: string, after: string) => boolean;
   isVersionOnlyPatch: (file: string, patch: string) => boolean;
   isPureVersionAlignment: (
@@ -150,4 +152,19 @@ test('SEENIT-QUALITY-001 réserve la SPEC complète aux zones sensibles ou règl
   assert.equal(requiresSpecification('server.ts'), false);
   assert.equal(requiresSpecification('src/components/Toast.tsx'), false);
   assert.equal(requiresSpecification('src/screens/WatchListScreen.tsx'), false);
+});
+
+test('le contrat SPEC distingue les tests JVM Android locaux du runtime et du harnais instrumenté', () => {
+  const localUnitTest = 'android/app/src/test/java/com/getcapacitor/myapp/ExampleUnitTest.java';
+  const runtimeSource = 'android/app/src/main/java/com/seenit/app/MainActivity.java';
+  const instrumentedTest =
+    'android/app/src/androidTest/java/com/seenit/app/UpgradeContractInstrumentedTest.java';
+
+  assert.equal(isBehavioralFile(localUnitTest), false);
+  assert.equal(requiresSpecification(localUnitTest), false);
+
+  assert.equal(isBehavioralFile(runtimeSource), true);
+  assert.equal(requiresSpecification(runtimeSource), true);
+  assert.equal(isBehavioralFile(instrumentedTest), true);
+  assert.equal(requiresSpecification(instrumentedTest), true);
 });

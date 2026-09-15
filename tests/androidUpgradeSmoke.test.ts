@@ -53,6 +53,20 @@ test('SEENIT-APK-003 bloque toute baseline APK dont l’empreinte est incohéren
   );
 });
 
+test('SEENIT-APK-003 conserve uniquement le harnais Android instrumenté SeenIt', () => {
+  const exampleUnitTest = 'android/app/src/test/java/com/getcapacitor/myapp/ExampleUnitTest.java';
+  const instrumentedTest =
+    'android/app/src/androidTest/java/com/seenit/app/UpgradeContractInstrumentedTest.java';
+
+  assert.equal(fs.existsSync(exampleUnitTest), false);
+  assert.equal(fs.existsSync(instrumentedTest), true);
+
+  const instrumentation = fs.readFileSync(instrumentedTest, 'utf8');
+  assert.match(instrumentation, /package com\.seenit\.app;/);
+  assert.match(instrumentation, /@RunWith\(AndroidJUnit4\.class\)/);
+  assert.match(instrumentation, /verifyUpgradeStateAndNativeContracts/);
+});
+
 test('SEENIT-APK-003 installe réellement N puis N+1 sans désinstaller les données', () => {
   const smoke = fs.readFileSync('scripts/android-upgrade-smoke.sh', 'utf8');
   const instrumentation = fs.readFileSync(
