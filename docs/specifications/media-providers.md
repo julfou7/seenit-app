@@ -9,6 +9,7 @@ PWA ou l'APK.
 | Consommateur | Opérations | Destination |
 |---|---|---|
 | `tmdbClient.ts` | Recherche, find par ID, fiches, saisons/épisodes, collections, fournisseurs, mots-clés, personnes, discover/trending | `GET /api/media/tmdb/…` |
+| `apiAuth.ts` / filtre parental Explorer | Regroupement des preuves `release_dates` / `content_ratings` déjà demandées par le client, sans changer la sémantique de classification | `GET /api/media/parental-ratings?items=…` |
 | `tmdb.ts` | Cinéma France, notes, collection film exacte, hydratation des relations TVDB | Façade TMDB + client TVDB sécurisé |
 | `lib/recommendations.ts` | Discover genres/personnes et fallback populaire d'Explorer | Même façade TMDB ; scoring Explorer inchangé |
 | `services/tvdb.ts` | Franchise/univers depuis TVDB ID ou IMDb ID exact | `GET /api/media/tvdb/franchise` |
@@ -49,6 +50,15 @@ le badge attendu est Paramount+, pas Plex.
 - TMDB reste un proxy GET à allowlist stricte. La route TVDB n'est **pas** un proxy générique : elle
   accepte uniquement `mediaType`, un `tvdbId` positif et/ou un IMDb ID exact `tt…` pour résoudre une
   franchise/univers selon `SEENIT-RELATION-001`.
+- Le batch parental n'est pas un proxy libre : il accepte au plus 40 identités exactes `movie:<tmdbId>`
+  ou `tv:<tmdbId>`, déduplique ces identités, choisit côté serveur uniquement `release_dates` pour un
+  film et `content_ratings` pour une série, puis ne renvoie que les preuves JSON correspondantes. Le
+  client regroupe les requêtes déjà émises par le filtre âge ; il n'invente aucune classification et
+  continue d'appliquer `SEENIT-PARENTAL-001` sur les mêmes payloads TMDB.
+- Le fan-out du batch parental est borné à 24 appels fournisseur concurrents et à un budget pondéré de
+  240 identités par minute et par UID. Une entrée invalide, une authentification absente, un secret
+  indisponible ou une preuve fournisseur en échec reste fail-closed ; aucune clé TMDB, URL fournisseur
+  ou erreur brute n'est relayée au client.
 - Aucun titre, année, popularité, mot-clé ou URL fournisseur ne peut être fourni à la route TVDB. Une
   absence de TVDB ID utilise uniquement l'IMDb ID exact avec `search/remoteid/{id}` côté serveur.
 - Le résolveur TVDB n'examine que les listes déjà rattachées au média exact, retient exactement une
@@ -61,7 +71,8 @@ le badge attendu est Paramount+, pas Plex.
   consommé que lorsqu'un cache miss crée effectivement un nouvel appel upstream : 600 TMDB et 30
   résolutions TVDB par minute et par UID. Un hit du cache ou une requête dédupliquée déjà en vol ne
   consomme pas ce quota fournisseur. Les compteurs restent locaux à chaque instance Cloud Run et toute
-  limitation renvoie `Retry-After` avec un HTTP 429.
+  limitation renvoie `Retry-After` avec un HTTP 429. Le batch parental ajoute son budget pondéré plus
+  restrictif afin d'empêcher qu'un seul appel client ne transforme 40 identités en fan-out non borné.
 - Cache serveur des succès TMDB : 5 min, 200 entrées/16 Mio maximum avec déduplication des requêtes en
   vol. Les relations TVDB ont un cache borné à 120 entrées pendant 5 min ; le token TVDB reste uniquement
   côté serveur et est renouvelé indépendamment des clients.
@@ -112,11 +123,15 @@ frontend. Une ancienne révision Cloud Run reste préférable à une candidate i
 ## Preuves automatisées attendues
 
 Les tests HTTP couvrent authentification, allowlists, absence de fuite, JSON malformé, timeout, quotas,
-caches bornés/déduplication et séparation des UID. Les TNR TVDB couvrent l'IMDb `remoteid` exact, le
-type movie/tv, l'absence de recherche par titre, l'unicité d'une liste officielle et le remapping TMDB
-exact. Les tests client vérifient que PWA/APK n'appellent que SeenIt et que le runtime ne contient plus
-aucune route ou clé OMDb. Le TNR `tests/watchProviderPreference.test.ts` couvre en plus la priorité
-« Mes plateformes » sur le fallback public générique et sur Plex, sans accepter achat/location.
+caches bornés/déduplication et séparation des UID. Le batch parental ajoute un TNR dédié sur 40 identités,
+la borne de concurrence, l'authentification, la validation stricte des identités et l'absence de fuite du
+secret. Un TNR client vérifie qu'avec la borne historique de huit résolutions simultanées, 40 preuves
+parentales deviennent cinq appels batch authentifiés et non 40 requêtes HTTP unitaires.
+Les TNR TVDB couvrent l'IMDb `remoteid` exact, le type movie/tv, l'absence de recherche par titre,
+l'unicité d'une liste officielle et le remapping TMDB exact. Les tests client vérifient que PWA/APK
+n'appellent que SeenIt et que le runtime ne contient plus aucune route ou clé OMDb. Le TNR
+`tests/watchProviderPreference.test.ts` couvre en plus la priorité « Mes plateformes » sur le fallback
+public générique et sur Plex, sans accepter achat/location.
 
 Tous les fichiers JS/sourcemaps du build Web embarqué dans Capacitor sont scannés. Ils ne doivent
 contenir ni `VITE_TMDB_API_KEY`, ni `VITE_OMDB_API_KEY`, ni `VITE_TVDB_API_KEY`, ni les hôtes API
