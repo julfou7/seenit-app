@@ -69,17 +69,27 @@ test('#229 retire le faux Voir tout terminal et conserve le vrai bouton d’en-t
   );
 });
 
-test('#269 stabilise la hauteur des rails quand un titre passe d’une à deux lignes', () => {
+test('#269 stabilise les rails sans réserver une deuxième ligne vide dans Continuer à regarder', () => {
   assert.match(continueCardSource, /line-clamp-2/);
   assert.match(movieCardSource, /line-clamp-2/);
   assert.match(
     carouselUxCss,
-    /\) \.line-clamp-2\s*\{\s*min-block-size:\s*2lh;/,
-    'les titres des quatre rails doivent toujours réserver deux hauteurs de ligne'
+    /#continue-watching-carousel \.line-clamp-2\s*\{[\s\S]*?-webkit-line-clamp:\s*1;[\s\S]*?min-block-size:\s*1lh;/,
+    'Continuer à regarder doit rester mono-ligne et compact sous l’image'
+  );
+  assert.match(
+    carouselUxCss,
+    /#nouveautes-carousel,[\s\S]*?#pas-vu-depuis-un-moment-carousel,[\s\S]*?#films-a-voir-carousel[\s\S]*?\) \.line-clamp-2\s*\{\s*min-block-size:\s*2lh;/,
+    'les autres rails gardent leur slot titre sur deux lignes pour éviter les sauts de hauteur'
   );
   assert.doesNotMatch(
     carouselUxCss,
     /min-(?:block-size|height):\s*\d+(?:\.\d+)?px/,
     'la stabilisation ne doit pas reposer sur une hauteur fixe en pixels'
+  );
+  assert.match(
+    watchListSource,
+    /\{nouveautesShows\.length > 0 && \(\s*<div className="mt-8">/,
+    'l’espace validé avant Nouveautés doit rester inchangé'
   );
 });
