@@ -147,6 +147,17 @@ Un rerun ne doit pas créer une succession de commentaires identiques : le check
 
 Lors d’une reprise dans un nouveau chat, ce checkpoint est la première preuve à lire avant de reconstruire manuellement l’état d’une release terminée.
 
+## Relais inter-conversations avant déclenchement
+
+Lorsque le propriétaire a explicitement demandé une APK mais délégué sa publication après merge,
+le chantier release est transmis sur #102 avec le marqueur
+`<!-- seenit-apk-release-handoff -->` et un bail `HANDOFF_READY` selon `AGENTS.md` §0.4a. Ce relais
+n'est **pas** une commande `/prepare-release-apk` ou `/release-apk` : seul son destinataire, après
+relecture de `main`, de la dernière release et des baux, publie ensuite la commande exacte. Un état
+`WAITING Terrain` sur l'issue fonctionnelle ne constitue pas une attente de release. Si le SHA visé
+est déjà couvert par une release officielle, le relais est clôturé sans nouveau patch ; si `main` a
+avancé, son lot et son autorisation sont réconciliés avant toute commande.
+
 ## Retour après déclenchement
 
 Une demande « publie l’APK » seule autorise l’agent à laisser GitHub Actions terminer après identification du run exact : il **rend la main par défaut** une fois le run précis identifié et tracé. Si l’utilisateur demande explicitement d’attendre le résultat — notamment avec une formulation comme « publie et attends le résultat » — le suivi reste ciblé sur ce run jusqu’à l’APK signée, au smoke et à la publication.

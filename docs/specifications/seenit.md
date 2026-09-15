@@ -1,6 +1,6 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
-Dernière mise à jour : 14 septembre 2026
+Dernière mise à jour : 15 septembre 2026
 Version applicative : **1.4.151**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
@@ -962,7 +962,13 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   le reset connu ou au plus une fois par heure si l'heure est inconnue. En l'absence de cette capacité,
   le checkpoint exige une reprise manuelle Codex sans libérer le périmètre. Seul un `HANDOFF_READY` explicite
   ou un transfert utilisateur explicite autorise une autre tâche à reprendre ; `WAITING` reste non
-  actionnable et `DONE` reste terminal.
+  actionnable et `DONE` reste terminal. Si une APK a été explicitement demandée puis **déléguée après
+  merge**, le propriétaire du chantier transmet séparément la release sur #102 avec le marqueur
+  `<!-- seenit-apk-release-handoff -->`, un bail `HANDOFF_READY`, l'autorisation et le destinataire,
+  le SHA `main`, la dernière release, le lot APK non publié, la prochaine version et les contrôles
+  restants. La tâche destinataire reprend ce relais avant une nouvelle issue, vérifie baux, `main`
+  et idempotence puis suit les commandes canoniques ; un `WAITING Terrain` sur l'issue fonctionnelle
+  ne masque pas l'opération release. Aucun merge sans autorisation ne devient une release automatique.
 - **SEENIT-QUALITY-005** — Un import, une reconnexion ou une synchronisation AI Studio/GitHub est un
   transport non autoritatif. Avant tout commit depuis un workspace importé, le diff est comparé à la
   branche GitHub source et toute mutation automatique non demandée de Firebase/Firestore, Android,

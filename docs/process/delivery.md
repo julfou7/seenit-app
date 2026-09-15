@@ -244,6 +244,25 @@ l'environnement Codex courant, le checkpoint le signale et exige une reprise man
 le périmètre. `WAITING` reste non actionnable, `DONE` est terminal et seul `HANDOFF_READY` exprime un
 transfert autonome vers une autre exécution.
 
+### Relais d'une APK explicitement déléguée
+
+Un changement `apk` mergé et sain sur `main` n'est pas, à lui seul, un ordre de publication. Quand
+l'utilisateur demande une APK **et** confie sa publication à une autre tâche, le propriétaire du
+chantier code transmet une opération release indépendante sur #102 selon `AGENTS.md` §0.4a. Il publie
+un checkpoint `<!-- seenit-apk-release-handoff -->` et un bail final `HANDOFF_READY`, avec preuve de
+l'autorisation, SHA `main`, dernière release officielle, lot APK non publié, prochain patch, état
+candidate/runs, destinataire et prochaine action canonique. L'issue code peut demeurer `WAITING Terrain`
+pour les tests sur appareil ; ce statut ne suspend pas le relais #102 lorsqu'aucun événement externe
+n'est requis pour la publication. À l'inverse, un simple commentaire « une autre tâche s'en chargera »
+ou une CI `main` verte ne met aucune release en file.
+
+La tâche destinataire traite ce relais avant un nouveau chantier produit, acquiert le bail #102 puis
+revalide `main`, la dernière release, les baux concurrents et l'autorisation si `main` a avancé. Une
+release déjà publiée clôt le relais sans nouveau dispatch ; sinon elle reprend
+`/prepare-release-apk` → PR verte/merge → `/release-apk` via le contrôleur. La tâche à horaire fixe
+ne s'éveille pas au merge : elle verra ce relais à sa **prochaine exécution**. Cette règle ne rétablit
+pas une APK automatique sur chaque push ou merge et ne contourne aucun garde d'immuabilité ou smoke.
+
 ## Cause racine et portée d'un correctif
 
 Un exemple reproductible prouve un symptôme, pas la portée du correctif. Avant toute implémentation,
