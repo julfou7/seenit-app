@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { build } from 'esbuild';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
@@ -8,7 +8,7 @@ import { buildProviderRequest } from '../src/features/providers/mediaProviderBac
 
 const require = createRequire(import.meta.url);
 const { hasProviderSecret } = require('../scripts/scan-provider-client-bundle.cjs');
-const json = (data: any, status = 200) => new Response(JSON.stringify(data), { status });
+const json = (data: any, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 
 async function loadClient(entry: string, handler: (url: URL) => Promise<Response> | Response, native = false) {
   const calls: URL[] = [];
@@ -42,6 +42,10 @@ async function loadClient(entry: string, handler: (url: URL) => Promise<Response
       assert.equal(url.origin, 'https://seenit.ai.studio');
       assert.equal(url.searchParams.has('api_key'), false);
       assert.equal(url.searchParams.has('apikey'), false);
+      if (url.pathname === '/api/media/parental-ratings') {
+        calls.push(url);
+        return handler(url);
+      }
       assert.equal(url.pathname.startsWith('/api/media/tmdb/'), true, url.pathname);
       assert.ok(buildProviderRequest('tmdb', url.pathname.replace('/api/media/tmdb/', ''), Object.fromEntries(url.searchParams)), url.pathname);
       calls.push(url);
@@ -81,6 +85,23 @@ for (const native of [false, true]) {
       maxActive = Math.max(maxActive, active);
       await new Promise(resolve => setTimeout(resolve, 5));
       active -= 1;
+      if (url.pathname === '/api/media/parental-ratings') {
+        const items = (url.searchParams.get('items') || '').split(',').filter(Boolean);
+        return json({
+          results: items.map(item => {
+            const [mediaType, rawId] = item.split(':');
+            const id = Number(rawId);
+            return {
+              key: item,
+              media_type: mediaType,
+              id,
+              details: mediaType === 'movie'
+                ? { id, media_type: mediaType, release_dates: { results: [{ iso_3166_1: 'US', release_dates: [{ certification: 'PG' }] }] } }
+                : { id, media_type: mediaType, content_ratings: { results: [{ iso_3166_1: 'US', rating: 'TV-PG' }] } },
+            };
+          }),
+        });
+      }
       if (!url.pathname.endsWith('/release_dates') && !url.pathname.endsWith('/content_ratings')) {
         return json({
           id: Number(url.pathname.split('/').at(-1)),
@@ -101,26 +122,26 @@ for (const native of [false, true]) {
       client.getParentalRatingDetails(42, 'movie'),
     ]);
     assert.ok(duplicate.every((result: any) => result.ok));
-    assert.equal(fixture.calls.length, 1, 'deux résolutions identiques partagent la même requête');
+    assert.equal(fixture.calls.length, 1, 'deux résolutions identiques partagent le même batch');
+    assert.equal(fixture.calls[0].pathname, '/api/media/parental-ratings');
     assert.ok(duplicate[0].value.release_dates);
 
     const results = await Promise.all(Array.from({ length: 20 }, (_, index) => (
       client.getParentalRatingDetails(100 + index, index % 2 === 0 ? 'movie' : 'tv')
     )));
     assert.ok(results.every((result: any) => result.ok));
-    assert.equal(maxActive <= fixture.exports.PARENTAL_RATING_MAX_CONCURRENT, true);
-    assert.equal(fixture.exports.PARENTAL_RATING_MAX_CONCURRENT, 8);
-    assert.equal(fixture.calls.every(url => (
-      url.pathname.endsWith('/release_dates') || url.pathname.endsWith('/content_ratings')
-    )), true, 'le fast path doit utiliser uniquement les endpoints de certification');
-    assert.equal(fixture.calls.every(url => !url.searchParams.has('append_to_response')), true);
+    assert.equal(fixture.calls.length, 2, '20 classifications distinctes doivent partager un seul appel batch supplémentaire');
+    assert.equal(fixture.calls[1].pathname, '/api/media/parental-ratings');
+    assert.equal((fixture.calls[1].searchParams.get('items') || '').split(',').length, 20);
+    assert.equal(fixture.exports.PARENTAL_RATING_BATCH_MAX_ITEMS, 40);
+    assert.equal(maxActive <= 1, true, 'le fan-out HTTP client disparaît derrière la façade batch');
 
     await client.getParentalRatingDetails(42, 'movie');
-    assert.equal(fixture.calls.length, 21, 'la classification déjà connue reste en cache');
+    assert.equal(fixture.calls.length, 2, 'la classification déjà connue reste en cache');
 
     await client.getMovieDetails(77);
     await client.getParentalRatingDetails(77, 'movie');
-    assert.equal(fixture.calls.length, 22, 'une fiche complète déjà en cache fournit directement sa preuve parentale');
+    assert.equal(fixture.calls.length, 3, 'une fiche complète déjà en cache fournit directement sa preuve parentale');
   });
 }
 

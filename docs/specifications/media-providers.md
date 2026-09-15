@@ -9,7 +9,7 @@ PWA ou l'APK.
 | Consommateur | Opérations | Destination |
 |---|---|---|
 | `tmdbClient.ts` | Recherche, find par ID, fiches, saisons/épisodes, collections, fournisseurs, mots-clés, personnes, discover/trending | `GET /api/media/tmdb/…` |
-| `apiAuth.ts` / filtre parental Explorer | Regroupement des preuves `release_dates` / `content_ratings` déjà demandées par le client, sans changer la sémantique de classification | `GET /api/media/parental-ratings?items=…` |
+| `tmdbClient.ts` / filtre parental Explorer | Regroupement des preuves `release_dates` / `content_ratings` déjà demandées par le client, sans changer la sémantique de classification | `GET /api/media/parental-ratings?items=…` |
 | `tmdb.ts` | Cinéma France, notes, collection film exacte, hydratation des relations TVDB | Façade TMDB + client TVDB sécurisé |
 | `lib/recommendations.ts` | Discover genres/personnes et fallback populaire d'Explorer | Même façade TMDB ; scoring Explorer inchangé |
 | `services/tvdb.ts` | Franchise/univers depuis TVDB ID ou IMDb ID exact | `GET /api/media/tvdb/franchise` |
@@ -125,8 +125,8 @@ frontend. Une ancienne révision Cloud Run reste préférable à une candidate i
 Les tests HTTP couvrent authentification, allowlists, absence de fuite, JSON malformé, timeout, quotas,
 caches bornés/déduplication et séparation des UID. Le batch parental ajoute un TNR dédié sur 40 identités,
 la borne de concurrence, l'authentification, la validation stricte des identités et l'absence de fuite du
-secret. Un TNR client vérifie qu'avec la borne historique de huit résolutions simultanées, 40 preuves
-parentales deviennent cinq appels batch authentifiés et non 40 requêtes HTTP unitaires.
+secret. Un TNR client vérifie que 40 preuves parentales froides deviennent un seul appel batch authentifié,
+et non 40 requêtes HTTP unitaires.
 Les TNR TVDB couvrent l'IMDb `remoteid` exact, le type movie/tv, l'absence de recherche par titre,
 l'unicité d'une liste officielle et le remapping TMDB exact. Les tests client vérifient que PWA/APK
 n'appellent que SeenIt et que le runtime ne contient plus aucune route ou clé OMDb. Le TNR
