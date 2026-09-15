@@ -105,7 +105,7 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
       return;
     }
     const budget = takeBudget(uid, items.length);
-    if (!budget.ok) {
+    if ('retryAfter' in budget) {
       res.setHeader('Retry-After', String(budget.retryAfter));
       res.status(429).json({ error: 'Trop de classifications demandées, réessayez plus tard.' });
       return;
