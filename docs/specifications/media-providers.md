@@ -41,6 +41,17 @@ masquer une plateforme de « Mes plateformes » réellement disponible.** Exempl
 disponible sur Paramount+ (`provider_id=531`) et dans Plex, et que 531 appartient à « Mes plateformes »,
 le badge attendu est Paramount+, pas Plex.
 
+Cette priorité s'applique aussi pendant l'enrichissement asynchrone des cartes. L'absence momentanée
+d'un provider public avant la fin de la résolution TMDB n'est **pas** une preuve d'absence : Plex ne doit
+pas être affiché comme fallback provisoire pendant cette fenêtre. Plex ne devient éligible qu'après un
+snapshot public frais déjà connu ou après une réponse TMDB réussie qui ne contient aucun provider public
+éligible. Une erreur réseau ne transforme pas un état public non résolu en preuve négative.
+
+Les IDs de **Mes plateformes** restent autoritatifs par compte via Firestore et leur miroir local UID ne
+sert qu'au démarrage rapide. Une hydratation Firestore ou une modification des plateformes après le
+premier rendu doit invalider le choix visible déjà monté et recalculer le provider à partir du payload
+TMDB disponible, sans rechargement d'écran ni listener Firestore individuel par carte.
+
 ## Réseau et sécurité
 
 - PWA/APK utilisent `authenticatedFetch` et la résolution d'origine SeenIt existante. Le token Firebase
@@ -116,7 +127,10 @@ caches bornés/déduplication et séparation des UID. Les TNR TVDB couvrent l'IM
 type movie/tv, l'absence de recherche par titre, l'unicité d'une liste officielle et le remapping TMDB
 exact. Les tests client vérifient que PWA/APK n'appellent que SeenIt et que le runtime ne contient plus
 aucune route ou clé OMDb. Le TNR `tests/watchProviderPreference.test.ts` couvre en plus la priorité
-« Mes plateformes » sur le fallback public générique et sur Plex, sans accepter achat/location.
+« Mes plateformes » sur le fallback public générique et sur Plex, sans accepter achat/location, ainsi
+que la séquence réelle où Plex est connu avant la fin de la résolution publique : aucun badge Plex
+provisoire n'est alors autorisé, puis le provider préféré doit apparaître dès que le payload TMDB ou la
+préférence de compte devient autoritatif.
 
 Tous les fichiers JS/sourcemaps du build Web embarqué dans Capacitor sont scannés. Ils ne doivent
 contenir ni `VITE_TMDB_API_KEY`, ni `VITE_OMDB_API_KEY`, ni `VITE_TVDB_API_KEY`, ni les hôtes API

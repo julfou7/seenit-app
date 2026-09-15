@@ -1,4 +1,10 @@
 const USER_STORAGE_PREFIX = 'seenit_user';
+const USER_SCOPED_STORAGE_UPDATED_EVENT = 'seenit:user-scoped-storage-updated';
+
+type UserScopedStorageUpdateDetail = {
+  uid: string;
+  field: string;
+};
 
 export const LEGACY_UNSCOPED_USER_KEYS = [
   'cached_shows_v1',
@@ -12,6 +18,38 @@ export const LEGACY_UNSCOPED_USER_KEYS = [
 export function getUserScopedStorageKey(uid: string, field: string): string {
   if (!uid) throw new Error('UID requis pour accéder à un cache utilisateur');
   return `${USER_STORAGE_PREFIX}:${uid}:${field}`;
+}
+
+function notifyUserScopedStorageUpdated(uid: string, field: string): void {
+  if (typeof window === 'undefined' || typeof CustomEvent === 'undefined') return;
+  window.dispatchEvent(new CustomEvent<UserScopedStorageUpdateDetail>(
+    USER_SCOPED_STORAGE_UPDATED_EVENT,
+    { detail: { uid, field } },
+  ));
+}
+
+export function subscribeUserScopedStorageField(
+  uid: string | null | undefined,
+  field: string,
+  listener: () => void,
+): () => void {
+  if (!uid || typeof window === 'undefined') return () => {};
+  const scopedKey = getUserScopedStorageKey(uid, field);
+
+  const handleInternalUpdate = (event: Event) => {
+    const detail = (event as CustomEvent<UserScopedStorageUpdateDetail>).detail;
+    if (detail?.uid === uid && detail.field === field) listener();
+  };
+  const handleExternalUpdate = (event: StorageEvent) => {
+    if (event.key === scopedKey) listener();
+  };
+
+  window.addEventListener(USER_SCOPED_STORAGE_UPDATED_EVENT, handleInternalUpdate as EventListener);
+  window.addEventListener('storage', handleExternalUpdate);
+  return () => {
+    window.removeEventListener(USER_SCOPED_STORAGE_UPDATED_EVENT, handleInternalUpdate as EventListener);
+    window.removeEventListener('storage', handleExternalUpdate);
+  };
 }
 
 export function readUserScopedJson<T>(uid: string | null | undefined, field: string, fallback: T): T {
@@ -28,6 +66,7 @@ export function writeUserScopedJson(uid: string | null | undefined, field: strin
   if (!uid) return false;
   try {
     localStorage.setItem(getUserScopedStorageKey(uid, field), JSON.stringify(value));
+    notifyUserScopedStorageUpdated(uid, field);
     return true;
   } catch {
     // Le cache local est une optimisation : Firestore reste la source de vérité.
@@ -39,6 +78,7 @@ export function removeUserScopedValue(uid: string | null | undefined, field: str
   if (!uid) return;
   try {
     localStorage.removeItem(getUserScopedStorageKey(uid, field));
+    notifyUserScopedStorageUpdated(uid, field);
   } catch {
     // Aucun impact sur la donnée Cloud.
   }
@@ -52,7 +92,10 @@ function migrateLegacyValue(uid: string, legacyKey: string, field: string, trans
   try {
     const parsed = JSON.parse(raw);
     const value = transform ? transform(parsed) : parsed;
-    if (value !== undefined && value !== null) localStorage.setItem(destination, JSON.stringify(value));
+    if (value !== undefined && value !== null) {
+      localStorage.setItem(destination, JSON.stringify(value));
+      notifyUserScopedStorageUpdated(uid, field);
+    }
   } catch {
     // Une ancienne valeur invalide est simplement abandonnée.
   }

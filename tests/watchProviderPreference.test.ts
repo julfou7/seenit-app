@@ -31,10 +31,35 @@ test('#337 le diffuseur public préféré reste prioritaire sur une disponibilit
     'tv:125359:prefs:531',
     provider,
     { available: true, serverName: 'Maison' },
+    true,
   );
 
   assert.equal(state.name, 'Paramount Plus');
   assert.equal(state.logo, '/paramount.jpg');
+});
+
+test('#337 Plex reste masqué tant que la résolution publique de Lioness est en attente', () => {
+  const state = resolvePassiveProviderState(
+    'tv:125359:prefs:531',
+    null,
+    { available: true, serverName: 'Maison' },
+    false,
+  );
+
+  assert.equal(state.name, null);
+  assert.equal(state.logo, null);
+});
+
+test('#337 une réponse publique autoritative vide autorise ensuite le fallback Plex', () => {
+  const state = resolvePassiveProviderState(
+    'tv:125359:prefs:531',
+    null,
+    { available: true, serverName: 'Maison' },
+    true,
+  );
+
+  assert.equal(state.name, 'Plex (Maison)');
+  assert.match(state.logo || '', /plex/i);
 });
 
 test('#337 une plateforme cochée mais absente du média n’est jamais inventée', () => {
@@ -42,6 +67,15 @@ test('#337 une plateforme cochée mais absente du média n’est jamais inventé
 
   assert.equal(provider?.provider_id, 8);
   assert.equal(provider?.provider_name, 'Netflix');
+});
+
+test('#337 une préférence hydratée après le premier rendu re-sélectionne le payload TMDB connu', () => {
+  const beforeHydration = extractOfficialStreamingProvider(lionessProviders, []);
+  const afterHydration = extractOfficialStreamingProvider(lionessProviders, [531]);
+
+  assert.equal(beforeHydration?.provider_id, 8);
+  assert.equal(afterHydration?.provider_id, 531);
+  assert.equal(afterHydration?.provider_name, 'Paramount Plus');
 });
 
 test('#337 achat et location restent exclus du choix des diffuseurs', () => {
