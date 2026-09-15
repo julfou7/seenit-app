@@ -42,10 +42,12 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   Une disponibilité personnelle `serverId + ratingKey` reste une preuve de présence/couverture mais
   ne pilote plus la navigation. Aucun titre, année ou accueil Plex n'est utilisé comme fallback.
 - La status bar Android est edge-to-edge : la WebView s'étend derrière une barre transparente avec
-  icônes claires, tandis que le contenu principal et le login respectent `env(safe-area-inset-top)`.
-  Avec `@capacitor/status-bar`, ce rendu clair sur fond sombre exige explicitement `Style.Dark` / `DARK` ;
-  `Style.Light` / `LIGHT` est interdit car il produit des icônes sombres. La barre de navigation basse
-  reste sombre et conserve les safe areas CSS.
+  icônes claires. Sur Android 15/16 avec Capacitor 8, `SystemBars.insetsHandling` reste `disable` et
+  l'edge-to-edge natif interdit tout padding supérieur du parent WebView ; les insets système/cutout
+  sont exposés au Web via `--seenit-safe-area-*`, avec `env(safe-area-inset-*)` comme fallback CSS.
+  Le plugin `@capacitor/status-bar` conserve `Style.Dark` / `DARK` comme garde de compatibilité ;
+  `Style.Light` / `LIGHT`, une barre opaque ou un padding natif révélant le fond de fenêtre sont interdits.
+  La barre de navigation basse reste sombre et conserve la même politique de safe area.
 
 ### 2.1 Contrat APK immuable
 
@@ -89,10 +91,13 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   animé Web `src/components/SplashScreen.tsx`. Le splash système imposé par Android 12+ reste
   visuellement neutre, avec fond `#040406`, icône transparente et animation native nulle ; il n'est
   masqué qu'après le premier rendu du splash Web afin d'éviter tout flash vide. Après lancement, la
-  status bar overlay la WebView avec un fond transparent et des icônes claires ; les écrans racine
-  compensent cette superposition par la safe area haute. La réintroduction d'un logo natif distinct,
-  de `Style.Light` / `LIGHT`, de `overlaysWebView=false` ou d'une status bar opaque constitue une
-  régression TNR bloquée par les tests.
+  status bar overlay la WebView avec un fond transparent et des icônes claires. Sur Android 15/16,
+  Capacitor `SystemBars` est explicitement configuré sans gestion native des insets et l'activité force
+  l'edge-to-edge : aucun inset supérieur ne devient un padding du parent WebView. Les insets système et
+  cutout alimentent les variables CSS `--seenit-safe-area-*`, utilisées par les écrans racine avant le
+  fallback `env(safe-area-inset-*)`. La réintroduction d'un logo natif distinct, de `Style.Light` /
+  `LIGHT`, de `SystemBars.insetsHandling='css'`, de `overlaysWebView=false`, d'un padding natif de la
+  WebView ou d'une status bar opaque constitue une régression TNR bloquée par les tests.
 - Le fichier `docs/specifications/android-contract.json` fixe les invariants natifs vérifiables :
   identité, signature, version, icônes, permissions, deep link, origine API, safe areas et canal APK.
 - Lors d'une release APK, le contrôle Android s'exécute avant et après `npx cap sync android` afin de
@@ -589,14 +594,14 @@ pour le cache des sagas et univers.
   rapprochement par titre ou année.
 - **SEENIT-PLEX-008** — L’association d’un compte Plex repose sur une tentative immuable : la création
   du PIN, l’URL d’autorisation et chaque vérification réutilisent exactement le même `clientIdentifier`,
-  le produit `SeenIt`, la version SeenIt, la plateforme, le `pinId`, le `code` et l’expiration. Aucun écran
+  le produit `SeenIt`, la version SeenIt, la plateforme, le `pinId`, le `code` et l'expiration. Aucun écran
   ne reconstruit une identité différente. Une seule vérification séquentielle peut être active ; elle
-  s’arrête au succès, à l’annulation, au changement de Firebase UID, à l’expiration ou à une erreur
+  s’arrête au succès, à l’annulation, au changement de Firebase UID, à l'expiration ou à une erreur
   permanente. Un `429` applique un backoff borné et un échec terminal réactive explicitement l’action
   « Réessayer ». Un `authToken` n’est persisté pour le même UID et la première synchronisation complète
-  n’est déclenchée qu’après validation du jeton via `GET https://plex.tv/api/v2/user` avec cette même
+  n’est déclenchée qu'après validation du jeton via `GET https://plex.tv/api/v2/user` avec cette même
   identité. Le code PIN, le jeton, l’URL d’autorisation complète et le `clientIdentifier` complet ne sont
-  jamais journalisés. La PWA et l’APK partagent ce contrat ; l’APK ouvre l’autorisation dans le navigateur
+  jamais journalisés. La PWA et l'APK partagent ce contrat ; l'APK ouvre l'autorisation dans le navigateur
   externe puis reprend la même tentative sans créer un second poller. Le flux PIN historique reste le
   contrat courant tant qu’il est accepté ; toute migration JWK/JWT constitue une évolution explicite
   distincte.
@@ -1073,9 +1078,10 @@ l'identité de l'APK et ses actifs.
   de transition reste `#040406`.
 - **TNR lancement Android — status bar :** dès la première image de l'application, confirmer que
   l'heure, le réseau, le Wi-Fi et la batterie restent clairs/blancs sur le fond sombre, que la barre
-  reste transparente/edge-to-edge et que la safe area ne saute pas. Les invariants `DARK` / `Style.Dark`
-  et mono-splash sont en plus bloqués automatiquement par `tests/androidLaunchChrome.test.ts` et
-  `npm run test:android`.
+  reste transparente/edge-to-edge et que la safe area ne saute pas. Le TNR automatisé verrouille
+  `SystemBars.insetsHandling='disable'`, l'edge-to-edge natif sans padding du parent WebView,
+  `DARK` / `Style.Dark`, la transparence et les variables de safe area ; l'ancien overlay StatusBar
+  seul n'est jamais considéré comme une preuve suffisante sur Android 15/16.
 - Démarrer l'APK à froid, le reprendre après veille, tester Retour depuis chaque niveau puis vérifier
   qu'aucun listener ou téléchargement n'est dupliqué.
 
