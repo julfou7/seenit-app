@@ -30,7 +30,7 @@ test('#337 le diffuseur public préféré reste prioritaire sur une disponibilit
   const state = resolvePassiveProviderState(
     'tv:125359:prefs:531',
     provider,
-    { available: true, serverId: 'server-1', ratingKey: '42' },
+    { available: true, serverName: 'Maison' },
   );
 
   assert.equal(state.name, 'Paramount Plus');
