@@ -167,18 +167,22 @@ function analyzeRequirementsChurn(before, after) {
   };
 }
 
+function isAndroidLocalUnitTestFile(file) {
+  return normalizePath(file).startsWith('android/app/src/test/');
+}
+
 function isBehavioralFile(file) {
   const normalized = normalizePath(file);
   return (normalized.startsWith('src/') && normalized !== 'src/store/updateStore.ts')
     || normalized === 'server.ts'
-    || normalized.startsWith('android/app/src/')
+    || (normalized.startsWith('android/app/src/') && !isAndroidLocalUnitTestFile(normalized))
     || normalized === 'public/firebase-messaging-sw.js'
     || normalized === 'capacitor.config.ts';
 }
 
 function requiresSpecification(file) {
   const normalized = normalizePath(file);
-  return normalized.startsWith('android/app/src/')
+  return (normalized.startsWith('android/app/src/') && !isAndroidLocalUnitTestFile(normalized))
     || normalized === 'capacitor.config.ts'
     || normalized === 'src/lib/firebase.ts'
     || normalized === 'src/lib/firebase-admin.ts'
@@ -307,6 +311,7 @@ module.exports = {
   analyzeRequirementsChurn,
   countLineChurn,
   getChangedContentLines,
+  isAndroidLocalUnitTestFile,
   isBehavioralFile,
   isVersionOnlyJsonChange,
   isVersionOnlyPatch,
