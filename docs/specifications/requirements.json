@@ -1459,6 +1459,10 @@
         {
           "file": "tests/issueTrackingGovernance.test.ts",
           "contains": "SEENIT-QUALITY-004 conserve les chantiers Codex pendant un arrêt de quota"
+        },
+        {
+          "file": "tests/issueTrackingGovernance.test.ts",
+          "contains": "SEENIT-QUALITY-004 transmet une APK déléguée par un relais release distinct"
         }
       ]
     },

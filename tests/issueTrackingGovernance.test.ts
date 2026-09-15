@@ -103,3 +103,28 @@ test('SEENIT-QUALITY-004 conserve les chantiers Codex pendant un arrêt de quota
   assert.match(spec, /SEENIT-QUALITY-004[\s\S]*quota Codex[\s\S]*HANDOFF_READY/i);
   assert.match(requestRegistry, /USR-2026-09-13-006/);
 });
+
+test('SEENIT-QUALITY-004 transmet une APK déléguée par un relais release distinct', () => {
+  const agents = fs.readFileSync('AGENTS.md', 'utf8');
+  const bootstrap = fs.readFileSync('.agents/AGENTS.md', 'utf8');
+  const delivery = fs.readFileSync('docs/process/delivery.md', 'utf8');
+  const releaseControl = fs.readFileSync('docs/specifications/release-control.md', 'utf8');
+  const spec = fs.readFileSync('docs/specifications/seenit.md', 'utf8');
+  const requestRegistry = fs.readFileSync('docs/requests/registry.md', 'utf8');
+
+  for (const source of [agents, bootstrap, delivery, releaseControl, spec]) {
+    assert.match(source, /<!-- seenit-apk-release-handoff -->/);
+    assert.match(source, /HANDOFF_READY/);
+    assert.match(source, /#102/);
+    assert.match(source, /WAITING Terrain/);
+  }
+  assert.match(agents, /acquiert d'abord[\s\S]*bail `ACTIVE` sur #102[\s\S]*HANDOFF_READY/i);
+  assert.match(agents, /demande utilisateur[\s\S]*SHA `main`[\s\S]*dernière release officielle[\s\S]*commits APK non publiés/i);
+  assert.match(agents, /destinataire[\s\S]*\/prepare-release-apk[\s\S]*\/release-apk/i);
+  assert.match(agents, /déjà publiée[\s\S]*sans doublon[\s\S]*main` a avancé/i);
+  assert.match(agents, /sans demande\/délégation[\s\S]*ne crée pas[\s\S]*release automatique/i);
+  assert.match(agents, /promet une publication par une autre tâche[\s\S]*relire #102/i);
+  assert.match(delivery, /prochaine exécution/i);
+  assert.match(releaseControl, /n'est \*\*pas\*\* une commande/i);
+  assert.match(requestRegistry, /USR-2026-09-15-001/);
+});

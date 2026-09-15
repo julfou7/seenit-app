@@ -45,6 +45,8 @@ Un correctif peut suivre ce chemin lorsque son issue existe, que sa cause racine
 6. Après dix minutes sans fichier modifié, test ciblé exécuté, commit, PR ou blocage précis, publier un jalon concret et réorienter le diagnostic ; ne pas enchaîner une seconde longue passe silencieuse.
 7. Après merge d'un correctif qui doit être publié, basculer directement vers le fast path release-only de la section 0.0 ou le fast path PWA/runtime 0.0a selon la surface demandée, sans relire une seconde fois tout le contexte produit.
 
+Si l'utilisateur a explicitement confié la publication APK à une **autre tâche** après ce merge, appliquer à la place le relais distinct de la section 0.4a avant de rendre la main. La validation terrain de l'issue fonctionnelle n'est pas ce relais.
+
 Ce chemin ne réduit aucun contrôle de sécurité, d'identité média/Plex, de données, d'APK, de signature, de test terrain ou de release. Il réduit uniquement la lecture et les validations redondantes.
 
 ## 0.2 Culture obligatoire — cause racine avant correctif
@@ -122,6 +124,40 @@ parallèle sur des issues et surfaces indépendantes avec des branches ou worktr
 planifiée ne doit jamais « aider » un chantier déjà loué par une session interactive. Pour un chantier
 Codex interrompu par quota, cette exclusion reste valable même après merge pendant les contrôles post-merge
 ou la livraison encore possédés par Codex.
+
+## 0.4a Relais obligatoire — APK demandée et déléguée après merge
+
+Une publication APK confiée explicitement à une autre conversation ou tâche reste une **opération de
+release distincte** de l'issue de code et de ses validations terrain. Après merge et validation du `main`
+canonique, l'agent qui transmet ne peut annoncer « la tâche planifiée publiera » qu'après avoir créé sur
+**#102** un checkpoint visible `<!-- seenit-apk-release-handoff -->` avec bail
+`<!-- seenit-agent-lease -->`, `Statut: HANDOFF_READY` et destinataire identifié. Il acquiert d'abord
+un bail `ACTIVE` sur #102, relit la concurrence, puis le libère explicitement en `HANDOFF_READY` ; un
+bail `ACTIVE` d'une autre tâche sur #102 interdit ce transfert et doit être signalé comme tel.
+
+Le relais donne la preuve de la demande utilisateur et de la délégation, le SHA mergé et le SHA `main`
+courant, la dernière release officielle (version + SHA), les commits APK non publiés, la prochaine version
+patch attendue, l'état de la candidate et des runs, les validations connues, le destinataire, la prochaine
+action exacte `/prepare-release-apk` → PR verte/merge → `/release-apk`, et le critère de fin : release
+immuable, APK signée, SHA-256 et smoke requis. **Aucune commande de contrôleur n'est cachée dans le
+commentaire de relais** : la tâche destinataire déclenche elle-même les commandes exactes après ses gardes.
+L'issue fonctionnelle peut rester `WAITING Terrain` ; cela ne transforme pas #102 en `WAITING` si aucune
+dépendance externe ne bloque la publication. Le transfert explicite `HANDOFF_READY` lève, sur le seul
+périmètre release #102, la réserve Codex prévue pour un arrêt de quota ; il ne transfère pas le chantier
+fonctionnel.
+
+À la reprise, rechercher ce relais sur #102 **avant** de choisir une nouvelle issue, acquérir et relire
+son bail, puis comparer `main` et la dernière release au SHA du relais. Si l'APK cible est déjà publiée,
+marquer le relais `DONE` sans doublon. Si `main` a avancé, vérifier les commits supplémentaires et les
+baux concurrents : ne publier qu'après avoir confirmé que le lot courant reste dans l'autorisation
+explicite ; sinon consigner l'écart et ne pas élargir silencieusement la release. Si l'APK manque encore,
+reprendre le fast path #102. `WAITING Terrain` sur une issue produit ne masque jamais ce relais. Un push
+ou merge `apk` sans demande/délégation de publication **ne crée pas** de relais et ne déclenche jamais de
+release automatique ; une tâche à horaire fixe agit seulement lors de sa prochaine exécution.
+
+Avant toute réponse finale qui promet une publication par une autre tâche, relire #102 et vérifier que
+ce checkpoint `HANDOFF_READY` existe réellement avec son SHA et sa prochaine action. Sinon, dire
+explicitement que la release n'a **pas** été mise en file, sans présenter la délégation comme acquise.
 
 ## 0. Avant toute analyse, proposition ou modification
 
