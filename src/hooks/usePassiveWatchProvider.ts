@@ -17,6 +17,8 @@ import {
   type PassiveProviderState,
 } from '../features/providers/passiveProviderState';
 import { extractOfficialStreamingProvider } from '../utils/providerLogos';
+import { auth } from '../lib/firebase';
+import { readUserScopedJson } from '../lib/userIsolation';
 
 interface PassiveWatchProviderParams {
   tmdbId?: number | string | null;
@@ -46,16 +48,25 @@ function getProviderKey(tmdbId: number, mediaType: 'movie' | 'tv'): string {
   return `${mediaType}:${tmdbId}`;
 }
 
+function normalizePreferredProviderIds(ids: readonly number[]): number[] {
+  return Array.from(new Set(
+    ids
+      .map(Number)
+      .filter((id) => Number.isFinite(id) && id > 0),
+  )).sort((a, b) => a - b);
+}
+
 function readCachedProviderSnapshot(
   tmdbId: number,
   mediaType: 'movie' | 'tv',
+  preferredProviderIds: readonly number[],
 ): CachedProviderSnapshot | null {
   const memoryData = tmdb.peekWatchProviders(tmdbId, mediaType);
   if (memoryData) {
     return {
       data: memoryData,
       fresh: true,
-      provider: extractOfficialStreamingProvider(memoryData?.results),
+      provider: extractOfficialStreamingProvider(memoryData?.results, preferredProviderIds),
     };
   }
 
@@ -65,7 +76,7 @@ function readCachedProviderSnapshot(
   return {
     data: persisted.data,
     fresh: persisted.fresh,
-    provider: extractOfficialStreamingProvider(persisted.data?.results),
+    provider: extractOfficialStreamingProvider(persisted.data?.results, preferredProviderIds),
   };
 }
 
@@ -79,13 +90,19 @@ export function usePassiveWatchProvider({
   const cardRef = useRef<HTMLDivElement>(null);
   const numericTmdbId = Number(tmdbId);
   const validTmdbId = Number.isFinite(numericTmdbId) && numericTmdbId > 0;
-  const providerKey = validTmdbId ? getProviderKey(numericTmdbId, mediaType) : `${mediaType}:invalid`;
+  const preferredProviderIds = normalizePreferredProviderIds(
+    readUserScopedJson<number[]>(auth.currentUser?.uid, 'platforms', []),
+  );
+  const preferredProviderKey = preferredProviderIds.join(',');
+  const providerKey = validTmdbId
+    ? `${getProviderKey(numericTmdbId, mediaType)}:prefs:${preferredProviderKey}`
+    : `${mediaType}:invalid:prefs:${preferredProviderKey}`;
   const plexMediaKey = getPlexMediaKey(validTmdbId ? numericTmdbId : null, mediaType);
   const cachedPlexInfo = usePlexAvailabilityStore(state => validTmdbId && !hasKnownProvider
     ? state.cache[plexMediaKey]
     : undefined);
   const renderSnapshot = validTmdbId && !hasKnownProvider
-    ? readCachedProviderSnapshot(numericTmdbId, mediaType)
+    ? readCachedProviderSnapshot(numericTmdbId, mediaType, preferredProviderIds)
     : null;
   const renderProviderState = resolvePassiveProviderState(
     providerKey,
@@ -145,7 +162,7 @@ export function usePassiveWatchProvider({
 
     const startLoadingIfNeeded = () => {
       if (!isMounted || hasKnownProvider) return;
-      const latestSnapshot = readCachedProviderSnapshot(numericTmdbId, mediaType);
+      const latestSnapshot = readCachedProviderSnapshot(numericTmdbId, mediaType, preferredProviderIds);
       const latestPlexInfo = usePlexAvailabilityStore.getState().getMediaAvailability(plexMediaKey);
       if (!latestSnapshot?.provider && !latestPlexInfo?.available && !latestSnapshot?.fresh) {
         setLoadingState(current => current.key === providerKey && current.loading
@@ -162,7 +179,7 @@ export function usePassiveWatchProvider({
 
     const initialSnapshot = hasKnownProvider
       ? null
-      : readCachedProviderSnapshot(numericTmdbId, mediaType);
+      : readCachedProviderSnapshot(numericTmdbId, mediaType, preferredProviderIds);
     updateProviderState(resolvePassiveProviderState(
       providerKey,
       initialSnapshot?.provider,
@@ -173,7 +190,7 @@ export function usePassiveWatchProvider({
     const applyAuthoritativeTmdbPayload = (payload: any) => {
       if (!isMounted) return;
       const stream = payload?.results
-        ? extractOfficialStreamingProvider(payload.results)
+        ? extractOfficialStreamingProvider(payload.results, preferredProviderIds)
         : null;
       updateProviderState(resolvePassiveProviderState(
         providerKey,
@@ -190,7 +207,7 @@ export function usePassiveWatchProvider({
         return;
       }
 
-      const latestSnapshot = readCachedProviderSnapshot(numericTmdbId, mediaType);
+      const latestSnapshot = readCachedProviderSnapshot(numericTmdbId, mediaType, preferredProviderIds);
       const latestPlexInfo = usePlexAvailabilityStore.getState().getMediaAvailability(plexMediaKey);
       if (isPassiveProviderResolutionComplete(hasKnownProvider, Boolean(latestSnapshot?.fresh))) {
         updateProviderState(resolvePassiveProviderState(
@@ -224,7 +241,7 @@ export function usePassiveWatchProvider({
     stopObserving = observeWatchProviderCard(cardRef.current, () => {
       const latestSnapshot = hasKnownProvider
         ? null
-        : readCachedProviderSnapshot(numericTmdbId, mediaType);
+        : readCachedProviderSnapshot(numericTmdbId, mediaType, preferredProviderIds);
       if (!onEnrich && isPassiveProviderResolutionComplete(hasKnownProvider, Boolean(latestSnapshot?.fresh))) {
         updateProviderState(resolvePassiveProviderState(
           providerKey,
@@ -243,7 +260,7 @@ export function usePassiveWatchProvider({
       stopObserving();
       cancelScheduledEnrichment();
     };
-  }, [cachedPlexInfo, hasKnownProvider, mediaType, numericTmdbId, onEnrich, plexMediaKey, providerKey, retainInLibraryCache, validTmdbId]);
+  }, [cachedPlexInfo, hasKnownProvider, mediaType, numericTmdbId, onEnrich, plexMediaKey, preferredProviderKey, providerKey, retainInLibraryCache, validTmdbId]);
 
   return {
     cardRef,
