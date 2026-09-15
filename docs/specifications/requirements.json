@@ -164,7 +164,7 @@
     },
     {
       "id": "SEENIT-APK-005",
-      "title": "Lancement Android mono-splash et status bar edge-to-edge stable",
+      "title": "Lancement Android mono-splash, SystemBars sans padding natif et status bar edge-to-edge stable",
       "targets": [
         "apk",
         "ci"

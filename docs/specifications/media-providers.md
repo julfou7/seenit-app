@@ -24,6 +24,23 @@ transmet jamais de titre. Le backend est seul responsable du login TVDB et des a
 `api4.thetvdb.com`. Les métadonnées publiques Wikipedia/Wikidata de la recherche de personnes restent
 hors de cette façade et ne deviennent aucune preuve de relation ou d'identité Plex.
 
+## Priorité des diffuseurs visibles
+
+La disponibilité publique affichée par les cartes SeenIt reste fondée exclusivement sur les watch
+providers **France** renvoyés par TMDB. Seules les offres de streaming `flatrate`, `free` et `ads` sont
+des preuves éligibles ; `buy` et `rent` ne doivent jamais créer un badge de diffuseur.
+
+Lorsque l'utilisateur a configuré **Profil > Mes plateformes**, SeenIt choisit en priorité, parmi les
+diffuseurs réellement disponibles pour le média, un provider dont l'ID TMDB figure dans cette liste.
+La préférence ne fabrique jamais une disponibilité : une plateforme cochée mais absente du payload
+TMDB du média est ignorée. Si aucune plateforme utilisateur ne correspond, le premier diffuseur public
+éligible conserve le rôle de fallback.
+
+Une disponibilité Plex personnelle vient seulement après ce choix public. **Plex ne doit jamais
+masquer une plateforme de « Mes plateformes » réellement disponible.** Exemple TNR : si *Lioness* est
+disponible sur Paramount+ (`provider_id=531`) et dans Plex, et que 531 appartient à « Mes plateformes »,
+le badge attendu est Paramount+, pas Plex.
+
 ## Réseau et sécurité
 
 - PWA/APK utilisent `authenticatedFetch` et la résolution d'origine SeenIt existante. Le token Firebase
@@ -98,7 +115,8 @@ Les tests HTTP couvrent authentification, allowlists, absence de fuite, JSON mal
 caches bornés/déduplication et séparation des UID. Les TNR TVDB couvrent l'IMDb `remoteid` exact, le
 type movie/tv, l'absence de recherche par titre, l'unicité d'une liste officielle et le remapping TMDB
 exact. Les tests client vérifient que PWA/APK n'appellent que SeenIt et que le runtime ne contient plus
-aucune route ou clé OMDb.
+aucune route ou clé OMDb. Le TNR `tests/watchProviderPreference.test.ts` couvre en plus la priorité
+« Mes plateformes » sur le fallback public générique et sur Plex, sans accepter achat/location.
 
 Tous les fichiers JS/sourcemaps du build Web embarqué dans Capacitor sont scannés. Ils ne doivent
 contenir ni `VITE_TMDB_API_KEY`, ni `VITE_OMDB_API_KEY`, ni `VITE_TVDB_API_KEY`, ni les hôtes API
