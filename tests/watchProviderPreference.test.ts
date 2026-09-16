@@ -59,7 +59,8 @@ test('#337 une réponse publique autoritative vide autorise ensuite le fallback 
   );
 
   assert.equal(state.name, 'Plex (Maison)');
-  assert.match(state.logo || '', /plex/i);
+  assert.ok(state.logo, 'le fallback Plex doit exposer son logo');
+  assert.match(state.logo, /^data:image\/svg\+xml/i);
 });
 
 test('#337 une plateforme cochée mais absente du média n’est jamais inventée', () => {
