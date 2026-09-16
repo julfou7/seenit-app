@@ -12,6 +12,12 @@ import {
   parseMaxAgeFilter,
   resolveParentalRating,
 } from '../shows/parentalRating';
+import {
+  filterResolvedPrefixes,
+  shouldApplyProgressivePartial,
+} from './progressiveAgeFilterCore';
+
+export { shouldApplyProgressivePartial } from './progressiveAgeFilterCore';
 
 type MediaType = 'movie' | 'tv';
 
@@ -116,14 +122,6 @@ export async function resolveParentalRatingBatch(items: any[]): Promise<Map<stri
   return resolved;
 }
 
-export function shouldApplyProgressivePartial(
-  requestGeneration: number,
-  currentGeneration: number,
-  page: number,
-): boolean {
-  return page === 1 && requestGeneration === currentGeneration;
-}
-
 export interface ProgressiveAgeDiscoverDependencies {
   discover: typeof discoverSeenIt;
   resolveBatch: typeof resolveParentalRatingBatch;
@@ -157,40 +155,39 @@ export function createProgressiveAgeDiscover(
       return baseResult;
     }
 
-    const rawResults = baseResult.value.results;
-    const accepted: any[] = [];
-    let lastPublishedCount = 0;
-
-    for (let offset = 0; offset < rawResults.length; offset += DISCOVER_CRITICAL_GRID_ITEMS) {
-      const prefix = rawResults.slice(offset, offset + DISCOVER_CRITICAL_GRID_ITEMS);
-      const detailsByKey = await dependencies.resolveBatch(prefix);
-
-      for (const item of prefix) {
+    const accepted = await filterResolvedPrefixes<any, any | null, any>(
+      baseResult.value.results,
+      DISCOVER_CRITICAL_GRID_ITEMS,
+      async prefix => {
+        const detailsByKey = await dependencies.resolveBatch(prefix);
+        return prefix.map(item => {
+          const identity = identityFor(item);
+          return identity ? detailsByKey.get(identity.key) ?? null : null;
+        });
+      },
+      (item, details) => {
         const identity = identityFor(item);
-        if (!identity) continue;
+        if (!identity) return null;
         const override = getParentalRatingOverride(identity.mediaType, identity.id);
-        const details = detailsByKey.get(identity.key) ?? null;
         const rating = override
           ? resolveParentalRating(identity.mediaType, null, override)
           : details
             ? resolveParentalRating(identity.mediaType, details)
             : null;
-        if (!rating || !matchesMaxRecommendedAge(rating, maxAge)) continue;
-        accepted.push({ ...item, seenitParentalRating: rating });
-      }
-
-      if (accepted.length > lastPublishedCount) {
-        lastPublishedCount = accepted.length;
+        if (!rating || !matchesMaxRecommendedAge(rating, maxAge)) return null;
+        return { ...item, seenitParentalRating: rating };
+      },
+      partialResults => {
         const partial: ProgressiveDiscoverPartial = {
           ...baseResult.value,
-          results: [...accepted],
+          results: partialResults,
         };
         if (onPartial) onPartial(partial);
         if (shouldApplyProgressivePartial(generation, currentGeneration, page)) {
           publishSnapshot({ generation, page, partial });
         }
-      }
-    }
+      },
+    );
 
     return ok({
       ...baseResult.value,
