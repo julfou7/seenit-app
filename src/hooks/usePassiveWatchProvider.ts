@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { tmdb } from '../features/shows/tmdb';
 import { getPlexMediaKey, usePlexAvailabilityStore } from '../features/plex/plexAvailability';
 import {
@@ -18,7 +18,7 @@ import {
 } from '../features/providers/passiveProviderState';
 import { extractOfficialStreamingProvider } from '../utils/providerLogos';
 import { auth } from '../lib/firebase';
-import { readUserScopedJson } from '../lib/userIsolation';
+import { readUserScopedJson, subscribeUserScopedStorageField } from '../lib/userIsolation';
 
 interface PassiveWatchProviderParams {
   tmdbId?: number | string | null;
@@ -90,8 +90,23 @@ export function usePassiveWatchProvider({
   const cardRef = useRef<HTMLDivElement>(null);
   const numericTmdbId = Number(tmdbId);
   const validTmdbId = Number.isFinite(numericTmdbId) && numericTmdbId > 0;
+  const currentUid = auth.currentUser?.uid ?? null;
+  const subscribeToPlatformPreferences = useCallback(
+    (listener: () => void) => subscribeUserScopedStorageField(currentUid, 'platforms', listener),
+    [currentUid],
+  );
+  const readPlatformPreferencesSnapshot = useCallback(
+    () => JSON.stringify(readUserScopedJson<number[]>(currentUid, 'platforms', [])),
+    [currentUid],
+  );
+  const readServerPlatformPreferencesSnapshot = useCallback(() => '[]', []);
+  const serializedPreferredProviderIds = useSyncExternalStore(
+    subscribeToPlatformPreferences,
+    readPlatformPreferencesSnapshot,
+    readServerPlatformPreferencesSnapshot,
+  );
   const preferredProviderIds = normalizePreferredProviderIds(
-    readUserScopedJson<number[]>(auth.currentUser?.uid, 'platforms', []),
+    JSON.parse(serializedPreferredProviderIds) as number[],
   );
   const preferredProviderKey = preferredProviderIds.join(',');
   const providerKey = validTmdbId
@@ -108,6 +123,7 @@ export function usePassiveWatchProvider({
     providerKey,
     renderSnapshot?.provider,
     cachedPlexInfo,
+    Boolean(renderSnapshot?.fresh),
   );
   const [providerState, setProviderState] = useState<PassiveProviderState>(() => renderProviderState);
   const [loadingState, setLoadingState] = useState<ProviderLoadingState>(() => ({
@@ -163,8 +179,7 @@ export function usePassiveWatchProvider({
     const startLoadingIfNeeded = () => {
       if (!isMounted || hasKnownProvider) return;
       const latestSnapshot = readCachedProviderSnapshot(numericTmdbId, mediaType, preferredProviderIds);
-      const latestPlexInfo = usePlexAvailabilityStore.getState().getMediaAvailability(plexMediaKey);
-      if (!latestSnapshot?.provider && !latestPlexInfo?.available && !latestSnapshot?.fresh) {
+      if (!latestSnapshot?.fresh) {
         setLoadingState(current => current.key === providerKey && current.loading
           ? current
           : { key: providerKey, loading: true });
@@ -184,6 +199,7 @@ export function usePassiveWatchProvider({
       providerKey,
       initialSnapshot?.provider,
       usePlexAvailabilityStore.getState().getMediaAvailability(plexMediaKey),
+      Boolean(initialSnapshot?.fresh),
     ));
     finishLoading();
 
@@ -196,6 +212,7 @@ export function usePassiveWatchProvider({
         providerKey,
         stream,
         usePlexAvailabilityStore.getState().getMediaAvailability(plexMediaKey),
+        true,
       ));
       finishLoading();
     };
@@ -214,12 +231,13 @@ export function usePassiveWatchProvider({
           providerKey,
           latestSnapshot?.provider,
           latestPlexInfo,
+          true,
         ));
         finishLoading();
         return;
       }
 
-      if (!latestSnapshot?.provider && !latestPlexInfo?.available) startLoadingIfNeeded();
+      startLoadingIfNeeded();
 
       tmdb.getWatchProviders(numericTmdbId, mediaType).then(res => {
         if (!res.ok || !res.value) {
@@ -247,6 +265,7 @@ export function usePassiveWatchProvider({
           providerKey,
           latestSnapshot?.provider,
           usePlexAvailabilityStore.getState().getMediaAvailability(plexMediaKey),
+          true,
         ));
         finishLoading();
         return;
