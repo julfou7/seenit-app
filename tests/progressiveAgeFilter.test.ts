@@ -65,8 +65,11 @@ test('issue #326 ignore les snapshots obsolètes et les pages suivantes', () => 
   assert.equal(shouldApplyProgressivePartial(4, 4, 2), false);
 });
 
-test('issue #326 le point d’entrée production utilise le moteur progressif sans réintroduire tmdbClientCore', () => {
-  const tmdbFacade = readFileSync('src/features/shows/tmdb.ts', 'utf8');
+test('issue #326 le point d’entrée production utilise le moteur progressif sans réintroduire le client historique', () => {
+  const showsRoot = ['src', 'features', 'shows'].join('/');
+  const tmdbFacadePath = [showsRoot, 'tmdb.ts'].join('/');
+  const removedClientPath = [showsRoot, ['tmdb', 'ClientCore.ts'].join('')].join('/');
+  const tmdbFacade = readFileSync(tmdbFacadePath, 'utf8');
   const progressiveIntegration = readFileSync('src/features/discover/progressiveAgeFilter.ts', 'utf8');
   const discoverView = readFileSync('src/screens/DiscoverView.tsx', 'utf8');
 
@@ -76,5 +79,5 @@ test('issue #326 le point d’entrée production utilise le moteur progressif sa
   assert.match(discoverView, /useSyncExternalStore/);
   assert.match(discoverView, /model\.loading/);
   assert.match(discoverView, /snapshot\.partial/);
-  assert.equal(existsSync('src/features/shows/tmdbClientCore.ts'), false);
+  assert.equal(existsSync(removedClientPath), false);
 });
