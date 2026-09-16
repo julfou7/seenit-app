@@ -1,0 +1,22 @@
+{
+  "name": "SeenIt — workspace canonique",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "remoteUser": "node",
+  "updateRemoteUserUID": true,
+  "mounts": [
+    "source=seenit-node-modules,target=${containerWorkspaceFolder}/node_modules,type=volume",
+    "source=seenit-npm-cache,target=/home/node/.npm,type=volume"
+  ],
+  "postCreateCommand": "node scripts/bootstrap-agent-workspace.cjs",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  }
+}
