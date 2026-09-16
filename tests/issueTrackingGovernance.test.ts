@@ -104,6 +104,27 @@ test('SEENIT-QUALITY-004 conserve les chantiers Codex pendant un arrêt de quota
   assert.match(requestRegistry, /USR-2026-09-13-006/);
 });
 
+test('SEENIT-QUALITY-004 vérifie la reprise planifiée avant tout rendu de main', () => {
+  const agents = fs.readFileSync('AGENTS.md', 'utf8');
+  const bootstrap = fs.readFileSync('.agents/AGENTS.md', 'utf8');
+  const delivery = fs.readFileSync('docs/process/delivery.md', 'utf8');
+  const spec = fs.readFileSync('docs/specifications/seenit.md', 'utf8');
+  const requestRegistry = fs.readFileSync('docs/requests/registry.md', 'utf8');
+
+  for (const source of [agents, bootstrap, delivery, spec]) {
+    assert.match(source, /SeenIt — reprise autonome/);
+    assert.match(source, /HANDOFF_READY[\s\S]*WAITING/is);
+  }
+
+  assert.match(agents, /avant de rendre la main[\s\S]*SeenIt — reprise autonome[\s\S]*active/is);
+  assert.match(agents, /chantier reste inachevé[\s\S]*reprenable[\s\S]*prochaine exécution/is);
+  assert.match(agents, /désactivée[\s\S]*réactiver[\s\S]*ne jamais annoncer une reprise automatique non vérifiée/is);
+  assert.match(bootstrap, /avant tout rendu de main[\s\S]*SeenIt — reprise autonome[\s\S]*active/is);
+  assert.match(delivery, /Garde de reprise planifiée[\s\S]*prochaine exécution/is);
+  assert.match(spec, /SEENIT-QUALITY-004[\s\S]*SeenIt — reprise autonome[\s\S]*prochaine exécution/is);
+  assert.match(requestRegistry, /USR-2026-09-16-001/);
+});
+
 test('SEENIT-QUALITY-004 transmet une APK déléguée par un relais release distinct', () => {
   const agents = fs.readFileSync('AGENTS.md', 'utf8');
   const bootstrap = fs.readFileSync('.agents/AGENTS.md', 'utf8');
