@@ -12,6 +12,7 @@ const bootstrap = readFileSync('scripts/bootstrap-agent-workspace.cjs', 'utf8');
 const remoteWorkflow = readFileSync('.github/workflows/agent-remote-validate.yml', 'utf8');
 const remoteProcess = readFileSync('docs/process/agent-remote-workspace.md', 'utf8');
 const bootstrapRules = readFileSync('.agents/AGENTS.md', 'utf8');
+const rootRules = readFileSync('AGENTS.md', 'utf8');
 
 test('SEENIT-QUALITY-004 fournit un devcontainer reproductible et réutilise les dépendances exactes', () => {
   assert.equal(devcontainer.build?.dockerfile, 'Dockerfile');
@@ -42,4 +43,15 @@ test('SEENIT-QUALITY-004 le fallback sans egress reste une quarantaine exact-SHA
   assert.match(bootstrapRules, /docs\/process\/agent-remote-workspace\.md/);
   assert.match(bootstrapRules, /agent-staging\/\*\*/);
   assert.match(bootstrapRules, /SHA exact/);
+});
+
+test('SEENIT-QUALITY-004 le contrat racine autorise uniquement le fallback no-egress gouverné', () => {
+  assert.match(rootRules, /Fallback sans egress strictement borné/);
+  assert.match(rootRules, /docs\/process\/agent-remote-workspace\.md/);
+  assert.match(rootRules, /agent-staging\/\*\*/);
+  assert.match(rootRules, /SHA exact/);
+  assert.match(rootRules, /unique exception au garde local/i);
+  assert.match(rootRules, /Sauf fallback sans egress strictement borné de la section 0\.3/);
+  assert.match(rootRules, /SeenIt — reprise autonome/);
+  assert.match(rootRules, /Ne jamais désactiver cette automatisation/i);
 });
