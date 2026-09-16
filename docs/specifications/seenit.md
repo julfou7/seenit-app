@@ -1,6 +1,6 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
-Dernière mise à jour : 15 septembre 2026
+Dernière mise à jour : 16 septembre 2026
 Version applicative : **1.4.153**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
@@ -967,13 +967,21 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   le reset connu ou au plus une fois par heure si l'heure est inconnue. En l'absence de cette capacité,
   le checkpoint exige une reprise manuelle Codex sans libérer le périmètre. Seul un `HANDOFF_READY` explicite
   ou un transfert utilisateur explicite autorise une autre tâche à reprendre ; `WAITING` reste non
-  actionnable et `DONE` reste terminal. Si une APK a été explicitement demandée puis **déléguée après
-  merge**, le propriétaire du chantier transmet séparément la release sur #102 avec le marqueur
-  `<!-- seenit-apk-release-handoff -->`, un bail `HANDOFF_READY`, l'autorisation et le destinataire,
-  le SHA `main`, la dernière release, le lot APK non publié, la prochaine version et les contrôles
-  restants. La tâche destinataire reprend ce relais avant une nouvelle issue, vérifie baux, `main`
-  et idempotence puis suit les commandes canoniques ; un `WAITING Terrain` sur l'issue fonctionnelle
-  ne masque pas l'opération release. Aucun merge sans autorisation ne devient une release automatique.
+  actionnable et `DONE` reste terminal. Avant qu'une conversation ChatGPT interactive rende la main, elle
+  vérifie que la tâche planifiée `SeenIt — reprise autonome` est active. Si le chantier reste inachevé, elle
+  confirme également que son checkpoint final est réellement reprenable par cette tâche à sa prochaine
+  exécution : `HANDOFF_READY`, ou `WAITING` uniquement avec un événement externe précis et une condition de
+  reprise, jamais un handoff ordinaire en `ACTIVE`, sans bail concurrent ni réserve Codex sur le même
+  périmètre. Si la tâche est désactivée et que la gestion des automations est disponible, elle est réactivée
+  avant la réponse finale ; sinon l'absence de reprise automatique garantie est tracée comme blocage réel et
+  ne peut pas être présentée comme acquise. Un chantier terminé n'a pas besoin d'être repris, mais cette
+  vérification ne désactive jamais la tâche globale. Si une APK a été explicitement demandée puis
+  **déléguée après merge**, le propriétaire du chantier transmet séparément la release sur #102 avec le
+  marqueur `<!-- seenit-apk-release-handoff -->`, un bail `HANDOFF_READY`, l'autorisation et le destinataire,
+  le SHA `main`, la dernière release, le lot APK non publié, la prochaine version et les contrôles restants.
+  La tâche destinataire reprend ce relais avant une nouvelle issue, vérifie baux, `main` et idempotence puis
+  suit les commandes canoniques ; un `WAITING Terrain` sur l'issue fonctionnelle ne masque pas l'opération
+  release. Aucun merge sans autorisation ne devient une release automatique.
 - **SEENIT-QUALITY-005** — Un import, une reconnexion ou une synchronisation AI Studio/GitHub est un
   transport non autoritatif. Avant tout commit depuis un workspace importé, le diff est comparé à la
   branche GitHub source et toute mutation automatique non demandée de Firebase/Firestore, Android,
