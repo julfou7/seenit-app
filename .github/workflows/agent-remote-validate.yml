@@ -1,0 +1,112 @@
+name: Agent Remote Validate
+
+on:
+  push:
+    branches:
+      - 'agent-staging/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seenit-agent-remote-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate exact staging SHA
+    if: startsWith(github.ref, 'refs/heads/agent-staging/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout exact staging SHA
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Resolve exact main merge-base
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" != 'refs/heads/main'
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          base_sha="$(git merge-base HEAD refs/remotes/origin/main)"
+          test -n "$base_sha"
+          echo "SEENIT_VALIDATE_BASE_SHA=$base_sha" >> "$GITHUB_ENV"
+          echo "SEENIT_STAGING_HEAD_SHA=$GITHUB_SHA" >> "$GITHUB_ENV"
+          {
+            echo '## Agent Remote Validate'
+            echo
+            echo "- staging SHA: \`$GITHUB_SHA\`"
+            echo "- main merge-base: \`$base_sha\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Set up Node.js 22 with npm cache
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install pinned actionlint
+        shell: bash
+        run: |
+          set -euo pipefail
+          version='1.7.12'
+          archive="$RUNNER_TEMP/actionlint.tar.gz"
+          curl -fsSL "https://github.com/rhysd/actionlint/releases/download/v${version}/actionlint_${version}_linux_amd64.tar.gz" -o "$archive"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $archive" | sha256sum --check --status
+          tar -xzf "$archive" -C "$RUNNER_TEMP" actionlint
+          chmod +x "$RUNNER_TEMP/actionlint"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/actionlint" -version
+
+      - name: Validate change preflight
+        run: npm run validate:change -- --preflight
+
+      - name: Build canonical devcontainer
+        run: docker build --file .devcontainer/Dockerfile .
+
+      - name: Resolve Node cache identity
+        id: runtime
+        run: echo "node_version=$(node -p 'process.versions.node')" >> "$GITHUB_OUTPUT"
+
+      - name: Restore exact node_modules cache
+        id: node_modules_cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules
+          key: seenit-agent-node-modules-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.runtime.outputs.node_version }}-${{ hashFiles('package.json', 'package-lock.json', 'scripts/patch-local-notifications.cjs', 'scripts/materialize-android-config.cjs') }}
+
+      - name: Install dependencies on cache miss
+        if: steps.node_modules_cache.outputs.cache-hit != 'true'
+        run: npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
+
+      - name: Validate exact staging change
+        run: npm run validate:change -- --postinstall
+        env:
+          SEENIT_VALIDATE_BASE_SHA: ${{ env.SEENIT_VALIDATE_BASE_SHA }}
+
+      - name: Save trusted staging node_modules cache
+        if: success() && steps.node_modules_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules
+          key: seenit-agent-node-modules-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.runtime.outputs.node_version }}-${{ hashFiles('package.json', 'package-lock.json', 'scripts/patch-local-notifications.cjs', 'scripts/materialize-android-config.cjs') }}
+
+      - name: Publish exact-SHA validation proof
+        if: success()
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$SEENIT_STAGING_HEAD_SHA"
+          {
+            echo
+            echo '### Résultat'
+            echo '- `validate:change` vert sur le SHA de staging exact.'
+            echo '- Le SHA peut être promu sans réécriture vers une branche de chantier ; il ne doit jamais être mergé depuis `agent-staging/**`.'
+          } >> "$GITHUB_STEP_SUMMARY"

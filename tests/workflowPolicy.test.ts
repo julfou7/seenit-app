@@ -9,21 +9,50 @@ const require = createRequire(import.meta.url);
 const {
   ACTIONLINT_VERSION,
   ALLOWED_WORKFLOWS,
+  containsForbiddenGitMutation,
   findWritePermissions,
+  validateAgentRemoteWorkflowContract,
   validateWorkflowPolicy
 } = require('../scripts/validate-workflow-policy.cjs') as {
   ACTIONLINT_VERSION: string;
   ALLOWED_WORKFLOWS: Set<string>;
+  containsForbiddenGitMutation: (content: string) => boolean;
   findWritePermissions: (content: string) => string[];
+  validateAgentRemoteWorkflowContract: (content: string) => string[];
   validateWorkflowPolicy: (workflowDir?: string) => string[];
 };
+
+const validRemoteWorkflow = `name: Agent Remote Validate
+on:
+  push:
+    branches:
+      - 'agent-staging/**'
+permissions:
+  contents: read
+jobs:
+  validate:
+    name: Validate exact staging SHA
+    if: startsWith(github.ref, 'refs/heads/agent-staging/')
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: \${{ github.sha }}
+      - run: git merge-base HEAD refs/remotes/origin/main
+      - run: echo SEENIT_VALIDATE_BASE_SHA=x
+      - run: npm run validate:change -- --preflight
+      - run: docker build --file .devcontainer/Dockerfile .
+      - run: npm run validate:change -- --postinstall
+`;
 
 function createFixture(overrides: Record<string, string> = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'seenit-workflows-'));
   for (const file of ALLOWED_WORKFLOWS) {
+    const defaultContent = file === 'agent-remote-validate.yml'
+      ? validRemoteWorkflow
+      : 'name: Test\npermissions:\n  contents: read\njobs: {}\n';
     fs.writeFileSync(
       path.join(directory, file),
-      overrides[file] ?? 'name: Test\npermissions:\n  contents: read\njobs: {}\n',
+      overrides[file] ?? defaultContent,
       'utf8'
     );
   }
@@ -42,7 +71,11 @@ test('SEENIT-QUALITY-008 verrouille actionlint et accepte uniquement l’allowli
   }
 });
 
-test('SEENIT-QUALITY-008 interdit les mutations Git directes dans les workflows', () => {
+test('SEENIT-QUALITY-008 interdit les mutations Git directes dans les workflows sans bloquer merge-base', () => {
+  assert.equal(containsForbiddenGitMutation('git merge-base HEAD origin/main'), false);
+  assert.equal(containsForbiddenGitMutation('git merge main'), true);
+  assert.equal(containsForbiddenGitMutation('git push origin main'), true);
+
   const directory = createFixture({
     'discover-media-relations.yml': 'name: Test\njobs:\n  bad:\n    steps:\n      - run: git commit -am "hotfix" && git push\n'
   });
@@ -79,4 +112,18 @@ test('SEENIT-QUALITY-008 autorise uniquement les écritures canoniques nécessai
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('SEENIT-QUALITY-004 verrouille la quarantaine distante sur le SHA exact et le merge-base de main', () => {
+  assert.deepEqual(validateAgentRemoteWorkflowContract(validRemoteWorkflow), []);
+  assert.match(validRemoteWorkflow, /agent-staging\/\*\*/);
+  assert.match(validRemoteWorkflow, /github\.sha/);
+  assert.match(validRemoteWorkflow, /merge-base HEAD refs\/remotes\/origin\/main/);
+
+  const unsafe = validRemoteWorkflow
+    .replace("      - 'agent-staging/**'", '      - main')
+    .replace('git merge-base HEAD refs/remotes/origin/main', 'git rev-parse HEAD^');
+  const errors = validateAgentRemoteWorkflowContract(unsafe).join('\n');
+  assert.match(errors, /agent-staging/);
+  assert.match(errors, /merge-base/);
 });
