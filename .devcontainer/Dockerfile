@@ -8,7 +8,7 @@ RUN set -eux; \
     npm install --global npm@10.9.3; \
     deb_arch="$(dpkg --print-architecture)"; \
     case "$deb_arch" in \
-      amd64) actionlint_arch='x86_64' ;; \
+      amd64) actionlint_arch='amd64' ;; \
       arm64) actionlint_arch='arm64' ;; \
       *) echo "Architecture actionlint non supportée: $deb_arch" >&2; exit 1 ;; \
     esac; \
