@@ -20,6 +20,7 @@ export function resolvePassiveProviderState(
   key: string,
   publicProvider?: PublicProviderSnapshot | null,
   plexProvider?: PlexProviderSnapshot | null,
+  publicResolutionSettled = true,
 ): PassiveProviderState {
   if (publicProvider?.logo_path || publicProvider?.provider_name) {
     return {
@@ -29,7 +30,10 @@ export function resolvePassiveProviderState(
     };
   }
 
-  if (plexProvider?.available) {
+  // Plex est un fallback personnel, pas un état provisoire pendant que TMDB
+  // est encore en cours de résolution. Une absence momentanée de provider
+  // public ne constitue donc pas encore une preuve d'absence.
+  if (publicResolutionSettled && plexProvider?.available) {
     return {
       key,
       logo: PLEX_LOGO_SVG,
