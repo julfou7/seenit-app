@@ -198,7 +198,17 @@ distinctes. `SEENIT-QUALITY-004` impose la première à chaque intervention ; el
    incomplète, publier avant de rendre la main : SHA de référence, branche, PR éventuelle, fichiers
    modifiés, tests déjà exécutés/verts, blocage éventuel et prochaine action exacte. Une reprise dans un
    environnement neuf utilise ce checkpoint avant toute nouvelle exploration.
-7. **Travail distant.** CI, release et déploiement sont exécutés par GitHub Actions. L'agent n'occupe pas
+7. **Garde de reprise planifiée.** Avant qu'une conversation ChatGPT interactive rende la main, elle
+   vérifie que la tâche planifiée `SeenIt — reprise autonome` est **active**. Si le chantier reste
+   incomplet, le checkpoint final doit être réellement éligible à la reprise lors de la **prochaine
+   exécution** : `HANDOFF_READY`, ou `WAITING` uniquement avec un événement externe précis et une
+   condition de reprise explicite ; un handoff ordinaire ne reste jamais en `ACTIVE`. L'agent relit
+   également les baux afin qu'aucun bail concurrent ni réserve Codex n'interdise cette reprise. Si la
+   tâche est désactivée et que la surface Automations est disponible, elle est réactivée avant la réponse
+   finale ; sinon l'impossibilité de garantir la reprise est consignée comme blocage réel et n'est jamais
+   présentée comme une reprise automatique acquise. Un chantier terminé ne nécessite pas de reprise du
+   même sujet, mais la tâche globale reste active et n'est jamais désactivée faute de travail.
+8. **Travail distant.** CI, release et déploiement sont exécutés par GitHub Actions. L'agent n'occupe pas
    sa fenêtre d'exécution avec des polls rapprochés ; il suit synchroniquement uniquement sur demande
    explicite ou pour diagnostiquer un échec précis.
 
