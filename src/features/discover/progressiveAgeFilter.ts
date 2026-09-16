@@ -1,4 +1,4 @@
-import { ok, tryCatch, type Result } from '../../core/Result';
+import { ok, tryCatch } from '../../core/Result';
 import { authenticatedFetch } from '../../lib/apiAuth';
 import { getParentalRatingOverride } from '../../store/parentalRatingStore';
 import { DISCOVER_CRITICAL_GRID_ITEMS } from '../../screens/discoverPresentation';
@@ -6,7 +6,7 @@ import {
   discoverSeenIt,
   tmdb,
   type SeenItDiscoverOptions,
-} from '../shows/tmdb';
+} from '../shows/tmdbCore';
 import {
   matchesMaxRecommendedAge,
   parseMaxAgeFilter,
@@ -15,12 +15,38 @@ import {
 
 type MediaType = 'movie' | 'tv';
 
-type DiscoverValue = Awaited<ReturnType<typeof discoverSeenIt>> extends Result<infer TValue>
-  ? TValue
-  : never;
-
-export type ProgressiveDiscoverPartial = DiscoverValue & { results: any[] };
+export interface ProgressiveDiscoverPartial {
+  results: any[];
+  total_pages?: number;
+  total_results?: number;
+  [key: string]: any;
+}
 export type ProgressiveDiscoverPartialHandler = (partial: ProgressiveDiscoverPartial) => void;
+
+export interface ProgressiveAgeSnapshot {
+  generation: number;
+  page: number;
+  partial: ProgressiveDiscoverPartial | null;
+}
+
+type ProgressiveSnapshotPublisher = (snapshot: ProgressiveAgeSnapshot | null) => void;
+
+let globalSnapshot: ProgressiveAgeSnapshot | null = null;
+const globalSnapshotListeners = new Set<() => void>();
+
+export function getProgressiveAgeSnapshot(): ProgressiveAgeSnapshot | null {
+  return globalSnapshot;
+}
+
+export function subscribeProgressiveAgeSnapshot(listener: () => void): () => void {
+  globalSnapshotListeners.add(listener);
+  return () => globalSnapshotListeners.delete(listener);
+}
+
+export function publishProgressiveAgeSnapshot(snapshot: ProgressiveAgeSnapshot | null): void {
+  globalSnapshot = snapshot;
+  for (const listener of globalSnapshotListeners) listener();
+}
 
 interface BatchIdentity {
   item: any;
@@ -108,16 +134,28 @@ export function createProgressiveAgeDiscover(
     discover: discoverSeenIt,
     resolveBatch: resolveParentalRatingBatch,
   },
+  publishSnapshot: ProgressiveSnapshotPublisher = () => undefined,
 ) {
+  let currentGeneration = 0;
+
   return async function progressiveAgeDiscover(
     options: SeenItDiscoverOptions,
     onPartial?: ProgressiveDiscoverPartialHandler,
   ) {
+    const generation = ++currentGeneration;
+    const page = Number(options?.page || 1);
     const maxAge = parseMaxAgeFilter(options?.pegi || 'Tous');
+
+    if (page === 1) {
+      publishSnapshot(maxAge === null ? null : { generation, page, partial: null });
+    }
     if (maxAge === null) return dependencies.discover(options);
 
     const baseResult = await dependencies.discover({ ...options, pegi: 'Tous' });
-    if (!baseResult.ok || !Array.isArray(baseResult.value?.results)) return baseResult;
+    if (!baseResult.ok || !Array.isArray(baseResult.value?.results)) {
+      if (page === 1 && generation === currentGeneration) publishSnapshot(null);
+      return baseResult;
+    }
 
     const rawResults = baseResult.value.results;
     const accepted: any[] = [];
@@ -141,12 +179,16 @@ export function createProgressiveAgeDiscover(
         accepted.push({ ...item, seenitParentalRating: rating });
       }
 
-      if (onPartial && accepted.length > lastPublishedCount) {
+      if (accepted.length > lastPublishedCount) {
         lastPublishedCount = accepted.length;
-        onPartial({
+        const partial: ProgressiveDiscoverPartial = {
           ...baseResult.value,
           results: [...accepted],
-        });
+        };
+        if (onPartial) onPartial(partial);
+        if (shouldApplyProgressivePartial(generation, currentGeneration, page)) {
+          publishSnapshot({ generation, page, partial });
+        }
       }
     }
 
@@ -157,4 +199,7 @@ export function createProgressiveAgeDiscover(
   };
 }
 
-export const discoverSeenItProgressive = createProgressiveAgeDiscover();
+export const discoverSeenItProgressive = createProgressiveAgeDiscover(
+  undefined,
+  publishProgressiveAgeSnapshot,
+);
