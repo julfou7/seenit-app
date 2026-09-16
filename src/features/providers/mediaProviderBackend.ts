@@ -2,6 +2,7 @@ import type { Application } from 'express';
 import {
   registerMediaProviderRoutes as registerCoreMediaProviderRoutes,
 } from './mediaProviderBackendCore.ts';
+import { registerParentalRatingBatchRoute } from './parentalRatingBatchBackend.ts';
 
 export {
   assertMediaProviderSecrets,
@@ -257,8 +258,13 @@ export function createParentalRatingPrefetchFetch(
 
 export function registerMediaProviderRoutes(app: Application, dependencies: CoreDependencies): void {
   const upstream = dependencies.fetch || fetch;
+  const acceleratedFetch = createParentalRatingPrefetchFetch(upstream);
+  registerParentalRatingBatchRoute(app, {
+    ...dependencies,
+    fetch: acceleratedFetch,
+  });
   registerCoreMediaProviderRoutes(app, {
     ...dependencies,
-    fetch: createParentalRatingPrefetchFetch(upstream),
+    fetch: acceleratedFetch,
   });
 }
