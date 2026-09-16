@@ -277,7 +277,7 @@ Toute modification de projet Firebase, databaseId, signature ou identité Androi
 
 - **TMDB ID est l’unique identité canonique** pour rattacher une fiche SeenIt à un téléchargement.
 - TVDB/IMDb peuvent être transportés comme métadonnées, mais doivent être résolus vers TMDB avant toute association média.
-- Titre, titre original, année et nom de fichier et nom de release ne sont **jamais** des clés de matching.
+- Titre, titre original, année, nom de fichier et nom de release ne sont **jamais** des clés de matching.
 - Un même transfert physique se reconnaît uniquement par `requestId`, infohash/downloadId/alias exact ou chemin de transfert exact ; en cas d'ambiguïté, ne pas fusionner.
 
 ## 5.2 Relations médias : TMDB pour les sagas, TVDB pour les franchises
