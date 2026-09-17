@@ -1,7 +1,6 @@
 import { ok, tryCatch } from '../../core/Result';
 import { authenticatedFetch } from '../../lib/apiAuth';
 import { getParentalRatingOverride } from '../../store/parentalRatingStore';
-import { DISCOVER_CRITICAL_GRID_ITEMS } from '../../screens/discoverPresentation';
 import {
   discoverSeenIt,
   type SeenItDiscoverOptions,
@@ -62,6 +61,11 @@ interface BatchIdentity {
 }
 
 const BATCH_CACHE_MAX = 240;
+// Le nombre de cartes visibles n'est pas une borne de recherche parentale. Avec une
+// limite stricte (notamment <= 10), les premiers candidats peuvent tous être refusés
+// ou inconnus. On garde donc un média par requête pour publier chaque preuve dès son
+// arrivée, mais on explore en parallèle jusqu'à la borne explicite du backend.
+const PARENTAL_PROGRESSIVE_MAX_CONCURRENT = 24;
 const parentalBatchCache = new Map<string, any>();
 
 function identityFor(item: any): BatchIdentity | null {
@@ -155,11 +159,10 @@ export function createProgressiveAgeDiscover(
       return baseResult;
     }
 
-    // Resolve one media per request inside the first visible grid window. The backend
-    // returns a batch only once every item in that batch has settled, so keeping a
-    // six-item request here would let one slow TMDB classification hide five safe
-    // neighbours. Six single-item prefixes preserve the same bounded item budget
-    // while allowing each safe result to reach the UI independently.
+    // Un média par requête évite qu'une classification lente masque ses voisines.
+    // La fenêtre de classification est volontairement plus large que les six cartes
+    // visibles : un seuil <= 10 peut n'avoir aucun média admissible dans ces six
+    // premiers candidats. La borne 24 reste identique à la limite backend.
     const accepted = await filterResolvedPrefixes<any, any | null, any>(
       baseResult.value.results,
       1,
@@ -192,7 +195,7 @@ export function createProgressiveAgeDiscover(
           publishSnapshot({ generation, page, partial });
         }
       },
-      DISCOVER_CRITICAL_GRID_ITEMS,
+      PARENTAL_PROGRESSIVE_MAX_CONCURRENT,
     );
 
     return ok({
