@@ -16,17 +16,19 @@ function validateReleaseDispatchInput({ repository, runId, headSha, token }) {
   }
 }
 
-function buildRepositoryDispatchRequest({ runId, headSha }) {
+function buildRepositoryDispatchRequest({ runId, headSha, fastTerrain = false }) {
+  const clientPayload = {
+    release_run_id: runId,
+    release_head_sha: headSha
+  };
+  if (fastTerrain) clientPayload.fast_terrain = true;
   return {
     event_type: EVENT_TYPE,
-    client_payload: {
-      release_run_id: runId,
-      release_head_sha: headSha
-    }
+    client_payload: clientPayload
   };
 }
 
-async function dispatchReleaseUpdate({ repository, runId, headSha, token, fetchImpl = fetch }) {
+async function dispatchReleaseUpdate({ repository, runId, headSha, fastTerrain = false, token, fetchImpl = fetch }) {
   validateReleaseDispatchInput({ repository, runId, headSha, token });
   const response = await fetchImpl(`https://api.github.com/repos/${repository}/dispatches`, {
     method: 'POST',
@@ -37,7 +39,7 @@ async function dispatchReleaseUpdate({ repository, runId, headSha, token, fetchI
       'X-GitHub-Api-Version': '2022-11-28',
       'User-Agent': 'seenit-release-update-dispatch'
     },
-    body: JSON.stringify(buildRepositoryDispatchRequest({ runId, headSha }))
+    body: JSON.stringify(buildRepositoryDispatchRequest({ runId, headSha, fastTerrain }))
   });
 
   if (!response.ok) {
@@ -45,15 +47,16 @@ async function dispatchReleaseUpdate({ repository, runId, headSha, token, fetchI
     throw new Error(`GitHub repository_dispatch refusé (${response.status}): ${detail}`);
   }
 
-  console.log(`Notification Android mise en file pour le run ${runId} (${headSha.slice(0, 8)}).`);
+  console.log(`Notification Android mise en file pour le run ${runId} (${headSha.slice(0, 8)})${fastTerrain ? ' en mode terrain rapide' : ''}.`);
 }
 
 async function main() {
   const repository = String(process.env.RELEASE_REPOSITORY || '').trim();
   const runId = Number(process.env.RELEASE_RUN_ID || '');
   const headSha = String(process.env.RELEASE_HEAD_SHA || '').trim();
+  const fastTerrain = String(process.env.RELEASE_FAST_TERRAIN || '').trim().toLowerCase() === 'true';
   const token = String(process.env.GITHUB_TOKEN || '').trim();
-  await dispatchReleaseUpdate({ repository, runId, headSha, token });
+  await dispatchReleaseUpdate({ repository, runId, headSha, fastTerrain, token });
 }
 
 module.exports = {
