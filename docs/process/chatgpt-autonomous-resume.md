@@ -21,11 +21,11 @@ Snapshot vérifié le **17 septembre 2026** contre la tâche active côté ChatG
 - État attendu : **active**
 - Fuseau : `Europe/Paris`
 - Cadence : **toutes les heures**
-- Mode : `condition_watch`
+- Mode : `exact_schedule`
 - Notifications utilisateur : désactivées par défaut ; le prompt décide quand une notification est réellement nécessaire.
 - Dépôt exclusif : `julfou7/seenit-app`
 
-La date de départ historique de l’automatisation n’est pas contractuelle. En cas de reconstruction, conserver une cadence horaire et le mode conditionnel ; ne pas tenter de reproduire un ancien `DTSTART` uniquement pour obtenir le même texte iCal.
+La date de départ historique de l’automatisation n’est pas contractuelle. En cas de reconstruction, conserver une cadence horaire stricte et le mode `exact_schedule` ; ne pas tenter de reproduire un ancien `DTSTART` uniquement pour obtenir le même texte iCal.
 
 ## Prompt générique de référence
 
@@ -114,10 +114,10 @@ Au 17 septembre 2026, une tâche séparée `Reprendre SeenIt #102` existait avec
 Lorsque la surface ChatGPT Automations est disponible :
 
 1. rechercher la tâche au **titre exact** `SeenIt — reprise autonome` ;
-2. si elle existe, vérifier d’abord qu’elle est active, horaire, en `condition_watch`, et que sa mission reste générique ;
+2. si elle existe, vérifier d’abord qu’elle est active, horaire, en `exact_schedule`, et que sa mission reste générique ;
 3. comparer les différences avec ce document en tenant compte du fait qu’une évolution volontaire plus récente peut exister ;
 4. ne jamais écraser une configuration plus récente uniquement parce qu’elle diffère de ce snapshot ; rechercher d’abord la raison de la divergence dans `AGENTS.md`, les issues process et l’historique GitHub ;
-5. si la tâche a réellement disparu ou a été accidentellement remplacée par un prompt dédié, la recréer sous le titre exact, cadence horaire, mode `condition_watch`, fuseau `Europe/Paris`, avec le prompt générique ci-dessus ;
+5. si la tâche a réellement disparu ou a été accidentellement remplacée par un prompt dédié, la recréer sous le titre exact, cadence horaire stricte, mode `exact_schedule`, fuseau `Europe/Paris`, avec le prompt générique ci-dessus ;
 6. après restauration, confirmer qu’elle est **active** ;
 7. conserver les tâches temporaires dédiées séparées : ne jamais fusionner leur prompt dans la tâche générique pour « gagner une tâche ».
 
