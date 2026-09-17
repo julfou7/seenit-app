@@ -9,8 +9,9 @@ const POLL_LIMIT = 20;
 const POLL_DELAY_MS = 1500;
 const ACTIVE_RUN_STATUSES = new Set(['queued', 'in_progress', 'waiting', 'requested', 'pending']);
 const ALLOWED_COMMANDS = Object.freeze({
-  '/release-apk': { action: 'release', android12Smoke: false },
-  '/release-apk android12_smoke=true': { action: 'release', android12Smoke: true }
+  '/release-terrain': { action: 'release', android12Smoke: false, fastTerrain: true },
+  '/release-apk': { action: 'release', android12Smoke: false, fastTerrain: false },
+  '/release-apk android12_smoke=true': { action: 'release', android12Smoke: true, fastTerrain: false }
 });
 
 function parseReleaseControlCommand(raw) {
@@ -35,7 +36,7 @@ function validateReleaseControlEvent(event) {
   }
   const command = parseReleaseControlCommand(comment?.body);
   if (!command) {
-    throw new Error('Commande refusée : utiliser exactement /release-apk ou /release-apk android12_smoke=true.');
+    throw new Error('Commande refusée : utiliser exactement /release-terrain, /release-apk ou /release-apk android12_smoke=true.');
   }
   return {
     repository: repository.full_name,
@@ -56,7 +57,8 @@ function validateReleasePreflight({
   tagExists = false,
   releaseExists = false,
   activeDuplicate = false,
-  android12Smoke = false
+  android12Smoke = false,
+  fastTerrain = false
 }) {
   if (defaultBranch !== MAIN_BRANCH) {
     throw new Error(`Branche par défaut inattendue : ${defaultBranch || '(absente)'}. SeenIt exige main.`);
@@ -77,27 +79,34 @@ function validateReleasePreflight({
   if (activeDuplicate) {
     throw new Error(`Un workflow de release est déjà actif pour le SHA main ${mainSha}.`);
   }
+  if (fastTerrain && android12Smoke) {
+    throw new Error('Le mode terrain rapide ne peut pas activer le smoke Android 12.');
+  }
+  const inputs = {
+    release_apk: 'true',
+    android12_smoke: android12Smoke ? 'true' : 'false'
+  };
+  if (fastTerrain) inputs.fast_terrain = 'true';
   return {
     expectedVersion,
     mainSha,
     mainVersion,
     ref: MAIN_BRANCH,
-    inputs: {
-      release_apk: 'true',
-      android12_smoke: android12Smoke ? 'true' : 'false'
-    }
+    inputs
   };
 }
 
-function buildWorkflowDispatchRequest(android12Smoke) {
+function buildWorkflowDispatchRequest(android12Smoke, fastTerrain = false) {
+  const inputs = {
+    release_apk: 'true',
+    android12_smoke: android12Smoke ? 'true' : 'false'
+  };
+  if (fastTerrain) inputs.fast_terrain = 'true';
   return {
     method: 'POST',
     body: {
       ref: MAIN_BRANCH,
-      inputs: {
-        release_apk: 'true',
-        android12_smoke: android12Smoke ? 'true' : 'false'
-      }
+      inputs
     }
   };
 }
@@ -115,11 +124,12 @@ async function dispatchReleaseWorkflow({
   request,
   mainSha,
   android12Smoke,
+  fastTerrain = false,
   previousRunIds = [],
   pollLimit = POLL_LIMIT,
   sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 }) {
-  const dispatch = buildWorkflowDispatchRequest(android12Smoke);
+  const dispatch = buildWorkflowDispatchRequest(android12Smoke, fastTerrain);
   await request(`/actions/workflows/${RELEASE_WORKFLOW}/dispatches`, dispatch);
   for (let attempt = 0; attempt < pollLimit; attempt += 1) {
     const data = await request(`/actions/workflows/${RELEASE_WORKFLOW}/runs?event=workflow_dispatch&branch=${MAIN_BRANCH}&per_page=30`);
@@ -198,13 +208,15 @@ async function runReleaseControl({ event, token = process.env.GITHUB_TOKEN } = {
     tagExists: Boolean(existingTag),
     releaseExists: Boolean(existingRelease),
     activeDuplicate: Boolean(activeDuplicate),
-    android12Smoke: validatedEvent.android12Smoke
+    android12Smoke: validatedEvent.android12Smoke,
+    fastTerrain: validatedEvent.fastTerrain
   });
   const previousRunIds = (runs?.workflow_runs || []).map(run => run.id);
   const run = await dispatchReleaseWorkflow({
     request,
     mainSha,
     android12Smoke: validatedEvent.android12Smoke,
+    fastTerrain: validatedEvent.fastTerrain,
     previousRunIds
   });
   const metric = elapsedSeconds(validatedEvent.requestedAt);
@@ -220,6 +232,7 @@ async function runReleaseControl({ event, token = process.env.GITHUB_TOKEN } = {
     `🚀 Release **${versionTag}** déclenchée nativement depuis #${CONTROL_ISSUE}.`,
     '',
     `- SHA main : \`${mainSha}\``,
+    `- Mode : **${validatedEvent.fastTerrain ? 'terrain rapide' : 'release complète'}**`,
     `- Android 12 smoke : **${validatedEvent.android12Smoke ? 'activé' : 'désactivé'}**`,
     `- Run : ${run.html_url || `#${run.id}`}`,
     metric === null ? null : `- Demande → workflow : **${metric} s**`
@@ -230,6 +243,7 @@ async function runReleaseControl({ event, token = process.env.GITHUB_TOKEN } = {
     version: preflight.mainVersion,
     mainSha,
     android12Smoke: validatedEvent.android12Smoke,
+    fastTerrain: validatedEvent.fastTerrain,
     runId: run.id,
     runUrl: run.html_url || null,
     requestToWorkflowSeconds: metric
