@@ -4,6 +4,7 @@ const featureFiles = {
   discover: [
     'src/screens/DiscoverScreen.tsx',
     'src/screens/DiscoverView.tsx',
+    'src/screens/DiscoverViewCore.tsx',
     'src/screens/DiscoverHero.tsx',
     'src/screens/discoverPresentation.tsx',
   ],
