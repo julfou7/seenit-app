@@ -12,6 +12,7 @@ const deferred = <T>() => {
   return { promise, resolve };
 };
 
+// TNR terrain #326 : le premier lot sûr doit être publiable avant la fin du lot complet.
 test('issue #326 publie un premier résultat sûr pendant que la fin du lot reste volontairement bloquée', async () => {
   const items = Array.from({ length: 12 }, (_, index) => index + 1);
   const releaseTail = deferred<number[]>();
