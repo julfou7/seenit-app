@@ -50,23 +50,24 @@ test('SEENIT-RELEASE-003 agrège tous les commits de la version au lieu du seul 
       cwd,
       'feature',
       'feat(qualité): verrouiller la fiabilité de l’APK SeenIt',
-      '- protège identité, signature et actifs Android\n- fiabilise les mises à jour APK avec SHA-256'
+      'Changelog:\n- L’APK conserve son identité lors des mises à jour\n- Les mises à jour restent vérifiables par empreinte SHA-256\n\nDétails techniques:\n- protège identité, signature et actifs Android'
     );
     commitFile(
       cwd,
       'fix',
       'fix(ci): valider le wrapper Gradle officiel',
-      '- remplace le wrapper non reconnu par Gradle officiel\n- vérifie la distribution Gradle par SHA-256'
+      'Changelog:\n- Les mises à jour Android utilisent le wrapper Gradle officiel\n- La distribution Gradle reste vérifiée avant la construction\n\nDétails techniques:\n- vérifie la distribution Gradle par SHA-256'
     );
 
     const notes = generateReleaseNotes({ version: '1.4.81', cwd });
 
-    assert.match(notes, /Protège identité, signature et actifs Android\./);
-    assert.match(notes, /Fiabilise les mises à jour APK avec SHA-256\./);
-    assert.match(notes, /Remplace le wrapper non reconnu par Gradle officiel\./);
-    assert.match(notes, /Vérifie la distribution Gradle par SHA-256\./);
+    assert.match(notes, /L’APK conserve son identité lors des mises à jour\./);
+    assert.match(notes, /Les mises à jour restent vérifiables par empreinte SHA-256\./);
+    assert.match(notes, /Les mises à jour Android utilisent le wrapper Gradle officiel\./);
+    assert.match(notes, /La distribution Gradle reste vérifiée avant la construction\./);
+    assert.doesNotMatch(notes, /protège identité|Détails techniques/i);
     assert.ok(
-      notes.indexOf('Protège identité') < notes.indexOf('Remplace le wrapper'),
+      notes.indexOf('L’APK conserve') < notes.indexOf('Les mises à jour Android'),
       'les notes doivent conserver l’ordre chronologique des commits de la version'
     );
   } finally {
@@ -84,7 +85,7 @@ test('SEENIT-RELEASE-003 ignore le tag de la version courante pour retrouver la 
 
     commitFile(cwd, 'base', 'chore: base 1.4.80');
     git(cwd, 'tag', 'v1.4.80');
-    commitFile(cwd, 'release', 'fix: correctif 1.4.81', '- corrige le comportement');
+    commitFile(cwd, 'release', 'fix: correctif 1.4.81', 'Changelog:\n- Le correctif restaure le comportement attendu.');
     git(cwd, 'tag', 'v1.4.81');
 
     assert.equal(findPreviousReleaseTag('1.4.81', cwd), 'v1.4.80');
@@ -127,6 +128,43 @@ Détails techniques:
   );
 });
 
+test('SEENIT-RELEASE-003 n’expose jamais les sujets ou puces techniques sans Changelog explicite', () => {
+  const body = buildReleaseBody([
+    {
+      hash: 'v157',
+      message: 'fix(notifications): matérialiser les images\n\n- Materialize notification media directory.\n- Isolate progressive parental batch.'
+    },
+    {
+      hash: 'v156',
+      message: 'fix(#326): accélérer le filtre âge\n\n- Fix #326 unblock safe age results within first batch.\n- Test #326 field regression inside parental batch.\n- Distinguish immediate and scheduled notifications.\n- Deliver due media reminders immediately.'
+    }
+  ]);
+
+  assert.equal(body, '');
+});
+
+test('SEENIT-RELEASE-003 bloque une note explicite manifestement anglaise avant publication', () => {
+  assert.throws(
+    () => extractCommitNotes('fix(notifications): corriger les images\n\nChangelog:\n- Materialize notification media directory.'),
+    /doit être rédigée en français/i
+  );
+  assert.throws(
+    () => extractCommitNotes('fix(age): accélérer le filtre\n\nChangelog:\n- Fix safe age results within first batch.'),
+    /doit être rédigée en français/i
+  );
+});
+
+test('SEENIT-RELEASE-003 refuse les notes vagues et les références internes', () => {
+  assert.throws(
+    () => extractCommitNotes('fix(ui): ajuster l’interface\n\nChangelog:\n- Améliorations générales.'),
+    /trop vague/i
+  );
+  assert.throws(
+    () => extractCommitNotes('fix(age): corriger le filtre\n\nChangelog:\n- Le filtre âge corrige #326.'),
+    /référence d.issue/i
+  );
+});
+
 test('SEENIT-RELEASE-003 ne publie jamais les marqueurs de changelog vide', () => {
   const body = buildReleaseBody([
     {
@@ -150,6 +188,32 @@ test('SEENIT-RELEASE-003 ne publie jamais les marqueurs de changelog vide', () =
   assert.match(body, /Les rappels média retrouvent leur visuel\./);
   assert.doesNotMatch(body, /Aucun|Néant|None|N\/A/i);
   assert.doesNotMatch(body, /fallback navigateur|SPEC/i);
+});
+
+test('SEENIT-RELEASE-003 échoue fermé si une version ne contient aucune note publique explicite', () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'seenit-release-empty-'));
+
+  try {
+    git(cwd, 'init');
+    git(cwd, 'config', 'user.email', 'seenit-tests@example.test');
+    git(cwd, 'config', 'user.name', 'SeenIt Tests');
+
+    commitFile(cwd, 'base', 'chore: base 1.4.80');
+    git(cwd, 'tag', 'v1.4.80');
+    commitFile(
+      cwd,
+      'fix',
+      'fix(notifications): changer la matérialisation',
+      '- Materialize notification media directory.\n- Isolate progressive parental batch.'
+    );
+
+    assert.throws(
+      () => generateReleaseNotes({ version: '1.4.81', cwd }),
+      /Aucune note de version publique valide/i
+    );
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
 });
 
 test('SEENIT-RELEASE-003 documente un format public court et homogène', () => {
