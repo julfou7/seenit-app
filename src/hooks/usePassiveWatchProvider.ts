@@ -16,6 +16,10 @@ import {
   resolvePassiveProviderState,
   type PassiveProviderState,
 } from '../features/providers/passiveProviderState';
+import {
+  hydratePreferredProviderIds,
+  normalizePreferredProviderIds,
+} from '../features/providers/providerPreferences';
 import { extractOfficialStreamingProvider } from '../utils/providerLogos';
 import { auth } from '../lib/firebase';
 import { readUserScopedJson, subscribeUserScopedStorageField } from '../lib/userIsolation';
@@ -46,14 +50,6 @@ type ProviderLoadingState = {
 
 function getProviderKey(tmdbId: number, mediaType: 'movie' | 'tv'): string {
   return `${mediaType}:${tmdbId}`;
-}
-
-function normalizePreferredProviderIds(ids: readonly number[]): number[] {
-  return Array.from(new Set(
-    ids
-      .map(Number)
-      .filter((id) => Number.isFinite(id) && id > 0),
-  )).sort((a, b) => a - b);
 }
 
 function readCachedProviderSnapshot(
@@ -135,6 +131,14 @@ export function usePassiveWatchProvider({
     ? providerState
     : renderProviderState;
   const isProviderLoading = loadingState.key === providerKey && loadingState.loading;
+
+  useEffect(() => {
+    if (!currentUid) return;
+    // `Mes plateformes` est une préférence de compte, pas une donnée de l’écran
+    // Réglages. Une WebView fraîche/mise à niveau doit l’hydrater avant de figer
+    // une décision Plex à partir de son seul cache local.
+    void hydratePreferredProviderIds(currentUid).catch(() => undefined);
+  }, [currentUid]);
 
   useEffect(() => {
     if (!validTmdbId || hasKnownProvider || !retainInLibraryCache) return;
