@@ -261,7 +261,10 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Core
   const acceleratedFetch = createParentalRatingPrefetchFetch(upstream);
   registerParentalRatingBatchRoute(app, {
     ...dependencies,
-    fetch: acceleratedFetch,
+    // The explicit batch endpoint is the progressive age-filter contract. It must
+    // execute only the media requested by the client; routing it through the old
+    // Explorer warmup turns a one-item prefix into a hidden 20-item fan-out.
+    fetch: upstream,
   });
   registerCoreMediaProviderRoutes(app, {
     ...dependencies,
