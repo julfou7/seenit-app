@@ -4,9 +4,9 @@ import { getParentalRatingOverride } from '../../store/parentalRatingStore';
 import { DISCOVER_CRITICAL_GRID_ITEMS } from '../../screens/discoverPresentation';
 import {
   discoverSeenIt,
-  tmdb,
   type SeenItDiscoverOptions,
 } from '../shows/tmdbCore';
+import { tmdb } from '../shows/tmdbClient';
 import {
   matchesMaxRecommendedAge,
   parseMaxAgeFilter,
