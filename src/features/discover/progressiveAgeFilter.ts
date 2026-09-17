@@ -155,9 +155,14 @@ export function createProgressiveAgeDiscover(
       return baseResult;
     }
 
+    // Resolve one media per request inside the first visible grid window. The backend
+    // returns a batch only once every item in that batch has settled, so keeping a
+    // six-item request here would let one slow TMDB classification hide five safe
+    // neighbours. Six single-item prefixes preserve the same bounded item budget
+    // while allowing each safe result to reach the UI independently.
     const accepted = await filterResolvedPrefixes<any, any | null, any>(
       baseResult.value.results,
-      DISCOVER_CRITICAL_GRID_ITEMS,
+      1,
       async prefix => {
         const detailsByKey = await dependencies.resolveBatch(prefix);
         return prefix.map(item => {
@@ -187,6 +192,7 @@ export function createProgressiveAgeDiscover(
           publishSnapshot({ generation, page, partial });
         }
       },
+      DISCOVER_CRITICAL_GRID_ITEMS,
     );
 
     return ok({

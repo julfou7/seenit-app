@@ -47,6 +47,51 @@ test('issue #326 publie un résultat sûr plus loin sans attendre un préfixe an
   assert.deepEqual(await run, [1, 3, 5, 7, 9, 11], 'le résultat final retrouve strictement l’ordre source');
 });
 
+// TNR terrain #326 v1.4.155 : l'ancien découpage par six restait bloqué car la
+// route /parental-ratings répond seulement après le Promise.all du lot. La politique
+// de production doit donc isoler chaque média dans la fenêtre critique tout en gardant
+// six classifications maximum en vol.
+test('issue #326 v1.4.155 un média lent ne bloque plus un voisin sûr du même ancien lot', async () => {
+  const items = [1, 2, 3, 4, 5, 6];
+  const blocked = deferred<number[]>();
+  const firstPartial = deferred<number[]>();
+  let settled = false;
+  let active = 0;
+  let maxActive = 0;
+
+  const run = filterResolvedPrefixes<number, number | null, number>(
+    items,
+    1,
+    async prefix => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      if (prefix[0] === 1) {
+        const values = await blocked.promise;
+        active -= 1;
+        return values;
+      }
+      await Promise.resolve();
+      active -= 1;
+      return prefix;
+    },
+    (item, resolved) => resolved !== null && resolved !== undefined && item % 2 === 1 ? item : null,
+    partial => firstPartial.resolve(partial),
+    6,
+  ).then(value => {
+    settled = true;
+    return value;
+  });
+
+  const first = await firstPartial.promise;
+  assert.ok(first.includes(3), 'le premier voisin sûr doit être publiable pendant que le média 1 reste bloqué');
+  assert.equal(first.includes(1), false, 'le média non résolu ne doit jamais fuiter');
+  assert.equal(settled, false, 'le résultat final peut attendre le média lent sans retenir le premier résultat sûr');
+  assert.equal(maxActive, 6, 'la fenêtre critique garde au plus six classifications indépendantes en vol');
+
+  blocked.resolve([1]);
+  assert.deepEqual(await run, [1, 3, 5]);
+});
+
 test('issue #326 borne la concurrence des préfixes pendant qu’un lot reste lent', async () => {
   const items = Array.from({ length: 24 }, (_, index) => index + 1);
   const blocked = deferred<number[]>();
@@ -109,7 +154,16 @@ test('issue #326 le point d’entrée production utilise le moteur progressif sa
   const discoverView = readFileSync('src/screens/DiscoverView.tsx', 'utf8');
 
   assert.match(tmdbFacade, /discoverSeenItProgressive as discoverSeenIt/);
-  assert.match(progressiveIntegration, /DISCOVER_CRITICAL_GRID_ITEMS/);
+  assert.match(
+    progressiveIntegration,
+    /filterResolvedPrefixes<any, any \| null, any>\(\s*baseResult\.value\.results,\s*1,/,
+    'la production doit casser la barrière Promise.all du lot en résolvant un média par préfixe',
+  );
+  assert.match(
+    progressiveIntegration,
+    /partialResults =>[\s\S]*?DISCOVER_CRITICAL_GRID_ITEMS,\s*\);/,
+    'la production doit conserver une concurrence bornée à la fenêtre critique',
+  );
   assert.match(progressiveIntegration, /baseResult\.value[\s\S]*results: partialResults/);
   assert.match(discoverView, /useSyncExternalStore/);
   assert.match(discoverView, /model\.loading/);
