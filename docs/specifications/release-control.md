@@ -24,7 +24,7 @@ Seul le propriétaire du dépôt, avec `author_association=OWNER`, est autorisé
 
 Quand aucune candidate compatible n’existe, `/prepare-release-apk` devient le chemin prioritaire. L’absence d’un workspace, de `gh`, d’un token shell ou d’un navigateur authentifié **n’est pas un blocage** et ne justifie plus une reproduction manuelle des huit fichiers. Cette reproduction n’est admise qu’en secours après panne prouvée du contrôleur.
 
-Le job `Prepare Release Candidate` possède uniquement `contents: write`, `pull-requests: write` et `issues: write`. Il n’a aucun droit de déclenchement de release ni accès aux secrets de signature Android.
+Le job `Prepare Release Candidate` possède `actions: write`, `contents: write`, `pull-requests: write` et `issues: write`. `actions: write` sert exclusivement à déclencher la validation canonique non-release de la candidate ; il n’autorise pas ce job à publier une APK et ne lui donne aucun accès aux secrets de signature Android.
 
 Avant toute création, il doit :
 
@@ -72,6 +72,14 @@ Une candidate incompatible reste bloquante par défaut et n’est jamais réécr
 Quand toutes ces preuves sont réunies, le contrôleur supprime explicitement la ref obsolète avec l’API GitHub, trace l’ancien SHA, l’ancienne base et le nouveau `main` sur #102, puis recrée `release/vX.Y.Z` depuis le `main` courant par le préparateur atomique normal. **Aucun force-push n’est autorisé.** Si une seule preuve manque ou si la ref change entre inspection et suppression, le recyclage est refusé et l’incompatibilité reste bloquante.
 
 Le contrôleur poste sur #102 la version, la base `main`, la branche, le commit, la PR, la portée release-only et la mesure « demande → PR » lorsqu’elle est disponible.
+
+### Validation canonique explicite des PR créées par `GITHUB_TOKEN`
+
+Une PR créée par un workflow avec son `GITHUB_TOKEN` ne doit pas dépendre d’un nouvel événement `pull_request` : GitHub protège contre les boucles récursives et ce chemin a produit des runs `action_required` sans job exploitable sur les candidates v1.4.154 à v1.4.156.
+
+Après création ou réutilisation d’une PR candidate, le contrôleur déclenche donc explicitement `Validate & Release SeenIt` via `workflow_dispatch` sur **la branche candidate exacte**, avec `release_apk=false` et `android12_smoke=false`. Le job `Validate Change` retrouve le merge-base du `main` grâce au checkout complet et exécute le même `npm run validate:change` canonique que la CI de PR. Le contrôleur mémorise les runs précédents, recherche pendant au plus 30 secondes le nouveau run `workflow_dispatch` dont `head_sha` est exactement le SHA candidat, puis publie son lien sur #102.
+
+Cette validation explicite est un garde obligatoire : une PR candidate créée/réutilisée par le contrôleur n’est **jamais considérée prête ni fusionnable** tant que ce run précis n’est pas terminé en succès. Si le dispatch est accepté mais que le run n’est pas retrouvé dans la fenêtre bornée, le contrôleur échoue et interdit tout redéclenchement aveugle ; l’état GitHub doit d’abord être relu.
 
 ### Policy du dépôt interdisant la création de PR par GitHub Actions
 
@@ -162,7 +170,7 @@ avancé, son lot et son autorisation sont réconciliés avant toute commande.
 
 Une demande « publie l’APK » seule autorise l’agent à laisser GitHub Actions terminer après identification du run exact : il **rend la main par défaut** une fois le run précis identifié et tracé. Si l’utilisateur demande explicitement d’attendre le résultat — notamment avec une formulation comme « publie et attends le résultat » — le suivi reste ciblé sur ce run jusqu’à l’APK signée, au smoke et à la publication.
 
-Lorsqu’une candidate doit d’abord être préparée, l’agent utilise `/prepare-release-apk`, attend uniquement la CI de la PR créée/réutilisée — ou ouvre via le connecteur la PR demandée par un handoff policy explicite —, fusionne si elle est verte, puis enchaîne `/release-apk`. Il ne relit pas l’historique fonctionnel complet entre ces étapes.
+Lorsqu’une candidate doit d’abord être préparée, l’agent utilise `/prepare-release-apk`, attend la **validation canonique explicite du SHA candidat** publiée par le contrôleur — ou, en cas de handoff policy, ouvre via le connecteur la PR demandée et attend sa CI normale —, fusionne uniquement si elle est verte, puis enchaîne `/release-apk`. Il ne relit pas l’historique fonctionnel complet entre ces étapes.
 
 ## Bruit `issue_comment`
 
@@ -180,7 +188,8 @@ Les TNR de release couvrent réellement :
 - séparation des permissions préparation/publication ;
 - préparation atomique N → N+1 et conservation du format des catalogues JSON ;
 - reconnaissance stricte du seul `403` de policy GitHub Actions pour le handoff PR, tout autre échec restant bloquant ;
-- dispatch natif et anti-doublon ;
+- dispatch explicite de validation non-release sur la branche candidate, corrélation stricte au `head_sha` et refus de considérer une candidate prête sans run identifié ;
+- dispatch natif de release et anti-doublon ;
 - format du checkpoint final en succès et en échec de notification ;
 - permission `issues: write` limitée au workflow post-release qui produit ce checkpoint.
 
@@ -191,4 +200,5 @@ Les assertions documentaires seules ne suffisent pas : les helpers de décision 
 - v1.4.114 : validation du parcours de publication connector-only sans GitHub CLI, token shell ni navigateur authentifié ;
 - v1.4.115 : dispatch en 17,9 s ; le problème distinct d’attente runner a été traité par #135 ;
 - v1.4.122 : dispatch `/release-apk` en 20,5 s, build/signature, upgrade smoke Android 36, publication et notification tous verts. Cette release a révélé le dernier trou « candidate absente », désormais couvert par `/prepare-release-apk` ;
-- v1.4.123 : premier `/prepare-release-apk` terrain ; génération et push de la candidate réussis, puis `POST /pulls` refusé par la policy GitHub malgré `pull-requests: write`. Ce cas est désormais couvert par le handoff connector-only strict sans recréation des huit surfaces.
+- v1.4.123 : premier `/prepare-release-apk` terrain ; génération et push de la candidate réussis, puis `POST /pulls` refusé par la policy GitHub malgré `pull-requests: write`. Ce cas est désormais couvert par le handoff connector-only strict sans recréation des huit surfaces ;
+- v1.4.154 à v1.4.156 : la création de PR par `github-actions[bot]` a confirmé que l’événement dérivé du `GITHUB_TOKEN` ne déclenche pas la CI de PR attendue. La validation explicite `workflow_dispatch` du SHA candidat devient le garde durable et supprime le besoin de recréer la PR sous l’identité utilisateur.

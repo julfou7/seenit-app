@@ -4,8 +4,11 @@ import { readFileSync } from 'node:fs';
 import {
   ACTIONS_PR_POLICY_MESSAGE,
   PREPARE_COMMAND,
+  VALIDATION_WORKFLOW,
   buildCandidateBranchName,
+  dispatchCandidateValidation,
   evaluateRemoteCandidate,
+  findNewCandidateValidationRun,
   isActionsPrCreationPolicyError,
   resolvePreparationTarget,
   sameReleaseFiles,
@@ -101,9 +104,50 @@ test('SEENIT-RELEASE-005 traite uniquement le 403 policy GitHub Actions comme ha
   assert.equal(isActionsPrCreationPolicyError(new Error('GitHub API POST /pulls -> 500: server error')), false);
 });
 
+test('SEENIT-RELEASE-005 identifie uniquement le nouveau workflow_dispatch du SHA candidat', () => {
+  const sha = 'b'.repeat(40);
+  const runs = [
+    { id: 1, event: 'workflow_dispatch', head_sha: sha },
+    { id: 2, event: 'pull_request', head_sha: sha },
+    { id: 3, event: 'workflow_dispatch', head_sha: 'c'.repeat(40) },
+    { id: 4, event: 'workflow_dispatch', head_sha: sha }
+  ];
+  assert.equal(findNewCandidateValidationRun(runs, sha, [1])?.id, 4);
+  assert.equal(findNewCandidateValidationRun(runs, sha, [1, 4]), null);
+});
+
+test('SEENIT-RELEASE-005 déclenche explicitement la validation canonique de la branche candidate', async () => {
+  const sha = 'b'.repeat(40);
+  const calls = [];
+  let polls = 0;
+  const request = async (path, options = {}) => {
+    calls.push({ path, options });
+    if (path.endsWith('/dispatches')) return null;
+    polls += 1;
+    return { workflow_runs: polls === 1 ? [] : [{ id: 42, event: 'workflow_dispatch', head_sha: sha, html_url: 'https://example.test/run/42' }] };
+  };
+  const run = await dispatchCandidateValidation({
+    request,
+    branchName: 'release/v1.4.157',
+    branchSha: sha,
+    previousRunIds: [],
+    pollLimit: 2,
+    sleep: async () => {}
+  });
+  assert.equal(run?.id, 42);
+  assert.equal(VALIDATION_WORKFLOW, 'build-apk.yml');
+  assert.deepEqual(calls[0], {
+    path: '/actions/workflows/build-apk.yml/dispatches',
+    options: {
+      method: 'POST',
+      body: { ref: 'release/v1.4.157', inputs: { release_apk: false, android12_smoke: false } }
+    }
+  });
+});
+
 test('workflow de contrôle sépare les permissions préparation et publication', () => {
   assert.match(workflow, /github\.event\.comment\.body == '\/prepare-release-apk'/);
-  assert.match(workflow, /prepare_candidate:[\s\S]*?contents: write[\s\S]*?pull-requests: write/);
+  assert.match(workflow, /prepare_candidate:[\s\S]*?actions: write[\s\S]*?contents: write[\s\S]*?pull-requests: write/);
   assert.match(workflow, /release_control:[\s\S]*?actions: write[\s\S]*?contents: read/);
   assert.doesNotMatch(workflow.match(/release_control:[\s\S]*$/)?.[0] || '', /pull-requests: write/);
 });
@@ -116,6 +160,7 @@ test('les consignes interdisent le fallback manuel tant que #102 sait préparer 
   assert.match(bootstrapAgents, /n'est jamais un motif pour reproduire manuellement les huit fichiers/);
   assert.match(releaseControlSpec, /n’est pas un blocage/);
   assert.match(releaseControlSpec, /handoff connector-only/);
+  assert.match(releaseControlSpec, /validation canonique explicite/);
   assert.match(releaseControlSpec, /seenit-release-summary:<runId>/);
 });
 

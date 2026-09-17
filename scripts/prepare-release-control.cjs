@@ -10,6 +10,9 @@ const BOT_NAME = 'github-actions[bot]';
 const BOT_EMAIL = '41898282+github-actions[bot]@users.noreply.github.com';
 const ACTIONS_PR_POLICY_MESSAGE = 'GitHub Actions is not permitted to create or approve pull requests.';
 const CONTROLLER_COMMIT_MARKER = 'Préparation créée par le contrôleur connector-only #102.';
+const VALIDATION_WORKFLOW = 'build-apk.yml';
+const VALIDATION_POLL_LIMIT = 10;
+const VALIDATION_POLL_DELAY_MS = 3000;
 
 function runGit(args, options = {}) {
   return execFileSync('git', args, {
@@ -151,7 +154,7 @@ function buildCandidatePrBody({ version, mainSha }) {
     '- exactement les 8 surfaces canoniques de version ;',
     '- un seul commit release-only ;',
     '- aucune modification métier ;',
-    '- publication uniquement après CI verte + merge + commande `/release-apk` sur #102.',
+    '- publication uniquement après validation canonique verte + merge + commande `/release-apk` sur #102.',
     '',
     'Refs #102'
   ].join('\n');
@@ -198,6 +201,45 @@ async function createCandidatePrWithPolicyHandoff(request, options) {
     if (!isActionsPrCreationPolicyError(error)) throw error;
     return { pr: null, prHandoff: true };
   }
+}
+
+function findNewCandidateValidationRun(runs, branchSha, previousIds = []) {
+  const previous = new Set(previousIds);
+  return (runs || []).find(run => run?.event === 'workflow_dispatch' && run?.head_sha === branchSha && !previous.has(run.id)) || null;
+}
+
+async function dispatchCandidateValidation({
+  request,
+  branchName,
+  branchSha,
+  previousRunIds = [],
+  pollLimit = VALIDATION_POLL_LIMIT,
+  sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+}) {
+  await request(`/actions/workflows/${VALIDATION_WORKFLOW}/dispatches`, {
+    method: 'POST',
+    body: {
+      ref: branchName,
+      inputs: { release_apk: false, android12_smoke: false }
+    }
+  });
+  for (let attempt = 0; attempt < pollLimit; attempt += 1) {
+    const data = await request(`/actions/workflows/${VALIDATION_WORKFLOW}/runs?event=workflow_dispatch&branch=${encodeURIComponent(branchName)}&per_page=30`);
+    const run = findNewCandidateValidationRun(data?.workflow_runs, branchSha, previousRunIds);
+    if (run) return run;
+    if (attempt + 1 < pollLimit) await sleep(VALIDATION_POLL_DELAY_MS);
+  }
+  return null;
+}
+
+async function startCandidateValidation({ request, branchName, branchSha }) {
+  const existing = await request(`/actions/workflows/${VALIDATION_WORKFLOW}/runs?event=workflow_dispatch&branch=${encodeURIComponent(branchName)}&per_page=30`);
+  const previousRunIds = (existing?.workflow_runs || []).map(run => run.id);
+  const run = await dispatchCandidateValidation({ request, branchName, branchSha, previousRunIds });
+  if (!run) {
+    throw new Error(`Validation candidate dispatchée pour ${branchName} (${branchSha}) mais run non retrouvé dans les 30 s ; ne pas merger ni redéclencher aveuglément.`);
+  }
+  return run;
 }
 
 async function deleteRemoteCandidateRef(request, branchName, expectedSha) {
@@ -335,6 +377,10 @@ async function runPrepareReleaseControl({ event, token = process.env.GITHUB_TOKE
 
   const seconds = metric();
   const requiresConnectorPr = candidate.prHandoff === true;
+  let validationRun = null;
+  if (!requiresConnectorPr) {
+    validationRun = await startCandidateValidation({ request, branchName, branchSha: candidate.branchSha });
+  }
   const candidateLabel = candidate.recycled
     ? '♻️ Candidate obsolète recréée'
     : candidate.reused
@@ -347,13 +393,14 @@ async function runPrepareReleaseControl({ event, token = process.env.GITHUB_TOKE
     `- Branche : \`${branchName}\``,
     `- Commit release-only : \`${candidate.branchSha}\``,
     requiresConnectorPr
-      ? `- PR : non créée par \`GITHUB_TOKEN\` car la policy du dépôt interdit aux GitHub Actions de créer des pull requests.`
+      ? '- PR : non créée par `GITHUB_TOKEN` car la policy du dépôt interdit aux GitHub Actions de créer des pull requests.'
       : `- PR : ${candidate.pr?.html_url || `#${candidate.pr?.number || '?'}`}`,
+    validationRun ? `- Validation canonique explicite : ${validationRun.html_url || `run #${validationRun.id}`}` : null,
     '- Portée : exactement 8 surfaces de version, 1 commit, aucun fichier métier.',
     requiresConnectorPr
       ? `- Prochaine action exacte : ouvrir via le connecteur GitHub une PR \`${branchName}\` → \`${MAIN_BRANCH}\`, sans modifier ni recréer la candidate ; attendre sa CI, fusionner si verte, puis \`/release-apk\` sur #102.`
-      : '- Prochaine action exacte : attendre la CI de cette PR, fusionner si verte, puis `/release-apk` sur #102.',
-    seconds === null ? null : `- Demande → ${requiresConnectorPr ? 'handoff PR' : 'PR'} : **${seconds} s**`
+      : '- Prochaine action exacte : attendre la validation canonique explicite de ce SHA ; fusion interdite tant qu’elle n’est pas verte, puis `/release-apk` sur #102.',
+    seconds === null ? null : `- Demande → ${requiresConnectorPr ? 'handoff PR' : 'PR + validation'} : **${seconds} s**`
   ].filter(Boolean).join('\n'));
 
   return {
@@ -366,6 +413,8 @@ async function runPrepareReleaseControl({ event, token = process.env.GITHUB_TOKE
     prUrl: candidate.pr?.html_url || null,
     prHandoff: requiresConnectorPr,
     recycled: candidate.recycled === true,
+    validationRunId: validationRun?.id || null,
+    validationRunUrl: validationRun?.html_url || null,
     requestToPrSeconds: requiresConnectorPr ? null : seconds,
     requestToDecisionSeconds: requiresConnectorPr ? seconds : null
   };
@@ -390,16 +439,20 @@ module.exports = {
   BOT_NAME,
   CONTROLLER_COMMIT_MARKER,
   PREPARE_COMMAND,
+  VALIDATION_WORKFLOW,
   buildCandidateBranchName,
   buildCandidatePrBody,
   deleteRemoteCandidateRef,
+  dispatchCandidateValidation,
   evaluateRecyclableRemoteCandidate,
   evaluateRemoteCandidate,
+  findNewCandidateValidationRun,
   isActionsPrCreationPolicyError,
   isControllerGeneratedCandidateCommit,
   resolvePreparationTarget,
   runPrepareReleaseControl,
   sameReleaseFiles,
+  startCandidateValidation,
   validatePrepareControlEvent
 };
 
