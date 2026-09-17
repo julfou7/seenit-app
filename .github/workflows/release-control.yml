@@ -50,7 +50,8 @@ jobs:
       github.event.issue.number == 102 &&
       github.event.comment.user.login == github.event.repository.owner.login &&
       github.event.comment.author_association == 'OWNER' &&
-      (github.event.comment.body == '/release-apk' ||
+      (github.event.comment.body == '/release-terrain' ||
+       github.event.comment.body == '/release-apk' ||
        github.event.comment.body == '/release-apk android12_smoke=true')
     runs-on: ubuntu-latest
     timeout-minutes: 3
