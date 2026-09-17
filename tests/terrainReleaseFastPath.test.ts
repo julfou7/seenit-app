@@ -188,11 +188,11 @@ test('issue #368 propage le mode terrain au checkpoint sans changer le payload h
 test('issue #368 formalise la boucle terrain automatique et le SLO téléphone', () => {
   assert.match(agentRules, /release terrain/i);
   assert.match(agentRules, /\/release-terrain/);
-  assert.match(agentRules, /sans nouvelle demande utilisateur/i);
+  assert.match(agentRules, /(?:ne doit pas avoir à relancer séparément|sans nouvelle demande utilisateur)/i);
   assert.match(agentRules, /premier.*terrain.*(?:rouge|KO)/is);
   assert.match(agentRules, /chemin.*production/i);
   assert.match(agentRules, /<!-- seenit-resume -->/);
-  assert.match(agentRules, /mis à jour.*en place/i);
+  assert.match(agentRules, /(?:mis|mettre) à jour.*en place/i);
 
   assert.match(delivery, /release terrain/i);
   assert.match(delivery, /10 minutes/i);
