@@ -12,11 +12,11 @@ const deferred = <T>() => {
   return { promise, resolve };
 };
 
-// TNR terrain #326 : le premier lot sûr doit être publiable avant la fin du lot complet.
-// Revalidation distante : ce SHA est construit sur le main canonique courant.
-test('issue #326 publie un premier résultat sûr pendant que la fin du lot reste volontairement bloquée', async () => {
+// TNR terrain #326 v1.4.154 : un préfixe lent ne doit plus bloquer un préfixe
+// suivant entièrement résolu et sûr. La concurrence reste explicitement bornée.
+test('issue #326 publie un résultat sûr plus loin sans attendre un préfixe antérieur bloqué', async () => {
   const items = Array.from({ length: 12 }, (_, index) => index + 1);
-  const releaseTail = deferred<number[]>();
+  const releaseFirstPrefix = deferred<number[]>();
   const firstPartial = deferred<number[]>();
   let settled = false;
   let prefixCalls = 0;
@@ -26,25 +26,58 @@ test('issue #326 publie un premier résultat sûr pendant que la fin du lot rest
     6,
     async prefix => {
       prefixCalls += 1;
-      if (prefixCalls === 1) return prefix.map(id => id === 2 ? null : id);
-      return releaseTail.promise.then(values => prefix.map((_, index) => values[index] ?? null));
+      if (prefix[0] === 1) {
+        return releaseFirstPrefix.promise.then(values => prefix.map((_, index) => values[index] ?? null));
+      }
+      return prefix.map(id => id === 8 ? null : id);
     },
     (item, resolved) => resolved !== null && resolved !== undefined && item % 2 === 1 ? item : null,
-    partial => {
-      if (prefixCalls === 1) firstPartial.resolve(partial);
-    },
+    partial => firstPartial.resolve(partial),
   ).then(value => {
     settled = true;
     return value;
   });
 
   const first = await firstPartial.promise;
-  assert.deepEqual(first, [1, 3, 5]);
-  assert.equal(settled, false, 'la page finale ne doit pas bloquer le premier rendu sûr');
-  assert.equal(prefixCalls, 2, 'la queue peut déjà préparer le préfixe suivant sans retarder le premier rendu');
+  assert.deepEqual(first, [7, 9, 11]);
+  assert.equal(settled, false, 'le résultat final attend encore le préfixe antérieur');
+  assert.equal(prefixCalls, 2, 'deux préfixes au maximum doivent pouvoir travailler en parallèle');
 
-  releaseTail.resolve([7, 8, 9, 10, 11, 12]);
-  assert.deepEqual(await run, [1, 3, 5, 7, 9, 11]);
+  releaseFirstPrefix.resolve([1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(await run, [1, 3, 5, 7, 9, 11], 'le résultat final retrouve strictement l’ordre source');
+});
+
+test('issue #326 borne la concurrence des préfixes pendant qu’un lot reste lent', async () => {
+  const items = Array.from({ length: 24 }, (_, index) => index + 1);
+  const blocked = deferred<number[]>();
+  let active = 0;
+  let maxActive = 0;
+  let calls = 0;
+
+  const run = filterResolvedPrefixes<number, number, number>(
+    items,
+    6,
+    async prefix => {
+      calls += 1;
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      if (prefix[0] === 1) {
+        const values = await blocked.promise;
+        active -= 1;
+        return values;
+      }
+      await Promise.resolve();
+      active -= 1;
+      return prefix;
+    },
+    (item, resolved) => resolved === undefined ? null : item,
+  );
+
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(maxActive, 2);
+  assert.ok(calls >= 2, 'le second préfixe doit démarrer malgré le premier bloqué');
+  blocked.resolve([1, 2, 3, 4, 5, 6]);
+  assert.equal((await run).length, 24);
 });
 
 test('issue #326 exclut les classifications inconnues et conserve strictement l’ordre du discover brut', async () => {
@@ -57,7 +90,7 @@ test('issue #326 exclut les classifications inconnues et conserve strictement l�
     partial => partials.push(partial),
   );
 
-  assert.deepEqual(partials[0], [10, 30, 40, 50]);
+  assert.ok(partials.some(partial => partial.includes(70)), 'un résultat sûr du second préfixe peut être publié tôt');
   assert.deepEqual(result, [10, 30, 40, 50, 70]);
 });
 
