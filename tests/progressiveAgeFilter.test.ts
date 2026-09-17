@@ -92,6 +92,46 @@ test('issue #326 v1.4.155 un média lent ne bloque plus un voisin sûr du même 
   assert.deepEqual(await run, [1, 3, 5]);
 });
 
+// TNR terrain #326 v1.4.157 : pour <= 10, le premier média admissible peut se
+// trouver au-delà des six cartes visibles. Les six premiers ne doivent donc plus
+// constituer une barrière implicite avant le premier résultat utile.
+test('issue #326 v1.4.157 publie un résultat sûr au-delà des six premiers candidats dès la première vague', async () => {
+  const items = Array.from({ length: 24 }, (_, index) => index + 1);
+  const releaseFirstSix = deferred<void>();
+  const firstPartial = deferred<number[]>();
+  let settled = false;
+  let active = 0;
+  let maxActive = 0;
+
+  const run = filterResolvedPrefixes<number, boolean, number>(
+    items,
+    1,
+    async prefix => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      const id = prefix[0];
+      if (id <= 6) await releaseFirstSix.promise;
+      await Promise.resolve();
+      active -= 1;
+      return [id === 18];
+    },
+    (item, eligible) => eligible ? item : null,
+    partial => firstPartial.resolve(partial),
+    24,
+  ).then(value => {
+    settled = true;
+    return value;
+  });
+
+  const first = await firstPartial.promise;
+  assert.deepEqual(first, [18], 'un candidat admissible plus profond doit atteindre l’UI sans attendre les six premiers');
+  assert.equal(settled, false, 'le résultat final peut attendre les candidats bloqués sans retenir le premier résultat sûr');
+  assert.equal(maxActive, 24, 'la première vague doit utiliser toute la borne backend sans la dépasser');
+
+  releaseFirstSix.resolve();
+  assert.deepEqual(await run, [18]);
+});
+
 test('issue #326 borne la concurrence des préfixes pendant qu’un lot reste lent', async () => {
   const items = Array.from({ length: 24 }, (_, index) => index + 1);
   const blocked = deferred<number[]>();
@@ -152,6 +192,7 @@ test('issue #326 le point d’entrée production utilise le moteur progressif sa
   const tmdbFacade = readFileSync(tmdbFacadePath, 'utf8');
   const progressiveIntegration = readFileSync('src/features/discover/progressiveAgeFilter.ts', 'utf8');
   const discoverView = readFileSync('src/screens/DiscoverView.tsx', 'utf8');
+  const parentalBatchBackend = readFileSync('src/features/providers/parentalRatingBatchBackend.ts', 'utf8');
 
   assert.match(tmdbFacade, /discoverSeenItProgressive as discoverSeenIt/);
   assert.match(
@@ -161,8 +202,23 @@ test('issue #326 le point d’entrée production utilise le moteur progressif sa
   );
   assert.match(
     progressiveIntegration,
-    /partialResults =>[\s\S]*?DISCOVER_CRITICAL_GRID_ITEMS,\s*\);/,
-    'la production doit conserver une concurrence bornée à la fenêtre critique',
+    /const PARENTAL_PROGRESSIVE_MAX_CONCURRENT = 24;/,
+    'la fenêtre de classification restrictive doit couvrir au-delà des six cartes visibles',
+  );
+  assert.match(
+    parentalBatchBackend,
+    /PARENTAL_BATCH_MAX_CONCURRENT = 24;/,
+    'la concurrence cliente doit rester alignée sur la borne explicite du backend',
+  );
+  assert.match(
+    progressiveIntegration,
+    /partialResults =>[\s\S]*?PARENTAL_PROGRESSIVE_MAX_CONCURRENT,\s*\);/,
+    'la production doit appliquer la borne parentale dédiée au moteur progressif',
+  );
+  assert.doesNotMatch(
+    progressiveIntegration,
+    /DISCOVER_CRITICAL_GRID_ITEMS/,
+    'la concurrence réseau parentale ne doit plus dépendre du nombre de cartes visibles',
   );
   assert.match(progressiveIntegration, /baseResult\.value[\s\S]*results: partialResults/);
   assert.match(discoverView, /useSyncExternalStore/);
