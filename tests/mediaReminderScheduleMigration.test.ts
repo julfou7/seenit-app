@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { resolveMediaReminderSchedule } from '../src/features/notifications/mediaReminderSchedule.ts';
 
 const reminderSource = readFileSync('src/hooks/useRemindersNotifier.ts', 'utf8');
 const nativeSource = readFileSync('src/features/notifications/mediaReminderNotification.ts', 'utf8');
@@ -17,6 +18,29 @@ test('issue #106 remplace les alarmes V4 par le transport sans bitmap V5 sans do
     'les rappels film et série doivent rester versionnés par le schéma de payload');
   assert.match(nativeSource, /LocalNotifications\.cancel\(\{[\s\S]*?getMediaReminderNotificationId\(tag\)/,
     'l’ancienne notification portant le même ID Android doit être annulable avant remplacement');
+});
+
+test('issue #106 livre les rappels dus immédiatement sans fausse alarme +100 ms', () => {
+  const now = Date.UTC(2026, 8, 17, 17, 0, 0);
+
+  assert.equal(resolveMediaReminderSchedule(undefined, now), undefined,
+    'un rappel dû immédiatement ne doit pas être transformé en notification planifiée');
+  assert.equal(resolveMediaReminderSchedule(new Date(now), now), undefined,
+    'une date déjà atteinte doit rester une livraison immédiate');
+  assert.doesNotMatch(nativeSource, /Date\.now\(\) \+ 100/,
+    'le workaround +100 ms réintroduirait la course Android observée sur le visuel');
+  assert.match(nativeSource, /\.\.\.\(schedule \? \{ schedule \} : \{\}\)/,
+    'la clé schedule doit être absente du payload immédiat, pas seulement définie à undefined');
+});
+
+test('issue #106 conserve la vraie date des rappels futurs', () => {
+  const now = Date.UTC(2026, 8, 17, 17, 0, 0);
+  const future = new Date(now + 60_000);
+
+  assert.deepEqual(resolveMediaReminderSchedule(future, now), {
+    at: future,
+    allowWhileIdle: true,
+  }, 'un vrai rappel futur doit conserver exactement sa date canonique');
 });
 
 test('issue #106 migre le patch Android V1 vers V2 de manière idempotente', () => {

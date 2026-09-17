@@ -5,6 +5,7 @@ import {
   sendNativeNotification,
   type NativeNotificationOptions,
 } from '../../lib/firebase';
+import { resolveMediaReminderSchedule } from './mediaReminderSchedule';
 
 export interface MediaReminderNotificationOptions extends NativeNotificationOptions {
   summaryText: string;
@@ -118,9 +119,7 @@ export async function sendMediaReminderNotification(
       season: options.season,
       episode: options.episode,
     };
-    const targetDate = options.scheduleDate && options.scheduleDate.getTime() > Date.now()
-      ? options.scheduleDate
-      : new Date(Date.now() + 100);
+    const schedule = resolveMediaReminderSchedule(options.scheduleDate);
 
     await LocalNotifications.schedule({
       notifications: [{
@@ -129,10 +128,7 @@ export async function sendMediaReminderNotification(
         largeBody: options.body || '',
         summaryText: options.summaryText,
         id: resolveNotificationId(options),
-        schedule: {
-          at: targetDate,
-          allowWhileIdle: true,
-        },
+        ...(schedule ? { schedule } : {}),
         smallIcon: 'ic_stat_seenit',
         iconColor: '#E5A93D',
         largeIcon: iconUrl || undefined,
