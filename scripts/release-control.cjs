@@ -7,6 +7,8 @@ const RELEASE_WORKFLOW = 'build-apk.yml';
 const MAIN_BRANCH = 'main';
 const POLL_LIMIT = 20;
 const POLL_DELAY_MS = 1500;
+const VALIDATION_POLL_LIMIT = 30;
+const VALIDATION_POLL_DELAY_MS = 3000;
 const ACTIVE_RUN_STATUSES = new Set(['queued', 'in_progress', 'waiting', 'requested', 'pending']);
 const ALLOWED_COMMANDS = Object.freeze({
   '/release-terrain': { action: 'release', android12Smoke: false, fastTerrain: true },
@@ -120,6 +122,28 @@ function findNewDispatchedRun(runs, mainSha, previousIds) {
   return (runs || []).find(run => run?.event === 'workflow_dispatch' && run?.head_sha === mainSha && !previous.has(run.id)) || null;
 }
 
+function findMainValidationRun(runs, mainSha) {
+  return (runs || []).find(run => run?.event === 'push' && run?.head_branch === MAIN_BRANCH && run?.head_sha === mainSha) || null;
+}
+
+async function waitForSuccessfulMainValidation({
+  request,
+  mainSha,
+  pollLimit = VALIDATION_POLL_LIMIT,
+  sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+}) {
+  for (let attempt = 0; attempt < pollLimit; attempt += 1) {
+    const data = await request(`/actions/workflows/${RELEASE_WORKFLOW}/runs?event=push&branch=${MAIN_BRANCH}&per_page=30`);
+    const run = findMainValidationRun(data?.workflow_runs, mainSha);
+    if (run?.status === 'completed' && run?.conclusion === 'success') return run;
+    if (run?.status === 'completed' && run?.conclusion && run.conclusion !== 'success') {
+      throw new Error(`La validation main du SHA ${mainSha} est ${run.conclusion} : fast terrain refusé.`);
+    }
+    if (attempt + 1 < pollLimit) await sleep(VALIDATION_POLL_DELAY_MS);
+  }
+  throw new Error(`Aucune validation main verte du SHA ${mainSha} après 90 s : fast terrain refusé sans preuve canonique.`);
+}
+
 async function dispatchReleaseWorkflow({
   request,
   mainSha,
@@ -211,6 +235,10 @@ async function runReleaseControl({ event, token = process.env.GITHUB_TOKEN } = {
     android12Smoke: validatedEvent.android12Smoke,
     fastTerrain: validatedEvent.fastTerrain
   });
+  let validationRun = null;
+  if (validatedEvent.fastTerrain) {
+    validationRun = await waitForSuccessfulMainValidation({ request, mainSha });
+  }
   const previousRunIds = (runs?.workflow_runs || []).map(run => run.id);
   const run = await dispatchReleaseWorkflow({
     request,
@@ -233,6 +261,7 @@ async function runReleaseControl({ event, token = process.env.GITHUB_TOKEN } = {
     '',
     `- SHA main : \`${mainSha}\``,
     `- Mode : **${validatedEvent.fastTerrain ? 'terrain rapide' : 'release complète'}**`,
+    validationRun ? `- Validation main réutilisée : ${validationRun.html_url || `#${validationRun.id}`} ✅` : null,
     `- Android 12 smoke : **${validatedEvent.android12Smoke ? 'activé' : 'désactivé'}**`,
     `- Run : ${run.html_url || `#${run.id}`}`,
     metric === null ? null : `- Demande → workflow : **${metric} s**`
@@ -244,6 +273,7 @@ async function runReleaseControl({ event, token = process.env.GITHUB_TOKEN } = {
     mainSha,
     android12Smoke: validatedEvent.android12Smoke,
     fastTerrain: validatedEvent.fastTerrain,
+    validationRunId: validationRun?.id || null,
     runId: run.id,
     runUrl: run.html_url || null,
     requestToWorkflowSeconds: metric
@@ -271,15 +301,19 @@ module.exports = {
   POLL_DELAY_MS,
   POLL_LIMIT,
   RELEASE_WORKFLOW,
+  VALIDATION_POLL_DELAY_MS,
+  VALIDATION_POLL_LIMIT,
   buildWorkflowDispatchRequest,
   createGitHubRequester,
   dispatchReleaseWorkflow,
   findActiveDuplicateRun,
+  findMainValidationRun,
   findNewDispatchedRun,
   parseReleaseControlCommand,
   runReleaseControl,
   validateReleaseControlEvent,
-  validateReleasePreflight
+  validateReleasePreflight,
+  waitForSuccessfulMainValidation
 };
 
 if (require.main === module) void main();
