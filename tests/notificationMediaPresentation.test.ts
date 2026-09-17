@@ -67,6 +67,23 @@ test('SEENIT-NOTIFICATION-002 utilise une référence privée stable et jamais g
     'le chemin canonique doit rester confiné sous filesDir');
 });
 
+test('issue #106 v1.4.156 matérialise le répertoire privé avant le téléchargement natif', () => {
+  assert.match(
+    notificationMediaSource,
+    /Filesystem\.mkdir\(\{\s*path: NOTIFICATION_MEDIA_DIR,\s*directory: Directory\.Data,\s*recursive: true\s*\}\)/,
+    'le sous-répertoire notification-media doit être créé explicitement dans Directory.Data',
+  );
+  const ensureIndex = notificationMediaSource.indexOf('await ensureNotificationMediaDirectory();');
+  const downloadIndex = notificationMediaSource.indexOf('await Filesystem.downloadFile({');
+  assert.ok(ensureIndex >= 0, 'le cache doit attendre la matérialisation du répertoire');
+  assert.ok(downloadIndex > ensureIndex, 'mkdir doit précéder downloadFile : recursive sur downloadFile ne crée pas le parent Android');
+  assert.match(
+    notificationMediaSource,
+    /notificationMediaDirectoryReady = null;\s*throw error;/,
+    'un mkdir réellement échoué doit rester retentable au lieu de figer une promesse rejetée',
+  );
+});
+
 test('SEENIT-NOTIFICATION-002 garde les images hors du pont Binder et borne le bitmap Android', () => {
   assert.match(notificationMediaSource, /Filesystem\.downloadFile\(/,
     'le téléchargement de l’image doit être effectué par la couche native Filesystem');
