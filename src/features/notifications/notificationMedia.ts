@@ -8,6 +8,8 @@ const NATIVE_IMAGE_READ_TIMEOUT_MS = 2_500;
 const MAX_NATIVE_IMAGE_FILE_BYTES = 512 * 1024;
 const ALLOWED_NATIVE_IMAGE_HOSTS = new Set(['image.tmdb.org', 'seenit.app']);
 
+let notificationMediaDirectoryReady: Promise<void> | null = null;
+
 export interface NotificationMediaVisual {
   icon?: string;
   image?: string;
@@ -36,6 +38,20 @@ export function notificationMediaPrivateRef(url: string): string {
   return `${SEENIT_DATA_SCHEME}${notificationMediaCachePath(url)}`;
 }
 
+async function ensureNotificationMediaDirectory(): Promise<void> {
+  if (!notificationMediaDirectoryReady) {
+    notificationMediaDirectoryReady = Filesystem.mkdir({
+      path: NOTIFICATION_MEDIA_DIR,
+      directory: Directory.Data,
+      recursive: true
+    }).then(() => undefined).catch(error => {
+      notificationMediaDirectoryReady = null;
+      throw error;
+    });
+  }
+  await notificationMediaDirectoryReady;
+}
+
 async function hasUsableCachedImage(path: string): Promise<boolean> {
   try {
     const stat = await Filesystem.stat({ path, directory: Directory.Data });
@@ -50,6 +66,11 @@ async function cacheNativeNotificationImage(url: string): Promise<string | undef
 
   const path = notificationMediaCachePath(url);
   if (!(await hasUsableCachedImage(path))) {
+    // Capacitor Filesystem.downloadFile() does not create a nested parent directory
+    // on Android. Materialize the app-private cache directory explicitly before
+    // opening notification-media/<hash>.img, otherwise the failure is swallowed by
+    // the text-only fallback and no bitmap ever reaches LocalNotifications.
+    await ensureNotificationMediaDirectory();
     await Filesystem.deleteFile({ path, directory: Directory.Data }).catch(() => undefined);
     await Filesystem.downloadFile({
       url,
