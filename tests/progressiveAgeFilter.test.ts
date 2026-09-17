@@ -41,7 +41,7 @@ test('issue #326 publie un premier résultat sûr pendant que la fin du lot rest
   const first = await firstPartial.promise;
   assert.deepEqual(first, [1, 3, 5]);
   assert.equal(settled, false, 'la page finale ne doit pas bloquer le premier rendu sûr');
-  assert.equal(prefixCalls, 2, 'la queue peut déjà préparer le préfixe suivant sans retarder le premier rendu');
+  assert.equal(prefixCalls, 1, 'le premier rendu sûr est publié dès la résolution du premier préfixe, avant de dépendre du suivant');
 
   releaseTail.resolve([7, 8, 9, 10, 11, 12]);
   assert.deepEqual(await run, [1, 3, 5, 7, 9, 11]);
