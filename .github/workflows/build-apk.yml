@@ -19,6 +19,11 @@ on:
         required: true
         default: false
         type: boolean
+      fast_terrain:
+        description: Publier rapidement une APK terrain déjà validée sans smokes émulateur ni validations redondantes
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -158,7 +163,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   build:
-    name: Build & APK Upgrade Smoke (Android 36)
+    name: Build APK & optional Upgrade Smoke (Android 36)
     if: >-
       github.event_name == 'workflow_dispatch' &&
       inputs.release_apk == true &&
@@ -213,6 +218,7 @@ jobs:
           echo "Baseline de release : $PREVIOUS_TAG ($BASE_SHA)"
 
       - name: Classify Release Candidate
+        if: inputs.fast_terrain != true
         id: release_delivery
         run: npm run delivery:classify
         env:
@@ -220,12 +226,14 @@ jobs:
           FORCED_DELIVERY_MODE: apk
 
       - name: Specification Change Contract
+        if: inputs.fast_terrain != true
         run: npm run test:spec:changes
         env:
           SPEC_BASE_SHA: ${{ steps.release_baseline.outputs.BASE_SHA }}
           DELIVERY_MODE: apk
 
       - name: Release Automated Tests
+        if: inputs.fast_terrain != true
         run: |
           npm run test:spec
           npm run lint
@@ -245,6 +253,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Production Dependency Audit
+        if: inputs.fast_terrain != true
         run: npm audit --omit=dev --audit-level=high
 
       - name: Build Web Assets
@@ -275,7 +284,11 @@ jobs:
       - name: Build APK with Gradle
         run: |
           cd android
-          ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
+          if [ "${{ inputs.fast_terrain }}" = "true" ]; then
+            ./gradlew --no-daemon :app:assembleDebug --stacktrace
+          else
+            ./gradlew --no-daemon :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
+          fi
         env:
           SEENIT_REQUIRE_ANDROID_KEYSTORE: 'true'
           SEENIT_ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.SEENIT_ANDROID_RELEASE_STORE_PASSWORD }}
@@ -300,6 +313,7 @@ jobs:
           retention-days: 30
 
       - name: Upload Android Upgrade Test Harness
+        if: inputs.fast_terrain != true
         uses: actions/upload-artifact@v7
         with:
           name: SeenIt-Android-Upgrade-Test-v${{ steps.release_candidate.outputs.APP_VERSION }}
@@ -308,6 +322,7 @@ jobs:
           retention-days: 30
 
       - name: Download and Verify Previous Official Release
+        if: inputs.fast_terrain != true
         id: android36_baseline
         run: node scripts/download-upgrade-baseline.cjs upgrade-baseline
         env:
@@ -316,12 +331,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Enable KVM
+        if: inputs.fast_terrain != true
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
       - name: Run N to N+1 Upgrade Smoke on Android 36
+        if: inputs.fast_terrain != true
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 36
@@ -341,7 +358,7 @@ jobs:
             "36"
 
       - name: Capture Android 36 Host Diagnostics
-        if: always()
+        if: always() && inputs.fast_terrain != true
         run: |
           mkdir -p upgrade-reports/android-36
           {
@@ -354,7 +371,7 @@ jobs:
           sudo dmesg --ctime | tail -n 500 > upgrade-reports/android-36/host-dmesg.txt 2>&1 || true
 
       - name: Publish Upgrade Smoke Evidence
-        if: always()
+        if: always() && inputs.fast_terrain != true
         uses: actions/upload-artifact@v7
         with:
           name: SeenIt-APK-Upgrade-Smoke-Android-36-v${{ steps.release_candidate.outputs.APP_VERSION }}
@@ -367,19 +384,28 @@ jobs:
         run: |
           now=$(date +%s)
           total_seconds=$((now-SEENIT_RELEASE_JOB_STARTED))
+          if [ "${{ inputs.fast_terrain }}" = "true" ]; then
+            mode='terrain rapide'
+            smoke='non bloquant — sauté'
+          else
+            mode='release complète'
+            smoke='bloquant — exécuté'
+          fi
           {
             echo "## Release APK — chemin critique"
             echo
             echo "| Mesure | Valeur |"
             echo "|---|---:|"
-            echo "| Build, contrôles et smoke Android 36 | ${total_seconds} s |"
+            echo "| Mode | $mode |"
+            echo "| Build et contrôles indispensables | ${total_seconds} s |"
+            echo "| Smoke Android 36 | $smoke |"
             echo "| Transition de runner build → Android 36 | 0 s |"
           } >> "$GITHUB_STEP_SUMMARY"
 
   android12_upgrade_smoke:
     name: Optional APK Upgrade Smoke (Android 12)
     needs: build
-    if: inputs.android12_smoke == true
+    if: inputs.fast_terrain != true && inputs.android12_smoke == true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -539,6 +565,7 @@ jobs:
           RELEASE_REPOSITORY: ${{ github.repository }}
           RELEASE_RUN_ID: ${{ github.run_id }}
           RELEASE_HEAD_SHA: ${{ github.sha }}
+          RELEASE_FAST_TERRAIN: ${{ inputs.fast_terrain }}
 
       - name: Report Notification Dispatch Failure
         if: steps.release_notification.outcome == 'failure'
