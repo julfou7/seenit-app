@@ -1,132 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import {
-  BoundedCache,
-  getManifestRelationSnapshot,
-} from '../src/features/shows/mediaRelations.ts';
+import { BoundedCache, getManifestRelationSnapshot } from '../src/features/shows/mediaRelations.ts';
 import { readFeatureSource } from './featureSource.ts';
 
 const tmdbClientSource = readFileSync(new URL('../src/features/shows/tmdbClient.ts', import.meta.url), 'utf8');
-const tmdbFacadeSource = readFileSync(new URL('../src/features/shows/tmdb.ts', import.meta.url), 'utf8');
+const tmdbFacadeSource = readFileSync(new URL('../src/features/shows/tmdbCore.ts', import.meta.url), 'utf8');
 const detailSource = readFeatureSource('showDetail');
 const detailWrapperSource = readFileSync(new URL('../src/screens/ShowDetailScreen.tsx', import.meta.url), 'utf8');
 const watchListSource = readFeatureSource('watchList');
 const presenceStoreSource = readFileSync(new URL('../src/store/mediaPresenceStore.ts', import.meta.url), 'utf8');
 const plexAvailabilitySource = readFileSync(new URL('../src/features/plex/plexAvailability.ts', import.meta.url), 'utf8');
 
-test('SEENIT-PERF-001 réutilise les détails et relations sans nouveau chargement', () => {
-  const startedAt = performance.now();
-  const first = getManifestRelationSnapshot('tv:1396');
-  const second = getManifestRelationSnapshot('movie:559969');
-  assert.deepEqual(first?.universe, second?.universe);
-  assert.ok(performance.now() - startedAt < 150);
-  assert.match(tmdbClientSource, /detailsCache = new BoundedCache<string, any>\(80\)/);
-  assert.match(tmdbClientSource, /detailsInFlight\.get\(cacheKey\)/);
-  assert.match(tmdbClientSource, /if \(existingRequest\) return existingRequest/);
-  assert.match(tmdbClientSource, /peekMediaDetails/);
-  assert.match(tmdbClientSource, /peekUniverseAndCollection/);
-});
-
-test('SEENIT-PERF-001 sépare les caches movie et tv et borne leur taille', () => {
-  const cache = new BoundedCache<string, string>(2);
-  cache.set('movie:42', 'film');
-  cache.set('tv:42', 'série');
-  assert.equal(cache.get('movie:42'), 'film');
-  assert.equal(cache.get('tv:42'), 'série');
-
-  cache.set('movie:43', 'autre film');
-  assert.equal(cache.size, 2);
-  assert.equal(cache.get('movie:42'), undefined);
-  assert.equal(cache.get('tv:42'), 'série');
-});
-
-test('SEENIT-PERF-001 réserve les skeletons au chargement réellement froid', () => {
-  assert.match(detailSource, /peekMediaDetails/);
-  assert.match(detailSource, /peekUniverseAndCollection/);
-  assert.match(detailSource, /setCollectionLoading\(!cachedRelations\)/);
-  assert.match(detailSource, /loading="eager" decoding="async"[\s\S]{0,120}fetchPriority="high"/);
-});
-
-test('SEENIT-PERF-001 charge le détail principal sans attendre les disponibilités secondaires', () => {
-  assert.match(detailWrapperSource, /tmdb\.peekMediaDetails\(tmdbId, mediaType\)/,
-    'un cache détail chaud doit court-circuiter le gate');
-  assert.match(detailWrapperSource, /void tmdb\.getWatchProviders\(tmdbId, mediaType\)\.catch/,
-    'les plateformes doivent partir en parallèle sans bloquer le cœur de fiche');
-  assert.match(detailWrapperSource, /await tmdb\.getMediaDetails\(tmdbId, mediaType\)/,
-    'le détail principal reste la seule donnée distante du chemin critique');
-  assert.doesNotMatch(detailWrapperSource, /getSeriesImdbData|omdbService|\/api\/media\/omdb/,
-    'le chargement froid ne doit plus dépendre d’IMDb ou OMDb');
-  assert.doesNotMatch(detailWrapperSource, /DETAIL_WARMUP_GRACE_MS|Promise\.race\(/,
-    'une disponibilité secondaire ne doit plus prolonger artificiellement le skeleton de page');
-  assert.match(detailWrapperSource, /data-seenit-detail-warmup="cold"/,
-    'le chargement froid doit utiliser un shell unique et stable');
-  assert.match(detailWrapperSource, /overflow-anchor: none/,
-    'les placeholders ne doivent pas devenir des ancres de scroll pendant leur remplacement');
-});
-
-test('SEENIT-PERF-001 affiche les repères déterministes pendant le skeleton froid', () => {
-  assert.match(detailWrapperSource, /knownTitle/,
-    'un titre local déjà connu doit être affiché immédiatement');
-  assert.match(detailWrapperSource, /📺 SÉRIE/);
-  assert.match(detailWrapperSource, /🎬 FILM/);
-  assert.match(detailWrapperSource, />À propos</);
-  assert.match(detailWrapperSource, />Épisodes</);
-  assert.match(detailWrapperSource, />Synopsis</);
-  assert.match(detailWrapperSource, />Catégories & Thèmes</);
-  assert.match(detailWrapperSource, />Où regarder</);
-  assert.match(detailWrapperSource, /Recherche Plex & streaming…/);
-});
-
-test('SEENIT-PERF-001 garde le titre relationnel neutre sans transformer Où regarder en skeleton', () => {
-  assert.match(
-    detailWrapperSource,
-    /h3\.mb-3:has\(\+ \.flex > \.animate-pulse\)[\s\S]{0,120}font-size: 0/,
-    'le skeleton de titre doit rester limité au heading relationnel mb-3',
-  );
-  assert.match(
-    detailWrapperSource,
-    /h3\.mb-3:has\(\+ \.flex > \.animate-pulse\)::after[\s\S]{0,220}animation: pulse/,
-    'le titre relationnel froid doit conserver une géométrie de skeleton stable',
-  );
-  assert.doesNotMatch(
-    detailWrapperSource,
-    /h3:has\(\+ \.flex > \.animate-pulse\)/,
-    'un sélecteur global ne doit plus masquer le titre stable Où regarder',
-  );
-});
-
-test('SEENIT-PERF-001 unifie le chargement des disponibilités et expose un refresh Plex compact', () => {
-  assert.match(detailSource, /Recherche Plex & streaming…/);
-  assert.match(detailSource, /<h3[^>]*>Où regarder<\/h3><button/);
-  assert.match(detailSource, /aria-label="Actualiser Plex"/);
-  assert.match(detailSource, /className="inline-flex w-11 h-11/);
-  assert.match(detailSource, /refreshPlexServers: true/);
-  assert.match(presenceStoreSource, /refreshServers: refreshPlexServers/);
-  assert.match(plexAvailabilitySource, /refreshServers/);
-  assert.match(tmdbFacadeSource, /readWatchProviderCache/);
-  assert.match(tmdbFacadeSource, /writeWatchProviderCache/);
-});
-
-test('SEENIT-PERF-001 ouvre un épisode avant de charger ses détails distants', () => {
-  const handlerStart = watchListSource.indexOf('const handleEpisodeClick');
-  const handlerEndMatch = /\r?\n\r?\n  useEffect\(\(\) => \{/.exec(watchListSource.slice(handlerStart));
-  const handlerEnd = handlerEndMatch ? handlerStart + handlerEndMatch.index : -1;
-  assert.ok(handlerStart >= 0 && handlerEnd > handlerStart, 'le handler épisode doit être détectable');
-
-  const handlerSource = watchListSource.slice(handlerStart, handlerEnd);
-  const modalOpenIndex = handlerSource.indexOf('setSelectedEpisodeModal({ show, season: seasonNumber, episode: epData })');
-  const historyIndex = handlerSource.indexOf('window.history.pushState');
-  const remoteFetchIndex = handlerSource.indexOf('tmdb.getEpisodeDetails');
-
-  assert.ok(modalOpenIndex >= 0 && remoteFetchIndex >= 0 && modalOpenIndex < remoteFetchIndex,
-    'la modale doit être visible avant le chargement TMDB');
-  assert.ok(historyIndex >= 0 && historyIndex < remoteFetchIndex,
-    'l’état de navigation doit être engagé avant le chargement TMDB');
-  assert.doesNotMatch(handlerSource, /await\s+tmdb\.getEpisodeDetails/,
-    'le réseau ne doit plus être dans le chemin critique du clic');
-  assert.match(handlerSource, /openingEpisodeRef\.current/,
-    'une garde synchrone doit absorber un double tap avant le prochain rendu React');
-  assert.match(handlerSource, /episodeRequestRef\.current/,
-    'une réponse obsolète ne doit jamais remplacer une autre modale épisode');
-});
+test('SEENIT-PERF-001 réutilise les détails et relations sans nouveau chargement', () => { const startedAt = performance.now(); const first = getManifestRelationSnapshot('tv:1396'); const second = getManifestRelationSnapshot('movie:559969'); assert.deepEqual(first?.universe, second?.universe); assert.ok(performance.now() - startedAt < 150); assert.match(tmdbClientSource, /detailsCache = new BoundedCache<string, any>\(80\)/); assert.match(tmdbClientSource, /detailsInFlight\.get\(cacheKey\)/); assert.match(tmdbClientSource, /if \(existingRequest\) return existingRequest/); assert.match(tmdbClientSource, /peekMediaDetails/); assert.match(tmdbClientSource, /peekUniverseAndCollection/); });
+test('SEENIT-PERF-001 sépare les caches movie et tv et borne leur taille', () => { const cache = new BoundedCache<string, string>(2); cache.set('movie:42', 'film'); cache.set('tv:42', 'série'); assert.equal(cache.get('movie:42'), 'film'); assert.equal(cache.get('tv:42'), 'série'); cache.set('movie:43', 'autre film'); assert.equal(cache.size, 2); assert.equal(cache.get('movie:42'), undefined); assert.equal(cache.get('tv:42'), 'série'); });
+test('SEENIT-PERF-001 réserve les skeletons au chargement réellement froid', () => { assert.match(detailSource, /peekMediaDetails/); assert.match(detailSource, /peekUniverseAndCollection/); assert.match(detailSource, /setCollectionLoading\(!cachedRelations\)/); assert.match(detailSource, /loading="eager" decoding="async"[\s\S]{0,120}fetchPriority="high"/); });
+test('SEENIT-PERF-001 charge le détail principal sans attendre les disponibilités secondaires', () => { assert.match(detailWrapperSource, /tmdb\.peekMediaDetails\(tmdbId, mediaType\)/); assert.match(detailWrapperSource, /void tmdb\.getWatchProviders\(tmdbId, mediaType\)\.catch/); assert.match(detailWrapperSource, /await tmdb\.getMediaDetails\(tmdbId, mediaType\)/); assert.doesNotMatch(detailWrapperSource, /getSeriesImdbData|omdbService|\/api\/media\/omdb/); assert.doesNotMatch(detailWrapperSource, /DETAIL_WARMUP_GRACE_MS|Promise\.race\(/); assert.match(detailWrapperSource, /data-seenit-detail-warmup="cold"/); assert.match(detailWrapperSource, /overflow-anchor: none/); });
+test('SEENIT-PERF-001 affiche les repères déterministes pendant le skeleton froid', () => { assert.match(detailWrapperSource, /knownTitle/); assert.match(detailWrapperSource, /📺 SÉRIE/); assert.match(detailWrapperSource, /🎬 FILM/); assert.match(detailWrapperSource, />À propos</); assert.match(detailWrapperSource, />Épisodes</); assert.match(detailWrapperSource, />Synopsis</); assert.match(detailWrapperSource, />Catégories & Thèmes</); assert.match(detailWrapperSource, />Où regarder</); assert.match(detailWrapperSource, /Recherche Plex & streaming…/); });
+test('SEENIT-PERF-001 garde le titre relationnel neutre sans transformer Où regarder en skeleton', () => { assert.match(detailWrapperSource, /h3\.mb-3:has\(\+ \.flex > \.animate-pulse\)[\s\S]{0,120}font-size: 0/); assert.match(detailWrapperSource, /h3\.mb-3:has\(\+ \.flex > \.animate-pulse\)::after[\s\S]{0,220}animation: pulse/); assert.doesNotMatch(detailWrapperSource, /h3:has\(\+ \.flex > \.animate-pulse\)/); });
+test('SEENIT-PERF-001 unifie le chargement des disponibilités et expose un refresh Plex compact', () => { assert.match(detailSource, /Recherche Plex & streaming…/); assert.match(detailSource, /<h3[^>]*>Où regarder<\/h3><button/); assert.match(detailSource, /aria-label="Actualiser Plex"/); assert.match(detailSource, /className="inline-flex w-11 h-11/); assert.match(detailSource, /refreshPlexServers: true/); assert.match(presenceStoreSource, /refreshServers: refreshPlexServers/); assert.match(plexAvailabilitySource, /refreshServers/); assert.match(tmdbFacadeSource, /readWatchProviderCache/); assert.match(tmdbFacadeSource, /writeWatchProviderCache/); });
+test('SEENIT-PERF-001 ouvre un épisode avant de charger ses détails distants', () => { const handlerStart = watchListSource.indexOf('const handleEpisodeClick'); const handlerEndMatch = /\r?\n\r?\n  useEffect\(\(\) => \{/.exec(watchListSource.slice(handlerStart)); const handlerEnd = handlerEndMatch ? handlerStart + handlerEndMatch.index : -1; assert.ok(handlerStart >= 0 && handlerEnd > handlerStart); const handlerSource = watchListSource.slice(handlerStart, handlerEnd); const modalOpenIndex = handlerSource.indexOf('setSelectedEpisodeModal({ show, season: seasonNumber, episode: epData })'); const historyIndex = handlerSource.indexOf('window.history.pushState'); const remoteFetchIndex = handlerSource.indexOf('tmdb.getEpisodeDetails'); assert.ok(modalOpenIndex >= 0 && remoteFetchIndex >= 0 && modalOpenIndex < remoteFetchIndex); assert.ok(historyIndex >= 0 && historyIndex < remoteFetchIndex); assert.doesNotMatch(handlerSource, /await\s+tmdb\.getEpisodeDetails/); assert.match(handlerSource, /openingEpisodeRef\.current/); assert.match(handlerSource, /episodeRequestRef\.current/); });
