@@ -17,8 +17,13 @@ import {
   resolveFrenchMovieReleaseReminderDate,
   toLocalReminderDate,
 } from '../features/notifications/movieReleaseReminder';
+import {
+  buildReminderToastSummary,
+  type ReminderToastCandidate,
+} from '../features/notifications/reminderToastSummary';
 
 const REMINDER_SCHEDULE_SCHEMA = 'v5';
+const REMINDER_TOAST_RECEIPT_SCHEMA = 'v1';
 
 function toLocalDateKey(date: Date): string {
   const year = date.getFullYear();
@@ -49,6 +54,8 @@ export function useRemindersNotifier() {
     const processReminders = async () => {
       // Delay execution to avoid hanging the app during startup
       await new Promise(r => setTimeout(r, 5000));
+      const dueToastCandidates: ReminderToastCandidate[] = [];
+
       for (const s of shows) {
         // Small delay between each processing to let the JS event loop breathe
         await new Promise(r => setTimeout(r, 50));
@@ -173,7 +180,15 @@ export function useRemindersNotifier() {
             } else if (targetStr === todayStr) {
               const notifiedKey = `notified_today_${s.id}_${tag}_${todayStr}`;
               if (!readUserScopedJson(uid, notifiedKey, false)) {
-                showToast(`🍿 ${msgBody}`, 'info', s);
+                dueToastCandidates.push({
+                  key: notifiedKey,
+                  title,
+                  body: msgBody,
+                  posterPath: s.posterPath,
+                  show: s,
+                });
+                // Le reçu UI est volontairement indépendant du succès natif :
+                // un échec Android pourra être retenté sans rejouer le toast.
                 if (await send()) writeUserScopedJson(uid, notifiedKey, true);
               }
             }
@@ -302,7 +317,13 @@ export function useRemindersNotifier() {
           } else if (targetStr === todayStr) {
             const notifiedKey = `notified_today_${s.id}_${tagPrefix}_S${sNum}E${eNum}_${todayStr}`;
             if (!readUserScopedJson(uid, notifiedKey, false)) {
-              showToast(`🎉 ${msgBody}`, 'info', s);
+              dueToastCandidates.push({
+                key: notifiedKey,
+                title,
+                body: msgBody,
+                posterPath: s.posterPath,
+                show: s,
+              });
               if (await send()) writeUserScopedJson(uid, notifiedKey, true);
             }
           }
@@ -327,6 +348,16 @@ export function useRemindersNotifier() {
             `S${sNum}E${eNum}${upcoming.name ? ` · ${upcoming.name}` : ''} disponible aujourd'hui.`,
             true
           );
+        }
+      }
+
+      const toastSummary = buildReminderToastSummary(dueToastCandidates);
+      if (toastSummary) {
+        const receiptKey = `reminder_toast_${REMINDER_TOAST_RECEIPT_SCHEMA}_${todayStr}`;
+        const previousSignature = readUserScopedJson<string>(uid, receiptKey, '');
+        if (previousSignature !== toastSummary.signature) {
+          showToast(toastSummary.message, 'reminder', toastSummary.show, null, 4000);
+          writeUserScopedJson(uid, receiptKey, toastSummary.signature);
         }
       }
     };
