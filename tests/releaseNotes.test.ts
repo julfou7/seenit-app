@@ -35,7 +35,7 @@ function commitFile(cwd: string, value: string, subject: string, body?: string) 
   git(cwd, ...args);
 }
 
-test('SEENIT-RELEASE-003 agrège tous les Changelog explicites de la version au lieu du seul dernier commit', () => {
+test('SEENIT-RELEASE-003 agrège tous les commits de la version au lieu du seul dernier commit', () => {
   const cwd = mkdtempSync(join(tmpdir(), 'seenit-release-notes-'));
 
   try {
