@@ -6,12 +6,16 @@ import { readFileSync } from 'node:fs';
 const require = createRequire(import.meta.url);
 const {
   buildWorkflowDispatchRequest,
+  findMainValidationRun,
   parseReleaseControlCommand,
-  validateReleasePreflight
+  validateReleasePreflight,
+  waitForSuccessfulMainValidation
 } = require('../scripts/release-control.cjs') as {
   buildWorkflowDispatchRequest: (android12Smoke: boolean, fastTerrain?: boolean) => any;
+  findMainValidationRun: (runs: any[], mainSha: string) => any;
   parseReleaseControlCommand: (body: string) => any;
   validateReleasePreflight: (input: any) => any;
+  waitForSuccessfulMainValidation: (input: any) => Promise<any>;
 };
 const { buildRepositoryDispatchRequest } = require('../scripts/dispatch-release-update.cjs') as {
   buildRepositoryDispatchRequest: (input: { runId: number; headSha: string; fastTerrain?: boolean }) => any;
@@ -66,6 +70,57 @@ test('issue #368 expose une commande terrain distincte sans changer la release c
     fastTerrain: true,
     android12Smoke: true
   }), /terrain rapide.*Android 12/i);
+});
+
+test('issue #368 exige une validation push verte du SHA main exact avant le fast terrain', async () => {
+  const mainSha = 'd'.repeat(40);
+  const otherSha = 'e'.repeat(40);
+  const exact = {
+    id: 91,
+    event: 'push',
+    head_branch: 'main',
+    head_sha: mainSha,
+    status: 'completed',
+    conclusion: 'success',
+    html_url: 'https://example.test/run/91'
+  };
+  assert.equal(findMainValidationRun([
+    { ...exact, id: 90, head_sha: otherSha },
+    exact
+  ], mainSha)?.id, 91);
+
+  let reads = 0;
+  const success = await waitForSuccessfulMainValidation({
+    mainSha,
+    pollLimit: 3,
+    sleep: async () => undefined,
+    request: async () => {
+      reads += 1;
+      return {
+        workflow_runs: reads === 1
+          ? [{ ...exact, status: 'in_progress', conclusion: null }]
+          : [exact]
+      };
+    }
+  });
+  assert.equal(success.id, 91);
+  assert.equal(reads, 2);
+
+  await assert.rejects(waitForSuccessfulMainValidation({
+    mainSha,
+    pollLimit: 1,
+    sleep: async () => undefined,
+    request: async () => ({
+      workflow_runs: [{ ...exact, conclusion: 'failure' }]
+    })
+  }), /validation main.*failure.*fast terrain refusé/i);
+
+  await assert.rejects(waitForSuccessfulMainValidation({
+    mainSha,
+    pollLimit: 1,
+    sleep: async () => undefined,
+    request: async () => ({ workflow_runs: [{ ...exact, head_sha: otherSha }] })
+  }), /aucune validation main verte.*fast terrain refusé/i);
 });
 
 test('issue #368 garde le build installable et retire seulement le cérémonial du chemin critique terrain', () => {
@@ -141,7 +196,7 @@ test('issue #368 formalise la boucle terrain automatique et le SLO téléphone',
 
   assert.match(delivery, /release terrain/i);
   assert.match(delivery, /10 minutes/i);
-  assert.match(delivery, /mise à jour intégrée/i);
+  assert.match(delivery, /mise à jour\s+(?:intégrée\s+)?installable/i);
   assert.match(delivery, /<!-- seenit-resume -->/);
   assert.match(releaseSpec, /\/release-terrain/);
   assert.match(releaseSpec, /terrain rapide/i);
