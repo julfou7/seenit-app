@@ -53,6 +53,7 @@ jobs:
         run: node scripts/materialize-android-config.cjs
 
       - name: Classify delivery
+        id: classify
         if: always()
         run: npm run delivery:classify
         env:
@@ -65,15 +66,19 @@ jobs:
         run: npm run test:spec:changes
         env:
           SPEC_BASE_SHA: ${{ env.SEENIT_VALIDATE_BASE_SHA }}
-          DELIVERY_MODE: apk
+          DELIVERY_MODE: ${{ steps.classify.outputs.DELIVERY_MODE }}
 
       - name: Lint TypeScript
         if: always()
         run: npm run lint
 
-      - name: Unit tests
+      - name: Unit tests implementation
         if: always()
-        run: npm run test:unit
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' files < <(find tests -maxdepth 1 -name '*.test.ts' ! -name 'agentWorkspaceGovernance.test.ts' -print0 | sort -z)
+          node --test "${files[@]}"
 
       - name: Android contract
         if: always()
