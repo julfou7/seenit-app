@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
+  createSupersedingAbortController,
   filterResolvedPrefixes,
   mergeProgressivePageItems,
   shouldApplyProgressivePartial,
@@ -289,4 +290,17 @@ test('issue #326 le point d’entrée production utilise le moteur progressif sa
   assert.match(discoverView, /model\.processRawResults\(mergedItems\)/);
   assert.match(discoverView, /mergeProgressivePageItems/);
   assert.equal(existsSync(removedClientPath), false);
+});
+
+
+test('issue #326 annule immédiatement la génération parentale précédente', () => {
+  const nextController = createSupersedingAbortController();
+  const first = nextController();
+  assert.equal(first.signal.aborted, false);
+  const second = nextController();
+  assert.equal(first.signal.aborted, true, 'un nouveau filtre doit interrompre la génération précédente');
+  assert.equal(second.signal.aborted, false);
+  const third = nextController();
+  assert.equal(second.signal.aborted, true);
+  assert.equal(third.signal.aborted, false);
 });
