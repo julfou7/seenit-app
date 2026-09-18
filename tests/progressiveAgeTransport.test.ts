@@ -93,7 +93,7 @@ test('SEENIT-PARENTAL-001 expose le diagnostic âge dans le preview sans donnée
 
   const diagnosticSlice = backend.slice(
     backend.indexOf('const diagnosticContext = {'),
-    backend.indexOf('if (stream) {'),
+    backend.indexOf("traceLog('provider_done', diagnosticContext)"),
   );
   assert.ok(diagnosticSlice.length > 0);
   assert.doesNotMatch(diagnosticSlice, /item\.id|item\.key|credential|target|api_key/);
