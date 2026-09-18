@@ -27,6 +27,10 @@
         {
           "file": "tests/plexExternalUrl.test.ts",
           "contains": "SEENIT-PLATFORM-001 ouvre le CTA Plex via Discover vérifié plutôt que le locator PMS"
+        },
+        {
+          "file": "tests/backendRuntime.test.ts",
+          "contains": "SEENIT-PLATFORM-001 autorise le preflight des traces âge depuis AI Studio et l’APK"
         }
       ]
     },

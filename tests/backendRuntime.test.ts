@@ -5,7 +5,8 @@ import {
   apiErrorMiddleware,
   backendHealthHandler,
   buildBackendHealthPayload,
-  installAsyncRouteForwarding
+  installAsyncRouteForwarding,
+  seenItCorsMiddleware
 } from '../src/features/runtime/backendRuntime.ts';
 
 test('SEENIT-RUNTIME-001 garde un health-check indépendant et identifiable', () => {
@@ -57,4 +58,46 @@ test('SEENIT-RUNTIME-001 contient les rejets async API sans terminer le backend'
       server.close(error => error ? reject(error) : resolve());
     });
   }
+});
+
+
+test('SEENIT-PLATFORM-001 autorise le preflight des traces âge depuis AI Studio et l’APK', async t => {
+  const app = express();
+  app.use(seenItCorsMiddleware);
+  app.get('/api/media/parental-ratings', (_req, res) => res.json({ ok: true }));
+
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  t.after(() => new Promise<void>((resolve, reject) => {
+    server.close(error => error ? reject(error) : resolve());
+  }));
+
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  const origin = `http://127.0.0.1:${address.port}`;
+  const requestedHeaders = [
+    'authorization',
+    'x-plex-version',
+    'x-seenit-age-trace',
+    'x-seenit-age-generation',
+    'x-seenit-age-page',
+    'x-seenit-age-max',
+  ];
+
+  const preflight = await fetch(`${origin}/api/media/parental-ratings`, {
+    method: 'OPTIONS',
+    headers: {
+      Origin: 'https://ais-dev-example.run.app',
+      'Access-Control-Request-Method': 'GET',
+      'Access-Control-Request-Headers': requestedHeaders.join(', '),
+    },
+  });
+
+  assert.equal(preflight.status, 200);
+  assert.equal(preflight.headers.get('access-control-allow-origin'), '*');
+  const allowed = String(preflight.headers.get('access-control-allow-headers') || '')
+    .toLowerCase()
+    .split(',')
+    .map(value => value.trim());
+  for (const header of requestedHeaders) assert.ok(allowed.includes(header), `${header} doit être autorisé par CORS`);
 });

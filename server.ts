@@ -21,7 +21,7 @@ import {
 } from "./src/features/downloads/downloadBackendSecurity.ts";
 import { buildC411SearchParams } from "./src/features/downloads/c411Query.ts";
 import { executeIdempotentMutation, type TimedMutationResult } from "./src/features/downloads/downloadIdempotency.ts";
-import { apiErrorMiddleware, backendHealthHandler, installAsyncRouteForwarding } from "./src/features/runtime/backendRuntime.ts";
+import { apiErrorMiddleware, backendHealthHandler, installAsyncRouteForwarding, seenItCorsMiddleware } from "./src/features/runtime/backendRuntime.ts";
 import { emitOperationalEvent } from "./src/features/runtime/operationalEvent.ts";
 import { assertMediaProviderSecrets, registerMediaProviderRoutes } from './src/features/providers/mediaProviderBackend.ts';
 import {
@@ -476,16 +476,9 @@ async function startServer() {
   installAsyncRouteForwarding(app);
   const PORT = 3000;
 
-  // CORS Middleware for native mobile app requests (APK) and web
-  app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Plex-Token, X-Plex-Client-Identifier, X-Plex-Product, X-Plex-Version, X-SeenIt-Webhook-Secret, X-SeenIt-Request-Id');
-    if (req.method === 'OPTIONS') {
-      return res.sendStatus(200);
-    }
-    next();
-  });
+  // CORS Middleware for native mobile app requests (APK) and web.
+  // Keep this shared with the runtime TNR so cross-origin preview/APK headers cannot drift.
+  app.use(seenItCorsMiddleware);
 
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
