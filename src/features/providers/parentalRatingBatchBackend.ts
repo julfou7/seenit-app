@@ -128,10 +128,12 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
 
     const clientAbort = new AbortController();
     let responseFinished = false;
-    res.once('finish', () => { responseFinished = true; });
-    res.once('close', () => {
-      if (!responseFinished) clientAbort.abort();
-    });
+    if (typeof (res as any).once === 'function') {
+      res.once('finish', () => { responseFinished = true; });
+      res.once('close', () => {
+        if (!responseFinished) clientAbort.abort();
+      });
+    }
 
     let active = 0;
     type Waiter = { granted: boolean; resolve: () => void; timer: ReturnType<typeof setTimeout> | null };
