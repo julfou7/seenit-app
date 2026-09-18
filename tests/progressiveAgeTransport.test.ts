@@ -47,7 +47,7 @@ test('issue #326 réutilise l’index parental et préfiltre uniquement les film
   const server = readFileSync('server.ts', 'utf8');
 
   assert.match(client, /readParentalRatingCache\(identity\.id, identity\.mediaType\)/);
-  assert.match(client, /transport_persistent_cache_hit/);
+  assert.match(client, /readPersistentBatchDetails\(identity\)/);
   assert.match(client, /writeParentalRatingCache\(id, mediaType, details\)/);
   assert.match(tmdbClient, /readParentalRatingCache\(normalizedId, type\)/);
   assert.match(tmdbClient, /writeParentalRatingCache\(normalizedId, type, details\)/);
