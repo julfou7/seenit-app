@@ -94,7 +94,12 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
       res.status(401).json({ error: 'Authentification requise.' });
       return;
     }
-    if (Object.keys(req.query).some(key => key !== 'items')) {
+    if (Object.keys(req.query).some(key => key !== 'items' && key !== 'stream')) {
+      res.status(400).json({ error: 'Requête de classifications refusée.' });
+      return;
+    }
+    const stream = req.query.stream === '1';
+    if (req.query.stream !== undefined && !stream) {
       res.status(400).json({ error: 'Requête de classifications refusée.' });
       return;
     }
@@ -120,19 +125,13 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
     let active = 0;
     const waiters: Array<() => void> = [];
     const runBounded = async <T>(task: () => Promise<T>): Promise<T> => {
-      if (active >= PARENTAL_BATCH_MAX_CONCURRENT) {
-        await new Promise<void>(resolve => waiters.push(resolve));
-      }
+      if (active >= PARENTAL_BATCH_MAX_CONCURRENT) await new Promise<void>(resolve => waiters.push(resolve));
       active += 1;
-      try {
-        return await task();
-      } finally {
-        active -= 1;
-        waiters.shift()?.();
-      }
+      try { return await task(); }
+      finally { active -= 1; waiters.shift()?.(); }
     };
 
-    const results = await Promise.all(items.map(item => runBounded(async () => {
+    const resolveItem = (item: ParentalBatchItem) => runBounded(async () => {
       const endpoint = item.mediaType === 'movie' ? 'release_dates' : 'content_ratings';
       const target = new URL(`${item.mediaType}/${item.id}/${endpoint}`, TMDB_ORIGIN);
       target.searchParams.set('api_key', credential);
@@ -152,8 +151,22 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
       } catch {
         return { key: item.key, media_type: item.mediaType, id: item.id, details: null };
       }
-    })));
+    });
 
+    if (stream) {
+      res.status(200);
+      res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.flushHeaders?.();
+      await Promise.all(items.map(async item => {
+        const result = await resolveItem(item);
+        res.write(`${JSON.stringify(result)}\n`);
+      }));
+      res.end();
+      return;
+    }
+
+    const results = await Promise.all(items.map(resolveItem));
     res.json({ results });
   });
 }
