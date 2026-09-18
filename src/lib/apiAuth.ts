@@ -64,16 +64,43 @@ async function logPlexDeltaDiagnostics(
   }
 }
 
+const AGE_FILTER_TRACE_ID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
+
+function readAgeFilterTraceId(headers: HeadersInit | undefined): string | null {
+  try {
+    const traceId = new Headers(headers).get('X-SeenIt-Age-Trace') || '';
+    return AGE_FILTER_TRACE_ID_PATTERN.test(traceId) ? traceId : null;
+  } catch {
+    return null;
+  }
+}
+
+function logAgeFilterRequestTiming(traceId: string | null, phase: string, durationMs: number, status?: number): void {
+  if (!traceId) return;
+  console.info(`[AgeFilterTrace] ${JSON.stringify({
+    traceId,
+    phase,
+    durationMs: Math.max(0, durationMs),
+    ...(typeof status === 'number' ? { httpStatus: status } : {}),
+  })}`);
+}
+
 export async function authenticatedFetch(
   input: RequestInfo | URL,
   init: RequestInit = {}
 ): Promise<Response> {
   const originalString = typeof input === 'string' ? input : null;
   const resolvedInput = originalString ? resolveSeenItApiUrl(originalString) : input;
+  const traceId = readAgeFilterTraceId(init.headers);
+  const authStartedAt = Date.now();
+  const authenticatedHeaders = await getAuthenticatedHeaders(init.headers);
+  logAgeFilterRequestTiming(traceId, 'auth_headers_ready', Date.now() - authStartedAt);
+  const fetchStartedAt = Date.now();
   const response = await fetch(resolvedInput, {
     ...init,
-    headers: await getAuthenticatedHeaders(init.headers)
+    headers: authenticatedHeaders
   });
+  logAgeFilterRequestTiming(traceId, 'http_response_headers', Date.now() - fetchStartedAt, response.status);
 
   // Un fallback SPA/Vite peut répondre 200 avec index.html quand le backend /api est absent.
   // Ce cas doit être une panne explicite, jamais un faux succès API.
