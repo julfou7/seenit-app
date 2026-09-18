@@ -46,6 +46,28 @@ test('issue #326 v1.4.158 coalesce la vague parentale dans un transport authenti
 });
 
 
+test('SEENIT-PARENTAL-001 corrèle le diagnostic âge sans exposer de donnée sensible', () => {
+  const client = readFileSync('src/features/discover/progressiveAgeFilter.ts', 'utf8');
+  const backend = readFileSync('src/features/providers/parentalRatingBatchBackend.ts', 'utf8');
+  const apiAuth = readFileSync('src/lib/apiAuth.ts', 'utf8');
+
+  assert.match(client, /traceId: createAgeFilterTraceId\(\)/);
+  assert.match(client, /X-SeenIt-Age-Trace/);
+  assert.match(backend, /seenitDiagnostic/);
+  assert.match(backend, /AGE_FILTER_REQUEST_TRACE/);
+  assert.doesNotMatch(client, /logAgeFilterTrace\([^;]*(?:identity\.id|itemsParam)/s);
+  assert.doesNotMatch(backend, /traceLog\([^;]*(?:uid|credential|item\.id|target|api_key)/s);
+
+  const timingHelper = apiAuth.slice(
+    apiAuth.indexOf('function logAgeFilterRequestTiming'),
+    apiAuth.indexOf('export async function authenticatedFetch'),
+  );
+  assert.ok(timingHelper.length > 0);
+  assert.doesNotMatch(timingHelper, /Authorization|Bearer|token|headers/i);
+  assert.doesNotMatch(backend, /seenitEvent[\s\S]{0,120}AGE_FILTER_REQUEST_TRACE/);
+});
+
+
 test('issue #326 propage l’annulation de génération jusqu’au transport parental', () => {
   const client = readFileSync('src/features/discover/progressiveAgeFilter.ts', 'utf8');
   const backend = readFileSync('src/features/providers/parentalRatingBatchBackend.ts', 'utf8');

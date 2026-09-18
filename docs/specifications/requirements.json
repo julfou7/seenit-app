@@ -394,6 +394,10 @@
         {
           "file": "tests/mediaProviderClients.test.ts",
           "contains": "issue #326 borne et déduplique le fast path parental"
+        },
+        {
+          "file": "tests/progressiveAgeTransport.test.ts",
+          "contains": "SEENIT-PARENTAL-001 corrèle le diagnostic âge sans exposer de donnée sensible"
         }
       ]
     },
