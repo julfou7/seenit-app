@@ -467,12 +467,25 @@ n'est rouverte que par une nouvelle décision produit explicite.
 
 ### 5.7 Réouverture et cache chaud d'une fiche média
 
-- **SEENIT-PERF-001** — Une fiche Film ou Série déjà résolue pendant la session est rendue
-  immédiatement depuis un cache borné indexé par `mediaType + tmdbId`. SeenIt ne vide jamais les
-  détails, relations ou URLs d'images avant d'avoir consulté ce cache.
-- Le skeleton de page est réservé au premier chargement réellement froid. Le parcours A → B → A
-  restitue A sans skeleton ni placeholder intermédiaire, puis peut actualiser silencieusement les
-  données. En cas d'échec réseau, la dernière valeur complète reste affichable (`stale-if-error`).
+- **SEENIT-PERF-001** — Les métadonnées publiques TMDB déjà résolues utilisent une couche de cache
+  commune, bornée et typée. Les détails média sont indexés par `mediaType + tmdbId`; les requêtes
+  Discover et Search utilisent une clé normalisée (chemin + paramètres triés). Les requêtes identiques
+  en vol partagent une seule Promise, y compris lorsqu'elles viennent de surfaces différentes.
+- Le cache chaud mémoire reste prioritaire. Les détails média sont persistés dans IndexedDB pendant
+  24 h comme valeur fraîche et restent utilisables jusqu'à 30 jours uniquement en `stale-if-error`.
+  Les pages Discover restent fraîches 2 minutes et stale 30 minutes afin d'accélérer retour écran,
+  annulation/réapplication de filtres et pages déjà parcourues sans figer durablement popularité ou notes.
+  Les recherches restent en mémoire 5 minutes et ne sont pas persistées, car leur clé contient le texte
+  saisi par l'utilisateur. Le stockage persistant public est borné à 320 entrées et 32 Mio ; un payload individuel supérieur à
+  1 Mio reste uniquement en mémoire. Il ne contient ni UID,
+  progression, préférences, token Plex ni autre donnée privée.
+- Le skeleton de page est réservé au premier chargement réellement froid. Le parcours A → B → A, y
+  compris après une réouverture récente de l'application lorsque le snapshot persistant est encore
+  admissible, restitue la dernière fiche complète avant un éventuel rafraîchissement silencieux. En cas
+  d'échec réseau, la dernière valeur complète reste affichable (`stale-if-error`).
+- Le proxy backend conserve son cache TMDB générique et sa déduplication en vol. Un diagnostic agrégé
+  `TMDB_REQUEST_CACHE_SUMMARY` mesure par famille les requêtes servies en mémoire, coalescées ou réellement
+  transmises à TMDB, sans journaliser ID média, texte recherché, UID, token ou paramètres utilisateur.
 - Le titre **« Où regarder »** est un libellé produit stable : il reste toujours rendu et n'est jamais
   remplacé par un skeleton pendant la résolution. Le chargement de cette zone emploie un seul libellé
   lisible, puis aboutit à un diffuseur, à Plex ou à un état d'indisponibilité explicite.

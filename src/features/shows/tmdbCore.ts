@@ -22,6 +22,13 @@ import {
 import { getParentalRatingOverride, getParentalRatingOverridesSnapshot } from '../../store/parentalRatingStore';
 import { convergeTrackedMediaTitleFromTmdb } from './trackedMediaTitle';
 import { mediaKeyFrom } from './mediaRelations';
+import {
+  isPublicMetadataFallbackStatus,
+  normalizePublicMetadataRequestKey,
+  readPublicMetadataCache,
+  runPublicMetadataSingleFlight,
+  writePublicMetadataCache,
+} from './publicMetadataCache';
 import { getTVDBFranchiseRelation } from '../../services/tvdb';
 import { readWatchProviderCache, writeWatchProviderCache } from '../providers/watchProviderCache';
 import {
@@ -290,6 +297,35 @@ const sortCombinedDiscoverResults = (
   });
 };
 
+const fetchCachedDiscoverPayload = async (url: string) => {
+  const cacheKey = normalizePublicMetadataRequestKey(url);
+  const cached = await readPublicMetadataCache<any>('discover', cacheKey, { allowStale: true });
+  if (cached?.fresh) return ok(cached.data);
+
+  return runPublicMetadataSingleFlight('discover', cacheKey, async () => {
+    const queued = await readPublicMetadataCache<any>('discover', cacheKey, { allowStale: true });
+    if (queued?.fresh) return ok(queued.data);
+    const fallback = queued || cached;
+
+    const response = await tryCatch(authenticatedFetch(url));
+    if (!response.ok) return fallback ? ok(fallback.data) : err((response as any).error);
+    if (!response.value.ok) {
+      return fallback && isPublicMetadataFallbackStatus(response.value.status)
+        ? ok(fallback.data)
+        : err(new Error(`TMDB Error: ${response.value.status}`));
+    }
+    const json = await tryCatch(response.value.json() as Promise<any>);
+    if (!json.ok) return fallback ? ok(fallback.data) : err((json as any).error);
+    if (json.value?.status_code) {
+      return fallback
+        ? ok(fallback.data)
+        : err(new Error(json.value.status_message || 'TMDB Error'));
+    }
+    writePublicMetadataCache('discover', cacheKey, json.value);
+    return json;
+  });
+};
+
 const applyCanonicalAgeFilter = async (items: any[], pegi: string): Promise<any[]> => {
   const maxAge = parseMaxAgeFilter(pegi || 'Tous');
   if (maxAge === null) return items;
@@ -395,11 +431,8 @@ export async function discoverSeenIt(options: SeenItDiscoverOptions) {
     }
 
     const url = `${resolveSeenItApiUrl(`/api/media/tmdb/discover/${mediaType}`)}?${params.toString()}`;
-    const response = await tryCatch(authenticatedFetch(url));
-    if (!response.ok) return err((response as any).error);
-    if (!response.value.ok) return err(new Error(`TMDB Error: ${response.value.status}`));
-    const json = await tryCatch(response.value.json() as Promise<any>);
-    if (!json.ok) return err((json as any).error);
+    const json = await fetchCachedDiscoverPayload(url);
+    if (!json.ok) return json;
 
     const checkedAt = Date.now();
     let results = Array.isArray(json.value?.results)
@@ -463,11 +496,8 @@ const strictFrenchNowPlaying = async (page: number = 1) => {
   params.set('page', String(page));
   const url = `${resolveSeenItApiUrl('/api/media/tmdb/discover/movie')}?${params.toString()}`;
 
-  const response = await tryCatch(authenticatedFetch(url));
-  if (!response.ok) return err((response as any).error);
-  if (!response.value.ok) return err(new Error(`TMDB Error: ${response.value.status}`));
-  const jsonResult = await tryCatch(response.value.json() as Promise<any>);
-  if (!jsonResult.ok) return err((jsonResult as any).error);
+  const jsonResult = await fetchCachedDiscoverPayload(url);
+  if (!jsonResult.ok) return jsonResult;
 
   if (jsonResult.value && Array.isArray(jsonResult.value.results)) {
     const checkedAt = Date.now();
