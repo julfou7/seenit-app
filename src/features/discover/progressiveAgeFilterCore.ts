@@ -87,3 +87,69 @@ export function shouldApplyProgressivePartial(
 ): boolean {
   return Number.isInteger(page) && page >= 1 && requestGeneration === currentGeneration;
 }
+
+
+export interface PrefetchedPage<T> {
+  promise: Promise<T>;
+  reused: boolean;
+}
+
+export function createPagePrefetchWindow<T>(
+  ahead: number,
+  maxEntries: number = Math.max(4, ahead + 4),
+) {
+  if (!Number.isInteger(ahead) || ahead < 0) throw new Error('PAGE_PREFETCH_AHEAD_INVALID');
+  if (!Number.isInteger(maxEntries) || maxEntries < ahead + 1) throw new Error('PAGE_PREFETCH_MAX_ENTRIES_INVALID');
+
+  let activeKey = '';
+  const pages = new Map<number, Promise<T>>();
+
+  const ensureKey = (queryKey: string) => {
+    if (queryKey === activeKey) return;
+    activeKey = queryKey;
+    pages.clear();
+  };
+
+  const trim = () => {
+    while (pages.size > maxEntries) {
+      const oldest = pages.keys().next().value;
+      if (oldest === undefined) return;
+      pages.delete(oldest);
+    }
+  };
+
+  const get = (
+    queryKey: string,
+    page: number,
+    loader: (page: number) => Promise<T>,
+  ): PrefetchedPage<T> => {
+    ensureKey(queryKey);
+    const existing = pages.get(page);
+    if (existing) return { promise: existing, reused: true };
+
+    const promise = Promise.resolve().then(() => loader(page));
+    pages.set(page, promise);
+    trim();
+    void promise.catch(() => {
+      if (pages.get(page) === promise) pages.delete(page);
+    });
+    return { promise, reused: false };
+  };
+
+  const primeAhead = (
+    queryKey: string,
+    page: number,
+    loader: (page: number) => Promise<T>,
+  ): number[] => {
+    ensureKey(queryKey);
+    const started: number[] = [];
+    for (let offset = 1; offset <= ahead; offset += 1) {
+      const targetPage = page + offset;
+      const prefetched = get(queryKey, targetPage, loader);
+      if (!prefetched.reused) started.push(targetPage);
+    }
+    return started;
+  };
+
+  return { get, primeAhead };
+}

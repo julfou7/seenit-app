@@ -274,6 +274,12 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
   Une erreur réseau, un timeout ou une réponse invalide n'est jamais transformé en preuve et n'est
   jamais persisté. Les caches conservent la preuve brute TMDB, pas l'âge calculé, afin qu'une évolution
   du mapping SeenIt soit appliquée immédiatement.
+- Pendant un filtre d'âge actif, Explorer maintient une **fenêtre bornée de deux pages Discover source
+  en avance**. Cette anticipation ne résout ni n'assouplit la classification parentale : elle prépare
+  uniquement les requêtes Discover des pages suivantes afin que le scroll rare ne paie plus
+  séquentiellement leur latence réseau. Une page préchargée est réutilisée exactement une fois par la
+  pagination normale, l'ordre page puis ordre source reste inchangé et un changement de filtre invalide
+  immédiatement la fenêtre.
 - La fiche, les cartes et Explorer réutilisent le même résolveur ; aucune copie locale de mapping ou
   heuristique de genre n'est autorisée.
 - Le diagnostic de performance du filtre peut corréler temporairement son chemin client/backend avec un

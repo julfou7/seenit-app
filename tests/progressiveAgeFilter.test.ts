@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
+  createPagePrefetchWindow,
   createSupersedingAbortController,
   filterResolvedPrefixes,
   mergeProgressivePageItems,
@@ -171,6 +172,38 @@ test('issue #326 v1.4.159 démarre les 40 candidats avant qu’un des 24 premier
   assert.deepEqual(await run, [37]);
 });
 
+test('issue #326 v1.4.166 précharge les deux pages source suivantes sans attendre la page courante', async () => {
+  const prefetch = createPagePrefetchWindow<number>(2, 6);
+  const releasePageOne = deferred<void>();
+  const started: number[] = [];
+  const loader = async (page: number) => {
+    started.push(page);
+    if (page === 1) await releasePageOne.promise;
+    return page;
+  };
+
+  const pageOne = prefetch.get('tp-filter', 1, loader);
+  const primed = prefetch.primeAhead('tp-filter', 1, loader);
+  await Promise.resolve();
+
+  assert.equal(pageOne.reused, false);
+  assert.deepEqual(primed, [2, 3]);
+  assert.deepEqual([...started].sort((a, b) => a - b), [1, 2, 3], 'les pages 2 et 3 démarrent pendant que la page 1 est encore bloquée');
+
+  const pageTwo = prefetch.get('tp-filter', 2, loader);
+  assert.equal(pageTwo.reused, true, 'la pagination doit consommer la requête déjà préchargée');
+  assert.equal(await pageTwo.promise, 2);
+  assert.equal(started.filter(page => page === 2).length, 1, 'la page 2 ne doit jamais être redemandée');
+
+  const nextFilterPage = prefetch.get('age-7-filter', 2, loader);
+  assert.equal(nextFilterPage.reused, false, 'un changement de filtre invalide immédiatement la fenêtre source');
+  assert.equal(await nextFilterPage.promise, 2);
+  assert.equal(started.filter(page => page === 2).length, 2);
+
+  releasePageOne.resolve();
+  assert.equal(await pageOne.promise, 1);
+});
+
 test('issue #326 borne la concurrence des préfixes pendant qu’un lot reste lent', async () => {
   const items = Array.from({ length: 24 }, (_, index) => index + 1);
   const blocked = deferred<number[]>();
@@ -274,6 +307,15 @@ test('issue #326 le point d’entrée production utilise le moteur progressif sa
     /const PROGRESSIVE_SNAPSHOT_BATCH_MS = 120;/,
     'les lignes NDJSON proches doivent être regroupées avant le repaint de la grille',
   );
+  assert.match(
+    progressiveIntegration,
+    /const AGE_SOURCE_PREFETCH_AHEAD = 2;/,
+    'le filtre âge doit garder deux pages Discover source en avance',
+  );
+  assert.match(progressiveIntegration, /createPagePrefetchWindow</);
+  assert.match(progressiveIntegration, /sourcePagePrefetch\.get\(sourcePrefetchKey, page, loadSourcePage\)/);
+  assert.match(progressiveIntegration, /sourcePagePrefetch\.primeAhead\(sourcePrefetchKey, page, loadSourcePage\)/);
+  assert.match(progressiveIntegration, /source_prefetch_hit/);
   assert.match(
     progressiveIntegration,
     /partialResults =>[\s\S]*?PARENTAL_PROGRESSIVE_MAX_CONCURRENT,\s*\);/,
