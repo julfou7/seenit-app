@@ -9,8 +9,13 @@ test('issue #326 v1.4.158 coalesce la vague parentale dans un transport authenti
   const client = readFileSync('src/features/discover/progressiveAgeFilter.ts', 'utf8');
   const backend = readFileSync('src/features/providers/parentalRatingBatchBackend.ts', 'utf8');
   const apiAuth = readFileSync('src/lib/apiAuth.ts', 'utf8');
+  const traceHelper = readFileSync('src/lib/ageFilterTrace.ts', 'utf8');
 
   assert.match(client, /parentalTransportPending = new Map/);
+  assert.match(traceHelper, /console\.log\(/);
+  assert.match(traceHelper, /__SEENIT_AGE_TRACE__/);
+  assert.match(traceHelper, /__SEENIT_AGE_TRACE_DUMP__/);
+  assert.match(traceHelper, /instrumentation_loaded/);
   assert.match(apiAuth, /auth_headers_ready/);
   assert.match(apiAuth, /http_response_headers/);
   assert.match(apiAuth, /X-SeenIt-Age-Trace/);
@@ -40,6 +45,10 @@ test('issue #326 v1.4.158 coalesce la vague parentale dans un transport authenti
   assert.match(backend, /maxQueued/);
   assert.match(backend, /burstGrants/);
   assert.match(backend, /application\/x-ndjson/);
+  assert.match(backend, /type: 'age_filter_diagnostic'/);
+  assert.match(backend, /writeStreamDiagnostic\('request_received'/);
+  assert.match(backend, /writeStreamDiagnostic\('request_complete'/);
+  assert.match(client, /entry\?\.type === 'age_filter_diagnostic'/);
   assert.match(backend, /res\.write\(`\$\{JSON\.stringify\(result\)\}\\n`\)/);
   assert.match(backend, /await Promise\.all\(items\.map\(async \(item, index\) => \{/);
   assert.match(backend, /const results = await Promise\.all\(items\.map\(\(item, index\) => resolveItem\(item, index \+ 1\)\)\)/, 'le contrat JSON historique reste disponible hors mode stream');
@@ -50,6 +59,7 @@ test('SEENIT-PARENTAL-001 corrèle le diagnostic âge sans exposer de donnée se
   const client = readFileSync('src/features/discover/progressiveAgeFilter.ts', 'utf8');
   const backend = readFileSync('src/features/providers/parentalRatingBatchBackend.ts', 'utf8');
   const apiAuth = readFileSync('src/lib/apiAuth.ts', 'utf8');
+  const traceHelper = readFileSync('src/lib/ageFilterTrace.ts', 'utf8');
 
   assert.match(client, /traceId: createAgeFilterTraceId\(\)/);
   assert.match(client, /X-SeenIt-Age-Trace/);
@@ -65,6 +75,28 @@ test('SEENIT-PARENTAL-001 corrèle le diagnostic âge sans exposer de donnée se
   assert.ok(timingHelper.length > 0);
   assert.doesNotMatch(timingHelper, /Authorization|Bearer|token|headers/i);
   assert.doesNotMatch(backend, /seenitEvent[\s\S]{0,120}AGE_FILTER_REQUEST_TRACE/);
+  assert.doesNotMatch(traceHelper, /Authorization|Bearer|uid|email|title|mediaId|tmdbId/i);
+});
+
+
+test('SEENIT-PARENTAL-001 expose le diagnostic âge dans le preview sans donnée sensible', () => {
+  const client = readFileSync('src/features/discover/progressiveAgeFilter.ts', 'utf8');
+  const backend = readFileSync('src/features/providers/parentalRatingBatchBackend.ts', 'utf8');
+  const traceHelper = readFileSync('src/lib/ageFilterTrace.ts', 'utf8');
+
+  assert.match(traceHelper, /AGE_FILTER_TRACE_BUFFER_MAX = 500/);
+  assert.match(traceHelper, /console\.log\(`\[AgeFilterTrace\]/);
+  assert.match(client, /installAgeFilterBrowserTraceSurface\(\)/);
+  assert.match(client, /readBackendDiagnosticContext/);
+  assert.match(backend, /const diagnostic = trace \? \{ phase: 'provider_done', context: diagnosticContext \} : undefined/);
+  assert.match(backend, /type: 'age_filter_diagnostic'/);
+
+  const diagnosticSlice = backend.slice(
+    backend.indexOf('const diagnosticContext = {'),
+    backend.indexOf('if (stream) {'),
+  );
+  assert.ok(diagnosticSlice.length > 0);
+  assert.doesNotMatch(diagnosticSlice, /item\.id|item\.key|credential|target|api_key/);
 });
 
 

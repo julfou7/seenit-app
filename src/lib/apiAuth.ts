@@ -1,5 +1,6 @@
 import { auth } from './firebase';
 import { CURRENT_APP_VERSION } from '../store/updateStore';
+import { emitAgeFilterBrowserTrace } from './ageFilterTrace';
 import { appLogger } from '../store/logStore';
 import {
   isSeenItApiRequest,
@@ -77,12 +78,12 @@ function readAgeFilterTraceId(headers: HeadersInit | undefined): string | null {
 
 function logAgeFilterRequestTiming(traceId: string | null, phase: string, durationMs: number, status?: number): void {
   if (!traceId) return;
-  console.info(`[AgeFilterTrace] ${JSON.stringify({
+  emitAgeFilterBrowserTrace({
     traceId,
     phase,
     durationMs: Math.max(0, durationMs),
     ...(typeof status === 'number' ? { httpStatus: status } : {}),
-  })}`);
+  });
 }
 
 export async function authenticatedFetch(

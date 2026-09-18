@@ -296,7 +296,7 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
             ? 'timeout'
             : 'error';
       }
-      traceLog('provider_done', {
+      const diagnosticContext = {
         ordinal,
         mediaType: item.mediaType,
         queueWaitMs,
@@ -306,8 +306,16 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
         hasDetails: Boolean(details),
         active,
         queued: waiters.length,
-      });
-      return { key: item.key, media_type: item.mediaType, id: item.id, details };
+      };
+      traceLog('provider_done', diagnosticContext);
+      const diagnostic = trace ? { phase: 'provider_done', context: diagnosticContext } : undefined;
+      return {
+        key: item.key,
+        media_type: item.mediaType,
+        id: item.id,
+        details,
+        ...(diagnostic ? { diagnostic } : {}),
+      };
     });
 
     if (stream) {
@@ -315,6 +323,26 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
       res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
       res.setHeader('X-Content-Type-Options', 'nosniff');
       res.flushHeaders?.();
+      const writeStreamDiagnostic = (
+        phase: string,
+        context: Record<string, string | number | boolean | null>,
+      ) => {
+        if (!trace || clientAbort.signal.aborted || res.destroyed) return;
+        res.write(`${JSON.stringify({
+          type: 'age_filter_diagnostic',
+          diagnostic: { phase, context },
+        })}\n`);
+      };
+      writeStreamDiagnostic('request_received', {
+        backendElapsedMs: Math.max(0, now() - requestStartedAt),
+        itemCount: items.length,
+        movieCount: items.filter(item => item.mediaType === 'movie').length,
+        tvCount: items.filter(item => item.mediaType === 'tv').length,
+        steadyConcurrency: PARENTAL_BATCH_MAX_CONCURRENT,
+        burstConcurrency: PARENTAL_BATCH_STALL_BURST_CONCURRENT,
+        stallBurstMs,
+        timeoutMs,
+      });
       let firstWriteMs: number | null = null;
       let writeSequence = 0;
       let resolvedCount = 0;
@@ -336,8 +364,20 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
           res.write(`${JSON.stringify(result)}\n`);
         }
       }));
-      traceLog('request_complete', {
+      const completionContext = {
         stream: true,
+        itemCount: items.length,
+        resolvedCount,
+        nullCount: items.length - resolvedCount,
+        firstWriteMs: firstWriteMs ?? -1,
+        maxActive,
+        maxQueued,
+        burstGrants,
+        aborted: clientAbort.signal.aborted,
+      };
+      traceLog('request_complete', completionContext);
+      writeStreamDiagnostic('request_complete', {
+        backendElapsedMs: Math.max(0, now() - requestStartedAt),
         itemCount: items.length,
         resolvedCount,
         nullCount: items.length - resolvedCount,

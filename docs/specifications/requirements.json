@@ -398,6 +398,10 @@
         {
           "file": "tests/progressiveAgeTransport.test.ts",
           "contains": "SEENIT-PARENTAL-001 corrèle le diagnostic âge sans exposer de donnée sensible"
+        },
+        {
+          "file": "tests/progressiveAgeTransport.test.ts",
+          "contains": "SEENIT-PARENTAL-001 expose le diagnostic âge dans le preview sans donnée sensible"
         }
       ]
     },
