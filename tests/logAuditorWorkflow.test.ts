@@ -12,6 +12,10 @@ test('SEENIT-OBSERVABILITY-001 exécute un batch Cloud Run en dry-run désactiva
   assert.match(workflow, /vars\.SEENIT_LOG_AUDITOR_MODE \|\| 'dry-run'/);
   assert.match(workflow, /env\.SEENIT_LOG_AUDITOR_MODE != 'off'/);
   assert.match(workflow, /jsonPayload\.seenitEvent\.schemaVersion=1/);
+  assert.match(workflow, /jsonPayload\.seenitDiagnostic\.code="TMDB_REQUEST_CACHE_SUMMARY"/);
+  assert.match(workflow, /summarize-tmdb-cache-diagnostics\.cjs/);
+  assert.match(workflow, /seenit-tmdb-cache-baseline-\$\{\{ github\.run_id \}\}/);
+  assert.match(workflow, /push:[\s\S]*branches:[\s\S]*main[\s\S]*summarize-tmdb-cache-diagnostics\.cjs/);
   assert.match(workflow, /--freshness=6h/);
   assert.match(workflow, /--limit=5000/);
   assert.match(workflow, /issues: write/);
@@ -20,6 +24,7 @@ test('SEENIT-OBSERVABILITY-001 exécute un batch Cloud Run en dry-run désactiva
   assert.match(workflow, /Remove temporary source logs/);
   assert.match(workflow, /path: \$\{\{ runner\.temp \}\}\/seenit-log-audit-report\.json/);
   assert.doesNotMatch(workflow, /path:.*seenit-structured-logs\.json/);
+  assert.doesNotMatch(workflow, /path:.*seenit-tmdb-cache-diagnostics\.json/);
   assert.match(bootstrap, /roles\/logging\.viewer/);
   assert.match(bootstrap, /seenit-log-auditor/);
   assert.doesNotMatch(bootstrap, /roles\/run\.sourceDeveloper|roles\/run\.admin/);

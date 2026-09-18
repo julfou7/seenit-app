@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: '23 */6 * * *'
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/audit-structured-logs.yml'
+      - 'scripts/summarize-tmdb-cache-diagnostics.cjs'
 
 permissions:
   contents: read
@@ -33,7 +39,9 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Initialize bounded input
-        run: printf '[]\n' > "$RUNNER_TEMP/seenit-structured-logs.json"
+        run: |
+          printf '[]\n' > "$RUNNER_TEMP/seenit-structured-logs.json"
+          printf '[]\n' > "$RUNNER_TEMP/seenit-tmdb-cache-diagnostics.json"
 
       - name: Authenticate read-only log collector
         id: auth
@@ -77,6 +85,42 @@ jobs:
             echo 'source_status=ok' >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Collect TMDB cache diagnostics
+        id: collect_tmdb_cache
+        if: env.SEENIT_LOG_AUDITOR_MODE != 'off'
+        shell: bash
+        run: |
+          set -euo pipefail
+          filter='resource.type="cloud_run_revision" AND resource.labels.service_name="'"$GCP_SERVICE"'" AND jsonPayload.seenitDiagnostic.schemaVersion=1 AND jsonPayload.seenitDiagnostic.code="TMDB_REQUEST_CACHE_SUMMARY"'
+          set +e
+          gcloud logging read "$filter" \
+            --project "$GCP_PROJECT_ID" \
+            --freshness=6h \
+            --limit=5000 \
+            --order=asc \
+            --format=json \
+            > "$RUNNER_TEMP/seenit-tmdb-cache-diagnostics.json"
+          status=$?
+          set -e
+
+          if [ "$status" -ne 0 ]; then
+            printf '[]\n' > "$RUNNER_TEMP/seenit-tmdb-cache-diagnostics.json"
+            echo 'source_status=unavailable' >> "$GITHUB_OUTPUT"
+            echo 'Les diagnostics TMDB sont indisponibles ; aucun log brut ne sera conservé.'
+          else
+            echo 'source_status=ok' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Summarize TMDB cache baseline
+        id: tmdb_cache_summary
+        continue-on-error: true
+        env:
+          SEENIT_TMDB_DIAGNOSTIC_SOURCE_STATUS: ${{ steps.collect_tmdb_cache.outputs.source_status || 'off' }}
+        run: >-
+          node scripts/summarize-tmdb-cache-diagnostics.cjs
+          --input=${{ runner.temp }}/seenit-tmdb-cache-diagnostics.json
+          --report=${{ runner.temp }}/seenit-tmdb-cache-baseline.json
+
       - name: Analyze, deduplicate and optionally update GitHub
         id: auditor
         continue-on-error: true
@@ -91,7 +135,7 @@ jobs:
       - name: Remove temporary source logs
         if: always()
         shell: bash
-        run: rm -f "$RUNNER_TEMP/seenit-structured-logs.json"
+        run: rm -f "$RUNNER_TEMP/seenit-structured-logs.json" "$RUNNER_TEMP/seenit-tmdb-cache-diagnostics.json"
 
       - name: Archive only the redacted aggregate report
         if: always()
@@ -102,8 +146,17 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Archive TMDB cache aggregate only
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: seenit-tmdb-cache-baseline-${{ github.run_id }}
+          path: ${{ runner.temp }}/seenit-tmdb-cache-baseline.json
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Fail observably after preserving the report
-        if: steps.auditor.outcome != 'success'
+        if: steps.auditor.outcome != 'success' || steps.tmdb_cache_summary.outcome != 'success'
         run: |
           echo 'L’auditeur a terminé en état dégradé. Le backend SeenIt reste indépendant de ce job.'
           exit 1
