@@ -1,5 +1,14 @@
 const DEFAULT_PREFIX_CONCURRENCY = 2;
 
+export function createSupersedingAbortController(): () => AbortController {
+  let current: AbortController | null = null;
+  return () => {
+    current?.abort();
+    current = new AbortController();
+    return current;
+  };
+}
+
 export async function filterResolvedPrefixes<TItem, TResolved, TAccepted>(
   items: TItem[],
   prefixSize: number,

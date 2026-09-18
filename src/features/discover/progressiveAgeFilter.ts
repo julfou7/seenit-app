@@ -4,7 +4,7 @@ import { getParentalRatingOverride } from '../../store/parentalRatingStore';
 import { discoverSeenIt, type SeenItDiscoverOptions } from '../shows/tmdbCore';
 import { tmdb } from '../shows/tmdbClient';
 import { matchesMaxRecommendedAge, parseMaxAgeFilter, resolveParentalRating } from '../shows/parentalRating';
-import { filterResolvedPrefixes, shouldApplyProgressivePartial } from './progressiveAgeFilterCore';
+import { createSupersedingAbortController, filterResolvedPrefixes, shouldApplyProgressivePartial } from './progressiveAgeFilterCore';
 
 export { shouldApplyProgressivePartial } from './progressiveAgeFilterCore';
 
@@ -30,7 +30,7 @@ const PARENTAL_TRANSPORT_MAX_ITEMS = 40;
 const PARENTAL_PROGRESSIVE_MAX_CONCURRENT = PARENTAL_TRANSPORT_MAX_ITEMS;
 const PROGRESSIVE_SNAPSHOT_BATCH_MS = 120;
 const parentalBatchCache = new Map<string, any>();
-const parentalTransportPending = new Map<string, { identity: BatchIdentity; deferred: DeferredDetails }>();
+const parentalTransportPending = new Map<AbortSignal | undefined, Map<string, { identity: BatchIdentity; deferred: DeferredDetails }>>();
 let parentalTransportFlushScheduled = false;
 
 function identityFor(item: any): BatchIdentity | null {
@@ -55,9 +55,9 @@ function deferredDetails(): DeferredDetails {
   return { promise, resolve };
 }
 
-async function consumeParentalStream(batch: Array<{ identity: BatchIdentity; deferred: DeferredDetails }>): Promise<void> {
+async function consumeParentalStream(batch: Array<{ identity: BatchIdentity; deferred: DeferredDetails }>, signal?: AbortSignal): Promise<void> {
   const itemsParam = batch.map(entry => entry.identity.key).join(',');
-  const response = await tryCatch(authenticatedFetch(`/api/media/parental-ratings?stream=1&items=${encodeURIComponent(itemsParam)}`));
+  const response = await tryCatch(authenticatedFetch(`/api/media/parental-ratings?stream=1&items=${encodeURIComponent(itemsParam)}`, { signal }));
   const unresolved = new Map(batch.map(entry => [entry.identity.key, entry]));
   if (response.ok && response.value.ok && response.value.body) {
     const reader = response.value.body.getReader();
@@ -83,45 +83,88 @@ async function consumeParentalStream(batch: Array<{ identity: BatchIdentity; def
         if (done) break;
       }
       acceptLine(buffer);
-    } finally { reader.releaseLock(); }
+    } catch {
+      // Un changement de filtre peut interrompre le stream : les entrées restantes
+      // sont résolues ci-dessous sans réutiliser une génération obsolète.
+    } finally {
+      if (signal?.aborted) await reader.cancel().catch(() => undefined);
+      reader.releaseLock();
+    }
   }
-  await Promise.all([...unresolved.values()].map(async pending => pending.deferred.resolve(await resolveUnit(pending.identity))));
+  await Promise.all([...unresolved.values()].map(async pending => {
+    if (signal?.aborted) {
+      pending.deferred.resolve(null);
+      return;
+    }
+    pending.deferred.resolve(await resolveUnit(pending.identity));
+  }));
 }
 
 async function flushParentalTransport(): Promise<void> {
   parentalTransportFlushScheduled = false;
-  const entries = [...parentalTransportPending.values()].slice(0, PARENTAL_TRANSPORT_MAX_ITEMS);
-  for (const entry of entries) parentalTransportPending.delete(entry.identity.key);
+  const groups = [...parentalTransportPending.entries()];
+  parentalTransportPending.clear();
+
+  await Promise.all(groups.map(async ([signal, pending]) => {
+    const allEntries = [...pending.values()];
+    const entries = allEntries.slice(0, PARENTAL_TRANSPORT_MAX_ITEMS);
+    const leftovers = allEntries.slice(PARENTAL_TRANSPORT_MAX_ITEMS);
+
+    if (leftovers.length > 0) {
+      const nextPending = new Map<string, { identity: BatchIdentity; deferred: DeferredDetails }>();
+      for (const entry of leftovers) nextPending.set(entry.identity.key, entry);
+      parentalTransportPending.set(signal, nextPending);
+    }
+
+    if (signal?.aborted) {
+      for (const entry of entries) entry.deferred.resolve(null);
+      return;
+    }
+    if (entries.length > 0) await consumeParentalStream(entries, signal);
+  }));
+
   if (parentalTransportPending.size > 0) scheduleParentalTransportFlush();
-  if (entries.length > 0) await consumeParentalStream(entries);
 }
 function scheduleParentalTransportFlush(): void {
   if (parentalTransportFlushScheduled) return;
   parentalTransportFlushScheduled = true;
   queueMicrotask(() => { void flushParentalTransport(); });
 }
-function enqueueParentalIdentity(identity: BatchIdentity): Promise<any | null> {
+function enqueueParentalIdentity(identity: BatchIdentity, signal?: AbortSignal): Promise<any | null> {
+  if (signal?.aborted) return Promise.resolve(null);
   const cached = parentalBatchCache.get(identity.key); if (cached) return Promise.resolve(cached);
-  const existing = parentalTransportPending.get(identity.key); if (existing) return existing.deferred.promise;
+
+  let pending = parentalTransportPending.get(signal);
+  if (!pending) {
+    pending = new Map();
+    parentalTransportPending.set(signal, pending);
+  }
+  const existing = pending.get(identity.key); if (existing) return existing.deferred.promise;
   const deferred = deferredDetails();
-  parentalTransportPending.set(identity.key, { identity, deferred });
+  pending.set(identity.key, { identity, deferred });
   scheduleParentalTransportFlush();
   return deferred.promise;
 }
 
-export async function resolveParentalRatingBatch(items: any[]): Promise<Map<string, any | null>> {
+export async function resolveParentalRatingBatch(items: any[], signal?: AbortSignal): Promise<Map<string, any | null>> {
   const identities = items.map(identityFor).filter((value): value is BatchIdentity => value !== null);
-  const values = await Promise.all(identities.map(identity => enqueueParentalIdentity(identity)));
+  const values = await Promise.all(identities.map(identity => enqueueParentalIdentity(identity, signal)));
   return new Map(identities.map((identity, index) => [identity.key, values[index] ?? null]));
 }
 
-export interface ProgressiveAgeDiscoverDependencies { discover: typeof discoverSeenIt; resolveBatch: typeof resolveParentalRatingBatch; }
+export interface ProgressiveAgeDiscoverDependencies {
+  discover: typeof discoverSeenIt;
+  resolveBatch: (items: any[], signal?: AbortSignal) => Promise<Map<string, any | null>>;
+}
 export function createProgressiveAgeDiscover(
   dependencies: ProgressiveAgeDiscoverDependencies = { discover: discoverSeenIt, resolveBatch: resolveParentalRatingBatch },
   publishSnapshot: ProgressiveSnapshotPublisher = () => undefined,
 ) {
   let currentGeneration = 0;
+  const nextRequestController = createSupersedingAbortController();
   return async function progressiveAgeDiscover(options: SeenItDiscoverOptions, onPartial?: ProgressiveDiscoverPartialHandler) {
+    const requestController = nextRequestController();
+    const requestSignal = requestController.signal;
     const generation = ++currentGeneration;
     const page = Number(options?.page || 1);
     const maxAge = parseMaxAgeFilter(options?.pegi || 'Tous');
@@ -132,13 +175,13 @@ export function createProgressiveAgeDiscover(
       pendingSnapshotTimer = null;
       const snapshot = pendingSnapshot;
       pendingSnapshot = null;
-      if (snapshot && shouldApplyProgressivePartial(generation, currentGeneration, page)) {
+      if (snapshot && !requestSignal.aborted && shouldApplyProgressivePartial(generation, currentGeneration, page)) {
         publishSnapshot(snapshot);
       }
     };
 
     const queueProgressiveSnapshot = (partial: ProgressiveDiscoverPartial) => {
-      if (!shouldApplyProgressivePartial(generation, currentGeneration, page)) return;
+      if (requestSignal.aborted || !shouldApplyProgressivePartial(generation, currentGeneration, page)) return;
       pendingSnapshot = { generation, page, partial };
       if (pendingSnapshotTimer === null) {
         pendingSnapshotTimer = setTimeout(flushPendingSnapshot, PROGRESSIVE_SNAPSHOT_BATCH_MS);
@@ -153,15 +196,16 @@ export function createProgressiveAgeDiscover(
     }
     const baseResult = await dependencies.discover({ ...options, pegi: 'Tous' });
     if (!baseResult.ok || !Array.isArray(baseResult.value?.results)) {
-      if (shouldApplyProgressivePartial(generation, currentGeneration, page)) publishSnapshot(null);
+      if (!requestSignal.aborted && shouldApplyProgressivePartial(generation, currentGeneration, page)) publishSnapshot(null);
       return baseResult;
     }
+    if (requestSignal.aborted) return baseResult;
 
     const accepted = await filterResolvedPrefixes<any, any | null, any>(
       baseResult.value.results,
       1,
       async prefix => {
-        const detailsByKey = await dependencies.resolveBatch(prefix);
+        const detailsByKey = await dependencies.resolveBatch(prefix, requestSignal);
         return prefix.map(item => { const identity = identityFor(item); return identity ? detailsByKey.get(identity.key) ?? null : null; });
       },
       (item, details) => {
@@ -183,7 +227,7 @@ export function createProgressiveAgeDiscover(
       clearTimeout(pendingSnapshotTimer);
       pendingSnapshotTimer = null;
     }
-    if (pendingSnapshot && shouldApplyProgressivePartial(generation, currentGeneration, page)) {
+    if (pendingSnapshot && !requestSignal.aborted && shouldApplyProgressivePartial(generation, currentGeneration, page)) {
       publishSnapshot(pendingSnapshot);
       pendingSnapshot = null;
     }

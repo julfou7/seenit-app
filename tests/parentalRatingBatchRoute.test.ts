@@ -175,3 +175,58 @@ test('issue #326 v1.4.160 libère la queue 25-40 avant le timeout fournisseur de
     if (done) break;
   }
 });
+
+
+test('issue #326 coupe les appels TMDB quand le client abandonne le stream', async t => {
+  let started = 0;
+  let aborted = 0;
+  const authenticate: RequestHandler = (req: any, _res, next) => {
+    req.user = { uid: 'terrain-abort' };
+    next();
+  };
+  const app = express();
+  registerParentalRatingBatchRoute(app, {
+    authenticate,
+    secrets: () => ({ TMDB_API_KEY: 'private-tmdb-key' }),
+    fetch: async (_input, init) => {
+      started += 1;
+      const signal = init?.signal;
+      return new Promise<Response>((_resolve, reject) => {
+        const fail = () => {
+          aborted += 1;
+          const error = new Error('aborted');
+          error.name = 'AbortError';
+          reject(error);
+        };
+        if (signal?.aborted) {
+          fail();
+          return;
+        }
+        signal?.addEventListener('abort', fail, { once: true });
+      });
+    },
+  });
+
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  t.after(() => new Promise<void>((resolve, reject) => {
+    server.closeAllConnections();
+    server.close(error => error ? reject(error) : resolve());
+  }));
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+
+  const controller = new AbortController();
+  const items = Array.from({ length: PARENTAL_BATCH_MAX_ITEMS }, (_, index) => `movie:${index + 1}`).join(',');
+  const response = await fetch(
+    `http://127.0.0.1:${address.port}/api/media/parental-ratings?stream=1&items=${encodeURIComponent(items)}`,
+    { headers: { Authorization: 'Bearer test' }, signal: controller.signal },
+  );
+  assert.equal(response.status, 200);
+  await sleep(10);
+  controller.abort();
+  await sleep(50);
+
+  assert.ok(started > 0, 'le backend doit avoir commencé la résolution fournisseur');
+  assert.ok(aborted > 0, 'la fermeture du client doit interrompre les appels fournisseur déjà lancés');
+});

@@ -126,6 +126,15 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
       return;
     }
 
+    const clientAbort = new AbortController();
+    let responseFinished = false;
+    if (typeof (res as any).once === 'function') {
+      res.once('finish', () => { responseFinished = true; });
+      res.once('close', () => {
+        if (!responseFinished) clientAbort.abort();
+      });
+    }
+
     let active = 0;
     type Waiter = { granted: boolean; resolve: () => void; timer: ReturnType<typeof setTimeout> | null };
     const waiters: Waiter[] = [];
@@ -177,7 +186,7 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
           method: 'GET',
           headers: { Accept: 'application/json' },
           redirect: 'error',
-          signal: AbortSignal.timeout(timeoutMs),
+          signal: AbortSignal.any([AbortSignal.timeout(timeoutMs), clientAbort.signal]),
         });
         const payload = await readJsonResponse(response);
         if (!payload) return { key: item.key, media_type: item.mediaType, id: item.id, details: null };
@@ -197,14 +206,15 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
       res.flushHeaders?.();
       await Promise.all(items.map(async item => {
         const result = await resolveItem(item);
-        res.write(`${JSON.stringify(result)}\n`);
-        (res as any).flush?.();
+        if (!clientAbort.signal.aborted && !res.destroyed) {
+          res.write(`${JSON.stringify(result)}\n`);
+        }
       }));
-      res.end();
+      if (!res.destroyed) res.end();
       return;
     }
 
     const results = await Promise.all(items.map(resolveItem));
-    res.json({ results });
+    if (!clientAbort.signal.aborted && !res.destroyed) res.json({ results });
   });
 }
