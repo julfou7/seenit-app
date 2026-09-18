@@ -91,6 +91,11 @@ function validatePreflight() {
     label: 'Intégrité SPEC',
     metric: 'SEENIT_SPEC_SECONDS'
   });
+  const baseSha = resolveBaseSha();
+  run('node', ['scripts/validate-changelog-coverage.cjs', baseSha], {
+    label: 'Couverture Changelog des commits',
+    metric: 'SEENIT_CHANGELOG_SECONDS'
+  });
 }
 
 function validatePostinstall() {
