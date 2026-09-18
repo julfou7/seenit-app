@@ -42,7 +42,7 @@ test('issue #326 v1.4.158 coalesce la vague parentale dans un transport authenti
   assert.match(backend, /application\/x-ndjson/);
   assert.match(backend, /res\.write\(`\$\{JSON\.stringify\(result\)\}\\n`\)/);
   assert.match(backend, /await Promise\.all\(items\.map\(async \(item, index\) => \{/);
-  assert.match(backend, /const results = await Promise\.all\(items\.map\(resolveItem\)\)/, 'le contrat JSON historique reste disponible hors mode stream');
+  assert.match(backend, /const results = await Promise\.all\(items\.map\(\(item, index\) => resolveItem\(item, index \+ 1\)\)\)/, 'le contrat JSON historique reste disponible hors mode stream');
 });
 
 
