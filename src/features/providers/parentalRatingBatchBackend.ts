@@ -198,6 +198,7 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
       await Promise.all(items.map(async item => {
         const result = await resolveItem(item);
         res.write(`${JSON.stringify(result)}\n`);
+        (res as any).flush?.();
       }));
       res.end();
       return;
