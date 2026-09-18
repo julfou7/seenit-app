@@ -53,10 +53,28 @@ export async function filterResolvedPrefixes<TItem, TResolved, TAccepted>(
     .map(([, candidate]) => candidate);
 }
 
+export function mergeProgressivePageItems<T>(
+  settledItems: T[],
+  partialItems: T[],
+  page: number,
+  keyOf: (item: T) => string,
+): T[] {
+  const source = page <= 1 ? partialItems : [...settledItems, ...partialItems];
+  const seen = new Set<string>();
+  const merged: T[] = [];
+  for (const item of source) {
+    const key = keyOf(item);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    merged.push(item);
+  }
+  return merged;
+}
+
 export function shouldApplyProgressivePartial(
   requestGeneration: number,
   currentGeneration: number,
   page: number,
 ): boolean {
-  return page === 1 && requestGeneration === currentGeneration;
+  return Number.isInteger(page) && page >= 1 && requestGeneration === currentGeneration;
 }

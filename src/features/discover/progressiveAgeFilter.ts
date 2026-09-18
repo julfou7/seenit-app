@@ -144,11 +144,16 @@ export function createProgressiveAgeDiscover(
         pendingSnapshotTimer = setTimeout(flushPendingSnapshot, PROGRESSIVE_SNAPSHOT_BATCH_MS);
       }
     };
-    if (page === 1) publishSnapshot(maxAge === null ? null : { generation, page, partial: null });
-    if (maxAge === null) return dependencies.discover(options);
+    if (maxAge === null) {
+      if (page === 1) publishSnapshot(null);
+      return dependencies.discover(options);
+    }
+    if (shouldApplyProgressivePartial(generation, currentGeneration, page)) {
+      publishSnapshot({ generation, page, partial: null });
+    }
     const baseResult = await dependencies.discover({ ...options, pegi: 'Tous' });
     if (!baseResult.ok || !Array.isArray(baseResult.value?.results)) {
-      if (page === 1 && generation === currentGeneration) publishSnapshot(null);
+      if (shouldApplyProgressivePartial(generation, currentGeneration, page)) publishSnapshot(null);
       return baseResult;
     }
 

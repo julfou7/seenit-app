@@ -18,6 +18,7 @@ test('issue #326 v1.4.158 coalesce la vague parentale dans un transport authenti
   assert.match(client, /const PARENTAL_PROGRESSIVE_MAX_CONCURRENT = PARENTAL_TRANSPORT_MAX_ITEMS;/);
   assert.match(client, /setTimeout\(flushPendingSnapshot, PROGRESSIVE_SNAPSHOT_BATCH_MS\)/);
   assert.match(client, /filterResolvedPrefixes<any, any \| null, any>\(\s*baseResult\.value\.results,\s*1,/);
+  assert.match(client, /publishSnapshot\(\{ generation, page, partial: null \}\)/);
 
   assert.match(backend, /key !== 'items' && key !== 'stream'/);
   assert.match(backend, /application\/x-ndjson/);

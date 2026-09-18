@@ -757,8 +757,8 @@ export function DiscoverScreen({ onShowClick }: Props) {
     return popular.length > 0 ? popular : trending;
   }, [debouncedQuery, searchResults, popular, trending, popularPersons, activeCategory, shows]);
 
-  const processedResults = useMemo(() => {
-    let list = [...rawList];
+  const processRawResults = useCallback((sourceList: TMDBMedia[]) => {
+    let list = [...sourceList];
     const qClean = debouncedQuery.trim().toLowerCase();
 
     list = list.filter((item: any) => {
@@ -865,7 +865,12 @@ export function DiscoverScreen({ onShowClick }: Props) {
     }
 
     return list;
-  }, [rawList, debouncedQuery, selectedGenreIds, selectedGenres, minRating, sortBy, sortOrder, activeCategory, watchedIdsSnapshot, selectedPlatforms]);
+  }, [debouncedQuery, selectedGenreIds, selectedGenres, minRating, sortBy, sortOrder, activeCategory, watchedIdsSnapshot, selectedPlatforms]);
+
+  const processedResults = useMemo(
+    () => processRawResults(rawList),
+    [processRawResults, rawList],
+  );
 
   const top10 = useMemo(() => {
     if (debouncedQuery.trim() || activeCategory === 'Personnes' || hasActiveFilters || sortBy !== 'popular') return [];
@@ -989,5 +994,5 @@ export function DiscoverScreen({ onShowClick }: Props) {
     && sortBy === 'popular'
     && (activeCategory === 'Tout' || activeCategory === 'Séries' || activeCategory === 'Films' || activeCategory === 'Pépites' || activeCategory === 'Au cinéma');
 
-  return <DiscoverView model={{ activeCategory, activeFilterCount, activeHeroIndex, addShow, containerRef, debouncedQuery, deleteShow, handleAddMedia, handleHeroScroll, handleLongPress, handleOpenTrailer, handleScroll, handleToggleWatched, handleTouchEnd, handleTouchMove, handleTouchStart, hasActiveFilters, hasMore, heroCarouselRef, heroDetails, isLoadingMore, isOffline, isSearchVisible, isSortPickerOpen, loading, minRating, movieResults, observerTargetRef, onShowClick, openPersonModal, pegi, personResults, previewMedia, processedResults, query, selectedGenres, selectedPersonId, selectedPlatforms, seriesResults, setActiveCategory, setActiveHeroIndex, setIsSearchFocused, setIsSearchVisible, setIsSortPickerOpen, setMinRating, setPegi, setPreviewMedia, setQuery, setSelectedGenres, setSelectedPersonId, setSelectedPlatforms, setShowGenreMenu, setShowScrollTop, setSortBy, setSortOrder, setTrailerModalVideos, showGenreMenu, showHeroSurface, showScrollTop, showsByTmdbId, sortBy, top10, trailerModalVideos, uniqueProcessedResults, visibleHeroItems, visibleMovieResults, visiblePersonResults, visibleProcessedResults, visibleSeriesResults }} />;
+  return <DiscoverView model={{ activeCategory, activeFilterCount, activeHeroIndex, addShow, containerRef, debouncedQuery, deleteShow, handleAddMedia, handleHeroScroll, handleLongPress, handleOpenTrailer, handleScroll, handleToggleWatched, handleTouchEnd, handleTouchMove, handleTouchStart, hasActiveFilters, hasMore, heroCarouselRef, heroDetails, isLoadingMore, isOffline, isSearchVisible, isSortPickerOpen, loading, minRating, movieResults, observerTargetRef, onShowClick, openPersonModal, pegi, personResults, previewMedia, processRawResults, processedResults, query, selectedGenres, selectedPersonId, selectedPlatforms, seriesResults, setActiveCategory, setActiveHeroIndex, setIsSearchFocused, setIsSearchVisible, setIsSortPickerOpen, setMinRating, setPegi, setPreviewMedia, setQuery, setSelectedGenres, setSelectedPersonId, setSelectedPlatforms, setShowGenreMenu, setShowScrollTop, setSortBy, setSortOrder, setTrailerModalVideos, showGenreMenu, showHeroSurface, showScrollTop, showsByTmdbId, sortBy, top10, trailerModalVideos, uniqueProcessedResults, visibleHeroItems, visibleMovieResults, visiblePersonResults, visibleProcessedResults, visibleSeriesResults }} />;
 }
