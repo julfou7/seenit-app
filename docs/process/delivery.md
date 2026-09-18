@@ -10,7 +10,12 @@ ce document prévaut pour les déclencheurs CI, la classification de livraison e
 ## Objectif
 
 Un push doit prouver rapidement que le dépôt reste sain. Il ne doit pas être transformé automatiquement
-en nouvelle release APK. Les releases Android sont des jalons explicites et regroupés.
+en nouvelle release APK. Les releases Android restent explicites, avec deux usages distincts : la release
+complète pour les changements qui exigent les smokes d'installation, et la **release terrain rapide** pour
+mettre un correctif déjà validé sur le téléphone du propriétaire sans repayer les mêmes validations.
+
+Pour une boucle terrain demandée avec le correctif, la cible est **correctif prêt/mergé → mise à jour
+intégrée installable en ≤ 10 minutes**, sans téléchargement manuel et sans seconde demande « publie APK ».
 
 ## GitHub, Cloud Run et AI Studio
 
@@ -65,11 +70,11 @@ La classe `apk` signifie seulement « devra entrer dans la prochaine APK ». Ell
 ### Commande locale canonique
 
 Pendant la mise au point, les tests ciblés peuvent être exécutés autant que nécessaire. **Avant le premier
-push d'un arbre Git modifié, `npm run validate:change` doit être vert sur cet arbre exact.** Cette commande
-constitue la validation complète canonique : elle dérive la baseline PR/`main`, contrôle les workflows et
-la SPEC, rematérialise Android, classe le changement, vérifie le contrat de changement, TypeScript et les
-tests unitaires, ajoute le contrat Android si la classe est `apk`, exécute l'audit de dépendances lorsqu'il
-est requis puis construit les assets Web/serveur.
+push d'un arbre Git modifié, `npm run validate:change` doit être vert sur cet arbre exact**, hors fallback
+sans egress défini dans `AGENTS.md` §0.3. Cette commande constitue la validation complète canonique : elle
+dérive la baseline PR/`main`, contrôle les workflows et la SPEC, rematérialise Android, classe le changement,
+vérifie le contrat de changement, TypeScript et les tests unitaires, ajoute le contrat Android si la classe
+est `apk`, exécute l'audit de dépendances lorsqu'il est requis puis construit les assets Web/serveur.
 
 GitHub Actions réutilise cette même orchestration. Le job `Validate Change` la découpe uniquement en deux
 phases pour conserver le fail-fast et le cache :
@@ -141,10 +146,11 @@ vérifiée et toute divergence est bloquée.
 `npm audit --omit=dev --audit-level=high` n'est exécuté que :
 
 - lorsqu'un manifeste/lockfile de dépendances change ;
-- lors d'une release APK manuelle ;
+- lors d'une release APK complète ;
 - lors du contrôle périodique hebdomadaire.
 
-Un push sur `main` **ne publie jamais automatiquement une APK**.
+Un push sur `main` **ne publie jamais automatiquement une APK**. La poursuite automatique vers
+`/release-terrain` vient du mandat du chantier utilisateur, pas d'un déclencheur aveugle à chaque merge.
 
 ### TNR du chemin rapide
 
@@ -155,8 +161,13 @@ rematérialisation Android, de l'orchestration `validate:change`, du résumé et
 interdites ; `tests/changeValidationOrchestrator.test.ts` protège les sorties et la classification de
 l'orchestrateur. Le test `tests/testEsmImportsGuard.test.ts` verrouille le garde ESM : imports statiques,
 side-effect et dynamiques, extensions explicites, packages ignorés et absence d'impact sur le code Vite.
-La preuve du SLO est maintenue dans l'issue #84 à partir de 20 validations réelles consécutives ; elle
-n'est pas simulée par des runs artificiels.
+`tests/terrainReleaseFastPath.test.ts` protège la commande `/release-terrain`, la réutilisation de la
+validation exacte de `main`, les étapes indispensables de construction/signature/publication et
+l'exclusion des validations redondantes/smokes émulateur du chemin critique terrain.
+
+La preuve du SLO de validation continue est maintenue dans l'issue #84 à partir de 20 validations réelles
+consécutives. La preuve du SLO terrain est maintenue dans #368 à partir de releases réelles ; aucune mesure
+synthétique n'est fabriquée.
 
 ## Gouvernance proportionnée
 
@@ -194,13 +205,15 @@ distinctes. `SEENIT-QUALITY-004` impose la première à chaque intervention ; el
 5. **Reprise déterministe.** Commencer par l'issue, la PR ou la branche existante et par le dernier jalon
    qui donne la prochaine action exacte. Ne relire que les sections canoniques nécessaires à cette action ;
    ne pas reconstruire l'historique complet déjà capturé par l'issue/PR.
-6. **Checkpoint exploitable.** Si un handoff est inévitable alors que la demande initiale reste
-   incomplète, publier avant de rendre la main : SHA de référence, branche, PR éventuelle, fichiers
-   modifiés, tests déjà exécutés/verts, blocage éventuel et prochaine action exacte. Une reprise dans un
-   environnement neuf utilise ce checkpoint avant toute nouvelle exploration.
+6. **Checkpoint unique.** Chaque issue active conserve un commentaire stable marqué exactement
+   `<!-- seenit-resume -->`. Il est créé une fois puis **mis à jour en place** à chaque jalon/handoff au lieu
+   d'empiler des résumés concurrents. Il contient SHA/branche/PR, surfaces modifiées, tests déjà verts,
+   validations rouges utiles, dernier résultat terrain, blocage éventuel, prochaine action exacte et
+   critère de fin. Les baux et preuves CI/release restent dans leurs commentaires dédiés ; une reprise lit
+   d'abord ce checkpoint stable.
 7. **Travail distant.** CI, release et déploiement sont exécutés par GitHub Actions. L'agent n'occupe pas
    sa fenêtre d'exécution avec des polls rapprochés ; il suit synchroniquement uniquement sur demande
-   explicite ou pour diagnostiquer un échec précis.
+   explicite, pour une livraison qui fait partie de la demande en cours, ou pour diagnostiquer un échec précis.
 
 Cette politique ne promet aucune persistance du sandbox. Lorsqu'un environnement neuf est réellement
 fourni, l'acquisition locale peut devoir être répétée ; elle reste minimale et n'entraîne pas une
@@ -263,6 +276,10 @@ release déjà publiée clôt le relais sans nouveau dispatch ; sinon elle repre
 ne s'éveille pas au merge : elle verra ce relais à sa **prochaine exécution**. Cette règle ne rétablit
 pas une APK automatique sur chaque push ou merge et ne contourne aucun garde d'immuabilité ou smoke.
 
+Cette section de délégation ne s'applique pas lorsqu'une **validation terrain fait partie du chantier
+interactif courant** : dans ce cas, `AGENTS.md` §0.0t ordonne au même agent de poursuivre directement vers
+`/release-terrain` sans créer un relais artificiel ni attendre une tâche planifiée.
+
 ## Cause racine et portée d'un correctif
 
 Un exemple reproductible prouve un symptôme, pas la portée du correctif. Avant toute implémentation,
@@ -278,6 +295,22 @@ globale acceptable.
 
 Les modèles GitHub demandent ces informations pour les changements comportementaux. Documentation,
 copie d'interface et maintenance sans anomalie peuvent répondre « sans objet » et garder le chemin light.
+
+### Après un premier terrain rouge
+
+Un terrain KO invalide la preuve de correction, même si les tests précédents sont verts. À partir du
+**premier échec terrain** d'un même symptôme, le chantier quitte la succession de micro-patches isolés :
+
+- reconstruire le chemin de production réel de bout en bout, jusqu'au provider ou à la couche native ;
+- identifier la frontière réellement fautive avec logs/mesures ou instrumentation bornée si nécessaire ;
+- transformer le cas terrain en TNR au **point d'entrée de production réellement utilisé** — façade,
+  singleton, adapter, route, wiring ou API native — plutôt qu'en testant seulement une fonction interne ;
+- couvrir l'invariant générique et un cas voisin/négatif pertinent ;
+- enregistrer dans `<!-- seenit-resume -->` le dernier résultat terrain, l'hypothèse invalidée et la
+  prochaine preuve recherchée avant de modifier à nouveau.
+
+Cette escalade ne signifie pas audit global : elle élargit le diagnostic uniquement au chemin de
+production de la classe affectée et empêche de brûler plusieurs versions sur la même hypothèse incomplète.
 
 ## Fast path de correctif ciblé
 
@@ -299,7 +332,8 @@ SPEC et la décision produit.
    un churn massif de `requirements.json` disproportionné aux exigences réellement modifiées.
 5. Si dix minutes ne produisent ni artefact concret ni blocage précis, publier un jalon sur l'issue et
    cibler le blocage avant de continuer.
-6. Après merge, une publication déjà demandée reprend directement le fast path APK ci-dessous.
+6. Après merge, une publication déjà demandée reprend directement le fast path APK ci-dessous ; une
+   validation téléphone demandée reprend le fast path terrain sans nouvelle demande utilisateur.
 
 Ce raccourci porte sur l'orchestration de l'agent, pas sur les preuves : tests, protections de branche,
 contrats Plex/identité/données/APK et validations terrain nécessaires restent inchangés.
@@ -363,68 +397,65 @@ aux autres octets. Une candidate qui reformate massivement le catalogue est inva
 Une fois les checks requis de la PR verts, fusionner selon les protections du dépôt puis relancer
 `release:status`. L'état attendu est alors `dispatch`.
 
-Une demande explicite « Publie l'APK », « Lance la release » ou équivalent vaut mandat opérationnel :
-l'agent déclenche lui-même la release. Il ne se contente pas de fournir un bouton ou une commande à
-exécuter par l'utilisateur. Après identification du run, il rend la main par défaut ; « publie et
-attends le résultat » ajoute explicitement un suivi synchrone.
+Une demande explicite « Publie l'APK », « Lance la release » ou équivalent vaut mandat opérationnel pour
+une release complète. Un correctif explicitement destiné au terrain vaut mandat opérationnel pour
+`/release-terrain` une fois le correctif mergé et `main` vert. L'agent ne se contente pas de fournir un
+bouton ou une commande à exécuter par l'utilisateur.
 
 Pour créer le `workflow_dispatch`, l'ordre canonique est :
 
-1. depuis une conversation disposant du connecteur GitHub, publier la commande exacte `/release-apk`
-   sur l'issue #102 ; `SeenIt Release Control` applique les contrôles et crée le run nativement ;
+1. depuis une conversation disposant du connecteur GitHub, publier sur #102 la commande exacte :
+   `/release-terrain` pour la boucle téléphone déjà validée, `/release-apk` pour une release complète ou
+   `/release-apk android12_smoke=true` lorsqu'Android 12 doit être ajouté ;
 2. **outil GitHub direct** de déclenchement de workflow s'il est réellement disponible dans la session,
-   avec ref `main`, `release_apk=true` et `android12_smoke=false` par défaut ;
-3. sinon fallback local borné :
+   avec ref `main` et les inputs équivalents ;
+3. sinon fallback local borné avec `release:dispatch`/`gh` pour la release complète documentée ci-dessous.
 
 ```bash
 npm run release:dispatch
 ```
 
-Ce wrapper exécute l'équivalent canonique :
+Ce wrapper historique exécute l'équivalent canonique complet :
 
 ```bash
-gh workflow run build-apk.yml --repo julfou7/seenit-app --ref main -f release_apk=true -f android12_smoke=false
+gh workflow run build-apk.yml --repo julfou7/seenit-app --ref main -f release_apk=true -f android12_smoke=false -f fast_terrain=false
 ```
 
-4. si aucune des voies précédentes ne sait créer le run et que `gh` ou son authentification shell manque,
-   utiliser l'**interface GitHub Actions via un navigateur authentifié contrôlable par l'agent** : ouvrir
-   `Validate & Release SeenIt`, choisir exactement `main`, activer `release_apk`, laisser
-   `android12_smoke=false` par défaut, puis déclencher le workflow.
-
+Le chemin connector-only #102 reste prioritaire et couvre le fast terrain sans dépendre du shell.
 L'absence de `gh`, de `GH_TOKEN` ou de `GITHUB_TOKEN` dans le shell n'est donc pas un blocage tant que
-le navigateur GitHub authentifié est pilotable. L'agent ne renvoie pas l'utilisateur vers « un clic
-manuel » avant d'avoir réellement épuisé les trois voies. Une intervention humaine n'est demandée que
-pour un blocage concret d'accès, d'authentification ou d'autorisation.
+le contrôleur #102 ou une action GitHub dédiée est disponible. Une intervention humaine n'est demandée
+que pour un blocage concret d'accès, d'authentification ou d'autorisation après épuisement des voies
+canoniques.
 
 Quelle que soit la voie, vérifier avant le dispatch qu'aucun run de release portant le même SHA/version
-n'est déjà actif. Le wrapper vérifie d'abord que le workspace est propre et exactement sur `main`, puis
-recherche pendant au plus 30 secondes le run `workflow_dispatch` portant le même SHA. Si le run n'est
-pas retrouvé, il s'arrête sans relancer aveuglément. Dès que le run est identifié, l'agent publie son
-lien et rend la main ; il n'enchaîne pas des attentes et polls rapprochés. Sur demande explicite de suivi,
-les lectures sont espacées et ciblent uniquement ce run précis.
+n'est déjà actif. Le contrôleur recherche pendant au plus 30 secondes le run `workflow_dispatch` portant
+le même SHA et ne redéclenche jamais aveuglément. Pour `/release-terrain`, il attend auparavant jusqu'à
+90 secondes la validation `push` verte du `main` exact. Dès que le run de release est identifié, le suivi
+reste ciblé sur ce run ; lorsqu'il fait partie d'un chantier terrain à terminer dans la même demande,
+l'agent poursuit jusqu'à la release et à la notification au lieu de rendre la main au milieu de la boucle.
 
-### 4. Mesure « demande → workflow »
+### 4. Mesures
 
-Au début d'une demande release-only, l'agent conserve l'heure dans
-`SEENIT_RELEASE_REQUEST_STARTED_AT` (ISO-8601 ou epoch). `release:dispatch` publie alors la durée
-**demande → création du workflow** dans `RELEASE_DISPATCH_JSON`. Si un outil direct est utilisé, la
-même mesure est calculée entre l'heure de la demande et le `created_at` du run. Cette métrique est
-reportée dans l'issue/release concernée ; le temps d'attente des checks de PR n'est pas compté dans le
-budget opérateur.
+Pour une demande release-only, conserver la mesure **demande → workflow**. Pour une boucle terrain,
+mesurer en plus **correctif prêt/merge → release installable/notifiée** avec une cible ≤ 10 minutes.
+Consigner également le nombre de versions terrain nécessaires avant un OK, les handoffs avant fin et les
+P1 apparaissant dans les 24 h suivant une release. Ces mesures servent à réduire le churn de versions ;
+elles ne sont pas des barrières supplémentaires avant publication.
 
-Le workflow de release publie séparément le temps actif du job regroupant contrôles, build et smoke
-Android 36. Le passage build → smoke reste à zéro seconde de transition de runner. Le temps total du
-run permet de distinguer la file GitHub précédant le job de publication du travail réellement exécuté.
+Le workflow publie séparément le temps actif de son chemin critique. En mode complet il inclut les smokes
+requis ; en mode terrain il expose explicitement que le smoke Android 36 a été sauté et que la validation
+`main` exacte a été réutilisée.
 
-Cibles : ≤ 2 minutes de travail opérateur avec candidate prête et verte ; ≤ 5 minutes hors attente CI
-si la candidate doit être préparée.
+Cibles release-only : ≤ 2 minutes de travail opérateur avec candidate prête et verte ; ≤ 5 minutes hors
+attente CI si la candidate doit être préparée. Cible terrain : ≤ 10 minutes du correctif prêt/mergé à la
+mise à jour installable dans SeenIt.
 
 ## Préparation d'une release APK
 
 Les changements `apk` peuvent s'accumuler sur `main` avec plusieurs commits. La version Android n'est
 pas incrémentée à chaque commit.
 
-Quand le lot est prêt, le chemin canonique est désormais :
+Quand le lot est prêt pour une release complète, le chemin canonique est :
 
 1. lire `npm run release:status -- --json` ;
 2. si nécessaire, préparer le prochain patch avec `npm run release:prepare -- X.Y.Z` ;
@@ -432,22 +463,19 @@ Quand le lot est prêt, le chemin canonique est désormais :
 4. fusionner cette candidate ;
 5. vérifier que les trois secrets de dépôt `SEENIT_ANDROID_RELEASE_KEYSTORE_B64`,
    `SEENIT_ANDROID_RELEASE_STORE_PASSWORD` et `SEENIT_ANDROID_RELEASE_KEY_PASSWORD` sont présents ;
-6. sur demande explicite, laisser l'agent déclencher `Validate & Release SeenIt` avec
-   `release_apk=true` depuis `main`, via l'outil GitHub direct, `release:dispatch` ou le navigateur
-   GitHub authentifié ;
-7. rendre la main dès que le run précis est identifié, sauf demande explicite de suivi synchrone ;
-8. après création de la release, le job de publication émet un `repository_dispatch` dédié ; le workflow
+6. déclencher `Validate & Release SeenIt` avec `release_apk=true`, `fast_terrain=false` ;
+7. après création de la release, le job de publication émet un `repository_dispatch` dédié ; le workflow
    `Android APK Update Notification` attend la terminaison réussie du run source, puis transmet
    uniquement son identité publique au backend canonique. Celui-ci revalide GitHub et diffuse l'alerte
    FCM Android de manière idempotente, sans rendre l'état de la release dépendant de FCM ;
-9. valider sur appareil Android réel la réception et l'ouverture de l'alerte lorsque ce parcours change.
+8. valider sur appareil Android réel la réception et l'ouverture de l'alerte lorsque ce parcours change.
 
-Le déclenchement manuel de release ne relance pas d'abord le job de validation continue puis un second
-job identique. Le job de candidate exécute lui-même, **une seule fois sur le même runner**, le contrat
-de changement, SPEC, TypeScript, tests unitaires, contrat Android, garde d'immuabilité, audit de
-dépendances, build Web, Gradle et smoke Android 36. Le contrôle reste complet, mais `npm ci`, le build Web,
-la configuration Node/JDK et la transition vers un second runner ne sont plus payés deux fois pour le
-chemin Android cible. Le smoke Android 12 optionnel reste un job séparé et démarre après ce chemin critique.
+Pour une **release terrain**, les étapes de version/candidate restent identiques si elles sont nécessaires,
+mais le contrôleur exige ensuite la validation `main` exacte verte et déclenche `fast_terrain=true`.
+Le job ne rejoue pas classification/SPEC/lint/unit/audit déjà prouvés et ne construit pas le harness ni
+les émulateurs Android 36/12. Il matérialise toujours la clé, vérifie l'immuabilité, construit les assets,
+synchronise Capacitor, rejoue le contrat Android après sync, produit l'APK signée et son digest, publie la
+release officielle puis notifie SeenIt. Une tentative terrain correspond donc à **une seule APK publiée**.
 
 Avant les tests Android de release, la CI décode `SEENIT_ANDROID_RELEASE_KEYSTORE_B64` dans
 `android/app/seenit-release.p12`, refuse un secret absent ou un Base64 invalide puis compare le SHA-256
@@ -485,11 +513,17 @@ dans les preuves GitHub.
 
 ## Smokes Android
 
-À chaque release :
+Pour une **release complète** :
 
 - Android cible courant (API 36 actuellement) : **bloquant** ;
 - Android 12 / API 31 : **optionnel manuel** via `android12_smoke=true` et utilisable comme contrôle
   périodique ou lors d'un changement Android à risque.
+
+Pour une **release terrain rapide d'un correctif applicatif déjà validé**, Android 36 et Android 12 sont
+sautés avant le premier test réel : le téléphone du propriétaire est la validation terrain prioritaire.
+Ce raccourci est interdit si le changement touche précisément la signature, l'identité/package, une
+migration d'installation ou le mécanisme de mise à jour/install ; la release complète et son smoke N→N+1
+sont alors requis.
 
 Depuis la release 1.4.112, la rotation est terminée et la baseline officielle porte la signature
 release active. Le smoke compare package, versions et certificats réels puis exige que **N et N+1
@@ -498,14 +532,14 @@ installe N+1 sur place avec `adb install -r`, puis prouve la conservation des do
 l'icône, des notifications, du launcher et du deep link. Toute divergence de signature et toute
 réinstallation par désinstallation sont bloquantes.
 
-Le smoke Android 36 privilégie la fiabilité à l'optimisation : chaque release recrée un AVD propre
-(`force-avd-creation: true`) et ne réutilise aucun snapshot ou cache `~/.android/avd`. L'AVD API 36 est
-plafonné explicitement à `2048M`, comme l'API 31 stable, afin de réduire la pression mémoire hôte sans
-modifier les assertions du TNR. Les preuves du smoke archivent aussi `free`, les principaux RSS et la
-fin de `dmesg` pour distinguer un kill QEMU sous pression d'un défaut applicatif. Le run de release
-1.4.112 `33809261658` a validé ce parcours sur Android 36 et Android 12. L'API 36 reste bloquante et le
-contrôle Retour n'est pas supprimé. Depuis #135, le build et ce smoke partagent le même runner à droits
-de lecture ; seul le job de publication séparé conserve `contents: write`.
+Le smoke Android 36 de la release complète privilégie la fiabilité à l'optimisation : chaque exécution
+recrée un AVD propre (`force-avd-creation: true`) et ne réutilise aucun snapshot ou cache `~/.android/avd`.
+L'AVD API 36 est plafonné explicitement à `2048M`, comme l'API 31 stable, afin de réduire la pression mémoire
+hôte sans modifier les assertions du TNR. Les preuves du smoke archivent aussi `free`, les principaux RSS
+et la fin de `dmesg` pour distinguer un kill QEMU sous pression d'un défaut applicatif. Le run de release
+1.4.112 `33809261658` a validé ce parcours sur Android 36 et Android 12. Depuis #135, le build et ce smoke
+partagent le même runner à droits de lecture ; seul le job de publication séparé conserve `contents: write`.
+`npm ci` et le build Web sont ainsi exécutés une seule fois sur le même runner et ne sont plus payés deux fois.
 
 ### Distribution hors Play et Play Protect
 
@@ -550,9 +584,10 @@ La simplification ne réduit pas les garde-fous sur :
 
 ## Principe de décision
 
-Le but n'est plus de transformer chaque commit en release réglementée. Le pipeline doit répondre à
-deux questions séparées :
+Le pipeline répond à trois questions séparées :
 
 1. **Le changement est-il sain ?** → validation à chaque push.
-2. **Veut-on publier un nouveau binaire Android maintenant ?** → action manuelle explicite, une fois
-   le lot prêt.
+2. **Doit-il être essayé maintenant sur le téléphone réel ?** → `/release-terrain` après validation verte du SHA exact, sans répéter les preuves déjà acquises.
+3. **Le changement touche-t-il directement l'installation/invariant APK ou demande-t-on une release complète ?** → `/release-apk` avec smoke Android 36 bloquant.
+
+Cette séparation vise à réduire le temps de retour terrain et le nombre de versions brûlées sur des hypothèses incomplètes, sans affaiblir les invariants réellement nécessaires à l'installation.
