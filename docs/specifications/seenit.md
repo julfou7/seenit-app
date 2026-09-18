@@ -27,8 +27,11 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 - **SEENIT-PLATFORM-001** — La PWA canonique servie depuis `seenit.ai.studio` conserve les routes
   SeenIt relatives au même domaine. L'APK et tout preview AI Studio dont un label d'hôte commence
   par `ais-dev-*` ciblent explicitement `https://seenit.ai.studio` pour les routes `/api/*` afin de
-  partager le même backend canonique. Un comportement commun partage la même logique métier, mais
-  le transport et l'ouverture d'applications peuvent être adaptés par la plateforme. Dans l'APK,
+  partager le même backend canonique. Les requêtes authentifiées cross-origin de ces surfaces doivent
+  réussir leur preflight CORS avec tous les en-têtes SeenIt effectivement émis, y compris les en-têtes
+  diagnostics bornés du filtre d'âge ; une instrumentation ne doit jamais forcer un fallback réseau.
+  Un comportement commun partage la même logique métier, mais le transport et l'ouverture d'applications
+  peuvent être adaptés par la plateforme. Dans l'APK,
   une panne réseau temporaire ou une résolution DNS impossible de cette origine primaire déclenche
   de façon bornée l'URL Cloud Run Google vérifiée du **même service canonique** ; ce secours n'est
   jamais utilisé après une réponse HTTP fonctionnelle et ne modifie ni authentification, ni corps,

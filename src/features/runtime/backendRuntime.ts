@@ -34,6 +34,35 @@ import {
 
 export const SEENIT_BACKEND_IDENTITY = 'canonical';
 
+export const SEENIT_CORS_ALLOWED_HEADERS = [
+  'Origin',
+  'X-Requested-With',
+  'Content-Type',
+  'Accept',
+  'Authorization',
+  'X-Plex-Token',
+  'X-Plex-Client-Identifier',
+  'X-Plex-Product',
+  'X-Plex-Version',
+  'X-SeenIt-Webhook-Secret',
+  'X-SeenIt-Request-Id',
+  'X-SeenIt-Age-Trace',
+  'X-SeenIt-Age-Generation',
+  'X-SeenIt-Age-Page',
+  'X-SeenIt-Age-Max',
+] as const;
+
+export const seenItCorsMiddleware: RequestHandler = (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', SEENIT_CORS_ALLOWED_HEADERS.join(', '));
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+    return;
+  }
+  next();
+};
+
 const PLEX_DELTA_SNAPSHOT_FIELD = 'deltaWatchedSnapshotV1';
 const MAX_PLEX_DELTA_SNAPSHOT_ITEMS = 5000;
 
