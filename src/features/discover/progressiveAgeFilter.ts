@@ -1,5 +1,6 @@
 import { ok, tryCatch } from '../../core/Result';
 import { authenticatedFetch } from '../../lib/apiAuth';
+import { emitAgeFilterBrowserTrace, installAgeFilterBrowserTraceSurface } from '../../lib/ageFilterTrace';
 import { getParentalRatingOverride } from '../../store/parentalRatingStore';
 import { discoverSeenIt, type SeenItDiscoverOptions } from '../shows/tmdbCore';
 import { tmdb } from '../shows/tmdbClient';
@@ -49,7 +50,7 @@ function logAgeFilterTrace(
   context: Record<string, string | number | boolean | null> = {},
 ): void {
   if (!trace) return;
-  console.info(`[AgeFilterTrace] ${JSON.stringify({
+  emitAgeFilterBrowserTrace({
     traceId: trace.traceId,
     generation: trace.generation,
     page: trace.page,
@@ -57,8 +58,31 @@ function logAgeFilterTrace(
     phase,
     elapsedMs: Math.max(0, Date.now() - trace.startedAt),
     ...context,
-  })}`);
+  });
 }
+
+function readBackendDiagnosticContext(value: any): Record<string, string | number | boolean | null> {
+  if (!value || typeof value !== 'object') return {};
+  const allowed = [
+    'backendElapsedMs', 'itemCount', 'movieCount', 'tvCount',
+    'steadyConcurrency', 'burstConcurrency', 'stallBurstMs', 'timeoutMs',
+    'ordinal', 'mediaType', 'queueWaitMs', 'providerMs', 'outcome',
+    'httpStatus', 'hasDetails', 'active', 'queued', 'resolvedCount',
+    'nullCount', 'firstWriteMs', 'maxActive', 'maxQueued', 'burstGrants',
+    'aborted',
+  ] as const;
+  const safe: Record<string, string | number | boolean | null> = {};
+  for (const key of allowed) {
+    const entry = value[key];
+    if (typeof entry === 'string') safe[key] = entry.slice(0, 80);
+    else if (typeof entry === 'number' && Number.isFinite(entry)) safe[key] = entry;
+    else if (typeof entry === 'boolean') safe[key] = entry;
+    else if (entry === null) safe[key] = null;
+  }
+  return safe;
+}
+
+installAgeFilterBrowserTraceSurface();
 
 const BATCH_CACHE_MAX = 240;
 const PARENTAL_TRANSPORT_MAX_ITEMS = 40;
@@ -138,8 +162,19 @@ async function consumeParentalStream(batch: ParentalPendingEntry[], signal?: Abo
       if (!line.trim()) return;
       try {
         const entry = JSON.parse(line);
+        if (entry?.type === 'age_filter_diagnostic' && entry?.diagnostic?.phase) {
+          logAgeFilterTrace(trace, `backend_${String(entry.diagnostic.phase).slice(0, 64)}`, readBackendDiagnosticContext(entry.diagnostic.context));
+          return;
+        }
         const pending = unresolved.get(entry?.key);
         if (!pending) return;
+        if (entry?.diagnostic?.phase) {
+          logAgeFilterTrace(
+            pending.trace || trace,
+            `backend_${String(entry.diagnostic.phase).slice(0, 64)}`,
+            readBackendDiagnosticContext(entry.diagnostic.context),
+          );
+        }
         unresolved.delete(entry.key);
         lineNumber += 1;
         if (firstLineAt === null) firstLineAt = Date.now();

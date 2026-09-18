@@ -267,7 +267,11 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
   attente d'authentification/transport, ordre du stream, durées fournisseur et annulation, mais **jamais**
   journaliser le jeton Firebase, un en-tête `Authorization`, l'UID, l'email, le titre, l'ID TMDB ni le
   payload d'un média. Cette instrumentation n'altère ni le résultat, ni l'ordre, ni la source de vérité
-  parentale et reste distincte de l'auditeur d'incidents à haute confiance.
+  parentale et reste distincte de l'auditeur d'incidents à haute confiance. Dans un navigateur ou le
+  preview AI Studio, les événements sont émis avec `console.log` et conservés dans un buffer borné
+  `window.__SEENIT_AGE_TRACE__` (dump texte via `window.__SEENIT_AGE_TRACE_DUMP__()`). Le transport
+  NDJSON peut également renvoyer au client les seules métriques backend autorisées (file, durée,
+  outcome, concurrence et synthèse), sans identifiant média ni donnée d'authentification.
 
 ### 5.2.2 Notes TMDB uniques
 
