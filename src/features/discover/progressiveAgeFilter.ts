@@ -1,12 +1,12 @@
 import { ok, tryCatch } from '../../core/Result';
 import { authenticatedFetch } from '../../lib/apiAuth';
 import { emitAgeFilterBrowserTrace, installAgeFilterBrowserTraceSurface } from '../../lib/ageFilterTrace';
-import { getParentalRatingOverride } from '../../store/parentalRatingStore';
+import { getParentalRatingOverride, getParentalRatingOverridesSnapshot } from '../../store/parentalRatingStore';
 import { discoverSeenIt, type SeenItDiscoverOptions } from '../shows/tmdbCore';
 import { tmdb } from '../shows/tmdbClient';
 import { matchesMaxRecommendedAge, parseMaxAgeFilter, resolveParentalRating } from '../shows/parentalRating';
 import { readParentalRatingCache, writeParentalRatingCache } from '../shows/parentalRatingCache';
-import { createSupersedingAbortController, filterResolvedPrefixes, shouldApplyProgressivePartial } from './progressiveAgeFilterCore';
+import { createPagePrefetchWindow, createSupersedingAbortController, filterResolvedPrefixes, shouldApplyProgressivePartial } from './progressiveAgeFilterCore';
 
 export { shouldApplyProgressivePartial } from './progressiveAgeFilterCore';
 
@@ -91,6 +91,8 @@ const PARENTAL_TRANSPORT_MAX_ITEMS = 40;
 // La concurrence fournisseur reste bornée côté backend à 24.
 const PARENTAL_PROGRESSIVE_MAX_CONCURRENT = PARENTAL_TRANSPORT_MAX_ITEMS;
 const PROGRESSIVE_SNAPSHOT_BATCH_MS = 120;
+const AGE_SOURCE_PREFETCH_AHEAD = 2;
+const AGE_SOURCE_PREFETCH_MAX_ENTRIES = 8;
 const parentalBatchCache = new Map<string, any>();
 const parentalTransportPending = new Map<AbortSignal | undefined, Map<string, ParentalPendingEntry>>();
 let parentalTransportFlushScheduled = false;
@@ -356,12 +358,36 @@ export interface ProgressiveAgeDiscoverDependencies {
     trace?: AgeFilterTraceContext,
   ) => Promise<Map<string, any | null>>;
 }
+function createSourcePrefetchKey(options: SeenItDiscoverOptions, maxAge: number): string {
+  const overrides = getParentalRatingOverridesSnapshot();
+  const hasRescuingMovieOverride = Object.entries(overrides).some(([key, override]) => (
+    key.startsWith('movie:')
+    && Number.isInteger(override?.age)
+    && override.age >= 0
+    && override.age <= maxAge
+  ));
+  return JSON.stringify({
+    type: options.type || 'all',
+    category: options.category || 'Tout',
+    watchProviders: [...(options.watchProviders || [])].sort(),
+    genres: [...(options.genres || [])].sort(),
+    maxAge,
+    minRating: options.minRating || 'Toutes',
+    sortBy: options.sortBy || 'popular',
+    sortOrder: options.sortOrder || 'desc',
+    hasRescuingMovieOverride,
+  });
+}
+
 export function createProgressiveAgeDiscover(
   dependencies: ProgressiveAgeDiscoverDependencies = { discover: discoverSeenIt, resolveBatch: resolveParentalRatingBatch },
   publishSnapshot: ProgressiveSnapshotPublisher = () => undefined,
 ) {
   let currentGeneration = 0;
   const nextRequestController = createSupersedingAbortController();
+  const sourcePagePrefetch = createPagePrefetchWindow<
+    Awaited<ReturnType<ProgressiveAgeDiscoverDependencies['discover']>>
+  >(AGE_SOURCE_PREFETCH_AHEAD, AGE_SOURCE_PREFETCH_MAX_ENTRIES);
   return async function progressiveAgeDiscover(options: SeenItDiscoverOptions, onPartial?: ProgressiveDiscoverPartialHandler) {
     const requestController = nextRequestController();
     const requestSignal = requestController.signal;
@@ -406,14 +432,29 @@ export function createProgressiveAgeDiscover(
       logAgeFilterTrace(trace, 'snapshot_reset');
     }
     const discoverStartedAt = Date.now();
-    logAgeFilterTrace(trace, 'source_discover_start');
-    const baseResult = await dependencies.discover({
+    const sourcePrefetchKey = createSourcePrefetchKey(options, maxAge);
+    const loadSourcePage = (targetPage: number) => dependencies.discover({
       ...options,
+      page: targetPage,
       pegi: 'Tous',
       parentalPrefilterMaxAge: maxAge,
     });
+    const sourcePage = sourcePagePrefetch.get(sourcePrefetchKey, page, loadSourcePage);
+    const prefetchedPages = sourcePagePrefetch.primeAhead(sourcePrefetchKey, page, loadSourcePage);
+    logAgeFilterTrace(trace, sourcePage.reused ? 'source_prefetch_hit' : 'source_discover_start', {
+      prefetchedAhead: prefetchedPages.length,
+    });
+    if (prefetchedPages.length > 0) {
+      logAgeFilterTrace(trace, 'source_prefetch_start', {
+        prefetchedAhead: prefetchedPages.length,
+        firstPrefetchedPage: prefetchedPages[0],
+        lastPrefetchedPage: prefetchedPages[prefetchedPages.length - 1],
+      });
+    }
+    const baseResult = await sourcePage.promise;
     logAgeFilterTrace(trace, 'source_discover_done', {
       ok: baseResult.ok,
+      reusedPrefetch: sourcePage.reused,
       durationMs: Math.max(0, Date.now() - discoverStartedAt),
       rawResults: baseResult.ok && Array.isArray(baseResult.value?.results) ? baseResult.value.results.length : 0,
       totalPages: baseResult.ok ? Number(baseResult.value?.total_pages || 0) : 0,
