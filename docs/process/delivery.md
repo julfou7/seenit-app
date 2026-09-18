@@ -504,9 +504,11 @@ Détails techniques:
 - Ignore le serveur en timeout et poursuit les autres collectes.
 ```
 
-`Changelog: aucun` signale explicitement un commit sans effet visible. Le générateur privilégie cette
-section, ignore les détails techniques et conserve un fallback pour les anciens commits. Le résultat
-utilise un seul titre `### 🛠️ Ce qui a été fait`, avec des phrases françaises courtes, ponctuées et
+`Changelog: aucun` signale explicitement un commit sans effet visible. Le générateur n'utilise que cette
+section explicite et ignore les détails techniques. Le préflight canonique `validate:change` vérifie en plus,
+sur chaque commit non-merge entre la baseline et `HEAD`, qu'un bloc `Changelog:` existe avant toute PR/merge ;
+une note non vide est soumise immédiatement aux mêmes contrôles de langue et de qualité que la publication.
+Le résultat utilise un seul titre `### 🛠️ Ce qui a été fait`, avec des phrases françaises courtes, ponctuées et
 orientées usage. Pour éviter de surcharger la fenêtre mobile, viser deux à cinq puces et regrouper les
 changements liés ; les noms de fichiers, identifiants internes, tests, CI, commits, PR et issues restent
 dans les preuves GitHub.

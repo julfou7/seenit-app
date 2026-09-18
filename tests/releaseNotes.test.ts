@@ -18,6 +18,13 @@ const {
   findPreviousReleaseTag: (version: string, cwd?: string) => string | null;
   generateReleaseNotes: (options?: { version?: string; cwd?: string }) => string;
 };
+const {
+  validateChangelogRange,
+  validateCommitMessage
+} = require('../scripts/validate-changelog-coverage.cjs') as {
+  validateChangelogRange: (options: { baseSha: string; head?: string; cwd?: string }) => string[];
+  validateCommitMessage: (message: string, label?: string) => string[];
+};
 
 function git(cwd: string, ...args: string[]) {
   return execFileSync('git', args, {
@@ -214,6 +221,60 @@ test('SEENIT-RELEASE-003 échoue fermé si une version ne contient aucune note p
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
+});
+
+test('SEENIT-RELEASE-003 bloque un commit sans bloc Changelog avant la publication', () => {
+  assert.throws(
+    () => validateCommitMessage('fix(explorer): accélérer le filtre âge\n\nDétails techniques:\n- ajuste la fenêtre'),
+    /sans bloc Changelog/i
+  );
+  assert.deepEqual(
+    validateCommitMessage('docs: ajuster le processus\n\nChangelog: aucun'),
+    []
+  );
+  assert.deepEqual(
+    validateCommitMessage('fix(explorer): accélérer le filtre âge\n\nChangelog:\n- Le filtre Âge conseillé affiche plus rapidement les résultats avec les seuils restrictifs.'),
+    ['- Le filtre Âge conseillé affiche plus rapidement les résultats avec les seuils restrictifs.']
+  );
+  assert.throws(
+    () => validateCommitMessage('fix(explorer): accélérer le filtre âge\n\nChangelog:\n- Fix safe age results within first batch.'),
+    /doit être rédigée en français/i
+  );
+});
+
+test('SEENIT-RELEASE-003 valide la plage Git de la PR et ignore seulement les commits de merge', () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'seenit-changelog-coverage-'));
+
+  try {
+    git(cwd, 'init');
+    git(cwd, 'config', 'user.email', 'seenit-tests@example.test');
+    git(cwd, 'config', 'user.name', 'SeenIt Tests');
+
+    commitFile(cwd, 'base', 'chore: base', 'Changelog: aucun');
+    const baseSha = git(cwd, 'rev-parse', 'HEAD');
+
+    commitFile(
+      cwd,
+      'valid',
+      'fix(explorer): accélérer le filtre âge',
+      'Changelog:\n- Le filtre Âge conseillé affiche plus rapidement les résultats avec les seuils restrictifs.'
+    );
+    assert.equal(validateChangelogRange({ baseSha, cwd }).length, 1);
+
+    commitFile(cwd, 'invalid', 'test: oublier le changelog');
+    assert.throws(
+      () => validateChangelogRange({ baseSha, cwd }),
+      /sans bloc Changelog/i
+    );
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('SEENIT-RELEASE-003 exécute le garde Changelog dans le préflight canonique', () => {
+  const validator = readFileSync(new URL('../scripts/validate-change.cjs', import.meta.url), 'utf8');
+  assert.match(validator, /scripts\/validate-changelog-coverage\.cjs/);
+  assert.match(validator, /Couverture Changelog des commits/);
 });
 
 test('SEENIT-RELEASE-003 documente un format public court et homogène', () => {
