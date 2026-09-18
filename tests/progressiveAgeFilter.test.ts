@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   filterResolvedPrefixes,
+  mergeProgressivePageItems,
   shouldApplyProgressivePartial,
 } from '../src/features/discover/progressiveAgeFilterCore.ts';
 
@@ -216,10 +217,19 @@ test('issue #326 exclut les classifications inconnues et conserve strictement l�
   assert.deepEqual(result, [10, 30, 40, 50, 70]);
 });
 
-test('issue #326 ignore les snapshots obsolètes et les pages suivantes', () => {
+test('issue #326 publie les snapshots de toutes les pages mais ignore les générations obsolètes', () => {
   assert.equal(shouldApplyProgressivePartial(4, 4, 1), true);
-  assert.equal(shouldApplyProgressivePartial(3, 4, 1), false);
-  assert.equal(shouldApplyProgressivePartial(4, 4, 2), false);
+  assert.equal(shouldApplyProgressivePartial(4, 4, 2), true);
+  assert.equal(shouldApplyProgressivePartial(3, 4, 2), false);
+  assert.equal(shouldApplyProgressivePartial(4, 4, 0), false);
+});
+
+test('issue #326 ajoute une page progressive sans retirer les résultats stables précédents', () => {
+  const page1 = [{ id: 10, media_type: 'movie' }, { id: 20, media_type: 'tv' }];
+  const page2Partial = [{ id: 20, media_type: 'tv' }, { id: 30, media_type: 'tv' }];
+  const keyOf = (item: any) => `${item.media_type}:${item.id}`;
+  assert.deepEqual(mergeProgressivePageItems(page1, page2Partial, 2, keyOf).map(item => item.id), [10, 20, 30]);
+  assert.deepEqual(mergeProgressivePageItems(page1, page2Partial, 1, keyOf).map(item => item.id), [20, 30]);
 });
 
 test('issue #326 le point d’entrée production utilise le moteur progressif sans réintroduire le client historique', () => {
@@ -274,7 +284,9 @@ test('issue #326 le point d’entrée production utilise le moteur progressif sa
   );
   assert.match(progressiveIntegration, /baseResult\.value[\s\S]*results: partialResults/);
   assert.match(discoverView, /useSyncExternalStore/);
-  assert.match(discoverView, /model\.loading/);
-  assert.match(discoverView, /snapshot\.partial/);
+  assert.match(discoverView, /progressiveRequestActive = page === 1 \? model\.loading : page > 1 && model\.isLoadingMore/);
+  assert.match(discoverView, /snapshot\?\.partial/);
+  assert.match(discoverView, /model\.processRawResults\(mergedItems\)/);
+  assert.match(discoverView, /mergeProgressivePageItems/);
   assert.equal(existsSync(removedClientPath), false);
 });

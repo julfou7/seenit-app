@@ -5,6 +5,7 @@ import {
   PARENTAL_BATCH_ITEM_BUDGET_PER_MINUTE,
   PARENTAL_BATCH_MAX_CONCURRENT,
   PARENTAL_BATCH_MAX_ITEMS,
+  PARENTAL_BATCH_STALL_BURST_CONCURRENT,
   registerParentalRatingBatchRoute,
 } from '../src/features/providers/parentalRatingBatchBackend.ts';
 
@@ -14,7 +15,7 @@ const json = (data: unknown, status = 200) => new Response(JSON.stringify(data),
   headers: { 'Content-Type': 'application/json' },
 });
 
-async function harness(t: any) {
+async function harness(t: any, options: { stallBurstMs?: number } = {}) {
   let active = 0;
   let maxActive = 0;
   const calls: URL[] = [];
@@ -31,6 +32,7 @@ async function harness(t: any) {
   registerParentalRatingBatchRoute(app, {
     authenticate,
     secrets: () => ({ TMDB_API_KEY: 'private-tmdb-key', TVDB_API_KEY: 'private-tvdb-key' }),
+    stallBurstMs: options.stallBurstMs,
     fetch: async input => {
       const url = new URL(String(input));
       calls.push(url);
@@ -71,7 +73,7 @@ test('issue #326 batch parental authentifié résout 40 médias avec un fan-out 
   assert.equal(payload.results.length, PARENTAL_BATCH_MAX_ITEMS);
   assert.equal(calls.length, PARENTAL_BATCH_MAX_ITEMS);
   assert.equal(maxActive() <= PARENTAL_BATCH_MAX_CONCURRENT, true);
-  assert.equal(maxActive() > 8, true, 'le serveur doit dépasser la vieille borne client à 8 sans dépasser 24');
+  assert.equal(maxActive() > 8, true, 'le chemin normal doit dépasser la vieille borne client à 8 sans dépasser 24');
   assert.equal(calls.every(url => url.origin === 'https://api.themoviedb.org'), true);
   assert.equal(calls.every(url => url.searchParams.get('api_key') === 'private-tmdb-key'), true);
   assert.equal(JSON.stringify(payload).includes('private-tmdb-key'), false, 'la clé TMDB ne doit jamais revenir au client');
@@ -108,4 +110,68 @@ test('issue #326 budget pondéré refuse le 241e média avec Retry-After sans ap
   assert.equal(blocked.status, 429);
   assert.ok(Number(blocked.headers.get('retry-after')) >= 1);
   assert.equal(calls.length, PARENTAL_BATCH_ITEM_BUDGET_PER_MINUTE);
+});
+
+
+test('issue #326 v1.4.160 libère la queue 25-40 avant le timeout fournisseur des 24 premiers', async t => {
+  let releaseBlocked!: () => void;
+  const blocked = new Promise<void>(resolve => { releaseBlocked = resolve; });
+  let active = 0;
+  let maxActive = 0;
+  const started = new Set<number>();
+  const authenticate: RequestHandler = (req: any, _res, next) => { req.user = { uid: 'terrain-v160' }; next(); };
+  const app = express();
+  registerParentalRatingBatchRoute(app, {
+    authenticate,
+    stallBurstMs: 20,
+    secrets: () => ({ TMDB_API_KEY: 'private-tmdb-key' }),
+    fetch: async input => {
+      const url = new URL(String(input));
+      const id = Number(url.pathname.split('/').at(-2));
+      started.add(id);
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      if (id <= PARENTAL_BATCH_MAX_CONCURRENT) await blocked;
+      active -= 1;
+      return json({ id, results: [{ iso_3166_1: 'US', release_dates: [{ certification: 'G' }] }] });
+    },
+  });
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  t.after(() => new Promise<void>((resolve, reject) => {
+    server.closeAllConnections();
+    server.close(error => error ? reject(error) : resolve());
+  }));
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  const items = Array.from({ length: PARENTAL_BATCH_MAX_ITEMS }, (_, index) => `movie:${index + 1}`).join(',');
+  const response = await fetch(
+    `http://127.0.0.1:${address.port}/api/media/parental-ratings?stream=1&items=${encodeURIComponent(items)}`,
+    { headers: { Authorization: 'Bearer test' } },
+  );
+  assert.equal(response.status, 200);
+  assert.ok(response.body);
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let streamed = '';
+  const deepResult = Promise.race([
+    (async () => {
+      for (;;) {
+        const { value, done } = await reader.read();
+        streamed += decoder.decode(value || new Uint8Array(), { stream: !done });
+        if (streamed.includes('"key":"movie:37"')) return true;
+        if (done) return false;
+      }
+    })(),
+    sleep(500).then(() => false),
+  ]);
+  assert.equal(await deepResult, true);
+  assert.equal(started.size, PARENTAL_BATCH_MAX_ITEMS);
+  assert.equal(maxActive <= PARENTAL_BATCH_STALL_BURST_CONCURRENT, true);
+  assert.equal(maxActive > PARENTAL_BATCH_MAX_CONCURRENT, true);
+  releaseBlocked();
+  for (;;) {
+    const { done } = await reader.read();
+    if (done) break;
+  }
 });

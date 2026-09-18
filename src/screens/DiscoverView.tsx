@@ -3,7 +3,7 @@ import {
   getProgressiveAgeSnapshot,
   subscribeProgressiveAgeSnapshot,
 } from '../features/discover/progressiveAgeFilter';
-import { checkIsUpToDate } from './discoverPresentation';
+import { mergeProgressivePageItems } from '../features/discover/progressiveAgeFilterCore';
 import { DiscoverView as DiscoverViewCore } from './DiscoverViewCore';
 
 interface DiscoverViewProps {
@@ -24,30 +24,36 @@ export function DiscoverView({ model }: DiscoverViewProps) {
   );
 
   const progressiveModel = useMemo(() => {
-    const partial = snapshot?.page === 1 ? snapshot.partial : null;
-    if (!model.loading
+    const page = Number(snapshot?.page || 0);
+    const partial = snapshot?.partial;
+    const progressiveRequestActive = page === 1 ? model.loading : page > 1 && model.isLoadingMore;
+    if (!progressiveRequestActive
       || model.pegi === 'Tous'
       || model.debouncedQuery?.trim()
       || !Array.isArray(partial?.results)
-      || partial.results.length === 0) {
+      || partial.results.length === 0
+      || typeof model.processRawResults !== 'function') {
       return model;
     }
 
-    const results = partial.results.filter((item: any) => {
-      const show = model.showsByTmdbId?.get?.(Number(item?.id));
-      if (!show) return true;
-      return !(show.status === 'completed'
-        || show.seenEpisodes?.includes?.('movie')
-        || checkIsUpToDate(show));
-    });
+    const settledItems = page === 1 && model.loading
+      ? []
+      : (Array.isArray(model.processedResults) ? model.processedResults : []);
+    const mergedItems = mergeProgressivePageItems(
+      settledItems,
+      partial.results,
+      page,
+      (item: any) => `${mediaTypeOf(item)}:${Number(item?.id)}`,
+    );
+    const results = model.processRawResults(mergedItems);
     const seriesResults = results.filter((item: any) => mediaTypeOf(item) === 'tv');
     const movieResults = results.filter((item: any) => mediaTypeOf(item) === 'movie');
 
     return {
       ...model,
       loading: false,
-      isLoadingMore: false,
-      hasMore: false,
+      isLoadingMore: page > 1,
+      hasMore: page > 1 ? model.hasMore : false,
       processedResults: results,
       uniqueProcessedResults: results,
       visibleProcessedResults: results,

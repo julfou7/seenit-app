@@ -261,7 +261,10 @@ Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, 
   certification absente ou inconnue s'affiche **« Âge à vérifier »** ; aucun genre n'est utilisé comme
   fallback et le terme PEGI n'est pas employé pour les films/séries.
 - L'application du filtre d'âge récupère seulement la preuve de classification nécessaire, réutilise les
-  détails ou classifications déjà en cache et borne le fan-out réseau à huit requêtes. Elle ne charge pas
+  détails ou classifications déjà en cache et transporte jusqu'à une page `Tout` complète (40 identités)
+  dans un flux backend unique. Les preuves sûres sont publiées progressivement sur **toutes** les pages de
+  pagination ; le backend garde une concurrence fournisseur bornée et peut admettre la queue d'une page
+  après une courte attente anti-stall, sans attendre le timeout fournisseur de 10 s. Elle ne charge pas
   les fiches TMDB complètes des résultats Explorer.
 - Le panneau « Type de contenu » permet notamment de choisir **Top 100** ; ce choix change de catégorie et ne constitue pas un tri.
 - Tri Populaires, Mieux notés, Plus récents ou Ordre alphabétique.

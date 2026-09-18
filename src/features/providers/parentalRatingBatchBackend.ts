@@ -9,6 +9,7 @@ interface Dependencies {
   secrets?: () => Secrets;
   now?: () => number;
   timeoutMs?: number;
+  stallBurstMs?: number;
 }
 
 interface ParentalBatchItem {
@@ -20,6 +21,8 @@ interface ParentalBatchItem {
 const TMDB_ORIGIN = 'https://api.themoviedb.org/3/';
 export const PARENTAL_BATCH_MAX_ITEMS = 40;
 export const PARENTAL_BATCH_MAX_CONCURRENT = 24;
+export const PARENTAL_BATCH_STALL_BURST_CONCURRENT = PARENTAL_BATCH_MAX_ITEMS;
+export const PARENTAL_BATCH_STALL_BURST_MS = 1_000;
 export const PARENTAL_BATCH_ITEM_BUDGET_PER_MINUTE = 240;
 const MAX_PARENTAL_RESPONSE_BYTES = 256 * 1024;
 
@@ -66,6 +69,7 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
   const request = dependencies.fetch || fetch;
   const now = dependencies.now || Date.now;
   const timeoutMs = dependencies.timeoutMs ?? 10_000;
+  const stallBurstMs = dependencies.stallBurstMs ?? PARENTAL_BATCH_STALL_BURST_MS;
   const readSecrets = dependencies.secrets || (() => ({
     TMDB_API_KEY: process.env.TMDB_API_KEY,
     TVDB_API_KEY: process.env.TVDB_API_KEY,
@@ -123,12 +127,45 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
     }
 
     let active = 0;
-    const waiters: Array<() => void> = [];
-    const runBounded = async <T>(task: () => Promise<T>): Promise<T> => {
-      if (active >= PARENTAL_BATCH_MAX_CONCURRENT) await new Promise<void>(resolve => waiters.push(resolve));
+    type Waiter = { granted: boolean; resolve: () => void; timer: ReturnType<typeof setTimeout> | null };
+    const waiters: Waiter[] = [];
+
+    const grant = (waiter: Waiter): boolean => {
+      if (waiter.granted) return false;
+      waiter.granted = true;
+      if (waiter.timer !== null) clearTimeout(waiter.timer);
+      waiter.timer = null;
+      const index = waiters.indexOf(waiter);
+      if (index >= 0) waiters.splice(index, 1);
       active += 1;
+      waiter.resolve();
+      return true;
+    };
+    const grantSteadySlots = () => {
+      while (active < PARENTAL_BATCH_MAX_CONCURRENT && waiters.length > 0) {
+        if (!grant(waiters[0])) waiters.shift();
+      }
+    };
+    const acquire = async () => {
+      if (active < PARENTAL_BATCH_MAX_CONCURRENT) {
+        active += 1;
+        return;
+      }
+      await new Promise<void>(resolve => {
+        const waiter: Waiter = { granted: false, resolve, timer: null };
+        waiter.timer = setTimeout(() => {
+          if (!waiter.granted && active < PARENTAL_BATCH_STALL_BURST_CONCURRENT) grant(waiter);
+        }, stallBurstMs);
+        waiters.push(waiter);
+      });
+    };
+    const runBounded = async <T>(task: () => Promise<T>): Promise<T> => {
+      await acquire();
       try { return await task(); }
-      finally { active -= 1; waiters.shift()?.(); }
+      finally {
+        active -= 1;
+        grantSteadySlots();
+      }
     };
 
     const resolveItem = (item: ParentalBatchItem) => runBounded(async () => {
