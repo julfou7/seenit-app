@@ -59,6 +59,10 @@ test('SEENIT-OBSERVABILITY-001 agrège les deltas TMDB sans archiver les snapsho
   });
   assert.equal(report.families.find((item: any) => item.family === 'details').upstream, 10);
   assert.equal(report.families.find((item: any) => item.family === 'discover').upstream, 10);
+  assert.equal(report.lifetimeSinceInstanceStart.totals.requests, 75);
+  assert.equal(report.lifetimeSinceInstanceStart.totals.upstream, 38);
+  assert.equal(report.lifetimeSinceInstanceStart.families.find((item: any) => item.family === 'details').upstream, 18);
+  assert.equal(report.lifetimeSinceInstanceStart.families.find((item: any) => item.family === 'discover').upstream, 20);
   assert.doesNotMatch(JSON.stringify(report), /instance-secret-value/);
 });
 
@@ -84,5 +88,8 @@ test('issue #410 ignore les snapshots non comparables et reste report-only quand
   assert.equal(report.rejectedCount, 1);
   assert.equal(report.totals.requests, 0);
   assert.deepEqual(report.families, []);
+  assert.equal(report.lifetimeSinceInstanceStart.totals.requests, 25);
+  assert.equal(report.lifetimeSinceInstanceStart.totals.upstream, 25);
+  assert.equal(report.lifetimeSinceInstanceStart.families[0].family, 'season');
   assert.doesNotMatch(JSON.stringify(report), /secret-search|secret-user|instance-secret-value/);
 });
