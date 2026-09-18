@@ -2,6 +2,7 @@ const endpoint = (process.env.RELEASE_NOTIFICATION_ENDPOINT || 'https://seenit.a
 const repository = (process.env.RELEASE_REPOSITORY || '').trim();
 const runId = Number(process.env.RELEASE_RUN_ID || '');
 const headSha = (process.env.RELEASE_HEAD_SHA || '').trim();
+const fastTerrain = String(process.env.RELEASE_FAST_TERRAIN || '').trim().toLowerCase() === 'true';
 const maxAttempts = 3;
 const runPollLimit = 30;
 const runPollDelayMs = 2_000;
@@ -118,7 +119,14 @@ function sanitizeFailure(error) {
   return message.replace(/Bearer\s+\S+/gi, 'Bearer ***').replace(/\s+/g, ' ').slice(0, 240);
 }
 
-function buildFinalReleaseSummary({ release, sourceRunId, sourceHeadSha, notification, notificationError = null }) {
+function buildFinalReleaseSummary({
+  release,
+  sourceRunId,
+  sourceHeadSha,
+  notification,
+  notificationError = null,
+  fastTerrain: isFastTerrain = false
+}) {
   const evidence = getReleaseAssetEvidence(release);
   const marker = `<!-- seenit-release-summary:${sourceRunId} -->`;
   const notificationLine = notificationError
@@ -136,7 +144,8 @@ function buildFinalReleaseSummary({ release, sourceRunId, sourceHeadSha, notific
     '',
     `- SHA main : \`${sourceHeadSha}\``,
     `- Run release : https://github.com/${repository || 'julfou7/seenit-app'}/actions/runs/${sourceRunId}`,
-    '- Smoke Android 36 : ✅',
+    `- Mode : ${isFastTerrain ? '⚡ terrain rapide' : 'release complète'}`,
+    isFastTerrain ? '- Smoke Android 36 : ⏭️ non bloquant — sauté pour le terrain rapide' : '- Smoke Android 36 : ✅',
     evidence.apkUrl ? `- APK : ${evidence.apkUrl}` : `- APK : ${evidence.apkName || 'introuvable'}`,
     evidence.digest ? `- SHA-256 APK : \`${String(evidence.digest).replace(/^sha256:/, '')}\`` : '- SHA-256 APK : ⚠️ indisponible',
     notificationLine
@@ -230,7 +239,8 @@ async function main() {
     sourceRunId: runId,
     sourceHeadSha: headSha,
     notification,
-    notificationError
+    notificationError,
+    fastTerrain
   });
   await upsertFinalReleaseSummary({ body: summary });
 
