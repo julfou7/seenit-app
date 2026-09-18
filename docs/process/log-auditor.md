@@ -76,6 +76,11 @@ en mémoire du runner et ne sont jamais écrits dans l'artefact. Les fichiers Cl
 `seenit-structured-logs.json` et `seenit-tmdb-cache-diagnostics.json` restent dans `$RUNNER_TEMP`
 puis sont supprimés avant archivage.
 
+En complément, le rapport conserve le **dernier compteur cumulé de chaque instance observée**, toujours
+sans identifiant d'instance. Ce total couvre la vie des instances et ne remplace pas le delta de fenêtre.
+Il devient néanmoins une baseline post-déploiement exacte lorsqu'une révision vient d'être créée à
+l'intérieur de la fenêtre observée et que son heure de déploiement est connue par la CI.
+
 Le statut de baseline est :
 - `ready` à partir de deux intervalles comparables et 50 requêtes couvertes ;
 - `partial` lorsqu'au moins un delta est mesurable ;

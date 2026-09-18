@@ -121,6 +121,7 @@ function summarizeTmdbCacheDiagnostics(entries, options = {}) {
   }
 
   const aggregate = new Map();
+  const lifetimeAggregate = new Map();
   let comparableIntervals = 0;
   let exactComparableIntervals = 0;
   let resetIntervals = 0;
@@ -131,7 +132,15 @@ function summarizeTmdbCacheDiagnostics(entries, options = {}) {
   for (const events of byInstance.values()) {
     events.sort((left, right) => left.timestampMs - right.timestampMs);
     if (events[0]?.exactInstanceIdentity) exactInstancesObserved += 1;
-    if (events.length > 0) excludedInitialSnapshots += 1;
+    if (events.length > 0) {
+      excludedInitialSnapshots += 1;
+      const latest = events[events.length - 1];
+      for (const [family, counters] of Object.entries(latest.families)) {
+        const currentAggregate = lifetimeAggregate.get(family) || emptyCounters();
+        addCounters(currentAggregate, counters);
+        lifetimeAggregate.set(family, currentAggregate);
+      }
+    }
     if (events.length < 2) continue;
 
     let instanceCompared = false;
@@ -185,6 +194,25 @@ function summarizeTmdbCacheDiagnostics(entries, options = {}) {
     return sum;
   }, { ...emptyCounters(), cacheAvoided: 0 });
 
+  const lifetimeFamilies = [...lifetimeAggregate.entries()]
+    .map(([family, counters]) => ({
+      family,
+      ...counters,
+      cacheAvoided: counters.memoryHits + counters.inFlightHits,
+      upstreamRate: counters.requests > 0 ? Number((counters.upstream / counters.requests).toFixed(4)) : 0,
+    }))
+    .sort((left, right) =>
+      right.upstream - left.upstream
+      || right.upstreamBytes - left.upstreamBytes
+      || left.family.localeCompare(right.family)
+    );
+
+  const lifetimeTotals = lifetimeFamilies.reduce((sum, family) => {
+    for (const key of COUNTER_KEYS) sum[key] += family[key];
+    sum.cacheAvoided += family.cacheAvoided;
+    return sum;
+  }, { ...emptyCounters(), cacheAvoided: 0 });
+
   const sourceStatus = String(options.sourceStatus || 'ok');
   const baselineStatus = sourceStatus !== 'ok'
     ? 'source_unavailable'
@@ -215,11 +243,18 @@ function summarizeTmdbCacheDiagnostics(entries, options = {}) {
     },
     totals,
     families,
+    lifetimeSinceInstanceStart: {
+      note: 'Somme du dernier snapshot cumulé de chaque instance observée. Ce compteur couvre la vie de l’instance, pas nécessairement la seule fenêtre de 6 h.',
+      totals: lifetimeTotals,
+      families: lifetimeFamilies,
+    },
   };
 }
 
 function buildSummary(report) {
   const top = report.families.slice(0, 6)
+    .map(item => `- ${item.family}: upstream=${item.upstream}, requests=${item.requests}, cacheAvoided=${item.cacheAvoided}, upstreamBytes=${item.upstreamBytes}`);
+  const lifetimeTop = report.lifetimeSinceInstanceStart.families.slice(0, 6)
     .map(item => `- ${item.family}: upstream=${item.upstream}, requests=${item.requests}, cacheAvoided=${item.cacheAvoided}, upstreamBytes=${item.upstreamBytes}`);
   return [
     '## Baseline cache TMDB SeenIt',
@@ -230,7 +265,12 @@ function buildSummary(report) {
     `- Intervalles comparables : ${report.coverage.comparableIntervals} (identité instance exacte : ${report.coverage.exactComparableIntervals})`,
     `- Requêtes couvertes : ${report.totals.requests} ; upstream : ${report.totals.upstream} ; économisées/coalescées : ${report.totals.cacheAvoided}`,
     '',
-    ...(top.length ? ['### Familles les plus coûteuses', '', ...top] : ['Aucun delta comparable dans la fenêtre.']),
+    ...(top.length ? ['### Familles les plus coûteuses — delta fenêtre', '', ...top] : ['Aucun delta comparable dans la fenêtre.']),
+    '',
+    '### Dernier compteur cumulé par instance',
+    '',
+    `- Requêtes depuis démarrage des instances observées : ${report.lifetimeSinceInstanceStart.totals.requests} ; upstream : ${report.lifetimeSinceInstanceStart.totals.upstream} ; économisées/coalescées : ${report.lifetimeSinceInstanceStart.totals.cacheAvoided}`,
+    ...(lifetimeTop.length ? lifetimeTop : ['Aucun snapshot cumulatif exploitable.']),
   ].join('\n');
 }
 
@@ -257,7 +297,10 @@ function main() {
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   const summary = buildSummary(report);
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`, 'utf8');
-  console.log(`[TMDBCacheBaseline] source=${report.sourceStatus} statut=${report.baselineStatus} snapshots=${report.acceptedCount} intervals=${report.coverage.comparableIntervals} requests=${report.totals.requests} upstream=${report.totals.upstream}`);
+  console.log(`[TMDBCacheBaseline] source=${report.sourceStatus} statut=${report.baselineStatus} snapshots=${report.acceptedCount} intervals=${report.coverage.comparableIntervals} requests=${report.totals.requests} upstream=${report.totals.upstream} lifetimeRequests=${report.lifetimeSinceInstanceStart.totals.requests} lifetimeUpstream=${report.lifetimeSinceInstanceStart.totals.upstream}`);
+  for (const family of report.lifetimeSinceInstanceStart.families.slice(0, 8)) {
+    console.log(`[TMDBCacheBaselineFamily] family=${family.family} lifetimeRequests=${family.requests} memoryHits=${family.memoryHits} inFlightHits=${family.inFlightHits} upstream=${family.upstream} upstreamBytes=${family.upstreamBytes}`);
+  }
 }
 
 module.exports = {
