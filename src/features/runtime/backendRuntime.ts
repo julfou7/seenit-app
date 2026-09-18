@@ -46,10 +46,6 @@ export const SEENIT_CORS_ALLOWED_HEADERS = [
   'X-Plex-Version',
   'X-SeenIt-Webhook-Secret',
   'X-SeenIt-Request-Id',
-  'X-SeenIt-Age-Trace',
-  'X-SeenIt-Age-Generation',
-  'X-SeenIt-Age-Page',
-  'X-SeenIt-Age-Max',
 ] as const;
 
 export const seenItCorsMiddleware: RequestHandler = (req, res, next) => {

@@ -28,8 +28,7 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   SeenIt relatives au même domaine. L'APK et tout preview AI Studio dont un label d'hôte commence
   par `ais-dev-*` ciblent explicitement `https://seenit.ai.studio` pour les routes `/api/*` afin de
   partager le même backend canonique. Les requêtes authentifiées cross-origin de ces surfaces doivent
-  réussir leur preflight CORS avec tous les en-têtes SeenIt effectivement émis, y compris les en-têtes
-  diagnostics bornés du filtre d'âge ; une instrumentation ne doit jamais forcer un fallback réseau.
+  réussir leur preflight CORS avec tous les en-têtes SeenIt effectivement émis.
   Un comportement commun partage la même logique métier, mais le transport et l'ouverture d'applications
   peuvent être adaptés par la plateforme. Dans l'APK,
   une panne réseau temporaire ou une résolution DNS impossible de cette origine primaire déclenche

@@ -61,7 +61,7 @@ test('SEENIT-RUNTIME-001 contient les rejets async API sans terminer le backend'
 });
 
 
-test('SEENIT-PLATFORM-001 autorise le preflight des traces âge depuis AI Studio et l’APK', async t => {
+test('SEENIT-PLATFORM-001 autorise le preflight cross-origin avec les en-têtes SeenIt réellement émis', async t => {
   const app = express();
   app.use(seenItCorsMiddleware);
   app.get('/api/media/parental-ratings', (_req, res) => res.json({ ok: true }));
@@ -78,10 +78,7 @@ test('SEENIT-PLATFORM-001 autorise le preflight des traces âge depuis AI Studio
   const requestedHeaders = [
     'authorization',
     'x-plex-version',
-    'x-seenit-age-trace',
-    'x-seenit-age-generation',
-    'x-seenit-age-page',
-    'x-seenit-age-max',
+    'x-seenit-request-id',
   ];
 
   const preflight = await fetch(`${origin}/api/media/parental-ratings`, {

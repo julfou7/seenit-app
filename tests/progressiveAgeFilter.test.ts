@@ -315,7 +315,6 @@ test('issue #326 le point d’entrée production utilise le moteur progressif sa
   assert.match(progressiveIntegration, /createPagePrefetchWindow</);
   assert.match(progressiveIntegration, /sourcePagePrefetch\.get\(sourcePrefetchKey, page, loadSourcePage\)/);
   assert.match(progressiveIntegration, /sourcePagePrefetch\.primeAhead\(sourcePrefetchKey, page, loadSourcePage\)/);
-  assert.match(progressiveIntegration, /source_prefetch_hit/);
   assert.match(
     progressiveIntegration,
     /partialResults =>[\s\S]*?PARENTAL_PROGRESSIVE_MAX_CONCURRENT,\s*\);/,

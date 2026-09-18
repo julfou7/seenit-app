@@ -30,7 +30,7 @@
         },
         {
           "file": "tests/backendRuntime.test.ts",
-          "contains": "SEENIT-PLATFORM-001 autorise le preflight des traces âge depuis AI Studio et l’APK"
+          "contains": "SEENIT-PLATFORM-001 autorise le preflight cross-origin avec les en-têtes SeenIt réellement émis"
         }
       ]
     },
@@ -401,20 +401,16 @@
           "contains": "issue #326 borne et déduplique le fast path parental"
         },
         {
-          "file": "tests/progressiveAgeTransport.test.ts",
-          "contains": "SEENIT-PARENTAL-001 corrèle le diagnostic âge sans exposer de donnée sensible"
-        },
-        {
-          "file": "tests/progressiveAgeTransport.test.ts",
-          "contains": "SEENIT-PARENTAL-001 expose le diagnostic âge dans le preview sans donnée sensible"
-        },
-        {
           "file": "tests/parentalRating.test.ts",
           "contains": "SEENIT-PARENTAL-001 préfiltre les films sans perdre un override personnel"
         },
         {
           "file": "tests/parentalRatingCache.test.ts",
           "contains": "SEENIT-PARENTAL-001 persiste les preuves parentales sans transformer un inconnu"
+        },
+        {
+          "file": "tests/progressiveAgeTransport.test.ts",
+          "contains": "issue #326 retire les traces temporaires du filtre âge sans retirer le transport groupé"
         },
         {
           "file": "tests/progressiveAgeTransport.test.ts",
