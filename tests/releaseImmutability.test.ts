@@ -76,7 +76,7 @@ test('SEENIT-RELEASE-004 sépare le build de la publication et vérifie la paire
   assert.match(workflow, /cancel-in-progress: true/);
   assert.match(workflow, /^\s{2}validate:/m);
   assert.match(workflow, /^\s{2}build:/m);
-  assert.match(workflow, /Build & APK Upgrade Smoke \(Android 36\)/);
+  assert.match(workflow, /Build APK & optional Upgrade Smoke \(Android 36\)/);
   assert.match(workflow, /Resolve Previous Published Release Baseline/);
   assert.match(workflow, /git tag --list 'v\*' --sort=-v:refname/);
   assert.match(workflow, /^\s{2}publish:/m);
