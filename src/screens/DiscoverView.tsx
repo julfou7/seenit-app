@@ -54,6 +54,9 @@ export function DiscoverView({ model }: DiscoverViewProps) {
       loading: false,
       isLoadingMore: page > 1,
       hasMore: page > 1 ? model.hasMore : false,
+      // hasMore=false sur une page 1 partielle bloque volontairement la pagination,
+      // mais ne signifie pas que la recherche est terminée.
+      suppressEndOfResults: true,
       processedResults: results,
       uniqueProcessedResults: results,
       visibleProcessedResults: results,
