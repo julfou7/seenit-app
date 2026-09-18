@@ -41,7 +41,7 @@ test('issue #326 v1.4.158 coalesce la vague parentale dans un transport authenti
   assert.match(backend, /burstGrants/);
   assert.match(backend, /application\/x-ndjson/);
   assert.match(backend, /res\.write\(`\$\{JSON\.stringify\(result\)\}\\n`\)/);
-  assert.match(backend, /await Promise\.all\(items\.map\(async item => \{/);
+  assert.match(backend, /await Promise\.all\(items\.map\(async \(item, index\) => \{/);
   assert.match(backend, /const results = await Promise\.all\(items\.map\(resolveItem\)\)/, 'le contrat JSON historique reste disponible hors mode stream');
 });
 
@@ -77,7 +77,7 @@ test('issue #326 propage l’annulation de génération jusqu’au transport par
   assert.match(client, /dependencies\.resolveBatch\(prefix, requestSignal, trace\)/);
   assert.match(client, /authenticatedFetch\([\s\S]*?\{ signal, headers: traceHeaders \}[\s\S]*?\)/);
   assert.match(client, /parentalTransportPending = new Map<AbortSignal \| undefined/);
-  assert.match(client, /if \(signal\?\.aborted\) return Promise\.resolve\(null\)/);
+  assert.match(client, /if \(signal\?\.aborted\) \{[\s\S]*?return Promise\.resolve\(null\);[\s\S]*?\}/);
 
   assert.match(backend, /res\.once\('close'/);
   assert.match(backend, /clientAbort\.abort\(\)/);
