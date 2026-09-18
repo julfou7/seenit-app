@@ -263,6 +263,17 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
   reste bornée : 24 appels constituent la fenêtre nominale et, si cette fenêtre reste bloquée, seule la
   queue de la page courante peut être admise après 1 s, sans jamais dépasser 40 appels pour cette page.
   Une fiche média complète ne doit jamais être hydratée uniquement pour appliquer le filtre d'âge.
+- Pour un filtre strict inférieur à 18 ans, Explorer peut pousser la borne **film** dans
+  `discover/movie` via les certifications US TMDB afin d'éviter de charger des candidats déjà hors
+  limite. Ce préfiltre n'est qu'une optimisation : le résolveur SeenIt reste la validation finale et il
+  est désactivé dès qu'un choix personnel admissible pourrait sauver un film exclu par TMDB. Aucun
+  paramètre de certification n'est supposé filtrer `discover/tv`.
+- Une réponse TMDB parentale réussie est mémorisée sous `mediaType + TMDB ID` dans un cache public
+  local borné pendant 7 jours et dans un index backend partagé Firestore de même durée. Une absence
+  explicite de certification US y reste une preuve « Âge à vérifier » et évite le même appel répété.
+  Une erreur réseau, un timeout ou une réponse invalide n'est jamais transformé en preuve et n'est
+  jamais persisté. Les caches conservent la preuve brute TMDB, pas l'âge calculé, afin qu'une évolution
+  du mapping SeenIt soit appliquée immédiatement.
 - La fiche, les cartes et Explorer réutilisent le même résolveur ; aucune copie locale de mapping ou
   heuristique de genre n'est autorisée.
 - Le diagnostic de performance du filtre peut corréler temporairement son chemin client/backend avec un

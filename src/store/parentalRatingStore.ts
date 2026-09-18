@@ -96,6 +96,10 @@ function activateParentalRatingScope(uid?: string | null) {
 
 auth.onAuthStateChanged(user => activateParentalRatingScope(user?.uid));
 
+export function getParentalRatingOverridesSnapshot(): ParentalRatingOverrides {
+  return useParentalRatingStore.getState().overrides;
+}
+
 export function getParentalRatingOverride(
   mediaType: ParentalMediaType,
   tmdbId: number,

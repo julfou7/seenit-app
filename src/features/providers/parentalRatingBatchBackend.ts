@@ -10,6 +10,8 @@ interface Dependencies {
   now?: () => number;
   timeoutMs?: number;
   stallBurstMs?: number;
+  readPersisted?: (keys: string[]) => Promise<Map<string, any>>;
+  writePersisted?: (entries: Array<{ key: string; details: any }>) => Promise<void>;
 }
 
 interface ParentalBatchItem {
@@ -25,6 +27,8 @@ export const PARENTAL_BATCH_MAX_CONCURRENT = 24;
 export const PARENTAL_BATCH_STALL_BURST_CONCURRENT = PARENTAL_BATCH_MAX_ITEMS;
 export const PARENTAL_BATCH_STALL_BURST_MS = 1_000;
 export const PARENTAL_BATCH_ITEM_BUDGET_PER_MINUTE = 240;
+export const PARENTAL_BATCH_PROVIDER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+export const PARENTAL_BATCH_PROVIDER_CACHE_MAX_ENTRIES = 5_000;
 const MAX_PARENTAL_RESPONSE_BYTES = 256 * 1024;
 
 interface AgeFilterRequestTrace {
@@ -92,6 +96,34 @@ function parseBatchItems(raw: unknown): ParentalBatchItem[] | null {
   return items.length > 0 ? items : null;
 }
 
+function compactParentalDetails(item: ParentalBatchItem, payload: any): any {
+  if (item.mediaType === 'movie') {
+    const results = Array.isArray(payload?.results)
+      ? payload.results
+          .filter((entry: any) => entry?.iso_3166_1 === 'US')
+          .map((entry: any) => ({
+            iso_3166_1: 'US',
+            release_dates: Array.isArray(entry?.release_dates)
+              ? entry.release_dates.map((release: any) => ({
+                  certification: String(release?.certification ?? '').trim(),
+                }))
+              : [],
+          }))
+      : [];
+    return { id: item.id, media_type: item.mediaType, release_dates: { results } };
+  }
+
+  const results = Array.isArray(payload?.results)
+    ? payload.results
+        .filter((entry: any) => entry?.iso_3166_1 === 'US')
+        .map((entry: any) => ({
+          iso_3166_1: 'US',
+          rating: String(entry?.rating ?? '').trim(),
+        }))
+    : [];
+  return { id: item.id, media_type: item.mediaType, content_ratings: { results } };
+}
+
 async function readJsonResponse(response: Response): Promise<any | null> {
   if (!response.ok) {
     await response.body?.cancel().catch(() => undefined);
@@ -121,6 +153,28 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
     TVDB_API_KEY: process.env.TVDB_API_KEY,
   }));
   const budgets = new Map<string, { used: number; resetAt: number }>();
+  const providerCache = new Map<string, { details: any; expiresAt: number }>();
+  let providerCacheCredential = '';
+
+  const readProviderCache = (key: string): any | null => {
+    const current = now();
+    const entry = providerCache.get(key);
+    if (!entry) return null;
+    if (entry.expiresAt <= current) {
+      providerCache.delete(key);
+      return null;
+    }
+    providerCache.delete(key);
+    providerCache.set(key, entry);
+    return entry.details;
+  };
+  const writeProviderCache = (key: string, details: any) => {
+    providerCache.delete(key);
+    providerCache.set(key, { details, expiresAt: now() + PARENTAL_BATCH_PROVIDER_CACHE_TTL_MS });
+    while (providerCache.size > PARENTAL_BATCH_PROVIDER_CACHE_MAX_ENTRIES) {
+      providerCache.delete(providerCache.keys().next().value!);
+    }
+  };
 
   const takeBudget = (uid: string, cost: number): { ok: true } | { ok: false; retryAfter: number } => {
     const time = now();
@@ -167,6 +221,12 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
       res.status(400).json({ error: 'Requête de classifications refusée.' });
       return;
     }
+    const persistedByKey = dependencies.readPersisted
+      ? await dependencies.readPersisted(items.map(item => item.key)).catch(() => new Map<string, any>())
+      : new Map<string, any>();
+    for (const [key, details] of persistedByKey) writeProviderCache(key, details);
+    const misses = items.filter(item => !readProviderCache(item.key));
+
     traceLog('request_received', {
       stream,
       itemCount: items.length,
@@ -177,7 +237,7 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
       stallBurstMs,
       timeoutMs,
     });
-    const budget = takeBudget(uid, items.length);
+    const budget = takeBudget(uid, misses.length);
     if ('retryAfter' in budget) {
       traceLog('request_rejected_budget', { itemCount: items.length, retryAfter: budget.retryAfter });
       res.setHeader('Retry-After', String(budget.retryAfter));
@@ -185,12 +245,24 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
       return;
     }
 
-    const credential = readSecrets().TMDB_API_KEY?.trim();
-    if (!credential) {
-      traceLog('request_rejected_provider_config', { itemCount: items.length });
+    const credential = misses.length > 0 ? readSecrets().TMDB_API_KEY?.trim() : '';
+    if (misses.length > 0 && !credential) {
+      traceLog('request_rejected_provider_config', { itemCount: misses.length });
       res.status(503).json({ error: 'Fournisseur non configuré.' });
       return;
     }
+    if (credential && providerCacheCredential !== credential) {
+      providerCacheCredential = credential;
+      for (const item of misses) providerCache.delete(item.key);
+    }
+
+    const newlyResolved = new Map<string, any>();
+    const persistNewEvidence = async () => {
+      if (!dependencies.writePersisted || newlyResolved.size === 0) return;
+      await dependencies.writePersisted(
+        [...newlyResolved.entries()].map(([key, details]) => ({ key, details })),
+      ).catch(() => undefined);
+    };
 
     const clientAbort = new AbortController();
     let responseFinished = false;
@@ -257,66 +329,92 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
       }
     };
 
-    const resolveItem = (item: ParentalBatchItem, ordinal: number) => runBounded(async queueWaitMs => {
-      const providerStartedAt = now();
-      traceLog('provider_start', {
-        ordinal,
-        mediaType: item.mediaType,
-        queueWaitMs,
-        active,
-        queued: waiters.length,
-      });
-      const endpoint = item.mediaType === 'movie' ? 'release_dates' : 'content_ratings';
-      const target = new URL(`${item.mediaType}/${item.id}/${endpoint}`, TMDB_ORIGIN);
-      target.searchParams.set('api_key', credential);
-      let details: any | null = null;
-      let outcome = 'error';
-      let httpStatus = 0;
-      try {
-        const response = await request(target, {
-          method: 'GET',
-          headers: { Accept: 'application/json' },
-          redirect: 'error',
-          signal: AbortSignal.any([AbortSignal.timeout(timeoutMs), clientAbort.signal]),
-        });
-        httpStatus = response.status;
-        const payload = await readJsonResponse(response);
-        if (payload) {
-          details = item.mediaType === 'movie'
-            ? { id: item.id, media_type: item.mediaType, release_dates: payload }
-            : { id: item.id, media_type: item.mediaType, content_ratings: payload };
-          outcome = 'ok';
-        } else {
-          outcome = response.ok ? 'invalid_payload' : 'http_error';
-        }
-      } catch (error: any) {
-        outcome = clientAbort.signal.aborted
-          ? 'client_aborted'
-          : String(error?.name || '').toLowerCase().includes('timeout')
-            ? 'timeout'
-            : 'error';
+    const resolveItem = async (item: ParentalBatchItem, ordinal: number) => {
+      const cachedDetails = readProviderCache(item.key);
+      if (cachedDetails) {
+        const diagnosticContext = {
+          ordinal,
+          mediaType: item.mediaType,
+          queueWaitMs: 0,
+          providerMs: 0,
+          outcome: 'cache_hit',
+          httpStatus: 200,
+          hasDetails: true,
+          active,
+          queued: waiters.length,
+        };
+        traceLog('provider_done', diagnosticContext);
+        const diagnostic = trace ? { phase: 'provider_done', context: diagnosticContext } : undefined;
+        return {
+          key: item.key,
+          media_type: item.mediaType,
+          id: item.id,
+          details: cachedDetails,
+          ...(diagnostic ? { diagnostic } : {}),
+        };
       }
-      const diagnosticContext = {
-        ordinal,
-        mediaType: item.mediaType,
-        queueWaitMs,
-        providerMs: Math.max(0, now() - providerStartedAt),
-        outcome,
-        httpStatus,
-        hasDetails: Boolean(details),
-        active,
-        queued: waiters.length,
-      };
-      traceLog('provider_done', diagnosticContext);
-      const diagnostic = trace ? { phase: 'provider_done', context: diagnosticContext } : undefined;
-      return {
-        key: item.key,
-        media_type: item.mediaType,
-        id: item.id,
-        details,
-        ...(diagnostic ? { diagnostic } : {}),
-      };
-    });
+
+      return runBounded(async queueWaitMs => {
+        const providerStartedAt = now();
+        traceLog('provider_start', {
+          ordinal,
+          mediaType: item.mediaType,
+          queueWaitMs,
+          active,
+          queued: waiters.length,
+        });
+        const endpoint = item.mediaType === 'movie' ? 'release_dates' : 'content_ratings';
+        const target = new URL(`${item.mediaType}/${item.id}/${endpoint}`, TMDB_ORIGIN);
+        target.searchParams.set('api_key', credential);
+        let details: any | null = null;
+        let outcome = 'error';
+        let httpStatus = 0;
+        try {
+          const response = await request(target, {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+            redirect: 'error',
+            signal: AbortSignal.any([AbortSignal.timeout(timeoutMs), clientAbort.signal]),
+          });
+          httpStatus = response.status;
+          const payload = await readJsonResponse(response);
+          if (payload) {
+            details = compactParentalDetails(item, payload);
+            writeProviderCache(item.key, details);
+            newlyResolved.set(item.key, details);
+            outcome = 'ok';
+          } else {
+            outcome = response.ok ? 'invalid_payload' : 'http_error';
+          }
+        } catch (error: any) {
+          outcome = clientAbort.signal.aborted
+            ? 'client_aborted'
+            : String(error?.name || '').toLowerCase().includes('timeout')
+              ? 'timeout'
+              : 'error';
+        }
+        const diagnosticContext = {
+          ordinal,
+          mediaType: item.mediaType,
+          queueWaitMs,
+          providerMs: Math.max(0, now() - providerStartedAt),
+          outcome,
+          httpStatus,
+          hasDetails: Boolean(details),
+          active,
+          queued: waiters.length,
+        };
+        traceLog('provider_done', diagnosticContext);
+        const diagnostic = trace ? { phase: 'provider_done', context: diagnosticContext } : undefined;
+        return {
+          key: item.key,
+          media_type: item.mediaType,
+          id: item.id,
+          details,
+          ...(diagnostic ? { diagnostic } : {}),
+        };
+      });
+    };
 
     if (stream) {
       res.status(200);
@@ -387,11 +485,13 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
         burstGrants,
         aborted: clientAbort.signal.aborted,
       });
+      await persistNewEvidence();
       if (!res.destroyed) res.end();
       return;
     }
 
     const results = await Promise.all(items.map((item, index) => resolveItem(item, index + 1)));
+    await persistNewEvidence();
     traceLog('request_complete', {
       stream: false,
       itemCount: items.length,

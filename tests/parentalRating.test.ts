@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildMovieCertificationPrefilter,
   decorateParentalRatingDetails,
   matchesMaxRecommendedAge,
   parentalRatingKey,
@@ -93,4 +94,27 @@ test('SEENIT-PARENTAL-001 adapte les écrans legacy sans muter la certification 
   assert.equal(decorated.release_dates.results[0].release_dates[0].certification, '');
   assert.equal(decorated.release_dates.results[1].release_dates[0].certification, 'PG-13 · US · 13+');
   assert.equal(decorated.seenitParentalRating.original, 'PG-13');
+});
+
+
+test('SEENIT-PARENTAL-001 préfiltre les films sans perdre un override personnel', () => {
+  assert.deepEqual(buildMovieCertificationPrefilter(7), { country: 'US', lte: 'G' });
+  assert.deepEqual(buildMovieCertificationPrefilter(10), { country: 'US', lte: 'PG' });
+  assert.deepEqual(buildMovieCertificationPrefilter(13), { country: 'US', lte: 'PG-13' });
+  assert.deepEqual(buildMovieCertificationPrefilter(17), { country: 'US', lte: 'R' });
+  assert.equal(buildMovieCertificationPrefilter(18), null);
+
+  assert.equal(
+    buildMovieCertificationPrefilter(10, { 'movie:42': { age: 8, updatedAt: 1 } }),
+    null,
+    'un choix personnel admissible doit pouvoir sauver un film exclu par TMDB',
+  );
+  assert.deepEqual(
+    buildMovieCertificationPrefilter(10, { 'movie:42': { age: 13, updatedAt: 1 } }),
+    { country: 'US', lte: 'PG' },
+  );
+  assert.deepEqual(
+    buildMovieCertificationPrefilter(10, { 'tv:42': { age: 7, updatedAt: 1 } }),
+    { country: 'US', lte: 'PG' },
+  );
 });

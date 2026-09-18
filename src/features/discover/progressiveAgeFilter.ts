@@ -5,6 +5,7 @@ import { getParentalRatingOverride } from '../../store/parentalRatingStore';
 import { discoverSeenIt, type SeenItDiscoverOptions } from '../shows/tmdbCore';
 import { tmdb } from '../shows/tmdbClient';
 import { matchesMaxRecommendedAge, parseMaxAgeFilter, resolveParentalRating } from '../shows/parentalRating';
+import { readParentalRatingCache, writeParentalRatingCache } from '../shows/parentalRatingCache';
 import { createSupersedingAbortController, filterResolvedPrefixes, shouldApplyProgressivePartial } from './progressiveAgeFilterCore';
 
 export { shouldApplyProgressivePartial } from './progressiveAgeFilterCore';
@@ -100,15 +101,32 @@ function identityFor(item: any): BatchIdentity | null {
   const mediaType: MediaType = item?.media_type === 'movie' || Boolean(item?.release_date) ? 'movie' : 'tv';
   return { item, mediaType, id, key: `${mediaType}:${id}` };
 }
-function rememberBatchDetails(key: string, details: any): void {
+function rememberBatchDetails(key: string, details: any, persist = true): void {
   parentalBatchCache.delete(key); parentalBatchCache.set(key, details);
   while (parentalBatchCache.size > BATCH_CACHE_MAX) parentalBatchCache.delete(parentalBatchCache.keys().next().value!);
+  if (!persist) return;
+  const [mediaType, rawId] = key.split(':');
+  const id = Number(rawId);
+  if ((mediaType === 'movie' || mediaType === 'tv') && Number.isInteger(id) && id > 0) {
+    writeParentalRatingCache(id, mediaType, details);
+  }
+}
+function readPersistentBatchDetails(identity: BatchIdentity): any | null {
+  const cached = readParentalRatingCache(identity.id, identity.mediaType);
+  if (!cached) return null;
+  rememberBatchDetails(identity.key, cached.data, false);
+  return cached.data;
 }
 async function resolveUnit(identity: BatchIdentity, trace?: AgeFilterTraceContext): Promise<any | null> {
   const cached = parentalBatchCache.get(identity.key);
   if (cached) {
     logAgeFilterTrace(trace, 'fallback_cache_hit', { mediaType: identity.mediaType, cacheSize: parentalBatchCache.size });
     return cached;
+  }
+  const persistent = readPersistentBatchDetails(identity);
+  if (persistent) {
+    logAgeFilterTrace(trace, 'fallback_persistent_cache_hit', { mediaType: identity.mediaType });
+    return persistent;
   }
   const startedAt = Date.now();
   logAgeFilterTrace(trace, 'fallback_unit_start', { mediaType: identity.mediaType });
@@ -291,6 +309,12 @@ function enqueueParentalIdentity(identity: BatchIdentity, signal?: AbortSignal, 
     return Promise.resolve(cached);
   }
 
+  const persistent = readPersistentBatchDetails(identity);
+  if (persistent) {
+    logAgeFilterTrace(trace, 'transport_persistent_cache_hit', { mediaType: identity.mediaType });
+    return Promise.resolve(persistent);
+  }
+
   let pending = parentalTransportPending.get(signal);
   if (!pending) {
     pending = new Map();
@@ -383,7 +407,11 @@ export function createProgressiveAgeDiscover(
     }
     const discoverStartedAt = Date.now();
     logAgeFilterTrace(trace, 'source_discover_start');
-    const baseResult = await dependencies.discover({ ...options, pegi: 'Tous' });
+    const baseResult = await dependencies.discover({
+      ...options,
+      pegi: 'Tous',
+      parentalPrefilterMaxAge: maxAge,
+    });
     logAgeFilterTrace(trace, 'source_discover_done', {
       ok: baseResult.ok,
       durationMs: Math.max(0, Date.now() - discoverStartedAt),

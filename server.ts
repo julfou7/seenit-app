@@ -86,6 +86,52 @@ const rateLimitBuckets = new Map<string, RateLimitBucket>();
 const proxyMutationCache = new Map<string, TimedMutationResult<Record<string, unknown>>>();
 const proxyMutationsInFlight = new Map<string, Promise<Record<string, unknown>>>();
 
+const PARENTAL_EVIDENCE_COLLECTION = 'publicParentalRatingEvidence';
+const PARENTAL_EVIDENCE_SCHEMA_VERSION = 1;
+const PARENTAL_EVIDENCE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+async function readPersistedParentalEvidence(keys: string[]): Promise<Map<string, any>> {
+  const safeKeys = [...new Set(keys)].filter(key => /^(movie|tv):[1-9]\d{0,12}$/.test(key)).slice(0, 40);
+  if (safeKeys.length === 0) return new Map();
+  const refs = safeKeys.map(key => adminDb.collection(PARENTAL_EVIDENCE_COLLECTION).doc(key));
+  const snapshots = await adminDb.getAll(...refs);
+  const now = Date.now();
+  const resolved = new Map<string, any>();
+  snapshots.forEach((snapshot, index) => {
+    if (!snapshot.exists) return;
+    const data = snapshot.data();
+    const updatedAt = Number(data?.updatedAt || 0);
+    if (data?.schemaVersion !== PARENTAL_EVIDENCE_SCHEMA_VERSION
+      || !Number.isFinite(updatedAt)
+      || now - updatedAt >= PARENTAL_EVIDENCE_TTL_MS
+      || !data?.details
+      || typeof data.details !== 'object') return;
+    resolved.set(safeKeys[index], data.details);
+  });
+  return resolved;
+}
+
+async function writePersistedParentalEvidence(
+  entries: Array<{ key: string; details: any }>,
+): Promise<void> {
+  const safeEntries = entries
+    .filter(entry => /^(movie|tv):[1-9]\d{0,12}$/.test(entry.key)
+      && entry.details
+      && typeof entry.details === 'object')
+    .slice(0, 40);
+  if (safeEntries.length === 0) return;
+  const batch = adminDb.batch();
+  const updatedAt = Date.now();
+  for (const entry of safeEntries) {
+    batch.set(adminDb.collection(PARENTAL_EVIDENCE_COLLECTION).doc(entry.key), {
+      schemaVersion: PARENTAL_EVIDENCE_SCHEMA_VERSION,
+      updatedAt,
+      details: entry.details,
+    });
+  }
+  await batch.commit();
+}
+
 function rateLimit(
   namespace: string,
   maxRequests: number,
@@ -482,7 +528,13 @@ async function startServer() {
 
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-  registerMediaProviderRoutes(app, { authenticate: requireAuth });
+  registerMediaProviderRoutes(app, {
+    authenticate: requireAuth,
+    parentalEvidence: {
+      read: readPersistedParentalEvidence,
+      write: writePersistedParentalEvidence,
+    },
+  });
 
   const handleResolveSlug = async (req: express.Request, res: express.Response) => {
     console.log('[Plex Resolve Backend] --- DÉBUT DE LA RÉSOLUTION DU SLUG PLEX ---');

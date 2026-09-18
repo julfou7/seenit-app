@@ -116,3 +116,24 @@ test('issue #326 propage l’annulation de génération jusqu’au transport par
   assert.match(backend, /AbortSignal\.any\(\[AbortSignal\.timeout\(timeoutMs\), clientAbort\.signal\]\)/);
   assert.doesNotMatch(backend, /\(res as any\)\.flush\?\.\(\)/, 'le correctif AI Studio non prouvé ne doit pas survivre au nettoyage');
 });
+
+
+test('issue #326 réutilise l’index parental et préfiltre uniquement les films à la source', () => {
+  const client = readFileSync('src/features/discover/progressiveAgeFilter.ts', 'utf8');
+  const tmdbClient = readFileSync('src/features/shows/tmdbClient.ts', 'utf8');
+  const core = readFileSync('src/features/shows/tmdbCore.ts', 'utf8');
+  const server = readFileSync('server.ts', 'utf8');
+
+  assert.match(client, /readParentalRatingCache\(identity\.id, identity\.mediaType\)/);
+  assert.match(client, /transport_persistent_cache_hit/);
+  assert.match(client, /writeParentalRatingCache\(id, mediaType, details\)/);
+  assert.match(tmdbClient, /readParentalRatingCache\(normalizedId, type\)/);
+  assert.match(tmdbClient, /writeParentalRatingCache\(normalizedId, type, details\)/);
+  assert.match(client, /parentalPrefilterMaxAge: maxAge/);
+  assert.match(core, /mediaType === 'movie'[\s\S]*?buildMovieCertificationPrefilter/);
+  assert.match(core, /params\.set\('certification_country', prefilter\.country\)/);
+  assert.match(core, /params\.set\('certification\.lte', prefilter\.lte\)/);
+  assert.doesNotMatch(core, /mediaType === 'tv'[\s\S]{0,300}certification_country/);
+  assert.match(server, /publicParentalRatingEvidence/);
+  assert.match(server, /parentalEvidence:[\s\S]*?read: readPersistedParentalEvidence/);
+});
