@@ -15,6 +15,8 @@ test('issue #326 v1.4.158 coalesce la vague parentale dans un transport authenti
   assert.match(client, /response\.value\.body\.getReader\(\)/);
   assert.match(client, /pending\.deferred\.resolve\(/, 'une preuve reçue doit débloquer son média sans attendre la fin du stream');
   assert.match(client, /const PARENTAL_TRANSPORT_MAX_ITEMS = 40;/);
+  assert.match(client, /const PARENTAL_PROGRESSIVE_MAX_CONCURRENT = PARENTAL_TRANSPORT_MAX_ITEMS;/);
+  assert.match(client, /setTimeout\(flushPendingSnapshot, PROGRESSIVE_SNAPSHOT_BATCH_MS\)/);
   assert.match(client, /filterResolvedPrefixes<any, any \| null, any>\(\s*baseResult\.value\.results,\s*1,/);
 
   assert.match(backend, /key !== 'items' && key !== 'stream'/);
