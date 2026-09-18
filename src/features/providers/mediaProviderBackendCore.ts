@@ -20,6 +20,24 @@ const TVDB_ORIGIN = 'https://api4.thetvdb.com/v4/';
 const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
 const MAX_CACHE_BYTES = 16 * 1024 * 1024;
 const TTL = 5 * 60_000;
+const TMDB_CACHE_METRIC_LOG_EVERY = 25;
+
+export function classifyTmdbMetricFamily(path: string): string {
+  const normalized = path.replace(/^\/+/, '');
+  if (/^discover\//.test(normalized)) return 'discover';
+  if (/^search\//.test(normalized)) return 'search';
+  if (/^find\//.test(normalized)) return 'find';
+  if (/^trending\//.test(normalized)) return 'trending';
+  if (/^collection\//.test(normalized)) return 'collection';
+  if (/^person\//.test(normalized)) return 'person';
+  if (/^tv\/[1-9]\d*\/season\/\d+(?:\/episode\/\d+)?$/.test(normalized)) {
+    return normalized.includes('/episode/') ? 'episode' : 'season';
+  }
+  if (/^(movie|tv)\/[1-9]\d*\/watch\/providers$/.test(normalized)) return 'watch_providers';
+  if (/^(movie|tv)\/[1-9]\d*\/(release_dates|content_ratings)$/.test(normalized)) return 'parental';
+  if (/^(movie|tv)\/[1-9]\d*$/.test(normalized)) return 'details';
+  return 'metadata';
+}
 const TVDB_TOKEN_TTL = 23 * 60 * 60_000;
 const TVDB_RELATION_CACHE_MAX = 120;
 const TMDB_PATHS = [
@@ -211,7 +229,41 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
   let tvdbToken: { value: string; expires: number; apiKey: string } | null = null;
   let cacheBytes = 0;
   let currentSecrets: Secrets = {};
+  let tmdbMetricRequests = 0;
+  const tmdbMetricFamilies = new Map<string, { requests: number; memoryHits: number; inFlightHits: number; upstream: number; bytes: number }>();
   const evict = (key: string) => { cacheBytes -= cache.get(key)?.bytes || 0; cache.delete(key); };
+
+  const recordTmdbCacheMetric = (
+    family: string,
+    outcome: 'memory_hit' | 'inflight_hit' | 'upstream',
+    bytes: number = 0,
+  ) => {
+    const current = tmdbMetricFamilies.get(family) || { requests: 0, memoryHits: 0, inFlightHits: 0, upstream: 0, bytes: 0 };
+    current.requests += 1;
+    if (outcome === 'memory_hit') current.memoryHits += 1;
+    else if (outcome === 'inflight_hit') current.inFlightHits += 1;
+    else current.upstream += 1;
+    current.bytes += Math.max(0, bytes);
+    tmdbMetricFamilies.set(family, current);
+    tmdbMetricRequests += 1;
+
+    if (tmdbMetricRequests % TMDB_CACHE_METRIC_LOG_EVERY === 0) {
+      console.info(JSON.stringify({
+        seenitDiagnostic: {
+          schemaVersion: 1,
+          code: 'TMDB_REQUEST_CACHE_SUMMARY',
+          timestamp: new Date().toISOString(),
+          context: {
+            requests: tmdbMetricRequests,
+            cacheEntries: cache.size,
+            cacheBytes,
+            inFlight: inFlight.size,
+            families: Object.fromEntries(tmdbMetricFamilies),
+          },
+        },
+      }));
+    }
+  };
 
   const takeQuota = (scope: QuotaScope, provider: QuotaProvider, uid: string, limit: number, res: any): boolean => {
     const time = now();
@@ -255,12 +307,21 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
     if (!credential) { res.status(503).json({ error: 'Fournisseur non configuré.' }); return; }
     const generation = currentSecrets;
     const key = 'tmdb:' + target.pathname + target.search;
+    const metricFamily = classifyTmdbMetricFamily(path);
     const time = now();
     const cached = cache.get(key);
-    if (cached && cached.expires > time) { cache.delete(key); cache.set(key, cached); res.type('json').send(cached.body); return; }
+    if (cached && cached.expires > time) {
+      cache.delete(key);
+      cache.set(key, cached);
+      recordTmdbCacheMetric(metricFamily, 'memory_hit', cached.bytes);
+      res.type('json').send(cached.body);
+      return;
+    }
     if (cached) evict(key);
     let pending = inFlight.get(key);
+    if (pending) recordTmdbCacheMetric(metricFamily, 'inflight_hit');
     if (!pending) {
+      recordTmdbCacheMetric(metricFamily, 'upstream');
       if (inFlight.size >= 48) { res.setHeader('Retry-After', '1'); res.status(429).json({ error: 'Service occupé, réessayez.' }); return; }
       if (!takeQuota('upstream', 'tmdb', uid, UPSTREAM_LIMITS.tmdb, res)) return;
       target.searchParams.set('api_key', credential);

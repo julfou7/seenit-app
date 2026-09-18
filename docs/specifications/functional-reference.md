@@ -269,6 +269,9 @@ Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, 
 - Le panneau « Type de contenu » permet notamment de choisir **Top 100** ; ce choix change de catégorie et ne constitue pas un tri.
 - Tri Populaires, Mieux notés, Plus récents ou Ordre alphabétique.
 - Hero Top 10, chargement infini, aperçu long-press et cache utilisable lors d'une panne réseau.
+  Les pages Discover récemment obtenues sont réutilisées directement sur l'appareil pour un retour écran,
+  une combinaison identique ou une page déjà parcourue, puis expirent rapidement afin de laisser TMDB
+  reprendre la main sur les données volatiles.
 - Le chargement du Hero réserve immédiatement la rangée de progression ; son remplacement par les
   indicateurs interactifs ne décale ni les catégories, ni le titre Explorer, ni la grille.
 - La barre de recherche se masque pendant la descente et ne se réaffiche que lorsque le défilement repart réellement vers le haut ; le geste tactile et le `scrollTop` utilisent la même sémantique de direction.
@@ -418,9 +421,11 @@ La décision durable complète est figée dans
 TVDB exact pour franchise/univers et aucune section similaire sur les fiches. Le pipeline relationnel
 historique n'est plus une source runtime de la fiche.
 
-Une fiche déjà ouverte pendant la session doit se réafficher depuis le cache chaud, sans repasser par
-un skeleton de deux à trois secondes. Détails et relations sont indexés par `movie:<id>` / `tv:<id>`,
-les images principales gardent une URL stable et les actualisations distantes restent silencieuses.
+Une fiche déjà résolue doit se réafficher depuis le cache chaud sans repasser par un skeleton de deux à
+trois secondes. Les détails publics sont également persistés localement : après une réouverture récente de
+l'application, SeenIt peut afficher immédiatement le dernier snapshot admissible puis le rafraîchir
+silencieusement. Détails et relations restent indexés par `movie:<id>` / `tv:<id>`, les images principales
+gardent une URL stable et aucune donnée utilisateur n'entre dans ce cache public.
 Le contrat complet est `SEENIT-PERF-001` et son suivi est
 [#146](https://github.com/julfou7/seenit-app/issues/146).
 

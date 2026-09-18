@@ -1745,6 +1745,18 @@
         {
           "file": "tests/profileAnalyticsSnapshot.test.ts",
           "contains": "SEENIT-PERF-001 sépare la baseline d’affichage du snapshot de travail volumineux"
+        },
+        {
+          "file": "tests/publicMetadataCache.test.ts",
+          "contains": "SEENIT-PERF-001 mutualise les métadonnées publiques avec TTL par famille et single-flight"
+        },
+        {
+          "file": "tests/publicMetadataCache.test.ts",
+          "contains": "SEENIT-PERF-001 normalise les requêtes et ne persiste pas le texte de recherche"
+        },
+        {
+          "file": "tests/publicMetadataCache.test.ts",
+          "contains": "issue #410 branche détails Discover et recherche sur le cache commun"
         }
       ]
     }

@@ -13,6 +13,12 @@ import {
 } from './mediaRelations';
 import { createWatchProviderRequestLimiter } from '../providers/watchProviderRequestPolicy';
 import { readParentalRatingCache, writeParentalRatingCache } from './parentalRatingCache';
+import {
+  normalizePublicMetadataRequestKey,
+  readPublicMetadataCache,
+  runPublicMetadataSingleFlight,
+  writePublicMetadataCache,
+} from './publicMetadataCache';
 
 export const PARENTAL_RATING_MAX_CONCURRENT = 8;
 
@@ -155,6 +161,34 @@ export class TMDBClient {
   private lastRequestTime = 0;
   private readonly MIN_MS_BETWEEN_REQUESTS = 250; // 4 req/sec pour être conservateur et éviter le 429
 
+  private async getCachedSearchResponse(url: URL): Promise<Result<SearchResponse>> {
+    const cacheKey = normalizePublicMetadataRequestKey(url);
+    const cached = await readPublicMetadataCache<SearchResponse>('search', cacheKey, { allowStale: true });
+    if (cached?.fresh) return ok(cached.data);
+
+    return runPublicMetadataSingleFlight('search', cacheKey, async () => {
+      const queued = await readPublicMetadataCache<SearchResponse>('search', cacheKey, { allowStale: true });
+      if (queued?.fresh) return ok(queued.data);
+      const fallback = queued || cached;
+
+      const response = await tryCatch(authenticatedFetch(url.toString()));
+      if (!response.ok) return fallback ? ok(fallback.data) : err((response as any).error);
+      if (!response.value.ok) {
+        return fallback ? ok(fallback.data) : err(new Error(`TMDB Error: ${response.value.status}`));
+      }
+
+      const data = await tryCatch(response.value.json() as Promise<SearchResponse>);
+      if (!data.ok) return fallback ? ok(fallback.data) : err((data as any).error);
+      if ((data.value as any)?.status_code) {
+        return fallback
+          ? ok(fallback.data)
+          : err(new Error((data.value as any).status_message || 'TMDB Error'));
+      }
+      writePublicMetadataCache('search', cacheKey, data.value);
+      return data;
+    });
+  }
+
   async searchMedia(query: string, year?: string, type?: 'movie' | 'tv', page: number = 1): Promise<Result<TMDBMedia>> {
 
 
@@ -178,9 +212,7 @@ export class TMDBClient {
         url.searchParams.append('primary_release_year', searchYear);
       }
 
-      const res = await tryCatch(authenticatedFetch(url.toString()));
-      if (!res.ok || !res.value.ok) return [];
-      const data = await tryCatch(res.value.json() as Promise<SearchResponse>);
+      const data = await this.getCachedSearchResponse(url);
       if (!data.ok) return [];
       return data.value.results || [];
     };
@@ -345,7 +377,6 @@ export class TMDBClient {
     return err(new Error(`No media found on TMDB for external ID ${externalId}`));
   }
   private detailsCache = new BoundedCache<string, any>(80);
-  private detailsInFlight = new Map<string, Promise<Result<any>>>();
   private parentalRatingDetailsCache = new BoundedCache<string, any>(240);
   private parentalRatingDetailsInFlight = new Map<string, Promise<Result<any>>>();
   private parentalRatingRequestLimiter = createWatchProviderRequestLimiter(PARENTAL_RATING_MAX_CONCURRENT);
@@ -359,21 +390,57 @@ export class TMDBClient {
     const cached = this.detailsCache.get(cacheKey);
     if (cached) return ok(cached);
 
-    const existingRequest = this.detailsInFlight.get(cacheKey);
-    if (existingRequest) return existingRequest;
+    const persisted = await readPublicMetadataCache<any>('details', cacheKey, { allowStale: true });
+    if (persisted?.fresh) {
+      this.detailsCache.set(cacheKey, persisted.data);
+      return ok(persisted.data);
+    }
 
-    const request = (async (): Promise<Result<any>> => {
+    return runPublicMetadataSingleFlight('details', cacheKey, async (): Promise<Result<any>> => {
+      const queuedMemory = this.detailsCache.get(cacheKey);
+      if (queuedMemory) return ok(queuedMemory);
+
+      const queuedPersistent = await readPublicMetadataCache<any>('details', cacheKey, { allowStale: true });
+      if (queuedPersistent?.fresh) {
+        this.detailsCache.set(cacheKey, queuedPersistent.data);
+        return ok(queuedPersistent.data);
+      }
+      const fallback = queuedPersistent || persisted;
 
       const appended = type === 'tv'
         ? 'credits,aggregate_credits,similar,recommendations,videos,content_ratings,external_ids,images,keywords'
         : 'credits,similar,recommendations,videos,release_dates,external_ids,images,keywords';
       const url = new URL(`${this.baseUrl}/${type}/${id}?language=fr-FR&append_to_response=${appended}&include_video_language=fr,en,null&include_image_language=fr,en,null,de,es,it,ja,ko`);
       const res = await tryCatch(authenticatedFetch(url.toString()));
-      if (!res.ok) return err((res as any).error);
-      if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
+      if (!res.ok) {
+        if (fallback) {
+          this.detailsCache.set(cacheKey, fallback.data);
+          return ok(fallback.data);
+        }
+        return err((res as any).error);
+      }
+      if (!res.value.ok) {
+        if (fallback) {
+          this.detailsCache.set(cacheKey, fallback.data);
+          return ok(fallback.data);
+        }
+        return err(new Error(`TMDB Error: ${res.value.status}`));
+      }
       const data = await tryCatch(res.value.json());
-      if (!data.ok) return err((data as any).error);
-      if (data.value && data.value.status_code) return err(new Error(data.value.status_message || 'TMDB Error'));
+      if (!data.ok) {
+        if (fallback) {
+          this.detailsCache.set(cacheKey, fallback.data);
+          return ok(fallback.data);
+        }
+        return err((data as any).error);
+      }
+      if (data.value && data.value.status_code) {
+        if (fallback) {
+          this.detailsCache.set(cacheKey, fallback.data);
+          return ok(fallback.data);
+        }
+        return err(new Error(data.value.status_message || 'TMDB Error'));
+      }
 
       if (data.value) {
         data.value.media_type = type;
@@ -385,16 +452,10 @@ export class TMDBClient {
         }
         if (type === 'tv') adjustTMDBShowDataForEurope(data.value);
         this.detailsCache.set(cacheKey, data.value);
+        writePublicMetadataCache('details', cacheKey, data.value);
       }
       return data;
-    })();
-
-    this.detailsInFlight.set(cacheKey, request);
-    try {
-      return await request;
-    } finally {
-      this.detailsInFlight.delete(cacheKey);
-    }
+    });
   }
 
   async getShowDetails(id: number): Promise<Result<any>> {
@@ -606,6 +667,14 @@ export class TMDBClient {
   async getMediaKeywords(id: number, type: 'tv' | 'movie' = 'tv'): Promise<Result<string[]>> {
 
 
+    const detailCacheKey = `${type}_${Number(id)}`;
+    const knownDetails = this.detailsCache.get(detailCacheKey)
+      || (await readPublicMetadataCache<any>('details', detailCacheKey, { allowStale: true }))?.data;
+    const knownKeywordList = type === 'tv' ? knownDetails?.keywords?.results : knownDetails?.keywords?.keywords;
+    if (Array.isArray(knownKeywordList)) {
+      return ok(knownKeywordList.map((keyword: { name?: string }) => String(keyword?.name || '')).filter(Boolean));
+    }
+
     const url = new URL(`${this.baseUrl}/${type}/${id}/keywords`);
     const res = await tryCatch(authenticatedFetch(url.toString()));
     if (!res.ok) return err((res as any).error);
@@ -669,12 +738,8 @@ export class TMDBClient {
     // or just let it be. We will not modify the URL for search/multi as it ignores it.
 
     const url = new URL(urlStr);
-    const res = await tryCatch(authenticatedFetch(url.toString()));
-    if (!res.ok) return err((res as any).error);
-    if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
-    const data = await tryCatch(res.value.json() as Promise<SearchResponse>);
-    if (!data.ok) return err((data as any).error);
-    if ((data.value as any)?.status_code) return err(new Error((data.value as any).status_message || 'TMDB Error'));
+    const data = await this.getCachedSearchResponse(url);
+    if (!data.ok) return data;
     if (data.value && Array.isArray(data.value.results)) {
       data.value.results = filterCredibleMedia(data.value.results, 0);
     }
@@ -688,12 +753,8 @@ export class TMDBClient {
     // Note: TMDB search/tv doesn't support with_watch_providers.
 
     const url = new URL(urlStr);
-    const res = await tryCatch(authenticatedFetch(url.toString()));
-    if (!res.ok) return err((res as any).error);
-    if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
-    const data = await tryCatch(res.value.json() as Promise<SearchResponse>);
-    if (!data.ok) return err((data as any).error);
-    if ((data.value as any)?.status_code) return err(new Error((data.value as any).status_message || 'TMDB Error'));
+    const data = await this.getCachedSearchResponse(url);
+    if (!data.ok) return data;
     if (data.value && Array.isArray(data.value.results)) {
       data.value.results = filterCredibleMedia(data.value.results, 0).map(r => ({ ...r, media_type: 'tv' }));
     }
@@ -707,12 +768,8 @@ export class TMDBClient {
     // Note: TMDB search/movie doesn't support with_watch_providers.
 
     const url = new URL(urlStr);
-    const res = await tryCatch(authenticatedFetch(url.toString()));
-    if (!res.ok) return err((res as any).error);
-    if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
-    const data = await tryCatch(res.value.json() as Promise<SearchResponse>);
-    if (!data.ok) return err((data as any).error);
-    if ((data.value as any)?.status_code) return err(new Error((data.value as any).status_message || 'TMDB Error'));
+    const data = await this.getCachedSearchResponse(url);
+    if (!data.ok) return data;
     if (data.value && Array.isArray(data.value.results)) {
       data.value.results = filterCredibleMedia(data.value.results, 0).map(r => ({ ...r, media_type: 'movie' }));
     }
@@ -722,12 +779,8 @@ export class TMDBClient {
   async searchPerson(query: string, page: number = 1): Promise<Result<SearchResponse>> {
 
     const url = new URL(`${this.baseUrl}/search/person?query=${encodeURIComponent(query)}&language=fr-FR&page=${page}`);
-    const res = await tryCatch(authenticatedFetch(url.toString()));
-    if (!res.ok) return err((res as any).error);
-    if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
-    const data = await tryCatch(res.value.json() as Promise<SearchResponse>);
-    if (!data.ok) return err((data as any).error);
-    if ((data.value as any)?.status_code) return err(new Error((data.value as any).status_message || 'TMDB Error'));
+    const data = await this.getCachedSearchResponse(url);
+    if (!data.ok) return data;
     if (data.value && Array.isArray(data.value.results)) {
       data.value.results = data.value.results.map(p => ({ ...p, media_type: 'person' }));
     }
