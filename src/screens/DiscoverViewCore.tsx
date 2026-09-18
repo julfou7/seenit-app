@@ -42,7 +42,7 @@ interface DiscoverViewProps {
 }
 
 export function DiscoverView({ model }: DiscoverViewProps) {
-  const { activeCategory, activeFilterCount, activeHeroIndex, addShow, containerRef, debouncedQuery, deleteShow, handleAddMedia, handleHeroScroll, handleLongPress, handleOpenTrailer, handleScroll, handleToggleWatched, handleTouchEnd, handleTouchMove, handleTouchStart, hasActiveFilters, hasMore, heroCarouselRef, heroDetails, isLoadingMore, isOffline, isSearchVisible, isSortPickerOpen, loading, minRating, movieResults, observerTargetRef, onShowClick, openPersonModal, pegi, personResults, previewMedia, processedResults, query, selectedGenres, selectedPersonId, selectedPlatforms, seriesResults, setActiveCategory, setActiveHeroIndex, setIsSearchFocused, setIsSearchVisible, setIsSortPickerOpen, setMinRating, setPegi, setPreviewMedia, setQuery, setSelectedGenres, setSelectedPersonId, setSelectedPlatforms, setShowGenreMenu, setShowScrollTop, setSortBy, setSortOrder, setTrailerModalVideos, showGenreMenu, showHeroSurface, showScrollTop, showsByTmdbId, sortBy, top10, trailerModalVideos, uniqueProcessedResults, visibleHeroItems, visibleMovieResults, visiblePersonResults, visibleProcessedResults, visibleSeriesResults } = model;
+  const { activeCategory, activeFilterCount, activeHeroIndex, addShow, containerRef, debouncedQuery, deleteShow, handleAddMedia, handleHeroScroll, handleLongPress, handleOpenTrailer, handleScroll, handleToggleWatched, handleTouchEnd, handleTouchMove, handleTouchStart, hasActiveFilters, hasMore, heroCarouselRef, heroDetails, isLoadingMore, isOffline, isSearchVisible, isSortPickerOpen, loading, minRating, movieResults, observerTargetRef, onShowClick, openPersonModal, pegi, personResults, previewMedia, processedResults, query, selectedGenres, selectedPersonId, selectedPlatforms, seriesResults, setActiveCategory, setActiveHeroIndex, setIsSearchFocused, setIsSearchVisible, setIsSortPickerOpen, setMinRating, setPegi, setPreviewMedia, setQuery, setSelectedGenres, setSelectedPersonId, setSelectedPlatforms, setShowGenreMenu, setShowScrollTop, setSortBy, setSortOrder, setTrailerModalVideos, showGenreMenu, showHeroSurface, showScrollTop, showsByTmdbId, suppressEndOfResults, sortBy, top10, trailerModalVideos, uniqueProcessedResults, visibleHeroItems, visibleMovieResults, visiblePersonResults, visibleProcessedResults, visibleSeriesResults } = model;
   return (
     <div className="relative flex-1 h-full bg-transparent text-white max-w-2xl mx-auto w-full overflow-hidden flex flex-col">
       <button
@@ -476,7 +476,7 @@ export function DiscoverView({ model }: DiscoverViewProps) {
                           <div className="h-5 w-5" />
                         )}
                       </div>
-                    ) : (uniqueProcessedResults.length > 0 || seriesResults.length > 0 || movieResults.length > 0 || personResults.length > 0) ? (
+                    ) : (!suppressEndOfResults && (uniqueProcessedResults.length > 0 || seriesResults.length > 0 || movieResults.length > 0 || personResults.length > 0)) ? (
                       <div className="w-full text-center py-2 px-4">
                         <p className="text-xs font-medium text-zinc-500 flex items-center justify-center gap-2">
                           <span className="h-[1px] w-8 bg-zinc-800" />

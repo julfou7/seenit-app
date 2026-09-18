@@ -240,6 +240,7 @@ test('issue #326 le point d’entrée production utilise le moteur progressif sa
   const tmdbFacade = readFileSync(tmdbFacadePath, 'utf8');
   const progressiveIntegration = readFileSync('src/features/discover/progressiveAgeFilter.ts', 'utf8');
   const discoverView = readFileSync('src/screens/DiscoverView.tsx', 'utf8');
+  const discoverViewCore = readFileSync('src/screens/DiscoverViewCore.tsx', 'utf8');
   const parentalBatchBackend = readFileSync('src/features/providers/parentalRatingBatchBackend.ts', 'utf8');
 
   assert.match(tmdbFacade, /discoverSeenItProgressive as discoverSeenIt/);
@@ -289,6 +290,16 @@ test('issue #326 le point d’entrée production utilise le moteur progressif sa
   assert.match(discoverView, /snapshot\?\.partial/);
   assert.match(discoverView, /model\.processRawResults\(mergedItems\)/);
   assert.match(discoverView, /mergeProgressivePageItems/);
+  assert.match(
+    discoverView,
+    /hasMore: page > 1 \? model\.hasMore : false,[\s\S]*suppressEndOfResults: true/,
+    'la page 1 progressive peut bloquer temporairement la pagination sans annoncer une fin définitive',
+  );
+  assert.match(
+    discoverViewCore,
+    /!suppressEndOfResults && \(uniqueProcessedResults\.length > 0/,
+    'le point d’entrée UI réel doit masquer « Fin des résultats » pendant un snapshot progressif',
+  );
   assert.equal(existsSync(removedClientPath), false);
 });
 
