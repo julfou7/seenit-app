@@ -11,6 +11,8 @@ export const PUBLIC_METADATA_CACHE_SCHEMA_VERSION = 1;
 export const PUBLIC_METADATA_CACHE_DB_NAME = 'seenit-public-metadata-v1';
 export const PUBLIC_METADATA_CACHE_STORE_NAME = 'entries';
 export const PUBLIC_METADATA_CACHE_PERSISTENT_MAX_ENTRIES = 320;
+export const PUBLIC_METADATA_CACHE_PERSISTENT_MAX_BYTES = 32 * 1024 * 1024;
+export const PUBLIC_METADATA_CACHE_MAX_ENTRY_BYTES = 1024 * 1024;
 
 export const PUBLIC_METADATA_CACHE_POLICIES: Record<PublicMetadataFamily, PublicMetadataPolicy> = {
   details: {
@@ -48,6 +50,7 @@ interface StoredPublicMetadataEntry {
   storedAt: number;
   schemaVersion: number;
   data: unknown;
+  bytes: number;
 }
 
 interface PublicMetadataFamilyStats {
@@ -60,6 +63,7 @@ interface PublicMetadataFamilyStats {
   singleFlightHits: number;
   readErrors: number;
   writeErrors: number;
+  oversizedSkips: number;
 }
 
 export interface PublicMetadataCacheStatsSnapshot {
@@ -70,9 +74,9 @@ export interface PublicMetadataCacheStatsSnapshot {
 }
 
 const createStats = (): Record<PublicMetadataFamily, PublicMetadataFamilyStats> => ({
-  details: { memoryHits: 0, persistentHits: 0, staleHits: 0, misses: 0, writes: 0, networkLoads: 0, singleFlightHits: 0, readErrors: 0, writeErrors: 0 },
-  discover: { memoryHits: 0, persistentHits: 0, staleHits: 0, misses: 0, writes: 0, networkLoads: 0, singleFlightHits: 0, readErrors: 0, writeErrors: 0 },
-  search: { memoryHits: 0, persistentHits: 0, staleHits: 0, misses: 0, writes: 0, networkLoads: 0, singleFlightHits: 0, readErrors: 0, writeErrors: 0 },
+  details: { memoryHits: 0, persistentHits: 0, staleHits: 0, misses: 0, writes: 0, networkLoads: 0, singleFlightHits: 0, readErrors: 0, writeErrors: 0, oversizedSkips: 0 },
+  discover: { memoryHits: 0, persistentHits: 0, staleHits: 0, misses: 0, writes: 0, networkLoads: 0, singleFlightHits: 0, readErrors: 0, writeErrors: 0, oversizedSkips: 0 },
+  search: { memoryHits: 0, persistentHits: 0, staleHits: 0, misses: 0, writes: 0, networkLoads: 0, singleFlightHits: 0, readErrors: 0, writeErrors: 0, oversizedSkips: 0 },
 });
 
 let stats = createStats();
@@ -94,6 +98,14 @@ function cloneJson<T>(value: T): T {
 
 function compositeKey(family: PublicMetadataFamily, key: string): string {
   return `${family}:${key}`;
+}
+
+function jsonByteLength(value: unknown): number {
+  try {
+    return new TextEncoder().encode(JSON.stringify(value)).byteLength;
+  } catch {
+    return PUBLIC_METADATA_CACHE_MAX_ENTRY_BYTES + 1;
+  }
 }
 
 function touchMemory(family: PublicMetadataFamily, key: string, entry: StoredPublicMetadataEntry): void {
@@ -178,30 +190,47 @@ async function prunePersistentCache(database: IDBDatabase): Promise<void> {
   const transaction = database.transaction(PUBLIC_METADATA_CACHE_STORE_NAME, 'readwrite');
   const completion = transactionToPromise(transaction);
   const store = transaction.objectStore(PUBLIC_METADATA_CACHE_STORE_NAME);
-  const count = await requestToPromise(store.count());
-  let toDelete = Math.max(0, count - PUBLIC_METADATA_CACHE_PERSISTENT_MAX_ENTRIES);
-  if (toDelete > 0) {
-    const cursorRequest = store.index('storedAt').openCursor();
-    await new Promise<void>((resolve, reject) => {
-      cursorRequest.onerror = () => reject(cursorRequest.error || new Error('INDEXEDDB_CURSOR_FAILED'));
-      cursorRequest.onsuccess = () => {
-        const cursor = cursorRequest.result;
-        if (!cursor || toDelete <= 0) {
-          resolve();
-          return;
-        }
-        cursor.delete();
-        toDelete -= 1;
+  const cursorRequest = store.index('storedAt').openCursor();
+
+  await new Promise<void>((resolve, reject) => {
+    const entries: Array<{ key: IDBValidKey; bytes: number }> = [];
+    cursorRequest.onerror = () => reject(cursorRequest.error || new Error('INDEXEDDB_CURSOR_FAILED'));
+    cursorRequest.onsuccess = () => {
+      const cursor = cursorRequest.result;
+      if (cursor) {
+        const value = cursor.value as StoredPublicMetadataEntry;
+        entries.push({
+          key: cursor.primaryKey,
+          bytes: Number.isFinite(value?.bytes) ? Math.max(0, Number(value.bytes)) : jsonByteLength(value?.data),
+        });
         cursor.continue();
-      };
-    });
-  }
+        return;
+      }
+
+      let remainingEntries = entries.length;
+      let remainingBytes = entries.reduce((sum, entry) => sum + entry.bytes, 0);
+      for (const entry of entries) {
+        if (
+          remainingEntries <= PUBLIC_METADATA_CACHE_PERSISTENT_MAX_ENTRIES
+          && remainingBytes <= PUBLIC_METADATA_CACHE_PERSISTENT_MAX_BYTES
+        ) break;
+        store.delete(entry.key);
+        remainingEntries -= 1;
+        remainingBytes = Math.max(0, remainingBytes - entry.bytes);
+      }
+      resolve();
+    };
+  });
   await completion;
 }
 
 async function persistEntry(entry: StoredPublicMetadataEntry): Promise<void> {
   const policy = PUBLIC_METADATA_CACHE_POLICIES[entry.family];
   if (!policy.persist) return;
+  if (entry.bytes > PUBLIC_METADATA_CACHE_MAX_ENTRY_BYTES) {
+    stats[entry.family].oversizedSkips += 1;
+    return;
+  }
   const database = await openPublicMetadataDatabase();
   if (!database) return;
   try {
@@ -286,12 +315,14 @@ export function writePublicMetadataCache<T>(
 ): void {
   if (data === undefined) return;
   const storedAt = options.now ?? Date.now();
+  const clonedData = cloneJson(data);
   const entry: StoredPublicMetadataEntry = {
     key: compositeKey(family, key),
     family,
     storedAt,
     schemaVersion: PUBLIC_METADATA_CACHE_SCHEMA_VERSION,
-    data: cloneJson(data),
+    data: clonedData,
+    bytes: jsonByteLength(clonedData),
   };
   touchMemory(family, key, entry);
   stats[family].writes += 1;
