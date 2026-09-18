@@ -10,7 +10,7 @@ export interface PublicMetadataPolicy {
 export const PUBLIC_METADATA_CACHE_SCHEMA_VERSION = 1;
 export const PUBLIC_METADATA_CACHE_DB_NAME = 'seenit-public-metadata-v1';
 export const PUBLIC_METADATA_CACHE_STORE_NAME = 'entries';
-export const PUBLIC_METADATA_CACHE_PERSISTENT_MAX_ENTRIES = 1_500;
+export const PUBLIC_METADATA_CACHE_PERSISTENT_MAX_ENTRIES = 320;
 
 export const PUBLIC_METADATA_CACHE_POLICIES: Record<PublicMetadataFamily, PublicMetadataPolicy> = {
   details: {
@@ -166,8 +166,9 @@ async function deletePersistedEntry(key: string): Promise<void> {
   if (!database) return;
   try {
     const transaction = database.transaction(PUBLIC_METADATA_CACHE_STORE_NAME, 'readwrite');
+    const completion = transactionToPromise(transaction);
     transaction.objectStore(PUBLIC_METADATA_CACHE_STORE_NAME).delete(key);
-    await transactionToPromise(transaction);
+    await completion;
   } catch {
     // Cache d'optimisation : une suppression ratée ne doit jamais bloquer SeenIt.
   }
@@ -175,6 +176,7 @@ async function deletePersistedEntry(key: string): Promise<void> {
 
 async function prunePersistentCache(database: IDBDatabase): Promise<void> {
   const transaction = database.transaction(PUBLIC_METADATA_CACHE_STORE_NAME, 'readwrite');
+  const completion = transactionToPromise(transaction);
   const store = transaction.objectStore(PUBLIC_METADATA_CACHE_STORE_NAME);
   const count = await requestToPromise(store.count());
   let toDelete = Math.max(0, count - PUBLIC_METADATA_CACHE_PERSISTENT_MAX_ENTRIES);
@@ -194,7 +196,7 @@ async function prunePersistentCache(database: IDBDatabase): Promise<void> {
       };
     });
   }
-  await transactionToPromise(transaction);
+  await completion;
 }
 
 async function persistEntry(entry: StoredPublicMetadataEntry): Promise<void> {
@@ -204,8 +206,9 @@ async function persistEntry(entry: StoredPublicMetadataEntry): Promise<void> {
   if (!database) return;
   try {
     const transaction = database.transaction(PUBLIC_METADATA_CACHE_STORE_NAME, 'readwrite');
+    const completion = transactionToPromise(transaction);
     transaction.objectStore(PUBLIC_METADATA_CACHE_STORE_NAME).put(cloneJson(entry));
-    await transactionToPromise(transaction);
+    await completion;
     persistentWritesSincePrune += 1;
     if (persistentWritesSincePrune >= 40) {
       persistentWritesSincePrune = 0;
@@ -214,6 +217,10 @@ async function persistEntry(entry: StoredPublicMetadataEntry): Promise<void> {
   } catch {
     stats[entry.family].writeErrors += 1;
   }
+}
+
+export function isPublicMetadataFallbackStatus(status: number): boolean {
+  return status === 408 || status === 425 || status === 429 || status >= 500;
 }
 
 export function normalizePublicMetadataRequestKey(input: string | URL): string {

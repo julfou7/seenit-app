@@ -23,6 +23,7 @@ import { getParentalRatingOverride, getParentalRatingOverridesSnapshot } from '.
 import { convergeTrackedMediaTitleFromTmdb } from './trackedMediaTitle';
 import { mediaKeyFrom } from './mediaRelations';
 import {
+  isPublicMetadataFallbackStatus,
   normalizePublicMetadataRequestKey,
   readPublicMetadataCache,
   runPublicMetadataSingleFlight,
@@ -309,7 +310,9 @@ const fetchCachedDiscoverPayload = async (url: string) => {
     const response = await tryCatch(authenticatedFetch(url));
     if (!response.ok) return fallback ? ok(fallback.data) : err((response as any).error);
     if (!response.value.ok) {
-      return fallback ? ok(fallback.data) : err(new Error(`TMDB Error: ${response.value.status}`));
+      return fallback && isPublicMetadataFallbackStatus(response.value.status)
+        ? ok(fallback.data)
+        : err(new Error(`TMDB Error: ${response.value.status}`));
     }
     const json = await tryCatch(response.value.json() as Promise<any>);
     if (!json.ok) return fallback ? ok(fallback.data) : err((json as any).error);

@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
+  PUBLIC_METADATA_CACHE_PERSISTENT_MAX_ENTRIES,
   PUBLIC_METADATA_CACHE_POLICIES,
+  isPublicMetadataFallbackStatus,
   clearPublicMetadataMemoryCacheForTests,
   getPublicMetadataCacheStats,
   normalizePublicMetadataRequestKey,
@@ -52,6 +54,12 @@ test('SEENIT-PERF-001 normalise les requêtes et ne persiste pas le texte de rec
   assert.equal(PUBLIC_METADATA_CACHE_POLICIES.details.persist, true);
   assert.equal(PUBLIC_METADATA_CACHE_POLICIES.discover.persist, true);
   assert.equal(PUBLIC_METADATA_CACHE_POLICIES.search.persist, false, 'le texte recherché ne doit pas entrer dans IndexedDB');
+  assert.equal(PUBLIC_METADATA_CACHE_PERSISTENT_MAX_ENTRIES, 320, 'le working set public reste volontairement borné');
+  assert.equal(isPublicMetadataFallbackStatus(429), true);
+  assert.equal(isPublicMetadataFallbackStatus(503), true);
+  assert.equal(isPublicMetadataFallbackStatus(401), false, 'un cache stale ne doit jamais masquer une authentification invalide');
+  assert.equal(isPublicMetadataFallbackStatus(403), false);
+  assert.equal(isPublicMetadataFallbackStatus(404), false);
 });
 
 test('issue #410 branche détails Discover et recherche sur le cache commun', () => {
@@ -69,9 +77,15 @@ test('issue #410 branche détails Discover et recherche sur le cache commun', ()
   assert.match(core, /runPublicMetadataSingleFlight\('discover'/);
   assert.match(core, /writePublicMetadataCache\('discover'/);
   assert.match(cache, /indexedDB\.open\(PUBLIC_METADATA_CACHE_DB_NAME/);
-  assert.match(cache, /PUBLIC_METADATA_CACHE_PERSISTENT_MAX_ENTRIES = 1_500/);
+  assert.match(cache, /PUBLIC_METADATA_CACHE_PERSISTENT_MAX_ENTRIES = 320/);
   assert.match(cache, /__SEENIT_TMDB_CACHE_STATS__/);
   assert.match(backend, /TMDB_REQUEST_CACHE_SUMMARY/);
   assert.match(backend, /classifyTmdbMetricFamily/);
-  assert.doesNotMatch(backend, /TMDB_REQUEST_CACHE_SUMMARY[\s\S]{0,600}(?:uid|api_key|credential|target\.search|req\.query)/i);
+  const metricLogger = backend.slice(
+    backend.indexOf('const recordTmdbCacheMetric'),
+    backend.indexOf('const takeQuota'),
+  );
+  assert.ok(metricLogger.length > 0);
+  assert.doesNotMatch(metricLogger, /uid|api_key|credential|target\.search|req\.query/i);
+  assert.match(metricLogger, /upstreamBytes/);
 });

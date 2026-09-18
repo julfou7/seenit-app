@@ -14,6 +14,7 @@ import {
 import { createWatchProviderRequestLimiter } from '../providers/watchProviderRequestPolicy';
 import { readParentalRatingCache, writeParentalRatingCache } from './parentalRatingCache';
 import {
+  isPublicMetadataFallbackStatus,
   normalizePublicMetadataRequestKey,
   readPublicMetadataCache,
   runPublicMetadataSingleFlight,
@@ -174,7 +175,9 @@ export class TMDBClient {
       const response = await tryCatch(authenticatedFetch(url.toString()));
       if (!response.ok) return fallback ? ok(fallback.data) : err((response as any).error);
       if (!response.value.ok) {
-        return fallback ? ok(fallback.data) : err(new Error(`TMDB Error: ${response.value.status}`));
+        return fallback && isPublicMetadataFallbackStatus(response.value.status)
+          ? ok(fallback.data)
+          : err(new Error(`TMDB Error: ${response.value.status}`));
       }
 
       const data = await tryCatch(response.value.json() as Promise<SearchResponse>);
@@ -420,7 +423,7 @@ export class TMDBClient {
         return err((res as any).error);
       }
       if (!res.value.ok) {
-        if (fallback) {
+        if (fallback && isPublicMetadataFallbackStatus(res.value.status)) {
           this.detailsCache.set(cacheKey, fallback.data);
           return ok(fallback.data);
         }
@@ -452,7 +455,8 @@ export class TMDBClient {
         }
         if (type === 'tv') adjustTMDBShowDataForEurope(data.value);
         this.detailsCache.set(cacheKey, data.value);
-        writePublicMetadataCache('details', cacheKey, data.value);
+        const { similar: _similar, recommendations: _recommendations, ...persistedDetails } = data.value;
+        writePublicMetadataCache('details', cacheKey, persistedDetails);
       }
       return data;
     });

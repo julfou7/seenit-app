@@ -476,7 +476,7 @@ n'est rouverte que par une nouvelle décision produit explicite.
   Les pages Discover restent fraîches 2 minutes et stale 30 minutes afin d'accélérer retour écran,
   annulation/réapplication de filtres et pages déjà parcourues sans figer durablement popularité ou notes.
   Les recherches restent en mémoire 5 minutes et ne sont pas persistées, car leur clé contient le texte
-  saisi par l'utilisateur. Le stockage persistant public est borné à 1 500 entrées et ne contient ni UID,
+  saisi par l'utilisateur. Le stockage persistant public est borné à 320 entrées et ne contient ni UID,
   progression, préférences, token Plex ni autre donnée privée.
 - Le skeleton de page est réservé au premier chargement réellement froid. Le parcours A → B → A, y
   compris après une réouverture récente de l'application lorsque le snapshot persistant est encore

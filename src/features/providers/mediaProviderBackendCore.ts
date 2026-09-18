@@ -230,20 +230,18 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
   let cacheBytes = 0;
   let currentSecrets: Secrets = {};
   let tmdbMetricRequests = 0;
-  const tmdbMetricFamilies = new Map<string, { requests: number; memoryHits: number; inFlightHits: number; upstream: number; bytes: number }>();
+  const tmdbMetricFamilies = new Map<string, { requests: number; memoryHits: number; inFlightHits: number; upstream: number; upstreamBytes: number }>();
   const evict = (key: string) => { cacheBytes -= cache.get(key)?.bytes || 0; cache.delete(key); };
 
   const recordTmdbCacheMetric = (
     family: string,
     outcome: 'memory_hit' | 'inflight_hit' | 'upstream',
-    bytes: number = 0,
   ) => {
-    const current = tmdbMetricFamilies.get(family) || { requests: 0, memoryHits: 0, inFlightHits: 0, upstream: 0, bytes: 0 };
+    const current = tmdbMetricFamilies.get(family) || { requests: 0, memoryHits: 0, inFlightHits: 0, upstream: 0, upstreamBytes: 0 };
     current.requests += 1;
     if (outcome === 'memory_hit') current.memoryHits += 1;
     else if (outcome === 'inflight_hit') current.inFlightHits += 1;
     else current.upstream += 1;
-    current.bytes += Math.max(0, bytes);
     tmdbMetricFamilies.set(family, current);
     tmdbMetricRequests += 1;
 
@@ -313,7 +311,7 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
     if (cached && cached.expires > time) {
       cache.delete(key);
       cache.set(key, cached);
-      recordTmdbCacheMetric(metricFamily, 'memory_hit', cached.bytes);
+      recordTmdbCacheMetric(metricFamily, 'memory_hit');
       res.type('json').send(cached.body);
       return;
     }
@@ -332,8 +330,10 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
           throw new ProviderFailure(upstream.status === 404 ? 404 : upstream.status === 429 ? 429 : 502);
         }
         const body = await readBoundedJson(upstream, [(secrets.TMDB_API_KEY || '').trim(), (secrets.TVDB_API_KEY || '').trim()]);
+        const bytes = Buffer.byteLength(body);
+        const metric = tmdbMetricFamilies.get(metricFamily);
+        if (metric) metric.upstreamBytes += bytes;
         if (generation === currentSecrets) {
-          const bytes = Buffer.byteLength(body);
           while (cache.size >= 200 || cacheBytes + bytes > MAX_CACHE_BYTES) evict(cache.keys().next().value!);
           cache.set(key, { body, bytes, expires: now() + TTL }); cacheBytes += bytes;
         }
