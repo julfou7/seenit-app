@@ -114,7 +114,7 @@ test('SEENIT-APK-003 interdit toute réinstallation ou divergence de signature a
   );
 });
 
-test('SEENIT-APK-003 conserve les smokes Android de la release complète sans bloquer le fast terrain', () => {
+test('SEENIT-APK-003 exécute le smoke sur Android 12 et la cible Android courante avant publication', () => {
   const workflow = fs.readFileSync('.github/workflows/build-apk.yml', 'utf8');
   assert.doesNotMatch(workflow, /^  android_upgrade_smoke:/m);
   assert.match(workflow, /build:[\s\S]*Build APK & optional Upgrade Smoke \(Android 36\)/);
