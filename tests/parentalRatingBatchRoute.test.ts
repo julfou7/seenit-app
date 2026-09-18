@@ -166,7 +166,16 @@ test('issue #326 v1.4.160 libère la queue 25-40 avant le timeout fournisseur de
     sleep(500).then(() => false),
   ]);
   assert.equal(await deepResult, true);
-  assert.equal(started.size, PARENTAL_BATCH_MAX_ITEMS);
+  const allBurstItemsStarted = await Promise.race([
+    (async () => {
+      for (let attempt = 0; attempt < 25 && started.size < PARENTAL_BATCH_MAX_ITEMS; attempt += 1) {
+        await sleep(10);
+      }
+      return started.size === PARENTAL_BATCH_MAX_ITEMS;
+    })(),
+    sleep(300).then(() => false),
+  ]);
+  assert.equal(allBurstItemsStarted, true, 'les 40 items doivent démarrer sans attendre la libération des 24 premiers');
   assert.equal(maxActive <= PARENTAL_BATCH_STALL_BURST_CONCURRENT, true);
   assert.equal(maxActive > PARENTAL_BATCH_MAX_CONCURRENT, true);
   releaseBlocked();
