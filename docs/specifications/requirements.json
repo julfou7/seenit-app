@@ -30,7 +30,7 @@
         },
         {
           "file": "tests/backendRuntime.test.ts",
-          "contains": "SEENIT-PLATFORM-001 autorise le preflight des traces âge depuis AI Studio et l’APK"
+          "contains": "SEENIT-PLATFORM-001 autorise le preflight cross-origin avec les en-têtes SeenIt réellement émis"
         }
       ]
     },
