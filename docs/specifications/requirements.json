@@ -1765,6 +1765,10 @@
         {
           "file": "tests/publicMetadataCache.test.ts",
           "contains": "issue #410 branche détails Discover et recherche sur le cache commun"
+        },
+        {
+          "file": "tests/publicMetadataCache.test.ts",
+          "contains": "SEENIT-PERF-001 persiste les saisons TMDB avec TTL court et single-flight commun"
         }
       ]
     }

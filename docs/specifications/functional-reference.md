@@ -424,8 +424,10 @@ historique n'est plus une source runtime de la fiche.
 Une fiche déjà résolue doit se réafficher depuis le cache chaud sans repasser par un skeleton de deux à
 trois secondes. Les détails publics sont également persistés localement : après une réouverture récente de
 l'application, SeenIt peut afficher immédiatement le dernier snapshot admissible puis le rafraîchir
-silencieusement. Détails et relations restent indexés par `movie:<id>` / `tv:<id>`, les images principales
-gardent une URL stable et aucune donnée utilisateur n'entre dans ce cache public.
+silencieusement. Une saison déjà ouverte suit la même logique avec un TTL plus court : les réouvertures
+rapprochées n'appellent plus TMDB, tandis qu'une saison en cours peut être rafraîchie après deux heures.
+Détails et relations restent indexés par `movie:<id>` / `tv:<id>`, les images principales gardent une URL
+stable et aucune donnée utilisateur n'entre dans ce cache public.
 Le contrat complet est `SEENIT-PERF-001` et son suivi est
 [#146](https://github.com/julfou7/seenit-app/issues/146).
 

@@ -692,22 +692,53 @@ export class TMDBClient {
   }
 
   async getSeasonDetails(id: number, seasonNumber: number): Promise<Result<any>> {
+    const normalizedId = Number(id);
+    const normalizedSeason = Number(seasonNumber);
+    const cacheKey = `${normalizedId}:${normalizedSeason}`;
 
-    const url = new URL(`${this.baseUrl}/tv/${id}/season/${seasonNumber}?language=fr-FR&append_to_response=videos&include_video_language=fr,en,null`);
-    const res = await tryCatch(authenticatedFetch(url.toString()));
-    if (!res.ok) return err((res as any).error);
-    if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
-    const data = await tryCatch(res.value.json());
-    if (!data.ok) return err((data as any).error);
-    if (data.value && data.value.status_code) return err(new Error(data.value.status_message || 'TMDB Error'));
+    const decorateForEurope = async (raw: any) => {
+      if (!raw) return raw;
+      const tvDetails = this.detailsCache.get(`tv_${normalizedId}`)
+        || (await readPublicMetadataCache<any>('details', `tv_${normalizedId}`, { allowStale: true }))?.data;
+      adjustTMDBSeasonDataForEurope(raw, tvDetails?.networks);
+      return raw;
+    };
 
-    // Globally adjust season dates for European viewers if the show belongs to an offset network
-    if (data.value) {
-      const tvDetails = this.detailsCache.get(`tv_${id}`);
-      adjustTMDBSeasonDataForEurope(data.value, tvDetails?.networks);
-    }
+    const cached = await readPublicMetadataCache<any>('season', cacheKey, { allowStale: true });
+    if (cached?.fresh) return ok(await decorateForEurope(cached.data));
 
-    return data;
+    return runPublicMetadataSingleFlight('season', cacheKey, async (): Promise<Result<any>> => {
+      const queued = await readPublicMetadataCache<any>('season', cacheKey, { allowStale: true });
+      if (queued?.fresh) return ok(await decorateForEurope(queued.data));
+      const fallback = queued || cached;
+
+      const url = new URL(`${this.baseUrl}/tv/${normalizedId}/season/${normalizedSeason}?language=fr-FR&append_to_response=videos&include_video_language=fr,en,null`);
+      const res = await tryCatch(authenticatedFetch(url.toString()));
+      if (!res.ok) {
+        return fallback ? ok(await decorateForEurope(fallback.data)) : err((res as any).error);
+      }
+      if (!res.value.ok) {
+        return fallback && isPublicMetadataFallbackStatus(res.value.status)
+          ? ok(await decorateForEurope(fallback.data))
+          : err(new Error(`TMDB Error: ${res.value.status}`));
+      }
+
+      const data = await tryCatch(res.value.json());
+      if (!data.ok) {
+        return fallback ? ok(await decorateForEurope(fallback.data)) : err((data as any).error);
+      }
+      if (data.value && data.value.status_code) {
+        return err(new Error(data.value.status_message || 'TMDB Error'));
+      }
+
+      if (data.value) {
+        // Persist raw TMDB data first; the Europe adjustment depends on show
+        // metadata that may be warmer on a later read.
+        writePublicMetadataCache('season', cacheKey, data.value);
+        data.value = await decorateForEurope(data.value);
+      }
+      return data;
+    });
   }
 
   async getEpisodeDetails(id: number, seasonNumber: number, episodeNumber: number): Promise<Result<any>> {

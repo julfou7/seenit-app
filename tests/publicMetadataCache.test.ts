@@ -66,6 +66,39 @@ test('SEENIT-PERF-001 normalise les requêtes et ne persiste pas le texte de rec
   assert.equal(isPublicMetadataFallbackStatus(404), false);
 });
 
+test('SEENIT-PERF-001 persiste les saisons TMDB avec TTL court et single-flight commun', async () => {
+  clearPublicMetadataMemoryCacheForTests();
+  const key = '1396:2';
+  writePublicMetadataCache('season', key, { id: 2, episodes: [{ id: 1 }] }, { now: 1_000 });
+
+  const fresh = await readPublicMetadataCache<any>('season', key, {
+    now: 1_000 + PUBLIC_METADATA_CACHE_POLICIES.season.freshMs - 1,
+    allowStale: true,
+  });
+  assert.equal(fresh?.fresh, true);
+  assert.equal(fresh?.data.episodes[0].id, 1);
+
+  const stale = await readPublicMetadataCache<any>('season', key, {
+    now: 1_000 + PUBLIC_METADATA_CACHE_POLICIES.season.freshMs + 1,
+    allowStale: true,
+  });
+  assert.equal(stale?.fresh, false);
+  assert.equal(PUBLIC_METADATA_CACHE_POLICIES.season.freshMs, 2 * 60 * 60 * 1000);
+  assert.equal(PUBLIC_METADATA_CACHE_POLICIES.season.staleMs, 24 * 60 * 60 * 1000);
+  assert.equal(PUBLIC_METADATA_CACHE_POLICIES.season.persist, true);
+
+  const client = readFileSync('src/features/shows/tmdbClient.ts', 'utf8');
+  const seasonMethod = client.slice(
+    client.indexOf('async getSeasonDetails'),
+    client.indexOf('async getEpisodeDetails'),
+  );
+  assert.match(seasonMethod, /readPublicMetadataCache<any>\('season', cacheKey/);
+  assert.match(seasonMethod, /runPublicMetadataSingleFlight\('season', cacheKey/);
+  assert.match(seasonMethod, /writePublicMetadataCache\('season', cacheKey, data\.value\)/);
+  assert.match(seasonMethod, /isPublicMetadataFallbackStatus\(res\.value\.status\)/);
+  assert.match(seasonMethod, /writePublicMetadataCache[\s\S]*adjustTMDBSeasonDataForEurope/);
+});
+
 test('issue #410 branche détails Discover et recherche sur le cache commun', () => {
   const client = readFileSync('src/features/shows/tmdbClient.ts', 'utf8');
   const core = readFileSync('src/features/shows/tmdbCore.ts', 'utf8');

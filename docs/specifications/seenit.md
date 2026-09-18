@@ -475,6 +475,10 @@ n'est rouverte que par une nouvelle décision produit explicite.
   24 h comme valeur fraîche et restent utilisables jusqu'à 30 jours uniquement en `stale-if-error`.
   Les pages Discover restent fraîches 2 minutes et stale 30 minutes afin d'accélérer retour écran,
   annulation/réapplication de filtres et pages déjà parcourues sans figer durablement popularité ou notes.
+  Les saisons déjà ouvertes rejoignent la même couche : fraîcheur 2 heures, repli stale-if-error jusqu'à
+  24 heures, persistance bornée et single-flight partagé. Le payload brut TMDB est mis en cache avant
+  l'ajustement européen des dates afin que chaque lecture puisse appliquer les métadonnées réseau les plus
+  récentes connues pour la série.
   Les recherches restent en mémoire 5 minutes et ne sont pas persistées, car leur clé contient le texte
   saisi par l'utilisateur. Le stockage persistant public est borné à 320 entrées et 32 Mio ; un payload individuel supérieur à
   1 Mio reste uniquement en mémoire. Il ne contient ni UID,
