@@ -28,6 +28,13 @@ const MAX_DISCOVER_RESPONSE_BYTES = 4 * 1024 * 1024;
 
 type MediaType = 'movie' | 'tv';
 type CoreDependencies = Parameters<typeof registerCoreMediaProviderRoutes>[1];
+export interface ParentalEvidencePersistence {
+  read: (keys: string[]) => Promise<Map<string, any>>;
+  write: (entries: Array<{ key: string; details: any }>) => Promise<void>;
+}
+type MediaProviderDependencies = CoreDependencies & {
+  parentalEvidence?: ParentalEvidencePersistence;
+};
 interface ResponseSnapshot {
   body: string;
   status: number;
@@ -256,11 +263,13 @@ export function createParentalRatingPrefetchFetch(
   }) as typeof fetch;
 }
 
-export function registerMediaProviderRoutes(app: Application, dependencies: CoreDependencies): void {
+export function registerMediaProviderRoutes(app: Application, dependencies: MediaProviderDependencies): void {
   const upstream = dependencies.fetch || fetch;
   const acceleratedFetch = createParentalRatingPrefetchFetch(upstream);
   registerParentalRatingBatchRoute(app, {
     ...dependencies,
+    readPersisted: dependencies.parentalEvidence?.read,
+    writePersisted: dependencies.parentalEvidence?.write,
     // The explicit batch endpoint is the progressive age-filter contract. It must
     // execute only the media requested by the client; routing it through the old
     // Explorer warmup turns a one-item prefix into a hidden 20-item fan-out.

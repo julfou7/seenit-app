@@ -35,6 +35,31 @@ const TV_US_AGES: Record<string, number> = {
   '18': 18,
 };
 
+export interface MovieCertificationPrefilter {
+  country: 'US';
+  lte: 'G' | 'PG' | 'PG-13' | 'R';
+}
+
+export function buildMovieCertificationPrefilter(
+  maxAge: number | null,
+  overrides: Record<string, ParentalRatingOverride> = {},
+): MovieCertificationPrefilter | null {
+  if (maxAge === null || maxAge >= 18) return null;
+
+  const hasRescuingOverride = Object.entries(overrides).some(([key, override]) => (
+    key.startsWith('movie:')
+    && Number.isInteger(override?.age)
+    && override.age >= 0
+    && override.age <= maxAge
+  ));
+  if (hasRescuingOverride) return null;
+
+  if (maxAge >= 17) return { country: 'US', lte: 'R' };
+  if (maxAge >= 13) return { country: 'US', lte: 'PG-13' };
+  if (maxAge >= 10) return { country: 'US', lte: 'PG' };
+  return { country: 'US', lte: 'G' };
+}
+
 export const parentalRatingKey = (mediaType: ParentalMediaType, tmdbId: number): string => (
   `${mediaType}:${Number(tmdbId)}`
 );

@@ -13,12 +13,13 @@ import {
   rememberFrenchTheatricalEvidence,
 } from './cinemaPolicy';
 import {
+  buildMovieCertificationPrefilter,
   decorateParentalRatingDetails,
   matchesMaxRecommendedAge,
   parseMaxAgeFilter,
   resolveParentalRating,
 } from './parentalRating';
-import { getParentalRatingOverride } from '../../store/parentalRatingStore';
+import { getParentalRatingOverride, getParentalRatingOverridesSnapshot } from '../../store/parentalRatingStore';
 import { convergeTrackedMediaTitleFromTmdb } from './trackedMediaTitle';
 import { mediaKeyFrom } from './mediaRelations';
 import { getTVDBFranchiseRelation } from '../../services/tvdb';
@@ -260,6 +261,8 @@ export interface SeenItDiscoverOptions {
   watchProviders?: string[];
   genres?: string[];
   pegi?: string;
+  /** Borne interne : préfiltre la source sans appliquer deux fois le résolveur parental. */
+  parentalPrefilterMaxAge?: number;
   minRating?: string;
   sortBy?: 'popular' | 'rating' | 'date' | 'title';
   sortOrder?: 'asc' | 'desc';
@@ -316,6 +319,7 @@ export async function discoverSeenIt(options: SeenItDiscoverOptions) {
     watchProviders = [],
     genres = [],
     pegi = 'Tous',
+    parentalPrefilterMaxAge,
     minRating = 'Toutes',
     sortBy = 'popular',
     sortOrder = 'desc',
@@ -323,11 +327,25 @@ export async function discoverSeenIt(options: SeenItDiscoverOptions) {
 
   const categoryDefaultSort: 'popular' | 'rating' | 'date' | 'title' =
     (category === 'Top 100' || category === 'Pépites') && sortBy === 'popular' ? 'rating' : sortBy;
+  const sourceMaxAge = parentalPrefilterMaxAge === undefined
+    ? parseMaxAgeFilter(pegi)
+    : parentalPrefilterMaxAge;
 
   const fetchType = async (mediaType: 'tv' | 'movie') => {
     const params = new URLSearchParams();
     params.set('language', 'fr-FR');
     params.set('page', String(page));
+
+    if (mediaType === 'movie' && category !== 'Au cinéma' && sourceMaxAge !== null) {
+      const prefilter = buildMovieCertificationPrefilter(
+        sourceMaxAge,
+        getParentalRatingOverridesSnapshot(),
+      );
+      if (prefilter) {
+        params.set('certification_country', prefilter.country);
+        params.set('certification.lte', prefilter.lte);
+      }
+    }
 
     let sortParam = `popularity.${sortOrder}`;
     if (categoryDefaultSort === 'rating') sortParam = `vote_average.${sortOrder}`;

@@ -230,3 +230,51 @@ test('issue #326 coupe les appels TMDB quand le client abandonne le stream', asy
   assert.ok(started > 0, 'le backend doit avoir commencé la résolution fournisseur');
   assert.ok(aborted > 0, 'la fermeture du client doit interrompre les appels fournisseur déjà lancés');
 });
+
+
+test('issue #326 réutilise le cache fournisseur partagé au lieu de recharger puis rejeter', async t => {
+  const { send, calls } = await harness(t);
+  const items = 'movie:42,tv:142';
+
+  assert.equal((await send(items, 'cache')).status, 200);
+  assert.equal(calls.length, 2);
+  assert.equal((await send(items, 'cache')).status, 200);
+  assert.equal(calls.length, 2, 'une preuve TMDB réussie doit être réutilisée sans nouvel appel fournisseur');
+});
+
+test('issue #326 sert l’index parental persistant avant tout appel TMDB', async t => {
+  let providerCalls = 0;
+  let persistedWrites = 0;
+  const app = express();
+  registerParentalRatingBatchRoute(app, {
+    authenticate: ((req: any, _res, next) => { req.user = { uid: 'persisted' }; next(); }) as RequestHandler,
+    fetch: async () => {
+      providerCalls += 1;
+      throw new Error('TMDB ne doit pas être appelé pour une preuve persistée');
+    },
+    secrets: () => ({ TMDB_API_KEY: 'private-tmdb-key' }),
+    readPersisted: async keys => new Map(keys.map(key => [key, {
+      id: 7,
+      media_type: 'movie',
+      release_dates: { results: [{ iso_3166_1: 'US', release_dates: [{ certification: 'PG' }] }] },
+    }])),
+    writePersisted: async entries => { persistedWrites += entries.length; },
+  });
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  t.after(() => new Promise<void>((resolve, reject) => {
+    server.closeAllConnections();
+    server.close(error => error ? reject(error) : resolve());
+  }));
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+
+  const response = await fetch(
+    `http://127.0.0.1:${address.port}/api/media/parental-ratings?items=movie%3A7`,
+  );
+  assert.equal(response.status, 200);
+  const payload = await response.json() as any;
+  assert.equal(payload.results[0].details.release_dates.results[0].release_dates[0].certification, 'PG');
+  assert.equal(providerCalls, 0);
+  assert.equal(persistedWrites, 0, 'une preuve déjà indexée ne doit pas être réécrite');
+});

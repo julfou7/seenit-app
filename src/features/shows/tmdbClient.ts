@@ -12,6 +12,7 @@ import {
   type RelationMediaType,
 } from './mediaRelations';
 import { createWatchProviderRequestLimiter } from '../providers/watchProviderRequestPolicy';
+import { readParentalRatingCache, writeParentalRatingCache } from './parentalRatingCache';
 
 export const PARENTAL_RATING_MAX_CONCURRENT = 8;
 
@@ -418,7 +419,12 @@ export class TMDBClient {
     const normalizedId = Number(id);
     const fullDetails = this.detailsCache.get(`${type}_${normalizedId}`);
     if (fullDetails) return this.toParentalRatingDetails(normalizedId, type, fullDetails);
-    return this.parentalRatingDetailsCache.get(`${type}_${normalizedId}`) || null;
+    const memory = this.parentalRatingDetailsCache.get(`${type}_${normalizedId}`);
+    if (memory) return memory;
+    const persistent = readParentalRatingCache(normalizedId, type);
+    if (!persistent) return null;
+    this.parentalRatingDetailsCache.set(`${type}_${normalizedId}`, persistent.data);
+    return persistent.data;
   }
 
   async getParentalRatingDetails(id: number, type: RelationMediaType = 'tv'): Promise<Result<any>> {
@@ -445,6 +451,7 @@ export class TMDBClient {
 
       const details = this.toParentalRatingDetails(normalizedId, type, data.value || {});
       this.parentalRatingDetailsCache.set(cacheKey, details);
+      writeParentalRatingCache(normalizedId, type, details);
       return ok(details);
     });
 

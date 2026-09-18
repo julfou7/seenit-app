@@ -367,6 +367,7 @@
       "id": "SEENIT-PARENTAL-001",
       "title": "Classification d’âge conservatrice, explicite et synchronisée",
       "targets": [
+        "backend",
         "pwa",
         "apk"
       ],
@@ -406,6 +407,26 @@
         {
           "file": "tests/progressiveAgeTransport.test.ts",
           "contains": "SEENIT-PARENTAL-001 expose le diagnostic âge dans le preview sans donnée sensible"
+        },
+        {
+          "file": "tests/parentalRating.test.ts",
+          "contains": "SEENIT-PARENTAL-001 préfiltre les films sans perdre un override personnel"
+        },
+        {
+          "file": "tests/parentalRatingCache.test.ts",
+          "contains": "SEENIT-PARENTAL-001 persiste les preuves parentales sans transformer un inconnu"
+        },
+        {
+          "file": "tests/progressiveAgeTransport.test.ts",
+          "contains": "issue #326 réutilise l’index parental et préfiltre uniquement les films à la source"
+        },
+        {
+          "file": "tests/parentalRatingBatchRoute.test.ts",
+          "contains": "issue #326 réutilise le cache fournisseur partagé au lieu de recharger puis rejeter"
+        },
+        {
+          "file": "tests/parentalRatingBatchRoute.test.ts",
+          "contains": "issue #326 sert l’index parental persistant avant tout appel TMDB"
         }
       ]
     },
