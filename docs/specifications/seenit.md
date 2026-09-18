@@ -262,6 +262,12 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
   Une fiche média complète ne doit jamais être hydratée uniquement pour appliquer le filtre d'âge.
 - La fiche, les cartes et Explorer réutilisent le même résolveur ; aucune copie locale de mapping ou
   heuristique de genre n'est autorisée.
+- Le diagnostic de performance du filtre peut corréler temporairement son chemin client/backend avec un
+  UUID éphémère par génération. Les traces peuvent mesurer page, seuil d'âge, volumes, concurrence,
+  attente d'authentification/transport, ordre du stream, durées fournisseur et annulation, mais **jamais**
+  journaliser le jeton Firebase, un en-tête `Authorization`, l'UID, l'email, le titre, l'ID TMDB ni le
+  payload d'un média. Cette instrumentation n'altère ni le résultat, ni l'ordre, ni la source de vérité
+  parentale et reste distincte de l'auditeur d'incidents à haute confiance.
 
 ### 5.2.2 Notes TMDB uniques
 

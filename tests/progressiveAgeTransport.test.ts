@@ -8,10 +8,19 @@ import test from 'node:test';
 test('issue #326 v1.4.158 coalesce la vague parentale dans un transport authentifié streamé', () => {
   const client = readFileSync('src/features/discover/progressiveAgeFilter.ts', 'utf8');
   const backend = readFileSync('src/features/providers/parentalRatingBatchBackend.ts', 'utf8');
+  const apiAuth = readFileSync('src/lib/apiAuth.ts', 'utf8');
 
   assert.match(client, /parentalTransportPending = new Map/);
+  assert.match(apiAuth, /auth_headers_ready/);
+  assert.match(apiAuth, /http_response_headers/);
+  assert.match(apiAuth, /X-SeenIt-Age-Trace/);
   assert.match(client, /queueMicrotask\(\(\) => \{ void flushParentalTransport\(\); \}\)/);
   assert.match(client, /parental-ratings\?stream=1&items=/);
+  assert.match(client, /X-SeenIt-Age-Trace/);
+  assert.match(client, /transport_request_start/);
+  assert.match(client, /transport_response_headers/);
+  assert.match(client, /transport_stream_item/);
+  assert.match(client, /discover_complete/);
   assert.match(client, /response\.value\.body\.getReader\(\)/);
   assert.match(client, /pending\.deferred\.resolve\(/, 'une preuve reçue doit débloquer son média sans attendre la fin du stream');
   assert.match(client, /const PARENTAL_TRANSPORT_MAX_ITEMS = 40;/);
@@ -21,10 +30,41 @@ test('issue #326 v1.4.158 coalesce la vague parentale dans un transport authenti
   assert.match(client, /publishSnapshot\(\{ generation, page, partial: null \}\)/);
 
   assert.match(backend, /key !== 'items' && key !== 'stream'/);
+  assert.match(backend, /AGE_FILTER_REQUEST_TRACE/);
+  assert.match(backend, /provider_start/);
+  assert.match(backend, /provider_done/);
+  assert.match(backend, /stream_first_write/);
+  assert.match(backend, /request_complete/);
+  assert.match(backend, /ordinal/);
+  assert.match(backend, /maxActive/);
+  assert.match(backend, /maxQueued/);
+  assert.match(backend, /burstGrants/);
   assert.match(backend, /application\/x-ndjson/);
   assert.match(backend, /res\.write\(`\$\{JSON\.stringify\(result\)\}\\n`\)/);
-  assert.match(backend, /await Promise\.all\(items\.map\(async item => \{/);
-  assert.match(backend, /const results = await Promise\.all\(items\.map\(resolveItem\)\)/, 'le contrat JSON historique reste disponible hors mode stream');
+  assert.match(backend, /await Promise\.all\(items\.map\(async \(item, index\) => \{/);
+  assert.match(backend, /const results = await Promise\.all\(items\.map\(\(item, index\) => resolveItem\(item, index \+ 1\)\)\)/, 'le contrat JSON historique reste disponible hors mode stream');
+});
+
+
+test('SEENIT-PARENTAL-001 corrèle le diagnostic âge sans exposer de donnée sensible', () => {
+  const client = readFileSync('src/features/discover/progressiveAgeFilter.ts', 'utf8');
+  const backend = readFileSync('src/features/providers/parentalRatingBatchBackend.ts', 'utf8');
+  const apiAuth = readFileSync('src/lib/apiAuth.ts', 'utf8');
+
+  assert.match(client, /traceId: createAgeFilterTraceId\(\)/);
+  assert.match(client, /X-SeenIt-Age-Trace/);
+  assert.match(backend, /seenitDiagnostic/);
+  assert.match(backend, /AGE_FILTER_REQUEST_TRACE/);
+  assert.doesNotMatch(client, /logAgeFilterTrace\([^;]*(?:identity\.id|itemsParam)/s);
+  assert.doesNotMatch(backend, /traceLog\([^;]*(?:uid|credential|item\.id|target|api_key)/s);
+
+  const timingHelper = apiAuth.slice(
+    apiAuth.indexOf('function logAgeFilterRequestTiming'),
+    apiAuth.indexOf('export async function authenticatedFetch'),
+  );
+  assert.ok(timingHelper.length > 0);
+  assert.doesNotMatch(timingHelper, /Authorization|Bearer|token|headers/i);
+  assert.doesNotMatch(backend, /seenitEvent[\s\S]{0,120}AGE_FILTER_REQUEST_TRACE/);
 });
 
 
@@ -34,10 +74,10 @@ test('issue #326 propage l’annulation de génération jusqu’au transport par
 
   assert.match(client, /createSupersedingAbortController/);
   assert.match(client, /const requestSignal = requestController\.signal/);
-  assert.match(client, /dependencies\.resolveBatch\(prefix, requestSignal\)/);
-  assert.match(client, /authenticatedFetch\([^\n]+, \{ signal \}\)/);
+  assert.match(client, /dependencies\.resolveBatch\(prefix, requestSignal, trace\)/);
+  assert.match(client, /authenticatedFetch\([\s\S]*?\{ signal, headers: traceHeaders \}[\s\S]*?\)/);
   assert.match(client, /parentalTransportPending = new Map<AbortSignal \| undefined/);
-  assert.match(client, /if \(signal\?\.aborted\) return Promise\.resolve\(null\)/);
+  assert.match(client, /if \(signal\?\.aborted\) \{[\s\S]*?return Promise\.resolve\(null\);[\s\S]*?\}/);
 
   assert.match(backend, /res\.once\('close'/);
   assert.match(backend, /clientAbort\.abort\(\)/);
