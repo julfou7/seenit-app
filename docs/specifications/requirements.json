@@ -807,6 +807,14 @@
         {
           "file": "tests/logAuditorWorkflow.test.ts",
           "contains": "SEENIT-OBSERVABILITY-001 réutilise le provider WIF canonique sans le recréer"
+        },
+        {
+          "file": "tests/tmdbCacheDiagnostics.test.ts",
+          "contains": "SEENIT-OBSERVABILITY-001 agrège les deltas TMDB sans archiver les snapshots cumulés ni les identités"
+        },
+        {
+          "file": "tests/tmdbCacheDiagnostics.test.ts",
+          "contains": "issue #410 ignore les snapshots non comparables et reste report-only quand la baseline est insuffisante"
         }
       ]
     },

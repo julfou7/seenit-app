@@ -870,6 +870,10 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   redigé ; aucune issue n'est fermée automatiquement. Le compte de lecture dédié réutilise le
   provider WIF canonique déjà administré pour GitHub Actions : son bootstrap cible explicitement le
   projet SeenIt et ne tente jamais de recréer le pool ou le provider partagé après un échec de lecture.
+  Le même batch peut collecter des diagnostics de performance explicitement allowlistés en **report-only**.
+  Pour `TMDB_REQUEST_CACHE_SUMMARY`, seuls les deltas de compteurs par famille sont archivés ; les
+  snapshots bruts et identifiants d'instance servent uniquement au calcul temporaire puis sont supprimés.
+  Ces diagnostics ne peuvent ni créer ni enrichir automatiquement une issue GitHub.
 - Les clés TMDB et TVDB restent exclusivement côté backend et sont injectées depuis Secret Manager.
   OMDb et `OMDB_API_KEY` ne font plus partie du runtime ni du déploiement SeenIt.
 - La clé PKCS12 `seenit`, générée hors dépôt et matérialisée depuis GitHub Secrets, est l'unique clé

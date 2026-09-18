@@ -24,8 +24,11 @@ initialement `autoIssue=true`. `PLEX_SYNC_PARTIAL` reste report-only.
   `seenit-log-auditor@gen-lang-client-0201895414.iam.gserviceaccount.com` reçoit uniquement le rôle
   read-only `roles/logging.viewer` via `scripts/bootstrap-gcp-log-auditor.sh`. Il réutilise le provider
   WIF borné au dépôt et à `main`, sans clé JSON durable ni permission de déploiement.
-- Collecte : uniquement `seenit-app`, uniquement `jsonPayload.seenitEvent.schemaVersion=1`, six heures
+- Collecte anomalies : uniquement `seenit-app`, `jsonPayload.seenitEvent.schemaVersion=1`, six heures
   et 5 000 entrées au maximum.
+- Collecte diagnostics : le même batch peut lire séparément
+  `jsonPayload.seenitDiagnostic.code="TMDB_REQUEST_CACHE_SUMMARY"` avec les mêmes bornes. Cette voie
+  est **report-only** : elle n'alimente jamais les règles de création d'issue.
 
 Le bootstrap doit être rejoué une fois par un opérateur GCP autorisé après l'introduction du rôle :
 
@@ -59,6 +62,29 @@ allowlisté. Il ne contient pas le timestamp, la corrélation, un utilisateur, u
 Avant création, le job recherche une issue ouverte contenant son marqueur stable. Une issue existante
 est enrichie au plus toutes les six heures. Le job crée au plus trois issues par run et trois issues
 automatiques par jour UTC. Il ne ferme jamais une issue.
+
+## Baseline TMDB report-only
+
+Le cache TMDB backend émet périodiquement des compteurs **cumulés**. Le batch ne somme donc jamais les
+snapshots bruts : `scripts/summarize-tmdb-cache-diagnostics.cjs` groupe les événements par instance
+Cloud Run, exclut le premier snapshot de chaque instance puis ne conserve que les **deltas entre deux
+snapshots comparables**. Cela évite d'attribuer à la fenêtre courante des appels antérieurs au lot.
+
+Le rapport final contient uniquement des compteurs par famille : requêtes, hits mémoire, requêtes
+coalescées, appels upstream et octets upstream. Les identifiants d'instance servent seulement au calcul
+en mémoire du runner et ne sont jamais écrits dans l'artefact. Les fichiers Cloud bruts
+`seenit-structured-logs.json` et `seenit-tmdb-cache-diagnostics.json` restent dans `$RUNNER_TEMP`
+puis sont supprimés avant archivage.
+
+Le statut de baseline est :
+- `ready` à partir de deux intervalles comparables et 50 requêtes couvertes ;
+- `partial` lorsqu'au moins un delta est mesurable ;
+- `insufficient` lorsqu'aucun delta n'est encore comparable ;
+- `source_unavailable` si Cloud Logging ne peut pas être lu.
+
+Le workflow se déclenche aussi lors d'une modification de son propre collecteur sur `main`, afin de
+valider immédiatement la chaîne réelle après une évolution d'observabilité, puis revient au rythme
+périodique de six heures.
 
 ## Rejeu local redigé
 
