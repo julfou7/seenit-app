@@ -96,7 +96,11 @@ test('SEENIT-PERF-001 persiste les saisons TMDB avec TTL court et single-flight 
   assert.match(seasonMethod, /runPublicMetadataSingleFlight\('season', cacheKey/);
   assert.match(seasonMethod, /writePublicMetadataCache\('season', cacheKey, data\.value\)/);
   assert.match(seasonMethod, /isPublicMetadataFallbackStatus\(res\.value\.status\)/);
-  assert.match(seasonMethod, /writePublicMetadataCache[\s\S]*adjustTMDBSeasonDataForEurope/);
+  assert.match(
+    seasonMethod,
+    /writePublicMetadataCache\('season', cacheKey, data\.value\);[\s\S]*data\.value = await decorateForEurope\(data\.value\)/,
+    'le payload brut TMDB doit être persisté avant la décoration Europe',
+  );
 });
 
 test('issue #410 branche détails Discover et recherche sur le cache commun', () => {
