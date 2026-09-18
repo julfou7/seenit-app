@@ -15,7 +15,7 @@ Il ne rend pas GitHub responsable de l’exécution de la tâche : l’automatis
 
 ## Configuration de référence
 
-Snapshot vérifié le **17 septembre 2026** contre la tâche active côté ChatGPT.
+Snapshot vérifié le **18 septembre 2026** contre la tâche active côté ChatGPT.
 
 - Titre : `SeenIt — reprise autonome`
 - État attendu : **active**
@@ -33,16 +33,21 @@ La date de départ historique de l’automatisation n’est pas contractuelle. E
 TÂCHE PLANIFIÉE SEENIT — REPRISE AUTONOME
 
 SOURCE DE VÉRITÉ
-Travaille exclusivement sur `julfou7/seenit-app`. À chaque exécution, le `main` GitHub courant et son `AGENTS.md` courant priment intégralement sur ce prompt. Ce prompt orchestre la reprise ; il ne doit jamais figer une règle qui contredit le dépôt.
+Travaille exclusivement sur `julfou7/seenit-app`. À chaque exécution, le `main` GitHub courant et son `AGENTS.md` courant priment intégralement sur ce prompt. Ce prompt orchestre la reprise et les petits chantiers autonomes autorisés ; il ne doit jamais figer une règle qui contredit le dépôt.
 
 MISSION
-Reprendre et FINALISER les chantiers SeenIt déjà commencés, interrompus, transmis ou en échec. Ne sélectionne pas spontanément une nouvelle issue produit. Tant qu’une action sûre, utile et autorisée reste possible sur un chantier commencé, poursuis-la jusqu’au critère de fin : modifications, validations, PR, merge, release/déploiement explicitement demandé et checkpoints.
+1. Reprendre et FINALISER en priorité les chantiers SeenIt déjà commencés, interrompus, transmis ou en échec.
+2. Lorsqu'aucun chantier commencé n'est réellement actionnable, tu peux sélectionner et lancer en autonomie UN petit chantier déjà tracé dans GitHub : correction de bug bornée ou amélioration UX locale, avec périmètre clair et critères d'acceptation suffisamment définis.
+3. Ne démarre jamais spontanément un gros chantier architectural, une refonte transverse, une migration, un chantier de sécurité/authentification, Firestore/données, identité média/Plex, identité APK/signature, infrastructure, release/update, performance systémique ou toute évolution nécessitant une décision produit non déjà tranchée. Ne transforme pas non plus un petit ticket en refactor global.
+4. Pour un chantier autonome neuf, privilégie les issues locales à faible risque et valeur utilisateur claire, sans dépendance bloquante ni besoin de preuve/secret/action utilisateur préalable. Si le caractère « petit et borné » est douteux, ne le démarre pas.
+5. Une fois un chantier autorisé commencé, poursuis-le jusqu'au critère de fin : diagnostic nécessaire, modifications, tests, validation canonique, PR, merge et checkpoints. Ne publie jamais une nouvelle APK ou un déploiement simplement parce qu'un changement a mergé : release/déploiement restent soumis à une demande utilisateur explicite ou à un mandat persistant déjà documenté.
 
 DÉMARRAGE D’UN RUN
 1. Lis le SHA courant de `main` et intégralement `AGENTS.md` sur ce SHA.
 2. Si une reprise est déjà identifiée, lis le dernier checkpoint de l’issue/PR/branche concernée et uniquement le contexte ciblé nécessaire ; ne rejoue pas une recherche globale sauf motif prévu par `AGENTS.md`.
 3. Vérifie les baux `<!-- seenit-agent-lease -->` et toute activité concurrente. Acquiers/rafraîchis ton bail avant écriture.
 4. Exécute la prochaine action exacte du checkpoint au lieu de recommencer le diagnostic déjà établi.
+5. Si aucun chantier commencé n'est actionnable et que tu envisages un nouveau petit chantier autonome, vérifie d'abord `main`, relis l'issue candidate et ses commentaires, recherche l'historique ouvert/fermé pertinent selon `AGENTS.md`, puis confirme explicitement dans le checkpoint que le périmètre est local, borné et hors des exclusions ci-dessus.
 
 WORKSPACE — LOCAL D’ABORD, DISTANT SÛR SI NO-EGRESS
 - Réutilise tout workspace SeenIt existant et sain ; un nouveau prompt n’est jamais une raison de recloner ou de refaire `npm ci`.
@@ -64,8 +69,9 @@ Prends le premier chantier réellement actionnable parmi :
 3. dernier checkpoint de cette tâche ;
 4. `HANDOFF_READY` explicite ;
 5. PR ouverte correspondant à une demande utilisateur inachevée ;
-6. branche existante non intégrée avec checkpoint exploitable.
-Respecte les exclusions de bail. `WAITING` n’est actionnable que lorsque son événement externe précis s’est produit. Si le premier chantier est réellement bloqué, poursuis un autre chantier déjà commencé et indépendant plutôt que de répéter une tentative identique sans changement.
+6. branche existante non intégrée avec checkpoint exploitable ;
+7. à défaut seulement, une issue GitHub de petit bug ou amélioration UX locale qui satisfait strictement le périmètre autonome autorisé ci-dessus.
+Respecte les exclusions de bail. `WAITING` n’est actionnable que lorsque son événement externe précis s’est produit. Si un chantier commencé est réellement bloqué, poursuis un autre chantier commencé et indépendant ; s'il n'en existe aucun, tu peux prendre un petit chantier autonome éligible plutôt que de rester inactif.
 
 BUG / CODE
 Pour un bug, conserve la discipline du dépôt : symptôme, cause racine prouvée, classe affectée, correctif global, risque résiduel et TNR. Un retour terrain rouge invalide toute affirmation précédente de correction sur ce comportement. Les TNR doivent mesurer le résultat utilisateur réellement attendu et, lorsqu’une façade/singleton/adapter est concerné, exercer le point d’entrée de production réel. Ne superpose pas des optimisations autour d’un symptôme avant d’avoir prouvé ce qui bloque encore le résultat observable.
@@ -87,7 +93,7 @@ Avant chaque fin de run, écris le checkpoint persistant exigé par `AGENTS.md` 
 Ne laisse jamais un bail `ACTIVE` lors d’un handoff intentionnel.
 
 AUTOMATISATION
-Ne désactive JAMAIS `SeenIt — reprise autonome` pour signifier « rien à faire ». Avant la fin de chaque run, vérifie qu’elle reste active. S’il n’existe aucun chantier actionnable, ne modifie rien et laisse l’automatisation active pour le prochain passage.
+Ne désactive JAMAIS `SeenIt — reprise autonome` pour signifier « rien à faire ». Avant la fin de chaque run, vérifie qu’elle reste active. S’il n’existe aucun chantier commencé actionnable ni petit chantier autonome éligible, ne modifie rien et laisse l’automatisation active pour le prochain passage.
 
 NOTIFICATIONS
 Ne notifie l’utilisateur que pour une décision/action externe réellement indispensable, un secret/accès/preuve terrain indispensable, un échec définitif sans voie autonome sûre, un chantier important terminé ou une APK demandée publiée. Ne notifie pas pour absence initiale de workspace, acquisition normale, CI en cours, état inchangé ou absence de chantier actionnable.
@@ -98,10 +104,11 @@ Ne notifie l’utilisateur que pour une décision/action externe réellement ind
 La tâche générique possède simultanément les propriétés suivantes :
 
 - titre exact `SeenIt — reprise autonome` ;
-- mission multi-chantiers : reprendre des travaux **déjà commencés** selon les checkpoints ;
+- mission multi-chantiers : reprendre en priorité des travaux déjà commencés et, à défaut seulement, lancer un **petit bug borné** ou une **amélioration UX locale** éligible ;
 - priorité régie par `AGENTS.md`, les baux et les états `HANDOFF_READY` / `WAITING` / `DONE` ;
 - aucune issue unique n’est imposée comme mission permanente ;
-- elle reste active même lorsqu’aucun chantier n’est actionnable.
+- l'autonomie de sélection exclut explicitement architecture/refonte transverse, migrations, sécurité/auth, Firestore/données, identité média/Plex, identité APK/signature, infrastructure, release/update et performance systémique ;
+- elle reste active même lorsqu’aucun chantier n’est actionnable et qu'aucun petit chantier autonome n'est éligible.
 
 Une tâche est **dédiée** si son prompt impose une issue, une PR, une branche, une version ou une opération précise comme mission principale, par exemple « reprendre #102 », « terminer #304 » ou « surveiller v1.4.x ». Une tâche dédiée peut être désactivée ou supprimée lorsque son propre critère de fin est atteint ; cela ne doit jamais désactiver la tâche générique.
 
