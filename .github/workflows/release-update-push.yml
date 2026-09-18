@@ -13,6 +13,11 @@ on:
         description: SHA main exact publié par ce run
         required: true
         type: string
+      fast_terrain:
+        description: Le run source a publié une release terrain rapide
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   actions: read
@@ -49,4 +54,5 @@ jobs:
           RELEASE_REPOSITORY: ${{ github.repository }}
           RELEASE_RUN_ID: ${{ github.event.client_payload.release_run_id || inputs.release_run_id }}
           RELEASE_HEAD_SHA: ${{ github.event.client_payload.release_head_sha || inputs.release_head_sha }}
+          RELEASE_FAST_TERRAIN: ${{ github.event.client_payload.fast_terrain || inputs.fast_terrain || false }}
           RELEASE_WAIT_FOR_COMPLETION: 'true'
