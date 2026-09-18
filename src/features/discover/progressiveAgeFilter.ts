@@ -24,8 +24,11 @@ interface BatchIdentity { item: any; mediaType: MediaType; id: number; key: stri
 interface DeferredDetails { promise: Promise<any | null>; resolve: (value: any | null) => void; }
 
 const BATCH_CACHE_MAX = 240;
-const PARENTAL_PROGRESSIVE_MAX_CONCURRENT = 24;
 const PARENTAL_TRANSPORT_MAX_ITEMS = 40;
+// Le scheduler client doit remplir tout le transport avant la microtask de flush.
+// La concurrence fournisseur reste bornée côté backend à 24.
+const PARENTAL_PROGRESSIVE_MAX_CONCURRENT = PARENTAL_TRANSPORT_MAX_ITEMS;
+const PROGRESSIVE_SNAPSHOT_BATCH_MS = 120;
 const parentalBatchCache = new Map<string, any>();
 const parentalTransportPending = new Map<string, { identity: BatchIdentity; deferred: DeferredDetails }>();
 let parentalTransportFlushScheduled = false;
@@ -122,6 +125,25 @@ export function createProgressiveAgeDiscover(
     const generation = ++currentGeneration;
     const page = Number(options?.page || 1);
     const maxAge = parseMaxAgeFilter(options?.pegi || 'Tous');
+    let pendingSnapshot: ProgressiveAgeSnapshot | null = null;
+    let pendingSnapshotTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const flushPendingSnapshot = () => {
+      pendingSnapshotTimer = null;
+      const snapshot = pendingSnapshot;
+      pendingSnapshot = null;
+      if (snapshot && shouldApplyProgressivePartial(generation, currentGeneration, page)) {
+        publishSnapshot(snapshot);
+      }
+    };
+
+    const queueProgressiveSnapshot = (partial: ProgressiveDiscoverPartial) => {
+      if (!shouldApplyProgressivePartial(generation, currentGeneration, page)) return;
+      pendingSnapshot = { generation, page, partial };
+      if (pendingSnapshotTimer === null) {
+        pendingSnapshotTimer = setTimeout(flushPendingSnapshot, PROGRESSIVE_SNAPSHOT_BATCH_MS);
+      }
+    };
     if (page === 1) publishSnapshot(maxAge === null ? null : { generation, page, partial: null });
     if (maxAge === null) return dependencies.discover(options);
     const baseResult = await dependencies.discover({ ...options, pegi: 'Tous' });
@@ -147,10 +169,20 @@ export function createProgressiveAgeDiscover(
       partialResults => {
         const partial: ProgressiveDiscoverPartial = { ...baseResult.value, results: partialResults };
         if (onPartial) onPartial(partial);
-        if (shouldApplyProgressivePartial(generation, currentGeneration, page)) publishSnapshot({ generation, page, partial });
+        queueProgressiveSnapshot(partial);
       },
       PARENTAL_PROGRESSIVE_MAX_CONCURRENT,
     );
+
+    if (pendingSnapshotTimer !== null) {
+      clearTimeout(pendingSnapshotTimer);
+      pendingSnapshotTimer = null;
+    }
+    if (pendingSnapshot && shouldApplyProgressivePartial(generation, currentGeneration, page)) {
+      publishSnapshot(pendingSnapshot);
+      pendingSnapshot = null;
+    }
+
     return ok({ ...baseResult.value, results: accepted });
   };
 }

@@ -132,6 +132,43 @@ test('issue #326 v1.4.157 publie un résultat sûr au-delà des six premiers can
   assert.deepEqual(await run, [18]);
 });
 
+// TNR terrain #326 v1.4.159 : une page "Tout" peut contenir 40 candidats.
+// Les positions 25-40 doivent entrer dans le transport initial, même si les 24
+// premières preuves restent bloquées. La borne 24 appartient au backend fournisseur,
+// pas au scheduler de coalescing client.
+test('issue #326 v1.4.159 démarre les 40 candidats avant qu’un des 24 premiers ne se débloque', async () => {
+  const items = Array.from({ length: 40 }, (_, index) => index + 1);
+  const releaseBlocked = deferred<void>();
+  const firstPartial = deferred<number[]>();
+  const started: number[] = [];
+  let settled = false;
+
+  const run = filterResolvedPrefixes<number, boolean, number>(
+    items,
+    1,
+    async prefix => {
+      const id = prefix[0];
+      started.push(id);
+      if (id <= 24) await releaseBlocked.promise;
+      return [id === 37];
+    },
+    (item, eligible) => eligible ? item : null,
+    partial => firstPartial.resolve(partial),
+    40,
+  ).then(value => {
+    settled = true;
+    return value;
+  });
+
+  const first = await firstPartial.promise;
+  assert.deepEqual(first, [37], 'un résultat rare après la position 24 doit être publiable dans la vague initiale');
+  assert.equal(started.length, 40, 'toute la page brute doit être enqueued avant le premier refill');
+  assert.equal(settled, false, 'les 24 premières preuves peuvent rester lentes sans retenir le résultat profond');
+
+  releaseBlocked.resolve();
+  assert.deepEqual(await run, [37]);
+});
+
 test('issue #326 borne la concurrence des préfixes pendant qu’un lot reste lent', async () => {
   const items = Array.from({ length: 24 }, (_, index) => index + 1);
   const blocked = deferred<number[]>();
@@ -202,13 +239,28 @@ test('issue #326 le point d’entrée production utilise le moteur progressif sa
   );
   assert.match(
     progressiveIntegration,
-    /const PARENTAL_PROGRESSIVE_MAX_CONCURRENT = 24;/,
-    'la fenêtre de classification restrictive doit couvrir au-delà des six cartes visibles',
+    /const PARENTAL_TRANSPORT_MAX_ITEMS = 40;/,
+    'le transport parental doit conserver sa capacité d’une page Tout complète',
+  );
+  assert.match(
+    progressiveIntegration,
+    /const PARENTAL_PROGRESSIVE_MAX_CONCURRENT = PARENTAL_TRANSPORT_MAX_ITEMS;/,
+    'le scheduler client doit enqueuer toute la page avant la microtask de transport',
   );
   assert.match(
     parentalBatchBackend,
     /PARENTAL_BATCH_MAX_CONCURRENT = 24;/,
-    'la concurrence cliente doit rester alignée sur la borne explicite du backend',
+    'la vraie concurrence fournisseur reste bornée côté backend',
+  );
+  assert.doesNotMatch(
+    progressiveIntegration,
+    /const PARENTAL_PROGRESSIVE_MAX_CONCURRENT = 24;/,
+    'la borne fournisseur ne doit plus tronquer la fenêtre de coalescing client',
+  );
+  assert.match(
+    progressiveIntegration,
+    /const PROGRESSIVE_SNAPSHOT_BATCH_MS = 120;/,
+    'les lignes NDJSON proches doivent être regroupées avant le repaint de la grille',
   );
   assert.match(
     progressiveIntegration,
