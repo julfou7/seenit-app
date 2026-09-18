@@ -164,7 +164,7 @@ export function writeParentalRatingCache(
   else persistStore(storage, store, now);
 }
 
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
   window.addEventListener('pagehide', () => flushParentalRatingCache());
   window.addEventListener('storage', event => {
     if (event.key !== PARENTAL_RATING_CACHE_STORAGE_KEY) return;
@@ -177,7 +177,7 @@ if (typeof window !== 'undefined') {
   });
 }
 
-if (typeof document !== 'undefined') {
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') flushParentalRatingCache();
   });
