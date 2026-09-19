@@ -21,7 +21,7 @@ Le proxy classe tous les appels TMDB dans les familles ci-dessous. Son cache com
 
 | Famille | Endpoints / surface | Cache client | Fraîcheur / stale | Persistance | Volatilité / décision |
 | --- | --- | --- | --- | --- | --- |
-| `details` | `/{movie,tv}/:id` + append credits, ratings, IDs, images, keywords ; fiches | couche commune | 24 h / 30 j stale-if-error transitoire | IndexedDB, ≤120 mémoire | moyenne ; payload lourd, >1 Mio reste mémoire-only |
+| `details` | `/{movie,tv}/:id` + append credits, ratings, IDs, images, keywords ; fiches | couche commune + snapshot `detail_render` | 24 h / 30 j stale-if-error transitoire | détail complet IndexedDB si ≤1 Mio ; `detail_render` compact persistant, ≤80 mémoire | moyenne ; un payload complet >1 Mio reste mémoire-only mais ne prive plus le premier rendu de titre/synopsis/genres/keywords |
 | `discover` | `/discover/{movie,tv}` + listes Explorer visibles (`trending`/`popular`/Top/Pépites/Documentaires) ; filtres et pages | couche commune | 2 min / 30 min | IndexedDB, ≤96 mémoire | forte ; ordre/popularité évoluent vite |
 | `search` | `/search/movie|tv|multi|person` ; recherche | couche commune | 5 min / 30 min | **mémoire seulement**, ≤80 | forte ; le texte utilisateur n'est jamais persisté |
 | `season` | `/tv/:id/season/:n` ; liste d'épisodes d'une saison | couche commune | 2 h / 24 h | IndexedDB, ≤80 mémoire | moyenne ; saison en cours susceptible d'évoluer |
@@ -147,6 +147,32 @@ La phase 3 corrige ces deux écarts sans étendre le stockage :
 Le TNR ne se contente plus de prouver qu'une donnée est cachée : il vérifie aussi que le cache détails
 est tenté **avant le premier rendu froid** et que le chemin Explorer réellement affiché ne contourne plus
 la couche commune.
+
+## Retour terrain v1.4.169 — snapshot de premier rendu
+
+Le terrain v1.4.169 a montré qu'un hit cache « logique » ne suffisait pas encore : la section
+**Catégories & Thèmes** pouvait repasser brièvement en skeleton après redémarrage.
+
+Deux causes partageaient le même symptôme :
+
+- l'amorce IndexedDB était abandonnée après 40 ms, donc un stockage local simplement plus lent pouvait
+  laisser monter la fiche comme froide ;
+- le payload `details` complet peut dépasser 1 Mio à cause des crédits et listes d'images, auquel cas
+  la garde d'architecture le conservait uniquement en mémoire et rien ne survivait au restart.
+
+La correction #146 sépare désormais le besoin de **premier paint** du payload complet :
+
+- un `detail_render` compact conserve titre, synopsis, poster/fond, genres, keywords et quelques
+  métadonnées légères ;
+- ce snapshot partage le cache public borné, TTL 24 h / stale 30 j et reste largement sous 1 Mio même
+  lorsque le détail source est massif ;
+- l'ouverture d'une fiche attend uniquement cette lecture locale cache-only avant de monter le composant,
+  sans timeout arbitraire ni appel fournisseur ;
+- le détail complet continue de charger ensuite pour casting, relations et autres sections lourdes ;
+- un ancien détail IndexedDB frais est converti localement vers `detail_render` pour migration douce.
+
+Les limites globales restent 320 entrées / 32 Mio / 1 Mio par entrée ; aucune nouvelle donnée privée ni
+lecture Firestore n'est ajoutée.
 
 ## Critère de réouverture
 

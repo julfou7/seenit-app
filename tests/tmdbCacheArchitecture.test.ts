@@ -33,7 +33,7 @@ test('SEENIT-PERF-001 borne toutes les mémoires TMDB et n’ajoute aucun Firest
   assert.equal(PUBLIC_METADATA_CACHE_MAX_ENTRY_BYTES, 1024 * 1024);
   assert.deepEqual(
     Object.fromEntries(Object.entries(PUBLIC_METADATA_CACHE_POLICIES).map(([family, policy]) => [family, policy.memoryMaxEntries])),
-    { details: 120, discover: 96, search: 80, season: 80 },
+    { detail_render: 80, details: 120, discover: 96, search: 80, season: 80 },
   );
 
   assert.match(clientSource, /export const EPISODE_DETAILS_CACHE_MAX_ENTRIES = 120/);

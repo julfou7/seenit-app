@@ -64,7 +64,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const effectiveTmdbId = show?.tmdbId || (externalTmdbId ? Number(externalTmdbId) : undefined) || persistentTmdbIdRef.current;
   const requestedMediaType: 'tv' | 'movie' = show?.mediaType === 'movie' || externalMediaType === 'movie' ? 'movie' : 'tv';
   const requestedMediaKey = effectiveTmdbId ? toMediaKey(requestedMediaType, Number(effectiveTmdbId)) : null;
-  const cachedInitialDetails = effectiveTmdbId ? tmdb.peekMediaDetails(Number(effectiveTmdbId), requestedMediaType) : null;
+  const cachedInitialDetails = effectiveTmdbId ? tmdb.peekRenderableMediaDetails(Number(effectiveTmdbId), requestedMediaType) : null;
   const cachedInitialRelations = effectiveTmdbId
     ? tmdb.peekUniverseAndCollection({ ...(cachedInitialDetails || {}), id: Number(effectiveTmdbId), media_type: requestedMediaType })
     : null;
@@ -405,7 +405,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     if (!effectiveTmdbId || !requestedMediaKey) return;
     if (lastLoadedMediaKeyRef.current === requestedMediaKey) return;
     lastLoadedMediaKeyRef.current = requestedMediaKey;
-    const cachedDetails = tmdb.peekMediaDetails(Number(effectiveTmdbId), requestedMediaType);
+    const cachedDetails = tmdb.peekRenderableMediaDetails(Number(effectiveTmdbId), requestedMediaType);
     const cachedRelations = tmdb.peekUniverseAndCollection({ ...(cachedDetails || {}), id: Number(effectiveTmdbId), media_type: requestedMediaType });
     const cachedProviders = tmdb.peekWatchProviders(Number(effectiveTmdbId), requestedMediaType);
     setTmdbDetails(cachedDetails);

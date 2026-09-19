@@ -472,6 +472,12 @@ n'est rouverte que par une nouvelle décision produit explicite.
   en vol partagent une seule Promise, y compris lorsqu'elles viennent de surfaces différentes.
 - Le cache chaud mémoire reste prioritaire. Les détails média sont persistés dans IndexedDB pendant
   24 h comme valeur fraîche et restent utilisables jusqu'à 30 jours uniquement en `stale-if-error`.
+  En complément, chaque détail résolu produit un **snapshot de premier rendu** public, typé et compact
+  (`detail_render`) qui conserve les champs immédiatement visibles — titre, synopsis, affiche/fond,
+  catégories, thèmes, quelques logos/vidéos et les métadonnées structurelles légères. Ce snapshot est
+  borné à 80 entrées mémoire, partage les limites globales IndexedDB et reste persistable même lorsque
+  le payload TMDB complet dépasse la limite individuelle de 1 Mio. Il ne contient ni casting massif,
+  listes d'images complètes, similaires ni recommandations.
   Les pages Discover restent fraîches 2 minutes et stale 30 minutes afin d'accélérer retour écran,
   annulation/réapplication de filtres et pages déjà parcourues sans figer durablement popularité ou notes.
   Les saisons déjà ouvertes rejoignent la même couche : fraîcheur 2 heures, repli stale-if-error jusqu'à
@@ -484,12 +490,14 @@ n'est rouverte que par une nouvelle décision produit explicite.
   1 Mio reste uniquement en mémoire. Il ne contient ni UID,
   progression, préférences, token Plex ni autre donnée privée.
 - Le skeleton de page est réservé au premier chargement réellement froid. Le parcours A → B → A, y
-  compris après une réouverture récente de l'application lorsque le snapshot persistant est encore
-  admissible, tente d'abord une **hydratation cache-only IndexedDB** avant de décider qu'une fiche est
-  froide. Ce préamorçage ne déclenche aucun fournisseur et dispose d'un budget de **40 ms maximum** :
-  un hit local évite le flash de skeleton ; une absence ou un stockage lent retombe immédiatement sur
-  le shell froid progressif normal. En cas d'échec réseau, la dernière valeur complète reste affichable
-  (`stale-if-error`).
+  compris après une réouverture récente de l'application, résout d'abord **cache-only** le snapshot
+  `detail_render` correspondant avant de monter la fiche. Il n'existe plus de timeout arbitraire qui
+  laisse monter une fiche chaude comme froide : la lecture locale ciblée est attendue, ne déclenche aucun
+  fournisseur, puis le détail complet se rafraîchit en arrière-plan. Si un ancien cache ne possède pas
+  encore de `detail_render`, un détail IndexedDB frais est converti localement et rétro-remplit ce
+  snapshot sans réseau. Ainsi une fiche dont le payload complet dépasse 1 Mio conserve malgré tout
+  titre, synopsis, catégories et thèmes au premier rendu après restart. En cas d'échec réseau, la dernière
+  valeur complète reste affichable (`stale-if-error`).
 - Les listes médias visibles d'Explorer, y compris le chemin par défaut **Tout** construit avec
   `trending` et `popular`, passent par la même famille de cache **Discover** (2 min frais / 30 min
   stale). Les catégories Top 100, Pépites et Documentaires réutilisent cette politique via leurs helpers

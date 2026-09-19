@@ -68,7 +68,6 @@ const tabScreenPreloaders: Record<string, () => Promise<unknown>> = {
   downloads: loadDownloadsScreen
 };
 
-const MEDIA_DETAIL_CACHE_PRIME_BUDGET_MS = 40;
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null | undefined>(undefined);
@@ -247,14 +246,9 @@ function MainApp() {
     }
 
     void (async () => {
-      await Promise.race([
-        import('./features/shows/tmdb')
-          .then(({ tmdb }) => tmdb.primeMediaDetailsFromPersistentCache(resolvedTmdbId, resolvedMediaType))
-          .catch(() => false),
-        new Promise<boolean>(resolve => {
-          globalThis.setTimeout(() => resolve(false), MEDIA_DETAIL_CACHE_PRIME_BUDGET_MS);
-        }),
-      ]);
+      await import('./features/shows/tmdb')
+        .then(({ tmdb }) => tmdb.primeMediaRenderSnapshotFromPersistentCache(resolvedTmdbId, resolvedMediaType))
+        .catch(() => false);
       commitOpen();
     })();
   }, [openShow, shows]);
