@@ -1777,6 +1777,14 @@
         {
           "file": "tests/tmdbCacheArchitecture.test.ts",
           "contains": "issue #410 documente chaque famille TMDB et la décision âge diffuseurs"
+        },
+        {
+          "file": "tests/mediaDetailPerformance.test.ts",
+          "contains": "SEENIT-PERF-001 amorce le cache persistant avant d’ouvrir une fiche après redémarrage"
+        },
+        {
+          "file": "tests/tmdbCacheArchitecture.test.ts",
+          "contains": "issue #410 route Explorer Tout par le cache Discover commun"
         }
       ]
     }

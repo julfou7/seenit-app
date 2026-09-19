@@ -23,6 +23,8 @@ const clientSource = readFileSync('src/features/shows/tmdbClient.ts', 'utf8');
 const publicCacheSource = readFileSync('src/features/shows/publicMetadataCache.ts', 'utf8');
 const backendSource = readFileSync('src/features/providers/mediaProviderBackendCore.ts', 'utf8');
 const serverSource = readFileSync('server.ts', 'utf8');
+const coreSource = readFileSync('src/features/shows/tmdbCore.ts', 'utf8');
+const discoverScreenSource = readFileSync('src/screens/DiscoverScreen.tsx', 'utf8');
 const audit = readFileSync('docs/audits/tmdb-cache-architecture-2026-09-19.md', 'utf8');
 
 test('SEENIT-PERF-001 borne toutes les mémoires TMDB et n’ajoute aucun Firestore générique', () => {
@@ -127,4 +129,34 @@ test('issue #410 documente chaque famille TMDB et la décision âge diffuseurs',
   assert.match(audit, /architecture #410 : 9 appels potentiels/);
   assert.match(audit, /35,7 %/);
   assert.match(audit, /83,3 %/);
+});
+
+test('issue #410 route Explorer Tout par le cache Discover commun', () => {
+  assert.match(
+    clientSource,
+    /async getCachedDiscoverResponse[\s\S]*?readPublicMetadataCache<SearchResponse>\('discover'[\s\S]*?runPublicMetadataSingleFlight\('discover'/,
+  );
+
+  const methodSlice = (name: string, nextName: string) => {
+    const start = clientSource.indexOf(`async ${name}`);
+    const end = clientSource.indexOf(`async ${nextName}`, start);
+    assert.ok(start >= 0 && end > start, `méthode ${name} introuvable`);
+    return clientSource.slice(start, end);
+  };
+
+  for (const [name, nextName] of [
+    ['getTopRated', 'getTopRatedRecent'],
+    ['getTopRatedRecent', 'getTrending'],
+    ['getTrending', 'discoverByGenre'],
+    ['discoverByGenre', 'getPopular'],
+    ['getPopular', 'getPopularPersons'],
+  ] as const) {
+    assert.match(methodSlice(name, nextName), /getCachedDiscoverResponse/);
+  }
+
+  assert.doesNotMatch(methodSlice('getPopularPersons', 'getNowPlaying'), /getCachedDiscoverResponse/);
+  assert.match(coreSource, /const fetchCachedDiscoverPayload = async \(url: string\) => tmdbClient\.getCachedDiscoverResponse\(url\)/);
+  assert.match(discoverScreenSource, /tmdb\.getTrending\('all', page, selectedPlatforms\)/);
+  assert.match(discoverScreenSource, /tmdb\.getPopular\('tv', page, selectedPlatforms\)/);
+  assert.match(discoverScreenSource, /tmdb\.getPopular\('movie', page, selectedPlatforms\)/);
 });

@@ -22,7 +22,7 @@ Le proxy classe tous les appels TMDB dans les familles ci-dessous. Son cache com
 | Famille | Endpoints / surface | Cache client | Fraîcheur / stale | Persistance | Volatilité / décision |
 | --- | --- | --- | --- | --- | --- |
 | `details` | `/{movie,tv}/:id` + append credits, ratings, IDs, images, keywords ; fiches | couche commune | 24 h / 30 j stale-if-error transitoire | IndexedDB, ≤120 mémoire | moyenne ; payload lourd, >1 Mio reste mémoire-only |
-| `discover` | `/discover/{movie,tv}` ; Explorer canonique, filtres et pages | couche commune | 2 min / 30 min | IndexedDB, ≤96 mémoire | forte ; ordre/popularité évoluent vite |
+| `discover` | `/discover/{movie,tv}` + listes Explorer visibles (`trending`/`popular`/Top/Pépites/Documentaires) ; filtres et pages | couche commune | 2 min / 30 min | IndexedDB, ≤96 mémoire | forte ; ordre/popularité évoluent vite |
 | `search` | `/search/movie|tv|multi|person` ; recherche | couche commune | 5 min / 30 min | **mémoire seulement**, ≤80 | forte ; le texte utilisateur n'est jamais persisté |
 | `season` | `/tv/:id/season/:n` ; liste d'épisodes d'une saison | couche commune | 2 h / 24 h | IndexedDB, ≤80 mémoire | moyenne ; saison en cours susceptible d'évoluer |
 | `episode` | `/tv/:id/season/:n/episode/:n` ; ouverture épisode | cache LRU dédié | 30 min, pas de stale | mémoire seulement, **≤120** | moyenne ; aucune répétition observée dans la baseline, donc pas de persistance |
@@ -31,7 +31,7 @@ Le proxy classe tous les appels TMDB dans les familles ci-dessous. Son cache com
 | `collection` | `/collection/:id` ; saga/collection | LRU dédié + single-flight | session ; backend 5 min | aucune | faible ; LRU 40 côté client, pas de signal justifiant IndexedDB |
 | `find` | `/find/:externalId` ; résolution d'identité exacte | backend générique | 5 min backend | aucune | faible ; appel ponctuel, identité technique |
 | `person` | personne, crédits combinés, popularité personne | backend générique | 5 min backend | aucune | moyenne ; surface ponctuelle, pas de signal terrain |
-| `trending` | `/trending/*` et helpers historiques de découverte | backend générique | 5 min backend | aucune | très forte ; le chemin Explorer canonique préfère Discover normalisé |
+| `trending` | `/trending/*` et helpers de découverte | couche Discover côté Explorer ; backend générique ailleurs | 2 min / 30 min côté client Explorer ; 5 min backend | IndexedDB lorsqu'affiché dans Explorer | très forte ; même politique courte que Discover |
 | `metadata` | keywords/recommendations/similar/external_ids/credits/images/videos | détails lorsque déjà appendus, sinon backend | détails 24 h ou backend 5 min | via snapshot détail quand présent | variable ; éviter un second appel quand le détail contient déjà la slice |
 
 ### Relations TVDB
@@ -125,6 +125,28 @@ Le même bundle TypeScript de cache public est utilisé en PWA et embarqué par 
 
 Le TNR final verrouille ces bornes et interdit qu'un import Firestore apparaisse dans
 `publicMetadataCache.ts`.
+
+## Réouverture terrain phase 3 — premier paint et Explorer « Tout »
+
+La vidéo v1.4.167 du 19 septembre a montré deux limites que la clôture initiale ne mesurait pas :
+
+1. un **hit IndexedDB détails** arrivait après la décision synchrone du shell de fiche ; le réseau était
+   bien évité, mais un skeleton froid pouvait quand même flasher ;
+2. le chemin Explorer par défaut **Tout** utilisait encore `getTrending` + `getPopular` directs et
+   contournait donc la famille `discover` persistante côté client.
+
+La phase 3 corrige ces deux écarts sans étendre le stockage :
+
+- avant de monter une fiche, SeenIt tente pendant **40 ms maximum** de réhydrater uniquement le snapshot
+  détails frais déjà présent dans IndexedDB ; aucun appel réseau n'est permis dans ce préamorçage ;
+- les helpers médias visibles `getTrending`, `getPopular`, `discoverByGenre`, `getTopRated` et
+  `getTopRatedRecent` passent désormais par la même politique Discover 2 min / stale 30 min ;
+- `Personnes` reste backend-only côté cache et Search reste mémoire-only ;
+- les bornes 320 entrées / 32 Mio / 1 Mio par payload sont inchangées.
+
+Le TNR ne se contente plus de prouver qu'une donnée est cachée : il vérifie aussi que le cache détails
+est tenté **avant le premier rendu froid** et que le chemin Explorer réellement affiché ne contourne plus
+la couche commune.
 
 ## Critère de réouverture
 

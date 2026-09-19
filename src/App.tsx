@@ -68,6 +68,8 @@ const tabScreenPreloaders: Record<string, () => Promise<unknown>> = {
   downloads: loadDownloadsScreen
 };
 
+const MEDIA_DETAIL_CACHE_PRIME_BUDGET_MS = 40;
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null | undefined>(undefined);
   
@@ -169,6 +171,7 @@ function MainApp() {
   const parentalRatingOverrides = useParentalRatingStore(state => state.overrides);
   const showToast = useToastStore(state => state.showToast);
   const processedActionsRef = useRef<Set<string>>(new Set());
+  const detailOpenRequestRef = useRef(0);
 
   useEffect(() => {
     useSyncStore.getState().resetQuotaError();
@@ -219,11 +222,42 @@ function MainApp() {
     initialSeason?: number,
     initialEpisode?: number
   ) => {
+    const requestId = ++detailOpenRequestRef.current;
     void loadShowDetailScreen();
-    startTransition(() => {
-      openShow(id, type, mediaType, tmdbId, initialSeason, initialEpisode);
-    });
-  }, [openShow]);
+
+    const matchingLocalShow = type === 'local'
+      ? shows.find(show => String(show.id) === String(id) || String(show.tmdbId) === String(id))
+      : undefined;
+    const resolvedTmdbId = Number(
+      type === 'tmdb' ? id : (tmdbId || matchingLocalShow?.tmdbId || 0),
+    );
+    const resolvedMediaType: 'tv' | 'movie' =
+      mediaType === 'movie' || matchingLocalShow?.mediaType === 'movie' ? 'movie' : 'tv';
+
+    const commitOpen = () => {
+      if (requestId !== detailOpenRequestRef.current) return;
+      startTransition(() => {
+        openShow(id, type, mediaType, tmdbId, initialSeason, initialEpisode);
+      });
+    };
+
+    if (!Number.isFinite(resolvedTmdbId) || resolvedTmdbId <= 0) {
+      commitOpen();
+      return;
+    }
+
+    void (async () => {
+      await Promise.race([
+        import('./features/shows/tmdb')
+          .then(({ tmdb }) => tmdb.primeMediaDetailsFromPersistentCache(resolvedTmdbId, resolvedMediaType))
+          .catch(() => false),
+        new Promise<boolean>(resolve => {
+          globalThis.setTimeout(() => resolve(false), MEDIA_DETAIL_CACHE_PRIME_BUDGET_MS);
+        }),
+      ]);
+      commitOpen();
+    })();
+  }, [openShow, shows]);
 
   const openLocalMedia = useCallback((id: any, mediaType?: 'tv' | 'movie') => {
     openShowSmooth(id, 'local', mediaType);
