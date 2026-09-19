@@ -425,12 +425,15 @@ historique n'est plus une source runtime de la fiche.
 
 Une fiche déjà résolue doit se réafficher depuis le cache chaud sans repasser par un skeleton de deux à
 trois secondes. Les détails publics sont également persistés localement : après une réouverture récente de
-l'application, SeenIt tente pendant au plus 40 ms de réhydrater le détail depuis IndexedDB **avant** de
-classer la fiche comme froide ; cette tentative reste strictement cache-only. SeenIt peut afficher immédiatement le dernier snapshot admissible puis le rafraîchir
-silencieusement. Une saison déjà ouverte suit la même logique avec un TTL plus court : les réouvertures
-rapprochées n'appellent plus TMDB, tandis qu'une saison en cours peut être rafraîchie après deux heures.
-Détails et relations restent indexés par `movie:<id>` / `tv:<id>`, les images principales gardent une URL
-stable et aucune donnée utilisateur n'entre dans ce cache public.
+l'application, SeenIt réhydrate d'abord le snapshot compact `detail_render` depuis IndexedDB en mode
+strictement cache-only, puis monte la fiche sans timeout arbitraire ; le détail complet peut ensuite se
+rafraîchir silencieusement. Une saison déjà ouverte suit la même logique avec un TTL plus court : les
+réouvertures rapprochées n'appellent plus TMDB, tandis qu'une saison en cours peut être rafraîchie après
+deux heures. Détails et relations restent indexés par `movie:<id>` / `tv:<id>`, les images principales
+gardent une URL stable et aucune donnée utilisateur n'entre dans ce cache public. Le loader relationnel
+n'est armé que lorsqu'une collection TMDB doit réellement être récupérée ; une série sans relation connue
+ne monte aucun faux skeleton. Lorsqu'un chargement relationnel est réel, ses cartes skeleton reprennent la
+même largeur et le même ratio que les cartes finales afin de ne pas déplacer les sections voisines.
 Le contrat complet est `SEENIT-PERF-001` et son suivi est
 [#146](https://github.com/julfou7/seenit-app/issues/146).
 
