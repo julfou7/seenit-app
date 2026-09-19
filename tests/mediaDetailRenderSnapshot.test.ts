@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { PUBLIC_METADATA_CACHE_MAX_ENTRY_BYTES } from '../src/features/shows/publicMetadataCache.ts';
 import {
+  MEDIA_DETAIL_RENDER_SCHEMA_VERSION,
   MEDIA_DETAIL_RENDER_MAX_CAST,
   MEDIA_DETAIL_RENDER_MAX_GENRES,
   MEDIA_DETAIL_RENDER_MAX_KEYWORDS,
@@ -43,6 +44,7 @@ test('SEENIT-PERF-001 garde Catégories et Thèmes persistables même quand le d
   assert.equal(snapshot.genres.length, MEDIA_DETAIL_RENDER_MAX_GENRES);
   assert.equal(snapshot.keywords.results.length, MEDIA_DETAIL_RENDER_MAX_KEYWORDS);
   assert.equal(snapshot.images.logos.length, MEDIA_DETAIL_RENDER_MAX_LOGOS);
+  assert.equal(snapshot.seenit_render_schema_version, MEDIA_DETAIL_RENDER_SCHEMA_VERSION);
   assert.equal(snapshot.aggregate_credits.cast.length, MEDIA_DETAIL_RENDER_MAX_CAST);
   assert.equal(snapshot.aggregate_credits.cast[0].name, 'Acteur agrégé 0 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx');
   assert.equal(snapshot.overview, 'Synopsis');
