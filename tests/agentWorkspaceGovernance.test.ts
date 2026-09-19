@@ -13,6 +13,7 @@ const remoteWorkflow = readFileSync('.github/workflows/agent-remote-validate.yml
 const remoteProcess = readFileSync('docs/process/agent-remote-workspace.md', 'utf8');
 const bootstrapRules = readFileSync('.agents/AGENTS.md', 'utf8');
 const rootRules = readFileSync('AGENTS.md', 'utf8');
+const autonomousResume = readFileSync('docs/process/chatgpt-autonomous-resume.md', 'utf8');
 
 test('SEENIT-QUALITY-004 fournit un devcontainer reproductible et réutilise les dépendances exactes', () => {
   assert.equal(devcontainer.build?.dockerfile, 'Dockerfile');
@@ -54,4 +55,14 @@ test('SEENIT-QUALITY-004 le contrat racine autorise uniquement le fallback no-eg
   assert.match(rootRules, /Sauf fallback sans egress strictement borné de la section 0\.3/);
   assert.match(rootRules, /SeenIt — reprise autonome/);
   assert.match(rootRules, /Ne jamais désactiver cette automatisation/i);
+});
+
+test('la reprise autonome ne sélectionne que des chantiers exécutables avec les outils du run', () => {
+  assert.match(autonomousResume, /PRÉFLIGHT D.EXÉCUTABILITÉ/);
+  assert.match(autonomousResume, /Petit et borné[^\n]+ne suffit pas/i);
+  assert.match(autonomousResume, /avant d.acquérir un bail[^\n]+capacités du run/i);
+  assert.match(autonomousResume, /HANDOFF_READY[^\n]+incapacité d.outillage inchangée[^\n]+pas une reprise actionnable/i);
+  assert.match(autonomousResume, /candidat échoue ce préflight[^\n]+candidat suivant/i);
+  assert.match(autonomousResume, /diff matérialisé, test ciblé exécuté, commit[^\n]+ou PR/i);
+  assert.match(autonomousResume, /checkpoint `DONE`[^\n]+release déjà publiée[^\n]+terminal/i);
 });
