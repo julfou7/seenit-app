@@ -15,7 +15,7 @@ Il ne rend pas GitHub responsable de l’exécution de la tâche : l’automatis
 
 ## Configuration de référence
 
-Snapshot vérifié le **18 septembre 2026** contre la tâche active côté ChatGPT.
+Snapshot vérifié le **19 septembre 2026** contre la tâche active côté ChatGPT.
 
 - Titre : `SeenIt — reprise autonome`
 - État attendu : **active**
@@ -49,6 +49,14 @@ DÉMARRAGE D’UN RUN
 4. Exécute la prochaine action exacte du checkpoint au lieu de recommencer le diagnostic déjà établi.
 5. Si aucun chantier commencé n'est actionnable et que tu envisages un nouveau petit chantier autonome, vérifie d'abord `main`, relis l'issue candidate et ses commentaires, recherche l'historique ouvert/fermé pertinent selon `AGENTS.md`, puis confirme explicitement dans le checkpoint que le périmètre est local, borné et hors des exclusions ci-dessus.
 
+PRÉFLIGHT D’EXÉCUTABILITÉ — OBLIGATOIRE AVANT TOUT NOUVEAU BAIL
+- « Petit et borné » côté produit ne suffit pas : un chantier n’est actionnable dans CE run que si les outils réellement disponibles permettent d’effectuer le premier changement exact, de matérialiser tous les fichiers requis et d’atteindre le chemin de validation canonique sans intervention utilisateur.
+- Avant d’acquérir un bail sur un nouveau ticket, inventorie brièvement les capacités du run (workspace/shell, écriture GitHub, création de branche, lecture et remplacement sûrs des fichiers, lancement de `Agent Remote Validate`). Écris dans le checkpoint candidat le fichier ou la surface à modifier, le mode d’écriture prévu et la validation prévue.
+- Avec un workspace sain, utilise le chemin local. En connector-only/no-egress, ne retiens un ticket que si le fallback distant permet de produire fidèlement le changement entier. Si l’outil ne sait que remplacer un fichier complet et que le fichier ne peut pas être relu puis réécrit sans risque, ce ticket est non actionnable pour CE run.
+- Un `HANDOFF_READY` créé par cette même tâche uniquement pour une incapacité d’outillage inchangée n’est pas une reprise actionnable et ne doit pas repasser devant les autres candidats. Ne republie ni bail ni checkpoint identique tant que les capacités ou l’état GitHub n’ont pas changé.
+- Si un candidat échoue ce préflight, n’arrête pas le run et ne le transforme pas en nouveau handoff : examine le candidat suivant dans l’ordre de priorité. Continue ainsi dans le même run jusqu’à trouver un chantier réellement exécutable ou avoir épuisé les candidats autonomes éligibles.
+- Pour une nouvelle prise en charge, un diagnostic ou un commentaire seul n’est pas un jalon utile. Dans les dix minutes suivant le bail, produis au moins une preuve concrète : diff matérialisé, test ciblé exécuté, commit de quarantaine/branche ou PR. À défaut, libère le bail, trace une seule fois la raison précise et passe au candidat suivant.
+
 WORKSPACE — LOCAL D’ABORD, DISTANT SÛR SI NO-EGRESS
 - Réutilise tout workspace SeenIt existant et sain ; un nouveau prompt n’est jamais une raison de recloner ou de refaire `npm ci`.
 - Si aucune copie locale n’existe et qu’un shell avec egress Git/npm fonctionne, acquiers le dépôt une seule fois avec le mode minimal prévu par `AGENTS.md`, puis réutilise-le. Réutilise `node_modules`/cache exact quand compatible.
@@ -71,7 +79,7 @@ Prends le premier chantier réellement actionnable parmi :
 5. PR ouverte correspondant à une demande utilisateur inachevée ;
 6. branche existante non intégrée avec checkpoint exploitable ;
 7. à défaut seulement, une issue GitHub de petit bug ou amélioration UX locale qui satisfait strictement le périmètre autonome autorisé ci-dessus.
-Respecte les exclusions de bail. `WAITING` n’est actionnable que lorsque son événement externe précis s’est produit. Si un chantier commencé est réellement bloqué, poursuis un autre chantier commencé et indépendant ; s'il n'en existe aucun, tu peux prendre un petit chantier autonome éligible plutôt que de rester inactif.
+Respecte les exclusions de bail. `WAITING` n’est actionnable que lorsque son événement externe précis s’est produit. Un checkpoint `DONE`, une release déjà publiée ou un contrôle #102 sans commande de publication encore due est terminal pour cette sélection et ne doit pas masquer les tickets suivants. Si un chantier commencé est réellement bloqué, poursuis un autre chantier commencé et indépendant ; s'il n'en existe aucun, tu peux prendre un petit chantier autonome éligible plutôt que de rester inactif.
 
 BUG / CODE
 Pour un bug, conserve la discipline du dépôt : symptôme, cause racine prouvée, classe affectée, correctif global, risque résiduel et TNR. Un retour terrain rouge invalide toute affirmation précédente de correction sur ce comportement. Les TNR doivent mesurer le résultat utilisateur réellement attendu et, lorsqu’une façade/singleton/adapter est concerné, exercer le point d’entrée de production réel. Ne superpose pas des optimisations autour d’un symptôme avant d’avoir prouvé ce qui bloque encore le résultat observable.
@@ -106,6 +114,7 @@ La tâche générique possède simultanément les propriétés suivantes :
 - titre exact `SeenIt — reprise autonome` ;
 - mission multi-chantiers : reprendre en priorité des travaux déjà commencés et, à défaut seulement, lancer un **petit bug borné** ou une **amélioration UX locale** éligible ;
 - priorité régie par `AGENTS.md`, les baux et les états `HANDOFF_READY` / `WAITING` / `DONE` ;
+- préflight d’exécutabilité obligatoire : elle ne prend pas un ticket uniquement parce qu’il est petit, et passe au candidat suivant lorsqu’elle ne peut pas réellement modifier puis valider le premier ;
 - aucune issue unique n’est imposée comme mission permanente ;
 - l'autonomie de sélection exclut explicitement architecture/refonte transverse, migrations, sécurité/auth, Firestore/données, identité média/Plex, identité APK/signature, infrastructure, release/update et performance systémique ;
 - elle reste active même lorsqu’aucun chantier n’est actionnable et qu'aucun petit chantier autonome n'est éligible.
