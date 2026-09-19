@@ -79,7 +79,11 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const [fetchError, setFetchError] = useState<boolean>(false);
   const [collectionData, setCollectionData] = useState<any>(cachedInitialRelations?.collection?.length ? { parts: cachedInitialRelations.collection } : null);
   const [universeData, setUniverseData] = useState<any>(cachedInitialRelations?.universe?.length ? { parts: cachedInitialRelations.universe } : null);
-  const [collectionLoading, setCollectionLoading] = useState<boolean>(!cachedInitialRelations);
+  const [collectionLoading, setCollectionLoading] = useState<boolean>(() =>
+    effectiveTmdbId
+      ? tmdb.shouldLoadUniverseAndCollection({ ...(cachedInitialDetails || {}), id: Number(effectiveTmdbId), media_type: requestedMediaType })
+      : false
+  );
   const [providers, setProviders] = useState<any>(() => {
     if (!effectiveTmdbId) return null;
     return tmdb.peekWatchProviders(Number(effectiveTmdbId), requestedMediaType)?.results?.FR || null;
@@ -412,7 +416,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     setFetchError(false);
     setCollectionData(cachedRelations?.collection?.length ? { parts: cachedRelations.collection } : null);
     setUniverseData(cachedRelations?.universe?.length ? { parts: cachedRelations.universe } : null);
-    setCollectionLoading(!cachedRelations);
+    setCollectionLoading(tmdb.shouldLoadUniverseAndCollection({ ...(cachedDetails || {}), id: Number(effectiveTmdbId), media_type: requestedMediaType }));
     setProviders(cachedProviders?.results?.FR || null);
     setKeywords(getKeywordsFromDetails(cachedDetails, requestedMediaType));
     setSeasonsCache({});
@@ -438,6 +442,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         setTmdbDetails(res.value);
         setFetchError(false);
         setKeywords(getKeywordsFromDetails(res.value, targetMediaType));
+        setCollectionLoading(tmdb.shouldLoadUniverseAndCollection(res.value));
         tmdb.getUniverseAndCollection(res.value).then(({ collection, universe }) => {
           if (!isCurrentRequest()) return;
           setCollectionData(collection.length > 0 ? { parts: collection } : null);

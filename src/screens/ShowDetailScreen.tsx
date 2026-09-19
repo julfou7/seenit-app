@@ -26,11 +26,11 @@ const HIDDEN_DOWNLOAD_SURFACE_CSS = `
 
 const DETAIL_UX_CSS = `
 [data-seenit-detail-shell="stable"] .animate-pulse { overflow-anchor: none; }
-[data-seenit-detail-shell="stable"] h3.mb-3:has(+ .flex > .animate-pulse) {
+[data-seenit-detail-shell="stable"] [data-seenit-relation-loading] > h3 {
   font-size: 0;
   min-height: 0.75rem;
 }
-[data-seenit-detail-shell="stable"] h3.mb-3:has(+ .flex > .animate-pulse)::after {
+[data-seenit-detail-shell="stable"] [data-seenit-relation-loading] > h3::after {
   content: '';
   display: block;
   width: 8rem;

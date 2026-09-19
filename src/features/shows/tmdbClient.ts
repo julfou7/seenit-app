@@ -637,6 +637,16 @@ export class TMDBClient {
     return this.relationCache.get(mediaKey) || getManifestRelationSnapshot(mediaKey);
   }
 
+  shouldLoadUniverseAndCollection(media: any): boolean {
+    const mediaKey = mediaKeyFrom(media);
+    if (!mediaKey) return false;
+    if (this.relationCache.get(mediaKey) || getManifestRelationSnapshot(mediaKey)) return false;
+
+    const mediaType = mediaKey.split(':')[0] as RelationMediaType;
+    const collectionId = Number(media?.belongs_to_collection?.id);
+    return mediaType === 'movie' && Number.isFinite(collectionId) && collectionId > 0;
+  }
+
   async getUniverseAndCollection(media: any): Promise<MediaRelationSnapshot> {
     const mediaKey = mediaKeyFrom(media);
     if (!mediaKey) return { collection: [], universe: [] };
