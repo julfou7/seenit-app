@@ -1803,6 +1803,26 @@
           "contains": "SEENIT-PERF-001 sert le snapshot Catégories et Thèmes avant le détail complet après restart"
         },
         {
+          "file": "tests/mediaDetailRenderSnapshot.test.ts",
+          "contains": "SEENIT-PERF-001 persiste un aperçu casting borné pour stabiliser les onglets"
+        },
+        {
+          "file": "tests/seriesProgressIncremental.test.ts",
+          "contains": "SEENIT-PERF-001 sert la progression série depuis le dernier état utilisateur persisté"
+        },
+        {
+          "file": "tests/seriesProgressIncremental.test.ts",
+          "contains": "SEENIT-PERF-001 applique un épisode vu ou non vu en delta sans resynchroniser toutes les saisons"
+        },
+        {
+          "file": "tests/seriesProgressIncremental.test.ts",
+          "contains": "SEENIT-PERF-001 applique une saison vue ou non vue en delta sans resynchronisation complète"
+        },
+        {
+          "file": "tests/seriesProgressIncremental.test.ts",
+          "contains": "SEENIT-PERF-001 réserve la resynchronisation complète aux refresh fournisseur"
+        },
+        {
           "file": "tests/tmdbCacheArchitecture.test.ts",
           "contains": "issue #410 route Explorer Tout par le cache Discover commun"
         }
