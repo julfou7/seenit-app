@@ -38,8 +38,12 @@ test('SEENIT-NOTIFICATION-002 affiche un visuel média et un seul emoji par év�
 test('SEENIT-NOTIFICATION-002 sépare affiche et image riche sans bloquer le fallback', () => {
   assert.match(notificationMediaSource, /Promise\.all\(/,
     'affiche et image riche sont préparées indépendamment');
-  assert.match(notificationMediaSource, /cacheNativeNotificationImageSafely\(nativePosterUrl, dependencies\)/);
-  assert.match(notificationMediaSource, /cacheNativeNotificationImageSafely\(richCandidate, dependencies\)/);
+  assert.match(notificationMediaSource, /normalizeNativeNotificationImageUrl\(nativePosterUrl, 'w342'\)/,
+    'une affiche TMDB persistée est bornée avant le cache natif');
+  assert.match(notificationMediaSource, /normalizeNativeNotificationImageUrl\(richImageUrl, 'w500'\)/,
+    'le visuel riche TMDB est borné avant le cache natif');
+  assert.match(notificationMediaSource, /cacheNativeNotificationImageSafely\(boundedPosterUrl, dependencies\)/);
+  assert.match(notificationMediaSource, /cacheNativeNotificationImageSafely\(boundedRichImageUrl, dependencies\)/);
   assert.match(notificationMediaSource, /icon: localPoster \|\| localRichImage/);
   assert.match(notificationMediaSource, /image: localRichImage \|\| localPoster/);
   assert.match(notificationMediaSource, /using text-only notification/,
