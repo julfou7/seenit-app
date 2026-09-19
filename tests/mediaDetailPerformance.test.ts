@@ -42,7 +42,14 @@ test('SEENIT-PERF-001 réserve les skeletons au chargement réellement froid', (
   assert.match(detailSource, /loading="eager" decoding="async"[\s\S]{0,120}fetchPriority="high"/);
 });
 test('SEENIT-PERF-001 charge le détail principal sans attendre les disponibilités secondaires', () => { assert.match(detailWrapperSource, /tmdb\.peekRenderableMediaDetails\(tmdbId, mediaType\)/); assert.match(detailWrapperSource, /void tmdb\.getWatchProviders\(tmdbId, mediaType\)\.catch/); assert.match(detailWrapperSource, /await tmdb\.getMediaDetails\(tmdbId, mediaType\)/); assert.doesNotMatch(detailWrapperSource, /getSeriesImdbData|omdbService|\/api\/media\/omdb/); assert.doesNotMatch(detailWrapperSource, /DETAIL_WARMUP_GRACE_MS|Promise\.race\(/); assert.match(detailWrapperSource, /data-seenit-detail-warmup="cold"/); assert.match(detailWrapperSource, /overflow-anchor: none/); });
-test('SEENIT-PERF-001 affiche les repères déterministes pendant le skeleton froid', () => { assert.match(detailWrapperSource, /knownTitle/); assert.match(detailWrapperSource, /📺 SÉRIE/); assert.match(detailWrapperSource, /🎬 FILM/); assert.match(detailWrapperSource, />À propos</); assert.match(detailWrapperSource, />Épisodes</); assert.match(detailWrapperSource, />Synopsis</); assert.match(detailWrapperSource, />Catégories & Thèmes</); assert.match(detailWrapperSource, />Où regarder</); assert.match(detailWrapperSource, /Recherche Plex & streaming…/); });
+test('SEENIT-PERF-001 affiche les repères déterministes pendant le skeleton froid', () => { assert.match(detailWrapperSource, /knownTitle/); assert.match(detailWrapperSource, /📺 SÉRIE/); assert.match(detailWrapperSource, /🎬 FILM/); assert.match(detailWrapperSource, />À propos</); assert.match(detailWrapperSource, />Épisodes</); assert.match(detailWrapperSource, />Casting</); assert.match(detailWrapperSource, />Synopsis</); assert.match(detailWrapperSource, />Catégories & Thèmes</); assert.match(detailWrapperSource, />Où regarder</); assert.match(detailWrapperSource, /Recherche Plex & streaming…/); });
+
+test('SEENIT-PERF-001 garde la structure À propos Épisodes Casting indépendante des crédits', () => {
+  assert.match(detailSource, /<button onClick=\{\(\) => \{ handleTabChange\('casting'\); setShowAllCast\(false\); \}\}[\s\S]{0,260}>Casting<\/button>/);
+  assert.doesNotMatch(detailSource, /\(tmdbDetails\?\.aggregate_credits\?\.cast \|\| tmdbDetails\?\.credits\?\.cast\)\?\.length > 0\) && <button[\s\S]{0,260}>Casting<\/button>/);
+  assert.match(detailSource, /id="section-casting"[\s\S]{0,700}data-seenit-casting-loading="true"/);
+  assert.match(detailSource, /castingPayloadKnown[\s\S]{0,900}Aucun casting disponible\./);
+});
 test('SEENIT-PERF-001 garde le loader Relations à la géométrie des cartes finales', () => {
   assert.match(detailWrapperSource, /\[data-seenit-relation-loading\] > h3[\s\S]{0,120}font-size: 0/);
   assert.match(detailWrapperSource, /\[data-seenit-relation-loading\] > h3::after[\s\S]{0,220}animation: pulse/);
