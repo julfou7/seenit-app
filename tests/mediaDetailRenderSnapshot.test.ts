@@ -27,10 +27,10 @@ test('SEENIT-PERF-001 garde Catégories et Thèmes persistables même quand le d
       posters: Array.from({ length: 8_000 }, (_, index) => ({ file_path: `/poster-${index}-${'x'.repeat(180)}.jpg` })),
     },
     credits: {
-      cast: Array.from({ length: 8_000 }, (_, index) => ({ id: index, name: `Acteur ${index} ${'x'.repeat(180)}` })),
+      cast: Array.from({ length: 8_000 }, (_, index) => ({ id: index + 1, name: `Acteur ${index} ${'x'.repeat(180)}` })),
     },
     aggregate_credits: {
-      cast: Array.from({ length: 8_000 }, (_, index) => ({ id: index, name: `Acteur agrégé ${index} ${'x'.repeat(180)}` })),
+      cast: Array.from({ length: 8_000 }, (_, index) => ({ id: index + 1, name: `Acteur agrégé ${index} ${'x'.repeat(180)}` })),
     },
   };
 
@@ -99,7 +99,6 @@ test('SEENIT-PERF-001 persiste un aperçu casting borné pour stabiliser les ong
     profile_path: '/actor-1.jpg',
     roles: [{ character: 'Rôle 1', episode_count: 2 }],
     total_episode_count: 2,
-    episode_count: undefined,
   });
 
   const movieSnapshot = createMediaDetailRenderSnapshot({
