@@ -485,8 +485,15 @@ n'est rouverte que par une nouvelle décision produit explicite.
   progression, préférences, token Plex ni autre donnée privée.
 - Le skeleton de page est réservé au premier chargement réellement froid. Le parcours A → B → A, y
   compris après une réouverture récente de l'application lorsque le snapshot persistant est encore
-  admissible, restitue la dernière fiche complète avant un éventuel rafraîchissement silencieux. En cas
-  d'échec réseau, la dernière valeur complète reste affichable (`stale-if-error`).
+  admissible, tente d'abord une **hydratation cache-only IndexedDB** avant de décider qu'une fiche est
+  froide. Ce préamorçage ne déclenche aucun fournisseur et dispose d'un budget de **40 ms maximum** :
+  un hit local évite le flash de skeleton ; une absence ou un stockage lent retombe immédiatement sur
+  le shell froid progressif normal. En cas d'échec réseau, la dernière valeur complète reste affichable
+  (`stale-if-error`).
+- Les listes médias visibles d'Explorer, y compris le chemin par défaut **Tout** construit avec
+  `trending` et `popular`, passent par la même famille de cache **Discover** (2 min frais / 30 min
+  stale). Les catégories Top 100, Pépites et Documentaires réutilisent cette politique via leurs helpers
+  de listes. La recherche reste mémoire-only et les personnes ne sont pas persistées côté client.
 - L'inventaire des familles TMDB, leur TTL, la baseline avant/après et la justification des caches
   spécialisés sont figés dans
   [l'audit #410 du 19 septembre 2026](../audits/tmdb-cache-architecture-2026-09-19.md).

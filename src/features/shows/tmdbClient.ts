@@ -194,6 +194,37 @@ export class TMDBClient {
     });
   }
 
+  async getCachedDiscoverResponse(url: string | URL): Promise<Result<SearchResponse>> {
+    const requestUrl = url instanceof URL ? url : new URL(url);
+    const cacheKey = normalizePublicMetadataRequestKey(requestUrl);
+    const cached = await readPublicMetadataCache<SearchResponse>('discover', cacheKey, { allowStale: true });
+    if (cached?.fresh) return ok(cached.data);
+
+    return runPublicMetadataSingleFlight('discover', cacheKey, async () => {
+      const queued = await readPublicMetadataCache<SearchResponse>('discover', cacheKey, { allowStale: true });
+      if (queued?.fresh) return ok(queued.data);
+      const fallback = queued || cached;
+
+      const response = await tryCatch(authenticatedFetch(requestUrl.toString()));
+      if (!response.ok) return fallback ? ok(fallback.data) : err((response as any).error);
+      if (!response.value.ok) {
+        return fallback && isPublicMetadataFallbackStatus(response.value.status)
+          ? ok(fallback.data)
+          : err(new Error(`TMDB Error: ${response.value.status}`));
+      }
+
+      const data = await tryCatch(response.value.json() as Promise<SearchResponse>);
+      if (!data.ok) return fallback ? ok(fallback.data) : err((data as any).error);
+      if ((data.value as any)?.status_code) {
+        return fallback
+          ? ok(fallback.data)
+          : err(new Error((data.value as any).status_message || 'TMDB Error'));
+      }
+      writePublicMetadataCache('discover', cacheKey, data.value);
+      return data;
+    });
+  }
+
   async searchMedia(query: string, year?: string, type?: 'movie' | 'tv', page: number = 1): Promise<Result<TMDBMedia>> {
 
 
@@ -388,6 +419,21 @@ export class TMDBClient {
 
   peekMediaDetails(id: number, type: RelationMediaType = 'tv'): any | null {
     return this.detailsCache.get(`${type}_${Number(id)}`) || null;
+  }
+
+  async primeMediaDetailsFromPersistentCache(
+    id: number,
+    type: RelationMediaType = 'tv',
+  ): Promise<boolean> {
+    const normalizedId = Number(id);
+    if (!Number.isFinite(normalizedId) || normalizedId <= 0) return false;
+    const cacheKey = `${type}_${normalizedId}`;
+    if (this.detailsCache.get(cacheKey)) return true;
+
+    const persisted = await readPublicMetadataCache<any>('details', cacheKey);
+    if (!persisted?.fresh) return false;
+    this.detailsCache.set(cacheKey, persisted.data);
+    return true;
   }
 
   private async getCachedMediaDetails(id: number, type: RelationMediaType): Promise<Result<any>> {
@@ -1026,44 +1072,27 @@ export class TMDBClient {
   }
 
   async getTopRated(type: 'tv' | 'movie', page: number = 1): Promise<Result<SearchResponse>> {
-
-
-    // Pour simuler un Top 100 IMDb, on prend les mieux notés avec au moins 3000 votes
     const url = `${this.baseUrl}/discover/${type}?language=fr-FR&sort_by=vote_average.desc&vote_count.gte=3000&page=${page}`;
-    const res = await tryCatch(authenticatedFetch(url));
-    if (!res.ok) return err((res as any).error);
-    if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
-    const data = await tryCatch(res.value.json());
-    if (!data.ok) return err((data as any).error);
-    return data;
+    return this.getCachedDiscoverResponse(url);
   }
 
   async getTopRatedRecent(type: 'tv' | 'movie' | 'all', page: number = 1, watchProviders?: string[]): Promise<Result<SearchResponse>> {
     const today = new Date();
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(today.getFullYear() - 1);
-
     const dateStr = oneYearAgo.toISOString().split('T')[0];
-
-
     const hasProviders = watchProviders && watchProviders.length > 0;
     const minVotes = hasProviders ? 5 : 50;
 
     const fetchByType = async (t: 'tv' | 'movie') => {
-      const endpoint = `discover/${t}`;
       const dateParam = t === 'tv' ? `first_air_date.gte=${dateStr}` : `primary_release_date.gte=${dateStr}`;
       const voteParam = hasProviders ? 'vote_count.gte=5' : 'vote_count.gte=100';
-      let urlStr = `${this.baseUrl}/${endpoint}?language=fr-FR&sort_by=vote_average.desc&${voteParam}&vote_average.gte=7.0&${dateParam}&page=${page}`;
+      let urlStr = `${this.baseUrl}/discover/${t}?language=fr-FR&sort_by=vote_average.desc&${voteParam}&vote_average.gte=7.0&${dateParam}&page=${page}`;
 
       if (hasProviders) {
         const PLATFORM_ID_MAP: Record<string, string> = {
-          'netflix': '8',
-          'hbo': '118',
-          'disney': '337',
-          'apple': '350',
-          'prime': '119',
-          'canal': '381',
-          'max': '1825',
+          'netflix': '8', 'hbo': '118', 'disney': '337', 'apple': '350',
+          'prime': '119', 'canal': '381', 'max': '1825',
         };
         const tmdbProviderIds = watchProviders.map(p => PLATFORM_ID_MAP[p]).filter(Boolean);
         if (tmdbProviderIds.length > 0) {
@@ -1071,11 +1100,12 @@ export class TMDBClient {
         }
       }
 
-      const res = await tryCatch(authenticatedFetch(urlStr));
-      if (!res.ok) return err((res as any).error);
-      const jsonRes = await tryCatch(res.value.json());
-      if (jsonRes.ok && jsonRes.value && Array.isArray(jsonRes.value.results)) {
-        jsonRes.value.results = filterCredibleMedia(jsonRes.value.results.map(r => ({ ...r, media_type: t })), minVotes);
+      const jsonRes = await this.getCachedDiscoverResponse(urlStr);
+      if (jsonRes.ok && Array.isArray(jsonRes.value?.results)) {
+        jsonRes.value.results = filterCredibleMedia(
+          jsonRes.value.results.map(r => ({ ...r, media_type: t })),
+          minVotes,
+        );
       }
       return jsonRes;
     };
@@ -1083,87 +1113,63 @@ export class TMDBClient {
     if (type === 'all') {
       const [tvRes, movieRes] = await Promise.all([fetchByType('tv'), fetchByType('movie')]);
       if (tvRes.ok && movieRes.ok) {
-        const results = filterCredibleMedia([...tvRes.value.results, ...movieRes.value.results], minVotes).sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
+        const results = filterCredibleMedia(
+          [...tvRes.value.results, ...movieRes.value.results],
+          minVotes,
+        ).sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
         return ok({ results });
       }
       return tvRes.ok ? tvRes : movieRes;
-    } else {
-      return fetchByType(type);
     }
+    return fetchByType(type);
   }
 
   async getTrending(type: 'tv' | 'movie' | 'all' = 'tv', page: number = 1, watchProviders?: string[]): Promise<Result<SearchResponse>> {
-
-
     if (watchProviders && watchProviders.length > 0) {
       const PLATFORM_ID_MAP: Record<string, string> = {
-        'netflix': '8',
-        'hbo': '118',
-        'disney': '337',
-        'apple': '350',
-        'prime': '119',
-        'canal': '381',
-        'max': '1825',
+        'netflix': '8', 'hbo': '118', 'disney': '337', 'apple': '350',
+        'prime': '119', 'canal': '381', 'max': '1825',
       };
       const tmdbProviderIds = watchProviders.map(p => PLATFORM_ID_MAP[p]).filter(Boolean);
       if (tmdbProviderIds.length > 0) {
         const providersStr = tmdbProviderIds.join('|');
         if (type === 'all') {
           const [resTv, resMov] = await Promise.all([
-            tryCatch(authenticatedFetch(`${this.baseUrl}/discover/tv?language=fr-FR&sort_by=popularity.desc&watch_region=FR&with_watch_providers=${providersStr}&page=${page}`)),
-            tryCatch(authenticatedFetch(`${this.baseUrl}/discover/movie?language=fr-FR&sort_by=popularity.desc&watch_region=FR&with_watch_providers=${providersStr}&page=${page}`))
+            this.getCachedDiscoverResponse(`${this.baseUrl}/discover/tv?language=fr-FR&sort_by=popularity.desc&watch_region=FR&with_watch_providers=${providersStr}&page=${page}`),
+            this.getCachedDiscoverResponse(`${this.baseUrl}/discover/movie?language=fr-FR&sort_by=popularity.desc&watch_region=FR&with_watch_providers=${providersStr}&page=${page}`),
           ]);
-          let tvResults: TMDBMedia[] = [];
-          let movResults: TMDBMedia[] = [];
-          if (resTv.ok && resTv.value.ok) {
-            const data = await resTv.value.json();
-            tvResults = (data.results || []).map((r: any) => ({ ...r, media_type: 'tv' }));
-          }
-          if (resMov.ok && resMov.value.ok) {
-            const data = await resMov.value.json();
-            movResults = (data.results || []).map((r: any) => ({ ...r, media_type: 'movie' }));
-          }
+          const tvResults = resTv.ok ? (resTv.value.results || []).map((r: any) => ({ ...r, media_type: 'tv' as const })) : [];
+          const movResults = resMov.ok ? (resMov.value.results || []).map((r: any) => ({ ...r, media_type: 'movie' as const })) : [];
           const combined = [...tvResults, ...movResults].sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
           return ok({ results: filterCredibleMedia(combined, 5) });
-        } else {
-          const urlStr = `${this.baseUrl}/discover/${type}?language=fr-FR&sort_by=popularity.desc&watch_region=FR&with_watch_providers=${providersStr}&page=${page}`;
-          const res = await tryCatch(authenticatedFetch(urlStr));
-          if (!res.ok) return err((res as any).error);
-          const jsonRes = await tryCatch(res.value.json());
-          if (jsonRes.ok && jsonRes.value && Array.isArray(jsonRes.value.results)) {
-            jsonRes.value.results = filterCredibleMedia(jsonRes.value.results.map(r => ({ ...r, media_type: type })), 5);
-          }
-          return jsonRes;
         }
+
+        const urlStr = `${this.baseUrl}/discover/${type}?language=fr-FR&sort_by=popularity.desc&watch_region=FR&with_watch_providers=${providersStr}&page=${page}`;
+        const jsonRes = await this.getCachedDiscoverResponse(urlStr);
+        if (jsonRes.ok && Array.isArray(jsonRes.value?.results)) {
+          jsonRes.value.results = filterCredibleMedia(jsonRes.value.results.map(r => ({ ...r, media_type: type })), 5);
+        }
+        return jsonRes;
       }
     }
 
-    let urlStr = `${this.baseUrl}/trending/${type}/week?language=fr-FR&page=${page}`;
-    const url = new URL(urlStr);
-    const res = await tryCatch(authenticatedFetch(url.toString()));
-    if (!res.ok) return err((res as any).error);
-    const jsonRes = await tryCatch(res.value.json());
-    if (jsonRes.ok && jsonRes.value && Array.isArray(jsonRes.value.results)) {
+    const url = new URL(`${this.baseUrl}/trending/${type}/week?language=fr-FR&page=${page}`);
+    const jsonRes = await this.getCachedDiscoverResponse(url);
+    if (jsonRes.ok && Array.isArray(jsonRes.value?.results)) {
       jsonRes.value.results = filterCredibleMedia(jsonRes.value.results, 50);
     }
     return jsonRes;
   }
 
   async discoverByGenre(type: 'tv' | 'movie', genreId: number, page: number = 1, watchProviders?: string[]): Promise<Result<SearchResponse>> {
-
     const hasProviders = watchProviders && watchProviders.length > 0;
     const minVotes = hasProviders ? 5 : 50;
     let urlStr = `${this.baseUrl}/discover/${type}?language=fr-FR&with_genres=${genreId}&vote_count.gte=${minVotes}&page=${page}`;
 
     if (hasProviders) {
       const PLATFORM_ID_MAP: Record<string, string> = {
-        'netflix': '8',
-        'hbo': '118',
-        'disney': '337',
-        'apple': '350',
-        'prime': '119',
-        'canal': '381',
-        'max': '1825',
+        'netflix': '8', 'hbo': '118', 'disney': '337', 'apple': '350',
+        'prime': '119', 'canal': '381', 'max': '1825',
       };
       const tmdbProviderIds = watchProviders.map(p => PLATFORM_ID_MAP[p]).filter(Boolean);
       if (tmdbProviderIds.length > 0) {
@@ -1171,35 +1177,27 @@ export class TMDBClient {
       }
     }
 
-    const url = new URL(urlStr);
-    const res = await tryCatch(authenticatedFetch(url.toString()));
-    if (!res.ok) return err((res as any).error);
-    const jsonRes = await tryCatch(res.value.json());
-    if (jsonRes.ok && jsonRes.value && Array.isArray(jsonRes.value.results)) {
-      jsonRes.value.results = filterCredibleMedia(jsonRes.value.results.map(r => ({ ...r, media_type: type })), minVotes);
+    const jsonRes = await this.getCachedDiscoverResponse(new URL(urlStr));
+    if (jsonRes.ok && Array.isArray(jsonRes.value?.results)) {
+      jsonRes.value.results = filterCredibleMedia(
+        jsonRes.value.results.map(r => ({ ...r, media_type: type })),
+        minVotes,
+      );
     }
     return jsonRes;
   }
 
   async getPopular(type: 'tv' | 'movie' = 'tv', page: number = 1, watchProviders?: string[]): Promise<Result<SearchResponse>> {
-
     const hasProviders = watchProviders && watchProviders.length > 0;
     const minVotes = hasProviders ? 5 : 50;
     const minDateParam = type === 'tv' ? 'first_air_date.gte=2016-01-01' : 'primary_release_date.gte=2016-01-01';
     let urlStr = `${this.baseUrl}/discover/${type}?language=fr-FR&sort_by=popularity.desc&vote_count.gte=${minVotes}&page=${page}`;
-    if (!hasProviders) {
-      urlStr += `&${minDateParam}`;
-    }
+    if (!hasProviders) urlStr += `&${minDateParam}`;
 
     if (hasProviders) {
       const PLATFORM_ID_MAP: Record<string, string> = {
-        'netflix': '8',
-        'hbo': '118',
-        'disney': '337',
-        'apple': '350',
-        'prime': '119',
-        'canal': '381',
-        'max': '1825',
+        'netflix': '8', 'hbo': '118', 'disney': '337', 'apple': '350',
+        'prime': '119', 'canal': '381', 'max': '1825',
       };
       const tmdbProviderIds = watchProviders.map(p => PLATFORM_ID_MAP[p]).filter(Boolean);
       if (tmdbProviderIds.length > 0) {
@@ -1207,12 +1205,12 @@ export class TMDBClient {
       }
     }
 
-    const url = new URL(urlStr);
-    const res = await tryCatch(authenticatedFetch(url.toString()));
-    if (!res.ok) return err((res as any).error);
-    const jsonRes = await tryCatch(res.value.json());
-    if (jsonRes.ok && jsonRes.value && Array.isArray(jsonRes.value.results)) {
-      jsonRes.value.results = filterCredibleMedia(jsonRes.value.results.map(r => ({ ...r, media_type: type })), minVotes);
+    const jsonRes = await this.getCachedDiscoverResponse(new URL(urlStr));
+    if (jsonRes.ok && Array.isArray(jsonRes.value?.results)) {
+      jsonRes.value.results = filterCredibleMedia(
+        jsonRes.value.results.map(r => ({ ...r, media_type: type })),
+        minVotes,
+      );
     }
     return jsonRes;
   }

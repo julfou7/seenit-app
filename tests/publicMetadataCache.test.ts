@@ -114,9 +114,10 @@ test('issue #410 branche détails Discover et recherche sur le cache commun', ()
   assert.match(client, /writePublicMetadataCache\('details'/);
   assert.match(client, /getCachedSearchResponse/);
   assert.match(client, /runPublicMetadataSingleFlight\('search'/);
-  assert.match(core, /fetchCachedDiscoverPayload/);
-  assert.match(core, /runPublicMetadataSingleFlight\('discover'/);
-  assert.match(core, /writePublicMetadataCache\('discover'/);
+  assert.match(client, /async getCachedDiscoverResponse/);
+  assert.match(client, /runPublicMetadataSingleFlight\('discover'/);
+  assert.match(client, /writePublicMetadataCache\('discover'/);
+  assert.match(core, /fetchCachedDiscoverPayload = async \(url: string\) => tmdbClient\.getCachedDiscoverResponse\(url\)/);
   assert.match(cache, /indexedDB\.open\(PUBLIC_METADATA_CACHE_DB_NAME/);
   assert.match(cache, /PUBLIC_METADATA_CACHE_PERSISTENT_MAX_ENTRIES = 320/);
   assert.match(cache, /PUBLIC_METADATA_CACHE_PERSISTENT_MAX_BYTES = 32 \* 1024 \* 1024/);
