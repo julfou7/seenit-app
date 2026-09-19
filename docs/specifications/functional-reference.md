@@ -431,8 +431,10 @@ rafraîchir silencieusement. Une saison déjà ouverte suit la même logique ave
 réouvertures rapprochées n'appellent plus TMDB, tandis qu'une saison en cours peut être rafraîchie après
 deux heures. Détails et relations restent indexés par `movie:<id>` / `tv:<id>`, les images principales
 gardent une URL stable et aucune donnée utilisateur n'entre dans ce cache public. Le snapshot conserve
-aussi un aperçu borné des premiers interprètes : une fiche déjà connue affiche donc immédiatement la même
-barre `À propos / Épisodes / Casting` lorsque le casting existe, sans attendre le détail TMDB complet.
+aussi un aperçu borné des premiers interprètes. La barre d'une fiche est structurelle dès le premier rendu :
+une série réserve toujours `À propos / Épisodes / Casting`, un film `À propos / Casting`, sans dépendre
+de la présence immédiate des crédits. La section Casting affiche un skeleton seulement tant que leur
+disponibilité est réellement inconnue, puis la grille ou un état vide stable.
 Le loader relationnel
 n'est armé que lorsqu'une collection TMDB doit réellement être récupérée ; une série sans relation connue
 ne monte aucun faux skeleton. Lorsqu'un chargement relationnel est réel, ses cartes skeleton reprennent la
