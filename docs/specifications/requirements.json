@@ -1765,6 +1765,18 @@
         {
           "file": "tests/publicMetadataCache.test.ts",
           "contains": "SEENIT-PERF-001 persiste les saisons TMDB avec TTL court et single-flight commun"
+        },
+        {
+          "file": "tests/tmdbCacheArchitecture.test.ts",
+          "contains": "SEENIT-PERF-001 borne toutes les mémoires TMDB et n’ajoute aucun Firestore générique"
+        },
+        {
+          "file": "tests/tmdbCacheArchitecture.test.ts",
+          "contains": "issue #410 mesure une session représentative sur deux ouvertures et réduit les appels fournisseur"
+        },
+        {
+          "file": "tests/tmdbCacheArchitecture.test.ts",
+          "contains": "issue #410 documente chaque famille TMDB et la décision âge diffuseurs"
         }
       ]
     }
