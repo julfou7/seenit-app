@@ -38,8 +38,8 @@ test('SEENIT-NOTIFICATION-002 affiche un visuel média et un seul emoji par év�
 test('SEENIT-NOTIFICATION-002 sépare affiche et image riche sans bloquer le fallback', () => {
   assert.match(notificationMediaSource, /Promise\.all\(/,
     'affiche et image riche sont préparées indépendamment');
-  assert.match(notificationMediaSource, /cacheNativeNotificationImageSafely\(nativePosterUrl\)/);
-  assert.match(notificationMediaSource, /cacheNativeNotificationImageSafely\(richCandidate\)/);
+  assert.match(notificationMediaSource, /cacheNativeNotificationImageSafely\(nativePosterUrl, dependencies\)/);
+  assert.match(notificationMediaSource, /cacheNativeNotificationImageSafely\(richCandidate, dependencies\)/);
   assert.match(notificationMediaSource, /icon: localPoster \|\| localRichImage/);
   assert.match(notificationMediaSource, /image: localRichImage \|\| localPoster/);
   assert.match(notificationMediaSource, /using text-only notification/,
@@ -70,22 +70,22 @@ test('SEENIT-NOTIFICATION-002 utilise une référence privée stable et jamais g
 test('issue #106 v1.4.156 matérialise le répertoire privé avant le téléchargement natif', () => {
   assert.match(
     notificationMediaSource,
-    /Filesystem\.mkdir\(\{\s*path: NOTIFICATION_MEDIA_DIR,\s*directory: Directory\.Data,\s*recursive: true\s*\}\)/,
+    /dependencies\.filesystem\.mkdir\(\{\s*path: NOTIFICATION_MEDIA_DIR,\s*directory: Directory\.Data,\s*recursive: true\s*\}\)/,
     'le sous-répertoire notification-media doit être créé explicitement dans Directory.Data',
   );
-  const ensureIndex = notificationMediaSource.indexOf('await ensureNotificationMediaDirectory();');
-  const downloadIndex = notificationMediaSource.indexOf('await Filesystem.downloadFile({');
+  const ensureIndex = notificationMediaSource.indexOf('await ensureNotificationMediaDirectory(dependencies);');
+  const downloadIndex = notificationMediaSource.indexOf('await dependencies.filesystem.downloadFile({');
   assert.ok(ensureIndex >= 0, 'le cache doit attendre la matérialisation du répertoire');
   assert.ok(downloadIndex > ensureIndex, 'mkdir doit précéder downloadFile : recursive sur downloadFile ne crée pas le parent Android');
   assert.match(
     notificationMediaSource,
-    /notificationMediaDirectoryReady = null;\s*throw error;/,
+    /directoryReadyByFilesystem\.delete\(key\);\s*throw error;/,
     'un mkdir réellement échoué doit rester retentable au lieu de figer une promesse rejetée',
   );
 });
 
 test('SEENIT-NOTIFICATION-002 garde les images hors du pont Binder et borne le bitmap Android', () => {
-  assert.match(notificationMediaSource, /Filesystem\.downloadFile\(/,
+  assert.match(notificationMediaSource, /dependencies\.filesystem\.downloadFile\(/,
     'le téléchargement de l’image doit être effectué par la couche native Filesystem');
   assert.match(notificationMediaSource, /directory: Directory\.Data/);
   assert.match(notificationMediaSource, /connectTimeout: NATIVE_IMAGE_CONNECT_TIMEOUT_MS/);
