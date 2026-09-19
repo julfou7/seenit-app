@@ -1045,6 +1045,10 @@
         {
           "file": "tests/notificationMediaPresentation.test.ts",
           "contains": "SEENIT-NOTIFICATION-002 hydrate le bitmap seulement à la livraison Android"
+        },
+        {
+          "file": "tests/notificationMediaRuntime.test.ts",
+          "contains": "issue #106 borne les URL TMDB absolues persistées par Plex avant le cache natif"
         }
       ]
     },
@@ -1644,6 +1648,10 @@
         {
           "file": "tests/nativeGoogleAuth.test.ts",
           "contains": "SEENIT-AUTH-001 traite l’annulation Google comme une sortie non bloquante"
+        },
+        {
+          "file": "tests/profileAvatarFallback.test.ts",
+          "contains": "issue #421 conserve les métadonnées photo du Credential Manager jusqu’au profil Firebase"
         }
       ]
     },

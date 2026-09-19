@@ -766,10 +766,14 @@ pour le cache des sagas et univers.
 - Les notifications système de fin de téléchargement proviennent des webhooks Sonarr/Radarr.
   Le polling local affiche uniquement un toast SeenIt afin d'éviter les doublons.
 - **SEENIT-NOTIFICATION-002** — Un rappel Film ou Série utilise, lorsqu'il existe, un visuel TMDB
-  préparé dans le stockage privé et borné de l'application. Pour un rappel Android planifié, aucun bitmap
-  n'est embarqué dans le `PendingIntent` d'AlarmManager : l'image est relue, validée et décodée seulement
-  par le receiver au moment de la livraison. Une image absente, invalide ou trop grande conserve le rappel
-  texte et ne bloque jamais les rappels suivants. Aucun octet/Base64 d'image ne traverse Capacitor/Binder.
+  préparé dans le stockage privé et borné de l'application. Les chemins TMDB relatifs comme les anciennes
+  URL absolues déjà persistées sont normalisés vers la taille propre au canal notification avant la clé
+  de cache et le téléchargement : affiche compacte pour `largeIcon`, visuel riche borné pour
+  `BigPictureStyle`. Un cache privé valide gagne toujours sur le réseau et ne déclenche aucun nouveau
+  téléchargement. Pour un rappel Android planifié, aucun bitmap n'est embarqué dans le `PendingIntent`
+  d'AlarmManager : l'image est relue, validée et décodée seulement par le receiver au moment de la
+  livraison. Une image absente, invalide ou trop grande conserve le rappel texte et ne bloque jamais les
+  rappels suivants. Aucun octet/Base64 d'image ne traverse Capacitor/Binder.
 
 ### 8.1 Mise à jour intégrée
 
@@ -1170,6 +1174,11 @@ l'identité de l'APK et ses actifs.
 - Dans l'APK Android, le bouton **Continuer avec Google** utilise en priorité Android Credential Manager / Sign in with Google afin d'afficher le sélecteur de comptes Google natif, selon le même parcours que l'application ATHIA.
 - Le client OAuth est lu depuis `default_web_client_id` généré par le `google-services.json` canonique de `com.seenit.app`; aucun nouvel identifiant utilisateur SeenIt n'est créé par la couche native.
 - Le Google ID token obtenu n'est qu'un transport : il est échangé via `GoogleAuthProvider.credential(...)` puis `signInWithCredential(...)` dans le Firebase Web SDK déjà utilisé par SeenIt, afin de conserver le même Firebase UID et les mêmes données Firestore pour les comptes existants.
+- Les métadonnées publiques du compte déjà retournées par Credential Manager, notamment le nom et la
+  photo Google, sont conservées à travers le bridge natif puis peuvent compléter le profil Firebase
+  courant sans créer ni changer l'UID. Le Profil privilégie `user.photoURL`, puis la photo du provider
+  `google.com`; seulement en leur absence ou en cas d'échec de chargement il utilise les initiales
+  locales déterministes.
 - `setFilterByAuthorizedAccounts(false)` permet une reconnexion / un nouveau consentement lorsque nécessaire et `setAutoSelectEnabled(false)` conserve un choix explicite du compte.
 - Une annulation utilisateur du sélecteur est une sortie normale et ne doit afficher aucune erreur bloquante.
 - Si Credential Manager est indisponible ou échoue pour une raison de compatibilité, l'ancien flux natif Google Auth reste un fallback; la PWA conserve `signInWithPopup`.
