@@ -48,9 +48,10 @@ test('SEENIT-PERF-001 amorce le cache persistant avant dâ€™ouvrir une fiche aprÃ
   const openEnd = appSource.indexOf('const openLocalMedia', openStart);
   assert.ok(openStart >= 0 && openEnd > openStart);
   const openSource = appSource.slice(openStart, openEnd);
-  const primeIndex = openSource.indexOf('primeMediaDetailsFromPersistentCache');
-  const commitIndex = openSource.indexOf('openShow(id, type');
-  assert.ok(primeIndex >= 0 && commitIndex > primeIndex);
+  const raceIndex = openSource.indexOf('await Promise.race');
+  const primeIndex = openSource.indexOf('primeMediaDetailsFromPersistentCache', raceIndex);
+  const commitIndex = openSource.indexOf('commitOpen();', primeIndex);
+  assert.ok(raceIndex >= 0 && primeIndex > raceIndex && commitIndex > primeIndex);
   assert.match(openSource, /Promise\.race/);
   assert.match(openSource, /detailOpenRequestRef\.current/);
 });
