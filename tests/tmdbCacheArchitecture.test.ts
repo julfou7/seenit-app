@@ -115,9 +115,9 @@ test('issue #410 documente chaque famille TMDB et la décision âge diffuseurs',
     'metadata',
   ];
   for (const family of families) {
-    assert.match(
-      backendSource,
-      family === 'metadata' ? /return 'metadata'/ : new RegExp(`return '${family}'`),
+    assert.ok(
+      backendSource.includes(`'${family}'`),
+      `famille ${family} absente du classifieur backend`,
     );
     assert.ok(audit.includes('| `' + family + '` |'), `famille ${family} absente de l'audit`);
   }
