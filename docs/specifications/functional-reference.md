@@ -430,12 +430,21 @@ strictement cache-only, puis monte la fiche sans timeout arbitraire ; le détail
 rafraîchir silencieusement. Une saison déjà ouverte suit la même logique avec un TTL plus court : les
 réouvertures rapprochées n'appellent plus TMDB, tandis qu'une saison en cours peut être rafraîchie après
 deux heures. Détails et relations restent indexés par `movie:<id>` / `tv:<id>`, les images principales
-gardent une URL stable et aucune donnée utilisateur n'entre dans ce cache public. Le loader relationnel
+gardent une URL stable et aucune donnée utilisateur n'entre dans ce cache public. Le snapshot conserve
+aussi un aperçu borné des premiers interprètes : une fiche déjà connue affiche donc immédiatement la même
+barre `À propos / Épisodes / Casting` lorsque le casting existe, sans attendre le détail TMDB complet.
+Le loader relationnel
 n'est armé que lorsqu'une collection TMDB doit réellement être récupérée ; une série sans relation connue
 ne monte aucun faux skeleton. Lorsqu'un chargement relationnel est réel, ses cartes skeleton reprennent la
 même largeur et le même ratio que les cartes finales afin de ne pas déplacer les sections voisines.
+Pour une série suivie, la progression visible part du dernier état déjà persisté localement et dans la
+bibliothèque utilisateur. Cocher/décocher un épisode ou une saison met à jour immédiatement ce delta
+(`seenEpisodes`, prochain épisode, statut/archive et temps restant dérivé) sans relancer une collecte
+TMDB de toutes les saisons. Les changements réels de diffusion ou de catalogue restent pris en charge par
+le worker de métadonnées planifié et par l'actualisation explicite.
 Le contrat complet est `SEENIT-PERF-001` et son suivi est
-[#146](https://github.com/julfou7/seenit-app/issues/146).
+[#146](https://github.com/julfou7/seenit-app/issues/146) pour le premier rendu et
+[#445](https://github.com/julfou7/seenit-app/issues/445) pour la progression incrémentale.
 
 La machine d'états exhaustive et le mapping Plex sont autoritatifs dans `seenit.md` §5.3 à §5.5.
 
