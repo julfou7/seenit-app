@@ -95,15 +95,46 @@ function dependencyKey(dependencies: NotificationMediaDependencies): object {
   return dependencies.filesystem as unknown as object;
 }
 
+async function hasNotificationMediaDirectory(dependencies: NotificationMediaDependencies): Promise<boolean> {
+  try {
+    const stat = await dependencies.filesystem.stat({
+      path: NOTIFICATION_MEDIA_DIR,
+      directory: Directory.Data,
+    });
+    return stat.type === 'directory';
+  } catch {
+    return false;
+  }
+}
+
+async function materializeNotificationMediaDirectory(
+  dependencies: NotificationMediaDependencies,
+): Promise<void> {
+  // Directory.Data survit aux redémarrages et mises à jour alors que ce module
+  // repart avec un WeakMap vide. Le mkdir Android de @capacitor/filesystem 8
+  // rejette un dossier déjà présent : son existence est donc un état sain, pas
+  // une erreur qui doit empêcher le prochain cache miss de télécharger l'image.
+  if (await hasNotificationMediaDirectory(dependencies)) return;
+
+  try {
+    await dependencies.filesystem.mkdir({
+      path: NOTIFICATION_MEDIA_DIR,
+      directory: Directory.Data,
+      recursive: true
+    });
+  } catch (error) {
+    // Couvre aussi la course entre le stat et mkdir : n'absorber l'erreur que
+    // si le répertoire existe réellement après l'échec.
+    if (await hasNotificationMediaDirectory(dependencies)) return;
+    throw error;
+  }
+}
+
 async function ensureNotificationMediaDirectory(dependencies: NotificationMediaDependencies): Promise<void> {
   const key = dependencyKey(dependencies);
   let ready = directoryReadyByFilesystem.get(key);
   if (!ready) {
-    ready = dependencies.filesystem.mkdir({
-      path: NOTIFICATION_MEDIA_DIR,
-      directory: Directory.Data,
-      recursive: true
-    }).then(() => undefined).catch(error => {
+    ready = materializeNotificationMediaDirectory(dependencies).catch(error => {
       directoryReadyByFilesystem.delete(key);
       throw error;
     });

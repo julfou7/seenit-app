@@ -770,7 +770,10 @@ pour le cache des sagas et univers.
   URL absolues déjà persistées sont normalisés vers la taille propre au canal notification avant la clé
   de cache et le téléchargement : affiche compacte pour `largeIcon`, visuel riche borné pour
   `BigPictureStyle`. Un cache privé valide gagne toujours sur le réseau et ne déclenche aucun nouveau
-  téléchargement. Pour un rappel Android planifié, aucun bitmap n'est embarqué dans le `PendingIntent`
+  téléchargement. Le sous-répertoire privé `notification-media` est persistant et sa préparation est
+  idempotente : son existence après un redémarrage ou une mise à jour est un état valide et ne doit jamais
+  empêcher un nouveau cache miss de télécharger son image. Pour un rappel Android planifié, aucun bitmap
+  n'est embarqué dans le `PendingIntent`
   d'AlarmManager : l'image est relue, validée et décodée seulement par le receiver au moment de la
   livraison. Une image absente, invalide ou trop grande conserve le rappel texte et ne bloque jamais les
   rappels suivants. Aucun octet/Base64 d'image ne traverse Capacitor/Binder.

@@ -71,20 +71,30 @@ test('SEENIT-NOTIFICATION-002 utilise une référence privée stable et jamais g
     'le chemin canonique doit rester confiné sous filesDir');
 });
 
-test('issue #106 v1.4.156 matérialise le répertoire privé avant le téléchargement natif', () => {
+test('issue #106 matérialise le répertoire privé de façon idempotente avant le téléchargement natif', () => {
   assert.match(
     notificationMediaSource,
-    /dependencies\.filesystem\.mkdir\(\{\s*path: NOTIFICATION_MEDIA_DIR,\s*directory: Directory\.Data,\s*recursive: true\s*\}\)/,
-    'le sous-répertoire notification-media doit être créé explicitement dans Directory.Data',
+    /hasNotificationMediaDirectory\(dependencies\)/,
+    'le cache doit reconnaître le dossier persistant déjà créé par une exécution précédente',
+  );
+  assert.match(
+    notificationMediaSource,
+    /if \(await hasNotificationMediaDirectory\(dependencies\)\) return;/,
+    'un dossier notification-media existant est un état sain et ne doit pas repasser par mkdir',
+  );
+  assert.match(
+    notificationMediaSource,
+    /catch \(error\) \{[\s\S]*?if \(await hasNotificationMediaDirectory\(dependencies\)\) return;[\s\S]*?throw error;/,
+    'une course AlreadyExists ne peut être absorbée qu’après confirmation du répertoire par stat',
   );
   const ensureIndex = notificationMediaSource.indexOf('await ensureNotificationMediaDirectory(dependencies);');
   const downloadIndex = notificationMediaSource.indexOf('await dependencies.filesystem.downloadFile({');
-  assert.ok(ensureIndex >= 0, 'le cache doit attendre la matérialisation du répertoire');
-  assert.ok(downloadIndex > ensureIndex, 'mkdir doit précéder downloadFile : recursive sur downloadFile ne crée pas le parent Android');
+  assert.ok(ensureIndex >= 0, 'le cache doit attendre la préparation idempotente du répertoire');
+  assert.ok(downloadIndex > ensureIndex, 'le répertoire privé doit être prêt avant downloadFile');
   assert.match(
     notificationMediaSource,
     /directoryReadyByFilesystem\.delete\(key\);\s*throw error;/,
-    'un mkdir réellement échoué doit rester retentable au lieu de figer une promesse rejetée',
+    'un échec réel de préparation doit rester retentable au lieu de figer une promesse rejetée',
   );
 });
 
