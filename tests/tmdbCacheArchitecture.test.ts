@@ -2,10 +2,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
-  EPISODE_DETAILS_CACHE_MAX_ENTRIES,
-  EPISODE_DETAILS_CACHE_TTL_MS,
-} from '../src/features/shows/tmdbClient.ts';
-import {
   PUBLIC_METADATA_CACHE_MAX_ENTRY_BYTES,
   PUBLIC_METADATA_CACHE_PERSISTENT_MAX_BYTES,
   PUBLIC_METADATA_CACHE_PERSISTENT_MAX_ENTRIES,
@@ -38,8 +34,8 @@ test('SEENIT-PERF-001 borne toutes les mémoires TMDB et n’ajoute aucun Firest
     { details: 120, discover: 96, search: 80, season: 80 },
   );
 
-  assert.equal(EPISODE_DETAILS_CACHE_MAX_ENTRIES, 120);
-  assert.equal(EPISODE_DETAILS_CACHE_TTL_MS, 30 * 60 * 1000);
+  assert.match(clientSource, /export const EPISODE_DETAILS_CACHE_MAX_ENTRIES = 120/);
+  assert.match(clientSource, /export const EPISODE_DETAILS_CACHE_TTL_MS = 30 \* 60 \* 1000/);
   assert.match(
     clientSource,
     /episodeDetailsCache = new BoundedCache<string, \{ data: any; timestamp: number \}>\(EPISODE_DETAILS_CACHE_MAX_ENTRIES\)/,
