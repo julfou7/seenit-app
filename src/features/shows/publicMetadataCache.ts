@@ -1,4 +1,4 @@
-export type PublicMetadataFamily = 'details' | 'discover' | 'search';
+export type PublicMetadataFamily = 'details' | 'discover' | 'search' | 'season';
 
 export interface PublicMetadataPolicy {
   freshMs: number;
@@ -34,6 +34,15 @@ export const PUBLIC_METADATA_CACHE_POLICIES: Record<PublicMetadataFamily, Public
     // Une recherche contient du texte saisi par l'utilisateur : on mutualise
     // en mémoire mais on ne la persiste pas dans le cache public.
     persist: false,
+  },
+  season: {
+    // Les épisodes d'une saison en cours peuvent encore évoluer : TTL plus court
+    // que la fiche principale, mais assez long pour supprimer les réouvertures
+    // répétées observées dans #410.
+    freshMs: 2 * 60 * 60 * 1000,
+    staleMs: 24 * 60 * 60 * 1000,
+    memoryMaxEntries: 80,
+    persist: true,
   },
 };
 
@@ -77,6 +86,7 @@ const createStats = (): Record<PublicMetadataFamily, PublicMetadataFamilyStats> 
   details: { memoryHits: 0, persistentHits: 0, staleHits: 0, misses: 0, writes: 0, networkLoads: 0, singleFlightHits: 0, readErrors: 0, writeErrors: 0, oversizedSkips: 0 },
   discover: { memoryHits: 0, persistentHits: 0, staleHits: 0, misses: 0, writes: 0, networkLoads: 0, singleFlightHits: 0, readErrors: 0, writeErrors: 0, oversizedSkips: 0 },
   search: { memoryHits: 0, persistentHits: 0, staleHits: 0, misses: 0, writes: 0, networkLoads: 0, singleFlightHits: 0, readErrors: 0, writeErrors: 0, oversizedSkips: 0 },
+  season: { memoryHits: 0, persistentHits: 0, staleHits: 0, misses: 0, writes: 0, networkLoads: 0, singleFlightHits: 0, readErrors: 0, writeErrors: 0, oversizedSkips: 0 },
 });
 
 let stats = createStats();
@@ -84,6 +94,7 @@ const memoryCaches: Record<PublicMetadataFamily, Map<string, StoredPublicMetadat
   details: new Map(),
   discover: new Map(),
   search: new Map(),
+  season: new Map(),
 };
 const inFlight = new Map<string, Promise<unknown>>();
 let databasePromise: Promise<IDBDatabase | null> | null = null;
@@ -358,6 +369,7 @@ export function getPublicMetadataCacheStats(): PublicMetadataCacheStatsSnapshot 
       details: memoryCaches.details.size,
       discover: memoryCaches.discover.size,
       search: memoryCaches.search.size,
+      season: memoryCaches.season.size,
     },
     families: cloneJson(stats),
   };
@@ -367,6 +379,7 @@ export function clearPublicMetadataMemoryCacheForTests(): void {
   memoryCaches.details.clear();
   memoryCaches.discover.clear();
   memoryCaches.search.clear();
+  memoryCaches.season.clear();
   inFlight.clear();
   stats = createStats();
 }
