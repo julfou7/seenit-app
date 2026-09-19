@@ -10,7 +10,7 @@ const nativePatchSource = readSource('scripts/patch-local-notifications.cjs');
 const androidVariablesSource = readSource('android/variables.gradle');
 
 test('SEENIT-NOTIFICATION-002 affiche un visuel média et un seul emoji par événement', () => {
-  assert.match(reminderSource, /https:\/\/image\.tmdb\.org\/t\/p\/w154/,
+  assert.match(reminderSource, /https:\/\/image\.tmdb\.org\/t\/p\/w342/,
     'l’APK doit utiliser un poster TMDB compact pour le largeIcon');
   assert.match(reminderSource, /https:\/\/image\.tmdb\.org\/t\/p\/w500/,
     'le visuel riche TMDB doit rester compact avant son cache natif');
@@ -38,8 +38,8 @@ test('SEENIT-NOTIFICATION-002 affiche un visuel média et un seul emoji par év�
 test('SEENIT-NOTIFICATION-002 sépare affiche et image riche sans bloquer le fallback', () => {
   assert.match(notificationMediaSource, /Promise\.all\(/,
     'affiche et image riche sont préparées indépendamment');
-  assert.match(notificationMediaSource, /cacheNativeNotificationImageSafely\(nativePosterUrl\)/);
-  assert.match(notificationMediaSource, /cacheNativeNotificationImageSafely\(richCandidate\)/);
+  assert.match(notificationMediaSource, /cacheNativeNotificationImageSafely\(nativePosterUrl, dependencies\)/);
+  assert.match(notificationMediaSource, /cacheNativeNotificationImageSafely\(richCandidate, dependencies\)/);
   assert.match(notificationMediaSource, /icon: localPoster \|\| localRichImage/);
   assert.match(notificationMediaSource, /image: localRichImage \|\| localPoster/);
   assert.match(notificationMediaSource, /using text-only notification/,
@@ -70,28 +70,34 @@ test('SEENIT-NOTIFICATION-002 utilise une référence privée stable et jamais g
 test('issue #106 v1.4.156 matérialise le répertoire privé avant le téléchargement natif', () => {
   assert.match(
     notificationMediaSource,
-    /Filesystem\.mkdir\(\{\s*path: NOTIFICATION_MEDIA_DIR,\s*directory: Directory\.Data,\s*recursive: true\s*\}\)/,
+    /dependencies\.filesystem\.mkdir\(\{\s*path: NOTIFICATION_MEDIA_DIR,\s*directory: Directory\.Data,\s*recursive: true\s*\}\)/,
     'le sous-répertoire notification-media doit être créé explicitement dans Directory.Data',
   );
-  const ensureIndex = notificationMediaSource.indexOf('await ensureNotificationMediaDirectory();');
-  const downloadIndex = notificationMediaSource.indexOf('await Filesystem.downloadFile({');
+  const ensureIndex = notificationMediaSource.indexOf('await ensureNotificationMediaDirectory(dependencies);');
+  const downloadIndex = notificationMediaSource.indexOf('await dependencies.filesystem.downloadFile({');
   assert.ok(ensureIndex >= 0, 'le cache doit attendre la matérialisation du répertoire');
   assert.ok(downloadIndex > ensureIndex, 'mkdir doit précéder downloadFile : recursive sur downloadFile ne crée pas le parent Android');
   assert.match(
     notificationMediaSource,
-    /notificationMediaDirectoryReady = null;\s*throw error;/,
+    /directoryReadyByFilesystem\.delete\(key\);\s*throw error;/,
     'un mkdir réellement échoué doit rester retentable au lieu de figer une promesse rejetée',
   );
 });
 
 test('SEENIT-NOTIFICATION-002 garde les images hors du pont Binder et borne le bitmap Android', () => {
-  assert.match(notificationMediaSource, /Filesystem\.downloadFile\(/,
+  assert.match(notificationMediaSource, /dependencies\.filesystem\.downloadFile\(/,
     'le téléchargement de l’image doit être effectué par la couche native Filesystem');
   assert.match(notificationMediaSource, /directory: Directory\.Data/);
   assert.match(notificationMediaSource, /connectTimeout: NATIVE_IMAGE_CONNECT_TIMEOUT_MS/);
   assert.match(notificationMediaSource, /readTimeout: NATIVE_IMAGE_READ_TIMEOUT_MS/);
   assert.match(notificationMediaSource, /MAX_NATIVE_IMAGE_FILE_BYTES = 512 \* 1024/,
     'la taille de chaque fichier image doit rester bornée côté JS');
+  assert.match(notificationMediaSource, /NATIVE_IMAGE_DOWNLOAD_ATTEMPTS = 3/,
+    'un cache miss doit disposer de retries bornés');
+  assert.match(notificationMediaSource, /downloadsInFlightByFilesystem/,
+    'deux rappels concurrents ne doivent pas télécharger deux fois la même image');
+  assert.match(reminderSource, /result\.delivered && result\.visualReady/,
+    'une alarme future sans visuel ne doit pas être figée comme définitivement programmée');
   assert.doesNotMatch(notificationMediaSource, /FileReader|readAsDataURL|data:image/i,
     'le chemin natif ne doit jamais matérialiser l’image en Data URL');
   assert.doesNotMatch(mediaReminderSource, /FileReader|readAsDataURL|Base64|data:image/i,
@@ -142,6 +148,6 @@ test('SEENIT-NOTIFICATION-002 hydrate le bitmap seulement à la livraison Androi
     'le patch doit refuser explicitement toute réintroduction du recoverBuilder AndroidX');
   assert.match(hydratedDeliveryBlock, /notificationJson\?\.let \{ LocalNotification\.buildNotificationFromJSObject\(it\) \}/);
   assert.match(hydratedDeliveryBlock, /notificationManager\.notify\(id, deliveredNotification\)/);
-  assert.match(reminderSource, /REMINDER_SCHEDULE_SCHEMA = 'v5'/,
+  assert.match(reminderSource, /REMINDER_SCHEDULE_SCHEMA = 'v6'/,
     'les alarmes existantes doivent être recréées sans bitmap dans leur PendingIntent');
 });

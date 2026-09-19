@@ -215,7 +215,7 @@ annulation.
 
 ## 6. Profil, statistiques et Ma Liste
 
-Le profil affiche l'identité Google, l'année d'inscription et deux onglets :
+Le profil affiche l'identité Google, l'année d'inscription et deux onglets. La photo Google est utilisée lorsqu'elle charge ; si elle est absente ou indisponible, SeenIt affiche des initiales locales déterministes plutôt qu'une seconde image distante ou une image cassée :
 
 - **Statistiques** : temps de visionnage estimé, volumes, répartitions, personnes fréquentes et badges
   Centenaire, Oiseau de Nuit, Grand Écran et Binge-Master ;
@@ -555,8 +555,13 @@ explicite, aucun rappel film n'est programmé et aucune estimation J+120 n'est u
 - Les clés locales de programmation évitent le doublon sur une même installation et leur schéma peut être
   versionné pour remplacer proprement une alarme persistée quand son payload doit évoluer.
 - Le receiver Android hydrate le grand pictogramme et le BigPicture depuis le fichier privé borné au
-  moment exact de la livraison. L'alarme planifiée ne transporte jamais le bitmap ; le fallback texte reste
-  valide si le fichier a disparu ou ne peut pas être décodé.
+  moment exact de la livraison. La préparation consulte d'abord ce cache persistant : une image déjà
+  matérialisée n'est pas retéléchargée. Un cache miss est retenté de façon bornée et les téléchargements
+  concurrents de la même image sont coalescés. Les métadonnées TMDB (dont les chemins d'image) continuent
+  de bénéficier du cache public #410 ; ce cache de métadonnées ne duplique pas les octets du fichier image.
+  Une alarme future qui n'a pu obtenir aucun visuel reste réparable lors d'un prochain passage avant sa
+  livraison. L'alarme planifiée ne transporte jamais le bitmap ; le fallback texte reste valide si le
+  fichier a disparu ou ne peut pas être décodé.
 
 Après qu'une release APK officielle a été publiée et vérifiée, SeenIt peut prévenir les installations
 Android autorisées du compte :

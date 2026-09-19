@@ -52,7 +52,7 @@ test('#353 le hook n’émet plus un toast dans chaque branche média et garde l
   assert.match(source, /const dueToastCandidates: ReminderToastCandidate\[\] = \[\]/);
   assert.match(source, /showToast\(toastSummary\.message, 'reminder'/);
   assert.match(source, /reminder_toast_\$\{REMINDER_TOAST_RECEIPT_SCHEMA\}_\$\{todayStr\}/);
-  assert.match(source, /if \(await send\(\)\) writeUserScopedJson\(uid, notifiedKey, true\)/,
+  assert.match(source, /if \(\(await send\(\)\)\.delivered\) writeUserScopedJson\(uid, notifiedKey, true\)/,
     'le succès natif conserve sa propre clé de retry');
   assert.doesNotMatch(source, /showToast\(`(?:🍿|🎉)/u);
 });

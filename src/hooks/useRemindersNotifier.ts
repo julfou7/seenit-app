@@ -22,7 +22,7 @@ import {
   type ReminderToastCandidate,
 } from '../features/notifications/reminderToastSummary';
 
-const REMINDER_SCHEDULE_SCHEMA = 'v5';
+const REMINDER_SCHEDULE_SCHEMA = 'v6';
 const REMINDER_TOAST_RECEIPT_SCHEMA = 'v1';
 
 function toLocalDateKey(date: Date): string {
@@ -75,12 +75,12 @@ export function useRemindersNotifier() {
         // Le logo SeenIt n'est jamais substitué à une affiche absente : le
         // résolveur natif doit pouvoir choisir explicitement le fallback texte.
         const iconUrl = s.posterPath
-          ? (s.posterPath.startsWith('http') ? s.posterPath : `https://image.tmdb.org/t/p/w154${s.posterPath}`)
+          ? (s.posterPath.startsWith('http') ? s.posterPath : `https://image.tmdb.org/t/p/w342${s.posterPath}`)
           : undefined;
 
         const imageUrl = s.backdropPath
           ? (s.backdropPath.startsWith('http') ? s.backdropPath : `https://image.tmdb.org/t/p/w500${s.backdropPath}`)
-          : (s.posterPath ? (s.posterPath.startsWith('http') ? s.posterPath : `https://image.tmdb.org/t/p/w500${s.posterPath}`) : undefined);
+          : iconUrl;
 
         // --- FILMS ---
         if (s.mediaType === 'movie') {
@@ -161,12 +161,16 @@ export function useRemindersNotifier() {
 
             const send = async (scheduleDate?: Date) => {
               const mediaVisual = await resolveNotificationMediaVisual(iconUrl, imageUrl);
-              return sendMediaReminderNotification(notificationTitle, {
+              const delivered = await sendMediaReminderNotification(notificationTitle, {
                 ...notificationPayload,
                 ...mediaVisual,
                 summaryText,
                 scheduleDate
               } as any);
+              return {
+                delivered,
+                visualReady: Boolean(mediaVisual.icon || mediaVisual.image),
+              };
             };
 
             if (targetDate.getTime() > now.getTime()) {
@@ -175,7 +179,11 @@ export function useRemindersNotifier() {
                 // Même ID Android : on remplace explicitement une éventuelle
                 // ancienne alarme pour lui injecter le payload visuel courant.
                 await cancelMediaReminderNotificationByTag(notificationTag);
-                if (await send(targetDate)) writeUserScopedJson(uid, scheduleKey, true);
+                const result = await send(targetDate);
+                // Une alarme future programmée sans image reste volontairement
+                // réparable : tant que le fichier privé n'existe pas, le prochain
+                // passage annule/reprogramme le même ID et retente le cache.
+                if (result.delivered && result.visualReady) writeUserScopedJson(uid, scheduleKey, true);
               }
             } else if (targetStr === todayStr) {
               const notifiedKey = `notified_today_${s.id}_${tag}_${todayStr}`;
@@ -189,7 +197,7 @@ export function useRemindersNotifier() {
                 });
                 // Le reçu UI est volontairement indépendant du succès natif :
                 // un échec Android pourra être retenté sans rejouer le toast.
-                if (await send()) writeUserScopedJson(uid, notifiedKey, true);
+                if ((await send()).delivered) writeUserScopedJson(uid, notifiedKey, true);
               }
             }
           };
@@ -299,20 +307,25 @@ export function useRemindersNotifier() {
 
           const send = async (scheduleDate?: Date) => {
             const mediaVisual = await resolveNotificationMediaVisual(iconUrl, tvImageUrl);
-            return sendMediaReminderNotification(notificationTitle, {
+            const delivered = await sendMediaReminderNotification(notificationTitle, {
               ...fullPayload,
               ...mediaVisual,
               summaryText,
               allowMarkWatched: addActions,
               scheduleDate
             } as any);
+            return {
+              delivered,
+              visualReady: Boolean(mediaVisual.icon || mediaVisual.image),
+            };
           };
 
           if (targetDate.getTime() > now.getTime()) {
             const scheduleKey = `scheduled_9am_${REMINDER_SCHEDULE_SCHEMA}_${s.id}_${tagPrefix}_S${sNum}E${eNum}_${targetStr}`;
             if (!readUserScopedJson(uid, scheduleKey, false)) {
               await cancelMediaReminderNotificationByTag(notificationTag);
-              if (await send(targetDate)) writeUserScopedJson(uid, scheduleKey, true);
+              const result = await send(targetDate);
+              if (result.delivered && result.visualReady) writeUserScopedJson(uid, scheduleKey, true);
             }
           } else if (targetStr === todayStr) {
             const notifiedKey = `notified_today_${s.id}_${tagPrefix}_S${sNum}E${eNum}_${todayStr}`;
@@ -324,7 +337,7 @@ export function useRemindersNotifier() {
                 posterPath: s.posterPath,
                 show: s,
               });
-              if (await send()) writeUserScopedJson(uid, notifiedKey, true);
+              if ((await send()).delivered) writeUserScopedJson(uid, notifiedKey, true);
             }
           }
         };
