@@ -84,6 +84,7 @@ function StableColdDetailSkeleton({ onBack, mediaType, knownTitle }: StableColdD
         <div className="h-10 bg-zinc-900 rounded-full border border-white/5 p-1 flex items-center gap-1">
           <span className="flex-1 py-2 text-center text-xs font-bold tracking-wider uppercase rounded-full bg-zinc-800 text-[#E5A93D]">À propos</span>
           {isSeries && <span className="flex-1 py-2 text-center text-xs font-bold tracking-wider uppercase text-zinc-500">Épisodes</span>}
+          <span className="flex-1 py-2 text-center text-xs font-bold tracking-wider uppercase text-zinc-500">Casting</span>
         </div>
       </div>
 
