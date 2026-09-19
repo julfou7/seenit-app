@@ -1,5 +1,6 @@
 export type MediaDetailRenderType = 'tv' | 'movie';
 
+export const MEDIA_DETAIL_RENDER_SCHEMA_VERSION = 2;
 export const MEDIA_DETAIL_RENDER_MAX_GENRES = 24;
 export const MEDIA_DETAIL_RENDER_MAX_KEYWORDS = 40;
 export const MEDIA_DETAIL_RENDER_MAX_LOGOS = 8;
@@ -133,6 +134,7 @@ export function createMediaDetailRenderSnapshot(
   } : undefined;
 
   return {
+    seenit_render_schema_version: MEDIA_DETAIL_RENDER_SCHEMA_VERSION,
     id,
     media_type: type,
     name: details?.name || undefined,
