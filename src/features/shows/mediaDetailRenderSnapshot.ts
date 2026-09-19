@@ -3,6 +3,7 @@ export type MediaDetailRenderType = 'tv' | 'movie';
 export const MEDIA_DETAIL_RENDER_MAX_GENRES = 24;
 export const MEDIA_DETAIL_RENDER_MAX_KEYWORDS = 40;
 export const MEDIA_DETAIL_RENDER_MAX_LOGOS = 8;
+export const MEDIA_DETAIL_RENDER_MAX_CAST = 12;
 export const MEDIA_DETAIL_RENDER_MAX_SEASONS = 40;
 export const MEDIA_DETAIL_RENDER_MAX_VIDEOS = 8;
 
@@ -29,6 +30,31 @@ const compactKeyword = (item: any) => {
   return {
     id: Number.isFinite(Number(item.id)) ? Number(item.id) : undefined,
     name: String(item.name),
+  };
+};
+
+const compactCastMember = (item: any) => {
+  const id = Number(item?.id);
+  if (!Number.isFinite(id) || id <= 0 || !item?.name) return null;
+
+  const roles = Array.isArray(item.roles)
+    ? item.roles
+        .map((role: any) => ({
+          character: role?.character ? String(role.character) : undefined,
+          episode_count: Number.isFinite(Number(role?.episode_count)) ? Number(role.episode_count) : undefined,
+        }))
+        .filter((role: any) => role.character || role.episode_count !== undefined)
+        .slice(0, 3)
+    : undefined;
+
+  return {
+    id,
+    name: String(item.name),
+    profile_path: item.profile_path || null,
+    character: item.character ? String(item.character) : undefined,
+    ...(roles && roles.length > 0 ? { roles } : {}),
+    total_episode_count: Number.isFinite(Number(item.total_episode_count)) ? Number(item.total_episode_count) : undefined,
+    episode_count: Number.isFinite(Number(item.episode_count)) ? Number(item.episode_count) : undefined,
   };
 };
 
@@ -74,6 +100,12 @@ export function createMediaDetailRenderSnapshot(
     : [];
   const logos = Array.isArray(details?.images?.logos)
     ? details.images.logos.map(compactImage).filter(Boolean).slice(0, MEDIA_DETAIL_RENDER_MAX_LOGOS)
+    : [];
+  const rawCast = type === 'tv'
+    ? (Array.isArray(details?.aggregate_credits?.cast) ? details.aggregate_credits.cast : details?.credits?.cast)
+    : details?.credits?.cast;
+  const cast = Array.isArray(rawCast)
+    ? rawCast.map(compactCastMember).filter(Boolean).slice(0, MEDIA_DETAIL_RENDER_MAX_CAST)
     : [];
   const seasons = Array.isArray(details?.seasons)
     ? details.seasons.map(compactSeason).filter(Boolean).slice(0, MEDIA_DETAIL_RENDER_MAX_SEASONS)
@@ -131,5 +163,6 @@ export function createMediaDetailRenderSnapshot(
     seasons,
     images: { logos },
     videos: { results: videos },
+    ...(type === 'tv' ? { aggregate_credits: { cast } } : { credits: { cast } }),
   };
 }
