@@ -123,7 +123,7 @@ test('issue #410 documente chaque famille TMDB et la décision âge diffuseurs',
       backendSource,
       family === 'metadata' ? /return 'metadata'/ : new RegExp(`return '${family}'`),
     );
-    assert.ok(audit.includes(`| \\`${family}\\` |`), `famille ${family} absente de l'audit`);
+    assert.ok(audit.includes('| `' + family + '` |'), `famille ${family} absente de l'audit`);
   }
 
   assert.match(audit, /Décision : \*\*convergence d'identité et d'observabilité, pas convergence physique du stockage\*\*/);
