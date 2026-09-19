@@ -10,7 +10,7 @@ const nativePatchSource = readSource('scripts/patch-local-notifications.cjs');
 const androidVariablesSource = readSource('android/variables.gradle');
 
 test('SEENIT-NOTIFICATION-002 affiche un visuel média et un seul emoji par événement', () => {
-  assert.match(reminderSource, /https:\/\/image\.tmdb\.org\/t\/p\/w154/,
+  assert.match(reminderSource, /https:\/\/image\.tmdb\.org\/t\/p\/w342/,
     'l’APK doit utiliser un poster TMDB compact pour le largeIcon');
   assert.match(reminderSource, /https:\/\/image\.tmdb\.org\/t\/p\/w500/,
     'le visuel riche TMDB doit rester compact avant son cache natif');
@@ -92,6 +92,12 @@ test('SEENIT-NOTIFICATION-002 garde les images hors du pont Binder et borne le b
   assert.match(notificationMediaSource, /readTimeout: NATIVE_IMAGE_READ_TIMEOUT_MS/);
   assert.match(notificationMediaSource, /MAX_NATIVE_IMAGE_FILE_BYTES = 512 \* 1024/,
     'la taille de chaque fichier image doit rester bornée côté JS');
+  assert.match(notificationMediaSource, /NATIVE_IMAGE_DOWNLOAD_ATTEMPTS = 3/,
+    'un cache miss doit disposer de retries bornés');
+  assert.match(notificationMediaSource, /downloadsInFlightByFilesystem/,
+    'deux rappels concurrents ne doivent pas télécharger deux fois la même image');
+  assert.match(reminderSource, /result\.delivered && result\.visualReady/,
+    'une alarme future sans visuel ne doit pas être figée comme définitivement programmée');
   assert.doesNotMatch(notificationMediaSource, /FileReader|readAsDataURL|data:image/i,
     'le chemin natif ne doit jamais matérialiser l’image en Data URL');
   assert.doesNotMatch(mediaReminderSource, /FileReader|readAsDataURL|Base64|data:image/i,
@@ -142,6 +148,6 @@ test('SEENIT-NOTIFICATION-002 hydrate le bitmap seulement à la livraison Androi
     'le patch doit refuser explicitement toute réintroduction du recoverBuilder AndroidX');
   assert.match(hydratedDeliveryBlock, /notificationJson\?\.let \{ LocalNotification\.buildNotificationFromJSObject\(it\) \}/);
   assert.match(hydratedDeliveryBlock, /notificationManager\.notify\(id, deliveredNotification\)/);
-  assert.match(reminderSource, /REMINDER_SCHEDULE_SCHEMA = 'v5'/,
+  assert.match(reminderSource, /REMINDER_SCHEDULE_SCHEMA = 'v6'/,
     'les alarmes existantes doivent être recréées sans bitmap dans leur PendingIntent');
 });

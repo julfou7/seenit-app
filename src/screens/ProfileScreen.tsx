@@ -10,6 +10,7 @@ import { ProAnalyticsDashboard } from '../components/ProAnalyticsDashboard';
 import { SeenItLogo } from '../components/SeenItLogo';
 import { LibraryScreen } from './LibraryScreen';
 import { useToastStore } from '../store/toastStore';
+import { getProfileInitials } from '../features/profile/profileAvatar';
 
 const ProfileStatsContent = React.memo(function ProfileStatsContent({
   onPersonClick,
@@ -33,6 +34,7 @@ export const ProfileScreen = React.memo(function ProfileScreen({
   // valeur déjà disponible évite une frame « Utilisateur » au redémarrage.
   const [user, setUser] = useState<FirebaseUser | null>(() => auth.currentUser);
   const [shareCopied, setShareCopied] = useState(false);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [activeTab, setActiveTab] = useState<'stats' | 'library'>('stats');
   const [mountedProfileTabs, setMountedProfileTabs] = useState(() => new Set<'stats' | 'library'>(['stats']));
   const [isProfileVisible, setIsProfileVisible] = useState(true);
@@ -185,6 +187,10 @@ export const ProfileScreen = React.memo(function ProfileScreen({
     return onAuthStateChanged(auth, setUser);
   }, []);
 
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [user?.uid, user?.photoURL]);
+
   const handleShare = async () => {
     const text = `Découvre mon Profil Cinéphile sur l'application !`;
     if (navigator.share) {
@@ -208,6 +214,8 @@ export const ProfileScreen = React.memo(function ProfileScreen({
     ? new Date(user.metadata.creationTime).getFullYear() 
     : 2024;
   const profileContentVisible = isProfileVisible && !showSettings;
+  const avatarUrl = user?.photoURL?.trim() || null;
+  const avatarInitials = getProfileInitials(user?.displayName, user?.email);
 
   return (
     <div ref={rootRef} className="flex-1 overflow-y-auto bg-transparent text-white pb-nav custom-scrollbar">
@@ -218,11 +226,22 @@ export const ProfileScreen = React.memo(function ProfileScreen({
         <div className="flex justify-between items-start mb-4">
           <div className="relative">
              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-2 border-[#E5A93D] p-1 shadow-lg shadow-[#E5A93D]/10">
-               <img 
-                 src={user?.photoURL || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=300"} 
-                 alt="Avatar" 
-                 className="w-full h-full rounded-full object-cover" 
-               />
+               {avatarUrl && !avatarLoadFailed ? (
+                 <img
+                   src={avatarUrl}
+                   alt="Avatar"
+                   className="w-full h-full rounded-full object-cover"
+                   onError={() => setAvatarLoadFailed(true)}
+                 />
+               ) : (
+                 <div
+                   className="w-full h-full rounded-full bg-zinc-800 flex items-center justify-center text-xl sm:text-2xl font-black text-[#E5A93D]"
+                   role="img"
+                   aria-label="Avatar"
+                 >
+                   {avatarInitials}
+                 </div>
+               )}
              </div>
              <button 
                onClick={() => setShowSettings(true)}
