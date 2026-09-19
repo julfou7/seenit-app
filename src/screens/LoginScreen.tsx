@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { signInWithPopup, signInWithCredential, GoogleAuthProvider, getRedirectResult } from 'firebase/auth';
+import { signInWithPopup, signInWithCredential, GoogleAuthProvider, getRedirectResult, updateProfile } from 'firebase/auth';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { auth, googleAuthProvider } from '../lib/firebase';
 import { LogIn, Tv2, Film, Clapperboard, Sparkles } from 'lucide-react';
@@ -55,10 +55,15 @@ export function LoginScreen() {
       if (Capacitor.isNativePlatform()) {
         // UX Android primaire : même Credential Manager natif qu'ATHIA.
         let idToken: string | undefined;
+        let googleProfile: { displayName?: string; photoURL?: string } = {};
 
         try {
           const nativeCredential = await SeenItAuth.signInWithGoogle();
           idToken = nativeCredential.idToken;
+          googleProfile = {
+            displayName: nativeCredential.displayName?.trim() || undefined,
+            photoURL: nativeCredential.photoURL?.trim() || undefined,
+          };
         } catch (credentialError: any) {
           if (isGoogleAuthCancellation(credentialError)) return;
 
@@ -72,6 +77,10 @@ export function LoginScreen() {
             });
             const googleUser = await GoogleAuth.signIn();
             idToken = googleUser.authentication?.idToken || (googleUser as any)?.idToken;
+            googleProfile = {
+              displayName: (googleUser as any)?.name?.trim() || undefined,
+              photoURL: (googleUser as any)?.imageUrl?.trim() || undefined,
+            };
           } catch (fallbackError: any) {
             if (isGoogleAuthCancellation(fallbackError)) return;
             throw fallbackError;
@@ -84,7 +93,25 @@ export function LoginScreen() {
 
         // Le token natif est échangé dans le Firebase Web SDK existant : même UID / même compte SeenIt.
         const credential = GoogleAuthProvider.credential(idToken);
-        await signInWithCredential(auth, credential);
+        const firebaseCredential = await signInWithCredential(auth, credential);
+
+        // Credential Manager connaît déjà le nom et la photo Google. Firebase
+        // n'expose pas toujours ces métadonnées au niveau racine du User après
+        // l'échange d'un ID token ; on répare alors le profil sans changer l'UID.
+        const profileUpdate: { displayName?: string; photoURL?: string } = {};
+        if (googleProfile.photoURL && googleProfile.photoURL !== firebaseCredential.user.photoURL) {
+          profileUpdate.photoURL = googleProfile.photoURL;
+        }
+        if (googleProfile.displayName && !firebaseCredential.user.displayName) {
+          profileUpdate.displayName = googleProfile.displayName;
+        }
+        if (Object.keys(profileUpdate).length > 0) {
+          try {
+            await updateProfile(firebaseCredential.user, profileUpdate);
+          } catch (profileError) {
+            console.warn('Profil Google connecté mais métadonnées non resynchronisées :', profileError);
+          }
+        }
       } else {
         // PWA : flux Firebase Web standard inchangé.
         await signInWithPopup(auth, googleAuthProvider);

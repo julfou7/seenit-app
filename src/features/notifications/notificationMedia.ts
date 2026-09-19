@@ -60,6 +60,37 @@ export function notificationMediaPrivateRef(url: string): string {
   return `${SEENIT_DATA_SCHEME}${notificationMediaCachePath(url)}`;
 }
 
+type NativeNotificationImageSize = 'w342' | 'w500';
+
+/**
+ * Les données suivies peuvent contenir soit un chemin TMDB brut, soit une URL
+ * TMDB déjà matérialisée par une ancienne synchro/Plex (w500, w1280, original).
+ * Le cache notification applique son propre budget : toute image TMDB est donc
+ * ramenée à la taille requise avant de calculer la clé locale ou de télécharger.
+ */
+export function normalizeNativeNotificationImageUrl(
+  url: string | undefined,
+  size: NativeNotificationImageSize,
+): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith('/')) return `https://image.tmdb.org/t/p/${size}${url}`;
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname !== 'image.tmdb.org') return url;
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return url;
+
+    const imagePath = parsed.pathname.match(/^\/t\/p\/[^/]+(\/.+)$/)?.[1];
+    if (!imagePath) return url;
+
+    parsed.protocol = 'https:';
+    parsed.pathname = `/t/p/${size}${imagePath}`;
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 function dependencyKey(dependencies: NotificationMediaDependencies): object {
   return dependencies.filesystem as unknown as object;
 }
@@ -211,10 +242,14 @@ export async function resolveNotificationMediaVisual(
     };
   }
 
-  const richCandidate = richImageUrl && richImageUrl !== nativePosterUrl ? richImageUrl : undefined;
+  const boundedPosterUrl = normalizeNativeNotificationImageUrl(nativePosterUrl, 'w342');
+  const boundedRichImageUrl = richImageUrl && richImageUrl !== nativePosterUrl
+    ? normalizeNativeNotificationImageUrl(richImageUrl, 'w500')
+    : undefined;
+
   const [localPoster, localRichImage] = await Promise.all([
-    cacheNativeNotificationImageSafely(nativePosterUrl, dependencies),
-    cacheNativeNotificationImageSafely(richCandidate, dependencies)
+    cacheNativeNotificationImageSafely(boundedPosterUrl, dependencies),
+    cacheNativeNotificationImageSafely(boundedRichImageUrl, dependencies)
   ]);
 
   if (!localPoster && !localRichImage) {

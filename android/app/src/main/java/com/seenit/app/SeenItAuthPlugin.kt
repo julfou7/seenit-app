@@ -70,6 +70,13 @@ class SeenItAuthPlugin : Plugin() {
                     val googleCredential = GoogleIdTokenCredential.createFrom(credential.data)
                     val result = JSObject()
                     result.put("idToken", googleCredential.idToken)
+                    googleCredential.displayName
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { result.put("displayName", it) }
+                    googleCredential.profilePictureUri
+                        ?.toString()
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { result.put("photoURL", it) }
                     call.resolve(result)
                     return@launch
                 }

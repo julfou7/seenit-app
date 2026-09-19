@@ -10,7 +10,7 @@ import { ProAnalyticsDashboard } from '../components/ProAnalyticsDashboard';
 import { SeenItLogo } from '../components/SeenItLogo';
 import { LibraryScreen } from './LibraryScreen';
 import { useToastStore } from '../store/toastStore';
-import { getProfileInitials } from '../features/profile/profileAvatar';
+import { getProfileAvatarUrl, getProfileInitials } from '../features/profile/profileAvatar';
 
 const ProfileStatsContent = React.memo(function ProfileStatsContent({
   onPersonClick,
@@ -39,6 +39,7 @@ export const ProfileScreen = React.memo(function ProfileScreen({
   const [mountedProfileTabs, setMountedProfileTabs] = useState(() => new Set<'stats' | 'library'>(['stats']));
   const [isProfileVisible, setIsProfileVisible] = useState(true);
   const showToast = useToastStore(state => state.showToast);
+  const avatarUrl = getProfileAvatarUrl(user);
 
   const [isExitingSettings, setIsExitingSettings] = useState(false);
   const [dragXSettings, setDragXSettings] = useState(0);
@@ -189,7 +190,7 @@ export const ProfileScreen = React.memo(function ProfileScreen({
 
   useEffect(() => {
     setAvatarLoadFailed(false);
-  }, [user?.uid, user?.photoURL]);
+  }, [user?.uid, avatarUrl]);
 
   const handleShare = async () => {
     const text = `Découvre mon Profil Cinéphile sur l'application !`;
@@ -214,7 +215,6 @@ export const ProfileScreen = React.memo(function ProfileScreen({
     ? new Date(user.metadata.creationTime).getFullYear() 
     : 2024;
   const profileContentVisible = isProfileVisible && !showSettings;
-  const avatarUrl = user?.photoURL?.trim() || null;
   const avatarInitials = getProfileInitials(user?.displayName, user?.email);
 
   return (

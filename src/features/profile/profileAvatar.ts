@@ -18,3 +18,26 @@ export function getProfileInitials(displayName?: string | null, email?: string |
 
   return '?';
 }
+
+
+interface ProfileAvatarProviderLike {
+  providerId?: string | null;
+  photoURL?: string | null;
+}
+
+interface ProfileAvatarUserLike {
+  photoURL?: string | null;
+  providerData?: readonly ProfileAvatarProviderLike[];
+}
+
+export function getProfileAvatarUrl(user?: ProfileAvatarUserLike | null): string | null {
+  const directPhoto = user?.photoURL?.trim();
+  if (directPhoto) return directPhoto;
+
+  const googlePhoto = user?.providerData
+    ?.find(provider => provider.providerId === 'google.com')
+    ?.photoURL
+    ?.trim();
+
+  return googlePhoto || null;
+}
