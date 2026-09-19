@@ -477,7 +477,8 @@ n'est rouverte que par une nouvelle décision produit explicite.
   Les saisons déjà ouvertes rejoignent la même couche : fraîcheur 2 heures, repli stale-if-error jusqu'à
   24 heures, persistance bornée et single-flight partagé. Le payload brut TMDB est mis en cache avant
   l'ajustement européen des dates afin que chaque lecture puisse appliquer les métadonnées réseau les plus
-  récentes connues pour la série.
+  récentes connues pour la série. Les détails d'épisode restent volontairement mémoire-only tant que les
+  métriques ne justifient pas leur persistance : TTL 30 minutes et LRU strictement borné à 120 entrées.
   Les recherches restent en mémoire 5 minutes et ne sont pas persistées, car leur clé contient le texte
   saisi par l'utilisateur. Le stockage persistant public est borné à 320 entrées et 32 Mio ; un payload individuel supérieur à
   1 Mio reste uniquement en mémoire. Il ne contient ni UID,
@@ -486,6 +487,9 @@ n'est rouverte que par une nouvelle décision produit explicite.
   compris après une réouverture récente de l'application lorsque le snapshot persistant est encore
   admissible, restitue la dernière fiche complète avant un éventuel rafraîchissement silencieux. En cas
   d'échec réseau, la dernière valeur complète reste affichable (`stale-if-error`).
+- L'inventaire des familles TMDB, leur TTL, la baseline avant/après et la justification des caches
+  spécialisés sont figés dans
+  [l'audit #410 du 19 septembre 2026](../audits/tmdb-cache-architecture-2026-09-19.md).
 - Le proxy backend conserve son cache TMDB générique et sa déduplication en vol. Un diagnostic agrégé
   `TMDB_REQUEST_CACHE_SUMMARY` mesure par famille les requêtes servies en mémoire, coalescées ou réellement
   transmises à TMDB, sans journaliser ID média, texte recherché, UID, token ou paramètres utilisateur.
@@ -498,6 +502,14 @@ n'est rouverte que par une nouvelle décision produit explicite.
   en `stale-if-error` pendant 7 jours au maximum. Le cache mémoire de session reste prioritaire et aucune
   donnée utilisateur ou secret Plex n'est stocké dans ce cache. Seul le territoire `FR` effectivement
   consommé par SeenIt est persisté ; les autres pays du payload TMDB restent hors du stockage local.
+- Les caches **diffuseurs** et **classification parentale** restent spécialisés par décision d'architecture,
+  et non par dette accidentelle. Le cache diffuseurs conserve deux compartiments de rétention
+  (120 découverte + 240 bibliothèque), un payload FR compact et des écritures regroupées hors scroll :
+  la couche générique ne possède pas ces priorités métier. La classification parentale conserve son
+  contrat de preuve sensible, son batch dédié, son cache local 7 j / stale 30 j et son index backend
+  Firestore 7 j limité à 40 identités par lot ; la dupliquer dans IndexedDB ajouterait du stockage et des
+  lectures sans supprimer ce chemin spécialisé. Ces deux familles partagent l'identité TMDB et les
+  métriques backend, mais gardent leur politique de fraîcheur propre.
 - Le snapshot persistant des diffuseurs n'est désérialisé qu'une fois par contexte de stockage. Les
   réponses rapprochées mettent à jour ce snapshot en mémoire puis regroupent sa persistance hors du
   chemin critique du scroll ; une mise en arrière-plan force un unique flush borné. La promotion d'une

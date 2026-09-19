@@ -22,6 +22,8 @@ import {
 } from './publicMetadataCache';
 
 export const PARENTAL_RATING_MAX_CONCURRENT = 8;
+export const EPISODE_DETAILS_CACHE_TTL_MS = 30 * 60 * 1000;
+export const EPISODE_DETAILS_CACHE_MAX_ENTRIES = 120;
 
 export interface TMDBMedia {
   id: number;
@@ -621,7 +623,7 @@ export class TMDBClient {
   private watchProvidersCache = new BoundedCache<string, { data: any; timestamp: number }>(80);
   private watchProvidersInFlight = new Map<string, Promise<Result<any>>>();
   private watchProviderRequestLimiter = createWatchProviderRequestLimiter();
-  private episodeDetailsCache = new Map<string, { data: any; timestamp: number }>();
+  private episodeDetailsCache = new BoundedCache<string, { data: any; timestamp: number }>(EPISODE_DETAILS_CACHE_MAX_ENTRIES);
 
   peekWatchProviders(id: number, type: 'tv' | 'movie' = 'tv'): any | null {
     const cached = this.watchProvidersCache.get(`${type}:${Number(id)}`);
@@ -744,7 +746,7 @@ export class TMDBClient {
   async getEpisodeDetails(id: number, seasonNumber: number, episodeNumber: number): Promise<Result<any>> {
     const cacheKey = `${id}:${seasonNumber}:${episodeNumber}`;
     const cached = this.episodeDetailsCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < 30 * 60 * 1000) {
+    if (cached && Date.now() - cached.timestamp < EPISODE_DETAILS_CACHE_TTL_MS) {
       return ok(cached.data);
     }
 
