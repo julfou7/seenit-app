@@ -53,7 +53,7 @@ test('SEENIT-PERF-001 applique une saison vue ou non vue en delta sans resynchro
 });
 
 test('SEENIT-PERF-001 réserve la resynchronisation complète aux refresh fournisseur', () => {
-  const manualSync = sliceBetween(detailCore, 'const handleSyncSingle = async', 'const handle1ClickDownloadSeason = async');
+  const manualSync = sliceBetween(detailCore, 'const handleSyncSingle = async', 'const [visibleSeasons, setVisibleSeasons]');
   assert.match(manualSync, /syncSingleItem\(show\.id\)/);
 
   assert.match(detailsWorker, /hasFutureReleaseOnly/);
