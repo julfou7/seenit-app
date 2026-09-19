@@ -61,6 +61,8 @@ test('SEENIT-PERF-001 amorce le cache persistant avant dâ€™ouvrir une fiche aprÃ
   assert.match(primeSource, /readPublicMetadataCache<any>\('detail_render', cacheKey\)/);
   assert.match(primeSource, /readPublicMetadataCache<any>\('details', cacheKey\)/);
   assert.match(primeSource, /renderSnapshot\?\.fresh/);
+  assert.match(primeSource, /seenit_render_schema_version === MEDIA_DETAIL_RENDER_SCHEMA_VERSION/);
+  assert.match(primeSource, /persistedDetails\?\.fresh[\s\S]{0,260}cacheMediaDetailRenderSnapshot/);
   assert.doesNotMatch(primeSource, /authenticatedFetch|runPublicMetadataSingleFlight/);
 
   const openStart = appSource.indexOf('const openShowSmooth');

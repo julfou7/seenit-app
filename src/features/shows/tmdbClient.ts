@@ -13,7 +13,10 @@ import {
 } from './mediaRelations';
 import { createWatchProviderRequestLimiter } from '../providers/watchProviderRequestPolicy';
 import { readParentalRatingCache, writeParentalRatingCache } from './parentalRatingCache';
-import { createMediaDetailRenderSnapshot } from './mediaDetailRenderSnapshot';
+import {
+  createMediaDetailRenderSnapshot,
+  MEDIA_DETAIL_RENDER_SCHEMA_VERSION,
+} from './mediaDetailRenderSnapshot';
 import {
   isPublicMetadataFallbackStatus,
   normalizePublicMetadataRequestKey,
@@ -454,16 +457,26 @@ export class TMDBClient {
     if (this.detailsCache.get(cacheKey) || this.detailRenderCache.get(cacheKey)) return true;
 
     const renderSnapshot = await readPublicMetadataCache<any>('detail_render', cacheKey);
-    if (renderSnapshot?.fresh) {
+    if (renderSnapshot?.fresh && renderSnapshot.data?.seenit_render_schema_version === MEDIA_DETAIL_RENDER_SCHEMA_VERSION) {
       this.detailRenderCache.set(cacheKey, renderSnapshot.data);
       return true;
     }
 
+    // Migration locale des snapshots v1 : si le détail complet frais existe encore,
+    // il enrichit detail_render avant le premier paint, sans appel fournisseur.
     const persistedDetails = await readPublicMetadataCache<any>('details', cacheKey);
-    if (!persistedDetails?.fresh) return false;
-    this.detailsCache.set(cacheKey, persistedDetails.data);
-    this.cacheMediaDetailRenderSnapshot(cacheKey, persistedDetails.data, type, persistedDetails.storedAt);
-    return true;
+    if (persistedDetails?.fresh) {
+      this.detailsCache.set(cacheKey, persistedDetails.data);
+      this.cacheMediaDetailRenderSnapshot(cacheKey, persistedDetails.data, type, persistedDetails.storedAt);
+      return true;
+    }
+
+    // Un ancien snapshot reste préférable à un shell froid si le gros payload n'était pas persistable.
+    if (renderSnapshot?.fresh) {
+      this.detailRenderCache.set(cacheKey, renderSnapshot.data);
+      return true;
+    }
+    return false;
   }
 
   async primeMediaDetailsFromPersistentCache(

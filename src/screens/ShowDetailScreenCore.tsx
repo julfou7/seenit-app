@@ -630,16 +630,14 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       }
       calculatedLastWatchedAt = maxRemaining;
     }
-    await updateShow(currentShow.id, { seenEpisodes: Array.from(newSeen as Set<string>), episodeRecords: newRecords, lastWatchedAt: calculatedLastWatchedAt, updatedAt: Date.now(), isSynced: false, nextEpisodeToWatch: optimisticNextEp, isArchived: autoArchived, status: optimisticNextEp ? 'watching' : 'completed' });
-    syncSingleItem(currentShow.id, true).catch(console.error);
+    await updateShow(currentShow.id, { seenEpisodes: Array.from(newSeen as Set<string>), episodeRecords: newRecords, lastWatchedAt: calculatedLastWatchedAt, updatedAt: Date.now(), nextEpisodeToWatch: optimisticNextEp, isArchived: autoArchived, status: optimisticNextEp ? 'watching' : 'completed' });
     scrollAllCarouselsToStart();
     const sNumStr = String(season).padStart(2, '0');
     const eNumStr = String(episode).padStart(2, '0');
     const showTitleStr = currentShow.title || tmdbDetails?.name || tmdbDetails?.title || 'Série';
     const undo = async () => {
       if (currentShow?.id) {
-        await updateShow(currentShow.id, { seenEpisodes: prevSeenEpisodes, episodeRecords: prevEpisodeRecords, lastWatchedAt: prevLastWatchedAt, nextEpisodeToWatch: prevNextEpisodeToWatch, isArchived: prevIsArchived, updatedAt: Date.now(), isSynced: false });
-        syncSingleItem(currentShow.id, true).catch(console.error);
+        await updateShow(currentShow.id, { seenEpisodes: prevSeenEpisodes, episodeRecords: prevEpisodeRecords, lastWatchedAt: prevLastWatchedAt, nextEpisodeToWatch: prevNextEpisodeToWatch, isArchived: prevIsArchived, updatedAt: Date.now() });
         scrollAllCarouselsToStart();
       }
     };
@@ -700,13 +698,11 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     const optimisticNextEp = await computeOptimisticNextEp(existingSeen);
     const isEnded = tmdbDetails?.status === 'Ended' || tmdbDetails?.status === 'Canceled' || currentShow.seriesEnded || currentShow.tmdbStatus === 'Ended' || currentShow.tmdbStatus === 'Canceled';
     const autoArchived = computeAutoArchiveStatus({ ...currentShow, seenEpisodes: Array.from(existingSeen as Set<string>), tmdbStatus: tmdbDetails?.status || currentShow.tmdbStatus, seriesEnded: isEnded, nextEpisodeToWatch: optimisticNextEp });
-    await updateShow(currentShow.id, { seenEpisodes: Array.from(existingSeen as Set<string>), episodeRecords: existingRecords, lastWatchedAt: allSeen ? (currentShow.lastWatchedAt || now) : now, updatedAt: now, isSynced: false, nextEpisodeToWatch: optimisticNextEp, isArchived: autoArchived, status: optimisticNextEp ? 'watching' : 'completed' });
-    syncSingleItem(currentShow.id, true).catch(console.error);
+    await updateShow(currentShow.id, { seenEpisodes: Array.from(existingSeen as Set<string>), episodeRecords: existingRecords, lastWatchedAt: allSeen ? (currentShow.lastWatchedAt || now) : now, updatedAt: now, nextEpisodeToWatch: optimisticNextEp, isArchived: autoArchived, status: optimisticNextEp ? 'watching' : 'completed' });
     const showTitleStr = currentShow.title || tmdbDetails?.name || tmdbDetails?.title || 'Série';
     const undo = async () => {
       if (currentShow?.id) {
-        await updateShow(currentShow.id, { seenEpisodes: prevSeenEpisodes, episodeRecords: prevEpisodeRecords, lastWatchedAt: prevLastWatchedAt, nextEpisodeToWatch: prevNextEpisodeToWatch, isArchived: prevIsArchived, updatedAt: Date.now(), isSynced: false });
-        syncSingleItem(currentShow.id, true).catch(console.error);
+        await updateShow(currentShow.id, { seenEpisodes: prevSeenEpisodes, episodeRecords: prevEpisodeRecords, lastWatchedAt: prevLastWatchedAt, nextEpisodeToWatch: prevNextEpisodeToWatch, isArchived: prevIsArchived, updatedAt: Date.now() });
       }
     };
     showToast(`« ${showTitleStr} » Saison ${seasonNumber} marquée comme ${allSeen ? 'non vue' : 'vue !'}`, allSeen ? 'info' : 'success', currentShow, undo);
@@ -953,7 +949,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const posterPath = rawPoster ? (rawPoster.startsWith('http') ? rawPoster : `https://image.tmdb.org/t/p/w500${rawPoster.startsWith('/') ? '' : '/'}${rawPoster}`) : undefined;
   const rawBackdrop = tmdbDetails?.backdrop_path || show?.backdropPath;
   const backdropUrl = rawBackdrop ? (rawBackdrop.startsWith('http') ? rawBackdrop : `https://image.tmdb.org/t/p/w780${rawBackdrop.startsWith('/') ? '' : '/'}${rawBackdrop}`) : posterPath;
-  const totalEpisodes = tmdbDetails?.number_of_episodes || show?.totalEpisodes || show?.totalAiredEpisodes || 0;
+  const totalEpisodes = show?.totalEpisodes || tmdbDetails?.number_of_episodes || show?.totalAiredEpisodes || 0;
   const seenCount = isSeries ? (show?.seenEpisodes?.length || 0) : (hasSeenMedia ? 1 : 0);
   const progressPercentage = totalEpisodes > 0 ? Math.min(100, Math.round((seenCount / totalEpisodes) * 100)) : 0;
   const episodeRunTime = tmdbDetails?.episode_run_time?.[0] || 45;
