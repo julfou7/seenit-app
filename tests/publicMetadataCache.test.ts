@@ -53,6 +53,8 @@ test('SEENIT-PERF-001 normalise les requêtes et ne persiste pas le texte de rec
   const left = normalizePublicMetadataRequestKey('/api/media/tmdb/discover/movie?page=2&language=fr-FR&sort_by=popularity.desc');
   const right = normalizePublicMetadataRequestKey('/api/media/tmdb/discover/movie?sort_by=popularity.desc&language=fr-FR&page=2');
   assert.equal(left, right, 'l’ordre des paramètres ne doit pas créer deux entrées pour la même requête');
+  assert.equal(PUBLIC_METADATA_CACHE_POLICIES.detail_render.persist, true);
+  assert.equal(PUBLIC_METADATA_CACHE_POLICIES.detail_render.freshMs, 24 * 60 * 60 * 1000);
   assert.equal(PUBLIC_METADATA_CACHE_POLICIES.details.persist, true);
   assert.equal(PUBLIC_METADATA_CACHE_POLICIES.discover.persist, true);
   assert.equal(PUBLIC_METADATA_CACHE_POLICIES.search.persist, false, 'le texte recherché ne doit pas entrer dans IndexedDB');

@@ -13,6 +13,7 @@ import {
 } from './mediaRelations';
 import { createWatchProviderRequestLimiter } from '../providers/watchProviderRequestPolicy';
 import { readParentalRatingCache, writeParentalRatingCache } from './parentalRatingCache';
+import { createMediaDetailRenderSnapshot } from './mediaDetailRenderSnapshot';
 import {
   isPublicMetadataFallbackStatus,
   normalizePublicMetadataRequestKey,
@@ -413,6 +414,7 @@ export class TMDBClient {
     return err(new Error(`No media found on TMDB for external ID ${externalId}`));
   }
   private detailsCache = new BoundedCache<string, any>(80);
+  private detailRenderCache = new BoundedCache<string, any>(80);
   private parentalRatingDetailsCache = new BoundedCache<string, any>(240);
   private parentalRatingDetailsInFlight = new Map<string, Promise<Result<any>>>();
   private parentalRatingRequestLimiter = createWatchProviderRequestLimiter(PARENTAL_RATING_MAX_CONCURRENT);
@@ -421,29 +423,70 @@ export class TMDBClient {
     return this.detailsCache.get(`${type}_${Number(id)}`) || null;
   }
 
-  async primeMediaDetailsFromPersistentCache(
+  peekRenderableMediaDetails(id: number, type: RelationMediaType = 'tv'): any | null {
+    const cacheKey = `${type}_${Number(id)}`;
+    return this.detailsCache.get(cacheKey) || this.detailRenderCache.get(cacheKey) || null;
+  }
+
+  private cacheMediaDetailRenderSnapshot(
+    cacheKey: string,
+    value: any,
+    type: RelationMediaType,
+    storedAt?: number,
+    persist: boolean = true,
+  ): any | null {
+    const snapshot = createMediaDetailRenderSnapshot(value, type);
+    if (!snapshot) return null;
+    this.detailRenderCache.set(cacheKey, snapshot);
+    if (persist) {
+      writePublicMetadataCache('detail_render', cacheKey, snapshot, storedAt ? { now: storedAt } : undefined);
+    }
+    return snapshot;
+  }
+
+  async primeMediaRenderSnapshotFromPersistentCache(
     id: number,
     type: RelationMediaType = 'tv',
   ): Promise<boolean> {
     const normalizedId = Number(id);
     if (!Number.isFinite(normalizedId) || normalizedId <= 0) return false;
     const cacheKey = `${type}_${normalizedId}`;
-    if (this.detailsCache.get(cacheKey)) return true;
+    if (this.detailsCache.get(cacheKey) || this.detailRenderCache.get(cacheKey)) return true;
 
-    const persisted = await readPublicMetadataCache<any>('details', cacheKey);
-    if (!persisted?.fresh) return false;
-    this.detailsCache.set(cacheKey, persisted.data);
+    const renderSnapshot = await readPublicMetadataCache<any>('detail_render', cacheKey);
+    if (renderSnapshot?.fresh) {
+      this.detailRenderCache.set(cacheKey, renderSnapshot.data);
+      return true;
+    }
+
+    const persistedDetails = await readPublicMetadataCache<any>('details', cacheKey);
+    if (!persistedDetails?.fresh) return false;
+    this.detailsCache.set(cacheKey, persistedDetails.data);
+    this.cacheMediaDetailRenderSnapshot(cacheKey, persistedDetails.data, type, persistedDetails.storedAt);
     return true;
+  }
+
+  async primeMediaDetailsFromPersistentCache(
+    id: number,
+    type: RelationMediaType = 'tv',
+  ): Promise<boolean> {
+    return this.primeMediaRenderSnapshotFromPersistentCache(id, type);
   }
 
   private async getCachedMediaDetails(id: number, type: RelationMediaType): Promise<Result<any>> {
     const cacheKey = `${type}_${Number(id)}`;
     const cached = this.detailsCache.get(cacheKey);
-    if (cached) return ok(cached);
+    if (cached) {
+      if (!this.detailRenderCache.get(cacheKey)) {
+        this.cacheMediaDetailRenderSnapshot(cacheKey, cached, type, undefined, false);
+      }
+      return ok(cached);
+    }
 
     const persisted = await readPublicMetadataCache<any>('details', cacheKey, { allowStale: true });
     if (persisted?.fresh) {
       this.detailsCache.set(cacheKey, persisted.data);
+      this.cacheMediaDetailRenderSnapshot(cacheKey, persisted.data, type, persisted.storedAt);
       return ok(persisted.data);
     }
 
@@ -454,6 +497,7 @@ export class TMDBClient {
       const queuedPersistent = await readPublicMetadataCache<any>('details', cacheKey, { allowStale: true });
       if (queuedPersistent?.fresh) {
         this.detailsCache.set(cacheKey, queuedPersistent.data);
+        this.cacheMediaDetailRenderSnapshot(cacheKey, queuedPersistent.data, type, queuedPersistent.storedAt);
         return ok(queuedPersistent.data);
       }
       const fallback = queuedPersistent || persisted;
@@ -466,6 +510,7 @@ export class TMDBClient {
       if (!res.ok) {
         if (fallback) {
           this.detailsCache.set(cacheKey, fallback.data);
+          this.cacheMediaDetailRenderSnapshot(cacheKey, fallback.data, type, fallback.storedAt);
           return ok(fallback.data);
         }
         return err((res as any).error);
@@ -473,6 +518,7 @@ export class TMDBClient {
       if (!res.value.ok) {
         if (fallback && isPublicMetadataFallbackStatus(res.value.status)) {
           this.detailsCache.set(cacheKey, fallback.data);
+          this.cacheMediaDetailRenderSnapshot(cacheKey, fallback.data, type, fallback.storedAt);
           return ok(fallback.data);
         }
         return err(new Error(`TMDB Error: ${res.value.status}`));
@@ -481,6 +527,7 @@ export class TMDBClient {
       if (!data.ok) {
         if (fallback) {
           this.detailsCache.set(cacheKey, fallback.data);
+          this.cacheMediaDetailRenderSnapshot(cacheKey, fallback.data, type, fallback.storedAt);
           return ok(fallback.data);
         }
         return err((data as any).error);
@@ -488,6 +535,7 @@ export class TMDBClient {
       if (data.value && data.value.status_code) {
         if (fallback) {
           this.detailsCache.set(cacheKey, fallback.data);
+          this.cacheMediaDetailRenderSnapshot(cacheKey, fallback.data, type, fallback.storedAt);
           return ok(fallback.data);
         }
         return err(new Error(data.value.status_message || 'TMDB Error'));
@@ -503,6 +551,7 @@ export class TMDBClient {
         }
         if (type === 'tv') adjustTMDBShowDataForEurope(data.value);
         this.detailsCache.set(cacheKey, data.value);
+        this.cacheMediaDetailRenderSnapshot(cacheKey, data.value, type);
         const { similar: _similar, recommendations: _recommendations, ...persistedDetails } = data.value;
         writePublicMetadataCache('details', cacheKey, persistedDetails);
       }

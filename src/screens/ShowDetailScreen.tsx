@@ -140,7 +140,7 @@ export function ShowDetailScreen(props: ShowDetailScreenProps) {
   const detailIdentity = resolvedMedia.tmdbId ? `${resolvedMedia.mediaType}:${resolvedMedia.tmdbId}` : null;
   const [coldWarmupIdentity, setColdWarmupIdentity] = useState<string | null>(() => {
     if (!resolvedMedia.tmdbId || !detailIdentity) return null;
-    return tmdb.peekMediaDetails(resolvedMedia.tmdbId, resolvedMedia.mediaType) ? null : detailIdentity;
+    return tmdb.peekRenderableMediaDetails(resolvedMedia.tmdbId, resolvedMedia.mediaType) ? null : detailIdentity;
   });
 
   useEffect(() => {
@@ -148,7 +148,7 @@ export function ShowDetailScreen(props: ShowDetailScreenProps) {
     const mediaType = resolvedMedia.mediaType;
     const identity = detailIdentity;
     if (!tmdbId || !identity) { setColdWarmupIdentity(null); return; }
-    if (tmdb.peekMediaDetails(tmdbId, mediaType)) { setColdWarmupIdentity(null); return; }
+    if (tmdb.peekRenderableMediaDetails(tmdbId, mediaType)) { setColdWarmupIdentity(null); return; }
 
     let cancelled = false;
     setColdWarmupIdentity(identity);

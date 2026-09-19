@@ -1,4 +1,4 @@
-export type PublicMetadataFamily = 'details' | 'discover' | 'search' | 'season';
+export type PublicMetadataFamily = 'detail_render' | 'details' | 'discover' | 'search' | 'season';
 
 export interface PublicMetadataPolicy {
   freshMs: number;
@@ -15,6 +15,12 @@ export const PUBLIC_METADATA_CACHE_PERSISTENT_MAX_BYTES = 32 * 1024 * 1024;
 export const PUBLIC_METADATA_CACHE_MAX_ENTRY_BYTES = 1024 * 1024;
 
 export const PUBLIC_METADATA_CACHE_POLICIES: Record<PublicMetadataFamily, PublicMetadataPolicy> = {
+  detail_render: {
+    freshMs: 24 * 60 * 60 * 1000,
+    staleMs: 30 * 24 * 60 * 60 * 1000,
+    memoryMaxEntries: 80,
+    persist: true,
+  },
   details: {
     freshMs: 24 * 60 * 60 * 1000,
     staleMs: 30 * 24 * 60 * 60 * 1000,
@@ -83,6 +89,7 @@ export interface PublicMetadataCacheStatsSnapshot {
 }
 
 const createStats = (): Record<PublicMetadataFamily, PublicMetadataFamilyStats> => ({
+  detail_render: { memoryHits: 0, persistentHits: 0, staleHits: 0, misses: 0, writes: 0, networkLoads: 0, singleFlightHits: 0, readErrors: 0, writeErrors: 0, oversizedSkips: 0 },
   details: { memoryHits: 0, persistentHits: 0, staleHits: 0, misses: 0, writes: 0, networkLoads: 0, singleFlightHits: 0, readErrors: 0, writeErrors: 0, oversizedSkips: 0 },
   discover: { memoryHits: 0, persistentHits: 0, staleHits: 0, misses: 0, writes: 0, networkLoads: 0, singleFlightHits: 0, readErrors: 0, writeErrors: 0, oversizedSkips: 0 },
   search: { memoryHits: 0, persistentHits: 0, staleHits: 0, misses: 0, writes: 0, networkLoads: 0, singleFlightHits: 0, readErrors: 0, writeErrors: 0, oversizedSkips: 0 },
@@ -91,6 +98,7 @@ const createStats = (): Record<PublicMetadataFamily, PublicMetadataFamilyStats> 
 
 let stats = createStats();
 const memoryCaches: Record<PublicMetadataFamily, Map<string, StoredPublicMetadataEntry>> = {
+  detail_render: new Map(),
   details: new Map(),
   discover: new Map(),
   search: new Map(),
@@ -366,6 +374,7 @@ export function getPublicMetadataCacheStats(): PublicMetadataCacheStatsSnapshot 
     schemaVersion: PUBLIC_METADATA_CACHE_SCHEMA_VERSION,
     inFlight: inFlight.size,
     memoryEntries: {
+      detail_render: memoryCaches.detail_render.size,
       details: memoryCaches.details.size,
       discover: memoryCaches.discover.size,
       search: memoryCaches.search.size,
@@ -376,6 +385,7 @@ export function getPublicMetadataCacheStats(): PublicMetadataCacheStatsSnapshot 
 }
 
 export function clearPublicMetadataMemoryCacheForTests(): void {
+  memoryCaches.detail_render.clear();
   memoryCaches.details.clear();
   memoryCaches.discover.clear();
   memoryCaches.search.clear();

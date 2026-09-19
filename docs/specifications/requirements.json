@@ -1783,6 +1783,14 @@
           "contains": "SEENIT-PERF-001 amorce le cache persistant avant d’ouvrir une fiche après redémarrage"
         },
         {
+          "file": "tests/mediaDetailRenderSnapshot.test.ts",
+          "contains": "SEENIT-PERF-001 garde Catégories et Thèmes persistables même quand le détail complet dépasse 1 Mio"
+        },
+        {
+          "file": "tests/mediaDetailRenderSnapshot.test.ts",
+          "contains": "SEENIT-PERF-001 sert le snapshot Catégories et Thèmes avant le détail complet après restart"
+        },
+        {
           "file": "tests/tmdbCacheArchitecture.test.ts",
           "contains": "issue #410 route Explorer Tout par le cache Discover commun"
         }
