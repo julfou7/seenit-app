@@ -52,10 +52,10 @@ const compactCastMember = (item: any) => {
     id,
     name: String(item.name),
     profile_path: item.profile_path || null,
-    character: item.character ? String(item.character) : undefined,
+    ...(item.character ? { character: String(item.character) } : {}),
     ...(roles && roles.length > 0 ? { roles } : {}),
-    total_episode_count: Number.isFinite(Number(item.total_episode_count)) ? Number(item.total_episode_count) : undefined,
-    episode_count: Number.isFinite(Number(item.episode_count)) ? Number(item.episode_count) : undefined,
+    ...(Number.isFinite(Number(item.total_episode_count)) ? { total_episode_count: Number(item.total_episode_count) } : {}),
+    ...(Number.isFinite(Number(item.episode_count)) ? { episode_count: Number(item.episode_count) } : {}),
   };
 };
 
