@@ -476,8 +476,10 @@ n'est rouverte que par une nouvelle décision produit explicite.
   (`detail_render`) qui conserve les champs immédiatement visibles — titre, synopsis, affiche/fond,
   catégories, thèmes, quelques logos/vidéos et les métadonnées structurelles légères. Ce snapshot est
   borné à 80 entrées mémoire, partage les limites globales IndexedDB et reste persistable même lorsque
-  le payload TMDB complet dépasse la limite individuelle de 1 Mio. Il ne contient ni casting massif,
-  listes d'images complètes, similaires ni recommandations.
+  le payload TMDB complet dépasse la limite individuelle de 1 Mio. Il conserve également un aperçu
+  **strictement borné aux 12 premiers interprètes utiles** (identité, portrait et rôle nécessaires au
+  premier rendu) afin que l'onglet Casting et sa première vue ne soient pas ajoutés tardivement. Il ne
+  contient jamais le casting massif, les listes d'images complètes, les similaires ni les recommandations.
   Les pages Discover restent fraîches 2 minutes et stale 30 minutes afin d'accélérer retour écran,
   annulation/réapplication de filtres et pages déjà parcourues sans figer durablement popularité ou notes.
   Les saisons déjà ouvertes rejoignent la même couche : fraîcheur 2 heures, repli stale-if-error jusqu'à
@@ -489,6 +491,14 @@ n'est rouverte que par une nouvelle décision produit explicite.
   saisi par l'utilisateur. Le stockage persistant public est borné à 320 entrées et 32 Mio ; un payload individuel supérieur à
   1 Mio reste uniquement en mémoire. Il ne contient ni UID,
   progression, préférences, token Plex ni autre donnée privée.
+- Pour un média suivi, la **progression utilisateur** repart du dernier état déjà persisté dans le store
+  UID-scopé (`seenEpisodes`, compteurs d'épisodes et prochain épisode connus). Marquer un épisode ou une
+  saison vu/non vu applique uniquement ce delta et ses champs directement dérivables ; cette mutation
+  n'invalide pas à elle seule les métadonnées fournisseur et ne déclenche pas un rechargement TMDB de
+  toutes les saisons. Les changements de catalogue/diffusion restent rafraîchis par le worker de
+  métadonnées lorsqu'une date de diffusion, un refresh manuel, une échéance de fraîcheur ou une réparation
+  le justifie. Le détail TMDB frais peut compléter un compteur absent, mais il ne remplace pas au premier
+  rendu un total utilisateur déjà connu.
 - Le skeleton de page est réservé au premier chargement réellement froid. Le parcours A → B → A, y
   compris après une réouverture récente de l'application, résout d'abord **cache-only** le snapshot
   `detail_render` correspondant avant de monter la fiche. Il n'existe plus de timeout arbitraire qui
