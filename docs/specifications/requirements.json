@@ -1049,6 +1049,10 @@
         {
           "file": "tests/notificationMediaRuntime.test.ts",
           "contains": "issue #106 borne les URL TMDB absolues persistées par Plex avant le cache natif"
+        },
+        {
+          "file": "tests/notificationMediaRuntime.test.ts",
+          "contains": "issue #106 réutilise un répertoire notification-media déjà présent après redémarrage"
         }
       ]
     },

@@ -7,15 +7,33 @@ import {
   type NotificationMediaDependencies,
 } from '../src/features/notifications/notificationMedia.ts';
 
-function createFakeDependencies(options: { failuresBeforeSuccess?: number } = {}) {
+function createFakeDependencies(options: {
+  failuresBeforeSuccess?: number;
+  directoryExists?: boolean;
+  directoryAppearsDuringMkdir?: boolean;
+} = {}) {
   const files = new Map<string, number>();
+  let directoryExists = options.directoryExists ?? false;
   let downloads = 0;
+  let mkdirs = 0;
   const downloadedUrls: string[] = [];
   let failures = options.failuresBeforeSuccess ?? 0;
 
   const filesystem: NotificationMediaDependencies['filesystem'] = {
-    async mkdir() {},
+    async mkdir() {
+      mkdirs += 1;
+      if (options.directoryAppearsDuringMkdir) {
+        directoryExists = true;
+        throw new Error('DIRECTORY_ALREADY_EXISTS');
+      }
+      if (directoryExists) throw new Error('DIRECTORY_ALREADY_EXISTS');
+      directoryExists = true;
+    },
     async stat({ path }: any) {
+      if (path === 'notification-media') {
+        if (!directoryExists) throw new Error('ENOENT');
+        return { type: 'directory', size: 0 };
+      }
       const size = files.get(path);
       if (!size) throw new Error('ENOENT');
       return { type: 'file', size };
@@ -43,6 +61,7 @@ function createFakeDependencies(options: { failuresBeforeSuccess?: number } = {}
   return {
     dependencies,
     getDownloads: () => downloads,
+    getMkdirs: () => mkdirs,
     getDownloadedUrls: () => [...downloadedUrls],
   };
 }
@@ -125,4 +144,33 @@ test('issue #106 durcit les anciennes URL TMDB HTTP sans modifier les hôtes non
     normalizeNativeNotificationImageUrl('https://seenit.app/icon-192.png', 'w342'),
     'https://seenit.app/icon-192.png',
   );
+});
+
+
+test('issue #106 réutilise un répertoire notification-media déjà présent après redémarrage', async () => {
+  const poster = 'https://image.tmdb.org/t/p/w342/mobland.jpg';
+  const fake = createFakeDependencies({ directoryExists: true });
+
+  const result = await resolveNotificationMediaVisual(poster, undefined, fake.dependencies);
+
+  assert.deepEqual(result, {
+    icon: notificationMediaPrivateRef(poster),
+    image: notificationMediaPrivateRef(poster),
+  });
+  assert.equal(fake.getMkdirs(), 0, 'un dossier privé persistant existant ne doit pas être recréé');
+  assert.equal(fake.getDownloads(), 1, 'un nouveau cache miss doit encore télécharger son image');
+});
+
+test('issue #106 accepte une course mkdir AlreadyExists seulement si le dossier existe réellement', async () => {
+  const poster = 'https://image.tmdb.org/t/p/w342/race.jpg';
+  const fake = createFakeDependencies({ directoryAppearsDuringMkdir: true });
+
+  const result = await resolveNotificationMediaVisual(poster, undefined, fake.dependencies);
+
+  assert.deepEqual(result, {
+    icon: notificationMediaPrivateRef(poster),
+    image: notificationMediaPrivateRef(poster),
+  });
+  assert.equal(fake.getMkdirs(), 1);
+  assert.equal(fake.getDownloads(), 1, 'AlreadyExists confirmé par stat ne doit pas bloquer le téléchargement');
 });
