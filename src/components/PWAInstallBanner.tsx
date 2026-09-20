@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Download, X, Smartphone } from 'lucide-react';
+import { Download, X } from 'lucide-react';
 import { SeenItLogo } from './SeenItLogo';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -15,7 +15,7 @@ export function PWAInstallBanner() {
   useEffect(() => {
     // Check if already running as PWA
     const isStandaloneApp = window.matchMedia('(display-mode: standalone)').matches 
-      || (navigator as any).standalone 
+      || (navigator as Navigator & { standalone?: boolean }).standalone 
       || document.referrer.includes('android-app://');
     
     if (isStandaloneApp) {
@@ -55,7 +55,10 @@ export function PWAInstallBanner() {
         <SeenItLogo variant="icon" size={40} />
         <div>
           <p className="text-xs font-semibold text-white tracking-tight">Installer SeenIt</p>
-          <p className="text-[11px] text-zinc-400">Ajouter à l'écran d'accueil</p>
+          <p className="text-[11px] text-zinc-400">
+            <span className="lg:hidden">Ajouter à l'écran d'accueil</span>
+            <span className="hidden lg:inline">Application dédiée pour ce PC</span>
+          </p>
         </div>
       </div>
       <div className="flex items-center gap-2">
@@ -64,7 +67,8 @@ export function PWAInstallBanner() {
           className="flex items-center gap-1.5 bg-[#E5A93D] hover:bg-[#d4992f] text-black text-xs font-bold px-3 py-1.5 rounded-full transition-all shadow-md active:scale-95"
         >
           <Download className="w-3.5 h-3.5" />
-          <span>Installer</span>
+          <span className="lg:hidden">Installer</span>
+          <span className="hidden lg:inline">Installer sur ce PC</span>
         </button>
         <button
           onClick={() => setIsDismissed(true)}
