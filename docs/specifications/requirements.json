@@ -771,6 +771,10 @@
         {
           "file": "tests/firebaseIdentityGuardrails.test.ts",
           "contains": "SEENIT-DATA-005 verrouille la base Firestore canonique sur default"
+        },
+        {
+          "file": "tests/backendDeploymentWorkflow.test.ts",
+          "contains": "SEENIT-COST-001 purge les artefacts de build régénérables seulement après validation production"
         }
       ]
     },

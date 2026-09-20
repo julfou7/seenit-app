@@ -928,10 +928,13 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   Firestore applicatif reste exclusivement sur la base `default`, seule base éligible au quota gratuit ;
   aucune base nommée AI Studio n'est une dépendance applicative. Le déploiement Cloud Run canonique force
   `minScale=0`, borne `maxScale=2`, conserve la facturation CPU liée aux requêtes et retire tout VPC
-  connector / Direct VPC hérité tant qu'aucune dépendance privée explicitement validée ne l'exige. Un
-  budget reste une alerte et jamais un hard cap. Toute migration de région exige d'abord la preuve de la
-  localisation Firestore afin de ne pas déplacer le coût vers du trafic inter-région. Les coûts courants
-  sont suivis par l'audit FinOps et une dérive non nulle bloque la clôture de #23.
+  connector / Direct VPC hérité tant qu'aucune dépendance privée explicitement validée ne l'exige.
+  Après promotion et smoke production, les images Artifact Registry du package `seenit-app` et les
+  archives source du bucket Cloud Build sont traitées comme des artefacts régénérables et purgées via
+  un build sans source ; Cloud Run conserve sa copie importée de l'image déployée. Un budget reste une
+  alerte et jamais un hard cap. Toute migration de région exige d'abord la preuve de la localisation
+  Firestore afin de ne pas déplacer le coût vers du trafic inter-région. Les coûts courants sont suivis
+  par l'audit FinOps et une dérive non nulle bloque la clôture de #23.
 - Le bundle initial doit conserver le découpage paresseux des écrans privés. Toute hausse
   significative doit être expliquée dans la livraison.
 

@@ -424,3 +424,53 @@ jobs:
             --quiet
           verify_endpoint "$CANONICAL_ORIGIN" 'Backend après rollback' || true
           exit 1
+
+      - name: Purge regenerable Cloud Build artifacts
+        if: steps.impact.outputs.SHOULD_DEPLOY == 'true'
+        run: |
+          set -euo pipefail
+          cleanup_id="$(gcloud builds submit \
+            --no-source \
+            --config cloudbuild/cleanup-seenit-artifacts.yaml \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
+            --substitutions="_REGION=$GCP_REGION,_REPOSITORY=$GCP_ARTIFACT_REPOSITORY,_SERVICE=$GCP_SERVICE" \
+            --async \
+            --format='value(id)')"
+
+          if [[ ! "$cleanup_id" =~ ^[0-9a-f-]{36}$ ]]; then
+            echo "Identifiant Cloud Build de nettoyage invalide: ${cleanup_id:-absent}"
+            exit 1
+          fi
+
+          cleanup_deadline=$((SECONDS + 300))
+          while (( SECONDS < cleanup_deadline )); do
+            cleanup_json="$(gcloud builds describe "$cleanup_id" \
+              --project "$GCP_PROJECT_ID" \
+              --region "$GCP_REGION" \
+              --format=json)"
+            cleanup_status="$(jq -r '.status // "STATUS_UNKNOWN"' <<<"$cleanup_json")"
+            echo "Nettoyage FinOps $cleanup_id: $cleanup_status"
+
+            case "$cleanup_status" in
+              SUCCESS)
+                echo "Artefacts régénérables purgés: images $GCP_SERVICE + archives source Cloud Build."
+                exit 0
+                ;;
+              PENDING|QUEUED|WORKING)
+                sleep 5
+                ;;
+              FAILURE|INTERNAL_ERROR|TIMEOUT|CANCELLED|EXPIRED|STATUS_UNKNOWN)
+                echo "Nettoyage FinOps en échec: $cleanup_status"
+                jq '{id, status, statusDetail, steps: [.steps[]? | {id, name, status}]}' <<<"$cleanup_json" || true
+                exit 1
+                ;;
+              *)
+                echo "Statut de nettoyage inattendu: $cleanup_status"
+                exit 1
+                ;;
+            esac
+          done
+
+          echo "Le nettoyage FinOps n'a pas atteint SUCCESS dans la fenêtre autorisée."
+          exit 1

@@ -57,7 +57,7 @@ héritables depuis une ancienne configuration :
 - retrait de tout VPC connector ou Direct VPC hérité ;
 - TNR sur configuration déjà bornée et configuration historique non bornée.
 
-Ces garde-fous traitent les dérives de compute/VPC. Ils **ne traitent pas à eux seuls** le coût intercontinental.
+Ces garde-fous traitent les dérives de compute/VPC. Le même chantier purge aussi, après smoke production, les images Artifact Registry `seenit-app` et les archives source Cloud Build, qui sont régénérables. Ils **ne traitent pas à eux seuls** le coût intercontinental ni les lectures Firestore.
 
 ## Cause racine réseau
 
@@ -92,6 +92,7 @@ absence de VPC connector sans décision explicite, budget comme alerte et preuve
 | coût courant non nul | P1 | confirmé | identifier le SKU courant puis supprimer sa cause |
 | Cloud Run `us-west1` → Europe | P1 | cause candidate forte | confirmer région Firestore puis choisir l'architecture sans transfert facturable |
 | Cloud Run non borné par contrat | P1 | corrigé dans le chantier #23 | CI + déploiement canonique verts |
+| Artifact Registry / archives Cloud Build s'accumulent | P1 | correctif préparé | purge post-smoke des images `seenit-app` et sources Cloud Build, puis vérifier la facture |
 | base Firestore nommée dans le code | P1 | protégée | maintenir `SEENIT-DATA-005` |
 | Storage historique ATHIA | P1 | données historiques supprimées | inventorier le bucket actuel |
 | Cloud SQL historique | P1 | non prouvé | inventorier et supprimer uniquement si orphelin |

@@ -152,6 +152,26 @@ test('SEENIT-RUNTIME-001 conserve un rollback vers la révision précédemment s
   assert.match(workflow, /--to-revisions "\$PREVIOUS_REVISION=100"/);
 });
 
+test('SEENIT-COST-001 purge les artefacts de build régénérables seulement après validation production', () => {
+  const productionCheck = workflow.indexOf("verify_endpoint \"$CANONICAL_ORIGIN\" 'Backend canonique'");
+  const cleanupStep = workflow.indexOf('Purge regenerable Cloud Build artifacts');
+  const noSourceBuild = workflow.indexOf('--no-source', cleanupStep);
+  const cleanupConfig = workflow.indexOf('cloudbuild/cleanup-seenit-artifacts.yaml', cleanupStep);
+
+  assert.ok(productionCheck >= 0);
+  assert.ok(cleanupStep > productionCheck);
+  assert.ok(noSourceBuild > cleanupStep);
+  assert.ok(cleanupConfig > cleanupStep);
+  assert.match(workflow, /Artefacts régénérables purgés/);
+
+  const cleanup = fs.readFileSync(path.join(rootDir, 'cloudbuild', 'cleanup-seenit-artifacts.yaml'), 'utf8');
+  assert.match(cleanup, /gcloud artifacts docker images delete/);
+  assert.match(cleanup, /--delete-tags/);
+  assert.match(cleanup, /\$\{PROJECT_ID\}_cloudbuild\/source/);
+  assert.match(cleanup, /gcloud storage rm/);
+  assert.match(cleanup, /logging:\s*CLOUD_LOGGING_ONLY/);
+});
+
 test('SEENIT-RUNTIME-001 documente que la sync AI Studio ne vaut jamais preuve de déploiement', () => {
   assert.match(runbook, /sync Git AI Studio/i);
   assert.match(runbook, /ne constitu(?:e|ent) pas un déploiement/i);
