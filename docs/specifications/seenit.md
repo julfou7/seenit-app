@@ -1153,8 +1153,11 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   migration globale risquée. La baseline mesurée le 20 septembre 2026 sur `main`
   `c463d2aa01a17715362518ae515ed84434c0a7e9` compte 199 fichiers de production, 1 118 `any`
   explicites et 197 appels directs à `console.*` ; ces nombres sont une limite historique, jamais un
-  objectif. La validation canonique interdit à chaque fichier TypeScript modifié d'augmenter l'un de ces
-  deux compteurs et interdit toute dette de ce type dans un nouveau fichier. Les frontières critiques
+  objectif. La validation canonique interdit toute dette `any` / `console.*` sur une ligne ajoutée ou
+  modifiée et exige qu'un fichier de production déjà endetté sorte strictement meilleur de chaque changement,
+  avec au moins une occurrence historique supprimée. Un fichier propre reste propre ; le logger SeenIt conserve
+  uniquement son allowance console explicite. Cette règle « boy scout » rembourse donc la dette au fil des
+  chantiers sans imposer le nettoyage complet d'un gros fichier en une seule PR. Les frontières critiques
   listées dans `typescript-quality-baseline.json` — API, Firestore, Plex, téléchargements et transport
   Capacitor — restent à zéro `any` explicite et à zéro console direct ; seul le logger SeenIt conserve
   son miroir console interne. Un projet TypeScript `strict` séparé, avec `allowJs=false`, couvre un

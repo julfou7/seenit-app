@@ -135,13 +135,72 @@ function readBaseFile(baseSha, relativePath, root = ROOT) {
   }
 }
 
-function compareFileDebt(current, previous) {
+function addedLineNumbers(baseSha, relativePath, root = ROOT) {
+  if (!baseSha) return new Set();
+  let diff = '';
+  try {
+    diff = execFileSync(
+      'git',
+      ['diff', '--unified=0', '--no-ext-diff', baseSha, '--', relativePath],
+      { cwd: root, encoding: 'utf8' }
+    );
+  } catch {
+    return new Set();
+  }
+
+  const added = new Set();
+  for (const line of diff.split(/\r?\n/)) {
+    const match = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/);
+    if (!match) continue;
+    const start = Number(match[1]);
+    const count = match[2] == null ? 1 : Number(match[2]);
+    for (let offset = 0; offset < count; offset += 1) added.add(start + offset);
+  }
+  return added;
+}
+
+function debtAllowanceForFile(policy, relativePath) {
+  const boundary = policy.criticalBoundaries.find(entry => entry.path === relativePath);
+  return {
+    explicitAny: boundary?.maxExplicitAny || 0,
+    directConsole: boundary?.maxDirectConsole || 0
+  };
+}
+
+function debtExcess(metrics, allowance = { explicitAny: 0, directConsole: 0 }) {
+  return Math.max(0, metrics.explicitAny - allowance.explicitAny)
+    + Math.max(0, metrics.directConsole - allowance.directConsole);
+}
+
+function compareFileDebt(current, previous, allowance = { explicitAny: 0, directConsole: 0 }) {
   const violations = [];
   if (current.explicitAny > previous.explicitAny) {
     violations.push(`any explicites ${previous.explicitAny} → ${current.explicitAny}`);
   }
   if (current.directConsole > previous.directConsole) {
     violations.push(`console directs ${previous.directConsole} → ${current.directConsole}`);
+  }
+
+  const previousExcess = debtExcess(previous, allowance);
+  const currentExcess = debtExcess(current, allowance);
+  if (previousExcess > 0 && currentExcess >= previousExcess) {
+    violations.push(`dette historique non réduite ${previousExcess} → ${currentExcess}`);
+  }
+  return violations;
+}
+
+function addedLineDebt(metrics, addedLines, allowance = { explicitAny: 0, directConsole: 0 }) {
+  const violations = [];
+  const addedAny = metrics.anyLines.filter(line => addedLines.has(line));
+  if (addedAny.length > 0) {
+    violations.push(`any explicite ajouté ligne(s) ${addedAny.join(', ')}`);
+  }
+
+  if (allowance.directConsole === 0) {
+    const addedConsole = metrics.consoleLines.filter(line => addedLines.has(line));
+    if (addedConsole.length > 0) {
+      violations.push(`console direct ajouté ligne(s) ${addedConsole.join(', ')}`);
+    }
   }
   return violations;
 }
@@ -173,8 +232,12 @@ function validateReport(report, policy, options = {}) {
       if (!fs.existsSync(absolutePath)) continue;
       const current = report.files[relativePath] || scanSource(fs.readFileSync(absolutePath, 'utf8'), relativePath);
       const previous = scanSource(readBaseFile(baseSha, relativePath, root), relativePath);
-      for (const reason of compareFileDebt(current, previous)) {
-        violations.push(`${relativePath}: nouvelle dette interdite (${reason})`);
+      const allowance = debtAllowanceForFile(policy, relativePath);
+      for (const reason of addedLineDebt(current, addedLineNumbers(baseSha, relativePath, root), allowance)) {
+        violations.push(`${relativePath}: dette interdite dans les lignes modifiées (${reason})`);
+      }
+      for (const reason of compareFileDebt(current, previous, allowance)) {
+        violations.push(`${relativePath}: règle boy-scout non respectée (${reason})`);
       }
     }
   }
@@ -223,8 +286,12 @@ function main() {
 }
 
 module.exports = {
+  addedLineDebt,
+  addedLineNumbers,
   changedProductionFiles,
   compareFileDebt,
+  debtAllowanceForFile,
+  debtExcess,
   isProductionTypeScript,
   loadPolicy,
   scanRepository,

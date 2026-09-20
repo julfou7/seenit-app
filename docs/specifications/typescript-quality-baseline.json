@@ -66,5 +66,11 @@
     "src/features/downloads/qbitNativeSession.ts",
     "src/features/downloads/downloadIdentity.ts",
     "src/features/logging/logPrivacy.ts"
-  ]
+  ],
+  "touchedFilePolicy": {
+    "rejectDebtOnAddedLines": true,
+    "requireDebtReductionWhenTouched": true,
+    "minimumReduction": 1,
+    "loggerConsoleAllowance": "criticalBoundaries"
+  }
 }

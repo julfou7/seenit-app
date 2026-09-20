@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const {
+  addedLineDebt,
   compareFileDebt,
   isProductionTypeScript,
   loadPolicy,
@@ -29,18 +30,46 @@ test('SEENIT-QUALITY-011 mesure any explicites et console directs sans faux posi
   assert.deepEqual(metrics.consoleLines, [5]);
 });
 
-test('SEENIT-QUALITY-011 interdit toute aggravation fichier par fichier', () => {
+test('SEENIT-QUALITY-011 impose une amélioration de dette sur chaque fichier endetté touché', () => {
   assert.deepEqual(
     compareFileDebt(
-      { explicitAny: 3, directConsole: 2 },
+      { explicitAny: 2, directConsole: 2 },
       { explicitAny: 2, directConsole: 2 }
     ),
-    ['any explicites 2 → 3']
+    ['dette historique non réduite 4 → 4']
   );
   assert.deepEqual(
     compareFileDebt(
-      { explicitAny: 1, directConsole: 1 },
+      { explicitAny: 1, directConsole: 2 },
       { explicitAny: 2, directConsole: 2 }
+    ),
+    []
+  );
+  assert.deepEqual(
+    compareFileDebt(
+      { explicitAny: 0, directConsole: 0 },
+      { explicitAny: 0, directConsole: 0 }
+    ),
+    []
+  );
+});
+
+test('SEENIT-QUALITY-011 refuse une nouvelle dette dans une ligne modifiée même si elle est compensée ailleurs', () => {
+  const metrics = {
+    explicitAny: 2,
+    directConsole: 1,
+    anyLines: [3, 20],
+    consoleLines: [8]
+  };
+  assert.deepEqual(
+    addedLineDebt(metrics, new Set([3, 8])),
+    ['any explicite ajouté ligne(s) 3', 'console direct ajouté ligne(s) 8']
+  );
+  assert.deepEqual(
+    addedLineDebt(
+      { explicitAny: 0, directConsole: 3, anyLines: [], consoleLines: [5, 10, 15] },
+      new Set([15]),
+      { explicitAny: 0, directConsole: 3 }
     ),
     []
   );
