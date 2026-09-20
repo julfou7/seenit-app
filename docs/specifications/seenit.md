@@ -945,6 +945,8 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   l'auditeur lecture seule agrège aussi les journaux de requêtes Cloud Run par famille de route et
   volume de réponse. Les URL, paramètres, identifiants et logs bruts sont supprimés avant archivage ;
   seul l'agrégat FinOps est conservé assez longtemps pour comparer sept jours puis une période complète.
+  Les réponses JSON volumineuses de synchronisation Plex utilisent `gzip` quand le client l'accepte,
+  tout en conservant un chemin non compressé pour les clients qui annoncent `identity`.
 - Le bundle initial doit conserver le découpage paresseux des écrans privés. Toute hausse
   significative doit être expliquée dans la livraison.
 

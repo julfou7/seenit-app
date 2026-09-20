@@ -791,6 +791,14 @@
         {
           "file": "tests/cloudRunTrafficAudit.test.ts",
           "contains": "SEENIT-COST-001 agrège le trafic Cloud Run par route sans conserver URL ni identifiant"
+        },
+        {
+          "file": "tests/plexResponseCompression.test.ts",
+          "contains": "SEENIT-COST-001 compresse les réponses Plex volumineuses sans modifier leur contrat"
+        },
+        {
+          "file": "tests/plexResponseCompression.test.ts",
+          "contains": "SEENIT-COST-001 respecte les clients Plex qui refusent la compression"
         }
       ]
     },

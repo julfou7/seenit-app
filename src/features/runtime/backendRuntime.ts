@@ -1,6 +1,8 @@
-import type { Application, ErrorRequestHandler, RequestHandler } from 'express';
+import type { Application, ErrorRequestHandler, Request, RequestHandler, Response } from 'express';
 import dns from 'node:dns/promises';
 import net from 'node:net';
+import { promisify } from 'node:util';
+import { constants as zlibConstants, gzip as gzipCallback } from 'node:zlib';
 import { emitOperationalEvent } from './operationalEvent.ts';
 import { sanitizePlexSyncWatchEvidence } from '../plex/plexWatchEvidence.ts';
 import {
@@ -33,6 +35,8 @@ import {
 } from './plexDeltaUnwatchSafety.ts';
 
 export const SEENIT_BACKEND_IDENTITY = 'canonical';
+const gzipAsync = promisify(gzipCallback);
+const PLEX_JSON_COMPRESSION_THRESHOLD_BYTES = 1024;
 
 export const SEENIT_CORS_ALLOWED_HEADERS = [
   'Origin',
@@ -264,10 +268,13 @@ async function loadPlexDeltaWatchedSnapshot(uid: string): Promise<PlexDeltaWatch
     const { adminDb } = await import('../../lib/firebase-admin.ts');
     const snapshot = await adminDb.doc(`users/${uid}/settings/plex`).get();
     return sanitizePlexDeltaWatchedLocators(snapshot.get(PLEX_DELTA_SNAPSHOT_FIELD));
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const details = error && typeof error === 'object'
+      ? error as { code?: unknown; name?: unknown }
+      : {};
     console.warn('[Plex Delta Snapshot Store]', {
       action: 'read',
-      code: String(error?.code ?? error?.name ?? 'READ_FAILED').slice(0, 80)
+      code: String(details.code ?? details.name ?? 'READ_FAILED').slice(0, 80)
     });
     return [];
   }
@@ -908,9 +915,35 @@ async function enrichPlexDeltaResponse(req: any, body: any): Promise<any> {
   return body;
 }
 
+async function sendPlexJsonResponse(
+  req: Request,
+  res: Response,
+  originalJson: Response['json'],
+  body: unknown
+): Promise<Response> {
+  const acceptsGzip = typeof req.acceptsEncodings === 'function'
+    && req.acceptsEncodings('gzip') === 'gzip';
+  if (!acceptsGzip) return originalJson(body);
+
+  const serialized = JSON.stringify(body);
+  if (typeof serialized !== 'string') return originalJson(body);
+  if (Buffer.byteLength(serialized) < PLEX_JSON_COMPRESSION_THRESHOLD_BYTES) {
+    return originalJson(body);
+  }
+
+  const compressed = await gzipAsync(Buffer.from(serialized), {
+    level: zlibConstants.Z_BEST_SPEED
+  });
+  res.vary('Accept-Encoding');
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Content-Encoding', 'gzip');
+  res.removeHeader('Content-Length');
+  return res.send(compressed);
+}
+
 function installPlexWatchEvidenceResponseGuard(app: Application): void {
   app.use((req, res, next) => {
-    if (req.method !== 'POST' || req.path !== '/api/plex/history') {
+    if (req.method !== 'POST' || !['/api/plex/history', '/api/plex-sync'].includes(req.path)) {
       next();
       return;
     }
@@ -921,7 +954,7 @@ function installPlexWatchEvidenceResponseGuard(app: Application): void {
       if (responseScheduled) return res;
       responseScheduled = true;
       void enrichPlexDeltaResponse(req, body)
-        .then(enriched => originalJson(sanitizePlexSyncWatchEvidence(enriched)))
+        .then(enriched => sendPlexJsonResponse(req, res, originalJson, sanitizePlexSyncWatchEvidence(enriched)))
         .catch(() => originalJson(sanitizePlexSyncWatchEvidence(body)));
       return res;
     };
