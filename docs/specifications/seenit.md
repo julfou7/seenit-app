@@ -1032,6 +1032,21 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   de chargement paresseux, interdit aux modules internes de réimporter leur façade et borne chaque
   module à 1 000 lignes. Une exception supérieure reste admise uniquement lorsqu'elle est documentée,
   justifiée par un invariant métier ou transactionnel et plafonnée par un TNR dédié.
+  Les garde-fous transverses de l'issue #15 sont décrits dans
+  `docs/specifications/quality-gates.json` : les parcours critiques sont connexion, bibliothèque, Plex,
+  téléchargements, mise à jour et notifications, avec une preuve déterministe PWA/APK pour chacun et
+  sans accès aux comptes Plex/Arr/qBittorrent personnels. Après chaque build canonique, le bundle est
+  mesuré en gzip et bloque au-delà de 280 KiB pour l'entrypoint, 560 KiB pour le graphe JS initial,
+  30 KiB pour le CSS initial ou 40 KiB pour un chunk lazy. Le smoke navigateur utilise le Chrome du
+  runner sans dépendance Playwright/Puppeteer, coupe les origines externes, rend la vraie PWA en 360,
+  412 et 1280 px, exige une cible de connexion d'au moins 44 CSS px, son atteignabilité au clavier et
+  son exposition dans l'arbre d'accessibilité. Le service worker est testé en intégration pour
+  installation/activation, fallback hors-ligne, clic de notification et exclusion stricte de `/api/`
+  du cache. Le smoke Android N → N+1 existant bloque un cold start supérieur à 9 000 ms ou une reprise
+  supérieure à 2 500 ms et vérifie via l'arbre d'accessibilité Android que la connexion est exposée et
+  actionnable. Cette sonde automatisée ne remplace pas un contrôle humain TalkBack lorsqu'un changement
+  UX à risque le justifie. Les rapports bundle/PWA et les rapports du smoke Android sont publiés comme
+  artefacts CI ; une régression d'un seuil fait échouer la validation correspondante.
 - **SEENIT-QUALITY-002** — Tout audit est conservé comme rapport daté et indexé, avec version,
   commit, périmètre et preuves. Chaque constat ouvert renvoie vers une issue GitHub portant une
   priorité, ou vers une décision de risque accepté justifiée ; aucun point ne reste uniquement dans

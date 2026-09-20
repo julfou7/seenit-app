@@ -12,6 +12,8 @@ API_LEVEL="${5:?Niveau API manquant}"
 ADB_TIMEOUT_SECONDS="${ADB_TIMEOUT_SECONDS:-60}"
 ADB_DIAGNOSTIC_TIMEOUT_SECONDS="${ADB_DIAGNOSTIC_TIMEOUT_SECONDS:-10}"
 SMOKE_MODE="upgrade-in-place"
+COLD_START_BUDGET_MS="$(node -p "require('./docs/specifications/quality-gates.json').budgets.android.coldStartMs")"
+RESUME_BUDGET_MS="$(node -p "require('./docs/specifications/quality-gates.json').budgets.android.resumeMs")"
 
 mkdir -p "$REPORT_DIR"
 
@@ -39,6 +41,31 @@ test -x "$AAPT" || { echo "aapt introuvable"; exit 1; }
 preflight_failure() {
   echo "[APK Upgrade] Échec préflight : $1" | tee -a "$REPORT_DIR/preflight.txt" >&2
   exit 1
+}
+
+smoke_failure() {
+  echo "[APK Upgrade] Échec smoke : $1" | tee -a "$REPORT_DIR/smoke-failure.txt" >&2
+  exit 1
+}
+
+activity_metric_ms() {
+  local file="$1"
+  local preferred="$2"
+  local fallback="$3"
+  local value
+  value="$(sed -n "s/^[[:space:]]*${preferred}:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p" "$file" | tail -n 1)"
+  if [[ -z "$value" ]]; then
+    value="$(sed -n "s/^[[:space:]]*${fallback}:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p" "$file" | tail -n 1)"
+  fi
+  [[ "$value" =~ ^[0-9]+$ ]] || smoke_failure "mesure ${preferred}/${fallback} absente dans $file."
+  printf '%s' "$value"
+}
+
+assert_performance_budget() {
+  local label="$1"
+  local actual="$2"
+  local budget="$3"
+  (( actual <= budget )) || smoke_failure "$label ${actual} ms > budget ${budget} ms."
 }
 
 apk_field() {
@@ -156,9 +183,27 @@ adb_bounded shell am force-stop "$PACKAGE_ID"
 adb_bounded shell am start -W -n "$PACKAGE_ID/.MainActivity" | tee "$REPORT_DIR/cold-start.txt"
 grep -q 'Status: ok' "$REPORT_DIR/cold-start.txt"
 
+sleep 3
+adb_bounded shell uiautomator dump /sdcard/seenit-accessibility.xml > "$REPORT_DIR/accessibility-dump.txt"
+adb_bounded pull /sdcard/seenit-accessibility.xml "$REPORT_DIR/accessibility.xml" > "$REPORT_DIR/accessibility-pull.txt"
+LOGIN_ACCESSIBILITY_NODE="$(grep -o '<node[^>]*Continuer avec Google[^>]*>' "$REPORT_DIR/accessibility.xml" | head -n 1 || true)"
+[[ -n "$LOGIN_ACCESSIBILITY_NODE" ]] || smoke_failure "le bouton de connexion n’est pas exposé dans l’arbre d’accessibilité Android."
+grep -q 'clickable="true"' <<< "$LOGIN_ACCESSIBILITY_NODE" \
+  || smoke_failure "le bouton de connexion exposé à Android n’est pas actionnable."
+
 adb_bounded shell input keyevent KEYCODE_HOME
 adb_bounded shell am start -W -n "$PACKAGE_ID/.MainActivity" | tee "$REPORT_DIR/resume.txt"
 grep -q 'Status: ok' "$REPORT_DIR/resume.txt"
+
+COLD_START_MS="$(activity_metric_ms "$REPORT_DIR/cold-start.txt" TotalTime WaitTime)"
+RESUME_MS="$(activity_metric_ms "$REPORT_DIR/resume.txt" WaitTime TotalTime)"
+assert_performance_budget "cold start Android" "$COLD_START_MS" "$COLD_START_BUDGET_MS"
+assert_performance_budget "reprise Android" "$RESUME_MS" "$RESUME_BUDGET_MS"
+{
+  echo "cold start Android=${COLD_START_MS} ms (budget ${COLD_START_BUDGET_MS} ms)"
+  echo "reprise Android=${RESUME_MS} ms (budget ${RESUME_BUDGET_MS} ms)"
+  echo "accessibilité Android=Continuer avec Google exposé et actionnable"
+} | tee "$REPORT_DIR/performance.txt"
 
 adb_bounded shell am start -W -a android.intent.action.VIEW \
   -c android.intent.category.BROWSABLE \
@@ -173,7 +218,7 @@ if grep -A 8 'FATAL EXCEPTION' "$REPORT_DIR/runtime-logcat.txt" | grep -q "Proce
   exit 1
 fi
 
-RESULT_TEXT="installation N → N+1 sur place, signature stable, données/session, icône, notifications, deep link et cycle de vie validés"
+RESULT_TEXT="installation N → N+1 sur place, signature stable, données/session, accessibilité, budgets de démarrage/reprise, notifications, deep link et cycle de vie validés"
 
 {
   echo "# Smoke APK SeenIt"
@@ -185,6 +230,9 @@ RESULT_TEXT="installation N → N+1 sur place, signature stable, données/sessio
   echo "- Signature baseline : $BASELINE_SIGNER"
   echo "- Signature candidate : $CURRENT_SIGNER"
   echo "- Mode : $SMOKE_MODE"
+  echo "- Cold start : ${COLD_START_MS} ms / budget ${COLD_START_BUDGET_MS} ms"
+  echo "- Reprise : ${RESUME_MS} ms / budget ${RESUME_BUDGET_MS} ms"
+  echo "- Accessibilité Android : bouton de connexion exposé et actionnable dans l’arbre système"
   echo "- Résultat : $RESULT_TEXT"
 } > "$REPORT_DIR/summary.md"
 
