@@ -37,6 +37,7 @@ rapport existant et son historique.
 | AUDIT-2026-09-10-LOG-OBSERVABILITY | 2026-09-10 | 1.4.134 (`575c02c`) | logs backend structurés, redaction, détection, déduplication GitHub, garde-fous CI et coût | [Audit observabilité des logs](./audit-log-observability-2026-09-10.md) | [Issue #27](https://github.com/julfou7/seenit-app/issues/27) |
 | AUDIT-2026-09-10-FRAME-PACING | 2026-09-10 | 1.4.135 (`158f27b`) | vidéo Android, navigation globale, Explorer, À Regarder, Profil/Ma Liste, images, diffuseurs TMDB et Plex | [Audit frame pacing](./audit-frame-pacing-2026-09-10.md) | [Issue #229](https://github.com/julfou7/seenit-app/issues/229) |
 | AUDIT-2026-09-11-EXPLORER-FILTERS | 2026-09-11 | 1.4.143 (`ecaec22`) | vidéo Android, filtres, tri, recherche, pagination, HERO, grille et diffuseurs Explorer | [Audit Explorer](./AUDIT-2026-09-11-EXPLORER-FILTERS.md) | [Issue #294](https://github.com/julfou7/seenit-app/issues/294) |
+| AUDIT-2026-09-20-GCP-FINOPS | 2026-09-20 | 1.4.174 (`6f33296`) | Firestore, Storage, Cloud Run, egress, bornes et preuve 0 € | [Audit FinOps GCP](./audit-finops-gcp-2026-09-20.md) | [Issue #23](https://github.com/julfou7/seenit-app/issues/23) |
 
 L'audit historique des téléchargements antérieur à ce protocole reste disponible dans
 [`../audit-telechargements-2026-08-30.md`](../audit-telechargements-2026-08-30.md). Ses corrections

@@ -1,0 +1,21 @@
+steps:
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        image_base="${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE}"
+        gcloud artifacts docker images list "$$image_base" --include-tags --format='value(version)' \
+          | sort -u \
+          | while IFS= read -r digest; do
+              if [[ -n "$$digest" ]]; then
+                gcloud artifacts docker images delete "$$image_base@$$digest" --delete-tags --quiet
+              fi
+            done
+
+        source_bucket="gs://${PROJECT_ID}_cloudbuild/source"
+        if gcloud storage ls "$$source_bucket/" >/dev/null 2>&1; then
+          gcloud storage rm "$$source_bucket/**"
+        fi
+options:
+  logging: CLOUD_LOGGING_ONLY

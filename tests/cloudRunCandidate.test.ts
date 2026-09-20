@@ -61,7 +61,10 @@ test('SEENIT-RUNTIME-001 prépare une candidate image en conservant la configura
   assert.doesNotMatch(prepared, /runtimeClassName:\s*run\.googleapis\.com\/linux-base-image-update/);
 
   assert.match(prepared, /run\.googleapis\.com\/ingress: all/);
+  assert.match(prepared, /autoscaling\.knative\.dev\/minScale: '0'/);
   assert.match(prepared, /autoscaling\.knative\.dev\/maxScale: '2'/);
+  assert.match(prepared, /run\.googleapis\.com\/cpu-throttling: 'true'/);
+  assert.doesNotMatch(prepared, /run\.googleapis\.com\/(?:vpc-access-connector|vpc-access-egress|network-interfaces)/);
   assert.match(prepared, /client\.knative\.dev\/nonce: keep-me/);
   assert.match(prepared, /KEEP_ENV/);
   assert.match(prepared, /keep-value/);
@@ -77,6 +80,33 @@ test('SEENIT-RUNTIME-001 prépare une candidate image en conservant la configura
   assert.match(prepared, /percent: 0\n    revisionName: seenit-app-gh-12345\n    tag: candidate-12345/);
 });
 
+test('SEENIT-COST-001 borne Cloud Run et retire tout réseau VPC payant hérité', () => {
+  const unbounded = exportedService.replace(
+    "        autoscaling.knative.dev/maxScale: '2'\n",
+    `        autoscaling.knative.dev/minScale: '3'
+        autoscaling.knative.dev/maxScale: '50'
+        run.googleapis.com/cpu-throttling: 'false'
+        run.googleapis.com/vpc-access-connector: costly-connector
+        run.googleapis.com/vpc-access-egress: all-traffic
+        run.googleapis.com/network-interfaces: '[{"network":"default"}]'
+`
+  );
+  const prepared = prepareCandidateService(unbounded, baseOptions);
+
+  assert.match(prepared, /autoscaling\.knative\.dev\/minScale: '0'/);
+  assert.match(prepared, /autoscaling\.knative\.dev\/maxScale: '2'/);
+  assert.match(prepared, /run\.googleapis\.com\/cpu-throttling: 'true'/);
+  assert.doesNotMatch(prepared, /costly-connector|all-traffic|network-interfaces/);
+});
+
+test('SEENIT-COST-001 ajoute les bornes Cloud Run même si l’export historique ne les déclare pas', () => {
+  const withoutBounds = exportedService.replace("        autoscaling.knative.dev/maxScale: '2'\n", '');
+  const prepared = prepareCandidateService(withoutBounds, baseOptions);
+
+  assert.match(prepared, /autoscaling\.knative\.dev\/minScale: '0'/);
+  assert.match(prepared, /autoscaling\.knative\.dev\/maxScale: '2'/);
+  assert.match(prepared, /run\.googleapis\.com\/cpu-throttling: 'true'/);
+});
 test('SEENIT-RUNTIME-001 retire command et args hérités quand ils portent la puce du conteneur', () => {
   const inheritedLaunch = exportedService.replace(
     '      - env:\n',
