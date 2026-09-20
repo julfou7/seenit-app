@@ -179,8 +179,6 @@ if (typeof window !== 'undefined') {
       return;
     }
 
-    void useDownloadConfigStore.getState().syncFromCloud();
-
     try {
       const docRef = doc(db, 'users', user.uid, 'settings', 'downloadConfig');
       unsubscribeSnapshot = onSnapshot(
