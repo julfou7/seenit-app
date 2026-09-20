@@ -1347,6 +1347,10 @@
         {
           "file": "tests/largeModuleCharacterization.test.ts",
           "contains": "SEENIT-QUALITY-001 / #14 interdit aux modules extraits de réimporter leurs façades"
+        },
+        {
+          "file": "tests/qualityGates.test.ts",
+          "contains": "SEENIT-QUALITY-001 garde les parcours PWA/APK critiques, l’accessibilité et les budgets de performance sous des garde-fous bloquants"
         }
       ]
     },

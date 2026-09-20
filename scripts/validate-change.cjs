@@ -137,6 +137,10 @@ function validatePostinstall() {
       runNpm(['audit', '--omit=dev', '--audit-level=high'], { label: 'Audit dépendances production' });
     }
     runNpm(['run', 'build'], { label: 'Build Web + serveur', metric: 'SEENIT_BUILD_SECONDS' });
+    run('node', ['scripts/quality-bundle-budget.cjs'], {
+      label: 'Budgets bundle qualité',
+      metric: 'SEENIT_QUALITY_BUNDLE_SECONDS'
+    });
 
     console.log(`\n[Validate Change] ✅ Validation ${classification.mode} verte.`);
     return classification;

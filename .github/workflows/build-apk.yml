@@ -115,6 +115,18 @@ jobs:
           SEENIT_VALIDATE_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           SEENIT_FORCE_DEPENDENCY_AUDIT: ${{ github.event_name == 'schedule' }}
 
+      - name: Run PWA Browser Quality Gate
+        run: node scripts/pwa-browser-smoke.cjs
+
+      - name: Publish Quality Gate Evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: SeenIt-Quality-Gates-${{ github.run_id }}
+          path: quality-reports
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Save Trusted node_modules Cache
         if: >-
           success() &&
@@ -159,6 +171,8 @@ jobs:
             echo "| Tests unitaires | ${SEENIT_UNIT_SECONDS:-n/a} s |"
             echo "| Contrat Android | ${SEENIT_ANDROID_SECONDS:-n/a} s |"
             echo "| Build Web + serveur | ${SEENIT_BUILD_SECONDS:-n/a} s |"
+            echo "| Budget bundle | ${SEENIT_QUALITY_BUNDLE_SECONDS:-n/a} s |"
+            echo "| Smoke PWA navigateur | ${SEENIT_PWA_QUALITY_SECONDS:-n/a} s |"
             echo "| Total mesuré | $total_seconds s |"
           } >> "$GITHUB_STEP_SUMMARY"
 

@@ -130,6 +130,13 @@ Le cache npm de téléchargement de `actions/setup-node` reste actif comme secou
 froide. `npm audit` n'est jamais mélangé à `npm ci` : il conserve son étape conditionnelle et son
 niveau bloquant existant.
 
+Le build canonique exécute aussi le budget bundle défini dans
+`docs/specifications/quality-gates.json` et publie son rapport. Dans GitHub Actions, un smoke Chromium
+sans dépendance navigateur supplémentaire rend ensuite la vraie PWA en 360/412/desktop, bloque les
+origines externes, vérifie clavier/arbre d'accessibilité/cible 44 px et joint rapports + captures dans
+un artefact `SeenIt-Quality-Gates-*`. La quarantaine distante exécute le même smoke avant de déclarer
+un SHA exact promouvable. Ces contrôles restent séparés du TNR humain TalkBack.
+
 Le job `Validate Change` possède un plafond dur de 10 minutes. Ce plafond n'est pas le budget nominal :
 la cible reste une médiane maximale de 45 secondes et un p95 maximal de 90 secondes sur 20 validations
 consécutives. Un cache froid après changement de lockfile peut dépasser cette cible ponctuellement ;
@@ -137,6 +144,11 @@ il doit être visible comme `miss` dans le résumé puis alimenter le cache de r
 `main`. Une installation qui approche le plafond est traitée comme un incident d'infrastructure :
 ne pas retirer de test, vérifier le statut GitHub/npm, relancer une seule fois sur le même commit et
 ouvrir/actualiser une issue si la dérive se répète.
+
+Le smoke Android de release réutilise le même contrat qualité : cold start ≤ 9 000 ms et reprise
+≤ 2 500 ms, avec rapport `performance.txt` et capture de l'arbre d'accessibilité système. Un dépassement
+est bloquant ; ces plafonds gardent une marge sur les baselines Android 36 observées afin de détecter
+une régression majeure sans transformer la variabilité émulateur en flake.
 
 Le contrat Android exécuté en validation continue contrôle l'identité et le contrat de signature sans
 exiger le fichier privé de keystore : les secrets de signature ne sont jamais exposés aux PR ni aux

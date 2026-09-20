@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface SplashScreenProps {
   onComplete: () => void;
@@ -17,6 +17,16 @@ export function SplashScreen({
 }: SplashScreenProps) {
   const [timeElapsed, setTimeElapsed] = useState(minimumDisplayTime === 0);
   const [isClosing, setIsClosing] = useState(false);
+  const onCompleteRef = useRef(onComplete);
+  const onStartCloseRef = useRef(onStartClose);
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  useEffect(() => {
+    onStartCloseRef.current = onStartClose;
+  }, [onStartClose]);
 
   useEffect(() => {
     if (minimumDisplayTime === 0) {
@@ -31,15 +41,18 @@ export function SplashScreen({
   }, [minimumDisplayTime]);
 
   useEffect(() => {
-    if (timeElapsed && isReady && !isClosing) {
-      setIsClosing(true);
-      if (onStartClose) onStartClose();
-      const closeTimer = setTimeout(() => {
-        onComplete();
-      }, 500);
-      return () => clearTimeout(closeTimer);
-    }
-  }, [timeElapsed, isReady, isClosing, onComplete, onStartClose]);
+    if (!timeElapsed || !isReady || isClosing) return;
+    setIsClosing(true);
+    onStartCloseRef.current?.();
+  }, [timeElapsed, isReady, isClosing]);
+
+  useEffect(() => {
+    if (!isClosing) return;
+    const closeTimer = setTimeout(() => {
+      onCompleteRef.current();
+    }, 500);
+    return () => clearTimeout(closeTimer);
+  }, [isClosing]);
 
   return (
     <div

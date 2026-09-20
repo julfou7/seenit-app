@@ -643,8 +643,11 @@ le databaseId ou la signature APK.
 ## 13. Résilience, UX et limites assumées
 
 Le cadrage transversal [UX](./ux-reference.md) couvre les boutons, cartes, en-têtes, superpositions et
-gestes spécifiques. Les constats du code sont suivis dans [l'audit UX](../audits/audit-ux-2026-09-06.md)
-et #178 à #181 ; la preuve visuelle/tactile PWA/APK reste à produire avec #15.
+gestes spécifiques. Les constats du code restent suivis dans [l'audit UX](../audits/audit-ux-2026-09-06.md)
+et #178 à #181. Le socle #15 fournit désormais une preuve automatisée PWA/APK : rendu navigateur réel
+360/412/desktop, clavier, arbre d'accessibilité, cible tactile 44 px, service worker/offline/notification,
+budgets bundle et budgets de démarrage/reprise Android. Les essais humains TalkBack et gestes système
+restent des TNR terrain lorsque le risque du changement UX l'exige ; ils ne sont pas simulés par la CI.
 
 - Le rendu mobile respecte les safe areas ; la barre basse ne masque ni contenu ni toast.
 - Les écrans lourds sont lazy-loadés et préchargés après connexion ; l'écran courant reste visible
@@ -657,6 +660,10 @@ et #178 à #181 ; la preuve visuelle/tactile PWA/APK reste à produire avec #15.
   jamais de GitHub pour répondre aux requêtes.
 - Une indisponibilité TMDB peut laisser un écran partiel ou un cache ; elle ne justifie aucun matching
   par titre et ne transforme jamais une classification d'âge inconnue en « Tous publics ».
+- Les parcours critiques qualité sont connexion, bibliothèque, Plex, téléchargements, mise à jour et
+  notifications. Leur matrice de preuves est versionnée dans `quality-gates.json`. Les tests PWA
+  navigateur bloquent toute origine externe : aucune validation CI de ce socle ne contacte les comptes
+  personnels Plex, Sonarr, Radarr ou qBittorrent.
 - Une indisponibilité d'un serveur Plex/Arr/qBit ne doit pas effacer un état connu.
 - SeenIt est pour l'instant un produit personnel mono-propriétaire logique. Il n'existe pas encore de
   profil public, partage social, administration multi-utilisateur ou catalogue éditorial propre.
@@ -696,7 +703,6 @@ elle est nécessaire à la plateforme et explicitement documentée.
 | P1 | La classification d’âge actuelle peut préférer une valeur FR permissive, sous-classer des certifications US et inventer un TP par genre. | Appliquer `SEENIT-PARENTAL-001` : [#98](https://github.com/julfou7/seenit-app/issues/98). |
 | P1 | Les personnes favorites restent locales et font diverger les recommandations PWA/APK. | Rendre Firestore autoritatif : [#95](https://github.com/julfou7/seenit-app/issues/95). |
 | P2 | Partager une fiche ou le profil ne garantit pas encore un lien réouvrable conforme. | Décider/corriger : [#96](https://github.com/julfou7/seenit-app/issues/96). |
-| P2 | Les parcours fonctionnels réels ne sont pas encore couverts de bout en bout. | Programme E2E/accessibilité/performance : [#15](https://github.com/julfou7/seenit-app/issues/15). |
 
 ## 16. Contrat de maintenance de cette référence
 
