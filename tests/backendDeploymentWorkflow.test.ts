@@ -183,6 +183,8 @@ test('SEENIT-COST-001 capture un inventaire GCP en lecture seule après la purge
 
   const inventory = fs.readFileSync(path.join(rootDir, 'scripts', 'gcp-finops-inventory.sh'), 'utf8');
   assert.match(inventory, /gcloud firestore databases list/);
+  assert.match(inventory, /databaseEdition, freeTier, createTime, updateTime/);
+  assert.match(inventory, /firestoreDataAccessMode, mongodbCompatibleDataAccessMode/);
   assert.match(inventory, /gcloud storage buckets describe/);
   assert.match(inventory, /gcloud sql instances list/);
   assert.match(inventory, /gcloud artifacts packages list/);
