@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
-Dernière mise à jour : 15 septembre 2026
-Version applicative : **1.4.173**
+Dernière mise à jour : 20 septembre 2026
+Version applicative : **1.4.174**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -257,11 +257,16 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
   par exemple `10 ans` conserve les classifications explicites « Tous publics », `7+` et `10+`, mais
   exclut `13+`, `14+`, `17+`, `18+` et toute valeur « Âge à vérifier ». Le mode « Tous » ne filtre pas.
 - Explorer résout cette preuve via les payloads TMDB minimaux `release_dates` ou `content_ratings`.
-  Une page `Tout` complète est coalescée dans un transport backend streamé ; les classifications sûres
-  sont rendues progressivement sur la première page comme sur les suivantes. La concurrence fournisseur
-  reste bornée : 24 appels constituent la fenêtre nominale et, si cette fenêtre reste bloquée, seule la
-  queue de la page courante peut être admise après 1 s, sans jamais dépasser 40 appels pour cette page.
-  Une fiche média complète ne doit jamais être hydratée uniquement pour appliquer le filtre d'âge.
+  Une page `Tout` complète est coalescée dans un transport backend streamé. Avec le tri **Populaires**,
+  les classifications sûres sont rendues progressivement sur la première page comme sur les suivantes :
+  dès qu'une carte sûre apparaît, sa position relative est figée pour la génération courante et les
+  nouvelles cartes sûres s'ajoutent sans déplacer celles déjà visibles ; le résultat complet conserve
+  ce même ordre de présentation stable. Avec un tri explicite par note, date ou titre, la page attend sa
+  résolution parentale complète avant d'afficher ses nouveaux résultats afin de respecter exactement le
+  tri choisi sans réordonner une grille en cours de chargement. La concurrence fournisseur reste bornée :
+  24 appels constituent la fenêtre nominale et, si cette fenêtre reste bloquée, seule la queue de la page
+  courante peut être admise après 1 s, sans jamais dépasser 40 appels pour cette page. Une fiche média
+  complète ne doit jamais être hydratée uniquement pour appliquer le filtre d'âge.
 - Pour un filtre strict inférieur à 18 ans, Explorer peut pousser la borne **film** dans
   `discover/movie` via les certifications US TMDB afin d'éviter de charger des candidats déjà hors
   limite. Ce préfiltre n'est qu'une optimisation : le résolveur SeenIt reste la validation finale et il
@@ -277,7 +282,7 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
   en avance**. Cette anticipation ne résout ni n'assouplit la classification parentale : elle prépare
   uniquement les requêtes Discover des pages suivantes afin que le scroll rare ne paie plus
   séquentiellement leur latence réseau. Une page préchargée est réutilisée exactement une fois par la
-  pagination normale, l'ordre page puis ordre source reste inchangé et un changement de filtre invalide
+  pagination normale, l'ordre des pages reste inchangé et un changement de filtre invalide
   immédiatement la fenêtre.
 - La fiche, les cartes et Explorer réutilisent le même résolveur ; aucune copie locale de mapping ou
   heuristique de genre n'est autorisée.
