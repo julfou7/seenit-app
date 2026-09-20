@@ -84,7 +84,7 @@ phases pour conserver le fail-fast et le cache :
 3. `npm run validate:change -- --preflight`, qui exécute la politique/syntaxe des workflows puis l'intégrité SPEC ;
 4. restauration éventuelle d'un cache `node_modules` exact ;
 5. sur cache absent seulement, `npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund` ;
-6. `npm run validate:change -- --postinstall`, qui rematérialise Android, classe `light` / `backend` / `apk`, applique le contrat de changement, TypeScript, les tests unitaires, le contrat Android conditionnel, l'audit applicable et le build ;
+6. `npm run validate:change -- --postinstall`, qui rematérialise Android, classe `light` / `backend` / `apk`, applique le contrat de changement, le typecheck global, le strict TypeScript progressif, le garde de dette `any`/console, le formatage minimal du diff, les tests unitaires, le contrat Android conditionnel, l'audit applicable et le build ;
 7. résumé du mode, du cache et des durées principales.
 
 Les options `--preflight` et `--postinstall` ne définissent aucune logique de validation concurrente : elles
@@ -129,6 +129,15 @@ chaque validation depuis le contrat suivi.
 Le cache npm de téléchargement de `actions/setup-node` reste actif comme secours d'une installation
 froide. `npm audit` n'est jamais mélangé à `npm ci` : il conserve son étape conditionnelle et son
 niveau bloquant existant.
+
+Le lint canonique ne dépend d'aucun outil externe supplémentaire : il réutilise le compilateur TypeScript
+installé pour compter les `any` explicites et les appels directs à `console.*`. La baseline historique
+est figée dans `docs/specifications/typescript-quality-baseline.json` ; chaque fichier de production
+modifié est comparé à sa version du merge-base et ne peut augmenter sa propre dette. Les nouvelles
+frontières critiques sont à zéro, tandis qu'un `tsconfig.strict-boundaries.json` avec `strict=true` et
+`allowJs=false` étend progressivement le typage fort sur des modules autonomes API, Firestore, Plex,
+téléchargements et transport natif. `npm run format:check` bloque les erreurs de whitespace du diff et
+`npm run format` fournit la normalisation minimale correspondante sans reformatage global.
 
 Le build canonique exécute aussi le budget bundle défini dans
 `docs/specifications/quality-gates.json` et publie son rapport. Dans GitHub Actions, un smoke Chromium

@@ -15,6 +15,7 @@ import {
   formatCleanMediaInfo
 } from '../services/sonarrRadarr';
 import { useToastStore } from './toastStore';
+import { appLogger } from './logStore';
 import { useShowsStore } from './showsStore';
 import { auth, db } from '../lib/firebase';
 import {
@@ -72,6 +73,11 @@ const localItemMutationRevision: Record<string, number> = {};
 let sharedDownloadUnsubscribe: (() => void) | null = null;
 const SHARED_DOWNLOAD_REQUEST_TTL_MS = 10 * 60_000;
 
+type SharedDownloadRequestDocument = Partial<LiveDownloadItem> & {
+  sharedExpiresAt?: number;
+  sharedUpdatedAt?: number;
+};
+
 function markLocalItemMutation(id: string) {
   localMutationRevision += 1;
   localItemMutationRevision[id] = localMutationRevision;
@@ -119,7 +125,7 @@ async function publishSharedDownloadRequest(item: LiveDownloadItem) {
       { merge: true }
     );
   } catch (error) {
-    console.warn('[Downloads Sync] Impossible de publier la demande partagée:', error);
+    appLogger.warn('sync', '[Downloads Sync] Impossible de publier la demande partagée', error);
   }
 }
 
@@ -152,7 +158,7 @@ function startSharedDownloadRequestSync(uid: string) {
       );
       const remoteItems: LiveDownloadItem[] = [];
       for (const entry of snapshot.docs) {
-        const data = entry.data() as any;
+        const data = entry.data() as SharedDownloadRequestDocument;
         if (Number(data.sharedExpiresAt || 0) <= now) {
           void deleteDoc(entry.ref).catch(() => {});
           continue;
@@ -254,7 +260,7 @@ function startSharedDownloadRequestSync(uid: string) {
       if (!state.isPolling) state.startPolling(1000);
       else void state.fetchDownloads();
     },
-    error => console.warn('[Downloads Sync] Écoute Firestore interrompue:', error)
+    error => appLogger.warn('sync', '[Downloads Sync] Écoute Firestore interrompue', error)
   );
 }
 const OPTIMISTIC_TTL_MS = 120_000;
@@ -1045,10 +1051,10 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             lastUpdated: Date.now(),
             error: null
           });
-        } catch (error: any) {
+        } catch (error) {
           if (!isCurrentScope()) return;
           set({
-            error: error?.message || 'Erreur réseau',
+            error: error instanceof Error && error.message ? error.message : 'Erreur réseau',
             isLoading: false
           });
         } finally {

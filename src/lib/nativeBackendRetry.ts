@@ -26,10 +26,17 @@ export function buildNativeBackendAttempts<T>(params: {
   ];
 }
 
+function readUnknownErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === 'string') return message;
+  }
+  return error == null ? '' : String(error);
+}
+
 export function isRetryableBackendNetworkError(error: unknown): boolean {
-  const message = error instanceof Error
-    ? error.message
-    : String((error as any)?.message || error || '');
+  const message = readUnknownErrorMessage(error);
 
   return /unable to resolve host|no address associated with hostname|unknownhost|err_name_not_resolved|failed to fetch|network(?: request)? failed|network error|load failed|timed? ?out|timeout|connection (?:reset|refused)|software caused connection abort/i.test(message);
 }
@@ -38,9 +45,7 @@ export function describeBackendNetworkFailure(error: unknown): string {
   if (isRetryableBackendNetworkError(error)) {
     return 'Connexion au backend SeenIt impossible. Vérifiez la connexion réseau ou le DNS privé de cet appareil, puis réessayez.';
   }
-  return error instanceof Error
-    ? error.message
-    : String((error as any)?.message || error || 'Erreur réseau inconnue');
+  return readUnknownErrorMessage(error) || 'Erreur réseau inconnue';
 }
 
 export async function executeBackendAttempts<T>(params: {

@@ -1,14 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import fs from 'node:fs';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const {
+  compareFileDebt,
   isProductionTypeScript,
+  loadPolicy,
   scanRepository,
   scanSource,
-  topEntries
+  validateReport
 } = require('../scripts/lint-typescript-quality.cjs');
+const { normalizeText } = require('../scripts/format-source.cjs');
 
 test('SEENIT-QUALITY-011 mesure any explicites et console directs sans faux positif lexical', () => {
   const metrics = scanSource(`
@@ -25,6 +29,23 @@ test('SEENIT-QUALITY-011 mesure any explicites et console directs sans faux posi
   assert.deepEqual(metrics.consoleLines, [5]);
 });
 
+test('SEENIT-QUALITY-011 interdit toute aggravation fichier par fichier', () => {
+  assert.deepEqual(
+    compareFileDebt(
+      { explicitAny: 3, directConsole: 2 },
+      { explicitAny: 2, directConsole: 2 }
+    ),
+    ['any explicites 2 → 3']
+  );
+  assert.deepEqual(
+    compareFileDebt(
+      { explicitAny: 1, directConsole: 1 },
+      { explicitAny: 2, directConsole: 2 }
+    ),
+    []
+  );
+});
+
 test('SEENIT-QUALITY-011 borne la mesure au code TypeScript de production', () => {
   assert.equal(isProductionTypeScript('src/lib/api.ts'), true);
   assert.equal(isProductionTypeScript('src/view.tsx'), true);
@@ -34,19 +55,37 @@ test('SEENIT-QUALITY-011 borne la mesure au code TypeScript de production', () =
   assert.equal(isProductionTypeScript('src/types.d.ts'), false);
 });
 
-test('SEENIT-QUALITY-011 publie la baseline actuelle avant gel des seuils', () => {
+test('SEENIT-QUALITY-011 bloque toute nouvelle dette any/console et active le strict progressif', () => {
+  const policy = loadPolicy();
   const report = scanRepository();
-  assert.ok(report.fileCount > 0);
-  assert.ok(report.explicitAny > 0, 'la phase de mesure doit observer la dette any historique avant durcissement');
-  assert.ok(report.directConsole > 0, 'la phase de mesure doit observer les console directs historiques avant durcissement');
+  const violations = validateReport(report, policy);
 
-  const summary = {
-    scope: report.scope,
-    fileCount: report.fileCount,
-    explicitAny: report.explicitAny,
-    directConsole: report.directConsole,
-    topExplicitAny: topEntries(report.files, 'explicitAny'),
-    topDirectConsole: topEntries(report.files, 'directConsole')
-  };
-  console.log('[SEENIT-QUALITY-011 baseline]', JSON.stringify(summary));
+  assert.deepEqual(violations, []);
+  assert.equal(policy.observedBaseline.fileCount, 199);
+  assert.equal(policy.observedBaseline.explicitAny, 1118);
+  assert.equal(policy.observedBaseline.directConsole, 197);
+  assert.ok(report.explicitAny < policy.observedBaseline.explicitAny);
+  assert.ok(report.directConsole < policy.observedBaseline.directConsole);
+
+  for (const boundary of policy.criticalBoundaries) {
+    const metrics = report.files[boundary.path];
+    assert.ok(metrics, `frontière absente: ${boundary.path}`);
+    assert.ok(metrics.explicitAny <= boundary.maxExplicitAny, boundary.path);
+    assert.ok(metrics.directConsole <= boundary.maxDirectConsole, boundary.path);
+  }
+
+  const strictConfig = JSON.parse(fs.readFileSync('tsconfig.strict-boundaries.json', 'utf8'));
+  assert.equal(strictConfig.compilerOptions.strict, true);
+  assert.equal(strictConfig.compilerOptions.allowJs, false);
+  assert.deepEqual(strictConfig.files, policy.strictFiles);
+
+  const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+  assert.match(pkg.scripts.lint, /typecheck/);
+  assert.match(pkg.scripts.lint, /typecheck:strict/);
+  assert.match(pkg.scripts.lint, /lint:quality/);
+  assert.match(pkg.scripts.lint, /format:check/);
+});
+
+test('le formatteur minimal normalise fins de ligne et espaces sans réécrire le style', () => {
+  assert.equal(normalizeText('const x = 1;  \r\n\r\n'), 'const x = 1;\n');
 });

@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "measuredAt": "2026-09-20",
+  "scope": "src/**/*.{ts,tsx} + server.ts",
+  "observedBaseline": {
+    "commit": "c463d2aa01a17715362518ae515ed84434c0a7e9",
+    "fileCount": 199,
+    "explicitAny": 1118,
+    "directConsole": 197
+  },
+  "ceilings": {
+    "explicitAny": 1118,
+    "directConsole": 197
+  },
+  "criticalBoundaries": [
+    {
+      "path": "src/lib/apiAuth.ts",
+      "domain": "API authentifiée",
+      "maxExplicitAny": 0,
+      "maxDirectConsole": 0
+    },
+    {
+      "path": "src/lib/firebase.ts",
+      "domain": "Firebase / Capacitor notifications",
+      "maxExplicitAny": 0,
+      "maxDirectConsole": 0
+    },
+    {
+      "path": "src/services/plex.ts",
+      "domain": "Plex provider",
+      "maxExplicitAny": 0,
+      "maxDirectConsole": 0
+    },
+    {
+      "path": "src/store/downloadConfigStore.ts",
+      "domain": "Firestore téléchargements",
+      "maxExplicitAny": 0,
+      "maxDirectConsole": 0
+    },
+    {
+      "path": "src/store/liveDownloadStoreCore.ts",
+      "domain": "Firestore / téléchargements live",
+      "maxExplicitAny": 0,
+      "maxDirectConsole": 0
+    },
+    {
+      "path": "src/lib/nativeBackendRetry.ts",
+      "domain": "transport API / Capacitor",
+      "maxExplicitAny": 0,
+      "maxDirectConsole": 0
+    },
+    {
+      "path": "src/store/logStore.ts",
+      "domain": "logger SeenIt",
+      "maxExplicitAny": 0,
+      "maxDirectConsole": 3
+    }
+  ],
+  "strictFiles": [
+    "src/lib/seenitApi.ts",
+    "src/lib/nativeBackendRetry.ts",
+    "src/lib/firestoreRecovery.ts",
+    "src/features/plex/plexAvailabilityRequestPolicy.ts",
+    "src/features/downloads/downloadConfigBoundary.ts",
+    "src/features/downloads/downloadNetwork.ts",
+    "src/features/downloads/qbitNativeSession.ts",
+    "src/features/downloads/downloadIdentity.ts",
+    "src/features/logging/logPrivacy.ts"
+  ]
+}

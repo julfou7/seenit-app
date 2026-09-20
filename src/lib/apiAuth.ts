@@ -59,8 +59,13 @@ async function logPlexDeltaDiagnostics(
     appLogger.info('plex', `[Plex Delta Debug] ===== DIAGNOSTIC DELTA (${lines.length} ligne(s)) =====`);
     lines.forEach((line: string) => appLogger.info('plex', `[Plex Delta Debug] ${line}`));
     appLogger.info('plex', '[Plex Delta Debug] ===== FIN DIAGNOSTIC DELTA =====');
-  } catch (error: any) {
-    appLogger.warn('plex', `[Plex Delta Debug] Diagnostic illisible : ${String(error?.name || 'PARSE_FAILED').slice(0, 60)}.`);
+  } catch (error) {
+    const errorName = error instanceof Error
+      ? error.name
+      : (typeof error === 'object' && error !== null && 'name' in error
+          ? String((error as { name?: unknown }).name || 'PARSE_FAILED')
+          : 'PARSE_FAILED');
+    appLogger.warn('plex', `[Plex Delta Debug] Diagnostic illisible : ${errorName.slice(0, 60)}.`);
   }
 }
 
