@@ -33,6 +33,7 @@ test('les tokens invalides sont identifiés sans bloquer les appareils valides',
 
 test('le proxy n’accepte que les chemins Sonarr Radarr et qBittorrent nécessaires', () => {
   assert.equal(isAllowedServiceProxyPath('https://sonarr.example/api/v3/queue?page=1', 'GET'), true);
+  assert.equal(isAllowedServiceProxyPath('https://sonarr.example/api/v3/parse?title=Dark.Matter.S01E01', 'GET'), true);
   assert.equal(isAllowedServiceProxyPath('https://radarr.example/api/v3/release/push', 'POST'), true);
   assert.equal(isAllowedServiceProxyPath('https://qbit.example/api/v2/torrents/info?filter=all', 'GET'), true);
   assert.equal(isAllowedServiceProxyPath('https://qbit.example/api/v2/torrents/files?hash=abc', 'GET'), true);

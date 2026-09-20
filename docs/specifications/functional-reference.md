@@ -545,6 +545,10 @@ et webhooks, qui ne doit pas être dupliquée dans les réglages généraux.
 ### 10.3 Identité et cohérence
 
 - Une fiche/téléchargement est rattaché uniquement par TMDB ID.
+- Pour envoyer une release TV externe à Sonarr, SeenIt recalcule le TVDB ID depuis le TMDB ID de la
+  fiche, garantit la présence de cette série exacte dans Sonarr et vérifie avec le parseur Sonarr que
+  la release pointe vers cette même série. Sans convergence exacte, aucun envoi n'est effectué ; le
+  titre, l'année, l'IMDb ID ou le nom de release ne peuvent pas sélectionner une œuvre homonyme.
 - Un transfert se réconcilie par `requestId`, infohash/downloadId/alias exact ou chemin exact.
 - Un titre, une release, une taille ou une proximité temporelle ne suffisent jamais à fusionner.
 - Les mutations sont idempotentes ; un POST Android dont le résultat est ambigu après timeout n'est
