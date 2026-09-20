@@ -3,18 +3,30 @@
 - **Identifiant** : AUDIT-2026-09-20-GCP-FINOPS
 - **Date** : 20 septembre 2026
 - **Dernière vérification** : 20 septembre 2026
-- **Statut** : ouvert — garde-fous déployés, inventaire partiel acquis, preuves Firestore/Cloud SQL/Billing encore manquantes
-- **Baseline** : `main` `10b25e498913247275b4756442f8b8dec460447c`
-- **Commit observé** : `10b25e498913247275b4756442f8b8dec460447c`
+- **Statut** : ouvert — garde-fous déployés, Billing par SKU acquis ; preuves runtime Firestore/Cloud SQL et temporelles encore manquantes
+- **Baseline** : `main` `92e2fc274832bd7109810d1c4021df1ff331b034`
+- **Commit observé** : `92e2fc274832bd7109810d1c4021df1ff331b034`
 - **Périmètre** : Firestore, Firebase Storage, Cloud Run, Cloud SQL historique, coûts réseau et garde-fous
 - **Suivi** : issue #23
 
 ## Synthèse
 
-La cible 0,00 € n'est pas atteinte. Une capture Cloud Billing fournie le 20/09/2026 montre encore un
-coût total courant non nul de **0,96 €**. La vue est regroupée par produit et montre environ **0,41 € Cloud Run** après remises, **0,31 € Artifact Registry**, **0,13 € Cloud Storage** et **0,11 € Firestore**. Elle ne donne pas encore l'attribution par SKU nécessaire pour expliquer chaque ligne.
+La cible 0,00 € n'est pas atteinte. Une nouvelle capture Cloud Billing fournie le 20/09/2026,
+sur la période **Mois en cours** et regroupée par **SKU**, affiche un total courant de **0,99 €**. Cette
+vue permet désormais d'attribuer précisément les lignes visibles du mois ; elle reste cumulative et ne
+permet donc pas, à elle seule, de distinguer un coût historique déjà corrigé d'un coût encore reproductible
+après les purges et correctifs du 20/09.
 
-L'historique de #23 contient déjà une ligne `Cloud Run Network Internet Data Transfer Out Intercontinental` : 0,11 Gio pour 0,01 €. Le runtime canonique GitHub est déployé en `us-west1`, ce qui maintient ce mécanisme possible pour un utilisateur européen. Cependant la capture actuelle prouve désormais que le coût actif est plus large : Artifact Registry, Cloud Storage et Firestore contribuent aussi au total.
+Les principaux SKU visibles sont : **0,34 €** de transfert Cloud Run intercontinental (3,27 GiB),
+**0,33 €** d'Artifact Registry Storage (4,29 GiB-month), **0,11 €** de Standard Storage US Regional
+(11,42 GiB-month), **0,08 €** de transfert Cloud Run North America → North America (1,84 GiB),
+**0,07 €** de Firestore Read Ops sur bases nommées (133 979 lectures), **0,02 €** de Cloud Firestore
+Enterprise Write Units London (97 716 unités), **0,01 €** de transfert Firestore Europe → Europe sur
+bases nommées (0,08 GiB), ainsi que deux lignes Cloud Storage réseau à **0,01 €** chacune.
+
+La cause réseau Cloud Run n'est donc plus un simple centime historique : le transfert intercontinental est
+la première ligne de coût visible du mois. Toutefois la région de Firestore `default` doit être prouvée
+avant toute migration de Cloud Run afin d'éviter de remplacer un coût Internet par un coût inter-région.
 
 ## Attribution historique
 
@@ -80,10 +92,10 @@ absence de VPC connector sans décision explicite, budget comme alerte et preuve
 
 ## Limites / preuves encore nécessaires
 
-1. export Cloud Billing courant par SKU pour attribuer précisément les **0,96 €** historiques du mois ;
-2. localisation de Firestore `default` et liste actuelle des bases Firestore ;
-3. liste des instances Cloud SQL ;
-4. configuration budget/alertes ;
+1. localisation de Firestore `default` et liste actuelle des bases Firestore ;
+2. liste des instances Cloud SQL ;
+3. configuration budget/alertes ;
+4. mesure post-correctifs permettant de distinguer les coûts historiques du mois des nouveaux coûts incrémentaux ;
 5. preuve de 7 jours puis d'une période complète à 0,00 €.
 
 ## Matrice exhaustive
@@ -131,3 +143,26 @@ tant que la localisation de Firestore `default` n'est pas connue.
 Les coûts Artifact Registry et Storage déjà affichés dans le mois courant ne peuvent pas être annulés
 rétroactivement. La preuve pertinente est maintenant l'absence de **nouveau coût incrémental** après cette
 purge, puis la période complète exigée par #23.
+
+
+## Preuve Cloud Billing par SKU — 20/09/2026
+
+La capture utilisateur de **Facturation > Rapports**, période **Mois en cours**, groupée par **SKU**,
+affiche les lignes visibles suivantes :
+
+| SKU | Usage visible | Coût visible |
+| --- | ---: | ---: |
+| Cloud Run Network Internet Data Transfer Out Intercontinental (Excl Oceania, Africa and China) | 3,27 GiB | 0,34 € |
+| Artifact Registry Storage | 4,29 GiB-month | 0,33 € |
+| Standard Storage US Regional | 11,42 GiB-month | 0,11 € |
+| Cloud Run Network Internet Data Transfer Out North America to North America | 1,84 GiB | 0,08 € |
+| Cloud Firestore Read Ops (named databases) | 133 979 | 0,07 € |
+| Cloud Firestore Enterprise Write Units London | 97 716 | 0,02 € |
+| Cloud Firestore Internet Data Transfer Out from Europe to Europe (named databases) | 0,08 GiB | 0,01 € |
+| Network Data Transfer GCP Multi-region within Northern America | 0,47 GiB | 0,01 € |
+| Network Data Transfer GCP Replication within Northern America | 0,47 GiB | 0,01 € |
+
+Cette preuve ferme le manque « attribution par SKU ». Elle ne ferme pas encore la cause racine :
+les coûts du mois sont cumulatifs, alors que Storage et Artifact Registry ont été purgés seulement le
+20/09. La prochaine lecture structurelle doit confirmer Firestore et Cloud SQL avec les permissions IAM
+least-privilege ajoutées au compte WIF de déploiement.
