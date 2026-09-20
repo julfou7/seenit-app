@@ -53,6 +53,22 @@ est strictement en lecture seule et écrit les résultats accessibles dans les l
 Une ligne `UNAVAILABLE (IAM/API)` signifie qu'une preuve console ou un rôle de lecture explicite reste
 nécessaire ; elle n'autorise jamais à élargir silencieusement les droits du compte de déploiement.
 
+État observé le 20/09/2026 sur le run #35522214354 :
+- Storage : **US-EAST1**, **0 B** ;
+- Artifact Registry : **0 package** après purge ;
+- Cloud Run : **us-west1**, min 0 / max 2, CPU request-based, aucun VPC ;
+- Firestore et Cloud SQL : lecture indisponible avec les droits WIF actuels.
+
+Pour rendre ces deux lectures autonomes, ne pas donner de rôle d'écriture au compte de déploiement.
+Le chemin prédéfini le plus simple est d'accorder uniquement `roles/datastore.viewer` et
+`roles/cloudsql.viewer` à
+`seenit-github-deployer@gen-lang-client-0201895414.iam.gserviceaccount.com`.
+`roles/datastore.viewer` permet aussi la lecture des entités : si cette portée est jugée trop large,
+préférer un rôle personnalisé limité aux métadonnées de bases (`datastore.databases.get`,
+`datastore.databases.getMetadata`, `datastore.databases.list`) et un rôle personnalisé Cloud SQL limité
+à `cloudsql.instances.get` / `cloudsql.instances.list`. Toute attribution IAM reste une action
+d'infrastructure explicite ; le workflow ne tente jamais de s'auto-accorder ces permissions.
+
 Preuves attendues :
 
 1. `default` est l'unique base Firestore utile à SeenIt et sa localisation est connue ;
