@@ -76,7 +76,7 @@ export default function App() {
 
   const isPWAStandalone = typeof window !== 'undefined' && (
     window.matchMedia('(display-mode: standalone)').matches || 
-    (window.navigator as any).standalone === true
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true
   );
 
   const [showSplash, setShowSplash] = useState(true);
@@ -448,9 +448,8 @@ function MainApp() {
 
     const handleVisibilityOrFocus = () => {
       checkUrlParams();
-      if (document.visibilityState === 'visible' && auth.currentUser) {
-        useShowsStore.getState().fetchShows();
-      }
+      // Le listener Firestore actif reprend automatiquement les changements distants.
+      // Ne pas relire toute la bibliothèque à chaque focus/retour de visibilité.
     };
 
     window.addEventListener('focus', handleVisibilityOrFocus);

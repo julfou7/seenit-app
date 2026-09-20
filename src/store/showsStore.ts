@@ -92,7 +92,10 @@ function applyMergedShowsState(userId: string, mergedShows: Show[]): boolean {
 }
 
 function scheduleWhenIdle(callback: () => void): () => void {
-  const idleWindow = window as any;
+  const idleWindow = window as Window & {
+    requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+    cancelIdleCallback?: (handle: number) => void;
+  };
   if (typeof idleWindow.requestIdleCallback === 'function') {
     const handle = idleWindow.requestIdleCallback(callback, { timeout: REALTIME_IDLE_TIMEOUT_MS });
     return () => {
@@ -539,7 +542,8 @@ auth.onAuthStateChanged(user => {
       useShowsStore.setState({ shows: scopedCache, loading: false, initialized: true });
     }
     localStorage.setItem('last_active_uid', user.uid);
-    void useShowsStore.getState().fetchShows();
+    // Le listener temps réel fournit déjà le snapshot initial puis tous les deltas.
+    // Un fetch serveur parallèle doublerait les lectures de toute la bibliothèque au login.
     setupRealtimeShowsListener(user.uid);
   } else {
     const explicitLogout = localStorage.getItem('explicit_logout') === 'true';
