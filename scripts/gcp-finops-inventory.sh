@@ -20,7 +20,7 @@ probe_json() {
   local jq_filter="$2"
   shift 2
   local output
-  if output="$("$@" --format=json 2>&1)"; then
+  if output="$("$@" --format=json 2>/dev/null)"; then
     summary_line "- ${label}: OK"
     if ! jq -c "$jq_filter" <<<"$output"; then
       printf '%s\n' "$output"
