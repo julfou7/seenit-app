@@ -102,3 +102,11 @@ absence de VPC connector sans décision explicite, budget comme alerte et preuve
 ## Validation runtime du 20/09/2026
 
 La première exécution du nettoyage post-déploiement a laissé le Cloud Build en état `WORKING` au-delà de 5 minutes, car les versions Docker étaient supprimées une par une. La production avait déjà été promue et validée ; seul le nettoyage a rendu le workflow rouge. Le correctif remplace cette boucle par la suppression native du package Artifact Registry `seenit-app`, qui supprime toutes ses versions et tags en une opération, et porte la fenêtre de suivi à 15 minutes.
+
+## Inventaire automatisé GCP
+
+Le workflow canonique capture désormais, après promotion et purge, un inventaire **lecture seule** :
+bases Firestore et localisation, métadonnées/taille du bucket Firebase, instances Cloud SQL, packages
+Artifact Registry restants et bornes réseau/compute Cloud Run. Une lecture refusée par IAM/API est
+journalisée `UNAVAILABLE` sans modifier la ressource ni casser la production. Cette sonde permet
+d'épuiser le canal GitHub→GCP avant de demander une preuve manuelle dans la console.

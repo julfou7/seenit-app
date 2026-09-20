@@ -48,6 +48,11 @@ gcloud sql instances list --project=gen-lang-client-0201895414
 gcloud run services describe seenit-app --project=gen-lang-client-0201895414 --region=us-west1 --format=export
 ```
 
+Le déploiement canonique exécute aussi `scripts/gcp-finops-inventory.sh` après le nettoyage. La sonde
+est strictement en lecture seule et écrit les résultats accessibles dans les logs/summary GitHub Actions.
+Une ligne `UNAVAILABLE (IAM/API)` signifie qu'une preuve console ou un rôle de lecture explicite reste
+nécessaire ; elle n'autorise jamais à élargir silencieusement les droits du compte de déploiement.
+
 Preuves attendues :
 
 1. `default` est l'unique base Firestore utile à SeenIt et sa localisation est connue ;
