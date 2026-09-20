@@ -36,6 +36,17 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   jamais utilisé après une réponse HTTP fonctionnelle et ne modifie ni authentification, ni corps,
   ni données utilisateur. La PWA reste en même origine et n'utilise pas ce secours natif.
 - La PWA doit fonctionner installée ou dans un navigateur mobile/desktop.
+- **SEENIT-DESKTOP-001** — À partir de **1024 CSS px**, la PWA Web SeenIt devient une expérience
+  PC first-class : le shell n'est plus limité à une colonne mobile, une navigation latérale persistante
+  expose **À Voir → Explorer → Télécharger (si activé) → Profil**, et les surfaces de contenu utilisent
+  la largeur disponible dans une enveloppe lisible. Ce shell desktop est strictement Web :
+  `Capacitor.isNativePlatform()` conserve toujours la navigation basse et le layout mobile de l'APK,
+  y compris sur un écran Android large. Le desktop garde les mêmes Firebase UID, Firestore `default`,
+  backend, règles métier et feature gates que les autres surfaces ; aucun fork de données ou de logique
+  n'est autorisé. Une activation clavier/souris équivalente, `aria-current`, un reset explicite de la vue
+  active, des toasts sans réserve de barre basse et une fiche média contenue dans la zone de travail sont
+  obligatoires. La distribution PC V1 reste la PWA installable `display: standalone` ; un packaging
+  Electron/Tauri/EXE n'est pas requis tant qu'aucune capacité native desktop ne le justifie.
 - L'APK doit gérer explicitement reprise d'activité, bouton Retour Android, safe areas,
   notifications FCM et intents vers les applications natives.
 - Le CTA Plex ouvre la fiche universelle Plex Discover strictement résolue depuis le TMDB ID,
