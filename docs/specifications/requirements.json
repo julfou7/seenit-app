@@ -35,6 +35,27 @@
       ]
     },
     {
+      "id": "SEENIT-DESKTOP-001",
+      "title": "PWA desktop first-class sans divergence métier ni impact APK",
+      "targets": [
+        "pwa"
+      ],
+      "tests": [
+        {
+          "file": "tests/desktopPwaShell.test.ts",
+          "contains": "SEENIT-DESKTOP-001 active le shell PC uniquement sur la PWA grand écran"
+        },
+        {
+          "file": "tests/desktopPwaShell.test.ts",
+          "contains": "SEENIT-DESKTOP-001 conserve la navigation mobile et APK sous le breakpoint desktop"
+        },
+        {
+          "file": "tests/desktopPwaShell.test.ts",
+          "contains": "SEENIT-DESKTOP-001 adapte navigation, détails, toasts et installation au desktop"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-FUNCTIONAL-001",
       "title": "Référence fonctionnelle complète, obligatoire et synchronisée avec le produit",
       "targets": [
