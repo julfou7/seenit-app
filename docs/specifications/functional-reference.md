@@ -255,6 +255,7 @@ Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, 
 
 - Recherche multi-pages TMDB, regroupée en personnes, séries et films.
 - Filtres par plateformes choisies dans les réglages, genres, **Âge conseillé** maximal et note minimale.
+- Avec **Âge conseillé** et le tri Populaires, une carte déjà affichée conserve sa position pendant le chargement : les nouvelles preuves sûres s'ajoutent sans déplacer la grille existante. Les tris explicites par note, date ou titre attendent la page complète avant d'afficher ses nouveaux résultats.
 - Le filtre d’âge est cumulatif : `10 ans` accepte seulement les médias dont la preuve résolue vaut
   « Tous publics », `7+` ou `10+`; une certification inconnue est exclue. « Tous » ne filtre pas.
 - La classification automatique provient exclusivement de la certification US explicite TMDB. Une

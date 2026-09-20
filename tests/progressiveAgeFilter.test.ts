@@ -7,6 +7,7 @@ import {
   filterResolvedPrefixes,
   mergeProgressivePageItems,
   shouldApplyProgressivePartial,
+  stabilizeProgressiveDisplayItems,
 } from '../src/features/discover/progressiveAgeFilterCore.ts';
 
 const deferred = <T>() => {
@@ -266,6 +267,39 @@ test('issue #326 ajoute une page progressive sans retirer les résultats stables
   assert.deepEqual(mergeProgressivePageItems(page1, page2Partial, 1, keyOf).map(item => item.id), [20, 30]);
 });
 
+test('issue #326 terrain v1.4.173 garde les cartes déjà affichées dans un ordre stable', () => {
+  const keyOf = (item: { id: number }) => String(item.id);
+
+  const first = stabilizeProgressiveDisplayItems(
+    [{ id: 3 }, { id: 7 }],
+    [],
+    keyOf,
+  );
+  assert.deepEqual(first.items.map(item => item.id), [3, 7]);
+
+  const later = stabilizeProgressiveDisplayItems(
+    [{ id: 1 }, { id: 3 }, { id: 5 }, { id: 7 }],
+    first.order,
+    keyOf,
+  );
+  assert.deepEqual(
+    later.items.map(item => item.id),
+    [3, 7, 1, 5],
+    'une preuve arrivée tardivement ne doit jamais s’insérer devant une carte déjà visible',
+  );
+
+  const complete = stabilizeProgressiveDisplayItems(
+    [{ id: 1 }, { id: 3 }, { id: 5 }, { id: 7 }, { id: 9 }],
+    later.order,
+    keyOf,
+  );
+  assert.deepEqual(
+    complete.items.map(item => item.id),
+    [3, 7, 1, 5, 9],
+    'le passage du snapshot progressif au résultat complet ne doit pas provoquer de snap-back',
+  );
+});
+
 test('issue #326 le point d’entrée production utilise le moteur progressif sans réintroduire le client historique', () => {
   const showsRoot = ['src', 'features', 'shows'].join('/');
   const tmdbFacadePath = [showsRoot, 'tmdb.ts'].join('/');
@@ -331,6 +365,9 @@ test('issue #326 le point d’entrée production utilise le moteur progressif sa
   assert.match(discoverView, /snapshot\?\.partial/);
   assert.match(discoverView, /model\.processRawResults\(mergedItems\)/);
   assert.match(discoverView, /mergeProgressivePageItems/);
+  assert.match(discoverView, /stabilizeProgressiveDisplayItems/);
+  assert.match(discoverView, /stableOrderRef = useRef<string\[\]>\(\[\]\)/);
+  assert.match(discoverView, /stableProgressiveOrderEnabled = ageFilterActive && model\.sortBy === 'popular'/);
   assert.match(
     discoverView,
     /hasMore: page > 1 \? model\.hasMore : false,[\s\S]*suppressEndOfResults: true/,
