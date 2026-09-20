@@ -22,3 +22,13 @@ test('SEENIT-COST-001 évite les refetch complets redondants quand le listener t
   assert.doesNotMatch(syncWorker, /useShowsStore\.getState\(\)\.fetchShows\(\)/);
   assert.match(syncWorker, /updateShowOptimistic\(showId, movieUpdatePayload\)/);
 });
+
+test('SEENIT-COST-001 n’effectue pas de getDoc avant le listener downloadConfig', () => {
+  const downloadConfig = read('src/store/downloadConfigStore.ts');
+  const authStart = downloadConfig.indexOf('onAuthStateChanged(auth, user => {');
+  assert.ok(authStart >= 0);
+  const authBlock = downloadConfig.slice(authStart);
+  const listenerIndex = authBlock.indexOf('onSnapshot(');
+  assert.ok(listenerIndex >= 0);
+  assert.doesNotMatch(authBlock.slice(0, listenerIndex), /syncFromCloud\(\)/);
+});

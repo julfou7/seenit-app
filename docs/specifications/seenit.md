@@ -936,8 +936,10 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   Firestore afin de ne pas déplacer le coût vers du trafic inter-région. Tant que le listener temps réel
   de la bibliothèque est actif, le cycle normal login/focus/synchronisation ne lance aucun refetch complet
   redondant de la collection `shows` ; les lectures serveur complètes restent réservées aux parcours
-  explicitement autoritatifs ou de récupération. Les coûts courants sont suivis par l'audit FinOps et
-  une dérive non nulle bloque la clôture de #23.
+  explicitement autoritatifs ou de récupération. Les documents de réglages suivis par `onSnapshot`
+  n'effectuent pas en parallèle un `getDoc` initial sur la même référence : le snapshot initial hydrate
+  le store à lui seul. Les coûts courants sont suivis par l'audit FinOps et une dérive non nulle bloque
+  la clôture de #23.
 - Le bundle initial doit conserver le découpage paresseux des écrans privés. Toute hausse
   significative doit être expliquée dans la livraison.
 

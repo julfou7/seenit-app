@@ -779,6 +779,10 @@
         {
           "file": "tests/firestoreReadCostPolicy.test.ts",
           "contains": "SEENIT-COST-001 évite les refetch complets redondants quand le listener temps réel est actif"
+        },
+        {
+          "file": "tests/firestoreReadCostPolicy.test.ts",
+          "contains": "SEENIT-COST-001 n’effectue pas de getDoc avant le listener downloadConfig"
         }
       ]
     },
