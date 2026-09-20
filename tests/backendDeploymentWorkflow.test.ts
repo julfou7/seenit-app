@@ -163,10 +163,12 @@ test('SEENIT-COST-001 purge les artefacts de build régénérables seulement apr
   assert.ok(noSourceBuild > cleanupStep);
   assert.ok(cleanupConfig > cleanupStep);
   assert.match(workflow, /Artefacts régénérables purgés/);
+  assert.match(workflow, /cleanup_deadline=\$\(\(SECONDS \+ 900\)\)/);
 
   const cleanup = fs.readFileSync(path.join(rootDir, 'cloudbuild', 'cleanup-seenit-artifacts.yaml'), 'utf8');
-  assert.match(cleanup, /gcloud artifacts docker images delete/);
-  assert.match(cleanup, /--delete-tags/);
+  assert.match(cleanup, /gcloud artifacts packages delete/);
+  assert.match(cleanup, /--repository=/);
+  assert.match(cleanup, /--location=/);
   assert.match(cleanup, /\$\{PROJECT_ID\}_cloudbuild\/source/);
   assert.match(cleanup, /gcloud storage rm/);
   assert.match(cleanup, /logging:\s*CLOUD_LOGGING_ONLY/);

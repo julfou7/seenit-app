@@ -16,7 +16,7 @@ Le runtime canonique est `seenit-app`. Le déploiement GitHub force à chaque r�
 Ces bornes réduisent le risque de dérive de calcul mais ne rendent pas gratuit un trafic réseau facturable.
 
 Après un déploiement confirmé en production, le workflow lance un **Cloud Build sans source** qui
-supprime les images du package Artifact Registry `seenit-app` et les archives
+supprime le package Artifact Registry `seenit-app` en une seule opération (toutes ses versions/tags) et les archives
 `gs://gen-lang-client-0201895414_cloudbuild/source/**`. Ces objets sont régénérables : Cloud Run
 importe l'image lors du déploiement et conserve sa propre copie pour les révisions déployées. Le build
 de nettoyage utilise uniquement Cloud Logging afin de ne pas recréer un bucket de logs utilisateur.
