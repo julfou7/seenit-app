@@ -534,9 +534,12 @@ et webhooks, qui ne doit pas être dupliquée dans les réglages généraux.
 ### 10.2 Recherche et lancement
 
 - C411 recherche avec filtres Tous/Film/Série, qualité Toutes/4K/1080p/720p et tri seeders/taille/date.
-- Si le type Tous est actif, l'utilisateur doit choisir Film ou Série avant l'envoi.
-- Film va à Radarr, Série à Sonarr. qBittorrent ou l'ouverture d'un magnet BTIH validé servent de
-  fallback selon la configuration disponible.
+- Film/Série est un filtre facultatif : le mode Tous reste utilisable jusqu'au téléchargement. Chaque
+  résultat indique le type lorsque C411 fournit la sous-catégorie exacte (`6` Film ou `7` Série).
+- Depuis cette recherche globale sans fiche associée, un type et une identité ne sont jamais déduits du
+  nom de release. Si qBittorrent est configuré et que C411 fournit le type exact, le Magnet BTIH validé
+  lui est transmis directement ; sinon le Magnet est remis au client local. Sonarr/Radarr ne sont
+  contactés que depuis une fiche SeenIt qui fournit l'identité canonique `mediaType + tmdbId`.
 - Les cartes C411 n'ouvrent une fiche SeenIt que si un TMDB ID exact est connu.
 
 ### 10.3 Identité et cohérence

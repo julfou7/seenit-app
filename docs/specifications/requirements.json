@@ -856,6 +856,28 @@
       ]
     },
     {
+      "id": "SEENIT-C411-003",
+      "title": "Routage manuel C411 sûr, sans identité inventée",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/c411ManualRouting.test.ts",
+          "contains": "SEENIT-C411-003 dérive Film et Série uniquement des sous-catégories C411 exactes"
+        },
+        {
+          "file": "tests/c411ManualRouting.test.ts",
+          "contains": "SEENIT-C411-003 route le mode Tous vers qBittorrent sans choix redondant"
+        },
+        {
+          "file": "tests/c411ManualRouting.test.ts",
+          "contains": "SEENIT-C411-003 ne contacte jamais Arr sans identité SeenIt canonique"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-DOWNLOAD-001",
       "title": "Réconciliation download sans titre, ancrée sur TMDB ou preuve physique exacte",
       "targets": [

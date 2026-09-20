@@ -30,6 +30,11 @@ import { useToastStore } from '../store/toastStore';
 import { DownloadConfigSection } from '../components/DownloadConfigSection';
 import { SwipeableCard } from '../components/cards/SwipeableCard';
 import {
+  getC411ManualMediaTypeLabel,
+  planC411ManualDownload,
+  resolveC411ManualMediaType
+} from '../features/downloads/c411ManualRouting';
+import {
   acceptDownloadRequest,
   beginDownloadRequest,
   failDownloadRequest
@@ -313,6 +318,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
   const showToast = useToastStore(state => state.showToast);
   const screenRootRef = useRef<HTMLDivElement>(null);
   const searchRequestRef = useRef(0);
+  const sendInFlightRef = useRef(false);
 
   const [viewMode, setViewMode] = useState<ViewMode>('downloads');
   const [showConfiguration, setShowConfiguration] = useState(false);
@@ -482,73 +488,56 @@ export function DownloadsScreen({ onShowClick }: Props) {
     showToast('Cette section a été vidée sans toucher aux téléchargements actifs.', 'success');
   };
 
-  const resolveSearchMediaType = (_torrent: C411Torrent): 'movie' | 'tv' | null => {
-    if (selectedMediaType === 'movie' || selectedMediaType === 'tv') return selectedMediaType;
-    return null;
-  };
-
   const handleSendTorrent = async (torrent: C411Torrent) => {
-    const mediaType = resolveSearchMediaType(torrent);
-    if (!mediaType) {
-      showToast('Choisis “Film” ou “Série” avant d’envoyer cette release.', 'error');
+    if (sendInFlightRef.current) return;
+
+    const route = planC411ManualDownload(torrent, {
+      qbittorrentConfigured: Boolean(config.qbittorrentUrl),
+      sonarrConfigured: Boolean(config.sonarrUrl && config.sonarrApiKey),
+      radarrConfigured: Boolean(config.radarrUrl && config.radarrApiKey)
+    });
+
+    if (route.kind === 'blocked') {
+      showToast(route.message, 'error');
       return;
     }
 
-    let service: 'sonarr' | 'radarr' | 'qbittorrent' | null = null;
-    let url = '';
-    let apiKey = '';
-    let username = '';
-    let password = '';
+    sendInFlightRef.current = true;
+    setSendingTorrentId(torrent.id);
 
-    if (mediaType === 'tv' && config.sonarrUrl && config.sonarrApiKey) {
-      service = 'sonarr';
-      url = config.sonarrUrl;
-      apiKey = config.sonarrApiKey;
-    } else if (mediaType === 'movie' && config.radarrUrl && config.radarrApiKey) {
-      service = 'radarr';
-      url = config.radarrUrl;
-      apiKey = config.radarrApiKey;
-    } else if (config.qbittorrentUrl) {
-      service = 'qbittorrent';
-      url = config.qbittorrentUrl;
-      username = config.qbittorrentUsername;
-      password = config.qbittorrentPassword;
-    }
-
-    if (!service) {
-      if (torrent.magnetUri) {
+    if (route.kind === 'magnet') {
+      try {
         const opened = await openC411Magnet(torrent.magnetUri);
         showToast(
-          opened ? 'Ouverture du client BitTorrent local…' : 'Aucun client BitTorrent ne peut ouvrir ce lien.',
+          opened
+            ? 'Ouverture du client BitTorrent local…'
+            : 'Associe la release à une fiche SeenIt exacte ou configure qBittorrent.',
           opened ? 'info' : 'error'
         );
-      } else {
-        showToast('Aucun client de téléchargement configuré.', 'error');
+      } finally {
+        sendInFlightRef.current = false;
+        setSendingTorrentId(null);
       }
       return;
     }
 
-    setSendingTorrentId(torrent.id);
-    const clientLabel = service === 'sonarr' ? 'Sonarr' : service === 'radarr' ? 'Radarr' : 'qBittorrent';
     const requestId = beginDownloadRequest({
       title: torrent.name,
-      mediaType,
-      downloadClient: clientLabel,
-      statusText: 'Recherche en cours',
+      mediaType: route.mediaType,
+      downloadClient: 'qBittorrent',
+      statusText: 'Envoi du Magnet exact à qBittorrent',
       releaseTitle: torrent.name
     });
-    showToast('Recherche du téléchargement…', 'download');
+    showToast('Envoi à qBittorrent…', 'download');
 
     try {
       const result = await pushReleaseDirectly({
-        service,
-        url,
-        apiKey,
-        username,
-        password,
+        service: 'qbittorrent',
+        url: config.qbittorrentUrl,
+        username: config.qbittorrentUsername,
+        password: config.qbittorrentPassword,
         torrent,
-        mediaType,
-        mediaInfo: { title: torrent.name }
+        mediaType: route.mediaType
       });
 
       if (result.success) {
@@ -563,6 +552,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
       failDownloadRequest(requestId, message);
       showToast(message, 'error');
     } finally {
+      sendInFlightRef.current = false;
       setSendingTorrentId(null);
     }
   };
@@ -834,37 +824,58 @@ export function DownloadsScreen({ onShowClick }: Props) {
               </div>
             ) : filteredTorrents.length > 0 ? (
               <div className="space-y-2.5">
-                {filteredTorrents.map(torrent => (
-                  <div key={torrent.id} className="rounded-2xl bg-zinc-900/85 border border-white/10 p-3.5 space-y-2.5">
-                    <h3 className="text-xs font-bold text-white break-words leading-snug">{torrent.name}</h3>
-                    <div className="flex flex-wrap items-center gap-2 text-[10px] text-zinc-400">
-                      {torrent.quality && <span className="font-bold text-blue-300">{torrent.quality}</span>}
-                      {torrent.language && <span>{torrent.language}</span>}
-                      <span>{formatTorrentSize(torrent.size)}</span>
-                      <span className="text-emerald-400 font-bold">↑ {torrent.seeders || 0}</span>
-                      <span>↓ {torrent.leechers || 0}</span>
+                {filteredTorrents.map(torrent => {
+                  const c411MediaType = resolveC411ManualMediaType(torrent);
+                  const mediaTypeLabel = getC411ManualMediaTypeLabel(c411MediaType);
+                  const manualRoute = planC411ManualDownload(torrent, {
+                    qbittorrentConfigured: Boolean(config.qbittorrentUrl),
+                    sonarrConfigured: Boolean(config.sonarrUrl && config.sonarrApiKey),
+                    radarrConfigured: Boolean(config.radarrUrl && config.radarrApiKey)
+                  });
+                  const actionLabel = manualRoute.kind === 'qbittorrent'
+                    ? 'Télécharger'
+                    : manualRoute.kind === 'magnet'
+                      ? 'Ouvrir Magnet'
+                      : 'Indisponible';
+
+                  return (
+                    <div key={torrent.id} className="rounded-2xl bg-zinc-900/85 border border-white/10 p-3.5 space-y-2.5">
+                      <h3 className="text-xs font-bold text-white break-words leading-snug">{torrent.name}</h3>
+                      <div className="flex flex-wrap items-center gap-2 text-[10px] text-zinc-400">
+                        {mediaTypeLabel && (
+                          <span className="inline-flex items-center gap-1 font-bold text-[#E5A93D]">
+                            {c411MediaType === 'tv' ? <Tv size={11} /> : <Film size={11} />}
+                            {mediaTypeLabel}
+                          </span>
+                        )}
+                        {torrent.quality && <span className="font-bold text-blue-300">{torrent.quality}</span>}
+                        {torrent.language && <span>{torrent.language}</span>}
+                        <span>{formatTorrentSize(torrent.size)}</span>
+                        <span className="text-emerald-400 font-bold">↑ {torrent.seeders || 0}</span>
+                        <span>↓ {torrent.leechers || 0}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={sendingTorrentId !== null}
+                          onClick={() => void handleSendTorrent(torrent)}
+                          className="flex-1 min-h-11 rounded-xl bg-[#E5A93D] hover:bg-[#f0b84c] text-black text-xs font-black flex items-center justify-center gap-1.5 disabled:opacity-50"
+                        >
+                          {sendingTorrentId === torrent.id ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                          {actionLabel}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void copyMagnet(torrent)}
+                          className="min-h-11 px-3 rounded-xl bg-zinc-800 text-zinc-300 text-xs font-bold flex items-center gap-1.5"
+                        >
+                          {copiedHash === torrent.infoHash ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                          Magnet
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        disabled={sendingTorrentId === torrent.id}
-                        onClick={() => void handleSendTorrent(torrent)}
-                        className="flex-1 min-h-11 rounded-xl bg-[#E5A93D] hover:bg-[#f0b84c] text-black text-xs font-black flex items-center justify-center gap-1.5 disabled:opacity-50"
-                      >
-                        {sendingTorrentId === torrent.id ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-                        Envoyer
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void copyMagnet(torrent)}
-                        className="min-h-11 px-3 rounded-xl bg-zinc-800 text-zinc-300 text-xs font-bold flex items-center gap-1.5"
-                      >
-                        {copiedHash === torrent.infoHash ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-                        Magnet
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : hasSearched ? (
               <div className="py-14 text-center text-xs text-zinc-500">Aucune release trouvée.</div>
