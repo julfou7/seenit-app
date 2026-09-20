@@ -1,7 +1,7 @@
 # SeenIt — Référence fonctionnelle canonique
 
-Dernière vérification : 14 septembre 2026
-Baseline observée avant correction : **1.4.150**, `main` `6189bafed525fb510c1a81c87a04e19c01f92393`
+Dernière vérification : 20 septembre 2026
+Baseline observée avant évolution PC : **1.4.174**, `main` `10b25e498913247275b4756442f8b8dec460447c`
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : composante obligatoire de la SPEC SeenIt
 
@@ -14,9 +14,9 @@ connus sont listés à la fin et reliés à GitHub Issues.
 ## 1. Produit, vocabulaire et sources de vérité
 
 SeenIt est l'application personnelle de suivi de films et séries de son propriétaire. Le même compte
-Google doit retrouver sa bibliothèque et ses intentions durables sur PWA et APK. L'application est
-d'abord mobile ; l'APK est la plateforme la plus sensible, mais la PWA reste un client complet du même
-compte et du même backend.
+Google doit retrouver sa bibliothèque et ses intentions durables sur PWA et APK. L'application conserve une ergonomie mobile de référence et l'APK reste la plateforme la plus sensible.
+La PWA est aussi un client complet **desktop first-class** : sur grand écran elle adopte un shell PC dédié,
+sans créer un second produit ni un second modèle de données.
 
 | Terme | Signification SeenIt |
 |---|---|
@@ -125,6 +125,13 @@ ces boutons sont des actions de récupération explicites.
 ## 4. Navigation globale
 
 Les gestes et leur portée exacte sont inventoriés dans la [référence UX](./ux-reference.md).
+Sur la PWA Web à partir de 1024 CSS px, le shell PC remplace la barre basse par une navigation
+latérale persistante. L'ordre reste **À Voir → Explorer → Télécharger (si activé) → Profil** et le reset
+de la vue active possède une action visible utilisable à la souris ou au clavier. Sous ce breakpoint,
+ainsi que dans **toute** l'APK Android quelle que soit sa largeur, la navigation basse décrite ci-dessous
+reste inchangée. La fiche média desktop s'ouvre dans la zone de travail sans recouvrir la navigation
+latérale et les toasts n'y réservent pas l'espace d'une barre basse absente.
+
 Le contrat de navigation est `SEENIT-UX-005` : la reconnaissance ne partage aucun tap avec un changement
 d'onglet et chaque reset reste strictement limité à l'écran actif.
 
@@ -694,6 +701,11 @@ restent des TNR terrain lorsque le risque du changement UX l'exige ; ils ne sont
 | Notifications | Web Push/service worker | Push + notifications locales Capacitor |
 | Mise à jour | Bannière/rechargement PWA | Téléchargement, SHA-256, installateur Android |
 | Hors-ligne | Shell/cache et dernier état UID | Même logique dans la WebView |
+
+La **version PC** n'ajoute pas une troisième source de données : elle est le mode grand écran de la
+colonne PWA ci-dessus, installable via le manifeste `display: standalone`. Elle conserve le même Firebase
+UID, Firestore, backend, caches Web et service worker. Un exécutable Electron/Tauri n'est pas une dépendance
+de cette V1.
 
 Dans l'APK, une erreur réseau/DNS temporaire vers `seenit.ai.studio` peut replier une requête Plex
 sur l'URL Cloud Run vérifiée du même backend canonique. Les couples origine/transport sont essayés
