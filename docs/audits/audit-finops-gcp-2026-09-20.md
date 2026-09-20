@@ -5,6 +5,7 @@
 - **Dernière vérification** : 20 septembre 2026
 - **Statut** : ouvert — garde-fous techniques en cours, coût courant encore non nul
 - **Baseline** : SeenIt 1.4.174, `main` `6f33296d59bfde7ca8e6e8ef16f80d13bcfdac0d`
+- **Commit observé** : `6f33296d59bfde7ca8e6e8ef16f80d13bcfdac0d`
 - **Périmètre** : Firestore, Firebase Storage, Cloud Run, Cloud SQL historique, coûts réseau et garde-fous
 - **Suivi** : issue #23
 
