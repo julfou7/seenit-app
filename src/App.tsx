@@ -15,6 +15,7 @@ import { LoginScreen } from './screens/LoginScreen';
 import { SplashScreen } from './components/SplashScreen';
 
 import { BottomNav } from './components/BottomNav';
+import { DesktopNav } from './components/DesktopNav';
 import { ToastContainer } from './components/ToastContainer';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { AppUpdateBanner } from './components/AppUpdateBanner';
@@ -103,11 +104,14 @@ export default function App() {
           } else if (localPlatforms.length > 0) {
             await setDoc(prefRef, { platforms: localPlatforms }, { merge: true });
           }
-        } catch (e: any) {
-          const errorMessage = e?.message || String(e);
+        } catch (e: unknown) {
+          const errorMessage = e instanceof Error ? e.message : String(e);
+          const errorCode = typeof e === 'object' && e !== null && 'code' in e
+            ? String((e as { code?: unknown }).code || '')
+            : '';
           const isOffline = !navigator.onLine || 
                             errorMessage.toLowerCase().includes('offline') || 
-                            e?.code === 'unavailable';
+                            errorCode === 'unavailable';
           if (isOffline) {
             console.warn('[App] Client is offline, using local cached streaming platforms:', errorMessage);
           } else {
@@ -165,6 +169,7 @@ export default function App() {
 }
 
 function MainApp() {
+  const isNative = Capacitor.isNativePlatform();
   const { updateShow } = useShows();
   const shows = useShowsStore(state => state.shows);
   const parentalRatingOverrides = useParentalRatingStore(state => state.overrides);
@@ -499,13 +504,26 @@ function MainApp() {
 
   return (
     <div className="w-full min-h-[100dvh] bg-[#040406] flex justify-center selection:bg-[#E5A93D]/30">
-      <div className="w-full max-w-md bg-premium-ambient h-[100dvh] flex flex-col relative shadow-2xl shadow-black/90 overflow-hidden pt-safe">
+      <div
+        data-seenit-shell={isNative ? 'native-mobile' : 'web-responsive'}
+        className={`w-full ${isNative ? 'max-w-md' : 'max-w-md lg:max-w-[1600px]'} bg-premium-ambient h-[100dvh] flex flex-col relative shadow-2xl shadow-black/90 overflow-hidden pt-safe`}
+      >
         
         <PWAInstallBanner />
         <AppUpdateBanner />
         
-        <div className="flex-1 min-h-0 flex flex-col relative">
-          <div className="flex-1 min-h-0 flex flex-col">
+        <div className="flex-1 min-h-0 flex relative">
+          {!isNative && (
+            <DesktopNav
+              currentTab={currentTab}
+              onTabChange={handleTabChange}
+              onActiveTabClick={handleActiveTabClick}
+              onResetClick={handleActiveTabDoubleClick}
+            />
+          )}
+
+          <div className="flex-1 min-w-0 min-h-0 flex flex-col relative">
+            <div className="flex-1 min-h-0 flex flex-col">
             <Suspense fallback={<div className="flex-1 bg-premium-ambient" aria-label="Chargement de l’écran" />}>
               {mountedTabs.has('watchlist') && (
                 <Activity mode={currentTab === 'watchlist' ? 'visible' : 'hidden'}>
@@ -548,7 +566,7 @@ function MainApp() {
 
           {selectedShow && (
             <div 
-              className="fixed inset-0 z-[150] bg-black flex flex-col overflow-hidden max-w-md mx-auto animate-in fade-in slide-in-from-bottom-6 duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] animate-overlay-in pt-safe"
+              className="absolute inset-0 z-[150] bg-black flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-6 duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] animate-overlay-in pt-safe lg:inset-6 lg:rounded-[28px] lg:border lg:border-white/10 lg:shadow-2xl lg:shadow-black/80"
               style={{ willChange: 'transform, opacity' }}
             >
               <Suspense fallback={<div className="flex-1 bg-premium-ambient" aria-label="Chargement de la fiche" />}>
@@ -569,14 +587,25 @@ function MainApp() {
               />
             </div>
           )}
+          {isNative ? (
+            <BottomNav
+              currentTab={currentTab}
+              onTabChange={handleTabChange}
+              onActiveTabClick={handleActiveTabClick}
+              onActiveTabDoubleClick={handleActiveTabDoubleClick}
+            />
+          ) : (
+            <div className="lg:hidden">
+              <BottomNav
+                currentTab={currentTab}
+                onTabChange={handleTabChange}
+                onActiveTabClick={handleActiveTabClick}
+                onActiveTabDoubleClick={handleActiveTabDoubleClick}
+              />
+            </div>
+          )}
+          </div>
         </div>
-
-        <BottomNav 
-          currentTab={currentTab} 
-          onTabChange={handleTabChange}
-          onActiveTabClick={handleActiveTabClick}
-          onActiveTabDoubleClick={handleActiveTabDoubleClick}
-        />
 
         <ToastContainer />
       </div>
