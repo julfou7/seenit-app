@@ -22,6 +22,7 @@ import {
 import { buildC411SearchParams } from "./src/features/downloads/c411Query.ts";
 import { executeIdempotentMutation, type TimedMutationResult } from "./src/features/downloads/downloadIdempotency.ts";
 import { apiErrorMiddleware, backendHealthHandler, installAsyncRouteForwarding, seenItCorsMiddleware } from "./src/features/runtime/backendRuntime.ts";
+import { applySeenItServiceWorkerHeaders, createSeenItSecurityHeadersMiddleware } from "./src/features/runtime/pwaSecurityHeaders.ts";
 import { emitOperationalEvent } from "./src/features/runtime/operationalEvent.ts";
 import { assertMediaProviderSecrets, registerMediaProviderRoutes } from './src/features/providers/mediaProviderBackend.ts';
 import {
@@ -505,7 +506,7 @@ async function getPlexServers(
     } else {
       throw new Error(`Plex resources HTTP ${resourcesRes.status}`);
     }
-  } catch (err: any) {
+  } catch (err) {
     // If timeout or network glitch, return previously cached if available
     if (cached && cached.servers.length > 0) {
       return cached.servers;
@@ -525,6 +526,9 @@ async function startServer() {
   // CORS Middleware for native mobile app requests (APK) and web.
   // Keep this shared with the runtime TNR so cross-origin preview/APK headers cannot drift.
   app.use(seenItCorsMiddleware);
+  app.use(createSeenItSecurityHeadersMiddleware(
+    process.env.NODE_ENV === 'production' ? 'production' : 'development'
+  ));
 
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -2666,10 +2670,10 @@ async function startServer() {
 
   app.get('/firebase-messaging-sw.js', (req, res) => {
     const filename = req.path.replace('/', '');
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    applySeenItServiceWorkerHeaders(
+      res,
+      process.env.NODE_ENV === 'production' ? 'production' : 'development'
+    );
 
     const distFilePath = path.join(process.cwd(), 'dist', filename);
     const publicFilePath = path.join(process.cwd(), 'public', filename);
@@ -2693,8 +2697,15 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
+    app.use(express.static(distPath, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('index.html') || filePath.endsWith('manifest.json')) {
+          res.setHeader('Cache-Control', 'no-cache');
+        }
+      }
+    }));
+    app.get("*", (_req, res) => {
+      res.setHeader('Cache-Control', 'no-cache');
       res.sendFile(path.join(distPath, "index.html"));
     });
   }

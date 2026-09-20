@@ -766,6 +766,33 @@
       ]
     },
     {
+      "id": "SEENIT-SECURITY-004",
+      "title": "En-têtes HTTP PWA et service worker unique durcis",
+      "targets": [
+        "pwa",
+        "backend",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/pwaSecurityHeaders.test.ts",
+          "contains": "SEENIT-SECURITY-004 applique les en-têtes de sécurité PWA sans casser Google Auth ni les médias distants"
+        },
+        {
+          "file": "tests/serviceWorkerRegistration.test.ts",
+          "contains": "SEENIT-SECURITY-004 centralise un seul enregistrement et un seul contrôle de mise à jour par session"
+        },
+        {
+          "file": "tests/serviceWorkerRegistration.test.ts",
+          "contains": "SEENIT-PLATFORM-001 ne monte jamais le service worker PWA dans la WebView native"
+        },
+        {
+          "file": "tests/serviceWorkerIntegration.test.ts",
+          "contains": "SEENIT-SECURITY-004 ne détourne jamais les requêtes cross-origin vers le cache SeenIt"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-SECURITY-003",
       "title": "Secrets masqués avant persistance des logs",
       "targets": [
