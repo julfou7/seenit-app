@@ -89,7 +89,7 @@ absence de VPC connector sans décision explicite, budget comme alerte et preuve
 6. configuration budget/alertes ;
 7. preuve de 7 jours puis d'une période complète à 0,00 €.
 
-## Matrice
+## Matrice exhaustive
 
 | Constat | Priorité | Statut | Sortie |
 | --- | --- | --- | --- |
