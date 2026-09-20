@@ -734,7 +734,12 @@ pour le cache des sagas et univers.
   Depuis l'APK il est remis au résolveur d'applications Android ; depuis la PWA il est remis au
   navigateur. Une absence de client produit une erreur lisible.
 - Une recherche ou un test C411 possède un timeout et distingue « aucun résultat » d'une panne.
-- Un envoi manuel sans type impose de choisir Film ou Série avant de contacter un client.
+- **SEENIT-C411-003** — Dans la recherche manuelle globale, Film/Série reste un filtre facultatif.
+  Le type d'une release provient uniquement de sa sous-catégorie C411 explicite (`6` Film, `7` Série),
+  jamais de son nom. Avec qBittorrent configuré et un type prouvé, SeenIt lui transmet une seule fois
+  le Magnet BTIH exact. Sans cette preuve ou sans qBittorrent, SeenIt remet le Magnet au client local ;
+  il ne tente jamais d'ajouter une œuvre à Sonarr/Radarr depuis le titre de release. Un envoi Arr exige
+  le contexte canonique `mediaType + tmdbId` d'une fiche SeenIt exacte.
 
 ### 7.3 Identité, réconciliation et sécurité destructive
 
