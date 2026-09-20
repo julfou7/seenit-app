@@ -939,7 +939,9 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   explicitement autoritatifs ou de récupération. Les documents de réglages suivis par `onSnapshot`
   n'effectuent pas en parallèle un `getDoc` initial sur la même référence : le snapshot initial hydrate
   le store à lui seul. Les coûts courants sont suivis par l'audit FinOps et une dérive non nulle bloque
-  la clôture de #23.
+  la clôture de #23. Après chaque déploiement runtime réussi, le workflow capture en lecture seule
+  l'inventaire Firestore, Storage, Cloud SQL, Artifact Registry et Cloud Run ; une permission de lecture
+  absente est signalée sans transformer l'inventaire en action destructive.
 - Le bundle initial doit conserver le découpage paresseux des écrans privés. Toute hausse
   significative doit être expliquée dans la livraison.
 

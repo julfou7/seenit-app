@@ -174,6 +174,22 @@ test('SEENIT-COST-001 purge les artefacts de build régénérables seulement apr
   assert.match(cleanup, /logging:\s*CLOUD_LOGGING_ONLY/);
 });
 
+test('SEENIT-COST-001 capture un inventaire GCP en lecture seule après la purge', () => {
+  const cleanupStep = workflow.indexOf('Purge regenerable Cloud Build artifacts');
+  const inventoryStep = workflow.indexOf('Snapshot FinOps GCP inventory');
+  assert.ok(cleanupStep >= 0);
+  assert.ok(inventoryStep > cleanupStep);
+  assert.match(workflow.slice(inventoryStep), /bash scripts\/gcp-finops-inventory\.sh/);
+
+  const inventory = fs.readFileSync(path.join(rootDir, 'scripts', 'gcp-finops-inventory.sh'), 'utf8');
+  assert.match(inventory, /gcloud firestore databases list/);
+  assert.match(inventory, /gcloud storage buckets describe/);
+  assert.match(inventory, /gcloud sql instances list/);
+  assert.match(inventory, /gcloud artifacts packages list/);
+  assert.match(inventory, /gcloud run services describe/);
+  assert.doesNotMatch(inventory, /gcloud (?:firestore|storage|sql|artifacts|run).*(?: delete | rm | update | create )/);
+});
+
 test('SEENIT-RUNTIME-001 documente que la sync AI Studio ne vaut jamais preuve de déploiement', () => {
   assert.match(runbook, /sync Git AI Studio/i);
   assert.match(runbook, /ne constitu(?:e|ent) pas un déploiement/i);

@@ -783,6 +783,10 @@
         {
           "file": "tests/firestoreReadCostPolicy.test.ts",
           "contains": "SEENIT-COST-001 n’effectue pas de getDoc avant le listener downloadConfig"
+        },
+        {
+          "file": "tests/backendDeploymentWorkflow.test.ts",
+          "contains": "SEENIT-COST-001 capture un inventaire GCP en lecture seule après la purge"
         }
       ]
     },

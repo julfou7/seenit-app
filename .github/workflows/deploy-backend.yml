@@ -474,3 +474,7 @@ jobs:
 
           echo "Le nettoyage FinOps n'a pas atteint SUCCESS dans la fenêtre autorisée."
           exit 1
+
+      - name: Snapshot FinOps GCP inventory
+        if: steps.impact.outputs.SHOULD_DEPLOY == 'true'
+        run: bash scripts/gcp-finops-inventory.sh
