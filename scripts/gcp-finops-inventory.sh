@@ -19,16 +19,27 @@ probe_json() {
   local label="$1"
   local jq_filter="$2"
   shift 2
-  local output
-  if output="$("$@" --format=json 2>&1)"; then
+  local output stderr_file
+  stderr_file="$(mktemp)"
+
+  if output="$("$@" --format=json 2>"$stderr_file")"; then
     summary_line "- ${label}: OK"
     if ! jq -c "$jq_filter" <<<"$output"; then
+      printf '[FinOpsInventory] %s: réponse JSON invalide.\n' "$label"
       printf '%s\n' "$output"
+    fi
+    if [[ -s "$stderr_file" ]]; then
+      sed 's/^/[FinOpsInventory] /' "$stderr_file"
     fi
   else
     summary_line "- ${label}: UNAVAILABLE (IAM/API)"
     printf '[FinOpsInventory] %s indisponible.\n' "$label"
+    if [[ -s "$stderr_file" ]]; then
+      sed 's/^/[FinOpsInventory] /' "$stderr_file"
+    fi
   fi
+
+  rm -f "$stderr_file"
 }
 
 summary_line "## Inventaire FinOps GCP"
