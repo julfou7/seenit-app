@@ -188,6 +188,9 @@ test('SEENIT-COST-001 capture un inventaire GCP en lecture seule après la purge
   assert.match(inventory, /gcloud artifacts packages list/);
   assert.match(inventory, /gcloud run services describe/);
   assert.doesNotMatch(inventory, /gcloud (?:firestore|storage|sql|artifacts|run).*(?: delete | rm | update | create )/);
+  assert.match(inventory, /stderr_file="\\$\\(mktemp\\)"/);
+  assert.match(inventory, /--format=json 2>"\\$stderr_file"/);
+  assert.doesNotMatch(inventory, /--format=json 2>&1/);
 });
 
 test('SEENIT-RUNTIME-001 documente que la sync AI Studio ne vaut jamais preuve de déploiement', () => {
