@@ -62,6 +62,47 @@ export async function filterResolvedPrefixes<TItem, TResolved, TAccepted>(
     .map(([, candidate]) => candidate);
 }
 
+export interface StableProgressiveDisplay<T> {
+  items: T[];
+  order: string[];
+}
+
+export function stabilizeProgressiveDisplayItems<T>(
+  currentItems: T[],
+  previousOrder: string[],
+  keyOf: (item: T) => string,
+): StableProgressiveDisplay<T> {
+  const currentByKey = new Map<string, T>();
+  const currentOrder: string[] = [];
+
+  for (const item of currentItems) {
+    const key = keyOf(item);
+    if (!key || currentByKey.has(key)) continue;
+    currentByKey.set(key, item);
+    currentOrder.push(key);
+  }
+
+  const order: string[] = [];
+  const seen = new Set<string>();
+
+  for (const key of previousOrder) {
+    if (!currentByKey.has(key) || seen.has(key)) continue;
+    seen.add(key);
+    order.push(key);
+  }
+
+  for (const key of currentOrder) {
+    if (seen.has(key)) continue;
+    seen.add(key);
+    order.push(key);
+  }
+
+  return {
+    order,
+    items: order.map(key => currentByKey.get(key)!),
+  };
+}
+
 export function mergeProgressivePageItems<T>(
   settledItems: T[],
   partialItems: T[],

@@ -427,6 +427,10 @@
         {
           "file": "tests/progressiveAgeFilter.test.ts",
           "contains": "issue #326 v1.4.166 précharge les deux pages source suivantes sans attendre la page courante"
+        },
+        {
+          "file": "tests/progressiveAgeFilter.test.ts",
+          "contains": "issue #326 terrain v1.4.173 garde les cartes déjà affichées dans un ordre stable"
         }
       ]
     },
