@@ -3,9 +3,9 @@
 - **Identifiant** : AUDIT-2026-09-20-GCP-FINOPS
 - **Date** : 20 septembre 2026
 - **Dernière vérification** : 20 septembre 2026
-- **Statut** : ouvert — garde-fous techniques en cours, coût courant encore non nul
-- **Baseline** : SeenIt 1.4.174, `main` `6f33296d59bfde7ca8e6e8ef16f80d13bcfdac0d`
-- **Commit observé** : `6f33296d59bfde7ca8e6e8ef16f80d13bcfdac0d`
+- **Statut** : ouvert — garde-fous déployés, inventaire partiel acquis, preuves Firestore/Cloud SQL/Billing encore manquantes
+- **Baseline** : `main` `10b25e498913247275b4756442f8b8dec460447c`
+- **Commit observé** : `10b25e498913247275b4756442f8b8dec460447c`
 - **Périmètre** : Firestore, Firebase Storage, Cloud Run, Cloud SQL historique, coûts réseau et garde-fous
 - **Suivi** : issue #23
 
@@ -43,8 +43,11 @@ aucun import `firebase/storage`, client `getStorage` ou code d'upload n'est pré
 canonique auditée. Le coût historique 11,01 Gio-mois est cohérent avec les données ATHIA qui partageaient
 auparavant ce bucket.
 
-Il reste à prouver côté GCP : emplacement, taille actuelle, inventaire des objets utiles et absence de
-croissance résiduelle. Aucune suppression de données ne doit être faite depuis cette seule preuve de code.
+Le déploiement #35522214354 a désormais prouvé côté GCP que le bucket canonique
+`gen-lang-client-0201895414.firebasestorage.app` est en **US-EAST1** et contient **0 B**.
+Le coût Storage visible sur le mois courant est donc historique sur la période déjà consommée ; il ne
+correspond plus à un volume utile présent dans ce bucket. La preuve temporelle doit confirmer l'absence
+de nouvelle croissance.
 
 ## État Cloud Run
 
@@ -77,13 +80,11 @@ absence de VPC connector sans décision explicite, budget comme alerte et preuve
 
 ## Limites / preuves encore nécessaires
 
-1. export Cloud Billing courant par SKU pour attribuer précisément les **0,96 €** ;
-2. localisation de Firestore `default` ;
-3. liste actuelle des bases Firestore ;
-4. taille/région du bucket Firebase ;
-5. liste des instances Cloud SQL ;
-6. configuration budget/alertes ;
-7. preuve de 7 jours puis d'une période complète à 0,00 €.
+1. export Cloud Billing courant par SKU pour attribuer précisément les **0,96 €** historiques du mois ;
+2. localisation de Firestore `default` et liste actuelle des bases Firestore ;
+3. liste des instances Cloud SQL ;
+4. configuration budget/alertes ;
+5. preuve de 7 jours puis d'une période complète à 0,00 €.
 
 ## Matrice exhaustive
 
@@ -92,9 +93,9 @@ absence de VPC connector sans décision explicite, budget comme alerte et preuve
 | coût courant non nul | P1 | confirmé | identifier le SKU courant puis supprimer sa cause |
 | Cloud Run `us-west1` → Europe | P1 | cause candidate forte | confirmer région Firestore puis choisir l'architecture sans transfert facturable |
 | Cloud Run non borné par contrat | P1 | corrigé dans le chantier #23 | CI + déploiement canonique verts |
-| Artifact Registry / archives Cloud Build s'accumulent | P1 | correctif préparé | purge post-smoke des images `seenit-app` et sources Cloud Build, puis vérifier la facture |
+| Artifact Registry / archives Cloud Build s'accumulent | P1 | corrigé et prouvé | purge post-smoke active ; inventaire après purge : aucun package `seenit-app`, source Cloud Build vide/absente |
 | base Firestore nommée dans le code | P1 | protégée | maintenir `SEENIT-DATA-005` |
-| Storage historique ATHIA | P1 | données historiques supprimées | inventorier le bucket actuel |
+| Storage historique ATHIA | P1 | corrigé et prouvé | bucket canonique US-EAST1, taille actuelle 0 B ; surveiller l'absence de nouvelle croissance |
 | Cloud SQL historique | P1 | non prouvé | inventorier et supprimer uniquement si orphelin |
 | budget seul comme hard cap | P1 | explicitement interdit | budget + garde-fous + kill switch |
 | preuve 0 € dans le temps | P1 | non acquise | 7 jours + période complète à 0,00 € |
@@ -110,3 +111,23 @@ bases Firestore et localisation, métadonnées/taille du bucket Firebase, instan
 Artifact Registry restants et bornes réseau/compute Cloud Run. Une lecture refusée par IAM/API est
 journalisée `UNAVAILABLE` sans modifier la ressource ni casser la production. Cette sonde permet
 d'épuiser le canal GitHub→GCP avant de demander une preuve manuelle dans la console.
+
+## Résultat de l'inventaire runtime — déploiement #35522214354
+
+Le premier inventaire exécuté depuis GitHub Actions après la purge a produit les preuves suivantes :
+
+- Firestore databases : **UNAVAILABLE (IAM/API)** ;
+- Firebase Storage : bucket `gen-lang-client-0201895414.firebasestorage.app`, région **US-EAST1**, taille **0 B** ;
+- Cloud SQL instances : **UNAVAILABLE (IAM/API)** ;
+- Artifact Registry `cloud-run-source-deploy` : **aucun package restant** après purge ;
+- Cloud Run `seenit-app` : région **us-west1**, `minScale=0`, `maxScale=2`,
+  CPU request-based, aucun VPC connector et aucun Direct VPC ;
+- archives source Cloud Build : absentes/vides après purge.
+
+La production et la validation du même SHA sont vertes. Les deux seules lectures d'infrastructure encore
+bloquées par le compte WIF sont Firestore et Cloud SQL. La décision de région Cloud Run reste donc gelée
+tant que la localisation de Firestore `default` n'est pas connue.
+
+Les coûts Artifact Registry et Storage déjà affichés dans le mois courant ne peuvent pas être annulés
+rétroactivement. La preuve pertinente est maintenant l'absence de **nouveau coût incrémental** après cette
+purge, puis la période complète exigée par #23.
