@@ -4,7 +4,7 @@ Date : 14 septembre 2026. Baseline inspectée : 1.4.150.
 
 Ce document complète `seenit.md` §9 et `functional-reference.md`. Il distingue les comportements
 observés des cibles de normalisation encore ouvertes. Il ne certifie ni le rendu sur appareil ni la
-conformité accessibilité. Les exigences existantes `SEENIT-UX-001..006`, `SEENIT-FUNCTIONAL-001`,
+conformité accessibilité. Les exigences existantes `SEENIT-UX-001..006`, `SEENIT-DESKTOP-001`, `SEENIT-FUNCTIONAL-001`,
 `SEENIT-QUALITY-002/003` et les règles métier restent autoritatives. Les cibles non encore livrées
 ci-dessous restent des propositions de réalisation dans les issues liées ; les règles explicitement
 marquées comme livrées décrivent le comportement attendu du runtime courant.
@@ -74,6 +74,28 @@ Le contrat d'appui/reset de #178 est distinct de cet ordre visuel et désormais 
   ni préférences cloud. L'onglet actif est annoncé aux technologies d'assistance.
 - Le double appui applicatif ne remplace pas l'activation standard du lecteur d'écran. Les tests
   TalkBack doivent vérifier son comportement réel.
+
+### 3.1 Navigation PC — contrat #467
+
+À partir de **1024 CSS px** et uniquement dans la PWA Web, la navigation basse cède la place à un rail
+latéral persistant de 240 px. Ce rail reprend exactement les mêmes destinations et le même feature gate
+Téléchargements que le mobile. L'état actif reste or et porte `aria-current="page"`.
+
+- La destination se choisit au clic, à Entrée ou à Espace ; aucun geste tactile n'est requis.
+- Un bouton explicite **Réinitialiser la vue** applique le même reset local que le double appui mobile,
+  sans toucher aux données métier. Le raccourci mobile n'est pas supprimé.
+- Le contenu occupe la largeur restante dans une enveloppe maximale lisible ; Explorer augmente sa densité
+  de grille au lieu d'étirer quatre affiches géantes sur tout l'écran.
+- Une fiche média reste dans la zone de travail à droite du rail. Le rail ne disparaît donc pas lors de la
+  consultation d'une fiche et conserve le repère global de navigation.
+- Les zones scrollables PC peuvent afficher un scrollbar discret et restent entièrement utilisables à la
+  molette, au trackpad et au clavier.
+- Les toasts desktop se placent près du bord inférieur de la zone de travail, sans conserver l'offset de la
+  BottomNav mobile.
+- Le bandeau PWA utilise **« Installer sur ce PC »** sur grand écran ; sous le breakpoint il conserve
+  **« Ajouter à l'écran d'accueil »**.
+- L'APK Android reste volontairement hors de ce breakpoint : même sur tablette/DeX, elle conserve le shell
+  mobile tant qu'une décision produit distincte ne l'étend pas explicitement.
 
 ## 4. Boutons et retours d'action — proposition #180
 
