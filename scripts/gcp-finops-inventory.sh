@@ -37,7 +37,7 @@ summary_line "Projet: ${PROJECT_ID}; région runtime: ${REGION}."
 
 probe_json \
   "Firestore databases" \
-  '[.[] | {database:(.name | split("/")[-1]), locationId, type, deleteProtectionState, pointInTimeRecoveryEnablement}]' \
+  '[.[] | {database:(.name | split("/")[-1]), locationId, type, databaseEdition, freeTier, createTime, updateTime, deleteProtectionState, pointInTimeRecoveryEnablement, firestoreDataAccessMode, mongodbCompatibleDataAccessMode}]' \
   gcloud firestore databases list --project "$PROJECT_ID"
 
 probe_json \
