@@ -443,7 +443,7 @@ jobs:
             exit 1
           fi
 
-          cleanup_deadline=$((SECONDS + 300))
+          cleanup_deadline=$((SECONDS + 900))
           while (( SECONDS < cleanup_deadline )); do
             cleanup_json="$(gcloud builds describe "$cleanup_id" \
               --project "$GCP_PROJECT_ID" \

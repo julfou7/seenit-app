@@ -98,3 +98,7 @@ absence de VPC connector sans décision explicite, budget comme alerte et preuve
 | Cloud SQL historique | P1 | non prouvé | inventorier et supprimer uniquement si orphelin |
 | budget seul comme hard cap | P1 | explicitement interdit | budget + garde-fous + kill switch |
 | preuve 0 € dans le temps | P1 | non acquise | 7 jours + période complète à 0,00 € |
+
+## Validation runtime du 20/09/2026
+
+La première exécution du nettoyage post-déploiement a laissé le Cloud Build en état `WORKING` au-delà de 5 minutes, car les versions Docker étaient supprimées une par une. La production avait déjà été promue et validée ; seul le nettoyage a rendu le workflow rouge. Le correctif remplace cette boucle par la suppression native du package Artifact Registry `seenit-app`, qui supprime toutes ses versions et tags en une opération, et porte la fenêtre de suivi à 15 minutes.
