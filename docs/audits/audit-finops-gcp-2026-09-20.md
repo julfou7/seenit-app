@@ -73,6 +73,14 @@ de nouvelle croissance.
 
 ## État Cloud Run
 
+Le premier agrégat automatisé après la PR #472 (run #35530238313, fenêtre bornée aux 10 000
+requêtes disponibles du 1er au 8 septembre) mesure **167 665 682 octets**. La route
+`/api/plex/history` concentre **126 978 937 octets sur 249 requêtes**, soit **75,7 %** du volume,
+devant `/api/media/tmdb/*` (26 658 181 octets) et les assets (6 818 944 octets). Les réponses Plex
+atteignent 5 809 285 octets : elles sont désormais compressées en `gzip` lorsque le client l'annonce,
+sans modifier le JSON fonctionnel ni retirer le chemin `identity`. Le suivi toutes les six heures doit
+confirmer le gain sur les nouvelles révisions ; l'agrégat historique reste antérieur au correctif.
+
 Le workflow canonique déploie `seenit-app` en `us-west1`. Le correctif #23 rend les bornes de coût non
 héritables depuis une ancienne configuration :
 
