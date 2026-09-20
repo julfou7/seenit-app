@@ -12,13 +12,9 @@
 ## Synthèse
 
 La cible 0,00 € n'est pas atteinte. Une capture Cloud Billing fournie le 20/09/2026 montre encore un
-coût total courant non nul, d'environ **0,01 €**. La capture seule ne donne pas une attribution SKU
-suffisamment détaillée pour déclarer la ressource exacte responsable.
+coût total courant non nul de **0,96 €**. La vue est regroupée par produit et montre environ **0,41 € Cloud Run** après remises, **0,31 € Artifact Registry**, **0,13 € Cloud Storage** et **0,11 € Firestore**. Elle ne donne pas encore l'attribution par SKU nécessaire pour expliquer chaque ligne.
 
-L'historique de #23 contient déjà un coût de même ordre sur
-`Cloud Run Network Internet Data Transfer Out Intercontinental` : 0,11 Gio pour 0,01 €. Le runtime
-canonique GitHub est déployé en `us-west1`. Cette combinaison rend le trafic vers un utilisateur
-européen structurellement suspect avant même toute dérive CPU/RAM.
+L'historique de #23 contient déjà une ligne `Cloud Run Network Internet Data Transfer Out Intercontinental` : 0,11 Gio pour 0,01 €. Le runtime canonique GitHub est déployé en `us-west1`, ce qui maintient ce mécanisme possible pour un utilisateur européen. Cependant la capture actuelle prouve désormais que le coût actif est plus large : Artifact Registry, Cloud Storage et Firestore contribuent aussi au total.
 
 ## Attribution historique
 
@@ -81,7 +77,7 @@ absence de VPC connector sans décision explicite, budget comme alerte et preuve
 
 ## Limites / preuves encore nécessaires
 
-1. export Cloud Billing courant par SKU pour attribuer le ~0,01 € ;
+1. export Cloud Billing courant par SKU pour attribuer précisément les **0,96 €** ;
 2. localisation de Firestore `default` ;
 3. liste actuelle des bases Firestore ;
 4. taille/région du bucket Firebase ;
