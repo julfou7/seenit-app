@@ -14,6 +14,10 @@ test('SEENIT-OBSERVABILITY-001 exécute un batch Cloud Run en dry-run désactiva
   assert.match(workflow, /jsonPayload\.seenitEvent\.schemaVersion=1/);
   assert.match(workflow, /jsonPayload\.seenitDiagnostic\.code="TMDB_REQUEST_CACHE_SUMMARY"/);
   assert.match(workflow, /summarize-tmdb-cache-diagnostics\.cjs/);
+  assert.match(workflow, /log_id\("run\.googleapis\.com\/requests"\)/);
+  assert.match(workflow, /summarize-cloud-run-traffic\.cjs/);
+  assert.match(workflow, /seenit-cloud-run-traffic-\$\{\{ github\.run_id \}\}/);
+  assert.match(workflow, /retention-days: 40/);
   assert.match(workflow, /seenit-tmdb-cache-baseline-\$\{\{ github\.run_id \}\}/);
   assert.match(workflow, /push:[\s\S]*branches:[\s\S]*main[\s\S]*summarize-tmdb-cache-diagnostics\.cjs/);
   assert.match(workflow, /--freshness=6h/);
@@ -25,6 +29,7 @@ test('SEENIT-OBSERVABILITY-001 exécute un batch Cloud Run en dry-run désactiva
   assert.match(workflow, /path: \$\{\{ runner\.temp \}\}\/seenit-log-audit-report\.json/);
   assert.doesNotMatch(workflow, /path:.*seenit-structured-logs\.json/);
   assert.doesNotMatch(workflow, /path:.*seenit-tmdb-cache-diagnostics\.json/);
+  assert.doesNotMatch(workflow, /path:.*seenit-cloud-run-traffic\.json/);
   assert.match(bootstrap, /roles\/logging\.viewer/);
   assert.match(bootstrap, /seenit-log-auditor/);
   assert.doesNotMatch(bootstrap, /roles\/run\.sourceDeveloper|roles\/run\.admin/);
