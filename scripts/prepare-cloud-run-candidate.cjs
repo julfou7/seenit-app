@@ -30,6 +30,70 @@ function deriveCandidateTag(service, candidateRevision) {
   return tag;
 }
 
+function getTemplateMetadataBounds(lines) {
+  const templateIndex = lines.findIndex(line => /^  template:\s*$/.test(line));
+  if (templateIndex < 0) throw new Error('Bloc spec.template introuvable dans l’export Cloud Run.');
+  const templateEndCandidate = lines.findIndex((line, index) => index > templateIndex && /^  [A-Za-z0-9_-]+:\s*/.test(line));
+  const templateEnd = templateEndCandidate < 0 ? lines.length : templateEndCandidate;
+  const metadataIndex = lines.findIndex((line, index) => index > templateIndex && index < templateEnd && /^    metadata:\s*$/.test(line));
+  if (metadataIndex < 0) throw new Error('Bloc spec.template.metadata introuvable dans l’export Cloud Run.');
+  const metadataEndCandidate = lines.findIndex((line, index) => index > metadataIndex && index < templateEnd && /^    [A-Za-z0-9_-]+:\s*/.test(line));
+  return { metadataIndex, metadataEnd: metadataEndCandidate < 0 ? templateEnd : metadataEndCandidate };
+}
+
+function annotationLineMatches(line, name) {
+  const trimmed = line.trim();
+  return trimmed.startsWith(name + ':') || trimmed.startsWith("'" + name + "':") || trimmed.startsWith('"' + name + '":');
+}
+
+function removeTemplateAnnotation(lines, name) {
+  const bounds = getTemplateMetadataBounds(lines);
+  const matches = [];
+  for (let index = bounds.metadataIndex + 1; index < bounds.metadataEnd; index += 1) {
+    if (annotationLineMatches(lines[index], name)) matches.push(index);
+  }
+  if (matches.length > 1) throw new Error('Annotation Cloud Run ' + name + ' dupliquée.');
+  if (matches.length === 1) lines.splice(matches[0], 1);
+}
+
+function forceTemplateAnnotation(lines, name, value) {
+  let bounds = getTemplateMetadataBounds(lines);
+  let annotationsIndex = -1;
+  for (let index = bounds.metadataIndex + 1; index < bounds.metadataEnd; index += 1) {
+    if (/^      annotations:\s*$/.test(lines[index])) {
+      if (annotationsIndex >= 0) throw new Error('Bloc annotations Cloud Run dupliqué.');
+      annotationsIndex = index;
+    }
+  }
+  if (annotationsIndex < 0) {
+    lines.splice(bounds.metadataIndex + 1, 0, '      annotations:', '        ' + name + ': ' + value);
+    return;
+  }
+  bounds = getTemplateMetadataBounds(lines);
+  let annotationsEnd = bounds.metadataEnd;
+  for (let index = annotationsIndex + 1; index < bounds.metadataEnd; index += 1) {
+    if (/^      [A-Za-z0-9_-]+:\s*/.test(lines[index])) { annotationsEnd = index; break; }
+  }
+  const matches = [];
+  for (let index = annotationsIndex + 1; index < annotationsEnd; index += 1) {
+    if (annotationLineMatches(lines[index], name)) matches.push(index);
+  }
+  if (matches.length > 1) throw new Error('Annotation Cloud Run ' + name + ' dupliquée.');
+  if (matches.length === 1) { lines[matches[0]] = '        ' + name + ': ' + value; return; }
+  lines.splice(annotationsIndex + 1, 0, '        ' + name + ': ' + value);
+}
+
+function applySeenItFinOpsBounds(lines) {
+  for (const annotation of [
+    'run.googleapis.com/vpc-access-connector',
+    'run.googleapis.com/vpc-access-egress',
+    'run.googleapis.com/network-interfaces'
+  ]) removeTemplateAnnotation(lines, annotation);
+  forceTemplateAnnotation(lines, 'autoscaling.knative.dev/minScale', "'0'");
+  forceTemplateAnnotation(lines, 'autoscaling.knative.dev/maxScale', "'2'");
+  forceTemplateAnnotation(lines, 'run.googleapis.com/cpu-throttling', "'true'");
+}
+
 function getSingleContainerBounds(lines, imageIndex) {
   let containerStart = imageIndex;
   while (containerStart >= 0 && !/^      - [A-Za-z0-9_-]+:\s*/.test(lines[containerStart] || '')) {
@@ -284,6 +348,8 @@ function prepareCandidateService(source, { image, service, previousRevision, can
     if (trimmed === 'runtimeClassName: run.googleapis.com/linux-base-image-update') return false;
     return true;
   });
+  applySeenItFinOpsBounds(lines);
+
 
   let imageIndexes = [];
   lines.forEach((line, index) => {
@@ -351,10 +417,10 @@ function main() {
     candidateRevision: args['candidate-revision']
   });
   fs.writeFileSync(args.output, prepared, 'utf8');
-  console.log(`[CloudRunCandidate] Service préparé: ${args['previous-revision']} -> ${args['candidate-revision']} sur ${args.image}, entrypoint image conservé, NODE_ENV=production, secrets TMDB/TVDB liés, trafic normalisé et cible 0 %=${deriveCandidateTag(args.service, args['candidate-revision'])}`);
+  console.log(`[CloudRunCandidate] Service préparé: ${args['previous-revision']} -> ${args['candidate-revision']} sur ${args.image}, entrypoint image conservé, NODE_ENV=production, minScale=0, maxScale=2, CPU request-based, aucun VPC connector, secrets TMDB/TVDB liés, trafic normalisé et cible 0 %=${deriveCandidateTag(args.service, args['candidate-revision'])}`);
 }
 
-module.exports = { deriveCandidateTag, forceSingleContainerEnv, forceSingleContainerSecretEnv, getSingleContainerBounds, normalizeSingleContainerLaunch, normalizeTraffic, parseArgs, prepareCandidateService, removeSingleContainerEnv, validateRevisionName };
+module.exports = { applySeenItFinOpsBounds, deriveCandidateTag, forceSingleContainerEnv, forceSingleContainerSecretEnv, forceTemplateAnnotation, getSingleContainerBounds, getTemplateMetadataBounds, normalizeSingleContainerLaunch, normalizeTraffic, parseArgs, prepareCandidateService, removeSingleContainerEnv, removeTemplateAnnotation, validateRevisionName };
 
 if (require.main === module) {
   try {

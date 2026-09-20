@@ -924,6 +924,14 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   uniquement les scripts Firebase compat épinglés sur `www.gstatic.com`, et aucune route `/api/` ni
   origine distante n'est interceptée par son cache. Les détails et justifications sont maintenus dans
   `docs/security/pwa-http-security.md`.
+- **SEENIT-COST-001** — Le runtime de production SeenIt vise une dépense GCP récurrente de 0,00 €.
+  Firestore applicatif reste exclusivement sur la base `default`, seule base éligible au quota gratuit ;
+  aucune base nommée AI Studio n'est une dépendance applicative. Le déploiement Cloud Run canonique force
+  `minScale=0`, borne `maxScale=2`, conserve la facturation CPU liée aux requêtes et retire tout VPC
+  connector / Direct VPC hérité tant qu'aucune dépendance privée explicitement validée ne l'exige. Un
+  budget reste une alerte et jamais un hard cap. Toute migration de région exige d'abord la preuve de la
+  localisation Firestore afin de ne pas déplacer le coût vers du trafic inter-région. Les coûts courants
+  sont suivis par l'audit FinOps et une dérive non nulle bloque la clôture de #23.
 - Le bundle initial doit conserver le découpage paresseux des écrans privés. Toute hausse
   significative doit être expliquée dans la livraison.
 

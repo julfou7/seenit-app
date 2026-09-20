@@ -752,6 +752,29 @@
       ]
     },
     {
+      "id": "SEENIT-COST-001",
+      "title": "Production GCP bornée pour viser 0,00 € récurrent",
+      "targets": [
+        "backend",
+        "pwa",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/cloudRunCandidate.test.ts",
+          "contains": "SEENIT-COST-001 borne Cloud Run et retire tout réseau VPC payant hérité"
+        },
+        {
+          "file": "tests/cloudRunCandidate.test.ts",
+          "contains": "SEENIT-COST-001 ajoute les bornes Cloud Run même si l’export historique ne les déclare pas"
+        },
+        {
+          "file": "tests/firebaseIdentityGuardrails.test.ts",
+          "contains": "SEENIT-DATA-005 verrouille la base Firestore canonique sur default"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-SECURITY-001",
       "title": "Allowlist minimale du proxy de services",
       "targets": [
