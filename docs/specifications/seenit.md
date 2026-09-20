@@ -1141,6 +1141,19 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   correction locale : elle ne ferme pas l'issue systémique. Quand une généralisation sûre est impossible,
   l'agent documente la limite des sources, garde l'issue racine ouverte et propose une suite bornée sans
   introduire d'heuristique fragile. Les tâches sans anomalie peuvent déclarer cette analyse sans objet.
+- **SEENIT-QUALITY-011** — La dette TypeScript est réduite progressivement au lieu d'imposer une
+  migration globale risquée. La baseline mesurée le 20 septembre 2026 sur `main`
+  `c463d2aa01a17715362518ae515ed84434c0a7e9` compte 199 fichiers de production, 1 118 `any`
+  explicites et 197 appels directs à `console.*` ; ces nombres sont une limite historique, jamais un
+  objectif. La validation canonique interdit à chaque fichier TypeScript modifié d'augmenter l'un de ces
+  deux compteurs et interdit toute dette de ce type dans un nouveau fichier. Les frontières critiques
+  listées dans `typescript-quality-baseline.json` — API, Firestore, Plex, téléchargements et transport
+  Capacitor — restent à zéro `any` explicite et à zéro console direct ; seul le logger SeenIt conserve
+  son miroir console interne. Un projet TypeScript `strict` séparé, avec `allowJs=false`, couvre un
+  premier ensemble de modules autonomes de ces domaines et ne peut être élargi qu'en gardant la CI verte.
+  `npm run lint` combine le typecheck global, ce strict progressif, le garde AST de dette et le contrôle
+  de formatage minimal des diffs. `npm run format` normalise uniquement espaces de fin, fins de ligne et
+  newline terminale afin de stabiliser les changements sans reformater massivement l'historique.
 
 Une modification est terminée lorsque les validations applicables à sa classe sont vertes, son test
 ciblé existe si le comportement change, toute règle durable/zone sensible est reflétée dans la SPEC et

@@ -24,7 +24,7 @@ test('SEENIT-RELEASE-002 la CI valide puis publie sans modifier automatiquement 
   assert.match(workflow, /npm run validate:change -- --preflight/);
   assert.match(workflow, /npm run validate:change -- --postinstall/);
   assert.match(changeValidator, /label: 'Intégrité SPEC'/);
-  assert.match(changeValidator, /label: 'TypeScript'/);
+  assert.match(changeValidator, /label: 'TypeScript \+ lint \+ format'/);
   assert.match(changeValidator, /label: 'Tests unitaires'/);
   assert.match(changeValidator, /test:spec:changes/);
   assert.match(workflow, /cache: npm/);

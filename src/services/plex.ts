@@ -124,8 +124,21 @@ const responseJson = async (response: Response, context: string) => {
   }
 };
 
-const parseExpiryMs = (payload: any, createdAt: number) => {
-  const explicitExpiry = payload?.expiresAt ?? payload?.expires_at;
+const readRecord = (value: unknown): Record<string, unknown> => (
+  typeof value === 'object' && value !== null ? value as Record<string, unknown> : {}
+);
+
+const hasErrorName = (error: unknown, name: string): boolean => {
+  if (error instanceof Error) return error.name === name;
+  return typeof error === 'object'
+    && error !== null
+    && 'name' in error
+    && (error as { name?: unknown }).name === name;
+};
+
+const parseExpiryMs = (payload: unknown, createdAt: number) => {
+  const record = readRecord(payload);
+  const explicitExpiry = record.expiresAt ?? record.expires_at;
   if (typeof explicitExpiry === 'number' && Number.isFinite(explicitExpiry)) {
     return explicitExpiry > 10_000_000_000 ? explicitExpiry : explicitExpiry * 1000;
   }
@@ -134,7 +147,7 @@ const parseExpiryMs = (payload: any, createdAt: number) => {
     if (Number.isFinite(parsed)) return parsed;
   }
 
-  const expiresIn = Number(payload?.expiresIn ?? payload?.expires_in);
+  const expiresIn = Number(record.expiresIn ?? record.expires_in);
   if (Number.isFinite(expiresIn) && expiresIn > 0) {
     return createdAt + expiresIn * 1000;
   }
@@ -169,7 +182,7 @@ const providerFetch = async (
   try {
     return await (options.fetchImpl ?? fetch)(input, { ...init, signal: options.signal });
   } catch (error) {
-    if (options.signal?.aborted || (error as any)?.name === 'AbortError') {
+    if (options.signal?.aborted || hasErrorName(error, 'AbortError')) {
       throw cancelledError();
     }
     throw new PlexAuthError('network', `${context} : Plex est momentanément inaccessible.`, { cause: error });

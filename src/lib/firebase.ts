@@ -5,7 +5,7 @@ import { deleteToken, getMessaging, getToken, isSupported, type Messaging } from
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { PushNotifications } from '@capacitor/push-notifications';
-import { useLogStore } from '../store/logStore';
+import { appLogger, useLogStore } from '../store/logStore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { resolveSeenItApiUrl } from './seenitApi';
 import { queueAppUpdateAvailablePush } from '../features/release/releaseUpdatePushClient';
@@ -50,7 +50,7 @@ if (typeof window !== 'undefined' && 'Notification' in window) {
     navigator.serviceWorker.register('/firebase-messaging-sw.js').then((reg) => {
       reg.update().catch(() => {});
     }).catch((swErr) => {
-      console.warn('Could not auto-register firebase-messaging-sw.js:', swErr);
+      appLogger.warn('system', 'Could not auto-register firebase-messaging-sw.js', swErr);
     });
   }
 
@@ -59,11 +59,11 @@ if (typeof window !== 'undefined' && 'Notification' in window) {
       try {
         messaging = getMessaging(app);
       } catch (e) {
-        console.warn('FCM messaging init warning:', e);
+        appLogger.warn('system', 'FCM messaging init warning', e);
       }
     }
   }).catch((err) => {
-    console.warn('FCM isSupported check failed:', err);
+    appLogger.warn('system', 'FCM isSupported check failed', err);
   });
 }
 
@@ -92,7 +92,7 @@ async function fetchImageAsDataUrl(url?: string): Promise<string | undefined> {
       reader.readAsDataURL(blob);
     });
   } catch (err) {
-    console.warn('fetchImageAsDataUrl error for:', fullUrl, err);
+    appLogger.warn('system', `fetchImageAsDataUrl error for ${fullUrl}`, err);
     return undefined;
   }
 }
@@ -122,7 +122,7 @@ if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
       }));
     });
   } catch (err) {
-    console.warn('LocalNotifications listener setup warning:', err);
+    appLogger.warn('system', 'LocalNotifications listener setup warning', err);
   }
 }
 
@@ -136,11 +136,21 @@ function normalizeImageUrl(url?: string): string | undefined {
   return url;
 }
 
+export interface NativeNotificationData {
+  [key: string]: unknown;
+  showId?: string | number;
+  tmdbId?: number;
+  mediaType?: string;
+  season?: number;
+  episode?: number;
+  url?: string;
+}
+
 export interface NativeNotificationOptions extends NotificationOptions {
   image?: string;
   icon?: string;
   badge?: string;
-  data?: any;
+  data?: NativeNotificationData;
   showId?: string | number;
   tmdbId?: number;
   mediaType?: string;
@@ -165,15 +175,15 @@ export async function cancelScheduledNotification(id: number) {
     try {
       await LocalNotifications.cancel({ notifications: [{ id }] });
     } catch (err) {
-      console.warn('cancelScheduledNotification error:', err);
+      appLogger.warn('system', 'cancelScheduledNotification error', err);
     }
   }
 }
 
 export async function sendNativeNotification(title: string, options?: NativeNotificationOptions) {
-  const iconUrl = options?.icon || (options as any)?.image || 'https://seenit.app/icon-192.png';
-  const imageUrl = (options as any)?.image || options?.icon;
-  const extraData = (options as any)?.data || {
+  const iconUrl = options?.icon || options?.image || 'https://seenit.app/icon-192.png';
+  const imageUrl = options?.image || options?.icon;
+  const extraData: NativeNotificationData = options?.data || {
     showId: options?.showId,
     tmdbId: options?.tmdbId,
     mediaType: options?.mediaType,
@@ -202,10 +212,7 @@ export async function sendNativeNotification(title: string, options?: NativeNoti
         if (req.display !== 'granted') return;
       }
 
-      const attachments: any[] = [];
-      if (imageUrl) {
-        attachments.push({ id: 'photo', url: imageUrl });
-      }
+      const attachments = imageUrl ? [{ id: 'photo', url: imageUrl }] : undefined;
 
       // Register action types for notification buttons
       try {
@@ -239,7 +246,7 @@ export async function sendNativeNotification(title: string, options?: NativeNoti
           smallIcon: 'ic_stat_seenit',
           iconColor: '#E5A93D',
           largeIcon: imageUrl || undefined,
-          attachments: attachments.length > 0 ? attachments : undefined,
+          attachments,
           actionTypeId: 'EPISODE_NOTIF_ACTIONS',
           extra: {
             showId: extraData.showId,
@@ -253,7 +260,7 @@ export async function sendNativeNotification(title: string, options?: NativeNoti
       });
       return;
     } catch (err) {
-      console.warn('LocalNotifications native schedule failed:', err);
+      appLogger.warn('system', 'LocalNotifications native schedule failed', err);
     }
   }
 
@@ -286,13 +293,13 @@ export async function sendNativeNotification(title: string, options?: NativeNoti
       }
     }
   } catch (err) {
-    console.warn("SW showNotification failed, fallback to new Notification:", err);
+    appLogger.warn('system', 'SW showNotification failed, fallback to new Notification', err);
   }
 
   try {
     new Notification(title, options);
   } catch (err) {
-    console.warn("new Notification failed:", err);
+    appLogger.warn('system', 'new Notification failed', err);
   }
 }
 
@@ -381,26 +388,26 @@ export async function requestNotificationPermission(): Promise<string | null> {
       await registerNotificationDevice(token, 'android');
       return token;
     } catch (err) {
-      console.warn('PushNotifications registration error:', err);
+      appLogger.warn('system', 'PushNotifications registration error', err);
       return null;
     }
   }
 
   if (typeof window === 'undefined' || !('Notification' in window)) {
-    console.warn('Notification API not supported in this browser.');
+    appLogger.warn('system', 'Notification API not supported in this browser.');
     return null;
   }
 
   try {
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') {
-      console.warn('Notification permission not granted.');
+      appLogger.warn('system', 'Notification permission not granted.');
       return null;
     }
 
     const supported = await isSupported();
     if (!supported) {
-      console.warn('Firebase Messaging is not supported in this browser.');
+      appLogger.warn('system', 'Firebase Messaging is not supported in this browser.');
       return null;
     }
 
@@ -413,11 +420,11 @@ export async function requestNotificationPermission(): Promise<string | null> {
       try {
         swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
       } catch (swErr) {
-        console.warn('Could not register firebase-messaging-sw.js:', swErr);
+        appLogger.warn('system', 'Could not register firebase-messaging-sw.js', swErr);
       }
     }
 
-    const vapidKey = (firebaseConfig as any).vapidKey;
+    const vapidKey = (firebaseConfig as typeof firebaseConfig & { vapidKey?: string }).vapidKey;
     const options: { vapidKey?: string; serviceWorkerRegistration?: ServiceWorkerRegistration } = {};
     if (vapidKey) options.vapidKey = vapidKey;
     if (swRegistration) options.serviceWorkerRegistration = swRegistration;
@@ -426,7 +433,7 @@ export async function requestNotificationPermission(): Promise<string | null> {
     try {
       token = await getToken(messaging, Object.keys(options).length > 0 ? options : undefined);
     } catch (tokenErr) {
-      console.warn('getToken with options failed, trying default getToken:', tokenErr);
+      appLogger.warn('system', 'getToken with options failed, trying default getToken', tokenErr);
       token = await getToken(messaging);
     }
 
@@ -434,7 +441,7 @@ export async function requestNotificationPermission(): Promise<string | null> {
     await registerNotificationDevice(token, 'web');
     return token;
   } catch (error) {
-    console.error('Error in requestNotificationPermission:', error);
+    appLogger.error('system', 'Error in requestNotificationPermission', error);
     return null;
   }
 }

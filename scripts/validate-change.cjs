@@ -127,7 +127,11 @@ function validatePostinstall() {
       label: 'Contrat de changement',
       env: { SPEC_BASE_SHA: baseSha, DELIVERY_MODE: classification.mode }
     });
-    runNpm(['run', 'lint'], { label: 'TypeScript', metric: 'SEENIT_TYPESCRIPT_SECONDS' });
+    runNpm(['run', 'lint'], {
+      label: 'TypeScript + lint + format',
+      metric: 'SEENIT_TYPESCRIPT_SECONDS',
+      env: { SEENIT_LINT_BASE_SHA: baseSha }
+    });
     runNpm(['run', 'test:unit'], { label: 'Tests unitaires', metric: 'SEENIT_UNIT_SECONDS' });
 
     if (classification.mode === 'apk') {

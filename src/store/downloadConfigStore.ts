@@ -3,23 +3,14 @@ import { doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
 import { invalidateQbitCache } from '../services/sonarrRadarr';
+import { appLogger } from './logStore';
+import {
+  normalizeDownloadConfigPatch,
+  parseDownloadConfigDocument,
+  type DownloadClientConfig
+} from '../features/downloads/downloadConfigBoundary';
 
-export interface DownloadClientConfig {
-  downloadsEnabled: boolean;
-  c411ApiKey: string;
-  sonarrUrl: string;
-  sonarrApiKey: string;
-  sonarr1080pProfileId: number | null;
-  sonarr4kProfileId: number | null;
-  radarrUrl: string;
-  radarrApiKey: string;
-  radarr1080pProfileId: number | null;
-  radarr4kProfileId: number | null;
-  qbittorrentUrl: string;
-  qbittorrentUsername: string;
-  qbittorrentPassword: string;
-  autoSendToDownloader: boolean;
-}
+export type { DownloadClientConfig } from '../features/downloads/downloadConfigBoundary';
 
 interface DownloadConfigState extends DownloadClientConfig {
   scopeUid: string | null;
@@ -52,18 +43,6 @@ const DEFAULT_CONFIG: DownloadClientConfig = {
 
 let downloadConfigEpoch = 0;
 
-function normalizeConfig(input: Partial<DownloadClientConfig>): Partial<DownloadClientConfig> {
-  const output: Partial<DownloadClientConfig> = {};
-
-  for (const [rawKey, rawValue] of Object.entries(input)) {
-    if (rawValue === undefined) continue;
-    const key = rawKey as keyof DownloadClientConfig;
-    (output as any)[key] = typeof rawValue === 'string' ? rawValue.trim() : rawValue;
-  }
-
-  return output;
-}
-
 export const useDownloadConfigStore = create<DownloadConfigState>()((set, get) => ({
   ...DEFAULT_CONFIG,
   scopeUid: null,
@@ -72,13 +51,13 @@ export const useDownloadConfigStore = create<DownloadConfigState>()((set, get) =
   saveError: null,
 
   setConfig: (newConfig, shouldSave = true) => {
-    set({ ...normalizeConfig(newConfig), saveError: null });
+    set({ ...normalizeDownloadConfigPatch(newConfig), saveError: null });
     if (shouldSave) void get().saveToCloud();
   },
 
   saveConfig: async newConfig => {
     const previous = get();
-    const normalized = normalizeConfig(newConfig);
+    const normalized = normalizeDownloadConfigPatch(newConfig);
     const qbitScopeChanged =
       (normalized.qbittorrentUrl !== undefined && normalized.qbittorrentUrl !== previous.qbittorrentUrl)
       || (normalized.qbittorrentUsername !== undefined && normalized.qbittorrentUsername !== previous.qbittorrentUsername)
@@ -107,19 +86,19 @@ export const useDownloadConfigStore = create<DownloadConfigState>()((set, get) =
       if (requestEpoch !== downloadConfigEpoch || auth.currentUser?.uid !== user.uid) return;
       if (snap.exists()) {
         set({
-          ...(snap.data() as Partial<DownloadClientConfig>),
+          ...parseDownloadConfigDocument(snap.data()),
           isHydrated: true,
           saveError: null
         });
       } else {
         set({ isHydrated: true, saveError: null });
       }
-    } catch (error: any) {
+    } catch (error) {
       if (requestEpoch !== downloadConfigEpoch || auth.currentUser?.uid !== user.uid) return;
-      console.warn('[DownloadConfig] Erreur syncFromCloud:', error);
+      appLogger.warn('sync', '[DownloadConfig] Erreur syncFromCloud', error);
       set({
         isHydrated: true,
-        saveError: error?.message || 'Impossible de charger la configuration.'
+        saveError: error instanceof Error && error.message ? error.message : 'Impossible de charger la configuration.'
       });
     }
   },
@@ -158,12 +137,12 @@ export const useDownloadConfigStore = create<DownloadConfigState>()((set, get) =
       if (requestEpoch !== downloadConfigEpoch || auth.currentUser?.uid !== user.uid) return true;
       set({ isSaving: false, saveError: null, isHydrated: true });
       return true;
-    } catch (error: any) {
+    } catch (error) {
       if (requestEpoch !== downloadConfigEpoch || auth.currentUser?.uid !== user.uid) return false;
-      console.warn('[DownloadConfig] Erreur saveToCloud:', error);
+      appLogger.warn('sync', '[DownloadConfig] Erreur saveToCloud', error);
       set({
         isSaving: false,
-        saveError: error?.message || 'Impossible de sauvegarder la configuration.'
+        saveError: error instanceof Error && error.message ? error.message : 'Impossible de sauvegarder la configuration.'
       });
       return false;
     }
@@ -210,7 +189,7 @@ if (typeof window !== 'undefined') {
           if (listenerEpoch !== downloadConfigEpoch || auth.currentUser?.uid !== listenerUid) return;
           if (snapshot.exists()) {
             useDownloadConfigStore.setState({
-              ...(snapshot.data() as Partial<DownloadClientConfig>),
+              ...parseDownloadConfigDocument(snapshot.data()),
               isHydrated: true,
               saveError: null
             });
@@ -220,7 +199,7 @@ if (typeof window !== 'undefined') {
         },
         error => {
           if (listenerEpoch !== downloadConfigEpoch || auth.currentUser?.uid !== listenerUid) return;
-          console.warn('[DownloadConfig] Firestore snapshot warning:', error);
+          appLogger.warn('sync', '[DownloadConfig] Firestore snapshot warning', error);
           useDownloadConfigStore.setState({
             isHydrated: true,
             saveError: error?.message || 'Synchronisation des réglages indisponible.'
@@ -228,7 +207,7 @@ if (typeof window !== 'undefined') {
         }
       );
     } catch (error) {
-      console.warn('[DownloadConfig] Impossible d’établir le snapshot Firestore:', error);
+      appLogger.warn('sync', '[DownloadConfig] Impossible d’établir le snapshot Firestore', error);
       useDownloadConfigStore.setState({ isHydrated: true });
     }
   });

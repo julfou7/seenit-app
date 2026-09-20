@@ -11,12 +11,12 @@ export interface AppLogEntry {
   level: LogLevel;
   category: LogCategory;
   message: string;
-  details?: any;
+  details?: unknown;
 }
 
 interface LogState {
   logs: AppLogEntry[];
-  addLog: (categoryOrMsg: any, messageOrLevel?: any, details?: any, level?: LogLevel) => void;
+  addLog: (categoryOrMsg: unknown, messageOrLevel?: unknown, details?: unknown, level?: LogLevel) => void;
   clearLogs: () => void;
   getLogsAsText: () => string;
 }
@@ -88,7 +88,7 @@ function scheduleLogFlush() {
 export const useLogStore = create<LogState>((set, get) => ({
   logs: [],
 
-  addLog: (categoryOrMsg: any, messageOrLevel?: any, details?: any, level: LogLevel = 'info') => {
+  addLog: (categoryOrMsg: unknown, messageOrLevel?: unknown, details?: unknown, level: LogLevel = 'info') => {
     let category: LogCategory = 'sync';
     let message: string = '';
     let actualLevel: LogLevel = level;
@@ -154,7 +154,7 @@ export const useLogStore = create<LogState>((set, get) => ({
         const date = new Date(l.timestamp).toLocaleDateString('fr-FR');
         const lvl = l.level.toUpperCase().padEnd(7);
         const cat = `[${l.category.toUpperCase()}]`.padEnd(8);
-        const detailsStr = l.details ? ` | ${typeof l.details === 'object' ? JSON.stringify(l.details) : l.details}` : '';
+        const detailsStr = l.details ? ` | ${typeof l.details === 'object' ? JSON.stringify(l.details) : String(l.details)}` : '';
         return `[${date} ${time}] ${lvl} ${cat} ${l.message}${detailsStr}`;
       })
       .join('\n');
@@ -178,8 +178,8 @@ if (typeof window !== 'undefined') {
 
 // Quick helper function for easy logging anywhere
 export const appLogger = {
-  info: (category: LogCategory, message: string, details?: any) => useLogStore.getState().addLog(category, message, details, 'info'),
-  success: (category: LogCategory, message: string, details?: any) => useLogStore.getState().addLog(category, message, details, 'success'),
-  warn: (category: LogCategory, message: string, details?: any) => useLogStore.getState().addLog(category, message, details, 'warn'),
-  error: (category: LogCategory, message: string, details?: any) => useLogStore.getState().addLog(category, message, details, 'error')
+  info: (category: LogCategory, message: string, details?: unknown) => useLogStore.getState().addLog(category, message, details, 'info'),
+  success: (category: LogCategory, message: string, details?: unknown) => useLogStore.getState().addLog(category, message, details, 'success'),
+  warn: (category: LogCategory, message: string, details?: unknown) => useLogStore.getState().addLog(category, message, details, 'warn'),
+  error: (category: LogCategory, message: string, details?: unknown) => useLogStore.getState().addLog(category, message, details, 'error')
 };
