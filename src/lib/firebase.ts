@@ -9,6 +9,7 @@ import { appLogger, useLogStore } from '../store/logStore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { resolveSeenItApiUrl } from './seenitApi';
 import { queueAppUpdateAvailablePush } from '../features/release/releaseUpdatePushClient';
+import { ensureSeenItServiceWorkerRegistration } from '../features/pwa/serviceWorkerRegistration';
 
 const app = initializeApp(firebaseConfig);
 
@@ -46,13 +47,9 @@ try {
 export let messaging: Messaging | null = null;
 
 if (typeof window !== 'undefined' && 'Notification' in window) {
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/firebase-messaging-sw.js').then((reg) => {
-      reg.update().catch(() => {});
-    }).catch((swErr) => {
-      appLogger.warn('system', 'Could not auto-register firebase-messaging-sw.js', swErr);
-    });
-  }
+  void ensureSeenItServiceWorkerRegistration({ isNativePlatform: isNative }).catch((swErr) => {
+    appLogger.warn('system', 'Could not auto-register firebase-messaging-sw.js', swErr);
+  });
 
   isSupported().then((supported) => {
     if (supported) {
@@ -280,17 +277,10 @@ export async function sendNativeNotification(title: string, options?: NativeNoti
   if (Notification.permission !== 'granted') return;
 
   try {
-    if ('serviceWorker' in navigator) {
-      let reg = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
-      if (!reg) {
-        try {
-          reg = await navigator.serviceWorker.ready;
-        } catch {}
-      }
-      if (reg && reg.showNotification) {
-        await reg.showNotification(title, options);
-        return;
-      }
+    const registration = await ensureSeenItServiceWorkerRegistration({ isNativePlatform: isNative });
+    if (registration?.showNotification) {
+      await registration.showNotification(title, options);
+      return;
     }
   } catch (err) {
     appLogger.warn('system', 'SW showNotification failed, fallback to new Notification', err);
@@ -416,25 +406,26 @@ export async function requestNotificationPermission(): Promise<string | null> {
     }
 
     let swRegistration: ServiceWorkerRegistration | undefined;
-    if ('serviceWorker' in navigator) {
-      try {
-        swRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-      } catch (swErr) {
-        appLogger.warn('system', 'Could not register firebase-messaging-sw.js', swErr);
-      }
+    try {
+      swRegistration = await ensureSeenItServiceWorkerRegistration({ isNativePlatform: false });
+    } catch (swErr) {
+      appLogger.warn('system', 'Could not register firebase-messaging-sw.js', swErr);
+      return null;
     }
+    if (!swRegistration) return null;
 
     const vapidKey = (firebaseConfig as typeof firebaseConfig & { vapidKey?: string }).vapidKey;
-    const options: { vapidKey?: string; serviceWorkerRegistration?: ServiceWorkerRegistration } = {};
+    const options: { vapidKey?: string; serviceWorkerRegistration: ServiceWorkerRegistration } = {
+      serviceWorkerRegistration: swRegistration
+    };
     if (vapidKey) options.vapidKey = vapidKey;
-    if (swRegistration) options.serviceWorkerRegistration = swRegistration;
 
     let token: string | null = null;
     try {
-      token = await getToken(messaging, Object.keys(options).length > 0 ? options : undefined);
+      token = await getToken(messaging, options);
     } catch (tokenErr) {
-      appLogger.warn('system', 'getToken with options failed, trying default getToken', tokenErr);
-      token = await getToken(messaging);
+      appLogger.warn('system', 'getToken with VAPID failed, retrying with the same SeenIt worker', tokenErr);
+      token = await getToken(messaging, { serviceWorkerRegistration: swRegistration });
     }
 
     if (!token) return null;

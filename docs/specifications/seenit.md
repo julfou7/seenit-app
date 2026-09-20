@@ -910,8 +910,20 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
 - Les gros caches sont remplacés par une écriture atomique et partitionnés par UID.
 - Les requêtes possèdent des timeouts bornés et distinguent erreur transitoire, absence
   définitive et résultat vide.
-- Le service worker PWA est unique pour cache applicatif et FCM. Aucun double enregistrement ne
-  doit concurrencer sa mise à jour.
+- **SEENIT-SECURITY-004** — La PWA canonique applique des en-têtes HTTP de sécurité explicites :
+  CSP, `X-Content-Type-Options`, `X-Frame-Options`, Referrer Policy, Permissions Policy et COOP
+  compatible avec la popup Google Auth ; HSTS est ajouté en production. La CSP n'autorise l'exécution
+  de scripts distants que pour les surfaces Google/Firebase requises. Les exceptions plus larges sont
+  documentées et bornées par type de ressource : styles/fonts Google, images/médias HTTPS pour TMDB,
+  Plex et avatars, `connect-src https:` pour les endpoints Firebase/TMDB et surtout les serveurs Plex
+  HTTPS configurés dynamiquement par utilisateur, et frames Firebase Auth/YouTube pour connexion et
+  bandes-annonces. `unsafe-eval` et WebSocket ne sont permis qu'en développement Vite.
+  Le service worker PWA est unique pour cache applicatif et FCM : son enregistrement passe par un helper
+  idempotent, force `updateViaCache: none`, relance un contrôle de mise à jour une fois par session et
+  reste désactivé dans la WebView Capacitor. Sa réponse est `no-store`, porte une CSP dédiée autorisant
+  uniquement les scripts Firebase compat épinglés sur `www.gstatic.com`, et aucune route `/api/` ni
+  origine distante n'est interceptée par son cache. Les détails et justifications sont maintenus dans
+  `docs/security/pwa-http-security.md`.
 - Le bundle initial doit conserver le découpage paresseux des écrans privés. Toute hausse
   significative doit être expliquée dans la livraison.
 

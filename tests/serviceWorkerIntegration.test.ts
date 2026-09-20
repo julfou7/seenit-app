@@ -230,3 +230,13 @@ test('SEENIT-QUALITY-001 route un clic de notification vers la fiche exacte sans
   assert.ok(harness.FakeBroadcastChannel.messages.some(message => message.type === 'NAVIGATE_SHOW'));
   assert.equal(harness.openedWindows.length, 0);
 });
+
+test('SEENIT-SECURITY-004 ne détourne jamais les requêtes cross-origin vers le cache SeenIt', async () => {
+  const harness = createHarness();
+  let responded = false;
+  harness.listeners.get('fetch')!({
+    request: { method: 'GET', url: 'https://image.tmdb.org/t/p/w500/poster.jpg', mode: 'cors' },
+    respondWith: () => { responded = true; },
+  });
+  assert.equal(responded, false);
+});
