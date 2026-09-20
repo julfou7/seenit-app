@@ -126,9 +126,6 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
 
     if (tvShowsToSync.length === 0) {
       setSyncStatus(null);
-      if (changesMade) {
-        useShowsStore.getState().fetchShows();
-      }
       return { success: true, syncedCount: 0 };
     }
 
@@ -457,9 +454,6 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
     }
     
     setSyncStatus(null);
-    if (changesMade) {
-      useShowsStore.getState().fetchShows();
-    }
     return { success: true, syncedCount };
   } catch (err: any) {
     console.error("[SyncWorker] Error fetching shows to sync:", err);
@@ -578,19 +572,21 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
         return { success: false, error: 'Erreur lors de la récupération des détails TMDB' };
       }
       const details = detailsRes.value;
-      await updateDoc(showRef, {
+      const now = Date.now();
+      const movieUpdatePayload = {
         runtime: details.runtime || showToSync.runtime || 0,
         genres: details.genres || showToSync.genres || [],
         releaseDate: details.release_date || showToSync.releaseDate || '',
         voteAverage: details.vote_average || showToSync.voteAverage || 0,
         overview: details.overview || showToSync.overview || '',
         tagline: details.tagline || showToSync.tagline || '',
-        detailsSyncedAt: Date.now(),
+        detailsSyncedAt: now,
         isSynced: true,
-        lastSyncedAt: Date.now(),
-        updatedAt: Date.now()
-      });
-      useShowsStore.getState().fetchShows();
+        lastSyncedAt: now,
+        updatedAt: now
+      };
+      await updateDoc(showRef, movieUpdatePayload);
+      useShowsStore.getState().updateShowOptimistic(showId, movieUpdatePayload);
       if (!silent) setSyncStatus(null);
       return { success: true, title: showToSync.title };
     }
@@ -740,7 +736,7 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
     useShowsStore.getState().updateShowOptimistic(showId, updatePayload);
     if (!silent) setSyncStatus(null);
     return { success: true, title: showToSync.title };
-  } catch (err: any) {
+  } catch (err) {
     console.error(`[SyncWorker] Error syncing single item ${showId}:`, err);
     if (!silent) setSyncStatus(null);
     return { success: false, error: err?.message || String(err) };

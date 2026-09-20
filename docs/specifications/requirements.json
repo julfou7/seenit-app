@@ -775,6 +775,10 @@
         {
           "file": "tests/backendDeploymentWorkflow.test.ts",
           "contains": "SEENIT-COST-001 purge les artefacts de build régénérables seulement après validation production"
+        },
+        {
+          "file": "tests/firestoreReadCostPolicy.test.ts",
+          "contains": "SEENIT-COST-001 évite les refetch complets redondants quand le listener temps réel est actif"
         }
       ]
     },
