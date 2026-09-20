@@ -157,3 +157,70 @@ button.min-h-0.flex-1.overflow-hidden.bg-zinc-950 {
 .animate-toast-progress {
   animation: toastProgress 5s linear forwards;
 }
+
+/* SeenIt PC : la PWA gagne un vrai shell grand écran sans modifier le runtime
+   Capacitor. Le data-attribute est posé uniquement par le shell Web. */
+@media (min-width: 1024px) {
+  [data-seenit-shell="web-responsive"] {
+    max-width: 1600px;
+    border-left: 1px solid rgba(255, 255, 255, 0.06);
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  [data-seenit-shell="web-responsive"] .pb-nav {
+    padding-bottom: 1.5rem;
+  }
+
+  [data-seenit-shell="web-responsive"] [data-app-tab="discover"] > .max-w-2xl {
+    max-width: none;
+  }
+
+  [data-seenit-shell="web-responsive"] [data-app-tab="discover"] .grid.grid-cols-3.sm\:grid-cols-4 {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    column-gap: 0.625rem;
+    row-gap: 1.25rem;
+  }
+
+  [data-seenit-shell="web-responsive"] #toast-notification-wrapper {
+    left: calc(50% + 7.5rem) !important;
+    bottom: 2rem !important;
+    max-width: 36rem;
+  }
+
+  [data-seenit-shell="web-responsive"] #watchlist-container,
+  [data-seenit-shell="web-responsive"] [data-app-tab="profile"],
+  [data-seenit-shell="web-responsive"] [data-app-tab="discover"],
+  [data-seenit-shell="web-responsive"] [data-app-tab="downloads"] {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(113, 113, 122, 0.65) transparent;
+  }
+
+  [data-seenit-shell="web-responsive"] #watchlist-container::-webkit-scrollbar,
+  [data-seenit-shell="web-responsive"] [data-app-tab="profile"]::-webkit-scrollbar,
+  [data-seenit-shell="web-responsive"] [data-app-tab="discover"]::-webkit-scrollbar,
+  [data-seenit-shell="web-responsive"] [data-app-tab="downloads"]::-webkit-scrollbar {
+    display: block;
+    width: 8px;
+  }
+
+  [data-seenit-shell="web-responsive"] #watchlist-container::-webkit-scrollbar-thumb,
+  [data-seenit-shell="web-responsive"] [data-app-tab="profile"]::-webkit-scrollbar-thumb,
+  [data-seenit-shell="web-responsive"] [data-app-tab="discover"]::-webkit-scrollbar-thumb,
+  [data-seenit-shell="web-responsive"] [data-app-tab="downloads"]::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(113, 113, 122, 0.55);
+  }
+}
+
+@media (min-width: 1280px) {
+  [data-seenit-shell="web-responsive"] [data-app-tab="discover"] .grid.grid-cols-3.sm\:grid-cols-4 {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1536px) {
+  [data-seenit-shell="web-responsive"] [data-app-tab="discover"] .grid.grid-cols-3.sm\:grid-cols-4 {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+
