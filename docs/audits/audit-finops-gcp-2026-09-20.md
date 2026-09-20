@@ -3,9 +3,9 @@
 - **Identifiant** : AUDIT-2026-09-20-GCP-FINOPS
 - **Date** : 20 septembre 2026
 - **Dernière vérification** : 20 septembre 2026
-- **Statut** : ouvert — garde-fous déployés, Billing par SKU acquis ; preuves runtime Firestore/Cloud SQL et temporelles encore manquantes
-- **Baseline** : `main` `92e2fc274832bd7109810d1c4021df1ff331b034`
-- **Commit observé** : `92e2fc274832bd7109810d1c4021df1ff331b034`
+- **Statut** : ouvert — garde-fous déployés, inventaire runtime acquis ; topologie Firestore incompatible avec la garantie 0 € sans migration de données
+- **Baseline** : `main` `3a2b9ed95252a8c2e704a50a56dec1ed037225c7`
+- **Commit observé** : `3a2b9ed95252a8c2e704a50a56dec1ed037225c7`
 - **Périmètre** : Firestore, Firebase Storage, Cloud Run, Cloud SQL historique, coûts réseau et garde-fous
 - **Suivi** : issue #23
 
@@ -25,14 +25,14 @@ Enterprise Write Units London (97 716 unités), **0,01 €** de transfert Firest
 bases nommées (0,08 GiB), ainsi que deux lignes Cloud Storage réseau à **0,01 €** chacune.
 
 La cause réseau Cloud Run n'est donc plus un simple centime historique : le transfert intercontinental est
-la première ligne de coût visible du mois. Toutefois la région de Firestore `default` doit être prouvée
-avant toute migration de Cloud Run afin d'éviter de remplacer un coût Internet par un coût inter-région.
+la première ligne de coût visible du mois. Le run #35529029612 prouve désormais que Firestore `default`
+est en `eur3`, alors que Cloud Run et la base AI Studio sont en `us-west1`.
 
 ## Attribution historique
 
 | Ligne facturée historique | Ressource / origine prouvée | État au 20/09 |
 | --- | --- | --- |
-| Firestore Read Ops `named databases` — 333 370 lectures, 0,18 € | anciennes bases Firestore `ai-studio-*`; une base nommée n'a pas de quota gratuit | bases historiques supprimées ; code client/Admin toujours verrouillé sur `default` |
+| Firestore Read Ops `named databases` — 333 370 lectures, 0,18 € | anciennes bases Firestore `ai-studio-*`; une seule base par projet reçoit le quota gratuit, indépendamment de son ID | une base AI Studio est à nouveau présente ; code client/Admin toujours verrouillé sur `default` |
 | Firestore Internet Data Transfer Out `named databases` — 0,17 Gio, 0,02 € | mêmes bases nommées historiques | cause applicative historique éliminée ; toute recréation infrastructure reste une dérive |
 | Cloud Storage Standard US Regional — 11,01 Gio-mois, 0,11 € | bucket Firebase partagé avec ATHIA ; `exercise_images/` a été identifié puis supprimé après migration | bucket toujours configuré ; taille/région actuelles à relire côté GCP |
 | Cloud Run Internet Data Transfer Out Intercontinental — 0,11 Gio, 0,01 € | runtime Cloud Run publié | **risque encore reproductible** : `seenit-app` reste en `us-west1` |
@@ -44,9 +44,19 @@ Les garde-fous livrés par #21/#22 sont toujours présents : client `FIRESTORE_D
 Firebase Admin `getFirestore('default')`, aucune métadonnée `firestoreDatabaseId` dans la configuration
 canonique et Delete Protection de `default` comme invariant.
 
-Firestore offre un quota gratuit à une seule base par projet ; les bases nommées n'y sont pas éligibles.
-La localisation actuelle de `default` n'est pas prouvable depuis le dépôt et doit être capturée avant
-toute décision de déplacement Cloud Run.
+Firestore offre un quota gratuit à une seule base par projet. Le run #35529029612 prouve la topologie :
+
+- `default` : `eur3`, édition `STANDARD`, `freeTier=false`, Delete Protection active, PITR désactivé ;
+- `ai-studio-seenit-065aead8-cc5a-4b86-9f25-dd812194ffa4` : `us-west1`, édition `ENTERPRISE`,
+  `freeTier=true`, Delete Protection désactivée, PITR désactivé.
+
+Cette preuve invalide l'hypothèse selon laquelle `default` bénéficierait déjà du quota gratuit. Le champ
+`freeTier` est une métadonnée de sortie : supprimer la base AI Studio sans plan de migration ne promeut
+pas de façon démontrée une base existante. La
+[documentation Firestore](https://firebase.google.com/docs/firestore/pricing#free-quota-applies-only-to-one-database-per-project)
+indique que, si la base éligible est supprimée, c'est la **prochaine base créée** qui reçoit le quota
+gratuit. Toute solution exigeant de recréer ou remplacer `default` est donc une migration de données
+explicite, actuellement interdite par le périmètre de #23, et non un nettoyage automatique.
 
 ## État Storage
 
@@ -76,14 +86,17 @@ Ces garde-fous traitent les dérives de compute/VPC. Le même chantier purge aus
 
 ## Cause racine réseau
 
-Le coût historique intercontinental et la région `us-west1` forment une cause racine candidate forte
-pour le centime récurrent. La documentation Cloud Run actuelle limite le quota gratuit de transfert
-Internet à 1 Gio au sein de l'Amérique du Nord. Servir l'Europe depuis Oregon peut donc produire une
-ligne facturable alors que CPU/RAM/requêtes restent gratuits.
+Le coût historique intercontinental et la région `us-west1` forment une cause racine confirmée du trafic
+facturable. La [documentation Cloud Run](https://cloud.google.com/run/pricing#internet-data-transfer)
+limite le quota gratuit de transfert Internet à 1 Gio au sein de l'Amérique du Nord. Servir la PWA et ses
+API à l'Europe depuis Oregon produit donc une ligne facturable alors que CPU/RAM/requêtes restent gratuits.
 
-Une migration de région n'est pas autorisée tant que la localisation de Firestore `default` n'est pas
-confirmée. Si `default` est US, déplacer seulement Cloud Run en Europe peut introduire du trafic Firestore
-inter-région ; si `default` est Europe, conserver Cloud Run en Oregon est au contraire une anomalie.
+Déplacer Cloud Run vers l'Europe rapprocherait le backend de `default`, mais ne garantit pas 0 € : la
+gratuité Cloud Run documentée pour le transfert Internet ne couvre que 1 Gio depuis l'Amérique du Nord.
+Comme le même service sert aujourd'hui le shell PWA et les API, une migration de région isolée déplacerait
+la catégorie de coût sans supprimer nécessairement l'egress public. La cible à évaluer est donc un frontal
+statique sous quota gratuit qui relaie les API vers un Cloud Run colocalisé avec Firestore, pas un simple
+changement de constante `GCP_REGION`.
 
 ## Garde-fous durables
 
@@ -92,23 +105,29 @@ absence de VPC connector sans décision explicite, budget comme alerte et preuve
 
 ## Limites / preuves encore nécessaires
 
-1. localisation de Firestore `default` et liste actuelle des bases Firestore ;
-2. liste des instances Cloud SQL ;
+1. preuve que la base AI Studio est vide et sans dépendance avant toute suppression ;
+2. décision de migration Firestore compatible avec l'interdiction actuelle de supprimer/remplacer `default` ;
 3. configuration budget/alertes ;
 4. mesure post-correctifs permettant de distinguer les coûts historiques du mois des nouveaux coûts incrémentaux ;
 5. preuve de 7 jours puis d'une période complète à 0,00 €.
+
+La mesure par endpoint est désormais automatisée par l'auditeur lecture seule : toutes les six heures,
+il transforme les request logs Cloud Run en un agrégat borné (famille de route, requêtes, octets servis,
+classes HTTP) conservé 40 jours. Aucun log brut, URL, paramètre ou identifiant n'est archivé. Cette série
+permettra de distinguer le poids du shell PWA de celui des API et de vérifier l'effet d'une optimisation
+sans élargir les droits du compte de déploiement.
 
 ## Matrice exhaustive
 
 | Constat | Priorité | Statut | Sortie |
 | --- | --- | --- | --- |
 | coût courant non nul | P1 | confirmé | identifier le SKU courant puis supprimer sa cause |
-| Cloud Run `us-west1` → Europe | P1 | cause candidate forte | confirmer région Firestore puis choisir l'architecture sans transfert facturable |
+| Cloud Run `us-west1` → Europe | P1 | topologie confirmée, migration simple insuffisante | séparer le frontal statique de l'API et colocaliser l'API avec `default` après validation d'architecture |
 | Cloud Run non borné par contrat | P1 | corrigé dans le chantier #23 | CI + déploiement canonique verts |
 | Artifact Registry / archives Cloud Build s'accumulent | P1 | corrigé et prouvé | purge post-smoke active ; inventaire après purge : aucun package `seenit-app`, source Cloud Build vide/absente |
 | base Firestore nommée dans le code | P1 | protégée | maintenir `SEENIT-DATA-005` |
 | Storage historique ATHIA | P1 | corrigé et prouvé | bucket canonique US-EAST1, taille actuelle 0 B ; surveiller l'absence de nouvelle croissance |
-| Cloud SQL historique | P1 | non prouvé | inventorier et supprimer uniquement si orphelin |
+| Cloud SQL historique | P1 | corrigé et prouvé | inventaire runtime vide |
 | budget seul comme hard cap | P1 | explicitement interdit | budget + garde-fous + kill switch |
 | preuve 0 € dans le temps | P1 | non acquise | 7 jours + période complète à 0,00 € |
 
@@ -136,9 +155,10 @@ Le premier inventaire exécuté depuis GitHub Actions après la purge a produit 
   CPU request-based, aucun VPC connector et aucun Direct VPC ;
 - archives source Cloud Build : absentes/vides après purge.
 
-La production et la validation du même SHA sont vertes. Les deux seules lectures d'infrastructure encore
-bloquées par le compte WIF sont Firestore et Cloud SQL. La décision de région Cloud Run reste donc gelée
-tant que la localisation de Firestore `default` n'est pas connue.
+La production et la validation du même SHA sont vertes. Une exécution ultérieure, #35529029612, a levé
+les deux limites de lecture : Cloud SQL est vide et les deux bases Firestore sont inventoriées avec leur
+région, édition et éligibilité au quota gratuit. Elle révèle en contrepartie que `default` n'est pas la
+base éligible au free tier.
 
 Les coûts Artifact Registry et Storage déjà affichés dans le mois courant ne peuvent pas être annulés
 rétroactivement. La preuve pertinente est maintenant l'absence de **nouveau coût incrémental** après cette
@@ -164,5 +184,5 @@ affiche les lignes visibles suivantes :
 
 Cette preuve ferme le manque « attribution par SKU ». Elle ne ferme pas encore la cause racine :
 les coûts du mois sont cumulatifs, alors que Storage et Artifact Registry ont été purgés seulement le
-20/09. La prochaine lecture structurelle doit confirmer Firestore et Cloud SQL avec les permissions IAM
-least-privilege ajoutées au compte WIF de déploiement.
+20/09. L'inventaire #35529029612 confirme désormais Firestore et Cloud SQL ; la preuve restante porte sur
+les données/dépendances de la base AI Studio, la décision de migration et l'évolution incrémentale du coût.

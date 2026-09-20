@@ -787,6 +787,10 @@
         {
           "file": "tests/backendDeploymentWorkflow.test.ts",
           "contains": "SEENIT-COST-001 capture un inventaire GCP en lecture seule après la purge"
+        },
+        {
+          "file": "tests/cloudRunTrafficAudit.test.ts",
+          "contains": "SEENIT-COST-001 agrège le trafic Cloud Run par route sans conserver URL ni identifiant"
         }
       ]
     },

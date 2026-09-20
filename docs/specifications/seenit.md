@@ -941,7 +941,10 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   le store à lui seul. Les coûts courants sont suivis par l'audit FinOps et une dérive non nulle bloque
   la clôture de #23. Après chaque déploiement runtime réussi, le workflow capture en lecture seule
   l'inventaire Firestore, Storage, Cloud SQL, Artifact Registry et Cloud Run ; une permission de lecture
-  absente est signalée sans transformer l'inventaire en action destructive.
+  absente est signalée sans transformer l'inventaire en action destructive. Toutes les six heures,
+  l'auditeur lecture seule agrège aussi les journaux de requêtes Cloud Run par famille de route et
+  volume de réponse. Les URL, paramètres, identifiants et logs bruts sont supprimés avant archivage ;
+  seul l'agrégat FinOps est conservé assez longtemps pour comparer sept jours puis une période complète.
 - Le bundle initial doit conserver le découpage paresseux des écrans privés. Toute hausse
   significative doit être expliquée dans la livraison.
 

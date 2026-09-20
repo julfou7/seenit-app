@@ -10,6 +10,7 @@ on:
     paths:
       - '.github/workflows/audit-structured-logs.yml'
       - 'scripts/summarize-tmdb-cache-diagnostics.cjs'
+      - 'scripts/summarize-cloud-run-traffic.cjs'
 
 permissions:
   contents: read
@@ -42,6 +43,7 @@ jobs:
         run: |
           printf '[]\n' > "$RUNNER_TEMP/seenit-structured-logs.json"
           printf '[]\n' > "$RUNNER_TEMP/seenit-tmdb-cache-diagnostics.json"
+          printf '[]\n' > "$RUNNER_TEMP/seenit-cloud-run-traffic.json"
 
       - name: Authenticate read-only log collector
         id: auth
@@ -111,6 +113,32 @@ jobs:
             echo 'source_status=ok' >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Collect Cloud Run request traffic
+        id: collect_cloud_run_traffic
+        if: env.SEENIT_LOG_AUDITOR_MODE != 'off'
+        shell: bash
+        run: |
+          set -euo pipefail
+          filter='resource.type="cloud_run_revision" AND resource.labels.service_name="'"$GCP_SERVICE"'" AND log_id("run.googleapis.com/requests")'
+          set +e
+          gcloud logging read "$filter" \
+            --project "$GCP_PROJECT_ID" \
+            --freshness=6h \
+            --limit=10000 \
+            --order=asc \
+            --format=json \
+            > "$RUNNER_TEMP/seenit-cloud-run-traffic.json"
+          status=$?
+          set -e
+
+          if [ "$status" -ne 0 ]; then
+            printf '[]\n' > "$RUNNER_TEMP/seenit-cloud-run-traffic.json"
+            echo 'source_status=unavailable' >> "$GITHUB_OUTPUT"
+            echo 'Les journaux de requêtes Cloud Run sont indisponibles ; aucun log brut ne sera conservé.'
+          else
+            echo 'source_status=ok' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Summarize TMDB cache baseline
         id: tmdb_cache_summary
         continue-on-error: true
@@ -120,6 +148,16 @@ jobs:
           node scripts/summarize-tmdb-cache-diagnostics.cjs
           --input=${{ runner.temp }}/seenit-tmdb-cache-diagnostics.json
           --report=${{ runner.temp }}/seenit-tmdb-cache-baseline.json
+
+      - name: Summarize Cloud Run traffic without raw URLs
+        id: cloud_run_traffic_summary
+        continue-on-error: true
+        env:
+          SEENIT_CLOUD_RUN_TRAFFIC_SOURCE_STATUS: ${{ steps.collect_cloud_run_traffic.outputs.source_status || 'off' }}
+        run: >-
+          node scripts/summarize-cloud-run-traffic.cjs
+          --input=${{ runner.temp }}/seenit-cloud-run-traffic.json
+          --report=${{ runner.temp }}/seenit-cloud-run-traffic-report.json
 
       - name: Analyze, deduplicate and optionally update GitHub
         id: auditor
@@ -135,7 +173,7 @@ jobs:
       - name: Remove temporary source logs
         if: always()
         shell: bash
-        run: rm -f "$RUNNER_TEMP/seenit-structured-logs.json" "$RUNNER_TEMP/seenit-tmdb-cache-diagnostics.json"
+        run: rm -f "$RUNNER_TEMP/seenit-structured-logs.json" "$RUNNER_TEMP/seenit-tmdb-cache-diagnostics.json" "$RUNNER_TEMP/seenit-cloud-run-traffic.json"
 
       - name: Archive only the redacted aggregate report
         if: always()
@@ -155,8 +193,17 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+      - name: Archive FinOps traffic aggregate only
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: seenit-cloud-run-traffic-${{ github.run_id }}
+          path: ${{ runner.temp }}/seenit-cloud-run-traffic-report.json
+          if-no-files-found: warn
+          retention-days: 40
+
       - name: Fail observably after preserving the report
-        if: steps.auditor.outcome != 'success' || steps.tmdb_cache_summary.outcome != 'success'
+        if: steps.auditor.outcome != 'success' || steps.tmdb_cache_summary.outcome != 'success' || steps.cloud_run_traffic_summary.outcome != 'success'
         run: |
           echo 'L’auditeur a terminé en état dégradé. Le backend SeenIt reste indépendant de ce job.'
           exit 1
