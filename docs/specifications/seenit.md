@@ -747,7 +747,10 @@ pour le cache des sagas et univers.
   par titre, titre original, année ou nom de release. L'association média requiert un **TMDB ID exact** ;
   TVDB/IMDb seuls ne suffisent pas. La corrélation d'un même transfert sans TMDB n'est permise que par
   une preuve physique exacte (`requestId`, infohash/downloadId/alias ou chemin). Sinon le transfert reste
-  visible et non rattaché plutôt que produire un faux positif.
+  visible et non rattaché plutôt que produire un faux positif. Pour une release TV externe, SeenIt
+  recalcule le pont TVDB depuis ce TMDB ID, garantit la série Sonarr exacte puis exige que le parseur
+  Sonarr résolve la release vers cette même série avant tout envoi. Une divergence ou une identité
+  incomplète échoue fermée ; le titre de la release ne peut jamais sélectionner une série homonyme.
 - **SEENIT-DOWNLOAD-002** — Deux infohash incompatibles désignent toujours deux transferts,
   même si leurs titres et tailles se ressemblent.
 - **SEENIT-DOWNLOAD-003** — Deux mutations concurrentes possédant la même clé idempotente ne

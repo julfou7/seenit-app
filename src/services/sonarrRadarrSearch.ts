@@ -10,6 +10,14 @@ import { nextDownloadSourceBackoffMs, shouldFetchNextArrQueuePage } from '../fea
 import { executeDownloadMutationOnce } from '../features/downloads/downloadMutationPolicy';
 import { isSafeMagnetLink } from '../features/downloads/magnetLink';
 import {
+  findExactSonarrSeries,
+  pushExactSonarrRelease,
+  resolveCanonicalSeriesBridge,
+  toExactSonarrSeriesIdentity,
+  type ExactSonarrSeriesIdentity
+} from '../features/downloads/sonarrCanonicalIdentity';
+import { tmdb } from '../features/shows/tmdb';
+import {
   cleanUrl,
   executeArrInteractiveGet,
   executeArrInteractivePost,
@@ -165,7 +173,8 @@ export async function searchAndDownloadInSonarr(params: {
   episode?: number;
   qualityProfileId?: number;
   qualityPreference?: '1080p' | '4k';
-}): Promise<{ success: boolean; message: string }> {
+  ensureOnly?: boolean;
+}): Promise<{ success: boolean; message: string; target?: ExactSonarrSeriesIdentity }> {
   const base = cleanUrl(params.url);
   if (!base || !params.apiKey) {
     return { success: false, message: 'Configuration Sonarr incomplète (URL ou Clé API manquante)' };
@@ -178,6 +187,25 @@ export async function searchAndDownloadInSonarr(params: {
   };
 
   try {
+    const requestedTmdbId = Number(params.tmdbId);
+    if (!Number.isInteger(requestedTmdbId) || requestedTmdbId <= 0) {
+      return {
+        success: false,
+        message: 'Identité Sonarr incomplète : le TMDB ID exact de la fiche est requis.'
+      };
+    }
+
+    const tmdbDetails = await tmdb.getShowDetails(requestedTmdbId);
+    const canonicalIdentity = tmdbDetails.ok
+      ? resolveCanonicalSeriesBridge(requestedTmdbId, tmdbDetails.value)
+      : null;
+    if (!canonicalIdentity) {
+      return {
+        success: false,
+        message: 'Impossible de vérifier le pont TMDB → TVDB de cette série ; aucun téléchargement n’a été lancé.'
+      };
+    }
+
     let targetQualityProfileId = params.qualityProfileId;
     if (!targetQualityProfileId) {
       let qualityProfiles: any[] = [];
@@ -231,19 +259,17 @@ export async function searchAndDownloadInSonarr(params: {
       };
     }
 
-    let existingSeries: any = null;
-    if (Array.isArray(seriesList)) {
-      existingSeries = seriesList.find((s: any) => {
-        if (params.tvdbId && s.tvdbId && Number(s.tvdbId) === Number(params.tvdbId)) return true;
-        if (params.imdbId && s.imdbId && String(s.imdbId).toLowerCase() === String(params.imdbId).toLowerCase()) return true;
-        if (params.tmdbId && s.tmdbId && Number(s.tmdbId) === Number(params.tmdbId)) return true;
-        return false;
-      });
-    }
+    const existingSeries = findExactSonarrSeries(seriesList, canonicalIdentity);
 
     // 2. Si la série est déjà dans Sonarr -> Ajuster le profil si besoin & Déclencher la commande de recherche spécifique
     if (existingSeries && existingSeries.id) {
-      const seriesId = existingSeries.id;
+      const seriesId = Number(existingSeries.id);
+      if (params.ensureOnly) {
+        const target = toExactSonarrSeriesIdentity(existingSeries, canonicalIdentity);
+        return target
+          ? { success: true, message: 'Série Sonarr exacte vérifiée.', target }
+          : { success: false, message: 'Sonarr ne fournit pas une identité exploitable pour la série TMDB exacte.' };
+      }
 
       // Si le profil de qualité diffère, le mettre à jour
       if (existingSeries.qualityProfileId !== targetQualityProfileId) {
@@ -347,26 +373,13 @@ export async function searchAndDownloadInSonarr(params: {
 
     // 3. Si la série n'est pas dans Sonarr -> Faire un lookup pour obtenir les métadonnées TVDB/TheTVDB
     let lookupResult: any = null;
-    const lookupTerms = [
-      params.imdbId ? `imdb:${params.imdbId}` : null,
-      params.tvdbId ? `tvdb:${params.tvdbId}` : null
-    ].filter(Boolean);
-
-    if (lookupTerms.length === 0) {
-      return {
-        success: false,
-        message: 'Identité Sonarr incomplète : un identifiant TVDB ou IMDb vérifié est requis.'
-      };
-    }
+    const lookupTerms = [`tvdb:${canonicalIdentity.tvdbId}`];
 
     for (const term of lookupTerms) {
       try {
         const lookup = await executeGet(`${base}/api/v3/series/lookup?term=${encodeURIComponent(term!)}`, headers);
         if (Array.isArray(lookup) && lookup.length > 0) {
-          lookupResult = lookup.find((candidate: any) =>
-            Boolean(params.tvdbId && candidate?.tvdbId && Number(candidate.tvdbId) === Number(params.tvdbId))
-            || Boolean(params.imdbId && candidate?.imdbId && String(candidate.imdbId).toLowerCase() === String(params.imdbId).toLowerCase())
-          ) || null;
+          lookupResult = findExactSonarrSeries(lookup, canonicalIdentity);
         }
         if (lookupResult) {
           break;
@@ -438,8 +451,8 @@ export async function searchAndDownloadInSonarr(params: {
       images: lookupResult.images || [],
       addOptions: {
         // Empêche la recherche globale de toute la série si un épisode ou une saison est spécifié
-        searchForMissingEpisodes: !isEpisodeSearch && !isSeasonSearch,
-        monitor: (!isEpisodeSearch && !isSeasonSearch) ? 'all' : 'none'
+        searchForMissingEpisodes: !params.ensureOnly && !isEpisodeSearch && !isSeasonSearch,
+        monitor: (!params.ensureOnly && !isEpisodeSearch && !isSeasonSearch) ? 'all' : 'none'
       }
     };
     if (lookupResult.seriesType) addPayload.seriesType = lookupResult.seriesType;
@@ -448,6 +461,15 @@ export async function searchAndDownloadInSonarr(params: {
     const created = await executePost(`${base}/api/v3/series`, addPayload, headers);
 
     if (created && created.id) {
+      if (params.ensureOnly) {
+        const target = toExactSonarrSeriesIdentity(
+          { ...lookupResult, ...created, tvdbId: canonicalIdentity.tvdbId },
+          canonicalIdentity
+        );
+        return target
+          ? { success: true, message: 'Série Sonarr exacte ajoutée sans recherche automatique.', target }
+          : { success: false, message: 'Sonarr a ajouté la série sans confirmer son identité exacte.' };
+      }
       if (isEpisodeSearch) {
         try {
           const targetEp = await findEpisodeByNumber(
@@ -700,70 +722,43 @@ export async function pushReleaseDirectly(payload: {
     // 1. Sonarr Release Push
     if (payload.service === 'sonarr') {
       if (!payload.apiKey) return { success: false, message: 'Clé API Sonarr manquante' };
-      const endpoint = `${base}/api/v3/release/push`;
-      const body = {
-        title: payload.torrent.name,
-        downloadUrl: payload.torrent.magnetUri,
-        protocol: 'torrent',
-        publishDate: payload.torrent.createdAt || new Date().toISOString()
-      };
-
-      const resData = await executePost(endpoint, body, {
-        'X-Api-Key': payload.apiKey,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      });
-
-      const releaseResult = Array.isArray(resData) ? resData[0] : resData;
-      let rejections: string[] = [];
-      if (releaseResult) {
-        if (Array.isArray(releaseResult.rejections) && releaseResult.rejections.length > 0) {
-          rejections = releaseResult.rejections;
-        } else if (releaseResult.approved === false) {
-          rejections = ['Release non approuvée par Sonarr'];
-        }
-      }
-
-      if (rejections.length > 0) {
-        const reasonStr = rejections.join(' • ');
-        const isUnknown = /unknown|absent|introuvable|not found/i.test(reasonStr);
-
-        // Si la série n'est pas encore ajoutée dans Sonarr, l'ajouter automatiquement puis re-tester
-        if (isUnknown && payload.mediaInfo && payload.mediaInfo.title) {
-          const addRes = await searchAndDownloadInSonarr({
-            url: payload.url,
-            apiKey: payload.apiKey,
-            title: payload.mediaInfo.title,
-            tmdbId: payload.mediaInfo.tmdbId,
-            tvdbId: payload.mediaInfo.tvdbId,
-            imdbId: payload.mediaInfo.imdbId,
-            season: payload.mediaInfo.season,
-            episode: payload.mediaInfo.episode
-          });
-
-          if (addRes.success) {
-            try {
-              const retryRes = await executePost(endpoint, body, {
-                'X-Api-Key': payload.apiKey,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-              });
-              const retryResult = Array.isArray(retryRes) ? retryRes[0] : retryRes;
-              if (!retryResult || (!retryResult.rejections?.length && retryResult.approved !== false)) {
-                return { success: true, message: `« ${payload.mediaInfo.title} » ajoutée à Sonarr et torrent envoyé au téléchargement !` };
-              }
-            } catch (retryErr) {}
-            return { success: true, message: `« ${payload.mediaInfo.title} » ajoutée à Sonarr ! Recherche automatique lancée.` };
-          }
-        }
-
+      if (!payload.mediaInfo?.title || !payload.mediaInfo.tmdbId) {
         return {
           success: false,
-          message: `Sonarr a refusé la release : ${reasonStr}. Cliquez sur « Lancer dans Sonarr » pour ajouter d'abord la série.`
+          message: 'Le TMDB ID exact de la fiche est requis pour envoyer une release à Sonarr.'
         };
       }
 
-      return { success: true, message: 'Torrent envoyé avec succès à Sonarr !' };
+      const endpoint = `${base}/api/v3/release/push`;
+      const headers = {
+        'X-Api-Key': payload.apiKey,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      };
+
+      const exactSeries = await searchAndDownloadInSonarr({
+        url: payload.url,
+        apiKey: payload.apiKey,
+        title: payload.mediaInfo.title,
+        tmdbId: payload.mediaInfo.tmdbId,
+        season: payload.mediaInfo.season,
+        episode: payload.mediaInfo.episode,
+        ensureOnly: true
+      });
+      if (!exactSeries.success || !exactSeries.target) return exactSeries;
+
+      return pushExactSonarrRelease({
+        releaseTitle: payload.torrent.name,
+        magnetUri: payload.torrent.magnetUri,
+        publishDate: payload.torrent.createdAt || new Date().toISOString(),
+        exact: exactSeries.target
+      }, {
+        parseReleaseTitle: title => executeGet(
+          `${base}/api/v3/parse?title=${encodeURIComponent(title)}`,
+          headers
+        ),
+        postRelease: body => executePost(endpoint, body, headers)
+      });
     }
 
     // 2. Radarr Release Push

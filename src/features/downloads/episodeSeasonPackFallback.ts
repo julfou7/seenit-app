@@ -11,6 +11,10 @@ import {
 import { tmdb } from '../shows/tmdb';
 import { normalizeDownloadClientId } from './downloadIdentity';
 import {
+  findExactSonarrSeries,
+  resolveCanonicalSeriesBridge
+} from './sonarrCanonicalIdentity';
+import {
   chooseExactCleanupTorrentId,
   extractReleaseTorrentHash,
   findExactNewTorrentIds,
@@ -65,19 +69,23 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function enrichExactExternalIds(
   params: EpisodeDownloadWithFallbackParams
-): Promise<EpisodeDownloadWithFallbackParams> {
-  if (!params.tmdbId || (params.tvdbId && params.imdbId)) return params;
+): Promise<EpisodeDownloadWithFallbackParams | null> {
+  const tmdbId = Number(params.tmdbId);
+  if (!Number.isInteger(tmdbId) || tmdbId <= 0) return null;
   try {
-    const details = await tmdb.getShowDetails(Number(params.tmdbId));
-    if (!details.ok || !details.value) return params;
-    const external = details.value.external_ids || {};
+    const details = await tmdb.getShowDetails(tmdbId);
+    const canonical = details.ok
+      ? resolveCanonicalSeriesBridge(tmdbId, details.value)
+      : null;
+    if (!canonical) return null;
     return {
       ...params,
-      tvdbId: params.tvdbId || external.tvdb_id || undefined,
-      imdbId: params.imdbId || external.imdb_id || undefined
+      tmdbId: canonical.tmdbId,
+      tvdbId: canonical.tvdbId,
+      imdbId: canonical.imdbId
     };
   } catch {
-    return params;
+    return null;
   }
 }
 
@@ -140,13 +148,14 @@ async function postService(
 }
 
 function findExactSeries(seriesList: any[], params: EpisodeDownloadWithFallbackParams): any | null {
-  if (!Array.isArray(seriesList)) return null;
-  return seriesList.find(series => {
-    if (params.tvdbId && series?.tvdbId && Number(series.tvdbId) === Number(params.tvdbId)) return true;
-    if (params.imdbId && series?.imdbId && String(series.imdbId).toLowerCase() === String(params.imdbId).toLowerCase()) return true;
-    if (params.tmdbId && series?.tmdbId && Number(series.tmdbId) === Number(params.tmdbId)) return true;
-    return false;
-  }) || null;
+  const tmdbId = Number(params.tmdbId);
+  const tvdbId = Number(params.tvdbId);
+  if (!Number.isInteger(tmdbId) || tmdbId <= 0 || !Number.isInteger(tvdbId) || tvdbId <= 0) return null;
+  return findExactSonarrSeries(seriesList, {
+    tmdbId,
+    tvdbId,
+    imdbId: params.imdbId
+  });
 }
 
 async function resolveExactTarget(
@@ -467,6 +476,12 @@ export async function downloadEpisodeWithSeasonPackFallback(
   initialParams: EpisodeDownloadWithFallbackParams
 ): Promise<EpisodeDownloadWithFallbackResult> {
   const params = await enrichExactExternalIds(initialParams);
+  if (!params) {
+    return {
+      success: false,
+      message: 'Impossible de vérifier le pont TMDB → TVDB de cette série ; aucun téléchargement n’a été lancé.'
+    };
+  }
   const base = cleanUrl(params.url);
   const sonarrHeaders = {
     'X-Api-Key': params.apiKey,

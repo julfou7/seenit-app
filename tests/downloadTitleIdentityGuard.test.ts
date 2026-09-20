@@ -7,6 +7,7 @@ const read = (path: string) => fs.readFileSync(path, 'utf8');
 
 test('SEENIT-DOWNLOAD-001 interdit durablement tout fallback d’identité par titre ou release', () => {
   const identity = read('src/features/downloads/downloadIdentity.ts');
+  const sonarrIdentity = read('src/features/downloads/sonarrCanonicalIdentity.ts');
   const store = read('src/store/liveDownloadStore.ts');
   const service = readFeatureSource('sonarrRadarr');
   assert.equal(identity.includes('sameLegacyPhysicalTransfer'), false);
@@ -15,4 +16,8 @@ test('SEENIT-DOWNLOAD-001 interdit durablement tout fallback d’identité par t
   assert.equal(service.includes('sameLegacyPhysicalTransfer'), false);
   assert.match(identity, /!request\.tmdbId \|\| !remote\.tmdbId/);
   assert.match(identity, /if \(!item\?\.tmdbId/);
+  assert.match(service, /ensureOnly:\s*true/);
+  assert.match(service, /pushExactSonarrRelease/);
+  assert.match(sonarrIdentity, /parseReleaseTitle/);
+  assert.match(sonarrIdentity, /mappedSeriesId/);
 });

@@ -896,6 +896,14 @@
         {
           "file": "tests/downloadTitleIdentityGuard.test.ts",
           "contains": "SEENIT-DOWNLOAD-001 interdit durablement tout fallback d’identité par titre ou release"
+        },
+        {
+          "file": "tests/sonarrCanonicalIdentity.test.ts",
+          "contains": "SEENIT-DOWNLOAD-001 refuse une release Sonarr tant que son parseur ne confirme pas le TMDB exact"
+        },
+        {
+          "file": "tests/sonarrCanonicalIdentity.test.ts",
+          "contains": "SEENIT-DOWNLOAD-001 recadre une release homonyme sur la série Sonarr issue du TMDB exact"
         }
       ]
     },
