@@ -319,9 +319,11 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
 
 - **SEENIT-COMMUNITY-001** — Les réactions Reddit d'un épisode restent verrouillées tant que cet épisode
   n'est pas marqué vu. Une fois déverrouillées, SeenIt ouvre une **recherche Reddit standard réellement
-  exécutable**. Elle combine le titre localisé/original et le nom d'épisode avec les conventions
-  `S02E08`, `S2E8`, `Season 2 Episode 8`, `2x08`, `Episode 8` en utilisant la syntaxe Reddit
-  documentée : filtre `title:`, guillemets, `AND` / `OR` et parenthèses.
+  exécutable**. Le groupe de contexte obligatoire contient uniquement le titre de série localisé/original.
+  Le groupe épisode utilise les conventions `S02E08`, `S2E8`, `Season 2 Episode 8`, `2x08`,
+  `Episode 8` et le nom d'épisode comme simple indice `title:`, avec guillemets, `AND` / `OR` et
+  parenthèses. Le nom d'épisode ne devient jamais une alternative au titre de série dans le contexte :
+  un intitulé générique comme « Troy » ne doit pas pouvoir sélectionner seul des publications hors série.
 - SeenIt n'injecte jamais une consigne de type « réponds en français » ou « résume » dans
   `/search/?q=` : Reddit traite alors cette phrase comme une recherche classique littérale. La recherche
   IA appartient à Reddit et démarre uniquement lorsque l'utilisateur choisit **« Demander »** depuis les
