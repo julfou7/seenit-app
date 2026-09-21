@@ -52,8 +52,8 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   // Vérification de la présence locale (Sonarr / Plex)
   const presence = useMediaPresence({
     tmdbId: tmdbShowId || activeShow?.tmdbId,
-    tvdbId: (activeShow as any)?.tvdbId,
-    imdbId: (activeShow as any)?.imdbId,
+    tvdbId: activeShow?.tvdbId,
+    imdbId: activeShow?.imdbId,
     title: activeShow?.title || tmdbShowTitle,
     mediaType: 'tv'
   });
@@ -932,7 +932,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                       const targetTmdbId = tmdbShowId || activeShow?.tmdbId;
                       void openPlexWatchUrl(activeShow || {
                         tmdbId: targetTmdbId,
-                        imdbId: (activeShow as any)?.imdbId,
+                        imdbId: activeShow?.imdbId,
                         title: activeShow?.title || tmdbShowTitle,
                         mediaType: 'tv'
                       });
@@ -988,7 +988,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
 
                   {/* Single Episode Live Download Banner */}
                   {(() => {
-                    const epDownload = getEpisodeDownload(tmdbShowId || activeShow?.tmdbId, (activeShow as any)?.tvdbId, currentSeason, currentEpisode?.episode_number);
+                    const epDownload = getEpisodeDownload(tmdbShowId || activeShow?.tmdbId, activeShow?.tvdbId, currentSeason, currentEpisode?.episode_number);
                     if (!epDownload) return null;
                     return (
                       <div className="mt-2">
@@ -1083,7 +1083,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
       title={activeShow?.title || tmdbShowTitle || 'Série'}
       mediaType="tv"
       tmdbId={tmdbShowId || activeShow?.tmdbId}
-      tvdbId={(activeShow as any)?.tvdbId}
+      tvdbId={activeShow?.tvdbId}
       imdbId={activeShow?.imdbId}
       initialSeason={currentSeason}
       initialEpisode={currentEpisode.episode_number}
