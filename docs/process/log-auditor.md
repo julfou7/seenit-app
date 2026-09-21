@@ -13,8 +13,9 @@ Le mode vient de la variable de dépôt GitHub `SEENIT_LOG_AUDITOR_MODE` :
 - `off` : kill switch, aucune authentification Cloud ni écriture GitHub.
 
 Un premier run `dry-run` vert sur `main` est obligatoire avant de définir `live`. Une activation live
-ne modifie pas le catalogue de règles : seules `API_UNHANDLED_ERROR` et `BACKEND_STARTUP_FAILED` ont
-initialement `autoIssue=true`. `PLEX_SYNC_PARTIAL` reste report-only.
+ne contourne jamais le catalogue de règles. Les erreurs historiques `API_UNHANDLED_ERROR` et
+`BACKEND_STARTUP_FAILED` restent actives ; les warnings Plex explicitement catalogués peuvent aussi
+ouvrir/enrichir une issue uniquement après leur seuil déterministe.
 
 ## Accès minimaux
 
@@ -24,8 +25,9 @@ initialement `autoIssue=true`. `PLEX_SYNC_PARTIAL` reste report-only.
   `seenit-log-auditor@gen-lang-client-0201895414.iam.gserviceaccount.com` reçoit uniquement le rôle
   read-only `roles/logging.viewer` via `scripts/bootstrap-gcp-log-auditor.sh`. Il réutilise le provider
   WIF borné au dépôt et à `main`, sans clé JSON durable ni permission de déploiement.
-- Collecte anomalies : uniquement `seenit-app`, `jsonPayload.seenitEvent.schemaVersion=1`, six heures
-  et 5 000 entrées au maximum.
+- Collecte anomalies : uniquement `seenit-app`, `jsonPayload.seenitEvent.schemaVersion=1`, deux
+  fenêtres consécutives de six heures et 5 000 entrées au maximum. Les règles connues évaluent la fenêtre
+  courante ; le recul de douze heures sert uniquement à prouver la récurrence d’un code warning inconnu.
 - Collecte diagnostics : le même batch peut lire séparément
   `jsonPayload.seenitDiagnostic.code="TMDB_REQUEST_CACHE_SUMMARY"` avec les mêmes bornes. Cette voie
   est **report-only** : elle n'alimente jamais les règles de création d'issue.
@@ -55,7 +57,16 @@ artefact. Seul le JSON agrégé redigé est conservé sept jours.
 |---|---|---:|---|
 | `API_UNHANDLED_ERROR` | runtime | 5 | oui |
 | `BACKEND_STARTUP_FAILED` | runtime | 2 | oui |
-| `PLEX_SYNC_PARTIAL` | plex | 20 | non, rapport uniquement |
+| `PLEX_SYNC_PARTIAL` | plex | 20 | oui |
+| `PLEX_SNAPSHOT_STORE_FAILED` | plex | 6 | oui |
+| `PLEX_DELTA_SNAPSHOT_FAILED` | plex | 4 | oui |
+| `PLEX_FULL_SNAPSHOT_SEED_FAILED` | plex | 4 | oui |
+
+Un warning structuré dont le code n’est pas encore catalogué reste report-only. Il ne devient candidat
+qu’avec au moins une occurrence dans chacune des deux fenêtres consécutives de six heures et **huit
+occurrences cumulées** ; son contexte est alors volontairement vide et le fingerprint repose uniquement
+sur le domaine et le code stables. Cette promotion ouvre une issue de qualification, pas une règle métier
+implicite.
 
 Le fingerprint SHA-256 tronqué porte sur version de schéma, domaine, code et contexte technique
 allowlisté. Il ne contient pas le timestamp, la corrélation, un utilisateur, une route ou un titre.
@@ -110,3 +121,17 @@ du fichier Cloud original. Un run local sans token n'effectue aucune écriture G
 Une lecture Cloud ou un appel GitHub en échec est capturé comme décision dégradée. Le rapport est écrit
 avant l'échec final du job lorsque GitHub Actions reste disponible. Aucun retry n'est lancé depuis
 l'application et aucun échec de l'auditeur ne modifie les réponses backend.
+
+
+## Couverture warning — baseline du 21/09/2026
+
+L’inventaire statique #27 a parcouru `server.ts` et les sources TypeScript de `src/**`. La frontière
+Cloud Run comporte 12 sites `warn` dans `server.ts` + `src/features/runtime/backendRuntime.ts` ;
+avant cette extension, un seul était accompagné d’un `seenitEvent`, soit **11/12 invisibles** à
+l’auto-auditeur. La première vague structure les six warnings du snapshot Plex sans ajouter d’appel
+réseau : le log structuré remplace le warning existant.
+
+Les warnings PWA/APK restent locaux par défaut (notifications, Firestore client, téléchargements,
+mise à jour, providers, hydratation). Ils ne sont pas téléversés individuellement vers Cloud Logging.
+Les diagnostics TMDB existants restent report-only et agrégés. Ce choix garde le coût CPU/réseau du
+chemin utilisateur inchangé et borne le volume Cloud au rythme des événements backend déjà émis.

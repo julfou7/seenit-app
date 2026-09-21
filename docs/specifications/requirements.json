@@ -895,6 +895,14 @@
           "contains": "SEENIT-OBSERVABILITY-001 réutilise le provider WIF canonique sans le recréer"
         },
         {
+          "file": "tests/logAuditor.test.ts",
+          "contains": "SEENIT-OBSERVABILITY-001 couvre les warnings backend actionnables sans télémétrie client"
+        },
+        {
+          "file": "tests/logAuditor.test.ts",
+          "contains": "SEENIT-OBSERVABILITY-001 détecte un warning inconnu seulement après deux fenêtres consécutives"
+        },
+        {
           "file": "tests/tmdbCacheDiagnostics.test.ts",
           "contains": "SEENIT-OBSERVABILITY-001 agrège les deltas TMDB sans archiver les snapshots cumulés ni les identités"
         },

@@ -272,9 +272,11 @@ async function loadPlexDeltaWatchedSnapshot(uid: string): Promise<PlexDeltaWatch
     const details = error && typeof error === 'object'
       ? error as { code?: unknown; name?: unknown }
       : {};
-    console.warn('[Plex Delta Snapshot Store]', {
-      action: 'read',
-      code: String(details.code ?? details.name ?? 'READ_FAILED').slice(0, 80)
+    emitOperationalEvent({
+      code: 'PLEX_SNAPSHOT_STORE_FAILED',
+      context: { action: 'read', errorCode: String(details.code ?? details.name ?? 'READ_FAILED') },
+      domain: 'plex',
+      level: 'warn'
     });
     return [];
   }
@@ -288,9 +290,11 @@ async function loadPlexDeltaResolutionCache(uid: string): Promise<Record<string,
     const cache = snapshot.get('resolutionCache');
     return cache && typeof cache === 'object' && !Array.isArray(cache) ? cache : {};
   } catch (error: any) {
-    console.warn('[Plex Delta Snapshot Store]', {
-      action: 'read-resolution-cache',
-      code: String(error?.code ?? error?.name ?? 'READ_FAILED').slice(0, 80)
+    emitOperationalEvent({
+      code: 'PLEX_SNAPSHOT_STORE_FAILED',
+      context: { action: 'read-resolution-cache', errorCode: String(error?.code ?? error?.name ?? 'READ_FAILED') },
+      domain: 'plex',
+      level: 'warn'
     });
     return {};
   }
@@ -308,12 +312,19 @@ async function persistPlexDeltaWatchedSnapshot(uid: string, locators: PlexDeltaW
       deltaWatchedSnapshotOverflow: safeLocators.length > MAX_PLEX_DELTA_SNAPSHOT_ITEMS
     }, { merge: true });
     if (safeLocators.length > MAX_PLEX_DELTA_SNAPSHOT_ITEMS) {
-      console.warn('[Plex Delta Snapshot Store]', { action: 'write', code: 'SNAPSHOT_TOO_LARGE' });
+      emitOperationalEvent({
+        code: 'PLEX_SNAPSHOT_STORE_FAILED',
+        context: { action: 'write', errorCode: 'SNAPSHOT_TOO_LARGE' },
+        domain: 'plex',
+        level: 'warn'
+      });
     }
   } catch (error: any) {
-    console.warn('[Plex Delta Snapshot Store]', {
-      action: 'write',
-      code: String(error?.code ?? error?.name ?? 'WRITE_FAILED').slice(0, 80)
+    emitOperationalEvent({
+      code: 'PLEX_SNAPSHOT_STORE_FAILED',
+      context: { action: 'write', errorCode: String(error?.code ?? error?.name ?? 'WRITE_FAILED') },
+      domain: 'plex',
+      level: 'warn'
     });
   }
 }
@@ -891,7 +902,12 @@ async function enrichPlexDeltaResponse(req: any, body: any): Promise<any> {
       return mergePlexDeltaWatchedSnapshot(body, snapshot);
     } catch (error: any) {
       const code = String(error?.code ?? error?.name ?? 'PLEX_DELTA_SNAPSHOT_FAILED').slice(0, 80);
-      console.warn('[Plex Delta Snapshot]', { action: 'delta', code });
+      emitOperationalEvent({
+        code: 'PLEX_DELTA_SNAPSHOT_FAILED',
+        context: { errorCode: code },
+        domain: 'plex',
+        level: 'warn'
+      });
       return body;
     }
   }
@@ -910,7 +926,12 @@ async function enrichPlexDeltaResponse(req: any, body: any): Promise<any> {
     }
   } catch (error: any) {
     const code = String(error?.code ?? error?.name ?? 'PLEX_FULL_SNAPSHOT_SEED_FAILED').slice(0, 80);
-    console.warn('[Plex Delta Snapshot]', { action: 'seed-full', code });
+    emitOperationalEvent({
+      code: 'PLEX_FULL_SNAPSHOT_SEED_FAILED',
+      context: { errorCode: code },
+      domain: 'plex',
+      level: 'warn'
+    });
   }
   return body;
 }
