@@ -41,7 +41,7 @@ interface WatchListViewProps {
 }
 
 export function WatchListView({ model }: WatchListViewProps) {
-  const { activeTab, allShows, continueWatchingShows, executeUnfollow, expandedSection, filmsAVoirShows, handleArchiveShow, handleDropShow, handleEpisodeClick, handleToggleVoirTout, historyRef, isQuotaExceeded, loading, markMovieAsSeen, markNextEpisodeAsSeen, nouveautesShows, onShowClick, onShowClickProp, openPersonModal, pasVuDepuisUnMomentShows, pendingAction, scrollToSection, selectedEpisodeModal, selectedPersonId, setPendingAction, setSelectedEpisodeModal, setSelectedPersonId, setVisibleCount, upcomingRef, upcomingShows, visibleCount, watchNextRef } = model;
+  const { activeTab, allShows, continueWatchingShows, executeUnfollow, expandedSection, filmsAVoirShows, handleArchiveShow, handleDropShow, handleEpisodeClick, handleEpisodeParentClick, handleToggleVoirTout, historyRef, isQuotaExceeded, loading, markMovieAsSeen, markNextEpisodeAsSeen, nouveautesShows, onShowClick, onShowClickProp, openPersonModal, pasVuDepuisUnMomentShows, pendingAction, scrollToSection, selectedEpisodeModal, selectedPersonId, setPendingAction, setSelectedEpisodeModal, setSelectedPersonId, setVisibleCount, upcomingRef, upcomingShows, visibleCount, watchNextRef } = model;
   return (
     <div id="watchlist-container" className="flex-1 overflow-y-auto bg-transparent text-white pb-nav">
       <div className="sticky top-0 z-40 px-4 sm:px-6 pt-6 pb-4 flex flex-col gap-3 bg-zinc-950/60 backdrop-blur-xl">
@@ -450,22 +450,11 @@ export function WatchListView({ model }: WatchListViewProps) {
           show={selectedEpisodeModal.show}
           season={selectedEpisodeModal.season}
           episode={selectedEpisodeModal.episode}
+          isHydrating={selectedEpisodeModal.isHydrating}
           tmdbShowTitle={selectedEpisodeModal.show.title}
           tmdbShowId={selectedEpisodeModal.show.tmdbId}
           onShowClick={(tmdbId) => {
-            setSelectedEpisodeModal(null);
-            if (window.history.state?.isEpisodeDetailModal || window.history.state?.isModal) {
-              window.history.back();
-            }
-            setTimeout(() => {
-              if (onShowClick) {
-                if (selectedEpisodeModal.show.id) {
-                  onShowClick(selectedEpisodeModal.show.id, selectedEpisodeModal.show.mediaType);
-                } else {
-                  onShowClick(tmdbId.toString(), selectedEpisodeModal.show.mediaType);
-                }
-              }
-            }, 50);
+            handleEpisodeParentClick(selectedEpisodeModal.show, tmdbId);
           }}
           onClose={() => {
             setSelectedEpisodeModal(null);

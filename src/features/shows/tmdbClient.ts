@@ -749,6 +749,13 @@ export class TMDBClient {
     return cached.data;
   }
 
+  peekEpisodeDetails(id: number, seasonNumber: number, episodeNumber: number): any | null {
+    const cacheKey = `${Number(id)}:${Number(seasonNumber)}:${Number(episodeNumber)}`;
+    const cached = this.episodeDetailsCache.get(cacheKey);
+    if (!cached || Date.now() - cached.timestamp >= EPISODE_DETAILS_CACHE_TTL_MS) return null;
+    return cached.data;
+  }
+
   async getWatchProviders(id: number, type: 'tv' | 'movie' = 'tv'): Promise<Result<any>> {
     const cacheKey = `${type}:${id}`;
     const cached = this.watchProvidersCache.get(cacheKey);

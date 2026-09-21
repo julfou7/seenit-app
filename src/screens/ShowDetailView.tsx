@@ -49,7 +49,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   return (
     <div ref={mainScrollRef} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
       style={{ transform: isExiting ? 'translateX(100%)' : (dragX > 0 ? `translateX(${dragX}px)` : undefined) }}
-      className={cn("flex-1 overflow-y-auto bg-transparent text-white relative pb-nav w-full h-full", isDragging ? "transition-none" : "transition-transform duration-300 ease-out", !isExiting && dragX === 0 && "animate-in slide-in-from-right duration-300")}>
+      className={cn("flex-1 overflow-y-auto bg-transparent text-white relative pb-nav w-full h-full", isDragging ? "transition-none" : "transition-transform duration-300 ease-out")}>
       <div className="relative">
         <div className="absolute top-0 inset-x-0 h-96 z-0">
           {backdropUrl && <img loading="eager" decoding="async" fetchPriority="high" src={backdropUrl} alt="Backdrop" className="w-full h-full object-cover opacity-60" />}

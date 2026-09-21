@@ -7,6 +7,7 @@ interface EpisodeDetailModalProps {
   show?: Show;
   season: number;
   episode: any;
+  isHydrating?: boolean;
   tmdbShowTitle?: string;
   tmdbShowId?: number;
   onShowClick?: (tmdbId: number, mediaType?: 'tv' | 'movie') => void;

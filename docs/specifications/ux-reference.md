@@ -126,6 +126,13 @@ La pile visible est la source de l'action Retour : dialogue supérieur → fiche
 sortie Android. Chaque activation ferme un seul niveau. L'arrière-plan d'un dialogue modal ne reçoit
 ni clic ni focus ; à la fermeture, focus et position reviennent à l'élément déclencheur.
 
+Pour les fiches média et épisodes, la transition visuelle suit la même pile au lieu de révéler les niveaux
+intermédiaires. Une fiche Film/Série possède une seule entrée latérale au niveau de son conteneur ; sa vue
+interne et son shell froid ne rejouent pas une animation. La modal épisode fait entrer backdrop et panneau
+ensemble. Si le détail épisode n'est pas déjà en cache, elle réserve la géométrie finale sans afficher un
+titre ou une image provisoire. Le passage épisode → série dépile l'état de modal en la conservant visuellement
+jusqu'au remplacement par la fiche, afin que l'onglet/Historique inférieur ne flashe jamais entre les deux.
+
 Les niveaux de superposition ont des rôles nommés et sont rendus dans un contexte maîtrisé. Une valeur
 z-index plus grande n'est pas une preuve suffisante si un parent crée un autre stacking context.
 Les panneaux bloquants recouvrent la navigation ; une fiche qui conserve la nav réserve son espace.

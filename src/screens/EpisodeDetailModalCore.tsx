@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'motion/react';
 import { type Show } from '../types';
 import { X, Check, Star, ChevronLeft, ChevronRight, Clock, ArrowLeft, Sparkles, Download, CheckCircle2, Play } from 'lucide-react';
@@ -20,6 +20,7 @@ interface EpisodeDetailModalProps {
   show?: Show;
   season: number;
   episode: any;
+  isHydrating?: boolean;
   tmdbShowTitle?: string;
   tmdbShowId?: number;
   onShowClick?: (tmdbId: number, mediaType?: 'tv' | 'movie') => void;
@@ -27,7 +28,7 @@ interface EpisodeDetailModalProps {
   onLoadSeason?: (seasonNum: number) => Promise<any>;
 }
 
-export function EpisodeDetailModal({ show, season: initialSeason, episode: initialEpisode, tmdbShowTitle, tmdbShowId, onShowClick, onClose, onLoadSeason }: EpisodeDetailModalProps) {
+export function EpisodeDetailModal({ show, season: initialSeason, episode: initialEpisode, isHydrating = false, tmdbShowTitle, tmdbShowId, onShowClick, onClose, onLoadSeason }: EpisodeDetailModalProps) {
   const [currentSeason, setCurrentSeason] = useState(initialSeason);
   const [currentEpisode, setCurrentEpisode] = useState(initialEpisode);
   const [isSynopsisExpanded, setIsSynopsisExpanded] = useState(false);
@@ -124,7 +125,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
     }).catch(() => {});
   };
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setCurrentSeason(initialSeason);
     setCurrentEpisode(initialEpisode);
     setShowFutureConfirm(false);
@@ -671,8 +672,12 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   return (
     <div className="fixed inset-0 z-40 flex flex-col items-center">
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
+      <motion.div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.18, ease: 'easeOut' }}
         onClick={onClose}
       />
 
@@ -680,10 +685,10 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
       <motion.div
         className="relative bg-zinc-950 w-full max-w-md h-full overflow-hidden flex flex-col shadow-2xl"
         onClick={(e) => e.stopPropagation()}
-        initial={{ y: '100%' }}
-        animate={{ y: 0 }}
-        exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+        initial={{ y: 18, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 18, opacity: 0 }}
+        transition={{ duration: 0.18, ease: 'easeOut' }}
       >
 
         {/* Season Transition Toast Banner */}
@@ -772,6 +777,48 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
           }}
         >
           <AnimatePresence mode="wait" initial={false}>
+            {isHydrating ? (
+              <motion.div
+                key="episode-hydrating"
+                className="w-full h-full flex flex-col overflow-y-auto custom-scrollbar relative touch-pan-y"
+                initial={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.12 }}
+                aria-busy="true"
+              >
+                <div className="absolute left-4 right-4 z-30 flex items-center justify-between pointer-events-auto" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 14px)' }}>
+                  <button type="button" onClick={(e) => {
+                    e.stopPropagation();
+                    const targetTmdbId = tmdbShowId || show?.tmdbId;
+                    if (onShowClick && targetTmdbId) onShowClick(targetTmdbId, show?.mediaType || 'tv');
+                    else onClose();
+                  }} className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-zinc-900/85 backdrop-blur-md border border-white/10 text-white active:scale-95 transition-all max-w-[200px] group shadow-lg">
+                    <ArrowLeft size={16} className="text-[#E5A93D] shrink-0" />
+                    <div className="flex flex-col text-left overflow-hidden leading-tight">
+                      <span className="text-[9px] uppercase tracking-wider text-zinc-400 font-bold -mb-0.5">Série</span>
+                      <span className="text-xs font-semibold truncate max-w-[140px]">{show?.title || tmdbShowTitle || 'Retour'}</span>
+                    </div>
+                  </button>
+                  <button type="button" onClick={onClose} className="w-9 h-9 rounded-full bg-zinc-900/85 backdrop-blur-md border border-white/10 flex items-center justify-center text-zinc-300 active:scale-95 transition-all shadow-lg" aria-label="Fermer"><X size={18} /></button>
+                </div>
+                <div className="w-full">
+                  <div className="relative w-full h-[280px] sm:h-[340px] bg-zinc-900 overflow-hidden"><div className="absolute inset-0 bg-gradient-to-t from-[#09090B] via-[#09090B]/40 to-transparent" /></div>
+                  <div className="px-5 -mt-16 relative z-10 space-y-4 pb-nav">
+                    <div className="space-y-3">
+                      <span className="inline-block px-3 py-1 rounded-full text-[10px] font-bold bg-zinc-800/80 text-zinc-300 border border-white/10">S{currentSeason.toString().padStart(2, '0')} | E{String(currentEpisode?.episode_number || initialEpisode?.episode_number || 1).padStart(2, '0')}</span>
+                      <div className="h-9 w-4/5 max-w-[280px] rounded-lg bg-zinc-800/80" aria-hidden="true" />
+                      <div className="text-[#E5A93D] text-sm font-bold uppercase tracking-wider">{show?.title || tmdbShowTitle || 'Série'}</div>
+                    </div>
+                    <div className="h-14 w-full rounded-2xl bg-zinc-800/80" aria-hidden="true" />
+                    <div className="space-y-2 pt-2" aria-hidden="true">
+                      <div className="h-3.5 w-full rounded bg-zinc-800/80" />
+                      <div className="h-3.5 w-11/12 rounded bg-zinc-800/80" />
+                      <div className="h-3.5 w-4/5 rounded bg-zinc-800/80" />
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ) : (
             <motion.div
               key={`ep-${currentSeason}-${currentEpisode?.episode_number || 1}`}
               className="w-full h-full flex flex-col overflow-y-auto custom-scrollbar relative will-change-transform transform-gpu touch-pan-y"
@@ -1073,6 +1120,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
               </div>
             </div>
           </motion.div>
+            )}
         </AnimatePresence>
       </motion.div>
     </motion.div>

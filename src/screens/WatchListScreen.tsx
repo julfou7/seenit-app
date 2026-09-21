@@ -40,7 +40,14 @@ import {
 } from './watchListPresentation';
 import { WatchListView } from './WatchListView';
 
-export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick: (id: string, mediaType?: 'tv' | 'movie') => void; onOpenProfile?: () => void }) {
+export function WatchListScreen({
+  onShowClick: onShowClickProp,
+  onEpisodeParentClick: onEpisodeParentClickProp,
+}: {
+  onShowClick: (id: string, mediaType?: 'tv' | 'movie') => void;
+  onEpisodeParentClick?: (id: string, mediaType?: 'tv' | 'movie') => void;
+  onOpenProfile?: () => void;
+}) {
   const onShowClick = useCallback((id: string, mediaType?: 'tv' | 'movie') => {
     sessionStorage.setItem('home_scroll', window.scrollY.toString());
     onShowClickProp(id, mediaType);
@@ -48,7 +55,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
 
   const [activeTab, setActiveTab] = useState<'watch_next' | 'upcoming' | 'history'>('watch_next');
   const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [selectedEpisodeModal, setSelectedEpisodeModal] = useState<{ show: Show; season: number; episode: any } | null>(null);
+  const [selectedEpisodeModal, setSelectedEpisodeModal] = useState<{ show: Show; season: number; episode: any; isHydrating: boolean } | null>(null);
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState<number>(WATCHLIST_BATCH_SIZE);
@@ -75,6 +82,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
   const hasSeededNightAgent = useRef(false);
   const openingEpisodeRef = useRef(false);
   const episodeRequestRef = useRef(0);
+  const pendingEpisodeParentRef = useRef<{ id: string; mediaType: 'tv' | 'movie' } | null>(null);
 
   const handleEpisodeClick = useCallback((show: Show, seasonNumber: number, episodeNumber: number) => {
     if (openingEpisodeRef.current || selectedEpisodeModal) return;
@@ -86,52 +94,82 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
       Number(ep?.season_number) === Number(seasonNumber)
       && Number(ep?.episode_number) === Number(episodeNumber)
     );
-    const epData = {
+    const cachedEpisode = show.tmdbId ? tmdb.peekEpisodeDetails(show.tmdbId, seasonNumber, episodeNumber) : null;
+    const epData = cachedEpisode || {
       season_number: seasonNumber,
       episode_number: episodeNumber,
       name: knownEpisode?.name || `Épisode ${episodeNumber}`,
       air_date: knownEpisode?.air_date || null,
       still_path: knownEpisode?.still_path || null,
     };
+    const isHydrating = Boolean(show.tmdbId && !cachedEpisode);
 
-    setSelectedEpisodeModal({ show, season: seasonNumber, episode: epData });
+    setSelectedEpisodeModal({ show, season: seasonNumber, episode: epData, isHydrating });
     const currentState = window.history.state || {};
     if (!currentState.isEpisodeDetailModal) {
       window.history.pushState({ ...currentState, isModal: true, isEpisodeDetailModal: true }, '');
     }
 
     const requestId = ++episodeRequestRef.current;
-    requestAnimationFrame(() => {
-      openingEpisodeRef.current = false;
-    });
+    requestAnimationFrame(() => { openingEpisodeRef.current = false; });
+    if (!show.tmdbId || cachedEpisode) return;
 
-    if (!show.tmdbId) return;
-    void tmdb.getEpisodeDetails(show.tmdbId, seasonNumber, episodeNumber).then(res => {
-      if (!res.ok || !res.value || requestId !== episodeRequestRef.current) return;
+    const settleEpisodeHydration = (episode?: any) => {
       setSelectedEpisodeModal(current => {
         if (!current) return current;
-        const sameShow = String(current.show.id || current.show.tmdbId || '')
-          === String(show.id || show.tmdbId || '');
-        const sameEpisode = current.season === seasonNumber
-          && Number(current.episode?.episode_number) === Number(episodeNumber);
+        const sameShow = String(current.show.id || current.show.tmdbId || '') === String(show.id || show.tmdbId || '');
+        const sameEpisode = current.season === seasonNumber && Number(current.episode?.episode_number) === Number(episodeNumber);
         if (!sameShow || !sameEpisode) return current;
-        return { ...current, episode: res.value };
+        return { ...current, ...(episode ? { episode } : {}), isHydrating: false };
       });
-    }).catch(() => {});
+    };
+
+    void tmdb.getEpisodeDetails(show.tmdbId, seasonNumber, episodeNumber).then(res => {
+      if (requestId !== episodeRequestRef.current) return;
+      settleEpisodeHydration(res.ok && res.value ? res.value : undefined);
+    }).catch(() => {
+      if (requestId === episodeRequestRef.current) settleEpisodeHydration();
+    });
   }, [selectedEpisodeModal]);
+
+  const openEpisodeParentNow = useCallback((target: { id: string; mediaType: 'tv' | 'movie' }) => {
+    sessionStorage.setItem('home_scroll', window.scrollY.toString());
+    startTransition(() => {
+      if (onEpisodeParentClickProp) onEpisodeParentClickProp(target.id, target.mediaType);
+      else onShowClickProp(target.id, target.mediaType);
+      setSelectedEpisodeModal(null);
+    });
+  }, [onEpisodeParentClickProp, onShowClickProp]);
+
+  const handleEpisodeParentClick = useCallback((show: Show, tmdbId: number) => {
+    const target = {
+      id: show.id ? String(show.id) : String(tmdbId),
+      mediaType: show.mediaType === 'movie' ? 'movie' as const : 'tv' as const,
+    };
+    if (window.history.state?.isEpisodeDetailModal || window.history.state?.isModal) {
+      pendingEpisodeParentRef.current = target;
+      window.history.back();
+      return;
+    }
+    openEpisodeParentNow(target);
+  }, [openEpisodeParentNow]);
 
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
       if (!event.state || !event.state.isEpisodeDetailModal) {
-        setSelectedEpisodeModal(null);
+        const pendingParent = pendingEpisodeParentRef.current;
+        if (pendingParent) {
+          pendingEpisodeParentRef.current = null;
+          openEpisodeParentNow(pendingParent);
+        } else {
+          setSelectedEpisodeModal(null);
+        }
       }
-      if (event.state && event.state.isPersonDetailModal && event.state.personId) {
-        setSelectedPersonId(event.state.personId);
-      } else if (!event.state || !event.state.isPersonDetailModal) {
-        setSelectedPersonId(null);
-      }
+      if (event.state && event.state.isPersonDetailModal && event.state.personId) setSelectedPersonId(event.state.personId);
+      else if (!event.state || !event.state.isPersonDetailModal) setSelectedPersonId(null);
     };
     const handleCloseModals = () => {
+      pendingEpisodeParentRef.current = null;
       setSelectedEpisodeModal(null);
       setSelectedPersonId(null);
     };
@@ -141,7 +179,7 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
       window.removeEventListener('popstate', handlePopState);
       window.removeEventListener('app-close-modals', handleCloseModals);
     };
-  }, []);
+  }, [openEpisodeParentNow]);
 
   useEffect(() => {
     return onAuthStateChanged(auth, setUser);
@@ -611,5 +649,5 @@ export function WatchListScreen({ onShowClick: onShowClickProp }: { onShowClick:
     );
   }, []);
 
-  return <WatchListView model={{ activeTab, allShows, continueWatchingShows, executeUnfollow, expandedSection, filmsAVoirShows, handleArchiveShow, handleDropShow, handleEpisodeClick, handleToggleVoirTout, historyRef, isQuotaExceeded, loading, markMovieAsSeen, markNextEpisodeAsSeen, nouveautesShows, onShowClick, onShowClickProp, openPersonModal, pasVuDepuisUnMomentShows, pendingAction, scrollToSection, selectedEpisodeModal, selectedPersonId, setPendingAction, setSelectedEpisodeModal, setSelectedPersonId, setVisibleCount, upcomingRef, upcomingShows, visibleCount, watchNextRef }} />;
+  return <WatchListView model={{ activeTab, allShows, continueWatchingShows, executeUnfollow, expandedSection, filmsAVoirShows, handleArchiveShow, handleDropShow, handleEpisodeClick, handleEpisodeParentClick, handleToggleVoirTout, historyRef, isQuotaExceeded, loading, markMovieAsSeen, markNextEpisodeAsSeen, nouveautesShows, onShowClick, onShowClickProp, openPersonModal, pasVuDepuisUnMomentShows, pendingAction, scrollToSection, selectedEpisodeModal, selectedPersonId, setPendingAction, setSelectedEpisodeModal, setSelectedPersonId, setVisibleCount, upcomingRef, upcomingShows, visibleCount, watchNextRef }} />;
 }

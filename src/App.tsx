@@ -257,6 +257,11 @@ function MainApp() {
     openShowSmooth(id, 'local', mediaType);
   }, [openShowSmooth]);
 
+  const openLocalMediaImmediate = useCallback((id: any, mediaType?: 'tv' | 'movie') => {
+    void loadShowDetailScreen();
+    openShow(id, 'local', mediaType);
+  }, [openShow]);
+
   const openTmdbMedia = useCallback((id: any, mediaType?: 'tv' | 'movie') => {
     openShowSmooth(id, 'tmdb', mediaType);
   }, [openShowSmooth]);
@@ -510,7 +515,7 @@ function MainApp() {
               {mountedTabs.has('watchlist') && (
                 <Activity mode={currentTab === 'watchlist' ? 'visible' : 'hidden'}>
                   <div data-app-tab="watchlist" className="flex-1 min-h-0 flex flex-col">
-                    <WatchListScreen onShowClick={openLocalMedia} />
+                    <WatchListScreen onShowClick={openLocalMedia} onEpisodeParentClick={openLocalMediaImmediate} />
                   </div>
                 </Activity>
               )}
@@ -548,8 +553,8 @@ function MainApp() {
 
           {selectedShow && (
             <div 
-              className="fixed inset-0 z-[150] bg-black flex flex-col overflow-hidden max-w-md mx-auto animate-in fade-in slide-in-from-bottom-6 duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] animate-overlay-in pt-safe"
-              style={{ willChange: 'transform, opacity' }}
+              className="fixed inset-0 z-[150] bg-black flex flex-col overflow-hidden max-w-md mx-auto animate-in slide-in-from-right duration-300 ease-out motion-reduce:animate-none pt-safe"
+              style={{ willChange: 'transform' }}
             >
               <Suspense fallback={<div className="flex-1 bg-premium-ambient" aria-label="Chargement de la fiche" />}>
                 <ShowDetailScreen
