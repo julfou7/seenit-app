@@ -137,8 +137,9 @@ test('SEENIT-QUALITY-004 ouvre proactivement une issue d’amélioration continu
   const spec = fs.readFileSync('docs/specifications/seenit.md', 'utf8');
   const requestRegistry = fs.readFileSync('docs/requests/registry.md', 'utf8');
 
-  for (const source of [agents, bootstrap, spec]) {
-    assert.match(source, /difficulté réellement rencontrée[\s\S]*corrigeable[\s\S]*prochaine\s+intervention/i);
+  const normalizeReflowableText = (source: string) => source.replace(/\s+/g, ' ');
+  for (const source of [agents, bootstrap, spec].map(normalizeReflowableText)) {
+    assert.match(source, /difficulté réellement rencontrée[\s\S]*corrigeable[\s\S]*prochaine intervention/i);
     assert.match(source, /issues GitHub ouvertes[\s\S]*fermées/i);
     assert.match(source, /réutilise(?:r)?[\s\S]*rouvr(?:e|ir)/i);
     assert.match(source, /ouvr(?:e|ir) immédiatement[\s\S]*issue d'amélioration continue/i);
@@ -146,9 +147,12 @@ test('SEENIT-QUALITY-004 ouvre proactivement une issue d’amélioration continu
     assert.match(source, /chantier principal continue/i);
   }
 
-  assert.match(agents, /non reproductible[\s\S]*non corrigeable[\s\S]*difficulté inventée/i);
-  assert.match(bootstrap, /non reproductible[\s\S]*non corrigeable[\s\S]*difficulté inventée/i);
-  assert.match(spec, /non reproductible[\s\S]*non corrigeable[\s\S]*difficulté inventée/i);
+  const normalizedAgents = normalizeReflowableText(agents);
+  const normalizedBootstrap = normalizeReflowableText(bootstrap);
+  const normalizedSpec = normalizeReflowableText(spec);
+  assert.match(normalizedAgents, /non reproductible[\s\S]*non corrigeable[\s\S]*difficulté inventée/i);
+  assert.match(normalizedBootstrap, /non reproductible[\s\S]*non corrigeable[\s\S]*difficulté inventée/i);
+  assert.match(normalizedSpec, /non reproductible[\s\S]*non corrigeable[\s\S]*difficulté inventée/i);
   assert.match(requestRegistry, /USR-2026-09-21-014/);
   assert.match(requestRegistry, /issue #496/);
 });
