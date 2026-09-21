@@ -3,14 +3,12 @@
  *
  * Le rail conserve l'inertie native du geste, sans aucun scroll snap.
  * React ne garde qu'une fenêtre DOM bornée et les espaceurs préservent
- * la position horizontale. Les titres des rails génériques réservent leurs
- * deux lignes possibles pour que le recyclage des cartes ne fasse jamais
- * varier l'espacement vertical entre deux sections pendant le scroll.
+ * la position horizontale.
  *
- * "Continuer à regarder" est volontairement plus compact : son titre est
- * stabilisé sur une seule ligne, car la ligne épisode + la ligne "Vu" donnent
- * déjà le contexte et une seconde ligne réservée créait un grand vide sous
- * les titres courts.
+ * Les trois rails séries sont volontairement compacts : leur titre est
+ * stabilisé sur une seule ligne, car les lignes épisode/action et "Vu"
+ * apportent déjà le contexte. "Films à voir" conserve deux lignes de titre,
+ * sa carte n'ayant pas ces lignes de contexte supplémentaires.
  */
 :is(
   #continue-watching-carousel,
@@ -22,14 +20,14 @@
 }
 
 :is(
+  #continue-watching-carousel,
   #nouveautes-carousel,
-  #pas-vu-depuis-un-moment-carousel,
-  #films-a-voir-carousel
+  #pas-vu-depuis-un-moment-carousel
 ) .line-clamp-2 {
-  min-block-size: 2lh;
-}
-
-#continue-watching-carousel .line-clamp-2 {
   -webkit-line-clamp: 1;
   min-block-size: 1lh;
+}
+
+#films-a-voir-carousel .line-clamp-2 {
+  min-block-size: 2lh;
 }
