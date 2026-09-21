@@ -9,6 +9,7 @@ import { useToastStore } from '../store/toastStore';
 import { tmdb } from '../features/shows/tmdb';
 import { syncSingleItem } from "../hooks/useDetailsSyncWorker";
 import { RedditSection } from '../components/community/RedditSection';
+import { buildRedditEpisodeSearchQuery } from '../components/community/redditEpisodeSearch';
 import { DownloadModal } from '../components/DownloadModal';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { LiveDownloadBanner } from '../components/LiveDownloadBanner';
@@ -1058,7 +1059,13 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                   </div>
 
                   <RedditSection 
-                    query={`${tmdbShowTitle || show?.title || ''} S${String(currentSeason).padStart(2, '0')}E${String(currentEpisode.episode_number).padStart(2, '0')} discussion`} 
+                    query={buildRedditEpisodeSearchQuery({
+                      seriesTitle: tmdbShowTitle || activeShow?.title || show?.title || '',
+                      originalSeriesTitle: activeShow?.originalTitle || show?.originalTitle,
+                      seasonNumber: currentSeason,
+                      episodeNumber: currentEpisode.episode_number,
+                      episodeTitle: currentEpisode.name,
+                    })} 
                     isLocked={!isSeen} 
                     unlockMessage="Débloquez les discussions de la communauté sur cet épisode en le marquant comme vu."
                   />

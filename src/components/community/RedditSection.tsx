@@ -1,6 +1,7 @@
 import React from 'react';
 import { ExternalLink, Lock } from 'lucide-react';
 import { openExternalUrl } from '../../lib/utils';
+import { buildRedditSearchUrl } from './redditEpisodeSearch';
 
 interface RedditSectionProps {
   query: string;
@@ -21,9 +22,9 @@ export function RedditSection({
   isLocked = false, 
   unlockMessage = "Débloquez les discussions en regardant cet épisode.",
   title = "Discussions Reddit",
-  description = "Retrouvez les théories, avis et spoilers de la communauté."
+  description = "Avis, consensus, désaccords et théories autour de cet épisode."
 }: RedditSectionProps) {
-  const searchUrl = `https://www.reddit.com/search/?q=${encodeURIComponent(query)}&sort=relevance`;
+  const searchUrl = buildRedditSearchUrl(query);
 
   const handleOpenReddit = async () => {
     await openExternalUrl(searchUrl);
@@ -79,10 +80,10 @@ export function RedditSection({
           </div>
           <div>
             <h3 className="text-white font-bold text-sm leading-tight group-hover:text-amber-400 transition-colors">
-              Ouvrir dans l'application Reddit
+              Voir les réactions sur Reddit
             </h3>
             <p className="text-zinc-400 text-[11px] mt-0.5">
-              Rechercher les théories et avis de la communauté
+              Recherche prête · puis « Demander » pour le résumé IA
             </p>
           </div>
         </div>
