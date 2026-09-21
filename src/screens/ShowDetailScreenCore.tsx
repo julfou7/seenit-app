@@ -5,6 +5,7 @@ import { ChevronLeft, Star, Heart, CheckCircle2, Circle, Tv, Zap, X, EyeOff, Arc
 import { Capacitor } from '@capacitor/core';
 import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getBestLogoPath, getTodayStr, getCalendarDaysDiff, getEpisodeRelativeAirDate, scrollAllCarouselsToStart, openExternalUrl, checkIsUpToDate } from '../lib/utils';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
+import { MediaDetailColdShell } from './MediaDetailColdShell';
 import { PersonDetailModal } from './PersonDetailModal';
 import { TimelineMediaCard } from '../components/cards/TimelineMediaCard';
 import { EpisodeRatingsChart } from '../components/EpisodeRatingsChart';
@@ -145,8 +146,8 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         failDownloadRequest(requestId, res.message);
         showToast(res.message || "Erreur lors du lancement dans Sonarr", "error");
       }
-    } catch (err: any) {
-      const message = err?.message || "Erreur réseau Sonarr";
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erreur réseau Sonarr";
       failDownloadRequest(requestId, message);
       showToast(message, "error");
     } finally {
@@ -888,31 +889,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         </div>
       );
     }
-    return (
-      <div className="flex-1 overflow-y-auto bg-black text-white relative pb-nav w-full h-full animate-in fade-in duration-150">
-        <div className="relative">
-          <div className="absolute top-0 inset-x-0 h-96 bg-zinc-900/60 animate-pulse" />
-          <div className="sticky top-0 z-40 pt-10 pb-2 px-4 flex justify-between items-center">
-            <button onClick={onBack} className="w-10 h-10 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center border border-white/10 text-white"><ChevronLeft size={24} /></button>
-            <div className="w-10 h-10 bg-black/60 rounded-full border border-white/10 animate-pulse" />
-          </div>
-          <div className="relative z-10 px-4 mt-6">
-            <div className="flex gap-4">
-              <div className="w-[120px] shrink-0 aspect-[2/3] bg-zinc-800/80 rounded-xl border border-white/10 animate-pulse" />
-              <div className="flex-1 min-w-0 flex flex-col justify-end pb-1 gap-2.5">
-                <div className="flex gap-2"><div className="h-5 w-24 bg-zinc-800/80 rounded-md animate-pulse" /><div className="h-5 w-16 bg-zinc-800/80 rounded-md animate-pulse" /></div>
-                <div className="h-8 w-44 bg-zinc-800/80 rounded-lg animate-pulse my-0.5" />
-                <div className="h-4 w-32 bg-zinc-800/80 rounded animate-pulse" />
-                <div className="flex gap-2 mt-1"><div className="flex items-center gap-1.5 px-2 py-1 bg-zinc-800/80 border border-white/5 rounded-lg animate-pulse w-16 h-6"><span className="text-[#01b4e4]/60 font-black text-[9px] bg-black/20 px-1 rounded-sm">TMDB</span></div></div>
-              </div>
-            </div>
-            <div className="h-12 w-full bg-zinc-800/80 rounded-2xl mt-4 animate-pulse" />
-          </div>
-        </div>
-        <div className="px-4 mt-6"><div className="h-10 bg-zinc-900 rounded-full animate-pulse border border-white/5" /></div>
-        <div className="p-4 space-y-6"><div className="space-y-2"><div className="h-3 w-20 bg-zinc-800 rounded animate-pulse" /><div className="h-3.5 bg-zinc-800/80 rounded w-full animate-pulse" /><div className="h-3.5 bg-zinc-800/80 rounded w-11/12 animate-pulse" /><div className="h-3.5 bg-zinc-800/80 rounded w-4/5 animate-pulse" /></div><div className="space-y-2"><div className="h-3 w-24 bg-zinc-800 rounded animate-pulse" /><div className="flex gap-2"><div className="h-8 w-28 bg-zinc-800/80 rounded-xl border border-white/5 animate-pulse" /><div className="h-8 w-24 bg-zinc-800/80 rounded-xl border border-white/5 animate-pulse" /></div></div></div>
-      </div>
-    );
+    return <MediaDetailColdShell onBack={onBack} mediaType={requestedMediaType} />;
   }
 
   const hasSeenMedia = isSeries ? (show?.seenEpisodes && show.seenEpisodes.length > 0) : (show?.seenEpisodes?.includes('movie') || show?.status === 'completed');

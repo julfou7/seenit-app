@@ -1927,6 +1927,18 @@
           "contains": "SEENIT-PERF-001 réserve les skeletons au chargement réellement froid"
         },
         {
+          "file": "tests/mediaDetailPerformance.test.ts",
+          "contains": "SEENIT-PERF-001 ouvre un épisode avec cache ou shell stable sans contenu provisoire"
+        },
+        {
+          "file": "tests/mediaDetailPerformance.test.ts",
+          "contains": "SEENIT-PERF-001 bascule épisode vers série sans réafficher l’écran inférieur"
+        },
+        {
+          "file": "tests/mediaDetailPerformance.test.ts",
+          "contains": "SEENIT-PERF-001 unifie le shell froid média sans double animation"
+        },
+        {
           "file": "tests/explorerPerformance.test.ts",
           "contains": "SEENIT-PERF-001 regroupe la persistance des diffuseurs hors du scroll"
         },

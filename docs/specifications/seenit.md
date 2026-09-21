@@ -538,6 +538,16 @@ n'est rouverte que par une nouvelle décision produit explicite.
   snapshot sans réseau. Ainsi une fiche dont le payload complet dépasse 1 Mio conserve malgré tout
   titre, synopsis, catégories et thèmes au premier rendu après restart. En cas d'échec réseau, la dernière
   valeur complète reste affichable (`stale-if-error`).
+- L'ouverture d'un **détail d'épisode** suit la même règle de stabilité : un hit du cache mémoire
+  épisode est utilisé synchroniquement ; sinon la modal réserve immédiatement la géométrie finale sans
+  afficher de titre, visuel ou synopsis inventé pendant la requête. Le remplacement par le détail TMDB
+  complet se fait avant peinture via le même composant monté. Le backdrop et la modal entrent ensemble,
+  sans frame où seul l'écran inférieur flouté est visible.
+- Le passage **épisode → fiche série** dépile d'abord l'état historique de la modal tout en la laissant
+  visuellement en place, puis ouvre la fiche série et retire la modal dans la même transition React.
+  L'écran À voir/Historique sous-jacent ne doit donc jamais réapparaître entre les deux. La fiche média
+  possède une seule animation d'entrée portée par son conteneur ; le contenu interne et le shell froid
+  ne rejouent pas une seconde animation.
 - Les listes médias visibles d'Explorer, y compris le chemin par défaut **Tout** construit avec
   `trending` et `popular`, passent par la même famille de cache **Discover** (2 min frais / 30 min
   stale). Les catégories Top 100, Pépites et Documentaires réutilisent cette politique via leurs helpers
@@ -898,7 +908,9 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   remplace jamais l'écran courant par un écran vide ou noir. Les chunks des onglets et des fiches
   média restent séparés du bundle initial, sont préchargés en arrière-plan pendant le splash et les
   changements d'écran sont engagés dans une transition React afin de conserver le contenu déjà
-  affiché jusqu'à ce que la prochaine vue soit prête.
+  affiché jusqu'à ce que la prochaine vue soit prête. Une fiche média n'empile pas plusieurs animations
+  d'entrée : son conteneur porte l'unique transition, y compris lorsque le premier contenu affiché est
+  un shell froid.
 - **SEENIT-UX-004** — Un toast mobile long utilise toute la largeur utile disponible, revient à la
   ligne sans troncature et reste au-dessus de la navigation basse et de la safe area. La règle vaut
   pour la PWA et l'APK, notamment pour la synchronisation Plex. Pendant une synchronisation longue,

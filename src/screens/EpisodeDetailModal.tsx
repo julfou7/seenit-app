@@ -2,11 +2,13 @@ import { type Show } from '../types';
 import { EpisodeDetailModal as EpisodeDetailModalCore } from './EpisodeDetailModalCore';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { isDownloadFeatureEnabled } from '../features/downloads/downloadFeatureVisibility';
+import { type EpisodeDetailData } from './episodeDetailTypes';
 
 interface EpisodeDetailModalProps {
   show?: Show;
   season: number;
-  episode: any;
+  episode: EpisodeDetailData;
+  isHydrating?: boolean;
   tmdbShowTitle?: string;
   tmdbShowId?: number;
   onShowClick?: (tmdbId: number, mediaType?: 'tv' | 'movie') => void;

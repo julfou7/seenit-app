@@ -448,6 +448,14 @@ aussi un aperçu borné des premiers interprètes. La barre d'une fiche est stru
 une série réserve toujours `À propos / Épisodes / Casting`, un film `À propos / Casting`, sans dépendre
 de la présence immédiate des crédits. La section Casting affiche un skeleton seulement tant que leur
 disponibilité est réellement inconnue, puis la grille ou un état vide stable.
+Le détail d'épisode réutilise synchroniquement son cache mémoire lorsqu'il est chaud. À froid, la modal
+s'ouvre sur une géométrie stable sans afficher un faux titre ou un visuel provisoire, puis révèle le détail
+résolu sans remonter toute la modal. Backdrop et contenu entrent ensemble. Depuis cette modal, revenir à
+la fiche série dépile l'état historique de l'épisode en conservant la modal à l'écran jusqu'au remplacement
+atomique par la fiche : À voir/Historique ne doit pas réapparaître entre les deux niveaux. La fiche média
+elle-même n'a qu'une seule animation d'entrée, portée par son conteneur ; le shell froid partagé et la vue
+finale ne rejouent pas une seconde animation.
+
 Le loader relationnel
 n'est armé que lorsqu'une collection TMDB doit réellement être récupérée ; une série sans relation connue
 ne monte aucun faux skeleton. Lorsqu'un chargement relationnel est réel, ses cartes skeleton reprennent la
