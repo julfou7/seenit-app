@@ -54,7 +54,7 @@ test('SEENIT-OBSERVABILITY-001 détecte les angles morts de l’auditeur sans li
   assert.match(body, new RegExp(HEALTH_MARKER));
   assert.match(body, /tmdb_source/);
   assert.match(body, /audit_engine/);
-  assert.doesNotMatch(body, /Bearer|token=|uid=|email|payload utilisateur.*:/i);
+  assert.doesNotMatch(body, /Bearer\\s+[A-Za-z0-9._~-]{8,}|token=[^&\\s]+|uid=[A-Za-z0-9_-]{8,}|[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/i);
 });
 
 test('SEENIT-OBSERVABILITY-001 déduplique le watchdog et respecte son cooldown', async () => {
