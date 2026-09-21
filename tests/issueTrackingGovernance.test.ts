@@ -138,7 +138,7 @@ test('SEENIT-QUALITY-004 ouvre proactivement une issue d’amélioration continu
   const requestRegistry = fs.readFileSync('docs/requests/registry.md', 'utf8');
 
   for (const source of [agents, bootstrap, spec]) {
-    assert.match(source, /difficulté réellement rencontrée[\s\S]*corrigeable[\s\S]*prochaine intervention/i);
+    assert.match(source, /difficulté réellement rencontrée[\s\S]*corrigeable[\s\S]*prochaine\s+intervention/i);
     assert.match(source, /issues GitHub ouvertes[\s\S]*fermées/i);
     assert.match(source, /réutilise(?:r)?[\s\S]*rouvr(?:e|ir)/i);
     assert.match(source, /ouvr(?:e|ir) immédiatement[\s\S]*issue d'amélioration continue/i);
