@@ -1,6 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { sanitizeValue } = require('./audit-structured-logs.cjs');
+const { redactText } = require('./audit-structured-logs.cjs');
 
 function parseArgs(argv) {
   const args = {};
@@ -11,28 +11,41 @@ function parseArgs(argv) {
   return args;
 }
 
+const SENSITIVE_FIELD_PATTERN = /(authorization|cookie|password|secret|token|api[_-]?key|sid|uid|user(?:id)?|email|path|url|title|message)/i;
+
 function redactCloudRunEnvValues(value, depth = 0) {
-  if (depth > 20 || value == null || typeof value !== 'object') return value;
-  if (Array.isArray(value)) return value.slice(0, 10000).map(entry => redactCloudRunEnvValues(entry, depth + 1));
+  if (depth > 20) return '[PROFONDEUR_LIMITÉE]';
+  if (typeof value === 'string') return redactText(value);
+  if (value == null || typeof value === 'boolean' || typeof value === 'number') return value;
+  if (Array.isArray(value)) {
+    return value.slice(0, 10000).map(entry => redactCloudRunEnvValues(entry, depth + 1));
+  }
+  if (typeof value !== 'object') return redactText(value);
 
   const output = {};
   for (const [key, entry] of Object.entries(value).slice(0, 500)) {
     if (key === 'env' && Array.isArray(entry)) {
       output[key] = entry.slice(0, 500).map(binding => {
-        if (!binding || typeof binding !== 'object' || Array.isArray(binding)) return redactCloudRunEnvValues(binding, depth + 1);
+        if (!binding || typeof binding !== 'object' || Array.isArray(binding)) {
+          return redactCloudRunEnvValues(binding, depth + 1);
+        }
         const sanitizedBinding = redactCloudRunEnvValues(binding, depth + 1);
-        if (Object.prototype.hasOwnProperty.call(binding, 'value')) sanitizedBinding.value = '[MASQUÉ_ENV]';
+        if (Object.prototype.hasOwnProperty.call(binding, 'value')) {
+          sanitizedBinding.value = '[MASQUÉ_ENV]';
+        }
         return sanitizedBinding;
       });
       continue;
     }
-    output[key] = redactCloudRunEnvValues(entry, depth + 1);
+    output[key] = SENSITIVE_FIELD_PATTERN.test(key)
+      ? '[MASQUÉ]'
+      : redactCloudRunEnvValues(entry, depth + 1);
   }
   return output;
 }
 
 function redactGcpLogExport(payload) {
-  return sanitizeValue(redactCloudRunEnvValues(payload));
+  return redactCloudRunEnvValues(payload);
 }
 
 function readInput(input) {

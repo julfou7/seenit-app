@@ -34,5 +34,4 @@ test('SEENIT-SECURITY-003 redige les valeurs env Cloud Run avant tout export par
   assert.doesNotMatch(serialized, /ghp_super_secret|seenit\.ai\.studio|abcdefghijklmnopqrstuvwxyz123456|operator@example\.com/);
   assert.match(serialized, /MASQUÉ_ENV/);
   assert.match(serialized, /TMDB_API_KEY/);
-  assert.match(serialized, /latest/);
 });

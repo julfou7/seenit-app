@@ -15,7 +15,9 @@ test('SEENIT-SECURITY-001 injecte uniquement TMDB et TVDB depuis Secret Manager'
     assert.match(providerSpec, new RegExp(name));
   }
 
-  assert.match(sanitizer, /removeSingleContainerEnv\(lines, currentImageIndex, 'OMDB_API_KEY'\)/);
+  assert.match(sanitizer, /OBSOLETE_RUNTIME_ENV_NAMES/);
+  assert.match(sanitizer, /'OMDB_API_KEY'/);
+  assert.match(sanitizer, /removeSingleContainerEnv\(lines, obsoleteImageIndex, obsoleteName\)/);
   assert.match(sanitizer, /variable OMDB_API_KEY obsolète subsiste/i);
   assert.match(providerSpec, /OMDB_API_KEY` est obsolète/);
   assert.match(providerSpec, /Secret Manager Secret Accessor/);
