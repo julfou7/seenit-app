@@ -667,8 +667,9 @@ restent des TNR terrain lorsque le risque du changement UX l'exige ; ils ne sont
   localement puis envoyés uniquement sous forme `code + count`, par lot opportuniste au plus toutes les
   trente minutes lorsqu'un appel API authentifié a déjà lieu ; aucun warning individuel ne déclenche de
   trafic. Un warning inconnu doit se répéter sur deux fenêtres de six heures avant de devenir une issue
-  de qualification. Les autres événements restent report-only ; l'application ne dépend jamais de
-  GitHub pour répondre aux requêtes.
+  de qualification. En mode live, une panne de l'auditeur ou de ses sources ouvre/enrichit une issue
+  P1 de santé à partir des seuls outcomes/statuts techniques, sans ingérer de logs. Les autres événements
+  restent report-only ; l'application ne dépend jamais de GitHub pour répondre aux requêtes.
 - Une indisponibilité TMDB peut laisser un écran partiel ou un cache ; elle ne justifie aucun matching
   par titre et ne transforme jamais une classification d'âge inconnue en « Tous publics ».
 - Les parcours critiques qualité sont connexion, bibliothèque, Plex, téléchargements, mise à jour et

@@ -12,6 +12,7 @@ on:
       - 'scripts/summarize-tmdb-cache-diagnostics.cjs'
       - 'scripts/summarize-cloud-run-traffic.cjs'
       - 'scripts/audit-structured-logs.cjs'
+      - 'scripts/report-log-auditor-health.cjs'
       - 'src/features/runtime/operationalEvent.ts'
       - 'src/features/runtime/backendRuntime.ts'
       - 'server.ts'
@@ -217,8 +218,25 @@ jobs:
           if-no-files-found: warn
           retention-days: 40
 
+      - name: Report auditor health to GitHub
+        id: health_watchdog
+        if: always() && env.SEENIT_LOG_AUDITOR_MODE == 'live'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SEENIT_AUDITOR_AUTH_OUTCOME: ${{ steps.auth.outcome }}
+          SEENIT_AUDITOR_GCLOUD_OUTCOME: ${{ steps.gcloud.outcome }}
+          SEENIT_AUDITOR_COLLECT_OUTCOME: ${{ steps.collect.outcome }}
+          SEENIT_AUDITOR_TMDB_SUMMARY_OUTCOME: ${{ steps.tmdb_cache_summary.outcome }}
+          SEENIT_AUDITOR_TRAFFIC_SUMMARY_OUTCOME: ${{ steps.cloud_run_traffic_summary.outcome }}
+          SEENIT_AUDITOR_ENGINE_OUTCOME: ${{ steps.auditor.outcome }}
+          SEENIT_AUDITOR_STRUCTURED_SOURCE_STATUS: ${{ steps.collect.outputs.source_status || 'unavailable' }}
+          SEENIT_AUDITOR_TMDB_SOURCE_STATUS: ${{ steps.collect_tmdb_cache.outputs.source_status || 'unavailable' }}
+          SEENIT_AUDITOR_TRAFFIC_SOURCE_STATUS: ${{ steps.collect_cloud_run_traffic.outputs.source_status || 'unavailable' }}
+        run: node scripts/report-log-auditor-health.cjs
+
       - name: Fail observably after preserving the report
-        if: steps.auditor.outcome != 'success' || steps.tmdb_cache_summary.outcome != 'success' || steps.cloud_run_traffic_summary.outcome != 'success'
+        if: steps.auditor.outcome != 'success' || steps.tmdb_cache_summary.outcome != 'success' || steps.cloud_run_traffic_summary.outcome != 'success' || steps.health_watchdog.outcome == 'failure'
         run: |
           echo 'L’auditeur a terminé en état dégradé. Le backend SeenIt reste indépendant de ce job.'
           exit 1

@@ -30,6 +30,12 @@ test('SEENIT-OBSERVABILITY-001 exécute un batch Cloud Run en dry-run désactiva
   assert.match(workflow, /src\/features\/logging\/clientOperationalSignals\.ts/);
   assert.match(workflow, /src\/features\/logging\/clientOperationalDiagnostics\.ts/);
   assert.match(workflow, /src\/services\/appUpdater\.ts/);
+  assert.match(workflow, /scripts\/report-log-auditor-health\.cjs/);
+  assert.match(workflow, /Report auditor health to GitHub/);
+  assert.match(workflow, /SEENIT_AUDITOR_STRUCTURED_SOURCE_STATUS/);
+  assert.match(workflow, /SEENIT_AUDITOR_TMDB_SOURCE_STATUS/);
+  assert.match(workflow, /SEENIT_AUDITOR_TRAFFIC_SOURCE_STATUS/);
+  assert.match(workflow, /steps\.health_watchdog\.outcome == 'failure'/);
   assert.match(workflow, /issues: write/);
   assert.match(workflow, /id: auth[\s\S]*continue-on-error: true/);
   assert.match(workflow, /id: gcloud[\s\S]*continue-on-error: true/);

@@ -129,3 +129,13 @@ Un run local sans token n'effectue aucune écriture GitHub.
 Une lecture Cloud, un flush client ou un appel GitHub en échec n'affecte jamais le comportement métier.
 Le client conserve ses compteurs pour une tentative ultérieure bornée ; le job CI écrit son rapport
 redigé avant de signaler un état dégradé lorsque GitHub Actions reste disponible.
+
+Le workflow surveille aussi **sa propre santé**. En mode `live`, un watchdog indépendant du moteur
+d'analyse contrôle uniquement les outcomes des étapes et les trois statuts de source (événements
+structurés, baseline TMDB, trafic Cloud Run). Une dégradation ouvre une issue unique
+`[P1][Observabilité] Auditeur de logs indisponible` avec un marqueur stable ; les occurrences suivantes
+l'enrichissent au plus toutes les six heures. Le watchdog n'ingère aucun log et n'exporte que run, SHA et
+états techniques allowlistés. Il ne ferme jamais l'issue automatiquement après récupération.
+
+Ainsi, une panne WIF, Cloud Logging, du résumeur ou du moteur d'audit ne dépend plus d'une lecture manuelle
+des logs ou de GitHub Actions pour être découverte.
