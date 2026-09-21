@@ -193,6 +193,11 @@ function redactText(value) {
     .replace(/\/(?:home|Users|private|tmp|var)\/[^\s,;]*/g, '[CHEMIN_MASQUÉ]');
 }
 
+function looksLikeSensitiveEnvName(name) {
+  return String(name || '') === 'GITHUB_PAT'
+    || /(?:^|_)(?:TOKEN|SECRET|PASSWORD|PASSWD|API_KEY|APIKEY|PRIVATE_KEY|CREDENTIALS?|DATABASE_URL|DB_URL|CONNECTION_STRING|PAT)(?:$|_)/i.test(String(name || ''));
+}
+
 function sanitizeValue(value, depth = 0) {
   if (depth > 4) return '[PROFONDEUR_LIMITÉE]';
   if (typeof value === 'string') return redactText(value);
@@ -200,8 +205,15 @@ function sanitizeValue(value, depth = 0) {
   if (Array.isArray(value)) return value.slice(0, 20).map(entry => sanitizeValue(entry, depth + 1));
   if (typeof value !== 'object') return redactText(value);
 
+  const cloudRunEnvName = typeof value.name === 'string' ? value.name : '';
+  const masksNamedEnvValue = looksLikeSensitiveEnvName(cloudRunEnvName) && Object.prototype.hasOwnProperty.call(value, 'value');
+
   const safe = {};
   for (const [key, entry] of Object.entries(value).slice(0, 30)) {
+    if (masksNamedEnvValue && key === 'value') {
+      safe[key] = '[MASQUÉ]';
+      continue;
+    }
     if (/(authorization|cookie|password|secret|token|api[_-]?key|sid|uid|user(?:id)?|email|path|url|title|message)/i.test(key)) {
       safe[key] = '[MASQUÉ]';
     } else {
@@ -820,7 +832,8 @@ module.exports = {
   normalizeEvent,
   normalizeMode,
   redactText,
-  sanitizeValue
+  sanitizeValue,
+  looksLikeSensitiveEnvName
 };
 
 if (require.main === module) {

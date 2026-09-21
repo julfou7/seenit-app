@@ -2,6 +2,7 @@
 
 | ID | Date | Décision durable | Exigences / trace | Statut |
 |---|---|---|---|---|
+| USR-2026-09-21-012 | 2026-09-21 | Les secrets runtime SeenIt ne doivent jamais être recopiés en clair d’une révision Cloud Run à la suivante ni apparaître dans un export GCP partageable : Secret Manager est la source des credentials actifs, une candidate échoue fermée sur tout secret plaintext inattendu et les exports Admin Activity passent par une redaction obligatoire avant conservation. | `SEENIT-SECURITY-003`, [issue #30](https://github.com/julfou7/seenit-app/issues/30) | active |
 | USR-2026-08-30-001 | 2026-08-30 | SeenIt doit rester fonctionnel en PWA et surtout dans l'APK, avec des adaptations natives explicites comme l'ouverture de Plex Android. | `SEENIT-PLATFORM-001`, `SEENIT-APK-001`, `SEENIT-APK-002` | active |
 | USR-2026-08-30-002 | 2026-08-30 | L'identité Plex/TMDB n'est jamais devinée depuis le titre ou l'année ; seuls des identifiants techniques vérifiés sont acceptés. | `SEENIT-IDENTITY-001`, `SEENIT-PLEX-001` | active |
 | USR-2026-08-30-003 | 2026-08-30 | Les données d'un même compte SeenIt sont partagées entre PWA et APK, tandis que les secrets, caches et notifications restent isolés par UID et, lorsque nécessaire, par appareil. | `SEENIT-DATA-001`, `SEENIT-DATA-003`, `SEENIT-NOTIFICATION-001` | active |

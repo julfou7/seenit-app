@@ -1,5 +1,23 @@
 const fs = require('node:fs');
 
+const SENSITIVE_RUNTIME_ENV_NAME_PATTERN = /(?:^|_)(?:TOKEN|SECRET|PASSWORD|PASSWD|API_KEY|APIKEY|PRIVATE_KEY|CREDENTIALS?|DATABASE_URL|DB_URL|CONNECTION_STRING|PAT)(?:$|_)/i;
+const OBSOLETE_RUNTIME_ENV_NAMES = Object.freeze([
+  'OMDB_API_KEY',
+  'WEBHOOK_SECRET',
+  'VITE_TMDB_API_KEY',
+  'SEENIT_ADMIN_UIDS',
+  'GEMINI_API_KEY',
+  'DATABASE_URL',
+  'DB_PASSWORD',
+  'DATABASE_PASSWORD',
+  'POSTGRES_PASSWORD',
+  'PGPASSWORD',
+]);
+
+function isSensitiveRuntimeEnvName(name) {
+  return name === 'GITHUB_PAT' || SENSITIVE_RUNTIME_ENV_NAME_PATTERN.test(String(name || ''));
+}
+
 function parseArgs(argv) {
   const args = {};
   for (let index = 0; index < argv.length; index += 2) {
@@ -261,6 +279,60 @@ function removeSingleContainerEnv(lines, imageIndex, name) {
   lines.splice(start, end - start);
 }
 
+function listSingleContainerEnvBindings(lines, imageIndex) {
+  const { containerStart, containerEnd } = getSingleContainerBounds(lines, imageIndex);
+  const envIndex = lines.findIndex((line, index) => index >= containerStart && index < containerEnd && /^(?:      - |        )env:\s*$/.test(line));
+  if (envIndex < 0) return [];
+
+  let envEnd = containerEnd;
+  for (let index = envIndex + 1; index < containerEnd; index += 1) {
+    if (/^        [A-Za-z0-9_-]+:\s*/.test(lines[index])) { envEnd = index; break; }
+  }
+
+  const starts = [];
+  for (let index = envIndex + 1; index < envEnd; index += 1) {
+    const match = lines[index].match(/^        - name:\s*['"]?([^'"\s]+)['"]?\s*$/);
+    if (match) starts.push({ index, name: match[1] });
+  }
+
+  return starts.map((entry, position) => {
+    const end = starts[position + 1]?.index ?? envEnd;
+    const block = lines.slice(entry.index, end).join('\n');
+    const source = /\n\s+valueFrom:\s*(?:\n|$)[\s\S]*secretKeyRef:/.test(block)
+      ? 'secret'
+      : /\n\s+value:\s*/.test(block)
+        ? 'plain'
+        : 'other';
+    return { end, name: entry.name, source, start: entry.index };
+  });
+}
+
+function removePlaintextSingleContainerEnv(lines, imageIndex, name) {
+  const binding = listSingleContainerEnvBindings(lines, imageIndex).find(entry => entry.name === name);
+  if (!binding || binding.source !== 'plain') return false;
+  lines.splice(binding.start, binding.end - binding.start);
+  return true;
+}
+
+function assertNoPlaintextSensitiveEnv(lines, imageIndex) {
+  const offenders = listSingleContainerEnvBindings(lines, imageIndex)
+    .filter(entry => entry.source === 'plain' && isSensitiveRuntimeEnvName(entry.name))
+    .map(entry => entry.name)
+    .sort();
+  if (offenders.length) {
+    throw new Error(`Secret runtime en clair interdit dans la candidate Cloud Run: ${offenders.join(', ')}`);
+  }
+}
+
+function summarizeRuntimeEnvBindings(source) {
+  const lines = source.replace(/\r\n/g, '\n').split('\n');
+  const imageIndex = lines.findIndex(line => /^\s*(?:-\s*)?image:\s*\S+\s*$/.test(line));
+  if (imageIndex < 0) return [];
+  return listSingleContainerEnvBindings(lines, imageIndex)
+    .map(({ name, source: bindingSource }) => ({ name, source: bindingSource }))
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
+
 function normalizeTraffic(lines, trafficIndex, trafficEnd, previousRevision, candidateRevision, candidateTag) {
   const trafficLines = lines.slice(trafficIndex + 1, trafficEnd);
   const trafficText = trafficLines.join('\n');
@@ -369,7 +441,15 @@ function prepareCandidateService(source, { image, service, previousRevision, can
   forceSingleContainerEnv(lines, imageIndexes[0], 'NODE_ENV', 'production');
   let currentImageIndex = lines.findIndex(line => /^\s*(?:-\s*)?image:\s*\S+\s*$/.test(line));
   if (currentImageIndex < 0) throw new Error('Ligne image perdue avant retrait des variables obsolètes.');
-  removeSingleContainerEnv(lines, currentImageIndex, 'OMDB_API_KEY');
+  for (const obsoleteName of OBSOLETE_RUNTIME_ENV_NAMES) {
+    const obsoleteImageIndex = lines.findIndex(line => /^\s*(?:-\s*)?image:\s*\S+\s*$/.test(line));
+    if (obsoleteImageIndex < 0) throw new Error('Ligne image perdue avant retrait des variables historiques.');
+    removeSingleContainerEnv(lines, obsoleteImageIndex, obsoleteName);
+  }
+  currentImageIndex = lines.findIndex(line => /^\s*(?:-\s*)?image:\s*\S+\s*$/.test(line));
+  if (currentImageIndex < 0) throw new Error('Ligne image perdue avant assainissement du PAT GitHub.');
+  removePlaintextSingleContainerEnv(lines, currentImageIndex, 'GITHUB_PAT');
+
   for (const secretName of ['TMDB_API_KEY', 'TVDB_API_KEY']) {
     const secretImageIndex = lines.findIndex(line => /^\s*(?:-\s*)?image:\s*\S+\s*$/.test(line));
     if (secretImageIndex < 0) throw new Error('Ligne image perdue avant injection Secret Manager.');
@@ -377,6 +457,7 @@ function prepareCandidateService(source, { image, service, previousRevision, can
   }
   const refreshedImageIndex = lines.findIndex(line => /^\s*(?:-\s*)?image:\s*\S+\s*$/.test(line));
   if (refreshedImageIndex < 0) throw new Error('Ligne image perdue pendant la préparation du runtime.');
+  assertNoPlaintextSensitiveEnv(lines, refreshedImageIndex);
   lines[refreshedImageIndex] = lines[refreshedImageIndex].replace(/^(\s*(?:-\s*)?image:\s*)\S+\s*$/, `$1${image}`);
 
   const trafficIndex = lines.findIndex(line => /^  traffic:\s*$/.test(line));
@@ -417,10 +498,14 @@ function main() {
     candidateRevision: args['candidate-revision']
   });
   fs.writeFileSync(args.output, prepared, 'utf8');
+  const inventory = summarizeRuntimeEnvBindings(prepared)
+    .map(binding => `${binding.name}=${binding.source}`)
+    .join(', ');
+  console.log(`[CloudRunCandidate] Inventaire runtime sans valeurs: ${inventory || 'aucune variable'}`);
   console.log(`[CloudRunCandidate] Service préparé: ${args['previous-revision']} -> ${args['candidate-revision']} sur ${args.image}, entrypoint image conservé, NODE_ENV=production, minScale=0, maxScale=2, CPU request-based, aucun VPC connector, secrets TMDB/TVDB liés, trafic normalisé et cible 0 %=${deriveCandidateTag(args.service, args['candidate-revision'])}`);
 }
 
-module.exports = { applySeenItFinOpsBounds, deriveCandidateTag, forceSingleContainerEnv, forceSingleContainerSecretEnv, forceTemplateAnnotation, getSingleContainerBounds, getTemplateMetadataBounds, normalizeSingleContainerLaunch, normalizeTraffic, parseArgs, prepareCandidateService, removeSingleContainerEnv, removeTemplateAnnotation, validateRevisionName };
+module.exports = { applySeenItFinOpsBounds, assertNoPlaintextSensitiveEnv, deriveCandidateTag, forceSingleContainerEnv, forceSingleContainerSecretEnv, forceTemplateAnnotation, getSingleContainerBounds, getTemplateMetadataBounds, isSensitiveRuntimeEnvName, listSingleContainerEnvBindings, normalizeSingleContainerLaunch, normalizeTraffic, parseArgs, prepareCandidateService, removePlaintextSingleContainerEnv, removeSingleContainerEnv, removeTemplateAnnotation, summarizeRuntimeEnvBindings, validateRevisionName };
 
 if (require.main === module) {
   try {

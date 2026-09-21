@@ -249,3 +249,52 @@ test('SEENIT-RUNTIME-001 refuse une configuration multi-conteneurs ambiguë', ()
   const ambiguous = exportedService.replace('        resources:\n', `        resources:\n      - image: us-west1-docker.pkg.dev/sidecar/image:latest\n`);
   assert.throws(() => prepareCandidateService(ambiguous, baseOptions), /2 ligne\(s\) image détectée\(s\)/);
 });
+
+
+test('SEENIT-SECURITY-003 retire les credentials historiques en clair sans supprimer un secretKeyRef GitHub', () => {
+  const leaked = exportedService.replace(
+    '        - name: KEEP_ENV\n          value: keep-value\n',
+    `        - name: KEEP_ENV
+          value: keep-value
+        - name: GITHUB_PAT
+          value: legacy-exposed-pat
+        - name: WEBHOOK_SECRET
+          value: legacy-webhook
+        - name: DATABASE_URL
+          value: postgres://legacy
+`
+  );
+  const prepared = prepareCandidateService(leaked, baseOptions);
+  assert.doesNotMatch(prepared, /legacy-exposed-pat|legacy-webhook|postgres:\/\/legacy/);
+  assert.doesNotMatch(prepared, /name: GITHUB_PAT/);
+  assert.doesNotMatch(prepared, /name: WEBHOOK_SECRET|name: DATABASE_URL/);
+
+  const secretBacked = exportedService.replace(
+    '        - name: KEEP_ENV\n          value: keep-value\n',
+    `        - name: KEEP_ENV
+          value: keep-value
+        - name: GITHUB_PAT
+          valueFrom:
+            secretKeyRef:
+              key: latest
+              name: GITHUB_PAT
+`
+  );
+  const preserved = prepareCandidateService(secretBacked, baseOptions);
+  assert.match(preserved, /name: GITHUB_PAT[\s\S]*secretKeyRef:[\s\S]*name: GITHUB_PAT/);
+});
+
+test('SEENIT-SECURITY-003 refuse un secret inconnu encore injecté en clair', () => {
+  const unsafe = exportedService.replace(
+    '        - name: KEEP_ENV\n          value: keep-value\n',
+    `        - name: KEEP_ENV
+          value: keep-value
+        - name: PARTNER_PASSWORD
+          value: should-never-be-copied
+`
+  );
+  assert.throws(
+    () => prepareCandidateService(unsafe, baseOptions),
+    /Secret runtime en clair interdit.*PARTNER_PASSWORD/
+  );
+});
