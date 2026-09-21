@@ -1154,7 +1154,15 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   `SEENIT-QUALITY-009` lit la carte et les seules sections canoniques directement concernées. L'agent
   recherche ensuite les issues GitHub ouvertes et fermées liées au sujet ainsi que les PR, commits, audits et
   documents pertinents. Il réutilise ou rouvre l'issue adaptée lorsqu'elle existe au lieu de créer un
-  doublon. Dès qu'un travail est relié à une issue GitHub, son corps reste la source de vérité opérationnelle
+  doublon. Pendant l'intervention, toute difficulté réellement rencontrée qui est corrigeable et dont la
+  correction éviterait ou réduirait le même coût lors d'une prochaine intervention déclenche d'abord une
+  recherche des issues GitHub ouvertes et fermées liées. L'agent réutilise ou rouvre l'issue adaptée ou,
+  si aucune n'existe, ouvre immédiatement une issue d'amélioration continue dédiée décrivant le contexte,
+  l'impact concret, la cause racine connue ou l'hypothèse qualifiée, l'amélioration durable proposée, le
+  bénéfice attendu, les critères de validation/fin et le lien vers le chantier révélateur. Le chantier
+  principal continue sauf si cette amélioration est nécessaire pour le terminer correctement ; aucune issue
+  n'est créée pour une gêne non reproductible, un simple manque d'information déjà résolu, une contrainte
+  externe non corrigeable ou une difficulté inventée. Dès qu'un travail est relié à une issue GitHub, son corps reste la source de vérité opérationnelle
   pendant toute l'intervention : l'agent l'actualise aux jalons significatifs prouvés (diagnostic et décisions
   utiles, implémentation prête, validation/CI, intégration sur `main`, release ou blocage), coche chaque
   critère dès qu'il est réellement satisfait et remplace les informations devenues obsolètes. Les

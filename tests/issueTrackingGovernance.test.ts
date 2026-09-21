@@ -130,3 +130,25 @@ test('SEENIT-QUALITY-004 transmet une APK déléguée par un relais release dist
   assert.match(releaseControl, /n'est \*\*pas\*\* une commande/i);
   assert.match(requestRegistry, /USR-2026-09-15-001/);
 });
+
+test('SEENIT-QUALITY-004 ouvre proactivement une issue d’amélioration continue pour toute difficulté corrigeable et réutilisable', () => {
+  const agents = fs.readFileSync('AGENTS.md', 'utf8');
+  const bootstrap = fs.readFileSync('.agents/AGENTS.md', 'utf8');
+  const spec = fs.readFileSync('docs/specifications/seenit.md', 'utf8');
+  const requestRegistry = fs.readFileSync('docs/requests/registry.md', 'utf8');
+
+  for (const source of [agents, bootstrap, spec]) {
+    assert.match(source, /difficulté réellement rencontrée[\s\S]*corrigeable[\s\S]*prochaine intervention/i);
+    assert.match(source, /issues GitHub ouvertes[\s\S]*fermées/i);
+    assert.match(source, /réutilise(?:r)?[\s\S]*rouvr(?:e|ir)/i);
+    assert.match(source, /ouvr(?:e|ir) immédiatement[\s\S]*issue d'amélioration continue/i);
+    assert.match(source, /contexte[\s\S]*impact concret[\s\S]*cause racine[\s\S]*hypothèse[\s\S]*amélioration durable[\s\S]*bénéfice attendu[\s\S]*critères de validation\/fin/i);
+    assert.match(source, /chantier principal continue/i);
+  }
+
+  assert.match(agents, /non reproductible[\s\S]*non corrigeable[\s\S]*difficulté inventée/i);
+  assert.match(bootstrap, /non reproductible[\s\S]*non corrigeable[\s\S]*difficulté inventée/i);
+  assert.match(spec, /non reproductible[\s\S]*non corrigeable[\s\S]*difficulté inventée/i);
+  assert.match(requestRegistry, /USR-2026-09-21-014/);
+  assert.match(requestRegistry, /issue #496/);
+});
