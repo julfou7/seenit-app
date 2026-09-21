@@ -2695,8 +2695,6 @@ async function startServer() {
       const source = String(req.params.source);
       const payload = req.body || {};
       const eventType = payload.eventType || payload.event_type || 'Unknown';
-      console.log(`[Webhook] source=${source} event=${String(eventType).slice(0, 40)}`);
-
       if (eventType === 'Test') {
         return res.json({ success: true, message: 'Test webhook reçu avec succès par SeenIt !' });
       }
