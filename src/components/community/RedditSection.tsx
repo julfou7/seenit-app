@@ -1,7 +1,7 @@
 import React from 'react';
 import { ExternalLink, Lock } from 'lucide-react';
 import { openExternalUrl } from '../../lib/utils';
-import { buildRedditSearchUrl } from './redditEpisodeSearch';
+import { buildRedditEpisodeAiQuestion, buildRedditSearchUrl } from './redditEpisodeSearch';
 
 interface RedditSectionProps {
   query: string;
@@ -24,10 +24,15 @@ export function RedditSection({
   title = "Discussions Reddit",
   description = "Avis, consensus, désaccords et théories autour de cet épisode."
 }: RedditSectionProps) {
-  const searchUrl = buildRedditSearchUrl(query);
+  const aiSearchUrl = buildRedditSearchUrl(buildRedditEpisodeAiQuestion(query));
+  const classicSearchUrl = buildRedditSearchUrl(query);
 
   const handleOpenReddit = async () => {
-    await openExternalUrl(searchUrl);
+    await openExternalUrl(aiSearchUrl);
+  };
+
+  const handleOpenClassicSearch = async () => {
+    await openExternalUrl(classicSearchUrl);
   };
 
   if (isLocked) {
@@ -80,14 +85,22 @@ export function RedditSection({
           </div>
           <div>
             <h3 className="text-white font-bold text-sm leading-tight group-hover:text-amber-400 transition-colors">
-              Voir les réactions sur Reddit
+              Résumé IA Reddit
             </h3>
             <p className="text-zinc-400 text-[11px] mt-0.5">
-              Recherche prête · puis « Demander » pour le résumé IA
+              Question préparée en français · puis « Demander »
             </p>
           </div>
         </div>
         <ExternalLink size={17} className="text-zinc-500 group-hover:text-[#FF4500] transition-colors shrink-0 ml-2" />
+      </button>
+
+      <button
+        type="button"
+        onClick={handleOpenClassicSearch}
+        className="mt-1.5 min-h-11 w-full rounded-xl px-3 text-xs font-semibold text-zinc-400 transition-colors hover:text-zinc-200 active:text-white touch-manipulation"
+      >
+        Voir la recherche Reddit classique
       </button>
     </div>
   );

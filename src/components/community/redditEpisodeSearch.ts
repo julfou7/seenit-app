@@ -59,6 +59,17 @@ export function buildRedditEpisodeSearchQuery({
   return parts.join(' ');
 }
 
+export function buildRedditEpisodeAiQuestion(searchQuery: string): string {
+  const episodeContext = searchQuery.replace(/\s+/g, ' ').trim();
+
+  return [
+    'Réponds en français, même si les publications et commentaires sources sont en anglais.',
+    `À partir des discussions Reddit correspondant à ${episodeContext},`,
+    'résume uniquement les réactions à cet épisode : avis dominants, points de consensus, désaccords, détails remarqués et principales théories.',
+    'N’inclus aucun spoiler sur les épisodes suivants.',
+  ].join(' ');
+}
+
 export function buildRedditSearchUrl(query: string): string {
   return `https://www.reddit.com/search/?q=${encodeURIComponent(query)}&sort=relevance`;
 }
