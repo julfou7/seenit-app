@@ -40,7 +40,7 @@ test('SEENIT-PERF-001 borne toutes les mémoires TMDB et n’ajoute aucun Firest
   assert.match(clientSource, /export const EPISODE_DETAILS_CACHE_TTL_MS = 30 \* 60 \* 1000/);
   assert.match(
     clientSource,
-    /episodeDetailsCache = new BoundedCache<string, \{ data: any; timestamp: number \}>\(EPISODE_DETAILS_CACHE_MAX_ENTRIES\)/,
+    /episodeDetailsCache = new BoundedCache<string, \{ data: TmdbEpisodeDetails; timestamp: number \}>\(EPISODE_DETAILS_CACHE_MAX_ENTRIES\)/,
   );
   assert.doesNotMatch(clientSource, /episodeDetailsCache = new Map/);
 
