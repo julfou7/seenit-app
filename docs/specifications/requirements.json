@@ -1676,7 +1676,7 @@
     },
     {
       "id": "SEENIT-QUALITY-004",
-      "title": "Contexte GitHub complet, bail inter-conversations et issues maintenues à jour",
+      "title": "Contexte GitHub complet, amélioration continue proactive, bail inter-conversations et issues maintenues à jour",
       "targets": [
         "ci"
       ],
@@ -1700,6 +1700,10 @@
         {
           "file": "tests/issueTrackingGovernance.test.ts",
           "contains": "SEENIT-QUALITY-004 transmet une APK déléguée par un relais release distinct"
+        },
+        {
+          "file": "tests/issueTrackingGovernance.test.ts",
+          "contains": "SEENIT-QUALITY-004 ouvre proactivement une issue d’amélioration continue pour toute difficulté corrigeable et réutilisable"
         }
       ]
     },
