@@ -310,6 +310,13 @@ présence Plex/Arr, bande-annonce, âge conseillé, casting, ordre de visionnage
 Reddit. Les recommandations contextuelles restent dans Explorer. Les modals personne et épisode restent
 dans la pile Retour.
 
+Dans une fiche épisode, **Discussions Reddit** reste verrouillé avant visionnage. Après marquage vu, le CTA
+ouvre une recherche Reddit standard préremplie avec plusieurs conventions de numérotation de l'épisode,
+le titre de série et, lorsqu'ils existent, le titre original et le nom de l'épisode comme indices. Cette
+surface est volontairement aussi le fallback : si Reddit affiche **« Demander »**, un appui supplémentaire
+lance son résumé IA natif ; sinon les résultats Reddit classiques sont déjà utilisables. SeenIt n'appelle
+ni Data API Reddit, ni scraping, ni service IA payant pour produire ce résumé.
+
 Le titre affiché privilégie le `title`/`name` de la fiche TMDB récupérée en `fr-FR`. Un ancien titre
 enregistré dans la bibliothèque sert seulement de fallback avant ou hors hydratation. Lorsqu'un média
 suivi est hydraté par son identité exacte `mediaType + TMDB ID`, SeenIt fait converger uniquement son

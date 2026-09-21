@@ -9,6 +9,7 @@ import { useToastStore } from '../store/toastStore';
 import { tmdb } from '../features/shows/tmdb';
 import { syncSingleItem } from "../hooks/useDetailsSyncWorker";
 import { RedditSection } from '../components/community/RedditSection';
+import { buildRedditEpisodeSearchQuery } from '../components/community/redditEpisodeSearch';
 import { DownloadModal } from '../components/DownloadModal';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { LiveDownloadBanner } from '../components/LiveDownloadBanner';
@@ -41,9 +42,9 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   const { getEpisodeDownload } = useLiveDownloadStore();
 
   // Find live show from Zustand store so updates are instantly reactive
-  const liveShow = shows.find(s => 
-    (show?.id && s.id === show.id) || 
-    (show?.tmdbId && s.tmdbId === show.tmdbId) || 
+  const liveShow = shows.find(s =>
+    (show?.id && s.id === show.id) ||
+    (show?.tmdbId && s.tmdbId === show.tmdbId) ||
     (tmdbShowId && s.tmdbId === tmdbShowId)
   );
   const activeShow = liveShow || show;
@@ -51,8 +52,8 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   // Vérification de la présence locale (Sonarr / Plex)
   const presence = useMediaPresence({
     tmdbId: tmdbShowId || activeShow?.tmdbId,
-    tvdbId: (activeShow as any)?.tvdbId,
-    imdbId: (activeShow as any)?.imdbId,
+    tvdbId: activeShow?.tvdbId,
+    imdbId: activeShow?.imdbId,
     title: activeShow?.title || tmdbShowTitle,
     mediaType: 'tv'
   });
@@ -271,7 +272,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
           setIsLoadingEpisode(true);
           curSeasonEps = await fetchAndCacheSeason(currentSeason);
         }
-        
+
         if (curSeasonEps && curSeasonEps.length > 0) {
           const foundNext = curSeasonEps.find((e: any) => e.episode_number === nextEpNum);
           if (foundNext) {
@@ -279,7 +280,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
             setIsLoadingEpisode(false);
             return;
           }
-          
+
           if (nextEpNum > curSeasonEps.length) {
             // End of current season -> switch to next season (currentSeason + 1)
             const targetSeason = currentSeason + 1;
@@ -301,7 +302,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
             }
           }
         }
-        
+
         setIsLoadingEpisode(true);
         const res = await tmdb.getEpisodeDetails(effectiveTmdbId, currentSeason, nextEpNum);
         if (res.ok && res.value && !res.value.status_code && typeof res.value.episode_number === 'number') {
@@ -367,7 +368,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
             setIsLoadingEpisode(true);
             curSeasonEps = await fetchAndCacheSeason(currentSeason);
           }
-          
+
           if (curSeasonEps && curSeasonEps.length > 0) {
             const foundPrev = curSeasonEps.find((e: any) => e.episode_number === prevEpNum);
             if (foundPrev) {
@@ -376,14 +377,14 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
               return;
             }
           }
-          
+
           const prevKey = `${effectiveTmdbId}_${currentSeason}_${prevEpNum}`;
           if (episodeCacheRef.current[prevKey]) {
             setCurrentEpisode(episodeCacheRef.current[prevKey]);
             setIsLoadingEpisode(false);
             return;
           }
-          
+
           setIsLoadingEpisode(true);
           const res = await tmdb.getEpisodeDetails(effectiveTmdbId, currentSeason, prevEpNum);
           if (res.ok && res.value && !res.value.status_code && typeof res.value.episode_number === 'number') {
@@ -396,7 +397,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
           animate(dragX, 0, { type: 'spring', damping: 25, stiffness: 300 });
           return;
         }
-        
+
         setCurrentEpisode({
           season_number: currentSeason,
           episode_number: prevEpNum,
@@ -470,7 +471,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
     }
 
     if (!currentShow || !currentShow.id) return;
-    
+
     const prevSeenEpisodes = currentShow.seenEpisodes || [];
     const prevEpisodeRecords = currentShow.episodeRecords || {};
     const prevLastWatchedAt = currentShow.lastWatchedAt || null;
@@ -479,14 +480,14 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
 
     const newSeen = new Set(prevSeenEpisodes);
     const newRecords = { ...prevEpisodeRecords };
-    
+
     const wasSeen = newSeen.has(epKey);
     if (wasSeen) {
       newSeen.delete(epKey);
       delete newRecords[epKey];
     } else {
       newSeen.add(epKey);
-      newRecords[epKey] = { 
+      newRecords[epKey] = {
         watchedAt: Date.now(),
         episodeTitle: currentEpisode?.name || null
       };
@@ -540,7 +541,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
         };
       }
     }
-    
+
     const autoArchived = computeAutoArchiveStatus({
       ...currentShow,
       seenEpisodes: newSeenArray,
@@ -559,7 +560,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
       calculatedLastWatchedAt = maxRemaining;
     }
 
-    await updateShow(currentShow.id, { 
+    await updateShow(currentShow.id, {
        seenEpisodes: Array.from(newSeen as Set<string>),
        episodeRecords: newRecords,
        lastWatchedAt: calculatedLastWatchedAt,
@@ -624,9 +625,9 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
      if (!activeShow?.id || !isSeen) return;
      const newRecords = { ...(activeShow.episodeRecords || {}) };
      if (!newRecords[epKey]) newRecords[epKey] = { watchedAt: Date.now() };
-     
+
      newRecords[epKey] = { ...newRecords[epKey], ...updates };
-     
+
      await updateShow(activeShow.id, {
         episodeRecords: newRecords,
         updatedAt: Date.now()
@@ -640,8 +641,8 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   }) : null;
 
   const todayStr = getTodayStr();
-  const isFutureEpisode = currentEpisode.air_date 
-    ? currentEpisode.air_date > todayStr 
+  const isFutureEpisode = currentEpisode.air_date
+    ? currentEpisode.air_date > todayStr
     : false;
 
   const getRelativeAirDateLabel = () => {
@@ -670,13 +671,13 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   return (
     <div className="fixed inset-0 z-40 flex flex-col items-center">
       {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300" 
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
         onClick={onClose}
       />
-      
+
       {/* Modal Content */}
-      <motion.div 
+      <motion.div
         className="relative bg-zinc-950 w-full max-w-md h-full overflow-hidden flex flex-col shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         initial={{ y: '100%' }}
@@ -684,11 +685,11 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
         exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
       >
-        
+
         {/* Season Transition Toast Banner */}
         <AnimatePresence>
           {seasonChangeNotice && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: -25, scale: 0.85 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -15, scale: 0.9 }}
@@ -705,7 +706,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
         {/* Swipe Visual Previews (Uniquement lors d'un changement de saison) */}
         <div className="absolute inset-0 pointer-events-none z-50 overflow-hidden">
           {isPrevSeasonChange && (
-            <motion.div 
+            <motion.div
               style={{ opacity: opacityPrev, scale: scalePrev, x: xPrev }}
               className="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col items-center gap-2"
             >
@@ -720,7 +721,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
           )}
 
           {isNextSeasonChange && (
-            <motion.div 
+            <motion.div
               style={{ opacity: opacityNext, scale: scaleNext, x: xNext }}
               className="absolute right-6 top-1/2 -translate-y-1/2 flex flex-col items-center gap-2"
             >
@@ -789,12 +790,12 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
               </div>
             )}
             {/* 1. FLOATING BUTTONS (Positioned over the banner with safe-area support) */}
-            <div 
+            <div
               className="absolute left-4 right-4 z-30 flex items-center justify-between pointer-events-auto"
               style={{ top: 'calc(env(safe-area-inset-top, 0px) + 14px)' }}
             >
               {/* Series Button */}
-              <button 
+              <button
                 onClick={(e) => {
                   e.stopPropagation();
                   const targetTmdbId = tmdbShowId || show?.tmdbId;
@@ -814,7 +815,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
               </button>
 
               {/* Close Button */}
-              <button 
+              <button
                 onClick={onClose}
                 className="w-9 h-9 rounded-full bg-zinc-900/85 backdrop-blur-md border border-white/10 flex items-center justify-center text-zinc-300 hover:text-white active:scale-95 transition-all shadow-lg"
                 aria-label="Fermer"
@@ -828,8 +829,8 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
               {/* Banner Section */}
               <div className="relative w-full h-[280px] sm:h-[340px] bg-zinc-900 overflow-hidden">
                 {currentEpisode.still_path && (
-                  <img loading="lazy" decoding="async" 
-                    src={`https://image.tmdb.org/t/p/w1280${currentEpisode.still_path}`} 
+                  <img loading="lazy" decoding="async"
+                    src={`https://image.tmdb.org/t/p/w1280${currentEpisode.still_path}`}
                     className="w-full h-full object-cover"
                     alt=""
                   />
@@ -880,7 +881,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                   {/* Main Action Button (Pleine largeur) */}
                   <div>
                     {isSeen ? (
-                      <button 
+                      <button
                         onClick={handleMainButtonClick}
                         className="w-full py-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] bg-emerald-500 hover:bg-emerald-400 text-black font-bold shadow-lg shadow-emerald-500/20 touch-manipulation select-none cursor-pointer"
                       >
@@ -888,7 +889,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                         Épisode vu
                       </button>
                     ) : isFutureEpisode ? (
-                      <button 
+                      <button
                         onClick={handleMainButtonClick}
                         className="w-full py-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] bg-zinc-800 text-zinc-400 border border-zinc-700 font-medium cursor-pointer hover:bg-zinc-700 touch-manipulation select-none"
                       >
@@ -896,7 +897,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                         {relativeAirDateLabel}
                       </button>
                     ) : (
-                      <button 
+                      <button
                         onClick={handleMainButtonClick}
                         className="w-full py-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] bg-[#E5A93D] hover:bg-[#d4982f] text-black font-bold shadow-lg shadow-[#E5A93D]/20 touch-manipulation select-none cursor-pointer"
                       >
@@ -931,7 +932,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                       const targetTmdbId = tmdbShowId || activeShow?.tmdbId;
                       void openPlexWatchUrl(activeShow || {
                         tmdbId: targetTmdbId,
-                        imdbId: (activeShow as any)?.imdbId,
+                        imdbId: activeShow?.imdbId,
                         title: activeShow?.title || tmdbShowTitle,
                         mediaType: 'tv'
                       });
@@ -972,7 +973,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
               </div>
             );
           }
-    
+
                     return (
                       <button
                         type="button"
@@ -987,7 +988,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
 
                   {/* Single Episode Live Download Banner */}
                   {(() => {
-                    const epDownload = getEpisodeDownload(tmdbShowId || activeShow?.tmdbId, (activeShow as any)?.tvdbId, currentSeason, currentEpisode?.episode_number);
+                    const epDownload = getEpisodeDownload(tmdbShowId || activeShow?.tmdbId, activeShow?.tvdbId, currentSeason, currentEpisode?.episode_number);
                     if (!epDownload) return null;
                     return (
                       <div className="mt-2">
@@ -1057,9 +1058,15 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                      </div>
                   </div>
 
-                  <RedditSection 
-                    query={`${tmdbShowTitle || show?.title || ''} S${String(currentSeason).padStart(2, '0')}E${String(currentEpisode.episode_number).padStart(2, '0')} discussion`} 
-                    isLocked={!isSeen} 
+                  <RedditSection
+                    query={buildRedditEpisodeSearchQuery({
+                      seriesTitle: tmdbShowTitle || activeShow?.title || show?.title || '',
+                      originalSeriesTitle: activeShow?.originalTitle || show?.originalTitle,
+                      seasonNumber: currentSeason,
+                      episodeNumber: currentEpisode.episode_number,
+                      episodeTitle: currentEpisode.name,
+                    })}
+                    isLocked={!isSeen}
                     unlockMessage="Débloquez les discussions de la communauté sur cet épisode en le marquant comme vu."
                   />
                 </div>
@@ -1076,7 +1083,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
       title={activeShow?.title || tmdbShowTitle || 'Série'}
       mediaType="tv"
       tmdbId={tmdbShowId || activeShow?.tmdbId}
-      tvdbId={(activeShow as any)?.tvdbId}
+      tvdbId={activeShow?.tvdbId}
       imdbId={activeShow?.imdbId}
       initialSeason={currentSeason}
       initialEpisode={currentEpisode.episode_number}

@@ -346,6 +346,28 @@
       ]
     },
     {
+      "id": "SEENIT-COMMUNITY-001",
+      "title": "Réactions Reddit épisode via recherche native, fallback classique et anti-spoiler",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/redditEpisodeSearch.test.ts",
+          "contains": "SEENIT-COMMUNITY-001 prépare une recherche épisode multi-conventions pour Reddit"
+        },
+        {
+          "file": "tests/redditEpisodeSearch.test.ts",
+          "contains": "SEENIT-COMMUNITY-001 garde Reddit verrouillé avant visionnage et sans API privée"
+        },
+        {
+          "file": "tests/redditEpisodeSearch.test.ts",
+          "contains": "SEENIT-COMMUNITY-001 conserve la recherche standard comme fallback du résumé IA Reddit"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-DISCOVER-001",
       "title": "Au cinéma limité aux sorties théâtrales françaises TMDB",
       "targets": [
