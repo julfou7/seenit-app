@@ -1,9 +1,20 @@
 # Audit de couverture des warnings SeenIt — 21/09/2026
 
-- **Issue** : #27
-- **Baseline** : `faec21af59fe347c7c53a343068274c0cb80c731`
-- **Périmètre statique** : `server.ts` + sources TypeScript `src/**`
+- **Identifiant** : AUDIT-2026-09-21-WARNING-COVERAGE
+- **Date** : 21 septembre 2026
+- **Dernière vérification** : 21 septembre 2026
+- **Statut** : implémentation #27 en validation
+- **Baseline / commit observé** : `faec21af59fe347c7c53a343068274c0cb80c731`
+- **Périmètre** : `server.ts` + sources TypeScript `src/**`
+- **Suivi** : issue #27
 - **But** : étendre l’amélioration continue sans téléverser les warnings PWA/APK
+
+## Preuves reproductibles
+
+- inventaire statique des appels `console.warn`, `appLogger.warn` et événements structurés sur le commit observé ;
+- comparaison avec le filtre Cloud Logging `jsonPayload.seenitEvent.schemaVersion=1` ;
+- TNR `tests/logAuditor.test.ts` et `tests/logAuditorWorkflow.test.ts` ;
+- validation canonique `npm run validate:change` sur le SHA exact de quarantaine.
 
 ## Mesure de l’angle mort backend
 
@@ -50,3 +61,17 @@ contexte libre est supprimé et le fingerprint ne dépend que du domaine/code st
 - cooldown d’enrichissement : 6 h ;
 - aucun trafic supplémentaire PWA/APK ;
 - aucun log brut archivé.
+
+
+## Matrice exhaustive des constats
+
+| Priorité | Constat | Impact | Sortie | Suivi |
+|---|---|---|---|---|
+| P2 | 11/12 warnings de la frontière Cloud Run étaient invisibles à l’auto-auditeur | dégradations répétées non transformées en backlog | première vague Plex structurée + TNR verts | [#27](https://github.com/julfou7/seenit-app/issues/27) |
+| P2 | les warnings PWA/APK sont nombreux mais locaux | risque de sur-télémétrie et coût si upload naïf | aucun upload individuel ; classification locale/report-only | [#27](https://github.com/julfou7/seenit-app/issues/27) |
+| P2 | un nouveau code warning peut apparaître avant sa règle dédiée | angle mort futur | issue de qualification seulement après 2 fenêtres et 8 occurrences cumulées | [#27](https://github.com/julfou7/seenit-app/issues/27) |
+
+## Points solides à préserver
+
+La redaction, les fingerprints stables, le plafond de trois issues, le cooldown de six heures, le kill
+switch et l’absence de dépendance runtime à GitHub restent inchangés.
