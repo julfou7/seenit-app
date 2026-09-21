@@ -112,9 +112,7 @@ export function emitOperationalEvent(
   sink?: (line: string) => void
 ): OperationalEventEnvelope {
   const envelope = buildOperationalEvent(input);
-  const write = sink || (input.level === 'warn'
-    ? (line: string) => console.warn(line)
-    : (line: string) => console.error(line));
+  const write = sink || ((line: string) => process.stderr.write(`${line}\n`));
   write(JSON.stringify(envelope));
   return envelope;
 }
