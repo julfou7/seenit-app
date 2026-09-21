@@ -26,6 +26,8 @@ test('SEENIT-DATA-006 borne la migration unique de default par export, répétit
   assert.match(workflow, /github\.event\.comment\.author_association == 'OWNER'/);
   assert.match(workflow, /sha=\(\[0-9a-f\]\{40\}\)/);
   assert.match(script, /SEENIT_MIGRATION_CONFIRMATION/);
+  assert.match(script, /readonly DEFAULT_DATABASE='default'/);
+  assert.doesNotMatch(script, /readonly DEFAULT_DATABASE='\(default\)'/);
   assert.match(script, /lock_public_traffic[\s\S]*firebase\.migration-lockdown\.json/);
   assert.match(script, /write_digest "\$DEFAULT_DATABASE"[\s\S]*gcloud firestore export/);
   assert.match(script, /write_digest "\$AI_DATABASE"[\s\S]*gcloud firestore export/);

@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 readonly EXPECTED_PROJECT='gen-lang-client-0201895414'
-readonly DEFAULT_DATABASE='(default)'
+readonly DEFAULT_DATABASE='default'
 readonly AI_DATABASE='ai-studio-seenit-065aead8-cc5a-4b86-9f25-dd812194ffa4'
 readonly DEFAULT_LOCATION='eur3'
 readonly AI_LOCATION='us-west1'
