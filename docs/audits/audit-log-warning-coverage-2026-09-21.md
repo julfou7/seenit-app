@@ -3,75 +3,121 @@
 - **Identifiant** : AUDIT-2026-09-21-WARNING-COVERAGE
 - **Date** : 21 septembre 2026
 - **Dernière vérification** : 21 septembre 2026
-- **Statut** : implémentation #27 en validation
-- **Baseline / commit observé** : `faec21af59fe347c7c53a343068274c0cb80c731`
-- **Périmètre** : `server.ts` + sources TypeScript `src/**`
+- **Statut** : seconde tranche #27 en validation
+- **Baseline / commit observé** : `b2a261dc841ae51e9f9c89d58e145acf00c52164`
+- **Périmètre** : `server.ts`, runtime backend, providers, classifications, téléchargements, notifications, mise à jour, Firestore client et cache/hydratation
 - **Suivi** : issue #27
-- **But** : étendre l’amélioration continue sans téléverser les warnings PWA/APK
+- **But** : transformer les dégradations répétées utiles en backlog sans exporter les logs bruts ni créer une télémétrie client bavarde
 
 ## Preuves reproductibles
 
-- inventaire statique des appels `console.warn`, `appLogger.warn` et événements structurés sur le commit observé ;
+- inventaire statique des `console.warn/error`, `appLogger.warn/error`, `seenitEvent` et diagnostics structurés sur le commit observé ;
 - comparaison avec le filtre Cloud Logging `jsonPayload.seenitEvent.schemaVersion=1` ;
-- TNR `tests/logAuditor.test.ts` et `tests/logAuditorWorkflow.test.ts` ;
-- validation canonique `npm run validate:change` sur le SHA exact de quarantaine.
+- TNR `tests/logAuditor.test.ts`, `tests/logAuditorNonPlex.test.ts`, `tests/clientOperationalSignals.test.ts` et `tests/logAuditorWorkflow.test.ts` ;
+- validation canonique `npm run validate:change` sur le SHA exact de quarantaine avant toute promotion.
 
-## Mesure de l’angle mort backend
+## Chemin réel des signaux
 
-La frontière Cloud Run contient 12 sites `console.warn` dans `server.ts` et
-`src/features/runtime/backendRuntime.ts`. Avant ce changement, seul le warning
-`PLEX_SYNC_PARTIAL` était immédiatement suivi d’un `seenitEvent`.
+Les événements backend qualifiés sont écrits en JSON `seenitEvent` dans stderr/stdout Cloud Run. Google
+Cloud Logging les collecte. Toutes les six heures, `Audit Structured SeenIt Logs` relit au plus 5 000
+événements sur douze heures, applique redaction, seuils, fingerprints et déduplication, puis crée ou
+enrichit une issue GitHub seulement lorsqu'une règle fiable franchit son seuil.
 
-**Résultat : 11/12 sites warning backend étaient invisibles à l’auto-auditeur.**
+Les logs bruts ne sont jamais copiés dans GitHub. L'issue reçoit uniquement domaine, code stable,
+compte, première/dernière occurrence et contexte technique allowlisté.
 
-Cette métrique mesure les warnings de la frontière backend collectable par Cloud Logging sans
-télémétrie client ; elle ne prétend pas compter tous les `error` ou logs de l’application.
+Côté PWA/APK, cinq anomalies seulement alimentent ce chemin. Elles incrémentent d'abord un compteur
+local par utilisateur ; aucun warning individuel ne déclenche de requête. Lors d'un futur appel API
+SeenIt déjà authentifié, un lot peut être envoyé vers `/api/diagnostics/client-signals` au plus une
+fois toutes les trente minutes. Le lot contient uniquement `code + count`, jamais message, stack,
+UID, email, titre, URL ni payload. Le backend le transforme ensuite en `seenitEvent`, donc le même
+auditeur et les mêmes garde-fous s'appliquent.
 
-## Classement par domaine
+## Mesure de l'angle mort initial
 
-| Domaine | Signaux constatés | Décision |
-|---|---|---|
-| Backend/API | exceptions non gérées, démarrage | auto-issue haute confiance déjà existante |
-| Plex backend | sync partielle, lecture/écriture snapshot, delta et seed full | première vague structurée + seuils |
-| TMDB/providers backend | `TMDB_REQUEST_CACHE_SUMMARY` | report-only agrégé existant |
-| Firestore/auth PWA/APK | erreurs de sync, listener, auth | local/report-only ; aucun upload par warning |
-| Notifications PWA/APK | planification, cache visuel, permissions | local/report-only |
-| Téléchargements | Sonarr/Radarr/qBittorrent/C411 | local/report-only tant qu’aucune frontière backend stable n’est définie |
-| Mise à jour APK | téléchargement/installation/check | local/report-only |
-| Cache/hydratation/UI | fallbacks et erreurs de chargement | local/report-only |
+La première passe #27 avait mesuré 12 sites `warn` sur la frontière Cloud Run
+`server.ts + backendRuntime.ts` et seulement un warning déjà structuré : **11/12 étaient invisibles** à
+l'auto-auditeur. La PR #475 a corrigé la première vague Plex.
 
-## Première vague livrée
+Cette mesure n'était toutefois pas un inventaire fonctionnel complet. La seconde passe a donc repris
+les domaines explicitement demandés par #27 et identifié des frontières stables non-Plex : proxy
+TMDB/TVDB, batch de classifications, C411, webhooks Sonarr/Radarr, proxy de services privés,
+publication/vérification de mise à jour, erreurs client Firestore, notifications, téléchargements,
+installation APK et cache IndexedDB.
 
-Les six warnings `Plex Delta Snapshot` de `backendRuntime.ts` sont remplacés par des événements
-structurés. Aucun nouvel appel réseau, polling, flush client ou service permanent n’est ajouté.
+## Classement exhaustif par domaine
 
-Règles warning : `PLEX_SYNC_PARTIAL` (20), `PLEX_SNAPSHOT_STORE_FAILED` (6),
-`PLEX_DELTA_SNAPSHOT_FAILED` (4) et `PLEX_FULL_SNAPSHOT_SEED_FAILED` (4).
+| Domaine | Signaux actuels | Décision | Justification |
+|---|---|---|---|
+| Backend/API | exception API non gérée, démarrage backend | **auto-issue haute confiance** | invariants backend ; règles historiques conservées |
+| Plex | sync partielle, snapshot, delta, seed full | **auto-issue après seuil** | première tranche #475 conservée |
+| TMDB | 429/5xx/timeout sur proxy backend ; cache summary | **auto-issue après agrégation** pour erreurs upstream ; cache **report-only** | un échec upstream n'est journalisé qu'une fois par groupe de 5 ; diagnostic cache reste séparé |
+| TVDB | 429/5xx/timeout/login upstream | **auto-issue après agrégation** | même échantillonnage par groupes de 5 |
+| OMDb | aucune intégration/runtime OMDb actif trouvé sur la baseline | **ignoré explicitement** | aucun warning orphelin à classifier tant que la source n'existe pas |
+| Diffuseurs/providers | appels `watch/providers` passent par le proxy TMDB | **couvert par PROVIDER_UPSTREAM_FAILED** | pas de télémétrie parallèle |
+| Explorer/classifications | échecs TMDB du batch `release_dates/content_ratings` | **auto-issue après seuil pondéré** | un seul événement agrégé par batch ; le filtre reste fail-closed |
+| Firestore client | sauvegarde Cloud/fetchShows fatals | **auto-issue via lot client** | compteur local uniquement, aucun détail exporté |
+| Auth | absence de session, permission refusée, token invalide | **ignorer/report-only** | peut être attendu, provoqué par l'utilisateur ou du trafic invalide ; pas d'auto-issue |
+| Sonarr/Radarr/qBittorrent direct | service privé indisponible via `service-proxy` | **report-only** | machine locale éteinte ou hors réseau = situation normale possible |
+| Webhooks Sonarr/Radarr | traitement d'un webhook valide en erreur | **auto-issue après seuil** | frontière backend SeenIt stable |
+| C411 | test/recherche backend en échec | **auto-issue après répétition** | les erreurs d'auth 401/403 normales ne passent pas par cette règle |
+| Notifications client | planification finale ou média après retries bornés | **auto-issue via lot client** | refus de permission, API non supportée et fallback réussi restent ignorés |
+| Notifications release | échec de publication de la notification de mise à jour | **auto-issue rapide** | signal CI/backend haute confiance |
+| Mise à jour APK | download/vérification/ouverture installateur en échec | **auto-issue via lot client** | échec final uniquement ; progress listener fallback reste local |
+| Vérification de mise à jour | backend incapable de lire la dernière release | **auto-issue après seuil** | pas de token ou payload dans l'événement |
+| Cache/hydratation | erreurs IndexedDB read/write du cache public | **auto-issue via lot client** | misses, stale et fallback normaux ne sont pas des anomalies |
+| Warnings inconnus structurés | code non catalogué | **report-only puis qualification** | candidat seulement s'il existe dans deux fenêtres consécutives et atteint huit occurrences |
 
-Les codes inconnus restent report-only. Une issue de qualification n’est possible qu’après au moins une
-occurrence dans chacune de deux fenêtres consécutives de six heures et huit occurrences cumulées. Le
-contexte libre est supprimé et le fingerprint ne dépend que du domaine/code stables.
+## Règles non-Plex ajoutées
 
-## Budget
+| Code | Domaine | Seuil | Auto-issue |
+|---|---|---:|---|
+| `PROVIDER_UPSTREAM_FAILED` | providers | 10 occurrences pondérées | oui |
+| `PARENTAL_RATING_PROVIDER_FAILED` | providers | 12 | oui |
+| `DOWNLOAD_C411_FAILED` | downloads | 10 | oui |
+| `DOWNLOAD_SERVICE_PROXY_FAILED` | downloads | 20 | **non, report-only** |
+| `DOWNLOAD_WEBHOOK_FAILED` | downloads | 3 | oui |
+| `RELEASE_UPDATE_PUSH_FAILED` | release | 2 | oui |
+| `UPDATE_CHECK_BACKEND_FAILED` | release | 5 | oui |
+| `FIRESTORE_CLIENT_SYNC_FAILED` | firestore | 5 | oui |
+| `NOTIFICATION_CLIENT_FAILED` | notifications | 5 | oui |
+| `DOWNLOAD_CLIENT_SYNC_FAILED` | downloads | 6 | oui |
+| `APP_UPDATE_CLIENT_FAILED` | release | 4 | oui |
+| `CACHE_CLIENT_STORAGE_FAILED` | cache | 8 | oui |
 
-- collecte structurée : 5 000 entrées maximum ;
-- cadence : toutes les six heures ;
-- lookback : 12 h uniquement pour comparer deux fenêtres de 6 h ;
-- nouvelles issues : 3 maximum par run et par jour UTC ;
-- cooldown d’enrichissement : 6 h ;
-- aucun trafic supplémentaire PWA/APK ;
-- aucun log brut archivé.
+Les compteurs batch sont pondérés par l'auditeur : un événement
+`{ code: APP_UPDATE_CLIENT_FAILED, count: 4 }` représente quatre occurrences sans écrire quatre logs
+Cloud. Le fingerprint ignore `count` afin qu'une même anomalie enrichisse toujours la même issue.
 
+## Budget performance et volume
+
+- collecte Cloud structurée : 5 000 entrées maximum sur 12 h ;
+- cadence auditeur : toutes les six heures ;
+- nouvelles issues : 3 maximum par run et 3 par jour UTC ;
+- cooldown d'enrichissement : 6 h ;
+- TMDB/TVDB upstream : un `seenitEvent` seulement par groupe de **5** erreurs pertinentes ; les 404 ne sont pas comptés ;
+- classifications : au maximum un événement structuré par requête batch, avec un compteur interne ;
+- client : 5 codes allowlistés, compteurs locaux plafonnés, persistance locale débouncée à 500 ms ;
+- client → backend : aucune requête par warning, aucun polling, aucun timer réseau ; au plus un POST opportuniste toutes les 30 min quand un lot est réellement en attente ;
+- chaque POST contient au plus 50 occurrences par code et la route backend est elle-même limitée à 4 appels/heure ;
+- aucun log brut n'est archivé par GitHub Actions.
+
+Le coût du chemin utilisateur reste donc borné à une incrémentation mémoire/localStorage pour un signal
+client et, plus tard, éventuellement un POST asynchrone non bloquant sur un appel API déjà engagé.
 
 ## Matrice exhaustive des constats
 
 | Priorité | Constat | Impact | Sortie | Suivi |
 |---|---|---|---|---|
-| P2 | 11/12 warnings de la frontière Cloud Run étaient invisibles à l’auto-auditeur | dégradations répétées non transformées en backlog | première vague Plex structurée + TNR verts | [#27](https://github.com/julfou7/seenit-app/issues/27) |
-| P2 | les warnings PWA/APK sont nombreux mais locaux | risque de sur-télémétrie et coût si upload naïf | aucun upload individuel ; classification locale/report-only | [#27](https://github.com/julfou7/seenit-app/issues/27) |
-| P2 | un nouveau code warning peut apparaître avant sa règle dédiée | angle mort futur | issue de qualification seulement après 2 fenêtres et 8 occurrences cumulées | [#27](https://github.com/julfou7/seenit-app/issues/27) |
+| P2 | la première tranche couvrait surtout Plex | dégradations non-Plex non transformées en backlog | instrumentation backend non-Plex + agrégats client bornés | [#27](https://github.com/julfou7/seenit-app/issues/27) |
+| P2 | les fournisseurs peuvent produire un volume élevé | tempête de Cloud Logging possible avec un log par échec | échantillonnage par paquets de 5 et seuil pondéré | [#27](https://github.com/julfou7/seenit-app/issues/27) |
+| P2 | les erreurs utiles PWA/APK n'existent pas dans Cloud Logging | angles morts Firestore, APK, notifications et cache | cinq compteurs locaux allowlistés, POST opportuniste max 30 min | [#27](https://github.com/julfou7/seenit-app/issues/27) |
+| P2 | l'indisponibilité d'un service privé est ambiguë | faux positifs GitHub | `DOWNLOAD_SERVICE_PROXY_FAILED` catalogué report-only | [#27](https://github.com/julfou7/seenit-app/issues/27) |
+| P2 | permissions/refus/fallbacks normaux ressemblent à des warnings | bruit | classement explicite ignore/report-only ; seuls les échecs finaux sont comptés | [#27](https://github.com/julfou7/seenit-app/issues/27) |
+| P2 | un futur code structuré peut ne pas avoir de règle | angle mort futur | qualification seulement après 2 fenêtres et 8 occurrences | [#27](https://github.com/julfou7/seenit-app/issues/27) |
 
 ## Points solides à préserver
 
-La redaction, les fingerprints stables, le plafond de trois issues, le cooldown de six heures, le kill
-switch et l’absence de dépendance runtime à GitHub restent inchangés.
+La redaction, les fingerprints stables, le plafond d'issues, le cooldown, le kill switch, la suppression
+des logs bruts et l'indépendance du runtime vis-à-vis de GitHub restent inchangés. L'application ne
+bloque jamais un parcours utilisateur pour envoyer ou échouer à envoyer un diagnostic.

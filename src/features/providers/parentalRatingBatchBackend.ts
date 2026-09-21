@@ -1,4 +1,5 @@
-import type { Application, RequestHandler } from 'express';
+import type { Application, Request, RequestHandler } from 'express';
+import { emitOperationalEvent } from '../runtime/operationalEvent.ts';
 
 type MediaType = 'movie' | 'tv';
 type Secrets = Partial<Record<'TMDB_API_KEY' | 'TVDB_API_KEY', string>>;
@@ -145,7 +146,7 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
     return { ok: true };
   };
 
-  app.get('/api/media/parental-ratings', dependencies.authenticate, async (req: any, res) => {
+  app.get('/api/media/parental-ratings', dependencies.authenticate, async (req: Request & { user?: { uid?: string } }, res) => {
     res.setHeader('Cache-Control', 'no-store');
     const uid = req.user?.uid;
     if (!uid) {
@@ -191,6 +192,16 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
     }
 
     const newlyResolved = new Map<string, any>();
+    let providerFailureCount = 0;
+    const emitProviderFailures = () => {
+      if (providerFailureCount <= 0) return;
+      emitOperationalEvent({
+        code: 'PARENTAL_RATING_PROVIDER_FAILED',
+        context: { count: providerFailureCount },
+        domain: 'providers',
+        level: 'warn'
+      });
+    };
     const persistNewEvidence = async () => {
       if (!dependencies.writePersisted || newlyResolved.size === 0) return;
       await dependencies.writePersisted(
@@ -270,6 +281,7 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
             newlyResolved.set(item.key, details);
           }
         } catch { /* fournisseur indisponible : fail-closed */ }
+        if (!details && !clientAbort.signal.aborted) providerFailureCount += 1;
         return { key: item.key, media_type: item.mediaType, id: item.id, details };
       });
     };
@@ -284,12 +296,14 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
         if (!clientAbort.signal.aborted && !res.destroyed) res.write(`${JSON.stringify(result)}\n`);
       }));
       await persistNewEvidence();
+      emitProviderFailures();
       if (!res.destroyed) res.end();
       return;
     }
 
     const results = await Promise.all(items.map(item => resolveItem(item)));
     await persistNewEvidence();
+    emitProviderFailures();
     if (!clientAbort.signal.aborted && !res.destroyed) res.json({ results });
   });
 }

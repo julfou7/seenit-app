@@ -662,11 +662,13 @@ restent des TNR terrain lorsque le risque du changement UX l'exige ; ils ne sont
 - Les erreurs réseau privées deviennent des messages ou logs bornés, sans secret.
 - Les erreurs et warnings backend qualifiés produisent un événement opérationnel structuré sans route,
   message, en-tête, UID ni payload utilisateur. Un lot GitHub Actions les audite périodiquement : il
-  reste en `dry-run` par défaut et n'ouvre ou n'enrichit une issue que pour une règle haute confiance
-  ayant dépassé son seuil. Un warning inconnu doit se répéter sur deux fenêtres de six heures avant de
-  devenir une issue de qualification. Les warnings PWA/APK restent locaux : aucun appel réseau n'est
-  ajouté par warning individuel. Les autres événements restent dans un rapport redigé ; l'application
-  ne dépend jamais de GitHub pour répondre aux requêtes.
+  n'ouvre ou n'enrichit une issue que pour une règle ayant dépassé son seuil. Les échecs client
+  allowlistés (Firestore, notifications, téléchargements, mise à jour APK, cache) sont d'abord comptés
+  localement puis envoyés uniquement sous forme `code + count`, par lot opportuniste au plus toutes les
+  trente minutes lorsqu'un appel API authentifié a déjà lieu ; aucun warning individuel ne déclenche de
+  trafic. Un warning inconnu doit se répéter sur deux fenêtres de six heures avant de devenir une issue
+  de qualification. Les autres événements restent report-only ; l'application ne dépend jamais de
+  GitHub pour répondre aux requêtes.
 - Une indisponibilité TMDB peut laisser un écran partiel ou un cache ; elle ne justifie aucun matching
   par titre et ne transforme jamais une classification d'âge inconnue en « Tous publics ».
 - Les parcours critiques qualité sont connexion, bibliothèque, Plex, téléchargements, mise à jour et

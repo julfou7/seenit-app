@@ -1,6 +1,7 @@
 import { auth } from './firebase';
 import { CURRENT_APP_VERSION } from '../store/updateStore';
 import { appLogger } from '../store/logStore';
+import { flushClientOperationalSignals } from '../features/logging/clientOperationalDiagnostics';
 import {
   isSeenItApiRequest,
   isUnexpectedHtmlApiResponse,
@@ -23,6 +24,7 @@ export async function getAuthenticatedHeaders(
   }
 
   const token = await user.getIdToken();
+  void flushClientOperationalSignals(token);
   const normalizedHeaders = new Headers(headers);
   normalizedHeaders.set('Authorization', `Bearer ${token}`);
   normalizedHeaders.set('X-Plex-Version', CURRENT_APP_VERSION);

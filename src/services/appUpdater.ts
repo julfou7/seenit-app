@@ -8,6 +8,9 @@ import {
   type SeenItReleaseInfo
 } from '../features/release/releasePolicy';
 import type { UpdateProgress } from '../features/release/updateProgress';
+import { recordClientOperationalSignal } from '../features/logging/clientOperationalDiagnostics';
+
+const localConsole = globalThis.console;
 
 export { getUpdateProgressPresentation } from '../features/release/updateProgress';
 export type { UpdateProgress } from '../features/release/updateProgress';
@@ -80,7 +83,7 @@ export async function downloadAndInstallApk(
         }
       });
     } catch (e) {
-      console.warn('Progress listener unsupported, continuing download...', e);
+      localConsole.warn('Progress listener unsupported, continuing download...', e);
     }
 
     onProgress?.({ percent: 15, status: 'downloading', message: 'Téléchargement de la mise à jour...' });
@@ -144,7 +147,8 @@ export async function downloadAndInstallApk(
     if (progressListener) {
       try { await progressListener.remove(); } catch {}
     }
-    console.error('Failed to download & install APK natively:', err);
+    recordClientOperationalSignal('APP_UPDATE_CLIENT_FAILED');
+    localConsole.error('Failed to download & install APK natively:', err);
 
     onProgress?.({
       percent: 0,

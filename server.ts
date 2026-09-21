@@ -24,6 +24,10 @@ import { executeIdempotentMutation, type TimedMutationResult } from "./src/featu
 import { apiErrorMiddleware, backendHealthHandler, installAsyncRouteForwarding, seenItCorsMiddleware } from "./src/features/runtime/backendRuntime.ts";
 import { applySeenItServiceWorkerHeaders, createSeenItSecurityHeadersMiddleware } from "./src/features/runtime/pwaSecurityHeaders.ts";
 import { emitOperationalEvent } from "./src/features/runtime/operationalEvent.ts";
+import {
+  CLIENT_OPERATIONAL_SIGNAL_METADATA,
+  normalizeClientOperationalSignalBatch
+} from "./src/features/logging/clientOperationalSignals.ts";
 import { assertMediaProviderSecrets, registerMediaProviderRoutes } from './src/features/providers/mediaProviderBackend.ts';
 import {
   buildPlexParentShowIdentityItem,
@@ -49,6 +53,12 @@ import { readExplicitPlexCurrentWatchState } from "./src/features/runtime/plexAc
 
 export interface AuthRequest extends Request {
   user?: DecodedIdToken;
+}
+
+function operationalErrorCode(error: unknown, fallback: string): string {
+  if (!error || typeof error !== 'object') return fallback;
+  const details = error as { code?: unknown; name?: unknown };
+  return String(details.code ?? details.name ?? fallback).slice(0, 80);
 }
 
 export function supportsPlexOwnedUnwatch(rawVersion: unknown): boolean {
@@ -2238,11 +2248,17 @@ async function startServer() {
         success: true,
         message: 'Connexion C411 reussie !'
       });
-    } catch (error: any) {
-      console.error('[C411 Test Error]', error);
+    } catch (error: unknown) {
+      const errorCode = operationalErrorCode(error, 'C411_TEST_FAILED');
+      emitOperationalEvent({
+        code: 'DOWNLOAD_C411_FAILED',
+        context: { action: 'test', errorCode },
+        domain: 'downloads',
+        level: 'warn'
+      });
       return res.status(502).json({
         success: false,
-        error: error?.name === 'TimeoutError'
+        error: errorCode === 'TimeoutError'
           ? 'C411 ne repond pas dans le delai imparti'
           : 'Impossible de tester la connexion C411'
       });
@@ -2337,16 +2353,43 @@ async function startServer() {
       }
 
       return res.json({ torrents });
-    } catch (error: any) {
-      console.error('[C411 Search Error]', error?.name || 'RequestError');
-      return res.status(error?.name === 'TimeoutError' || error?.name === 'AbortError' ? 504 : 502).json({
-        error: error?.name === 'TimeoutError' || error?.name === 'AbortError'
+    } catch (error: unknown) {
+      const errorCode = operationalErrorCode(error, 'C411_SEARCH_FAILED');
+      emitOperationalEvent({
+        code: 'DOWNLOAD_C411_FAILED',
+        context: { action: 'search', errorCode },
+        domain: 'downloads',
+        level: 'warn'
+      });
+      const timedOut = errorCode === 'TimeoutError' || errorCode === 'AbortError';
+      return res.status(timedOut ? 504 : 502).json({
+        error: timedOut
           ? 'C411 ne répond pas dans le délai imparti.'
           : 'La recherche C411 est momentanément indisponible.',
         torrents: []
       });
     }
   });
+
+  app.post(
+    '/api/diagnostics/client-signals',
+    requireAuth,
+    rateLimit('client-operational-signals', 4, 60 * 60_000),
+    (req: AuthRequest, res) => {
+      const signals = normalizeClientOperationalSignalBatch(req.body);
+      if (!signals) return res.status(400).json({ error: 'Lot de diagnostics invalide.' });
+      for (const signal of signals) {
+        const metadata = CLIENT_OPERATIONAL_SIGNAL_METADATA[signal.code];
+        emitOperationalEvent({
+          code: signal.code,
+          context: { count: signal.count },
+          domain: metadata.domain,
+          level: 'warn'
+        });
+      }
+      return res.status(204).end();
+    }
+  );
 
   app.get("/api/health", backendHealthHandler);
 
@@ -2363,7 +2406,15 @@ async function startServer() {
         `${Number(body.alreadySent || 0)} déjà traitée(s), ${Number(body.invalid || 0)} token(s) invalide(s).`
       );
     } else if (result.status >= 400) {
-      console.warn(`[ReleaseUpdatePush] Échec borné (${result.status}, ${String(body.error || 'retryable')}).`);
+      emitOperationalEvent({
+        code: 'RELEASE_UPDATE_PUSH_FAILED',
+        context: {
+          status: result.status,
+          errorCode: String(body.error || 'RELEASE_PUSH_FAILED')
+        },
+        domain: 'release',
+        level: 'warn'
+      });
     }
     return res.status(result.status).json(body);
   });
@@ -2389,9 +2440,15 @@ async function startServer() {
 
       const data = await response.json();
       res.json(data);
-    } catch (error: any) {
-      console.error('Error fetching update:', error);
-      res.status(500).json({ error: error.message });
+    } catch (error: unknown) {
+      emitOperationalEvent({
+        code: 'UPDATE_CHECK_BACKEND_FAILED',
+        context: { errorCode: operationalErrorCode(error, 'UPDATE_CHECK_FAILED') },
+        domain: 'release',
+        level: 'warn'
+      });
+      const message = error instanceof Error ? error.message : 'Update check failed';
+      res.status(500).json({ error: message });
     }
   });
 
@@ -2487,7 +2544,14 @@ async function startServer() {
       }
       res.status(200).json(responsePayload);
     } catch (err: any) {
-      if (err?.name === 'TimeoutError' || err?.message?.includes('aborted') || err?.message?.includes('timeout')) {
+      const timedOut = err?.name === 'TimeoutError' || err?.message?.includes('aborted') || err?.message?.includes('timeout');
+      emitOperationalEvent({
+        code: 'DOWNLOAD_SERVICE_PROXY_FAILED',
+        context: { errorCode: timedOut ? 'TIMEOUT' : operationalErrorCode(err, 'PROXY_FETCH_ERROR') },
+        domain: 'downloads',
+        level: 'warn'
+      });
+      if (timedOut) {
         return res.status(200).json({
           status: 504,
           ok: false,
@@ -2631,7 +2695,7 @@ async function startServer() {
       const source = String(req.params.source);
       const payload = req.body || {};
       const eventType = payload.eventType || payload.event_type || 'Unknown';
-      console.log(`[Webhook] source=${source} event=${String(eventType).slice(0, 40)} uid=${uid.slice(0, 8)}`);
+      console.log(`[Webhook] source=${source} event=${String(eventType).slice(0, 40)}`);
 
       if (eventType === 'Test') {
         return res.json({ success: true, message: 'Test webhook reçu avec succès par SeenIt !' });
@@ -2658,8 +2722,16 @@ async function startServer() {
       });
 
       return res.json({ success: true, eventType, delivered: delivery.delivered, invalidTokensRemoved: delivery.invalid });
-    } catch (err: any) {
-      console.error('[Webhook Error]', err?.name || 'WebhookError');
+    } catch (err: unknown) {
+      emitOperationalEvent({
+        code: 'DOWNLOAD_WEBHOOK_FAILED',
+        context: {
+          source: String(req.params.source || 'unknown'),
+          errorCode: operationalErrorCode(err, 'WEBHOOK_ERROR')
+        },
+        domain: 'downloads',
+        level: 'warn'
+      });
       res.status(500).json({ error: 'Impossible de traiter ce webhook.' });
     }
     }

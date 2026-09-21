@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import { getUserLogStorageKey, sanitizeLogDetails } from '../features/logging/logPrivacy';
+import {
+  activateClientOperationalSignalScope,
+  recordClientOperationalSignal
+} from '../features/logging/clientOperationalDiagnostics';
+import { classifyClientOperationalLog } from '../features/logging/clientOperationalSignals';
 import { normalizePlexNonVuWording } from './toastQueuePolicy';
+
+const localConsole = globalThis.console;
 
 export type LogLevel = 'info' | 'success' | 'warn' | 'error';
 export type LogCategory = 'plex' | 'tmdb' | 'sync' | 'system' | 'auth';
@@ -117,15 +124,18 @@ export const useLogStore = create<LogState>((set, get) => ({
       details: actualDetails ? sanitizeLogDetails(actualDetails) : undefined
     };
 
+    const operationalCode = classifyClientOperationalLog(category, actualLevel, newEntry.message);
+    if (operationalCode) recordClientOperationalSignal(operationalCode);
+
     // Le miroir console reste immédiat, mais l'état React + localStorage sont
     // regroupés afin qu'une rafale Plex ne monopolise pas le thread UI.
     const prefix = `[${category.toUpperCase()}]`;
     if (actualLevel === 'error') {
-      console.error(prefix, newEntry.message, newEntry.details || '');
+      localConsole.error(prefix, newEntry.message, newEntry.details || '');
     } else if (actualLevel === 'warn') {
-      console.warn(prefix, newEntry.message, newEntry.details || '');
+      localConsole.warn(prefix, newEntry.message, newEntry.details || '');
     } else {
-      console.log(prefix, newEntry.message, newEntry.details || '');
+      localConsole.log(prefix, newEntry.message, newEntry.details || '');
     }
 
     pendingLogEntries.unshift(newEntry);
@@ -166,6 +176,7 @@ export function activateLogUserScope(uid?: string | null): void {
   if (nextUid === activeLogUid) return;
   flushPendingLogs();
   activeLogUid = nextUid;
+  activateClientOperationalSignalScope(nextUid);
   try {
     localStorage.removeItem(LEGACY_STORAGE_KEY);
   } catch {}

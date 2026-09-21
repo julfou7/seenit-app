@@ -871,6 +871,8 @@
       "title": "Anomalies de logs transformées en backlog sans secret ni spam",
       "targets": [
         "backend",
+        "pwa",
+        "apk",
         "ci"
       ],
       "tests": [
@@ -901,6 +903,14 @@
         {
           "file": "tests/logAuditor.test.ts",
           "contains": "SEENIT-OBSERVABILITY-001 détecte un warning inconnu seulement après deux fenêtres consécutives"
+        },
+        {
+          "file": "tests/logAuditorNonPlex.test.ts",
+          "contains": "SEENIT-OBSERVABILITY-001 couvre les domaines non-Plex et pondère les agrégats"
+        },
+        {
+          "file": "tests/clientOperationalSignals.test.ts",
+          "contains": "SEENIT-OBSERVABILITY-001 agrège localement sans appel réseau par warning"
         },
         {
           "file": "tests/tmdbCacheDiagnostics.test.ts",
