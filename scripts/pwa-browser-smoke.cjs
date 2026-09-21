@@ -45,7 +45,7 @@ async function waitForHttp(url, timeoutMs = 10_000) {
   throw new Error(`Preview Vite indisponible après ${timeoutMs} ms : ${lastError?.message || 'timeout'}`);
 }
 
-function listenForDevtools(processHandle, timeoutMs = 10_000) {
+function listenForDevtools(processHandle, timeoutMs = 30_000) {
   return new Promise((resolve, reject) => {
     const deadline = setTimeout(() => reject(new Error('Chrome n’a pas exposé DevTools à temps.')), timeoutMs);
     let buffer = '';

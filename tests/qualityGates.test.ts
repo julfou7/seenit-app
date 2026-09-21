@@ -92,6 +92,13 @@ test('les preuves qualité sont exécutées sur le chemin CI sans ajouter de gro
   assert.match(remoteWorkflow, /Run PWA Browser Quality Gate/);
   assert.match(remoteWorkflow, /SeenIt-Agent-Quality-Gates-/);
   assert.equal(Boolean(packageJson.devDependencies?.playwright || packageJson.devDependencies?.puppeteer), false);
+
+  const browserSmoke = fs.readFileSync('scripts/pwa-browser-smoke.cjs', 'utf8');
+  assert.match(
+    browserSmoke,
+    /listenForDevtools\(processHandle, timeoutMs = 30_000\)/,
+    'Chrome dispose de 30 s pour publier DevTools afin d’éviter les faux rouges de démarrage CI',
+  );
 });
 
 test('le smoke Android applique les budgets de démarrage et publie leur preuve', () => {
