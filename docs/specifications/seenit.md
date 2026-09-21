@@ -318,18 +318,17 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
 ### 5.2.3 Réactions Reddit d'un épisode
 
 - **SEENIT-COMMUNITY-001** — Les réactions Reddit d'un épisode restent verrouillées tant que cet épisode
-  n'est pas marqué vu. Une fois déverrouillées, SeenIt prépare deux surfaces à partir du même contexte :
-  une **question IA en français** et une **recherche Reddit classique**. La recherche classique conserve
-  le titre de série localisé, le titre original disponible, les conventions `S02E08`, `S2E8`,
-  `Season 2 Episode 8`, `2x08`, `Episode 8`, le nom d'épisode comme simple indice et les termes
-  `discussion` / `post episode discussion` / `episode discussion` / `reactions`.
-- La question IA demande explicitement à Reddit de **répondre en français même lorsque les publications
-  et commentaires sources sont en anglais**, de résumer avis dominants, consensus, désaccords, détails
-  remarqués et théories, uniquement pour l'épisode courant, sans spoiler les épisodes suivants.
-- La recherche IA appartient à Reddit : lorsque Reddit expose **« Demander »** depuis ses résultats,
-  l'utilisateur lance le résumé en un geste supplémentaire. SeenIt ne dépend d'aucun deep-link IA non
-  documenté et ne suppose pas que Reddit affiche automatiquement une synthèse ; une action distincte
-  **« Voir la recherche Reddit classique »** conserve le fallback fonctionnel permanent.
+  n'est pas marqué vu. Une fois déverrouillées, SeenIt ouvre une **recherche Reddit standard réellement
+  exécutable**. Elle combine le titre localisé/original et le nom d'épisode avec les conventions
+  `S02E08`, `S2E8`, `Season 2 Episode 8`, `2x08`, `Episode 8` en utilisant la syntaxe Reddit
+  documentée : filtre `title:`, guillemets, `AND` / `OR` et parenthèses.
+- SeenIt n'injecte jamais une consigne de type « réponds en français » ou « résume » dans
+  `/search/?q=` : Reddit traite alors cette phrase comme une recherche classique littérale. La recherche
+  IA appartient à Reddit et démarre uniquement lorsque l'utilisateur choisit **« Demander »** depuis les
+  résultats. Le français est une langue officiellement prise en charge par Reddit AI Search, mais aucun
+  paramètre URL documenté ne permet à SeenIt de forcer la langue de la réponse.
+- La page de résultats standard est simultanément le point d'entrée vers **« Demander »** et le fallback
+  permanent si la synthèse IA n'est pas proposée ou échoue.
 - Aucun client ID/secret Reddit, Data API, scraping, contournement anti-bot ni API IA payante n'est requis.
   La PWA et l'APK ouvrent la même URL HTTPS ; le transport de plateforme existant décide nouvel onglet,
   application Reddit associée ou Custom Tab sans modifier la requête.

@@ -311,13 +311,14 @@ Reddit. Les recommandations contextuelles restent dans Explorer. Les modals pers
 dans la pile Retour.
 
 Dans une fiche épisode, **Discussions Reddit** reste verrouillé avant visionnage. Après marquage vu, le CTA
-principal ouvre Reddit avec une question naturelle qui demande explicitement une **synthèse en français**,
-même lorsque les sources sont en anglais, limitée à l'épisode courant et sans spoiler les suivants. Les
-indices de recherche conservent plusieurs conventions de numérotation, le titre de série, le titre original
-et le nom de l'épisode lorsqu'ils existent. Si Reddit affiche **« Demander »**, un appui supplémentaire
-lance son résumé IA natif ; SeenIt ne dépend pas de l'apparition automatique de cette synthèse. Une action
-secondaire **« Voir la recherche Reddit classique »** conserve la requête multi-conventions d'origine
-comme fallback. SeenIt n'appelle ni Data API Reddit, ni scraping, ni service IA payant pour produire ce résumé.
+ouvre d'abord une recherche Reddit standard ciblée sur l'épisode avec les opérateurs officiellement
+supportés (`title:`, guillemets, `AND` / `OR`, parenthèses) et plusieurs conventions de numérotation.
+Cette page fournit immédiatement les threads trouvés et, si Reddit affiche **« Demander »**, un appui
+supplémentaire lance son résumé IA natif. SeenIt ne transforme jamais une instruction IA en paramètre
+`/search?q=`, car Reddit l'interprète comme du texte à rechercher ; il n'existe pas de paramètre URL
+documenté permettant de forcer la langue de la synthèse. Le français est supporté par Reddit AI Search,
+mais la langue effective de la réponse reste pilotée par Reddit. SeenIt n'appelle ni Data API Reddit,
+ni scraping, ni service IA payant pour produire ce résumé.
 
 Le titre affiché privilégie le `title`/`name` de la fiche TMDB récupérée en `fr-FR`. Un ancien titre
 enregistré dans la bibliothèque sert seulement de fallback avant ou hors hydratation. Lorsqu'un média
