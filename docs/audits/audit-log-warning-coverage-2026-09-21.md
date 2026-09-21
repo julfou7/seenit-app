@@ -3,8 +3,8 @@
 - **Identifiant** : AUDIT-2026-09-21-WARNING-COVERAGE
 - **Date** : 21 septembre 2026
 - **Dernière vérification** : 21 septembre 2026
-- **Statut** : lot 2 livré ; watchdog de santé final en validation
-- **Baseline / commit observé** : `b2a261dc841ae51e9f9c89d58e145acf00c52164`
+- **Statut** : terminé et validé en production
+- **Baseline / commit final validé** : `194259abc362601d113c66cd827e9ad78224be65`
 - **Périmètre** : `server.ts`, runtime backend, providers, classifications, téléchargements, notifications, mise à jour, Firestore client et cache/hydratation
 - **Suivi** : issue #27
 - **But** : transformer les dégradations répétées utiles en backlog sans exporter les logs bruts ni créer une télémétrie client bavarde
@@ -14,7 +14,10 @@
 - inventaire statique des `console.warn/error`, `appLogger.warn/error`, `seenitEvent` et diagnostics structurés sur le commit observé ;
 - comparaison avec le filtre Cloud Logging `jsonPayload.seenitEvent.schemaVersion=1` ;
 - TNR `tests/logAuditor.test.ts`, `tests/logAuditorNonPlex.test.ts`, `tests/clientOperationalSignals.test.ts` et `tests/logAuditorWorkflow.test.ts` ;
-- validation canonique `npm run validate:change` sur le SHA exact de quarantaine avant toute promotion.
+- validation canonique `npm run validate:change` sur le SHA exact de quarantaine avant toute promotion ;
+- lot 2 livré via PR #476 puis déployé Cloud Run avec health-check/promotion production ;
+- watchdog livré via PR #477 ; run live `Audit Structured SeenIt Logs` #35587774430 vert sur `main` ;
+- preuve réelle : `[AuditorWatchdog] état=sain action=aucune` et création automatique de l'issue #478 sur un signal `RELEASE_UPDATE_PUSH_FAILED` répété.
 
 ## Chemin réel des signaux
 
