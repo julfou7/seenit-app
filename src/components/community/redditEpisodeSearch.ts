@@ -42,9 +42,7 @@ export function buildRedditEpisodeSearchQuery({
   ];
   if (episodeName) identifiers.push(episodeName);
 
-  const contextTerms = [...titles, episodeName].filter(
-    (value, index, values) => value && values.indexOf(value) === index,
-  );
+  const contextTerms = titles;
   const contextGroup =
     contextTerms.length === 1
       ? quoted(contextTerms[0])

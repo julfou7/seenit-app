@@ -47,7 +47,21 @@ test('SEENIT-COMMUNITY-001 prépare une recherche épisode multi-conventions pou
 
   const bilingual = buildRedditEpisodeSearchQuery(fixtures[1]);
   assert.match(bilingual, /"Le dernier d’entre nous" OR "The Last of Us"/);
-  assert.match(bilingual, /"Through the Valley"/);
+  assert.match(bilingual, /title:"Through the Valley"/);
+
+  const siloFinale = buildRedditEpisodeSearchQuery({
+    seriesTitle: 'Silo',
+    originalSeriesTitle: 'Silo',
+    episodeTitle: 'Troy',
+    seasonNumber: 3,
+    episodeNumber: 10,
+  });
+
+  assert.match(siloFinale, /^"Silo" AND \(/);
+  assert.match(siloFinale, /title:"S03E10"/);
+  assert.match(siloFinale, /title:"Troy"/);
+  assert.doesNotMatch(siloFinale, /\("Silo" OR "Troy"\)/);
+  assert.equal((siloFinale.match(/"Troy"/g) ?? []).length, 1);
 });
 
 test('SEENIT-COMMUNITY-001 n’injecte jamais une consigne IA dans la recherche Reddit', () => {
