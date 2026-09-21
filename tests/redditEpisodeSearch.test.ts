@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 import {
-  buildRedditEpisodeAiQuestion,
   buildRedditEpisodeSearchQuery,
   buildRedditSearchUrl,
 } from '../src/components/community/redditEpisodeSearch.ts';
@@ -38,12 +37,12 @@ test('SEENIT-COMMUNITY-001 prépare une recherche épisode multi-conventions pou
     const season = String(fixture.seasonNumber).padStart(2, '0');
     const episode = String(fixture.episodeNumber).padStart(2, '0');
 
-    assert.match(query, new RegExp(`S${season}E${episode}`));
-    assert.match(query, new RegExp(`Season ${fixture.seasonNumber} Episode ${fixture.episodeNumber}`));
-    assert.match(query, new RegExp(`${fixture.seasonNumber}x${episode}`));
-    assert.match(query, new RegExp(`Episode ${fixture.episodeNumber}`));
-    assert.match(query, /post episode discussion/);
-    assert.match(query, /reactions/);
+    assert.match(query, new RegExp(`title:"S${season}E${episode}"`));
+    assert.match(query, new RegExp(`title:"Season ${fixture.seasonNumber} Episode ${fixture.episodeNumber}"`));
+    assert.match(query, new RegExp(`title:"${fixture.seasonNumber}x${episode}"`));
+    assert.match(query, new RegExp(`title:"Episode ${fixture.episodeNumber}"`));
+    assert.match(query, /\bAND\b/);
+    assert.match(query, /\bOR\b/);
   }
 
   const bilingual = buildRedditEpisodeSearchQuery(fixtures[1]);
@@ -51,7 +50,7 @@ test('SEENIT-COMMUNITY-001 prépare une recherche épisode multi-conventions pou
   assert.match(bilingual, /"Through the Valley"/);
 });
 
-test('SEENIT-COMMUNITY-001 prépare une question IA française sans perdre les indices Reddit', () => {
+test('SEENIT-COMMUNITY-001 n’injecte jamais une consigne IA dans la recherche Reddit', () => {
   const searchQuery = buildRedditEpisodeSearchQuery({
     seriesTitle: 'Severance',
     originalSeriesTitle: 'Severance',
@@ -59,14 +58,11 @@ test('SEENIT-COMMUNITY-001 prépare une question IA française sans perdre les i
     episodeNumber: 8,
     episodeTitle: 'Sweet Vitriol',
   });
-  const aiQuestion = buildRedditEpisodeAiQuestion(searchQuery);
 
-  assert.match(aiQuestion, /^Réponds en français/);
-  assert.match(aiQuestion, /sources sont en anglais/);
-  assert.match(aiQuestion, /S02E08/);
-  assert.match(aiQuestion, /post episode discussion/);
-  assert.match(aiQuestion, /principales théories/);
-  assert.match(aiQuestion, /aucun spoiler sur les épisodes suivants/);
+  assert.match(searchQuery, /"Severance"/);
+  assert.match(searchQuery, /title:"S02E08"/);
+  assert.match(searchQuery, /title:"Sweet Vitriol"/);
+  assert.doesNotMatch(searchQuery, /Réponds|français|résume|consensus|théories/i);
 });
 
 test('SEENIT-COMMUNITY-001 garde Reddit verrouillé avant visionnage et sans API privée', () => {
@@ -89,16 +85,13 @@ test('SEENIT-COMMUNITY-001 conserve la recherche standard comme fallback du rés
     episodeTitle: 'Scallop',
   });
   const url = buildRedditSearchUrl(query);
-  const aiUrl = buildRedditSearchUrl(buildRedditEpisodeAiQuestion(query));
   const redditSection = fs.readFileSync('src/components/community/RedditSection.tsx', 'utf8');
 
   assert.equal(new URL(url).origin, 'https://www.reddit.com');
   assert.equal(new URL(url).pathname, '/search/');
   assert.equal(new URL(url).searchParams.get('sort'), 'relevance');
   assert.equal(new URL(url).searchParams.get('q'), query);
-  assert.match(new URL(aiUrl).searchParams.get('q') ?? '', /^Réponds en français/);
   assert.match(redditSection, /Demander/);
-  assert.match(redditSection, /buildRedditEpisodeAiQuestion\(query\)/);
   assert.match(redditSection, /buildRedditSearchUrl\(query\)/);
-  assert.match(redditSection, /Voir la recherche Reddit classique/);
+  assert.doesNotMatch(redditSection, /buildRedditEpisodeAiQuestion|Réponds en français/);
 });

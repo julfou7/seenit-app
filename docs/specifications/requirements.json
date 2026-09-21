@@ -359,7 +359,7 @@
         },
         {
           "file": "tests/redditEpisodeSearch.test.ts",
-          "contains": "SEENIT-COMMUNITY-001 prépare une question IA française sans perdre les indices Reddit"
+          "contains": "SEENIT-COMMUNITY-001 n’injecte jamais une consigne IA dans la recherche Reddit"
         },
         {
           "file": "tests/redditEpisodeSearch.test.ts",
