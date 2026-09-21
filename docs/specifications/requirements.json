@@ -359,6 +359,10 @@
         },
         {
           "file": "tests/redditEpisodeSearch.test.ts",
+          "contains": "SEENIT-COMMUNITY-001 prépare une question IA française sans perdre les indices Reddit"
+        },
+        {
+          "file": "tests/redditEpisodeSearch.test.ts",
           "contains": "SEENIT-COMMUNITY-001 garde Reddit verrouillé avant visionnage et sans API privée"
         },
         {

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 import {
+  buildRedditEpisodeAiQuestion,
   buildRedditEpisodeSearchQuery,
   buildRedditSearchUrl,
 } from '../src/components/community/redditEpisodeSearch.ts';
@@ -50,6 +51,24 @@ test('SEENIT-COMMUNITY-001 prépare une recherche épisode multi-conventions pou
   assert.match(bilingual, /"Through the Valley"/);
 });
 
+test('SEENIT-COMMUNITY-001 prépare une question IA française sans perdre les indices Reddit', () => {
+  const searchQuery = buildRedditEpisodeSearchQuery({
+    seriesTitle: 'Severance',
+    originalSeriesTitle: 'Severance',
+    seasonNumber: 2,
+    episodeNumber: 8,
+    episodeTitle: 'Sweet Vitriol',
+  });
+  const aiQuestion = buildRedditEpisodeAiQuestion(searchQuery);
+
+  assert.match(aiQuestion, /^Réponds en français/);
+  assert.match(aiQuestion, /sources sont en anglais/);
+  assert.match(aiQuestion, /S02E08/);
+  assert.match(aiQuestion, /post episode discussion/);
+  assert.match(aiQuestion, /principales théories/);
+  assert.match(aiQuestion, /aucun spoiler sur les épisodes suivants/);
+});
+
 test('SEENIT-COMMUNITY-001 garde Reddit verrouillé avant visionnage et sans API privée', () => {
   const episodeModal = fs.readFileSync('src/screens/EpisodeDetailModalCore.tsx', 'utf8');
   const redditSection = fs.readFileSync('src/components/community/RedditSection.tsx', 'utf8');
@@ -70,12 +89,16 @@ test('SEENIT-COMMUNITY-001 conserve la recherche standard comme fallback du rés
     episodeTitle: 'Scallop',
   });
   const url = buildRedditSearchUrl(query);
+  const aiUrl = buildRedditSearchUrl(buildRedditEpisodeAiQuestion(query));
   const redditSection = fs.readFileSync('src/components/community/RedditSection.tsx', 'utf8');
 
   assert.equal(new URL(url).origin, 'https://www.reddit.com');
   assert.equal(new URL(url).pathname, '/search/');
   assert.equal(new URL(url).searchParams.get('sort'), 'relevance');
   assert.equal(new URL(url).searchParams.get('q'), query);
+  assert.match(new URL(aiUrl).searchParams.get('q') ?? '', /^Réponds en français/);
   assert.match(redditSection, /Demander/);
+  assert.match(redditSection, /buildRedditEpisodeAiQuestion\(query\)/);
   assert.match(redditSection, /buildRedditSearchUrl\(query\)/);
+  assert.match(redditSection, /Voir la recherche Reddit classique/);
 });
