@@ -146,8 +146,8 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         failDownloadRequest(requestId, res.message);
         showToast(res.message || "Erreur lors du lancement dans Sonarr", "error");
       }
-    } catch (err: any) {
-      const message = err?.message || "Erreur réseau Sonarr";
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erreur réseau Sonarr";
       failDownloadRequest(requestId, message);
       showToast(message, "error");
     } finally {

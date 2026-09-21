@@ -35,9 +35,50 @@ import {
   ProgressiveWatchlistCarousel,
   WATCHLIST_BATCH_SIZE,
 } from './watchListPresentation';
+import { type EpisodeDetailData } from './episodeDetailTypes';
+
+type WatchListTab = 'watch_next' | 'upcoming' | 'history';
+type WatchListPendingAction = { type: 'archive' | 'unfollow' | 'drop'; item: Show } | null;
+type SelectedEpisodeModal = { show: Show; season: number; episode: EpisodeDetailData; isHydrating: boolean };
+
+interface WatchListViewModel {
+  activeTab: WatchListTab;
+  allShows: Show[];
+  continueWatchingShows: Show[];
+  executeUnfollow: (show: Show) => void | Promise<void>;
+  expandedSection: string | null;
+  filmsAVoirShows: Show[];
+  handleArchiveShow: (show: Show) => void | Promise<void>;
+  handleDropShow: (show: Show) => void | Promise<void>;
+  handleEpisodeClick: (show: Show, seasonNumber: number, episodeNumber: number) => void;
+  handleEpisodeParentClick: (show: Show, tmdbId: number) => void;
+  handleToggleVoirTout: (sectionKey: string) => void;
+  historyRef: RefObject<HTMLDivElement>;
+  isQuotaExceeded: boolean;
+  loading: boolean;
+  markMovieAsSeen: (show: Show) => void | Promise<void>;
+  markNextEpisodeAsSeen: (show: Show) => void | Promise<void>;
+  nouveautesShows: Show[];
+  onShowClick: (id: string, mediaType?: 'tv' | 'movie') => void;
+  onShowClickProp: (id: string, mediaType?: 'tv' | 'movie') => void;
+  openPersonModal: (personId: number) => void;
+  pasVuDepuisUnMomentShows: Show[];
+  pendingAction: WatchListPendingAction;
+  scrollToSection: (ref: RefObject<HTMLDivElement>, tab: WatchListTab) => void;
+  selectedEpisodeModal: SelectedEpisodeModal | null;
+  selectedPersonId: number | null;
+  setPendingAction: React.Dispatch<React.SetStateAction<WatchListPendingAction>>;
+  setSelectedEpisodeModal: React.Dispatch<React.SetStateAction<SelectedEpisodeModal | null>>;
+  setSelectedPersonId: React.Dispatch<React.SetStateAction<number | null>>;
+  setVisibleCount: React.Dispatch<React.SetStateAction<number>>;
+  upcomingRef: RefObject<HTMLDivElement>;
+  upcomingShows: Show[];
+  visibleCount: number;
+  watchNextRef: RefObject<HTMLDivElement>;
+}
 
 interface WatchListViewProps {
-  model: Record<string, any>;
+  model: WatchListViewModel;
 }
 
 export function WatchListView({ model }: WatchListViewProps) {

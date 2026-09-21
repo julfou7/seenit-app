@@ -15,11 +15,12 @@ import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { LiveDownloadBanner } from '../components/LiveDownloadBanner';
 import { useMediaPresence } from '../hooks/useMediaPresence';
 import { openPlexWatchUrl } from '../features/plex/syncPlex';
+import { type EpisodeDetailData } from './episodeDetailTypes';
 
 interface EpisodeDetailModalProps {
   show?: Show;
   season: number;
-  episode: any;
+  episode: EpisodeDetailData;
   isHydrating?: boolean;
   tmdbShowTitle?: string;
   tmdbShowId?: number;

@@ -39,6 +39,7 @@ import {
   parseTimestamp,
 } from './watchListPresentation';
 import { WatchListView } from './WatchListView';
+import { type EpisodeDetailData } from './episodeDetailTypes';
 
 export function WatchListScreen({
   onShowClick: onShowClickProp,
@@ -55,7 +56,7 @@ export function WatchListScreen({
 
   const [activeTab, setActiveTab] = useState<'watch_next' | 'upcoming' | 'history'>('watch_next');
   const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [selectedEpisodeModal, setSelectedEpisodeModal] = useState<{ show: Show; season: number; episode: any; isHydrating: boolean } | null>(null);
+  const [selectedEpisodeModal, setSelectedEpisodeModal] = useState<{ show: Show; season: number; episode: EpisodeDetailData; isHydrating: boolean } | null>(null);
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState<number>(WATCHLIST_BATCH_SIZE);
@@ -114,7 +115,7 @@ export function WatchListScreen({
     requestAnimationFrame(() => { openingEpisodeRef.current = false; });
     if (!show.tmdbId || cachedEpisode) return;
 
-    const settleEpisodeHydration = (episode?: any) => {
+    const settleEpisodeHydration = (episode?: EpisodeDetailData) => {
       setSelectedEpisodeModal(current => {
         if (!current) return current;
         const sameShow = String(current.show.id || current.show.tmdbId || '') === String(show.id || show.tmdbId || '');

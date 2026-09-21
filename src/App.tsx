@@ -253,11 +253,11 @@ function MainApp() {
     })();
   }, [openShow, shows]);
 
-  const openLocalMedia = useCallback((id: any, mediaType?: 'tv' | 'movie') => {
+  const openLocalMedia = useCallback((id: string | number, mediaType?: 'tv' | 'movie') => {
     openShowSmooth(id, 'local', mediaType);
   }, [openShowSmooth]);
 
-  const openLocalMediaImmediate = useCallback((id: any, mediaType?: 'tv' | 'movie') => {
+  const openLocalMediaImmediate = useCallback((id: string | number, mediaType?: 'tv' | 'movie') => {
     void loadShowDetailScreen();
     openShow(id, 'local', mediaType);
   }, [openShow]);
