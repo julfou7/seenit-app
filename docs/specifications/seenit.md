@@ -1229,9 +1229,13 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   explicites et 197 appels directs à `console.*` ; ces nombres sont une limite historique, jamais un
   objectif. La validation canonique interdit toute dette `any` / `console.*` sur une ligne ajoutée ou
   modifiée et exige qu'un fichier de production déjà endetté sorte strictement meilleur de chaque changement,
-  avec au moins une occurrence historique supprimée. Un fichier propre reste propre ; le logger SeenIt conserve
-  uniquement son allowance console explicite. Cette règle « boy scout » rembourse donc la dette au fil des
-  chantiers sans imposer le nettoyage complet d'un gros fichier en une seule PR. Les frontières critiques
+  avec au moins une occurrence historique supprimée. **Exception strictement bornée : un alignement de version
+  pur reconnu par le contrat de changement ne modifie aucun comportement et n'a pas à rembourser artificiellement
+  la dette historique de `server.ts` ou `src/store/updateStore.ts` ; toute nouvelle dette sur les lignes
+  modifiées reste interdite, et les plafonds globaux/frontières critiques restent bloquants.** Un fichier propre
+  reste propre ; le logger SeenIt conserve uniquement son allowance console explicite. Cette règle « boy scout »
+  rembourse donc la dette au fil des chantiers métier sans imposer le nettoyage complet d'un gros fichier en une
+  seule PR ni transformer une montée de version mécanique en refactor hors périmètre. Les frontières critiques
   listées dans `typescript-quality-baseline.json` — API, Firestore, Plex, téléchargements et transport
   Capacitor — restent à zéro `any` explicite et à zéro console direct ; seul le logger SeenIt conserve
   son miroir console interne. Un projet TypeScript `strict` séparé, avec `allowJs=false`, couvre un

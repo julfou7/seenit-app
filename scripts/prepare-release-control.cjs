@@ -126,8 +126,16 @@ function evaluateRecyclableRemoteCandidate({
   if (!sameReleaseFiles(compare?.files)) {
     return { recyclable: false, reason: 'La candidate obsolète modifie des fichiers hors des 8 surfaces de version.' };
   }
-  if ((candidatePrs || []).length > 0) {
-    return { recyclable: false, reason: 'La candidate possède déjà un historique de pull request et ne peut pas être recyclée automatiquement.' };
+  const blockingPr = (candidatePrs || []).find(pr => (
+    String(pr?.state || '').toLowerCase() !== 'closed'
+    || Boolean(pr?.merged_at)
+    || pr?.merged === true
+  ));
+  if (blockingPr) {
+    return {
+      recyclable: false,
+      reason: `La candidate possède une PR active ou mergée (#${blockingPr.number || '?'}).`
+    };
   }
   if (candidateCommit?.sha !== branchSha || !isControllerGeneratedCandidateCommit(candidateCommit, targetVersion)) {
     return { recyclable: false, reason: 'Le commit de candidate n’est pas une préparation canonique créée par github-actions[bot].' };

@@ -54,6 +54,31 @@ test('SEENIT-QUALITY-011 impose une amélioration de dette sur chaque fichier en
   );
 });
 
+test('SEENIT-QUALITY-011 exempte uniquement l’alignement de version pur du remboursement historique', () => {
+  assert.deepEqual(
+    compareFileDebt(
+      { explicitAny: 2, directConsole: 2 },
+      { explicitAny: 2, directConsole: 2 },
+      { explicitAny: 0, directConsole: 0 },
+      { requireImprovement: false }
+    ),
+    []
+  );
+  assert.deepEqual(
+    compareFileDebt(
+      { explicitAny: 3, directConsole: 2 },
+      { explicitAny: 2, directConsole: 2 },
+      { explicitAny: 0, directConsole: 0 },
+      { requireImprovement: false }
+    ),
+    ['any explicites 2 → 3']
+  );
+
+  const guard = fs.readFileSync('scripts/lint-typescript-quality.cjs', 'utf8');
+  assert.match(guard, /isPureVersionAlignmentFromGit\(baseSha\)/);
+  assert.match(guard, /pureVersionAlignment[\s\S]*requireImprovement: !pureVersionAlignment/);
+});
+
 test('SEENIT-QUALITY-011 refuse une nouvelle dette dans une ligne modifiée même si elle est compensée ailleurs', () => {
   const metrics = {
     explicitAny: 2,

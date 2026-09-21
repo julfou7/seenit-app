@@ -1495,6 +1495,10 @@
         {
           "file": "tests/releaseFastPath.test.ts",
           "contains": "SEENIT-RELEASE-005 rend l'agent autonome jusqu'au workflow avec fallback navigateur"
+        },
+        {
+          "file": "tests/releaseCandidateRecycling.test.ts",
+          "contains": "SEENIT-RELEASE-005 recycle une candidate contrôleur après une PR fermée non mergée"
         }
       ]
     },
@@ -1825,6 +1829,10 @@
         {
           "file": "tests/typescriptQualityGuard.test.ts",
           "contains": "SEENIT-QUALITY-011 bloque toute nouvelle dette any/console et active le strict progressif"
+        },
+        {
+          "file": "tests/typescriptQualityGuard.test.ts",
+          "contains": "SEENIT-QUALITY-011 exempte uniquement l’alignement de version pur du remboursement historique"
         },
         {
           "file": "tests/downloadConfigBoundary.test.ts",

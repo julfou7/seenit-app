@@ -59,7 +59,19 @@ test('SEENIT-RELEASE-005 recycle uniquement une candidate contrôleur abandonné
   }), { recyclable: true });
 });
 
-test('SEENIT-RELEASE-005 refuse de recycler une branche humaine, revendiquée par PR ou hors surfaces de version', () => {
+test('SEENIT-RELEASE-005 recycle une candidate contrôleur après une PR fermée non mergée', () => {
+  assert.deepEqual(evaluateRecyclableRemoteCandidate({
+    mainSha,
+    branchSha,
+    compare: staleCompare(),
+    branchVersion: targetVersion,
+    targetVersion,
+    candidateCommit: controllerCommit(),
+    candidatePrs: [{ number: 483, state: 'closed', merged_at: null }]
+  }), { recyclable: true });
+});
+
+test('SEENIT-RELEASE-005 refuse de recycler une branche humaine, une PR active ou mergée et un diff hors contrat', () => {
   const humanCommit = controllerCommit({
     author: { login: 'julfou7' },
     committer: { login: 'julfou7' }
@@ -82,7 +94,11 @@ test('SEENIT-RELEASE-005 refuse de recycler une branche humaine, revendiquée pa
   }).recyclable, false);
   assert.equal(evaluateRecyclableRemoteCandidate({
     ...baseInput,
-    candidatePrs: [{ number: 326, state: 'closed' }]
+    candidatePrs: [{ number: 326, state: 'open', merged_at: null }]
+  }).recyclable, false);
+  assert.equal(evaluateRecyclableRemoteCandidate({
+    ...baseInput,
+    candidatePrs: [{ number: 327, state: 'closed', merged_at: '2026-09-21T12:00:00Z' }]
   }).recyclable, false);
   assert.equal(evaluateRecyclableRemoteCandidate({
     ...baseInput,
