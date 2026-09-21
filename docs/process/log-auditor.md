@@ -139,3 +139,23 @@ l'enrichissent au plus toutes les six heures. Le watchdog n'ingère aucun log et
 
 Ainsi, une panne WIF, Cloud Logging, du résumeur ou du moteur d'audit ne dépend plus d'une lecture manuelle
 des logs ou de GitHub Actions pour être découverte.
+
+
+## Exports Cloud Logging / Admin Activity hors auditeur
+
+Les exports d'audit Cloud Run ne doivent **jamais** être attachés bruts à GitHub ni conservés comme
+artefact : une entrée Admin Activity peut embarquer `containers[].env[].value` avec la configuration
+complète d'une révision. Le workflow structuré ci-dessus n'a pas besoin de ces payloads.
+
+Pour un diagnostic ponctuel nécessitant un export GCP, la seule procédure partageable est un flux direct
+vers le redactor versionné, sans `tee` ni fichier intermédiaire brut :
+
+```bash
+gcloud logging read '<filtre borné>' --project=gen-lang-client-0201895414 --format=json \
+  | node scripts/redact-gcp-log-export.cjs --input=- --output=build/gcp-log-redacted.json
+```
+
+Le redactor masque **toutes** les valeurs de `env[]` Cloud Run, même lorsqu'une variable n'est pas
+classée secrète, puis réapplique la redaction défensive des tokens, clés, emails, UID et chemins.
+Seul le fichier redigé peut être copié, joint ou archivé. Pour un simple inventaire runtime, le
+déploiement canonique journalise uniquement `nom=plain|secret`, jamais la valeur.

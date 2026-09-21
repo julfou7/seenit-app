@@ -963,7 +963,14 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
 
 - **SEENIT-SECURITY-003** — Avant toute persistance ou export de log, les champs sensibles et les
   secrets reconnaissables dans les chaînes sont masqués. La profondeur, la taille et le nombre
-  d'éléments sérialisés sont bornés.
+  d'éléments sérialisés sont bornés. Un export Cloud Logging / Admin Activity susceptible de contenir
+  une configuration Cloud Run n'est jamais conservé ni partagé brut : toutes les valeurs de
+  `containers[].env[]` sont supprimées par le redactor versionné avant écriture partageable. La
+  préparation d'une nouvelle révision Cloud Run retire les variables secrètes historiques devenues
+  inutiles, remplace TMDB/TVDB par des `secretKeyRef`, supprime tout `GITHUB_PAT` hérité en clair
+  et refuse toute autre variable au nom sensible encore portée par `value:`. Une référence Secret
+  Manager reste autorisée. Les inventaires runtime ne contiennent que le nom et le type de source,
+  jamais la valeur.
 - **SEENIT-OBSERVABILITY-001** — Le backend peut émettre des événements opérationnels JSON à code
   stable, sans message libre ni donnée utilisateur. Un lot CI périodique peut transformer uniquement
   les anomalies appartenant à une allowlist haute confiance en issues GitHub : il applique une

@@ -863,6 +863,18 @@
         {
           "file": "tests/logPrivacy.test.ts",
           "contains": "SEENIT-SECURITY-003 masque les secrets avant de persister un journal"
+        },
+        {
+          "file": "tests/cloudRunCandidate.test.ts",
+          "contains": "SEENIT-SECURITY-003 retire les credentials historiques en clair sans supprimer un secretKeyRef GitHub"
+        },
+        {
+          "file": "tests/cloudRunCandidate.test.ts",
+          "contains": "SEENIT-SECURITY-003 refuse un secret inconnu encore injecté en clair"
+        },
+        {
+          "file": "tests/gcpLogRedaction.test.ts",
+          "contains": "SEENIT-SECURITY-003 redige les valeurs env Cloud Run avant tout export partageable"
         }
       ]
     },
