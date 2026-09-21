@@ -80,7 +80,11 @@ Le quota Firestore gratuit n'est pas transféré par simple suppression vers une
 [documentation Firestore](https://firebase.google.com/docs/firestore/pricing#free-quota-applies-only-to-one-database-per-project)
 indique que la prochaine base créée devient éligible après suppression de la base free tier. Avec
 `default` existante en `freeTier=false`, toute remédiation qui la recrée ou la remplace est une migration
-de données et requiert une décision explicite ; elle ne fait pas partie d'un nettoyage sûr.
+de données et requiert une décision explicite ; elle ne fait pas partie d'un nettoyage sûr. Cette décision
+a été donnée pour #23 le 21/09/2026. L’unique procédure autorisée est
+[`firestore-default-free-tier-migration.md`](firestore-default-free-tier-migration.md) : elle fige les
+écritures, exporte les deux bases, vérifie deux restaurations de répétition, recrée `default` avec Delete
+Protection, exige `freeTier=true`, compare le digest final et conserve les exports privés 30 jours.
 
 ## Attribution du coût
 

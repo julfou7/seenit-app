@@ -155,6 +155,11 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   d’empêcher sa suppression accidentelle. Aucun import/sync AI Studio, script ou agent ne désactive
   automatiquement cette protection. Une désactivation exige une opération de migration/suppression
   explicitement approuvée par l’utilisateur, précédée d’une sauvegarde et accompagnée d’un rollback.
+  L’unique migration de quota gratuit autorisée est en plus sérialisée par #23, verrouille temporairement
+  les accès client et backend, exporte puis restaure en répétition **chaque** base supprimée, compare un
+  digest exhaustif des documents sans journaliser leur contenu, refuse tout trigger Firestore non inventorié
+  et recrée `default` en Standard `eur3` avec Delete Protection avant de rétablir le trafic. Une erreur après
+  le début de la bascule conserve le service en maintenance tant que `default` n’est pas restaurée et vérifiée.
 - Une réponse asynchrone capture l'UID et un epoch ; elle est ignorée si le compte change avant
   son écriture.
 - La PWA et l'APK d'un même UID partagent Firestore et convergent vers les mêmes données, sans
@@ -925,8 +930,12 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   origine distante n'est interceptée par son cache. Les détails et justifications sont maintenus dans
   `docs/security/pwa-http-security.md`.
 - **SEENIT-COST-001** — Le runtime de production SeenIt vise une dépense GCP récurrente de 0,00 €.
-  Firestore applicatif reste exclusivement sur la base `default`, seule base éligible au quota gratuit ;
-  aucune base nommée AI Studio n'est une dépendance applicative. Le déploiement Cloud Run canonique force
+  Firestore applicatif reste exclusivement sur la base `default`, seule base qui doit porter le quota gratuit ;
+  aucune base nommée AI Studio n'est une dépendance applicative. Si le quota gratuit appartient à une base
+  nommée, la remédiation conserve l’identité `default` : export complet, restauration de répétition et digests
+  équivalents avant suppression, recréation en `eur3` Standard avec `freeTier=true`, réimport puis restauration
+  des règles et de Delete Protection. Les exports de rollback utilisent des buckets dédiés proches des bases,
+  non publics et munis d’une expiration bornée afin de ne pas recréer un coût de stockage durable. Le déploiement Cloud Run canonique force
   `minScale=0`, borne `maxScale=2`, conserve la facturation CPU liée aux requêtes et retire tout VPC
   connector / Direct VPC hérité tant qu'aucune dépendance privée explicitement validée ne l'exige.
   Après promotion et smoke production, les images Artifact Registry du package `seenit-app` et les

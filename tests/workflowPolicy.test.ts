@@ -103,6 +103,7 @@ test('SEENIT-QUALITY-008 autorise uniquement les écritures canoniques nécessai
     'audit-structured-logs.yml': 'name: Test\npermissions:\n  contents: read\n  id-token: write\n  issues: write\njobs: {}\n',
     'build-apk.yml': 'name: Test\npermissions:\n  contents: write\njobs: {}\n',
     'deploy-backend.yml': 'name: Test\npermissions:\n  contents: read\n  id-token: write\njobs: {}\n',
+    'firestore-default-migration.yml': 'name: Test\npermissions:\n  contents: read\n  id-token: write\n  issues: write\njobs: {}\n',
     'release-control.yml': 'name: Test\npermissions:\n  contents: write\n  actions: write\n  issues: write\n  pull-requests: write\njobs: {}\n',
     'release-update-push.yml': 'name: Test\npermissions:\n  contents: read\n  issues: write\njobs: {}\n',
     'runtime-control.yml': 'name: Test\npermissions:\n  contents: read\n  actions: write\n  issues: write\njobs: {}\n'

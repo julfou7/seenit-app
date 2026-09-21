@@ -2,10 +2,10 @@
 
 - **Identifiant** : AUDIT-2026-09-20-GCP-FINOPS
 - **Date** : 20 septembre 2026
-- **Dernière vérification** : 20 septembre 2026
-- **Statut** : ouvert — garde-fous déployés, inventaire runtime acquis ; topologie Firestore incompatible avec la garantie 0 € sans migration de données
-- **Baseline** : `main` `3a2b9ed95252a8c2e704a50a56dec1ed037225c7`
-- **Commit observé** : `3a2b9ed95252a8c2e704a50a56dec1ed037225c7`
+- **Dernière vérification** : 21 septembre 2026
+- **Statut** : ouvert — migration Firestore option 1 autorisée et contrôleur de bascule sécurisé préparé ; preuve temporelle 0 € encore requise
+- **Baseline** : `main` `5a68cd2ddec7fa9176ad15e50fa4a0ccae5bdfb9`
+- **Commit observé** : `5a68cd2ddec7fa9176ad15e50fa4a0ccae5bdfb9`
 - **Périmètre** : Firestore, Firebase Storage, Cloud Run, Cloud SQL historique, coûts réseau et garde-fous
 - **Suivi** : issue #23
 
@@ -56,7 +56,16 @@ pas de façon démontrée une base existante. La
 [documentation Firestore](https://firebase.google.com/docs/firestore/pricing#free-quota-applies-only-to-one-database-per-project)
 indique que, si la base éligible est supprimée, c'est la **prochaine base créée** qui reçoit le quota
 gratuit. Toute solution exigeant de recréer ou remplacer `default` est donc une migration de données
-explicite, actuellement interdite par le périmètre de #23, et non un nettoyage automatique.
+explicite, et non un nettoyage automatique. L’utilisateur a retenu l’option 1 le 21/09/2026 : conserver
+l’identité `default`, la recréer en `eur3` Standard après export/restauration de répétition et lui
+transférer ainsi le quota gratuit.
+
+La console Usage apporte une seconde preuve importante sur la base AI Studio : aucune série temporelle de
+lecture, mise à jour temps réel, écriture ou suppression gérée sur les sept derniers jours, mais un stockage
+compris entre **21,671 MiB et 26,116 MiB**. Elle est donc inactive mais non vide. Le runbook
+`docs/process/firestore-default-free-tier-migration.md` exige en conséquence son propre export, une
+restauration de répétition Enterprise et un digest documentaire identique avant suppression. Les deux
+exports restent privés et expirent automatiquement après 30 jours.
 
 ## État Storage
 
@@ -113,11 +122,10 @@ absence de VPC connector sans décision explicite, budget comme alerte et preuve
 
 ## Limites / preuves encore nécessaires
 
-1. preuve que la base AI Studio est vide et sans dépendance avant toute suppression ;
-2. décision de migration Firestore compatible avec l'interdiction actuelle de supprimer/remplacer `default` ;
-3. configuration budget/alertes ;
-4. mesure post-correctifs permettant de distinguer les coûts historiques du mois des nouveaux coûts incrémentaux ;
-5. preuve de 7 jours puis d'une période complète à 0,00 €.
+1. exécution verte de la migration autorisée, avec deux répétitions et digest final identique ;
+2. configuration budget/alertes ;
+3. mesure post-correctifs permettant de distinguer les coûts historiques du mois des nouveaux coûts incrémentaux ;
+4. preuve de 7 jours puis d'une période complète à 0,00 €.
 
 La mesure par endpoint est désormais automatisée par l'auditeur lecture seule : toutes les six heures,
 il transforme les request logs Cloud Run en un agrégat borné (famille de route, requêtes, octets servis,

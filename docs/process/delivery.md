@@ -105,6 +105,11 @@ l'outil est donc une évolution explicite de la politique : le script, les TNR e
 mis à jour dans le même changement. Un workflow correctif temporaire auto-modifiant n'est jamais un moyen
 autorisé de réparer la CI.
 
+Le contrôleur exceptionnel `firestore-default-migration.yml` est borné à l’issue #23, au propriétaire du
+dépôt, au projet GCP canonique et au SHA `main` exact écrit dans la commande. Ses seules permissions GitHub
+en écriture sont `id-token` pour WIF et `issues` pour son checkpoint ; il ne peut ni écrire le dépôt ni se
+déclencher sur un push. Sa topologie préflight rend toute réexécution inopérante après la migration unique.
+
 Le préflight conserve également le garde des imports ESM des TNR Node sans dépendances, qui inspecte uniquement les TNR
 `tests/**/*.test.ts` exécutés directement par `node --test`. Lorsqu'un import relatif local cible un
 module TypeScript existant, son extension (`.ts`, `.tsx`, etc.) doit être explicite ; les imports de
