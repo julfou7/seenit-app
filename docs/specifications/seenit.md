@@ -978,7 +978,9 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   report-only sauf s’il apparaît dans deux fenêtres consécutives de six heures avec au moins huit
   occurrences cumulées : il peut alors ouvrir une unique issue de qualification, sans contexte libre.
   Les événements non autorisés restent dans le rapport redigé ; aucune issue n'est fermée automatiquement.
-  Le compte de lecture dédié réutilise le
+  En mode live, le workflow surveille aussi sa propre santé : perte WIF/Cloud Logging, source agrégée
+  indisponible ou moteur d'audit en échec ouvre/enrichit une issue P1 unique à partir d'états techniques
+  allowlistés, sans lire ni exporter de log brut. Le compte de lecture dédié réutilise le
   provider WIF canonique déjà administré pour GitHub Actions : son bootstrap cible explicitement le
   projet SeenIt et ne tente jamais de recréer le pool ou le provider partagé après un échec de lecture.
   Le même batch peut collecter des diagnostics de performance explicitement allowlistés en **report-only**.

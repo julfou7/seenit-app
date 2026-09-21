@@ -3,7 +3,7 @@
 - **Identifiant** : AUDIT-2026-09-21-WARNING-COVERAGE
 - **Date** : 21 septembre 2026
 - **Dernière vérification** : 21 septembre 2026
-- **Statut** : seconde tranche #27 en validation
+- **Statut** : lot 2 livré ; watchdog de santé final en validation
 - **Baseline / commit observé** : `b2a261dc841ae51e9f9c89d58e145acf00c52164`
 - **Périmètre** : `server.ts`, runtime backend, providers, classifications, téléchargements, notifications, mise à jour, Firestore client et cache/hydratation
 - **Suivi** : issue #27
@@ -115,6 +115,7 @@ client et, plus tard, éventuellement un POST asynchrone non bloquant sur un app
 | P2 | l'indisponibilité d'un service privé est ambiguë | faux positifs GitHub | `DOWNLOAD_SERVICE_PROXY_FAILED` catalogué report-only | [#27](https://github.com/julfou7/seenit-app/issues/27) |
 | P2 | permissions/refus/fallbacks normaux ressemblent à des warnings | bruit | classement explicite ignore/report-only ; seuls les échecs finaux sont comptés | [#27](https://github.com/julfou7/seenit-app/issues/27) |
 | P2 | un futur code structuré peut ne pas avoir de règle | angle mort futur | qualification seulement après 2 fenêtres et 8 occurrences | [#27](https://github.com/julfou7/seenit-app/issues/27) |
+| P1 | l’auditeur peut lui-même perdre Cloud Logging/WIF ou casser avant l’analyse | l’amélioration continue devient silencieusement aveugle si personne ne regarde Actions | watchdog indépendant, issue santé unique, cooldown 6 h, jamais de logs bruts | [#27](https://github.com/julfou7/seenit-app/issues/27) |
 
 ## Points solides à préserver
 

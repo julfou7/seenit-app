@@ -913,6 +913,10 @@
           "contains": "SEENIT-OBSERVABILITY-001 agrège localement sans appel réseau par warning"
         },
         {
+          "file": "tests/logAuditorHealth.test.ts",
+          "contains": "SEENIT-OBSERVABILITY-001 détecte les angles morts de l’auditeur sans lire les logs"
+        },
+        {
           "file": "tests/tmdbCacheDiagnostics.test.ts",
           "contains": "SEENIT-OBSERVABILITY-001 agrège les deltas TMDB sans archiver les snapshots cumulés ni les identités"
         },
