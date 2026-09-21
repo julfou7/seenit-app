@@ -1,4 +1,4 @@
-import type { Application, Request, RequestHandler, Response } from 'express';
+import type { Application, Request, RequestHandler, Response as ExpressResponse } from 'express';
 import { registerPlexAvailabilityRoute } from '../../backend/plexAvailabilityBackend.ts';
 import { emitOperationalEvent } from '../runtime/operationalEvent.ts';
 
@@ -282,7 +282,7 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
     }
   };
 
-  const takeQuota = (scope: QuotaScope, provider: QuotaProvider, uid: string, limit: number, res: Response): boolean => {
+  const takeQuota = (scope: QuotaScope, provider: QuotaProvider, uid: string, limit: number, res: ExpressResponse): boolean => {
     const time = now();
     for (const [key, bucket] of buckets) if (bucket.reset <= time) buckets.delete(key);
     const subject = `${scope}:${provider}:${uid}`;
