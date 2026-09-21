@@ -20,6 +20,8 @@ test('SEENIT-QUALITY-004 impose le contexte GitHub complet avant toute intervent
   assert.match(agents, /branche GitHub `main`[\s\S]*source de vérité/i);
   assert.match(agents, /nouveau chantier[\s\S]*issues GitHub \*\*ouvertes et fermées liées au sujet\*\*/i);
   assert.match(agents, /Réutiliser ou rouvrir l'issue pertinente[\s\S]*éviter les doublons/i);
+  assert.match(agents, /next issue[\s\S]*plus ancienne issue ouverte actionnable[\s\S]*date de création/i);
+  assert.match(agents, /Ne sauter une issue[\s\S]*WAITING[\s\S]*bail concurrent actif/i);
   assert.match(agents, /Reprise identifiée : pas de recherche globale/i);
   assert.match(agents, /sans relancer la recherche générale[\s\S]*périmètre[\s\S]*checkpoint[\s\S]*contradiction pertinente/is);
 
