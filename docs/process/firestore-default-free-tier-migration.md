@@ -48,8 +48,9 @@ une base inattendue, un trigger Firestore, un index/TTL non capturé ou un expor
 
 ## Séquence de bascule
 
-1. Inventorier les bases, les triggers Eventarc/Cloud Functions, les index, les TTL et la liaison publique
-   Cloud Run. Refuser toute divergence de la baseline.
+1. Inventorier les bases actives, les triggers Eventarc/Cloud Functions, les index, les TTL et la liaison
+   publique Cloud Run. Les anciennes bases avec `deleteTime` restent visibles pendant leur fenêtre de
+   restauration mais sont exclues de la topologie active ; refuser toute autre divergence de la baseline.
 2. Créer deux buckets privés dédiés : `EU` pour `default`, `us-west1` pour la base AI Studio. Ils restent en
    Standard, sans versioning, avec prévention d’accès public et suppression automatique après 30 jours.
 3. Retirer temporairement `allUsers/roles/run.invoker` de `seenit-app`, puis déployer les règles

@@ -233,7 +233,8 @@ preflight() {
   mkdir -p "$STATE_DIR"
   databases="$(gcloud firestore databases list --project "$PROJECT_ID" --format=json)"
   jq -e --arg default "$DEFAULT_DATABASE" --arg ai "$AI_DATABASE" \
-    '([.[].name | split("/")[-1]] | sort) == ([$default, $ai] | sort)' <<<"$databases" >/dev/null || {
+    '([.[] | select((.deleteTime // "") == "") | .name | split("/")[-1]] | sort)
+      == ([$default, $ai] | sort)' <<<"$databases" >/dev/null || {
       log 'Topologie Firestore différente des deux bases attendues ; migration refusée.'
       return 1
     }
@@ -454,10 +455,11 @@ run_migration() {
 
   gcloud firestore databases list --project "$PROJECT_ID" --format=json > "$STATE_DIR/databases-after.json"
   jq -e --arg default "$DEFAULT_DATABASE" --arg project "$PROJECT_ID" '
-    length == 1
-    and .[0].name == ("projects/" + $project + "/databases/" + $default)
-    and .[0].freeTier == true
-    and .[0].deleteProtectionState == "DELETE_PROTECTION_ENABLED"
+    [.[] | select((.deleteTime // "") == "")] as $active
+    | ($active | length) == 1
+    and $active[0].name == ("projects/" + $project + "/databases/" + $default)
+    and $active[0].freeTier == true
+    and $active[0].deleteProtectionState == "DELETE_PROTECTION_ENABLED"
   ' "$STATE_DIR/databases-after.json" >/dev/null
 
   jq -n \
