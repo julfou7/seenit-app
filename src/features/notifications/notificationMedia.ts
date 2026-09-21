@@ -1,4 +1,7 @@
 import { Capacitor } from '@capacitor/core';
+import { recordClientOperationalSignal } from '../logging/clientOperationalDiagnostics.ts';
+
+const localConsole = globalThis.console;
 import { Directory, Filesystem } from '@capacitor/filesystem';
 
 const NOTIFICATION_MEDIA_DIR = 'notification-media';
@@ -243,7 +246,8 @@ async function cacheNativeNotificationImageSafely(
   try {
     return await cacheNativeNotificationImage(url, dependencies);
   } catch (error) {
-    console.warn('Notification media cache failed after bounded retries; keeping notification without this visual:', error);
+    recordClientOperationalSignal('NOTIFICATION_CLIENT_FAILED');
+    localConsole.warn('Notification media cache failed after bounded retries; keeping notification without this visual:', error);
     return undefined;
   }
 }
@@ -284,7 +288,7 @@ export async function resolveNotificationMediaVisual(
   ]);
 
   if (!localPoster && !localRichImage) {
-    console.warn('Notification media unavailable; using text-only notification');
+    localConsole.warn('Notification media unavailable; using text-only notification');
     return {};
   }
 

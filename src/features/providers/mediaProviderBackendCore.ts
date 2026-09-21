@@ -1,5 +1,6 @@
-import type { Application, Request, RequestHandler } from 'express';
+import type { Application, Request, RequestHandler, Response as ExpressResponse } from 'express';
 import { registerPlexAvailabilityRoute } from '../../backend/plexAvailabilityBackend.ts';
+import { emitOperationalEvent } from '../runtime/operationalEvent.ts';
 
 type Provider = 'tmdb';
 type QuotaProvider = Provider | 'tvdb';
@@ -231,6 +232,24 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
   let currentSecrets: Secrets = {};
   let tmdbMetricRequests = 0;
   const tmdbMetricFamilies = new Map<string, { requests: number; memoryHits: number; inFlightHits: number; upstream: number; upstreamBytes: number }>();
+  const providerFailurePending = new Map<string, number>();
+  const recordProviderFailure = (provider: QuotaProvider, status: number) => {
+    if (status === 404 || status < 429) return;
+    const normalizedStatus = Number.isInteger(status) && status >= 400 && status <= 599 ? status : 500;
+    const key = `${provider}:${normalizedStatus}`;
+    const pendingCount = (providerFailurePending.get(key) || 0) + 1;
+    if (pendingCount < 5) {
+      providerFailurePending.set(key, pendingCount);
+      return;
+    }
+    providerFailurePending.set(key, 0);
+    emitOperationalEvent({
+      code: 'PROVIDER_UPSTREAM_FAILED',
+      context: { provider, status: normalizedStatus, count: 5 },
+      domain: 'providers',
+      level: 'warn'
+    });
+  };
   const evict = (key: string) => { cacheBytes -= cache.get(key)?.bytes || 0; cache.delete(key); };
 
   const recordTmdbCacheMetric = (
@@ -263,7 +282,7 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
     }
   };
 
-  const takeQuota = (scope: QuotaScope, provider: QuotaProvider, uid: string, limit: number, res: any): boolean => {
+  const takeQuota = (scope: QuotaScope, provider: QuotaProvider, uid: string, limit: number, res: ExpressResponse): boolean => {
     const time = now();
     for (const [key, bucket] of buckets) if (bucket.reset <= time) buckets.delete(key);
     const subject = `${scope}:${provider}:${uid}`;
@@ -324,20 +343,30 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
       if (!takeQuota('upstream', 'tmdb', uid, UPSTREAM_LIMITS.tmdb, res)) return;
       target.searchParams.set('api_key', credential);
       pending = (async () => {
-        const upstream = await request(target, { method: 'GET', headers: { Accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(timeoutMs) });
-        if (!upstream.ok) {
-          await upstream.body?.cancel();
-          throw new ProviderFailure(upstream.status === 404 ? 404 : upstream.status === 429 ? 429 : 502);
+        try {
+          const upstream = await request(target, { method: 'GET', headers: { Accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(timeoutMs) });
+          if (!upstream.ok) {
+            const status = upstream.status === 404 ? 404 : upstream.status === 429 ? 429 : 502;
+            recordProviderFailure('tmdb', status);
+            await upstream.body?.cancel();
+            throw new ProviderFailure(status);
+          }
+          const body = await readBoundedJson(upstream, [(secrets.TMDB_API_KEY || '').trim(), (secrets.TVDB_API_KEY || '').trim()]);
+          const bytes = Buffer.byteLength(body);
+          const metric = tmdbMetricFamilies.get(metricFamily);
+          if (metric) metric.upstreamBytes += bytes;
+          if (generation === currentSecrets) {
+            while (cache.size >= 200 || cacheBytes + bytes > MAX_CACHE_BYTES) evict(cache.keys().next().value!);
+            cache.set(key, { body, bytes, expires: now() + TTL }); cacheBytes += bytes;
+          }
+          return body;
+        } catch (error) {
+          if (!(error instanceof ProviderFailure)) {
+            const status = error instanceof Error && ['AbortError', 'TimeoutError'].includes(error.name) ? 504 : 502;
+            recordProviderFailure('tmdb', status);
+          }
+          throw error;
         }
-        const body = await readBoundedJson(upstream, [(secrets.TMDB_API_KEY || '').trim(), (secrets.TVDB_API_KEY || '').trim()]);
-        const bytes = Buffer.byteLength(body);
-        const metric = tmdbMetricFamilies.get(metricFamily);
-        if (metric) metric.upstreamBytes += bytes;
-        if (generation === currentSecrets) {
-          while (cache.size >= 200 || cacheBytes + bytes > MAX_CACHE_BYTES) evict(cache.keys().next().value!);
-          cache.set(key, { body, bytes, expires: now() + TTL }); cacheBytes += bytes;
-        }
-        return body;
       })();
       inFlight.set(key, pending);
     }
@@ -352,7 +381,11 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
   const tvdbRequest = async (path: string, token: string): Promise<any | null> => {
     const target = new URL(path.replace(/^\/+/, ''), TVDB_ORIGIN);
     const upstream = await request(target, { method: 'GET', headers: { Accept: 'application/json', Authorization: `Bearer ${token}` }, redirect: 'error', signal: AbortSignal.timeout(timeoutMs) });
-    if (!upstream.ok) { await upstream.body?.cancel(); return null; }
+    if (!upstream.ok) {
+      recordProviderFailure('tvdb', upstream.status);
+      await upstream.body?.cancel();
+      return null;
+    }
     return readJsonBody(upstream);
   };
 
@@ -363,7 +396,11 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
       method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({ apikey: apiKey }), redirect: 'error', signal: AbortSignal.timeout(timeoutMs),
     });
-    if (!upstream.ok) { await upstream.body?.cancel(); return null; }
+    if (!upstream.ok) {
+      recordProviderFailure('tvdb', upstream.status);
+      await upstream.body?.cancel();
+      return null;
+    }
     const payload = await readJsonBody(upstream);
     const token = typeof payload?.data?.token === 'string' ? payload.data.token.trim() : '';
     if (!token) return null;
@@ -454,6 +491,7 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
       res.json(value ? { kind: value.kind, results: value.results } : { kind: null, results: [] });
     } catch (error) {
       const status = error instanceof ProviderFailure ? error.status : error instanceof Error && ['AbortError', 'TimeoutError'].includes(error.name) ? 504 : 502;
+      recordProviderFailure('tvdb', status);
       res.status(status).json({ error: status === 504 ? 'Le fournisseur ne répond pas à temps.' : 'Métadonnées indisponibles, réessayez.' });
     }
   };

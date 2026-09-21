@@ -31,6 +31,114 @@ const RULES = Object.freeze({
     threshold: 2,
     title: 'Échecs répétés du démarrage backend'
   }),
+  PROVIDER_UPSTREAM_FAILED: Object.freeze({
+    autoIssue: true,
+    domain: 'providers',
+    impact: 'TMDB ou TVDB échoue de façon répétée sur la frontière backend, ce qui dégrade les métadonnées, diffuseurs ou univers.',
+    investigation: 'Contrôler le fournisseur et le statut HTTP agrégé, puis reproduire sans exporter de requête, média ou utilisateur.',
+    priority: 'P2',
+    threshold: 10,
+    title: 'Échecs répétés d’un fournisseur de métadonnées'
+  }),
+  PARENTAL_RATING_PROVIDER_FAILED: Object.freeze({
+    autoIssue: true,
+    domain: 'providers',
+    impact: 'Les classifications d’âge ne peuvent pas être résolues de façon répétée et le filtre âge doit alors rester fail-closed.',
+    investigation: 'Contrôler la route batch de classifications et TMDB sans transformer une classification inconnue en valeur permissive.',
+    priority: 'P2',
+    threshold: 12,
+    title: 'Échecs répétés des classifications d’âge'
+  }),
+  DOWNLOAD_C411_FAILED: Object.freeze({
+    autoIssue: true,
+    domain: 'downloads',
+    impact: 'Les recherches ou tests C411 échouent de façon répétée sur la frontière backend.',
+    investigation: 'Vérifier la disponibilité de C411 et le type d’échec stable sans exporter de requête ni de clé API.',
+    priority: 'P2',
+    threshold: 10,
+    title: 'Échecs répétés de C411'
+  }),
+  DOWNLOAD_SERVICE_PROXY_FAILED: Object.freeze({
+    autoIssue: false,
+    domain: 'downloads',
+    impact: 'Un service privé Sonarr, Radarr ou qBittorrent est momentanément injoignable via le proxy.',
+    investigation: 'Conserver ce signal en rapport uniquement : une machine privée éteinte ou hors réseau peut être normale.',
+    priority: 'P2',
+    threshold: 20,
+    title: 'Indisponibilités répétées du proxy de téléchargement'
+  }),
+  DOWNLOAD_WEBHOOK_FAILED: Object.freeze({
+    autoIssue: true,
+    domain: 'downloads',
+    impact: 'Des webhooks Sonarr/Radarr valides ne peuvent pas être traités de façon répétée par SeenIt.',
+    investigation: 'Contrôler le traitement du webhook et la livraison de notification sans journaliser le payload, le média ou l’utilisateur.',
+    priority: 'P2',
+    threshold: 3,
+    title: 'Échecs répétés des webhooks de téléchargement'
+  }),
+  RELEASE_UPDATE_PUSH_FAILED: Object.freeze({
+    autoIssue: true,
+    domain: 'release',
+    impact: 'La notification d’une nouvelle version SeenIt échoue de façon répétée.',
+    investigation: 'Contrôler la publication de release et le code d’échec stable de la notification sans exporter de token appareil.',
+    priority: 'P1',
+    threshold: 2,
+    title: 'Échecs répétés de notification de mise à jour'
+  }),
+  UPDATE_CHECK_BACKEND_FAILED: Object.freeze({
+    autoIssue: true,
+    domain: 'release',
+    impact: 'Le backend n’arrive plus de façon répétée à lire la dernière release disponible.',
+    investigation: 'Contrôler l’accès GitHub Releases et la configuration backend sans exporter de jeton.',
+    priority: 'P2',
+    threshold: 5,
+    title: 'Échecs répétés de vérification des mises à jour'
+  }),
+  FIRESTORE_CLIENT_SYNC_FAILED: Object.freeze({
+    autoIssue: true,
+    domain: 'firestore',
+    impact: 'Des synchronisations Firestore côté application échouent de façon répétée malgré les mécanismes de reprise.',
+    investigation: 'Reproduire le parcours de synchronisation concerné et qualifier le défaut sans exporter de document, UID ou contenu utilisateur.',
+    priority: 'P1',
+    threshold: 5,
+    title: 'Échecs répétés de synchronisation Firestore'
+  }),
+  NOTIFICATION_CLIENT_FAILED: Object.freeze({
+    autoIssue: true,
+    domain: 'notifications',
+    impact: 'Des notifications locales ou leurs médias échouent après les reprises bornées prévues.',
+    investigation: 'Contrôler le chemin Android/PWA de notification avec un TNR ciblé sans exporter le titre, l’image ou le token.',
+    priority: 'P2',
+    threshold: 5,
+    title: 'Échecs répétés des notifications client'
+  }),
+  DOWNLOAD_CLIENT_SYNC_FAILED: Object.freeze({
+    autoIssue: true,
+    domain: 'downloads',
+    impact: 'La synchronisation partagée des téléchargements côté application échoue de façon répétée.',
+    investigation: 'Contrôler l’écriture ou l’écoute Firestore du suivi de téléchargement sans exporter de média ni de configuration privée.',
+    priority: 'P2',
+    threshold: 6,
+    title: 'Échecs répétés de synchronisation des téléchargements'
+  }),
+  APP_UPDATE_CLIENT_FAILED: Object.freeze({
+    autoIssue: true,
+    domain: 'release',
+    impact: 'Le téléchargement, la vérification ou l’ouverture de l’APK échoue de façon répétée côté Android.',
+    investigation: 'Contrôler le parcours de mise à jour intégré, le digest et le Package Installer sans exporter de chemin local.',
+    priority: 'P1',
+    threshold: 4,
+    title: 'Échecs répétés de mise à jour APK'
+  }),
+  CACHE_CLIENT_STORAGE_FAILED: Object.freeze({
+    autoIssue: true,
+    domain: 'cache',
+    impact: 'Le cache persistant de métadonnées rencontre des erreurs répétées de lecture ou d’écriture.',
+    investigation: 'Contrôler IndexedDB et la stratégie de fallback/stale sans exporter les clés de médias.',
+    priority: 'P2',
+    threshold: 8,
+    title: 'Échecs répétés du cache persistant'
+  }),
   PLEX_SYNC_PARTIAL: Object.freeze({
     autoIssue: true,
     domain: 'plex',
@@ -124,6 +232,11 @@ function normalizeCount(value) {
   return Math.max(0, Math.min(100, Math.floor(count)));
 }
 
+function normalizeHttpStatus(value) {
+  const status = Number(value);
+  return Number.isInteger(status) && status >= 400 && status <= 599 ? status : 500;
+}
+
 function normalizeRuleContext(code, context = {}) {
   if (code === 'API_UNHANDLED_ERROR') {
     return {
@@ -150,6 +263,47 @@ function normalizeRuleContext(code, context = {}) {
   if (code === 'PLEX_DELTA_SNAPSHOT_FAILED' || code === 'PLEX_FULL_SNAPSHOT_SEED_FAILED') {
     return { errorCode: normalizeErrorCode(context.errorCode, code) };
   }
+  if (code === 'PROVIDER_UPSTREAM_FAILED') {
+    const provider = String(context.provider || '').trim().toLowerCase();
+    return {
+      provider: provider === 'tmdb' || provider === 'tvdb' ? provider : 'unknown',
+      status: normalizeHttpStatus(context.status),
+      count: normalizeCount(context.count)
+    };
+  }
+  if (
+    code === 'PARENTAL_RATING_PROVIDER_FAILED'
+    || code === 'FIRESTORE_CLIENT_SYNC_FAILED'
+    || code === 'NOTIFICATION_CLIENT_FAILED'
+    || code === 'DOWNLOAD_CLIENT_SYNC_FAILED'
+    || code === 'APP_UPDATE_CLIENT_FAILED'
+    || code === 'CACHE_CLIENT_STORAGE_FAILED'
+  ) {
+    return { count: normalizeCount(context.count) };
+  }
+  if (code === 'DOWNLOAD_C411_FAILED') {
+    const action = String(context.action || '').trim().toLowerCase();
+    return {
+      action: action === 'test' || action === 'search' ? action : 'unknown',
+      errorCode: normalizeErrorCode(context.errorCode, 'C411_FAILED')
+    };
+  }
+  if (code === 'DOWNLOAD_SERVICE_PROXY_FAILED' || code === 'UPDATE_CHECK_BACKEND_FAILED') {
+    return { errorCode: normalizeErrorCode(context.errorCode, code) };
+  }
+  if (code === 'DOWNLOAD_WEBHOOK_FAILED') {
+    const source = String(context.source || '').trim().toLowerCase();
+    return {
+      source: source === 'sonarr' || source === 'radarr' ? source : 'unknown',
+      errorCode: normalizeErrorCode(context.errorCode, 'WEBHOOK_FAILED')
+    };
+  }
+  if (code === 'RELEASE_UPDATE_PUSH_FAILED') {
+    return {
+      status: normalizeHttpStatus(context.status),
+      errorCode: normalizeErrorCode(context.errorCode, 'RELEASE_PUSH_FAILED')
+    };
+  }
   return {};
 }
 
@@ -167,6 +321,11 @@ function fingerprintContext(code, context) {
   if (code === 'PLEX_SYNC_PARTIAL') return { mode: context.mode };
   if (code === 'PLEX_SNAPSHOT_STORE_FAILED') return { action: context.action, errorCode: context.errorCode };
   if (code === 'PLEX_DELTA_SNAPSHOT_FAILED' || code === 'PLEX_FULL_SNAPSHOT_SEED_FAILED') return { errorCode: context.errorCode };
+  if (code === 'PROVIDER_UPSTREAM_FAILED') return { provider: context.provider, status: context.status };
+  if (code === 'DOWNLOAD_C411_FAILED') return { action: context.action, errorCode: context.errorCode };
+  if (code === 'DOWNLOAD_SERVICE_PROXY_FAILED' || code === 'UPDATE_CHECK_BACKEND_FAILED') return { errorCode: context.errorCode };
+  if (code === 'DOWNLOAD_WEBHOOK_FAILED') return { source: context.source, errorCode: context.errorCode };
+  if (code === 'RELEASE_UPDATE_PUSH_FAILED') return { status: context.status, errorCode: context.errorCode };
   return {};
 }
 
@@ -202,14 +361,20 @@ function normalizeEvent(entry) {
     ? String(envelope.correlationId)
     : null;
 
+  const context = rule ? normalizeRuleContext(code, envelope.context) : {};
+  const weight = rule && typeof context.count === 'number' && context.count > 0
+    ? context.count
+    : 1;
+
   return {
     code,
-    context: rule ? normalizeRuleContext(code, envelope.context) : {},
+    context,
     correlationId,
     domain,
     level: envelope.level === 'warn' ? 'warn' : 'error',
     rule,
-    timestamp: new Date(timestampMs).toISOString()
+    timestamp: new Date(timestampMs).toISOString(),
+    weight
   };
 }
 
@@ -269,10 +434,10 @@ function analyzeLogEntries(entries, options = {}) {
       };
       groupsByFingerprint.set(fingerprint, group);
     }
-    group.totalCount += 1;
+    group.totalCount += event.weight;
     const timestampMs = Date.parse(event.timestamp);
-    if (timestampMs >= currentWindowStart && timestampMs <= anchorMs) group.recentWindowCount += 1;
-    else if (timestampMs >= previousWindowStart && timestampMs < currentWindowStart) group.previousWindowCount += 1;
+    if (timestampMs >= currentWindowStart && timestampMs <= anchorMs) group.recentWindowCount += event.weight;
+    else if (timestampMs >= previousWindowStart && timestampMs < currentWindowStart) group.previousWindowCount += event.weight;
     if (event.timestamp < group.firstOccurrence) group.firstOccurrence = event.timestamp;
     if (event.timestamp > group.lastOccurrence) {
       group.lastOccurrence = event.timestamp;
@@ -323,7 +488,17 @@ function fingerprintMarker(fingerprint) {
 }
 
 function buildIssueTitle(group) {
-  const domain = group.domain === 'plex' ? 'Plex' : 'Runtime';
+  const labels = {
+    cache: 'Cache',
+    downloads: 'Téléchargements',
+    firestore: 'Firestore',
+    notifications: 'Notifications',
+    plex: 'Plex',
+    providers: 'Fournisseurs',
+    release: 'Mise à jour',
+    runtime: 'Runtime'
+  };
+  const domain = labels[group.domain] || 'Runtime';
   return `[${group.priority}][${domain}] ${group.title}`;
 }
 
@@ -347,7 +522,11 @@ function buildIssueBody(group) {
     `- Dernière occurrence : ${group.lastOccurrence}`,
     `- Occurrences dans le lot : **${group.count}** (seuil : ${group.threshold})`,
     `- Domaine / code : \`${group.domain}\` / \`${group.code}\``,
+    `- Niveau : **${group.level === 'error' ? 'error' : 'warning'}**`,
     `- Fingerprint : \`${fingerprintMarker(group.fingerprint)}\``,
+    ...(/^[a-f0-9]{40}$/i.test(String(process.env.GITHUB_SHA || ''))
+      ? [`- SHA des règles d’audit : \`${process.env.GITHUB_SHA}\``]
+      : []),
     '',
     '## Exemple redigé',
     '',
@@ -549,6 +728,12 @@ function buildMarkdownSummary(result) {
   const decisions = new Map();
   for (const action of result.actions) decisions.set(action.decision, (decisions.get(action.decision) || 0) + 1);
   const decisionLines = [...decisions.entries()].map(([decision, count]) => `- \`${decision}\` : ${count}`);
+  const groupDecisions = new Map();
+  for (const group of result.groups) {
+    groupDecisions.set(group.decision, (groupDecisions.get(group.decision) || 0) + 1);
+  }
+  const groupDecisionLines = [...groupDecisions.entries()]
+    .map(([decision, count]) => `- \`${decision}\` : ${count}`);
   const coverageLabels = {
     candidates_detected: 'anomalie(s) candidate(s) détectée(s)',
     covered_no_anomaly: 'signaux couverts présents, aucune anomalie au-dessus des seuils',
@@ -561,10 +746,11 @@ function buildMarkdownSummary(result) {
     `- Mode : **${result.mode}**`,
     `- Source : **${result.sourceStatus}**`,
     `- Couverture : **${coverageLabels[result.coverageStatus] || result.coverageStatus}**`,
-    `- Entrées / acceptées / rejetées : ${result.inputCount} / ${result.acceptedCount} / ${result.rejectedCount}`,
+    `- Événements vus / exploitables / ignorés-rejetés : ${result.inputCount} / ${result.acceptedCount} / ${result.rejectedCount}`,
     `- Groupes configurés / inconnus / candidats : ${result.knownGroupCount} / ${result.unknownGroupCount} / ${result.candidates.length}`,
     `- État : **${result.degraded ? 'dégradé' : 'sain'}**`, '',
-    ...(decisionLines.length ? ['### Décisions', '', ...decisionLines] : ['Aucune action GitHub candidate.'])
+    ...(groupDecisionLines.length ? ['### Classement des signaux', '', ...groupDecisionLines, ''] : []),
+    ...(decisionLines.length ? ['### Décisions GitHub', '', ...decisionLines] : ['Aucune action GitHub candidate.'])
   ].join('\n');
 }
 function parseArguments(argv) {

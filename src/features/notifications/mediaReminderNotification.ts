@@ -6,6 +6,9 @@ import {
   type NativeNotificationOptions,
 } from '../../lib/firebase';
 import { resolveMediaReminderSchedule } from './mediaReminderSchedule';
+import { recordClientOperationalSignal } from '../logging/clientOperationalDiagnostics.ts';
+
+const localConsole = globalThis.console;
 
 export interface MediaReminderNotificationOptions extends NativeNotificationOptions {
   summaryText: string;
@@ -32,7 +35,7 @@ export async function cancelMediaReminderNotificationByTag(tag: string): Promise
       notifications: [{ id: getMediaReminderNotificationId(tag) }],
     });
   } catch (error) {
-    console.warn('Media reminder native cancellation failed safely:', error);
+    localConsole.warn('Media reminder native cancellation failed safely:', error);
   }
 }
 
@@ -65,7 +68,7 @@ export async function prunePendingMediaReminderNotifications(
       await LocalNotifications.cancel({ notifications });
     }
   } catch (error) {
-    console.warn('Media reminder native pruning failed safely:', error);
+    localConsole.warn('Media reminder native pruning failed safely:', error);
   }
 }
 
@@ -146,7 +149,8 @@ export async function sendMediaReminderNotification(
     });
     return true;
   } catch (error) {
-    console.warn('Media reminder native schedule failed; notification skipped safely:', error);
+    recordClientOperationalSignal('NOTIFICATION_CLIENT_FAILED');
+    localConsole.warn('Media reminder native schedule failed; notification skipped safely:', error);
     return false;
   }
 }

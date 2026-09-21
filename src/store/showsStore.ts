@@ -354,7 +354,7 @@ export function setupRealtimeShowsListener(userId: string) {
     };
 
     const firestoreUnsubscribe = onSnapshot(showsRef, scheduleSnapshot, (err) => {
-      console.warn('[showsStore] Realtime listener error:', err);
+      appLogger.warn('sync', '[showsStore] Realtime listener interrompu', err);
     });
 
     unsubscribeRealtimeListener = () => {
@@ -363,7 +363,7 @@ export function setupRealtimeShowsListener(userId: string) {
       latestSnapshot = null;
     };
   } catch (err) {
-    console.warn('[showsStore] Failed to setup realtime listener:', err);
+    appLogger.warn('sync', '[showsStore] Realtime listener impossible à initialiser', err);
   }
 }
 
@@ -505,7 +505,7 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
         errStr.toLowerCase().includes('resource_exhausted');
 
       if (isQuotaError) {
-        console.warn("[showsStore] Firestore quota exhausted on fetch.");
+        appLogger.warn('sync', '[showsStore] Firestore quota exhausted on fetch.');
         useSyncStore.getState().setQuotaExceeded(true);
       } else {
         handleFirestoreError(err, OperationType.GET, `users/${user.uid}/shows`);

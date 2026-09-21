@@ -7,6 +7,8 @@ export interface PublicMetadataPolicy {
   persist: boolean;
 }
 
+import { recordClientOperationalSignal } from '../logging/clientOperationalDiagnostics.ts';
+
 export const PUBLIC_METADATA_CACHE_SCHEMA_VERSION = 1;
 export const PUBLIC_METADATA_CACHE_DB_NAME = 'seenit-public-metadata-v1';
 export const PUBLIC_METADATA_CACHE_STORE_NAME = 'entries';
@@ -264,6 +266,7 @@ async function persistEntry(entry: StoredPublicMetadataEntry): Promise<void> {
     }
   } catch {
     stats[entry.family].writeErrors += 1;
+    recordClientOperationalSignal('CACHE_CLIENT_STORAGE_FAILED');
   }
 }
 
@@ -319,6 +322,7 @@ export async function readPublicMetadataCache<T>(
       }
     } catch {
       stats[family].readErrors += 1;
+      recordClientOperationalSignal('CACHE_CLIENT_STORAGE_FAILED');
     }
   }
 
@@ -394,6 +398,12 @@ export function clearPublicMetadataMemoryCacheForTests(): void {
   stats = createStats();
 }
 
+declare global {
+  interface Window {
+    __SEENIT_TMDB_CACHE_STATS__?: () => PublicMetadataCacheStatsSnapshot;
+  }
+}
+
 if (typeof window !== 'undefined') {
-  (window as any).__SEENIT_TMDB_CACHE_STATS__ = () => getPublicMetadataCacheStats();
+  window.__SEENIT_TMDB_CACHE_STATS__ = () => getPublicMetadataCacheStats();
 }

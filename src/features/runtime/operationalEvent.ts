@@ -2,13 +2,33 @@ import { randomUUID } from 'node:crypto';
 
 export type OperationalEventCode =
   | 'API_UNHANDLED_ERROR'
+  | 'APP_UPDATE_CLIENT_FAILED'
   | 'BACKEND_STARTUP_FAILED'
+  | 'CACHE_CLIENT_STORAGE_FAILED'
+  | 'DOWNLOAD_C411_FAILED'
+  | 'DOWNLOAD_CLIENT_SYNC_FAILED'
+  | 'DOWNLOAD_SERVICE_PROXY_FAILED'
+  | 'DOWNLOAD_WEBHOOK_FAILED'
+  | 'FIRESTORE_CLIENT_SYNC_FAILED'
+  | 'NOTIFICATION_CLIENT_FAILED'
+  | 'PARENTAL_RATING_PROVIDER_FAILED'
   | 'PLEX_DELTA_SNAPSHOT_FAILED'
   | 'PLEX_FULL_SNAPSHOT_SEED_FAILED'
   | 'PLEX_SNAPSHOT_STORE_FAILED'
-  | 'PLEX_SYNC_PARTIAL';
+  | 'PLEX_SYNC_PARTIAL'
+  | 'PROVIDER_UPSTREAM_FAILED'
+  | 'RELEASE_UPDATE_PUSH_FAILED'
+  | 'UPDATE_CHECK_BACKEND_FAILED';
 
-export type OperationalEventDomain = 'plex' | 'runtime';
+export type OperationalEventDomain =
+  | 'cache'
+  | 'downloads'
+  | 'firestore'
+  | 'notifications'
+  | 'plex'
+  | 'providers'
+  | 'release'
+  | 'runtime';
 export type OperationalEventLevel = 'error' | 'warn';
 
 export interface OperationalEventEnvelope {
@@ -38,6 +58,21 @@ function normalizeCount(value: unknown): number {
   const count = Number(value);
   if (!Number.isFinite(count)) return 0;
   return Math.max(0, Math.min(100, Math.floor(count)));
+}
+
+function normalizeHttpStatus(value: unknown): number {
+  const status = Number(value);
+  return Number.isInteger(status) && status >= 400 && status <= 599 ? status : 500;
+}
+
+function normalizeProvider(value: unknown): string {
+  const provider = String(value || '').trim().toLowerCase();
+  return provider === 'tmdb' || provider === 'tvdb' ? provider : 'unknown';
+}
+
+function normalizeSource(value: unknown): string {
+  const source = String(value || '').trim().toLowerCase();
+  return source === 'sonarr' || source === 'radarr' ? source : 'unknown';
 }
 
 function normalizeContext(
@@ -74,6 +109,54 @@ function normalizeContext(
           ? 'PLEX_DELTA_SNAPSHOT_FAILED'
           : 'PLEX_FULL_SNAPSHOT_SEED_FAILED'
       )
+    };
+  }
+
+  if (code === 'PROVIDER_UPSTREAM_FAILED') {
+    return {
+      provider: normalizeProvider(context.provider),
+      status: normalizeHttpStatus(context.status),
+      count: normalizeCount(context.count)
+    };
+  }
+
+  if (
+    code === 'PARENTAL_RATING_PROVIDER_FAILED'
+    || code === 'FIRESTORE_CLIENT_SYNC_FAILED'
+    || code === 'NOTIFICATION_CLIENT_FAILED'
+    || code === 'DOWNLOAD_CLIENT_SYNC_FAILED'
+    || code === 'APP_UPDATE_CLIENT_FAILED'
+    || code === 'CACHE_CLIENT_STORAGE_FAILED'
+  ) {
+    return { count: normalizeCount(context.count) };
+  }
+
+  if (code === 'DOWNLOAD_C411_FAILED') {
+    const action = String(context.action || '').trim().toLowerCase();
+    return {
+      action: action === 'test' || action === 'search' ? action : 'unknown',
+      errorCode: normalizeErrorCode(context.errorCode, 'C411_FAILED')
+    };
+  }
+
+  if (code === 'DOWNLOAD_WEBHOOK_FAILED') {
+    return {
+      source: normalizeSource(context.source),
+      errorCode: normalizeErrorCode(context.errorCode, 'WEBHOOK_FAILED')
+    };
+  }
+
+  if (
+    code === 'DOWNLOAD_SERVICE_PROXY_FAILED'
+    || code === 'UPDATE_CHECK_BACKEND_FAILED'
+  ) {
+    return { errorCode: normalizeErrorCode(context.errorCode, code) };
+  }
+
+  if (code === 'RELEASE_UPDATE_PUSH_FAILED') {
+    return {
+      status: normalizeHttpStatus(context.status),
+      errorCode: normalizeErrorCode(context.errorCode, 'RELEASE_PUSH_FAILED')
     };
   }
 
