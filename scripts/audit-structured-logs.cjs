@@ -7,6 +7,8 @@ const MAX_INPUT_EVENTS = 5000;
 const MAX_NEW_ISSUES_PER_RUN = 3;
 const MAX_NEW_ISSUES_PER_UTC_DAY = 3;
 const EXISTING_ISSUE_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+const RECURRENCE_WINDOW_MS = 6 * 60 * 60 * 1000;
+const UNKNOWN_WARNING_THRESHOLD = 8;
 const AUTO_CREATED_MARKER = 'Créée automatiquement par l’auditeur de logs SeenIt';
 const FINGERPRINT_PREFIX = 'seenit-log-fingerprint:';
 
@@ -30,13 +32,40 @@ const RULES = Object.freeze({
     title: 'Échecs répétés du démarrage backend'
   }),
   PLEX_SYNC_PARTIAL: Object.freeze({
-    autoIssue: false,
+    autoIssue: true,
     domain: 'plex',
-    impact: 'Des collectes Plex restent partielles ; une indisponibilité ponctuelle peut toutefois être normale.',
-    investigation: 'Réévaluer le taux et les causes techniques avant toute activation de création automatique.',
+    impact: 'Des collectes Plex restent partielles de façon répétée et empêchent la validation fiable du curseur.',
+    investigation: 'Identifier la source Plex incomplète, vérifier sa disponibilité puis conserver le curseur tant que la collecte n’est pas complète.',
     priority: 'P2',
     threshold: 20,
     title: 'Synchronisations Plex partielles répétées'
+  }),
+  PLEX_SNAPSHOT_STORE_FAILED: Object.freeze({
+    autoIssue: true,
+    domain: 'plex',
+    impact: 'Le snapshot technique utilisé par la synchronisation Plex ne peut pas être lu ou persisté de façon répétée.',
+    investigation: 'Vérifier Firestore et la taille du snapshot, puis ajouter un TNR sur le code d’erreur stable observé.',
+    priority: 'P2',
+    threshold: 6,
+    title: 'Échecs répétés du snapshot Plex'
+  }),
+  PLEX_DELTA_SNAPSHOT_FAILED: Object.freeze({
+    autoIssue: true,
+    domain: 'plex',
+    impact: 'L’enrichissement delta Plex échoue de façon répétée et peut retarder la convergence des états vus/non vus.',
+    investigation: 'Contrôler la collecte delta et le code d’erreur stable sans exposer de média ni d’utilisateur.',
+    priority: 'P2',
+    threshold: 4,
+    title: 'Échecs répétés de la delta Plex'
+  }),
+  PLEX_FULL_SNAPSHOT_SEED_FAILED: Object.freeze({
+    autoIssue: true,
+    domain: 'plex',
+    impact: 'La synchronisation complète n’arrive pas à préparer de façon répétée la baseline technique du prochain delta.',
+    investigation: 'Contrôler la persistance de la baseline après un full complet et reproduire avec un TNR ciblé.',
+    priority: 'P2',
+    threshold: 4,
+    title: 'Échecs répétés de la baseline Plex'
   })
 });
 
@@ -84,6 +113,11 @@ function normalizeMethod(value) {
   return SAFE_METHODS.has(method) ? method : 'UNKNOWN';
 }
 
+function normalizeDomain(value) {
+  const domain = String(value || '').trim().toLowerCase();
+  return /^[a-z][a-z0-9_-]{0,39}$/.test(domain) ? domain : 'unknown';
+}
+
 function normalizeCount(value) {
   const count = Number(value);
   if (!Number.isFinite(count)) return 0;
@@ -106,6 +140,16 @@ function normalizeRuleContext(code, context = {}) {
       incompleteSourceCount: normalizeCount(context.incompleteSourceCount)
     };
   }
+  if (code === 'PLEX_SNAPSHOT_STORE_FAILED') {
+    const action = String(context.action || '').trim();
+    return {
+      action: ['read', 'read-resolution-cache', 'write'].includes(action) ? action : 'unknown',
+      errorCode: normalizeErrorCode(context.errorCode, 'SNAPSHOT_STORE_FAILED')
+    };
+  }
+  if (code === 'PLEX_DELTA_SNAPSHOT_FAILED' || code === 'PLEX_FULL_SNAPSHOT_SEED_FAILED') {
+    return { errorCode: normalizeErrorCode(context.errorCode, code) };
+  }
   return {};
 }
 
@@ -121,6 +165,8 @@ function fingerprintContext(code, context) {
   }
   if (code === 'BACKEND_STARTUP_FAILED') return { errorCode: context.errorCode };
   if (code === 'PLEX_SYNC_PARTIAL') return { mode: context.mode };
+  if (code === 'PLEX_SNAPSHOT_STORE_FAILED') return { action: context.action, errorCode: context.errorCode };
+  if (code === 'PLEX_DELTA_SNAPSHOT_FAILED' || code === 'PLEX_FULL_SNAPSHOT_SEED_FAILED') return { errorCode: context.errorCode };
   return {};
 }
 
@@ -149,10 +195,9 @@ function normalizeEvent(entry) {
   const timestampMs = Date.parse(String(timestampValue || ''));
   if (!Number.isFinite(timestampMs)) return null;
 
-  const normalizedCode = normalizeCode(envelope.code);
-  const rule = RULES[normalizedCode] || null;
-  const code = rule ? normalizedCode : 'UNKNOWN_EVENT';
-  const domain = rule?.domain || 'unknown';
+  const code = normalizeCode(envelope.code);
+  const rule = RULES[code] || null;
+  const domain = rule?.domain || normalizeDomain(envelope.domain);
   const correlationId = SAFE_CORRELATION_PATTERN.test(String(envelope.correlationId || ''))
     ? String(envelope.correlationId)
     : null;
@@ -181,18 +226,26 @@ function createFingerprint(event) {
 function analyzeLogEntries(entries, options = {}) {
   const source = Array.isArray(entries) ? entries : [];
   const limited = source.slice(0, MAX_INPUT_EVENTS);
-  const groupsByFingerprint = new Map();
+  const normalized = [];
   let rejectedCount = 0;
-
   for (const entry of limited) {
     const event = normalizeEvent(entry);
-    if (!event) {
-      rejectedCount += 1;
-      continue;
-    }
+    if (event) normalized.push(event);
+    else rejectedCount += 1;
+  }
+
+  const latestTimestampMs = normalized.reduce((latest, event) => Math.max(latest, Date.parse(event.timestamp)), 0);
+  const explicitNowMs = options.now instanceof Date ? options.now.getTime() : Number.NaN;
+  const anchorMs = Number.isFinite(explicitNowMs) ? explicitNowMs : (latestTimestampMs > 0 ? latestTimestampMs + 1 : Date.now());
+  const currentWindowStart = anchorMs - RECURRENCE_WINDOW_MS;
+  const previousWindowStart = currentWindowStart - RECURRENCE_WINDOW_MS;
+  const groupsByFingerprint = new Map();
+
+  for (const event of normalized) {
     const fingerprint = createFingerprint(event);
     let group = groupsByFingerprint.get(fingerprint);
     if (!group) {
+      const configured = Boolean(event.rule);
       group = {
         autoIssue: Boolean(event.rule?.autoIssue),
         code: event.code,
@@ -202,17 +255,24 @@ function analyzeLogEntries(entries, options = {}) {
         domain: event.domain,
         fingerprint,
         firstOccurrence: event.timestamp,
-        impact: event.rule?.impact || 'Événement non reconnu conservé pour revue.',
-        investigation: event.rule?.investigation || 'Qualifier le code et sa sécurité avant de créer une règle.',
+        impact: event.rule?.impact || 'Un warning structuré non catalogué se répète sur plusieurs fenêtres d’audit.',
+        investigation: event.rule?.investigation || 'Qualifier ce code stable, décider ignore/report-only/auto-issue puis ajouter un TNR avant toute règle spécialisée.',
         lastOccurrence: event.timestamp,
+        level: event.level,
+        previousWindowCount: 0,
         priority: event.rule?.priority || 'P2',
-        threshold: event.rule?.threshold || null,
-        title: event.rule?.title || 'Événement inconnu'
+        recentWindowCount: 0,
+        ruleConfigured: configured,
+        threshold: event.rule?.threshold || UNKNOWN_WARNING_THRESHOLD,
+        title: event.rule?.title || `Warning récurrent à qualifier : ${event.code}`,
+        totalCount: 0
       };
       groupsByFingerprint.set(fingerprint, group);
     }
-
-    group.count += 1;
+    group.totalCount += 1;
+    const timestampMs = Date.parse(event.timestamp);
+    if (timestampMs >= currentWindowStart && timestampMs <= anchorMs) group.recentWindowCount += 1;
+    else if (timestampMs >= previousWindowStart && timestampMs < currentWindowStart) group.previousWindowCount += 1;
     if (event.timestamp < group.firstOccurrence) group.firstOccurrence = event.timestamp;
     if (event.timestamp > group.lastOccurrence) {
       group.lastOccurrence = event.timestamp;
@@ -221,29 +281,43 @@ function analyzeLogEntries(entries, options = {}) {
   }
 
   const groups = [...groupsByFingerprint.values()]
-    .map(group => ({
-      ...group,
-      decision: !RULES[group.code]
-        ? 'unknown_report_only'
-        : group.count < group.threshold
-          ? 'below_threshold'
-          : group.autoIssue
-            ? 'candidate'
-            : 'known_report_only'
-    }))
+    .filter(group => group.ruleConfigured ? group.recentWindowCount > 0 : group.totalCount > 0)
+    .map(group => {
+      const unknownRecurring = !group.ruleConfigured && group.level === 'warn'
+        && group.recentWindowCount > 0 && group.previousWindowCount > 0
+        && group.totalCount >= UNKNOWN_WARNING_THRESHOLD;
+      const count = group.ruleConfigured ? group.recentWindowCount : group.totalCount;
+      return {
+        ...group,
+        autoIssue: group.ruleConfigured ? group.autoIssue : unknownRecurring,
+        count,
+        decision: group.ruleConfigured
+          ? count < group.threshold ? 'below_threshold' : group.autoIssue ? 'candidate' : 'known_report_only'
+          : unknownRecurring ? 'candidate' : 'unknown_report_only'
+      };
+    })
     .sort((left, right) => right.count - left.count || left.fingerprint.localeCompare(right.fingerprint));
 
+  const candidates = groups.filter(group => group.decision === 'candidate');
+  const knownGroupCount = groups.filter(group => group.ruleConfigured).length;
+  const unknownGroupCount = groups.length - knownGroupCount;
+  const coverageStatus = candidates.length > 0 ? 'candidates_detected'
+    : normalized.length === 0 ? (source.length === 0 ? 'no_events' : 'no_structured_signal')
+    : knownGroupCount === 0 ? 'no_covered_signal' : 'covered_no_anomaly';
+
   return {
-    acceptedCount: limited.length - rejectedCount,
-    candidates: groups.filter(group => group.decision === 'candidate'),
-    generatedAt: (options.now || new Date()).toISOString(),
+    acceptedCount: normalized.length,
+    candidates,
+    coverageStatus,
+    generatedAt: (options.now || new Date(anchorMs)).toISOString(),
     groups,
     inputCount: source.length,
+    knownGroupCount,
     rejectedCount,
-    truncatedCount: Math.max(0, source.length - limited.length)
+    truncatedCount: Math.max(0, source.length - limited.length),
+    unknownGroupCount
   };
 }
-
 function fingerprintMarker(fingerprint) {
   return `${FINGERPRINT_PREFIX}${fingerprint}`;
 }
@@ -473,23 +547,26 @@ function createGithubClient({ fetchImpl = globalThis.fetch, repository, token })
 
 function buildMarkdownSummary(result) {
   const decisions = new Map();
-  for (const action of result.actions) {
-    decisions.set(action.decision, (decisions.get(action.decision) || 0) + 1);
-  }
+  for (const action of result.actions) decisions.set(action.decision, (decisions.get(action.decision) || 0) + 1);
   const decisionLines = [...decisions.entries()].map(([decision, count]) => `- \`${decision}\` : ${count}`);
+  const coverageLabels = {
+    candidates_detected: 'anomalie(s) candidate(s) détectée(s)',
+    covered_no_anomaly: 'signaux couverts présents, aucune anomalie au-dessus des seuils',
+    no_covered_signal: 'signaux structurés présents, aucun code couvert par les règles',
+    no_events: 'aucun événement structuré collecté',
+    no_structured_signal: 'entrées présentes mais aucun signal structuré exploitable'
+  };
   return [
-    '## Auditeur de logs SeenIt',
-    '',
+    '## Auditeur de logs SeenIt', '',
     `- Mode : **${result.mode}**`,
     `- Source : **${result.sourceStatus}**`,
+    `- Couverture : **${coverageLabels[result.coverageStatus] || result.coverageStatus}**`,
     `- Entrées / acceptées / rejetées : ${result.inputCount} / ${result.acceptedCount} / ${result.rejectedCount}`,
-    `- Groupes / candidats : ${result.groups.length} / ${result.candidates.length}`,
-    `- État : **${result.degraded ? 'dégradé' : 'sain'}**`,
-    '',
+    `- Groupes configurés / inconnus / candidats : ${result.knownGroupCount} / ${result.unknownGroupCount} / ${result.candidates.length}`,
+    `- État : **${result.degraded ? 'dégradé' : 'sain'}**`, '',
     ...(decisionLines.length ? ['### Décisions', '', ...decisionLines] : ['Aucune action GitHub candidate.'])
   ].join('\n');
 }
-
 function parseArguments(argv) {
   const args = {};
   for (const item of argv) {
@@ -542,7 +619,9 @@ module.exports = {
   MAX_INPUT_EVENTS,
   MAX_NEW_ISSUES_PER_RUN,
   MAX_NEW_ISSUES_PER_UTC_DAY,
+  RECURRENCE_WINDOW_MS,
   RULES,
+  UNKNOWN_WARNING_THRESHOLD,
   analyzeLogEntries,
   buildIssueBody,
   buildIssueTitle,

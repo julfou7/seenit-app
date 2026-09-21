@@ -11,7 +11,7 @@ test('SEENIT-OBSERVABILITY-001 exécute un batch Cloud Run en dry-run désactiva
   assert.match(workflow, /cron: '23 \*\/6 \* \* \*'/);
   assert.match(workflow, /vars\.SEENIT_LOG_AUDITOR_MODE \|\| 'dry-run'/);
   assert.match(workflow, /env\.SEENIT_LOG_AUDITOR_MODE != 'off'/);
-  assert.match(workflow, /jsonPayload\.seenitEvent\.schemaVersion=1/);
+  assert.match(workflow, /jsonPayload\.seenitEvent\.schemaVersion=1[\s\S]*--freshness=12h/);
   assert.match(workflow, /jsonPayload\.seenitDiagnostic\.code="TMDB_REQUEST_CACHE_SUMMARY"/);
   assert.match(workflow, /summarize-tmdb-cache-diagnostics\.cjs/);
   assert.match(workflow, /log_id\("run\.googleapis\.com\/requests"\)/);
@@ -22,6 +22,9 @@ test('SEENIT-OBSERVABILITY-001 exécute un batch Cloud Run en dry-run désactiva
   assert.match(workflow, /push:[\s\S]*branches:[\s\S]*main[\s\S]*summarize-tmdb-cache-diagnostics\.cjs/);
   assert.match(workflow, /--freshness=6h/);
   assert.match(workflow, /--limit=5000/);
+  assert.match(workflow, /scripts\/audit-structured-logs\.cjs/);
+  assert.match(workflow, /src\/features\/runtime\/operationalEvent\.ts/);
+  assert.match(workflow, /src\/features\/runtime\/backendRuntime\.ts/);
   assert.match(workflow, /issues: write/);
   assert.match(workflow, /id: auth[\s\S]*continue-on-error: true/);
   assert.match(workflow, /id: gcloud[\s\S]*continue-on-error: true/);

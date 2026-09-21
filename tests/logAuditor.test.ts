@@ -7,14 +7,18 @@ import { buildOperationalEvent } from '../src/features/runtime/operationalEvent.
 const require = createRequire(import.meta.url);
 const {
   MAX_INPUT_EVENTS,
+  RULES,
   analyzeLogEntries,
   buildIssueBody,
+  buildMarkdownSummary,
   executeAudit,
   sanitizeValue
 } = require('../scripts/audit-structured-logs.cjs') as {
   MAX_INPUT_EVENTS: number;
+  RULES: Record<string, { autoIssue: boolean; threshold: number }>;
   analyzeLogEntries: (entries: unknown[], options?: { now?: Date }) => any;
   buildIssueBody: (group: any) => string;
+  buildMarkdownSummary: (result: any) => string;
   executeAudit: (input: any) => Promise<any>;
   sanitizeValue: (value: unknown) => unknown;
 };
@@ -73,14 +77,14 @@ test('SEENIT-OBSERVABILITY-001 agrège les anomalies et applique les seuils dét
   ]);
   assert.equal(startupLoop.candidates.length, 1);
 
-  const plexReportOnly = analyzeLogEntries(Array.from({ length: 20 }, () => buildOperationalEvent({
+  const plexRepeated = analyzeLogEntries(Array.from({ length: 20 }, () => buildOperationalEvent({
     code: 'PLEX_SYNC_PARTIAL',
     context: { mode: 'delta', incompleteSourceCount: 2 },
     domain: 'plex',
     level: 'warn'
   })));
-  assert.equal(plexReportOnly.candidates.length, 0);
-  assert.equal(plexReportOnly.groups[0].decision, 'known_report_only');
+  assert.equal(plexRepeated.candidates.length, 1);
+  assert.equal(plexRepeated.groups[0].decision, 'candidate');
 });
 
 test('SEENIT-OBSERVABILITY-001 déduplique et borne les écritures GitHub', async () => {
@@ -221,4 +225,62 @@ test('SEENIT-OBSERVABILITY-001 exclut secrets UID emails et chemins privés des 
   assert.equal(guardedEnvelope.seenitEvent.context.errorCode, 'API_ERROR');
   assert.match(guardedEnvelope.seenitEvent.correlationId, /^[a-f0-9-]{36}$/);
   assert.doesNotMatch(JSON.stringify(guardedEnvelope), /personne@example\.test|not-a-code/);
+});
+
+
+test('SEENIT-OBSERVABILITY-001 couvre les warnings backend actionnables sans télémétrie client', () => {
+  assert.equal(RULES.PLEX_SYNC_PARTIAL.autoIssue, true);
+  assert.equal(RULES.PLEX_SNAPSHOT_STORE_FAILED.autoIssue, true);
+  assert.equal(RULES.PLEX_DELTA_SNAPSHOT_FAILED.autoIssue, true);
+  assert.equal(RULES.PLEX_FULL_SNAPSHOT_SEED_FAILED.autoIssue, true);
+  const snapshot = analyzeLogEntries(Array.from({ length: 6 }, () => buildOperationalEvent({
+    code: 'PLEX_SNAPSHOT_STORE_FAILED',
+    context: { action: 'write', errorCode: 'WRITE_FAILED' },
+    domain: 'plex',
+    level: 'warn'
+  })));
+  assert.equal(snapshot.candidates.length, 1);
+  assert.deepEqual(snapshot.candidates[0].context, { action: 'write', errorCode: 'WRITE_FAILED' });
+  const delta = analyzeLogEntries(Array.from({ length: 4 }, () => buildOperationalEvent({
+    code: 'PLEX_DELTA_SNAPSHOT_FAILED',
+    context: { errorCode: 'UPSTREAM_TIMEOUT' },
+    domain: 'plex',
+    level: 'warn'
+  })));
+  assert.equal(delta.candidates.length, 1);
+  const seed = analyzeLogEntries(Array.from({ length: 4 }, () => buildOperationalEvent({
+    code: 'PLEX_FULL_SNAPSHOT_SEED_FAILED',
+    context: { errorCode: 'WRITE_FAILED' },
+    domain: 'plex',
+    level: 'warn'
+  })));
+  assert.equal(seed.candidates.length, 1);
+});
+
+test('SEENIT-OBSERVABILITY-001 détecte un warning inconnu seulement après deux fenêtres consécutives', () => {
+  const now = new Date('2026-09-10T12:00:00.000Z');
+  const unknown = (iso: string) => ({ seenitEvent: {
+    schemaVersion: 1, timestamp: iso, domain: 'providers', level: 'warn',
+    code: 'PROVIDER_FALLBACK_REPEATED',
+    correlationId: '00000000-0000-4000-8000-000000000001',
+    context: { title: 'ne doit pas être repris' }
+  }});
+  const oneWindow = analyzeLogEntries(
+    Array.from({ length: 8 }, (_, index) => unknown(`2026-09-10T11:00:0${index}.000Z`)), { now }
+  );
+  assert.equal(oneWindow.candidates.length, 0);
+  assert.equal(oneWindow.groups[0].decision, 'unknown_report_only');
+  const twoWindows = analyzeLogEntries([
+    ...Array.from({ length: 4 }, (_, index) => unknown(`2026-09-10T03:00:0${index}.000Z`)),
+    ...Array.from({ length: 4 }, (_, index) => unknown(`2026-09-10T09:00:0${index}.000Z`))
+  ], { now });
+  assert.equal(twoWindows.candidates.length, 1);
+  assert.equal(twoWindows.candidates[0].recentWindowCount, 4);
+  assert.equal(twoWindows.candidates[0].previousWindowCount, 4);
+  assert.deepEqual(twoWindows.candidates[0].context, {});
+  const report = buildMarkdownSummary({ ...twoWindows, actions: [], degraded: false, mode: 'live', sourceStatus: 'ok' });
+  assert.match(report, /Couverture : .*anomalie\(s\) candidate\(s\) détectée\(s\)/);
+  assert.match(report, /Groupes configurés \/ inconnus \/ candidats/);
+  const uncovered = analyzeLogEntries([unknown('2026-09-10T11:30:00.000Z')], { now });
+  assert.equal(uncovered.coverageStatus, 'no_covered_signal');
 });

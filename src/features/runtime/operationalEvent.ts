@@ -3,6 +3,9 @@ import { randomUUID } from 'node:crypto';
 export type OperationalEventCode =
   | 'API_UNHANDLED_ERROR'
   | 'BACKEND_STARTUP_FAILED'
+  | 'PLEX_DELTA_SNAPSHOT_FAILED'
+  | 'PLEX_FULL_SNAPSHOT_SEED_FAILED'
+  | 'PLEX_SNAPSHOT_STORE_FAILED'
   | 'PLEX_SYNC_PARTIAL';
 
 export type OperationalEventDomain = 'plex' | 'runtime';
@@ -52,6 +55,25 @@ function normalizeContext(
   if (code === 'BACKEND_STARTUP_FAILED') {
     return {
       errorCode: normalizeErrorCode(context.errorCode, 'STARTUP_ERROR')
+    };
+  }
+
+  if (code === 'PLEX_SNAPSHOT_STORE_FAILED') {
+    const action = String(context.action || '').trim();
+    return {
+      action: ['read', 'read-resolution-cache', 'write'].includes(action) ? action : 'unknown',
+      errorCode: normalizeErrorCode(context.errorCode, 'SNAPSHOT_STORE_FAILED')
+    };
+  }
+
+  if (code === 'PLEX_DELTA_SNAPSHOT_FAILED' || code === 'PLEX_FULL_SNAPSHOT_SEED_FAILED') {
+    return {
+      errorCode: normalizeErrorCode(
+        context.errorCode,
+        code === 'PLEX_DELTA_SNAPSHOT_FAILED'
+          ? 'PLEX_DELTA_SNAPSHOT_FAILED'
+          : 'PLEX_FULL_SNAPSHOT_SEED_FAILED'
+      )
     };
   }
 

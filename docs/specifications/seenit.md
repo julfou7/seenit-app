@@ -970,8 +970,12 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   redaction défensive, un seuil par fingerprint déterministe, la déduplication avec les issues
   ouvertes, un cooldown et un plafond global. Le mode par défaut est `dry-run`, `off` coupe
   immédiatement toute écriture GitHub sans couper les logs, et une panne de la source ou de GitHub
-  n'affecte jamais le backend. Les événements inconnus ou non autorisés restent dans le rapport
-  redigé ; aucune issue n'est fermée automatiquement. Le compte de lecture dédié réutilise le
+  n'affecte jamais le backend. Les warnings backend explicitement catalogués suivent le même contrat et ne deviennent candidats
+  qu’après répétition ; les warnings PWA/APK ne déclenchent aucun upload individuel. Un code warning
+  structuré inconnu reste report-only sauf s’il apparaît dans deux fenêtres consécutives de six heures
+  avec au moins huit occurrences cumulées : il peut alors ouvrir une unique issue de qualification,
+  sans contexte libre. Les événements non autorisés restent dans le rapport redigé ; aucune issue n'est
+  fermée automatiquement. Le compte de lecture dédié réutilise le
   provider WIF canonique déjà administré pour GitHub Actions : son bootstrap cible explicitement le
   projet SeenIt et ne tente jamais de recréer le pool ou le provider partagé après un échec de lecture.
   Le même batch peut collecter des diagnostics de performance explicitement allowlistés en **report-only**.
