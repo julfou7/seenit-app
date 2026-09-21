@@ -1,5 +1,5 @@
 import { Capacitor } from '@capacitor/core';
-import { recordClientOperationalSignal } from '../logging/clientOperationalDiagnostics';
+import { recordClientOperationalSignal } from '../logging/clientOperationalDiagnostics.ts';
 
 const localConsole = globalThis.console;
 import { Directory, Filesystem } from '@capacitor/filesystem';

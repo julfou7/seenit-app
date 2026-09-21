@@ -34,10 +34,14 @@ export function classifyClientOperationalLog(
 
   if (
     category === 'sync'
-    && level === 'error'
     && (
-      text.startsWith('[showsStore] ❌ Erreur sauvegarde Cloud Firestore')
-      || text.startsWith('[showsStore] Erreur fatale lors de fetchShows')
+      (
+        level === 'error'
+        && (
+          text.startsWith('[showsStore] ❌ Erreur sauvegarde Cloud Firestore')
+          || text.startsWith('[showsStore] Erreur fatale lors de fetchShows')
+        )
+      )
       || text.startsWith('[showsStore] Realtime listener')
       || text.startsWith('[showsStore] Firestore quota exhausted')
     )

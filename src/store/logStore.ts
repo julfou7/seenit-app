@@ -3,8 +3,8 @@ import { getUserLogStorageKey, sanitizeLogDetails } from '../features/logging/lo
 import {
   activateClientOperationalSignalScope,
   recordClientOperationalSignal
-} from '../features/logging/clientOperationalDiagnostics';
-import { classifyClientOperationalLog } from '../features/logging/clientOperationalSignals';
+} from '../features/logging/clientOperationalDiagnostics.ts';
+import { classifyClientOperationalLog } from '../features/logging/clientOperationalSignals.ts';
 import { normalizePlexNonVuWording } from './toastQueuePolicy';
 
 const localConsole = globalThis.console;

@@ -1,7 +1,7 @@
 import { auth } from './firebase';
 import { CURRENT_APP_VERSION } from '../store/updateStore';
 import { appLogger } from '../store/logStore';
-import { flushClientOperationalSignals } from '../features/logging/clientOperationalDiagnostics';
+import { flushClientOperationalSignals } from '../features/logging/clientOperationalDiagnostics.ts';
 import {
   isSeenItApiRequest,
   isUnexpectedHtmlApiResponse,

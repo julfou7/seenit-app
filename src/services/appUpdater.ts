@@ -8,7 +8,7 @@ import {
   type SeenItReleaseInfo
 } from '../features/release/releasePolicy';
 import type { UpdateProgress } from '../features/release/updateProgress';
-import { recordClientOperationalSignal } from '../features/logging/clientOperationalDiagnostics';
+import { recordClientOperationalSignal } from '../features/logging/clientOperationalDiagnostics.ts';
 
 const localConsole = globalThis.console;
 

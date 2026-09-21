@@ -6,7 +6,7 @@ import {
   type NativeNotificationOptions,
 } from '../../lib/firebase';
 import { resolveMediaReminderSchedule } from './mediaReminderSchedule';
-import { recordClientOperationalSignal } from '../logging/clientOperationalDiagnostics';
+import { recordClientOperationalSignal } from '../logging/clientOperationalDiagnostics.ts';
 
 const localConsole = globalThis.console;
 
