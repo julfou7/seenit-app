@@ -69,18 +69,23 @@ test('#229 retire le faux Voir tout terminal et conserve le vrai bouton d’en-t
   );
 });
 
-test('#269 stabilise les rails sans réserver une deuxième ligne vide dans Continuer à regarder', () => {
+test('#269 stabilise les trois rails séries sur une ligne sans toucher aux films', () => {
   assert.match(continueCardSource, /line-clamp-2/);
   assert.match(movieCardSource, /line-clamp-2/);
   assert.match(
     carouselUxCss,
-    /#continue-watching-carousel \.line-clamp-2\s*\{[\s\S]*?-webkit-line-clamp:\s*1;[\s\S]*?min-block-size:\s*1lh;/,
-    'Continuer à regarder doit rester mono-ligne et compact sous l’image'
+    /:is\(\s*#continue-watching-carousel,\s*#nouveautes-carousel,\s*#pas-vu-depuis-un-moment-carousel\s*\) \.line-clamp-2\s*\{[\s\S]*?-webkit-line-clamp:\s*1;[\s\S]*?min-block-size:\s*1lh;/,
+    'Continuer, Nouveautés et Pas vu depuis un moment doivent partager le même titre mono-ligne compact'
   );
   assert.match(
     carouselUxCss,
-    /#nouveautes-carousel,[\s\S]*?#pas-vu-depuis-un-moment-carousel,[\s\S]*?#films-a-voir-carousel[\s\S]*?\) \.line-clamp-2\s*\{\s*min-block-size:\s*2lh;/,
-    'les autres rails gardent leur slot titre sur deux lignes pour éviter les sauts de hauteur'
+    /#films-a-voir-carousel \.line-clamp-2\s*\{\s*min-block-size:\s*2lh;/,
+    'Films à voir conserve son slot titre sur deux lignes'
+  );
+  assert.equal(
+    (carouselUxCss.match(/min-block-size:\s*2lh;/g) || []).length,
+    1,
+    'aucun rail série ne doit encore réserver une seconde ligne vide'
   );
   assert.doesNotMatch(
     carouselUxCss,
