@@ -24,11 +24,18 @@ test('SEENIT-DATA-006 protège default contre une suppression accidentelle', () 
   const workflow = read('.github/workflows/build-apk.yml');
   const scripts = fs.readdirSync('scripts')
     .filter(name => name.endsWith('.cjs') || name.endsWith('.sh'))
+    .filter(name => name !== 'migrate-firestore-default.sh')
     .map(name => read(`scripts/${name}`))
     .join('\n');
+  const migration = read('scripts/migrate-firestore-default.sh');
   assert.match(agents, /Delete Protection[^\n]*activée/i);
   assert.match(specification, /SEENIT-DATA-006[\s\S]*Delete Protection activée/);
   assert.equal(/--no-delete-protection|DELETE_PROTECTION_DISABLED/.test(`${workflow}\n${scripts}`), false);
+  assert.match(migration, /SEENIT_MIGRATION_CONFIRMATION/);
+  assert.match(migration, /gcloud firestore export[\s\S]*gcloud firestore import/);
+  assert.match(migration, /compare_digests/);
+  assert.match(migration, /--no-delete-protection/);
+  assert.match(migration, /--delete-protection/);
 });
 
 test('SEENIT-APK-004 protège l’identité Firebase Android canonique générée', () => {

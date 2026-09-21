@@ -273,6 +273,10 @@
         {
           "file": "tests/firebaseIdentityGuardrails.test.ts",
           "contains": "SEENIT-DATA-006 protège default contre une suppression accidentelle"
+        },
+        {
+          "file": "tests/firestoreMigration.test.ts",
+          "contains": "SEENIT-DATA-006 borne la migration unique de default par export, répétition, maintenance et rollback"
         }
       ]
     },
@@ -799,6 +803,10 @@
         {
           "file": "tests/plexResponseCompression.test.ts",
           "contains": "SEENIT-COST-001 respecte les clients Plex qui refusent la compression"
+        },
+        {
+          "file": "tests/firestoreMigration.test.ts",
+          "contains": "SEENIT-COST-001 transfère le quota gratuit vers default sans stockage permanent"
         }
       ]
     },
