@@ -7,7 +7,7 @@ export interface PublicMetadataPolicy {
   persist: boolean;
 }
 
-import { recordClientOperationalSignal } from '../logging/clientOperationalDiagnostics';
+import { recordClientOperationalSignal } from '../logging/clientOperationalDiagnostics.ts';
 
 export const PUBLIC_METADATA_CACHE_SCHEMA_VERSION = 1;
 export const PUBLIC_METADATA_CACHE_DB_NAME = 'seenit-public-metadata-v1';

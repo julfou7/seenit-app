@@ -1,9 +1,9 @@
-import { resolveSeenItApiUrl } from '../../lib/seenitApi';
+import { resolveSeenItApiUrl } from '../../lib/seenitApi.ts';
 import {
   CLIENT_OPERATIONAL_SIGNAL_CODES,
   CLIENT_OPERATIONAL_SIGNAL_MAX_COUNT,
   type ClientOperationalSignalCode,
-} from './clientOperationalSignals';
+} from './clientOperationalSignals.ts';
 
 export const CLIENT_OPERATIONAL_SIGNAL_FLUSH_COOLDOWN_MS = 30 * 60_000;
 const CLIENT_OPERATIONAL_SIGNAL_STORAGE_PREFIX = 'seenit_client_operational_signals_v1:';
