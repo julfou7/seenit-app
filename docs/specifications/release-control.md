@@ -69,10 +69,10 @@ Une candidate incompatible reste bloquante par défaut et n’est jamais réécr
 - la branche contient exactement **un commit propre** (`ahead_by=1`) et le `main` a avancé (`behind_by>0`) ;
 - le diff propre à cette branche contient exactement les huit surfaces de version et aucun fichier métier ;
 - le commit de tête est auteur **et** committer `github-actions[bot]`, porte le titre canonique `chore(release): préparer SeenIt X.Y.Z`, `Changelog: aucun` et le marqueur `Préparation créée par le contrôleur connector-only #102.` ;
-- aucune PR, ouverte ou fermée, n’existe pour cette branche ;
+- aucune PR ouverte ou mergée n’existe pour cette branche ; un historique composé uniquement de PR **fermées non mergées** après échec de validation est recyclable, car il ne revendique plus la branche ;
 - le SHA de la ref distante est relu immédiatement avant mutation et correspond toujours au SHA inspecté.
 
-Quand toutes ces preuves sont réunies, le contrôleur supprime explicitement la ref obsolète avec l’API GitHub, trace l’ancien SHA, l’ancienne base et le nouveau `main` sur #102, puis recrée `release/vX.Y.Z` depuis le `main` courant par le préparateur atomique normal. **Aucun force-push n’est autorisé.** Si une seule preuve manque ou si la ref change entre inspection et suppression, le recyclage est refusé et l’incompatibilité reste bloquante.
+Quand toutes ces preuves sont réunies, y compris après une PR précédente fermée non mergée, le contrôleur supprime explicitement la ref obsolète avec l’API GitHub, trace l’ancien SHA, l’ancienne base et le nouveau `main` sur #102, puis recrée `release/vX.Y.Z` depuis le `main` courant par le préparateur atomique normal. **Aucun force-push n’est autorisé.** Si une seule preuve manque ou si la ref change entre inspection et suppression, le recyclage est refusé et l’incompatibilité reste bloquante.
 
 Le contrôleur poste sur #102 la version, la base `main`, la branche, le commit, la PR, la portée release-only et la mesure « demande → PR » lorsqu’elle est disponible.
 

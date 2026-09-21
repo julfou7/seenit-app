@@ -2,6 +2,7 @@ const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
+const { isPureVersionAlignment } = require('./validate-change-contract.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const POLICY_PATH = path.join(ROOT, 'docs/specifications/typescript-quality-baseline.json');
@@ -114,13 +115,41 @@ function resolveBaseSha(root = ROOT) {
   }
 }
 
-function changedProductionFiles(baseSha, root = ROOT) {
+function changedFiles(baseSha, root = ROOT) {
   if (!baseSha) return [];
   const output = execFileSync('git', ['diff', '--name-only', baseSha, '--'], {
     cwd: root,
     encoding: 'utf8'
   });
-  return output.split(/\r?\n/).filter(Boolean).filter(isProductionTypeScript);
+  return output.split(/\r?\n/).filter(Boolean);
+}
+
+function changedProductionFiles(baseSha, root = ROOT) {
+  return changedFiles(baseSha, root).filter(isProductionTypeScript);
+}
+
+function readPatch(baseSha, relativePath, root = ROOT) {
+  return execFileSync(
+    'git',
+    ['diff', '--unified=0', '--no-ext-diff', baseSha, '--', relativePath],
+    { cwd: root, encoding: 'utf8' }
+  );
+}
+
+function readCurrentFile(relativePath, root = ROOT) {
+  const absolutePath = path.join(root, relativePath);
+  return fs.existsSync(absolutePath) ? fs.readFileSync(absolutePath, 'utf8') : '';
+}
+
+function isPureVersionAlignmentFromGit(baseSha, root = ROOT) {
+  if (!baseSha) return false;
+  const files = changedFiles(baseSha, root);
+  return isPureVersionAlignment(
+    files,
+    relativePath => readPatch(baseSha, relativePath, root),
+    relativePath => readBaseFile(baseSha, relativePath, root),
+    relativePath => readCurrentFile(relativePath, root)
+  );
 }
 
 function readBaseFile(baseSha, relativePath, root = ROOT) {
@@ -172,8 +201,9 @@ function debtExcess(metrics, allowance = { explicitAny: 0, directConsole: 0 }) {
     + Math.max(0, metrics.directConsole - allowance.directConsole);
 }
 
-function compareFileDebt(current, previous, allowance = { explicitAny: 0, directConsole: 0 }) {
+function compareFileDebt(current, previous, allowance = { explicitAny: 0, directConsole: 0 }, options = {}) {
   const violations = [];
+  const requireImprovement = options.requireImprovement !== false;
   if (current.explicitAny > previous.explicitAny) {
     violations.push(`any explicites ${previous.explicitAny} → ${current.explicitAny}`);
   }
@@ -183,7 +213,7 @@ function compareFileDebt(current, previous, allowance = { explicitAny: 0, direct
 
   const previousExcess = debtExcess(previous, allowance);
   const currentExcess = debtExcess(current, allowance);
-  if (previousExcess > 0 && currentExcess >= previousExcess) {
+  if (requireImprovement && previousExcess > 0 && currentExcess >= previousExcess) {
     violations.push(`dette historique non réduite ${previousExcess} → ${currentExcess}`);
   }
   return violations;
@@ -226,6 +256,7 @@ function validateReport(report, policy, options = {}) {
 
   const baseSha = options.baseSha || null;
   const root = options.root || ROOT;
+  const pureVersionAlignment = options.pureVersionAlignment === true;
   if (baseSha) {
     for (const relativePath of changedProductionFiles(baseSha, root)) {
       const absolutePath = path.join(root, relativePath);
@@ -236,7 +267,7 @@ function validateReport(report, policy, options = {}) {
       for (const reason of addedLineDebt(current, addedLineNumbers(baseSha, relativePath, root), allowance)) {
         violations.push(`${relativePath}: dette interdite dans les lignes modifiées (${reason})`);
       }
-      for (const reason of compareFileDebt(current, previous, allowance)) {
+      for (const reason of compareFileDebt(current, previous, allowance, { requireImprovement: !pureVersionAlignment })) {
         violations.push(`${relativePath}: règle boy-scout non respectée (${reason})`);
       }
     }
@@ -270,13 +301,17 @@ function main() {
   const policy = loadPolicy();
   const report = scanRepository();
   const baseSha = resolveBaseSha();
-  const violations = validateReport(report, policy, { baseSha });
+  const pureVersionAlignment = isPureVersionAlignmentFromGit(baseSha);
+  const violations = validateReport(report, policy, { baseSha, pureVersionAlignment });
   const payload = writeReport(report, policy, violations);
   console.log(
     `[TypeScript Quality] any=${report.explicitAny}/${policy.ceilings.explicitAny}; `
     + `console=${report.directConsole}/${policy.ceilings.directConsole}; `
     + `réductions=${payload.reductions.explicitAny}/${payload.reductions.directConsole}.`
   );
+  if (pureVersionAlignment) {
+    console.log('[TypeScript Quality] Alignement de version pur : nouvelle dette interdite, remboursement historique non requis.');
+  }
   if (violations.length > 0) {
     violations.forEach(message => console.error(`[TypeScript Quality] ❌ ${message}`));
     process.exitCode = 1;
@@ -288,11 +323,13 @@ function main() {
 module.exports = {
   addedLineDebt,
   addedLineNumbers,
+  changedFiles,
   changedProductionFiles,
   compareFileDebt,
   debtAllowanceForFile,
   debtExcess,
   isProductionTypeScript,
+  isPureVersionAlignmentFromGit,
   loadPolicy,
   scanRepository,
   scanSource,
