@@ -27,6 +27,11 @@ test('SEENIT-DATA-006 borne la migration unique de default par export, répétit
   assert.match(workflow, /github\.event\.comment\.author_association == 'OWNER'/);
   assert.match(workflow, /sha=\(\[0-9a-f\]\{40\}\)/);
   assert.match(script, /SEENIT_MIGRATION_CONFIRMATION/);
+  assert.match(script, /readonly ROLLBACK_ARTIFACT_DATABASE='\(default\)'/);
+  assert.match(
+    script,
+    /write_digest "\$ROLLBACK_ARTIFACT_DATABASE"[\s\S]*\.documentCount == 0[\s\S]*delete_database_if_present "\$ROLLBACK_ARTIFACT_DATABASE"/
+  );
   assert.match(script, /readonly DEFAULT_DATABASE='default'/);
   assert.doesNotMatch(script, /readonly DEFAULT_DATABASE='\(default\)'/);
   assert.match(script, /lock_public_traffic[\s\S]*firebase\.migration-lockdown\.json/);
@@ -39,8 +44,8 @@ test('SEENIT-DATA-006 borne la migration unique de default par export, répétit
   assert.match(script, /firestore fields ttls list/);
   assert.equal(
     (script.match(/select\(\(\.deleteTime \/\/ ""\) == ""\)/g) ?? []).length,
-    2,
-    'les tombstones Firestore doivent être ignorés au préflight et dans la topologie finale'
+    3,
+    'les tombstones Firestore doivent être ignorés dans les deux topologies de préflight et la topologie finale'
   );
   assert.match(script, /recover_on_failure[\s\S]*restore_default_after_cutover_failure/);
   assert.match(script, /ROLLBACK INCOMPLET[\s\S]*maintenance conservée/);

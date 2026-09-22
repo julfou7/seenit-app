@@ -4,6 +4,7 @@ set -Eeuo pipefail
 readonly EXPECTED_PROJECT='gen-lang-client-0201895414'
 readonly DEFAULT_DATABASE='default'
 readonly AI_DATABASE='ai-studio-seenit-065aead8-cc5a-4b86-9f25-dd812194ffa4'
+readonly ROLLBACK_ARTIFACT_DATABASE='(default)'
 readonly DEFAULT_LOCATION='eur3'
 readonly AI_LOCATION='us-west1'
 readonly CLOUD_RUN_REGION='us-west1'
@@ -25,6 +26,7 @@ AI_EXPORT="gs://${AI_BUCKET}/ai-studio"
 
 TRAFFIC_LOCKED=false
 RULES_LOCKED=false
+ROLLBACK_ARTIFACT_PRESENT=false
 DEFAULT_PROTECTION_DISABLED=false
 DEFAULT_DELETED=false
 DEFAULT_RECREATED=false
@@ -212,7 +214,7 @@ recover_on_failure() {
 trap recover_on_failure EXIT
 
 preflight() {
-  local current_sha command_expected databases default_meta ai_meta
+  local current_sha command_expected databases default_meta ai_meta rollback_artifact_meta
   [[ "$PROJECT_ID" == "$EXPECTED_PROJECT" ]] || {
     log "Projet refusé : ${PROJECT_ID:-absent}."
     return 1
@@ -242,12 +244,38 @@ preflight() {
 
   mkdir -p "$STATE_DIR"
   databases="$(gcloud firestore databases list --project "$PROJECT_ID" --format=json)"
-  jq -e --arg default "$DEFAULT_DATABASE" --arg ai "$AI_DATABASE" \
-    '([.[] | select((.deleteTime // "") == "") | .name | split("/")[-1]] | sort)
-      == ([$default, $ai] | sort)' <<<"$databases" >/dev/null || {
-      log 'Topologie Firestore différente des deux bases attendues ; migration refusée.'
+  if jq -e --arg default "$DEFAULT_DATABASE" --arg ai "$AI_DATABASE" \
+      '([.[] | select((.deleteTime // "") == "") | .name | split("/")[-1]] | sort)
+        == ([$default, $ai] | sort)' <<<"$databases" >/dev/null; then
+    :
+  elif jq -e --arg default "$DEFAULT_DATABASE" --arg ai "$AI_DATABASE" \
+      --arg artifact "$ROLLBACK_ARTIFACT_DATABASE" \
+      '([.[] | select((.deleteTime // "") == "") | .name | split("/")[-1]] | sort)
+        == ([$default, $ai, $artifact] | sort)' <<<"$databases" >/dev/null; then
+    rollback_artifact_meta="$(database_json "$ROLLBACK_ARTIFACT_DATABASE")"
+    jq -e '
+      .locationId == "nam5"
+      and .databaseEdition == "STANDARD"
+      and .type == "FIRESTORE_NATIVE"
+      and .freeTier == false
+      and .deleteProtectionState == "DELETE_PROTECTION_DISABLED"
+      and .pointInTimeRecoveryEnablement == "POINT_IN_TIME_RECOVERY_DISABLED"
+    ' <<<"$rollback_artifact_meta" >/dev/null || {
+      log 'La base (default) inattendue ne correspond pas à l’artefact de rollback connu.'
       return 1
     }
+    write_digest "$ROLLBACK_ARTIFACT_DATABASE" "$STATE_DIR/rollback-artifact-digest.json"
+    jq -e '.documentCount == 0 and (.collectionGroupCounts | length) == 0' \
+      "$STATE_DIR/rollback-artifact-digest.json" >/dev/null || {
+        log 'La base (default) contient des données ; suppression automatique refusée.'
+        return 1
+      }
+    ROLLBACK_ARTIFACT_PRESENT=true
+    log 'Base (default) vide issue du rollback précédent identifiée.'
+  else
+    log 'Topologie Firestore différente des bases attendues ; migration refusée.'
+    return 1
+  fi
 
   default_meta="$(database_json "$DEFAULT_DATABASE")"
   ai_meta="$(database_json "$AI_DATABASE")"
@@ -353,6 +381,11 @@ run_migration() {
   local attempt default_etag ai_etag final_meta health_status
   preflight
   log 'Préflight canonique validé.'
+
+  if [[ "$ROLLBACK_ARTIFACT_PRESENT" == 'true' ]]; then
+    delete_database_if_present "$ROLLBACK_ARTIFACT_DATABASE"
+    log 'Base (default) vide créée par le rollback précédent supprimée.'
+  fi
 
   create_export_bucket "$DEFAULT_BUCKET" 'EU'
   create_export_bucket "$AI_BUCKET" "$AI_LOCATION"
