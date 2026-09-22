@@ -9,6 +9,7 @@ readonly DEFAULT_LOCATION='eur3'
 readonly AI_LOCATION='us-west1'
 readonly CLOUD_RUN_REGION='us-west1'
 readonly CLOUD_RUN_SERVICE='seenit-app'
+readonly CANONICAL_ORIGIN='https://seenit.ai.studio'
 readonly FIREBASE_TOOLS_VERSION='14.16.0'
 
 PROJECT_ID="${GCP_PROJECT_ID:-}"
@@ -25,6 +26,8 @@ DEFAULT_EXPORT="gs://${DEFAULT_BUCKET}/default"
 AI_EXPORT="gs://${AI_BUCKET}/ai-studio"
 
 TRAFFIC_LOCKED=false
+PUBLIC_ACCESS_VIA_DISABLED_CHECK=false
+PUBLIC_ACCESS_VIA_ALL_USERS=false
 RULES_LOCKED=false
 ROLLBACK_ARTIFACT_PRESENT=false
 DEFAULT_PROTECTION_DISABLED=false
@@ -69,38 +72,113 @@ restore_rules_if_locked() {
   log 'Règles Firestore canoniques restaurées.'
 }
 
-restore_public_traffic() {
-  if [[ "$TRAFFIC_LOCKED" != 'true' ]]; then
-    return 0
-  fi
-  gcloud run services add-iam-policy-binding "$CLOUD_RUN_SERVICE" \
-    --project "$PROJECT_ID" \
-    --region "$CLOUD_RUN_REGION" \
-    --member='allUsers' \
-    --role='roles/run.invoker' \
-    --quiet >/dev/null
-  TRAFFIC_LOCKED=false
-  log 'Accès public Cloud Run restauré.'
+canonical_health_is_public() {
+  local output_file="$1"
+  local health_status
+  health_status="$(curl --silent --show-error --max-time 15 \
+    --output "$output_file" \
+    --write-out '%{http_code}' \
+    "${CANONICAL_ORIGIN}/api/health" || true)"
+  [[ "$health_status" == '200' ]] \
+    && jq -e '.status == "ok" and .service == "seenit-backend" and .identity == "canonical"' \
+      "$output_file" >/dev/null
 }
 
-lock_public_traffic() {
+capture_public_access_mode() {
+  local service_file="$STATE_DIR/cloud-run-service.json"
   local policy_file="$STATE_DIR/cloud-run-policy.json"
+
+  PUBLIC_ACCESS_VIA_DISABLED_CHECK=false
+  PUBLIC_ACCESS_VIA_ALL_USERS=false
+
+  gcloud run services describe "$CLOUD_RUN_SERVICE" \
+    --project "$PROJECT_ID" \
+    --region "$CLOUD_RUN_REGION" \
+    --format=json > "$service_file"
   gcloud run services get-iam-policy "$CLOUD_RUN_SERVICE" \
     --project "$PROJECT_ID" \
     --region "$CLOUD_RUN_REGION" \
     --format=json > "$policy_file"
-  if ! jq -e 'any(.bindings[]?; .role == "roles/run.invoker" and any(.members[]?; . == "allUsers"))' "$policy_file" >/dev/null; then
-    log 'Le backend canonique n’est pas publiquement invocable ; bascule refusée.'
+
+  if jq -e '((.metadata.annotations["run.googleapis.com/invoker-iam-disabled"] // "false") | tostring) == "true"' \
+      "$service_file" >/dev/null; then
+    PUBLIC_ACCESS_VIA_DISABLED_CHECK=true
+  fi
+  if jq -e 'any(.bindings[]?; .role == "roles/run.invoker" and any(.members[]?; . == "allUsers"))' \
+      "$policy_file" >/dev/null; then
+    PUBLIC_ACCESS_VIA_ALL_USERS=true
+  fi
+
+  if [[ "$PUBLIC_ACCESS_VIA_DISABLED_CHECK" != 'true' && "$PUBLIC_ACCESS_VIA_ALL_USERS" != 'true' ]]; then
+    log 'Aucun mode public Cloud Run supporté n’est détecté ; bascule refusée.'
     return 1
   fi
-  gcloud run services remove-iam-policy-binding "$CLOUD_RUN_SERVICE" \
-    --project "$PROJECT_ID" \
-    --region "$CLOUD_RUN_REGION" \
-    --member='allUsers' \
-    --role='roles/run.invoker' \
-    --quiet >/dev/null
+  if ! canonical_health_is_public "$STATE_DIR/health-before-lock.json"; then
+    log 'Le endpoint canonique /api/health n’est pas publiquement sain ; bascule refusée.'
+    return 1
+  fi
+}
+
+restore_public_traffic() {
+  if [[ "$TRAFFIC_LOCKED" != 'true' ]]; then
+    return 0
+  fi
+
+  if [[ "$PUBLIC_ACCESS_VIA_ALL_USERS" == 'true' ]]; then
+    gcloud run services add-iam-policy-binding "$CLOUD_RUN_SERVICE" \
+      --project "$PROJECT_ID" \
+      --region "$CLOUD_RUN_REGION" \
+      --member='allUsers' \
+      --role='roles/run.invoker' \
+      --quiet >/dev/null
+  fi
+  if [[ "$PUBLIC_ACCESS_VIA_DISABLED_CHECK" == 'true' ]]; then
+    gcloud run services update "$CLOUD_RUN_SERVICE" \
+      --project "$PROJECT_ID" \
+      --region "$CLOUD_RUN_REGION" \
+      --no-invoker-iam-check \
+      --quiet >/dev/null
+  fi
+
+  TRAFFIC_LOCKED=false
+  log 'Accès public Cloud Run restauré selon son mode d’origine.'
+}
+
+lock_public_traffic() {
+  local policy_after_check="$STATE_DIR/cloud-run-policy-after-invoker-check.json"
+
+  capture_public_access_mode
   TRAFFIC_LOCKED=true
-  log 'Accès public Cloud Run suspendu.'
+
+  if [[ "$PUBLIC_ACCESS_VIA_DISABLED_CHECK" == 'true' ]]; then
+    gcloud run services update "$CLOUD_RUN_SERVICE" \
+      --project "$PROJECT_ID" \
+      --region "$CLOUD_RUN_REGION" \
+      --invoker-iam-check \
+      --quiet >/dev/null
+  fi
+
+  if [[ "$PUBLIC_ACCESS_VIA_ALL_USERS" == 'true' ]]; then
+    gcloud run services get-iam-policy "$CLOUD_RUN_SERVICE" \
+      --project "$PROJECT_ID" \
+      --region "$CLOUD_RUN_REGION" \
+      --format=json > "$policy_after_check"
+    if jq -e 'any(.bindings[]?; .role == "roles/run.invoker" and any(.members[]?; . == "allUsers"))' \
+        "$policy_after_check" >/dev/null; then
+      gcloud run services remove-iam-policy-binding "$CLOUD_RUN_SERVICE" \
+        --project "$PROJECT_ID" \
+        --region "$CLOUD_RUN_REGION" \
+        --member='allUsers' \
+        --role='roles/run.invoker' \
+        --quiet >/dev/null
+    fi
+  fi
+
+  if canonical_health_is_public "$STATE_DIR/health-after-lock.json"; then
+    log 'Le backend canonique reste publiquement invocable après verrouillage ; bascule refusée.'
+    return 1
+  fi
+  log 'Accès public Cloud Run suspendu sans changer durablement son mode d’invocation.'
 }
 
 write_digest() {
@@ -477,7 +555,7 @@ run_migration() {
   restore_public_traffic
   health_status=''
   for attempt in $(seq 1 12); do
-    health_status="$(curl --silent --show-error --max-time 15 --output "$STATE_DIR/health.json" --write-out '%{http_code}' https://seenit.ai.studio/api/health || true)"
+    health_status="$(curl --silent --show-error --max-time 15 --output "$STATE_DIR/health.json" --write-out '%{http_code}' "${CANONICAL_ORIGIN}/api/health" || true)"
     if [[ "$health_status" == '200' ]] \
       && jq -e '.status == "ok" and .service == "seenit-backend" and .identity == "canonical"' \
         "$STATE_DIR/health.json" >/dev/null; then
