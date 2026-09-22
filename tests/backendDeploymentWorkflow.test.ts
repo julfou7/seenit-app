@@ -188,8 +188,8 @@ test('SEENIT-COST-001 capture un inventaire GCP en lecture seule après la purge
   assert.match(inventory, /gcloud storage buckets list/);
   assert.match(inventory, /FINOPS_DEEP_STORAGE_SCAN/);
   assert.match(inventory, /REPORT_PATH="\${FINOPS_REPORT_PATH:-}"/);
-  assert.match(inventory, /default_count=.*== \\"default\\"/);
-  assert.doesNotMatch(inventory, /== \\"\(default\)\\"/);
+  assert.match(inventory, /default_count=.*== "default"/);
+  assert.doesNotMatch(inventory, /== "\(default\)"/);
   assert.match(inventory, /gcloud sql instances list/);
   assert.match(inventory, /gcloud artifacts repositories list[\s\S]*--location=all/);
   assert.match(inventory, /gcloud artifacts packages list/);
@@ -203,8 +203,8 @@ test('SEENIT-COST-001 capture un inventaire GCP en lecture seule après la purge
     'utf8'
   );
   assert.match(auditWorkflow, /FINOPS_REPORT_PATH/);
-  assert.match(auditWorkflow, /cat "\\$FINOPS_REPORT_PATH"/);
-  assert.doesNotMatch(auditWorkflow, /cat "\\$GITHUB_STEP_SUMMARY"/);
+  assert.match(auditWorkflow, /cat "\$FINOPS_REPORT_PATH"/);
+  assert.doesNotMatch(auditWorkflow, /cat "\$GITHUB_STEP_SUMMARY"/);
 });
 
 test('SEENIT-RUNTIME-001 documente que la sync AI Studio ne vaut jamais preuve de déploiement', () => {
