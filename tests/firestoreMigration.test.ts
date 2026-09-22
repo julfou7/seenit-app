@@ -27,6 +27,11 @@ test('SEENIT-DATA-006 borne la migration unique de default par export, répétit
   assert.match(workflow, /github\.event\.comment\.author_association == 'OWNER'/);
   assert.match(workflow, /sha=\(\[0-9a-f\]\{40\}\)/);
   assert.match(script, /SEENIT_MIGRATION_CONFIRMATION/);
+  assert.match(script, /readonly ROLLBACK_ARTIFACT_DATABASE='\(default\)'/);
+  assert.match(
+    script,
+    /write_digest "\$ROLLBACK_ARTIFACT_DATABASE"[\s\S]*\.documentCount == 0[\s\S]*delete_database_if_present "\$ROLLBACK_ARTIFACT_DATABASE"/
+  );
   assert.match(script, /readonly DEFAULT_DATABASE='default'/);
   assert.doesNotMatch(script, /readonly DEFAULT_DATABASE='\(default\)'/);
   assert.match(script, /lock_public_traffic[\s\S]*firebase\.migration-lockdown\.json/);

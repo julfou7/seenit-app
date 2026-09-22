@@ -74,8 +74,11 @@ une base inattendue, un trigger Firestore, un index/TTL non capturé ou un expor
 ## Rollback et état d’échec
 
 Avant la première suppression, tout échec restaure automatiquement les règles et l’accès Cloud Run ; les
-bases sources sont intactes. Après la première suppression, le gestionnaire d’erreur tente de recréer
-`default`, réimporte son export et compare le digest. Il ne rouvre le trafic que si cette preuve est verte.
+bases sources sont intactes. Si un ancien rollback a créé la base distincte `(default)`, le préflight ne
+l’accepte que si ses métadonnées correspondent à l’artefact connu et si son digest prouve zéro document et
+zéro groupe de collections ; elle est alors supprimée avant la création des nouveaux exports. Après la
+première suppression, le gestionnaire d’erreur tente de recréer `default`, réimporte son export et compare
+le digest. Il ne rouvre le trafic que si cette preuve est verte.
 Sinon, Cloud Run et les règles restent verrouillés, les exports demeurent disponibles 30 jours et le run
 publie l’opération exacte à reprendre. La base AI Studio supprimée reste récupérable depuis son export dédié.
 
