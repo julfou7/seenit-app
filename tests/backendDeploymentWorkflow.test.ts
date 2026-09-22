@@ -187,6 +187,11 @@ test('SEENIT-COST-001 capture un inventaire GCP en lecture seule après la purge
   assert.match(inventory, /firestoreDataAccessMode, mongodbCompatibleDataAccessMode/);
   assert.match(inventory, /gcloud storage buckets list/);
   assert.match(inventory, /FINOPS_DEEP_STORAGE_SCAN/);
+  assert.match(inventory, /FINOPS_STORAGE_MAX_BYTES:-5000000000/);
+  assert.match(inventory, /storage_total_bytes/);
+  assert.match(inventory, /dépasse le plafond conservateur/);
+  assert.match(inventory, /storage_class/);
+  assert.match(inventory, /soft_delete_policy/);
   assert.match(inventory, /REPORT_PATH="\${FINOPS_REPORT_PATH:-}"/);
   assert.match(inventory, /default_count=.*== "default"/);
   assert.doesNotMatch(inventory, /== "\(default\)"/);
@@ -203,6 +208,8 @@ test('SEENIT-COST-001 capture un inventaire GCP en lecture seule après la purge
     'utf8'
   );
   assert.match(auditWorkflow, /FINOPS_REPORT_PATH/);
+  assert.match(auditWorkflow, /FINOPS_STORAGE_MAX_BYTES: '5000000000'/);
+  assert.match(auditWorkflow, /github\.event_name == 'schedule'/);
   assert.match(auditWorkflow, /cat "\$FINOPS_REPORT_PATH"/);
   assert.doesNotMatch(auditWorkflow, /cat "\$GITHUB_STEP_SUMMARY"/);
 });

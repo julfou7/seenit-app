@@ -10,6 +10,7 @@ CLOUDBUILD_SOURCE_BUCKET="${PROJECT_ID}_cloudbuild"
 STRICT="${FINOPS_STRICT:-false}"
 DEEP_STORAGE_SCAN="${FINOPS_DEEP_STORAGE_SCAN:-false}"
 REPORT_PATH="${FINOPS_REPORT_PATH:-}"
+STORAGE_MAX_BYTES="${FINOPS_STORAGE_MAX_BYTES:-5000000000}"
 VIOLATIONS=0
 
 summary_line() {
@@ -117,20 +118,44 @@ if buckets_json="$(gcloud storage buckets list --project "$PROJECT_ID" --format=
   bucket_count="$(jq 'length' <<<"$buckets_json")"
   summary_line "### Cloud Storage"
   summary_line "- Buckets: **${bucket_count}**."
-  console_json "Cloud Storage buckets" "$(jq '[.[] | {name:(.name // .url), location, storageClass, versioning, softDeletePolicy, lifecycle}]' <<<"$buckets_json")"
+  console_json "Cloud Storage buckets" "$(jq '[.[] | {name:(.name // .url), location:(.location // .location_type // "UNKNOWN"), storageClass:(.storageClass // .storage_class // "UNKNOWN"), versioning:(.versioning // {enabled:(.versioning_enabled // false)}), softDeletePolicy:(.softDeletePolicy // .soft_delete_policy), lifecycle:(.lifecycle // .lifecycle_config)}]' <<<"$buckets_json")"
 
   if [[ "$DEEP_STORAGE_SCAN" == "true" ]]; then
     summary_line "- Scan profond des tailles: activé pour ce run."
+    storage_total_bytes=0
+    storage_scan_complete=true
+    storage_cap_valid=true
+    if ! [[ "$STORAGE_MAX_BYTES" =~ ^[0-9]+$ ]]; then
+      storage_cap_valid=false
+      violation "Le seuil Storage FINOPS_STORAGE_MAX_BYTES doit être un entier positif."
+    fi
+
     while IFS= read -r bucket_name; do
       [[ -n "$bucket_name" ]] || continue
-      if bucket_size="$(gcloud storage du --summarize --readable-sizes "gs://${bucket_name}" 2>/dev/null)"; then
-        summary_line "  - \`gs://${bucket_name}\`: ${bucket_size}"
+      if bucket_size_raw="$(gcloud storage du --summarize "gs://${bucket_name}" 2>/dev/null)"; then
+        bucket_size_bytes="${bucket_size_raw%%[[:space:]]*}"
+        if [[ "$bucket_size_bytes" =~ ^[0-9]+$ ]]; then
+          storage_total_bytes=$((storage_total_bytes + bucket_size_bytes))
+          bucket_size_human="$(numfmt --to=iec-i --suffix=B "$bucket_size_bytes" 2>/dev/null || printf '%s B' "$bucket_size_bytes")"
+          summary_line "  - \`gs://${bucket_name}\`: ${bucket_size_human} (${bucket_size_bytes} octets)"
+        else
+          storage_scan_complete=false
+          summary_line "  - \`gs://${bucket_name}\`: taille illisible (preuve incomplète)."
+        fi
       else
+        storage_scan_complete=false
         summary_line "  - \`gs://${bucket_name}\`: taille indisponible (IAM/API)."
       fi
     done < <(jq -r '.[] | (.name // .url // "") | sub("^gs://"; "")' <<<"$buckets_json")
+
+    summary_line "- Total Storage observé: **${storage_total_bytes} octets**; plafond conservateur: **${STORAGE_MAX_BYTES} octets**."
+    if [[ "$storage_scan_complete" != "true" ]]; then
+      violation "Le scan Storage est incomplet : le respect du plafond ne peut pas être prouvé."
+    elif [[ "$storage_cap_valid" == "true" ]] && (( storage_total_bytes > STORAGE_MAX_BYTES )); then
+      violation "Le stockage cumulé dépasse le plafond conservateur de ${STORAGE_MAX_BYTES} octets."
+    fi
   else
-    summary_line "- Scan profond des tailles: désactivé (zéro opération objet ajoutée par l'audit quotidien)."
+    summary_line "- Scan profond des tailles: désactivé ; le plafond Storage n'est pas évalué pendant ce run."
   fi
 else
   summary_line "### Cloud Storage"
