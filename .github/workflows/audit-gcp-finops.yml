@@ -1,0 +1,91 @@
+name: Audit GCP FinOps Zero Cost
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/gcp-finops-inventory.sh
+      - .github/workflows/audit-gcp-finops.yml
+  schedule:
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+    inputs:
+      deep_storage_scan:
+        description: 'Calculer ponctuellement la taille des objets Cloud Storage'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+
+env:
+  GCP_PROJECT_ID: gen-lang-client-0201895414
+  GCP_REGION: us-west1
+  GCP_SERVICE: seenit-app
+  GCP_ARTIFACT_REPOSITORY: cloud-run-source-deploy
+  GCP_WORKLOAD_IDENTITY_PROVIDER: projects/799043440232/locations/global/workloadIdentityPools/seenit-github/providers/seenit-main
+  GCP_DEPLOY_SERVICE_ACCOUNT: seenit-github-deployer@gen-lang-client-0201895414.iam.gserviceaccount.com
+
+jobs:
+  audit:
+    name: Audit read-only des ressources potentiellement facturables
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout canonical main
+        uses: actions/checkout@v6
+
+      - name: Authenticate to Google Cloud with Workload Identity Federation
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Run zero-cost structural audit
+        id: finops
+        continue-on-error: true
+        env:
+          FINOPS_STRICT: 'true'
+          FINOPS_DEEP_STORAGE_SCAN: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deep_storage_scan)) && 'true' || 'false' }}
+        run: ./scripts/gcp-finops-inventory.sh
+
+      - name: Trace audit in issue 23
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUDIT_OUTCOME: ${{ steps.finops.outcome }}
+        run: |
+          set -euo pipefail
+          report="$(mktemp)"
+          {
+            echo "## Audit FinOps automatique — $(date -u +'%Y-%m-%d %H:%M UTC')"
+            echo
+            if [[ "$AUDIT_OUTCOME" == "success" ]]; then
+              echo "Statut du garde-fou structurel : ✅ succès."
+            else
+              echo "Statut du garde-fou structurel : ❌ échec ou preuve incomplète."
+            fi
+            echo
+            if [[ -s "$GITHUB_STEP_SUMMARY" ]]; then
+              cat "$GITHUB_STEP_SUMMARY"
+            else
+              echo "Le script n'a pas produit de résumé exploitable ; consulter le run GitHub Actions."
+            fi
+            echo
+            echo "Run : ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          } > "$report"
+          gh issue comment 23 --repo "$GITHUB_REPOSITORY" --body-file "$report"
+
+      - name: Fail when structural guardrails fail
+        if: steps.finops.outcome != 'success'
+        run: |
+          echo "L'audit FinOps strict a détecté un écart structurel ou n'a pas pu terminer correctement."
+          exit 1
