@@ -7,6 +7,7 @@ const DEFAULT_WORKFLOW_DIR = path.join(root, '.github', 'workflows');
 const ACTIONLINT_VERSION = '1.7.12';
 const WORKFLOW_WRITE_PERMISSIONS = Object.freeze({
   'agent-remote-validate.yml': new Set([]),
+  'audit-gcp-finops.yml': new Set(['id-token', 'issues']),
   'audit-structured-logs.yml': new Set(['id-token', 'issues']),
   'build-apk.yml': new Set(['contents']),
   'deploy-backend.yml': new Set(['id-token']),

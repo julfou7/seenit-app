@@ -185,10 +185,12 @@ test('SEENIT-COST-001 capture un inventaire GCP en lecture seule après la purge
   assert.match(inventory, /gcloud firestore databases list/);
   assert.match(inventory, /databaseEdition, freeTier, createTime, updateTime/);
   assert.match(inventory, /firestoreDataAccessMode, mongodbCompatibleDataAccessMode/);
-  assert.match(inventory, /gcloud storage buckets describe/);
+  assert.match(inventory, /gcloud storage buckets list/);
+  assert.match(inventory, /FINOPS_DEEP_STORAGE_SCAN/);
   assert.match(inventory, /gcloud sql instances list/);
+  assert.match(inventory, /gcloud artifacts repositories list[\s\S]*--location=all/);
   assert.match(inventory, /gcloud artifacts packages list/);
-  assert.match(inventory, /gcloud run services describe/);
+  assert.match(inventory, /gcloud run services list/);
   assert.match(inventory, /--format=json 2>\/dev\/null/);
   assert.doesNotMatch(inventory, /--format=json 2>&1/);
   assert.doesNotMatch(inventory, /gcloud (?:firestore|storage|sql|artifacts|run).*(?: delete | rm | update | create )/);
