@@ -9,6 +9,8 @@ test('SEENIT-DATA-005 verrouille la base Firestore canonique sur default', () =>
   const client = read('src/lib/firebase.ts');
   const admin = read('src/lib/firebase-admin.ts');
   const workspaceConfig = JSON.parse(read('firebase-applet-config.json'));
+  const firebaseConfig = JSON.parse(read('firebase.json'));
+  const migrationLockdown = JSON.parse(read('firebase.migration-lockdown.json'));
   assert.match(client, /export const FIRESTORE_DATABASE_ID = ['"]default['"]/);
   assert.match(client, /initializeFirestore[\s\S]*FIRESTORE_DATABASE_ID\s*\)/);
   assert.equal(client.includes('(default)'), false);
@@ -16,6 +18,16 @@ test('SEENIT-DATA-005 verrouille la base Firestore canonique sur default', () =>
   assert.match(admin, /getFirestore\(['"]default['"]\)/);
   assert.equal(/getFirestore\(\s*\)/.test(admin), false);
   assert.equal('firestoreDatabaseId' in workspaceConfig, false);
+  assert.deepEqual(
+    firebaseConfig.firestore.map((entry: { database: string }) => entry.database),
+    ['default']
+  );
+  assert.deepEqual(
+    migrationLockdown.firestore.map((entry: { database: string }) => entry.database),
+    ['default', 'ai-studio-seenit-065aead8-cc5a-4b86-9f25-dd812194ffa4']
+  );
+  assert.equal(JSON.stringify(firebaseConfig).includes('(default)'), false);
+  assert.equal(JSON.stringify(migrationLockdown).includes('(default)'), false);
 });
 
 test('SEENIT-DATA-006 protège default contre une suppression accidentelle', () => {

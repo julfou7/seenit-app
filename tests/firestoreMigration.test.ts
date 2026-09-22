@@ -19,7 +19,7 @@ const read = (path: string) => fs.readFileSync(path, 'utf8');
 test('SEENIT-DATA-006 borne la migration unique de default par export, répétition, maintenance et rollback', () => {
   const script = read('scripts/migrate-firestore-default.sh');
   const workflow = read('.github/workflows/firestore-default-migration.yml');
-  const lockdown = read('firebase.migration-lockdown.json');
+  const lockdown = JSON.parse(read('firebase.migration-lockdown.json'));
   const lifecycle = JSON.parse(read('config/firestore-export-lifecycle.json'));
   const bucketGuard = 'config/firestore-export-bucket-guard.jq';
 
@@ -44,9 +44,14 @@ test('SEENIT-DATA-006 borne la migration unique de default par export, répétit
   );
   assert.match(script, /recover_on_failure[\s\S]*restore_default_after_cutover_failure/);
   assert.match(script, /ROLLBACK INCOMPLET[\s\S]*maintenance conservée/);
-  assert.match(script, /deploy_rules firebase\.json[\s\S]*restore_public_traffic/);
+  assert.match(script, /restore_rules_if_locked[\s\S]*restore_public_traffic/);
+  assert.match(script, /RULES_LOCKED=true[\s\S]*deploy_rules firebase\.migration-lockdown\.json/);
   assert.match(script, /-f config\/firestore-export-bucket-guard\.jq/);
-  assert.match(lockdown, /\(default\)[\s\S]*ai-studio-seenit-/);
+  assert.deepEqual(
+    lockdown.firestore.map((entry: { database: string }) => entry.database),
+    ['default', 'ai-studio-seenit-065aead8-cc5a-4b86-9f25-dd812194ffa4']
+  );
+  assert.equal(JSON.stringify(lockdown).includes('(default)'), false);
   assert.equal(lifecycle.rule[0].action.type, 'Delete');
   assert.equal(lifecycle.rule[0].condition.age, 30);
   if (process.platform !== 'win32') {
