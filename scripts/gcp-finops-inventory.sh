@@ -9,12 +9,16 @@ FIREBASE_BUCKET="${GCP_FIREBASE_BUCKET:-gen-lang-client-0201895414.firebasestora
 CLOUDBUILD_SOURCE_BUCKET="${PROJECT_ID}_cloudbuild"
 STRICT="${FINOPS_STRICT:-false}"
 DEEP_STORAGE_SCAN="${FINOPS_DEEP_STORAGE_SCAN:-false}"
+REPORT_PATH="${FINOPS_REPORT_PATH:-}"
 VIOLATIONS=0
 
 summary_line() {
   printf '%s\n' "$1"
   if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
     printf '%s\n' "$1" >> "$GITHUB_STEP_SUMMARY"
+  fi
+  if [[ -n "$REPORT_PATH" ]]; then
+    printf '%s\n' "$1" >> "$REPORT_PATH"
   fi
 }
 
@@ -33,32 +37,36 @@ unavailable() {
   summary_line "- ${1}: UNAVAILABLE (IAM/API)"
 }
 
+if [[ -n "$REPORT_PATH" ]]; then
+  : > "$REPORT_PATH"
+fi
+
 summary_line "## Inventaire FinOps GCP"
 summary_line ""
 summary_line "Projet: \`${PROJECT_ID}\`; région runtime canonique déclarée: \`${REGION}\`."
 summary_line "Mode strict: \`${STRICT}\`; scan profond Storage: \`${DEEP_STORAGE_SCAN}\`."
 summary_line ""
 
-# Firestore: le fonctionnement cible de #23 impose une seule base `(default)`, Standard et free tier.
+# Firestore: le fonctionnement cible de #23 impose une seule base `default`, Standard et free tier.
 if firestore_json="$(gcloud firestore databases list --project "$PROJECT_ID" --format=json 2>/dev/null)"; then
   firestore_count="$(jq 'length' <<<"$firestore_json")"
-  named_count="$(jq '[.[] | select((.name | split("/")[-1]) != "(default)")] | length' <<<"$firestore_json")"
-  default_count="$(jq '[.[] | select((.name | split("/")[-1]) == "(default)")] | length' <<<"$firestore_json")"
-  default_free_tier="$(jq -r '[.[] | select((.name | split("/")[-1]) == "(default)")][0].freeTier // false' <<<"$firestore_json")"
-  default_edition="$(jq -r '[.[] | select((.name | split("/")[-1]) == "(default)")][0].databaseEdition // "UNKNOWN"' <<<"$firestore_json")"
-  default_location="$(jq -r '[.[] | select((.name | split("/")[-1]) == "(default)")][0].locationId // "UNKNOWN"' <<<"$firestore_json")"
-  delete_protection="$(jq -r '[.[] | select((.name | split("/")[-1]) == "(default)")][0].deleteProtectionState // "UNKNOWN"' <<<"$firestore_json")"
+  named_count="$(jq '[.[] | select((.name | split("/")[-1]) != "default")] | length' <<<"$firestore_json")"
+  default_count="$(jq '[.[] | select((.name | split("/")[-1]) == "default")] | length' <<<"$firestore_json")"
+  default_free_tier="$(jq -r '[.[] | select((.name | split("/")[-1]) == "default")][0].freeTier // false' <<<"$firestore_json")"
+  default_edition="$(jq -r '[.[] | select((.name | split("/")[-1]) == "default")][0].databaseEdition // "UNKNOWN"' <<<"$firestore_json")"
+  default_location="$(jq -r '[.[] | select((.name | split("/")[-1]) == "default")][0].locationId // "UNKNOWN"' <<<"$firestore_json")"
+  delete_protection="$(jq -r '[.[] | select((.name | split("/")[-1]) == "default")][0].deleteProtectionState // "UNKNOWN"' <<<"$firestore_json")"
 
   summary_line "### Firestore"
-  summary_line "- Bases actives: **${firestore_count}**; bases nommées hors \`(default)\`: **${named_count}**."
-  summary_line "- \`(default)\`: région **${default_location}**, édition **${default_edition}**, free tier **${default_free_tier}**, protection suppression **${delete_protection}**."
+  summary_line "- Bases actives: **${firestore_count}**; bases nommées hors \`default\`: **${named_count}**."
+  summary_line "- \`default\`: région **${default_location}**, édition **${default_edition}**, free tier **${default_free_tier}**, protection suppression **${delete_protection}**."
   console_json "Firestore" "$(jq '[.[] | {database:(.name | split("/")[-1]), locationId, databaseEdition, freeTier, createTime, updateTime, firestoreDataAccessMode, mongodbCompatibleDataAccessMode, deleteProtectionState, pointInTimeRecoveryEnablement}]' <<<"$firestore_json")"
 
   if [[ "$firestore_count" != "1" || "$named_count" != "0" || "$default_count" != "1" ]]; then
-    violation "Firestore doit contenir uniquement la base \`(default)\`."
+    violation "Firestore doit contenir uniquement la base \`default\`."
   fi
   if [[ "$default_free_tier" != "true" || "$default_edition" != "STANDARD" ]]; then
-    violation "La base \`(default)\` doit rester Standard et porteuse du free tier."
+    violation "La base \`default\` doit rester Standard et porteuse du free tier."
   fi
 else
   summary_line "### Firestore"

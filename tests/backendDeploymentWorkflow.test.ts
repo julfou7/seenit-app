@@ -187,6 +187,9 @@ test('SEENIT-COST-001 capture un inventaire GCP en lecture seule après la purge
   assert.match(inventory, /firestoreDataAccessMode, mongodbCompatibleDataAccessMode/);
   assert.match(inventory, /gcloud storage buckets list/);
   assert.match(inventory, /FINOPS_DEEP_STORAGE_SCAN/);
+  assert.match(inventory, /REPORT_PATH="\${FINOPS_REPORT_PATH:-}"/);
+  assert.match(inventory, /default_count=.*== "default"/);
+  assert.doesNotMatch(inventory, /== "\(default\)"/);
   assert.match(inventory, /gcloud sql instances list/);
   assert.match(inventory, /gcloud artifacts repositories list[\s\S]*--location=all/);
   assert.match(inventory, /gcloud artifacts packages list/);
@@ -194,6 +197,14 @@ test('SEENIT-COST-001 capture un inventaire GCP en lecture seule après la purge
   assert.match(inventory, /--format=json 2>\/dev\/null/);
   assert.doesNotMatch(inventory, /--format=json 2>&1/);
   assert.doesNotMatch(inventory, /gcloud (?:firestore|storage|sql|artifacts|run).*(?: delete | rm | update | create )/);
+
+  const auditWorkflow = fs.readFileSync(
+    path.join(rootDir, '.github', 'workflows', 'audit-gcp-finops.yml'),
+    'utf8'
+  );
+  assert.match(auditWorkflow, /FINOPS_REPORT_PATH/);
+  assert.match(auditWorkflow, /cat "\$FINOPS_REPORT_PATH"/);
+  assert.doesNotMatch(auditWorkflow, /cat "\$GITHUB_STEP_SUMMARY"/);
 });
 
 test('SEENIT-RUNTIME-001 documente que la sync AI Studio ne vaut jamais preuve de déploiement', () => {
