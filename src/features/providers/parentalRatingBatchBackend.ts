@@ -29,6 +29,7 @@ export const PARENTAL_BATCH_STALL_BURST_MS = 1_000;
 export const PARENTAL_BATCH_ITEM_BUDGET_PER_MINUTE = 240;
 export const PARENTAL_BATCH_PROVIDER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const PARENTAL_BATCH_PROVIDER_CACHE_MAX_ENTRIES = 5_000;
+export const PARENTAL_BATCH_MOVIE_DETAILS_SCHEMA = 2;
 const MAX_PARENTAL_RESPONSE_BYTES = 256 * 1024;
 
 function parseBatchItems(raw: unknown): ParentalBatchItem[] | null {
@@ -51,21 +52,33 @@ function parseBatchItems(raw: unknown): ParentalBatchItem[] | null {
   return items.length > 0 ? items : null;
 }
 
-function compactParentalDetails(item: ParentalBatchItem, payload: any): any {
+export function compactParentalDetails(item: ParentalBatchItem, payload: any): any {
   if (item.mediaType === 'movie') {
     const results = Array.isArray(payload?.results)
       ? payload.results
-          .filter((entry: any) => entry?.iso_3166_1 === 'US')
+          .filter((entry: any) => entry?.iso_3166_1 === 'US' || entry?.iso_3166_1 === 'FR')
           .map((entry: any) => ({
-            iso_3166_1: 'US',
+            iso_3166_1: entry.iso_3166_1,
             release_dates: Array.isArray(entry?.release_dates)
-              ? entry.release_dates.map((release: any) => ({
-                  certification: String(release?.certification ?? '').trim(),
-                }))
+              ? entry.release_dates.map((release: any) => entry.iso_3166_1 === 'FR'
+                ? {
+                    certification: String(release?.certification ?? '').trim(),
+                    type: Number(release?.type) || null,
+                    release_date: typeof release?.release_date === 'string' ? release.release_date : null,
+                    note: typeof release?.note === 'string' ? release.note : '',
+                  }
+                : {
+                    certification: String(release?.certification ?? '').trim(),
+                  })
               : [],
           }))
       : [];
-    return { id: item.id, media_type: item.mediaType, release_dates: { results } };
+    return {
+      id: item.id,
+      media_type: item.mediaType,
+      seenitParentalDetailsSchema: PARENTAL_BATCH_MOVIE_DETAILS_SCHEMA,
+      release_dates: { results },
+    };
   }
 
   const results = Array.isArray(payload?.results)
@@ -77,6 +90,12 @@ function compactParentalDetails(item: ParentalBatchItem, payload: any): any {
         }))
     : [];
   return { id: item.id, media_type: item.mediaType, content_ratings: { results } };
+}
+
+function isReusablePersistedDetails(item: ParentalBatchItem, details: any): boolean {
+  if (!details || typeof details !== 'object') return false;
+  if (item.mediaType !== 'movie') return true;
+  return Number(details.seenitParentalDetailsSchema) === PARENTAL_BATCH_MOVIE_DETAILS_SCHEMA;
 }
 
 async function readJsonResponse(response: Response): Promise<any | null> {
@@ -171,7 +190,10 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
     const persistedByKey = dependencies.readPersisted
       ? await dependencies.readPersisted(items.map(item => item.key)).catch(() => new Map<string, any>())
       : new Map<string, any>();
-    for (const [key, details] of persistedByKey) writeProviderCache(key, details);
+    for (const item of items) {
+      const details = persistedByKey.get(item.key);
+      if (isReusablePersistedDetails(item, details)) writeProviderCache(item.key, details);
+    }
     const misses = items.filter(item => !readProviderCache(item.key));
 
     const budget = takeBudget(uid, misses.length);
@@ -243,7 +265,7 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
     const acquire = async () => {
       if (active < PARENTAL_BATCH_MAX_CONCURRENT) {
         active += 1;
-          return;
+        return;
       }
       await new Promise<void>(resolve => {
         const waiter: Waiter = { granted: false, resolve, timer: null };
