@@ -1,6 +1,11 @@
 import { authenticatedFetch } from '../../lib/apiAuth';
+import {
+  applyCinemaEvidenceToSearchResults,
+  movieSearchEvidenceKey,
+} from './cinemaSearchEvidenceCore';
 
-export const CINEMA_SEARCH_EVIDENCE_SCHEMA = 2;
+export { CINEMA_SEARCH_EVIDENCE_SCHEMA, applyCinemaEvidenceToSearchResults } from './cinemaSearchEvidenceCore';
+
 const CINEMA_SEARCH_BATCH_MAX_ITEMS = 40;
 
 interface BatchCinemaEntry {
@@ -11,41 +16,11 @@ interface BatchCinemaEntry {
   } | null;
 }
 
-function isMovieSearchResult(item: any): boolean {
-  return item?.media_type === 'movie';
-}
-
-function movieKey(item: any): string | null {
-  if (!isMovieSearchResult(item)) return null;
-  const id = Number(item?.id);
-  return Number.isInteger(id) && id > 0 ? `movie:${id}` : null;
-}
-
-export function applyCinemaEvidenceToSearchResults(
-  results: any[],
-  detailsByKey: Map<string, any | null>,
-): any[] {
-  return results.map(item => {
-    const key = movieKey(item);
-    if (!key) return item;
-    const details = detailsByKey.get(key);
-    if (!details
-      || Number(details.seenitParentalDetailsSchema) !== CINEMA_SEARCH_EVIDENCE_SCHEMA
-      || !details.release_dates
-      || !Array.isArray(details.release_dates.results)) return item;
-
-    return {
-      ...item,
-      release_dates: details.release_dates,
-    };
-  });
-}
-
 export async function enrichCinemaEvidenceForSearchResults(
   results: any[],
   signal?: AbortSignal,
 ): Promise<any[]> {
-  const keys = [...new Set(results.map(movieKey).filter((key): key is string => Boolean(key)))]
+  const keys = [...new Set(results.map(movieSearchEvidenceKey).filter((key): key is string => Boolean(key)))]
     .slice(0, CINEMA_SEARCH_BATCH_MAX_ITEMS);
   if (keys.length === 0 || signal?.aborted) return results;
 
