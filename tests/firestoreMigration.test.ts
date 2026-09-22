@@ -44,8 +44,8 @@ test('SEENIT-DATA-006 borne la migration unique de default par export, répétit
   assert.match(script, /firestore fields ttls list/);
   assert.equal(
     (script.match(/select\(\(\.deleteTime \/\/ ""\) == ""\)/g) ?? []).length,
-    2,
-    'les tombstones Firestore doivent être ignorés au préflight et dans la topologie finale'
+    3,
+    'les tombstones Firestore doivent être ignorés dans les deux topologies de préflight et la topologie finale'
   );
   assert.match(script, /recover_on_failure[\s\S]*restore_default_after_cutover_failure/);
   assert.match(script, /ROLLBACK INCOMPLET[\s\S]*maintenance conservée/);
