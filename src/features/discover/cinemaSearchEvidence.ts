@@ -10,16 +10,13 @@ const CINEMA_SEARCH_BATCH_MAX_ITEMS = 40;
 
 interface BatchCinemaEntry {
   key?: string;
-  details?: {
-    seenitParentalDetailsSchema?: number;
-    release_dates?: unknown;
-  } | null;
+  details?: unknown;
 }
 
-export async function enrichCinemaEvidenceForSearchResults(
-  results: any[],
+export async function enrichCinemaEvidenceForSearchResults<T>(
+  results: T[],
   signal?: AbortSignal,
-): Promise<any[]> {
+): Promise<T[]> {
   const keys = [...new Set(results.map(movieSearchEvidenceKey).filter((key): key is string => Boolean(key)))]
     .slice(0, CINEMA_SEARCH_BATCH_MAX_ITEMS);
   if (keys.length === 0 || signal?.aborted) return results;
@@ -33,7 +30,7 @@ export async function enrichCinemaEvidenceForSearchResults(
     const payload = await response.json() as { results?: BatchCinemaEntry[] };
     if (!Array.isArray(payload?.results)) return results;
 
-    const detailsByKey = new Map<string, any | null>();
+    const detailsByKey = new Map<string, unknown | null>();
     for (const entry of payload.results) {
       if (typeof entry?.key !== 'string') continue;
       detailsByKey.set(entry.key, entry.details ?? null);
