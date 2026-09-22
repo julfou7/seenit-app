@@ -4,6 +4,7 @@ set -u
 PROJECT_ID="${GCP_PROJECT_ID:-gen-lang-client-0201895414}"
 REGION="${GCP_REGION:-us-west1}"
 SERVICE="${GCP_SERVICE:-seenit-app}"
+ALLOWED_RUN_SERVICES="${FINOPS_ALLOWED_RUN_SERVICES:-${SERVICE},athia}"
 ARTIFACT_REPOSITORY="${GCP_ARTIFACT_REPOSITORY:-cloud-run-source-deploy}"
 FIREBASE_BUCKET="${GCP_FIREBASE_BUCKET:-gen-lang-client-0201895414.firebasestorage.app}"
 CLOUDBUILD_SOURCE_BUCKET="${PROJECT_ID}_cloudbuild"
@@ -36,6 +37,10 @@ violation() {
 
 unavailable() {
   summary_line "- ${1}: UNAVAILABLE (IAM/API)"
+}
+
+csv_to_json_array() {
+  jq -cn --arg csv "$1" '$csv | split(",") | map(gsub("^[[:space:]]+|[[:space:]]+$"; "")) | map(select(length > 0))'
 }
 
 if [[ -n "$REPORT_PATH" ]]; then
@@ -75,15 +80,29 @@ else
 fi
 summary_line ""
 
-# Cloud Run: inventaire global, sans limiter l'audit à us-west1.
+# Cloud Run: l'audit distingue le runtime SeenIt canonique des applications sœurs explicitement autorisées.
+# Une application sœur autorisée reste visible dans l'inventaire et le budget projet ; elle n'est simplement
+# plus qualifiée à tort de runtime parasite SeenIt.
 if run_json="$(gcloud run services list --project "$PROJECT_ID" --platform managed --format=json 2>/dev/null)"; then
   run_count="$(jq 'length' <<<"$run_json")"
   run_regions="$(jq -r '[.[] | (.metadata.labels["cloud.googleapis.com/location"] // .metadata.annotations["run.googleapis.com/region"] // "UNKNOWN")] | unique | join(", ")' <<<"$run_json")"
+  allowed_run_services_json="$(csv_to_json_array "$ALLOWED_RUN_SERVICES")"
+  canonical_run_count="$(jq --arg expected "$SERVICE" '[.[] | select(.metadata.name == $expected)] | length' <<<"$run_json")"
+  unexpected_run_services_json="$(jq --argjson allowed "$allowed_run_services_json" '[.[] | .metadata.name as $name | select(($allowed | index($name)) == null) | $name]' <<<"$run_json")"
+  unexpected_run_count="$(jq 'length' <<<"$unexpected_run_services_json")"
+  allowed_run_services_label="$(jq -r 'join(", ")' <<<"$allowed_run_services_json")"
+  unexpected_run_services_label="$(jq -r 'join(", ")' <<<"$unexpected_run_services_json")"
+
   summary_line "### Cloud Run"
   summary_line "- Services actifs: **${run_count}**; régions: **${run_regions:-aucune}**."
+  summary_line "- Runtime SeenIt requis: \`${SERVICE}\`; services explicitement autorisés: **${allowed_run_services_label:-aucun}**."
   console_json "Cloud Run" "$(jq '[.[] | {name:.metadata.name, region:(.metadata.labels["cloud.googleapis.com/location"] // .metadata.annotations["run.googleapis.com/region"] // "UNKNOWN"), url:.status.url, minScale:.spec.template.metadata.annotations["autoscaling.knative.dev/minScale"], maxScale:.spec.template.metadata.annotations["autoscaling.knative.dev/maxScale"], vpcConnector:.spec.template.metadata.annotations["run.googleapis.com/vpc-access-connector"], directVpc:.spec.template.metadata.annotations["run.googleapis.com/network-interfaces"]}]' <<<"$run_json")"
-  if (( run_count > 1 )); then
-    violation "Plus d'un service Cloud Run est actif : vérifier qu'aucun runtime parasite ne peut générer de coût."
+
+  if [[ "$canonical_run_count" != "1" ]]; then
+    violation "Le runtime Cloud Run canonique \`${SERVICE}\` doit être présent exactement une fois."
+  fi
+  if (( unexpected_run_count > 0 )); then
+    violation "Service(s) Cloud Run non autorisé(s): ${unexpected_run_services_label}. Vérifier qu'aucun runtime parasite ne peut générer de coût."
   fi
 else
   summary_line "### Cloud Run"
@@ -113,7 +132,8 @@ fi
 summary_line ""
 
 # Cloud Storage: le listing de métadonnées est léger. Le calcul des tailles objet par objet est opt-in
-# pour éviter que l'audit quotidien ne crée lui-même des opérations inutiles.
+# pour éviter que l'audit quotidien ne crée lui-même des opérations inutiles. Le plafond reste volontairement
+# au niveau du projet partagé : ATHIA est préservée, mais sa consommation reste visible dans le budget GCP réel.
 if buckets_json="$(gcloud storage buckets list --project "$PROJECT_ID" --format=json 2>/dev/null)"; then
   bucket_count="$(jq 'length' <<<"$buckets_json")"
   summary_line "### Cloud Storage"
@@ -148,11 +168,11 @@ if buckets_json="$(gcloud storage buckets list --project "$PROJECT_ID" --format=
       fi
     done < <(jq -r '.[] | (.name // .url // "") | sub("^gs://"; "")' <<<"$buckets_json")
 
-    summary_line "- Total Storage observé: **${storage_total_bytes} octets**; plafond conservateur: **${STORAGE_MAX_BYTES} octets**."
+    summary_line "- Total Storage observé: **${storage_total_bytes} octets**; plafond conservateur partagé: **${STORAGE_MAX_BYTES} octets**."
     if [[ "$storage_scan_complete" != "true" ]]; then
       violation "Le scan Storage est incomplet : le respect du plafond ne peut pas être prouvé."
     elif [[ "$storage_cap_valid" == "true" ]] && (( storage_total_bytes > STORAGE_MAX_BYTES )); then
-      violation "Le stockage cumulé dépasse le plafond conservateur de ${STORAGE_MAX_BYTES} octets."
+      violation "Le stockage cumulé du projet dépasse le plafond conservateur de ${STORAGE_MAX_BYTES} octets."
     fi
   else
     summary_line "- Scan profond des tailles: désactivé ; le plafond Storage n'est pas évalué pendant ce run."
