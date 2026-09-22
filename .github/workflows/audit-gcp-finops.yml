@@ -25,6 +25,7 @@ env:
   GCP_PROJECT_ID: gen-lang-client-0201895414
   GCP_REGION: us-west1
   GCP_SERVICE: seenit-app
+  FINOPS_ALLOWED_RUN_SERVICES: seenit-app,athia
   GCP_ARTIFACT_REPOSITORY: cloud-run-source-deploy
   GCP_WORKLOAD_IDENTITY_PROVIDER: projects/799043440232/locations/global/workloadIdentityPools/seenit-github/providers/seenit-main
   GCP_DEPLOY_SERVICE_ACCOUNT: seenit-github-deployer@gen-lang-client-0201895414.iam.gserviceaccount.com

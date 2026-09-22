@@ -1,0 +1,154 @@
+name: Cleanup Orphaned tv-track-offline Storage
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+
+concurrency:
+  group: seenit-tv-track-offline-cleanup
+  cancel-in-progress: false
+
+env:
+  GCP_PROJECT_ID: gen-lang-client-0201895414
+  GCP_WORKLOAD_IDENTITY_PROVIDER: projects/799043440232/locations/global/workloadIdentityPools/seenit-github/providers/seenit-main
+  GCP_DEPLOY_SERVICE_ACCOUNT: seenit-github-deployer@gen-lang-client-0201895414.iam.gserviceaccount.com
+  CLEANUP_BUCKET: ai-studio-bucket-799043440232-us-west1
+  CLEANUP_PREFIX: services/tv-track-offline/
+
+jobs:
+  cleanup:
+    name: Delete only orphaned tv-track-offline build artifacts
+    if: >-
+      github.event.issue.number == 23 &&
+      github.event.issue.pull_request == null &&
+      github.event.comment.author_association == 'OWNER' &&
+      github.event.comment.user.login == github.repository_owner &&
+      startsWith(github.event.comment.body, '/cleanup-tv-track-offline ')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout canonical main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Verify exact owner command and immutable main SHA
+        id: command
+        shell: bash
+        env:
+          COMMAND_BODY: ${{ github.event.comment.body }}
+        run: |
+          set -euo pipefail
+          expected_prefix='services/tv-track-offline/'
+          expected_bucket='ai-studio-bucket-799043440232-us-west1'
+          if [[ ! "$COMMAND_BODY" =~ ^/cleanup-tv-track-offline\ project=gen-lang-client-0201895414\ bucket=ai-studio-bucket-799043440232-us-west1\ prefix=services/tv-track-offline/\ sha=([0-9a-f]{40})$ ]]; then
+            echo 'Commande de nettoyage refusée : syntaxe exacte requise.'
+            exit 1
+          fi
+          requested_sha="${BASH_REMATCH[1]}"
+          checked_out_sha="$(git rev-parse HEAD)"
+          if [[ "$requested_sha" != "$checked_out_sha" ]]; then
+            echo "Commande périmée : requested=${requested_sha}, current=${checked_out_sha}."
+            exit 1
+          fi
+          [[ "$CLEANUP_BUCKET" == "$expected_bucket" ]]
+          [[ "$CLEANUP_PREFIX" == "$expected_prefix" ]]
+          echo "sha=$requested_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate with Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Preview exact target
+        id: preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="gs://${CLEANUP_BUCKET}/${CLEANUP_PREFIX}"
+          athia="gs://${CLEANUP_BUCKET}/services/athia/"
+          echo "Target: ${target}"
+          echo "Protected sibling prefix: ${athia}"
+          listing="$(gcloud storage ls --recursive "$target" 2>/dev/null || true)"
+          count="$(awk '/^gs:\/\// {count++} END {print count+0}' <<<"$listing")"
+          bytes=0
+          if [[ "$count" -gt 0 ]]; then
+            size_raw="$(gcloud storage du --summarize "$target")"
+            candidate="${size_raw%%[[:space:]]*}"
+            [[ "$candidate" =~ ^[0-9]+$ ]] && bytes="$candidate"
+          fi
+          echo "objects=$count" >> "$GITHUB_OUTPUT"
+          echo "bytes=$bytes" >> "$GITHUB_OUTPUT"
+          echo "Preview: ${count} active object(s), ${bytes} bytes."
+
+      - name: Delete exact orphan prefix
+        if: steps.preview.outputs.objects != '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="gs://${CLEANUP_BUCKET}/${CLEANUP_PREFIX}"
+          [[ "$target" == 'gs://ai-studio-bucket-799043440232-us-west1/services/tv-track-offline/' ]]
+          gcloud storage rm --recursive "$target"
+
+      - name: Verify target is empty and ATHIA remains untouched
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="gs://${CLEANUP_BUCKET}/${CLEANUP_PREFIX}"
+          remaining="$(gcloud storage ls --recursive "$target" 2>/dev/null || true)"
+          remaining_count="$(awk '/^gs:\/\// {count++} END {print count+0}' <<<"$remaining")"
+          if [[ "$remaining_count" -ne 0 ]]; then
+            echo "Nettoyage incomplet : ${remaining_count} objet(s) actif(s) restent sous ${target}."
+            exit 1
+          fi
+          athia="gs://${CLEANUP_BUCKET}/services/athia/"
+          athia_listing="$(gcloud storage ls --recursive "$athia" 2>/dev/null || true)"
+          athia_count="$(awk '/^gs:\/\// {count++} END {print count+0}' <<<"$athia_listing")"
+          if [[ "$athia_count" -eq 0 ]]; then
+            echo "Garde de préservation ATHIA non prouvée : aucun objet actif visible sous ${athia}."
+            exit 1
+          fi
+          echo "ATHIA préservée : ${athia_count} objet(s) actif(s) toujours visibles."
+
+      - name: Publish success checkpoint
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          MAIN_SHA: ${{ steps.command.outputs.sha }}
+          BEFORE_OBJECTS: ${{ steps.preview.outputs.objects }}
+          BEFORE_BYTES: ${{ steps.preview.outputs.bytes }}
+        run: >-
+          gh issue comment 23
+          --repo "$GITHUB_REPOSITORY"
+          --body "<!-- seenit-tv-track-cleanup -->
+          Nettoyage ciblé terminé sur main ${MAIN_SHA} : le seul préfixe supprimé est \`services/tv-track-offline/\`
+          (${BEFORE_OBJECTS} objet(s) actifs, ${BEFORE_BYTES} octets avant suppression). \`services/athia/\` a été revérifié après l'opération
+          et reste présent. Le bucket partagé et les autres préfixes n'ont pas été ciblés. La soft-delete policy du bucket peut conserver
+          temporairement les octets supprimés côté facturation/récupération. Preuve : ${RUN_URL}."
+
+      - name: Publish actionable failure checkpoint
+        if: failure() && steps.command.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          MAIN_SHA: ${{ steps.command.outputs.sha }}
+        run: >-
+          gh issue comment 23
+          --repo "$GITHUB_REPOSITORY"
+          --body "<!-- seenit-tv-track-cleanup -->
+          Le nettoyage ciblé \`services/tv-track-offline/\` sur main ${MAIN_SHA} a échoué ou sa vérification de préservation ATHIA n'a pas pu être prouvée.
+          Aucune extension de périmètre n'est autorisée : ne pas toucher \`services/athia/\`, au service Cloud Run \`athia\` ni à \`athia10.ai.studio\`.
+          Prochaine action : diagnostiquer l'étape en échec dans ${RUN_URL} avant toute nouvelle tentative."
