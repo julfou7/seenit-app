@@ -209,7 +209,7 @@ test('SEENIT-COST-001 capture un inventaire GCP en lecture seule après la purge
   );
   assert.match(auditWorkflow, /FINOPS_REPORT_PATH/);
   assert.match(auditWorkflow, /FINOPS_STORAGE_MAX_BYTES: '5000000000'/);
-  assert.match(auditWorkflow, /github\\.event_name == 'schedule'/);
+  assert.match(auditWorkflow, /github\.event_name == 'schedule'/);
   assert.match(auditWorkflow, /cat "\$FINOPS_REPORT_PATH"/);
   assert.doesNotMatch(auditWorkflow, /cat "\$GITHUB_STEP_SUMMARY"/);
 });
