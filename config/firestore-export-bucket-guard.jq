@@ -5,4 +5,3 @@ and any(
   (.lifecycle_config.rule // .lifecycle.rule // [])[]?;
   .action.type == "Delete" and (.condition.age | tonumber) == 30
 )
-

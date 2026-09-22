@@ -476,4 +476,3 @@ run_migration() {
 }
 
 run_migration
-

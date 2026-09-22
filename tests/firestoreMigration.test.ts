@@ -118,4 +118,3 @@ test('le digest Firestore est déterministe et ne journalise pas les données', 
   assert.equal(digestScript.includes('console.log(document.data'), false);
   assert.equal(digestScript.includes('JSON.stringify(report, null'), false);
 });
-
