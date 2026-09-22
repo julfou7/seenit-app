@@ -89,6 +89,24 @@ test('SEENIT-DATA-006 borne la migration unique de default par export, répétit
   }
 });
 
+test('le verrou Cloud Run accepte les deux modes publics supportés et restaure le mode initial', () => {
+  const script = read('scripts/migrate-firestore-default.sh');
+
+  assert.match(script, /readonly CANONICAL_ORIGIN='https:\/\/seenit\.ai\.studio'/);
+  assert.match(script, /canonical_health_is_public[\s\S]*CANONICAL_ORIGIN[\s\S]*\/api\/health/);
+  assert.match(script, /run\.googleapis\.com\/invoker-iam-disabled/);
+  assert.match(script, /PUBLIC_ACCESS_VIA_DISABLED_CHECK=true/);
+  assert.match(script, /PUBLIC_ACCESS_VIA_ALL_USERS=true/);
+  assert.match(
+    script,
+    /lock_public_traffic[\s\S]*--invoker-iam-check[\s\S]*remove-iam-policy-binding[\s\S]*health-after-lock/
+  );
+  assert.match(
+    script,
+    /restore_public_traffic[\s\S]*PUBLIC_ACCESS_VIA_ALL_USERS[\s\S]*add-iam-policy-binding[\s\S]*PUBLIC_ACCESS_VIA_DISABLED_CHECK[\s\S]*--no-invoker-iam-check/
+  );
+});
+
 test('SEENIT-COST-001 transfère le quota gratuit vers default sans stockage permanent', () => {
   const script = read('scripts/migrate-firestore-default.sh');
   const workflowPolicy = read('scripts/validate-workflow-policy.cjs');
