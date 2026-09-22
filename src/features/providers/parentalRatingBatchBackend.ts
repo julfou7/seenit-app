@@ -3,6 +3,7 @@ import { emitOperationalEvent } from '../runtime/operationalEvent.ts';
 
 type MediaType = 'movie' | 'tv';
 type Secrets = Partial<Record<'TMDB_API_KEY' | 'TVDB_API_KEY', string>>;
+type UnknownRecord = Record<string, unknown>;
 
 interface Dependencies {
   authenticate: RequestHandler;
@@ -32,6 +33,12 @@ export const PARENTAL_BATCH_PROVIDER_CACHE_MAX_ENTRIES = 5_000;
 export const PARENTAL_BATCH_MOVIE_DETAILS_SCHEMA = 2;
 const MAX_PARENTAL_RESPONSE_BYTES = 256 * 1024;
 
+function asRecord(value: unknown): UnknownRecord | null {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as UnknownRecord
+    : null;
+}
+
 function parseBatchItems(raw: unknown): ParentalBatchItem[] | null {
   if (typeof raw !== 'string' || raw.length === 0 || raw.length > 1024) return null;
   const parts = raw.split(',');
@@ -52,27 +59,29 @@ function parseBatchItems(raw: unknown): ParentalBatchItem[] | null {
   return items.length > 0 ? items : null;
 }
 
-export function compactParentalDetails(item: ParentalBatchItem, payload: any): any {
+export function compactParentalDetails(item: ParentalBatchItem, payload: unknown): UnknownRecord {
+  const payloadRecord = asRecord(payload);
+  const sourceResults = Array.isArray(payloadRecord?.results) ? payloadRecord.results : [];
+
   if (item.mediaType === 'movie') {
-    const results = Array.isArray(payload?.results)
-      ? payload.results
-          .filter((entry: any) => entry?.iso_3166_1 === 'US' || entry?.iso_3166_1 === 'FR')
-          .map((entry: any) => ({
-            iso_3166_1: entry.iso_3166_1,
-            release_dates: Array.isArray(entry?.release_dates)
-              ? entry.release_dates.map((release: any) => entry.iso_3166_1 === 'FR'
-                ? {
-                    certification: String(release?.certification ?? '').trim(),
-                    type: Number(release?.type) || null,
-                    release_date: typeof release?.release_date === 'string' ? release.release_date : null,
-                    note: typeof release?.note === 'string' ? release.note : '',
-                  }
-                : {
-                    certification: String(release?.certification ?? '').trim(),
-                  })
-              : [],
-          }))
-      : [];
+    const results = sourceResults.flatMap(rawEntry => {
+      const entry = asRecord(rawEntry);
+      const country = entry?.iso_3166_1;
+      if (country !== 'US' && country !== 'FR') return [];
+      const sourceReleaseDates = Array.isArray(entry.release_dates) ? entry.release_dates : [];
+      const releaseDates = sourceReleaseDates.map(rawRelease => {
+        const release = asRecord(rawRelease);
+        const certification = String(release?.certification ?? '').trim();
+        if (country === 'US') return { certification };
+        return {
+          certification,
+          type: Number(release?.type) || null,
+          release_date: typeof release?.release_date === 'string' ? release.release_date : null,
+          note: typeof release?.note === 'string' ? release.note : '',
+        };
+      });
+      return [{ iso_3166_1: country, release_dates: releaseDates }];
+    });
     return {
       id: item.id,
       media_type: item.mediaType,
@@ -81,21 +90,22 @@ export function compactParentalDetails(item: ParentalBatchItem, payload: any): a
     };
   }
 
-  const results = Array.isArray(payload?.results)
-    ? payload.results
-        .filter((entry: any) => entry?.iso_3166_1 === 'US')
-        .map((entry: any) => ({
-          iso_3166_1: 'US',
-          rating: String(entry?.rating ?? '').trim(),
-        }))
-    : [];
+  const results = sourceResults.flatMap(rawEntry => {
+    const entry = asRecord(rawEntry);
+    if (entry?.iso_3166_1 !== 'US') return [];
+    return [{
+      iso_3166_1: 'US',
+      rating: String(entry.rating ?? '').trim(),
+    }];
+  });
   return { id: item.id, media_type: item.mediaType, content_ratings: { results } };
 }
 
-function isReusablePersistedDetails(item: ParentalBatchItem, details: any): boolean {
-  if (!details || typeof details !== 'object') return false;
+function isReusablePersistedDetails(item: ParentalBatchItem, details: unknown): boolean {
+  const record = asRecord(details);
+  if (!record) return false;
   if (item.mediaType !== 'movie') return true;
-  return Number(details.seenitParentalDetailsSchema) === PARENTAL_BATCH_MOVIE_DETAILS_SCHEMA;
+  return Number(record.seenitParentalDetailsSchema) === PARENTAL_BATCH_MOVIE_DETAILS_SCHEMA;
 }
 
 async function readJsonResponse(response: Response): Promise<any | null> {
