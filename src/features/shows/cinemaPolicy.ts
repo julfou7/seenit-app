@@ -2,7 +2,17 @@ const CINEMA_PAST_DAYS = 75;
 const CINEMA_FUTURE_DAYS = 10;
 const CINEMA_EVIDENCE_TTL_MS = 6 * 60 * 60 * 1000;
 const FRENCH_THEATRICAL_RELEASE_TYPES = new Set([2, 3]);
-const frenchTheatricalMovieEvidence = new Map<number, number>();
+
+const EVENT_SPECIFIC_RELEASE_NOTE_PATTERNS = [
+  /\bfestival\b/i,
+  /\bavant[\s-]?premi[eè]re\b/i,
+  /\bprojection\b/i,
+  /\bs[ée]ance\b/i,
+  /\bscreening\b/i,
+  /\bspecial\s+screening\b/i,
+  /\bcin[ée]math[eè]que\b/i,
+  /\binstitut\s+lumi[eè]re\b/i,
+];
 
 export const getCinemaWindow = (now: Date = new Date()) => {
   const pastCutoff = new Date(now);
@@ -16,7 +26,16 @@ export const getCinemaWindow = (now: Date = new Date()) => {
   return { pastCutoff, futureCutoff };
 };
 
-const getFrenchTheatricalReleaseDates = (media: any): Date[] => {
+const isEndedEventSpecificRelease = (release: any, releaseDate: Date, now: Date): boolean => {
+  const note = typeof release?.note === 'string' ? release.note.trim() : '';
+  if (!note || !EVENT_SPECIFIC_RELEASE_NOTE_PATTERNS.some(pattern => pattern.test(note))) return false;
+
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+  return releaseDate < todayStart;
+};
+
+const getFrenchTheatricalReleaseDates = (media: any, now: Date): Date[] => {
   const countries = media?.release_dates?.results;
   if (!Array.isArray(countries)) return [];
 
@@ -25,66 +44,58 @@ const getFrenchTheatricalReleaseDates = (media: any): Date[] => {
 
   return france.release_dates
     .filter((release: any) => FRENCH_THEATRICAL_RELEASE_TYPES.has(Number(release?.type)))
-    .map((release: any) => new Date(release?.release_date))
-    .filter((releaseDate: Date) => !Number.isNaN(releaseDate.getTime()));
+    .map((release: any) => ({ release, releaseDate: new Date(release?.release_date) }))
+    .filter(({ releaseDate }: { releaseDate: Date }) => !Number.isNaN(releaseDate.getTime()))
+    .filter(({ release, releaseDate }: { release: any; releaseDate: Date }) => !isEndedEventSpecificRelease(release, releaseDate, now))
+    .map(({ releaseDate }: { releaseDate: Date }) => releaseDate);
 };
 
 export const hasCurrentFrenchTheatricalRelease = (media: any, now: Date = new Date()): boolean => {
-  const theatricalDates = getFrenchTheatricalReleaseDates(media);
+  const theatricalDates = getFrenchTheatricalReleaseDates(media, now);
   if (theatricalDates.length === 0) return false;
 
   const { pastCutoff, futureCutoff } = getCinemaWindow(now);
   return theatricalDates.some(releaseDate => releaseDate >= pastCutoff && releaseDate <= futureCutoff);
 };
 
+/**
+ * API conservée pour les appels historiques. La preuve cinéma n'est plus stockée
+ * dans un état global mutable : un résultat Discover transporte son marqueur inline
+ * et un payload release_dates détaillé reste autoritatif sans réchauffer les cartes.
+ */
 export const rememberFrenchTheatricalEvidence = (mediaId: number, checkedAt: number = Date.now()) => {
-  if (Number.isFinite(mediaId)) frenchTheatricalMovieEvidence.set(mediaId, checkedAt);
+  void mediaId;
+  void checkedAt;
 };
 
 export const clearFrenchTheatricalEvidence = (mediaId: number) => {
-  if (Number.isFinite(mediaId)) frenchTheatricalMovieEvidence.delete(mediaId);
-};
-
-const hasFreshFrenchTheatricalEvidence = (mediaId: number, nowMs: number): boolean => {
-  if (!Number.isFinite(mediaId)) return false;
-  const checkedAt = frenchTheatricalMovieEvidence.get(mediaId);
-  if (!checkedAt) return false;
-  if (nowMs - checkedAt > CINEMA_EVIDENCE_TTL_MS) {
-    frenchTheatricalMovieEvidence.delete(mediaId);
-    return false;
-  }
-  return true;
+  void mediaId;
 };
 
 const isFreshInlineTheatricalEvidence = (media: any, nowMs: number): boolean => {
-  if (media?.seenitFrenchTheatrical !== true) return false;
+  // Les marqueurs inline ne sont valides que sur les objets TMDB de liste. Un Show
+  // suivi utilise `mediaType`/`tmdbId` et ne doit jamais réactiver une preuve détaillée
+  // négative via les OR historiques des vues.
+  if (media?.media_type !== 'movie' || media?.seenitFrenchTheatrical !== true) return false;
   const checkedAt = Number(media?.seenitFrenchTheatricalCheckedAt);
   return Number.isFinite(checkedAt) && nowMs - checkedAt <= CINEMA_EVIDENCE_TTL_MS;
 };
 
 /**
  * Politique pure de preuve cinéma. Le filtrage TV/adulte reste à la façade TMDB.
+ *
+ * - release_dates est toujours autoritatif lorsqu'il existe ;
+ * - une projection explicitement événementielle déjà passée ne prouve pas une
+ *   disponibilité cinéma courante ;
+ * - l'ouverture d'une fiche ne peut plus modifier une carte via un cache global ;
+ * - seul le marqueur inline d'un résultat TMDB Discover contraint peut servir sans
+ *   payload détaillé.
  */
 export const hasFrenchTheatricalCinemaEvidence = (media: any, now: Date = new Date()): boolean => {
   if (!media) return false;
 
-  const nowMs = now.getTime();
-  const mediaId = Number(media.id ?? media.tmdbId);
   const hasReleaseDatesPayload = Array.isArray(media?.release_dates?.results);
+  if (hasReleaseDatesPayload) return hasCurrentFrenchTheatricalRelease(media, now);
 
-  // Un payload release_dates complet est prioritaire sur tout cache : il confirme
-  // ou invalide directement la preuve théâtrale française.
-  if (hasReleaseDatesPayload) {
-    const isTheatrical = hasCurrentFrenchTheatricalRelease(media, now);
-    if (Number.isFinite(mediaId)) {
-      if (isTheatrical) rememberFrenchTheatricalEvidence(mediaId, nowMs);
-      else clearFrenchTheatricalEvidence(mediaId);
-    }
-    return isTheatrical;
-  }
-
-  // Un marqueur interne n'est valide que s'il vient d'une preuve récente.
-  if (isFreshInlineTheatricalEvidence(media, nowMs)) return true;
-
-  return hasFreshFrenchTheatricalEvidence(mediaId, nowMs);
+  return isFreshInlineTheatricalEvidence(media, now.getTime());
 };
