@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import express, { type RequestHandler } from 'express';
+import express, { type Request, type RequestHandler } from 'express';
 import {
   PARENTAL_BATCH_MOVIE_DETAILS_SCHEMA,
   compactParentalDetails,
@@ -14,6 +14,22 @@ import {
 import { hasFrenchTheatricalCinemaEvidence } from '../src/features/shows/cinemaPolicy.ts';
 
 const NOW = new Date('2026-09-22T12:00:00+02:00');
+type UnknownRecord = Record<string, unknown>;
+
+function requireRecord(value: unknown): UnknownRecord {
+  assert.ok(value && typeof value === 'object' && !Array.isArray(value));
+  return value as UnknownRecord;
+}
+
+function requireRecords(value: unknown): UnknownRecord[] {
+  assert.ok(Array.isArray(value));
+  return value.map(entry => requireRecord(entry));
+}
+
+function releaseEntries(details: UnknownRecord): UnknownRecord[] {
+  const releaseDates = requireRecord(details.release_dates);
+  return requireRecords(releaseDates.results);
+}
 
 function rawReleaseDates(frRelease: Record<string, unknown>) {
   return {
@@ -44,9 +60,14 @@ test('issue #91 Tombé du ciel : la recherche reçoit la même preuve cinéma d�
   );
 
   assert.equal(compact.seenitParentalDetailsSchema, CINEMA_SEARCH_EVIDENCE_SCHEMA);
-  assert.equal(compact.release_dates.results.find((entry: any) => entry.iso_3166_1 === 'US')?.release_dates[0]?.certification, 'PG-13');
+  const entries = releaseEntries(compact);
+  const us = entries.find(entry => entry.iso_3166_1 === 'US');
+  const fr = entries.find(entry => entry.iso_3166_1 === 'FR');
+  assert.ok(us);
+  assert.ok(fr);
+  assert.equal(requireRecord(requireRecords(us.release_dates)[0]).certification, 'PG-13');
   assert.deepEqual(
-    compact.release_dates.results.find((entry: any) => entry.iso_3166_1 === 'FR')?.release_dates[0],
+    requireRecord(requireRecords(fr.release_dates)[0]),
     {
       certification: '',
       type: 3,
@@ -100,8 +121,12 @@ test('issue #91 une ancienne preuve parentale sans schéma cinéma ne devient ja
 test('issue #91 le backend invalide une preuve film persistée v1 et recharge FR en un appel fournisseur', async t => {
   let providerCalls = 0;
   const app = express();
+  const authenticate: RequestHandler = (req, _res, next) => {
+    (req as Request & { user?: { uid?: string } }).user = { uid: 'cinema-search' };
+    next();
+  };
   registerParentalRatingBatchRoute(app, {
-    authenticate: ((req: any, _res, next) => { req.user = { uid: 'cinema-search' }; next(); }) as RequestHandler,
+    authenticate,
     secrets: () => ({ TMDB_API_KEY: 'private-tmdb-key' }),
     readPersisted: async () => new Map([['movie:7', {
       id: 7,
@@ -128,10 +153,13 @@ test('issue #91 le backend invalide une preuve film persistée v1 et recharge FR
 
   const response = await fetch(`http://127.0.0.1:${address.port}/api/media/parental-ratings?items=movie%3A7`);
   assert.equal(response.status, 200);
-  const payload = await response.json() as any;
+  const payload = requireRecord(await response.json());
+  const results = requireRecords(payload.results);
   assert.equal(providerCalls, 1);
-  assert.equal(payload.results[0].details.seenitParentalDetailsSchema, CINEMA_SEARCH_EVIDENCE_SCHEMA);
-  assert.ok(payload.results[0].details.release_dates.results.some((entry: any) => entry.iso_3166_1 === 'FR'));
+  assert.equal(results.length, 1);
+  const details = requireRecord(results[0].details);
+  assert.equal(details.seenitParentalDetailsSchema, CINEMA_SEARCH_EVIDENCE_SCHEMA);
+  assert.ok(releaseEntries(details).some(entry => entry.iso_3166_1 === 'FR'));
 });
 
 test('issue #91 le facade Explorer attend bien l’enrichissement cinéma avant de rendre smartSearchMulti', () => {
