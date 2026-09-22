@@ -315,12 +315,8 @@ create_export_bucket() {
     --soft-delete-duration=0s \
     --lifecycle-file=config/firestore-export-lifecycle.json
   gcloud storage buckets describe "gs://${bucket}" --format=json \
-    | jq -e --arg location "${location^^}" '
-      (.location | ascii_upcase) == $location
-      and .iamConfiguration.uniformBucketLevelAccess.enabled == true
-      and .iamConfiguration.publicAccessPrevention == "enforced"
-      and any(.lifecycle.rule[]?; .action.type == "Delete" and .condition.age == 30)
-    ' >/dev/null
+    | jq -e --arg location "${location^^}" \
+      -f config/firestore-export-bucket-guard.jq >/dev/null
 }
 
 create_rehearsal_databases() {

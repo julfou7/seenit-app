@@ -21,6 +21,7 @@ test('SEENIT-DATA-006 borne la migration unique de default par export, répétit
   const workflow = read('.github/workflows/firestore-default-migration.yml');
   const lockdown = read('firebase.migration-lockdown.json');
   const lifecycle = JSON.parse(read('config/firestore-export-lifecycle.json'));
+  const bucketGuard = 'config/firestore-export-bucket-guard.jq';
 
   assert.match(workflow, /github\.event\.issue\.number == 23/);
   assert.match(workflow, /github\.event\.comment\.author_association == 'OWNER'/);
@@ -44,11 +45,31 @@ test('SEENIT-DATA-006 borne la migration unique de default par export, répétit
   assert.match(script, /recover_on_failure[\s\S]*restore_default_after_cutover_failure/);
   assert.match(script, /ROLLBACK INCOMPLET[\s\S]*maintenance conservée/);
   assert.match(script, /deploy_rules firebase\.json[\s\S]*restore_public_traffic/);
+  assert.match(script, /-f config\/firestore-export-bucket-guard\.jq/);
   assert.match(lockdown, /\(default\)[\s\S]*ai-studio-seenit-/);
   assert.equal(lifecycle.rule[0].action.type, 'Delete');
   assert.equal(lifecycle.rule[0].condition.age, 30);
   if (process.platform !== 'win32') {
     execFileSync('bash', ['-n', 'scripts/migrate-firestore-default.sh']);
+    const currentGcloudShape = {
+      location: 'EU',
+      uniform_bucket_level_access: true,
+      public_access_prevention: 'enforced',
+      lifecycle_config: lifecycle
+    };
+    const legacyRestShape = {
+      location: 'EU',
+      iamConfiguration: {
+        uniformBucketLevelAccess: { enabled: true },
+        publicAccessPrevention: 'enforced'
+      },
+      lifecycle
+    };
+    for (const bucket of [currentGcloudShape, legacyRestShape]) {
+      execFileSync('jq', ['-e', '--arg', 'location', 'EU', '-f', bucketGuard], {
+        input: JSON.stringify(bucket)
+      });
+    }
   }
 });
 
