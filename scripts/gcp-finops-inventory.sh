@@ -52,7 +52,7 @@ if firestore_json="$(gcloud firestore databases list --project "$PROJECT_ID" --f
   summary_line "### Firestore"
   summary_line "- Bases actives: **${firestore_count}**; bases nommées hors \`(default)\`: **${named_count}**."
   summary_line "- \`(default)\`: région **${default_location}**, édition **${default_edition}**, free tier **${default_free_tier}**, protection suppression **${delete_protection}**."
-  console_json "Firestore" "$(jq '[.[] | {database:(.name | split("/")[-1]), locationId, databaseEdition, freeTier, deleteProtectionState, pointInTimeRecoveryEnablement}]' <<<"$firestore_json")"
+  console_json "Firestore" "$(jq '[.[] | {database:(.name | split("/")[-1]), locationId, databaseEdition, freeTier, createTime, updateTime, deleteProtectionState, pointInTimeRecoveryEnablement}]' <<<"$firestore_json")"
 
   if [[ "$firestore_count" != "1" || "$named_count" != "0" || "$default_count" != "1" ]]; then
     violation "Firestore doit contenir uniquement la base \`(default)\`."
