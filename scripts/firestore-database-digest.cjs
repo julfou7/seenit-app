@@ -68,10 +68,11 @@ function normalizeRestFields(value, databasePrefix) {
 async function digestDatabase(databaseId, options = {}) {
   const projectId = options.projectId || process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
   if (!projectId) throw new Error('GOOGLE_CLOUD_PROJECT est requis.');
-  const restDatabaseId = databaseId === 'default' ? '(default)' : databaseId;
+  const restDatabaseId = databaseId;
   const rootName = `projects/${projectId}/databases/${restDatabaseId}/documents/`;
   const rootParent = rootName.slice(0, -1);
-  const client = new v1.FirestoreClient({ projectId });
+  const ownsClient = !options.client;
+  const client = options.client || new v1.FirestoreClient({ projectId });
   const hash = crypto.createHash('sha256');
   const collectionGroupCounts = new Map();
   const visited = new Set();
@@ -79,11 +80,20 @@ async function digestDatabase(databaseId, options = {}) {
 
   async function listChildren(parentPath) {
     const parent = parentPath ? `${rootParent}/${parentPath}` : rootParent;
-    const [documents] = await client.listDocuments({
-      parent,
-      pageSize: 1000,
-      showMissing: true
-    });
+    const [collectionIds] = await client.listCollectionIds({ parent, pageSize: 1000 });
+    const documents = [];
+    for (const collectionId of [...new Set(collectionIds)].sort()) {
+      if (typeof collectionId !== 'string' || !collectionId) {
+        throw new Error(`Identifiant de collection inattendu dans ${restDatabaseId}.`);
+      }
+      const [collectionDocuments] = await client.listDocuments({
+        parent,
+        collectionId,
+        pageSize: 1000,
+        showMissing: true
+      });
+      documents.push(...collectionDocuments);
+    }
     return documents;
   }
 
@@ -118,7 +128,7 @@ async function digestDatabase(databaseId, options = {}) {
       digest: hash.digest('hex')
     };
   } finally {
-    await client.close();
+    if (ownsClient) await client.close();
   }
 }
 

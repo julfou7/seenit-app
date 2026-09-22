@@ -8,10 +8,16 @@ import test from 'node:test';
 const require = createRequire(import.meta.url);
 const {
   canonicalDocumentLine,
-  canonicalizeFirestoreValue
+  canonicalizeFirestoreValue,
+  digestDatabase
 } = require('../scripts/firestore-database-digest.cjs') as {
   canonicalDocumentLine: (path: string, data: unknown) => string;
   canonicalizeFirestoreValue: (value: unknown) => unknown;
+  digestDatabase: (databaseId: string, options: { projectId: string; client: unknown }) => Promise<{
+    databaseId: string;
+    documentCount: number;
+    digest: string;
+  }>;
 };
 
 const read = (path: string) => fs.readFileSync(path, 'utf8');
@@ -127,4 +133,42 @@ test('le digest Firestore est déterministe et ne journalise pas les données', 
   assert.match(digestScript, /documentCount[\s\S]*collectionGroupCounts[\s\S]*digest/);
   assert.equal(digestScript.includes('console.log(document.data'), false);
   assert.equal(digestScript.includes('JSON.stringify(report, null'), false);
+});
+
+
+test('le digest liste les collections avant les documents et distingue default de (default)', async () => {
+  const documentRequests: Array<Record<string, unknown>> = [];
+  const collectionParents: string[] = [];
+  const client = {
+    async listCollectionIds(request: { parent: string }) {
+      collectionParents.push(request.parent);
+      return [['users']];
+    },
+    async listDocuments(request: Record<string, unknown>) {
+      documentRequests.push(request);
+      return [[]];
+    }
+  };
+
+  const named = await digestDatabase('default', {
+    projectId: 'seenit-test',
+    client
+  });
+  const reserved = await digestDatabase('(default)', {
+    projectId: 'seenit-test',
+    client
+  });
+
+  assert.equal(named.documentCount, 0);
+  assert.equal(reserved.documentCount, 0);
+  assert.equal(named.digest, crypto.createHash('sha256').digest('hex'));
+  assert.deepEqual(collectionParents, [
+    'projects/seenit-test/databases/default/documents',
+    'projects/seenit-test/databases/(default)/documents'
+  ]);
+  assert.equal(documentRequests.length, 2);
+  for (const request of documentRequests) {
+    assert.equal(request.collectionId, 'users');
+    assert.equal(request.showMissing, true);
+  }
 });
