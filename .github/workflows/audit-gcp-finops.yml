@@ -54,7 +54,8 @@ jobs:
         continue-on-error: true
         env:
           FINOPS_STRICT: 'true'
-          FINOPS_DEEP_STORAGE_SCAN: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deep_storage_scan)) && 'true' || 'false' }}
+          FINOPS_DEEP_STORAGE_SCAN: ${{ (github.event_name == 'push' || github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.deep_storage_scan)) && 'true' || 'false' }}
+          FINOPS_STORAGE_MAX_BYTES: '5000000000'
           FINOPS_REPORT_PATH: ${{ runner.temp }}/seenit-finops-report.md
         run: ./scripts/gcp-finops-inventory.sh
 
