@@ -24,6 +24,7 @@ DEFAULT_EXPORT="gs://${DEFAULT_BUCKET}/default"
 AI_EXPORT="gs://${AI_BUCKET}/ai-studio"
 
 TRAFFIC_LOCKED=false
+RULES_LOCKED=false
 DEFAULT_PROTECTION_DISABLED=false
 DEFAULT_DELETED=false
 DEFAULT_RECREATED=false
@@ -55,6 +56,15 @@ deploy_rules() {
     --config "$config_file" \
     --only firestore:rules \
     --non-interactive
+}
+
+restore_rules_if_locked() {
+  if [[ "$RULES_LOCKED" != 'true' ]]; then
+    return 0
+  fi
+  deploy_rules firebase.json
+  RULES_LOCKED=false
+  log 'Règles Firestore canoniques restaurées.'
 }
 
 restore_public_traffic() {
@@ -160,7 +170,7 @@ restore_default_after_cutover_failure() {
     --quiet
   write_digest "$DEFAULT_DATABASE" "$recovery_digest"
   compare_digests "$STATE_DIR/default-source-digest.json" "$recovery_digest"
-  deploy_rules firebase.json
+  restore_rules_if_locked
   restore_public_traffic
   DEFAULT_RESTORED=true
   log 'Restauration d’urgence vérifiée ; le trafic a été rouvert.'
@@ -349,6 +359,7 @@ run_migration() {
   log 'Buckets privés à expiration 30 jours créés.'
 
   lock_public_traffic
+  RULES_LOCKED=true
   deploy_rules firebase.migration-lockdown.json
   sleep 30
   log 'Écritures client et backend figées.'
@@ -429,7 +440,7 @@ run_migration() {
   compare_digests "$STATE_DIR/default-source-digest.json" "$STATE_DIR/default-final-digest.json"
   DEFAULT_RESTORED=true
 
-  deploy_rules firebase.json
+  restore_rules_if_locked
   restore_public_traffic
   health_status=''
   for attempt in $(seq 1 12); do

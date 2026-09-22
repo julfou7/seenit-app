@@ -1,7 +1,7 @@
 {
   "firestore": [
     {
-      "database": "(default)",
+      "database": "default",
       "rules": "firestore.migration-lockdown.rules",
       "indexes": "firestore.indexes.json"
     },

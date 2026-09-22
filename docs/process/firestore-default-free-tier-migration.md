@@ -51,7 +51,10 @@ une base inattendue, un trigger Firestore, un index/TTL non capturé ou un expor
 1. Inventorier les bases actives, les triggers Eventarc/Cloud Functions, les index, les TTL et la liaison
    publique Cloud Run. `gcloud firestore databases list` expose l’identifiant API `default` (sans
    parenthèses) et uniquement les bases actives ; toute entrée éventuellement marquée par `deleteTime` est
-   aussi exclue par sécurité. Refuser toute autre divergence de la baseline.
+   aussi exclue par sécurité. Les configurations Firebase CLI ciblent elles aussi explicitement `default` :
+   dans ce projet, `(default)` désigne une autre base et ne doit jamais être utilisé comme alias. Le rollback
+   ne redéploie les règles canoniques que si les règles de maintenance ont effectivement été engagées.
+   Refuser toute autre divergence de la baseline.
 2. Créer deux buckets privés dédiés : `EU` pour `default`, `us-west1` pour la base AI Studio. Ils restent en
    Standard, sans versioning, avec prévention d’accès public et suppression automatique après 30 jours.
 3. Retirer temporairement `allUsers/roles/run.invoker` de `seenit-app`, puis déployer les règles
