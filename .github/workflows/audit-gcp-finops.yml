@@ -55,6 +55,7 @@ jobs:
         env:
           FINOPS_STRICT: 'true'
           FINOPS_DEEP_STORAGE_SCAN: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deep_storage_scan)) && 'true' || 'false' }}
+          FINOPS_REPORT_PATH: ${{ runner.temp }}/seenit-finops-report.md
         run: ./scripts/gcp-finops-inventory.sh
 
       - name: Trace audit in issue 23
@@ -62,6 +63,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           AUDIT_OUTCOME: ${{ steps.finops.outcome }}
+          FINOPS_REPORT_PATH: ${{ runner.temp }}/seenit-finops-report.md
         run: |
           set -euo pipefail
           report="$(mktemp)"
@@ -74,8 +76,8 @@ jobs:
               echo "Statut du garde-fou structurel : ❌ échec ou preuve incomplète."
             fi
             echo
-            if [[ -s "$GITHUB_STEP_SUMMARY" ]]; then
-              cat "$GITHUB_STEP_SUMMARY"
+            if [[ -s "$FINOPS_REPORT_PATH" ]]; then
+              cat "$FINOPS_REPORT_PATH"
             else
               echo "Le script n'a pas produit de résumé exploitable ; consulter le run GitHub Actions."
             fi
