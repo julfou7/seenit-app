@@ -20,6 +20,7 @@ import { getFormattedProviderLogo, PLEX_LOGO_SVG } from '../utils/providerLogos'
 import { openPlexWatchUrl } from '../features/plex/syncPlex';
 import { useMediaPresence } from '../hooks/useMediaPresence';
 import { RedditSection } from '../components/community/RedditSection';
+import { buildRedditMovieSearchQuery } from '../components/community/redditEpisodeSearch';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { LiveDownloadBanner } from '../components/LiveDownloadBanner';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
@@ -46,6 +47,22 @@ interface ShowDetailViewProps {
 
 export function ShowDetailView({ model }: ShowDetailViewProps) {
   const { activeTab, areThemesExpanded, backdropUrl, collectionData, collectionLoading, downloadTargetEpisode, downloadTargetSeason, dragX, dropShow, effectiveTmdbId, epStatus, expandedSeason, followShow, formatRemainingTime, formatRuntime, getEpisodeDownload, handle1ClickDownloadEpisode, handle1ClickDownloadMovie, handle1ClickDownloadSeason, handleAnimatedBack, handleDeleteShow, handleSyncSingle, handleTabChange, handleTouchEnd, handleTouchMove, handleTouchStart, handleWatchNextEpisode, hasActiveDownload, hasCancelledDownload, hasCompletedDownload, hasDownloadError, hasSeenMedia, hasTrailer, initialEpisode, initialSeason, is1ClickDownloading, isDownloadModalOpen, isDownloadMode, isDragging, isExiting, isRefreshingPlex, isSeries, isSyncingSingle, isSynopsisExpanded, isUnreleased, keywords, loadSeason, logoPath, mainScrollRef, onShowClick, openEpisodeModal, openPersonModal, plexMediaInfo, posterError, posterPath, progressPercentage, providers, ratingInfo, refreshPlexAvailability, releaseYear, remainingTimeMinutes, requestedMediaKey, resumeShow, rewatchShow, seasonObserverRef, seasonsCache, seenCount, selectedEpisode, selectedPersonId, setAreThemesExpanded, setDownloadTargetEpisode, setDownloadTargetSeason, setIsDownloadModalOpen, setIsDownloadMode, setIsSynopsisExpanded, setLogoError, setPosterError, setSeasonsCache, setSelectedEpisode, setSelectedPersonId, setShowAllCast, setShowMenu, setTrailerModalVideos, show, showDownloadSummary, showMenu, showToast, sortedProviders, tabsRef, title, tmdbDetails, toggleEpisodeSeen, toggleFavorite, toggleMovieSeen, togglePlanToWatchMovie, toggleSeasonSeen, totalEpisodes, trailerModalVideos, universeData, userPlatforms, visibleSeasons, ytVideos } = model;
+  const redditVisibleTitle = tmdbDetails?.name || tmdbDetails?.title || show?.title || '';
+  const redditMovieOriginalTitle = tmdbDetails?.original_title || show?.originalTitle || null;
+  const redditMovieQuery = buildRedditMovieSearchQuery({
+    movieTitle: redditVisibleTitle,
+    originalMovieTitle: redditMovieOriginalTitle,
+  });
+
+  const resolveRedditMovieQuery = async () => {
+    if (isSeries || !effectiveTmdbId) return redditMovieQuery;
+    const englishTitleResult = await tmdb.getEnglishMediaTitle(Number(effectiveTmdbId), 'movie');
+    return buildRedditMovieSearchQuery({
+      movieTitle: redditVisibleTitle,
+      communityMovieTitle: englishTitleResult.ok ? englishTitleResult.value : null,
+      originalMovieTitle: redditMovieOriginalTitle,
+    });
+  };
   return (
     <div ref={mainScrollRef} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
       style={{ transform: isExiting ? 'translateX(100%)' : (dragX > 0 ? `translateX(${dragX}px)` : undefined) }}
@@ -164,7 +181,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
             return <div className="flex items-center gap-3 flex-wrap">{isUnreleased ? <p className="text-xs text-zinc-500 italic font-medium flex items-center gap-1.5"><Clock size={14} /><span>Bientôt disponible</span></p> : <div className="flex items-center gap-2 flex-wrap">{!isSeries ? <button type="button" onClick={(e) => handle1ClickDownloadMovie(e)} disabled={is1ClickDownloading.movie} className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border border-blue-500/40 bg-blue-500/15 hover:bg-blue-500/25 active:scale-95 text-xs font-bold text-blue-300 transition-all cursor-pointer shadow-[0_0_15px_rgba(59,130,246,0.25)]" title="Télécharger le film en 1 clic dans Radarr"><Download size={14} className={cn("text-blue-300 stroke-[2.5]", is1ClickDownloading.movie && "animate-spin")} /><span>{is1ClickDownloading.movie ? "Lancement Radarr..." : "Télécharger le film (1 Clic)"}</span></button> : <button type="button" onClick={() => setIsDownloadModalOpen(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-500/40 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 active:scale-95 text-xs font-bold transition-all cursor-pointer shadow-[0_0_12px_rgba(59,130,246,0.2)]" title="Rechercher et télécharger sur Sonarr / C411"><Download size={14} className="shrink-0" /><span>Télécharger</span></button>}</div>}</div>;
           })()}</div>
 
-          <div className="pt-1"><RedditSection query={`${tmdbDetails?.name || tmdbDetails?.title || show?.title || ''} ${isSeries ? 'series discussion' : 'movie discussion'}`} isLocked={false} title="Discussions Reddit" description="Retrouvez les avis, théories et spoilers de la communauté." /></div>
+          <div className="pt-1"><RedditSection query={isSeries ? `${redditVisibleTitle} series discussion` : redditMovieQuery} resolveQuery={isSeries ? undefined : resolveRedditMovieQuery} isLocked={false} title="Discussions Reddit" description="Retrouvez les avis, théories et spoilers de la communauté." /></div>
         </div>
 
         {isSeries && <div id="section-episodes" className="scroll-mt-40 mt-12 space-y-4 animate-in fade-in duration-200">

@@ -372,6 +372,28 @@
       ]
     },
     {
+      "id": "SEENIT-COMMUNITY-002",
+      "title": "Réactions Reddit film via titre communautaire anglais et fils Official Discussion",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/redditMovieSearch.test.ts",
+          "contains": "SEENIT-COMMUNITY-002 cible Official Discussion au lieu de movie discussion"
+        },
+        {
+          "file": "tests/redditMovieSearch.test.ts",
+          "contains": "SEENIT-COMMUNITY-002 priorise le titre anglais du film avec fallback conservateur"
+        },
+        {
+          "file": "tests/redditMovieSearch.test.ts",
+          "contains": "SEENIT-COMMUNITY-002 résout le titre anglais par TMDB ID exact sur le chemin de production"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-DISCOVER-001",
       "title": "Au cinéma limité aux sorties théâtrales françaises TMDB",
       "targets": [
