@@ -7,20 +7,29 @@ import {
   buildRedditSearchUrl,
 } from '../src/components/community/redditEpisodeSearch.ts';
 
-test('SEENIT-COMMUNITY-002 cible Official Discussion au lieu de movie discussion', () => {
+test('SEENIT-COMMUNITY-002 couvre The Tinder Swindler sans suffixe éditorial', () => {
   const query = buildRedditMovieSearchQuery({
-    movieTitle: 'Oppenheimer',
+    movieTitle: 'The Tinder Swindler',
   });
 
-  assert.equal(query, 'Oppenheimer official discussion');
-  assert.doesNotMatch(query, /movie discussion/i);
+  assert.equal(query, 'The Tinder Swindler');
+  assert.doesNotMatch(query, /official discussion|movie discussion/i);
 
   const url = buildRedditSearchUrl(query);
   assert.equal(new URL(url).origin, 'https://www.reddit.com');
   assert.equal(new URL(url).pathname, '/search/');
-  assert.equal(new URL(url).searchParams.get('q'), 'Oppenheimer official discussion');
+  assert.equal(new URL(url).searchParams.get('q'), 'The Tinder Swindler');
   assert.equal(new URL(url).searchParams.get('sort'), null);
   assert.equal(new URL(url).searchParams.get('type'), null);
+});
+
+test('SEENIT-COMMUNITY-002 garde une requête film courte indépendante du type de thread', () => {
+  const query = buildRedditMovieSearchQuery({
+    movieTitle: 'Oppenheimer',
+  });
+
+  assert.equal(query, 'Oppenheimer');
+  assert.doesNotMatch(query, /official discussion|movie discussion/i);
 });
 
 test('SEENIT-COMMUNITY-002 priorise le titre anglais du film avec fallback conservateur', () => {
@@ -30,7 +39,7 @@ test('SEENIT-COMMUNITY-002 priorise le titre anglais du film avec fallback conse
       communityMovieTitle: 'The Room Next Door',
       originalMovieTitle: 'La habitación de al lado',
     }),
-    'The Room Next Door official discussion',
+    'The Room Next Door',
   );
 
   assert.equal(
@@ -39,7 +48,7 @@ test('SEENIT-COMMUNITY-002 priorise le titre anglais du film avec fallback conse
       communityMovieTitle: null,
       originalMovieTitle: 'Oppenheimer',
     }),
-    'Oppenheimer official discussion',
+    'Oppenheimer',
   );
 
   assert.equal(
@@ -48,7 +57,7 @@ test('SEENIT-COMMUNITY-002 priorise le titre anglais du film avec fallback conse
       communityMovieTitle: null,
       originalMovieTitle: 'La habitación de al lado',
     }),
-    'La habitación de al lado official discussion',
+    'La habitación de al lado',
   );
 });
 

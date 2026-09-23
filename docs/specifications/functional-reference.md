@@ -327,15 +327,16 @@ déclencher directement la synthèse IA native sur la surface **Tout** ; sinon l
 immédiatement utilisables. SeenIt ne garantit pas l'affichage du bloc IA, piloté par Reddit, et n'appelle
 ni Data API Reddit, ni scraping, ni service IA payant pour le produire.
 
-Dans une fiche **Film**, **Discussions Reddit** suit une règle distincte du parcours épisode. SeenIt ne
-concatène plus le suffixe générique `movie discussion` au titre visible. Au clic, le TMDB ID exact du
-film sert à résoudre son titre `en-US`, puis la recherche native Reddit reçoit la forme courte
-`English title official discussion`. Cette forme reflète le patron éditorial réellement utilisé par
-r/movies pour ses fils de référence, typiquement `Official Discussion - <Title> [SPOILERS]`. Le titre
-français de la fiche reste inchangé. Si la résolution anglaise échoue ou retourne un titre vide, SeenIt
-retombe sur le titre visible puis le titre original. Aucun cas spécial par film, table de traduction,
-`title:`, guillemets, opérateur logique ou scraping n'est ajouté. Comme pour les épisodes, les résultats
-standards restent le fallback permanent et Reddit décide seul si une synthèse IA est proposée.
+Dans une fiche **Film**, **Discussions Reddit** privilégie le rappel du corpus plutôt qu'une convention
+de thread particulière. Au clic, le TMDB ID exact du film sert à résoudre son titre `en-US`, puis la
+recherche native Reddit reçoit uniquement ce titre communautaire anglais, par exemple `The Tinder Swindler`.
+Le terrain v1.4.185 a montré que forcer `official discussion` pouvait déclencher la carte IA tout en lui
+laissant zéro publication pertinente alors que des discussions existaient dans r/Documentaries,
+r/NetflixBestOf ou sous d'autres titres de posts. Le titre français de la fiche reste inchangé. Si la
+résolution anglaise échoue ou retourne un titre vide, SeenIt retombe sur le titre visible puis le titre
+original. Aucun suffixe `official discussion` / `movie discussion`, cas spécial par film, table de
+traduction, `title:`, guillemet, opérateur logique ou scraping n'est ajouté. Les résultats standards
+restent le fallback permanent et Reddit décide seul du ranking et de l'affichage de sa synthèse IA.
 
 Le titre affiché privilégie le `title`/`name` de la fiche TMDB récupérée en `fr-FR`. Un ancien titre
 enregistré dans la bibliothèque sert seulement de fallback avant ou hors hydratation. Lorsqu'un média
