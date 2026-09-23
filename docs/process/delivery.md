@@ -218,7 +218,7 @@ une difficulté corrigeable réellement rencontrée et un axe d'amélioration co
 incident.
 
 Le chemin rapide est : recherche GitHub ciblée pour éviter un doublon → mise à jour/réouverture de l'issue
-existante ou création d'une issue courte → retour immédiat à la prochaine action du chantier principal.
+existante ou création d'une issue d'amélioration continue courte → retour immédiat à la prochaine action du chantier principal.
 La capture minimale contient l'observation et son contexte, le bénéfice attendu, la piste de traitement si
 elle est déjà évidente, un critère de fin et le lien vers le chantier révélateur. Aucune recherche large,
 reproduction supplémentaire, analyse de cause racine, implémentation ou validation n'est lancée uniquement
