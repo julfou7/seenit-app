@@ -318,19 +318,17 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
 ### 5.2.3 Réactions Reddit d'un épisode
 
 - **SEENIT-COMMUNITY-001** — Les réactions Reddit d'un épisode restent verrouillées tant que cet épisode
-  n'est pas marqué vu. Une fois déverrouillées, SeenIt ouvre une **recherche Reddit standard réellement
-  exécutable**. Le groupe de contexte obligatoire contient uniquement le titre de série localisé/original.
-  Le groupe épisode utilise les conventions `S02E08`, `S2E8`, `Season 2 Episode 8`, `2x08`,
-  `Episode 8` et le nom d'épisode comme simple indice `title:`, avec guillemets, `AND` / `OR` et
-  parenthèses. Le nom d'épisode ne devient jamais une alternative au titre de série dans le contexte :
-  un intitulé générique comme « Troy » ne doit pas pouvoir sélectionner seul des publications hors série.
-- SeenIt n'injecte jamais une consigne de type « réponds en français » ou « résume » dans
-  `/search/?q=` : Reddit traite alors cette phrase comme une recherche classique littérale. La recherche
-  IA appartient à Reddit et démarre uniquement lorsque l'utilisateur choisit **« Demander »** depuis les
-  résultats. Le français est une langue officiellement prise en charge par Reddit AI Search, mais aucun
-  paramètre URL documenté ne permet à SeenIt de forcer la langue de la réponse.
-- La page de résultats standard est simultanément le point d'entrée vers **« Demander »** et le fallback
-  permanent si la synthèse IA n'est pas proposée ou échoue.
+  n'est pas marqué vu. Une fois déverrouillées, SeenIt ouvre la recherche Reddit standard avec une
+  requête naturelle courte de la forme `Titre S03 E01`. Le titre de série visible est conservé tel quel ;
+  saison et épisode sont deux termes séparés et paddés. SeenIt n'ajoute ni `AND` / `OR`, ni `title:`,
+  ni guillemets/parenthèses de filtrage, ni nom d'épisode, ni consigne IA.
+- Cette simplicité est fonctionnelle : sur Reddit Android, une requête épisode courte peut ouvrir la
+  surface **Tout** et déclencher automatiquement la synthèse IA native avec ses sources. Une syntaxe
+  booléenne avancée peut au contraire ramener l'expérience vers une simple liste de publications et
+  empêcher ce bloc IA. Reddit reste seul responsable de décider si la synthèse est proposée.
+- Si le bloc IA n'est pas proposé ou échoue, les résultats standards restent le fallback permanent.
+  SeenIt ne force ni onglet spécialisé, ni langue, ni action **« Demander »** et n'injecte aucune phrase
+  de résumé dans `/search/?q=`.
 - Aucun client ID/secret Reddit, Data API, scraping, contournement anti-bot ni API IA payante n'est requis.
   La PWA et l'APK ouvrent la même URL HTTPS ; le transport de plateforme existant décide nouvel onglet,
   application Reddit associée ou Custom Tab sans modifier la requête.
