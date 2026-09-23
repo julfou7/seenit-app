@@ -3,6 +3,7 @@ import { emitOperationalEvent } from '../runtime/operationalEvent.ts';
 
 type MediaType = 'movie' | 'tv';
 type Secrets = Partial<Record<'TMDB_API_KEY' | 'TVDB_API_KEY', string>>;
+type UnknownRecord = Record<string, unknown>;
 
 interface Dependencies {
   authenticate: RequestHandler;
@@ -29,7 +30,14 @@ export const PARENTAL_BATCH_STALL_BURST_MS = 1_000;
 export const PARENTAL_BATCH_ITEM_BUDGET_PER_MINUTE = 240;
 export const PARENTAL_BATCH_PROVIDER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const PARENTAL_BATCH_PROVIDER_CACHE_MAX_ENTRIES = 5_000;
+export const PARENTAL_BATCH_MOVIE_DETAILS_SCHEMA = 2;
 const MAX_PARENTAL_RESPONSE_BYTES = 256 * 1024;
+
+function asRecord(value: unknown): UnknownRecord | null {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as UnknownRecord
+    : null;
+}
 
 function parseBatchItems(raw: unknown): ParentalBatchItem[] | null {
   if (typeof raw !== 'string' || raw.length === 0 || raw.length > 1024) return null;
@@ -51,32 +59,57 @@ function parseBatchItems(raw: unknown): ParentalBatchItem[] | null {
   return items.length > 0 ? items : null;
 }
 
-function compactParentalDetails(item: ParentalBatchItem, payload: any): any {
+export function compactParentalDetails(item: ParentalBatchItem, payload: unknown): UnknownRecord {
+  const payloadRecord = asRecord(payload);
+  const sourceResults = Array.isArray(payloadRecord?.results) ? payloadRecord.results : [];
+
   if (item.mediaType === 'movie') {
-    const results = Array.isArray(payload?.results)
-      ? payload.results
-          .filter((entry: any) => entry?.iso_3166_1 === 'US')
-          .map((entry: any) => ({
-            iso_3166_1: 'US',
-            release_dates: Array.isArray(entry?.release_dates)
-              ? entry.release_dates.map((release: any) => ({
-                  certification: String(release?.certification ?? '').trim(),
-                }))
-              : [],
-          }))
-      : [];
-    return { id: item.id, media_type: item.mediaType, release_dates: { results } };
+    const results = sourceResults.flatMap(rawEntry => {
+      const entry = asRecord(rawEntry);
+      const country = entry?.iso_3166_1;
+      if (country !== 'US' && country !== 'FR') return [];
+      const sourceReleaseDates = Array.isArray(entry.release_dates) ? entry.release_dates : [];
+      const releaseDates = sourceReleaseDates.map(rawRelease => {
+        const release = asRecord(rawRelease);
+        const certification = String(release?.certification ?? '').trim();
+        if (country === 'US') return { certification };
+        return {
+          certification,
+          type: Number(release?.type) || null,
+          release_date: typeof release?.release_date === 'string' ? release.release_date : null,
+          note: typeof release?.note === 'string' ? release.note : '',
+        };
+      });
+      return [{ iso_3166_1: country, release_dates: releaseDates }];
+    });
+    return {
+      id: item.id,
+      media_type: item.mediaType,
+      seenitParentalDetailsSchema: PARENTAL_BATCH_MOVIE_DETAILS_SCHEMA,
+      release_dates: { results },
+    };
   }
 
-  const results = Array.isArray(payload?.results)
-    ? payload.results
-        .filter((entry: any) => entry?.iso_3166_1 === 'US')
-        .map((entry: any) => ({
-          iso_3166_1: 'US',
-          rating: String(entry?.rating ?? '').trim(),
-        }))
-    : [];
+  const results = sourceResults.flatMap(rawEntry => {
+    const entry = asRecord(rawEntry);
+    if (entry?.iso_3166_1 !== 'US') return [];
+    return [{
+      iso_3166_1: 'US',
+      rating: String(entry.rating ?? '').trim(),
+    }];
+  });
   return { id: item.id, media_type: item.mediaType, content_ratings: { results } };
+}
+
+function isReusablePersistedDetails(
+  item: ParentalBatchItem,
+  details: unknown,
+  requireCinemaEvidence: boolean,
+): boolean {
+  const record = asRecord(details);
+  if (!record) return false;
+  if (item.mediaType !== 'movie' || !requireCinemaEvidence) return true;
+  return Number(record.seenitParentalDetailsSchema) === PARENTAL_BATCH_MOVIE_DETAILS_SCHEMA;
 }
 
 async function readJsonResponse(response: Response): Promise<any | null> {
@@ -153,12 +186,17 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
       res.status(401).json({ error: 'Authentification requise.' });
       return;
     }
-    if (Object.keys(req.query).some(key => key !== 'items' && key !== 'stream')) {
+    if (Object.keys(req.query).some(key => key !== 'items' && key !== 'stream' && key !== 'cinema')) {
       res.status(400).json({ error: 'Requête de classifications refusée.' });
       return;
     }
     const stream = req.query.stream === '1';
     if (req.query.stream !== undefined && !stream) {
+      res.status(400).json({ error: 'Requête de classifications refusée.' });
+      return;
+    }
+    const requireCinemaEvidence = req.query.cinema === '1';
+    if (req.query.cinema !== undefined && !requireCinemaEvidence) {
       res.status(400).json({ error: 'Requête de classifications refusée.' });
       return;
     }
@@ -171,7 +209,12 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
     const persistedByKey = dependencies.readPersisted
       ? await dependencies.readPersisted(items.map(item => item.key)).catch(() => new Map<string, any>())
       : new Map<string, any>();
-    for (const [key, details] of persistedByKey) writeProviderCache(key, details);
+    for (const item of items) {
+      const details = persistedByKey.get(item.key);
+      if (isReusablePersistedDetails(item, details, requireCinemaEvidence)) {
+        writeProviderCache(item.key, details);
+      }
+    }
     const misses = items.filter(item => !readProviderCache(item.key));
 
     const budget = takeBudget(uid, misses.length);
@@ -243,7 +286,7 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
     const acquire = async () => {
       if (active < PARENTAL_BATCH_MAX_CONCURRENT) {
         active += 1;
-          return;
+        return;
       }
       await new Promise<void>(resolve => {
         const waiter: Waiter = { granted: false, resolve, timer: null };
