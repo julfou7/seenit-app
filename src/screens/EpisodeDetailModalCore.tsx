@@ -10,7 +10,7 @@ import { tmdb } from '../features/shows/tmdb';
 import { syncSingleItem } from "../hooks/useDetailsSyncWorker";
 import { RedditSection } from '../components/community/RedditSection';
 import { buildRedditEpisodeSearchQuery } from '../components/community/redditEpisodeSearch';
-import { DownloadModal } from '../components/DownloadModal';
+import { DownloadModal, type SeasonInfo } from '../components/DownloadModal';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { LiveDownloadBanner } from '../components/LiveDownloadBanner';
 import { useMediaPresence } from '../hooks/useMediaPresence';
@@ -670,6 +670,32 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
     }
   };
 
+  const buildRedditQuery = (communitySeriesTitle?: string | null) =>
+    buildRedditEpisodeSearchQuery({
+      seriesTitle: tmdbShowTitle || activeShow?.title || show?.title || '',
+      communitySeriesTitle,
+      originalSeriesTitle: activeShow?.originalTitle || show?.originalTitle,
+      seasonNumber: currentSeason,
+      episodeNumber: currentEpisode.episode_number,
+      episodeTitle: currentEpisode.name,
+    });
+
+  const redditEpisodeQuery = buildRedditQuery();
+
+  const resolveRedditQuery = async () => {
+    const effectiveTmdbId = tmdbShowId || activeShow?.tmdbId || show?.tmdbId;
+    if (!effectiveTmdbId) return redditEpisodeQuery;
+
+    const englishTitleResult = await tmdb.getEnglishMediaTitle(Number(effectiveTmdbId), 'tv');
+    return buildRedditQuery(englishTitleResult.ok ? englishTitleResult.value : null);
+  };
+
+  const activeShowSeasonMeta = activeShow as (Show & {
+    numberOfSeasons?: number;
+    seasonsCount?: number;
+    seasons?: SeasonInfo[];
+  }) | undefined;
+
   return (
     <div className="fixed inset-0 z-40 flex flex-col items-center">
       {/* Backdrop */}
@@ -1107,13 +1133,8 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                   </div>
 
                   <RedditSection
-                    query={buildRedditEpisodeSearchQuery({
-                      seriesTitle: tmdbShowTitle || activeShow?.title || show?.title || '',
-                      originalSeriesTitle: activeShow?.originalTitle || show?.originalTitle,
-                      seasonNumber: currentSeason,
-                      episodeNumber: currentEpisode.episode_number,
-                      episodeTitle: currentEpisode.name,
-                    })}
+                    query={redditEpisodeQuery}
+                    resolveQuery={resolveRedditQuery}
                     isLocked={!isSeen}
                     unlockMessage="Débloquez les discussions de la communauté sur cet épisode en le marquant comme vu."
                   />
@@ -1136,8 +1157,8 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
       imdbId={activeShow?.imdbId}
       initialSeason={currentSeason}
       initialEpisode={currentEpisode.episode_number}
-      totalSeasons={(activeShow as any)?.numberOfSeasons || (activeShow as any)?.seasonsCount || (activeShow as any)?.seasons?.length || 1}
-      seasonsData={(activeShow as any)?.seasons}
+      totalSeasons={activeShowSeasonMeta?.numberOfSeasons || activeShowSeasonMeta?.seasonsCount || activeShowSeasonMeta?.seasons?.length || 1}
+      seasonsData={activeShowSeasonMeta?.seasons}
       onSuccessToast={showToast}
     />
   </div>

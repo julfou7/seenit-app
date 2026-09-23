@@ -40,6 +40,13 @@ export interface TmdbEpisodeDetails extends Record<string, unknown> {
   vote_count?: number;
 }
 
+interface TmdbLocalizedTitlePayload {
+  name?: string;
+  title?: string;
+  status_code?: number;
+  status_message?: string;
+}
+
 export interface TMDBMedia {
   id: number;
   media_type?: string;
@@ -55,7 +62,7 @@ export interface TMDBMedia {
   known_for_department?: string;
   character?: string;
   characterShow?: string;
-  known_for?: any[];
+  known_for?: TMDBMedia[];
   popularity?: number;
   vote_average?: number;
   vote_count?: number;
@@ -429,6 +436,8 @@ export class TMDBClient {
   }
   private detailsCache = new BoundedCache<string, any>(80);
   private detailRenderCache = new BoundedCache<string, any>(80);
+  private englishMediaTitleCache = new BoundedCache<string, string | null>(120);
+  private englishMediaTitleInFlight = new Map<string, Promise<Result<string | null>>>();
   private parentalRatingDetailsCache = new BoundedCache<string, any>(240);
   private parentalRatingDetailsInFlight = new Map<string, Promise<Result<any>>>();
   private parentalRatingRequestLimiter = createWatchProviderRequestLimiter(PARENTAL_RATING_MAX_CONCURRENT);
@@ -593,6 +602,50 @@ export class TMDBClient {
 
   async getMediaDetails(id: number, type: 'tv' | 'movie' = 'tv'): Promise<Result<any>> {
     return type === 'movie' ? this.getMovieDetails(id) : this.getShowDetails(id);
+  }
+
+  async getEnglishMediaTitle(
+    id: number,
+    type: 'tv' | 'movie' = 'tv',
+  ): Promise<Result<string | null>> {
+    const normalizedId = Number(id);
+    if (!Number.isFinite(normalizedId) || normalizedId <= 0) {
+      return err(new Error('TMDB media id invalide'));
+    }
+
+    const cacheKey = `${type}_${normalizedId}`;
+    const cached = this.englishMediaTitleCache.get(cacheKey);
+    if (cached !== undefined) return ok(cached);
+
+    const pending = this.englishMediaTitleInFlight.get(cacheKey);
+    if (pending) return pending;
+
+    const request = (async (): Promise<Result<string | null>> => {
+      const url = new URL(`${this.baseUrl}/${type}/${normalizedId}?language=en-US`);
+      const response = await tryCatch(authenticatedFetch(url.toString()));
+      if ('error' in response) return err(response.error);
+      if (!response.value.ok) return err(new Error(`TMDB Error: ${response.value.status}`));
+
+      const data = await tryCatch(response.value.json() as Promise<TmdbLocalizedTitlePayload>);
+      if ('error' in data) return err(data.error);
+      if (data.value.status_code) {
+        return err(new Error(data.value.status_message || 'TMDB Error'));
+      }
+
+      const rawTitle = type === 'tv' ? data.value.name : data.value.title;
+      const title = typeof rawTitle === 'string' && rawTitle.trim() ? rawTitle.trim() : null;
+      this.englishMediaTitleCache.set(cacheKey, title);
+      return ok(title);
+    })();
+
+    this.englishMediaTitleInFlight.set(cacheKey, request);
+    try {
+      return await request;
+    } finally {
+      if (this.englishMediaTitleInFlight.get(cacheKey) === request) {
+        this.englishMediaTitleInFlight.delete(cacheKey);
+      }
+    }
   }
 
   private toParentalRatingDetails(id: number, type: RelationMediaType, value: any): any {
