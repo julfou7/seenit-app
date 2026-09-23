@@ -339,15 +339,18 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
 
 ### 5.2.4 Réactions Reddit d'un film
 
-- **SEENIT-COMMUNITY-002** — Une fiche Film ouvre Reddit avec une requête courte fondée sur le patron des
-  fils de référence de r/movies : `English title official discussion`. Le suffixe générique
-  `movie discussion` n'appartient plus au chemin de production.
+- **SEENIT-COMMUNITY-002** — Une fiche Film ouvre Reddit avec la requête média la plus courte possible :
+  le titre communautaire anglais seul, par exemple `The Tinder Swindler` ou `Oppenheimer`. Aucun suffixe
+  éditorial `official discussion` ou `movie discussion` n'est ajouté. Le terrain v1.4.185 sur
+  *The Tinder Swindler* a prouvé qu'imposer le patron r/movies `Official Discussion` pouvait déclencher
+  la surface IA tout en l'empêchant de recevoir des publications pourtant pertinentes dans d'autres
+  subreddits ou sous d'autres conventions de titre.
 - Le titre d'affichage SeenIt reste localisé en `fr-FR`. Au moment exact du clic Reddit, le TMDB ID
   canonique du film résout séparément son titre `en-US` ; aucun titre n'est utilisé comme identité média.
   Si cette résolution échoue ou reste vide, la recherche retombe sur le titre visible puis le titre original.
 - SeenIt n'ajoute ni cas spécial par film, ni table de traduction, ni `title:`, guillemet/parenthèse,
-  `AND` / `OR`, année inventée, scraping ou consigne IA. Les résultats standards restent utilisables
-  lorsque Reddit n'affiche pas sa synthèse IA native.
+  `AND` / `OR`, année inventée, suffixe de type de thread, scraping ou consigne IA. Reddit conserve la
+  responsabilité du ranking et de sa synthèse IA ; les résultats standards restent le fallback permanent.
 
 ### 5.3 Machine d'états canonique
 
