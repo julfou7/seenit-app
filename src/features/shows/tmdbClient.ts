@@ -623,11 +623,11 @@ export class TMDBClient {
     const request = (async (): Promise<Result<string | null>> => {
       const url = new URL(`${this.baseUrl}/${type}/${normalizedId}?language=en-US`);
       const response = await tryCatch(authenticatedFetch(url.toString()));
-      if (!response.ok) return err(response.error);
+      if ('error' in response) return err(response.error);
       if (!response.value.ok) return err(new Error(`TMDB Error: ${response.value.status}`));
 
       const data = await tryCatch(response.value.json() as Promise<TmdbLocalizedTitlePayload>);
-      if (!data.ok) return err(data.error);
+      if ('error' in data) return err(data.error);
       if (data.value.status_code) {
         return err(new Error(data.value.status_message || 'TMDB Error'));
       }

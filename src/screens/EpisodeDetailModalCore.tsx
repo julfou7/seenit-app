@@ -10,7 +10,7 @@ import { tmdb } from '../features/shows/tmdb';
 import { syncSingleItem } from "../hooks/useDetailsSyncWorker";
 import { RedditSection } from '../components/community/RedditSection';
 import { buildRedditEpisodeSearchQuery } from '../components/community/redditEpisodeSearch';
-import { DownloadModal } from '../components/DownloadModal';
+import { DownloadModal, type SeasonInfo } from '../components/DownloadModal';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { LiveDownloadBanner } from '../components/LiveDownloadBanner';
 import { useMediaPresence } from '../hooks/useMediaPresence';
@@ -693,7 +693,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   const activeShowSeasonMeta = activeShow as (Show & {
     numberOfSeasons?: number;
     seasonsCount?: number;
-    seasons?: unknown[];
+    seasons?: SeasonInfo[];
   }) | undefined;
 
   return (
