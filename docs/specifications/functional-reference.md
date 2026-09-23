@@ -316,13 +316,14 @@ Reddit. Les recommandations contextuelles restent dans Explorer. Les modals pers
 dans la pile Retour.
 
 Dans une fiche épisode, **Discussions Reddit** reste verrouillé avant visionnage. Après marquage vu, le CTA
-ouvre une recherche Reddit volontairement simple de la forme `Titre S03 E01`. SeenIt conserve un seul
-titre de série visible, sépare saison et épisode en deux termes courts et n'ajoute ni `AND` / `OR`,
-ni `title:`, ni nom d'épisode, ni instruction de résumé. Cette forme naturelle laisse Reddit ouvrir sa
-surface **Tout** et peut déclencher directement sa synthèse IA native avec les publications/commentaires
-qu'il sélectionne. Si Reddit ne propose pas cette synthèse, les résultats standards restent immédiatement
-utilisables comme fallback. SeenIt ne garantit pas l'affichage du bloc IA, piloté par Reddit, et n'appelle
-ni Data API Reddit, ni scraping, ni service IA payant pour le produire.
+ouvre une recherche Reddit volontairement simple de la forme `Titre S3 E1`. SeenIt conserve un seul
+titre de série visible et les numéros humains de saison/épisode **sans zéro ajouté** : `S2 E1`, `S3 E1`,
+`S4 E10`. Il n'ajoute ni `AND` / `OR`, ni `title:`, ni nom d'épisode, ni instruction de résumé.
+Cette forme naturelle évite de transformer artificiellement la requête avant le classifieur de recherche
+Reddit et reste proche des conventions de threads courantes comme `S2E1` / `S3E1`. Elle peut déclencher
+directement la synthèse IA native sur la surface **Tout**. Si Reddit ne la propose pas, les résultats
+standards restent immédiatement utilisables comme fallback. SeenIt ne garantit pas l'affichage du bloc IA,
+piloté par Reddit, et n'appelle ni Data API Reddit, ni scraping, ni service IA payant pour le produire.
 
 Le titre affiché privilégie le `title`/`name` de la fiche TMDB récupérée en `fr-FR`. Un ancien titre
 enregistré dans la bibliothèque sert seulement de fallback avant ou hors hydratation. Lorsqu'un média

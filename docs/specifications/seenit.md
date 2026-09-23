@@ -319,13 +319,15 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
 
 - **SEENIT-COMMUNITY-001** — Les réactions Reddit d'un épisode restent verrouillées tant que cet épisode
   n'est pas marqué vu. Une fois déverrouillées, SeenIt ouvre la recherche Reddit standard avec une
-  requête naturelle courte de la forme `Titre S03 E01`. Le titre de série visible est conservé tel quel ;
-  saison et épisode sont deux termes séparés et paddés. SeenIt n'ajoute ni `AND` / `OR`, ni `title:`,
-  ni guillemets/parenthèses de filtrage, ni nom d'épisode, ni consigne IA.
-- Cette simplicité est fonctionnelle : sur Reddit Android, une requête épisode courte peut ouvrir la
-  surface **Tout** et déclencher automatiquement la synthèse IA native avec ses sources. Une syntaxe
-  booléenne avancée peut au contraire ramener l'expérience vers une simple liste de publications et
-  empêcher ce bloc IA. Reddit reste seul responsable de décider si la synthèse est proposée.
+  requête naturelle courte de la forme `Titre S3 E1`. Le titre de série visible est conservé tel quel ;
+  saison et épisode sont deux termes séparés utilisant leurs numéros humains **sans padding**. SeenIt
+  n'ajoute ni `AND` / `OR`, ni `title:`, ni guillemets/parenthèses de filtrage, ni nom d'épisode,
+  ni consigne IA.
+- Cette simplicité est fonctionnelle : le terrain MobLand a montré que `S02 E01` pouvait ne pas produire
+  le même rendu IA que `S2 E1`, et les discussions Reddit actuelles des cas validés utilisent des formes
+  non paddées comme `S2E1` / `S3E1`. SeenIt ne transforme donc plus `2/1` en `02/01` avant Reddit.
+  Une requête courte peut ouvrir la surface **Tout** et déclencher automatiquement la synthèse IA native
+  avec ses sources ; Reddit reste seul responsable de décider si cette synthèse est proposée.
 - Si le bloc IA n'est pas proposé ou échoue, les résultats standards restent le fallback permanent.
   SeenIt ne force ni onglet spécialisé, ni langue, ni action **« Demander »** et n'injecte aucune phrase
   de résumé dans `/search/?q=`.
