@@ -8,6 +8,28 @@ Le développement SeenIt ne doit pas dépendre du fait qu'un sandbox ChatGPT pos
 
 Ce mécanisme ne rend pas le sandbox persistant. Il évite en revanche de payer inutilement un nouveau clone, une nouvelle découverte de contexte ou un `npm ci` complet lorsque GitHub, Codespaces ou un workspace déjà matérialisé peuvent conserver l'état utile.
 
+## Garde pré-acquisition locale
+
+Une nouvelle matérialisation locale vient **après** les surfaces déjà exploitables, jamais par réflexe. Avant
+toute commande de clone/acquisition, l'agent publie dans l'issue le reçu
+`<!-- seenit-workspace-acquisition -->` avec exactement les faits suivants :
+
+```
+<!-- seenit-workspace-acquisition -->
+workspace existant recherché : oui
+résultat : trouvé et réutilisé | absent/inexploitable — <racines/surfaces vérifiées>
+exécution locale nécessaire : <commande/test exact> — API-first insuffisant : <raison factuelle>
+acquisition minimale : <mode retenu et borne> | sans objet
+```
+
+Le reçu est une preuve, pas une formule : `absent/inexploitable` cite les racines/surfaces réellement
+inspectées et, si l'agent invoque un runtime recréé, l'indice concret qui permet de le distinguer d'une
+simple reprise conversationnelle. Vérifier seulement un chemin attendu ne suffit pas. La nécessité locale
+nomme la commande ou le test qui ne peut pas être réalisé par API-first. Si cette justification manque,
+rester connector/API-first. Ne jamais lancer `git clone` pour simplement découvrir si l'egress fonctionne ;
+si Git/npm sont injoignables et qu'aucun workspace/cache exact n'est réutilisable, utiliser directement la
+quarantaine gouvernée ci-dessous.
+
 ## Chemin local prioritaire
 
 1. Vérifier `main` par l'API GitHub.
@@ -52,6 +74,6 @@ Une reprise identifiée repart du checkpoint de l'issue/PR et de la branche exis
 2. Codespace existant ou préconstruit ;
 3. branche de chantier déjà validée ;
 4. quarantaine `agent-staging/**` lorsqu'un runtime sans egress doit produire ou corriger un arbre ;
-5. nouvelle acquisition minimale seulement si aucune surface précédente n'est exploitable.
+5. nouvelle acquisition minimale seulement si aucune surface précédente n'est exploitable **et après reçu pré-acquisition complet**.
 
-Le critère n'est pas « un nouveau prompt » mais l'état réel du workspace, du lockfile, du SHA et des preuves déjà enregistrées.
+Le critère n'est pas « un nouveau prompt » mais l'état réel du workspace, du lockfile, du SHA et des preuves déjà enregistrées. Une reprise, même longue ou issue d'un autre prompt, ne prouve jamais à elle seule que le runtime ou le workspace a disparu.

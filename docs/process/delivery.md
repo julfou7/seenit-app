@@ -218,13 +218,25 @@ distinctes. `SEENIT-QUALITY-004` impose la première à chaque intervention ; el
 1. **Préflight API-first.** Lire `main`, l'issue, la PR, les commits et les fichiers nécessaires via le
    connecteur/API GitHub tant qu'aucune commande locale n'est nécessaire. Une demande read-only se
    traite sans clone, checkout local ou installation de dépendances.
-2. **Réutiliser avant d'acquérir.** Si un workspace SeenIt existe déjà dans l'environnement, contrôler
-   son état, sa branche/HEAD et son rapport au SHA canonique, puis le réutiliser. Un nouveau prompt ou une
-   reprise conversationnelle n'est jamais, à lui seul, une raison de recloner le dépôt.
-3. **Acquisition minimale.** Si aucun workspace n'existe et qu'une commande locale est réellement
-   nécessaire, acquérir une seule fois par environnement la branche/SHA utile. Préférer le mode minimal
-   compatible (`git clone --depth 1`, clone partiel ou checkout partiel) à l'historique complet, sauf si
-   le diagnostic exige cet historique.
+2. **Réutiliser avant d'acquérir.** Rechercher le workspace SeenIt dans les surfaces réellement accessibles
+   du runtime, pas seulement à un chemin supposé. Contrôler son état, sa branche/HEAD et son rapport au SHA
+   canonique, puis le réutiliser. Un nouveau prompt, une reprise conversationnelle ou une nouvelle phase du
+   même chantier n'est jamais, à lui seul, une raison de recloner le dépôt. Avant toute commande de clone ou
+   d'acquisition locale, publier dans l'issue concernée le reçu auditable suivant :
+   ```
+<!-- seenit-workspace-acquisition -->
+workspace existant recherché : oui
+résultat : trouvé et réutilisé | absent/inexploitable — <racines/surfaces vérifiées>
+exécution locale nécessaire : <commande/test exact> — API-first insuffisant : <raison factuelle>
+acquisition minimale : <mode retenu et borne> | sans objet
+   ```
+   Le champ `absent/inexploitable` doit citer les racines/surfaces réellement vérifiées ; vérifier seulement
+   `/mnt/data/seenit-app` ou un autre chemin attendu ne suffit pas. Si API-first, une branche déjà existante,
+   un Codespace ou le fallback distant couvrent encore le besoin, l'acquisition locale est interdite.
+3. **Acquisition minimale.** Seulement si le reçu conclut `absent/inexploitable` et nomme une commande/test
+   local réellement nécessaire, acquérir une seule fois par environnement la branche/SHA utile. Préférer le
+   mode minimal compatible (`git clone --depth 1`, clone partiel ou checkout partiel) à l'historique complet,
+   sauf si le diagnostic exige cet historique. `git clone` n'est jamais utilisé comme simple test d'egress.
 4. **Dépendances conditionnelles.** Réutiliser `node_modules` ou un cache exact lorsqu'il correspond à
    la version Node et au `package-lock.json` du chantier. Ne lancer `npm ci` que lorsque les dépendances
    sont absentes ou incompatibles ; un nouveau prompt ne déclenche jamais à lui seul une réinstallation.

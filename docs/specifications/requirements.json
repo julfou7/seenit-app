@@ -1704,6 +1704,14 @@
         {
           "file": "tests/issueTrackingGovernance.test.ts",
           "contains": "SEENIT-QUALITY-004 ouvre proactivement une issue d’amélioration continue pour toute difficulté corrigeable et réutilisable"
+        },
+        {
+          "file": "tests/issueTrackingGovernance.test.ts",
+          "contains": "SEENIT-QUALITY-004 reprend API-first sans clone obligatoire ni bootstrap redondant"
+        },
+        {
+          "file": "tests/issueTrackingGovernance.test.ts",
+          "contains": "SEENIT-QUALITY-004 exige un reçu pré-acquisition avant tout clone local"
         }
       ]
     },
