@@ -177,4 +177,3 @@ test('SEENIT-QUALITY-004 exige un reçu pré-acquisition avant tout clone local'
   assert.match(normalize(delivery), /API-first[\s\S]*acquisition locale est interdite/i);
   assert.match(normalize(remote), /Ne jamais lancer `git clone`[\s\S]*simplement découvrir si l'egress fonctionne/i);
 });
-
