@@ -245,6 +245,7 @@ export function ToastContainer() {
         <SeenItGlyph
           size={17}
           symbol={parsed.iconSymbol}
+          color="gold"
           glow={false}
           idPrefix={`toast-tab-${parsed.iconSymbol}`}
           className="shrink-0"
