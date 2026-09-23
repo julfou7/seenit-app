@@ -6,6 +6,7 @@ import { useShows } from '../hooks/useShows';
 import { cn, scrollAllCarouselsToStart } from '../lib/utils';
 import { SeenItGlyph } from './SeenItLogo';
 import { isDownloadToastPresentation } from '../features/toasts/toastPresentation';
+import { useLogStore } from '../store/logStore';
 import {
   dispatchToastMediaNavigation,
   resolveToastMediaNavigationTarget,
@@ -39,7 +40,12 @@ export function ToastContainer() {
         await onUndo();
         scrollAllCarouselsToStart();
       } catch (err) {
-        console.error('Error undoing toast action:', err);
+        useLogStore.getState().addLog(
+          'system',
+          "Impossible d'annuler l'action du toast",
+          err,
+          'error',
+        );
       }
       hideToast();
     } else if (type === 'archive' && show?.id) {
@@ -128,7 +134,7 @@ export function ToastContainer() {
       subtitle = `S${seasonEpisodeMatch[1]} | E${seasonEpisodeMatch[2]}`;
       action = action.replace(/S\d+E\d+/i, '').trim();
 
-      // Strip any episode title before "marqué comme..."
+      // Strip the episode title before "marqué comme..."
       const verbMatch = action.match(/(marqué[e]?\s+comme\s+.*)$/i);
       if (verbMatch) {
         action = verbMatch[1].trim();
@@ -234,6 +240,17 @@ export function ToastContainer() {
   };
 
   const renderIcon = () => {
+    if (parsed.iconSymbol) {
+      return (
+        <SeenItGlyph
+          size={17}
+          symbol={parsed.iconSymbol}
+          glow={false}
+          idPrefix={`toast-tab-${parsed.iconSymbol}`}
+          className="shrink-0"
+        />
+      );
+    }
     if (isDownloadToast) {
       return <SeenItGlyph size={17} symbol="download" color="blue" glow={false} idPrefix="toast-dl" className="shrink-0" />;
     }

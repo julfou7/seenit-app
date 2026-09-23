@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { NAVIGATION_TABS } from '../src/features/navigation/tabPresentation.ts';
 
 const bottomNavSource = readFileSync(
   new URL('../src/components/BottomNav.tsx', import.meta.url),
@@ -8,19 +9,11 @@ const bottomNavSource = readFileSync(
 );
 
 test('la navigation basse garde Profil à droite et Télécharger en troisième position lorsqu’il est visible', () => {
-  const watchlistIndex = bottomNavSource.indexOf("{ id: 'watchlist', label: 'À Voir'");
-  const discoverIndex = bottomNavSource.indexOf("{ id: 'discover', label: 'Explorer'");
-  const downloadsIndex = bottomNavSource.indexOf("{ id: 'downloads', label: 'Télécharger'");
-  const profileIndex = bottomNavSource.indexOf("{ id: 'profile', label: 'Profil'");
-
-  assert.ok(watchlistIndex >= 0);
-  assert.ok(discoverIndex > watchlistIndex);
-  assert.ok(downloadsIndex > discoverIndex);
-  assert.ok(profileIndex > downloadsIndex);
-  assert.match(
-    bottomNavSource,
-    /const visibleTabs = downloadsEnabled \? tabs : tabs\.filter\(tab => tab\.id !== 'downloads'\)/
+  assert.deepEqual(
+    NAVIGATION_TABS.map(tab => tab.id),
+    ['watchlist', 'discover', 'downloads', 'profile'],
   );
+  assert.match(bottomNavSource, /NAVIGATION_TABS\.filter\(tab => tab\.id !== 'downloads'\)/);
 });
 
 test('la navigation basse exploite sa largeur avec des icônes et cibles tactiles lisibles', () => {

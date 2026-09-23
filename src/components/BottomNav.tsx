@@ -1,9 +1,10 @@
 import React, { lazy, Suspense, useRef } from 'react';
-import { SeenItGlyph, type SeenItSymbolType } from './SeenItLogo';
+import { SeenItGlyph } from './SeenItLogo';
 import { cn } from '../lib/utils';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { isDownloadFeatureEnabled } from '../features/downloads/downloadFeatureVisibility';
 import { resolveActiveTabTap, type ActiveTabTapState } from '../features/navigation/activeTabTap';
+import { NAVIGATION_TABS, type RootNavigationTab } from '../features/navigation/tabPresentation';
 
 const DownloadNavBadge = lazy(() => import('./DownloadNavBadge').then(module => ({ default: module.DownloadNavBadge })));
 
@@ -14,26 +15,15 @@ interface Props {
   onActiveTabDoubleClick?: () => void;
 }
 
-interface TabItem {
-  id: 'watchlist' | 'discover' | 'downloads' | 'profile';
-  label: string;
-  symbol: SeenItSymbolType;
-}
-
 export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveTabDoubleClick }: Props) {
   const lastActiveTapRef = useRef<ActiveTabTapState | null>(null);
   const downloadsEnabled = useDownloadConfigStore(isDownloadFeatureEnabled);
 
-  const tabs: readonly TabItem[] = [
-    { id: 'watchlist', label: 'À Voir', symbol: 'watch' },
-    { id: 'discover', label: 'Explorer', symbol: 'discover' },
-    { id: 'downloads', label: 'Télécharger', symbol: 'download' },
-    { id: 'profile', label: 'Profil', symbol: 'profile' },
-  ] as const;
+  const visibleTabs = downloadsEnabled
+    ? NAVIGATION_TABS
+    : NAVIGATION_TABS.filter(tab => tab.id !== 'downloads');
 
-  const visibleTabs = downloadsEnabled ? tabs : tabs.filter(tab => tab.id !== 'downloads');
-
-  const handleTabClick = (e: React.MouseEvent, tabId: string) => {
+  const handleTabClick = (e: React.MouseEvent, tabId: RootNavigationTab) => {
     e.preventDefault();
 
     const resolution = resolveActiveTabTap(
@@ -45,7 +35,7 @@ export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveT
     lastActiveTapRef.current = resolution.nextTap;
 
     if (resolution.action === 'change-tab') {
-      onTabChange(tabId as any);
+      onTabChange(tabId);
       return;
     }
 
