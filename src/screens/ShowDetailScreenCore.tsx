@@ -51,7 +51,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     (externalTmdbId && String(s.tmdbId) === String(externalTmdbId))
   );
 
-  const lastKnownShowRef = useRef<any>(show);
+  const lastKnownShowRef = useRef<Show | undefined>(show);
   if (show) lastKnownShowRef.current = show;
 
   const persistentTmdbIdRef = useRef<number | undefined>(
