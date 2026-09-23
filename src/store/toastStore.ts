@@ -7,6 +7,10 @@ import {
   normalizePlexNonVuWording,
   type ToastQueueScope
 } from './toastQueuePolicy';
+import {
+  getActiveNavigationResetPresentation,
+  type NavigationTabSymbol,
+} from '../features/navigation/tabPresentation';
 
 export type ToastType = 'archive' | 'unfollow' | 'dropped' | 'success' | 'info' | 'follow' | 'error' | 'reminder' | 'favorite' | 'download';
 export type ToastScope = ToastQueueScope;
@@ -16,6 +20,7 @@ export interface ToastMessageObj {
   subtitle?: string;
   action: string;
   posterPath?: string | null;
+  iconSymbol?: NavigationTabSymbol;
 }
 
 export interface ToastItem {
@@ -51,7 +56,7 @@ interface ToastState {
   clearQueuedScope: (scope: ToastScope) => void;
 }
 
-let dequeueTimer: any = null;
+let dequeueTimer: ReturnType<typeof setTimeout> | null = null;
 let plexBatchStats = { watched: 0, unwatched: 0 };
 
 function getToastSearchText(message: string | ToastMessageObj): string {
@@ -115,7 +120,7 @@ export const useToastStore = create<ToastState>((set, get) => ({
     const finalDuration = typeof duration === 'number' ? duration : 5000;
 
     if (typeof show === 'function') {
-      finalUndo = show as any;
+      finalUndo = show as () => void | Promise<void>;
     } else if (typeof show === 'string') {
       if (typeof onUndo === 'function') {
         finalUndo = onUndo;
@@ -135,6 +140,15 @@ export const useToastStore = create<ToastState>((set, get) => ({
     let finalMessage = inferredScope === 'plex'
       ? normalizePlexToastMessage(message)
       : normalizeNotificationTestToastMessage(message);
+
+    const resetPresentation = type === 'info'
+      ? getActiveNavigationResetPresentation()
+      : null;
+    if (resetPresentation) {
+      finalMessage = typeof finalMessage === 'string'
+        ? { action: finalMessage, iconSymbol: resetPresentation.symbol }
+        : { ...finalMessage, iconSymbol: resetPresentation.symbol };
+    }
 
     if (inferredScope === 'plex' && !isCompletion) {
       if (/(?:dé-vu|non[- ]vu)\s+sur\s+plex/i.test(searchText)) {

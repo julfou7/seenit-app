@@ -234,6 +234,17 @@ export function ToastContainer() {
   };
 
   const renderIcon = () => {
+    if (parsed.iconSymbol) {
+      return (
+        <SeenItGlyph
+          size={17}
+          symbol={parsed.iconSymbol}
+          glow={false}
+          idPrefix={`toast-tab-${parsed.iconSymbol}`}
+          className="shrink-0"
+        />
+      );
+    }
     if (isDownloadToast) {
       return <SeenItGlyph size={17} symbol="download" color="blue" glow={false} idPrefix="toast-dl" className="shrink-0" />;
     }

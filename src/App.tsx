@@ -38,6 +38,7 @@ import { usePlexAvailabilityStore } from './features/plex/plexAvailability';
 import { readUserScopedJson, writeUserScopedJson } from './lib/userIsolation';
 import { activateLogUserScope } from './store/logStore';
 import { createCachedAsyncLoader, preloadInBackground } from './features/navigation/screenPreload';
+import { resolveRootNavigationTab, withNavigationResetToastContext } from './features/navigation/tabPresentation';
 
 const loadProfileScreen = createCachedAsyncLoader(() => import('./screens/ProfileScreen').then(module => ({ default: module.ProfileScreen })));
 const loadShowDetailScreen = createCachedAsyncLoader(() => import('./screens/ShowDetailScreen').then(module => ({ default: module.ShowDetailScreen })));
@@ -214,7 +215,7 @@ function MainApp() {
   }, [changeTab]);
 
   const openShowSmooth = useCallback((
-    id: any,
+    id: string | number,
     type: 'local' | 'tmdb' = 'local',
     mediaType?: 'tv' | 'movie',
     tmdbId?: number,
@@ -262,7 +263,7 @@ function MainApp() {
     openShow(id, 'local', mediaType);
   }, [openShow]);
 
-  const openTmdbMedia = useCallback((id: any, mediaType?: 'tv' | 'movie') => {
+  const openTmdbMedia = useCallback((id: string | number, mediaType?: 'tv' | 'movie') => {
     openShowSmooth(id, 'tmdb', mediaType);
   }, [openShowSmooth]);
 
@@ -486,20 +487,20 @@ function MainApp() {
     } else if (selectedShow) {
       closeShow();
     } else {
-      const rootTab = currentTab === 'library'
-        ? 'profile'
-        : currentTab === 'settings'
-          ? 'profile'
-          : currentTab;
-      window.dispatchEvent(new CustomEvent(`${rootTab}-back-one-level`));
+      const rootTab = resolveRootNavigationTab(currentTab);
+      if (rootTab) {
+        window.dispatchEvent(new CustomEvent(`${rootTab}-back-one-level`));
+      }
     }
   };
 
   const handleActiveTabDoubleClick = () => {
-    const rootTab = currentTab === 'library' || currentTab === 'settings'
-      ? 'profile'
-      : currentTab;
-    window.dispatchEvent(new CustomEvent(`${rootTab}-reset-all`));
+    const rootTab = resolveRootNavigationTab(currentTab);
+    if (!rootTab) return;
+
+    withNavigationResetToastContext(rootTab, () => {
+      window.dispatchEvent(new CustomEvent(`${rootTab}-reset-all`));
+    });
   };
 
   return (
