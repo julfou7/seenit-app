@@ -196,7 +196,7 @@ test('SEENIT-QUALITY-004 capture tout axe d’amélioration concret sans ralenti
     assert.match(source, /issue d'amélioration continue/i);
     assert.match(source, /observation[^.]*contexte[\s\S]*bénéfice attendu/i);
     assert.match(source, /critère de fin/i);
-    assert.match(source, /reprendre immédiatement|retour immédiat/i);
+    assert.match(source, /reprendre immédiatement|reprend immédiatement|retour immédiat/i);
   }
 
   assert.match(normalize(agents), /ni audit global[\s\S]*ni reproduction supplémentaire[\s\S]*ni implémentation/i);
