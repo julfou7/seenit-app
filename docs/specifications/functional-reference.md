@@ -245,8 +245,13 @@ Explorer et le recyclage des rangées ne peuvent donc pas chasser les résultats
 obtenus pour Ma Liste ; seule l'expiration normale permet leur actualisation silencieuse.
 
 Le bouton Réglages ouvre un écran superposé refermable par Retour ou swipe depuis le bord gauche.
-Le bouton Partager ne doit promettre qu'un lien réellement réouvrable ; l'écart actuel est suivi par
-#96.
+Le Profil n'expose pas d'action « Partager » : aucun profil public n'existe et aucune donnée de profil
+n'est publiée. Cette décision de confidentialité reste en vigueur tant qu'un périmètre public explicite
+n'est pas spécifié.
+Une fiche Film/Série se partage via l'URL publique canonique
+`https://seenit.ai.studio/?tmdbId=<id>&mediaType=<movie|tv>`. Web Share et le fallback presse-papiers
+utilisent la même URL ; elle rouvre la fiche exacte après démarrage/authentification, sans UID ni ID
+Firestore privé.
 
 ## 7. Explorer
 
@@ -713,6 +718,7 @@ restent des TNR terrain lorsque le risque du changement UX l'exige ; ils ne sont
 | Backend | Même origine canonique | `https://seenit.ai.studio` explicite |
 | Retour | Historique navigateur | Modals → fiche → historique → À Voir → quitter |
 | Toast média À voir / Vu | Ouvre la fiche exacte par `mediaType + tmdbId` | Même comportement dans la WebView ; retrait/suppression non navigable |
+| Partage fiche média | URL HTTPS canonique `tmdbId + mediaType` réouvrable | Même URL publique ; jamais d'URL `localhost`/WebView |
 | Plex | Fiche Discover Web vérifiée par TMDB | Lien Discover vérifié : application Plex puis Web ; locators PMS réservés à la disponibilité |
 | Reddit/autres liens | Nouvel onglet | Application associée, puis Custom Tab |
 | Magnet | Gestionnaire navigateur/système si Téléchargements est activé | Intent Android compatible si Téléchargements est activé |
@@ -734,7 +740,6 @@ elle est nécessaire à la plateforme et explicitement documentée.
 |---|---|---|
 | P1 | La classification d’âge actuelle peut préférer une valeur FR permissive, sous-classer des certifications US et inventer un TP par genre. | Appliquer `SEENIT-PARENTAL-001` : [#98](https://github.com/julfou7/seenit-app/issues/98). |
 | P1 | Les personnes favorites restent locales et font diverger les recommandations PWA/APK. | Rendre Firestore autoritatif : [#95](https://github.com/julfou7/seenit-app/issues/95). |
-| P2 | Partager une fiche ou le profil ne garantit pas encore un lien réouvrable conforme. | Décider/corriger : [#96](https://github.com/julfou7/seenit-app/issues/96). |
 
 ## 16. Contrat de maintenance de cette référence
 
