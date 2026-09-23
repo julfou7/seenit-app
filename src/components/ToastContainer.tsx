@@ -128,7 +128,7 @@ export function ToastContainer() {
       subtitle = `S${seasonEpisodeMatch[1]} | E${seasonEpisodeMatch[2]}`;
       action = action.replace(/S\d+E\d+/i, '').trim();
 
-      // Strip any episode title before "marqué comme..."
+      // Strip the episode title before "marqué comme..."
       const verbMatch = action.match(/(marqué[e]?\s+comme\s+.*)$/i);
       if (verbMatch) {
         action = verbMatch[1].trim();
