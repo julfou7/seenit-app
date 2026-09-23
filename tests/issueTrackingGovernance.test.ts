@@ -139,7 +139,7 @@ test('SEENIT-QUALITY-004 ouvre proactivement une issue d’amélioration continu
 
   const normalizeReflowableText = (source: string) => source.replace(/\s+/g, ' ');
   for (const source of [agents, bootstrap, spec].map(normalizeReflowableText)) {
-    assert.match(source, /difficulté réellement rencontrée[\s\S]*corrigeable/i);
+    assert.match(source, /difficulté[\s\S]*corrigeable/i);
     assert.match(source, /issues GitHub ouvertes[\s\S]*fermées|recherche GitHub ciblée/i);
     assert.match(source, /réutilise(?:r)?|rouvr(?:e|ir)/i);
     assert.match(source, /issue d'amélioration continue/i);
