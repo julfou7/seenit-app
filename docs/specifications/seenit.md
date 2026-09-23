@@ -231,12 +231,15 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
   type `2` (Theatrical limited) ou `3` (Theatrical), dans la fenêtre courante de J-75 à J+10. Une date
   générique `release_date` / `primary_release_date` ne suffit jamais ; une sortie uniquement numérique
   (`type=4`), physique (`type=5`) ou TV (`type=6`) est exclue.
-- La liste Explorer est alimentée par une requête TMDB `discover/movie` avec `region=FR`,
-  `with_release_type=2|3` et des bornes `release_date.gte/lte`. Un marqueur interne de preuve théâtrale
-  peut être attaché uniquement aux résultats issus de cette requête contrainte, afin que le filtre et
-  les cartes réutilisent exactement la même sémantique sans redeviner depuis une date générique.
-- Les fiches détaillées utilisent les `release_dates` TMDB déjà récupérées avec les détails du film pour
-  appliquer la même règle aux badges individuels. La logique est commune à la PWA et à l'APK.
+- La liste Explorer utilise `discover/movie` avec `region=FR`, `with_release_type=2|3` et des bornes
+  `release_date.gte/lte` uniquement comme **préfiltre de candidats**. Avant tout badge ou inclusion finale
+  dans « Au cinéma », ces candidats sont enrichis en lot avec leurs `release_dates` France détaillées puis
+  repassent dans le résolveur canonique. Un marqueur inline issu du Discover ne constitue jamais une preuve
+  suffisante à lui seul, notamment pour les projections événementielles terminées.
+- Les autres listes Explorer enrichissent elles aussi en lot leurs films avant le rendu final des cartes :
+  un même film aboutit donc à la même décision sur Tout/Films/recherche/« Au cinéma » et sur sa fiche, sans
+  appel TMDB unitaire par carte. Les fiches détaillées utilisent les `release_dates` déjà récupérées avec
+  les détails du film. La logique est commune à la PWA et à l'APK.
 - Sur la fiche Film, cette même décision canonique remplace le libellé générique du chip principal par
   **« AU CINÉMA »** dans le même emplacement, en conservant la durée lorsqu'elle est connue. Aucun second
   badge cinéma n'est rendu plus bas ; un film hors cinéma conserve le chip **« FILM »**. La ligne de

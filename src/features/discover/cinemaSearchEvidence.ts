@@ -13,7 +13,7 @@ interface BatchCinemaEntry {
   details?: unknown;
 }
 
-export async function enrichCinemaEvidenceForSearchResults<T>(
+export async function enrichCinemaEvidenceForMediaResults<T>(
   results: T[],
   signal?: AbortSignal,
 ): Promise<T[]> {
@@ -40,3 +40,26 @@ export async function enrichCinemaEvidenceForSearchResults<T>(
     return results;
   }
 }
+
+export async function enrichCinemaEvidenceForExplorerLists<T>(
+  results: T[],
+  featured: T[] | null,
+  signal?: AbortSignal,
+): Promise<[T[], T[] | null]> {
+  const enriched = await enrichCinemaEvidenceForMediaResults(results, signal);
+  if (!featured) return [enriched, featured];
+
+  const enrichedByKey = new Map<string, T>();
+  for (const item of enriched) {
+    const key = movieSearchEvidenceKey(item);
+    if (key) enrichedByKey.set(key, item);
+  }
+  return [enriched, featured.map(item => {
+    const key = movieSearchEvidenceKey(item);
+    return key ? enrichedByKey.get(key) ?? item : item;
+  })];
+}
+
+// Compatibilité du chemin de recherche historique : la même preuve batch est désormais
+// réutilisée par toutes les listes Explorer, pas seulement par smartSearchMulti.
+export const enrichCinemaEvidenceForSearchResults = enrichCinemaEvidenceForMediaResults;

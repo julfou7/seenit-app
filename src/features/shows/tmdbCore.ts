@@ -24,6 +24,7 @@ import { convergeTrackedMediaTitleFromTmdb } from './trackedMediaTitle';
 import { mediaKeyFrom } from './mediaRelations';
 import { getTVDBFranchiseRelation } from '../../services/tvdb';
 import { readWatchProviderCache, writeWatchProviderCache } from '../providers/watchProviderCache';
+import { enrichCinemaEvidenceForMediaResults } from '../discover/cinemaSearchEvidence';
 import {
   DISCOVER_PLATFORM_ID_MAP,
   getGenreIdsForMediaType,
@@ -400,7 +401,6 @@ export async function discoverSeenIt(options: SeenItDiscoverOptions) {
     const json = await fetchCachedDiscoverPayload(url);
     if (!json.ok) return json;
 
-    const checkedAt = Date.now();
     let results = Array.isArray(json.value?.results)
       ? json.value.results
           .map((item: any) => ({ ...item, media_type: mediaType }))
@@ -412,14 +412,8 @@ export async function discoverSeenIt(options: SeenItDiscoverOptions) {
     }
 
     if (category === 'Au cinéma' && mediaType === 'movie') {
-      results = results.map((movie: any) => {
-        rememberFrenchTheatricalEvidence(Number(movie.id), checkedAt);
-        return {
-          ...movie,
-          seenitFrenchTheatrical: true,
-          seenitFrenchTheatricalCheckedAt: checkedAt,
-        };
-      });
+      results = await enrichCinemaEvidenceForMediaResults(results);
+      results = results.filter((movie) => hasFrenchTheatricalCinemaEvidence(movie));
     }
 
     return ok({ ...json.value, results });
@@ -466,19 +460,12 @@ const strictFrenchNowPlaying = async (page: number = 1) => {
   if (!jsonResult.ok) return jsonResult;
 
   if (jsonResult.value && Array.isArray(jsonResult.value.results)) {
-    const checkedAt = Date.now();
-    jsonResult.value.results = jsonResult.value.results
-      .map((movie: any) => {
-        rememberFrenchTheatricalEvidence(Number(movie.id), checkedAt);
-        return {
-          ...movie,
-          media_type: 'movie' as const,
-          seenitFrenchTheatrical: true,
-          seenitFrenchTheatricalCheckedAt: checkedAt,
-        };
-      })
-      .filter((movie: any) => !isAdultOrParodyMedia(movie))
-      .filter((movie: any) => Number(movie.vote_count || 0) >= 5);
+    const candidates = jsonResult.value.results
+      .map((movie) => ({ ...movie, media_type: 'movie' as const }))
+      .filter((movie) => !isAdultOrParodyMedia(movie))
+      .filter((movie) => Number(movie.vote_count || 0) >= 5);
+    const enriched = await enrichCinemaEvidenceForMediaResults(candidates);
+    jsonResult.value.results = enriched.filter((movie) => hasFrenchTheatricalCinemaEvidence(movie));
   }
   return jsonResult;
 };

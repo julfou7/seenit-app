@@ -169,3 +169,45 @@ test('issue #91 le facade Explorer attend bien l’enrichissement cinéma avant 
   assert.match(wrapper, /await enrichCinemaEvidenceForSearchResults\(result\.value\.results\)/);
   assert.match(wrapper, /coreTmdb\.smartSearchMulti\s*=/);
 });
+
+
+test('issue #91 Matrix 1999 : un candidat Discover ne gagne jamais contre la preuve détaillée', () => {
+  const matrixCandidate = {
+    id: 603,
+    media_type: 'movie',
+    title: 'Matrix',
+    release_date: '1999-06-23',
+    seenitFrenchTheatrical: true,
+    seenitFrenchTheatricalCheckedAt: Date.now(),
+  };
+  assert.equal(hasFrenchTheatricalCinemaEvidence(matrixCandidate, NOW), false);
+
+  const matrixDetails = compactParentalDetails(
+    { mediaType: 'movie', id: 603, key: 'movie:603' },
+    rawReleaseDates({
+      type: 3,
+      release_date: '2026-09-01T18:00:00.000Z',
+      note: 'Projection événementielle — séance spéciale',
+    }),
+  );
+  const [enriched] = applyCinemaEvidenceToSearchResults(
+    [matrixCandidate],
+    new Map([['movie:603', matrixDetails]]),
+  );
+  assert.equal(
+    hasFrenchTheatricalCinemaEvidence(enriched, NOW),
+    false,
+    'Explorer doit rester aligné sur la fiche quand le détail invalide le candidat Discover',
+  );
+});
+
+test('issue #91 les listes Explorer ordinaires et Au cinéma passent par le même enrichissement batch', () => {
+  const tmdbCore = readFileSync(new URL('../src/features/shows/tmdbCore.ts', import.meta.url), 'utf8');
+  const discoverScreen = readFileSync(new URL('../src/screens/DiscoverScreen.tsx', import.meta.url), 'utf8');
+
+  assert.match(tmdbCore, /results = await enrichCinemaEvidenceForMediaResults\(results\)/);
+  assert.match(tmdbCore, /const enriched = await enrichCinemaEvidenceForMediaResults\(candidates\)/);
+  assert.doesNotMatch(tmdbCore, /seenitFrenchTheatrical:\s*true/);
+  assert.match(discoverScreen, /enrichCinemaEvidenceForExplorerLists\(nextPopular, nextTrending\)/);
+  assert.match(discoverScreen, /activeCategory !== 'Au cinéma'/);
+});

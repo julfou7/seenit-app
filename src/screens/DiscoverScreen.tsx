@@ -22,6 +22,7 @@ import { getRecommendations } from '../lib/recommendations';
 import { SeenItGlyph } from '../components/SeenItLogo';
 import { useGridVirtualWindow } from '../hooks/useBoundedVirtualWindow';
 import { hasMoreTmdbPages } from '../features/discover/discoverPagination';
+import { enrichCinemaEvidenceForExplorerLists } from '../features/discover/cinemaSearchEvidence';
 import {
   discoverTypeForCategory,
   isSearchCompatibleCategory,
@@ -560,8 +561,8 @@ export function DiscoverScreen({ onShowClick }: Props) {
         ]);
         if (!isCurrentRequest()) return;
         const tops = [
-          ...(topMovRes?.ok ? topMovRes.value.results.map((r: any) => ({ ...r, media_type: 'movie' as const })) : []),
-          ...(topTvRes?.ok ? topTvRes.value.results.map((r: any) => ({ ...r, media_type: 'tv' as const })) : [])
+          ...(topMovRes?.ok ? topMovRes.value.results.map((r) => ({ ...r, media_type: 'movie' as const })) : []),
+          ...(topTvRes?.ok ? topTvRes.value.results.map((r) => ({ ...r, media_type: 'tv' as const })) : [])
         ];
         tops.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
         nextPopular = tops;
@@ -628,7 +629,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
         nextPopular = mergeMedia(trendingList, popularList);
         nextTrending = trendingList;
         if (personRes?.ok && personRes.value.results) {
-          nextPersons = personRes.value.results.map((p: any) => ({ ...p, media_type: 'person' as const }));
+          nextPersons = personRes.value.results.map((p) => ({ ...p, media_type: 'person' as const }));
         }
         nextHasMore = hasMoreTmdbPages(page, popTvRes, popMovRes);
         if (page === 1) setHomeEnrichmentReady(true);
@@ -646,8 +647,8 @@ export function DiscoverScreen({ onShowClick }: Props) {
           const yr = parseInt(date.split('-')[0], 10);
           return !yr || yr >= 2016;
         };
-        const trendList = trendRes?.ok ? trendRes.value.results.filter(isRecent).map((r: any) => ({ ...r, media_type: type as 'movie' | 'tv' })) : [];
-        const popList = popRes?.ok ? popRes.value.results.filter(isRecent).map((r: any) => ({ ...r, media_type: type as 'movie' | 'tv' })) : [];
+        const trendList = trendRes?.ok ? trendRes.value.results.filter(isRecent).map((r) => ({ ...r, media_type: type as 'movie' | 'tv' })) : [];
+        const popList = popRes?.ok ? popRes.value.results.filter(isRecent).map((r) => ({ ...r, media_type: type as 'movie' | 'tv' })) : [];
         const combined = mergeMedia(trendList, popList);
         nextPopular = combined.length > 0 ? combined : popList;
         nextTrending = nextPopular.slice(0, 10);
@@ -655,7 +656,8 @@ export function DiscoverScreen({ onShowClick }: Props) {
       }
 
       if (!isCurrentRequest()) return;
-
+      if (nextPopular !== null && activeCategory !== 'Au cinéma') [nextPopular, nextTrending] = await enrichCinemaEvidenceForExplorerLists(nextPopular, nextTrending);
+      if (!isCurrentRequest()) return;
       if (nextPopular !== null) {
         setPopular(prev => page === 1 ? nextPopular! : mergeMedia(prev, nextPopular!));
       }
@@ -668,7 +670,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
       setHasMore(nextHasMore);
       setLoading(false);
       setIsLoadingMore(false);
-
       if (page === 1) {
         void getRecommendations(20)
           .then(recs => {
