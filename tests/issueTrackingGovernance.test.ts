@@ -202,4 +202,3 @@ test('SEENIT-QUALITY-004 capture tout axe d’amélioration concret sans ralenti
   assert.match(normalize(spec), /ne lance ni audit[\s\S]*ni reproduction[\s\S]*ni investigation[\s\S]*ni implémentation/i);
   assert.match(registry, /USR-2026-09-23-002/);
 });
-
