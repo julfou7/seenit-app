@@ -1,3 +1,9 @@
+export interface RedditMovieSearchInput {
+  movieTitle: string;
+  communityMovieTitle?: string | null;
+  originalMovieTitle?: string | null;
+}
+
 export interface RedditEpisodeSearchInput {
   seriesTitle: string;
   communitySeriesTitle?: string | null;
@@ -9,6 +15,19 @@ export interface RedditEpisodeSearchInput {
 
 function normalizeSearchTerm(value?: string | null): string {
   return (value ?? '').replace(/"/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+export function buildRedditMovieSearchQuery({
+  movieTitle,
+  communityMovieTitle,
+  originalMovieTitle,
+}: RedditMovieSearchInput): string {
+  const title =
+    normalizeSearchTerm(communityMovieTitle)
+    || normalizeSearchTerm(movieTitle)
+    || normalizeSearchTerm(originalMovieTitle);
+
+  return [title, 'official discussion'].filter(Boolean).join(' ');
 }
 
 export function buildRedditEpisodeSearchQuery({

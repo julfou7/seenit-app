@@ -337,6 +337,18 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
   La PWA et l'APK ouvrent la même URL HTTPS ; le transport de plateforme existant décide nouvel onglet,
   application Reddit associée ou Custom Tab sans modifier la requête.
 
+### 5.2.4 Réactions Reddit d'un film
+
+- **SEENIT-COMMUNITY-002** — Une fiche Film ouvre Reddit avec une requête courte fondée sur le patron des
+  fils de référence de r/movies : `English title official discussion`. Le suffixe générique
+  `movie discussion` n'appartient plus au chemin de production.
+- Le titre d'affichage SeenIt reste localisé en `fr-FR`. Au moment exact du clic Reddit, le TMDB ID
+  canonique du film résout séparément son titre `en-US` ; aucun titre n'est utilisé comme identité média.
+  Si cette résolution échoue ou reste vide, la recherche retombe sur le titre visible puis le titre original.
+- SeenIt n'ajoute ni cas spécial par film, ni table de traduction, ni `title:`, guillemet/parenthèse,
+  `AND` / `OR`, année inventée, scraping ou consigne IA. Les résultats standards restent utilisables
+  lorsque Reddit n'affiche pas sa synthèse IA native.
+
 ### 5.3 Machine d'états canonique
 
 Le statut, la progression et les intentions secondaires sont des dimensions différentes :
