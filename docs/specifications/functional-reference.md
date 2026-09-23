@@ -298,7 +298,9 @@ Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, 
   déjà vus/terminés ou abandonnés. **Explorer reste le lieu de la découverte approximative** ; ces
   recommandations ne sont pas réinjectées dans les fiches média comme relations.
 - « Au cinéma » exige une sortie théâtrale française TMDB type 2/3 dans la fenêtre J-75 à J+10 ; une
-  sortie streaming/VOD seule n'est jamais « au cinéma ».
+  sortie streaming/VOD seule n'est jamais « au cinéma ». Le Discover contraint ne sert que de préfiltre :
+  les listes films Explorer sont enrichies en lot avec `release_dates` avant décision, de sorte qu'une
+  projection événementielle terminée et un média vu hors du filtre aboutissent au même résultat que la fiche.
 
 Depuis une carte, l'utilisateur peut ouvrir la fiche, suivre/retirer, ou marquer un film vu. Les cartes
 qui disposent de la preuve détaillée utilisent le même résolveur parental que la fiche et Explorer.

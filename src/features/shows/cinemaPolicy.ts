@@ -1,6 +1,5 @@
 const CINEMA_PAST_DAYS = 75;
 const CINEMA_FUTURE_DAYS = 10;
-const CINEMA_EVIDENCE_TTL_MS = 6 * 60 * 60 * 1000;
 const FRENCH_THEATRICAL_RELEASE_TYPES = new Set([2, 3]);
 
 const EVENT_SPECIFIC_RELEASE_NOTE_PATTERNS = [
@@ -31,8 +30,6 @@ interface CinemaEvidenceMedia {
   media_type?: string | null;
   mediaType?: string | null;
   first_air_date?: unknown;
-  seenitFrenchTheatrical?: boolean;
-  seenitFrenchTheatricalCheckedAt?: number | string | null;
   release_dates?: {
     results?: TmdbReleaseCountry[] | null;
   } | null;
@@ -108,31 +105,20 @@ export const clearFrenchTheatricalEvidence = (mediaId: number) => {
   void mediaId;
 };
 
-const isFreshInlineTheatricalEvidence = (media: CinemaEvidenceMedia, nowMs: number): boolean => {
-  // Les marqueurs inline ne sont valides que sur les objets TMDB de liste. Un Show
-  // suivi utilise `mediaType`/`tmdbId` et ne doit jamais réactiver une preuve détaillée
-  // négative via les OR historiques des vues.
-  if (media.media_type !== 'movie' || media.seenitFrenchTheatrical !== true) return false;
-  const checkedAt = Number(media.seenitFrenchTheatricalCheckedAt);
-  return Number.isFinite(checkedAt) && nowMs - checkedAt <= CINEMA_EVIDENCE_TTL_MS;
-};
-
 /**
  * Politique pure de preuve cinéma. Le filtrage TV/adulte reste à la façade TMDB.
  *
- * - release_dates est toujours autoritatif lorsqu'il existe ;
+ * - release_dates détaillé est obligatoire et autoritatif ;
  * - une projection explicitement événementielle déjà passée ne prouve pas une
  *   disponibilité cinéma courante ;
- * - l'ouverture d'une fiche ne peut plus modifier une carte via un cache global ;
- * - seul le marqueur inline d'un résultat TMDB Discover contraint peut servir sans
- *   payload détaillé.
+ * - un résultat Discover type 2/3 reste seulement un candidat : son marqueur inline
+ *   ne peut jamais remplacer la preuve détaillée ;
+ * - l'ouverture d'une fiche ne peut plus modifier une carte via un cache global.
  */
 export const hasFrenchTheatricalCinemaEvidence = (media: unknown, now: Date = new Date()): boolean => {
   if (!media) return false;
 
   const normalizedMedia = toCinemaEvidenceMedia(media);
-  const hasReleaseDatesPayload = Array.isArray(normalizedMedia.release_dates?.results);
-  if (hasReleaseDatesPayload) return hasCurrentFrenchTheatricalRelease(normalizedMedia, now);
-
-  return isFreshInlineTheatricalEvidence(normalizedMedia, now.getTime());
+  if (!Array.isArray(normalizedMedia.release_dates?.results)) return false;
+  return hasCurrentFrenchTheatricalRelease(normalizedMedia, now);
 };

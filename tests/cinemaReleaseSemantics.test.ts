@@ -23,11 +23,14 @@ test('SEENIT-DISCOVER-001 exige une sortie théâtrale française pour Au ciném
   assert.equal(hasFrenchTheatricalCinemaEvidence({ media_type: 'movie', release_date: relativeIso(-10).slice(0, 10) }), false, 'une date générique récente ne prouve plus une sortie cinéma');
 });
 
-test('SEENIT-DISCOVER-001 respecte la fenêtre cinéma et le marqueur issu de la requête théâtrale', () => {
+test('SEENIT-DISCOVER-001 respecte la fenêtre cinéma et exige toujours le payload détaillé', () => {
   assert.equal(hasFrenchTheatricalCinemaEvidence(movieWithFrenchRelease(3, -76)), false);
   assert.equal(hasFrenchTheatricalCinemaEvidence(movieWithFrenchRelease(3, 11)), false);
-  assert.equal(hasFrenchTheatricalCinemaEvidence({ media_type: 'movie', seenitFrenchTheatrical: true, seenitFrenchTheatricalCheckedAt: Date.now() }), true);
-  assert.equal(hasFrenchTheatricalCinemaEvidence({ media_type: 'movie', seenitFrenchTheatrical: true, seenitFrenchTheatricalCheckedAt: Date.now() - (7 * 60 * 60 * 1000) }), false, 'une preuve interne périmée ne doit pas maintenir le badge indéfiniment');
+  assert.equal(
+    hasFrenchTheatricalCinemaEvidence({ media_type: 'movie', seenitFrenchTheatrical: true, seenitFrenchTheatricalCheckedAt: Date.now() }),
+    false,
+    'un candidat Discover type 2/3 ne suffit jamais sans release_dates détaillé',
+  );
   assert.equal(hasFrenchTheatricalCinemaEvidence({ mediaType: 'movie', tmdbId: 841, seenitFrenchTheatrical: true, seenitFrenchTheatricalCheckedAt: Date.now() }), false, 'un objet de suivi ne peut pas réactiver un marqueur de liste via le fallback historique');
 });
 
