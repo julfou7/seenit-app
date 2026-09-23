@@ -316,16 +316,13 @@ Reddit. Les recommandations contextuelles restent dans Explorer. Les modals pers
 dans la pile Retour.
 
 Dans une fiche épisode, **Discussions Reddit** reste verrouillé avant visionnage. Après marquage vu, le CTA
-ouvre d'abord une recherche Reddit standard ciblée sur l'épisode avec les opérateurs officiellement
-supportés (`title:`, guillemets, `AND` / `OR`, parenthèses) et plusieurs conventions de numérotation.
-Le groupe de contexte obligatoire contient uniquement le titre de série localisé/original ; le nom
-d'épisode reste un indice `title:` dans le groupe épisode et ne peut jamais satisfaire seul le contexte
-de série. Cette page fournit immédiatement les threads trouvés et, si Reddit affiche **« Demander »**,
-un appui supplémentaire lance son résumé IA natif. SeenIt ne transforme jamais une instruction IA en
-paramètre `/search?q=`, car Reddit l'interprète comme du texte à rechercher ; il n'existe pas de
-paramètre URL documenté permettant de forcer la langue de la synthèse. Le français est supporté par
-Reddit AI Search, mais la langue effective de la réponse reste pilotée par Reddit. SeenIt n'appelle ni
-Data API Reddit, ni scraping, ni service IA payant pour produire ce résumé.
+ouvre une recherche Reddit volontairement simple de la forme `Titre S03 E01`. SeenIt conserve un seul
+titre de série visible, sépare saison et épisode en deux termes courts et n'ajoute ni `AND` / `OR`,
+ni `title:`, ni nom d'épisode, ni instruction de résumé. Cette forme naturelle laisse Reddit ouvrir sa
+surface **Tout** et peut déclencher directement sa synthèse IA native avec les publications/commentaires
+qu'il sélectionne. Si Reddit ne propose pas cette synthèse, les résultats standards restent immédiatement
+utilisables comme fallback. SeenIt ne garantit pas l'affichage du bloc IA, piloté par Reddit, et n'appelle
+ni Data API Reddit, ni scraping, ni service IA payant pour le produire.
 
 Le titre affiché privilégie le `title`/`name` de la fiche TMDB récupérée en `fr-FR`. Un ancien titre
 enregistré dans la bibliothèque sert seulement de fallback avant ou hors hydratation. Lorsqu'un média

@@ -7,65 +7,22 @@ import {
   buildRedditSearchUrl,
 } from '../src/components/community/redditEpisodeSearch.ts';
 
-test('SEENIT-COMMUNITY-001 prépare une recherche épisode multi-conventions pour Reddit', () => {
-  const fixtures = [
-    {
-      seriesTitle: 'Severance',
-      originalSeriesTitle: 'Severance',
-      episodeTitle: 'Sweet Vitriol',
-      seasonNumber: 2,
-      episodeNumber: 8,
-    },
-    {
-      seriesTitle: 'Le dernier d’entre nous',
-      originalSeriesTitle: 'The Last of Us',
-      episodeTitle: 'Through the Valley',
-      seasonNumber: 2,
-      episodeNumber: 2,
-    },
-    {
-      seriesTitle: 'Bref.',
-      originalSeriesTitle: null,
-      episodeTitle: null,
-      seasonNumber: 1,
-      episodeNumber: 6,
-    },
-  ];
-
-  for (const fixture of fixtures) {
-    const query = buildRedditEpisodeSearchQuery(fixture);
-    const season = String(fixture.seasonNumber).padStart(2, '0');
-    const episode = String(fixture.episodeNumber).padStart(2, '0');
-
-    assert.match(query, new RegExp(`title:"S${season}E${episode}"`));
-    assert.match(query, new RegExp(`title:"Season ${fixture.seasonNumber} Episode ${fixture.episodeNumber}"`));
-    assert.match(query, new RegExp(`title:"${fixture.seasonNumber}x${episode}"`));
-    assert.match(query, new RegExp(`title:"Episode ${fixture.episodeNumber}"`));
-    assert.match(query, /\bAND\b/);
-    assert.match(query, /\bOR\b/);
-  }
-
-  const bilingual = buildRedditEpisodeSearchQuery(fixtures[1]);
-  assert.match(bilingual, /"Le dernier d’entre nous" OR "The Last of Us"/);
-  assert.match(bilingual, /title:"Through the Valley"/);
-
-  const siloFinale = buildRedditEpisodeSearchQuery({
-    seriesTitle: 'Silo',
-    originalSeriesTitle: 'Silo',
-    episodeTitle: 'Troy',
+test('SEENIT-COMMUNITY-001 utilise une requête épisode courte qui laisse Reddit déclencher son IA native', () => {
+  const query = buildRedditEpisodeSearchQuery({
+    seriesTitle: 'Lioness',
+    originalSeriesTitle: 'Special Ops: Lioness',
     seasonNumber: 3,
-    episodeNumber: 10,
+    episodeNumber: 1,
+    episodeTitle: 'The Spider and the Fly',
   });
 
-  assert.match(siloFinale, /^"Silo" AND \(/);
-  assert.match(siloFinale, /title:"S03E10"/);
-  assert.match(siloFinale, /title:"Troy"/);
-  assert.doesNotMatch(siloFinale, /\("Silo" OR "Troy"\)/);
-  assert.equal((siloFinale.match(/"Troy"/g) ?? []).length, 1);
+  assert.equal(query, 'Lioness S03 E01');
+  assert.doesNotMatch(query, /\b(?:AND|OR)\b|title:|["()]/);
+  assert.doesNotMatch(query, /Spider|Discussion|reactions/i);
 });
 
-test('SEENIT-COMMUNITY-001 n’injecte jamais une consigne IA dans la recherche Reddit', () => {
-  const searchQuery = buildRedditEpisodeSearchQuery({
+test('SEENIT-COMMUNITY-001 n’injecte jamais de syntaxe avancée ni de consigne IA', () => {
+  const query = buildRedditEpisodeSearchQuery({
     seriesTitle: 'Severance',
     originalSeriesTitle: 'Severance',
     seasonNumber: 2,
@@ -73,10 +30,9 @@ test('SEENIT-COMMUNITY-001 n’injecte jamais une consigne IA dans la recherche 
     episodeTitle: 'Sweet Vitriol',
   });
 
-  assert.match(searchQuery, /"Severance"/);
-  assert.match(searchQuery, /title:"S02E08"/);
-  assert.match(searchQuery, /title:"Sweet Vitriol"/);
-  assert.doesNotMatch(searchQuery, /Réponds|français|résume|consensus|théories/i);
+  assert.equal(query, 'Severance S02 E08');
+  assert.doesNotMatch(query, /\b(?:AND|OR)\b|title:|["()]/);
+  assert.doesNotMatch(query, /Réponds|français|résume|consensus|théories|Sweet Vitriol/i);
 });
 
 test('SEENIT-COMMUNITY-001 garde Reddit verrouillé avant visionnage et sans API privée', () => {
@@ -91,21 +47,20 @@ test('SEENIT-COMMUNITY-001 garde Reddit verrouillé avant visionnage et sans API
   assert.doesNotMatch(redditSection + helper, /search\.json|oauth|client[_ -]?id|gemini/i);
 });
 
-test('SEENIT-COMMUNITY-001 conserve la recherche standard comme fallback du résumé IA Reddit', () => {
+test('SEENIT-COMMUNITY-001 ouvre la recherche Tout sans forcer un mode de résultats', () => {
   const query = buildRedditEpisodeSearchQuery({
-    seriesTitle: 'The Bear',
-    seasonNumber: 4,
-    episodeNumber: 3,
-    episodeTitle: 'Scallop',
+    seriesTitle: 'Lioness',
+    seasonNumber: 3,
+    episodeNumber: 1,
   });
   const url = buildRedditSearchUrl(query);
   const redditSection = fs.readFileSync('src/components/community/RedditSection.tsx', 'utf8');
 
   assert.equal(new URL(url).origin, 'https://www.reddit.com');
   assert.equal(new URL(url).pathname, '/search/');
-  assert.equal(new URL(url).searchParams.get('sort'), 'relevance');
-  assert.equal(new URL(url).searchParams.get('q'), query);
-  assert.match(redditSection, /Demander/);
-  assert.match(redditSection, /buildRedditSearchUrl\(query\)/);
-  assert.doesNotMatch(redditSection, /buildRedditEpisodeAiQuestion|Réponds en français/);
+  assert.equal(new URL(url).searchParams.get('q'), 'Lioness S03 E01');
+  assert.equal(new URL(url).searchParams.get('sort'), null);
+  assert.equal(new URL(url).searchParams.get('type'), null);
+  assert.match(redditSection, /résumé IA automatique si Reddit le propose/);
+  assert.doesNotMatch(redditSection, /Demander/);
 });

@@ -83,7 +83,7 @@ export function RedditSection({
               Voir les réactions sur Reddit
             </h3>
             <p className="text-zinc-400 text-[11px] mt-0.5">
-              Résultats ciblés · puis « Demander » pour le résumé IA
+              Recherche simple · résumé IA automatique si Reddit le propose
             </p>
           </div>
         </div>
