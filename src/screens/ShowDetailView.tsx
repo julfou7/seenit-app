@@ -116,7 +116,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
                 const isUpcoming = !isSeries && !isAtCinema && (isMovieUpcoming(tmdbDetails) || isMovieUpcoming(show));
                 const rawStatus = isSeries ? (tmdbDetails?.status || show?.status) : null;
                 const statusText = rawStatus ? (rawStatus === 'Ended' ? 'Terminée' : rawStatus === 'Canceled' ? 'Annulée' : rawStatus === 'Returning Series' ? 'En cours' : rawStatus === 'In Production' ? 'En production' : rawStatus === 'Post Production' ? 'Post-production' : rawStatus === 'Planned' ? 'Prévue' : rawStatus === 'Pilot' ? 'Pilote' : rawStatus === 'ended' ? 'Terminée' : rawStatus === 'canceled' ? 'Annulée' : rawStatus === 'returning' ? 'En cours' : rawStatus) : null;
-                const numberOfSeasons = tmdbDetails?.number_of_seasons || (show as any)?.totalSeasons;
+                const numberOfSeasons = tmdbDetails?.number_of_seasons || (show as Show & { totalSeasons?: number })?.totalSeasons;
                 const hasTmdb = tmdbDetails?.vote_average != null && Number(tmdbDetails.vote_average) > 0;
                 const tmdbRating = hasTmdb ? Number(tmdbDetails.vote_average).toFixed(1) : null;
                 const isTmdbLoading = !tmdbDetails;
