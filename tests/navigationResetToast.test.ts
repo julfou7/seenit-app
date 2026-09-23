@@ -56,6 +56,21 @@ test('#292 câble le reset réel vers le contexte puis vers le toast', () => {
   assert.match(toastContainerSource, /symbol=\{parsed\.iconSymbol\}/);
 });
 
+test('#292 garde les toasts de reset en or sans recolorer les téléchargements métier', () => {
+  assert.match(
+    toastContainerSource,
+    /symbol=\{parsed\.iconSymbol\}[\s\S]{0,120}color="gold"/,
+  );
+  assert.match(
+    toastContainerSource,
+    /if \(isDownloadToast\)[\s\S]{0,180}symbol="download" color="blue"/,
+  );
+  assert.match(
+    toastContainerSource,
+    /case 'download': return <SeenItGlyph[^>]*symbol="download" color="blue"/,
+  );
+});
+
 test('#292 retire le cast any du changement d’onglet dans BottomNav', () => {
   assert.doesNotMatch(bottomNavSource, /onTabChange\(tabId as any\)/);
 });
