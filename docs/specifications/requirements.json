@@ -373,7 +373,7 @@
     },
     {
       "id": "SEENIT-COMMUNITY-002",
-      "title": "Réactions Reddit film via titre communautaire anglais et fils Official Discussion",
+      "title": "Réactions Reddit film via titre communautaire anglais et requête courte sans convention de thread",
       "targets": [
         "pwa",
         "apk"
@@ -381,7 +381,11 @@
       "tests": [
         {
           "file": "tests/redditMovieSearch.test.ts",
-          "contains": "SEENIT-COMMUNITY-002 cible Official Discussion au lieu de movie discussion"
+          "contains": "SEENIT-COMMUNITY-002 couvre The Tinder Swindler sans suffixe éditorial"
+        },
+        {
+          "file": "tests/redditMovieSearch.test.ts",
+          "contains": "SEENIT-COMMUNITY-002 garde une requête film courte indépendante du type de thread"
         },
         {
           "file": "tests/redditMovieSearch.test.ts",

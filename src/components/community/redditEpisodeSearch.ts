@@ -27,7 +27,7 @@ export function buildRedditMovieSearchQuery({
     || normalizeSearchTerm(movieTitle)
     || normalizeSearchTerm(originalMovieTitle);
 
-  return [title, 'official discussion'].filter(Boolean).join(' ');
+  return title;
 }
 
 export function buildRedditEpisodeSearchQuery({
