@@ -347,7 +347,7 @@
     },
     {
       "id": "SEENIT-COMMUNITY-001",
-      "title": "Réactions Reddit épisode via requête courte compatible synthèse IA native et anti-spoiler",
+      "title": "Réactions Reddit épisode via requête courte non paddée compatible synthèse IA native et anti-spoiler",
       "targets": [
         "pwa",
         "apk"
@@ -355,7 +355,7 @@
       "tests": [
         {
           "file": "tests/redditEpisodeSearch.test.ts",
-          "contains": "SEENIT-COMMUNITY-001 utilise une requête épisode courte qui laisse Reddit déclencher son IA native"
+          "contains": "SEENIT-COMMUNITY-001 conserve les numéros naturels sans padding sur le chemin de production Reddit"
         },
         {
           "file": "tests/redditEpisodeSearch.test.ts",
@@ -367,7 +367,7 @@
         },
         {
           "file": "tests/redditEpisodeSearch.test.ts",
-          "contains": "SEENIT-COMMUNITY-001 ouvre la recherche Tout sans forcer un mode de résultats"
+          "contains": "SEENIT-COMMUNITY-001 ouvre la recherche Tout sans padding ni mode de résultats forcé"
         }
       ]
     },
