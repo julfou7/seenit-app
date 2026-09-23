@@ -936,6 +936,13 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   actions secondaires telles que « Annuler » ou « Ignorer les suivants » ne déclenchent jamais la
   navigation, et un drag/swipe de fermeture neutralise le clic de relâchement. La règle est identique en
   PWA et APK ; au clavier, un toast navigable est focalisable et s'active avec Entrée ou Espace.
+- **SEENIT-UX-007** — Le partage d'une fiche Film/Série produit toujours une URL HTTPS publique
+  canonique sur `https://seenit.ai.studio/`, contenant uniquement l'identité `tmdbId` +
+  `mediaType`. Le lien doit rouvrir la même fiche après démarrage et, si nécessaire, authentification,
+  depuis la PWA comme depuis l'APK ; il n'expose jamais UID, ID Firestore, secret ni URL locale WebView.
+  Le Web Share et le fallback presse-papiers utilisent exactement cette même URL. Tant qu'aucun profil
+  public et son périmètre de confidentialité ne sont spécifiés, le Profil n'affiche aucune action
+  « Partager » et aucune donnée de profil n'est publiée.
 - Les dialogues critiques utilisent un rôle adapté, sont fermables par Échap, placent le focus
   sur une action et ne déclenchent aucune suppression sans confirmation quand le transfert est
   actif.

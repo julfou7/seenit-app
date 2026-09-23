@@ -30,6 +30,7 @@ import { downloadEpisodeWithSeasonPackFallback } from '../features/downloads/epi
 import { acceptDownloadRequest, beginDownloadRequest, failDownloadRequest, updateDownloadRequest } from '../features/downloads/downloadLifecycle';
 import { readUserScopedJson } from '../lib/userIsolation';
 import { mediaKeyFrom, toMediaKey } from '../features/shows/mediaRelations';
+import { buildMediaShareUrl } from '../features/navigation/mediaShareUrl';
 import { getParentalRatingColorClass, resolveParentalRating } from '../features/shows/parentalRating';
 import {
   type ShowDetailScreenProps,
@@ -50,7 +51,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     (externalTmdbId && String(s.tmdbId) === String(externalTmdbId))
   );
 
-  const lastKnownShowRef = useRef<any>(show);
+  const lastKnownShowRef = useRef<Show | undefined>(show);
   if (show) lastKnownShowRef.current = show;
 
   const persistentTmdbIdRef = useRef<number | undefined>(
@@ -869,11 +870,20 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   };
   const handleShare = async () => {
     const titleText = title || tmdbDetails?.name || tmdbDetails?.title || (isSeries ? 'Série' : 'Film');
-    const shareData = { title: titleText, text: `Découvre ${titleText} !`, url: window.location.href };
+    const shareUrl = effectiveTmdbId
+      ? buildMediaShareUrl({ tmdbId: Number(effectiveTmdbId), mediaType: requestedMediaType })
+      : null;
+
+    if (!shareUrl) {
+      showToast('Impossible de créer le lien de partage', 'info', show || undefined);
+      return;
+    }
+
+    const shareData = { title: titleText, text: `Découvre ${titleText} !`, url: shareUrl };
     if (typeof navigator !== 'undefined' && navigator.share) {
       try { await navigator.share(shareData); } catch (e) {}
     } else {
-      try { await navigator.clipboard.writeText(window.location.href); showToast('Lien copié dans le presse-papier !', 'info', show || undefined); }
+      try { await navigator.clipboard.writeText(shareUrl); showToast('Lien copié dans le presse-papier !', 'info', show || undefined); }
       catch (e) { showToast('Impossible de copier le lien', 'info', show || undefined); }
     }
   };

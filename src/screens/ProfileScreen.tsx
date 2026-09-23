@@ -1,5 +1,5 @@
 import React, { Activity, startTransition, useCallback, useState, useEffect, useRef } from 'react';
-import { Settings, Share2, Calendar, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { Settings, Calendar, ArrowLeft } from 'lucide-react';
 import { auth } from '../lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { SettingsScreen } from './SettingsScreen';
@@ -33,7 +33,6 @@ export const ProfileScreen = React.memo(function ProfileScreen({
   // App ne monte le Profil qu'après résolution de Firebase Auth : reprendre la
   // valeur déjà disponible évite une frame « Utilisateur » au redémarrage.
   const [user, setUser] = useState<FirebaseUser | null>(() => auth.currentUser);
-  const [shareCopied, setShareCopied] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [activeTab, setActiveTab] = useState<'stats' | 'library'>('stats');
   const [mountedProfileTabs, setMountedProfileTabs] = useState(() => new Set<'stats' | 'library'>(['stats']));
@@ -192,25 +191,6 @@ export const ProfileScreen = React.memo(function ProfileScreen({
     setAvatarLoadFailed(false);
   }, [user?.uid, avatarUrl]);
 
-  const handleShare = async () => {
-    const text = `Découvre mon Profil Cinéphile sur l'application !`;
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Mon Profil Cinéphile',
-          text,
-          url: window.location.href,
-        });
-      } catch (err) {
-        console.log(err);
-      }
-    } else {
-      navigator.clipboard.writeText(text);
-      setShareCopied(true);
-      setTimeout(() => setShareCopied(false), 2500);
-    }
-  };
-
   const creationYear = user?.metadata?.creationTime 
     ? new Date(user.metadata.creationTime).getFullYear() 
     : 2024;
@@ -253,13 +233,6 @@ export const ProfileScreen = React.memo(function ProfileScreen({
           </div>
 
           <div className="flex gap-2">
-            <button 
-              onClick={handleShare}
-              className="bg-zinc-800/80 hover:bg-zinc-800 active:scale-95 text-zinc-200 px-3 py-2 rounded-xl transition-all border border-zinc-700/50 flex items-center gap-1.5 text-xs font-semibold"
-            >
-              {shareCopied ? <CheckCircle2 size={15} className="text-emerald-400" /> : <Share2 size={15} />}
-              <span>{shareCopied ? 'Copié !' : 'Partager'}</span>
-            </button>
             <button 
               onClick={() => setShowSettings(true)}
               className="bg-zinc-800/80 hover:bg-zinc-800 active:scale-95 text-zinc-200 px-3 py-2 rounded-xl transition-all border border-zinc-700/50 flex items-center gap-1.5 text-xs font-semibold"

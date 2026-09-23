@@ -53,5 +53,5 @@ test('SEENIT-QUALITY-002 indexe l’audit fonctionnel et ne conserve que les éc
   assert.match(auditIndex, /#94/);
   assert.doesNotMatch(functional, /#94/);
   assert.match(functional, /#95/);
-  assert.match(functional, /#96/);
+  assert.doesNotMatch(functional, /#96/);
 });

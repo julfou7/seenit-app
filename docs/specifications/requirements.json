@@ -1643,6 +1643,28 @@
       ]
     },
     {
+      "id": "SEENIT-UX-007",
+      "title": "Partage média réouvrable sans exposition de profil privé",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/mediaShareNavigation.test.ts",
+          "contains": "SEENIT-UX-007 construit un lien média public canonique sans identifiant privé"
+        },
+        {
+          "file": "tests/mediaShareNavigation.test.ts",
+          "contains": "SEENIT-UX-007 réouvre le lien média par tmdbId et mediaType sur PWA et APK"
+        },
+        {
+          "file": "tests/mediaShareNavigation.test.ts",
+          "contains": "SEENIT-UX-007 retire le partage Profil tant qu’aucun profil public n’existe"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-QUALITY-002",
       "title": "Audits datés et reliés à un backlog priorisé",
       "targets": [
