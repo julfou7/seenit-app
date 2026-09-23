@@ -34,7 +34,7 @@ test('SEENIT-DOWNLOAD-VISIBILITY-001 masque navigation, actions et runtime tant 
 
   assert.match(configSource, /downloadsEnabled:\s*false/);
   assert.match(configSource, /downloadsEnabled:\s*current\.downloadsEnabled === true/);
-  assert.match(navSource, /tabs\.filter\(tab => tab\.id !== 'downloads'\)/);
+  assert.match(navSource, /NAVIGATION_TABS\.filter\(tab => tab\.id !== 'downloads'\)/);
   assert.match(navigationHookSource, /resolveDownloadAwareTab/);
   assert.match(settingsCardSource, /role="switch"/);
   assert.doesNotMatch(settingsCardSource, /C411|Sonarr|Radarr|qBittorrent/);
