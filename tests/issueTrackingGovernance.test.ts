@@ -177,3 +177,29 @@ test('SEENIT-QUALITY-004 exige un reçu pré-acquisition avant tout clone local'
   assert.match(normalize(delivery), /API-first[\s\S]*acquisition locale est interdite/i);
   assert.match(normalize(remote), /Ne jamais lancer `git clone`[\s\S]*simplement découvrir si l'egress fonctionne/i);
 });
+
+test('SEENIT-QUALITY-004 capture tout axe d’amélioration concret sans ralentir le chantier', () => {
+  const agents = fs.readFileSync('AGENTS.md', 'utf8');
+  const bootstrap = fs.readFileSync('.agents/AGENTS.md', 'utf8');
+  const delivery = fs.readFileSync('docs/process/delivery.md', 'utf8');
+  const spec = fs.readFileSync('docs/specifications/seenit.md', 'utf8');
+  const registry = fs.readFileSync('docs/requests/registry.md', 'utf8');
+  const normalize = (source: string) => source.replace(/\s+/g, ' ');
+
+  for (const source of [agents, bootstrap, delivery, spec].map(normalize)) {
+    assert.match(source, /axe d'amélioration concret[^.]*actionnable/i);
+    assert.match(source, /même sans difficulté|sans incident/i);
+    assert.match(source, /issues GitHub ouvertes[^.]*fermées|recherche GitHub ciblée/i);
+    assert.match(source, /réutilise|rouvre/i);
+    assert.match(source, /issue d'amélioration continue/i);
+    assert.match(source, /observation[^.]*contexte[\s\S]*bénéfice attendu/i);
+    assert.match(source, /critère de fin/i);
+    assert.match(source, /reprendre immédiatement|retour immédiat/i);
+  }
+
+  assert.match(normalize(agents), /ni audit global[\s\S]*ni reproduction supplémentaire[\s\S]*ni implémentation/i);
+  assert.match(normalize(delivery), /réduire le travail évitable[\s\S]*accélérer les interventions/i);
+  assert.match(normalize(spec), /ne lance ni audit[\s\S]*ni reproduction[\s\S]*ni investigation[\s\S]*ni implémentation/i);
+  assert.match(registry, /USR-2026-09-23-002/);
+});
+
