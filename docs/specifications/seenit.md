@@ -237,6 +237,11 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
   les cartes réutilisent exactement la même sémantique sans redeviner depuis une date générique.
 - Les fiches détaillées utilisent les `release_dates` TMDB déjà récupérées avec les détails du film pour
   appliquer la même règle aux badges individuels. La logique est commune à la PWA et à l'APK.
+- Sur la fiche Film, cette même décision canonique remplace le libellé générique du chip principal par
+  **« AU CINÉMA »** dans le même emplacement, en conservant la durée lorsqu'elle est connue. Aucun second
+  badge cinéma n'est rendu plus bas ; un film hors cinéma conserve le chip **« FILM »**. La ligne de
+  métadonnées reste repliable sans chevauchement sur les largeurs mobiles usuelles et le shell froid
+  conserve sa géométrie stable.
 - TMDB permet de distinguer théâtral et digital mais ne constitue pas une base temps réel des séances :
   « Au cinéma » signifie ici sortie théâtrale française dans cette fenêtre, pas présence garantie dans
   au moins une salle aujourd'hui.

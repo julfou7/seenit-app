@@ -84,3 +84,21 @@ test('SEENIT-DISCOVER-001 contraint Explorer aux release types TMDB 2 ou 3 en Fr
   assert.doesNotMatch(cinemaBlock, /primary_release_date\.gte/);
   assert.match(source, /getMovieDetails/, 'les détails film doivent alimenter la même preuve utilisée par les badges');
 });
+
+test('SEENIT-DISCOVER-001 intègre Au cinéma au chip principal de la fiche film sans doublon', () => {
+  const source = fs.readFileSync('src/screens/ShowDetailView.tsx', 'utf8');
+  const chipStart = source.indexOf('<div className="mb-2 flex items-center gap-2 flex-wrap min-h-[24px]">');
+  const logoStart = source.indexOf('<div className="my-2 min-h-[64px] flex items-center">', chipStart);
+  const chipSource = source.slice(chipStart, logoStart);
+
+  assert.ok(chipStart >= 0 && logoStart > chipStart, 'le chip principal doit rester identifiable dans le hero');
+  assert.equal((source.match(/const isAtCinema =/g) || []).length, 1, 'la décision cinéma est partagée au niveau de la fiche');
+  assert.ok(source.indexOf('const isAtCinema =') < chipStart, 'la décision cinéma doit être disponible avant le chip principal');
+  assert.match(chipSource, /isAtCinema \? <>🎟 AU CINÉMA • \{formatRuntime\(tmdbDetails\?\.runtime\)\}<\/>/);
+  assert.match(chipSource, /: <>🎬 FILM • \{formatRuntime\(tmdbDetails\?\.runtime\)\}<\/>/);
+  assert.match(chipSource, /border-\[#E5A93D\]\/30 shrink-0/);
+  assert.match(chipSource, /flex-wrap/);
+  assert.doesNotMatch(source, /<Ticket[\s\S]{0,160}Au cinéma/);
+  assert.doesNotMatch(source, />Au cinéma<\/span>/);
+  assert.match(source, /isUpcoming && <span className="text-purple-400/);
+});

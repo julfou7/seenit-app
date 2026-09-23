@@ -416,6 +416,10 @@
         {
           "file": "tests/cinemaReleaseSemantics.test.ts",
           "contains": "SEENIT-DISCOVER-001 contraint Explorer aux release types TMDB 2 ou 3 en France"
+        },
+        {
+          "file": "tests/cinemaReleaseSemantics.test.ts",
+          "contains": "SEENIT-DISCOVER-001 intègre Au cinéma au chip principal de la fiche film sans doublon"
         }
       ]
     },

@@ -375,6 +375,11 @@ en haut de la fiche** sont tous absents.
 
 ### 8.2 Films
 
+- Le chip principal du hero affiche **« AU CINÉMA »** à la place de **« FILM »** lorsque la preuve
+  théâtrale France canonique de `SEENIT-DISCOVER-001` est positive, sans second badge cinéma plus bas.
+  La durée reste dans ce même chip lorsqu'elle est connue ; un film hors cinéma conserve **« FILM »**.
+  Le chip et le badge d'âge peuvent se replier sur une seconde ligne sans troncature ni chevauchement,
+  avec la même géométrie froide/chaude en PWA et APK.
 - Ajouter à « Films à voir » suit sans marquer vu.
 - « Film vu » crée `seenEpisodes=['movie']`, un `episodeRecords.movie.watchedAt` et `completed`.
 - Repasser non vu retire cette progression et revient à « À voir ».
