@@ -151,7 +151,7 @@ test('issue #91 le backend invalide une preuve film persistée v1 et recharge FR
   const address = server.address();
   assert.ok(address && typeof address === 'object');
 
-  const response = await fetch(`http://127.0.0.1:${address.port}/api/media/parental-ratings?items=movie%3A7`);
+  const response = await fetch(`http://127.0.0.1:${address.port}/api/media/parental-ratings?items=movie%3A7&cinema=1`);
   assert.equal(response.status, 200);
   const payload = requireRecord(await response.json());
   const results = requireRecords(payload.results);

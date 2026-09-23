@@ -23,7 +23,7 @@ export async function enrichCinemaEvidenceForSearchResults<T>(
 
   try {
     const response = await authenticatedFetch(
-      `/api/media/parental-ratings?items=${encodeURIComponent(keys.join(','))}`,
+      `/api/media/parental-ratings?items=${encodeURIComponent(keys.join(','))}&cinema=1`,
       { signal },
     );
     if (!response.ok) return results;

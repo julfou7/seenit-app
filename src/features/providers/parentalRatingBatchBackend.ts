@@ -101,10 +101,14 @@ export function compactParentalDetails(item: ParentalBatchItem, payload: unknown
   return { id: item.id, media_type: item.mediaType, content_ratings: { results } };
 }
 
-function isReusablePersistedDetails(item: ParentalBatchItem, details: unknown): boolean {
+function isReusablePersistedDetails(
+  item: ParentalBatchItem,
+  details: unknown,
+  requireCinemaEvidence: boolean,
+): boolean {
   const record = asRecord(details);
   if (!record) return false;
-  if (item.mediaType !== 'movie') return true;
+  if (item.mediaType !== 'movie' || !requireCinemaEvidence) return true;
   return Number(record.seenitParentalDetailsSchema) === PARENTAL_BATCH_MOVIE_DETAILS_SCHEMA;
 }
 
@@ -182,12 +186,17 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
       res.status(401).json({ error: 'Authentification requise.' });
       return;
     }
-    if (Object.keys(req.query).some(key => key !== 'items' && key !== 'stream')) {
+    if (Object.keys(req.query).some(key => key !== 'items' && key !== 'stream' && key !== 'cinema')) {
       res.status(400).json({ error: 'Requête de classifications refusée.' });
       return;
     }
     const stream = req.query.stream === '1';
     if (req.query.stream !== undefined && !stream) {
+      res.status(400).json({ error: 'Requête de classifications refusée.' });
+      return;
+    }
+    const requireCinemaEvidence = req.query.cinema === '1';
+    if (req.query.cinema !== undefined && !requireCinemaEvidence) {
       res.status(400).json({ error: 'Requête de classifications refusée.' });
       return;
     }
@@ -202,7 +211,9 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
       : new Map<string, any>();
     for (const item of items) {
       const details = persistedByKey.get(item.key);
-      if (isReusablePersistedDetails(item, details)) writeProviderCache(item.key, details);
+      if (isReusablePersistedDetails(item, details, requireCinemaEvidence)) {
+        writeProviderCache(item.key, details);
+      }
     }
     const misses = items.filter(item => !readProviderCache(item.key));
 
