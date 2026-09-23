@@ -68,8 +68,10 @@ Le contrat d'appui/reset de #178 est distinct de cet ordre visuel et désormais 
 - Deux appuis sur le même onglet déjà actif constituent un raccourci de reset de sa vue uniquement.
   Le passage A → B → B ne doit pas consommer le premier tap comme un reset inattendu.
 - Chaque page restaure sa sous-vue initiale, replie ses panneaux et efface ses recherches, filtres et
-  expansions locales, puis affiche un toast adapté. À voir revient à À Regarder, Profil à Statistiques,
-  Télécharger à Mes téléchargements et Explorer à son filtre Tout.
+  expansions locales, puis affiche un toast reprenant le glyphe SeenIt de l’onglet en **or**, comme la
+  navigation active. À voir revient à À Regarder, Profil à Statistiques, Télécharger à Mes téléchargements
+  et Explorer à son filtre Tout. Cette couleur de contexte de navigation ne modifie pas les vrais toasts
+  métier de téléchargement, qui conservent leur présentation bleue.
 - Chaque reset a une alternative visible accessible et ne touche ni bibliothèque, ni progression,
   ni préférences cloud. L'onglet actif est annoncé aux technologies d'assistance.
 - Le double appui applicatif ne remplace pas l'activation standard du lecteur d'écran. Les tests
