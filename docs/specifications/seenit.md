@@ -1166,15 +1166,17 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   `SEENIT-QUALITY-009` lit la carte et les seules sections canoniques directement concernées. L'agent
   recherche ensuite les issues GitHub ouvertes et fermées liées au sujet ainsi que les PR, commits, audits et
   documents pertinents. Il réutilise ou rouvre l'issue adaptée lorsqu'elle existe au lieu de créer un
-  doublon. Pendant l'intervention, toute difficulté réellement rencontrée qui est corrigeable et dont la
-  correction éviterait ou réduirait le même coût lors d'une prochaine intervention déclenche d'abord une
-  recherche des issues GitHub ouvertes et fermées liées. L'agent réutilise ou rouvre l'issue adaptée ou,
-  si aucune n'existe, ouvre immédiatement une issue d'amélioration continue dédiée décrivant le contexte,
-  l'impact concret, la cause racine connue ou l'hypothèse qualifiée, l'amélioration durable proposée, le
-  bénéfice attendu, les critères de validation/fin et le lien vers le chantier révélateur. Le chantier
-  principal continue sauf si cette amélioration est nécessaire pour le terminer correctement ; aucune issue
-  n'est créée pour une gêne non reproductible, un simple manque d'information déjà résolu, une contrainte
-  externe non corrigeable ou une difficulté inventée. Dès qu'un travail est relié à une issue GitHub, son corps reste la source de vérité opérationnelle
+  doublon. Pendant l'intervention, toute difficulté réellement rencontrée qui est corrigeable **ou tout axe
+  d'amélioration concret et actionnable observé même sans difficulté** déclenche une recherche GitHub ciblée
+  des issues ouvertes et fermées liées. L'agent réutilise/rouvre l'issue adaptée ou, si aucune n'existe,
+  ouvre immédiatement une issue d'amélioration continue. Cette capture reste volontairement légère afin de
+  ne pas ralentir le chantier : observation et contexte, bénéfice attendu, piste si elle est déjà évidente,
+  critère de fin et lien vers le chantier ; impact/cause/hypothèse seulement s'ils sont déjà connus. L'agent
+  ne lance ni audit, ni reproduction, ni investigation, ni implémentation uniquement pour documenter cette
+  amélioration et reprend immédiatement le chantier principal. L'amélioration n'est traitée dans le même
+  chantier que si elle est nécessaire à sa bonne fin ou explicitement demandée. Aucune issue n'est créée
+  pour une idée purement spéculative, un doublon exact, un manque d'information déjà résolu ou une contrainte
+  externe non actionnable. Dès qu'un travail est relié à une issue GitHub, son corps reste la source de vérité opérationnelle
   pendant toute l'intervention : l'agent l'actualise aux jalons significatifs prouvés (diagnostic et décisions
   utiles, implémentation prête, validation/CI, intégration sur `main`, release ou blocage), coche chaque
   critère dès qu'il est réellement satisfait et remplace les informations devenues obsolètes. Les

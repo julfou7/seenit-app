@@ -139,20 +139,22 @@ test('SEENIT-QUALITY-004 ouvre proactivement une issue d’amélioration continu
 
   const normalizeReflowableText = (source: string) => source.replace(/\s+/g, ' ');
   for (const source of [agents, bootstrap, spec].map(normalizeReflowableText)) {
-    assert.match(source, /difficulté réellement rencontrée[\s\S]*corrigeable[\s\S]*prochaine intervention/i);
-    assert.match(source, /issues GitHub ouvertes[\s\S]*fermées/i);
-    assert.match(source, /réutilise(?:r)?[\s\S]*rouvr(?:e|ir)/i);
-    assert.match(source, /ouvr(?:e|ir) immédiatement[\s\S]*issue d'amélioration continue/i);
-    assert.match(source, /contexte[\s\S]*impact concret[\s\S]*cause racine[\s\S]*hypothèse[\s\S]*amélioration durable[\s\S]*bénéfice attendu[\s\S]*critères de validation\/fin/i);
-    assert.match(source, /chantier principal continue/i);
+    assert.match(source, /difficulté[\s\S]*corrigeable/i);
+    assert.match(source, /issues GitHub ouvertes[\s\S]*fermées|recherche GitHub ciblée/i);
+    assert.match(source, /réutilise(?:r)?|rouvr(?:e|ir)/i);
+    assert.match(source, /issue d'amélioration continue/i);
+    assert.match(source, /observation|contexte/i);
+    assert.match(source, /bénéfice attendu/i);
+    assert.match(source, /critère de fin/i);
+    assert.match(source, /reprendre immédiatement|reprend immédiatement|retour immédiat/i);
   }
 
   const normalizedAgents = normalizeReflowableText(agents);
   const normalizedBootstrap = normalizeReflowableText(bootstrap);
   const normalizedSpec = normalizeReflowableText(spec);
-  assert.match(normalizedAgents, /non reproductible[\s\S]*non corrigeable[\s\S]*difficulté inventée/i);
-  assert.match(normalizedBootstrap, /non reproductible[\s\S]*non corrigeable[\s\S]*difficulté inventée/i);
-  assert.match(normalizedSpec, /non reproductible[\s\S]*non corrigeable[\s\S]*difficulté inventée/i);
+  assert.match(normalizedAgents, /idée purement spéculative[\s\S]*doublon exact[\s\S]*contrainte externe/i);
+  assert.match(normalizedBootstrap, /idée purement spéculative[\s\S]*doublon exact[\s\S]*contrainte externe/i);
+  assert.match(normalizedSpec, /idée purement spéculative[\s\S]*doublon exact[\s\S]*contrainte externe/i);
   assert.match(requestRegistry, /USR-2026-09-21-014/);
   assert.match(requestRegistry, /issue #496/);
 });
@@ -176,4 +178,29 @@ test('SEENIT-QUALITY-004 exige un reçu pré-acquisition avant tout clone local'
   assert.match(normalize(agents), /vérifier seulement un chemin attendu[\s\S]*ne prouve pas l'absence de workspace/i);
   assert.match(normalize(delivery), /API-first[\s\S]*acquisition locale est interdite/i);
   assert.match(normalize(remote), /Ne jamais lancer `git clone`[\s\S]*simplement découvrir si l'egress fonctionne/i);
+});
+
+test('SEENIT-QUALITY-004 capture tout axe d’amélioration concret sans ralentir le chantier', () => {
+  const agents = fs.readFileSync('AGENTS.md', 'utf8');
+  const bootstrap = fs.readFileSync('.agents/AGENTS.md', 'utf8');
+  const delivery = fs.readFileSync('docs/process/delivery.md', 'utf8');
+  const spec = fs.readFileSync('docs/specifications/seenit.md', 'utf8');
+  const registry = fs.readFileSync('docs/requests/registry.md', 'utf8');
+  const normalize = (source: string) => source.replace(/\s+/g, ' ');
+
+  for (const source of [agents, bootstrap, delivery, spec].map(normalize)) {
+    assert.match(source, /axe d'amélioration concret[^.]*actionnable/i);
+    assert.match(source, /même[\s\S]{0,80}(?:sans|aucune) difficulté|sans incident/i);
+    assert.match(source, /issues GitHub ouvertes[^.]*fermées|recherche GitHub ciblée/i);
+    assert.match(source, /réutilise|rouvre/i);
+    assert.match(source, /issue d'amélioration continue/i);
+    assert.match(source, /observation[^.]*contexte[\s\S]*bénéfice attendu/i);
+    assert.match(source, /critère de fin/i);
+    assert.match(source, /reprendre immédiatement|reprend immédiatement|retour immédiat/i);
+  }
+
+  assert.match(normalize(agents), /ni audit global[\s\S]*ni reproduction supplémentaire[\s\S]*ni implémentation/i);
+  assert.match(normalize(delivery), /réduire le travail évitable[\s\S]*accélérer les interventions/i);
+  assert.match(normalize(spec), /ne lance ni audit[\s\S]*ni reproduction[\s\S]*ni investigation[\s\S]*ni implémentation/i);
+  assert.match(registry, /USR-2026-09-23-002/);
 });

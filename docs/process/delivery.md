@@ -210,6 +210,24 @@ administratifs. Le test ciblé et l'issue éventuelle suffisent.
 Les décisions de processus sont tracées ici, dans les audits et les issues d'architecture plutôt que
 d'être dupliquées dans chaque fiche produit.
 
+## Capture proactive des améliorations sans ralentir le chantier
+
+Pendant un développement, `SEENIT-QUALITY-004` traite une opportunité d'amélioration comme un élément de
+backlog à **capturer**, pas comme un sous-chantier à exécuter immédiatement. Le déclencheur couvre à la fois
+une difficulté corrigeable réellement rencontrée et un axe d'amélioration concret/actionnable observé sans
+incident.
+
+Le chemin rapide est : recherche GitHub ciblée pour éviter un doublon → mise à jour/réouverture de l'issue
+existante ou création d'une issue d'amélioration continue courte → retour immédiat à la prochaine action du chantier principal.
+La capture minimale contient l'observation et son contexte, le bénéfice attendu, la piste de traitement si
+elle est déjà évidente, un critère de fin et le lien vers le chantier révélateur. Aucune recherche large,
+reproduction supplémentaire, analyse de cause racine, implémentation ou validation n'est lancée uniquement
+pour enrichir cette issue. Une cause/hypothèse déjà connue peut être notée sans investigation additionnelle.
+
+L'amélioration n'entre dans le périmètre courant que si elle est nécessaire pour terminer correctement la
+demande en cours ou si l'utilisateur l'a explicitement demandée. Cette règle vise à **réduire le travail
+évitable et accélérer les interventions**, pas à ajouter une étape administrative lourde.
+
 ## Acquisition du workspace et reprise d'intervention
 
 La vérification du `main` GitHub canonique et la matérialisation d'un dépôt local sont deux opérations

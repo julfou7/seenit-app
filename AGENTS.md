@@ -345,19 +345,29 @@ Le rapport final précise ce qui a été validé en PWA et/ou APK et ce qui atte
 
 **Tout audit doit être enregistré** dans `docs/audits/`, indexé dans `docs/audits/README.md` et contenir baseline, périmètre, preuves, décisions et matrice exhaustive. Un constat ouvert pointe vers une **issue GitHub priorisée** ou un risque accepté explicitement.
 
-**Amélioration continue proactive pendant le chantier.** Dès qu'une difficulté réellement rencontrée
-(blocage, détour, limite d'outillage, échec de CI/TNR, friction de process ou hypothèse invalidée) est
-**corrigeable** et que sa correction permettrait d'éviter ou de réduire le même coût lors d'une prochaine
-intervention, l'agent agit sans attendre le rapport final. Il recherche d'abord les issues GitHub ouvertes
-et fermées liées à cette difficulté ; il réutilise ou rouvre l'issue adaptée lorsqu'elle existe et y ajoute
-la nouvelle preuve. Si aucune issue adaptée n'existe, il **ouvre immédiatement une issue d'amélioration
-continue dédiée**. Cette issue décrit au minimum la difficulté et son contexte, l'impact concret sur le
-chantier courant, la cause racine connue ou l'hypothèse explicitement qualifiée, l'amélioration durable
-proposée pour la prochaine fois, le bénéfice attendu, les critères de validation/fin et le lien vers le
-chantier qui l'a révélée. L'ouverture de cette issue ne remplace pas le travail courant : le chantier
-principal continue sauf si cette amélioration est elle-même nécessaire pour le terminer correctement.
-Ne pas créer d'issue pour une gêne non reproductible, un simple manque d'information déjà résolu, une
-contrainte externe non corrigeable ou une difficulté inventée.
+**Amélioration continue proactive pendant le chantier — capture légère, non bloquante.** Deux déclencheurs
+sont obligatoires :
+- toute **difficulté réellement rencontrée** (blocage, détour, limite d'outillage, échec de CI/TNR,
+  friction de process ou hypothèse invalidée) qui est corrigeable et dont le traitement éviterait ou
+  réduirait un coût futur ;
+- tout **axe d'amélioration concret et actionnable observé pendant le travail**, même s'il n'a provoqué
+  aucune difficulté : gain possible de vitesse, fiabilité, maintenabilité, qualité, UX, tests, CI,
+  outillage, architecture ou process.
+
+Dans les deux cas, l'agent effectue une **recherche GitHub ciblée et rapide** des issues ouvertes et
+fermées liées afin d'éviter les doublons. Il réutilise ou rouvre l'issue adaptée ; sinon il ouvre
+immédiatement une issue d'amélioration continue. Cette capture est volontairement minimale : observation
+et contexte/lien vers le chantier, bénéfice attendu, piste de traitement si elle est déjà évidente et
+critère de fin. Pour une difficulté, ajouter l'impact concret et la cause racine/hypothèse **uniquement si
+elle est déjà connue** ; ne pas lancer d'investigation supplémentaire juste pour remplir l'issue.
+
+**La capture ne doit pas ralentir le développement courant.** Elle n'entraîne ni audit global, ni
+reproduction supplémentaire, ni implémentation, ni validation dédiée dans le chantier en cours. Après
+création/mise à jour de l'issue, reprendre immédiatement la prochaine action du chantier principal. Traiter
+l'amélioration sur-le-champ uniquement si elle est nécessaire pour terminer correctement la demande
+courante ou si l'utilisateur l'a explicitement incluse dans le périmètre. Ne pas créer d'issue pour une
+idée purement spéculative sans observation concrète, un doublon exact, un simple manque d'information déjà
+résolu ou une contrainte externe non actionnable par SeenIt.
 
 Une issue active est mise à jour aux jalons utiles : implémentation prête, validation/CI, merge, release ou blocage. Ne mettez pas à jour le corps après chaque micro-commit. Cochez un critère seulement quand il est réellement prouvé.
 
