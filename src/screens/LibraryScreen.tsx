@@ -67,7 +67,7 @@ function findCurrentShow(media: TMDBMedia): Show | undefined {
 
 interface LibraryRowProps {
   data: LibraryItem[];
-  onShowClick: (id: any, mediaType?: 'tv' | 'movie') => void;
+  onShowClick: (id: string | number, mediaType?: 'tv' | 'movie') => void;
   onToggleWatched: (media: TMDBMedia) => void;
   onLongPress: (media: TMDBMedia) => void;
   onAddClick: (media: TMDBMedia) => void;
@@ -297,7 +297,7 @@ export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, is
     return () => window.removeEventListener('library-reset-all', handleResetAll);
   }, []);
 
-  const handleShowClick = useCallback((id: any, mediaType?: 'tv' | 'movie') => {
+  const handleShowClick = useCallback((id: string | number, mediaType?: 'tv' | 'movie') => {
     onShowClick(String(id), mediaType);
   }, [onShowClick]);
 
@@ -510,7 +510,7 @@ export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, is
     setPreviewMedia(null);
   }, []);
 
-  const handlePreviewShowClick = useCallback((id: any, mediaType?: 'tv' | 'movie') => {
+  const handlePreviewShowClick = useCallback((id: string | number, mediaType?: 'tv' | 'movie') => {
     setPreviewMedia(null);
     handleShowClick(id, mediaType);
   }, [handleShowClick]);
