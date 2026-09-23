@@ -1,5 +1,5 @@
-import { type TMDBMedia } from '../features/shows/tmdb';
-import { type Show } from '../types';
+import type { TMDBMedia } from '../features/shows/tmdb';
+import type { Show } from '../types';
 
 export function normalizeKnownLibraryDate(value?: string | null): string | undefined {
   const trimmed = value?.trim();
