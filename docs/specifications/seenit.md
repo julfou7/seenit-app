@@ -1199,6 +1199,12 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   restants. La tâche destinataire reprend ce relais avant une nouvelle issue, vérifie baux, `main`
   et idempotence puis suit les commandes canoniques ; un `WAITING Terrain` sur l'issue fonctionnelle
   ne masque pas l'opération release. Aucun merge sans autorisation ne devient une release automatique.
+  Avant toute commande de clone/acquisition locale, `SEENIT-QUALITY-004` exige désormais un reçu
+  `<!-- seenit-workspace-acquisition -->` prouvant : recherche réelle d'un workspace existant, résultat
+  `trouvé et réutilisé` ou `absent/inexploitable` avec surfaces vérifiées, exécution locale réellement
+  nécessaire et raison pour laquelle API-first ne suffit plus, puis mode d'acquisition minimal retenu.
+  Un nouveau prompt, une reprise ou une nouvelle phase n'est jamais une preuve de disparition du workspace ;
+  vérifier un seul chemin attendu ne suffit pas et un clone ne sert pas de sonde d'egress.
 - **SEENIT-QUALITY-005** — Un import, une reconnexion ou une synchronisation AI Studio/GitHub est un
   transport non autoritatif. Avant tout commit depuis un workspace importé, le diff est comparé à la
   branche GitHub source et toute mutation automatique non demandée de Firebase/Firestore, Android,

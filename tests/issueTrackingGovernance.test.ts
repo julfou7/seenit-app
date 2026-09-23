@@ -156,3 +156,24 @@ test('SEENIT-QUALITY-004 ouvre proactivement une issue d’amélioration continu
   assert.match(requestRegistry, /USR-2026-09-21-014/);
   assert.match(requestRegistry, /issue #496/);
 });
+
+test('SEENIT-QUALITY-004 exige un reçu pré-acquisition avant tout clone local', () => {
+  const agents = fs.readFileSync('AGENTS.md', 'utf8');
+  const bootstrap = fs.readFileSync('.agents/AGENTS.md', 'utf8');
+  const delivery = fs.readFileSync('docs/process/delivery.md', 'utf8');
+  const remote = fs.readFileSync('docs/process/agent-remote-workspace.md', 'utf8');
+  const normalize = (source: string) => source.replace(/\s+/g, ' ');
+
+  for (const source of [agents, bootstrap, delivery, remote].map(normalize)) {
+    assert.match(source, /seenit-workspace-acquisition/i);
+    assert.match(source, /workspace existant recherché\s*:\s*oui/i);
+    assert.match(source, /résultat\s*:\s*trouvé et réutilisé\s*\|\s*absent\/inexploitable/i);
+    assert.match(source, /exécution locale nécessaire[\s\S]*API-first insuffisant/i);
+    assert.match(source, /acquisition minimale/i);
+    assert.match(source, /nouveau prompt|reprise/i);
+  }
+
+  assert.match(normalize(agents), /vérifier seulement un chemin attendu[\s\S]*ne prouve pas l'absence de workspace/i);
+  assert.match(normalize(delivery), /API-first[\s\S]*acquisition locale est interdite/i);
+  assert.match(normalize(remote), /Ne jamais lancer `git clone`[\s\S]*simplement découvrir si l'egress fonctionne/i);
+});
