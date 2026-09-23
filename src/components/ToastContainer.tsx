@@ -6,6 +6,7 @@ import { useShows } from '../hooks/useShows';
 import { cn, scrollAllCarouselsToStart } from '../lib/utils';
 import { SeenItGlyph } from './SeenItLogo';
 import { isDownloadToastPresentation } from '../features/toasts/toastPresentation';
+import { useLogStore } from '../store/logStore';
 import {
   dispatchToastMediaNavigation,
   resolveToastMediaNavigationTarget,
@@ -39,7 +40,12 @@ export function ToastContainer() {
         await onUndo();
         scrollAllCarouselsToStart();
       } catch (err) {
-        console.error('Error undoing toast action:', err);
+        useLogStore.getState().addLog(
+          'system',
+          "Impossible d'annuler l'action du toast",
+          err,
+          'error',
+        );
       }
       hideToast();
     } else if (type === 'archive' && show?.id) {
