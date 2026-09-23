@@ -1,5 +1,6 @@
 export interface RedditEpisodeSearchInput {
   seriesTitle: string;
+  communitySeriesTitle?: string | null;
   originalSeriesTitle?: string | null;
   seasonNumber: number;
   episodeNumber: number;
@@ -12,11 +13,15 @@ function normalizeSearchTerm(value?: string | null): string {
 
 export function buildRedditEpisodeSearchQuery({
   seriesTitle,
+  communitySeriesTitle,
   originalSeriesTitle,
   seasonNumber,
   episodeNumber,
 }: RedditEpisodeSearchInput): string {
-  const title = normalizeSearchTerm(seriesTitle) || normalizeSearchTerm(originalSeriesTitle);
+  const title =
+    normalizeSearchTerm(communitySeriesTitle)
+    || normalizeSearchTerm(seriesTitle)
+    || normalizeSearchTerm(originalSeriesTitle);
   const season = Math.max(0, Math.trunc(seasonNumber));
   const episode = Math.max(0, Math.trunc(episodeNumber));
 

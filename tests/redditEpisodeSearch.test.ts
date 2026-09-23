@@ -7,10 +7,19 @@ import {
   buildRedditSearchUrl,
 } from '../src/components/community/redditEpisodeSearch.ts';
 
-test('SEENIT-COMMUNITY-001 conserve les numéros naturels sans padding sur le chemin de production Reddit', () => {
+test('SEENIT-COMMUNITY-001 priorise le titre communautaire anglais sans casser les titres courts', () => {
   const fixtures = [
     {
+      seriesTitle: "Berlin et La Dame à l'hermine",
+      communitySeriesTitle: 'Berlin and the Lady with an Ermine',
+      originalSeriesTitle: 'Berlín y la dama del armiño',
+      seasonNumber: 1,
+      episodeNumber: 1,
+      expected: 'Berlin and the Lady with an Ermine S1 E1',
+    },
+    {
       seriesTitle: 'MobLand',
+      communitySeriesTitle: 'MobLand',
       originalSeriesTitle: 'MobLand',
       seasonNumber: 2,
       episodeNumber: 1,
@@ -18,6 +27,7 @@ test('SEENIT-COMMUNITY-001 conserve les numéros naturels sans padding sur le ch
     },
     {
       seriesTitle: 'Lioness',
+      communitySeriesTitle: 'Lioness',
       originalSeriesTitle: 'Special Ops: Lioness',
       seasonNumber: 3,
       episodeNumber: 1,
@@ -25,6 +35,7 @@ test('SEENIT-COMMUNITY-001 conserve les numéros naturels sans padding sur le ch
     },
     {
       seriesTitle: 'The Bear',
+      communitySeriesTitle: 'The Bear',
       originalSeriesTitle: 'The Bear',
       seasonNumber: 4,
       episodeNumber: 10,
@@ -41,19 +52,21 @@ test('SEENIT-COMMUNITY-001 conserve les numéros naturels sans padding sur le ch
     assert.doesNotMatch(query, /\bS0\d\b|\bE0\d\b/);
   }
 
-  const episodeModal = fs.readFileSync('src/screens/EpisodeDetailModalCore.tsx', 'utf8');
-  const redditSection = fs.readFileSync('src/components/community/RedditSection.tsx', 'utf8');
-
-  assert.match(
-    episodeModal,
-    /<RedditSection[\s\S]*query=\{buildRedditEpisodeSearchQuery\(\{[\s\S]*seasonNumber: currentSeason,[\s\S]*episodeNumber: currentEpisode\.episode_number/,
+  assert.equal(
+    buildRedditEpisodeSearchQuery({
+      seriesTitle: 'Lioness',
+      originalSeriesTitle: 'Special Ops: Lioness',
+      seasonNumber: 3,
+      episodeNumber: 1,
+    }),
+    'Lioness S3 E1',
   );
-  assert.match(redditSection, /const searchUrl = buildRedditSearchUrl\(query\);/);
 });
 
 test('SEENIT-COMMUNITY-001 n’injecte jamais de syntaxe avancée ni de consigne IA', () => {
   const query = buildRedditEpisodeSearchQuery({
     seriesTitle: 'Severance',
+    communitySeriesTitle: 'Severance',
     originalSeriesTitle: 'Severance',
     seasonNumber: 2,
     episodeNumber: 8,
@@ -77,18 +90,29 @@ test('SEENIT-COMMUNITY-001 garde Reddit verrouillé avant visionnage et sans API
   assert.doesNotMatch(redditSection + helper, /search\.json|oauth|client[_ -]?id|gemini/i);
 });
 
-test('SEENIT-COMMUNITY-001 ouvre la recherche Tout sans padding ni mode de résultats forcé', () => {
-  const query = buildRedditEpisodeSearchQuery({
-    seriesTitle: 'MobLand',
-    seasonNumber: 2,
-    episodeNumber: 1,
-  });
-  const url = buildRedditSearchUrl(query);
+test('SEENIT-COMMUNITY-001 résout le titre anglais au clic sur le chemin de production Reddit', () => {
+  const episodeModal = fs.readFileSync('src/screens/EpisodeDetailModalCore.tsx', 'utf8');
   const redditSection = fs.readFileSync('src/components/community/RedditSection.tsx', 'utf8');
+  const tmdbClient = fs.readFileSync('src/features/shows/tmdbClient.ts', 'utf8');
 
+  assert.match(
+    episodeModal,
+    /tmdb\.getEnglishMediaTitle\(Number\(effectiveTmdbId\), 'tv'\)[\s\S]*buildRedditQuery\(englishTitleResult\.ok \? englishTitleResult\.value : null\)/,
+  );
+  assert.match(
+    episodeModal,
+    /<RedditSection[\s\S]*query=\{redditEpisodeQuery\}[\s\S]*resolveQuery=\{resolveRedditQuery\}/,
+  );
+  assert.match(
+    redditSection,
+    /const resolvedQuery = await resolveQuery\(\);[\s\S]*openExternalUrl\(buildRedditSearchUrl\(effectiveQuery\)\)/,
+  );
+  assert.match(tmdbClient, /\/\$\{type\}\/\$\{normalizedId\}\?language=en-US/);
+
+  const url = buildRedditSearchUrl('Berlin and the Lady with an Ermine S1 E1');
   assert.equal(new URL(url).origin, 'https://www.reddit.com');
   assert.equal(new URL(url).pathname, '/search/');
-  assert.equal(new URL(url).searchParams.get('q'), 'MobLand S2 E1');
+  assert.equal(new URL(url).searchParams.get('q'), 'Berlin and the Lady with an Ermine S1 E1');
   assert.equal(new URL(url).searchParams.get('sort'), null);
   assert.equal(new URL(url).searchParams.get('type'), null);
   assert.match(redditSection, /résumé IA automatique si Reddit le propose/);

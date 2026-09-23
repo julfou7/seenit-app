@@ -316,14 +316,16 @@ Reddit. Les recommandations contextuelles restent dans Explorer. Les modals pers
 dans la pile Retour.
 
 Dans une fiche épisode, **Discussions Reddit** reste verrouillé avant visionnage. Après marquage vu, le CTA
-ouvre une recherche Reddit volontairement simple de la forme `Titre S3 E1`. SeenIt conserve un seul
-titre de série visible et les numéros humains de saison/épisode **sans zéro ajouté** : `S2 E1`, `S3 E1`,
-`S4 E10`. Il n'ajoute ni `AND` / `OR`, ni `title:`, ni nom d'épisode, ni instruction de résumé.
-Cette forme naturelle évite de transformer artificiellement la requête avant le classifieur de recherche
-Reddit et reste proche des conventions de threads courantes comme `S2E1` / `S3E1`. Elle peut déclencher
-directement la synthèse IA native sur la surface **Tout**. Si Reddit ne la propose pas, les résultats
-standards restent immédiatement utilisables comme fallback. SeenIt ne garantit pas l'affichage du bloc IA,
-piloté par Reddit, et n'appelle ni Data API Reddit, ni scraping, ni service IA payant pour le produire.
+ouvre une recherche Reddit volontairement simple de la forme `English title S3 E1`. Le titre affiché dans
+SeenIt reste localisé en français ; au moment d'ouvrir Reddit, SeenIt résout séparément le titre TMDB
+`en-US` de la série lorsqu'il existe afin de viser le libellé le plus courant dans le corpus Reddit.
+Cette résolution ne change ni la fiche ni la bibliothèque. Si TMDB ne fournit pas ce titre ou si l'appel
+échoue, la recherche conserve le titre visible puis le titre original comme fallback. Saison et épisode
+restent deux termes humains **sans zéro ajouté** : `S2 E1`, `S3 E1`, `S4 E10`. SeenIt n'ajoute ni
+`AND` / `OR`, ni `title:`, ni nom d'épisode, ni instruction de résumé. Cette forme naturelle peut
+déclencher directement la synthèse IA native sur la surface **Tout** ; sinon les résultats standards restent
+immédiatement utilisables. SeenIt ne garantit pas l'affichage du bloc IA, piloté par Reddit, et n'appelle
+ni Data API Reddit, ni scraping, ni service IA payant pour le produire.
 
 Le titre affiché privilégie le `title`/`name` de la fiche TMDB récupérée en `fr-FR`. Un ancien titre
 enregistré dans la bibliothèque sert seulement de fallback avant ou hors hydratation. Lorsqu'un média

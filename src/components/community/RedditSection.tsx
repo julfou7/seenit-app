@@ -5,6 +5,7 @@ import { buildRedditSearchUrl } from './redditEpisodeSearch';
 
 interface RedditSectionProps {
   query: string;
+  resolveQuery?: () => Promise<string>;
   isLocked?: boolean;
   unlockMessage?: string;
   title?: string;
@@ -18,16 +19,24 @@ export const REDDIT_ICON_SVG = (
 );
 
 export function RedditSection({ 
-  query, 
+  query,
+  resolveQuery,
   isLocked = false, 
   unlockMessage = "Débloquez les discussions en regardant cet épisode.",
   title = "Discussions Reddit",
   description = "Avis, consensus, désaccords et théories autour de cet épisode."
 }: RedditSectionProps) {
-  const searchUrl = buildRedditSearchUrl(query);
-
   const handleOpenReddit = async () => {
-    await openExternalUrl(searchUrl);
+    let effectiveQuery = query;
+    if (resolveQuery) {
+      try {
+        const resolvedQuery = await resolveQuery();
+        if (resolvedQuery.trim()) effectiveQuery = resolvedQuery;
+      } catch {
+        // Le titre visible reste le fallback fiable si TMDB est indisponible.
+      }
+    }
+    await openExternalUrl(buildRedditSearchUrl(effectiveQuery));
   };
 
   if (isLocked) {
