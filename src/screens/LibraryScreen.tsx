@@ -10,6 +10,7 @@ import { Show } from '../types';
 import { SeenItLogo } from '../components/SeenItLogo';
 import { cn } from '../lib/utils';
 import { useHorizontalVirtualWindow } from '../hooks/useBoundedVirtualWindow';
+import { buildLibraryMedia } from './libraryPresentation';
 
 interface Props {
   onShowClick: (id: string, mediaType?: 'tv' | 'movie') => void;
@@ -44,17 +45,7 @@ function getLibraryItem(show: Show): LibraryItem {
 
   const item: LibraryItem = {
     show,
-    media: {
-      id: Number(show.tmdbId),
-      name: show.title,
-      title: show.title,
-      poster_path: show.posterPath,
-      backdrop_path: show.backdropPath,
-      first_air_date: show.mediaType === 'tv' ? (show.firstAirDate || '2000-01-01') : undefined,
-      release_date: show.mediaType === 'movie' ? (show.firstAirDate || '2000-01-01') : undefined,
-      media_type: show.mediaType,
-      vote_average: show.userRating || 0,
-    },
+    media: buildLibraryMedia(show),
   };
   libraryItemCache.set(show, item);
   return item;
@@ -76,7 +67,7 @@ function findCurrentShow(media: TMDBMedia): Show | undefined {
 
 interface LibraryRowProps {
   data: LibraryItem[];
-  onShowClick: (id: any, mediaType?: 'tv' | 'movie') => void;
+  onShowClick: (id: string | number, mediaType?: 'tv' | 'movie') => void;
   onToggleWatched: (media: TMDBMedia) => void;
   onLongPress: (media: TMDBMedia) => void;
   onAddClick: (media: TMDBMedia) => void;
@@ -306,7 +297,7 @@ export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, is
     return () => window.removeEventListener('library-reset-all', handleResetAll);
   }, []);
 
-  const handleShowClick = useCallback((id: any, mediaType?: 'tv' | 'movie') => {
+  const handleShowClick = useCallback((id: string | number, mediaType?: 'tv' | 'movie') => {
     onShowClick(String(id), mediaType);
   }, [onShowClick]);
 
@@ -519,7 +510,7 @@ export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, is
     setPreviewMedia(null);
   }, []);
 
-  const handlePreviewShowClick = useCallback((id: any, mediaType?: 'tv' | 'movie') => {
+  const handlePreviewShowClick = useCallback((id: string | number, mediaType?: 'tv' | 'movie') => {
     setPreviewMedia(null);
     handleShowClick(id, mediaType);
   }, [handleShowClick]);
