@@ -825,8 +825,8 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
         {/* Filmographie Grid (3 Cols on Mobile) */}
         <div className="px-3 pb-6">
           {filteredCredits.length > 0 ? (
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 gap-y-3">
-              {filteredCredits.map((credit: any, idx: number) => {
+            <div className="relative z-0 grid grid-cols-3 sm:grid-cols-4 gap-2 gap-y-3">
+              {filteredCredits.map((credit, idx: number) => {
                 const show = showsByTmdbId.get(Number(credit.id));
                 return (
                   <GridMediaCard
