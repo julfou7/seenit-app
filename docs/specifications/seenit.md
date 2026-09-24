@@ -100,6 +100,15 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   fallback `env(safe-area-inset-*)`. La réintroduction d'un logo natif distinct, de `Style.Light` /
   `LIGHT`, de `SystemBars.insetsHandling='css'`, de `overlaysWebView=false`, d'un padding natif de la
   WebView ou d'une status bar opaque constitue une régression TNR bloquée par les tests.
+- **SEENIT-APK-006** — SeenIt peut rester distribuée directement hors Google Play. Pour ce canal,
+  Android Developer Verification enregistre l'identité du développeur, `com.seenit.app` et l'empreinte
+  SHA-256 du certificat release canonique sans changer `SEENIT-APK-001..005`. Cette vérification de
+  propriété et d'identité est distincte de la réputation Play Protect : « Analyse d'appli recommandée »
+  signifie qu'Android/Google propose d'analyser une application ou un binaire encore inconnu, et SeenIt
+  laisse cette analyse système s'exécuter. Aucune désactivation, aucun contournement, aucune rotation de
+  package ou de signature n'est admis pour éviter le dialogue. Une nouvelle APK peut à nouveau nécessiter
+  une analyse et aucune disparition systématique du dialogue n'est promise. Le runbook
+  `docs/process/play-protect-sideload.md` fixe l'enregistrement initial et la preuve terrain à conserver.
 - Le fichier `docs/specifications/android-contract.json` fixe les invariants natifs vérifiables :
   identité, signature, version, icônes, permissions, deep link, origine API, safe areas et canal APK.
 - Lors d'une release APK, le contrôle Android s'exécute avant et après `npx cap sync android` afin de
