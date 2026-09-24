@@ -601,13 +601,21 @@ et la fin de `dmesg` pour distinguer un kill QEMU sous pression d'un défaut app
 partagent le même runner à droits de lecture ; seul le job de publication séparé conserve `contents: write`.
 `npm ci` et le build Web sont ainsi exécutés une seule fois sur le même runner et ne sont plus payés deux fois.
 
-La récidive #50 observée pendant la release 1.4.191 a montré que le binaire shell historique
-`uiautomator dump` pouvait rester bloqué après un cold start pourtant réussi, avec un fichier XML vide,
-puis précéder la disparition de QEMU alors que l'hôte disposait encore de mémoire et que l'installation
-N → N+1, les données/session et les contrats natifs étaient déjà validés. Le smoke ne retire donc pas le
-garde d'accessibilité : il l'exerce désormais directement dans le harness instrumenté via
-`Instrumentation.getUiAutomation().getRootInActiveWindow()`, avec une attente bornée et sans
-`UiAutomation.waitForIdle()`. Le shell `uiautomator dump` est interdit dans ce chemin de release.
+La récidive #50 observée pendant la release 1.4.191 a permis de séparer les couches :
+le premier run tombait après le binaire shell `uiautomator dump`, puis un second run sans ce binaire
+a reproduit la disparition de QEMU dès `UiAutomation.getRootInActiveWindow()`. Dans les deux cas,
+l'installation N → N+1, les données/session et les contrats natifs étaient déjà validés, l'hôte conservait
+plus de 14 Go disponibles et ADB devenait ensuite offline avec un signal KVM `Unhandled WRMSR`.
+La frontière non fiable est donc la pile UiAutomation/AccessibilityService de l'émulateur API 36,
+pas le parcours SeenIt testé auparavant.
+
+Le smoke bloquant ne supprime pas la preuve du CTA de connexion : après l'upgrade, son harness instrumenté
+ouvre la vraie WebView Android et exécute une sonde JavaScript bornée qui exige « Continuer avec Google »
+comme `button` / `role=button`, visible, actif et avec une cible d'au moins 44 × 44 px. Le smoke
+navigateur canonique reste responsable de la preuve d'arbre d'accessibilité complet. Un chantier qui
+modifie explicitement l'accessibilité Android ajoute une validation TalkBack terrain ; une release
+ordinaire ne réactive pas une pile UiAutomation connue pour tuer l'AVD. Les invariants package,
+signature, migration, données/session, cold start, reprise, budgets, deep link et Retour restent bloquants.
 
 ### Distribution hors Play et Play Protect
 

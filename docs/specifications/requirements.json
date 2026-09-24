@@ -1939,7 +1939,7 @@
     },
     {
       "id": "SEENIT-QUALITY-012",
-      "title": "Smoke Android cible avec preuve d’accessibilité instrumentée et bornée",
+      "title": "Smoke Android cible avec contrat sémantique WebView borné et accessibilité navigateur",
       "targets": [
         "apk",
         "ci"
@@ -1947,7 +1947,7 @@
       "tests": [
         {
           "file": "tests/androidEmulatorCache.test.ts",
-          "contains": "SEENIT-QUALITY-012 le smoke API 36 vérifie l’accessibilité via UiAutomation sans shell uiautomator"
+          "contains": "SEENIT-QUALITY-012 le smoke API 36 vérifie le CTA dans la WebView sans UiAutomation"
         }
       ]
     },
