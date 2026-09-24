@@ -185,6 +185,20 @@
       ]
     },
     {
+      "id": "SEENIT-APK-006",
+      "title": "Distribution hors Play vérifiée sans contourner Play Protect",
+      "targets": [
+        "apk",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/playProtectDistribution.test.ts",
+          "contains": "SEENIT-APK-006 distingue la vérification développeur de la réputation Play Protect hors Play"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-DATA-001",
       "title": "Caches locaux isolés par UID",
       "targets": [

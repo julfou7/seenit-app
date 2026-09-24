@@ -619,16 +619,27 @@ interdits dans ce smoke de release afin de ne pas convertir une panne KVM reprod
 ### Distribution hors Play et Play Protect
 
 SeenIt reste distribuée directement par APK. Le dialogue Android « Analyse d'appli recommandée »
-signifie que Play Protect ne connaît pas encore les octets de cette APK sideloadée ; il n'est pas un
-état produit par SeenIt et ne peut pas être masqué par son code. Le parcours autorisé conserve la clé
-release stable, le contrôle SHA-256 et les permissions minimales, puis laisse l'utilisateur demander
-l'analyse système. Aucun workflow, manifeste ou écran SeenIt ne désactive ou ne contourne Play Protect.
+signifie que Play Protect ne connaît pas encore suffisamment l'application ou ce binaire sideloadé pour
+l'installer sans proposer son analyse. Il n'est pas produit par SeenIt et ne peut pas être masqué par son
+code. Le parcours autorisé conserve la clé release stable, le contrôle SHA-256 et les permissions
+minimales, puis laisse l'utilisateur demander l'analyse système. Aucun workflow, manifeste ou écran SeenIt
+ne désactive ou ne contourne Play Protect.
 
-Pour améliorer la reconnaissance sans publier sur le Play Store, le propriétaire peut enregistrer son
-identité, `com.seenit.app` et le certificat release dans l'Android Developer Console pour la distribution
-hors Play, puis soumettre une demande officielle seulement si Google classe à tort l'application comme
-potentiellement dangereuse. Une simple demande d'analyse d'une application inconnue n'est pas une telle
-classification et aucune disparition du dialogue ne doit être promise pour chaque nouvel APK.
+Deux mécanismes Google distincts doivent rester séparés :
+
+- **Android Developer Verification** enregistre l'identité du développeur, le package
+  `com.seenit.app` et le certificat de signature afin d'autoriser la distribution hors Google Play sur
+  les appareils Android certifiés concernés par le dispositif. Cette vérification ne constitue pas une
+  promesse de réputation Play Protect pour chaque nouveau binaire.
+- **Play Protect** peut proposer l'analyse d'une application ou d'une version encore inconnue. Lorsque
+  « Analyse d'appli recommandée » apparaît, le parcours officiel est d'accepter cette analyse. Une demande
+  d'analyse n'est pas en elle-même une classification « application dangereuse » et le mécanisme d'appel
+  pour faux positif ne sert pas à supprimer ce simple message.
+
+Le runbook [Distribution APK hors Play — Android Developer Verification et Play Protect](./play-protect-sideload.md)
+décrit l'enregistrement initial et le test terrain à consigner pour une nouvelle APK. Aucune disparition
+systématique du dialogue n'est garantie : une nouvelle version reste un nouveau binaire que Play Protect
+peut vouloir analyser.
 
 ## Gestion et récupération des clés de signature
 

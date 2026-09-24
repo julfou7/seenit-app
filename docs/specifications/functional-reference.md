@@ -684,7 +684,10 @@ partielle conserve l'historique officiel déjà obtenu ou la dernière version c
 Une fois l'APK téléchargée et vérifiée, SeenIt affiche « Installeur lancé » pendant que le Package
 Installer Android prend le relais. Le dialogue Play Protect des applications distribuées hors Play
 reste sous le contrôle du système : SeenIt ne le masque pas et ne demande jamais de désactiver cette
-protection.
+protection. La livraison distingue l'enregistrement officiel du développeur/package/certificat de la
+réputation Play Protect et consigne le comportement d'une installation propre selon le
+[runbook hors Play](../process/play-protect-sideload.md). Aucune disparition du dialogue n'est garantie
+pour chaque nouveau binaire.
 
 L'import TV Time résout les entrées vers TMDB avant écriture. Un résultat introuvable reste en échec
 modifiable ; il n'est pas inventé. Les actions de maintenance ne changent jamais l'identité Firebase,
