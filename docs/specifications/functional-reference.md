@@ -697,9 +697,10 @@ le databaseId ou la signature APK.
 
 Le cadrage transversal [UX](./ux-reference.md) couvre les boutons, cartes, en-têtes, superpositions et
 gestes spécifiques. Les reliquats encore ouverts de l'audit restent suivis dans
-[l'audit UX](../audits/audit-ux-2026-09-06.md) et leurs issues dédiées. `SEENIT-UX-009` impose aux actions
-communes une cible 44 px, un focus et un nom accessibles, des états async sérialisés et des cartes dont
-l'ouverture clavier reste distincte des actions rapides ; l'appui long est annulable et possède une
+[l'audit UX](../audits/audit-ux-2026-09-06.md) et leurs issues dédiées. `SEENIT-UX-009` impose aux contrôles
+isolés une cible 44 px, un focus et un nom accessibles, des états async sérialisés et des cartes dont
+l'ouverture clavier reste distincte des actions rapides ; le footer d'action plein largeur d'une carte peut
+rester compact, et l'appui long est annulable avec une
 alternative de menu contextuel. La fiche épisode applique `SEENIT-UX-008` : swipe, boutons
 Précédent/Suivant et ←/→ clavier hors saisie partagent la même navigation locale, franchissent une saison seulement à partir des
 données disponibles et ne modifient jamais la progression ; les actions Plex/téléchargement/Vu restent

@@ -113,8 +113,10 @@ sur appareil ; la CI couvre la logique, les surfaces accessibles et les garde-fo
 Une famille légère `Button`, `IconButton`, `WatchToggle` suffit comme cible ; noms indicatifs, pas une
 obligation d'architecture. Les cartes et en-têtes consomment ces rôles plutôt que copier les classes.
 
-- Cible tactile au moins 44 × 44 CSS px ; la taille du pictogramme peut rester plus petite. Les contrôles
-  compacts doivent élargir leur zone de clic sans chevaucher l'action voisine.
+- Cible tactile au moins 44 × 44 CSS px pour les contrôles isolés et actions ordinaires ; la taille du
+  pictogramme peut rester plus petite. Exception produit : un footer d'action rapide plein largeur intégré
+  à une carte média peut rester visuellement compact avec sa hauteur historique `py-1`, puisque toute la
+  largeur est interactive et qu'il n'empiète sur aucune action voisine.
 - Nom accessible, focus visible, `type="button"` sauf soumission réelle ; contrôle sélectionné annoncé.
 - Une action async distingue appui, en cours, réussite et échec. La brève animation de pression n'est
   pas une preuve de succès ; la valeur finale vient de l'état métier.
@@ -144,14 +146,16 @@ l'aperçu au clavier.
 
 Le socle runtime commun est porté par `ActionButton`, `SeenItCheckButton` et les cartes pilotes
 `GridMediaCard` / `EpisodeCard`. Les migrations d'écrans conservent les variantes métier existantes mais
-ne doivent plus réintroduire de bouton sans cible 44 px, d'état async non sérialisé ou de conteneur cliquable
-sans sémantique clavier.
+ne doivent plus réintroduire de petit contrôle isolé sans cible 44 px, d'état async non sérialisé ou de
+conteneur cliquable sans sémantique clavier. Le footer plein largeur de `GridMediaCard` conserve
+volontairement sa hauteur compacte historique.
 
 Le quality gate navigateur construit uniquement pendant la CI un harness #180 hors bundle applicatif. Il
 rend la fixture réelle « avant » et le composant courant côte à côte à **360 px et 412 px**, capture les deux
 rendus et vérifie réellement cible 44 px, focus, nom accessible, action inverse, `pending/disabled` et
-sérialisation d'un double clic. La fixture avant doit reproduire la cible <44 px et deux intentions afin que
-la preuve avant/après reste discriminante.
+sérialisation d'un double clic sur les contrôles pilotes isolés. Cette preuve ne force pas la hauteur du
+footer d'action plein largeur de `GridMediaCard`. La fixture avant doit reproduire la cible <44 px et deux
+intentions afin que la preuve avant/après reste discriminante.
 
 ## 6. En-têtes, dialogues et safe areas — proposition #181
 
