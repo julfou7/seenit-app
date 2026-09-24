@@ -696,9 +696,12 @@ le databaseId ou la signature APK.
 ## 13. Résilience, UX et limites assumées
 
 Le cadrage transversal [UX](./ux-reference.md) couvre les boutons, cartes, en-têtes, superpositions et
-gestes spécifiques. Les constats du code restent suivis dans [l'audit UX](../audits/audit-ux-2026-09-06.md)
-et #178 à #181. La fiche épisode applique `SEENIT-UX-008` : swipe, boutons Précédent/Suivant et ←/→
-clavier hors saisie partagent la même navigation locale, franchissent une saison seulement à partir des
+gestes spécifiques. Les reliquats encore ouverts de l'audit restent suivis dans
+[l'audit UX](../audits/audit-ux-2026-09-06.md) et leurs issues dédiées. `SEENIT-UX-009` impose aux actions
+communes une cible 44 px, un focus et un nom accessibles, des états async sérialisés et des cartes dont
+l'ouverture clavier reste distincte des actions rapides ; l'appui long est annulable et possède une
+alternative de menu contextuel. La fiche épisode applique `SEENIT-UX-008` : swipe, boutons
+Précédent/Suivant et ←/→ clavier hors saisie partagent la même navigation locale, franchissent une saison seulement à partir des
 données disponibles et ne modifient jamais la progression ; les actions Plex/téléchargement/Vu restent
 indépendantes du drag. Le socle #15 fournit désormais une preuve automatisée PWA/APK : rendu navigateur réel
 360/412/desktop, clavier, arbre d'accessibilité, cible tactile 44 px, service worker/offline/notification,

@@ -27,6 +27,7 @@ import { fetchQualityProfiles, testServiceConnection } from '../services/sonarrR
 import { testC411Connection } from '../services/c411';
 import { authenticatedFetch } from '../lib/apiAuth';
 import { requestNotificationPermission } from '../lib/firebase';
+import { ActionButton } from './ui/ActionButton';
 import {
   resolveAutoQualityProfile,
   type DownloadQualityPreference,
@@ -492,15 +493,17 @@ export function DownloadConfigSection({ defaultOpen = false, hideToggle = false 
             </div>
           )}
 
-          <button
-            type="button"
-            disabled={config.isSaving}
+          <ActionButton
+            variant="primary"
+            pending={config.isSaving}
+            error={Boolean(config.saveError)}
+            pendingLabel="Enregistrement…"
             onClick={() => void handleSave()}
-            className="w-full min-h-11 rounded-xl bg-[#E5A93D] hover:bg-[#f0b84c] text-black text-sm font-black flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full"
+            icon={<Save size={14} />}
           >
-            {config.isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            {config.isSaving ? 'Enregistrement…' : 'Enregistrer et synchroniser'}
-          </button>
+            Enregistrer et synchroniser
+          </ActionButton>
 
           <div className="flex items-center justify-center gap-1.5 text-xs text-zinc-500">
             <Cloud size={11} className="text-blue-400" />
@@ -816,15 +819,16 @@ function ServiceHeader({
         {result === true && <CheckCircle2 size={12} className="text-emerald-400" />}
         {result === false && <AlertCircle size={12} className="text-red-400" />}
       </div>
-      <button
-        type="button"
-        disabled={testing}
+      <ActionButton
+        variant="secondary"
+        pending={testing}
+        pendingLabel="Test…"
         onClick={onTest}
-        className="min-h-11 px-3 rounded-lg border border-zinc-700 bg-zinc-900 text-xs font-bold text-zinc-300 flex items-center gap-1.5 disabled:opacity-50"
+        className="px-3 text-xs"
+        icon={<Wifi size={10} />}
       >
-        {testing ? <Loader2 size={10} className="animate-spin" /> : <Wifi size={10} />}
         Tester
-      </button>
+      </ActionButton>
     </div>
   );
 }

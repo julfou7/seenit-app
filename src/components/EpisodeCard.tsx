@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { MouseEvent } from 'react';
-import { Check, Calendar, Circle } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import { SeenItCheckButton } from './SeenItCheckButton';
 import { cn, getCalendarDaysDiff, formatAirDateSafe } from '../lib/utils';
 import type { Show } from '../types';
@@ -16,7 +16,7 @@ interface EpisodeCardProps {
 }
 
 export function EpisodeCard({ show, type, onShowClick, onMarkAsSeen }: EpisodeCardProps) {
-  const [isAnimating, setIsAnimating] = useState(false);
+  const [isPending, setIsPending] = useState(false);
 
   const expectedNext = type === 'watch_next' ? show.nextEpisodeToWatch : null;
   const nextAir = type === 'upcoming' ? show.nextEpisodeToAir : null;
@@ -25,13 +25,15 @@ export function EpisodeCard({ show, type, onShowClick, onMarkAsSeen }: EpisodeCa
   if (type === 'watch_next' && !expectedNext) return null;
   if (type === 'upcoming' && !nextAir) return null;
 
-  const handleActionClick = (e: MouseEvent) => {
+  const handleActionClick = async (e: MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
-    if (type === 'watch_next' && onMarkAsSeen) {
-      setIsAnimating(true);
-      setTimeout(() => {
-        onMarkAsSeen(show);
-      }, 300);
+    if (type !== 'watch_next' || !onMarkAsSeen || isPending) return;
+
+    setIsPending(true);
+    try {
+      await onMarkAsSeen(show);
+    } finally {
+      setIsPending(false);
     }
   };
 
@@ -91,10 +93,9 @@ export function EpisodeCard({ show, type, onShowClick, onMarkAsSeen }: EpisodeCa
   );
 
   return (
-    <div 
+    <div
       ref={cardRef}
-      onClick={() => show.id && onShowClick(show.id)}
-      className="w-full flex items-stretch justify-between gap-3 bg-zinc-900/60 hover:bg-zinc-900/80 rounded-2xl overflow-hidden relative isolate transition-all active:scale-[0.98] cursor-pointer mb-3 group shadow-xl"
+      className="w-full flex items-stretch justify-between gap-3 bg-zinc-900/60 hover:bg-zinc-900/80 rounded-2xl overflow-hidden relative isolate transition-all mb-3 group shadow-xl"
     >
       {/* OVERLAY PREMIUM : Bordure interne parfaite + Effet lumière */}
       <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/10 group-hover:ring-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] transition-all z-20" />
@@ -106,6 +107,12 @@ export function EpisodeCard({ show, type, onShowClick, onMarkAsSeen }: EpisodeCa
         </div>
       )}
 
+      <button
+        type="button"
+        onClick={() => show.id && onShowClick(show.id)}
+        aria-label={`Ouvrir ${show.title}`}
+        className="min-w-0 flex-1 flex items-stretch gap-3 text-left rounded-l-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#E5A93D]/70 active:scale-[0.99] transition-transform"
+      >
       {/* AFFICHE */}
       <div className="w-[76px] sm:w-[88px] min-h-[114px] sm:min-h-[132px] shrink-0 bg-zinc-950 rounded-l-2xl overflow-hidden flex items-center justify-center relative z-20">
         {imgSrc ? (
@@ -144,10 +151,13 @@ export function EpisodeCard({ show, type, onShowClick, onMarkAsSeen }: EpisodeCa
         </div>
       </div>
 
-      <div className={cn("pr-2 flex items-center justify-center shrink-0 relative z-20", networkLogo && "pt-3.5")}>
-        <SeenItCheckButton 
+      </button>
+
+      <div className={cn("pr-2 flex items-center justify-center shrink-0 relative z-30", networkLogo && "pt-3.5")}>
+        <SeenItCheckButton
           onClick={handleActionClick}
-          isWatched={isAnimating}
+          pending={isPending}
+          disabled={type !== 'watch_next' || !onMarkAsSeen}
           size={30}
           title={type === 'watch_next' ? "Marquer comme vu" : "Épisode à venir"}
         />

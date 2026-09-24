@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { cn } from '../lib/utils';
 
 export interface SeenItCheckButtonProps {
-  onClick: (e: React.MouseEvent) => void;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void | Promise<void>;
   isWatched?: boolean;
+  pending?: boolean;
+  disabled?: boolean;
+  error?: boolean;
   size?: number;
   className?: string;
   title?: string;
@@ -16,30 +19,61 @@ export interface SeenItCheckButtonProps {
 export function SeenItCheckButton({
   onClick,
   isWatched = false,
+  pending = false,
+  disabled = false,
+  error = false,
   size = 28,
   className = '',
-  title = 'Marquer comme vu'
+  title
 }: SeenItCheckButtonProps) {
   const [isTapped, setIsTapped] = useState(false);
+  const [internalPending, setInternalPending] = useState(false);
+  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const effectivePending = pending || internalPending;
+  const accessibleTitle = title ?? (isWatched ? 'Marquer comme non vu' : 'Marquer comme vu');
 
-  const handleClick = (e: React.MouseEvent) => {
+  useEffect(() => () => {
+    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+  }, []);
+
+  const handleClick = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
+    if (disabled || effectivePending) return;
+
     setIsTapped(true);
-    setTimeout(() => setIsTapped(false), 1200);
-    onClick(e);
+    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+    tapTimerRef.current = setTimeout(() => {
+      setIsTapped(false);
+      tapTimerRef.current = null;
+    }, 180);
+
+    setInternalPending(true);
+    try {
+      await onClick(e);
+    } finally {
+      setInternalPending(false);
+    }
   };
 
-  const active = isWatched || isTapped;
+  const active = isWatched;
 
   return (
     <button
+      type="button"
       onClick={handleClick}
-      title={title}
-      aria-label={title}
+      disabled={disabled || effectivePending}
+      title={accessibleTitle}
+      aria-label={accessibleTitle}
+      aria-pressed={isWatched}
+      aria-busy={effectivePending || undefined}
+      data-error={error ? 'true' : undefined}
       className={cn(
-        "group relative flex items-center justify-center rounded-xl p-1.5 transition-all duration-200 cursor-pointer select-none",
-        "focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/50",
+        "group relative min-h-11 min-w-11 flex items-center justify-center rounded-xl p-1.5 transition-all duration-200 cursor-pointer select-none",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
+        "disabled:cursor-not-allowed disabled:opacity-55",
+        error && "ring-1 ring-red-400/70",
         active ? "scale-105" : "hover:scale-105 active:scale-90",
+        isTapped && "scale-90",
         className
       )}
       style={{ touchAction: 'manipulation' }}
