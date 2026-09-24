@@ -96,9 +96,8 @@ export const ProfileScreen = React.memo(function ProfileScreen({
       setShowSettings(false);
       setIsExitingSettings(false);
       setDragXSettings(0);
-      setMountedProfileTabs(previous => previous.has('stats') ? previous : new Set(previous).add('stats'));
+      setMountedProfileTabs(new Set<'stats' | 'library'>(['stats']));
       setActiveTab('stats');
-      window.dispatchEvent(new CustomEvent('library-reset-all'));
       requestAnimationFrame(() => {
         if (rootRef.current) rootRef.current.scrollTop = 0;
       });

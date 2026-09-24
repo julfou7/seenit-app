@@ -70,8 +70,10 @@ Le contrat d'appui/reset de #178 est distinct de cet ordre visuel et désormais 
 - Chaque page restaure sa sous-vue initiale, replie ses panneaux et efface ses recherches, filtres et
   expansions locales, puis affiche un toast reprenant le glyphe SeenIt de l’onglet en **or**, comme la
   navigation active. À voir revient à À Regarder, Profil à Statistiques, Télécharger à Mes téléchargements
-  et Explorer à son filtre Tout. Cette couleur de contexte de navigation ne modifie pas les vrais toasts
-  métier de téléchargement, qui conservent leur présentation bleue.
+  et Explorer à son filtre Tout. Le reset Profil invalide aussi tout l’état UI local de **Ma Liste** même
+  si cette sous-vue a déjà été montée puis masquée ; son prochain affichage repart de son état initial.
+  Cette couleur de contexte de navigation ne modifie pas les vrais toasts métier de téléchargement, qui
+  conservent leur présentation bleue.
 - Chaque reset a une alternative visible accessible et ne touche ni bibliothèque, ni progression,
   ni préférences cloud. L'onglet actif est annoncé aux technologies d'assistance.
 - Le double appui applicatif ne remplace pas l'activation standard du lecteur d'écran. Les tests
