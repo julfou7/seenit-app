@@ -8,12 +8,13 @@ import { cn, checkIsUpToDate, computeAutoArchiveStatus, getTodayStr, getCalendar
 import { useShowsStore } from '../store/showsStore';
 import { getFormattedProviderLogo } from '../utils/providerLogos';
 import { usePassiveWatchProvider } from '../hooks/usePassiveWatchProvider';
+import type { Show } from '../types';
 
 export interface GridMediaCardProps {
   media: TMDBMedia;
   onShowClick: (id: any, mediaType?: 'tv' | 'movie') => void;
   isNewlyLoaded?: boolean;
-  show?: any;
+  show?: Show;
   onAddClick?: (media: TMDBMedia) => void;
   onToggleWatched?: (media: TMDBMedia) => void;
   onLongPress?: (media: TMDBMedia) => void;
