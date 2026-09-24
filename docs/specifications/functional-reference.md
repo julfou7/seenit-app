@@ -697,7 +697,10 @@ le databaseId ou la signature APK.
 
 Le cadrage transversal [UX](./ux-reference.md) couvre les boutons, cartes, en-têtes, superpositions et
 gestes spécifiques. Les constats du code restent suivis dans [l'audit UX](../audits/audit-ux-2026-09-06.md)
-et #178 à #181. Le socle #15 fournit désormais une preuve automatisée PWA/APK : rendu navigateur réel
+et #178 à #181. La fiche épisode applique `SEENIT-UX-008` : swipe, boutons Précédent/Suivant et ←/→
+clavier hors saisie partagent la même navigation locale, franchissent une saison seulement à partir des
+données disponibles et ne modifient jamais la progression ; les actions Plex/téléchargement/Vu restent
+indépendantes du drag. Le socle #15 fournit désormais une preuve automatisée PWA/APK : rendu navigateur réel
 360/412/desktop, clavier, arbre d'accessibilité, cible tactile 44 px, service worker/offline/notification,
 budgets bundle et budgets de démarrage/reprise Android. Les essais humains TalkBack et gestes système
 restent des TNR terrain lorsque le risque du changement UX l'exige ; ils ne sont pas simulés par la CI.

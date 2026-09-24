@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
-import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'motion/react';
+import { motion, AnimatePresence, useMotionValue, useTransform, animate, useDragControls } from 'motion/react';
 import { type Show } from '../types';
 import { X, Check, Star, ChevronLeft, ChevronRight, Clock, ArrowLeft, Sparkles, Download, CheckCircle2, Play } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
@@ -16,6 +16,11 @@ import { LiveDownloadBanner } from '../components/LiveDownloadBanner';
 import { useMediaPresence } from '../hooks/useMediaPresence';
 import { openPlexWatchUrl } from '../features/plex/syncPlex';
 import { type EpisodeDetailData } from './episodeDetailTypes';
+import {
+  canStartEpisodeSwipeFromTarget,
+  resolveEpisodeNavigationDirectionFromKey,
+  resolveLoadedAdjacentEpisode,
+} from '../features/navigation/episodeNavigation';
 
 interface EpisodeDetailModalProps {
   show?: Show;
@@ -26,7 +31,7 @@ interface EpisodeDetailModalProps {
   tmdbShowId?: number;
   onShowClick?: (tmdbId: number, mediaType?: 'tv' | 'movie') => void;
   onClose: () => void;
-  onLoadSeason?: (seasonNum: number) => Promise<any>;
+  onLoadSeason?: (seasonNum: number) => Promise<EpisodeDetailData[] | { episodes?: EpisodeDetailData[] } | null | undefined>;
 }
 
 export function EpisodeDetailModal({ show, season: initialSeason, episode: initialEpisode, isHydrating = false, tmdbShowTitle, tmdbShowId, onShowClick, onClose, onLoadSeason }: EpisodeDetailModalProps) {
@@ -60,14 +65,15 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
     mediaType: 'tv'
   });
 
-  const seasonCacheRef = useRef<Record<string, any[]>>({});
-  const episodeCacheRef = useRef<Record<string, any>>({});
+  const seasonCacheRef = useRef<Record<string, EpisodeDetailData[]>>({});
+  const episodeCacheRef = useRef<Record<string, EpisodeDetailData>>({});
   const imagePreloadRef = useRef<Record<string, HTMLImageElement>>({});
   const isTransitioningRef = useRef(false);
+  const navigationRequestRef = useRef(0);
 
   const fetchAndCacheSeason = useCallback(async (seasonNum: number) => {
     const effectiveTmdbId = tmdbShowId || activeShow?.tmdbId;
-    if (!effectiveTmdbId || seasonNum < 1) return null;
+    if (!effectiveTmdbId || seasonNum < 0) return null;
     const key = `${effectiveTmdbId}_${seasonNum}`;
     if (seasonCacheRef.current[key]) return seasonCacheRef.current[key];
 
@@ -89,7 +95,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
       if (res.ok && res.value?.episodes) {
         const episodes = res.value.episodes;
         seasonCacheRef.current[key] = episodes;
-        episodes.forEach((ep: any) => {
+        episodes.forEach((ep: EpisodeDetailData) => {
           if (ep && typeof ep.episode_number === 'number') {
             const epKey = `${effectiveTmdbId}_${seasonNum}_${ep.episode_number}`;
             if (!episodeCacheRef.current[epKey]) {
@@ -110,7 +116,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
 
   const preloadEpisodeKey = (season: number, epNum: number) => {
     const effectiveTmdbId = tmdbShowId || activeShow?.tmdbId;
-    if (!effectiveTmdbId || season < 1 || epNum < 1) return;
+    if (!effectiveTmdbId || season < 0 || epNum < 1) return;
     const key = `${effectiveTmdbId}_${season}_${epNum}`;
     if (episodeCacheRef.current[key]) return;
 
@@ -127,22 +133,29 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   };
 
   useLayoutEffect(() => {
+    navigationRequestRef.current += 1;
+    isTransitioningRef.current = false;
+    setIsLoadingEpisode(false);
     setCurrentSeason(initialSeason);
     setCurrentEpisode(initialEpisode);
     setShowFutureConfirm(false);
   }, [initialSeason, initialEpisode]);
+
+  useEffect(() => () => {
+    navigationRequestRef.current += 1;
+  }, []);
 
   const [currentSeasonEpCount, setCurrentSeasonEpCount] = useState<number | null>(null);
   const [nextSeasonEpCount, setNextSeasonEpCount] = useState<number | null>(null);
   const [swipeDirection, setSwipeDirection] = useState<'next' | 'prev' | null>(null);
   const isSwipingRef = useRef(false);
   const dragX = useMotionValue(0);
+  const dragControls = useDragControls();
 
   // Reset gesture state whenever currentSeason or currentEpisode changes
   useEffect(() => {
     dragX.set(0);
     isSwipingRef.current = false;
-    isTransitioningRef.current = false;
     setSwipeDirection(null);
   }, [currentSeason, currentEpisode?.episode_number, dragX]);
 
@@ -161,7 +174,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   // Background preloading of current, next and previous season details
   useEffect(() => {
     const effectiveTmdbId = tmdbShowId || activeShow?.tmdbId;
-    if (!effectiveTmdbId || !currentSeason || !currentEpisode?.episode_number) return;
+    if (!effectiveTmdbId || currentSeason < 0 || !currentEpisode?.episode_number) return;
 
     let isMounted = true;
 
@@ -170,9 +183,9 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
       if (isMounted && episodes) {
         setCurrentSeasonEpCount(episodes.length);
         const curEpNum = currentEpisode.episode_number;
-        const found = episodes.find((e: any) => e.episode_number === curEpNum);
+        const found = episodes.find(e => e.episode_number === curEpNum);
         if (found && (!currentEpisode.overview || !currentEpisode.still_path)) {
-          setCurrentEpisode((prev: any) => ({
+          setCurrentEpisode(prev => ({
             ...prev,
             ...found,
             overview: found.overview || prev?.overview || '',
@@ -188,7 +201,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
         setNextSeasonEpCount(episodes ? episodes.length : 0);
       }
     });
-    if (currentSeason > 1) {
+    if (currentSeason > minSeason) {
       fetchAndCacheSeason(currentSeason - 1);
     }
 
@@ -240,7 +253,11 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
     if (effectiveTmdbId) {
       const cachedCur = seasonCacheRef.current[`${effectiveTmdbId}_${currentSeason}`];
       if (cachedCur && cachedCur.length > 0) {
-        if (curEpNum < cachedCur.length) return true;
+        const highestEpisode = cachedCur.reduce(
+          (highest, episode) => Math.max(highest, episode.episode_number),
+          0,
+        );
+        if (curEpNum < highestEpisode) return true;
         const cachedNext = seasonCacheRef.current[`${effectiveTmdbId}_${currentSeason + 1}`];
         if (cachedNext && cachedNext.length > 0) return true;
       }
@@ -258,196 +275,311 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
     return nextSeasonEpCount !== 0;
   }, [currentEpisode?.episode_number, currentSeason, currentSeasonEpCount, nextSeasonEpCount, activeShow?.totalEpisodes, tmdbShowId, activeShow?.tmdbId]);
 
+  const finishNavigationRequest = (requestId: number) => {
+    setTimeout(() => {
+      if (navigationRequestRef.current !== requestId) return;
+      isTransitioningRef.current = false;
+      isSwipingRef.current = false;
+    }, 300);
+  };
+
+  const resetEpisodeDrag = () => {
+    animate(dragX, 0, { type: 'spring', damping: 25, stiffness: 300 });
+  };
+
+  const reportEpisodeNavigationFailure = (
+    direction: 'previous' | 'next',
+    reason: 'unavailable' | 'error',
+  ) => {
+    setIsLoadingEpisode(false);
+    resetEpisodeDrag();
+    if (reason === 'unavailable') {
+      showToast(
+        direction === 'next'
+          ? 'Aucun épisode suivant disponible.'
+          : 'Aucun épisode précédent disponible.',
+        'info',
+      );
+      return;
+    }
+    showToast(
+      direction === 'next'
+        ? 'Impossible de charger l’épisode suivant. Réessaie.'
+        : 'Impossible de charger l’épisode précédent. Réessaie.',
+      'error',
+    );
+  };
+
+  const applyEpisodeNavigationTarget = (
+    requestId: number,
+    direction: 'previous' | 'next',
+    target: { season: number; episode: EpisodeDetailData },
+  ) => {
+    if (navigationRequestRef.current !== requestId) return false;
+    setSwipeDirection(direction === 'next' ? 'next' : 'prev');
+    if (target.season !== currentSeason) setCurrentSeason(target.season);
+    setCurrentEpisode(target.episode);
+    setIsLoadingEpisode(false);
+    return true;
+  };
+
   const handleNextEpisode = async () => {
-    if (isTransitioningRef.current) return;
+    if (isTransitioningRef.current || isLoadingEpisode || !hasNext) return;
+
+    const requestId = ++navigationRequestRef.current;
     isTransitioningRef.current = true;
     isSwipingRef.current = true;
+    setSwipeDirection('next');
     setShowFutureConfirm(false);
+
     const effectiveTmdbId = tmdbShowId || activeShow?.tmdbId;
     const curEpNum = currentEpisode?.episode_number || 1;
     const nextEpNum = curEpNum + 1;
 
     try {
       if (effectiveTmdbId) {
-        let curSeasonEps = seasonCacheRef.current[`${effectiveTmdbId}_${currentSeason}`];
-        if (!curSeasonEps) {
+        let currentEpisodes: EpisodeDetailData[] | null | undefined = seasonCacheRef.current[`${effectiveTmdbId}_${currentSeason}`];
+        if (!currentEpisodes) {
           setIsLoadingEpisode(true);
-          curSeasonEps = await fetchAndCacheSeason(currentSeason);
+          currentEpisodes = await fetchAndCacheSeason(currentSeason);
+          if (navigationRequestRef.current !== requestId) return;
         }
 
-        if (curSeasonEps && curSeasonEps.length > 0) {
-          const foundNext = curSeasonEps.find((e: any) => e.episode_number === nextEpNum);
-          if (foundNext) {
-            setCurrentEpisode(foundNext);
-            setIsLoadingEpisode(false);
+        if (currentEpisodes && currentEpisodes.length > 0) {
+          const directTarget = resolveLoadedAdjacentEpisode({
+            direction: 'next',
+            currentSeason,
+            currentEpisodeNumber: curEpNum,
+            minSeason,
+            currentSeasonEpisodes: currentEpisodes,
+          });
+          if (directTarget) {
+            applyEpisodeNavigationTarget(requestId, 'next', directTarget);
             return;
           }
 
-          if (nextEpNum > curSeasonEps.length) {
-            // End of current season -> switch to next season (currentSeason + 1)
+          const highestEpisode = currentEpisodes.reduce(
+            (highest, episode) => Math.max(highest, episode.episode_number),
+            0,
+          );
+          if (curEpNum >= highestEpisode) {
             const targetSeason = currentSeason + 1;
-            let nextSeasonEps = seasonCacheRef.current[`${effectiveTmdbId}_${targetSeason}`];
-            if (!nextSeasonEps) {
+            let nextEpisodes: EpisodeDetailData[] | null | undefined = seasonCacheRef.current[`${effectiveTmdbId}_${targetSeason}`];
+            if (!nextEpisodes) {
               setIsLoadingEpisode(true);
-              nextSeasonEps = await fetchAndCacheSeason(targetSeason);
+              nextEpisodes = await fetchAndCacheSeason(targetSeason);
+              if (navigationRequestRef.current !== requestId) return;
             }
-            if (nextSeasonEps && nextSeasonEps.length > 0) {
-              setCurrentSeason(targetSeason);
-              setCurrentEpisode(nextSeasonEps[0]);
-              setIsLoadingEpisode(false);
-              return;
-            } else {
-              // Rebound gently on last episode of last season
-              setIsLoadingEpisode(false);
-              animate(dragX, 0, { type: 'spring', damping: 25, stiffness: 300 });
+
+            const boundaryTarget = resolveLoadedAdjacentEpisode({
+              direction: 'next',
+              currentSeason,
+              currentEpisodeNumber: curEpNum,
+              minSeason,
+              currentSeasonEpisodes: currentEpisodes,
+              adjacentSeasonEpisodes: nextEpisodes,
+            });
+            if (boundaryTarget) {
+              applyEpisodeNavigationTarget(requestId, 'next', boundaryTarget);
               return;
             }
+
+            reportEpisodeNavigationFailure('next', 'unavailable');
+            return;
           }
         }
 
         setIsLoadingEpisode(true);
         const res = await tmdb.getEpisodeDetails(effectiveTmdbId, currentSeason, nextEpNum);
-        if (res.ok && res.value && !res.value.status_code && typeof res.value.episode_number === 'number') {
-          episodeCacheRef.current[`${effectiveTmdbId}_${currentSeason}_${nextEpNum}`] = res.value;
-          setCurrentEpisode(res.value);
-          setIsLoadingEpisode(false);
+        if (navigationRequestRef.current !== requestId) return;
+        if (
+          res.ok &&
+          res.value &&
+          !res.value.status_code &&
+          typeof res.value.episode_number === 'number'
+        ) {
+          const targetEpisode = res.value as EpisodeDetailData;
+          episodeCacheRef.current[`${effectiveTmdbId}_${currentSeason}_${nextEpNum}`] = targetEpisode;
+          applyEpisodeNavigationTarget(requestId, 'next', {
+            season: currentSeason,
+            episode: targetEpisode,
+          });
           return;
         }
-        const nextSeasonRes = await tmdb.getEpisodeDetails(effectiveTmdbId, currentSeason + 1, 1);
-        if (nextSeasonRes.ok && nextSeasonRes.value && !nextSeasonRes.value.status_code && typeof nextSeasonRes.value.episode_number === 'number') {
-          episodeCacheRef.current[`${effectiveTmdbId}_${currentSeason + 1}_1`] = nextSeasonRes.value;
-          setCurrentSeason(currentSeason + 1);
-          setCurrentEpisode(nextSeasonRes.value);
-          setIsLoadingEpisode(false);
-          return;
-        }
-        setIsLoadingEpisode(false);
-        animate(dragX, 0, { type: 'spring', damping: 25, stiffness: 300 });
+
+        reportEpisodeNavigationFailure('next', 'error');
         return;
       }
 
       if (activeShow?.totalEpisodes && nextEpNum > activeShow.totalEpisodes) {
-        animate(dragX, 0, { type: 'spring', damping: 25, stiffness: 300 });
+        reportEpisodeNavigationFailure('next', 'unavailable');
         return;
       }
-      setCurrentEpisode({
-        season_number: currentSeason,
-        episode_number: nextEpNum,
-        name: `Épisode ${nextEpNum}`,
-        air_date: null,
-        overview: '',
-        still_path: null,
+
+      applyEpisodeNavigationTarget(requestId, 'next', {
+        season: currentSeason,
+        episode: {
+          season_number: currentSeason,
+          episode_number: nextEpNum,
+          name: `Épisode ${nextEpNum}`,
+          air_date: null,
+          overview: '',
+          still_path: null,
+        },
       });
-    } catch (err) {
-      setIsLoadingEpisode(false);
-      animate(dragX, 0, { type: 'spring', damping: 25, stiffness: 300 });
+    } catch {
+      if (navigationRequestRef.current !== requestId) return;
+      reportEpisodeNavigationFailure('next', 'error');
     } finally {
-      setTimeout(() => {
-        isTransitioningRef.current = false;
-        isSwipingRef.current = false;
-      }, 300);
+      if (navigationRequestRef.current === requestId) finishNavigationRequest(requestId);
     }
   };
 
   const handlePreviousEpisode = async () => {
-    if (isTransitioningRef.current) return;
-    const curEpNum = currentEpisode?.episode_number || 1;
-    if (currentSeason <= minSeason && curEpNum <= 1) {
-      animate(dragX, 0, { type: 'spring', damping: 25, stiffness: 300 });
-      return;
-    }
+    if (isTransitioningRef.current || isLoadingEpisode || !hasPrevious) return;
+
+    const requestId = ++navigationRequestRef.current;
     isTransitioningRef.current = true;
     isSwipingRef.current = true;
+    setSwipeDirection('prev');
     setShowFutureConfirm(false);
+
     const effectiveTmdbId = tmdbShowId || activeShow?.tmdbId;
+    const curEpNum = currentEpisode?.episode_number || 1;
 
     try {
       if (curEpNum > 1) {
         const prevEpNum = curEpNum - 1;
         if (effectiveTmdbId) {
-          let curSeasonEps = seasonCacheRef.current[`${effectiveTmdbId}_${currentSeason}`];
-          if (!curSeasonEps) {
+          let currentEpisodes: EpisodeDetailData[] | null | undefined = seasonCacheRef.current[`${effectiveTmdbId}_${currentSeason}`];
+          if (!currentEpisodes) {
             setIsLoadingEpisode(true);
-            curSeasonEps = await fetchAndCacheSeason(currentSeason);
+            currentEpisodes = await fetchAndCacheSeason(currentSeason);
+            if (navigationRequestRef.current !== requestId) return;
           }
 
-          if (curSeasonEps && curSeasonEps.length > 0) {
-            const foundPrev = curSeasonEps.find((e: any) => e.episode_number === prevEpNum);
-            if (foundPrev) {
-              setCurrentEpisode(foundPrev);
-              setIsLoadingEpisode(false);
-              return;
-            }
+          const loadedTarget = resolveLoadedAdjacentEpisode({
+            direction: 'previous',
+            currentSeason,
+            currentEpisodeNumber: curEpNum,
+            minSeason,
+            currentSeasonEpisodes: currentEpisodes,
+          });
+          if (loadedTarget) {
+            applyEpisodeNavigationTarget(requestId, 'previous', loadedTarget);
+            return;
           }
 
           const prevKey = `${effectiveTmdbId}_${currentSeason}_${prevEpNum}`;
-          if (episodeCacheRef.current[prevKey]) {
-            setCurrentEpisode(episodeCacheRef.current[prevKey]);
-            setIsLoadingEpisode(false);
+          const cachedPrevious = episodeCacheRef.current[prevKey];
+          if (cachedPrevious) {
+            applyEpisodeNavigationTarget(requestId, 'previous', {
+              season: currentSeason,
+              episode: cachedPrevious,
+            });
             return;
           }
 
           setIsLoadingEpisode(true);
           const res = await tmdb.getEpisodeDetails(effectiveTmdbId, currentSeason, prevEpNum);
-          if (res.ok && res.value && !res.value.status_code && typeof res.value.episode_number === 'number') {
-            episodeCacheRef.current[prevKey] = res.value;
-            setCurrentEpisode(res.value);
-            setIsLoadingEpisode(false);
+          if (navigationRequestRef.current !== requestId) return;
+          if (
+            res.ok &&
+            res.value &&
+            !res.value.status_code &&
+            typeof res.value.episode_number === 'number'
+          ) {
+            const targetEpisode = res.value as EpisodeDetailData;
+            episodeCacheRef.current[prevKey] = targetEpisode;
+            applyEpisodeNavigationTarget(requestId, 'previous', {
+              season: currentSeason,
+              episode: targetEpisode,
+            });
             return;
           }
-          setIsLoadingEpisode(false);
-          animate(dragX, 0, { type: 'spring', damping: 25, stiffness: 300 });
+
+          reportEpisodeNavigationFailure('previous', 'error');
           return;
         }
 
-        setCurrentEpisode({
-          season_number: currentSeason,
-          episode_number: prevEpNum,
-          name: `Épisode ${prevEpNum}`,
-          air_date: null,
-          overview: '',
-          still_path: null,
+        applyEpisodeNavigationTarget(requestId, 'previous', {
+          season: currentSeason,
+          episode: {
+            season_number: currentSeason,
+            episode_number: prevEpNum,
+            name: `Épisode ${prevEpNum}`,
+            air_date: null,
+            overview: '',
+            still_path: null,
+          },
         });
         return;
       }
 
       if (currentSeason > minSeason) {
-        const targetSeason = currentSeason - 1;
-        if (effectiveTmdbId) {
-          let prevSeasonEps = seasonCacheRef.current[`${effectiveTmdbId}_${targetSeason}`];
-          if (!prevSeasonEps) {
-            setIsLoadingEpisode(true);
-            prevSeasonEps = await fetchAndCacheSeason(targetSeason);
-          }
-          if (prevSeasonEps && prevSeasonEps.length > 0) {
-            const lastEp = prevSeasonEps[prevSeasonEps.length - 1];
-            setCurrentSeason(targetSeason);
-            setCurrentEpisode(lastEp);
-            setIsLoadingEpisode(false);
-            return;
-          }
+        if (!effectiveTmdbId) {
+          reportEpisodeNavigationFailure('previous', 'unavailable');
+          return;
         }
-        setCurrentSeason(targetSeason);
-        setCurrentEpisode({
-          season_number: targetSeason,
-          episode_number: 1,
-          name: `Épisode 1`,
-          air_date: null,
-          overview: '',
-          still_path: null,
+
+        const targetSeason = currentSeason - 1;
+        let previousEpisodes: EpisodeDetailData[] | null | undefined = seasonCacheRef.current[`${effectiveTmdbId}_${targetSeason}`];
+        if (!previousEpisodes) {
+          setIsLoadingEpisode(true);
+          previousEpisodes = await fetchAndCacheSeason(targetSeason);
+          if (navigationRequestRef.current !== requestId) return;
+        }
+
+        const boundaryTarget = resolveLoadedAdjacentEpisode({
+          direction: 'previous',
+          currentSeason,
+          currentEpisodeNumber: curEpNum,
+          minSeason,
+          currentSeasonEpisodes: seasonCacheRef.current[`${effectiveTmdbId}_${currentSeason}`],
+          adjacentSeasonEpisodes: previousEpisodes,
         });
-        setIsLoadingEpisode(false);
+        if (boundaryTarget) {
+          applyEpisodeNavigationTarget(requestId, 'previous', boundaryTarget);
+          return;
+        }
+
+        reportEpisodeNavigationFailure('previous', 'unavailable');
       }
-    } catch (err) {
-      setIsLoadingEpisode(false);
-      animate(dragX, 0, { type: 'spring', damping: 25, stiffness: 300 });
+    } catch {
+      if (navigationRequestRef.current !== requestId) return;
+      reportEpisodeNavigationFailure('previous', 'error');
     } finally {
-      setTimeout(() => {
-        isTransitioningRef.current = false;
-        isSwipingRef.current = false;
-      }, 300);
+      if (navigationRequestRef.current === requestId) finishNavigationRequest(requestId);
     }
   };
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isHydrating || isDownloadOpen || showFutureConfirm || isLoadingEpisode) return;
+      const direction = resolveEpisodeNavigationDirectionFromKey(event);
+      if (!direction) return;
+
+      if (direction === 'previous' && hasPrevious) {
+        event.preventDefault();
+        void handlePreviousEpisode();
+      } else if (direction === 'next' && hasNext) {
+        event.preventDefault();
+        void handleNextEpisode();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    hasPrevious,
+    hasNext,
+    isHydrating,
+    isDownloadOpen,
+    showFutureConfirm,
+    isLoadingEpisode,
+    handlePreviousEpisode,
+    handleNextEpisode,
+  ]);
 
   const toggleSeen = async () => {
     let currentShow = activeShow;
@@ -771,8 +903,16 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
         <motion.div
           className="flex-1 flex flex-col w-full h-full overflow-hidden relative bg-[#09090B]"
           drag="x"
+          dragControls={dragControls}
+          dragListener={false}
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.3}
+          onPointerDown={(event) => {
+            if (isTransitioningRef.current || isLoadingEpisode) return;
+            if (canStartEpisodeSwipeFromTarget(event.target)) {
+              dragControls.start(event);
+            }
+          }}
           onDrag={(_, info) => {
             if (isTransitioningRef.current || isLoadingEpisode) return;
             dragX.set(info.offset.x);
@@ -787,16 +927,14 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
 
             if (offset > 60 || velocity > 200) {
               if (hasPrevious) {
-                setSwipeDirection('prev');
                 animate(dragX, 0, { type: 'spring', damping: 25, stiffness: 300 });
-                handlePreviousEpisode();
+                void handlePreviousEpisode();
                 return;
               }
             } else if (offset < -60 || velocity < -200) {
               if (hasNext) {
-                setSwipeDirection('next');
                 animate(dragX, 0, { type: 'spring', damping: 25, stiffness: 300 });
-                handleNextEpisode();
+                void handleNextEpisode();
                 return;
               }
             }
@@ -952,6 +1090,35 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                 </div>
 
                 <div className="space-y-6">
+                  <nav aria-label="Navigation entre épisodes" className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      aria-label="Épisode précédent"
+                      disabled={!hasPrevious || isLoadingEpisode}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handlePreviousEpisode();
+                      }}
+                      className="min-h-[44px] px-3 rounded-xl border border-white/10 bg-zinc-900/85 text-zinc-200 flex items-center justify-center gap-2 text-xs font-bold transition-colors hover:bg-zinc-800 disabled:opacity-35 disabled:cursor-not-allowed"
+                    >
+                      <ChevronLeft size={18} aria-hidden="true" />
+                      <span>Précédent</span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Épisode suivant"
+                      disabled={!hasNext || isLoadingEpisode}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleNextEpisode();
+                      }}
+                      className="min-h-[44px] px-3 rounded-xl border border-white/10 bg-zinc-900/85 text-zinc-200 flex items-center justify-center gap-2 text-xs font-bold transition-colors hover:bg-zinc-800 disabled:opacity-35 disabled:cursor-not-allowed"
+                    >
+                      <span>Suivant</span>
+                      <ChevronRight size={18} aria-hidden="true" />
+                    </button>
+                  </nav>
+
                   {/* Main Action Button (Pleine largeur) */}
                   <div>
                     {isSeen ? (

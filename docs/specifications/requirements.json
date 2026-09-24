@@ -1738,6 +1738,28 @@
       ]
     },
     {
+      "id": "SEENIT-UX-008",
+      "title": "Navigation épisode précédente/suivante accessible et sans mutation métier",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/episodeNavigationAccessibility.test.ts",
+          "contains": "SEENIT-UX-008 ←/→ naviguent hors saisie sans répétition implicite"
+        },
+        {
+          "file": "tests/episodeNavigationAccessibility.test.ts",
+          "contains": "SEENIT-UX-008 résout épisode voisin et frontières de saison sans saut inventé"
+        },
+        {
+          "file": "tests/episodeNavigationAccessibility.test.ts",
+          "contains": "SEENIT-UX-008 expose boutons, clavier, garde stale et navigation sans mutation métier"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-QUALITY-002",
       "title": "Audits datés et reliés à un backlog priorisé",
       "targets": [

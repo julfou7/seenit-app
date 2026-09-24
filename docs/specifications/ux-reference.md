@@ -37,7 +37,7 @@ marquées comme livrées décrivent le comportement attendu du runtime courant.
 | Carrousel réduit « À Regarder » | Glissement horizontal | Parcourt librement les cartes ; la suite est préchargée automatiquement par lots avant la fin du rail, sans marqueur terminal | Aucun scroll-snap. Le vrai bouton « Voir tout » de l'en-tête reste l'alternative accessible vers la liste verticale exhaustive. |
 | Modal épisode | Glisser vers la gauche | Épisode suivant, puis saison suivante si disponible | Aucune progression vue ajoutée par la navigation. |
 | Modal épisode | Glisser vers la droite | Épisode précédent, puis fin de saison précédente si disponible | Même série exacte ; limites sans bouclage. |
-| Modal épisode | Déplacement > 60 px ou vitesse > 200 | Déclenche précédent/suivant si disponible, sinon retour en place | Seuils observés, pas une certification de confort. Alternatives absentes : #179. |
+| Modal épisode | Déplacement > 60 px ou vitesse > 200 | Déclenche précédent/suivant si disponible, sinon retour en place | Le swipe reste disponible ; boutons Précédent/Suivant et ←/→ clavier partagent désormais la même intention via `SEENIT-UX-008`. |
 | Carte série `SwipeableCard`, par défaut | Gauche / droite | Supprimer / Abandonner, configurables par le parent | Afficher l'action réellement liée, conserver confirmation/annulation du contexte. |
 | Carte téléchargement | Droite | Retirer historique ou demander confirmation pour annuler actif | Aucun effacement de fichier implicite ; directions différentes justifiées par le contexte. |
 | Grille Explorer | Appui long 500 ms, ou menu contextuel | Aperçu lorsque `onLongPress` existe ; mouvement annule le timer | Ajouter annulation au démontage/pointercancel et alternative accessible : #180. |
@@ -78,6 +78,27 @@ Le contrat d'appui/reset de #178 est distinct de cet ordre visuel et désormais 
   ni préférences cloud. L'onglet actif est annoncé aux technologies d'assistance.
 - Le double appui applicatif ne remplace pas l'activation standard du lecteur d'écran. Les tests
   TalkBack doivent vérifier son comportement réel.
+
+## 3.1 Fiche épisode — navigation accessible livrée #179
+
+- Le swipe horizontal reste inchangé : gauche → épisode suivant, droite → épisode précédent.
+- Deux boutons **Précédent** / **Suivant** d'au moins 44 px utilisent exactement les mêmes handlers que le
+  swipe. Les touches ←/→ font de même hors `input`, `textarea`, `select`, contenu éditable ou champ
+  ARIA de saisie ; les répétitions clavier et combinaisons avec modificateur sont ignorées.
+- Le drag horizontal ne démarre que depuis une surface non interactive. Un appui, un petit déplacement ou
+  un geste sur Vu/Non vu, Plex, téléchargement, lien ou autre bouton ne peut donc pas déclencher en plus
+  une navigation épisode.
+- La fin d'une saison rejoint le premier épisode réellement disponible de la suivante ; depuis le premier
+  épisode, Précédent rejoint le dernier épisode réellement disponible de la saison précédente. La saison
+  spéciale `0` est admise seulement lorsque le parcours courant la rend explicitement accessible.
+  Une saison absente ne produit jamais d'épisode synthétique de frontière.
+- Une seule transition est active à la fois. Chaque chargement porte un identifiant de requête ; si la
+  fiche change avant la réponse, cette réponse est ignorée. Une erreur conserve l'épisode courant et
+  affiche un message de reprise.
+- Consulter l'épisode précédent/suivant ne modifie ni progression, ni Vu/Non vu, ni Plex, ni transfert.
+
+La reconnaissance tactile réelle et le conflit avec les gestes système Android restent à valider au doigt
+sur appareil ; la CI couvre la logique, les surfaces accessibles et les garde-fous déterministes.
 
 ## 4. Boutons et retours d'action — proposition #180
 
