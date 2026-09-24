@@ -179,10 +179,10 @@ adb_bounded shell am instrument -w -r \
 grep -q '^OK (1 test)' "$REPORT_DIR/instrumentation-verify.txt"
 
 adb_bounded shell am instrument -w -r \
-  -e class "$TEST_CLASS#verifyLoginAccessibility" \
-  "$TEST_RUNNER" | tee "$REPORT_DIR/instrumentation-accessibility.txt"
-grep -q '^OK (1 test)' "$REPORT_DIR/instrumentation-accessibility.txt"
-grep -q 'SEENIT_ACCESSIBILITY_OK:' "$REPORT_DIR/instrumentation-accessibility.txt"
+  -e class "$TEST_CLASS#verifyLoginWebViewSemantics" \
+  "$TEST_RUNNER" | tee "$REPORT_DIR/instrumentation-webview-semantics.txt"
+grep -q '^OK (1 test)' "$REPORT_DIR/instrumentation-webview-semantics.txt"
+grep -q 'SEENIT_WEBVIEW_SEMANTICS_OK:' "$REPORT_DIR/instrumentation-webview-semantics.txt"
 
 adb_bounded logcat -c
 adb_bounded shell am force-stop "$PACKAGE_ID"
@@ -200,7 +200,7 @@ assert_performance_budget "reprise Android" "$RESUME_MS" "$RESUME_BUDGET_MS"
 {
   echo "cold start Android=${COLD_START_MS} ms (budget ${COLD_START_BUDGET_MS} ms)"
   echo "reprise Android=${RESUME_MS} ms (budget ${RESUME_BUDGET_MS} ms)"
-  echo "accessibilité Android=Continuer avec Google exposé et actionnable"
+  echo "sémantique WebView Android=Continuer avec Google visible, actif et cible >=44 px"
 } | tee "$REPORT_DIR/performance.txt"
 
 adb_bounded shell am start -W -a android.intent.action.VIEW \
@@ -216,7 +216,7 @@ if grep -A 8 'FATAL EXCEPTION' "$REPORT_DIR/runtime-logcat.txt" | grep -q "Proce
   exit 1
 fi
 
-RESULT_TEXT="installation N → N+1 sur place, signature stable, données/session, accessibilité, budgets de démarrage/reprise, notifications, deep link et cycle de vie validés"
+RESULT_TEXT="installation N → N+1 sur place, signature stable, données/session, contrat sémantique WebView, budgets de démarrage/reprise, notifications, deep link et cycle de vie validés"
 
 {
   echo "# Smoke APK SeenIt"
@@ -230,7 +230,7 @@ RESULT_TEXT="installation N → N+1 sur place, signature stable, données/sessio
   echo "- Mode : $SMOKE_MODE"
   echo "- Cold start : ${COLD_START_MS} ms / budget ${COLD_START_BUDGET_MS} ms"
   echo "- Reprise : ${RESUME_MS} ms / budget ${RESUME_BUDGET_MS} ms"
-  echo "- Accessibilité Android : bouton de connexion exposé et actionnable dans l’arbre système"
+  echo "- WebView Android : bouton de connexion sémantique, visible, actif et cible >=44 px"
   echo "- Résultat : $RESULT_TEXT"
 } > "$REPORT_DIR/summary.md"
 

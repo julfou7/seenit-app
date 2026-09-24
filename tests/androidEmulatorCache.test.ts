@@ -22,14 +22,15 @@ test('la release Android 36 repart d’un AVD propre et borne sa pression mémoi
   assert.match(workflow, /Capture Android 36 Host Diagnostics[\s\S]*dmesg --ctime/);
 });
 
-test('SEENIT-QUALITY-012 le smoke API 36 vérifie l’accessibilité via UiAutomation sans shell uiautomator', () => {
-  assert.doesNotMatch(upgradeSmoke, /uiautomator\s+dump/);
-  assert.match(upgradeSmoke, /\$TEST_CLASS#verifyLoginAccessibility/);
-  assert.match(upgradeSmoke, /SEENIT_ACCESSIBILITY_OK:/);
-  assert.match(upgradeInstrumentation, /verifyLoginAccessibility\(\)/);
-  assert.match(upgradeInstrumentation, /getUiAutomation\(\)/);
-  assert.match(upgradeInstrumentation, /getRootInActiveWindow\(\)/);
-  assert.match(upgradeInstrumentation, /findAccessibilityNodeInfosByText\("Continuer avec Google"\)/);
-  assert.match(upgradeInstrumentation, /isClickable\(\)/);
-  assert.match(upgradeInstrumentation, /SystemClock\.elapsedRealtime\(\) \+ 15_000L/);
+test('SEENIT-QUALITY-012 le smoke API 36 vérifie le CTA dans la WebView sans UiAutomation', () => {
+  assert.doesNotMatch(upgradeSmoke, /uiautomator\\s+dump/);
+  assert.match(upgradeSmoke, /\\$TEST_CLASS#verifyLoginWebViewSemantics/);
+  assert.match(upgradeSmoke, /SEENIT_WEBVIEW_SEMANTICS_OK:/);
+  assert.match(upgradeInstrumentation, /verifyLoginWebViewSemantics\\(\\)/);
+  assert.doesNotMatch(upgradeInstrumentation, /getUiAutomation\\(\\)/);
+  assert.doesNotMatch(upgradeInstrumentation, /getRootInActiveWindow\\(\\)/);
+  assert.match(upgradeInstrumentation, /evaluateJavascript\\(semanticProbe/);
+  assert.match(upgradeInstrumentation, /querySelectorAll\\('button,\\[role=/);
+  assert.match(upgradeInstrumentation, /rect\\.width>=44&&rect\\.height>=44/);
+  assert.match(upgradeInstrumentation, /SystemClock\\.elapsedRealtime\\(\\) \\+ 15_000L/);
 });
