@@ -65,7 +65,7 @@ async function buildComponentActionHarness() {
     "  );",
     "}",
     "createRoot(document.getElementById('root')).render(React.createElement(Harness));",
-  ].join('\\n');
+  ].join('\n');
   fs.writeFileSync(entryPath, entrySource, 'utf8');
 
   await esbuild.build({
@@ -84,7 +84,7 @@ async function buildComponentActionHarness() {
     ? fs.readdirSync(assetsDir)
       .filter(name => name.endsWith('.css'))
       .map(name => `<link rel="stylesheet" href="/assets/${name}">`)
-      .join('\\n')
+      .join('\n')
     : '';
 
   fs.writeFileSync(htmlPath, [
@@ -99,7 +99,7 @@ async function buildComponentActionHarness() {
     '</head>',
     '<body><div id="root"></div><script src="/__seenit-component-actions.js"></script></body>',
     '</html>',
-  ].join('\\n'), 'utf8');
+  ].join('\n'), 'utf8');
 }
 
 async function waitForComponentHarness(client, timeoutMs = 5_000) {
