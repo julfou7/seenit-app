@@ -886,6 +886,15 @@ pour le cache des sagas et univers.
   complet des releases SeenIt officielles disposant de leur APK canonique. Les versions sont présentées
   de la plus récente à la plus ancienne par pagination bornée. Une page distante indisponible conserve les
   entrées officielles déjà chargées ou, à défaut, la dernière release connue ; elle ne bloque pas l'écran.
+- **SEENIT-UPDATE-006** — Une mise à jour APK ne peut pas conserver l'ancienne Activity pendant le
+  remplacement du package : Android peut arrêter le processus de la version installée. SeenIt utilise donc
+  un handoff natif `PackageInstaller.Session` initié par l'utilisateur. Le callback d'installation est un
+  `IntentSender` explicite vers une activité SeenIt dédiée : `STATUS_PENDING_USER_ACTION` ouvre uniquement
+  la confirmation système fournie par Android, puis `STATUS_SUCCESS` relance immédiatement l'activité
+  principale avec le fond sombre SeenIt. Le parcours ne contourne ni la confirmation d'installation ni
+  Play Protect, ne change ni signature ni `applicationId`, et ne dépend pas d'un `startActivity()` arbitraire
+  depuis un broadcast receiver en arrière-plan. Si Android refuse ou interrompt l'installation, la version
+  courante reste utilisable et aucune boucle de relance n'est créée.
 - Après téléchargement et vérification, l'ouverture réussie du Package Installer est un succès
   observable nommé « Installeur lancé » à 100 %. Elle ne doit jamais être rendue comme une erreur,
   même si Android conserve SeenIt visible derrière sa boîte de dialogue système.

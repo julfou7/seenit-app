@@ -1,6 +1,5 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
-import { FileOpener } from '@capacitor-community/file-opener';
 import { openExternalUrl } from '../lib/utils';
 import {
   isTrustedSeenItApkUrl,
@@ -11,6 +10,12 @@ import type { UpdateProgress } from '../features/release/updateProgress';
 import { recordClientOperationalSignal } from '../features/logging/clientOperationalDiagnostics.ts';
 
 const localConsole = globalThis.console;
+
+interface SeenItUpdateNativePlugin {
+  installApk(options: { filePath: string }): Promise<{ sessionId: number }>;
+}
+
+const SeenItUpdate = registerPlugin<SeenItUpdateNativePlugin>('SeenItUpdate');
 
 export { getUpdateProgressPresentation } from '../features/release/updateProgress';
 export type { UpdateProgress } from '../features/release/updateProgress';
@@ -50,7 +55,7 @@ export async function downloadAndInstallApk(
     return { success: true };
   }
 
-  let progressListener: any = null;
+  let progressListener: PluginListenerHandle | null = null;
 
   try {
     onProgress?.({ percent: 5, status: 'downloading', message: 'Connexion au serveur de mise à jour...' });
@@ -69,7 +74,7 @@ export async function downloadAndInstallApk(
 
     // 2. Écouter la progression du téléchargement natif
     try {
-      progressListener = await Filesystem.addListener('progress', (progress: any) => {
+      progressListener = await Filesystem.addListener('progress', (progress) => {
         if (progress.bytes && progress.contentLength) {
           const percent = Math.min(98, Math.round((progress.bytes / progress.contentLength) * 100));
           const mbReceived = (progress.bytes / (1024 * 1024)).toFixed(1);
@@ -134,12 +139,10 @@ export async function downloadAndInstallApk(
 
     const targetPath = downloadRes.path || fileUri.uri;
 
-    // 6. Ouvrir l'archive APK avec le Package Installer natif d'Android
-    await FileOpener.open({
-      filePath: targetPath,
-      contentType: 'application/vnd.android.package-archive',
-      openWithDefault: true
-    });
+    // 6. Confier l'APK au handoff natif PackageInstaller. Android peut tuer
+    // l'ancienne version pendant le remplacement ; le callback natif reprend
+    // ensuite SeenIt sans laisser le launcher comme état terminal.
+    await SeenItUpdate.installApk({ filePath: targetPath });
 
     onProgress?.({ percent: 100, status: 'done', message: 'Installeur lancé !' });
     return { success: true };
