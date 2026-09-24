@@ -34,3 +34,48 @@ test('SEENIT-QUALITY-012 garde le smoke upgrade centré sur les invariants APK',
   assert.match(upgradeSmoke, /resume\.txt/);
   assert.match(upgradeSmoke, /deep-link\.txt/);
 });
+
+test('SEENIT-QUALITY-012 retente une seule fois uniquement une disparition d’émulateur qualifiée', () => {
+  const primaryStart = workflow.indexOf('name: Run N to N+1 Upgrade Smoke on Android 36');
+  const evidenceStart = workflow.indexOf('name: Capture Android 36 Host Diagnostics', primaryStart);
+  const android36Block = workflow.slice(primaryStart, evidenceStart);
+
+  assert.match(android36Block, /id: android36_smoke_primary[\s\S]*continue-on-error: true/);
+  assert.match(
+    android36Block,
+    /marker='upgrade-reports\/android-36\/retryable-emulator-failure\.txt'/,
+  );
+  assert.match(android36Block, /completed='upgrade-reports\/android-36\/summary\.md'/);
+  assert.match(
+    android36Block,
+    /if: steps\.android36_retry_decision\.outputs\.should_retry == 'true'/,
+  );
+  assert.equal(
+    (android36Block.match(/reactivecircus\/android-emulator-runner@/g) || []).length,
+    2,
+    'le smoke API 36 autorise exactement une tentative initiale et un seul retry',
+  );
+  assert.equal(
+    (android36Block.match(/continue-on-error: true/g) || []).length,
+    1,
+    'seule la tentative initiale peut être tolérée le temps de classifier l’incident',
+  );
+  assert.equal(
+    (android36Block.match(/force-avd-creation: true/g) || []).length,
+    2,
+    'le retry repart lui aussi d’un AVD neuf',
+  );
+
+  const criticalMarker = upgradeSmoke.indexOf(
+    "printf 'upgrade/data-session/budgets/deep-link=ok\\n' > \"$PRE_RETURN_ASSERTIONS_MARKER\"",
+  );
+  const verifyUpgrade = upgradeSmoke.indexOf('verifyUpgradeStateAndNativeContracts');
+  const deepLinkOk = upgradeSmoke.indexOf("grep -q 'Status: ok' \"$REPORT_DIR/deep-link.txt\"");
+  assert.ok(verifyUpgrade >= 0 && deepLinkOk > verifyUpgrade && criticalMarker > deepLinkOk);
+  assert.match(upgradeSmoke, /API_LEVEL" == "36"/);
+  assert.match(upgradeSmoke, /adb get-state/);
+  assert.match(upgradeSmoke, /classification=retryable-emulator-disappearance/);
+  assert.match(upgradeSmoke, /exit 75/);
+  assert.match(upgradeSmoke, /late_adb_failure "cycle Retour Android"/);
+  assert.match(upgradeSmoke, /late_adb_failure "lecture logcat après Retour Android"/);
+});

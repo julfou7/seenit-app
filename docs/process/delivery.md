@@ -160,11 +160,17 @@ ne pas retirer de test, vérifier le statut GitHub/npm, relancer une seule fois 
 ouvrir/actualiser une issue si la dérive se répète.
 
 Le smoke Android de release réutilise le même contrat qualité : cold start ≤ 9 000 ms et reprise
-≤ 2 500 ms, avec rapport `performance.txt` et preuve instrumentée du nœud d'accessibilité système.
-Le bouton « Continuer avec Google » doit être visible dans la racine `UiAutomation` et lui-même, ou l'un
-de ses ancêtres, doit être cliquable. Un dépassement ou l'absence de cette action est bloquant ; ces plafonds
-gardent une marge sur les baselines Android 36 observées afin de détecter une régression majeure sans
-transformer la variabilité émulateur en flake.
+≤ 2 500 ms, avec rapport `performance.txt`. La sémantique/accessibilité du login appartient au quality
+gate navigateur ; le smoke N → N+1 ne réactive ni `uiautomator dump`, ni `UiAutomation`, ni une
+`MainActivity` instrumentée uniquement pour sonder le login.
+
+L'API 36 reste bloquante. Si l'upgrade, les données/session, les budgets et le deep link sont déjà verts
+mais que QEMU/ADB disparaît avant la fin du contrôle Retour/logcat, le smoke écrit une preuve explicite
+`retryable-emulator-failure.txt`. Le workflow peut alors créer **un seul nouvel AVD propre** et rejouer
+le smoke complet. Sans cette preuve, le premier échec reste immédiatement bloquant ; le retry lui-même
+n'est jamais tolérant aux erreurs. Une divergence package/version/signature, un échec d'installation ou
+d'instrumentation, un dépassement de budget, un deep link rouge ou un crash SeenIt ne peut donc jamais être
+masqué par ce mécanisme.
 
 Le contrat Android exécuté en validation continue contrôle l'identité et le contrat de signature sans
 exiger le fichier privé de keystore : les secrets de signature ne sont jamais exposés aux PR ni aux

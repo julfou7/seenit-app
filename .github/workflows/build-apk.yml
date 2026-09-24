@@ -352,7 +352,9 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Run N to N+1 Upgrade Smoke on Android 36
+        id: android36_smoke_primary
         if: inputs.fast_terrain != true
+        continue-on-error: true
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 36
@@ -369,6 +371,47 @@ jobs:
             "SeenIt-v${{ steps.release_candidate.outputs.APP_VERSION }}.apk"
             "android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
             "upgrade-reports/android-36"
+            "36"
+
+      - name: Decide whether Android 36 smoke may retry
+        id: android36_retry_decision
+        if: always() && inputs.fast_terrain != true
+        shell: bash
+        run: |
+          if [ "${{ steps.android36_smoke_primary.outcome }}" = "success" ]; then
+            echo "should_retry=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          marker='upgrade-reports/android-36/retryable-emulator-failure.txt'
+          completed='upgrade-reports/android-36/summary.md'
+          if [ -f "$marker" ] || [ -f "$completed" ]; then
+            echo "should_retry=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Android 36 emulator infrastructure failure classified; one fresh-AVD retry is allowed."
+            exit 0
+          fi
+
+          echo "::error::Android 36 smoke failed before a retryable emulator disappearance was proven."
+          exit 1
+
+      - name: Retry N to N+1 Upgrade Smoke on Android 36 after classified emulator loss
+        if: steps.android36_retry_decision.outputs.should_retry == 'true'
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 2048M
+          force-avd-creation: true
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: >-
+            bash scripts/android-upgrade-smoke.sh
+            "upgrade-baseline/SeenIt-v${{ steps.android36_baseline.outputs.BASELINE_VERSION }}.apk"
+            "SeenIt-v${{ steps.release_candidate.outputs.APP_VERSION }}.apk"
+            "android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
+            "upgrade-reports/android-36-retry"
             "36"
 
       - name: Capture Android 36 Host Diagnostics
@@ -389,7 +432,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: SeenIt-APK-Upgrade-Smoke-Android-36-v${{ steps.release_candidate.outputs.APP_VERSION }}
-          path: upgrade-reports/android-36
+          path: |
+            upgrade-reports/android-36
+            upgrade-reports/android-36-retry
           if-no-files-found: warn
           retention-days: 30
 
@@ -403,7 +448,11 @@ jobs:
             smoke='non bloquant — sauté'
           else
             mode='release complète'
-            smoke='bloquant — exécuté'
+            if [ "${{ steps.android36_retry_decision.outputs.should_retry }}" = "true" ]; then
+              smoke='bloquant — retry infrastructure borné exécuté'
+            else
+              smoke='bloquant — exécuté'
+            fi
           fi
           {
             echo "## Release APK — chemin critique"
