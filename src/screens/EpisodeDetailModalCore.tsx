@@ -174,7 +174,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   // Background preloading of current, next and previous season details
   useEffect(() => {
     const effectiveTmdbId = tmdbShowId || activeShow?.tmdbId;
-    if (!effectiveTmdbId || !currentSeason || !currentEpisode?.episode_number) return;
+    if (!effectiveTmdbId || currentSeason < 0 || !currentEpisode?.episode_number) return;
 
     let isMounted = true;
 
@@ -338,7 +338,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
 
     try {
       if (effectiveTmdbId) {
-        let currentEpisodes = seasonCacheRef.current[`${effectiveTmdbId}_${currentSeason}`];
+        let currentEpisodes: EpisodeDetailData[] | null | undefined = seasonCacheRef.current[`${effectiveTmdbId}_${currentSeason}`];
         if (!currentEpisodes) {
           setIsLoadingEpisode(true);
           currentEpisodes = await fetchAndCacheSeason(currentSeason);
@@ -364,7 +364,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
           );
           if (curEpNum >= highestEpisode) {
             const targetSeason = currentSeason + 1;
-            let nextEpisodes = seasonCacheRef.current[`${effectiveTmdbId}_${targetSeason}`];
+            let nextEpisodes: EpisodeDetailData[] | null | undefined = seasonCacheRef.current[`${effectiveTmdbId}_${targetSeason}`];
             if (!nextEpisodes) {
               setIsLoadingEpisode(true);
               nextEpisodes = await fetchAndCacheSeason(targetSeason);
@@ -451,7 +451,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
       if (curEpNum > 1) {
         const prevEpNum = curEpNum - 1;
         if (effectiveTmdbId) {
-          let currentEpisodes = seasonCacheRef.current[`${effectiveTmdbId}_${currentSeason}`];
+          let currentEpisodes: EpisodeDetailData[] | null | undefined = seasonCacheRef.current[`${effectiveTmdbId}_${currentSeason}`];
           if (!currentEpisodes) {
             setIsLoadingEpisode(true);
             currentEpisodes = await fetchAndCacheSeason(currentSeason);
@@ -523,7 +523,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
         }
 
         const targetSeason = currentSeason - 1;
-        let previousEpisodes = seasonCacheRef.current[`${effectiveTmdbId}_${targetSeason}`];
+        let previousEpisodes: EpisodeDetailData[] | null | undefined = seasonCacheRef.current[`${effectiveTmdbId}_${targetSeason}`];
         if (!previousEpisodes) {
           setIsLoadingEpisode(true);
           previousEpisodes = await fetchAndCacheSeason(targetSeason);

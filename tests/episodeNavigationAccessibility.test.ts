@@ -109,6 +109,7 @@ test('SEENIT-UX-008 expose boutons, clavier, garde stale et navigation sans muta
   assert.match(coreSource, /canStartEpisodeSwipeFromTarget\(event\.target\)/);
   assert.match(coreSource, /navigationRequestRef\.current !== requestId/);
   assert.match(coreSource, /Impossible de charger l’épisode suivant\. Réessaie\./);
+  assert.doesNotMatch(coreSource, /!currentSeason \|\| !currentEpisode/);
 
   const navigationStart = coreSource.indexOf('const finishNavigationRequest');
   const navigationEnd = coreSource.indexOf('const toggleSeen');
