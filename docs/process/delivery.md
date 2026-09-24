@@ -160,9 +160,11 @@ ne pas retirer de test, vérifier le statut GitHub/npm, relancer une seule fois 
 ouvrir/actualiser une issue si la dérive se répète.
 
 Le smoke Android de release réutilise le même contrat qualité : cold start ≤ 9 000 ms et reprise
-≤ 2 500 ms, avec rapport `performance.txt` et capture de l'arbre d'accessibilité système. Un dépassement
-est bloquant ; ces plafonds gardent une marge sur les baselines Android 36 observées afin de détecter
-une régression majeure sans transformer la variabilité émulateur en flake.
+≤ 2 500 ms, avec rapport `performance.txt` et preuve instrumentée du nœud d'accessibilité système.
+Le bouton « Continuer avec Google » doit être visible dans la racine `UiAutomation` et lui-même, ou l'un
+de ses ancêtres, doit être cliquable. Un dépassement ou l'absence de cette action est bloquant ; ces plafonds
+gardent une marge sur les baselines Android 36 observées afin de détecter une régression majeure sans
+transformer la variabilité émulateur en flake.
 
 Le contrat Android exécuté en validation continue contrôle l'identité et le contrat de signature sans
 exiger le fichier privé de keystore : les secrets de signature ne sont jamais exposés aux PR ni aux
@@ -598,6 +600,14 @@ et la fin de `dmesg` pour distinguer un kill QEMU sous pression d'un défaut app
 1.4.112 `33809261658` a validé ce parcours sur Android 36 et Android 12. Depuis #135, le build et ce smoke
 partagent le même runner à droits de lecture ; seul le job de publication séparé conserve `contents: write`.
 `npm ci` et le build Web sont ainsi exécutés une seule fois sur le même runner et ne sont plus payés deux fois.
+
+La récidive #50 observée pendant la release 1.4.191 a montré que le binaire shell historique
+`uiautomator dump` pouvait rester bloqué après un cold start pourtant réussi, avec un fichier XML vide,
+puis précéder la disparition de QEMU alors que l'hôte disposait encore de mémoire et que l'installation
+N → N+1, les données/session et les contrats natifs étaient déjà validés. Le smoke ne retire donc pas le
+garde d'accessibilité : il l'exerce désormais directement dans le harness instrumenté via
+`Instrumentation.getUiAutomation().getRootInActiveWindow()`, avec une attente bornée et sans
+`UiAutomation.waitForIdle()`. Le shell `uiautomator dump` est interdit dans ce chemin de release.
 
 ### Distribution hors Play et Play Protect
 
