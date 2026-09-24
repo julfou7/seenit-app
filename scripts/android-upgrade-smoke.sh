@@ -178,18 +178,16 @@ adb_bounded shell am instrument -w -r \
   "$TEST_RUNNER" | tee "$REPORT_DIR/instrumentation-verify.txt"
 grep -q '^OK (1 test)' "$REPORT_DIR/instrumentation-verify.txt"
 
+adb_bounded shell am instrument -w -r \
+  -e class "$TEST_CLASS#verifyLoginAccessibility" \
+  "$TEST_RUNNER" | tee "$REPORT_DIR/instrumentation-accessibility.txt"
+grep -q '^OK (1 test)' "$REPORT_DIR/instrumentation-accessibility.txt"
+grep -q 'SEENIT_ACCESSIBILITY_OK:' "$REPORT_DIR/instrumentation-accessibility.txt"
+
 adb_bounded logcat -c
 adb_bounded shell am force-stop "$PACKAGE_ID"
 adb_bounded shell am start -W -n "$PACKAGE_ID/.MainActivity" | tee "$REPORT_DIR/cold-start.txt"
 grep -q 'Status: ok' "$REPORT_DIR/cold-start.txt"
-
-sleep 3
-adb_bounded shell uiautomator dump /sdcard/seenit-accessibility.xml > "$REPORT_DIR/accessibility-dump.txt"
-adb_bounded pull /sdcard/seenit-accessibility.xml "$REPORT_DIR/accessibility.xml" > "$REPORT_DIR/accessibility-pull.txt"
-LOGIN_ACCESSIBILITY_NODE="$(grep -o '<node[^>]*Continuer avec Google[^>]*>' "$REPORT_DIR/accessibility.xml" | head -n 1 || true)"
-[[ -n "$LOGIN_ACCESSIBILITY_NODE" ]] || smoke_failure "le bouton de connexion n’est pas exposé dans l’arbre d’accessibilité Android."
-grep -q 'clickable="true"' <<< "$LOGIN_ACCESSIBILITY_NODE" \
-  || smoke_failure "le bouton de connexion exposé à Android n’est pas actionnable."
 
 adb_bounded shell input keyevent KEYCODE_HOME
 adb_bounded shell am start -W -n "$PACKAGE_ID/.MainActivity" | tee "$REPORT_DIR/resume.txt"

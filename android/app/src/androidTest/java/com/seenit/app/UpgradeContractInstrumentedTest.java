@@ -5,6 +5,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import android.Manifest;
+import android.app.Instrumentation;
+import android.app.UiAutomation;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -14,12 +16,15 @@ import android.content.pm.PackageManager;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
+import android.os.SystemClock;
+import android.view.accessibility.AccessibilityNodeInfo;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.List;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -103,5 +108,56 @@ public class UpgradeContractInstrumentedTest {
         assertEquals(PROBE_VALUE, new String(persisted, StandardCharsets.UTF_8));
 
         assertNativeContracts(context);
+    }
+
+    @Test
+    public void verifyLoginAccessibility() throws Exception {
+        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        PackageManager packageManager = targetContext().getPackageManager();
+        Intent launcherIntent = packageManager.getLaunchIntentForPackage(PACKAGE_ID);
+        assertNotNull("Intent launcher SeenIt absent.", launcherIntent);
+        launcherIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+        instrumentation.startActivitySync(launcherIntent);
+        instrumentation.waitForIdleSync();
+
+        UiAutomation uiAutomation = instrumentation.getUiAutomation();
+        long deadline = SystemClock.elapsedRealtime() + 15_000L;
+        boolean loginActionFound = false;
+
+        while (SystemClock.elapsedRealtime() < deadline && !loginActionFound) {
+            AccessibilityNodeInfo root = uiAutomation.getRootInActiveWindow();
+            if (root != null) {
+                List<AccessibilityNodeInfo> matches =
+                    root.findAccessibilityNodeInfosByText("Continuer avec Google");
+                for (AccessibilityNodeInfo node : matches) {
+                    if (isNodeOrAncestorClickable(node)) {
+                        loginActionFound = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!loginActionFound) {
+                SystemClock.sleep(250L);
+            }
+        }
+
+        assertTrue(
+            "Le bouton « Continuer avec Google » n'est pas exposé comme action cliquable à Android.",
+            loginActionFound
+        );
+        System.out.println("SEENIT_ACCESSIBILITY_OK: Continuer avec Google clickable=true");
+    }
+
+    private boolean isNodeOrAncestorClickable(AccessibilityNodeInfo node) {
+        AccessibilityNodeInfo current = node;
+        for (int depth = 0; current != null && depth < 8; depth += 1) {
+            if (current.isClickable()) {
+                return true;
+            }
+            current = current.getParent();
+        }
+        return false;
     }
 }
