@@ -601,21 +601,20 @@ et la fin de `dmesg` pour distinguer un kill QEMU sous pression d'un défaut app
 partagent le même runner à droits de lecture ; seul le job de publication séparé conserve `contents: write`.
 `npm ci` et le build Web sont ainsi exécutés une seule fois sur le même runner et ne sont plus payés deux fois.
 
-La récidive #50 observée pendant la release 1.4.191 a permis de séparer les couches :
-le premier run tombait après le binaire shell `uiautomator dump`, puis un second run sans ce binaire
-a reproduit la disparition de QEMU dès `UiAutomation.getRootInActiveWindow()`. Dans les deux cas,
-l'installation N → N+1, les données/session et les contrats natifs étaient déjà validés, l'hôte conservait
-plus de 14 Go disponibles et ADB devenait ensuite offline avec un signal KVM `Unhandled WRMSR`.
-La frontière non fiable est donc la pile UiAutomation/AccessibilityService de l'émulateur API 36,
-pas le parcours SeenIt testé auparavant.
+La récidive #50 observée pendant la release 1.4.191 a isolé une limite de l'émulateur API 36 :
+trois variantes successives — `uiautomator dump`, `UiAutomation.getRootInActiveWindow()`, puis une
+seconde `MainActivity` instrumentée sondant directement la WebView — ont toutes précédé la disparition
+de QEMU, alors que l'installation N → N+1, la signature et les données/session étaient déjà validées,
+que l'hôte conservait plus de 14 Go disponibles et qu'ADB devenait ensuite offline avec un signal KVM
+`Unhandled WRMSR`.
 
-Le smoke bloquant ne supprime pas la preuve du CTA de connexion : après l'upgrade, son harness instrumenté
-ouvre la vraie WebView Android et exécute une sonde JavaScript bornée qui exige « Continuer avec Google »
-comme `button` / `role=button`, visible, actif et avec une cible d'au moins 44 × 44 px. Le smoke
-navigateur canonique reste responsable de la preuve d'arbre d'accessibilité complet. Un chantier qui
-modifie explicitement l'accessibilité Android ajoute une validation TalkBack terrain ; une release
-ordinaire ne réactive pas une pile UiAutomation connue pour tuer l'AVD. Les invariants package,
-signature, migration, données/session, cold start, reprise, budgets, deep link et Retour restent bloquants.
+Le smoke bloquant est donc recentré sur son rôle : prouver les invariants de migration APK et le cycle
+de vie de l'application, pas dupliquer les contrôles génériques du login. Il conserve package/version/
+signature, installation sur place, données/session, permissions/launcher/deep link, cold start, reprise,
+budgets et Retour. Le quality gate navigateur canonique couvre la sémantique et l'arbre d'accessibilité
+du login ; un changement Android explicitement centré sur l'accessibilité ajoute une validation TalkBack
+terrain. Les appels `uiautomator dump`, `UiAutomation` et la sonde WebView instrumentée de login sont
+interdits dans ce smoke de release afin de ne pas convertir une panne KVM reproductible en faux défaut APK.
 
 ### Distribution hors Play et Play Protect
 

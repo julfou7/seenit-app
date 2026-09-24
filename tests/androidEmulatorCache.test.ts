@@ -22,15 +22,15 @@ test('la release Android 36 repart d’un AVD propre et borne sa pression mémoi
   assert.match(workflow, /Capture Android 36 Host Diagnostics[\s\S]*dmesg --ctime/);
 });
 
-test('SEENIT-QUALITY-012 le smoke API 36 vérifie le CTA dans la WebView sans UiAutomation', () => {
+test('SEENIT-QUALITY-012 garde le smoke upgrade centré sur les invariants APK', () => {
   assert.ok(!upgradeSmoke.includes('uiautomator dump'));
-  assert.ok(upgradeSmoke.includes('$TEST_CLASS#verifyLoginWebViewSemantics'));
-  assert.ok(upgradeSmoke.includes('SEENIT_WEBVIEW_SEMANTICS_OK:'));
-  assert.ok(upgradeInstrumentation.includes('verifyLoginWebViewSemantics()'));
+  assert.ok(!upgradeSmoke.includes('verifyLoginAccessibility'));
+  assert.ok(!upgradeSmoke.includes('verifyLoginWebViewSemantics'));
   assert.ok(!upgradeInstrumentation.includes('getUiAutomation()'));
   assert.ok(!upgradeInstrumentation.includes('getRootInActiveWindow()'));
-  assert.ok(upgradeInstrumentation.includes('evaluateJavascript(semanticProbe'));
-  assert.ok(upgradeInstrumentation.includes("querySelectorAll('button,[role="));
-  assert.ok(upgradeInstrumentation.includes('rect.width>=44&&rect.height>=44'));
-  assert.ok(upgradeInstrumentation.includes('SystemClock.elapsedRealtime() + 15_000L'));
+  assert.ok(!upgradeInstrumentation.includes('evaluateJavascript(semanticProbe'));
+  assert.match(upgradeSmoke, /verifyUpgradeStateAndNativeContracts/);
+  assert.match(upgradeSmoke, /cold-start\.txt/);
+  assert.match(upgradeSmoke, /resume\.txt/);
+  assert.match(upgradeSmoke, /deep-link\.txt/);
 });
