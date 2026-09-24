@@ -26,7 +26,7 @@ export const ProfileScreen = React.memo(function ProfileScreen({
   onShowClick
 }: { 
   initialShowSettings?: boolean;
-  onShowClick?: (id: any, mediaType?: 'tv' | 'movie') => void;
+  onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void;
 }) {
   const [showSettings, setShowSettings] = useState(initialShowSettings);
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
@@ -96,9 +96,8 @@ export const ProfileScreen = React.memo(function ProfileScreen({
       setShowSettings(false);
       setIsExitingSettings(false);
       setDragXSettings(0);
-      setMountedProfileTabs(previous => previous.has('stats') ? previous : new Set(previous).add('stats'));
+      setMountedProfileTabs(new Set<'stats' | 'library'>(['stats']));
       setActiveTab('stats');
-      window.dispatchEvent(new CustomEvent('library-reset-all'));
       requestAnimationFrame(() => {
         if (rootRef.current) rootRef.current.scrollTop = 0;
       });

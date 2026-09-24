@@ -281,21 +281,6 @@ export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, is
 
   const [previewMedia, setPreviewMedia] = useState<TMDBMedia | null>(null);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleResetAll = () => {
-      setPreviewMedia(null);
-      setExpandedSection(null);
-      requestAnimationFrame(() => {
-        rootRef.current?.querySelectorAll<HTMLElement>('[data-library-row]').forEach(row => {
-          row.scrollLeft = 0;
-        });
-      });
-    };
-    window.addEventListener('library-reset-all', handleResetAll);
-    return () => window.removeEventListener('library-reset-all', handleResetAll);
-  }, []);
 
   const handleShowClick = useCallback((id: string | number, mediaType?: 'tv' | 'movie') => {
     onShowClick(String(id), mediaType);
@@ -446,7 +431,7 @@ export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, is
       s.status !== 'dropped'
     );
 
-    const isTvUpcoming = (s: any) => {
+    const isTvUpcoming = (s: Show) => {
       if (s.mediaType !== 'tv') return false;
       if ((s.seenEpisodes?.length || 0) > 0) return false;
       if (s.firstAirDate && s.firstAirDate > todayStr) return true;
@@ -516,7 +501,7 @@ export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, is
   }, [handleShowClick]);
 
   return (
-    <div ref={rootRef} className={cn("flex-1 text-white", !isEmbedded && "overflow-y-auto bg-transparent pb-nav")}>
+    <div className={cn("flex-1 text-white", !isEmbedded && "overflow-y-auto bg-transparent pb-nav")}>
       {!isEmbedded && (
         <div className="px-4 sm:px-6 pt-6 pb-4 relative">
           <div className="absolute top-0 left-0 w-72 h-40 bg-[#E5A93D]/15 blur-[120px] -z-10 rounded-full mix-blend-screen pointer-events-none" />
