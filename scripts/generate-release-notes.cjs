@@ -223,27 +223,34 @@ function isEmptyChangelogMarker(value) {
 }
 
 function extractExplicitChangelog(lines) {
-  const headerIndex = lines.findIndex(line => /^\s*changelog\s*:/i.test(line));
-  if (headerIndex < 0) return null;
+  const items = [];
+  let foundHeader = false;
 
-  const header = lines[headerIndex].match(/^\s*changelog\s*:\s*(.*)$/i);
-  const inline = String(header?.[1] || '').trim();
-  if (isEmptyChangelogMarker(inline)) return [];
+  for (let headerIndex = 0; headerIndex < lines.length; headerIndex += 1) {
+    const header = lines[headerIndex].match(/^\s*changelog\s*:\s*(.*)$/i);
+    if (!header) continue;
+    foundHeader = true;
 
-  const items = inline ? [inline] : [];
-  for (let index = headerIndex + 1; index < lines.length; index += 1) {
-    const line = lines[index];
-    const bullet = line.match(/^\s*(?:[-*•]|\d+[.)])\s+(.+)$/);
-    if (bullet) {
-      items.push(bullet[1].trim());
-      continue;
+    const inline = String(header[1] || '').trim();
+    if (inline && !isEmptyChangelogMarker(inline)) items.push(inline);
+    if (inline) continue;
+
+    for (let index = headerIndex + 1; index < lines.length; index += 1) {
+      const line = lines[index];
+      if (/^\s*changelog\s*:/i.test(line)) break;
+      const bullet = line.match(/^\s*(?:[-*•]|\d+[.)])\s+(.+)$/);
+      if (bullet) {
+        items.push(bullet[1].trim());
+        continue;
+      }
+
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      if (/^[^:]{1,80}:\s*$/.test(trimmed) || items.length > 0) break;
     }
-
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    if (/^[^:]{1,80}:\s*$/.test(trimmed) || items.length > 0) break;
   }
 
+  if (!foundHeader) return null;
   return items
     .filter(item => !isEmptyChangelogMarker(item))
     .map(formatPublicNote)
