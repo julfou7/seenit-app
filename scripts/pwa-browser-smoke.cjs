@@ -34,9 +34,9 @@ async function buildComponentActionHarness() {
   const entrySource = [
     "import React from 'react';",
     "import { createRoot } from 'react-dom/client';",
-    \`import { SeenItCheckButton } from \${JSON.stringify(currentCheckPath)};\`,
-    \`import { ActionButton } from \${JSON.stringify(actionButtonPath)};\`,
-    \`import { LegacySeenItCheckButton } from \${JSON.stringify(legacyCheckPath)};\`,
+    `import { SeenItCheckButton } from ${JSON.stringify(currentCheckPath)};`,
+    `import { ActionButton } from ${JSON.stringify(actionButtonPath)};`,
+    `import { LegacySeenItCheckButton } from ${JSON.stringify(legacyCheckPath)};`,
     "const telemetry = { legacyClicks: 0, currentClicks: 0 };",
     "window.__seenitActionHarness = telemetry;",
     "const delay = ms => new Promise(resolve => setTimeout(resolve, ms));",
@@ -83,7 +83,7 @@ async function buildComponentActionHarness() {
   const cssLinks = fs.existsSync(assetsDir)
     ? fs.readdirSync(assetsDir)
       .filter(name => name.endsWith('.css'))
-      .map(name => \`<link rel="stylesheet" href="/assets/\${name}">\`)
+      .map(name => `<link rel="stylesheet" href="/assets/${name}">`)
       .join('\\n')
     : '';
 
@@ -105,7 +105,7 @@ async function buildComponentActionHarness() {
 async function waitForComponentHarness(client, timeoutMs = 5_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const ready = await evaluate(client, \`Boolean(document.querySelector('[data-seenit-action-harness="ready"]'))\`);
+    const ready = await evaluate(client, `Boolean(document.querySelector('[data-seenit-action-harness="ready"]'))`);
     if (ready) return;
     await delay(50);
   }
@@ -122,7 +122,7 @@ async function testComponentActionHarness(client, viewport, minTouchTargetCssPx)
   await client.send('Page.navigate', { url: componentHarnessUrl });
   await waitForComponentHarness(client);
 
-  const metrics = await evaluate(client, \`(() => {
+  const metrics = await evaluate(client, `(() => {
     const inspect = selector => {
       const node = document.querySelector(selector);
       const rect = node?.getBoundingClientRect();
@@ -145,13 +145,13 @@ async function testComponentActionHarness(client, viewport, minTouchTargetCssPx)
       scrollWidth: document.documentElement.scrollWidth,
       innerWidth: window.innerWidth,
     };
-  })()\`);
+  })()`);
 
   if (!metrics?.before || !metrics?.after || !metrics?.watched) {
-    throw new Error(\`\${viewport.id}: boutons du harness #180 introuvables.\`);
+    throw new Error(`${viewport.id}: boutons du harness #180 introuvables.`);
   }
   if (metrics.before.width >= minTouchTargetCssPx && metrics.before.height >= minTouchTargetCssPx) {
-    throw new Error(\`\${viewport.id}: la fixture avant #180 ne reproduit plus la cible tactile insuffisante.\`);
+    throw new Error(`${viewport.id}: la fixture avant #180 ne reproduit plus la cible tactile insuffisante.`);
   }
   for (const [name, button] of Object.entries({
     after: metrics.after,
@@ -161,34 +161,34 @@ async function testComponentActionHarness(client, viewport, minTouchTargetCssPx)
     danger: metrics.danger,
   })) {
     if (!button || button.width < minTouchTargetCssPx || button.height < minTouchTargetCssPx) {
-      throw new Error(\`\${viewport.id}: cible #180 \${name} < \${minTouchTargetCssPx}px (\${JSON.stringify(button)}).\`);
+      throw new Error(`${viewport.id}: cible #180 ${name} < ${minTouchTargetCssPx}px (${JSON.stringify(button)}).`);
     }
   }
   if (metrics.scrollWidth > metrics.innerWidth + 1) {
-    throw new Error(\`\${viewport.id}: harness #180 déborde horizontalement (\${metrics.scrollWidth}px > \${metrics.innerWidth}px).\`);
+    throw new Error(`${viewport.id}: harness #180 déborde horizontalement (${metrics.scrollWidth}px > ${metrics.innerWidth}px).`);
   }
   if (metrics.watched.ariaLabel !== 'Marquer comme non vu' || metrics.watched.ariaPressed !== 'true') {
-    throw new Error(\`\${viewport.id}: action inverse Vu/Non vu incorrecte (\${JSON.stringify(metrics.watched)}).\`);
+    throw new Error(`${viewport.id}: action inverse Vu/Non vu incorrecte (${JSON.stringify(metrics.watched)}).`);
   }
   if (!metrics.pending.disabled || metrics.pending.ariaBusy !== 'true') {
-    throw new Error(\`\${viewport.id}: état pending ActionButton non exposé (\${JSON.stringify(metrics.pending)}).\`);
+    throw new Error(`${viewport.id}: état pending ActionButton non exposé (${JSON.stringify(metrics.pending)}).`);
   }
 
-  await evaluate(client, \`(() => {
+  await evaluate(client, `(() => {
     window.__seenitActionHarness.legacyClicks = 0;
     const button = document.querySelector('#issue180-before button');
     button.click();
     button.click();
-  })()\`);
-  const legacyClicks = await evaluate(client, \`window.__seenitActionHarness.legacyClicks\`);
-  if (legacyClicks !== 2) throw new Error(\`\${viewport.id}: la fixture avant ne reproduit pas le double déclenchement (count=\${legacyClicks}).\`);
+  })()`);
+  const legacyClicks = await evaluate(client, `window.__seenitActionHarness.legacyClicks`);
+  if (legacyClicks !== 2) throw new Error(`${viewport.id}: la fixture avant ne reproduit pas le double déclenchement (count=${legacyClicks}).`);
 
-  await evaluate(client, \`(() => {
+  await evaluate(client, `(() => {
     window.__seenitActionHarness.currentClicks = 0;
     document.querySelector('#issue180-after button').click();
-  })()\`);
+  })()`);
   await delay(40);
-  const pendingState = await evaluate(client, \`(() => {
+  const pendingState = await evaluate(client, `(() => {
     const button = document.querySelector('#issue180-after button');
     button.click();
     return {
@@ -196,12 +196,12 @@ async function testComponentActionHarness(client, viewport, minTouchTargetCssPx)
       disabled: button.disabled,
       ariaBusy: button.getAttribute('aria-busy'),
     };
-  })()\`);
+  })()`);
   if (pendingState.count !== 1 || !pendingState.disabled || pendingState.ariaBusy !== 'true') {
-    throw new Error(\`\${viewport.id}: double intention non sérialisée (\${JSON.stringify(pendingState)}).\`);
+    throw new Error(`${viewport.id}: double intention non sérialisée (${JSON.stringify(pendingState)}).`);
   }
   await delay(240);
-  const settledState = await evaluate(client, \`(() => {
+  const settledState = await evaluate(client, `(() => {
     const button = document.querySelector('#issue180-after button');
     button.focus();
     return {
@@ -210,17 +210,17 @@ async function testComponentActionHarness(client, viewport, minTouchTargetCssPx)
       ariaBusy: button.getAttribute('aria-busy'),
       focused: document.activeElement === button,
     };
-  })()\`);
+  })()`);
   if (settledState.count !== 1 || settledState.disabled || settledState.ariaBusy !== null || !settledState.focused) {
-    throw new Error(\`\${viewport.id}: état final/focus #180 incorrect (\${JSON.stringify(settledState)}).\`);
+    throw new Error(`${viewport.id}: état final/focus #180 incorrect (${JSON.stringify(settledState)}).`);
   }
 
   const ax = await client.send('Accessibility.getFullAXTree');
   const inverseNode = findNamedButton(ax.nodes || [], 'Marquer comme non vu');
-  if (!inverseNode) throw new Error(\`\${viewport.id}: bouton « Marquer comme non vu » absent de l’arbre d’accessibilité.\`);
+  if (!inverseNode) throw new Error(`${viewport.id}: bouton « Marquer comme non vu » absent de l’arbre d’accessibilité.`);
 
   fs.mkdirSync(reportDir, { recursive: true });
-  await captureScreenshot(client, path.join(reportDir, \`component-actions-before-after-\${viewport.id}.png\`));
+  await captureScreenshot(client, path.join(reportDir, `component-actions-before-after-${viewport.id}.png`));
   return { viewport: viewport.id, metrics, legacyClicks, pendingState, settledState };
 }
 
