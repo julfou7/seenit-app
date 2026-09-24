@@ -431,7 +431,7 @@ export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, is
       s.status !== 'dropped'
     );
 
-    const isTvUpcoming = (s: any) => {
+    const isTvUpcoming = (s: Show) => {
       if (s.mediaType !== 'tv') return false;
       if ((s.seenEpisodes?.length || 0) > 0) return false;
       if (s.firstAirDate && s.firstAirDate > todayStr) return true;

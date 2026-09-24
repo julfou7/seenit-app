@@ -26,7 +26,7 @@ export const ProfileScreen = React.memo(function ProfileScreen({
   onShowClick
 }: { 
   initialShowSettings?: boolean;
-  onShowClick?: (id: any, mediaType?: 'tv' | 'movie') => void;
+  onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void;
 }) {
   const [showSettings, setShowSettings] = useState(initialShowSettings);
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
