@@ -252,7 +252,7 @@ export const GridMediaCard = React.memo(function GridMediaCard({
               }
             }}
             className={cn(
-              "w-full py-1 text-center flex items-center justify-center gap-1 border-t text-[9px] font-extrabold uppercase tracking-wide cursor-pointer hover:opacity-90 active:scale-95 transition-all", 
+              "w-full min-h-11 py-1 text-center flex items-center justify-center gap-1 border-t text-[9px] font-extrabold uppercase tracking-wide cursor-pointer hover:opacity-90 active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#E5A93D]/70", 
               actionInfo ? actionInfo.className : "bg-[#1C1C1E] text-zinc-500 border-white/5 hover:text-zinc-300 transition-colors hover:bg-white/5"
             )}
           >
@@ -276,7 +276,7 @@ export const GridMediaCard = React.memo(function GridMediaCard({
         onClick={handleClick}
         onContextMenu={handlePreviewContextMenu}
         aria-label={openLabel}
-        className="flex flex-col px-0.5 min-w-0 text-left rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E5A93D]/70"
+        className="min-h-11 flex flex-col justify-center px-0.5 min-w-0 text-left rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E5A93D]/70"
       >
         <h3 className="text-xs font-bold text-white truncate w-full" title={displayTitle}>
           {displayTitle}
