@@ -101,6 +101,21 @@ test('les preuves qualité sont exécutées sur le chemin CI sans ajouter de gro
   );
 });
 
+
+test('SEENIT-UX-009 exécute un rendu navigateur avant/après des actions communes', () => {
+  const browserSmoke = fs.readFileSync('scripts/pwa-browser-smoke.cjs', 'utf8');
+  const fixture = fs.readFileSync('tests/fixtures/seenitCheckButton.issue180.before.tsx', 'utf8');
+
+  assert.match(browserSmoke, /buildComponentActionHarness/);
+  assert.match(browserSmoke, /testComponentActionHarness/);
+  assert.match(browserSmoke, /component-actions-before-after-\$\{viewport\.id\}\.png/);
+  assert.match(browserSmoke, /legacyClicks !== 2/);
+  assert.match(browserSmoke, /pendingState\.count !== 1/);
+  assert.match(browserSmoke, /Marquer comme non vu/);
+  assert.match(browserSmoke, /metrics\.before\.width >= minTouchTargetCssPx/);
+  assert.match(fixture, /setTimeout\(\(\) => setIsTapped\(false\), 1200\)/);
+});
+
 test('le smoke Android applique les budgets de démarrage et publie leur preuve', () => {
   const smoke = fs.readFileSync('scripts/android-upgrade-smoke.sh', 'utf8');
   assert.match(smoke, /quality-gates\.json/);
