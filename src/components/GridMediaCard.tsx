@@ -39,6 +39,7 @@ export const GridMediaCard = React.memo(function GridMediaCard({
 
   const isTv = media.media_type === 'tv' || show?.mediaType === 'tv' || (!media.media_type && media.first_air_date !== undefined);
   const mediaType = isTv ? 'tv' : 'movie';
+  const openLabel = `Ouvrir la fiche ${isTv ? 'Série' : 'Film'} ${displayTitle}`;
 
   const rating = media.vote_average && media.vote_average > 0 ? media.vote_average.toFixed(1) : null;
   const characterOrJob = (media as any).character || (media as any).job;
@@ -103,23 +104,35 @@ export const GridMediaCard = React.memo(function GridMediaCard({
     }
   }
 
-  const longPressTimer = useRef<any>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLongPressRef = useRef(false);
 
-  const handleTouchStart = () => {
-    isLongPressRef.current = false;
-    if (onLongPress) {
-      longPressTimer.current = setTimeout(() => {
-        isLongPressRef.current = true;
-        onLongPress(media);
-      }, 500);
-    }
+  const clearLongPressTimer = () => {
+    if (!longPressTimer.current) return;
+    clearTimeout(longPressTimer.current);
+    longPressTimer.current = null;
   };
 
-  const handleTouchEnd = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-    }
+  useEffect(() => () => {
+    clearLongPressTimer();
+    isLongPressRef.current = false;
+  }, []);
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    isLongPressRef.current = false;
+    clearLongPressTimer();
+    if (!onLongPress) return;
+
+    longPressTimer.current = setTimeout(() => {
+      longPressTimer.current = null;
+      isLongPressRef.current = true;
+      onLongPress(media);
+    }, 500);
+  };
+
+  const cancelLongPress = () => {
+    clearLongPressTimer();
   };
 
   const { cardRef, providerLogo, providerName } = usePassiveWatchProvider({
@@ -136,7 +149,7 @@ export const GridMediaCard = React.memo(function GridMediaCard({
     providerName || (show?.networks && show.networks.length > 0 ? show.networks[0].name : (show as any)?.network || (show as any)?.platform)
   );
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (isLongPressRef.current) {
       e.preventDefault();
       e.stopPropagation();
@@ -146,26 +159,38 @@ export const GridMediaCard = React.memo(function GridMediaCard({
     onShowClick(media.id, mediaType);
   };
 
+  const handlePreviewContextMenu = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!onLongPress) return;
+    e.preventDefault();
+    e.stopPropagation();
+    onLongPress(media);
+  };
+
+  const quickActionLabel = show && !isTv && isUpToDate
+    ? `Marquer ${displayTitle} comme non vu`
+    : actionInfo
+      ? `${actionInfo.text} — ${displayTitle}`
+      : `Ajouter ${displayTitle}`;
+
   return (
-    <div 
+    <div
       ref={cardRef}
-      onClick={handleClick}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      onTouchMove={handleTouchEnd}
-      onMouseDown={handleTouchStart}
-      onMouseUp={handleTouchEnd}
-      onMouseLeave={handleTouchEnd}
-      onContextMenu={(e) => {
-        if (onLongPress) {
-          e.preventDefault();
-          onLongPress(media);
-        }
-      }}
-      className={cn("media-grid-card flex flex-col gap-2 w-full cursor-pointer group transition-all duration-300 touch-manipulation active:scale-[0.98]", isNewlyLoaded && "animate-in fade-in slide-in-from-bottom-2 duration-500")}
+      className={cn("media-grid-card flex flex-col gap-2 w-full group transition-all duration-300 touch-manipulation", isNewlyLoaded && "animate-in fade-in slide-in-from-bottom-2 duration-500")}
     >
       {/* 1. BLOC AFFICHE AVEC BANDEAU OU BARRE DE PROGRESSION */}
       <div className="w-full rounded-xl overflow-hidden bg-[#1C1C1E] border border-white/5 shadow-md group-hover:scale-[1.02] transition-transform duration-200">
+        <button
+          type="button"
+          onClick={handleClick}
+          onPointerDown={handlePointerDown}
+          onPointerUp={cancelLongPress}
+          onPointerMove={cancelLongPress}
+          onPointerCancel={cancelLongPress}
+          onPointerLeave={cancelLongPress}
+          onContextMenu={handlePreviewContextMenu}
+          aria-label={openLabel}
+          className="block w-full text-left rounded-t-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#E5A93D]/70 active:scale-[0.99] transition-transform"
+        >
         <div className="relative aspect-[2/3] w-full bg-zinc-800">
           {media.poster_path ? (
             <img 
@@ -198,19 +223,22 @@ export const GridMediaCard = React.memo(function GridMediaCard({
 
           {(hideBadges || showProgress) && isTv && show && (
             <div className="absolute bottom-0 inset-x-0 h-1.5 bg-black/70 backdrop-blur-xs z-10 overflow-hidden">
-              <div 
+              <div
                 className={cn(
-                  "h-full transition-all duration-500", 
+                  "h-full transition-all duration-500",
                   isUpToDate ? "bg-emerald-500" : "bg-[#E5A93D]"
-                )} 
-                style={{ width: `${progressPercentage}%` }} 
+                )}
+                style={{ width: `${progressPercentage}%` }}
               />
             </div>
           )}
         </div>
+        </button>
 
         {!hideBadges && (
-          <div 
+          <button
+            type="button"
+            aria-label={quickActionLabel}
             onClick={(e) => {
               e.stopPropagation();
               if (!show && onAddClick) {
@@ -224,7 +252,7 @@ export const GridMediaCard = React.memo(function GridMediaCard({
               }
             }}
             className={cn(
-              "w-full py-1 text-center flex items-center justify-center gap-1 border-t text-[9px] font-extrabold uppercase tracking-wide cursor-pointer hover:opacity-90 active:scale-95 transition-all", 
+              "w-full min-h-11 py-1 text-center flex items-center justify-center gap-1 border-t text-[9px] font-extrabold uppercase tracking-wide cursor-pointer hover:opacity-90 active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#E5A93D]/70",
               actionInfo ? actionInfo.className : "bg-[#1C1C1E] text-zinc-500 border-white/5 hover:text-zinc-300 transition-colors hover:bg-white/5"
             )}
           >
@@ -239,11 +267,17 @@ export const GridMediaCard = React.memo(function GridMediaCard({
                 <span>Ajouter</span>
               </>
             )}
-          </div>
+          </button>
         )}
       </div>
 
-      <div className="flex flex-col px-0.5 min-w-0">
+      <button
+        type="button"
+        onClick={handleClick}
+        onContextMenu={handlePreviewContextMenu}
+        aria-label={openLabel}
+        className="min-h-11 flex flex-col justify-center px-0.5 min-w-0 text-left rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E5A93D]/70"
+      >
         <h3 className="text-xs font-bold text-white truncate w-full" title={displayTitle}>
           {displayTitle}
         </h3>
@@ -329,7 +363,7 @@ export const GridMediaCard = React.memo(function GridMediaCard({
             )}
           </div>
         )}
-      </div>
+      </button>
     </div>
   );
 });

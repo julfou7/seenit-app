@@ -993,6 +993,14 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   et ne marque jamais un épisode vu/non vu. Une seule transition est acceptée à la fois ; une réponse
   devenue obsolète est ignorée et un échec conserve l'épisode courant avec un feedback visible. Un drag
   ne démarre jamais depuis une action interactive Plex, téléchargement, Vu/Non vu ou autre contrôle.
+- **SEENIT-UX-009** — Les actions communes utilisent un vocabulaire sémantique partagé : action principale
+  or SeenIt, secondaire neutre et destructive explicitement rouge, sans écraser les accents fournisseur ou
+  les statuts métier. Chaque bouton possède une cible d'au moins 44 × 44 CSS px, un nom accessible, un focus
+  visible et un `type` explicite. Une mutation asynchrone expose son état `pending`, bloque les doublons et
+  ne présente jamais une animation d'appui comme une réussite métier. Le contrôle Vu annonce l'action inverse
+  lorsqu'il est déjà vu. Les cartes média séparent l'ouverture de fiche de leurs actions rapides via des
+  contrôles frères accessibles au clavier ; leur appui long est annulé au mouvement, `pointercancel` et
+  démontage, tandis que le menu contextuel du contrôle focalisable fournit l'alternative clavier.
 - Les dialogues critiques utilisent un rôle adapté, sont fermables par Échap, placent le focus
   sur une action et ne déclenchent aucune suppression sans confirmation quand le transfert est
   actif.

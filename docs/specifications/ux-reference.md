@@ -100,7 +100,7 @@ Le contrat d'appui/reset de #178 est distinct de cet ordre visuel et désormais 
 La reconnaissance tactile réelle et le conflit avec les gestes système Android restent à valider au doigt
 sur appareil ; la CI couvre la logique, les surfaces accessibles et les garde-fous déterministes.
 
-## 4. Boutons et retours d'action — proposition #180
+## 4. Boutons et retours d'action — contrat SEENIT-UX-009 / #180
 
 | Rôle | Présentation commune cible | Exemples |
 |---|---|---|
@@ -125,7 +125,7 @@ obligation d'architecture. Les cartes et en-têtes consomment ces rôles plutôt
 - Garder/Annuler reçoit le focus initial d'une confirmation destructive. Un texte précise ce qui sera
   retiré et si les fichiers sont conservés. Une opération réussie annulable expose Annuler.
 
-## 5. Cartes — proposition #180
+## 5. Cartes — contrat SEENIT-UX-009 / #180
 
 L'action d'ouverture de fiche et les actions rapides sont deux zones distinctes, accessibles au
 clavier et sans bouton imbriqué dans un autre bouton. Entrée/Espace ouvre la fiche focalisée ; agir
@@ -139,7 +139,13 @@ est réservé au contenu inconnu. Les cartes de transfert conservent leur clé e
 la réconciliation (contrat existant `SEENIT-UX-002`).
 
 L'appui long ne déclenche pas un clic supplémentaire à son relâchement. Scroll, annulation système et
-démontage annulent tout timer ; un menu ou bouton accessible permet aussi d'ouvrir l'aperçu.
+démontage annulent tout timer ; le menu contextuel du contrôle d'ouverture focalisable fournit également
+l'aperçu au clavier.
+
+Le socle runtime commun est porté par `ActionButton`, `SeenItCheckButton` et les cartes pilotes
+`GridMediaCard` / `EpisodeCard`. Les migrations d'écrans conservent les variantes métier existantes mais
+ne doivent plus réintroduire de bouton sans cible 44 px, d'état async non sérialisé ou de conteneur cliquable
+sans sémantique clavier.
 
 ## 6. En-têtes, dialogues et safe areas — proposition #181
 

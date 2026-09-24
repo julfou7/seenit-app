@@ -1760,6 +1760,28 @@
       ]
     },
     {
+      "id": "SEENIT-UX-009",
+      "title": "Boutons et cartes accessibles avec états async fiables",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/componentActionSemantics.test.ts",
+          "contains": "SEENIT-UX-009 normalise les rôles et états des boutons communs"
+        },
+        {
+          "file": "tests/componentActionSemantics.test.ts",
+          "contains": "SEENIT-UX-009 fiabilise Vu/Non vu et sérialise la mutation épisode"
+        },
+        {
+          "file": "tests/componentActionSemantics.test.ts",
+          "contains": "SEENIT-UX-009 sépare ouverture de carte, action rapide et long press"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-QUALITY-002",
       "title": "Audits datés et reliés à un backlog priorisé",
       "targets": [
