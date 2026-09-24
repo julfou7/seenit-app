@@ -1938,6 +1938,20 @@
       ]
     },
     {
+      "id": "SEENIT-QUALITY-012",
+      "title": "Smoke Android cible avec preuve d’accessibilité instrumentée et bornée",
+      "targets": [
+        "apk",
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/androidEmulatorCache.test.ts",
+          "contains": "SEENIT-QUALITY-012 le smoke API 36 vérifie l’accessibilité via UiAutomation sans shell uiautomator"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-AUTH-001",
       "title": "Connexion Google Android native via Credential Manager sans changer le Firebase UID",
       "targets": [

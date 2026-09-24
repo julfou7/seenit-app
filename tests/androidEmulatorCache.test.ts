@@ -22,8 +22,7 @@ test('la release Android 36 repart d’un AVD propre et borne sa pression mémoi
   assert.match(workflow, /Capture Android 36 Host Diagnostics[\s\S]*dmesg --ctime/);
 });
 
-
-test('le smoke API 36 vérifie l’accessibilité via UiAutomation sans shell uiautomator', () => {
+test('SEENIT-QUALITY-012 le smoke API 36 vérifie l’accessibilité via UiAutomation sans shell uiautomator', () => {
   assert.doesNotMatch(upgradeSmoke, /uiautomator\s+dump/);
   assert.match(upgradeSmoke, /UpgradeContractInstrumentedTest#verifyLoginAccessibility/);
   assert.match(upgradeSmoke, /SEENIT_ACCESSIBILITY_OK:/);

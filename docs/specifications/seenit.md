@@ -1318,6 +1318,13 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   `npm run lint` combine le typecheck global, ce strict progressif, le garde AST de dette et le contrôle
   de formatage minimal des diffs. `npm run format` normalise uniquement espaces de fin, fins de ligne et
   newline terminale afin de stabiliser les changements sans reformater massivement l'historique.
+- **SEENIT-QUALITY-012** — Le smoke Android cible conserve une preuve réelle d'accessibilité sans
+  dépendre du binaire shell historique `uiautomator dump`. Après l'installation N → N+1, le harness
+  instrumenté ouvre SeenIt et interroge directement `UiAutomation.getRootInActiveWindow()` avec une
+  attente bornée : l'action « Continuer avec Google » doit être présente et cliquable elle-même ou via
+  un ancêtre cliquable. L'absence de cette action reste bloquante. Ce changement de sonde ne retire
+  aucun contrôle de signature, données/session, cold start, reprise, budget, deep link ou cycle de vie,
+  et le shell `uiautomator dump` reste interdit dans ce chemin de release.
 
 Une modification est terminée lorsque les validations applicables à sa classe sont vertes, son test
 ciblé existe si le comportement change, toute règle durable/zone sensible est reflétée dans la SPEC et
