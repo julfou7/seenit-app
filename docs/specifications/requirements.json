@@ -1682,6 +1682,10 @@
         {
           "file": "tests/navigationDoubleTap.test.ts",
           "contains": "SEENIT-UX-005 Télécharger efface sa recherche sans appel métier"
+        },
+        {
+          "file": "tests/navigationDoubleTap.test.ts",
+          "contains": "SEENIT-UX-005 réinitialise Ma Liste même montée puis masquée"
         }
       ]
     },

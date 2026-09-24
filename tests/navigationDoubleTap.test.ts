@@ -15,6 +15,7 @@ const downloadsCoreSource = readFileSync(new URL('../src/screens/DownloadsScreen
 const discoverSource = readFeatureSource('discover');
 const watchlistSource = readFeatureSource('watchList');
 const profileSource = readFileSync(new URL('../src/screens/ProfileScreen.tsx', import.meta.url), 'utf8');
+const librarySource = readFileSync(new URL('../src/screens/LibraryScreen.tsx', import.meta.url), 'utf8');
 
 function tap(
   currentTab: string,
@@ -91,4 +92,23 @@ test('SEENIT-UX-005 Télécharger efface sa recherche sans appel métier', () =>
   assert.doesNotMatch(resetBlock, /fetchDownloads|removeDownload|clearAllDownloads|beginDownloadRequest|pushReleaseDirectly/);
   assert.match(combined, /searchRequestRef\.current \+= 1/,
     'un résultat C411 lancé avant le reset ne doit pas restaurer la recherche');
+});
+
+test('SEENIT-UX-005 réinitialise Ma Liste même montée puis masquée', () => {
+  const resetStart = profileSource.indexOf('const handleResetAll = () =>');
+  const resetEnd = profileSource.indexOf("window.addEventListener('popstate'", resetStart);
+  const resetBlock = profileSource.slice(resetStart, resetEnd);
+
+  assert.match(
+    profileSource,
+    /Activity mode=\{profileContentVisible && activeTab === 'library' \? 'visible' : 'hidden'\}/,
+  );
+  assert.match(
+    resetBlock,
+    /setMountedProfileTabs\(new Set<'stats' \| 'library'>\(\['stats'\]\)\)/,
+    'le reset Profil doit démonter Ma Liste même si elle était déjà montée puis masquée',
+  );
+  assert.match(resetBlock, /setActiveTab\('stats'\)/);
+  assert.doesNotMatch(resetBlock, /library-reset-all/);
+  assert.doesNotMatch(librarySource, /addEventListener\('library-reset-all'/);
 });
