@@ -1394,6 +1394,27 @@
       ]
     },
     {
+      "id": "SEENIT-UPDATE-006",
+      "title": "Reprise contrôlée de SeenIt après remplacement APK",
+      "targets": [
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/updateInstallHandoff.test.ts",
+          "contains": "SEENIT-UPDATE-006 utilise PackageInstaller.Session au lieu d'abandonner la reprise à FileOpener"
+        },
+        {
+          "file": "tests/updateInstallHandoff.test.ts",
+          "contains": "SEENIT-UPDATE-006 traite la confirmation système puis relance SeenIt sur succès"
+        },
+        {
+          "file": "tests/updateInstallHandoff.test.ts",
+          "contains": "SEENIT-UPDATE-006 garde le handoff interne non exporté et sans receiver de relance"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-UX-001",
       "title": "Actions de swipe accessibles au clavier",
       "targets": [
