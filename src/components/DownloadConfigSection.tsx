@@ -132,8 +132,9 @@ export function DownloadConfigSection({ defaultOpen = false, hideToggle = false 
             setSonarrProfiles(profiles);
             setProfileErrors(previous => ({ ...previous, sonarr: undefined }));
           }
-        } catch (error: any) {
-          if (!cancelled) setProfileErrors(previous => ({ ...previous, sonarr: error?.message || 'Profils Sonarr indisponibles.' }));
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : 'Profils Sonarr indisponibles.';
+          if (!cancelled) setProfileErrors(previous => ({ ...previous, sonarr: message }));
         }
       })());
       if (config.radarrUrl && config.radarrApiKey) requests.push((async () => {

@@ -11,7 +11,7 @@ interface EpisodeCardProps {
   key?: React.Key;
   show: Show;
   type: 'watch_next' | 'upcoming';
-  onShowClick: (id: any) => void;
+  onShowClick: (id: Show['id']) => void;
   onMarkAsSeen?: (show: Show) => void | Promise<void>;
 }
 
