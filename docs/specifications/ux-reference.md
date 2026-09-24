@@ -147,6 +147,12 @@ Le socle runtime commun est porté par `ActionButton`, `SeenItCheckButton` et le
 ne doivent plus réintroduire de bouton sans cible 44 px, d'état async non sérialisé ou de conteneur cliquable
 sans sémantique clavier.
 
+Le quality gate navigateur construit uniquement pendant la CI un harness #180 hors bundle applicatif. Il
+rend la fixture réelle « avant » et le composant courant côte à côte à **360 px et 412 px**, capture les deux
+rendus et vérifie réellement cible 44 px, focus, nom accessible, action inverse, `pending/disabled` et
+sérialisation d'un double clic. La fixture avant doit reproduire la cible <44 px et deux intentions afin que
+la preuve avant/après reste discriminante.
+
 ## 6. En-têtes, dialogues et safe areas — proposition #181
 
 Trois familles suffisent : en-tête d'onglet racine, en-tête de fiche avec Retour et actions, en-tête de

@@ -2,11 +2,14 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const esbuild = require('esbuild');
 
 const root = path.resolve(__dirname, '..');
 const configPath = path.join(root, 'docs', 'specifications', 'quality-gates.json');
 const reportDir = path.join(root, 'quality-reports');
+const distDir = path.join(root, 'dist');
 const previewUrl = 'http://127.0.0.1:4173/';
+const componentHarnessUrl = `${previewUrl}__seenit-component-actions.html`;
 
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -16,6 +19,211 @@ function appendGithubMetric(name, seconds) {
   if (!process.env.GITHUB_ENV) return;
   fs.appendFileSync(process.env.GITHUB_ENV, `${name}=${seconds}\n`, 'utf8');
 }
+
+async function buildComponentActionHarness() {
+  if (!fs.existsSync(distDir)) throw new Error('dist requis avant le harness composants #180.');
+  fs.mkdirSync(reportDir, { recursive: true });
+
+  const entryPath = path.join(os.tmpdir(), 'seenit-component-actions-harness.tsx');
+  const bundlePath = path.join(distDir, '__seenit-component-actions.js');
+  const htmlPath = path.join(distDir, '__seenit-component-actions.html');
+  const currentCheckPath = path.join(root, 'src', 'components', 'SeenItCheckButton.tsx');
+  const actionButtonPath = path.join(root, 'src', 'components', 'ui', 'ActionButton.tsx');
+  const legacyCheckPath = path.join(root, 'tests', 'fixtures', 'seenitCheckButton.issue180.before.tsx');
+
+  const entrySource = [
+    "import React from 'react';",
+    "import { createRoot } from 'react-dom/client';",
+    \`import { SeenItCheckButton } from \${JSON.stringify(currentCheckPath)};\`,
+    \`import { ActionButton } from \${JSON.stringify(actionButtonPath)};\`,
+    \`import { LegacySeenItCheckButton } from \${JSON.stringify(legacyCheckPath)};\`,
+    "const telemetry = { legacyClicks: 0, currentClicks: 0 };",
+    "window.__seenitActionHarness = telemetry;",
+    "const delay = ms => new Promise(resolve => setTimeout(resolve, ms));",
+    "function Harness() {",
+    "  return React.createElement('main', { 'data-seenit-action-harness': 'ready', style: { padding: 24, display: 'grid', gap: 20, maxWidth: 760, margin: '0 auto' } },",
+    "    React.createElement('h1', { style: { fontSize: 22, fontWeight: 800 } }, 'SeenIt #180 — avant / après'),",
+    "    React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 16 } },",
+    "      React.createElement('section', { id: 'issue180-before', style: { padding: 16, border: '1px solid #3f3f46', borderRadius: 16 } },",
+    "        React.createElement('h2', { style: { marginBottom: 12 } }, 'Avant'),",
+    "        React.createElement(LegacySeenItCheckButton, { onClick: () => { telemetry.legacyClicks += 1; } })",
+    "      ),",
+    "      React.createElement('section', { id: 'issue180-after', style: { padding: 16, border: '1px solid #E5A93D', borderRadius: 16 } },",
+    "        React.createElement('h2', { style: { marginBottom: 12 } }, 'Après'),",
+    "        React.createElement(SeenItCheckButton, { onClick: async () => { telemetry.currentClicks += 1; await delay(220); } })",
+    "      ),",
+    "      React.createElement('section', { id: 'issue180-watched', style: { padding: 16, border: '1px solid #3f3f46', borderRadius: 16 } },",
+    "        React.createElement('h2', { style: { marginBottom: 12 } }, 'Déjà vu'),",
+    "        React.createElement(SeenItCheckButton, { isWatched: true, onClick: () => {} })",
+    "      )",
+    "    ),",
+    "    React.createElement('section', { id: 'issue180-actions', style: { display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' } },",
+    "      React.createElement(ActionButton, { id: 'issue180-primary', variant: 'primary' }, 'Enregistrer'),",
+    "      React.createElement(ActionButton, { id: 'issue180-pending', variant: 'secondary', pending: true, pendingLabel: 'Enregistrement…' }, 'Enregistrer'),",
+    "      React.createElement(ActionButton, { id: 'issue180-danger', variant: 'danger', error: true }, 'Supprimer')",
+    "    )",
+    "  );",
+    "}",
+    "createRoot(document.getElementById('root')).render(React.createElement(Harness));",
+  ].join('\\n');
+  fs.writeFileSync(entryPath, entrySource, 'utf8');
+
+  await esbuild.build({
+    entryPoints: [entryPath],
+    bundle: true,
+    platform: 'browser',
+    format: 'iife',
+    target: ['chrome120'],
+    outfile: bundlePath,
+    logLevel: 'silent',
+    nodePaths: [path.join(root, 'node_modules')],
+  });
+
+  const assetsDir = path.join(distDir, 'assets');
+  const cssLinks = fs.existsSync(assetsDir)
+    ? fs.readdirSync(assetsDir)
+      .filter(name => name.endsWith('.css'))
+      .map(name => \`<link rel="stylesheet" href="/assets/\${name}">\`)
+      .join('\\n')
+    : '';
+
+  fs.writeFileSync(htmlPath, [
+    '<!doctype html>',
+    '<html lang="fr">',
+    '<head>',
+    '<meta charset="UTF-8">',
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+    '<title>SeenIt #180 component quality harness</title>',
+    cssLinks,
+    '<style>body{margin:0;background:#09090b;color:#fff;font-family:Arial,sans-serif}button{font:inherit}</style>',
+    '</head>',
+    '<body><div id="root"></div><script src="/__seenit-component-actions.js"></script></body>',
+    '</html>',
+  ].join('\\n'), 'utf8');
+}
+
+async function waitForComponentHarness(client, timeoutMs = 5_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const ready = await evaluate(client, \`Boolean(document.querySelector('[data-seenit-action-harness="ready"]'))\`);
+    if (ready) return;
+    await delay(50);
+  }
+  throw new Error('Harness composants #180 non prêt.');
+}
+
+async function testComponentActionHarness(client, viewport, minTouchTargetCssPx) {
+  await client.send('Emulation.setDeviceMetricsOverride', {
+    width: viewport.width,
+    height: viewport.height,
+    deviceScaleFactor: 1,
+    mobile: true,
+  });
+  await client.send('Page.navigate', { url: componentHarnessUrl });
+  await waitForComponentHarness(client);
+
+  const metrics = await evaluate(client, \`(() => {
+    const inspect = selector => {
+      const node = document.querySelector(selector);
+      const rect = node?.getBoundingClientRect();
+      return node && rect ? {
+        width: rect.width,
+        height: rect.height,
+        ariaLabel: node.getAttribute('aria-label'),
+        ariaPressed: node.getAttribute('aria-pressed'),
+        ariaBusy: node.getAttribute('aria-busy'),
+        disabled: Boolean(node.disabled),
+      } : null;
+    };
+    return {
+      before: inspect('#issue180-before button'),
+      after: inspect('#issue180-after button'),
+      watched: inspect('#issue180-watched button'),
+      primary: inspect('#issue180-primary'),
+      pending: inspect('#issue180-pending'),
+      danger: inspect('#issue180-danger'),
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth,
+    };
+  })()\`);
+
+  if (!metrics?.before || !metrics?.after || !metrics?.watched) {
+    throw new Error(\`\${viewport.id}: boutons du harness #180 introuvables.\`);
+  }
+  if (metrics.before.width >= minTouchTargetCssPx && metrics.before.height >= minTouchTargetCssPx) {
+    throw new Error(\`\${viewport.id}: la fixture avant #180 ne reproduit plus la cible tactile insuffisante.\`);
+  }
+  for (const [name, button] of Object.entries({
+    after: metrics.after,
+    watched: metrics.watched,
+    primary: metrics.primary,
+    pending: metrics.pending,
+    danger: metrics.danger,
+  })) {
+    if (!button || button.width < minTouchTargetCssPx || button.height < minTouchTargetCssPx) {
+      throw new Error(\`\${viewport.id}: cible #180 \${name} < \${minTouchTargetCssPx}px (\${JSON.stringify(button)}).\`);
+    }
+  }
+  if (metrics.scrollWidth > metrics.innerWidth + 1) {
+    throw new Error(\`\${viewport.id}: harness #180 déborde horizontalement (\${metrics.scrollWidth}px > \${metrics.innerWidth}px).\`);
+  }
+  if (metrics.watched.ariaLabel !== 'Marquer comme non vu' || metrics.watched.ariaPressed !== 'true') {
+    throw new Error(\`\${viewport.id}: action inverse Vu/Non vu incorrecte (\${JSON.stringify(metrics.watched)}).\`);
+  }
+  if (!metrics.pending.disabled || metrics.pending.ariaBusy !== 'true') {
+    throw new Error(\`\${viewport.id}: état pending ActionButton non exposé (\${JSON.stringify(metrics.pending)}).\`);
+  }
+
+  await evaluate(client, \`(() => {
+    window.__seenitActionHarness.legacyClicks = 0;
+    const button = document.querySelector('#issue180-before button');
+    button.click();
+    button.click();
+  })()\`);
+  const legacyClicks = await evaluate(client, \`window.__seenitActionHarness.legacyClicks\`);
+  if (legacyClicks !== 2) throw new Error(\`\${viewport.id}: la fixture avant ne reproduit pas le double déclenchement (count=\${legacyClicks}).\`);
+
+  await evaluate(client, \`(() => {
+    window.__seenitActionHarness.currentClicks = 0;
+    document.querySelector('#issue180-after button').click();
+  })()\`);
+  await delay(40);
+  const pendingState = await evaluate(client, \`(() => {
+    const button = document.querySelector('#issue180-after button');
+    button.click();
+    return {
+      count: window.__seenitActionHarness.currentClicks,
+      disabled: button.disabled,
+      ariaBusy: button.getAttribute('aria-busy'),
+    };
+  })()\`);
+  if (pendingState.count !== 1 || !pendingState.disabled || pendingState.ariaBusy !== 'true') {
+    throw new Error(\`\${viewport.id}: double intention non sérialisée (\${JSON.stringify(pendingState)}).\`);
+  }
+  await delay(240);
+  const settledState = await evaluate(client, \`(() => {
+    const button = document.querySelector('#issue180-after button');
+    button.focus();
+    return {
+      count: window.__seenitActionHarness.currentClicks,
+      disabled: button.disabled,
+      ariaBusy: button.getAttribute('aria-busy'),
+      focused: document.activeElement === button,
+    };
+  })()\`);
+  if (settledState.count !== 1 || settledState.disabled || settledState.ariaBusy !== null || !settledState.focused) {
+    throw new Error(\`\${viewport.id}: état final/focus #180 incorrect (\${JSON.stringify(settledState)}).\`);
+  }
+
+  const ax = await client.send('Accessibility.getFullAXTree');
+  const inverseNode = findNamedButton(ax.nodes || [], 'Marquer comme non vu');
+  if (!inverseNode) throw new Error(\`\${viewport.id}: bouton « Marquer comme non vu » absent de l’arbre d’accessibilité.\`);
+
+  fs.mkdirSync(reportDir, { recursive: true });
+  await captureScreenshot(client, path.join(reportDir, \`component-actions-before-after-\${viewport.id}.png\`));
+  return { viewport: viewport.id, metrics, legacyClicks, pendingState, settledState };
+}
+
 
 function findChrome() {
   const candidates = [
@@ -272,6 +480,7 @@ async function main() {
   let chrome;
   let client;
   try {
+    await buildComponentActionHarness();
     const viteBin = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
     if (!fs.existsSync(viteBin)) throw new Error('Vite installé requis avant le smoke navigateur.');
     preview = spawn(process.execPath, [viteBin, 'preview', '--host', '127.0.0.1', '--port', '4173', '--strictPort'], {
@@ -321,6 +530,10 @@ async function main() {
       });
     }
     const accessibility = await runKeyboardAndAccessibilityChecks(client, config.pwa.minTouchTargetCssPx);
+    const componentActions = [];
+    for (const viewport of config.pwa.viewports.filter(item => item.width === 360 || item.width === 412)) {
+      componentActions.push(await testComponentActionHarness(client, viewport, config.pwa.minTouchTargetCssPx));
+    }
     const report = {
       generatedAt: new Date().toISOString(),
       issue: config.issue,
@@ -328,6 +541,7 @@ async function main() {
       networkIsolation: 'Les requêtes hors http://127.0.0.1:4173 sont bloquées par CDP.',
       viewports,
       accessibility,
+      componentActions,
     };
     fs.writeFileSync(path.join(reportDir, 'pwa-browser.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
     fs.writeFileSync(path.join(reportDir, 'pwa-browser.md'), [
@@ -339,9 +553,11 @@ async function main() {
       '- Clavier : le bouton de connexion est atteignable au Tab.',
       '- Accessibilité : le bouton de connexion est exposé comme bouton nommé dans l’arbre Chromium.',
       '- Captures : mobile 360 px, mobile 412 px et desktop 1280 px.',
+      '- #180 : comparaison rendue avant/après à 360/412 px, cible 44 px, action inverse, pending/disabled et double intention contrôlés.',
+      '- #180 : captures `component-actions-before-after-mobile-360.png` et `component-actions-before-after-mobile-412.png`.',
       '',
     ].join('\n'), 'utf8');
-    console.log('[PWA Browser] ✅ rendu 360/412/desktop, clavier, cible tactile et arbre d’accessibilité validés.');
+    console.log('[PWA Browser] ✅ rendu 360/412/desktop, clavier, cible tactile, arbre d’accessibilité et harness #180 validés.');
   } catch (error) {
     fs.mkdirSync(reportDir, { recursive: true });
     fs.writeFileSync(path.join(reportDir, 'pwa-browser-failure.txt'), `${error.stack || error.message}\n\n${diagnostics.join('\n')}\n`, 'utf8');

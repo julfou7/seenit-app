@@ -1778,6 +1778,10 @@
         {
           "file": "tests/componentActionSemantics.test.ts",
           "contains": "SEENIT-UX-009 sépare ouverture de carte, action rapide et long press"
+        },
+        {
+          "file": "tests/qualityGates.test.ts",
+          "contains": "SEENIT-UX-009 exécute un rendu navigateur avant/après des actions communes"
         }
       ]
     },
