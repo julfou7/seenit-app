@@ -126,7 +126,7 @@ public class UpgradeContractInstrumentedTest {
 
         String semanticProbe =
             "(function() {" +
-            "const candidates=Array.from(document.querySelectorAll('button,[role=\\"button\\"]'));" +
+            "const candidates=Array.from(document.querySelectorAll('button,[role=\"button\"]'));" +
             "const target=candidates.find((element)=>(element.textContent||'').includes('Continuer avec Google'));" +
             "if(!target)return false;" +
             "const rect=target.getBoundingClientRect();" +
