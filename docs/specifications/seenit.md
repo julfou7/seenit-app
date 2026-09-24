@@ -986,6 +986,13 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   Le Web Share et le fallback presse-papiers utilisent exactement cette même URL. Tant qu'aucun profil
   public et son périmètre de confidentialité ne sont spécifiés, le Profil n'affiche aucune action
   « Partager » et aucune donnée de profil n'est publiée.
+- **SEENIT-UX-008** — La fiche épisode conserve le swipe horizontal et expose la même intention via
+  les boutons accessibles « Précédent » / « Suivant » et les flèches clavier ←/→ hors champs de saisie.
+  La navigation reste dans la même série exacte, franchit une frontière de saison uniquement à partir
+  d'épisodes réellement disponibles (y compris la saison spéciale 0 lorsqu'elle fait partie du parcours)
+  et ne marque jamais un épisode vu/non vu. Une seule transition est acceptée à la fois ; une réponse
+  devenue obsolète est ignorée et un échec conserve l'épisode courant avec un feedback visible. Un drag
+  ne démarre jamais depuis une action interactive Plex, téléchargement, Vu/Non vu ou autre contrôle.
 - Les dialogues critiques utilisent un rôle adapté, sont fermables par Échap, placent le focus
   sur une action et ne déclenchent aucune suppression sans confirmation quand le transfert est
   actif.

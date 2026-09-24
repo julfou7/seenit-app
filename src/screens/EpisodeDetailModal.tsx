@@ -13,7 +13,7 @@ interface EpisodeDetailModalProps {
   tmdbShowId?: number;
   onShowClick?: (tmdbId: number, mediaType?: 'tv' | 'movie') => void;
   onClose: () => void;
-  onLoadSeason?: (seasonNum: number) => Promise<any>;
+  onLoadSeason?: (seasonNum: number) => Promise<EpisodeDetailData[] | { episodes?: EpisodeDetailData[] } | null | undefined>;
 }
 
 const HIDDEN_DOWNLOAD_SURFACE_CSS = `
