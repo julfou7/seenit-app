@@ -1318,17 +1318,15 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   `npm run lint` combine le typecheck global, ce strict progressif, le garde AST de dette et le contrôle
   de formatage minimal des diffs. `npm run format` normalise uniquement espaces de fin, fins de ligne et
   newline terminale afin de stabiliser les changements sans reformater massivement l'historique.
-- **SEENIT-QUALITY-012** — Le smoke Android cible n'active pas la pile globale
-  `UiAutomation` de l'émulateur API 36 : les releases 1.4.191 ont prouvé qu'elle peut faire
-  disparaître QEMU après une migration N → N+1 pourtant valide, sans pression mémoire hôte.
-  Après l'upgrade, le harness instrumenté ouvre la vraie `MainActivity` / WebView SeenIt et
-  exécute une sonde JavaScript bornée : « Continuer avec Google » doit être un élément
-  `button` ou `role=button`, visible, non désactivé et mesurer au moins 44 × 44 px.
-  Le smoke navigateur canonique conserve la preuve de l'arbre d'accessibilité complet ; un
-  changement Android explicitement centré sur l'accessibilité exige en plus une validation
-  TalkBack terrain. Le smoke API 36 conserve sans réduction signature, données/session,
-  cold start, reprise, budgets, deep link et cycle de vie. Les chemins `uiautomator dump`,
-  `UiAutomation.getRootInActiveWindow()` et équivalents restent interdits dans ce garde de release.
+- **SEENIT-QUALITY-012** — Le smoke Android cible reste centré sur les invariants propres à une
+  migration APK : package/version/signature, installation N → N+1 sans désinstallation, conservation
+  des données/session, permissions/launcher/deep link, cold start, reprise, budgets et cycle de vie.
+  Il n'active ni `uiautomator dump`, ni `UiAutomation`, ni une seconde `MainActivity` instrumentée
+  uniquement pour inspecter le login : les releases 1.4.191 ont prouvé que ces trois variantes peuvent
+  faire disparaître QEMU après une migration déjà validée, avec hôte sain et ADB ensuite offline.
+  Le quality gate navigateur canonique conserve la preuve sémantique et l'arbre d'accessibilité du login.
+  Un changement Android explicitement centré sur l'accessibilité exige en plus une validation TalkBack
+  terrain dédiée. L'instabilité de l'AVD ne peut jamais supprimer les invariants APK/migration bloquants.
 
 Une modification est terminée lorsque les validations applicables à sa classe sont vertes, son test
 ciblé existe si le comportement change, toute règle durable/zone sensible est reflétée dans la SPEC et

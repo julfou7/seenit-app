@@ -1939,7 +1939,7 @@
     },
     {
       "id": "SEENIT-QUALITY-012",
-      "title": "Smoke Android cible avec contrat sémantique WebView borné et accessibilité navigateur",
+      "title": "Smoke Android cible centré sur les invariants de migration APK",
       "targets": [
         "apk",
         "ci"
@@ -1947,7 +1947,7 @@
       "tests": [
         {
           "file": "tests/androidEmulatorCache.test.ts",
-          "contains": "SEENIT-QUALITY-012 le smoke API 36 vérifie le CTA dans la WebView sans UiAutomation"
+          "contains": "SEENIT-QUALITY-012 garde le smoke upgrade centré sur les invariants APK"
         }
       ]
     },
