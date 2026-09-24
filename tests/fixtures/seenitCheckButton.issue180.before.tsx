@@ -1,6 +1,6 @@
 // Snapshot de la baseline #180 (main 8288953) utilisé uniquement par le quality gate avant/après.
 import React, { useState } from 'react';
-import { cn } from '../lib/utils';
+import { cn } from '../../src/lib/utils';
 
 export interface SeenItCheckButtonProps {
   onClick: (e: React.MouseEvent) => void;
