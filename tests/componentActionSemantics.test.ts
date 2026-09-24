@@ -35,6 +35,8 @@ test('SEENIT-UX-009 fiabilise Vu/Non vu et sérialise la mutation épisode', () 
 test('SEENIT-UX-009 sépare ouverture de carte, action rapide et long press', () => {
   assert.match(gridCardSource, /aria-label=\{openLabel\}/);
   assert.match(gridCardSource, /aria-label=\{quickActionLabel\}/);
+  assert.ok(gridCardSource.includes('"w-full py-1 text-center'));
+  assert.ok(!gridCardSource.includes('"w-full min-h-11 py-1 text-center'));
   assert.match(gridCardSource, /onPointerCancel=\{cancelLongPress\}/);
   assert.match(gridCardSource, /onPointerMove=\{cancelLongPress\}/);
   assert.match(gridCardSource, /onContextMenu=\{handlePreviewContextMenu\}/);

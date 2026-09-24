@@ -252,7 +252,7 @@ export const GridMediaCard = React.memo(function GridMediaCard({
               }
             }}
             className={cn(
-              "w-full min-h-11 py-1 text-center flex items-center justify-center gap-1 border-t text-[9px] font-extrabold uppercase tracking-wide cursor-pointer hover:opacity-90 active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#E5A93D]/70",
+              "w-full py-1 text-center flex items-center justify-center gap-1 border-t text-[9px] font-extrabold uppercase tracking-wide cursor-pointer hover:opacity-90 active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#E5A93D]/70",
               actionInfo ? actionInfo.className : "bg-[#1C1C1E] text-zinc-500 border-white/5 hover:text-zinc-300 transition-colors hover:bg-white/5"
             )}
           >
