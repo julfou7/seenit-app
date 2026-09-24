@@ -110,5 +110,6 @@ test('SEENIT-UX-005 réinitialise Ma Liste même montée puis masquée', () => {
   );
   assert.match(resetBlock, /setActiveTab\('stats'\)/);
   assert.doesNotMatch(resetBlock, /library-reset-all/);
+  assert.doesNotMatch(resetBlock, /updateShow|addShow|deleteShow|setShows/);
   assert.doesNotMatch(librarySource, /addEventListener\('library-reset-all'/);
 });
