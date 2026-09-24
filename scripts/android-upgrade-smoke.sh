@@ -12,6 +12,8 @@ API_LEVEL="${5:?Niveau API manquant}"
 ADB_TIMEOUT_SECONDS="${ADB_TIMEOUT_SECONDS:-60}"
 ADB_DIAGNOSTIC_TIMEOUT_SECONDS="${ADB_DIAGNOSTIC_TIMEOUT_SECONDS:-10}"
 SMOKE_MODE="upgrade-in-place"
+PRE_RETURN_ASSERTIONS_MARKER="$REPORT_DIR/pre-return-assertions-passed.txt"
+RETRYABLE_EMULATOR_MARKER="$REPORT_DIR/retryable-emulator-failure.txt"
 COLD_START_BUDGET_MS="$(node -p "require('./docs/specifications/quality-gates.json').budgets.android.coldStartMs")"
 RESUME_BUDGET_MS="$(node -p "require('./docs/specifications/quality-gates.json').budgets.android.resumeMs")"
 
@@ -46,6 +48,28 @@ preflight_failure() {
 smoke_failure() {
   echo "[APK Upgrade] Échec smoke : $1" | tee -a "$REPORT_DIR/smoke-failure.txt" >&2
   exit 1
+}
+
+device_is_available() {
+  local state
+  if ! state="$(timeout --foreground "${ADB_DIAGNOSTIC_TIMEOUT_SECONDS}s" adb get-state 2>&1)"; then
+    return 1
+  fi
+  [[ "$state" == "device" ]]
+}
+
+late_adb_failure() {
+  local phase="$1"
+  if [[ "$API_LEVEL" == "36" && -f "$PRE_RETURN_ASSERTIONS_MARKER" ]] && ! device_is_available; then
+    {
+      echo "classification=retryable-emulator-disappearance"
+      echo "phase=$phase"
+      echo "api_level=$API_LEVEL"
+      echo "reason=ADB/QEMU indisponible après les assertions critiques pré-Retour"
+    } | tee "$RETRYABLE_EMULATOR_MARKER" >&2
+    exit 75
+  fi
+  smoke_failure "$phase : ADB a échoué sans disparition d’émulateur qualifiée."
 }
 
 activity_metric_ms() {
@@ -201,9 +225,15 @@ adb_bounded shell am start -W -a android.intent.action.VIEW \
   -d 'com.seenit.app://upgrade-smoke' "$PACKAGE_ID" | tee "$REPORT_DIR/deep-link.txt"
 grep -q 'Status: ok' "$REPORT_DIR/deep-link.txt"
 
-adb_bounded shell input keyevent KEYCODE_BACK
+printf 'upgrade/data-session/budgets/deep-link=ok\n' > "$PRE_RETURN_ASSERTIONS_MARKER"
+
+if ! adb_bounded shell input keyevent KEYCODE_BACK; then
+  late_adb_failure "cycle Retour Android"
+fi
 sleep 1
-adb_bounded logcat -d > "$REPORT_DIR/runtime-logcat.txt"
+if ! adb_bounded logcat -d > "$REPORT_DIR/runtime-logcat.txt"; then
+  late_adb_failure "lecture logcat après Retour Android"
+fi
 if grep -A 8 'FATAL EXCEPTION' "$REPORT_DIR/runtime-logcat.txt" | grep -q "Process: $PACKAGE_ID"; then
   echo "Crash SeenIt détecté pendant le cycle démarrage/reprise/Retour."
   exit 1

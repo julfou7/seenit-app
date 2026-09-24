@@ -1988,6 +1988,10 @@
         {
           "file": "tests/androidEmulatorCache.test.ts",
           "contains": "SEENIT-QUALITY-012 garde le smoke upgrade centré sur les invariants APK"
+        },
+        {
+          "file": "tests/androidEmulatorCache.test.ts",
+          "contains": "SEENIT-QUALITY-012 retente une seule fois uniquement une disparition d’émulateur qualifiée"
         }
       ]
     },

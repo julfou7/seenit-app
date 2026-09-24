@@ -1342,7 +1342,11 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   faire disparaître QEMU après une migration déjà validée, avec hôte sain et ADB ensuite offline.
   Le quality gate navigateur canonique conserve la preuve sémantique et l'arbre d'accessibilité du login.
   Un changement Android explicitement centré sur l'accessibilité exige en plus une validation TalkBack
-  terrain dédiée. L'instabilité de l'AVD ne peut jamais supprimer les invariants APK/migration bloquants.
+  terrain dédiée. Sur Android 36, une disparition confirmée du device/QEMU **après** validation de
+  l'upgrade, des données/session, des budgets et du deep link peut déclencher **un seul retry** complet
+  sur un AVD neuf. Aucun échec de package, version, signature, installation N → N+1, instrumentation,
+  budget, deep link ou crash SeenIt ne peut être reclassé ni retenté automatiquement. Un second incident
+  d'émulateur reste bloquant.
 
 Une modification est terminée lorsque les validations applicables à sa classe sont vertes, son test
 ciblé existe si le comportement change, toute règle durable/zone sensible est reflétée dans la SPEC et
