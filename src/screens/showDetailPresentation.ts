@@ -115,7 +115,7 @@ export const getProviderDirectLink = (providerId: number, title: string, fallbac
     case 8: return `https://www.netflix.com/search?q=${query}`;
     case 119: return `https://www.primevideo.com/search/ref=atv_sr_sug_1?phrase=${query}`;
     case 337: return `https://www.disneyplus.com/search?q=${query}`;
-    case 381: return '#';
+    case 381: return 'https://www.canalplus.com/';
     case 350: return `https://tv.apple.com/fr/search?q=${query}`;
     case 531: return `https://www.paramountplus.com/search/?q=${query}`;
     case 1899: return `https://www.max.com/search?q=${query}`;
@@ -125,7 +125,7 @@ export const getProviderDirectLink = (providerId: number, title: string, fallbac
   }
 };
 
-export type ProviderLinkKind = 'provider-link' | 'provider-unavailable';
+export type ProviderLinkKind = 'provider-link' | 'provider-app-home';
 
 export interface ProviderLinkPresentation {
   url: string | null;
@@ -150,7 +150,7 @@ export const getProviderLinkPresentation = ({
     return {
       url: canalTarget.url,
       label: 'Canal',
-      title: `Disponible sur Canal · ouverture directe de « ${title} » indisponible`,
+      title: 'Ouvrir Canal',
       kind: canalTarget.kind,
     };
   }
@@ -193,6 +193,6 @@ export const getSmartDefaultSeason = (show: any, tmdbDetails: any): number => {
       .filter((s: number) => !isNaN(s) && s > 0);
     if (watchedSeasons.length > 0) return Math.max(...watchedSeasons);
   }
-  const validSeasons = tmdbDetails?.seasons?.filter((s: any) => s.season_number > 0) || [];
+  const validSeasons = tmdbDetails?.seasons?.filter((s: { season_number?: number }) => Number(s.season_number) > 0) || [];
   return validSeasons.length > 0 ? validSeasons[0].season_number : 1;
 };

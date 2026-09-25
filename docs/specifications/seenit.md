@@ -595,14 +595,14 @@ n'est rouverte que par une nouvelle décision produit explicite.
 - Le titre **« Où regarder »** est un libellé produit stable : il reste toujours rendu et n'est jamais
   remplacé par un skeleton pendant la résolution. Le chargement de cette zone emploie un seul libellé
   lisible, puis aboutit à un diffuseur, à Plex ou à un état d'indisponibilité explicite.
-- Un CTA de diffuseur n'est qualifié d'ouverture directe que si SeenIt transporte une identité fournisseur
-  prouvée. Pour **CANAL/myCANAL**, les fiches exactes utilisent une identité CANAL propriétaire que SeenIt
-  ne résout pas publiquement depuis `mediaType + tmdbId`. Le diffuseur reste visible sous le libellé
-  **« Canal »**, mais il est **non navigable** tant qu'aucun lien CANAL exact n'est prouvé : aucun lien de
-  recherche CANAL et aucun lien TMDB `watch/providers` ne sont utilisés comme destination fournisseur.
-  Une recherche par titre ne devient jamais une preuve d'identité ni un deep link exact, et SeenIt ne
-  scrape pas CANAL pour fabriquer cette correspondance. Ouvrir l'application sur son accueil ou Live TV
-  est explicitement considéré comme un échec, pas comme un fallback acceptable.
+- Un CTA de diffuseur n'est qualifié d'ouverture directe vers une **fiche média** que si SeenIt transporte
+  une identité fournisseur prouvée. Pour **CANAL/myCANAL**, SeenIt ne résout pas publiquement
+  `mediaType + tmdbId` vers l'identifiant CANAL propriétaire : il ne fabrique donc aucun lien de recherche
+  ni faux deep link média. Le diffuseur reste affiché **« Canal »** et reste ouvrable : dans l'APK Android,
+  le tap lance explicitement le package officiel `com.canal.android.canal`; en PWA/Web, il ouvre le site
+  CANAL+. Cette ouverture d'application/site est un fallback de service, pas une promesse de fiche exacte.
+  Une recherche par titre, une arrivée Live TV ou l'accueil ne sont jamais présentés comme une résolution
+  du média, et SeenIt ne scrape pas CANAL pour fabriquer cette correspondance.
 - Les diffuseurs TMDB publics sont persistés par `mediaType + tmdbId` dans deux compartiments bornés :
   120 entrées de découverte et 240 entrées réservées aux médias suivis. Explorer ne peut donc jamais
   évincer le diffuseur d'un film de Ma Liste. Une entrée reste fraîche pendant 6 heures et réutilisable
