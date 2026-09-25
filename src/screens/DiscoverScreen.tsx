@@ -1,31 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { 
-  Search, Plus, Check, WifiOff, Star, X, 
-  SlidersHorizontal, ArrowUp, ArrowDown, Film, Tv, Users, User,
-  Info, Sparkles, ChevronRight, ChevronDown, CheckCircle, CheckCircle2, Play, Archive, XCircle,
-  Ticket, MonitorPlay, Flame, Loader2, Calendar
-} from 'lucide-react';
 import { tmdb, discoverSeenIt, isMovieAtCinema, isMovieUpcoming, type TMDBMedia } from '../features/shows/tmdb';
 import { type Show } from '../types';
-import { cn, getNextEpisodeNumber } from '../lib/utils';
 import { useShows } from '../hooks/useShows';
 import { useToastStore } from '../store/toastStore';
-import { PersonCard } from '../components/cards/PersonCard';
-import { GridMediaCard, PreviewModal } from '../components/GridMediaCard';
-import { PersonDetailModal } from './PersonDetailModal';
-import { FilterModal } from '../components/FilterModal';
-import { TrailerModal } from '../components/TrailerModal';
-import { auth, db } from '../lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
-import { useShowsStore } from '../store/showsStore';
 import { getRecommendations } from '../lib/recommendations';
-import { SeenItGlyph } from '../components/SeenItLogo';
-import { useGridVirtualWindow } from '../hooks/useBoundedVirtualWindow';
 import { hasMoreTmdbPages } from '../features/discover/discoverPagination';
 import { enrichCinemaEvidenceForExplorerLists } from '../features/discover/cinemaSearchEvidence';
 import {
   discoverTypeForCategory,
-  isSearchCompatibleCategory,
   matchesMovieReleaseAfterYear,
   matchesSelectedGenres,
   parseMinimumRating,

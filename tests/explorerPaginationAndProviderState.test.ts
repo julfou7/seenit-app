@@ -43,7 +43,7 @@ test('Valider les filtres remonte Explorer avant de remplacer la liste', () => {
   assert.ok(validateStart >= 0 && validateEnd > validateStart, 'handleValidate doit être détectable');
   const validateSource = filterModalSource.slice(validateStart, validateEnd);
   const scrollIndex = validateSource.indexOf("scrollTo({ top: 0, behavior: 'auto' })");
-  const applyIndex = validateSource.indexOf('onApply(selectedPlatforms, selectedGenres, pegi, rating)');
+  const applyIndex = validateSource.indexOf('onApply(selectedPlatforms, selectedGenres, pegi, rating, movieReleaseAfterYear)');
   assert.ok(scrollIndex >= 0 && applyIndex > scrollIndex,
     'le viewport doit revenir en haut avant l’application des nouveaux résultats');
   assert.match(validateSource, /:scope > \.flex-1\.overflow-y-auto/,

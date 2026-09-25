@@ -8,7 +8,8 @@ const discoverSource = readFeatureSource('discover');
 const bottomNavSource = readFileSync(new URL('../src/components/BottomNav.tsx', import.meta.url), 'utf8');
 
 test('Explorer place Top 100 dans le type de contenu et plus dans les tris', () => {
-  assert.match(filterSource, /setDraftCategory\('Top 100'\)/);
+  assert.match(filterSource, /handleCategoryChange\('Top 100'\)/);
+  assert.match(filterSource, /if \(category !== 'Films'\) setMovieReleaseAfterYear\('Toutes'\)/);
   assert.match(filterSource, /<Trophy size=\{14\}\/> Top 100/);
   assert.match(discoverSource, /activeCategory === 'Top 100'/);
   const sortOptions = discoverSource.match(/const SORT_OPTIONS = \[([\s\S]*?)\n\];/);
