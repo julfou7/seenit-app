@@ -40,16 +40,12 @@ export * from './tmdbClient';
  * TMDB (type 2 ou 3) est prouvée dans la fenêtre courante. Une date de sortie
  * générique, digitale, physique ou TV ne suffit jamais.
  */
-interface CinemaMediaCandidate {
-  media_type?: string;
-  first_air_date?: unknown;
-}
-
-export function isMovieAtCinema(media: CinemaMediaCandidate | null | undefined): boolean {
-  if (!media) return false;
-  const isTv = media.media_type === 'tv' || media.first_air_date !== undefined;
-  if (isTv || isAdultOrParodyMedia(media)) return false;
-  return hasFrenchTheatricalCinemaEvidence(media);
+export function isMovieAtCinema(media: unknown): boolean {
+  if (!media || typeof media !== 'object') return false;
+  const candidate = media as Record<string, unknown>;
+  const isTv = candidate.media_type === 'tv' || candidate.first_air_date !== undefined;
+  if (isTv || isAdultOrParodyMedia(candidate)) return false;
+  return hasFrenchTheatricalCinemaEvidence(candidate);
 }
 
 const withoutDetailRecommendations = (details: any) => {
