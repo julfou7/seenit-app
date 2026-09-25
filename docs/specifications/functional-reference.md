@@ -370,6 +370,12 @@ visible et état de chargement. Quand la présence Plex est confirmée, le CTA P
 Discover dont le slug a été résolu strictement depuis le TMDB ID exact ; les locators PMS servent à la
 preuve de disponibilité mais ne pilotent plus la navigation.
 
+Pour **CANAL/myCANAL**, SeenIt ne présente plus une recherche construite depuis le titre comme une ouverture
+directe de la fiche. En l'absence de résolution publique fiable `mediaType + TMDB ID → identifiant CANAL`,
+le CTA privilégie le lien `watch/providers` TMDB qui appartient au média exact et affiche
+**« Canal+ · où regarder »**. Si ce lien exact manque, l'action devient explicitement
+**« Rechercher sur Canal+ »**. Aucun titre, année ou homonyme n'est accepté comme identité CANAL.
+
 Quand Téléchargements est désactivé, la fiche Film/Série ne montre aucune mention de cette fonction :
 le bouton bleu principal/annexe, le fallback « Où regarder », le mode « Téléchargement 1-Clic », les
 boutons saison/épisode, les statuts de transfert et surtout l'action **« Téléchargement » du menu « … »
