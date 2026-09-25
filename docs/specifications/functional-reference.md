@@ -372,10 +372,12 @@ preuve de disponibilité mais ne pilotent plus la navigation.
 
 Pour **CANAL/myCANAL**, SeenIt ne présente aucun lien comme une ouverture de fiche tant qu'une identité
 CANAL exacte n'est pas résolue. En l'absence de résolution publique fiable
-`mediaType + TMDB ID → identifiant CANAL`, le diffuseur reste affiché simplement **« Canal »** et n'est
-pas cliquable. Ni une recherche CANAL par titre, ni le lien TMDB `watch/providers` ne servent de
-destination CANAL : sur Android ces URL peuvent ouvrir l'application sur une surface générique / Live TV,
-ce qui n'est pas un succès. Aucun titre, année ou homonyme n'est accepté comme identité CANAL.
+`mediaType + TMDB ID → identifiant CANAL`, le diffuseur reste affiché simplement **« Canal »** mais reste
+ouvrable : l'APK Android lance directement le package officiel `com.canal.android.canal`, et la PWA/Web
+ouvre le site CANAL+. Ni une recherche CANAL par titre, ni le lien TMDB `watch/providers` ne servent de
+destination média. L'ouverture du service peut donc arriver sur son accueil, mais SeenIt ne la présente
+jamais comme une fiche exacte ; l'arrivée Live TV observée avec le lien de recherche reste explicitement
+un comportement à ne pas réintroduire. Aucun titre, année ou homonyme n'est accepté comme identité CANAL.
 
 Quand Téléchargements est désactivé, la fiche Film/Série ne montre aucune mention de cette fonction :
 le bouton bleu principal/annexe, le fallback « Où regarder », le mode « Téléchargement 1-Clic », les

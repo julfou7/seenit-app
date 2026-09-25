@@ -30,7 +30,7 @@
         },
         {
           "file": "tests/canalExternalUrl.test.ts",
-          "contains": "SEENIT-PLATFORM-001 garde CANAL visible sans navigation non prouvée"
+          "contains": "SEENIT-PLATFORM-001 ouvre CANAL par l’application Android sans faux deep link média"
         },
         {
           "file": "tests/backendRuntime.test.ts",

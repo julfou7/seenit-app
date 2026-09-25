@@ -5,6 +5,7 @@ import { AppLauncher } from '@capacitor/app-launcher';
 import { Capacitor } from '@capacitor/core';
 import { appLogger } from '../store/logStore';
 import { isExactPlexPmsWebUrl } from './plexExternalUrl';
+import { CANAL_ANDROID_PACKAGE, isCanalWebUrl } from './canalExternalUrl.ts';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -91,7 +92,29 @@ export async function openExternalUrl(
     }
 
 
-    // 2. Gestion Reddit : ouverture via l'application native Reddit (Intent Android)
+    // 2. Gestion CANAL+ : ouverture explicite du package Android officiel.
+    if (Capacitor.getPlatform() === 'android' && isCanalWebUrl(targetUrl)) {
+      try {
+        const canalApp = await AppLauncher.openUrl({ url: CANAL_ANDROID_PACKAGE });
+        if (canalApp?.completed) return true;
+      } catch {
+        appLogger.warn('system', '[CANAL] Application CANAL+ indisponible, fallback Web.');
+      }
+
+      try {
+        await Browser.open({ url: targetUrl, windowName: '_system' });
+        return true;
+      } catch {
+        try {
+          window.location.href = targetUrl;
+          return true;
+        } catch {
+          return false;
+        }
+      }
+    }
+
+    // 3. Gestion Reddit : ouverture via l'application native Reddit (Intent Android)
     if (url.includes('reddit.com') || url.startsWith('reddit://')) {
       const redditSchemeUrl = url.startsWith('reddit://')
         ? url
@@ -121,7 +144,7 @@ export async function openExternalUrl(
       }
     }
 
-    // 3. Autres liens externes : essai préalable AppLauncher pour déclencher les applications natives
+    // 4. Autres liens externes : essai préalable AppLauncher pour déclencher les applications natives
     try {
       const res = await AppLauncher.openUrl({ url });
       if (res && res.completed) {
@@ -448,7 +471,7 @@ const OFFSET_NETWORKS = [
   4330, // Paramount+
 ];
 
-export function requiresDateOffset(networks?: any[]): boolean {
+export function requiresDateOffset(networks?: Array<{ id?: number | null }>): boolean {
   if (!networks || !Array.isArray(networks)) return false;
   return networks.some(n => OFFSET_NETWORKS.includes(n.id));
 }

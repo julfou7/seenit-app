@@ -1,21 +1,23 @@
-export type CanalProviderTargetKind = 'provider-unavailable';
+import { CANAL_WEB_URL } from '../../lib/canalExternalUrl.ts';
+
+export type CanalProviderTargetKind = 'provider-app-home';
 
 export interface CanalProviderTarget {
-  url: null;
+  url: string;
   kind: CanalProviderTargetKind;
 }
 
 /**
- * CANAL ne fournit pas à SeenIt de résolution publique fiable
+ * SeenIt ne possède pas de résolution publique fiable
  * mediaType + TMDB ID -> identifiant/lien de contenu CANAL exact.
  *
- * Un lien de recherche ou la page TMDB watch/providers peut être intercepté
- * par l'app CANAL et retomber sur une surface générique. Tant qu'une identité
- * fournisseur exacte n'est pas disponible, le diffuseur reste informatif.
+ * Le CTA reste néanmoins ouvrable : le transport Android ouvre explicitement
+ * l'application CANAL+ par son package officiel, tandis que le Web utilise
+ * le site CANAL+. Aucun lien de recherche n'est fabriqué.
  */
 export function resolveCanalProviderTarget(): CanalProviderTarget {
   return {
-    url: null,
-    kind: 'provider-unavailable',
+    url: CANAL_WEB_URL,
+    kind: 'provider-app-home',
   };
 }
