@@ -250,3 +250,8 @@ pas les pixels d'une capture particulière.
 
 Ces règles décrivent le runtime commun PWA/APK. Les captures 360/412 px, le clavier, le texte agrandi
 et TalkBack restent des preuves à produire sur la candidate de release, pas des règles alternatives.
+
+
+### Détail épisode — re-téléchargement compact
+
+Le re-téléchargement d’un épisode déjà disponible utilise un contrôle icône compact de 44 × 44 px. Son nom accessible reste « Télécharger à nouveau », sans texte visible.
