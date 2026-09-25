@@ -23,6 +23,8 @@ test('SEENIT-QUALITY-004 impose le contexte GitHub complet avant toute intervent
   assert.match(agents, /next issue[\s\S]*plus ancienne issue ouverte actionnable[\s\S]*date de création/i);
   assert.match(agents, /Ne sauter une issue[\s\S]*WAITING[\s\S]*bail concurrent actif/i);
   assert.match(agents, /Reprise identifiée : pas de recherche globale/i);
+  assert.match(agents, /prompt de reprise est générique[\s\S]*PR ouvertes du dépôt/is);
+  assert.match(agents, /vieux checkpoint conversationnel[\s\S]*ne doit jamais supplanter une PR ouverte/is);
   assert.match(agents, /sans relancer la recherche générale[\s\S]*périmètre[\s\S]*checkpoint[\s\S]*contradiction pertinente/is);
 
   assert.match(bootstrap, /branche GitHub `main`[\s\S]*canonique/i);
