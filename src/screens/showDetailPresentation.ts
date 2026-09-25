@@ -115,7 +115,7 @@ export const getProviderDirectLink = (providerId: number, title: string, fallbac
     case 8: return `https://www.netflix.com/search?q=${query}`;
     case 119: return `https://www.primevideo.com/search/ref=atv_sr_sug_1?phrase=${query}`;
     case 337: return `https://www.disneyplus.com/search?q=${query}`;
-    case 381: return fallbackLink && fallbackLink !== '#' ? fallbackLink : `https://www.canalplus.com/recherche/?q=${query}`;
+    case 381: return '#';
     case 350: return `https://tv.apple.com/fr/search?q=${query}`;
     case 531: return `https://www.paramountplus.com/search/?q=${query}`;
     case 1899: return `https://www.max.com/search?q=${query}`;
@@ -125,10 +125,10 @@ export const getProviderDirectLink = (providerId: number, title: string, fallbac
   }
 };
 
-export type ProviderLinkKind = 'provider-link' | 'exact-media-watch' | 'provider-search';
+export type ProviderLinkKind = 'provider-link' | 'provider-unavailable';
 
 export interface ProviderLinkPresentation {
-  url: string;
+  url: string | null;
   label: string;
   title: string;
   kind: ProviderLinkKind;
@@ -139,31 +139,18 @@ export const getProviderLinkPresentation = ({
   providerName,
   title,
   fallbackLink,
-  mediaType,
-  tmdbId,
 }: {
   providerId: number;
   providerName: string;
   title: string;
   fallbackLink: string;
-  mediaType: 'tv' | 'movie';
-  tmdbId?: number | string;
 }): ProviderLinkPresentation => {
   if (providerId === 381) {
-    const canalTarget = resolveCanalProviderTarget({ title, fallbackLink, mediaType, tmdbId });
-    if (canalTarget.kind === 'exact-media-watch') {
-      return {
-        url: canalTarget.url,
-        label: 'Canal+ · où regarder',
-        title: `Voir les options de diffusion de « ${title} » (lien myCANAL direct indisponible)`,
-        kind: canalTarget.kind,
-      };
-    }
-
+    const canalTarget = resolveCanalProviderTarget();
     return {
       url: canalTarget.url,
-      label: 'Rechercher sur Canal+',
-      title: `Rechercher « ${title} » sur Canal+`,
+      label: 'Canal',
+      title: `Disponible sur Canal · ouverture directe de « ${title} » indisponible`,
       kind: canalTarget.kind,
     };
   }
@@ -176,7 +163,14 @@ export const getProviderLinkPresentation = ({
   };
 };
 
-export const getKeywordsFromDetails = (details: any, mediaType: 'tv' | 'movie'): string[] => {
+interface KeywordDetails {
+  keywords?: {
+    results?: Array<{ name?: string | null }>;
+    keywords?: Array<{ name?: string | null }>;
+  };
+}
+
+export const getKeywordsFromDetails = (details: KeywordDetails | null | undefined, mediaType: 'tv' | 'movie'): string[] => {
   const raw = mediaType === 'tv' ? details?.keywords?.results : details?.keywords?.keywords;
   const blacklist = [
     'aftercreditsstinger', 'duringcreditsstinger', 'post-credits scene',
@@ -184,7 +178,7 @@ export const getKeywordsFromDetails = (details: any, mediaType: 'tv' | 'movie'):
     'dc extended universe', 'cinematic universe', 'anime',
   ];
   return (Array.isArray(raw) ? raw : [])
-    .map((keyword: any) => String(keyword?.name || ''))
+    .map(keyword => String(keyword?.name || ''))
     .filter((keyword: string) => keyword.length > 0 && keyword.length < 25)
     .filter((keyword: string) => !blacklist.some(blocked => keyword.toLowerCase().includes(blocked)))
     .slice(0, 5);

@@ -1,39 +1,21 @@
-export type CanalProviderTargetKind = 'exact-media-watch' | 'provider-search';
+export type CanalProviderTargetKind = 'provider-unavailable';
 
 export interface CanalProviderTarget {
-  url: string;
+  url: null;
   kind: CanalProviderTargetKind;
 }
 
-export function resolveCanalProviderTarget({
-  title,
-  fallbackLink,
-  mediaType,
-  tmdbId,
-}: {
-  title: string;
-  fallbackLink: string;
-  mediaType: 'tv' | 'movie';
-  tmdbId?: number | string;
-}): CanalProviderTarget {
-  const numericTmdbId = Number(tmdbId);
-  if (fallbackLink && fallbackLink !== '#' && Number.isInteger(numericTmdbId) && numericTmdbId > 0) {
-    try {
-      const parsed = new URL(fallbackLink);
-      const host = parsed.hostname.toLowerCase();
-      const expectedPath = `/${mediaType}/${numericTmdbId}/watch`;
-      const isTmdbHost = parsed.protocol === 'https:' && (host === 'www.themoviedb.org' || host === 'themoviedb.org');
-      const isExactMediaPath = parsed.pathname === expectedPath || parsed.pathname.startsWith(`${expectedPath}/`);
-      if (isTmdbHost && isExactMediaPath) {
-        return { url: fallbackLink, kind: 'exact-media-watch' };
-      }
-    } catch {
-      // Un fallback malformé ne porte aucune preuve d'identité.
-    }
-  }
-
+/**
+ * CANAL ne fournit pas à SeenIt de résolution publique fiable
+ * mediaType + TMDB ID -> identifiant/lien de contenu CANAL exact.
+ *
+ * Un lien de recherche ou la page TMDB watch/providers peut être intercepté
+ * par l'app CANAL et retomber sur une surface générique. Tant qu'une identité
+ * fournisseur exacte n'est pas disponible, le diffuseur reste informatif.
+ */
+export function resolveCanalProviderTarget(): CanalProviderTarget {
   return {
-    url: `https://www.canalplus.com/recherche/?q=${encodeURIComponent(title)}`,
-    kind: 'provider-search',
+    url: null,
+    kind: 'provider-unavailable',
   };
 }

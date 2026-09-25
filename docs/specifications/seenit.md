@@ -597,11 +597,12 @@ n'est rouverte que par une nouvelle décision produit explicite.
   lisible, puis aboutit à un diffuseur, à Plex ou à un état d'indisponibilité explicite.
 - Un CTA de diffuseur n'est qualifié d'ouverture directe que si SeenIt transporte une identité fournisseur
   prouvée. Pour **CANAL/myCANAL**, les fiches exactes utilisent une identité CANAL propriétaire que SeenIt
-  ne résout pas publiquement depuis `mediaType + tmdbId` : le CTA réutilise donc prioritairement le lien
-  TMDB `watch/providers` de la fiche exacte et s'affiche comme **« Canal+ · où regarder »**. Si ce lien
-  exact est absent ou ne correspond pas au média courant, le dernier recours est explicitement
-  **« Rechercher sur Canal+ »**. Une recherche par titre ne devient jamais une preuve d'identité ni un
-  deep link exact, et SeenIt ne scrape pas CANAL pour fabriquer cette correspondance.
+  ne résout pas publiquement depuis `mediaType + tmdbId`. Le diffuseur reste visible sous le libellé
+  **« Canal »**, mais il est **non navigable** tant qu'aucun lien CANAL exact n'est prouvé : aucun lien de
+  recherche CANAL et aucun lien TMDB `watch/providers` ne sont utilisés comme destination fournisseur.
+  Une recherche par titre ne devient jamais une preuve d'identité ni un deep link exact, et SeenIt ne
+  scrape pas CANAL pour fabriquer cette correspondance. Ouvrir l'application sur son accueil ou Live TV
+  est explicitement considéré comme un échec, pas comme un fallback acceptable.
 - Les diffuseurs TMDB publics sont persistés par `mediaType + tmdbId` dans deux compartiments bornés :
   120 entrées de découverte et 240 entrées réservées aux médias suivis. Explorer ne peut donc jamais
   évincer le diffuseur d'un film de Ma Liste. Une entrée reste fraîche pendant 6 heures et réutilisable
