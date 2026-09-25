@@ -42,7 +42,7 @@ interface DiscoverViewProps {
 }
 
 export function DiscoverView({ model }: DiscoverViewProps) {
-  const { activeCategory, activeFilterCount, activeHeroIndex, addShow, containerRef, debouncedQuery, deleteShow, handleAddMedia, handleHeroScroll, handleLongPress, handleOpenTrailer, handleScroll, handleToggleWatched, handleTouchEnd, handleTouchMove, handleTouchStart, hasActiveFilters, hasMore, heroCarouselRef, heroDetails, isLoadingMore, isOffline, isSearchVisible, isSortPickerOpen, loading, minRating, movieResults, observerTargetRef, onShowClick, openPersonModal, pegi, personResults, previewMedia, processedResults, query, selectedGenres, selectedPersonId, selectedPlatforms, seriesResults, setActiveCategory, setActiveHeroIndex, setIsSearchFocused, setIsSearchVisible, setIsSortPickerOpen, setMinRating, setPegi, setPreviewMedia, setQuery, setSelectedGenres, setSelectedPersonId, setSelectedPlatforms, setShowGenreMenu, setShowScrollTop, setSortBy, setSortOrder, setTrailerModalVideos, showGenreMenu, showHeroSurface, showScrollTop, showsByTmdbId, suppressEndOfResults, sortBy, top10, trailerModalVideos, uniqueProcessedResults, visibleHeroItems, visibleMovieResults, visiblePersonResults, visibleProcessedResults, visibleSeriesResults } = model;
+  const { activeCategory, activeFilterCount, activeHeroIndex, addShow, containerRef, debouncedQuery, deleteShow, handleAddMedia, handleHeroScroll, handleLongPress, handleOpenTrailer, handleScroll, handleToggleWatched, handleTouchEnd, handleTouchMove, handleTouchStart, hasActiveFilters, hasMore, heroCarouselRef, heroDetails, isLoadingMore, isOffline, isSearchVisible, isSortPickerOpen, loading, minRating, movieReleaseAfterYear, movieResults, observerTargetRef, onShowClick, openPersonModal, pegi, personResults, previewMedia, processedResults, query, selectedGenres, selectedPersonId, selectedPlatforms, seriesResults, setActiveCategory, setActiveHeroIndex, setIsSearchFocused, setIsSearchVisible, setIsSortPickerOpen, setMinRating, setMovieReleaseAfterYear, setPegi, setPreviewMedia, setQuery, setSelectedGenres, setSelectedPersonId, setSelectedPlatforms, setShowGenreMenu, setShowScrollTop, setSortBy, setSortOrder, setTrailerModalVideos, showGenreMenu, showHeroSurface, showScrollTop, showsByTmdbId, suppressEndOfResults, sortBy, top10, trailerModalVideos, uniqueProcessedResults, visibleHeroItems, visibleMovieResults, visiblePersonResults, visibleProcessedResults, visibleSeriesResults } = model;
   return (
     <div className="relative flex-1 h-full bg-transparent text-white max-w-2xl mx-auto w-full overflow-hidden flex flex-col">
       <button
@@ -210,7 +210,7 @@ export function DiscoverView({ model }: DiscoverViewProps) {
                             key={opt.id}
                             type="button"
                             onClick={() => {
-                              setSortBy(opt.id as any);
+                              setSortBy(opt.id as 'popular' | 'rating' | 'date' | 'title');
                               setSortOrder(opt.id === 'title' ? 'asc' : 'desc');
                               setIsSortPickerOpen(false);
                             }}
@@ -631,12 +631,14 @@ export function DiscoverView({ model }: DiscoverViewProps) {
           initialSelectedGenres={selectedGenres}
           initialPegi={pegi}
           initialRating={minRating}
+          initialMovieReleaseAfterYear={movieReleaseAfterYear}
           query={query}
-          onApply={(platforms, genres, newPegi, newRating) => {
+          onApply={(platforms, genres, newPegi, newRating, newMovieReleaseAfterYear) => {
             setSelectedPlatforms(platforms);
             setSelectedGenres(genres);
             setPegi(newPegi);
             setMinRating(newRating);
+            setMovieReleaseAfterYear(newMovieReleaseAfterYear);
             setShowGenreMenu(false);
           }}
         />

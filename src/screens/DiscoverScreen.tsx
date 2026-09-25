@@ -1,31 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { 
-  Search, Plus, Check, WifiOff, Star, X, 
-  SlidersHorizontal, ArrowUp, ArrowDown, Film, Tv, Users, User,
-  Info, Sparkles, ChevronRight, ChevronDown, CheckCircle, CheckCircle2, Play, Archive, XCircle,
-  Ticket, MonitorPlay, Flame, Loader2, Calendar
-} from 'lucide-react';
 import { tmdb, discoverSeenIt, isMovieAtCinema, isMovieUpcoming, type TMDBMedia } from '../features/shows/tmdb';
 import { type Show } from '../types';
-import { cn, getNextEpisodeNumber } from '../lib/utils';
 import { useShows } from '../hooks/useShows';
 import { useToastStore } from '../store/toastStore';
-import { PersonCard } from '../components/cards/PersonCard';
-import { GridMediaCard, PreviewModal } from '../components/GridMediaCard';
-import { PersonDetailModal } from './PersonDetailModal';
-import { FilterModal } from '../components/FilterModal';
-import { TrailerModal } from '../components/TrailerModal';
-import { auth, db } from '../lib/firebase';
-import { doc, setDoc } from 'firebase/firestore';
-import { useShowsStore } from '../store/showsStore';
 import { getRecommendations } from '../lib/recommendations';
-import { SeenItGlyph } from '../components/SeenItLogo';
-import { useGridVirtualWindow } from '../hooks/useBoundedVirtualWindow';
 import { hasMoreTmdbPages } from '../features/discover/discoverPagination';
 import { enrichCinemaEvidenceForExplorerLists } from '../features/discover/cinemaSearchEvidence';
 import {
   discoverTypeForCategory,
-  isSearchCompatibleCategory,
+  matchesMovieReleaseAfterYear,
   matchesSelectedGenres,
   parseMinimumRating,
 } from '../features/discover/filterPolicy';
@@ -43,7 +26,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
   const { shows, addShow, updateShow, deleteShow } = useShows();
   
   const showsByTmdbId = React.useMemo(() => {
-    const map = new Map<number, any>();
+    const map = new Map<number, Show>();
     for (const s of shows) {
       if (s.tmdbId != null) {
         const numId = Number(s.tmdbId);
@@ -69,7 +52,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
   const [homeEnrichmentReady, setHomeEnrichmentReady] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   
-  const [activeCategory, setActiveCategory] = useState("Tout");
+  const [activeCategory, setActiveCategoryState] = useState("Tout");
 
   const displayRecommendations = React.useMemo(() => {
     return recommendations.filter(item => {
@@ -85,6 +68,11 @@ export function DiscoverScreen({ onShowClick }: Props) {
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [pegi, setPegi] = useState('Tous');
   const [minRating, setMinRating] = useState('Toutes');
+  const [movieReleaseAfterYear, setMovieReleaseAfterYear] = useState('Toutes');
+  const setActiveCategory = useCallback((category: string) => {
+    setActiveCategoryState(category);
+    if (category !== 'Films') setMovieReleaseAfterYear('Toutes');
+  }, []);
   const [showGenreMenu, setShowGenreMenu] = useState(false);
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
 
@@ -120,6 +108,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
       setSelectedGenreIds([]);
       setPegi('Tous');
       setMinRating('Toutes');
+      setMovieReleaseAfterYear('Toutes');
       setSortBy('popular');
       setSortOrder('desc');
       setShowGenreMenu(false);
@@ -215,7 +204,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
       }
     }
     setWatchedIdsSnapshot(completed);
-  }, [activeCategory, debouncedQuery, selectedPlatforms, selectedGenres, minRating, pegi, sortBy, sortOrder]);
+  }, [activeCategory, debouncedQuery, selectedPlatforms, selectedGenres, minRating, movieReleaseAfterYear, pegi, sortBy, sortOrder]);
 
   const mergeMedia = (prev: TMDBMedia[], next: TMDBMedia[]) => {
     const existingKeys = new Set(prev.map(p => `${p.media_type || (p.first_air_date ? 'tv' : 'movie')}_${p.id}`));
@@ -410,11 +399,16 @@ export function DiscoverScreen({ onShowClick }: Props) {
     if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);
   }, []);
 
-  const hasActiveFilters = selectedPlatforms.length > 0 || selectedGenres.length > 0 || pegi !== 'Tous' || minRating !== 'Toutes';
+  const hasActiveFilters = selectedPlatforms.length > 0
+    || selectedGenres.length > 0
+    || pegi !== 'Tous'
+    || minRating !== 'Toutes'
+    || movieReleaseAfterYear !== 'Toutes';
   const activeFilterCount = selectedPlatforms.length
     + selectedGenres.length
     + (pegi !== 'Tous' ? 1 : 0)
-    + (minRating !== 'Toutes' ? 1 : 0);
+    + (minRating !== 'Toutes' ? 1 : 0)
+    + (movieReleaseAfterYear !== 'Toutes' ? 1 : 0);
 
   const [expandedRecs, setExpandedRecs] = useState(false);
   const [showAffinityInfo, setShowAffinityInfo] = useState(false);
@@ -490,7 +484,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
     if (!debouncedQuery.trim() && activeCategory === 'Tout') {
       setHomeEnrichmentReady(false);
     }
-  }, [activeCategory, debouncedQuery, selectedPlatforms, selectedGenres, pegi, minRating, sortBy, sortOrder]);
+  }, [activeCategory, debouncedQuery, selectedPlatforms, selectedGenres, pegi, minRating, movieReleaseAfterYear, sortBy, sortOrder]);
 
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
@@ -536,6 +530,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
           genres: selectedGenres,
           pegi,
           minRating,
+          movieReleaseAfterYear,
           sortBy,
           sortOrder,
         });
@@ -683,7 +678,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
     return () => {
       if (isCurrentRequest()) homeRequestGenerationRef.current += 1;
     };
-  }, [debouncedQuery, isOffline, activeCategory, page, selectedPlatforms, selectedGenres, pegi, minRating, sortBy, sortOrder, hasActiveFilters]);
+  }, [debouncedQuery, isOffline, activeCategory, page, selectedPlatforms, selectedGenres, pegi, minRating, movieReleaseAfterYear, sortBy, sortOrder, hasActiveFilters]);
 
   useEffect(() => {
     const requestGeneration = ++searchRequestGenerationRef.current;
@@ -813,6 +808,10 @@ export function DiscoverScreen({ onShowClick }: Props) {
       }
     }
 
+    if (movieReleaseAfterYear !== 'Toutes') {
+      list = list.filter(item => matchesMovieReleaseAfterYear(item, movieReleaseAfterYear));
+    }
+
     if (activeCategory === 'Séries') {
       list = list.filter((item: any) => item.media_type === 'tv' || item.media_type === 'series' || !!item.first_air_date);
     } else if (activeCategory === 'Films') {
@@ -866,7 +865,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
     }
 
     return list;
-  }, [debouncedQuery, selectedGenreIds, selectedGenres, minRating, sortBy, sortOrder, activeCategory, watchedIdsSnapshot, selectedPlatforms]);
+  }, [debouncedQuery, selectedGenreIds, selectedGenres, minRating, movieReleaseAfterYear, sortBy, sortOrder, activeCategory, watchedIdsSnapshot, selectedPlatforms]);
 
   const processedResults = useMemo(
     () => processRawResults(rawList),
@@ -916,7 +915,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
 
   useEffect(() => {
     setActiveHeroIndex(0);
-  }, [activeCategory, selectedGenres, selectedPlatforms, pegi, minRating]);
+  }, [activeCategory, selectedGenres, selectedPlatforms, pegi, minRating, movieReleaseAfterYear]);
 
   const uniqueProcessedResults = useMemo(() => {
     const seen = new Set<string>();
@@ -995,5 +994,5 @@ export function DiscoverScreen({ onShowClick }: Props) {
     && sortBy === 'popular'
     && (activeCategory === 'Tout' || activeCategory === 'Séries' || activeCategory === 'Films' || activeCategory === 'Pépites' || activeCategory === 'Au cinéma');
 
-  return <DiscoverView model={{ activeCategory, activeFilterCount, activeHeroIndex, addShow, containerRef, debouncedQuery, deleteShow, handleAddMedia, handleHeroScroll, handleLongPress, handleOpenTrailer, handleScroll, handleToggleWatched, handleTouchEnd, handleTouchMove, handleTouchStart, hasActiveFilters, hasMore, heroCarouselRef, heroDetails, isLoadingMore, isOffline, isSearchVisible, isSortPickerOpen, loading, minRating, movieResults, observerTargetRef, onShowClick, openPersonModal, pegi, personResults, previewMedia, processRawResults, processedResults, query, selectedGenres, selectedPersonId, selectedPlatforms, seriesResults, setActiveCategory, setActiveHeroIndex, setIsSearchFocused, setIsSearchVisible, setIsSortPickerOpen, setMinRating, setPegi, setPreviewMedia, setQuery, setSelectedGenres, setSelectedPersonId, setSelectedPlatforms, setShowGenreMenu, setShowScrollTop, setSortBy, setSortOrder, setTrailerModalVideos, showGenreMenu, showHeroSurface, showScrollTop, showsByTmdbId, sortBy, top10, trailerModalVideos, uniqueProcessedResults, visibleHeroItems, visibleMovieResults, visiblePersonResults, visibleProcessedResults, visibleSeriesResults }} />;
+  return <DiscoverView model={{ activeCategory, activeFilterCount, activeHeroIndex, addShow, containerRef, debouncedQuery, deleteShow, handleAddMedia, handleHeroScroll, handleLongPress, handleOpenTrailer, handleScroll, handleToggleWatched, handleTouchEnd, handleTouchMove, handleTouchStart, hasActiveFilters, hasMore, heroCarouselRef, heroDetails, isLoadingMore, isOffline, isSearchVisible, isSortPickerOpen, loading, minRating, movieReleaseAfterYear, movieResults, observerTargetRef, onShowClick, openPersonModal, pegi, personResults, previewMedia, processRawResults, processedResults, query, selectedGenres, selectedPersonId, selectedPlatforms, seriesResults, setActiveCategory, setActiveHeroIndex, setIsSearchFocused, setIsSearchVisible, setIsSortPickerOpen, setMinRating, setMovieReleaseAfterYear, setPegi, setPreviewMedia, setQuery, setSelectedGenres, setSelectedPersonId, setSelectedPlatforms, setShowGenreMenu, setShowScrollTop, setSortBy, setSortOrder, setTrailerModalVideos, showGenreMenu, showHeroSurface, showScrollTop, showsByTmdbId, sortBy, top10, trailerModalVideos, uniqueProcessedResults, visibleHeroItems, visibleMovieResults, visiblePersonResults, visibleProcessedResults, visibleSeriesResults }} />;
 }

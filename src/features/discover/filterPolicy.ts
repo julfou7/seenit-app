@@ -1,5 +1,15 @@
 export type DiscoverMediaType = 'tv' | 'movie';
 
+export interface DiscoverFilterItem {
+  media_type?: string;
+  release_date?: string;
+  first_air_date?: string;
+  genre_ids?: Array<number | string>;
+  genres?: Array<{ id?: number | string }>;
+}
+
+export const MOVIE_RELEASE_YEAR_MIN = 1900;
+
 export const DISCOVER_GENRE_MAP: Record<string, Record<DiscoverMediaType, number[]>> = {
   Action: { movie: [28], tv: [10759] },
   Aventure: { movie: [12], tv: [10759] },
@@ -26,7 +36,7 @@ export const DISCOVER_PLATFORM_ID_MAP: Record<string, string> = {
 
 export const SEARCH_COMPATIBLE_CATEGORIES = new Set(['Tout', 'Séries', 'Films', 'Personnes']);
 
-export function resolveMediaType(item: any): DiscoverMediaType | null {
+export function resolveMediaType(item: DiscoverFilterItem): DiscoverMediaType | null {
   if (!item || item.media_type === 'person') return null;
   if (item.media_type === 'movie' || Boolean(item.release_date)) return 'movie';
   if (item.media_type === 'tv' || item.media_type === 'series' || Boolean(item.first_air_date)) return 'tv';
@@ -39,7 +49,7 @@ export function getGenreIdsForMediaType(genres: string[], mediaType: DiscoverMed
 
 /** Plusieurs genres sélectionnés forment un OU. Les autres familles de filtres
  * (plateforme, note, âge, type) se combinent ensuite en ET avec ce groupe. */
-export function matchesSelectedGenres(item: any, genres: string[]): boolean {
+export function matchesSelectedGenres(item: DiscoverFilterItem, genres: string[]): boolean {
   if (genres.length === 0) return true;
   const mediaType = resolveMediaType(item);
   if (!mediaType) return false;
@@ -48,7 +58,7 @@ export function matchesSelectedGenres(item: any, genres: string[]): boolean {
   const itemGenreIds: number[] = Array.isArray(item.genre_ids)
     ? item.genre_ids.map(Number)
     : Array.isArray(item.genres)
-      ? item.genres.map((genre: any) => Number(genre?.id)).filter(Number.isFinite)
+      ? item.genres.map(genre => Number(genre?.id)).filter(Number.isFinite)
       : [];
   return allowed.some(id => itemGenreIds.includes(id));
 }
@@ -57,6 +67,29 @@ export function parseMinimumRating(value: string): number | null {
   if (!value || value === 'Toutes') return null;
   const parsed = Number.parseFloat(value.replace('+', ''));
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function parseMovieReleaseAfterYear(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined || value === '' || value === 'Toutes') return null;
+  const parsed = Number(value);
+  const currentYear = new Date().getFullYear();
+  return Number.isInteger(parsed) && parsed >= MOVIE_RELEASE_YEAR_MIN && parsed <= currentYear ? parsed : null;
+}
+
+export function movieReleaseDateGteForAfterYear(value: string | number | null | undefined): string | null {
+  const year = parseMovieReleaseAfterYear(value);
+  return year === null ? null : `${year + 1}-01-01`;
+}
+
+export function matchesMovieReleaseAfterYear(
+  item: DiscoverFilterItem,
+  value: string | number | null | undefined,
+): boolean {
+  const selectedYear = parseMovieReleaseAfterYear(value);
+  if (selectedYear === null) return true;
+  if (resolveMediaType(item) !== 'movie') return false;
+  const releaseYear = Number.parseInt(String(item.release_date || '').slice(0, 4), 10);
+  return Number.isInteger(releaseYear) && releaseYear > selectedYear;
 }
 
 export function discoverTypeForCategory(category: string): 'tv' | 'movie' | 'all' {

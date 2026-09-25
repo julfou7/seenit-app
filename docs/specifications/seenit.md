@@ -257,6 +257,14 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
 - TMDB permet de distinguer théâtral et digital mais ne constitue pas une base temps réel des séances :
   « Au cinéma » signifie ici sortie théâtrale française dans cette fenêtre, pas présence garantie dans
   au moins une salle aujourd'hui.
+- **SEENIT-DISCOVER-002** — Explorer permet de filtrer les **films** selon une année de sortie minimale
+  exclusive. Une sélection « Sortis après Y » signifie strictement `année > Y` : elle force le type
+  **Films** et transmet à TMDB `primary_release_date.gte=(Y+1)-01-01` sur chaque page Discover. Une date
+  absente ou invalide est exclue quand le filtre est actif. Le seuil se combine en ET avec plateforme,
+  genre, âge conseillé, note et tri ; le cache/préchargement progressif d'âge inclut ce seuil dans son
+  identité afin qu'un changement d'année ne réutilise jamais une page source d'un autre filtre.
+  En recherche texte, le même seuil est vérifié localement sur `release_date`, sans requête
+  supplémentaire. « Réinitialiser » et le reset complet d'Explorer remettent l'année à « Toutes ».
 
 ### 5.2.1 Classification parentale et âge conseillé
 

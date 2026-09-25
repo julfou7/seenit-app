@@ -446,6 +446,28 @@
       ]
     },
     {
+      "id": "SEENIT-DISCOVER-002",
+      "title": "Filtre films sortis après une année choisie",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/explorerReleaseYearFilter.test.ts",
+          "contains": "SEENIT-DISCOVER-002 applique une borne strictement supérieure à l’année choisie"
+        },
+        {
+          "file": "tests/explorerReleaseYearFilter.test.ts",
+          "contains": "SEENIT-DISCOVER-002 force le filtre sur les films et le propage au moteur canonique"
+        },
+        {
+          "file": "tests/explorerReleaseYearFilter.test.ts",
+          "contains": "SEENIT-DISCOVER-002 conserve le seuil dans le cache progressif d’âge et la recherche texte"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-PARENTAL-001",
       "title": "Classification d’âge conservatrice, explicite et synchronisée",
       "targets": [
