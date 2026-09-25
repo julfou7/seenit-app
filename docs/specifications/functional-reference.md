@@ -405,6 +405,7 @@ swipes de suppression/abandon sur les cartes.
 - Revoir réinitialise la progression et propose S1E1 comme prochain épisode.
 - Lorsque Téléchargements est activé, Sonarr existe au niveau série, saison ou épisode et le détail
   affiche sa disponibilité par saison/épisode.
+- Lorsque Téléchargements est activé et qu’un épisode est déjà disponible, le re-téléchargement reste accessible par un contrôle compact de 44 × 44 px nommé « Télécharger à nouveau », sans libellé visible.
 - Lorsque Téléchargements est désactivé, le détail d'épisode ne montre ni « Télécharger », ni
   « Télécharger à nouveau », ni badge « Téléchargé », ni bannière de transfert, ni modal de téléchargement.
   La disponibilité Plex reste indépendante et continue d'être affichée normalement.
