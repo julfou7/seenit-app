@@ -109,7 +109,7 @@ export const getProviderDirectLink = (providerId: number, title: string, fallbac
     case 8: return `https://www.netflix.com/search?q=${query}`;
     case 119: return `https://www.primevideo.com/search/ref=atv_sr_sug_1?phrase=${query}`;
     case 337: return `https://www.disneyplus.com/search?q=${query}`;
-    case 381: return `https://www.canalplus.com/recherche/?q=${query}`;
+    case 381: return fallbackLink && fallbackLink !== '#' ? fallbackLink : `https://www.canalplus.com/recherche/?q=${query}`;
     case 350: return `https://tv.apple.com/fr/search?q=${query}`;
     case 531: return `https://www.paramountplus.com/search/?q=${query}`;
     case 1899: return `https://www.max.com/search?q=${query}`;
@@ -117,6 +117,85 @@ export const getProviderDirectLink = (providerId: number, title: string, fallbac
     case 239: return `https://www.arte.tv/fr/search/?q=${query}`;
     default: return fallbackLink || '#';
   }
+};
+
+export type ProviderLinkKind = 'provider-link' | 'exact-media-watch' | 'provider-search';
+
+export interface ProviderLinkPresentation {
+  url: string;
+  label: string;
+  title: string;
+  kind: ProviderLinkKind;
+}
+
+const getExactTmdbWatchLink = (
+  fallbackLink: string,
+  mediaType: 'tv' | 'movie',
+  tmdbId?: number | string
+): string | null => {
+  const numericTmdbId = Number(tmdbId);
+  if (!fallbackLink || fallbackLink === '#' || !Number.isInteger(numericTmdbId) || numericTmdbId <= 0) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(fallbackLink);
+    const host = parsed.hostname.toLowerCase();
+    if (parsed.protocol !== 'https:' || (host !== 'www.themoviedb.org' && host !== 'themoviedb.org')) {
+      return null;
+    }
+
+    const expectedPath = `/${mediaType}/${numericTmdbId}/watch`;
+    if (parsed.pathname !== expectedPath && !parsed.pathname.startsWith(`${expectedPath}/`)) {
+      return null;
+    }
+    return fallbackLink;
+  } catch {
+    return null;
+  }
+};
+
+export const getProviderLinkPresentation = ({
+  providerId,
+  providerName,
+  title,
+  fallbackLink,
+  mediaType,
+  tmdbId,
+}: {
+  providerId: number;
+  providerName: string;
+  title: string;
+  fallbackLink: string;
+  mediaType: 'tv' | 'movie';
+  tmdbId?: number | string;
+}): ProviderLinkPresentation => {
+  if (providerId === 381) {
+    const exactWatchLink = getExactTmdbWatchLink(fallbackLink, mediaType, tmdbId);
+    if (exactWatchLink) {
+      return {
+        url: exactWatchLink,
+        label: 'Canal+ · où regarder',
+        title: `Voir les options de diffusion de « ${title} » (lien myCANAL direct indisponible)`,
+        kind: 'exact-media-watch',
+      };
+    }
+
+    const query = encodeURIComponent(title);
+    return {
+      url: `https://www.canalplus.com/recherche/?q=${query}`,
+      label: 'Rechercher sur Canal+',
+      title: `Rechercher « ${title} » sur Canal+`,
+      kind: 'provider-search',
+    };
+  }
+
+  return {
+    url: getProviderDirectLink(providerId, title, fallbackLink),
+    label: providerName,
+    title: `Ouvrir ${providerName}`,
+    kind: 'provider-link',
+  };
 };
 
 export const getKeywordsFromDetails = (details: any, mediaType: 'tv' | 'movie'): string[] => {

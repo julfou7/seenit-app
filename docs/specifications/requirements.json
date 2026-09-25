@@ -29,6 +29,10 @@
           "contains": "SEENIT-PLATFORM-001 ouvre le CTA Plex via Discover vérifié plutôt que le locator PMS"
         },
         {
+          "file": "tests/canalExternalUrl.test.ts",
+          "contains": "SEENIT-PLATFORM-001 garde le CTA CANAL sur l’identité TMDB exacte sans faux deep link"
+        },
+        {
           "file": "tests/backendRuntime.test.ts",
           "contains": "SEENIT-PLATFORM-001 autorise le preflight cross-origin avec les en-têtes SeenIt réellement émis"
         }
