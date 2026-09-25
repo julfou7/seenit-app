@@ -157,3 +157,10 @@ button.min-h-0.flex-1.overflow-hidden.bg-zinc-950 {
 .animate-toast-progress {
   animation: toastProgress 5s linear forwards;
 }
+
+/* Fiche épisode : l’action de re-téléchargement garde une cible tactile compacte de 44 px sans libellé visible. */
+[data-seenit-episode-download-surface="visible"] button:has(> svg.lucide-download + span.sr-only) {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 9999px;
+}
