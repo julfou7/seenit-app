@@ -30,6 +30,7 @@ import { acceptDownloadRequest, beginDownloadRequest, failDownloadRequest, updat
 import { readUserScopedJson } from '../lib/userIsolation';
 import { mediaKeyFrom, toMediaKey } from '../features/shows/mediaRelations';
 import { getParentalRatingColorClass, resolveParentalRating } from '../features/shows/parentalRating';
+import { resolveCanalProviderTarget } from '../features/shows/canalProviderLink';
 
 
 export interface ShowDetailScreenProps {
@@ -85,8 +86,13 @@ export const getEpisodeAirDateLabel = (airDate?: string | null) => {
   return `Le ${formatAirDateSafe(airDate, 'short')}`;
 };
 
-export const getCleanProviderName = (provider: any) => {
-  const name = (provider.provider_name || '').toLowerCase();
+interface ProviderNameInput {
+  provider_name?: string | null;
+}
+
+export const getCleanProviderName = (provider: ProviderNameInput) => {
+  const providerName = provider.provider_name || '';
+  const name = providerName.toLowerCase();
   if (name.includes('netflix')) return 'Netflix';
   if (name.includes('prime') || name.includes('amazon')) return 'Prime Video';
   if (name.includes('disney')) return 'Disney+';
@@ -96,7 +102,7 @@ export const getCleanProviderName = (provider: any) => {
   if (name.includes('max') || name.includes('hbo')) return 'Max';
   if (name.includes('france') || name.includes('ftv')) return 'France TV';
   if (name.includes('arte')) return 'Arte';
-  return provider.provider_name
+  return providerName
     .replace(/ à la demande/gi, '')
     .replace(/ Plus/gi, '+')
     .replace(/ Channel/gi, '')
@@ -109,7 +115,7 @@ export const getProviderDirectLink = (providerId: number, title: string, fallbac
     case 8: return `https://www.netflix.com/search?q=${query}`;
     case 119: return `https://www.primevideo.com/search/ref=atv_sr_sug_1?phrase=${query}`;
     case 337: return `https://www.disneyplus.com/search?q=${query}`;
-    case 381: return `https://www.canalplus.com/recherche/?q=${query}`;
+    case 381: return fallbackLink && fallbackLink !== '#' ? fallbackLink : `https://www.canalplus.com/recherche/?q=${query}`;
     case 350: return `https://tv.apple.com/fr/search?q=${query}`;
     case 531: return `https://www.paramountplus.com/search/?q=${query}`;
     case 1899: return `https://www.max.com/search?q=${query}`;
@@ -117,6 +123,57 @@ export const getProviderDirectLink = (providerId: number, title: string, fallbac
     case 239: return `https://www.arte.tv/fr/search/?q=${query}`;
     default: return fallbackLink || '#';
   }
+};
+
+export type ProviderLinkKind = 'provider-link' | 'exact-media-watch' | 'provider-search';
+
+export interface ProviderLinkPresentation {
+  url: string;
+  label: string;
+  title: string;
+  kind: ProviderLinkKind;
+}
+
+export const getProviderLinkPresentation = ({
+  providerId,
+  providerName,
+  title,
+  fallbackLink,
+  mediaType,
+  tmdbId,
+}: {
+  providerId: number;
+  providerName: string;
+  title: string;
+  fallbackLink: string;
+  mediaType: 'tv' | 'movie';
+  tmdbId?: number | string;
+}): ProviderLinkPresentation => {
+  if (providerId === 381) {
+    const canalTarget = resolveCanalProviderTarget({ title, fallbackLink, mediaType, tmdbId });
+    if (canalTarget.kind === 'exact-media-watch') {
+      return {
+        url: canalTarget.url,
+        label: 'Canal+ · où regarder',
+        title: `Voir les options de diffusion de « ${title} » (lien myCANAL direct indisponible)`,
+        kind: canalTarget.kind,
+      };
+    }
+
+    return {
+      url: canalTarget.url,
+      label: 'Rechercher sur Canal+',
+      title: `Rechercher « ${title} » sur Canal+`,
+      kind: canalTarget.kind,
+    };
+  }
+
+  return {
+    url: getProviderDirectLink(providerId, title, fallbackLink),
+    label: providerName,
+    title: `Ouvrir ${providerName}`,
+    kind: 'provider-link',
+  };
 };
 
 export const getKeywordsFromDetails = (details: any, mediaType: 'tv' | 'movie'): string[] => {
