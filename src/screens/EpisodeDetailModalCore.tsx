@@ -1191,7 +1191,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                     className="inline-flex items-center justify-center gap-1.5 px-2 py-1.5 text-[10px] font-semibold text-zinc-500 hover:text-blue-400 transition-colors active:scale-95 touch-manipulation select-none"
                   >
                     <Download size={12} className="shrink-0" />
-                    <span>Télécharger à nouveau</span>
+                    <span className="sr-only">Télécharger à nouveau</span>
                   </button>
                 </div>
               );
