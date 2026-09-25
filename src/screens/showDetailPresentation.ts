@@ -163,7 +163,14 @@ export const getProviderLinkPresentation = ({
   };
 };
 
-export const getKeywordsFromDetails = (details: any, mediaType: 'tv' | 'movie'): string[] => {
+interface KeywordDetails {
+  keywords?: {
+    results?: Array<{ name?: string | null }>;
+    keywords?: Array<{ name?: string | null }>;
+  };
+}
+
+export const getKeywordsFromDetails = (details: KeywordDetails | null | undefined, mediaType: 'tv' | 'movie'): string[] => {
   const raw = mediaType === 'tv' ? details?.keywords?.results : details?.keywords?.keywords;
   const blacklist = [
     'aftercreditsstinger', 'duringcreditsstinger', 'post-credits scene',
@@ -171,7 +178,7 @@ export const getKeywordsFromDetails = (details: any, mediaType: 'tv' | 'movie'):
     'dc extended universe', 'cinematic universe', 'anime',
   ];
   return (Array.isArray(raw) ? raw : [])
-    .map((keyword: any) => String(keyword?.name || ''))
+    .map(keyword => String(keyword?.name || ''))
     .filter((keyword: string) => keyword.length > 0 && keyword.length < 25)
     .filter((keyword: string) => !blacklist.some(blocked => keyword.toLowerCase().includes(blocked)))
     .slice(0, 5);
