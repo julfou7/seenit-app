@@ -29,6 +29,7 @@ import {
   DISCOVER_PLATFORM_ID_MAP,
   getGenreIdsForMediaType,
   matchesSelectedGenres,
+  movieReleaseDateGteForAfterYear,
   parseMinimumRating,
 } from '../discover/filterPolicy';
 
@@ -39,7 +40,12 @@ export * from './tmdbClient';
  * TMDB (type 2 ou 3) est prouvée dans la fenêtre courante. Une date de sortie
  * générique, digitale, physique ou TV ne suffit jamais.
  */
-export function isMovieAtCinema(media: any): boolean {
+interface CinemaMediaCandidate {
+  media_type?: string;
+  first_air_date?: unknown;
+}
+
+export function isMovieAtCinema(media: CinemaMediaCandidate | null | undefined): boolean {
   if (!media) return false;
   const isTv = media.media_type === 'tv' || media.first_air_date !== undefined;
   if (isTv || isAdultOrParodyMedia(media)) return false;
@@ -265,6 +271,7 @@ export interface SeenItDiscoverOptions {
   /** Borne interne : préfiltre la source sans appliquer deux fois le résolveur parental. */
   parentalPrefilterMaxAge?: number;
   minRating?: string;
+  movieReleaseAfterYear?: string;
   sortBy?: 'popular' | 'rating' | 'date' | 'title';
   sortOrder?: 'asc' | 'desc';
 }
@@ -324,6 +331,7 @@ export async function discoverSeenIt(options: SeenItDiscoverOptions) {
     pegi = 'Tous',
     parentalPrefilterMaxAge,
     minRating = 'Toutes',
+    movieReleaseAfterYear = 'Toutes',
     sortBy = 'popular',
     sortOrder = 'desc',
   } = options;
@@ -333,6 +341,8 @@ export async function discoverSeenIt(options: SeenItDiscoverOptions) {
   const sourceMaxAge = parentalPrefilterMaxAge === undefined
     ? parseMaxAgeFilter(pegi)
     : parentalPrefilterMaxAge;
+  const movieReleaseDateGte = movieReleaseDateGteForAfterYear(movieReleaseAfterYear);
+  const effectiveType = movieReleaseDateGte ? 'movie' : type;
 
   const fetchType = async (mediaType: 'tv' | 'movie') => {
     const params = new URLSearchParams();
@@ -374,6 +384,13 @@ export async function discoverSeenIt(options: SeenItDiscoverOptions) {
       const oneYearAgo = new Date();
       oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
       params.set(mediaType === 'tv' ? 'first_air_date.gte' : 'primary_release_date.gte', oneYearAgo.toISOString().split('T')[0]);
+    }
+
+    if (mediaType === 'movie' && movieReleaseDateGte) {
+      const currentLowerBound = params.get('primary_release_date.gte');
+      if (!currentLowerBound || currentLowerBound < movieReleaseDateGte) {
+        params.set('primary_release_date.gte', movieReleaseDateGte);
+      }
     }
 
     if (category === 'Au cinéma' && mediaType === 'movie') {
@@ -420,7 +437,7 @@ export async function discoverSeenIt(options: SeenItDiscoverOptions) {
   };
 
   let rawResult: any;
-  if (type === 'all') {
+  if (effectiveType === 'all') {
     const [tvResult, movieResult] = await Promise.all([fetchType('tv'), fetchType('movie')]);
     if (!tvResult.ok && !movieResult.ok) return tvResult;
     const tvValue = tvResult.ok ? tvResult.value : { results: [], total_pages: 0, total_results: 0 };
@@ -435,7 +452,7 @@ export async function discoverSeenIt(options: SeenItDiscoverOptions) {
       total_results: Number(tvValue.total_results || 0) + Number(movieValue.total_results || 0),
     };
   } else {
-    const typedResult = await fetchType(type);
+    const typedResult = await fetchType(effectiveType);
     if (!typedResult.ok) return typedResult;
     rawResult = typedResult.value;
   }

@@ -40,7 +40,7 @@ const parentalBatchCache = new Map<string, any>();
 const parentalTransportPending = new Map<AbortSignal | undefined, Map<string, ParentalPendingEntry>>();
 let parentalTransportFlushScheduled = false;
 
-function identityFor(item: any): BatchIdentity | null {
+function identityFor(item: Record<string, unknown>): BatchIdentity | null {
   const id = Number(item?.id);
   if (!Number.isInteger(id) || id <= 0) return null;
   const mediaType: MediaType = item?.media_type === 'movie' || Boolean(item?.release_date) ? 'movie' : 'tv';
@@ -191,6 +191,7 @@ function createSourcePrefetchKey(options: SeenItDiscoverOptions, maxAge: number)
     genres: [...(options.genres || [])].sort(),
     maxAge,
     minRating: options.minRating || 'Toutes',
+    movieReleaseAfterYear: options.movieReleaseAfterYear || 'Toutes',
     sortBy: options.sortBy || 'popular',
     sortOrder: options.sortOrder || 'desc',
     hasRescuingMovieOverride,

@@ -13,13 +13,19 @@ interface DiscoverViewProps {
   model: Record<string, any>;
 }
 
-const mediaTypeOf = (item: any): 'movie' | 'tv' | 'person' => {
+interface DiscoverViewMedia {
+  id?: unknown;
+  media_type?: string;
+  release_date?: unknown;
+}
+
+const mediaTypeOf = (item: DiscoverViewMedia): 'movie' | 'tv' | 'person' => {
   if (item?.media_type === 'person') return 'person';
   if (item?.media_type === 'movie' || item?.release_date) return 'movie';
   return 'tv';
 };
 
-const mediaKeyOf = (item: any): string => {
+const mediaKeyOf = (item: DiscoverViewMedia): string => {
   const id = Number(item?.id);
   if (!Number.isFinite(id)) return '';
   return `${mediaTypeOf(item)}:${id}`;
@@ -31,6 +37,7 @@ const progressiveScopeOf = (model: Record<string, any>): string => JSON.stringif
   platforms: [...(model.selectedPlatforms || [])].sort(),
   genres: [...(model.selectedGenres || [])].sort(),
   minRating: model.minRating,
+  movieReleaseAfterYear: model.movieReleaseAfterYear,
   sortBy: model.sortBy,
 });
 

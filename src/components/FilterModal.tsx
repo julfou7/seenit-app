@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { cn } from '../lib/utils';
 import { Tv, Film, X, Sparkles, FileText, User, Ticket, Trophy } from 'lucide-react';
-import { isSearchCompatibleCategory } from '../features/discover/filterPolicy';
+import { isSearchCompatibleCategory, MOVIE_RELEASE_YEAR_MIN } from '../features/discover/filterPolicy';
 
 interface FilterModalProps {
   onClose: () => void;
@@ -11,8 +11,9 @@ interface FilterModalProps {
   initialSelectedGenres: string[];
   initialPegi: string;
   initialRating: string;
+  initialMovieReleaseAfterYear: string;
   query: string;
-  onApply: (platforms: string[], genres: string[], pegi: string, rating: string) => void;
+  onApply: (platforms: string[], genres: string[], pegi: string, rating: string, movieReleaseAfterYear: string) => void;
 }
 
 const GENRE_OPTIONS = [
@@ -43,6 +44,11 @@ const AGE_OPTIONS = [
   { id: 'age:18', label: '≤ 18' },
 ];
 const RATING_OPTIONS = ['Toutes', '6+', '7+', '7.5+', '8+', '8.5+', '9+'];
+const CURRENT_YEAR = new Date().getFullYear();
+const MOVIE_RELEASE_YEAR_OPTIONS = Array.from(
+  { length: CURRENT_YEAR - MOVIE_RELEASE_YEAR_MIN + 1 },
+  (_, index) => String(CURRENT_YEAR - index),
+);
 
 export function FilterModal({
   onClose,
@@ -52,6 +58,7 @@ export function FilterModal({
   initialSelectedGenres,
   initialPegi,
   initialRating,
+  initialMovieReleaseAfterYear,
   query,
   onApply
 }: FilterModalProps) {
@@ -63,6 +70,7 @@ export function FilterModal({
   const [selectedGenres, setSelectedGenres] = useState<string[]>(initialSelectedGenres);
   const [pegi, setPegi] = useState(initialPegi);
   const [rating, setRating] = useState(initialRating);
+  const [movieReleaseAfterYear, setMovieReleaseAfterYear] = useState(initialMovieReleaseAfterYear);
 
   const togglePlatform = (id: string) => {
     setSelectedPlatforms(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
@@ -70,6 +78,16 @@ export function FilterModal({
 
   const toggleGenre = (genre: string) => {
     setSelectedGenres(prev => prev.includes(genre) ? prev.filter(g => g !== genre) : [...prev, genre]);
+  };
+
+  const handleCategoryChange = (category: string) => {
+    setDraftCategory(category);
+    if (category !== 'Films') setMovieReleaseAfterYear('Toutes');
+  };
+
+  const handleMovieReleaseAfterYearChange = (value: string) => {
+    setMovieReleaseAfterYear(value);
+    if (value !== 'Toutes') setDraftCategory('Films');
   };
 
   const handleOverlayClick = (e: React.MouseEvent) => {
@@ -92,6 +110,7 @@ export function FilterModal({
     setSelectedGenres([]);
     setPegi('Tous');
     setRating('Toutes');
+    setMovieReleaseAfterYear('Toutes');
   };
 
   const handleValidate = () => {
@@ -105,7 +124,7 @@ export function FilterModal({
       }
     }
     setActiveCategory(draftCategory);
-    onApply(selectedPlatforms, selectedGenres, pegi, rating);
+    onApply(selectedPlatforms, selectedGenres, pegi, rating, movieReleaseAfterYear);
   };
 
   const typeButtonClass = (category: string, disabled = false) => cn(
@@ -147,44 +166,44 @@ export function FilterModal({
               )}
             </div>
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => setDraftCategory('Tout')} className={typeButtonClass('Tout')}>
+              <button onClick={() => handleCategoryChange('Tout')} className={typeButtonClass('Tout')}>
                 Tout
               </button>
-              <button onClick={() => setDraftCategory('Séries')} className={typeButtonClass('Séries')}>
+              <button onClick={() => handleCategoryChange('Séries')} className={typeButtonClass('Séries')}>
                 <Tv size={14}/> Séries
               </button>
-              <button onClick={() => setDraftCategory('Films')} className={typeButtonClass('Films')}>
+              <button onClick={() => handleCategoryChange('Films')} className={typeButtonClass('Films')}>
                 <Film size={14}/> Films
               </button>
               <button
                 disabled={searchDisabled('Top 100')}
-                onClick={() => setDraftCategory('Top 100')}
+                onClick={() => handleCategoryChange('Top 100')}
                 className={typeButtonClass('Top 100', searchDisabled('Top 100'))}
               >
                 <Trophy size={14}/> Top 100
               </button>
               <button
                 disabled={searchDisabled('Pépites')}
-                onClick={() => setDraftCategory('Pépites')}
+                onClick={() => handleCategoryChange('Pépites')}
                 className={typeButtonClass('Pépites', searchDisabled('Pépites'))}
               >
                 <Sparkles size={14}/> Pépites
               </button>
               <button
                 disabled={searchDisabled('Au cinéma')}
-                onClick={() => setDraftCategory('Au cinéma')}
+                onClick={() => handleCategoryChange('Au cinéma')}
                 className={typeButtonClass('Au cinéma', searchDisabled('Au cinéma'))}
               >
                 <Ticket size={14}/> Au cinéma
               </button>
               <button
                 disabled={searchDisabled('Documentaires')}
-                onClick={() => setDraftCategory('Documentaires')}
+                onClick={() => handleCategoryChange('Documentaires')}
                 className={typeButtonClass('Documentaires', searchDisabled('Documentaires'))}
               >
                 <FileText size={14}/> Documentaires
               </button>
-              <button onClick={() => setDraftCategory('Personnes')} className={typeButtonClass('Personnes')}>
+              <button onClick={() => handleCategoryChange('Personnes')} className={typeButtonClass('Personnes')}>
                 <User size={14}/> Personnes
               </button>
             </div>
@@ -237,6 +256,22 @@ export function FilterModal({
                 </button>
               ))}
             </div>
+          </div>
+
+          <div>
+            <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Films · date de sortie</h3>
+            <p className="text-[10px] text-zinc-600 mb-3">Sortis après l’année choisie · le type Films est activé automatiquement</p>
+            <select
+              aria-label="Films sortis après l’année"
+              value={movieReleaseAfterYear}
+              onChange={(event) => handleMovieReleaseAfterYearChange(event.target.value)}
+              className="w-full h-11 rounded-xl bg-black/20 border border-white/10 px-3 text-[13px] font-semibold text-zinc-200 outline-none focus:border-[#E5A93D]/60"
+            >
+              <option value="Toutes">Toutes les années</option>
+              {MOVIE_RELEASE_YEAR_OPTIONS.map(year => (
+                <option key={year} value={year}>{`Après ${year}`}</option>
+              ))}
+            </select>
           </div>
 
           <div>
