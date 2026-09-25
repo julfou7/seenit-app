@@ -6,41 +6,31 @@ import { resolveCanalProviderTarget } from '../src/features/shows/canalProviderL
 const presentationSource = readFileSync(new URL('../src/screens/showDetailPresentation.ts', import.meta.url), 'utf8');
 const viewSource = readFileSync(new URL('../src/screens/ShowDetailView.tsx', import.meta.url), 'utf8');
 
-test('SEENIT-PLATFORM-001 garde le CTA CANAL sur l’identité TMDB exacte sans faux deep link', () => {
-  const exactWatchUrl = 'https://www.themoviedb.org/tv/12345/watch?locale=FR';
-  const target = resolveCanalProviderTarget({
-    title: 'MobLand',
-    fallbackLink: exactWatchUrl,
-    mediaType: 'tv',
-    tmdbId: 12345,
-  });
+test('SEENIT-PLATFORM-001 garde CANAL visible sans navigation non prouvée', () => {
+  const target = resolveCanalProviderTarget();
 
-  assert.equal(target.url, exactWatchUrl);
-  assert.equal(target.kind, 'exact-media-watch');
-  assert.doesNotMatch(target.url, /canalplus\.com\/recherche/);
+  assert.equal(target.url, null);
+  assert.equal(target.kind, 'provider-unavailable');
 });
 
-test('issue #446 refuse un lien TMDB appartenant à un homonyme et ne fabrique qu’une recherche CANAL', () => {
-  const target = resolveCanalProviderTarget({
-    title: 'Dark Matter',
-    fallbackLink: 'https://www.themoviedb.org/tv/99999/watch?locale=FR',
-    mediaType: 'tv',
-    tmdbId: 12345,
-  });
+test('issue #446 ne fabrique plus de recherche CANAL ni de faux recours TMDB', () => {
+  const resolverSource = readFileSync(new URL('../src/features/shows/canalProviderLink.ts', import.meta.url), 'utf8');
 
-  assert.equal(target.kind, 'provider-search');
-  assert.match(target.url, /^https:\/\/www\.canalplus\.com\/recherche\/\?q=Dark%20Matter$/);
+  assert.doesNotMatch(resolverSource, /canalplus\.com\/recherche/i);
+  assert.doesNotMatch(resolverSource, /themoviedb\.org/i);
+  assert.doesNotMatch(presentationSource, /canalplus\.com\/recherche/i);
+  assert.match(presentationSource, /case 381: return '#'/);
 });
 
-test('issue #446 garde le fallback honnête dans la présentation et le point d’entrée réel', () => {
-  assert.match(presentationSource, /resolveCanalProviderTarget\(\{ title, fallbackLink, mediaType, tmdbId \}\)/);
-  assert.match(presentationSource, /label: 'Canal\+ · où regarder'/);
-  assert.match(presentationSource, /label: 'Rechercher sur Canal\+'/);
-  assert.match(presentationSource, /lien myCANAL direct indisponible/);
+test('issue #446 rend le badge Canal non navigable au point d’entrée réel', () => {
+  assert.match(presentationSource, /resolveCanalProviderTarget\(\)/);
+  assert.match(presentationSource, /label: 'Canal'/);
+  assert.match(presentationSource, /url: canalTarget\.url/);
+  assert.doesNotMatch(presentationSource, /Rechercher sur Canal/);
+  assert.doesNotMatch(presentationSource, /Canal\+ · où regarder/);
 
-  assert.match(viewSource, /getProviderLinkPresentation\(\{/);
-  assert.match(viewSource, /mediaType: isSeries \? 'tv' : 'movie'/);
-  assert.match(viewSource, /tmdbId: effectiveTmdbId/);
-  assert.match(viewSource, /title=\{providerLink\.title\}/);
-  assert.match(viewSource, /<span>\{providerLink\.label\}<\/span>/);
+  assert.match(viewSource, /if \(!directLink\) return <span/);
+  assert.match(viewSource, /aria-label=\{providerLink\.title\}/);
+  assert.match(viewSource, /return <a key=/);
+  assert.match(viewSource, /openExternalUrl\(directLink\)/);
 });

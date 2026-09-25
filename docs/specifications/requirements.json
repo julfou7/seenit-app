@@ -30,7 +30,7 @@
         },
         {
           "file": "tests/canalExternalUrl.test.ts",
-          "contains": "SEENIT-PLATFORM-001 garde le CTA CANAL sur l’identité TMDB exacte sans faux deep link"
+          "contains": "SEENIT-PLATFORM-001 garde CANAL visible sans navigation non prouvée"
         },
         {
           "file": "tests/backendRuntime.test.ts",
