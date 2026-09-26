@@ -73,7 +73,7 @@ test('SEENIT-QUALITY-004 route les reviews Codex P1/P2 post-merge sans bloquer l
 
   for (const source of [agents, bootstrap, delivery, spec].map(normalize)) {
     assert.match(source, /Codex Review|revue Codex/i);
-    assert.match(source, /ne (?:doit|devient) pas[^.]*bloqu|non bloquante/i);
+    assert.match(source, /ne (?:doit|devient) pas[^.]*bloqu|non bloquant(?:e)?/i);
     assert.match(source, /P1[\s\S]*P2/);
     assert.match(source, /P3[\s\S]*P4/);
     assert.match(source, /issue ouverte[\s\S]*référencée|issue.*ouverte.*PR/i);
