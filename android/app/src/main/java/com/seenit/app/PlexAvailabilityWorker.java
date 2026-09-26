@@ -84,11 +84,19 @@ public class PlexAvailabilityWorker extends Worker {
     @NonNull
     @Override
     public Result doWork() {
-        Credentials credentials = PlexBackgroundCredentialStore.read(getApplicationContext());
         String expectedUidHash = getInputData().getString("ownerUidHash");
-        if (credentials == null || expectedUidHash == null || !expectedUidHash.equals(credentials.uidHash)) {
-            // Fail closed: un signal ancien ou d'un autre UID ne doit révéler aucun titre
-            // et ne déclenche ni accès Plex ni notification sur cette installation.
+        if (expectedUidHash == null || expectedUidHash.length() != 16) {
+            return Result.failure();
+        }
+
+        Credentials credentials = PlexBackgroundCredentialStore.read(getApplicationContext());
+        if (credentials == null) {
+            // L'enregistrement FCM et la copie privée Plex sont asynchrones.
+            // Une absence momentanée n'est pas un succès terminal.
+            return getRunAttemptCount() + 1 < MAX_ATTEMPTS ? Result.retry() : Result.success();
+        }
+        if (!expectedUidHash.equals(credentials.uidHash)) {
+            // Fail closed : un signal ancien ou d'un autre UID ne révèle aucun titre.
             return Result.success();
         }
 
@@ -102,7 +110,7 @@ public class PlexAvailabilityWorker extends Worker {
 
         try {
             if (isAvailable(credentials.token, tmdbId, mediaType, season, episode)) {
-                showNotification(true);
+                showPlexAvailableNotification();
                 return Result.success();
             }
         } catch (Exception ignored) {
@@ -111,7 +119,7 @@ public class PlexAvailabilityWorker extends Worker {
 
         if (getRunAttemptCount() + 1 < MAX_ATTEMPTS) return Result.retry();
 
-        showNotification(false);
+        // « Import terminé » a déjà été livré par le webhook : pas de doublon.
         return Result.success();
     }
 
@@ -276,7 +284,7 @@ public class PlexAvailabilityWorker extends Worker {
         }
     }
 
-    private void showNotification(boolean available) {
+    private void showPlexAvailableNotification() {
         Context context = getApplicationContext();
         ensureChannel(context);
 
@@ -308,10 +316,8 @@ public class PlexAvailabilityWorker extends Worker {
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
-        String notificationTitle = available ? "Disponible dans Plex 🍿" : "Import terminé 🍿";
-        String body = available
-            ? "\"" + title + episodeSuffix + "\" est maintenant disponible dans Plex. Touchez pour ouvrir sa fiche."
-            : "\"" + title + episodeSuffix + "\" a été importé, mais Plex n’a pas encore confirmé sa disponibilité.";
+        String notificationTitle = "Disponible dans Plex 🍿";
+        String body = "\"" + title + episodeSuffix + "\" est maintenant disponible dans Plex. Touchez pour ouvrir sa fiche.";
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_seenit)

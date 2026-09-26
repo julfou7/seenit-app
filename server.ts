@@ -21,6 +21,7 @@ import {
 } from "./src/features/downloads/downloadBackendSecurity.ts";
 import { buildC411SearchParams } from "./src/features/downloads/c411Query.ts";
 import { buildDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookNotification.ts";
+import { deliverDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookDelivery.ts";
 import { supportsPlexAvailabilityBackgroundV1 } from "./src/features/notifications/notificationCapabilities.ts";
 import { executeIdempotentMutation, type TimedMutationResult } from "./src/features/downloads/downloadIdempotency.ts";
 import { apiErrorMiddleware, backendHealthHandler, installAsyncRouteForwarding, seenItCorsMiddleware } from "./src/features/runtime/backendRuntime.ts";
@@ -103,13 +104,13 @@ const PARENTAL_EVIDENCE_COLLECTION = 'publicParentalRatingEvidence';
 const PARENTAL_EVIDENCE_SCHEMA_VERSION = 1;
 const PARENTAL_EVIDENCE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-async function readPersistedParentalEvidence(keys: string[]): Promise<Map<string, any>> {
+async function readPersistedParentalEvidence(keys: string[]): Promise<Map<string, unknown>> {
   const safeKeys = [...new Set(keys)].filter(key => /^(movie|tv):[1-9]\d{0,12}$/.test(key)).slice(0, 40);
   if (safeKeys.length === 0) return new Map();
   const refs = safeKeys.map(key => adminDb.collection(PARENTAL_EVIDENCE_COLLECTION).doc(key));
   const snapshots = await adminDb.getAll(...refs);
   const now = Date.now();
-  const resolved = new Map<string, any>();
+  const resolved = new Map<string, unknown>();
   snapshots.forEach((snapshot, index) => {
     if (!snapshot.exists) return;
     const data = snapshot.data();
@@ -2729,34 +2730,12 @@ async function startServer() {
       const presentation = buildDownloadWebhookPresentation(source as 'sonarr' | 'radarr', payload);
       const ownerUidHash = createHash('sha256').update(uid).digest('hex').slice(0, 16);
 
-      let delivered = 0;
-      let invalidTokensRemoved = 0;
-
-      if (presentation.eventType === 'Download' && presentation.plexAvailabilityData) {
-        const [androidCapableDelivery, androidLegacyDelivery, webDelivery] = await Promise.all([
-          sendPushToUserDevices(uid, null, {
-            ...presentation.plexAvailabilityData,
-            ownerUidHash
-          }, {
-            platform: 'android',
-            androidHighPriority: true,
-            plexAvailabilityBackground: 'required'
-          }),
-          sendPushToUserDevices(uid, presentation.notification, presentation.data, {
-            platform: 'android',
-            plexAvailabilityBackground: 'legacy'
-          }),
-          sendPushToUserDevices(uid, presentation.notification, presentation.data, {
-            platform: 'web'
-          })
-        ]);
-        delivered = androidCapableDelivery.delivered + androidLegacyDelivery.delivered + webDelivery.delivered;
-        invalidTokensRemoved = androidCapableDelivery.invalid + androidLegacyDelivery.invalid + webDelivery.invalid;
-      } else {
-        const delivery = await sendPushToUserDevices(uid, presentation.notification, presentation.data);
-        delivered = delivery.delivered;
-        invalidTokensRemoved = delivery.invalid;
-      }
+      const { delivered, invalidTokensRemoved } = await deliverDownloadWebhookPresentation({
+        uid,
+        ownerUidHash,
+        presentation,
+        sendPush: sendPushToUserDevices,
+      });
 
       return res.json({
         success: true,
