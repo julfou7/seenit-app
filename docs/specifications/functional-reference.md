@@ -587,7 +587,8 @@ et webhooks, qui ne doit pas être dupliquée dans les réglages généraux.
 - Pendant le handoff vers le transfert physique, un qBittorrent encore sans identité média n'est pas
   affiché en parallèle d'une intention SeenIt active techniquement compatible. Seule sa représentation
   brute est masquée : aucune identité ne lui est attribuée sans preuve exacte.
-- Affiche séparément actifs, erreurs, annulés et terminés.
+- Affiche séparément actifs, erreurs, annulés et terminés. Une erreur explicite d'import reste dans
+  « En erreur » même si qBittorrent a physiquement atteint 100 %.
 - Les actifs conservent l'ordre de lancement ; l'historique affiche les plus récents d'abord.
 - Un swipe droit supprime une entrée d'historique ou demande confirmation pour annuler un actif.
 - L'annulation active retire la demande du client ; les fichiers qBittorrent sont conservés.
@@ -600,8 +601,10 @@ et webhooks, qui ne doit pas être dupliquée dans les réglages généraux.
   résultat indique le type lorsque C411 fournit la sous-catégorie exacte (`6` Film ou `7` Série).
 - Depuis cette recherche globale sans fiche associée, un type et une identité ne sont jamais déduits du
   nom de release. Si qBittorrent est configuré et que C411 fournit le type exact, le Magnet BTIH validé
-  lui est transmis directement ; sinon le Magnet est remis au client local. Sonarr/Radarr ne sont
-  contactés que depuis une fiche SeenIt qui fournit l'identité canonique `mediaType + tmdbId`.
+  lui est transmis directement **sans catégorie qBittorrent gérée par Sonarr/Radarr** ; ce téléchargement
+  reste manuel et l'interface le signale comme tel. Pour obtenir l'import *Arr/Plex automatique, la release
+  doit être lancée depuis une fiche SeenIt exacte qui fournit `mediaType + tmdbId`. Sinon le Magnet est
+  remis au client local ; Sonarr/Radarr ne sont jamais contactés à partir du titre brut.
 - Les cartes C411 n'ouvrent une fiche SeenIt que si un TMDB ID exact est connu.
 
 ### 10.3 Identité et cohérence
@@ -640,7 +643,8 @@ explicite, aucun rappel film n'est programmé et aucune estimation J+120 n'est u
   événement `Download` affiche toujours « Import terminé » sur chaque installation autorisée ; sur un
   Android dont la copie privée Plex est confirmée, un second signal silencieux vérifie ensuite Plex sans
   remplacer ce reçu visible. « Disponible dans Plex » n'apparaît qu'après une preuve TMDB exacte
-  (et saison/épisode exacts pour la TV).
+  (et saison/épisode exacts pour la TV). Associer ou retirer Plex rafraîchit immédiatement l'enregistrement
+  de l'appareil déjà autorisé afin que cette capability serveur suive l'état natif sans redémarrage.
 - Les notifications profondes ouvrent le média/épisode exact, y compris après un démarrage à froid de
   l'APK ; l'APK peut exposer « Marquer comme vu ».
 - Pour « nouvel épisode le jour J », la notification système est l'unique alerte : aucun toast interne

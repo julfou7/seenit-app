@@ -822,9 +822,11 @@ pour le cache des sagas et univers.
 - **SEENIT-C411-003** — Dans la recherche manuelle globale, Film/Série reste un filtre facultatif.
   Le type d'une release provient uniquement de sa sous-catégorie C411 explicite (`6` Film, `7` Série),
   jamais de son nom. Avec qBittorrent configuré et un type prouvé, SeenIt lui transmet une seule fois
-  le Magnet BTIH exact. Sans cette preuve ou sans qBittorrent, SeenIt remet le Magnet au client local ;
-  il ne tente jamais d'ajouter une œuvre à Sonarr/Radarr depuis le titre de release. Un envoi Arr exige
-  le contexte canonique `mediaType + tmdbId` d'une fiche SeenIt exacte.
+  le Magnet BTIH exact **sans catégorie qBittorrent gérée par Sonarr/Radarr** : ce flux global reste
+  explicitement manuel et ne peut pas être repris comme un import *Arr automatique sans identité canonique.
+  Sans cette preuve ou sans qBittorrent, SeenIt remet le Magnet au client local ; il ne tente jamais
+  d'ajouter une œuvre à Sonarr/Radarr depuis le titre de release. Un envoi Arr exige le contexte canonique
+  `mediaType + tmdbId` d'une fiche SeenIt exacte.
 
 ### 7.3 Identité, réconciliation et sécurité destructive
 
@@ -862,7 +864,9 @@ pour le cache des sagas et univers.
 - **SEENIT-DOWNLOAD-006** — Les actifs gardent l'ordre de lancement ; les historiques sont
   présentés du plus récent au plus ancien, indépendamment de l'ordre des réponses distantes.
 - **SEENIT-DOWNLOAD-007** — Les sections En cours, En erreur, Annulés et Terminés sont
-  distinctes. « Effacer » n'agit jamais sur un transfert actif.
+  distinctes. Une erreur métier explicite (`errorMessage`), notamment un import *Arr refusé après un
+  torrent arrivé à 100 %, reste prioritaire sur la progression physique et classe l'élément dans
+  « En erreur », jamais dans « Terminés ». « Effacer » n'agit jamais sur un transfert actif.
 - La progression distante garde ses décimales ; l'interface affiche un entier tronqué. La phase
   de recherche n'invente ni pourcentage ni message technique du client.
 - Une annulation active demande confirmation, nomme le client et précise que qBittorrent garde
@@ -891,7 +895,8 @@ pour le cache des sagas et univers.
   notification « Import terminé » n'est créée puisque le reçu d'import a déjà été livré. Une installation
   Android qui n'a pas confirmé la capability `plexAvailabilityBackgroundV1` conserve donc le reçu visible
   sans vérification silencieuse ; chaque réenregistrement recalcule cette capability afin qu'un ancien
-  client ou un stockage natif indisponible ne puisse jamais être déclaré capable par optimisme. Le chemin
+  client ou un stockage natif indisponible ne puisse jamais être déclaré capable par optimisme.
+  Après une association ou une déconnexion Plex, l'APK rafraîchit immédiatement l'enregistrement FCM déjà autorisé : une capability vraie n'est publiée qu'après persistance native confirmée et son retrait est annoncé sans attendre un redémarrage. Le chemin
   natif reste compatible avec `minSdkVersion = 24` sans dépendre d'API Java plus récentes non désucrées.
   Pour les épisodes, la saison `0` est une saison valide réservée aux spéciaux et reste distincte d'une
   saison absente : une preuve Plex S0E1 exige donc bien l'épisode exact, comme pour toute autre saison.

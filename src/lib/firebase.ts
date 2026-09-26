@@ -10,7 +10,10 @@ import firebaseConfig from '../../firebase-applet-config.json';
 import { resolveSeenItApiUrl } from './seenitApi';
 import { queueAppUpdateAvailablePush } from '../features/release/releaseUpdatePushClient';
 import { notificationCapabilitiesForPlatform } from '../features/notifications/notificationCapabilities';
-import { syncNativePlexBackgroundCredentials } from '../features/plex/plexStorage';
+import {
+  PLEX_BACKGROUND_CAPABILITY_CHANGED_EVENT,
+  syncNativePlexBackgroundCredentials
+} from '../features/plex/plexStorage';
 import { ensureSeenItServiceWorkerRegistration } from '../features/pwa/serviceWorkerRegistration';
 
 const app = initializeApp(firebaseConfig);
@@ -465,6 +468,14 @@ export async function syncGrantedNotificationDevice(): Promise<void> {
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
   }
   await requestNotificationPermission();
+}
+
+if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+  window.addEventListener(PLEX_BACKGROUND_CAPABILITY_CHANGED_EVENT, () => {
+    // Aucun nouveau prompt : syncGrantedNotificationDevice() vérifie d'abord
+    // que la permission push est déjà accordée.
+    void syncGrantedNotificationDevice();
+  });
 }
 
 

@@ -32,3 +32,21 @@ test('SEENIT-NOTIFICATION-003 garde une notification visible pour les APK legacy
   assert.ok(server.includes("device.get('plexAvailabilityBackgroundV1') === true"));
   assert.ok(server.includes('plexAvailabilityBackgroundV1,'));
 });
+
+
+test('SEENIT-NOTIFICATION-003 rafraîchit la capability après association ou retrait Plex', () => {
+  const plexStorage = readFileSync('src/features/plex/plexStorage.ts', 'utf8');
+  const client = readFileSync('src/lib/firebase.ts', 'utf8');
+
+  assert.ok(plexStorage.includes("PLEX_BACKGROUND_CAPABILITY_CHANGED_EVENT = 'seenit-plex-background-capability-changed'"));
+  assert.match(
+    plexStorage,
+    /persistNativePlexBackgroundCredentials\(uid, token\)\.then\(ready => \{\s+if \(ready\) notifyPlexBackgroundCapabilityChanged\(\);/
+  );
+  assert.match(
+    plexStorage,
+    /clearNativePlexBackgroundCredentials\(uid\)\.finally\(\(\) => \{[\s\S]*?notifyPlexBackgroundCapabilityChanged\(\);/
+  );
+  assert.ok(client.includes('window.addEventListener(PLEX_BACKGROUND_CAPABILITY_CHANGED_EVENT'));
+  assert.ok(client.includes('void syncGrantedNotificationDevice();'));
+});

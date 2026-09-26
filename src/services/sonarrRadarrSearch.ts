@@ -701,6 +701,11 @@ export async function pushReleaseDirectly(payload: {
   password?: string;
   torrent: C411Torrent;
   mediaType: 'movie' | 'tv';
+  /**
+   * undefined conserve le routage historique par type pour une fiche SeenIt ;
+   * null force un téléchargement qBittorrent manuel sans catégorie *Arr.
+   */
+  qbittorrentCategory?: string | null;
   mediaInfo?: {
     title: string;
     tmdbId?: number | string;
@@ -840,7 +845,14 @@ export async function pushReleaseDirectly(payload: {
         cookieHeader = loginRes.cookie || '';
       }
 
-      const formBody = `urls=${encodeURIComponent(payload.torrent.magnetUri)}&category=${payload.mediaType === 'tv' ? 'tv' : 'movies'}`;
+      const defaultCategory = payload.mediaType === 'tv' ? 'tv' : 'movies';
+      const requestedCategory = payload.qbittorrentCategory === undefined
+        ? defaultCategory
+        : payload.qbittorrentCategory;
+      const categoryField = requestedCategory?.trim()
+        ? `&category=${encodeURIComponent(requestedCategory.trim())}`
+        : '';
+      const formBody = `urls=${encodeURIComponent(payload.torrent.magnetUri)}${categoryField}`;
       const qbitHeaders: Record<string, string> = {
         'Content-Type': 'application/x-www-form-urlencoded',
         'Referer': base,
@@ -851,8 +863,9 @@ export async function pushReleaseDirectly(payload: {
       try {
         await executePost(`${base}/api/v2/torrents/add`, formBody, qbitHeaders);
         return { success: true, message: 'Torrent ajouté directement à qBittorrent !' };
-      } catch (err: any) {
-        if (!payload.username && !payload.password && (err?.message?.includes('403') || err?.message?.includes('401'))) {
+      } catch (err: unknown) {
+        const errMessage = err instanceof Error ? err.message : String(err);
+        if (!payload.username && !payload.password && (errMessage.includes('403') || errMessage.includes('401'))) {
           return {
             success: false,
             message: 'Authentification qBittorrent requise : renseignez votre nom d\'utilisateur et mot de passe'
