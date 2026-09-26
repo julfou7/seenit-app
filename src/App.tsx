@@ -519,7 +519,7 @@ function MainApp() {
       window.removeEventListener('focus', handleVisibilityOrFocus);
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
     };
-  }, [currentUser, handleTabChange, openShowSmooth, updateShow, showToast]);
+  }, [handleTabChange, openShowSmooth, updateShow, showToast]);
 
   const handleActiveTabClick = () => {
     window.dispatchEvent(new CustomEvent('app-close-modals'));
