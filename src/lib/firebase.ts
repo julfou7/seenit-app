@@ -10,6 +10,7 @@ import firebaseConfig from '../../firebase-applet-config.json';
 import { resolveSeenItApiUrl } from './seenitApi';
 import { queueAppUpdateAvailablePush } from '../features/release/releaseUpdatePushClient';
 import { notificationCapabilitiesForPlatform } from '../features/notifications/notificationCapabilities';
+import { syncNativePlexBackgroundCredentials } from '../features/plex/plexStorage';
 import { ensureSeenItServiceWorkerRegistration } from '../features/pwa/serviceWorkerRegistration';
 
 const app = initializeApp(firebaseConfig);
@@ -306,7 +307,11 @@ function getNotificationInstallationId(): string {
   return created;
 }
 
-async function registerNotificationDevice(fcmToken: string, platform: 'web' | 'android') {
+async function registerNotificationDevice(
+  fcmToken: string,
+  platform: 'web' | 'android',
+  capabilities: string[] = []
+) {
   const user = auth.currentUser;
   if (!user || fcmToken.length < 20) return false;
   const response = await fetch(resolveSeenItApiUrl('/api/devices/register'), {
@@ -319,7 +324,7 @@ async function registerNotificationDevice(fcmToken: string, platform: 'web' | 'a
       installationId: getNotificationInstallationId(),
       fcmToken,
       platform,
-      capabilities: notificationCapabilitiesForPlatform(platform)
+      capabilities
     })
   });
   return response.ok;
@@ -377,7 +382,14 @@ export async function requestNotificationPermission(): Promise<string | null> {
     try {
       const token = await requestNativePushToken();
       if (!token) return null;
-      await registerNotificationDevice(token, 'android');
+      const plexAvailabilityBackgroundReady = auth.currentUser
+        ? await syncNativePlexBackgroundCredentials(auth.currentUser.uid)
+        : false;
+      await registerNotificationDevice(
+        token,
+        'android',
+        notificationCapabilitiesForPlatform('android', plexAvailabilityBackgroundReady)
+      );
       return token;
     } catch (err) {
       appLogger.warn('system', 'PushNotifications registration error', err);
@@ -431,7 +443,7 @@ export async function requestNotificationPermission(): Promise<string | null> {
     }
 
     if (!token) return null;
-    await registerNotificationDevice(token, 'web');
+    await registerNotificationDevice(token, 'web', notificationCapabilitiesForPlatform('web'));
     return token;
   } catch (error) {
     appLogger.error('system', 'Error in requestNotificationPermission', error);

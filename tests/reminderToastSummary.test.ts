@@ -45,14 +45,18 @@ test('#353 déduplique les candidats et produit une signature stable pour les re
   assert.equal(first.message.title, '2 nouveautés aujourd’hui');
 });
 
-test('#353 le hook n’émet plus un toast dans chaque branche média et garde le retry système séparé', () => {
+test('#353 un nouvel épisode du jour n’ajoute aucun toast interne mais conserve l’envoi système', () => {
   const source = readFileSync('src/hooks/useRemindersNotifier.ts', 'utf8');
   assert.equal((source.match(/showToast\(/g) || []).length, 1,
     'un seul point d’émission UI doit rester après la boucle des médias');
-  assert.match(source, /const dueToastCandidates: ReminderToastCandidate\[\] = \[\]/);
-  assert.match(source, /showToast\(toastSummary\.message, 'reminder'/);
-  assert.match(source, /reminder_toast_\$\{REMINDER_TOAST_RECEIPT_SCHEMA\}_\$\{todayStr\}/);
+  assert.match(source, /emitInternalToast: boolean = true/);
+  assert.match(source, /if \(emitInternalToast\) \{\s+dueToastCandidates\.push\(/);
+  assert.match(
+    source,
+    /'today',[\s\S]*?'🆕 Nouvel épisode',[\s\S]*?true,\s+false\s+\);/,
+    'le rappel nouvel épisode doit explicitement désactiver le toast interne'
+  );
   assert.match(source, /if \(\(await send\(\)\)\.delivered\) writeUserScopedJson\(uid, notifiedKey, true\)/,
-    'le succès natif conserve sa propre clé de retry');
+    'la notification système garde son propre reçu et ses retries');
   assert.doesNotMatch(source, /showToast\(`(?:🍿|🎉)/u);
 });

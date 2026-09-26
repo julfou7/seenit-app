@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const server = readFileSync('server.ts', 'utf8');
+const delivery = readFileSync('src/features/downloads/downloadWebhookDelivery.ts', 'utf8');
 const manifest = readFileSync('android/app/src/main/AndroidManifest.xml', 'utf8');
 const appGradle = readFileSync('android/app/build.gradle', 'utf8');
 const androidVariables = readFileSync('android/variables.gradle', 'utf8');
@@ -14,10 +15,12 @@ const app = readFileSync('src/App.tsx', 'utf8');
 const plexStorage = readFileSync('src/features/plex/plexStorage.ts', 'utf8');
 
 test('SEENIT-NOTIFICATION-003 vérifie Plex en arrière-plan sans exposer le token', () => {
-  assert.ok(server.includes("platform: 'android'"));
-  assert.ok(server.includes('androidHighPriority: true'));
-  assert.ok(server.includes('ownerUidHash'));
-  assert.ok(server.includes('sendPushToUserDevices(uid, null'));
+  assert.ok(server.includes('deliverDownloadWebhookPresentation'));
+  assert.ok(delivery.includes("platform: 'android'"));
+  assert.ok(delivery.includes('androidHighPriority: true'));
+  assert.ok(delivery.includes('ownerUidHash'));
+  assert.ok(delivery.includes('sendPush(uid, null'));
+  assert.ok(delivery.includes('sendPush(uid, presentation.notification, presentation.data)'));
   assert.ok(service.includes('PlexAvailabilityWorker.enqueue'));
   assert.ok(service.includes('com.google.firebase.messaging.RemoteMessage'));
   assert.ok(service.includes('extends MessagingService'));
@@ -42,14 +45,15 @@ test('SEENIT-NOTIFICATION-003 vérifie Plex en arrière-plan sans exposer le tok
   assert.ok(worker.includes('season >= 0 && episode > 0'));
   assert.ok(plugin.includes('clearForUid'));
   assert.ok(plexStorage.includes('syncNativePlexBackgroundCredentials'));
-  assert.ok(worker.includes('Fail closed: un signal ancien'));
-  assert.ok(!worker.includes('showNotification(false);\n            return Result.success();'));
+  assert.ok(worker.includes('getRunAttemptCount() + 1 < MAX_ATTEMPTS ? Result.retry() : Result.success()'));
+  assert.ok(worker.includes('if (!expectedUidHash.equals(credentials.uidHash))'));
+  assert.ok(worker.includes('showPlexAvailableNotification()'));
+  assert.ok(!worker.includes('showNotification(false)'));
   assert.ok(manifest.includes('com.capacitorjs.plugins.pushnotifications.MessagingService'));
   assert.ok(manifest.includes('tools:node="remove"'));
   assert.ok(manifest.includes('android:name=".SeenItMessagingService"'));
   assert.ok(!server.includes('est prêt et disponible !'));
 });
-
 
 test('SEENIT-NOTIFICATION-003 reste compatible minSdk 24 et distingue la saison 0', () => {
   assert.ok(store.includes('new Scanner(file, StandardCharsets.UTF_8.name())'));

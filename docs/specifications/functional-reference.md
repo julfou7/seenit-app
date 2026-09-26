@@ -636,9 +636,16 @@ explicite, aucun rappel film n'est programmé et aucune estimation J+120 n'est u
 - L'intention est partagée via Firestore ; chaque installation autorisée possède son propre token.
 - Un téléphone et une PWA du même compte peuvent recevoir l'événement sans partager un token unique.
 - Déconnecter un appareil révoque son installation sans désactiver les autres.
-- Les webhooks Sonarr/Radarr ciblent seulement les installations du propriétaire de l'endpoint.
+- Les webhooks Sonarr/Radarr ciblent seulement les installations du propriétaire de l'endpoint. Un
+  événement `Download` affiche toujours « Import terminé » sur chaque installation autorisée ; sur un
+  Android dont la copie privée Plex est confirmée, un second signal silencieux vérifie ensuite Plex sans
+  remplacer ce reçu visible. « Disponible dans Plex » n'apparaît qu'après une preuve TMDB exacte
+  (et saison/épisode exacts pour la TV).
 - Les notifications profondes ouvrent le média/épisode exact, y compris après un démarrage à froid de
   l'APK ; l'APK peut exposer « Marquer comme vu ».
+- Pour « nouvel épisode le jour J », la notification système est l'unique alerte : aucun toast interne
+  « disponible aujourd'hui » n'est ajouté au démarrage ou lors d'une reprise. Les rappels saison J-7 et
+  film conservent leur feedback interne existant.
 - Les clés locales de programmation évitent le doublon sur une même installation et leur schéma peut être
   versionné pour remplacer proprement une alarme persistée quand son payload doit évoluer.
 - Le receiver Android hydrate le grand pictogramme et le BigPicture depuis le fichier privé borné au
