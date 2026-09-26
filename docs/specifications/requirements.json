@@ -1329,6 +1329,10 @@
         {
           "file": "tests/plexDownloadAvailabilityAndroid.test.ts",
           "contains": "SEENIT-NOTIFICATION-003 ouvre la fiche exacte depuis la notification Plex"
+        },
+        {
+          "file": "tests/downloadNotificationCapabilityRouting.test.ts",
+          "contains": "SEENIT-NOTIFICATION-003 garde une notification visible pour les APK legacy"
         }
       ]
     },
