@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
+  hasExplicitDownloadError,
   isDownloadActiveOrAttention,
+  isDownloadCompleted,
   isDownloadInHistorySection
 } from '../src/features/downloads/downloadStatePolicy.ts';
 
@@ -31,7 +34,22 @@ test('SEENIT-DOWNLOAD-007 une erreur d’import à 100 % reste dans En erreur', 
     errorMessage: 'Found matching movie via grab history. Manual Import required.'
   };
 
+  assert.equal(hasExplicitDownloadError(manualImportBlocked), true);
+  assert.equal(isDownloadCompleted(manualImportBlocked), false);
   assert.equal(isDownloadActiveOrAttention(manualImportBlocked), true);
   assert.equal(isDownloadInHistorySection(manualImportBlocked, 'error'), true);
   assert.equal(isDownloadInHistorySection(manualImportBlocked, 'completed'), false);
+});
+
+
+test('SEENIT-DOWNLOAD-007 la fiche média traite l’erreur avant le 100 % et ne relance pas Plex', () => {
+  const source = readFileSync('src/screens/ShowDetailScreenCore.tsx', 'utf8');
+
+  assert.ok(source.includes("import { hasExplicitDownloadError, isDownloadCompleted } from '../features/downloads/downloadStatePolicy';"));
+  assert.match(source, /const hasDownloadError = !hasActiveDownload && mediaDownloads\.some\(hasExplicitDownloadError\);/);
+  assert.match(
+    source,
+    /const hasCompletedDownload = !hasActiveDownload\s+&& !hasDownloadError\s+&& mediaDownloads\.some\(isDownloadCompleted\);/
+  );
+  assert.match(source, /if \(!hasCompletedDownload \|\| hasActiveDownload \|\| !effectiveTmdbId/);
 });
