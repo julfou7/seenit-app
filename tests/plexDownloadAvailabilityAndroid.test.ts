@@ -4,6 +4,8 @@ import test from 'node:test';
 
 const server = readFileSync('server.ts', 'utf8');
 const manifest = readFileSync('android/app/src/main/AndroidManifest.xml', 'utf8');
+const appGradle = readFileSync('android/app/build.gradle', 'utf8');
+const androidVariables = readFileSync('android/variables.gradle', 'utf8');
 const worker = readFileSync('android/app/src/main/java/com/seenit/app/PlexAvailabilityWorker.java', 'utf8');
 const service = readFileSync('android/app/src/main/java/com/seenit/app/SeenItMessagingService.java', 'utf8');
 const store = readFileSync('android/app/src/main/java/com/seenit/app/PlexBackgroundCredentialStore.java', 'utf8');
@@ -17,6 +19,10 @@ test('SEENIT-NOTIFICATION-003 vérifie Plex en arrière-plan sans exposer le tok
   assert.ok(server.includes('ownerUidHash'));
   assert.ok(server.includes('sendPushToUserDevices(uid, null'));
   assert.ok(service.includes('PlexAvailabilityWorker.enqueue'));
+  assert.ok(service.includes('com.google.firebase.messaging.RemoteMessage'));
+  assert.ok(service.includes('extends MessagingService'));
+  assert.ok(androidVariables.includes("firebaseMessagingVersion = '25.0.1'"));
+  assert.ok(appGradle.includes('com.google.firebase:firebase-messaging:$firebaseMessagingVersion'));
   assert.ok(worker.includes('WorkManager.getInstance'));
   assert.ok(worker.includes('BackoffPolicy.LINEAR'));
   assert.ok(worker.includes('/library/all?guid='));
@@ -28,6 +34,12 @@ test('SEENIT-NOTIFICATION-003 vérifie Plex en arrière-plan sans exposer le tok
   assert.ok(!worker.includes('title.equals'));
   assert.ok(store.includes('getNoBackupFilesDir'));
   assert.ok(store.includes('hashUid'));
+  assert.ok(store.includes('new Scanner(file, StandardCharsets.UTF_8.name())'));
+  assert.ok(!store.includes('.isBlank()'));
+  assert.ok(!store.includes('new Scanner(file, StandardCharsets.UTF_8)'));
+  assert.ok(worker.includes('nonNegativeInt(message.get("season"))'));
+  assert.ok(worker.includes('season < 0 || episode <= 0'));
+  assert.ok(worker.includes('season >= 0 && episode > 0'));
   assert.ok(plugin.includes('clearForUid'));
   assert.ok(plexStorage.includes('syncNativePlexBackgroundCredentials'));
   assert.ok(worker.includes('Fail closed: un signal ancien'));
@@ -36,6 +48,16 @@ test('SEENIT-NOTIFICATION-003 vérifie Plex en arrière-plan sans exposer le tok
   assert.ok(manifest.includes('tools:node="remove"'));
   assert.ok(manifest.includes('android:name=".SeenItMessagingService"'));
   assert.ok(!server.includes('est prêt et disponible !'));
+});
+
+
+test('SEENIT-NOTIFICATION-003 reste compatible minSdk 24 et distingue la saison 0', () => {
+  assert.ok(store.includes('new Scanner(file, StandardCharsets.UTF_8.name())'));
+  assert.ok(!store.includes('.isBlank()'));
+  assert.ok(!store.includes('new Scanner(file, StandardCharsets.UTF_8)'));
+  assert.ok(worker.includes('nonNegativeInt(message.get("season"))'));
+  assert.ok(worker.includes('season < 0 || episode <= 0'));
+  assert.ok(worker.includes('season >= 0 && episode > 0'));
 });
 
 test('SEENIT-NOTIFICATION-003 ouvre la fiche exacte depuis la notification Plex', () => {

@@ -889,7 +889,10 @@ pour le cache des sagas et univers.
   `plexAvailabilityBackgroundV1` lors de son enregistrement FCM. Une installation Android qui ne
   l'annonce pas — notamment une APK antérieure ou un downgrade — reçoit la notification visible sûre
   « Import terminé » ; chaque réenregistrement réécrit explicitement cette capability afin qu'un ancien
-  client ne puisse jamais hériter d'un état capable obsolète.
+  client ne puisse jamais hériter d'un état capable obsolète. Le chemin natif reste compatible avec
+  `minSdkVersion = 24` sans dépendre d'API Java plus récentes non désucrées. Pour les épisodes, la saison
+  `0` est une saison valide réservée aux spéciaux et reste distincte d'une saison absente : une preuve
+  Plex S0E1 exige donc bien l'épisode exact, comme pour toute autre saison.
 - **SEENIT-NOTIFICATION-002** — Un rappel Film ou Série utilise, lorsqu'il existe, un visuel TMDB
   préparé dans le stockage privé et borné de l'application. Les chemins TMDB relatifs comme les anciennes
   URL absolues déjà persistées sont normalisés vers la taille propre au canal notification avant la clé

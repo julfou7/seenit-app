@@ -35,6 +35,11 @@ function positiveInteger(value: unknown): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+function nonNegativeInteger(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+
 function displayText(value: unknown, fallback: string): string {
   if (typeof value !== 'string') return fallback;
   const clean = value.trim().replace(/\s+/g, ' ');
@@ -43,9 +48,9 @@ function displayText(value: unknown, fallback: string): string {
 
 function firstEpisode(payload: DownloadWebhookPayload): { season: number; episode: number } | null {
   const candidate = Array.isArray(payload?.episodes) ? payload.episodes[0] : null;
-  const season = positiveInteger(candidate?.seasonNumber);
+  const season = nonNegativeInteger(candidate?.seasonNumber);
   const episode = positiveInteger(candidate?.episodeNumber);
-  return season && episode ? { season, episode } : null;
+  return season !== null && episode !== null ? { season, episode } : null;
 }
 
 function buildEventKey(
