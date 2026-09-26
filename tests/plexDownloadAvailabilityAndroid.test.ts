@@ -50,6 +50,16 @@ test('SEENIT-NOTIFICATION-003 vérifie Plex en arrière-plan sans exposer le tok
   assert.ok(!server.includes('est prêt et disponible !'));
 });
 
+
+test('SEENIT-NOTIFICATION-003 reste compatible minSdk 24 et distingue la saison 0', () => {
+  assert.ok(store.includes('new Scanner(file, StandardCharsets.UTF_8.name())'));
+  assert.ok(!store.includes('.isBlank()'));
+  assert.ok(!store.includes('new Scanner(file, StandardCharsets.UTF_8)'));
+  assert.ok(worker.includes('nonNegativeInt(message.get("season"))'));
+  assert.ok(worker.includes('season < 0 || episode <= 0'));
+  assert.ok(worker.includes('season >= 0 && episode > 0'));
+});
+
 test('SEENIT-NOTIFICATION-003 ouvre la fiche exacte depuis la notification Plex', () => {
   assert.ok(worker.includes('.scheme("com.seenit.app")'));
   assert.ok(worker.includes('.authority("media")'));
