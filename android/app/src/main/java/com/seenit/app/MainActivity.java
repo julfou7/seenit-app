@@ -18,6 +18,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(SeenItAuthPlugin.class);
         registerPlugin(SeenItUpdatePlugin.class);
+        registerPlugin(SeenItPlexBackgroundPlugin.class);
         super.onCreate(savedInstanceState);
 
         // Android 15/16 impose l'edge-to-edge. On le rend explicite aussi sur les versions

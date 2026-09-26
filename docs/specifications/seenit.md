@@ -873,6 +873,18 @@ pour le cache des sagas et univers.
 - Un token FCM invalide est supprimé sans bloquer les appareils valides.
 - Les notifications système de fin de téléchargement proviennent des webhooks Sonarr/Radarr.
   Le polling local affiche uniquement un toast SeenIt afin d'éviter les doublons.
+- **SEENIT-NOTIFICATION-003** — Un événement Sonarr/Radarr `Download` prouve uniquement que l'import
+  Arr est terminé ; il ne prouve jamais à lui seul que Plex a indexé le média. La PWA peut annoncer
+  « Import terminé » sans promettre la disponibilité Plex. Sur l'APK Android, si le webhook contient
+  un TMDB ID exact, le backend envoie au seul UID concerné un message FCM data-only haute priorité.
+  Le téléphone compare l'empreinte du UID actif, conserve le jeton Plex uniquement dans son stockage
+  privé exclu des sauvegardes, puis effectue une vérification Plex bornée en arrière-plan par TMDB ID
+  exact et, pour un épisode, par saison + épisode exacts. Le titre n'est jamais une preuve d'identité.
+  « Disponible dans Plex » n'est affiché qu'après une correspondance Plex exacte ; les pannes et
+  absences temporaires sont retentées sans devenir des preuves négatives, puis retombent au maximum
+  sur « Import terminé ». Le tap ouvre la fiche SeenIt exacte, dont le CTA Plex garde son contrat
+  Discover existant. Un changement de compte invalide la copie native du jeton précédent et un signal
+  FCM d'un autre UID est rejeté par son empreinte avant toute requête Plex.
 - **SEENIT-NOTIFICATION-002** — Un rappel Film ou Série utilise, lorsqu'il existe, un visuel TMDB
   préparé dans le stockage privé et borné de l'application. Les chemins TMDB relatifs comme les anciennes
   URL absolues déjà persistées sont normalisés vers la taille propre au canal notification avant la clé
@@ -920,6 +932,12 @@ pour le cache des sagas et univers.
   Play Protect, ne change ni signature ni `applicationId`, et ne dépend pas d'un `startActivity()` arbitraire
   depuis un broadcast receiver en arrière-plan. Si Android refuse ou interrompt l'installation, la version
   courante reste utilisable et aucune boucle de relance n'est créée.
+- **SEENIT-UPDATE-007** — Dans l'APK Android, quand le fichier de mise à jour a fini d'être téléchargé
+  dans le cache privé et a passé les contrôles locaux applicables, notamment la taille minimale et le
+  SHA-256 lorsqu'il est fourni, SeenIt émet une notification locale « Mise à jour téléchargée » juste
+  avant le handoff vers Package Installer. Aucun succès n'est émis pour un fichier incomplet ou un
+  digest invalide. Une permission de notification refusée ou une erreur d'affichage ne bloque jamais
+  l'installation d'une APK déjà vérifiée ; la PWA est inchangée et DownloadManager n'est pas réintroduit.
 - Après téléchargement et vérification, l'ouverture réussie du Package Installer est un succès
   observable nommé « Installeur lancé » à 100 %. Elle ne doit jamais être rendue comme une erreur,
   même si Android conserve SeenIt visible derrière sa boîte de dialogue système.

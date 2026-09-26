@@ -131,7 +131,11 @@
     "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
     "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml",
     "android/app/src/main/res/drawable/ic_stat_seenit.xml",
-    "android/app/src/main/res/drawable/splash.png"
+    "android/app/src/main/res/drawable/splash.png",
+    "android/app/src/main/java/com/seenit/app/SeenItMessagingService.java",
+    "android/app/src/main/java/com/seenit/app/PlexAvailabilityWorker.java",
+    "android/app/src/main/java/com/seenit/app/PlexBackgroundCredentialStore.java",
+    "android/app/src/main/java/com/seenit/app/SeenItPlexBackgroundPlugin.kt"
   ],
   "requiredPermissions": [
     "android.permission.INTERNET",

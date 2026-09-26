@@ -71,7 +71,8 @@ Les routes backend produit sont :
 - `POST /api/releases/notify` : signal post-release public borné, dont le run, le SHA, le tag, l'APK et
   son SHA-256 sont revalidés auprès du dépôt officiel avant toute notification Android ;
 - `GET /api/webhooks/config`, `POST /api/webhooks/config/rotate` et webhooks personnels : réception
-  des événements Arr ;
+  des événements Arr ; un `Download` prouve l'import Arr, puis l'APK vérifie localement Plex avant
+  d'afficher « Disponible dans Plex » ;
 - `GET /api/update` : dernière release SeenIt officielle.
 
 Toutes les routes métier privées exigent un jeton Firebase du compte. Le health-check, les
@@ -115,6 +116,7 @@ prévues ; ce dernier n'accorde aucune confiance à l'appelant et exige les preu
 | News lues et rappels métier | Compte, partagés PWA/APK |
 | Token FCM, permission système, installation notification | Appareil, rattachés au UID courant |
 | Cache TMDB/Plex, clés anti-doublon de notification | Appareil et UID |
+| Copie Plex pour vérification Android en arrière-plan | Appareil et UID actifs, stockage privé `noBackup`, jamais Firestore |
 | Logs techniques | Appareil et UID ; export volontaire seulement |
 | Personnes favorites | Doivent être partagées ; écart actuel suivi par #95 |
 
@@ -695,8 +697,8 @@ La fiche Version de « À propos & Avancé » charge indépendamment toutes les 
 disponibles, de la plus récente à la plus ancienne. Cette consultation reste paginée et bornée ; une panne
 partielle conserve l'historique officiel déjà obtenu ou la dernière version connue.
 
-Une fois l'APK téléchargée et vérifiée, SeenIt affiche « Installeur lancé » pendant que le Package
-Installer Android prend le relais. Le dialogue Play Protect des applications distribuées hors Play
+Une fois l'APK téléchargée et vérifiée, SeenIt affiche une notification locale « Mise à jour
+téléchargée » puis « Installeur lancé » pendant que le Package Installer Android prend le relais. Le dialogue Play Protect des applications distribuées hors Play
 reste sous le contrôle du système : SeenIt ne le masque pas et ne demande jamais de désactiver cette
 protection. La livraison distingue l'enregistrement officiel du développeur/package/certificat de la
 réputation Play Protect et consigne le comportement d'une installation propre selon le
@@ -764,8 +766,8 @@ restent des TNR terrain lorsque le risque du changement UX l'exige ; ils ne sont
 | Plex | Fiche Discover Web vérifiée par TMDB | Lien Discover vérifié : application Plex puis Web ; locators PMS réservés à la disponibilité |
 | Reddit/autres liens | Nouvel onglet | Application associée, puis Custom Tab |
 | Magnet | Gestionnaire navigateur/système si Téléchargements est activé | Intent Android compatible si Téléchargements est activé |
-| Notifications | Web Push/service worker | Push + notifications locales Capacitor |
-| Mise à jour | Bannière/rechargement PWA | Téléchargement, SHA-256, installateur Android |
+| Notifications | Web Push/service worker ; « Import terminé » reste distinct de Plex | Push + notifications locales ; vérification Plex arrière-plan par identité exacte |
+| Mise à jour | Bannière/rechargement PWA | Téléchargement, SHA-256, notification de fin, installateur Android |
 | Hors-ligne | Shell/cache et dernier état UID | Même logique dans la WebView |
 
 Dans l'APK, une erreur réseau/DNS temporaire vers `seenit.ai.studio` peut replier une requête Plex

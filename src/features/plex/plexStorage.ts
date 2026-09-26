@@ -1,9 +1,30 @@
+import { Capacitor, registerPlugin } from '@capacitor/core';
+
+interface SeenItPlexBackgroundPlugin {
+  setCredentials(options: { uid: string; token: string }): Promise<void>;
+  clearCredentials(options: { uid: string }): Promise<void>;
+}
+
+const SeenItPlexBackground = registerPlugin<SeenItPlexBackgroundPlugin>('SeenItPlexBackground');
+
+function persistNativePlexBackgroundCredentials(uid: string, token: string): void {
+  if (!Capacitor.isNativePlatform() || !uid || !token) return;
+  void SeenItPlexBackground.setCredentials({ uid, token }).catch(() => undefined);
+}
+
+function clearNativePlexBackgroundCredentials(uid: string): void {
+  if (!Capacitor.isNativePlatform() || !uid) return;
+  void SeenItPlexBackground.clearCredentials({ uid }).catch(() => undefined);
+}
+
 export type PlexUserStorageField =
   | 'token'
   | 'username'
   | 'lastSyncTimestamp'
   | 'resolutionCache'
   | 'slugPurgeVersion';
+
+export type PlexResolutionCache = Record<string, unknown>;
 
 const ACTIVE_UID_KEY = 'seenit_plex_active_uid';
 const LEGACY_KEYS = [
@@ -24,6 +45,13 @@ export function getStoredPlexToken(uid?: string | null): string | null {
   return localStorage.getItem(getPlexUserStorageKey(uid, 'token'));
 }
 
+export function syncNativePlexBackgroundCredentials(uid?: string | null): void {
+  if (!uid) return;
+  const token = getStoredPlexToken(uid);
+  if (token) persistNativePlexBackgroundCredentials(uid, token);
+  else clearNativePlexBackgroundCredentials(uid);
+}
+
 export function getStoredPlexUsername(uid?: string | null): string {
   if (!uid) return '';
   return localStorage.getItem(getPlexUserStorageKey(uid, 'username')) || '';
@@ -31,6 +59,7 @@ export function getStoredPlexUsername(uid?: string | null): string {
 
 export function storePlexCredentials(uid: string, token: string, username = ''): void {
   localStorage.setItem(getPlexUserStorageKey(uid, 'token'), token);
+  persistNativePlexBackgroundCredentials(uid, token);
   if (username) {
     localStorage.setItem(getPlexUserStorageKey(uid, 'username'), username);
   } else {
@@ -40,6 +69,7 @@ export function storePlexCredentials(uid: string, token: string, username = ''):
 
 export function clearPlexCredentials(uid?: string | null): void {
   if (!uid) return;
+  clearNativePlexBackgroundCredentials(uid);
   localStorage.removeItem(getPlexUserStorageKey(uid, 'token'));
   localStorage.removeItem(getPlexUserStorageKey(uid, 'username'));
   localStorage.removeItem(getPlexUserStorageKey(uid, 'lastSyncTimestamp'));
@@ -57,7 +87,7 @@ export function setPlexLastSyncTimestamp(uid: string, timestamp: number): void {
   localStorage.setItem(getPlexUserStorageKey(uid, 'lastSyncTimestamp'), String(timestamp));
 }
 
-export function getPlexResolutionCache(uid: string): Record<string, any> {
+export function getPlexResolutionCache(uid: string): PlexResolutionCache {
   try {
     const raw = localStorage.getItem(getPlexUserStorageKey(uid, 'resolutionCache'));
     return raw ? JSON.parse(raw) : {};
@@ -79,29 +109,31 @@ const PLEX_RESOLUTION_FIELDS = [
   'first_air_date'
 ] as const;
 
-export function compactPlexResolutionCache(cache: Record<string, any>): Record<string, any> {
+export function compactPlexResolutionCache(cache: PlexResolutionCache): PlexResolutionCache {
   const keys = Object.keys(cache);
   const retainedKeys = keys.slice(-PLEX_RESOLUTION_CACHE_MAX_ITEMS);
   return Object.fromEntries(retainedKeys.flatMap((key) => {
     const source = cache[key];
-    if (!source || !Number.isFinite(Number(source.id))) return [];
+    if (!source || typeof source !== 'object' || Array.isArray(source)) return [];
+    const entry = source as Record<string, unknown>;
+    if (!Number.isFinite(Number(entry.id))) return [];
     const compact = Object.fromEntries(
       PLEX_RESOLUTION_FIELDS
-        .filter((field) => source[field] !== undefined && source[field] !== null)
-        .map((field) => [field, source[field]])
+        .filter((field) => entry[field] !== undefined && entry[field] !== null)
+        .map((field) => [field, entry[field]])
     );
     return [[key, compact]];
   }));
 }
 
 export function mergePlexResolutionCaches(
-  localCache: Record<string, any>,
-  cloudCache: Record<string, any>
-): Record<string, any> {
+  localCache: PlexResolutionCache,
+  cloudCache: PlexResolutionCache
+): PlexResolutionCache {
   return compactPlexResolutionCache({ ...localCache, ...cloudCache });
 }
 
-export function setPlexResolutionCache(uid: string, cache: Record<string, any>): void {
+export function setPlexResolutionCache(uid: string, cache: PlexResolutionCache): void {
   const value = compactPlexResolutionCache(cache);
   localStorage.setItem(getPlexUserStorageKey(uid, 'resolutionCache'), JSON.stringify(value));
 }

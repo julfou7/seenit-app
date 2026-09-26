@@ -8,6 +8,7 @@ import {
 } from '../features/release/releasePolicy';
 import type { UpdateProgress } from '../features/release/updateProgress';
 import { recordClientOperationalSignal } from '../features/logging/clientOperationalDiagnostics.ts';
+import { notifyVerifiedUpdateDownload } from '../features/release/updateDownloadNotification.ts';
 
 const localConsole = globalThis.console;
 
@@ -129,6 +130,8 @@ export async function downloadAndInstallApk(
       }
     }
 
+    await notifyVerifiedUpdateDownload(release.version);
+
     onProgress?.({ percent: 99, status: 'installing', message: 'Ouverture de l\'installeur Android...' });
 
     // 5. Récupérer l'URI du fichier
@@ -146,22 +149,27 @@ export async function downloadAndInstallApk(
 
     onProgress?.({ percent: 100, status: 'done', message: 'Installeur lancé !' });
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (progressListener) {
       try { await progressListener.remove(); } catch {}
     }
     recordClientOperationalSignal('APP_UPDATE_CLIENT_FAILED');
     localConsole.error('Failed to download & install APK natively:', err);
+    const errorMessage = err instanceof Error && err.message
+      ? err.message
+      : 'Erreur lors du téléchargement';
 
     onProgress?.({
       percent: 0,
       status: 'error',
-      message: err?.message || 'Erreur lors du téléchargement'
+      message: errorMessage
     });
 
     return {
       success: false,
-      error: err?.message || 'Impossible de lancer l\'installeur automatique.'
+      error: err instanceof Error && err.message
+        ? err.message
+        : 'Impossible de lancer l\'installeur automatique.'
     };
   }
 }
