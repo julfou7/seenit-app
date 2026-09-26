@@ -87,7 +87,8 @@ public class PlexAvailabilityWorker extends Worker {
         Credentials credentials = PlexBackgroundCredentialStore.read(getApplicationContext());
         String expectedUidHash = getInputData().getString("ownerUidHash");
         if (credentials == null || expectedUidHash == null || !expectedUidHash.equals(credentials.uidHash)) {
-            showNotification(false);
+            // Fail closed: un signal ancien ou d'un autre UID ne doit révéler aucun titre
+            // et ne déclenche ni accès Plex ni notification sur cette installation.
             return Result.success();
         }
 
