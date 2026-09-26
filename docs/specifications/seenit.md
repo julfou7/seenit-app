@@ -1321,6 +1321,13 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   nécessaire et raison pour laquelle API-first ne suffit plus, puis mode d'acquisition minimal retenu.
   Un nouveau prompt, une reprise ou une nouvelle phase n'est jamais une preuve de disparition du workspace ;
   vérifier un seul chemin attendu ne suffit pas et un clone ne sert pas de sonde d'egress.
+  Les **Code Reviews Codex** restent un audit complémentaire asynchrone et **non bloquant** : une PR
+  validée par les checks canoniques ne doit pas attendre Codex par principe. Si un P1/P2 est déjà visible
+  avant merge, il est confirmé et corrigé dans la PR seulement lorsqu'il est valide ; les P3/P4 ne bloquent
+  pas le merge par défaut. Après merge, le workflow `Codex Review Triage` route de manière **idempotente**
+  chaque nouveau P1/P2 vers une **issue ouverte référencée par la PR** ou, à défaut, vers une issue dédiée
+  explicitement **à confirmer**, sans rouvrir automatiquement une issue fermée ni modifier le code. La PR,
+  le thread exact et le ticket éventuel restent la trace canonique ; le mail Codex n'est qu'une notification.
 - **SEENIT-QUALITY-005** — Un import, une reconnexion ou une synchronisation AI Studio/GitHub est un
   transport non autoritatif. Avant tout commit depuis un workspace importé, le diff est comparé à la
   branche GitHub source et toute mutation automatique non demandée de Firebase/Firestore, Android,
