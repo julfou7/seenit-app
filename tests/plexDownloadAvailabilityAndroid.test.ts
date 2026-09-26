@@ -19,6 +19,9 @@ test('SEENIT-NOTIFICATION-003 vérifie Plex en arrière-plan sans exposer le tok
   assert.ok(service.includes('PlexAvailabilityWorker.enqueue'));
   assert.ok(worker.includes('WorkManager.getInstance'));
   assert.ok(worker.includes('BackoffPolicy.LINEAR'));
+  assert.ok(worker.includes('/library/all?guid='));
+  assert.ok(worker.includes('/hubs/search?query='));
+  assert.ok(worker.includes('themoviedb://'));
   assert.ok(worker.includes('hasExactTmdbGuid'));
   assert.ok(worker.includes('parentIndex'));
   assert.ok(worker.includes('index'));
