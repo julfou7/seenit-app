@@ -2831,10 +2831,10 @@ async function startServer() {
   startCronJobs();
 }
 
-void startServer().catch((error: any) => {
+void startServer().catch((error: unknown) => {
   emitOperationalEvent({
     code: 'BACKEND_STARTUP_FAILED',
-    context: { errorCode: String(error?.code ?? error?.name ?? 'StartupError').slice(0, 80) },
+    context: { errorCode: operationalErrorCode(error, 'StartupError') },
     domain: 'runtime',
     level: 'error'
   });
