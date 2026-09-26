@@ -17,7 +17,9 @@ jobs:
   triage:
     name: Route post-merge P1/P2 findings
     if: >-
-      (github.event_name == 'pull_request_review' && startsWith(github.event.review.user.login, 'chatgpt-codex-connector')) ||
+      (github.event_name == 'pull_request_review' &&
+       (github.event.review.user.login == 'chatgpt-codex-connector[bot]' ||
+        github.event.review.user.login == 'chatgpt-codex-connector')) ||
       (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
     timeout-minutes: 3

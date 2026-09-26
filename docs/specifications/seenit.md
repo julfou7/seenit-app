@@ -1325,8 +1325,11 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   validée par les checks canoniques ne doit pas attendre Codex par principe. Si un P1/P2 est déjà visible
   avant merge, il est confirmé et corrigé dans la PR seulement lorsqu'il est valide ; les P3/P4 ne bloquent
   pas le merge par défaut. Après merge, le workflow `Codex Review Triage` route de manière **idempotente**
-  chaque nouveau P1/P2 vers une **issue ouverte référencée par la PR** ou, à défaut, vers une issue dédiée
-  explicitement **à confirmer**, sans rouvrir automatiquement une issue fermée ni modifier le code. La PR,
+  chaque nouveau P1/P2, uniquement pour les **logins exacts** `chatgpt-codex-connector` et
+  `chatgpt-codex-connector[bot]`, vers une **issue ouverte référencée par la PR** ou, à défaut, vers une issue
+  dédiée explicitement **à confirmer**. Son marqueur idempotent est persisté dans le ticket/commentaire cible
+  avec l'effet de routage et réconcilié avant retry ; aucune issue fermée n'est rouverte automatiquement et
+  aucun code n'est modifié. La PR,
   le thread exact et le ticket éventuel restent la trace canonique ; le mail Codex n'est qu'une notification.
 - **SEENIT-QUALITY-005** — Un import, une reconnexion ou une synchronisation AI Studio/GitHub est un
   transport non autoritatif. Avant tout commit depuis un workspace importé, le diff est comparé à la

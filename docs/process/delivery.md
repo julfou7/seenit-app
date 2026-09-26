@@ -214,8 +214,8 @@ Le workflow `.github/workflows/codex-review-triage.yml` rend le suivi tardif exp
 
 1. `pull_request_review: submitted` capte une review Codex arrivée après le merge ;
 2. `pull_request: closed` rebalaye une PR au moment du merge et rattrape une review arrivée juste avant ;
-3. seuls les auteurs `chatgpt-codex-connector*` et les findings P1/P2 sont actionnables automatiquement ;
-4. le routeur est **idempotent** par identifiant de review/commentaire et sérialisé par numéro de PR ;
+3. seuls les **logins exacts** `chatgpt-codex-connector` et `chatgpt-codex-connector[bot]` ainsi que les findings P1/P2 sont actionnables automatiquement ;
+4. le routeur est **idempotent** par identifiant de review/commentaire et sérialisé par numéro de PR ; chaque marqueur est co-localisé dans le ticket/commentaire cible avec l'effet de routage, puis réconcilié avant un retry afin qu'une panne API partielle ne duplique ni commentaire ni issue ;
 5. une **issue ouverte référencée par la PR** est réutilisée en priorité ; sans issue ouverte, une issue
    de triage dédiée est créée, sans rouvrir automatiquement une issue fermée sur un signal encore **à confirmer** ;
 6. le suivi cite la PR et le thread exact, indique que le finding reste à confirmer et ne modifie jamais le code ;
