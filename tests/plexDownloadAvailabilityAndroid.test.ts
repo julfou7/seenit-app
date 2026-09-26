@@ -15,7 +15,8 @@ const app = readFileSync('src/App.tsx', 'utf8');
 const plexStorage = readFileSync('src/features/plex/plexStorage.ts', 'utf8');
 
 test('SEENIT-NOTIFICATION-003 vérifie Plex en arrière-plan sans exposer le token', () => {
-  assert.ok(server.includes("platform: 'android'"));
+  assert.ok(server.includes('deliverDownloadWebhookPresentation'));
+  assert.ok(delivery.includes("platform: 'android'"));
   assert.ok(delivery.includes('androidHighPriority: true'));
   assert.ok(delivery.includes('ownerUidHash'));
   assert.ok(delivery.includes('sendPush(uid, null'));
