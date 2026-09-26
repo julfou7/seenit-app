@@ -866,7 +866,9 @@ pour le cache des sagas et univers.
 - **SEENIT-DOWNLOAD-007** — Les sections En cours, En erreur, Annulés et Terminés sont
   distinctes. Une erreur métier explicite (`errorMessage`), notamment un import *Arr refusé après un
   torrent arrivé à 100 %, reste prioritaire sur la progression physique et classe l'élément dans
-  « En erreur », jamais dans « Terminés ». « Effacer » n'agit jamais sur un transfert actif.
+  « En erreur », jamais dans « Terminés ». La fiche média applique la même priorité et ne déclenche
+  aucun rafraîchissement Plex post-import tant qu'une erreur explicite subsiste. « Effacer » n'agit
+  jamais sur un transfert actif.
 - La progression distante garde ses décimales ; l'interface affiche un entier tronqué. La phase
   de recherche n'invente ni pourcentage ni message technique du client.
 - Une annulation active demande confirmation, nomme le client et précise que qBittorrent garde

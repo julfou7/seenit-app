@@ -588,7 +588,9 @@ et webhooks, qui ne doit pas être dupliquée dans les réglages généraux.
   affiché en parallèle d'une intention SeenIt active techniquement compatible. Seule sa représentation
   brute est masquée : aucune identité ne lui est attribuée sans preuve exacte.
 - Affiche séparément actifs, erreurs, annulés et terminés. Une erreur explicite d'import reste dans
-  « En erreur » même si qBittorrent a physiquement atteint 100 %.
+  « En erreur » même si qBittorrent a physiquement atteint 100 %. La fiche Film/Série réutilise la même
+  priorité : elle n'affiche jamais « Téléchargement terminé » et ne relance pas la présence Plex pour
+  un transfert dont l'import est encore explicitement en erreur.
 - Les actifs conservent l'ordre de lancement ; l'historique affiche les plus récents d'abord.
 - Un swipe droit supprime une entrée d'historique ou demande confirmation pour annuler un actif.
 - L'annulation active retire la demande du client ; les fichiers qBittorrent sont conservés.

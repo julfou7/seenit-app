@@ -28,6 +28,7 @@ import { useMediaPresenceStore } from '../store/mediaPresenceStore';
 import { searchAndDownloadInSonarr, searchAndDownloadInRadarr } from '../services/sonarrRadarr';
 import { downloadEpisodeWithSeasonPackFallback } from '../features/downloads/episodeSeasonPackFallback';
 import { acceptDownloadRequest, beginDownloadRequest, failDownloadRequest, updateDownloadRequest } from '../features/downloads/downloadLifecycle';
+import { hasExplicitDownloadError, isDownloadCompleted } from '../features/downloads/downloadStatePolicy';
 import { readUserScopedJson } from '../lib/userIsolation';
 import { mediaKeyFrom, toMediaKey } from '../features/shows/mediaRelations';
 import { buildMediaShareUrl } from '../features/navigation/mediaShareUrl';
@@ -215,8 +216,8 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         useLiveDownloadStore.getState().startPolling(1000);
         useLiveDownloadStore.getState().fetchDownloads();
       } else showToast(res.message || "Erreur lors du lancement dans Radarr", "error");
-    } catch (err: any) {
-      showToast(err?.message || "Erreur réseau Radarr", "error");
+    } catch (err: unknown) {
+      showToast(err instanceof Error && err.message ? err.message : "Erreur réseau Radarr", "error");
     } finally {
       setIs1ClickDownloading(prev => ({ ...prev, movie: false }));
     }
@@ -252,10 +253,20 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const mediaDownloads = isSeries
     ? getShowDownloads(effectiveTmdbId, tmdbDetails?.external_ids?.tvdb_id || (show as any)?.tvdbId, tmdbDetails?.name || show?.title)
     : (getMovieDownload(effectiveTmdbId, tmdbDetails?.title || show?.title) ? [getMovieDownload(effectiveTmdbId, tmdbDetails?.title || show?.title)!] : []);
-  const hasActiveDownload = mediaDownloads.some(item => item.status !== 'completed' && item.status !== 'cancelled' && item.status !== 'error' && Number(item.progress || 0) < 100);
-  const hasCompletedDownload = mediaDownloads.some(item => item.status === 'completed' || Number(item.progress || 0) >= 100);
-  const hasCancelledDownload = !hasActiveDownload && !hasCompletedDownload && mediaDownloads.some(item => item.status === 'cancelled');
-  const hasDownloadError = !hasActiveDownload && !hasCompletedDownload && !hasCancelledDownload && mediaDownloads.some(item => item.status === 'error' || Boolean(item.errorMessage));
+  const hasActiveDownload = mediaDownloads.some(item =>
+    !hasExplicitDownloadError(item)
+    && item.status !== 'completed'
+    && item.status !== 'cancelled'
+    && Number(item.progress || 0) < 100
+  );
+  const hasDownloadError = !hasActiveDownload && mediaDownloads.some(hasExplicitDownloadError);
+  const hasCompletedDownload = !hasActiveDownload
+    && !hasDownloadError
+    && mediaDownloads.some(isDownloadCompleted);
+  const hasCancelledDownload = !hasActiveDownload
+    && !hasDownloadError
+    && !hasCompletedDownload
+    && mediaDownloads.some(item => item.status === 'cancelled');
   const showDownloadSummary = hasActiveDownload || hasCancelledDownload || hasDownloadError || (!isSeries && hasCompletedDownload);
 
   const presence = useMediaPresence({
