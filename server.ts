@@ -2573,7 +2573,7 @@ async function startServer() {
         status: 500,
         ok: false,
         error: 'PROXY_FETCH_ERROR',
-        message: err?.message || 'Erreur lors de la requête proxy'
+        message: errorMessage || 'Erreur lors de la requête proxy'
       });
     }
   });
