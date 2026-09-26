@@ -4,6 +4,8 @@ import test from 'node:test';
 
 const server = readFileSync('server.ts', 'utf8');
 const manifest = readFileSync('android/app/src/main/AndroidManifest.xml', 'utf8');
+const appGradle = readFileSync('android/app/build.gradle', 'utf8');
+const androidVariables = readFileSync('android/variables.gradle', 'utf8');
 const worker = readFileSync('android/app/src/main/java/com/seenit/app/PlexAvailabilityWorker.java', 'utf8');
 const service = readFileSync('android/app/src/main/java/com/seenit/app/SeenItMessagingService.java', 'utf8');
 const store = readFileSync('android/app/src/main/java/com/seenit/app/PlexBackgroundCredentialStore.java', 'utf8');
@@ -17,6 +19,10 @@ test('SEENIT-NOTIFICATION-003 vérifie Plex en arrière-plan sans exposer le tok
   assert.ok(server.includes('ownerUidHash'));
   assert.ok(server.includes('sendPushToUserDevices(uid, null'));
   assert.ok(service.includes('PlexAvailabilityWorker.enqueue'));
+  assert.ok(service.includes('com.google.firebase.messaging.RemoteMessage'));
+  assert.ok(service.includes('extends MessagingService'));
+  assert.ok(androidVariables.includes("firebaseMessagingVersion = '25.0.1'"));
+  assert.ok(appGradle.includes('com.google.firebase:firebase-messaging:$firebaseMessagingVersion'));
   assert.ok(worker.includes('WorkManager.getInstance'));
   assert.ok(worker.includes('BackoffPolicy.LINEAR'));
   assert.ok(worker.includes('/library/all?guid='));
