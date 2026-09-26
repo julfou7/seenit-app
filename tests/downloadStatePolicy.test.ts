@@ -22,3 +22,16 @@ test('vider une section ne sélectionne jamais un téléchargement actif', () =>
   assert.equal(isDownloadInHistorySection({ status: 'cancelled', progress: 30 }, 'cancelled'), true);
   assert.equal(isDownloadInHistorySection({ status: 'error', progress: 30 }, 'error'), true);
 });
+
+
+test('SEENIT-DOWNLOAD-007 une erreur d’import à 100 % reste dans En erreur', () => {
+  const manualImportBlocked = {
+    status: 'completed',
+    progress: 100,
+    errorMessage: 'Found matching movie via grab history. Manual Import required.'
+  };
+
+  assert.equal(isDownloadActiveOrAttention(manualImportBlocked), true);
+  assert.equal(isDownloadInHistorySection(manualImportBlocked, 'error'), true);
+  assert.equal(isDownloadInHistorySection(manualImportBlocked, 'completed'), false);
+});

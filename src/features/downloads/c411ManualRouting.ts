@@ -20,6 +20,7 @@ export type C411ManualRoute =
   | {
       kind: 'qbittorrent';
       mediaType: C411ManualMediaType;
+      qbittorrentCategory: null;
     }
   | {
       kind: 'magnet';
@@ -55,7 +56,9 @@ export function planC411ManualDownload(
   }
 
   if (clients.qbittorrentConfigured && mediaType) {
-    return { kind: 'qbittorrent', mediaType };
+    // La recherche C411 globale n'a pas d'identité TMDB SeenIt. Elle ne doit
+    // donc jamais emprunter une catégorie qBittorrent surveillée par *Arr.
+    return { kind: 'qbittorrent', mediaType, qbittorrentCategory: null };
   }
 
   // Sonarr/Radarr exigent une fiche SeenIt et un TMDB ID exact. Une recherche

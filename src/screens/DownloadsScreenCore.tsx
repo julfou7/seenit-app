@@ -525,7 +525,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
       title: torrent.name,
       mediaType: route.mediaType,
       downloadClient: 'qBittorrent',
-      statusText: 'Envoi du Magnet exact à qBittorrent',
+      statusText: 'Téléchargement manuel qBittorrent • hors import automatique',
       releaseTitle: torrent.name
     });
     showToast('Envoi à qBittorrent…', 'download');
@@ -537,18 +537,25 @@ export function DownloadsScreen({ onShowClick }: Props) {
         username: config.qbittorrentUsername,
         password: config.qbittorrentPassword,
         torrent,
-        mediaType: route.mediaType
+        mediaType: route.mediaType,
+        qbittorrentCategory: route.qbittorrentCategory
       });
 
       if (result.success) {
-        acceptDownloadRequest(requestId, 'Préparation du téléchargement', 'queued');
-        showToast('Téléchargement lancé.', 'success');
+        acceptDownloadRequest(
+          requestId,
+          'Téléchargement manuel lancé • import Plex automatique non associé',
+          'queued'
+        );
+        showToast('Téléchargement manuel lancé dans qBittorrent.', 'success');
       } else {
         failDownloadRequest(requestId, result.message);
         showToast(result.message, 'error');
       }
-    } catch (error: any) {
-      const message = error?.message || "Erreur lors de l'envoi au client.";
+    } catch (error: unknown) {
+      const message = error instanceof Error && error.message
+        ? error.message
+        : "Erreur lors de l'envoi au client.";
       failDownloadRequest(requestId, message);
       showToast(message, 'error');
     } finally {
@@ -760,6 +767,11 @@ export function DownloadsScreen({ onShowClick }: Props) {
                 {isSearching ? <Loader2 size={15} className="animate-spin" /> : 'Chercher'}
               </button>
             </form>
+
+            <p className="text-[10px] leading-relaxed text-zinc-500">
+              Recherche globale : téléchargement manuel qBittorrent, sans import automatique Radarr/Sonarr/Plex.
+              Pour l’import automatique, lance la release depuis la fiche SeenIt du média.
+            </p>
 
             <div className="flex items-center gap-1 overflow-x-auto pb-1">
               {([

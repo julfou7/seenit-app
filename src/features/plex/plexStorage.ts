@@ -7,6 +7,13 @@ interface SeenItPlexBackgroundPlugin {
 
 const SeenItPlexBackground = registerPlugin<SeenItPlexBackgroundPlugin>('SeenItPlexBackground');
 
+export const PLEX_BACKGROUND_CAPABILITY_CHANGED_EVENT = 'seenit-plex-background-capability-changed';
+
+function notifyPlexBackgroundCapabilityChanged(): void {
+  if (typeof window === 'undefined' || !Capacitor.isNativePlatform()) return;
+  window.dispatchEvent(new Event(PLEX_BACKGROUND_CAPABILITY_CHANGED_EVENT));
+}
+
 async function persistNativePlexBackgroundCredentials(uid: string, token: string): Promise<boolean> {
   if (!Capacitor.isNativePlatform() || !uid || !token) return false;
   try {
@@ -65,7 +72,9 @@ export function getStoredPlexUsername(uid?: string | null): string {
 
 export function storePlexCredentials(uid: string, token: string, username = ''): void {
   localStorage.setItem(getPlexUserStorageKey(uid, 'token'), token);
-  void persistNativePlexBackgroundCredentials(uid, token);
+  void persistNativePlexBackgroundCredentials(uid, token).then(ready => {
+    if (ready) notifyPlexBackgroundCapabilityChanged();
+  });
   if (username) {
     localStorage.setItem(getPlexUserStorageKey(uid, 'username'), username);
   } else {
@@ -75,11 +84,15 @@ export function storePlexCredentials(uid: string, token: string, username = ''):
 
 export function clearPlexCredentials(uid?: string | null): void {
   if (!uid) return;
-  void clearNativePlexBackgroundCredentials(uid);
   localStorage.removeItem(getPlexUserStorageKey(uid, 'token'));
   localStorage.removeItem(getPlexUserStorageKey(uid, 'username'));
   localStorage.removeItem(getPlexUserStorageKey(uid, 'lastSyncTimestamp'));
   localStorage.removeItem(getPlexUserStorageKey(uid, 'resolutionCache'));
+  void clearNativePlexBackgroundCredentials(uid).finally(() => {
+    // Le serveur doit cesser les vérifications silencieuses même si le plugin
+    // natif refuse le nettoyage : annoncer "non capable" reste fail-closed.
+    notifyPlexBackgroundCapabilityChanged();
+  });
 }
 
 export function getPlexLastSyncTimestamp(uid?: string | null): number | undefined {

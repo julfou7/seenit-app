@@ -31,7 +31,8 @@ test('SEENIT-C411-003 route le mode Tous vers qBittorrent sans choix redondant',
     sonarrConfigured: true
   }), {
     kind: 'qbittorrent',
-    mediaType: 'tv'
+    mediaType: 'tv',
+    qbittorrentCategory: null
   });
 });
 
@@ -87,4 +88,17 @@ test('le flux de production global n’envoie jamais le titre brut à Sonarr ou 
   assert.match(handler, /service:\s*'qbittorrent'/);
   assert.doesNotMatch(handler, /service:\s*'sonarr'|service:\s*'radarr'/);
   assert.doesNotMatch(handler, /mediaInfo:\s*\{\s*title:\s*torrent\.name/);
+});
+
+
+test('SEENIT-C411-003 isole le téléchargement manuel des catégories qBittorrent gérées par Arr', () => {
+  const routingSource = readFileSync(new URL('../src/features/downloads/c411ManualRouting.ts', import.meta.url), 'utf8');
+  const serviceSource = readFileSync(new URL('../src/services/sonarrRadarrSearch.ts', import.meta.url), 'utf8');
+  const screenSource = readFileSync(new URL('../src/screens/DownloadsScreenCore.tsx', import.meta.url), 'utf8');
+
+  assert.match(routingSource, /qbittorrentCategory:\s*null/);
+  assert.match(serviceSource, /payload\.qbittorrentCategory === undefined/);
+  assert.match(serviceSource, /const categoryField = requestedCategory\?\.trim\(\)/);
+  assert.match(screenSource, /qbittorrentCategory:\s*route\.qbittorrentCategory/);
+  assert.match(screenSource, /sans import automatique Radarr\/Sonarr\/Plex/);
 });
