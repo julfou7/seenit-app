@@ -152,32 +152,42 @@ public class PlexAvailabilityWorker extends Worker {
         int season,
         int episode
     ) throws Exception {
-        String guid = URLEncoder.encode("tmdb://" + tmdbId, StandardCharsets.UTF_8);
-        JSONObject search = fetchJsonObject(
+        String rawGuid = "tmdb://" + tmdbId;
+        String guid = URLEncoder.encode(rawGuid, StandardCharsets.UTF_8);
+        String[] endpoints = new String[] {
             serverUri + "/library/all?guid=" + guid + "&includeGuids=1",
-            token
-        );
+            serverUri + "/hubs/search?query=" + guid + "&limit=5&includeGuids=1"
+        };
 
-        for (JSONObject item : extractItems(search)) {
-            String type = item.optString("type", "").toLowerCase();
-            if ("movie".equals(mediaType)) {
-                if ("movie".equals(type) && hasExactTmdbGuid(item, tmdbId)) return true;
+        for (String endpoint : endpoints) {
+            JSONObject search;
+            try {
+                search = fetchJsonObject(endpoint, token);
+            } catch (Exception ignored) {
                 continue;
             }
 
-            if (!("show".equals(type) || "series".equals(type)) || !hasExactTmdbGuid(item, tmdbId)) continue;
-            if (season <= 0 || episode <= 0) return true;
+            for (JSONObject item : extractItems(search)) {
+                String type = item.optString("type", "").toLowerCase();
+                if ("movie".equals(mediaType)) {
+                    if ("movie".equals(type) && hasExactTmdbGuid(item, tmdbId)) return true;
+                    continue;
+                }
 
-            String ratingKey = item.optString("ratingKey", "").trim();
-            if (ratingKey.isEmpty()) continue;
+                if (!("show".equals(type) || "series".equals(type)) || !hasExactTmdbGuid(item, tmdbId)) continue;
+                if (season <= 0 || episode <= 0) return true;
 
-            JSONObject leaves = fetchJsonObject(
-                serverUri + "/library/metadata/" + URLEncoder.encode(ratingKey, StandardCharsets.UTF_8) + "/allLeaves?includeGuids=1",
-                token
-            );
-            for (JSONObject leaf : extractItems(leaves)) {
-                if (!"episode".equalsIgnoreCase(leaf.optString("type", "episode"))) continue;
-                if (leaf.optInt("parentIndex", -1) == season && leaf.optInt("index", -1) == episode) return true;
+                String ratingKey = item.optString("ratingKey", "").trim();
+                if (ratingKey.isEmpty()) continue;
+
+                JSONObject leaves = fetchJsonObject(
+                    serverUri + "/library/metadata/" + URLEncoder.encode(ratingKey, StandardCharsets.UTF_8) + "/allLeaves?includeGuids=1",
+                    token
+                );
+                for (JSONObject leaf : extractItems(leaves)) {
+                    if (!"episode".equalsIgnoreCase(leaf.optString("type", "episode"))) continue;
+                    if (leaf.optInt("parentIndex", -1) == season && leaf.optInt("index", -1) == episode) return true;
+                }
             }
         }
         return false;
@@ -204,6 +214,7 @@ public class PlexAvailabilityWorker extends Worker {
         if (query >= 0) guid = guid.substring(0, query);
         String expected = String.valueOf(tmdbId);
         return guid.equals("tmdb://" + expected)
+            || guid.equals("themoviedb://" + expected)
             || guid.equals("com.plexapp.agents.themoviedb://" + expected);
     }
 
