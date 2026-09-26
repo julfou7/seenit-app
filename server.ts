@@ -104,13 +104,13 @@ const PARENTAL_EVIDENCE_COLLECTION = 'publicParentalRatingEvidence';
 const PARENTAL_EVIDENCE_SCHEMA_VERSION = 1;
 const PARENTAL_EVIDENCE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-async function readPersistedParentalEvidence(keys: string[]): Promise<Map<string, any>> {
+async function readPersistedParentalEvidence(keys: string[]): Promise<Map<string, unknown>> {
   const safeKeys = [...new Set(keys)].filter(key => /^(movie|tv):[1-9]\d{0,12}$/.test(key)).slice(0, 40);
   if (safeKeys.length === 0) return new Map();
   const refs = safeKeys.map(key => adminDb.collection(PARENTAL_EVIDENCE_COLLECTION).doc(key));
   const snapshots = await adminDb.getAll(...refs);
   const now = Date.now();
-  const resolved = new Map<string, any>();
+  const resolved = new Map<string, unknown>();
   snapshots.forEach((snapshot, index) => {
     if (!snapshot.exists) return;
     const data = snapshot.data();
@@ -460,9 +460,8 @@ function startCronJobs() {
           console.log(`[CRON] Notification envoyée pour ${data.showTitle} (${delivery.delivered} appareil(s))`);
           // On supprime le rappel une fois envoyé pour éviter les doublons
           batch.delete(doc.ref);
-        } catch (err: unknown) {
-          const errorMessage = err instanceof Error ? err.message : String(err);
-          console.error(`[CRON] Échec de l'envoi du rappel ${doc.id}:`, errorMessage);
+        } catch (err: any) {
+          console.error(`[CRON] Échec de l'envoi du rappel ${doc.id}:`, err.message);
         }
       }
 
