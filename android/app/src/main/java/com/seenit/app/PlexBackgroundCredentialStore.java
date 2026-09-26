@@ -23,7 +23,7 @@ final class PlexBackgroundCredentialStore {
     private PlexBackgroundCredentialStore() {}
 
     static void store(Context context, String uid, String token) throws Exception {
-        if (uid == null || uid.isBlank() || token == null || token.isBlank()) {
+        if (isBlank(uid) || isBlank(token)) {
             throw new IllegalArgumentException("PLEX_BACKGROUND_CREDENTIALS_MISSING");
         }
         File file = new File(context.getNoBackupFilesDir(), FILE_NAME);
@@ -36,12 +36,12 @@ final class PlexBackgroundCredentialStore {
     static Credentials read(Context context) {
         File file = new File(context.getNoBackupFilesDir(), FILE_NAME);
         if (!file.isFile()) return null;
-        try (Scanner scanner = new Scanner(file, StandardCharsets.UTF_8)) {
+        try (Scanner scanner = new Scanner(file, StandardCharsets.UTF_8.name())) {
             if (!scanner.hasNextLine()) return null;
             String uidHash = scanner.nextLine().trim();
             if (!scanner.hasNextLine()) return null;
             String token = scanner.nextLine().trim();
-            if (uidHash.length() != 16 || token.isBlank()) return null;
+            if (uidHash.length() != 16 || isBlank(token)) return null;
             return new Credentials(uidHash, token);
         } catch (Exception ignored) {
             return null;
@@ -49,7 +49,7 @@ final class PlexBackgroundCredentialStore {
     }
 
     static void clearForUid(Context context, String uid) {
-        if (uid == null || uid.isBlank()) return;
+        if (isBlank(uid)) return;
         Credentials current = read(context);
         if (current == null || !current.uidHash.equals(hashUid(uid))) return;
         clear(context);
@@ -61,6 +61,10 @@ final class PlexBackgroundCredentialStore {
             //noinspection ResultOfMethodCallIgnored
             file.delete();
         }
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     static String hashUid(String uid) {
