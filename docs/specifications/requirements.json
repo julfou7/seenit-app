@@ -1333,6 +1333,14 @@
         {
           "file": "tests/downloadNotificationCapabilityRouting.test.ts",
           "contains": "SEENIT-NOTIFICATION-003 garde une notification visible pour les APK legacy"
+        },
+        {
+          "file": "tests/downloadPlexAvailabilityNotification.test.ts",
+          "contains": "SEENIT-NOTIFICATION-003 préserve la saison 0 des épisodes spéciaux"
+        },
+        {
+          "file": "tests/plexDownloadAvailabilityAndroid.test.ts",
+          "contains": "SEENIT-NOTIFICATION-003 reste compatible minSdk 24 et distingue la saison 0"
         }
       ]
     },
