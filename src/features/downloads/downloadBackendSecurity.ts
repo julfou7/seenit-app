@@ -4,6 +4,7 @@ export interface NotificationDeviceCandidate {
   ownerUid: string;
   token: string;
   platform: 'web' | 'android';
+  plexAvailabilityBackgroundV1?: boolean;
 }
 
 export function hashDownloadSecret(secret: string): string {

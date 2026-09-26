@@ -9,6 +9,7 @@ import { appLogger, useLogStore } from '../store/logStore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { resolveSeenItApiUrl } from './seenitApi';
 import { queueAppUpdateAvailablePush } from '../features/release/releaseUpdatePushClient';
+import { notificationCapabilitiesForPlatform } from '../features/notifications/notificationCapabilities';
 import { ensureSeenItServiceWorkerRegistration } from '../features/pwa/serviceWorkerRegistration';
 
 const app = initializeApp(firebaseConfig);
@@ -317,7 +318,8 @@ async function registerNotificationDevice(fcmToken: string, platform: 'web' | 'a
     body: JSON.stringify({
       installationId: getNotificationInstallationId(),
       fcmToken,
-      platform
+      platform,
+      capabilities: notificationCapabilitiesForPlatform(platform)
     })
   });
   return response.ok;

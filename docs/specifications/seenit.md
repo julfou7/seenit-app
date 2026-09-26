@@ -884,7 +884,12 @@ pour le cache des sagas et univers.
   absences temporaires sont retentées sans devenir des preuves négatives, puis retombent au maximum
   sur « Import terminé ». Le tap ouvre la fiche SeenIt exacte, dont le CTA Plex garde son contrat
   Discover existant. Un changement de compte invalide la copie native du jeton précédent et un signal
-  FCM d'un autre UID est rejeté par son empreinte avant toute requête Plex.
+  FCM d'un autre UID est rejeté par son empreinte avant toute requête Plex. La vérification background
+  est activée uniquement pour une installation Android qui annonce explicitement la capability
+  `plexAvailabilityBackgroundV1` lors de son enregistrement FCM. Une installation Android qui ne
+  l'annonce pas — notamment une APK antérieure ou un downgrade — reçoit la notification visible sûre
+  « Import terminé » ; chaque réenregistrement réécrit explicitement cette capability afin qu'un ancien
+  client ne puisse jamais hériter d'un état capable obsolète.
 - **SEENIT-NOTIFICATION-002** — Un rappel Film ou Série utilise, lorsqu'il existe, un visuel TMDB
   préparé dans le stockage privé et borné de l'application. Les chemins TMDB relatifs comme les anciennes
   URL absolues déjà persistées sont normalisés vers la taille propre au canal notification avant la clé

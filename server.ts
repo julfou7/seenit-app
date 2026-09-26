@@ -21,6 +21,7 @@ import {
 } from "./src/features/downloads/downloadBackendSecurity.ts";
 import { buildC411SearchParams } from "./src/features/downloads/c411Query.ts";
 import { buildDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookNotification.ts";
+import { supportsPlexAvailabilityBackgroundV1 } from "./src/features/notifications/notificationCapabilities.ts";
 import { executeIdempotentMutation, type TimedMutationResult } from "./src/features/downloads/downloadIdempotency.ts";
 import { apiErrorMiddleware, backendHealthHandler, installAsyncRouteForwarding, seenItCorsMiddleware } from "./src/features/runtime/backendRuntime.ts";
 import { applySeenItServiceWorkerHeaders, createSeenItSecurityHeadersMiddleware } from "./src/features/runtime/pwaSecurityHeaders.ts";
@@ -176,6 +177,7 @@ function rateLimit(
 interface UserPushOptions {
   platform?: 'android' | 'web';
   androidHighPriority?: boolean;
+  plexAvailabilityBackground?: 'required' | 'legacy';
 }
 
 async function sendPushToUserDevices(
@@ -188,8 +190,18 @@ async function sendPushToUserDevices(
   const selected = selectUserNotificationDevices(uid, devicesSnapshot.docs.map(device => ({
     ownerUid: String(device.get('ownerUid') || uid),
     token: String(device.get('fcmToken') || ''),
-    platform: device.get('platform') === 'android' ? 'android' : 'web'
-  }))).filter(candidate => !options.platform || candidate.platform === options.platform);
+    platform: device.get('platform') === 'android' ? 'android' : 'web',
+    plexAvailabilityBackgroundV1: device.get('plexAvailabilityBackgroundV1') === true
+  }))).filter(candidate => {
+    if (options.platform && candidate.platform !== options.platform) return false;
+    if (options.plexAvailabilityBackground === 'required') {
+      return candidate.platform === 'android' && candidate.plexAvailabilityBackgroundV1 === true;
+    }
+    if (options.plexAvailabilityBackground === 'legacy') {
+      return candidate.platform === 'android' && candidate.plexAvailabilityBackgroundV1 !== true;
+    }
+    return true;
+  });
   const devices = selected.map(candidate => ({
     refs: devicesSnapshot.docs
       .filter(device => String(device.get('fcmToken') || '').trim() === candidate.token.trim())
@@ -2589,6 +2601,10 @@ async function startServer() {
     const installationId = typeof req.body?.installationId === 'string' ? req.body.installationId.trim() : '';
     const fcmToken = typeof req.body?.fcmToken === 'string' ? req.body.fcmToken.trim() : '';
     const platform = req.body?.platform === 'android' ? 'android' : 'web';
+    const plexAvailabilityBackgroundV1 = supportsPlexAvailabilityBackgroundV1(
+      platform,
+      req.body?.capabilities
+    );
     if (!uid || !/^[a-zA-Z0-9_-]{16,128}$/.test(installationId) || fcmToken.length < 20 || fcmToken.length > 4096) {
       return res.status(400).json({ error: 'Installation ou token de notification invalide' });
     }
@@ -2607,6 +2623,7 @@ async function startServer() {
         platform,
         ownerUid: uid,
         installationHash,
+        plexAvailabilityBackgroundV1,
         updatedAt: new Date()
       }, { merge: true });
       transaction.set(bindingRef, { uid, updatedAt: new Date() });
@@ -2716,20 +2733,25 @@ async function startServer() {
       let invalidTokensRemoved = 0;
 
       if (presentation.eventType === 'Download' && presentation.plexAvailabilityData) {
-        const [androidDelivery, webDelivery] = await Promise.all([
+        const [androidCapableDelivery, androidLegacyDelivery, webDelivery] = await Promise.all([
           sendPushToUserDevices(uid, null, {
             ...presentation.plexAvailabilityData,
             ownerUidHash
           }, {
             platform: 'android',
-            androidHighPriority: true
+            androidHighPriority: true,
+            plexAvailabilityBackground: 'required'
+          }),
+          sendPushToUserDevices(uid, presentation.notification, presentation.data, {
+            platform: 'android',
+            plexAvailabilityBackground: 'legacy'
           }),
           sendPushToUserDevices(uid, presentation.notification, presentation.data, {
             platform: 'web'
           })
         ]);
-        delivered = androidDelivery.delivered + webDelivery.delivered;
-        invalidTokensRemoved = androidDelivery.invalid + webDelivery.invalid;
+        delivered = androidCapableDelivery.delivered + androidLegacyDelivery.delivered + webDelivery.delivered;
+        invalidTokensRemoved = androidCapableDelivery.invalid + androidLegacyDelivery.invalid + webDelivery.invalid;
       } else {
         const delivery = await sendPushToUserDevices(uid, presentation.notification, presentation.data);
         delivered = delivery.delivered;
