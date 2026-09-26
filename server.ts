@@ -21,6 +21,7 @@ import {
 } from "./src/features/downloads/downloadBackendSecurity.ts";
 import { buildC411SearchParams } from "./src/features/downloads/c411Query.ts";
 import { buildDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookNotification.ts";
+import { deliverDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookDelivery.ts";
 import { supportsPlexAvailabilityBackgroundV1 } from "./src/features/notifications/notificationCapabilities.ts";
 import { executeIdempotentMutation, type TimedMutationResult } from "./src/features/downloads/downloadIdempotency.ts";
 import { apiErrorMiddleware, backendHealthHandler, installAsyncRouteForwarding, seenItCorsMiddleware } from "./src/features/runtime/backendRuntime.ts";
@@ -459,8 +460,9 @@ function startCronJobs() {
           console.log(`[CRON] Notification envoyée pour ${data.showTitle} (${delivery.delivered} appareil(s))`);
           // On supprime le rappel une fois envoyé pour éviter les doublons
           batch.delete(doc.ref);
-        } catch (err: any) {
-          console.error(`[CRON] Échec de l'envoi du rappel ${doc.id}:`, err.message);
+        } catch (err: unknown) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          console.error(`[CRON] Échec de l'envoi du rappel ${doc.id}:`, errorMessage);
         }
       }
 
@@ -2729,34 +2731,12 @@ async function startServer() {
       const presentation = buildDownloadWebhookPresentation(source as 'sonarr' | 'radarr', payload);
       const ownerUidHash = createHash('sha256').update(uid).digest('hex').slice(0, 16);
 
-      let delivered = 0;
-      let invalidTokensRemoved = 0;
-
-      if (presentation.eventType === 'Download' && presentation.plexAvailabilityData) {
-        const [androidCapableDelivery, androidLegacyDelivery, webDelivery] = await Promise.all([
-          sendPushToUserDevices(uid, null, {
-            ...presentation.plexAvailabilityData,
-            ownerUidHash
-          }, {
-            platform: 'android',
-            androidHighPriority: true,
-            plexAvailabilityBackground: 'required'
-          }),
-          sendPushToUserDevices(uid, presentation.notification, presentation.data, {
-            platform: 'android',
-            plexAvailabilityBackground: 'legacy'
-          }),
-          sendPushToUserDevices(uid, presentation.notification, presentation.data, {
-            platform: 'web'
-          })
-        ]);
-        delivered = androidCapableDelivery.delivered + androidLegacyDelivery.delivered + webDelivery.delivered;
-        invalidTokensRemoved = androidCapableDelivery.invalid + androidLegacyDelivery.invalid + webDelivery.invalid;
-      } else {
-        const delivery = await sendPushToUserDevices(uid, presentation.notification, presentation.data);
-        delivered = delivery.delivered;
-        invalidTokensRemoved = delivery.invalid;
-      }
+      const { delivered, invalidTokensRemoved } = await deliverDownloadWebhookPresentation({
+        uid,
+        ownerUidHash,
+        presentation,
+        sendPush: sendPushToUserDevices,
+      });
 
       return res.json({
         success: true,

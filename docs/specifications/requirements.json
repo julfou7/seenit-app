@@ -1311,6 +1311,10 @@
         {
           "file": "tests/notificationMediaRuntime.test.ts",
           "contains": "issue #106 réutilise un répertoire notification-media déjà présent après redémarrage"
+        },
+        {
+          "file": "tests/reminderToastSummary.test.ts",
+          "contains": "#353 un nouvel épisode du jour n’ajoute aucun toast interne mais conserve l’envoi système"
         }
       ]
     },
@@ -1325,6 +1329,14 @@
         {
           "file": "tests/downloadPlexAvailabilityNotification.test.ts",
           "contains": "SEENIT-NOTIFICATION-003 distingue l’import Arr de la disponibilité Plex"
+        },
+        {
+          "file": "tests/downloadWebhookDelivery.test.ts",
+          "contains": "SEENIT-NOTIFICATION-003 garde l’import visible et ajoute la vérification Plex capable"
+        },
+        {
+          "file": "tests/downloadNotificationCapabilityRouting.test.ts",
+          "contains": "SEENIT-NOTIFICATION-003 n’annonce la capability Android qu’après confirmation native"
         },
         {
           "file": "tests/plexDownloadAvailabilityAndroid.test.ts",

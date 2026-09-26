@@ -878,25 +878,23 @@ pour le cache des sagas et univers.
 - Les notifications système de fin de téléchargement proviennent des webhooks Sonarr/Radarr.
   Le polling local affiche uniquement un toast SeenIt afin d'éviter les doublons.
 - **SEENIT-NOTIFICATION-003** — Un événement Sonarr/Radarr `Download` prouve uniquement que l'import
-  Arr est terminé ; il ne prouve jamais à lui seul que Plex a indexé le média. La PWA peut annoncer
-  « Import terminé » sans promettre la disponibilité Plex. Sur l'APK Android, si le webhook contient
-  un TMDB ID exact, le backend envoie au seul UID concerné un message FCM data-only haute priorité.
-  Le téléphone compare l'empreinte du UID actif, conserve le jeton Plex uniquement dans son stockage
-  privé exclu des sauvegardes, puis effectue une vérification Plex bornée en arrière-plan par TMDB ID
-  exact et, pour un épisode, par saison + épisode exacts. Le titre n'est jamais une preuve d'identité.
-  « Disponible dans Plex » n'est affiché qu'après une correspondance Plex exacte ; les pannes et
-  absences temporaires sont retentées sans devenir des preuves négatives, puis retombent au maximum
-  sur « Import terminé ». Le tap ouvre la fiche SeenIt exacte, dont le CTA Plex garde son contrat
-  Discover existant. Un changement de compte invalide la copie native du jeton précédent et un signal
-  FCM d'un autre UID est rejeté par son empreinte avant toute requête Plex. La vérification background
-  est activée uniquement pour une installation Android qui annonce explicitement la capability
-  `plexAvailabilityBackgroundV1` lors de son enregistrement FCM. Une installation Android qui ne
-  l'annonce pas — notamment une APK antérieure ou un downgrade — reçoit la notification visible sûre
-  « Import terminé » ; chaque réenregistrement réécrit explicitement cette capability afin qu'un ancien
-  client ne puisse jamais hériter d'un état capable obsolète. Le chemin natif reste compatible avec
-  `minSdkVersion = 24` sans dépendre d'API Java plus récentes non désucrées. Pour les épisodes, la saison
-  `0` est une saison valide réservée aux spéciaux et reste distincte d'une saison absente : une preuve
-  Plex S0E1 exige donc bien l'épisode exact, comme pour toute autre saison.
+  Arr est terminé ; il ne prouve jamais à lui seul que Plex a indexé le média. Ce fait prouvé produit
+  toujours une notification visible « Import terminé » sur chaque installation autorisée PWA/APK du UID,
+  y compris un Android capable de vérifier Plex. Si le webhook contient un TMDB ID exact et que l'APK a
+  confirmé la copie privée de ses credentials Plex pour le UID actif, le backend ajoute — sans remplacer
+  cette notification visible — un message FCM data-only haute priorité. Le téléphone compare l'empreinte
+  du UID actif, conserve le jeton Plex uniquement dans son stockage privé exclu des sauvegardes, puis
+  effectue une vérification Plex bornée en arrière-plan par TMDB ID exact et, pour un épisode, par saison
+  + épisode exacts. Le titre n'est jamais une preuve d'identité. Une copie native momentanément absente
+  est retentée de façon bornée ; une empreinte UID différente échoue fermée. « Disponible dans Plex »
+  n'est affiché qu'après une correspondance Plex exacte. À l'épuisement des vérifications, aucune seconde
+  notification « Import terminé » n'est créée puisque le reçu d'import a déjà été livré. Une installation
+  Android qui n'a pas confirmé la capability `plexAvailabilityBackgroundV1` conserve donc le reçu visible
+  sans vérification silencieuse ; chaque réenregistrement recalcule cette capability afin qu'un ancien
+  client ou un stockage natif indisponible ne puisse jamais être déclaré capable par optimisme. Le chemin
+  natif reste compatible avec `minSdkVersion = 24` sans dépendre d'API Java plus récentes non désucrées.
+  Pour les épisodes, la saison `0` est une saison valide réservée aux spéciaux et reste distincte d'une
+  saison absente : une preuve Plex S0E1 exige donc bien l'épisode exact, comme pour toute autre saison.
 - **SEENIT-NOTIFICATION-002** — Un rappel Film ou Série utilise, lorsqu'il existe, un visuel TMDB
   préparé dans le stockage privé et borné de l'application. Les chemins TMDB relatifs comme les anciennes
   URL absolues déjà persistées sont normalisés vers la taille propre au canal notification avant la clé
@@ -908,7 +906,10 @@ pour le cache des sagas et univers.
   n'est embarqué dans le `PendingIntent`
   d'AlarmManager : l'image est relue, validée et décodée seulement par le receiver au moment de la
   livraison. Une image absente, invalide ou trop grande conserve le rappel texte et ne bloque jamais les
-  rappels suivants. Aucun octet/Base64 d'image ne traverse Capacitor/Binder.
+  rappels suivants. Aucun octet/Base64 d'image ne traverse Capacitor/Binder. Pour un nouvel épisode le
+  jour J, la notification système est l'unique alerte : le hook de rappels n'ajoute aucun toast interne
+  « disponible aujourd'hui », y compris au démarrage ou à la reprise. Les autres catégories de rappel
+  conservent leur feedback interne existant.
 
 ### 8.1 Mise à jour intégrée
 

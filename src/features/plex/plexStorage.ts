@@ -7,14 +7,19 @@ interface SeenItPlexBackgroundPlugin {
 
 const SeenItPlexBackground = registerPlugin<SeenItPlexBackgroundPlugin>('SeenItPlexBackground');
 
-function persistNativePlexBackgroundCredentials(uid: string, token: string): void {
-  if (!Capacitor.isNativePlatform() || !uid || !token) return;
-  void SeenItPlexBackground.setCredentials({ uid, token }).catch(() => undefined);
+async function persistNativePlexBackgroundCredentials(uid: string, token: string): Promise<boolean> {
+  if (!Capacitor.isNativePlatform() || !uid || !token) return false;
+  try {
+    await SeenItPlexBackground.setCredentials({ uid, token });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-function clearNativePlexBackgroundCredentials(uid: string): void {
+async function clearNativePlexBackgroundCredentials(uid: string): Promise<void> {
   if (!Capacitor.isNativePlatform() || !uid) return;
-  void SeenItPlexBackground.clearCredentials({ uid }).catch(() => undefined);
+  await SeenItPlexBackground.clearCredentials({ uid }).catch(() => undefined);
 }
 
 export type PlexUserStorageField =
@@ -45,11 +50,12 @@ export function getStoredPlexToken(uid?: string | null): string | null {
   return localStorage.getItem(getPlexUserStorageKey(uid, 'token'));
 }
 
-export function syncNativePlexBackgroundCredentials(uid?: string | null): void {
-  if (!uid) return;
+export async function syncNativePlexBackgroundCredentials(uid?: string | null): Promise<boolean> {
+  if (!uid || !Capacitor.isNativePlatform()) return false;
   const token = getStoredPlexToken(uid);
-  if (token) persistNativePlexBackgroundCredentials(uid, token);
-  else clearNativePlexBackgroundCredentials(uid);
+  if (token) return persistNativePlexBackgroundCredentials(uid, token);
+  await clearNativePlexBackgroundCredentials(uid);
+  return false;
 }
 
 export function getStoredPlexUsername(uid?: string | null): string {
@@ -59,7 +65,7 @@ export function getStoredPlexUsername(uid?: string | null): string {
 
 export function storePlexCredentials(uid: string, token: string, username = ''): void {
   localStorage.setItem(getPlexUserStorageKey(uid, 'token'), token);
-  persistNativePlexBackgroundCredentials(uid, token);
+  void persistNativePlexBackgroundCredentials(uid, token);
   if (username) {
     localStorage.setItem(getPlexUserStorageKey(uid, 'username'), username);
   } else {
@@ -69,7 +75,7 @@ export function storePlexCredentials(uid: string, token: string, username = ''):
 
 export function clearPlexCredentials(uid?: string | null): void {
   if (!uid) return;
-  clearNativePlexBackgroundCredentials(uid);
+  void clearNativePlexBackgroundCredentials(uid);
   localStorage.removeItem(getPlexUserStorageKey(uid, 'token'));
   localStorage.removeItem(getPlexUserStorageKey(uid, 'username'));
   localStorage.removeItem(getPlexUserStorageKey(uid, 'lastSyncTimestamp'));

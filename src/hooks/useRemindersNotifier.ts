@@ -12,6 +12,7 @@ import {
   getMediaReminderNotificationId,
   prunePendingMediaReminderNotifications,
   sendMediaReminderNotification,
+  type MediaReminderNotificationOptions,
 } from '../features/notifications/mediaReminderNotification';
 import {
   resolveFrenchMovieReleaseReminderDate,
@@ -166,7 +167,7 @@ export function useRemindersNotifier() {
                 ...mediaVisual,
                 summaryText,
                 scheduleDate
-              } as any);
+              } as MediaReminderNotificationOptions);
               return {
                 delivered,
                 visualReady: Boolean(mediaVisual.icon || mediaVisual.image),
@@ -295,7 +296,8 @@ export function useRemindersNotifier() {
           notificationTitle: string,
           summaryText: string,
           msgBody: string,
-          addActions: boolean = false
+          addActions: boolean = false,
+          emitInternalToast: boolean = true
         ) => {
           const targetStr = toLocalDateKey(targetDate);
           const notificationTag = buildTvTag(tagPrefix, targetStr);
@@ -313,7 +315,7 @@ export function useRemindersNotifier() {
               summaryText,
               allowMarkWatched: addActions,
               scheduleDate
-            } as any);
+            } as MediaReminderNotificationOptions);
             return {
               delivered,
               visualReady: Boolean(mediaVisual.icon || mediaVisual.image),
@@ -330,13 +332,15 @@ export function useRemindersNotifier() {
           } else if (targetStr === todayStr) {
             const notifiedKey = `notified_today_${s.id}_${tagPrefix}_S${sNum}E${eNum}_${todayStr}`;
             if (!readUserScopedJson(uid, notifiedKey, false)) {
-              dueToastCandidates.push({
-                key: notifiedKey,
-                title,
-                body: msgBody,
-                posterPath: s.posterPath,
-                show: s,
-              });
+              if (emitInternalToast) {
+                dueToastCandidates.push({
+                  key: notifiedKey,
+                  title,
+                  body: msgBody,
+                  posterPath: s.posterPath,
+                  show: s,
+                });
+              }
               if ((await send()).delivered) writeUserScopedJson(uid, notifiedKey, true);
             }
           }
@@ -359,7 +363,8 @@ export function useRemindersNotifier() {
             title,
             '🆕 Nouvel épisode',
             `S${sNum}E${eNum}${upcoming.name ? ` · ${upcoming.name}` : ''} disponible aujourd'hui.`,
-            true
+            true,
+            false
           );
         }
       }
