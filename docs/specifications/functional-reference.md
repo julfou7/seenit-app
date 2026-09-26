@@ -584,6 +584,9 @@ et webhooks, qui ne doit pas être dupliquée dans les réglages généraux.
 ### 10.1 Mes téléchargements
 
 - Réconcilie les intentions SeenIt avec les files Sonarr/Radarr et qBittorrent.
+- Pendant le handoff vers le transfert physique, un qBittorrent encore sans identité média n'est pas
+  affiché en parallèle d'une intention SeenIt active techniquement compatible. Seule sa représentation
+  brute est masquée : aucune identité ne lui est attribuée sans preuve exacte.
 - Affiche séparément actifs, erreurs, annulés et terminés.
 - Les actifs conservent l'ordre de lancement ; l'historique affiche les plus récents d'abord.
 - Un swipe droit supprime une entrée d'historique ou demande confirmation pour annuler un actif.
