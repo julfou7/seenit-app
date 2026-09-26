@@ -43,7 +43,7 @@ test('un qBit SxxEyy non résolu devient transitoirement une série', () => {
   assert.equal(normalized.episodeNumber, 5);
 });
 
-test('un qBit unique reste visible afin de conserver la progression live', () => {
+test('SEENIT-DOWNLOAD-001 masque le qBit anonyme pendant le handoff sans lui attribuer d’identité', () => {
   const pending = item({
     id: 'opt_movie',
     requestId: 'opt_movie',
@@ -63,7 +63,9 @@ test('un qBit unique reste visible afin de conserver la progression live', () =>
     addedAt: now
   });
 
-  assert.equal(shouldSuppressUnresolvedQbit(qbit, [pending], now), false);
+  assert.equal(shouldSuppressUnresolvedQbit(qbit, [pending], now), true);
+  assert.equal(qbit.tmdbId, undefined);
+  assert.equal(qbit.requestId, undefined);
 });
 
 test('un qBit résolu ou de résolution différente reste visible', () => {
@@ -103,7 +105,7 @@ test('deux intentions simultanées masquent le qBit ambigu sans corrélation par
   assert.equal(qbit.tmdbId, undefined);
 });
 
-test('deux épisodes simultanés de scopes différents ne rendent pas le qBit ambigu', () => {
+test('un qBit TV anonyme reste masqué quand le scope technique isole une intention', () => {
   const ep1 = item({
     id: 'opt_ep1', mediaType: 'tv', isOptimistic: true, tmdbId: 10,
     seasonNumber: 1, episodeNumber: 1, quality: '1080p', addedAt: now - 2_000, status: 'searching'
@@ -118,5 +120,7 @@ test('deux épisodes simultanés de scopes différents ne rendent pas le qBit am
   }));
 
   assert.equal(qbit.mediaType, 'tv');
-  assert.equal(shouldSuppressUnresolvedQbit(qbit, [ep1, ep2], now), false);
+  assert.equal(shouldSuppressUnresolvedQbit(qbit, [ep1, ep2], now), true);
+  assert.equal(qbit.tmdbId, undefined);
+  assert.equal(qbit.requestId, undefined);
 });
