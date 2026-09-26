@@ -27,6 +27,8 @@ test('SEENIT-NOTIFICATION-003 vérifie Plex en arrière-plan sans exposer le tok
   assert.ok(store.includes('hashUid'));
   assert.ok(plugin.includes('clearForUid'));
   assert.ok(plexStorage.includes('syncNativePlexBackgroundCredentials'));
+  assert.ok(worker.includes('Fail closed: un signal ancien'));
+  assert.ok(!worker.includes('showNotification(false);\n            return Result.success();'));
   assert.ok(manifest.includes('com.capacitorjs.plugins.pushnotifications.MessagingService'));
   assert.ok(manifest.includes('tools:node="remove"'));
   assert.ok(manifest.includes('android:name=".SeenItMessagingService"'));
