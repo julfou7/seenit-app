@@ -81,10 +81,14 @@ function compatiblePendingRequests(
 }
 
 /**
- * Un seul candidat reste visible : le handshake existant peut alors l'enrichir et
- * conserver sa télémétrie qBit. Avec plusieurs demandes compatibles simultanées,
- * choisir serait arbitraire ; le torrent brut est donc masqué jusqu'à l'arrivée
- * d'un hash/ID *Arr exact, sans aucun rapprochement par titre.
+ * Un qBit sans identité média ne doit pas devenir une seconde carte pendant le
+ * handoff d'une intention SeenIt. Tant qu'au moins une intention active est
+ * techniquement compatible, seule la représentation qBit brute est masquée.
+ *
+ * Cette suppression est strictement visuelle : elle n'attribue aucun TMDB ID,
+ * requestId ou autre identité au torrent. Dès qu'une preuve exacte arrive, la
+ * réconciliation sécurisée prend le relais ; sans intention compatible, le qBit
+ * reste visible comme n'importe quel transfert non résolu.
  */
 export function shouldSuppressUnresolvedQbit(
   remote: LiveDownloadItem,
@@ -96,5 +100,5 @@ export function shouldSuppressUnresolvedQbit(
   if (!isQbit || remote.tmdbId || remote.tvdbId || remote.imdbId) return false;
   if (remote.status === 'completed' || remote.status === 'cancelled' || remote.status === 'error' || Number(remote.progress || 0) >= 100) return false;
 
-  return compatiblePendingRequests(remote, pendingRequests, now, windowMs).length > 1;
+  return compatiblePendingRequests(remote, pendingRequests, now, windowMs).length > 0;
 }
