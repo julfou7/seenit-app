@@ -8,6 +8,7 @@ import {
 } from '../features/release/releasePolicy';
 import type { UpdateProgress } from '../features/release/updateProgress';
 import { recordClientOperationalSignal } from '../features/logging/clientOperationalDiagnostics.ts';
+import { notifyVerifiedUpdateDownload } from '../features/release/updateDownloadNotification.ts';
 
 const localConsole = globalThis.console;
 
@@ -128,6 +129,8 @@ export async function downloadAndInstallApk(
         throw new Error('La signature SHA-256 de la mise à jour ne correspond pas à la release GitHub. Fichier supprimé.');
       }
     }
+
+    await notifyVerifiedUpdateDownload(release.version);
 
     onProgress?.({ percent: 99, status: 'installing', message: 'Ouverture de l\'installeur Android...' });
 

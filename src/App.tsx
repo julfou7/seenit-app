@@ -33,7 +33,7 @@ import { parentalRatingKey } from './features/shows/parentalRating';
 import { markEpisodeWatched } from './features/shows/markEpisodeWatched';
 import { cleanOldCache } from './db/dexie';
 import './store/showsStore';
-import { activatePlexUserScope } from './features/plex/plexStorage';
+import { activatePlexUserScope, syncNativePlexBackgroundCredentials } from './features/plex/plexStorage';
 import { usePlexAvailabilityStore } from './features/plex/plexAvailability';
 import { readUserScopedJson, writeUserScopedJson } from './lib/userIsolation';
 import { activateLogUserScope } from './store/logStore';
@@ -89,6 +89,7 @@ export default function App() {
       if (activatePlexUserScope(user?.uid)) {
         usePlexAvailabilityStore.getState().clearCache();
       }
+      syncNativePlexBackgroundCredentials(user?.uid);
       setCurrentUser(user);
       if (user) {
         void syncGrantedNotificationDevice();
@@ -372,6 +373,49 @@ function MainApp() {
 
     checkUrlParams();
 
+    const handleNativeMediaUrl = (rawUrl?: string | null) => {
+      if (!rawUrl || !rawUrl.startsWith('com.seenit.app://media')) return;
+      if (!auth.currentUser) {
+        sessionStorage.setItem('seenit_pending_media_url', rawUrl);
+        return;
+      }
+
+      let parsed: URL;
+      try {
+        parsed = new URL(rawUrl);
+      } catch {
+        return;
+      }
+
+      const tmdbId = Number(parsed.searchParams.get('tmdbId'));
+      const mediaType = parsed.searchParams.get('mediaType') === 'movie' ? 'movie' : 'tv';
+      const season = Number(parsed.searchParams.get('season'));
+      const episode = Number(parsed.searchParams.get('episode'));
+      if (!Number.isInteger(tmdbId) || tmdbId <= 0) return;
+
+      const actionKey = `native-media:${mediaType}:${tmdbId}:${season || 0}:${episode || 0}`;
+      if (processedActionsRef.current.has(actionKey)) return;
+      processedActionsRef.current.add(actionKey);
+      sessionStorage.removeItem('seenit_pending_media_url');
+
+      openShowSmooth(
+        tmdbId,
+        'tmdb',
+        mediaType,
+        tmdbId,
+        Number.isInteger(season) && season > 0 ? season : undefined,
+        Number.isInteger(episode) && episode > 0 ? episode : undefined
+      );
+    };
+
+    let appUrlListener: any = null;
+    if (Capacitor.isNativePlatform()) {
+      void CapApp.addListener('appUrlOpen', ({ url }) => handleNativeMediaUrl(url))
+        .then(handle => { appUrlListener = handle; });
+      void CapApp.getLaunchUrl().then(result => handleNativeMediaUrl(result?.url));
+      handleNativeMediaUrl(sessionStorage.getItem('seenit_pending_media_url'));
+    }
+
     const handleNotificationMessage = (data: any) => {
       if (!data) return;
 
@@ -468,11 +512,14 @@ function MainApp() {
       if (bc) {
         bc.close();
       }
+      if (appUrlListener) {
+        appUrlListener.remove();
+      }
       window.removeEventListener('capacitor-notification-action' as any, handleCapacitorAction);
       window.removeEventListener('focus', handleVisibilityOrFocus);
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
     };
-  }, [handleTabChange, openShowSmooth, updateShow, showToast]);
+  }, [currentUser, handleTabChange, openShowSmooth, updateShow, showToast]);
 
   const handleActiveTabClick = () => {
     window.dispatchEvent(new CustomEvent('app-close-modals'));

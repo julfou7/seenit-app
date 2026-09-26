@@ -1309,7 +1309,29 @@
           "contains": "issue #106 réutilise un répertoire notification-media déjà présent après redémarrage"
         }
       ]
+    },    {
+      "id": "SEENIT-NOTIFICATION-003",
+      "title": "Disponibilité Plex notifiée uniquement après preuve exacte sur Android",
+      "targets": [
+        "backend",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/downloadPlexAvailabilityNotification.test.ts",
+          "contains": "SEENIT-NOTIFICATION-003 distingue l’import Arr de la disponibilité Plex"
+        },
+        {
+          "file": "tests/plexDownloadAvailabilityAndroid.test.ts",
+          "contains": "SEENIT-NOTIFICATION-003 vérifie Plex en arrière-plan sans exposer le token"
+        },
+        {
+          "file": "tests/plexDownloadAvailabilityAndroid.test.ts",
+          "contains": "SEENIT-NOTIFICATION-003 ouvre la fiche exacte depuis la notification Plex"
+        }
+      ]
     },
+
     {
       "id": "SEENIT-UPDATE-001",
       "title": "Métadonnées et asset de mise à jour officiels avec fallback APK",
@@ -1453,7 +1475,24 @@
           "contains": "SEENIT-UPDATE-006 garde le handoff interne non exporté et sans receiver de relance"
         }
       ]
+    },    {
+      "id": "SEENIT-UPDATE-007",
+      "title": "Notification Android après téléchargement et vérification de l’APK",
+      "targets": [
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/updateDownloadNotification.test.ts",
+          "contains": "SEENIT-UPDATE-007 notifie seulement après les contrôles de l’APK et avant PackageInstaller"
+        },
+        {
+          "file": "tests/updateDownloadNotification.test.ts",
+          "contains": "SEENIT-UPDATE-007 garde la notification non bloquante"
+        }
+      ]
     },
+
     {
       "id": "SEENIT-UX-001",
       "title": "Actions de swipe accessibles au clavier",

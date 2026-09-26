@@ -20,6 +20,7 @@ import {
   selectUserNotificationDevices
 } from "./src/features/downloads/downloadBackendSecurity.ts";
 import { buildC411SearchParams } from "./src/features/downloads/c411Query.ts";
+import { buildDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookNotification.ts";
 import { executeIdempotentMutation, type TimedMutationResult } from "./src/features/downloads/downloadIdempotency.ts";
 import { apiErrorMiddleware, backendHealthHandler, installAsyncRouteForwarding, seenItCorsMiddleware } from "./src/features/runtime/backendRuntime.ts";
 import { applySeenItServiceWorkerHeaders, createSeenItSecurityHeadersMiddleware } from "./src/features/runtime/pwaSecurityHeaders.ts";
@@ -172,17 +173,23 @@ function rateLimit(
   };
 }
 
+interface UserPushOptions {
+  platform?: 'android' | 'web';
+  androidHighPriority?: boolean;
+}
+
 async function sendPushToUserDevices(
   uid: string,
-  notification: { title: string; body: string },
-  data: Record<string, string> = {}
+  notification: { title: string; body: string } | null,
+  data: Record<string, string> = {},
+  options: UserPushOptions = {}
 ): Promise<{ delivered: number; invalid: number }> {
   const devicesSnapshot = await adminDb.collection(`users/${uid}/devices`).get();
   const selected = selectUserNotificationDevices(uid, devicesSnapshot.docs.map(device => ({
     ownerUid: String(device.get('ownerUid') || uid),
     token: String(device.get('fcmToken') || ''),
     platform: device.get('platform') === 'android' ? 'android' : 'web'
-  })));
+  }))).filter(candidate => !options.platform || candidate.platform === options.platform);
   const devices = selected.map(candidate => ({
     refs: devicesSnapshot.docs
       .filter(device => String(device.get('fcmToken') || '').trim() === candidate.token.trim())
@@ -198,8 +205,9 @@ async function sendPushToUserDevices(
     const chunk = devices.slice(index, index + 500);
     const result = await messaging.sendEachForMulticast({
       tokens: chunk.map(device => device.token),
-      notification,
-      data
+      ...(notification ? { notification } : {}),
+      data,
+      ...(options.androidHighPriority ? { android: { priority: 'high' as const } } : {})
     });
     delivered += result.successCount;
     const invalidRefs = result.responses
@@ -2699,27 +2707,39 @@ async function startServer() {
         return res.json({ success: true, message: 'Test webhook reçu avec succès par SeenIt !' });
       }
 
-      let title = 'Notification Téléchargement';
-      let body = 'Un événement de téléchargement a eu lieu.';
+      const presentation = buildDownloadWebhookPresentation(source as 'sonarr' | 'radarr', payload);
+      const ownerUidHash = createHash('sha256').update(uid).digest('hex').slice(0, 16);
 
-      if (eventType === 'Grab') {
-        const mediaTitle = payload.series?.title || payload.movie?.title || payload.release?.releaseTitle || 'Média';
-        title = 'Téléchargement démarré 🚀';
-        body = `"${mediaTitle}" a été envoyé au client de téléchargement.`;
-      } else if (eventType === 'Download') {
-        const mediaTitle = payload.series?.title || payload.movie?.title || 'Média';
-        const epInfo = payload.episodes?.[0] ? ` (S${payload.episodes[0].seasonNumber}E${payload.episodes[0].episodeNumber})` : '';
-        title = 'Téléchargement terminé 🍿';
-        body = `"${mediaTitle}${epInfo}" est prêt et disponible !`;
+      let delivered = 0;
+      let invalidTokensRemoved = 0;
+
+      if (presentation.eventType === 'Download' && presentation.plexAvailabilityData) {
+        const [androidDelivery, webDelivery] = await Promise.all([
+          sendPushToUserDevices(uid, null, {
+            ...presentation.plexAvailabilityData,
+            ownerUidHash
+          }, {
+            platform: 'android',
+            androidHighPriority: true
+          }),
+          sendPushToUserDevices(uid, presentation.notification, presentation.data, {
+            platform: 'web'
+          })
+        ]);
+        delivered = androidDelivery.delivered + webDelivery.delivered;
+        invalidTokensRemoved = androidDelivery.invalid + webDelivery.invalid;
+      } else {
+        const delivery = await sendPushToUserDevices(uid, presentation.notification, presentation.data);
+        delivered = delivery.delivered;
+        invalidTokensRemoved = delivery.invalid;
       }
 
-      const delivery = await sendPushToUserDevices(uid, { title, body }, {
-        type: 'DOWNLOAD_EVENT',
-        source,
-        eventType: String(eventType)
+      return res.json({
+        success: true,
+        eventType: presentation.eventType,
+        delivered,
+        invalidTokensRemoved
       });
-
-      return res.json({ success: true, eventType, delivered: delivery.delivered, invalidTokensRemoved: delivery.invalid });
     } catch (err: unknown) {
       emitOperationalEvent({
         code: 'DOWNLOAD_WEBHOOK_FAILED',
