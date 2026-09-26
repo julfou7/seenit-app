@@ -1,0 +1,40 @@
+name: Codex Review Triage
+
+on:
+  pull_request_review:
+    types: [submitted]
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seenit-codex-review-triage-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  triage:
+    name: Route post-merge P1/P2 findings
+    if: >-
+      (github.event_name == 'pull_request_review' && startsWith(github.event.review.user.login, 'chatgpt-codex-connector')) ||
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+
+    steps:
+      - name: Checkout canonical triage code
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Route late Codex findings without blocking merge
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/codex-review-triage.cjs

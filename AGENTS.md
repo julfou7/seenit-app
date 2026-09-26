@@ -67,6 +67,18 @@ Si l'utilisateur a explicitement confié la publication APK à une **autre tâch
 
 Ce chemin ne réduit aucun contrôle de sécurité, d'identité média/Plex, de données, d'APK, de signature, de test terrain ou de release. Il réduit uniquement la lecture et les validations redondantes.
 
+## 0.1r Revue Codex asynchrone — non bloquante, jamais perdue
+
+La **Code Review Codex** est un audit complémentaire asynchrone. Elle ne doit pas bloquer systématiquement un merge déjà autorisé par les checks canoniques et les protections du dépôt : attendre chaque review ferait payer de la latence à toutes les PR alors que la plupart ne produisent aucun finding utile.
+
+1. **Ne jamais attendre Codex par principe avant merge.** Si la CI requise est verte et que les autres gardes sont satisfaits, le merge peut continuer sans attendre une review Codex encore absente.
+2. Si un finding Codex **P1/P2 est déjà visible avant merge**, le confirmer rapidement contre le code et le chemin de production. S'il est manifestement valide et dans le périmètre, le corriger dans la PR courante avec le TNR adapté ; un finding non confirmé ne devient pas à lui seul un nouveau blocage. Les P3/P4 ne retardent pas le merge par défaut.
+3. Après merge, le workflow **`Codex Review Triage`** écoute `pull_request_review: submitted` et `pull_request: closed`. Il relit les reviews/commentaires du compte `chatgpt-codex-connector` et route uniquement les nouveaux findings **P1/P2**. Le traitement est **idempotent** par identifiant de finding afin que l'événement de review et l'événement de merge ne créent pas de doublon.
+4. Le routeur privilégie une **issue ouverte référencée par la PR**. S'il n'en existe aucune, il crée une issue de triage dédiée ; il ne rouvre pas automatiquement une issue fermée sur la seule foi d'un finding encore **à confirmer**. Il n'écrit jamais de code et ne déclenche aucun correctif automatique.
+5. Chaque suivi conserve la priorité, le lien exact de la PR/review et la mention explicite **« à confirmer »**. Un P1 est repris dès qu'un chantier en cours atteint un point sûr ; un P2 reçoit un diagnostic ciblé et un correctif rapide s'il est confirmé. Les P3/P4 restent visibles dans la PR et rejoignent le backlog uniquement sur décision explicite ou risque particulier.
+6. Un finding arrivé après merge — voire après une release déjà partie — produit un suivi ciblé, pas un rollback ni une réouverture aveugle. S'il est valide : cause racine, classe complète affectée, TNR puis PR corrective. S'il est faux : preuve documentée et thread résolu.
+7. GitHub reste la source de vérité de cette revue : le mail Codex n'est qu'une notification. La review, ses threads et le ticket de suivi éventuel constituent l'historique exploitable.
+
 ## 0.2 Culture obligatoire — cause racine avant correctif
 
 Pour tout bug, incident ou exemple utilisateur, l'agent distingue explicitement avant de coder :

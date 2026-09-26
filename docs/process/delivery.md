@@ -203,6 +203,29 @@ La preuve du SLO de validation continue est maintenue dans l'issue #84 à partir
 consécutives. La preuve du SLO terrain est maintenue dans #368 à partir de releases réelles ; aucune mesure
 synthétique n'est fabriquée.
 
+## Revue Codex asynchrone post-merge
+
+La **Code Review Codex** complète la CI sans devenir un check requis. Elle est volontairement **non bloquante** :
+une PR dont les checks canoniques sont verts peut être mergée sans attendre Codex. Si un P1/P2 est déjà
+visible avant le merge, il est confirmé rapidement et corrigé dans la PR seulement lorsqu'il est valide ;
+les P3/P4 ne retardent pas le merge par défaut.
+
+Le workflow `.github/workflows/codex-review-triage.yml` rend le suivi tardif exploitable sans polling :
+
+1. `pull_request_review: submitted` capte une review Codex arrivée après le merge ;
+2. `pull_request: closed` rebalaye une PR au moment du merge et rattrape une review arrivée juste avant ;
+3. seuls les auteurs `chatgpt-codex-connector*` et les findings P1/P2 sont actionnables automatiquement ;
+4. le routeur est **idempotent** par identifiant de review/commentaire et sérialisé par numéro de PR ;
+5. une **issue ouverte référencée par la PR** est réutilisée en priorité ; sans issue ouverte, une issue
+   de triage dédiée est créée, sans rouvrir automatiquement une issue fermée sur un signal encore **à confirmer** ;
+6. le suivi cite la PR et le thread exact, indique que le finding reste à confirmer et ne modifie jamais le code ;
+7. les P3/P4 restent dans la PR sauf décision explicite ou risque particulier.
+
+Un P1 est repris dès que le chantier courant atteint un point sûr. Un P2 reçoit un diagnostic ciblé et,
+s'il est confirmé, un correctif avec cause racine, portée complète et TNR. Un finding post-release ne
+déclenche pas de rollback automatique : il produit le même suivi ciblé. Le mail Codex reste une notification ;
+la PR GitHub et l'issue de suivi sont la trace canonique.
+
 ## Gouvernance proportionnée
 
 Un changement comportemental doit rester couvert par un test automatisé ciblé.

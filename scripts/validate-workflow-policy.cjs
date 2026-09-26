@@ -11,6 +11,7 @@ const WORKFLOW_WRITE_PERMISSIONS = Object.freeze({
   'audit-structured-logs.yml': new Set(['id-token', 'issues']),
   'build-apk.yml': new Set(['contents']),
   'cleanup-tv-track-offline.yml': new Set(['id-token', 'issues']),
+  'codex-review-triage.yml': new Set(['issues']),
   'deploy-backend.yml': new Set(['id-token']),
   'discover-media-relations.yml': new Set([]),
   'firestore-default-migration.yml': new Set(['id-token', 'issues']),
