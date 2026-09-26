@@ -34,6 +34,12 @@ test('SEENIT-NOTIFICATION-003 vérifie Plex en arrière-plan sans exposer le tok
   assert.ok(!worker.includes('title.equals'));
   assert.ok(store.includes('getNoBackupFilesDir'));
   assert.ok(store.includes('hashUid'));
+  assert.ok(store.includes('new Scanner(file, StandardCharsets.UTF_8.name())'));
+  assert.ok(!store.includes('.isBlank()'));
+  assert.ok(!store.includes('new Scanner(file, StandardCharsets.UTF_8)'));
+  assert.ok(worker.includes('nonNegativeInt(message.get("season"))'));
+  assert.ok(worker.includes('season < 0 || episode <= 0'));
+  assert.ok(worker.includes('season >= 0 && episode > 0'));
   assert.ok(plugin.includes('clearForUid'));
   assert.ok(plexStorage.includes('syncNativePlexBackgroundCredentials'));
   assert.ok(worker.includes('Fail closed: un signal ancien'));
