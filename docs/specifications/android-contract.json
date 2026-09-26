@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.200",
-  "versionCode": 104200,
+  "applicationVersion": "1.4.201",
+  "versionCode": 104201,
   "applicationId": "com.seenit.app",
   "appName": "SeenIt",
   "customUrlScheme": "com.seenit.app",
