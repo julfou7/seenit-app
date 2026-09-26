@@ -28,6 +28,16 @@ test('SEENIT-NOTIFICATION-003 distingue l’import Arr de la disponibilité Plex
   assert.equal(sonarr.plexAvailabilityData?.season, '2');
   assert.equal(sonarr.plexAvailabilityData?.episode, '8');
 
+  const special = buildDownloadWebhookPresentation('sonarr', {
+    eventType: 'Download',
+    downloadId: 'special-001',
+    series: { title: 'Severance', tmdbId: 95396 },
+    episodes: [{ seasonNumber: 0, episodeNumber: 1 }]
+  });
+  assert.equal(special.plexAvailabilityData?.season, '0');
+  assert.equal(special.plexAvailabilityData?.episode, '1');
+  assert.match(special.plexAvailabilityData?.eventKey || '', /s0e1$/);
+
   const unresolved = buildDownloadWebhookPresentation('radarr', {
     eventType: 'Download',
     movie: { title: 'Titre sans identité' }
