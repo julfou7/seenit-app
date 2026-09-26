@@ -49,7 +49,7 @@ public class PlexAvailabilityWorker extends Worker {
         if (tmdbId <= 0 || ownerUidHash.length() != 16) return;
 
         String mediaType = "movie".equals(message.get("mediaType")) ? "movie" : "tv";
-        int season = positiveInt(message.get("season"));
+        int season = nonNegativeInt(message.get("season"));
         int episode = positiveInt(message.get("episode"));
         String eventKey = clean(message.get("eventKey"), 128);
         if (eventKey.isEmpty()) {
@@ -94,7 +94,7 @@ public class PlexAvailabilityWorker extends Worker {
 
         int tmdbId = getInputData().getInt("tmdbId", 0);
         String mediaType = getInputData().getString("mediaType");
-        int season = getInputData().getInt("season", 0);
+        int season = getInputData().getInt("season", -1);
         int episode = getInputData().getInt("episode", 0);
         if (tmdbId <= 0 || (!"movie".equals(mediaType) && !"tv".equals(mediaType))) {
             return Result.failure();
@@ -175,7 +175,7 @@ public class PlexAvailabilityWorker extends Worker {
                 }
 
                 if (!("show".equals(type) || "series".equals(type)) || !hasExactTmdbGuid(item, tmdbId)) continue;
-                if (season <= 0 || episode <= 0) return true;
+                if (season < 0 || episode <= 0) return true;
 
                 String ratingKey = item.optString("ratingKey", "").trim();
                 if (ratingKey.isEmpty()) continue;
@@ -282,18 +282,18 @@ public class PlexAvailabilityWorker extends Worker {
 
         String mediaType = getInputData().getString("mediaType");
         int tmdbId = getInputData().getInt("tmdbId", 0);
-        int season = getInputData().getInt("season", 0);
+        int season = getInputData().getInt("season", -1);
         int episode = getInputData().getInt("episode", 0);
         String title = clean(getInputData().getString("title"), 180);
         if (title.isEmpty()) title = "Votre média";
-        String episodeSuffix = season > 0 && episode > 0 ? " (S" + season + "E" + episode + ")" : "";
+        String episodeSuffix = season >= 0 && episode > 0 ? " (S" + season + "E" + episode + ")" : "";
 
         Uri.Builder deepLink = new Uri.Builder()
             .scheme("com.seenit.app")
             .authority("media")
             .appendQueryParameter("tmdbId", String.valueOf(tmdbId))
             .appendQueryParameter("mediaType", "movie".equals(mediaType) ? "movie" : "tv");
-        if (season > 0 && episode > 0) {
+        if (season >= 0 && episode > 0) {
             deepLink.appendQueryParameter("season", String.valueOf(season));
             deepLink.appendQueryParameter("episode", String.valueOf(episode));
         }
@@ -344,6 +344,16 @@ public class PlexAvailabilityWorker extends Worker {
         );
         channel.setDescription("Disponibilité Plex après un téléchargement SeenIt");
         manager.createNotificationChannel(channel);
+    }
+
+    private static int nonNegativeInt(String value) {
+        if (value == null) return -1;
+        try {
+            int parsed = Integer.parseInt(value);
+            return parsed >= 0 ? parsed : -1;
+        } catch (NumberFormatException ignored) {
+            return -1;
+        }
     }
 
     private static int positiveInt(String value) {
