@@ -832,7 +832,11 @@ pour le cache des sagas et univers.
   par titre, titre original, année ou nom de release. L'association média requiert un **TMDB ID exact** ;
   TVDB/IMDb seuls ne suffisent pas. La corrélation d'un même transfert sans TMDB n'est permise que par
   une preuve physique exacte (`requestId`, infohash/downloadId/alias ou chemin). Sinon le transfert reste
-  visible et non rattaché plutôt que produire un faux positif. Pour une release TV externe, SeenIt
+  non rattaché. Pendant le handoff vers un transfert qBittorrent encore dépourvu d'identité média, SeenIt
+  masque uniquement sa représentation brute tant qu'au moins une intention active est techniquement
+  compatible ; cette suppression de visibilité n'assigne aucune identité et cesse dès qu'une preuve exacte
+  permet la réconciliation ou qu'aucune intention compatible ne subsiste. Hors de ce handoff, le transfert
+  non résolu reste visible plutôt que produire un faux positif. Pour une release TV externe, SeenIt
   recalcule le pont TVDB depuis ce TMDB ID, garantit la série Sonarr exacte puis exige que le parseur
   Sonarr résolve la release vers cette même série avant tout envoi. Une divergence ou une identité
   incomplète échoue fermée ; le titre de la release ne peut jamais sélectionner une série homonyme.

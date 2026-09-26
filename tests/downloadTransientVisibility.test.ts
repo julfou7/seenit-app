@@ -43,7 +43,7 @@ test('un qBit SxxEyy non résolu devient transitoirement une série', () => {
   assert.equal(normalized.episodeNumber, 5);
 });
 
-test('un qBit unique reste visible afin de conserver la progression live', () => {
+test('SEENIT-DOWNLOAD-001 masque le qBit anonyme pendant le handoff sans lui attribuer d’identité', () => {
   const pending = item({
     id: 'opt_movie',
     requestId: 'opt_movie',
@@ -63,7 +63,9 @@ test('un qBit unique reste visible afin de conserver la progression live', () =>
     addedAt: now
   });
 
-  assert.equal(shouldSuppressUnresolvedQbit(qbit, [pending], now), false);
+  assert.equal(shouldSuppressUnresolvedQbit(qbit, [pending], now), true);
+  assert.equal(qbit.tmdbId, undefined);
+  assert.equal(qbit.requestId, undefined);
 });
 
 test('un qBit résolu ou de résolution différente reste visible', () => {

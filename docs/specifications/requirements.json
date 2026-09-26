@@ -1107,6 +1107,10 @@
       "tests": [
         {
           "file": "tests/downloadTransientVisibility.test.ts",
+          "contains": "SEENIT-DOWNLOAD-001 masque le qBit anonyme pendant le handoff sans lui attribuer d’identité"
+        },
+        {
+          "file": "tests/downloadTransientVisibility.test.ts",
           "contains": "deux intentions simultanées masquent le qBit ambigu sans corrélation par titre"
         },
         {
