@@ -149,22 +149,27 @@ export async function downloadAndInstallApk(
 
     onProgress?.({ percent: 100, status: 'done', message: 'Installeur lancé !' });
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (progressListener) {
       try { await progressListener.remove(); } catch {}
     }
     recordClientOperationalSignal('APP_UPDATE_CLIENT_FAILED');
     localConsole.error('Failed to download & install APK natively:', err);
+    const errorMessage = err instanceof Error && err.message
+      ? err.message
+      : 'Erreur lors du téléchargement';
 
     onProgress?.({
       percent: 0,
       status: 'error',
-      message: err?.message || 'Erreur lors du téléchargement'
+      message: errorMessage
     });
 
     return {
       success: false,
-      error: err?.message || 'Impossible de lancer l\'installeur automatique.'
+      error: err instanceof Error && err.message
+        ? err.message
+        : 'Impossible de lancer l\'installeur automatique.'
     };
   }
 }

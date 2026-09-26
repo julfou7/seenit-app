@@ -9,6 +9,27 @@ export interface DownloadWebhookPresentation {
   plexAvailabilityData: Record<string, string> | null;
 }
 
+interface DownloadWebhookMedia {
+  title?: unknown;
+  tmdbId?: unknown;
+}
+
+interface DownloadWebhookPayload {
+  eventType?: unknown;
+  event_type?: unknown;
+  downloadId?: unknown;
+  series?: DownloadWebhookMedia;
+  movie?: DownloadWebhookMedia;
+  release?: { releaseTitle?: unknown };
+  episodes?: Array<{ seasonNumber?: unknown; episodeNumber?: unknown }>;
+}
+
+function normalizePayload(input: unknown): DownloadWebhookPayload {
+  return input && typeof input === 'object' && !Array.isArray(input)
+    ? input as DownloadWebhookPayload
+    : {};
+}
+
 function positiveInteger(value: unknown): number | null {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
@@ -20,7 +41,7 @@ function displayText(value: unknown, fallback: string): string {
   return clean ? clean.slice(0, 180) : fallback;
 }
 
-function firstEpisode(payload: any): { season: number; episode: number } | null {
+function firstEpisode(payload: DownloadWebhookPayload): { season: number; episode: number } | null {
   const candidate = Array.isArray(payload?.episodes) ? payload.episodes[0] : null;
   const season = positiveInteger(candidate?.seasonNumber);
   const episode = positiveInteger(candidate?.episodeNumber);
@@ -29,7 +50,7 @@ function firstEpisode(payload: any): { season: number; episode: number } | null 
 
 function buildEventKey(
   source: DownloadWebhookSource,
-  payload: any,
+  payload: DownloadWebhookPayload,
   tmdbId: number | null,
   episode: { season: number; episode: number } | null
 ): string {
@@ -40,11 +61,12 @@ function buildEventKey(
 
 export function buildDownloadWebhookPresentation(
   source: DownloadWebhookSource,
-  payload: any
+  input: unknown
 ): DownloadWebhookPresentation {
-  const eventType = typeof payload?.eventType === 'string'
+  const payload = normalizePayload(input);
+  const eventType = typeof payload.eventType === 'string'
     ? payload.eventType.trim()
-    : (typeof payload?.event_type === 'string' ? payload.event_type.trim() : 'Unknown');
+    : (typeof payload.event_type === 'string' ? payload.event_type.trim() : 'Unknown');
   const commonData: Record<string, string> = {
     type: 'DOWNLOAD_EVENT',
     source,

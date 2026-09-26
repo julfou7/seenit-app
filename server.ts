@@ -2504,7 +2504,7 @@ async function startServer() {
       const mutationCacheKey = normalizedMethod === 'POST' && requestId && req.user?.uid
         ? `${req.user.uid}:${normalizedMethod}:${targetUrl}:${requestId}`
         : null;
-      const fetchOptions: any = {
+      const fetchOptions: RequestInit & { headers: Record<string, string> } = {
         method: normalizedMethod,
         headers: cleanHeaders,
         signal: AbortSignal.timeout(10000)
@@ -2520,7 +2520,7 @@ async function startServer() {
       const performRequest = async (): Promise<Record<string, unknown>> => {
         const response = await secureServerFetch(targetUrl, fetchOptions);
         const text = await response.text();
-        let data: any = text;
+        let data: unknown = text;
         try {
           data = JSON.parse(text);
         } catch {}
@@ -2551,8 +2551,10 @@ async function startServer() {
         responsePayload = await performRequest();
       }
       res.status(200).json(responsePayload);
-    } catch (err: any) {
-      const timedOut = err?.name === 'TimeoutError' || err?.message?.includes('aborted') || err?.message?.includes('timeout');
+    } catch (err: unknown) {
+      const errorName = err instanceof Error ? err.name : '';
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      const timedOut = errorName === 'TimeoutError' || errorMessage.includes('aborted') || errorMessage.includes('timeout');
       emitOperationalEvent({
         code: 'DOWNLOAD_SERVICE_PROXY_FAILED',
         context: { errorCode: timedOut ? 'TIMEOUT' : operationalErrorCode(err, 'PROXY_FETCH_ERROR') },

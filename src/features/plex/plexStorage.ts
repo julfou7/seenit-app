@@ -24,6 +24,8 @@ export type PlexUserStorageField =
   | 'resolutionCache'
   | 'slugPurgeVersion';
 
+export type PlexResolutionCache = Record<string, unknown>;
+
 const ACTIVE_UID_KEY = 'seenit_plex_active_uid';
 const LEGACY_KEYS = [
   'plex_auth_token',
@@ -85,7 +87,7 @@ export function setPlexLastSyncTimestamp(uid: string, timestamp: number): void {
   localStorage.setItem(getPlexUserStorageKey(uid, 'lastSyncTimestamp'), String(timestamp));
 }
 
-export function getPlexResolutionCache(uid: string): Record<string, any> {
+export function getPlexResolutionCache(uid: string): PlexResolutionCache {
   try {
     const raw = localStorage.getItem(getPlexUserStorageKey(uid, 'resolutionCache'));
     return raw ? JSON.parse(raw) : {};
@@ -107,29 +109,31 @@ const PLEX_RESOLUTION_FIELDS = [
   'first_air_date'
 ] as const;
 
-export function compactPlexResolutionCache(cache: Record<string, any>): Record<string, any> {
+export function compactPlexResolutionCache(cache: PlexResolutionCache): PlexResolutionCache {
   const keys = Object.keys(cache);
   const retainedKeys = keys.slice(-PLEX_RESOLUTION_CACHE_MAX_ITEMS);
   return Object.fromEntries(retainedKeys.flatMap((key) => {
     const source = cache[key];
-    if (!source || !Number.isFinite(Number(source.id))) return [];
+    if (!source || typeof source !== 'object' || Array.isArray(source)) return [];
+    const entry = source as Record<string, unknown>;
+    if (!Number.isFinite(Number(entry.id))) return [];
     const compact = Object.fromEntries(
       PLEX_RESOLUTION_FIELDS
-        .filter((field) => source[field] !== undefined && source[field] !== null)
-        .map((field) => [field, source[field]])
+        .filter((field) => entry[field] !== undefined && entry[field] !== null)
+        .map((field) => [field, entry[field]])
     );
     return [[key, compact]];
   }));
 }
 
 export function mergePlexResolutionCaches(
-  localCache: Record<string, any>,
-  cloudCache: Record<string, any>
-): Record<string, any> {
+  localCache: PlexResolutionCache,
+  cloudCache: PlexResolutionCache
+): PlexResolutionCache {
   return compactPlexResolutionCache({ ...localCache, ...cloudCache });
 }
 
-export function setPlexResolutionCache(uid: string, cache: Record<string, any>): void {
+export function setPlexResolutionCache(uid: string, cache: PlexResolutionCache): void {
   const value = compactPlexResolutionCache(cache);
   localStorage.setItem(getPlexUserStorageKey(uid, 'resolutionCache'), JSON.stringify(value));
 }

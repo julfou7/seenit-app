@@ -105,11 +105,15 @@ export default function App() {
           } else if (localPlatforms.length > 0) {
             await setDoc(prefRef, { platforms: localPlatforms }, { merge: true });
           }
-        } catch (e: any) {
-          const errorMessage = e?.message || String(e);
+        } catch (e: unknown) {
+          const errorDetails = typeof e === 'object' && e !== null
+            ? e as { message?: unknown; code?: unknown }
+            : {};
+          const errorMessage = typeof errorDetails.message === 'string' ? errorDetails.message : String(e);
+          const errorCode = typeof errorDetails.code === 'string' ? errorDetails.code : '';
           const isOffline = !navigator.onLine || 
                             errorMessage.toLowerCase().includes('offline') || 
-                            e?.code === 'unavailable';
+                            errorCode === 'unavailable';
           if (isOffline) {
             console.warn('[App] Client is offline, using local cached streaming platforms:', errorMessage);
           } else {
@@ -280,7 +284,7 @@ function MainApp() {
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
 
-    let listenerHandler: any = null;
+    let listenerHandler: { remove: () => Promise<void> } | null = null;
 
     const setupBackButton = async () => {
       listenerHandler = await CapApp.addListener('backButton', ({ canGoBack }) => {
@@ -408,7 +412,7 @@ function MainApp() {
       );
     };
 
-    let appUrlListener: any = null;
+    let appUrlListener: { remove: () => Promise<void> } | null = null;
     if (Capacitor.isNativePlatform()) {
       void CapApp.addListener('appUrlOpen', ({ url }) => handleNativeMediaUrl(url))
         .then(handle => { appUrlListener = handle; });
