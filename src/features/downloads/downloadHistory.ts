@@ -1,7 +1,6 @@
 import {
   cleanUrl,
   executeGet,
-  type LiveDownloadItem,
   type SonarrRadarrConfig
 } from '../../services/sonarrRadarr';
 import { auth } from '../../lib/firebase';
