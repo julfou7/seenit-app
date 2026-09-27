@@ -213,7 +213,7 @@ retardent pas le merge par défaut. Un thread résolu avant le merge ne génère
 Le workflow `.github/workflows/codex-review-triage.yml` transforme les actions restantes en backlog durable :
 
 1. `pull_request_review: submitted` capte une review Codex arrivée après le merge ;
-2. `pull_request: closed` rebalaye la PR au moment du merge ;
+2. `pull_request: closed` déclenche une nouvelle réconciliation au moment du merge ;
 3. chaque finding **P1/P2/P3/P4 non résolu** produit sa **propre issue dédiée** marquée **à confirmer** ;
 4. une issue fonctionnelle liée à la PR peut être citée comme contexte mais n'est jamais le seul suivi du finding ;
 5. l'idempotence repose sur l'identifiant stable `comment:<id>` / `review:<id>` conservé dans le corps du ticket,
@@ -221,8 +221,10 @@ Le workflow `.github/workflows/codex-review-triage.yml` transforme les actions r
 6. les seuls auteurs autorisés sont exactement `chatgpt-codex-connector` et
    `chatgpt-codex-connector[bot]` ; aucun simple préfixe n'est accepté ;
 7. les threads inline déjà résolus et les reviews dismissées sont ignorés ; aucune écriture dans la PR fermée n'est nécessaire ;
-8. `workflow_dispatch` lance le **backfill historique** : toutes les PR mergées sont parcourues et chaque finding
-   non résolu encore absent est matérialisé avec la même clé idempotente.
+8. un verrou de concurrence global empêche deux créations concurrentes ; comme GitHub Actions peut remplacer
+   un run encore en attente dans ce groupe, **chaque exécution survivante** parcourt toutes les PR mergées et
+   matérialise les findings non résolus encore absents avec la même clé idempotente ;
+9. `workflow_dispatch` utilise exactement cette réconciliation pour lancer le **backfill historique**.
 
 Créer l'issue ne vaut jamais confirmation du bug et ne déclenche ni correction, ni rollback, ni APK. Le ticket
 rejoint le backlog normal avec sa priorité d'origine. S'il est confirmé, un chantier dédié applique cause racine,

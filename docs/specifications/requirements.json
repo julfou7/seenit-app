@@ -1972,6 +1972,10 @@
         {
           "file": "tests/codexReviewTriage.test.ts",
           "contains": "SEENIT-QUALITY-004 matérialise chaque finding Codex non résolu en issue dédiée"
+        },
+        {
+          "file": "tests/codexReviewTriage.test.ts",
+          "contains": "SEENIT-QUALITY-004 réconcilie tous les findings après remplacement d’un run en attente"
         }
       ]
     },
