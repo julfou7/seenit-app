@@ -3,7 +3,7 @@ import test from 'node:test';
 import {
   SEENIT_MANAGED_WEBHOOK_NAME,
   ensureArrManagedWebhook
-} from '../src/features/downloads/downloadWebhookProvisioning.ts';
+} from '../src/features/downloads/downloadWebhookProvisioningPolicy.ts';
 
 function webhookSchema() {
   return {
