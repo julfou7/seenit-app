@@ -1260,6 +1260,28 @@
       ]
     },
     {
+      "id": "SEENIT-DOWNLOAD-010",
+      "title": "Import Arr terminal conservé après disparition du transfert",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/downloadPostImportReconciliation.test.ts",
+          "contains": "SEENIT-DOWNLOAD-010 clôt une intention optimiste depuis un import Arr exact même si la queue a disparu"
+        },
+        {
+          "file": "tests/downloadPostImportReconciliation.test.ts",
+          "contains": "SEENIT-DOWNLOAD-010 refuse deux imports canoniques concurrents sans preuve physique"
+        },
+        {
+          "file": "tests/downloadPostImportReconciliation.test.ts",
+          "contains": "SEENIT-DOWNLOAD-010 retire l’intention Firestore dès le handoff ou la preuve terminale"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-DOWNLOAD-VISIBILITY-001",
       "title": "Téléchargements média masqués par défaut avec opt-in explicite par UID",
       "targets": [
