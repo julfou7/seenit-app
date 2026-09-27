@@ -81,6 +81,8 @@ test('SEENIT-QUALITY-004 matérialise chaque finding Codex non résolu en issue 
   assert.match(workflow, /pull_request_review:[\s\S]*submitted/);
   assert.match(workflow, /pull_request:[\s\S]*closed/);
   assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /concurrency:\s*[\s\S]*group:\s*seenit-codex-review-triage\s*[\s\S]*cancel-in-progress:\s*false/);
+  assert.doesNotMatch(workflow, /seenit-codex-review-triage-\$\{\{/);
   assert.match(workflow, /cancel-in-progress:\s*false/);
   assert.match(workflow, /issues:\s*write/);
   assert.match(workflow, /pull-requests:\s*read/);

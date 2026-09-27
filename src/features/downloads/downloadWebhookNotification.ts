@@ -30,14 +30,21 @@ function normalizePayload(input: unknown): DownloadWebhookPayload {
     : {};
 }
 
-function positiveInteger(value: unknown): number | null {
+function integerAtLeast(value: unknown, minimum: number): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'number' && typeof value !== 'string') return null;
+  if (typeof value === 'string' && !value.trim()) return null;
+
   const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  return Number.isInteger(parsed) && parsed >= minimum ? parsed : null;
+}
+
+function positiveInteger(value: unknown): number | null {
+  return integerAtLeast(value, 1);
 }
 
 function nonNegativeInteger(value: unknown): number | null {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+  return integerAtLeast(value, 0);
 }
 
 function displayText(value: unknown, fallback: string): string {

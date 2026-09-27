@@ -68,6 +68,48 @@ test('SEENIT-DOWNLOAD-001 masque le qBit anonyme pendant le handoff sans lui att
   assert.equal(qbit.requestId, undefined);
 });
 
+test('SEENIT-DOWNLOAD-001 conserve un qBit relié par une preuve physique exacte', () => {
+  const hash = '0123456789abcdef0123456789abcdef01234567';
+  const pendingByHash = item({
+    id: 'opt_movie_hash',
+    requestId: 'req_hash',
+    isOptimistic: true,
+    tmdbId: 123,
+    downloadId: hash,
+    quality: '1080p',
+    addedAt: now - 1_000,
+    status: 'searching'
+  });
+  const qbitByHash = item({
+    id: `qbit_${hash}`,
+    downloadClient: 'qBittorrent',
+    title: 'Raw.Transfer.1080p',
+    quality: '1080p',
+    addedAt: now
+  });
+  assert.equal(shouldSuppressUnresolvedQbit(qbitByHash, [pendingByHash], now), false);
+
+  const pendingByPath = item({
+    id: 'opt_movie_path',
+    requestId: 'req_path',
+    isOptimistic: true,
+    tmdbId: 456,
+    transferPath: '/downloads/exact/movie.mkv',
+    quality: '1080p',
+    addedAt: now - 1_000,
+    status: 'searching'
+  });
+  const qbitByPath = item({
+    id: 'qbit_other_hash',
+    downloadClient: 'qBittorrent',
+    title: 'Another.Raw.Transfer.1080p',
+    transferPath: '/downloads/exact/movie.mkv',
+    quality: '1080p',
+    addedAt: now
+  });
+  assert.equal(shouldSuppressUnresolvedQbit(qbitByPath, [pendingByPath], now), false);
+});
+
 test('un qBit résolu ou de résolution différente reste visible', () => {
   const pending = item({
     id: 'opt_movie',

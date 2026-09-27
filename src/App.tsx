@@ -393,8 +393,10 @@ function MainApp() {
 
       const tmdbId = Number(parsed.searchParams.get('tmdbId'));
       const mediaType = parsed.searchParams.get('mediaType') === 'movie' ? 'movie' : 'tv';
-      const season = Number(parsed.searchParams.get('season'));
-      const episode = Number(parsed.searchParams.get('episode'));
+      const seasonParam = parsed.searchParams.get('season');
+      const episodeParam = parsed.searchParams.get('episode');
+      const season = seasonParam !== null && seasonParam.trim() ? Number(seasonParam) : NaN;
+      const episode = episodeParam !== null && episodeParam.trim() ? Number(episodeParam) : NaN;
       if (!Number.isInteger(tmdbId) || tmdbId <= 0) return;
 
       const actionKey = `native-media:${mediaType}:${tmdbId}:${season || 0}:${episode || 0}`;
@@ -407,7 +409,7 @@ function MainApp() {
         'tmdb',
         mediaType,
         tmdbId,
-        Number.isInteger(season) && season > 0 ? season : undefined,
+        Number.isInteger(season) && season >= 0 ? season : undefined,
         Number.isInteger(episode) && episode > 0 ? episode : undefined
       );
     };
@@ -480,12 +482,12 @@ function MainApp() {
       navigator.serviceWorker.addEventListener('message', handleSWMessage);
     }
 
-    const handleCapacitorAction = (event: CustomEvent) => {
-      if (event.detail) {
+    const handleCapacitorAction: EventListener = (event) => {
+      if (event instanceof CustomEvent && event.detail) {
         handleNotificationMessage(event.detail);
       }
     };
-    window.addEventListener('capacitor-notification-action' as any, handleCapacitorAction);
+    window.addEventListener('capacitor-notification-action', handleCapacitorAction);
 
     const pendingAppUpdatePush = consumeAppUpdateAvailablePush();
     if (pendingAppUpdatePush) {
@@ -519,7 +521,7 @@ function MainApp() {
       if (appUrlListener) {
         appUrlListener.remove();
       }
-      window.removeEventListener('capacitor-notification-action' as any, handleCapacitorAction);
+      window.removeEventListener('capacitor-notification-action', handleCapacitorAction);
       window.removeEventListener('focus', handleVisibilityOrFocus);
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
     };

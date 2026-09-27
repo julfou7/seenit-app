@@ -1,4 +1,5 @@
 import type { LiveDownloadItem } from '../../services/sonarrRadarr';
+import { sameDownloadRequest, samePhysicalDownload, sameTransferPath } from './downloadIdentity.ts';
 
 function resolutionBucket(item: Partial<LiveDownloadItem>): '4k' | '1080p' | '720p' | null {
   const value = `${item.quality || ''} ${item.releaseTitle || ''} ${item.title || ''}`.toLowerCase();
@@ -80,6 +81,20 @@ function compatiblePendingRequests(
   });
 }
 
+function hasExactPendingTransferProof(
+  remote: LiveDownloadItem,
+  pendingRequests: LiveDownloadItem[]
+): boolean {
+  return pendingRequests.some(request => {
+    if (!request.isOptimistic) return false;
+    if (request.status === 'completed' || request.status === 'cancelled' || request.status === 'error') return false;
+
+    return sameDownloadRequest(request, remote)
+      || samePhysicalDownload(request, remote)
+      || sameTransferPath(request, remote);
+  });
+}
+
 /**
  * Un qBit sans identité média ne doit pas devenir une seconde carte pendant le
  * handoff d'une intention SeenIt. Tant qu'au moins une intention active est
@@ -99,6 +114,7 @@ export function shouldSuppressUnresolvedQbit(
   const isQbit = remote.id.startsWith('qbit_') || String(remote.downloadClient || '').toLowerCase().includes('qbittorrent');
   if (!isQbit || remote.tmdbId || remote.tvdbId || remote.imdbId) return false;
   if (remote.status === 'completed' || remote.status === 'cancelled' || remote.status === 'error' || Number(remote.progress || 0) >= 100) return false;
+  if (hasExactPendingTransferProof(remote, pendingRequests)) return false;
 
   return compatiblePendingRequests(remote, pendingRequests, now, windowMs).length > 0;
 }
