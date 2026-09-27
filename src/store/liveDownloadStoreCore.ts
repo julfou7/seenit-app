@@ -770,9 +770,10 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             : null;
           if (!isCurrentScope()) return;
 
+          const historyResolvedOptimisticIds = new Set<string>();
           const preservedItems: LiveDownloadItem[] = [];
           for (const oldItem of currentDownloads) {
-            if (oldItem.isOptimistic || removedSet.has(oldItem.id)) continue;
+            if (removedSet.has(oldItem.id)) continue;
             if (serverItems.some(serverItem => sameDownloadIdentity(oldItem, serverItem))) continue;
 
             if (isCancelledDownload(oldItem)) {
@@ -814,6 +815,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             if (historyOutcome.state === 'completed') {
               delete missingSince[oldItem.id];
               delete optimisticTimestamps[oldItem.id];
+              if (oldItem.isOptimistic) historyResolvedOptimisticIds.add(oldItem.id);
               void removeSharedDownloadRequest(oldItem);
               preservedItems.push({
                 ...oldItem,
@@ -836,6 +838,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             if (historyOutcome.state === 'failed') {
               delete missingSince[oldItem.id];
               delete optimisticTimestamps[oldItem.id];
+              if (oldItem.isOptimistic) historyResolvedOptimisticIds.add(oldItem.id);
               void removeSharedDownloadRequest(oldItem);
               preservedItems.push({
                 ...oldItem,
@@ -851,6 +854,8 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               });
               continue;
             }
+
+            if (oldItem.isOptimistic) continue;
 
             if (!missingSince[oldItem.id]) missingSince[oldItem.id] = now;
             const missingFor = now - missingSince[oldItem.id];
@@ -950,7 +955,11 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           };
 
           const finalItems: LiveDownloadItem[] = [];
-          for (const item of [...serverItems, ...pendingOptimistic, ...preservedItems]) {
+          for (const item of [
+            ...serverItems,
+            ...pendingOptimistic.filter(item => !historyResolvedOptimisticIds.has(item.id)),
+            ...preservedItems
+          ]) {
             if (removedSet.has(item.id)) continue;
 
             const existingIndex = finalItems.findIndex(existing => sameDownloadIdentity(existing, item));
