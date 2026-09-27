@@ -66,7 +66,7 @@ test('SEENIT-DOWNLOAD-010 refuse deux imports canoniques concurrents sans preuve
         date: '2026-09-27T21:34:40Z',
         downloadId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         movie: { tmdbId: 990001 },
-        sourceTitle: 'Release.A.1080p'
+        sourceTitle: 'One Last Shot'
       },
       {
         eventType: 'downloadFolderImported',
