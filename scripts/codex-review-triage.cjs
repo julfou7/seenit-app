@@ -315,6 +315,26 @@ async function listMergedPrReviews(repository) {
   return merged;
 }
 
+async function listBackfillPrNumbers(repository) {
+  const [mergedPrs, globalReviewComments] = await Promise.all([
+    listMergedPrReviews(repository),
+    listAll(`/repos/${repository}/pulls/comments?sort=created&direction=asc`)
+  ]);
+  const candidatePrNumbers = new Set();
+  for (const comment of globalReviewComments) {
+    if (!isCodexAuthor(comment?.user?.login)) continue;
+    if (![1, 2, 3, 4].includes(extractPriority(comment?.body || ''))) continue;
+    const prNumber = pullNumberFromUrl(comment.pull_request_url || '');
+    if (prNumber && mergedPrs.has(prNumber)) candidatePrNumbers.add(prNumber);
+  }
+  for (const [prNumber, pr] of mergedPrs) {
+    if (pr.reviews.some(review => isCodexAuthor(review?.user?.login) && [1, 2, 3, 4].includes(extractPriority(review?.body || '')))) {
+      candidatePrNumbers.add(prNumber);
+    }
+  }
+  return [...candidatePrNumbers].sort((a, b) => a - b);
+}
+
 async function backfill({ repository }) {
   const [issueIndex, mergedPrs, globalReviewComments] = await Promise.all([
     loadFindingIssueIndex(repository),
@@ -365,8 +385,24 @@ async function main() {
   const repository = process.env.GITHUB_REPOSITORY;
   const eventPath = process.env.GITHUB_EVENT_PATH;
   const eventName = process.env.GITHUB_EVENT_NAME;
-  if (!repository || !eventPath) throw new Error('GITHUB_REPOSITORY/GITHUB_EVENT_PATH absent.');
+  const args = process.argv.slice(2);
+  if (!repository) throw new Error('GITHUB_REPOSITORY absent.');
 
+  if (args.includes('--list-backfill-prs')) {
+    const prNumbers = await listBackfillPrNumbers(repository);
+    process.stdout.write(JSON.stringify(prNumbers));
+    return;
+  }
+
+  const prArgIndex = args.indexOf('--pr');
+  if (prArgIndex >= 0) {
+    const prNumber = Number(args[prArgIndex + 1]);
+    if (!Number.isInteger(prNumber) || prNumber <= 0) throw new Error('Numéro de PR invalide pour --pr.');
+    await triage({ repository, prNumber });
+    return;
+  }
+
+  if (!eventPath) throw new Error('GITHUB_EVENT_PATH absent.');
   if (eventName === 'workflow_dispatch') {
     await backfill({ repository });
     return;
@@ -391,6 +427,7 @@ module.exports = {
   findingKey,
   findingMarker,
   isCodexAuthor,
+  listBackfillPrNumbers,
   parseFindingMarkers,
   pullNumberFromUrl,
   repositoryParts,

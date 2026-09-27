@@ -10,26 +10,24 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: seenit-codex-review-triage-${{ github.event.pull_request.number || 'backfill' }}
-  cancel-in-progress: false
-
 jobs:
-  triage:
+  triage_event:
     name: Materialize unresolved Codex findings
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'pull_request_review' &&
-       (github.event.review.user.login == 'chatgpt-codex-connector[bot]' ||
-        github.event.review.user.login == 'chatgpt-codex-connector')) ||
-      (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+      github.event_name != 'workflow_dispatch' &&
+      ((github.event_name == 'pull_request_review' &&
+        (github.event.review.user.login == 'chatgpt-codex-connector[bot]' ||
+         github.event.review.user.login == 'chatgpt-codex-connector')) ||
+       (github.event_name == 'pull_request' && github.event.pull_request.merged == true))
+    concurrency:
+      group: seenit-codex-review-triage-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     permissions:
       contents: read
       issues: write
       pull-requests: read
-
     steps:
       - name: Checkout canonical triage code
         uses: actions/checkout@v6
@@ -37,8 +35,68 @@ jobs:
           ref: main
           fetch-depth: 1
           persist-credentials: false
-
       - name: Materialize unresolved Codex findings in Issues
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/codex-review-triage.cjs
+        run: node scripts/codex-review-triage.cjs --pr ${{ github.event.pull_request.number }}
+
+  discover_backfill:
+    name: Discover historical Codex PRs
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      prs: ${{ steps.candidates.outputs.prs }}
+    steps:
+      - name: Checkout canonical triage code
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+      - name: List merged PRs with Codex findings
+        id: candidates
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          prs="$(node scripts/codex-review-triage.cjs --list-backfill-prs)"
+          if [ "$prs" = "[]" ]; then prs='[0]'; fi
+          echo "prs=$prs" >> "$GITHUB_OUTPUT"
+
+  backfill_pr:
+    name: Backfill Codex findings for PR #${{ matrix.pr }}
+    if: github.event_name == 'workflow_dispatch'
+    needs: discover_backfill
+    strategy:
+      fail-fast: false
+      matrix:
+        pr: ${{ fromJSON(needs.discover_backfill.outputs.prs) }}
+    concurrency:
+      group: seenit-codex-review-triage-${{ matrix.pr }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Checkout canonical triage code
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Materialize historical finding issues
+        if: matrix.pr != 0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/codex-review-triage.cjs --pr ${{ matrix.pr }}
+      - name: No historical Codex findings
+        if: matrix.pr == 0
+        run: echo "Aucune PR mergée avec finding Codex P1-P4."

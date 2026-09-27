@@ -81,6 +81,10 @@ test('SEENIT-QUALITY-004 matérialise chaque finding Codex non résolu en issue 
   assert.match(workflow, /pull_request_review:[\s\S]*submitted/);
   assert.match(workflow, /pull_request:[\s\S]*closed/);
   assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /triage_event:[\s\S]*group:\s*seenit-codex-review-triage-\\\$\\\{\\\{ github\\.event\\.pull_request\\.number \\\}\\\}/);
+  assert.match(workflow, /backfill_pr:[\s\S]*group:\s*seenit-codex-review-triage-\\\$\\\{\\\{ matrix\\.pr \\\}\\\}/);
+  assert.match(workflow, /discover_backfill:[\s\S]*--list-backfill-prs/);
+  assert.match(workflow, /matrix:[\s\S]*fromJSON\(needs\.discover_backfill\.outputs\.prs\)/);
   assert.match(workflow, /cancel-in-progress:\s*false/);
   assert.match(workflow, /issues:\s*write/);
   assert.match(workflow, /pull-requests:\s*read/);
@@ -94,6 +98,9 @@ test('SEENIT-QUALITY-004 matérialise chaque finding Codex non résolu en issue 
   assert.match(script, /reviewThreads\(first:\s*100/);
   assert.match(script, /isResolved/);
   assert.match(script, /Backfill terminé/);
+  assert.match(script, /listBackfillPrNumbers/);
+  assert.match(script, /--list-backfill-prs/);
+  assert.match(script, /args\.indexOf\('--pr'\)/);
   assert.doesNotMatch(script, /resolveTargetIssue|extractReferencedIssueNumbers/);
 
   for (const source of [agents, bootstrap, delivery, spec].map(normalize)) {
