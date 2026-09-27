@@ -30,7 +30,11 @@ import {
   sameTransferPath
 } from '../features/downloads/downloadIdentity';
 import { findUniqueRecentOptimisticAttachments, mergeLateOptimisticMetadata } from '../features/downloads/downloadReconciliation';
-import { fetchRecentDownloadHistory, resolveDownloadHistoryOutcome } from '../features/downloads/downloadHistory';
+import {
+  fetchRecentDownloadHistory,
+  resolveDownloadHistoryOutcome,
+  shouldResolveMissingDownloadFromHistory
+} from '../features/downloads/downloadHistory';
 import { preferSeenItImagePath } from '../features/downloads/downloadPosterStability';
 import { isDownloadInHistorySection } from '../features/downloads/downloadStatePolicy';
 import { buildLiveDownloadStorageKey, isDownloadRequestScopeCurrent } from '../features/downloads/downloadUserScope';
@@ -728,6 +732,10 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             const serverMatch = serverItems.some(serverItem => sameDownloadIdentity(optimistic, serverItem));
             if (serverMatch) {
               delete optimisticTimestamps[optimistic.id];
+              // Le document Firestore n'est qu'une intention de handoff. Une fois
+              // le transfert physique prouvé, le conserver en "searching" pourrait
+              // ressusciter un état obsolète après import/déplacement.
+              void removeSharedDownloadRequest(optimistic);
               continue;
             }
 
@@ -742,11 +750,12 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             }
           }
 
+          const historyCheckNow = Date.now();
           const missingActiveItems = currentDownloads.filter(oldItem =>
-            !oldItem.isOptimistic
-            && !removedSet.has(oldItem.id)
+            !removedSet.has(oldItem.id)
             && !isTerminalDownload(oldItem)
             && !serverItems.some(serverItem => sameDownloadIdentity(oldItem, serverItem))
+            && shouldResolveMissingDownloadFromHistory(oldItem, historyCheckNow)
           );
           const historySnapshot = missingActiveItems.length > 0
             ? await fetchRecentDownloadHistory({
@@ -798,11 +807,14 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             }
 
             const historyOutcome = historySnapshot
+              && shouldResolveMissingDownloadFromHistory(oldItem, now)
               ? resolveDownloadHistoryOutcome(oldItem, historySnapshot)
               : { state: 'unknown' as const };
 
             if (historyOutcome.state === 'completed') {
               delete missingSince[oldItem.id];
+              delete optimisticTimestamps[oldItem.id];
+              void removeSharedDownloadRequest(oldItem);
               preservedItems.push({
                 ...oldItem,
                 quality: historyOutcome.quality || oldItem.quality,
@@ -815,6 +827,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
                 speedFormatted: '',
                 timeleft: '',
                 timeleftSeconds: 0,
+                isOptimistic: false,
                 isRestored: false
               });
               continue;
@@ -822,6 +835,8 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
 
             if (historyOutcome.state === 'failed') {
               delete missingSince[oldItem.id];
+              delete optimisticTimestamps[oldItem.id];
+              void removeSharedDownloadRequest(oldItem);
               preservedItems.push({
                 ...oldItem,
                 status: 'error',
@@ -831,6 +846,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
                 speedFormatted: '',
                 timeleft: '',
                 timeleftSeconds: 0,
+                isOptimistic: false,
                 isRestored: false
               });
               continue;
