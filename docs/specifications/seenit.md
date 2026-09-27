@@ -875,6 +875,17 @@ pour le cache des sagas et univers.
   « En erreur », jamais dans « Terminés ». La fiche média applique la même priorité et ne déclenche
   aucun rafraîchissement Plex post-import tant qu'une erreur explicite subsiste. « Effacer » n'agit
   jamais sur un transfert actif.
+- **SEENIT-DOWNLOAD-010** — Une disparition de la file active après un import *Arr réussi ne
+  réinitialise jamais une demande SeenIt vers « Recherche en cours ». Le document
+  `users/{uid}/downloadRequests` est une intention de handoff transitoire : dès qu'une preuve physique
+  exacte rattache la demande à un transfert réel, SeenIt retire cette intention partagée sans supprimer
+  ni modifier le transfert. Si l'import se termine entre deux polls avant ce rattachement, l'historique
+  *Arr peut clore l'intention uniquement à partir du TMDB ID canonique exact, du scope saison/épisode
+  exact lorsqu'il existe, d'un événement terminal postérieur à la demande et d'un résultat non ambigu.
+  Un `downloadId` exact reste prioritaire ; titre, titre original, année et nom de release ne prouvent
+  jamais l'identité. Une ambiguïté conserve l'état non résolu au lieu de fabriquer un succès. Une preuve
+  terminale rend l'entrée non optimiste et empêche un ancien document partagé de la ressusciter après
+  déplacement du fichier, poll ou réouverture de l'application.
 - La progression distante garde ses décimales ; l'interface affiche un entier tronqué. La phase
   de recherche n'invente ni pourcentage ni message technique du client.
 - Une annulation active demande confirmation, nomme le client et précise que qBittorrent garde
