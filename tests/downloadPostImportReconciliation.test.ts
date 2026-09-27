@@ -157,15 +157,15 @@ test('SEENIT-DOWNLOAD-010 retire l’intention Firestore dès le handoff ou la p
 
   assert.match(
     source,
-    /if \(serverMatch\) \{[\s\S]*?void removeSharedDownloadRequest\(optimistic\);[\s\S]*?continue;/
+    /if \(serverMatch\) \{[\s\S]*?sharedRequestsToRetire\.set\(sharedRequestDocId\(optimistic\), optimistic\);[\s\S]*?continue;/
   );
   assert.match(
     source,
-    /historyOutcome\.state === 'completed'[\s\S]*?void removeSharedDownloadRequest\(oldItem\);[\s\S]*?isOptimistic: false/
+    /historyOutcome\.state === 'completed'[\s\S]*?sharedRequestsToRetire\.set\(sharedRequestDocId\(oldItem\), oldItem\);[\s\S]*?isOptimistic: false/
   );
   assert.match(
     source,
-    /historyOutcome\.state === 'failed'[\s\S]*?void removeSharedDownloadRequest\(oldItem\);[\s\S]*?isOptimistic: false/
+    /historyOutcome\.state === 'failed'[\s\S]*?sharedRequestsToRetire\.set\(sharedRequestDocId\(oldItem\), oldItem\);[\s\S]*?isOptimistic: false/
   );
   assert.match(
     source,
