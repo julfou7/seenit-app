@@ -892,20 +892,23 @@ pour le cache des sagas et univers.
 - Les notifications système de fin de téléchargement proviennent des webhooks Sonarr/Radarr.
   Le polling local affiche uniquement un toast SeenIt afin d'éviter les doublons.
 - **SEENIT-NOTIFICATION-003** — Un événement Sonarr/Radarr `Download` prouve uniquement que l'import
-  Arr est terminé ; il ne prouve jamais à lui seul que Plex a indexé le média. Ce fait prouvé produit
-  toujours une notification visible « Import terminé » sur chaque installation autorisée PWA/APK du UID,
-  y compris un Android capable de vérifier Plex. Si le webhook contient un TMDB ID exact et que l'APK a
-  confirmé la copie privée de ses credentials Plex pour le UID actif, le backend ajoute — sans remplacer
-  cette notification visible — un message FCM data-only haute priorité. Le téléphone compare l'empreinte
-  du UID actif, conserve le jeton Plex uniquement dans son stockage privé exclu des sauvegardes, puis
-  effectue une vérification Plex bornée en arrière-plan par TMDB ID exact et, pour un épisode, par saison
-  + épisode exacts. Le titre n'est jamais une preuve d'identité. Une copie native momentanément absente
-  est retentée de façon bornée ; une empreinte UID différente échoue fermée. « Disponible dans Plex »
-  n'est affiché qu'après une correspondance Plex exacte. À l'épuisement des vérifications, aucune seconde
-  notification « Import terminé » n'est créée puisque le reçu d'import a déjà été livré. Une installation
-  Android qui n'a pas confirmé la capability `plexAvailabilityBackgroundV1` conserve donc le reçu visible
-  sans vérification silencieuse ; chaque réenregistrement recalcule cette capability afin qu'un ancien
-  client ou un stockage natif indisponible ne puisse jamais être déclaré capable par optimisme.
+  Arr est terminé ; il ne prouve jamais à lui seul que Plex a indexé le média. La PWA et les APK legacy
+  reçoivent un reçu FCM visible. Sur un Android ayant confirmé la capability
+  `plexAvailabilityBackgroundV1`, le backend envoie à la place un message data-only haute priorité :
+  le service natif affiche immédiatement une notification média locale dont le titre est le nom du média
+  et le statut « Import terminé · Vérification de Plex… », puis lance la vérification Plex bornée. Le même
+  identifiant de notification est réutilisé ; une preuve Plex exacte met donc cet élément à jour vers
+  « Disponible dans Plex » au lieu d'empiler une seconde alerte. Si la preuve n'arrive jamais, le reçu
+  d'import reste visible. Le téléphone compare l'empreinte du UID actif, conserve le jeton Plex uniquement
+  dans son stockage privé exclu des sauvegardes et vérifie par TMDB ID exact et, pour un épisode, par
+  saison + épisode exacts. Le titre n'est jamais une preuve d'identité. Une copie native momentanément
+  absente est retentée de façon bornée ; une empreinte UID différente échoue fermée. Le tap principal des
+  deux états ouvre la fiche SeenIt exacte. Après preuve Plex, l'affiche issue de la correspondance PMS
+  exacte peut être rendue comme grand pictogramme borné avec fallback texte, et l'action
+  « Ouvrir dans Plex » n'est exposée que si le slug Plex Discover est résolu strictement depuis ce TMDB ID ;
+  elle ouvre `https://watch.plex.tv/movie|show/<slug>`, application Plex puis Web, sans fallback
+  titre/année ni accueil. Chaque réenregistrement recalcule la capability afin qu'un ancien client ou un
+  stockage natif indisponible ne puisse jamais être déclaré capable par optimisme.
   Après une association ou une déconnexion Plex, l'APK rafraîchit immédiatement l'enregistrement FCM déjà autorisé : une capability vraie n'est publiée qu'après persistance native confirmée et son retrait est annoncé sans attendre un redémarrage. Le chemin
   natif reste compatible avec `minSdkVersion = 24` sans dépendre d'API Java plus récentes non désucrées.
   Pour les épisodes, la saison `0` est une saison valide réservée aux spéciaux et reste distincte d'une

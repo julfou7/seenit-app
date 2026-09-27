@@ -648,11 +648,15 @@ explicite, aucun rappel film n'est programmé et aucune estimation J+120 n'est u
 - Un téléphone et une PWA du même compte peuvent recevoir l'événement sans partager un token unique.
 - Déconnecter un appareil révoque son installation sans désactiver les autres.
 - Les webhooks Sonarr/Radarr ciblent seulement les installations du propriétaire de l'endpoint. Un
-  événement `Download` affiche toujours « Import terminé » sur chaque installation autorisée ; sur un
-  Android dont la copie privée Plex est confirmée, un second signal silencieux vérifie ensuite Plex sans
-  remplacer ce reçu visible. « Disponible dans Plex » n'apparaît qu'après une preuve TMDB exacte
-  (et saison/épisode exacts pour la TV). Associer ou retirer Plex rafraîchit immédiatement l'enregistrement
-  de l'appareil déjà autorisé afin que cette capability serveur suive l'état natif sans redémarrage.
+  événement `Download` garde un reçu visible « Import terminé » sur PWA/APK legacy. Sur un Android dont
+  la copie privée Plex est confirmée, le signal data-only affiche localement le média avec
+  « Import terminé · Vérification de Plex… » puis réutilise le même identifiant pour passer à
+  « Disponible dans Plex » après preuve TMDB exacte (et saison/épisode exacts pour la TV). Le tap ouvre
+  la fiche SeenIt exacte ; l'état final peut afficher le poster PMS exact à droite et n'expose
+  « Ouvrir dans Plex » que lorsqu'un slug Discover strictement résolu par TMDB permet l'URL
+  `watch.plex.tv/movie|show/<slug>`. Aucun titre/année ni accueil Plex n'est un fallback. Associer ou
+  retirer Plex rafraîchit immédiatement l'enregistrement de l'appareil déjà autorisé afin que cette
+  capability serveur suive l'état natif sans redémarrage.
   Ce second signal reçoit un `traceId` aléatoire : le backend trace son routage, puis Android journalise de
   façon bornée les étapes réception FCM, enqueue/exécution WorkManager, état du credential, résultat Plex
   et affichage local. Au prochain démarrage authentifié, ces breadcrumbs sont envoyés au backend puis

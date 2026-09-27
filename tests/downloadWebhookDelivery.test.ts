@@ -26,21 +26,28 @@ test('SEENIT-NOTIFICATION-003 garde l’import visible et ajoute la vérificatio
     },
   });
 
-  assert.equal(calls.length, 2);
-  assert.deepEqual(calls[0].notification, presentation.notification);
-  assert.deepEqual(calls[0].data, presentation.data);
-  assert.deepEqual(calls[0].options, {});
-  assert.equal(calls[1].notification, null);
-  assert.equal(calls[1].data.type, 'PLEX_AVAILABILITY_CHECK');
-  assert.equal(calls[1].data.tmdbId, '438631');
-  assert.equal(calls[1].data.ownerUidHash, '0123456789abcdef');
-  assert.deepEqual(calls[1].options, {
+  assert.equal(calls.length, 3);
+  assert.equal(calls[0].notification, null);
+  assert.equal(calls[0].data.type, 'PLEX_AVAILABILITY_CHECK');
+  assert.equal(calls[0].data.tmdbId, '438631');
+  assert.equal(calls[0].data.ownerUidHash, '0123456789abcdef');
+  assert.deepEqual(calls[0].options, {
     platform: 'android',
     androidHighPriority: true,
     plexAvailabilityBackground: 'required',
   });
+  assert.deepEqual(calls[1].notification, presentation.notification);
+  assert.deepEqual(calls[1].data, presentation.data);
+  assert.deepEqual(calls[1].options, {
+    platform: 'android',
+    plexAvailabilityBackground: 'legacy',
+  });
+  assert.deepEqual(calls[2].notification, presentation.notification);
+  assert.deepEqual(calls[2].data, presentation.data);
+  assert.deepEqual(calls[2].options, { platform: 'web' });
+
   assert.deepEqual(result, {
-    delivered: 2,
+    delivered: 3,
     invalidTokensRemoved: 0,
     plexCheckAttempted: 1,
     plexCheckDelivered: 1,
@@ -67,10 +74,11 @@ test('SEENIT-NOTIFICATION-003 propage un traceId uniquement au contrôle Plex', 
     },
   });
 
-  assert.equal(calls.length, 2);
-  assert.equal(calls[0].data.traceId, undefined);
-  assert.equal(calls[1].data.traceId, '00000000-0000-4000-8000-000000000430');
-  assert.equal(calls[1].data.type, 'PLEX_AVAILABILITY_CHECK');
+  assert.equal(calls.length, 3);
+  assert.equal(calls[0].data.traceId, '00000000-0000-4000-8000-000000000430');
+  assert.equal(calls[0].data.type, 'PLEX_AVAILABILITY_CHECK');
+  assert.equal(calls[1].data.traceId, undefined);
+  assert.equal(calls[2].data.traceId, undefined);
 });
 
 test('SEENIT-NOTIFICATION-003 garde le reçu visible quand aucune identité Plex exacte n’existe', async () => {
@@ -91,5 +99,6 @@ test('SEENIT-NOTIFICATION-003 garde le reçu visible quand aucune identité Plex
   });
 
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].notification?.title, 'Import terminé 🍿');
+  assert.equal(calls[0].notification?.title, 'Sans TMDB');
+  assert.equal(calls[0].notification?.body, 'Import terminé');
 });
