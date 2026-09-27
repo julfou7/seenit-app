@@ -597,6 +597,12 @@ et webhooks, qui ne doit pas être dupliquée dans les réglages généraux.
 - Un swipe droit supprime une entrée d'historique ou demande confirmation pour annuler un actif.
 - L'annulation active retire la demande du client ; les fichiers qBittorrent sont conservés.
 - « Vider » ne touche que la section d'historique visée, jamais un actif.
+- L'intention Firestore `downloadRequests` ne reste pas une seconde source d'état après le handoff :
+  dès qu'un transfert physique exact est rattaché, cette intention transitoire est retirée. Si *Arr
+  importe puis déplace le fichier entre deux polls, SeenIt peut terminer la demande depuis l'historique
+  *Arr uniquement avec une identité TMDB exacte, le scope TV exact et un événement terminal récent
+  non ambigu. La disparition de la queue n'est jamais interprétée comme une nouvelle recherche et un
+  ancien document `searching` ne peut pas ressusciter l'entrée après import ou redémarrage.
 
 ### 10.2 Recherche et lancement
 
