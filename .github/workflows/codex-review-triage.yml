@@ -41,4 +41,6 @@ jobs:
       - name: Materialize unresolved Codex findings in Issues
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Le groupe global peut remplacer un run encore en attente. Le script
+        # réconcilie donc toutes les PR mergées à chaque exécution survivante.
         run: node scripts/codex-review-triage.cjs

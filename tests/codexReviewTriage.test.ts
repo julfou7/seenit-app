@@ -81,8 +81,6 @@ test('SEENIT-QUALITY-004 matérialise chaque finding Codex non résolu en issue 
   assert.match(workflow, /pull_request_review:[\s\S]*submitted/);
   assert.match(workflow, /pull_request:[\s\S]*closed/);
   assert.match(workflow, /workflow_dispatch:/);
-  assert.match(workflow, /concurrency:\s*[\s\S]*group:\s*seenit-codex-review-triage\s*[\s\S]*cancel-in-progress:\s*false/);
-  assert.doesNotMatch(workflow, /seenit-codex-review-triage-\$\{\{/);
   assert.match(workflow, /cancel-in-progress:\s*false/);
   assert.match(workflow, /issues:\s*write/);
   assert.match(workflow, /pull-requests:\s*read/);
@@ -111,4 +109,21 @@ test('SEENIT-QUALITY-004 matérialise chaque finding Codex non résolu en issue 
 
   assert.match(registry, /USR-2026-09-27-001/);
   assert.match(registry, /superseded by USR-2026-09-27-001/);
+});
+
+test('SEENIT-QUALITY-004 réconcilie tous les findings après remplacement d’un run en attente', () => {
+  const workflow = fs.readFileSync('.github/workflows/codex-review-triage.yml', 'utf8');
+  const script = fs.readFileSync('scripts/codex-review-triage.cjs', 'utf8');
+  const delivery = fs.readFileSync('docs/process/delivery.md', 'utf8');
+  const spec = fs.readFileSync('docs/specifications/seenit.md', 'utf8');
+
+  assert.match(workflow, /concurrency:\s*[\s\S]*group:\s*seenit-codex-review-triage\s*[\s\S]*cancel-in-progress:\s*false/);
+  assert.doesNotMatch(workflow, /seenit-codex-review-triage-\$\{\{/);
+  assert.match(script, /async function main\(\)[\s\S]*await backfill\(\{ repository \}\);/);
+  assert.doesNotMatch(script, /GITHUB_EVENT_PATH|await triage\(\{ repository, prNumber \}\)/);
+
+  for (const source of [delivery, spec].map(value => value.replace(/\s+/g, ' '))) {
+    assert.match(source, /chaque exécution survivante/i);
+    assert.match(source, /remplac(?:e|é|ement)[^.]*run[^.]*attente/i);
+  }
 });

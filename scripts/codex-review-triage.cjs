@@ -1,5 +1,3 @@
-const fs = require('node:fs');
-
 const CODEX_LOGINS = new Set([
   'chatgpt-codex-connector',
   'chatgpt-codex-connector[bot]'
@@ -363,19 +361,12 @@ async function backfill({ repository }) {
 
 async function main() {
   const repository = process.env.GITHUB_REPOSITORY;
-  const eventPath = process.env.GITHUB_EVENT_PATH;
-  const eventName = process.env.GITHUB_EVENT_NAME;
-  if (!repository || !eventPath) throw new Error('GITHUB_REPOSITORY/GITHUB_EVENT_PATH absent.');
+  if (!repository) throw new Error('GITHUB_REPOSITORY absent.');
 
-  if (eventName === 'workflow_dispatch') {
-    await backfill({ repository });
-    return;
-  }
-
-  const event = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
-  const prNumber = Number(event?.pull_request?.number || event?.number);
-  if (!Number.isInteger(prNumber) || prNumber <= 0) throw new Error('Numéro de PR introuvable dans l’événement GitHub.');
-  await triage({ repository, prNumber });
+  // GitHub Actions ne conserve qu'un seul run en attente par groupe de
+  // concurrence. Chaque run survivant doit donc réconcilier tout le backlog,
+  // sinon l'événement remplacé d'une autre PR pourrait perdre ses findings.
+  await backfill({ repository });
 }
 
 module.exports = {
