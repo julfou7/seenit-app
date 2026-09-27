@@ -509,6 +509,12 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
 
       updateDownloadRequest: (id, patch) => {
         const existing = get().downloads.find(download => download.id === id);
+        if (existing && !existing.isOptimistic && patch.isOptimistic) {
+          // Un callback de soumission arrivé en retard ne doit jamais dégrader
+          // une télémétrie distante déjà autoritative (active ou terminale).
+          return;
+        }
+
         markLocalItemMutation(id);
         if (existing?.isOptimistic || patch.isOptimistic) {
           optimisticTimestamps[id] = Date.now();
@@ -727,6 +733,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
 
           const now = Date.now();
           const pendingOptimistic: LiveDownloadItem[] = [];
+          const sharedRequestsToRetire = new Map<string, LiveDownloadItem>();
 
           for (const optimistic of currentDownloads.filter(item => item.isOptimistic && !removedSet.has(item.id))) {
             const serverMatch = serverItems.some(serverItem => sameDownloadIdentity(optimistic, serverItem));
@@ -735,7 +742,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               // Le document Firestore n'est qu'une intention de handoff. Une fois
               // le transfert physique prouvé, le conserver en "searching" pourrait
               // ressusciter un état obsolète après import/déplacement.
-              void removeSharedDownloadRequest(optimistic);
+              sharedRequestsToRetire.set(sharedRequestDocId(optimistic), optimistic);
               continue;
             }
 
@@ -816,7 +823,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               delete missingSince[oldItem.id];
               delete optimisticTimestamps[oldItem.id];
               if (oldItem.isOptimistic) historyResolvedOptimisticIds.add(oldItem.id);
-              void removeSharedDownloadRequest(oldItem);
+              sharedRequestsToRetire.set(sharedRequestDocId(oldItem), oldItem);
               preservedItems.push({
                 ...oldItem,
                 quality: historyOutcome.quality || oldItem.quality,
@@ -839,7 +846,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               delete missingSince[oldItem.id];
               delete optimisticTimestamps[oldItem.id];
               if (oldItem.isOptimistic) historyResolvedOptimisticIds.add(oldItem.id);
-              void removeSharedDownloadRequest(oldItem);
+              sharedRequestsToRetire.set(sharedRequestDocId(oldItem), oldItem);
               preservedItems.push({
                 ...oldItem,
                 status: 'error',
@@ -1078,6 +1085,13 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             lastUpdated: Date.now(),
             error: null
           });
+
+          // Retirer le handoff seulement après avoir publié l'état autoritatif
+          // local afin qu'un callback de soumission concurrent ne puisse pas
+          // recréer un "searching" obsolète après l'import.
+          for (const request of sharedRequestsToRetire.values()) {
+            void removeSharedDownloadRequest(request);
+          }
         } catch (error) {
           if (!isCurrentScope()) return;
           set({
