@@ -127,6 +127,8 @@ function matchStrength(item: LiveDownloadItem, record: HistoryRecord, checkedAt:
 
   const date = recordDate(record);
   const requestAt = Number(item.addedAt || 0);
+  if (item.isOptimistic && (!requestAt || !date)) return 'none';
+
   const earliest = requestAt
     ? requestAt - (item.isOptimistic ? 5_000 : 5 * 60_000)
     : checkedAt - 24 * 60 * 60_000;
