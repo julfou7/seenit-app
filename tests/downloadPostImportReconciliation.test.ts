@@ -98,6 +98,22 @@ test('un ancien import du même TMDB ne clôt jamais une nouvelle intention opti
   assert.equal(outcome.state, 'unknown');
 });
 
+test('une intention optimiste refuse un événement terminal sans date exploitable', () => {
+  const outcome = resolveDownloadHistoryOutcome(
+    movieIntent(),
+    snapshot([
+      {
+        eventType: 'downloadFolderImported',
+        downloadId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        movie: { tmdbId: 990001 },
+        sourceTitle: 'Undated.Release.1080p'
+      }
+    ])
+  );
+
+  assert.equal(outcome.state, 'unknown');
+});
+
 test('une preuve physique exacte reste prioritaire même si le titre de release diffère', () => {
   const hash = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
   const outcome = resolveDownloadHistoryOutcome(
