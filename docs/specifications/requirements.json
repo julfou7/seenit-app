@@ -1379,6 +1379,14 @@
           "contains": "SEENIT-NOTIFICATION-003 propage un traceId uniquement au contrôle Plex"
         },
         {
+          "file": "tests/downloadWebhookProvisioning.test.ts",
+          "contains": "SEENIT-NOTIFICATION-003 installe automatiquement le webhook Arr manquant"
+        },
+        {
+          "file": "tests/downloadWebhookProvisioning.test.ts",
+          "contains": "SEENIT-NOTIFICATION-003 répare le webhook géré sans dupliquer ni toucher les autres Connect"
+        },
+        {
           "file": "tests/plexAvailabilityDiagnostics.test.ts",
           "contains": "SEENIT-NOTIFICATION-003 borne et redige les traces de disponibilité Plex"
         },

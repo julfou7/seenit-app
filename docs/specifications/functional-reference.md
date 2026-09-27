@@ -629,8 +629,12 @@ et webhooks, qui ne doit pas être dupliquée dans les réglages généraux.
 Chaque compte possède ses URL et identifiants C411, Sonarr, Radarr et qBittorrent. Ils restent conservés
 lorsque la fonctionnalité est masquée et réapparaissent inchangés après réactivation. Les boutons de test
 emploient le même transport que l'action réelle. Sonarr/Radarr disposent de profils qualité séparés
-1080p/4K. Les webhooks personnels exposent une URL par service et un secret envoyé dans l'en-tête
-`x-seenit-webhook-secret`; la rotation invalide l'ancien secret. Aucun secret n'est affiché dans les logs.
+1080p/4K. SeenIt provisionne automatiquement dans chaque client *Arr configuré un Connect Webhook géré,
+à partir de l'URL et de la clé API déjà enregistrées : création s'il manque, réparation idempotente de
+l'endpoint, du secret et des déclencheurs Download/Upgrade s'ils dérivent, sans toucher aux autres Connect.
+Les valeurs personnelles restent consultables pour diagnostic ; le secret est envoyé dans l'en-tête
+`x-seenit-webhook-secret`, sa rotation répare immédiatement les Connect joignables et aucun secret n'est
+écrit dans les logs. Une configuration manuelle dans Sonarr/Radarr n'est plus requise dans le parcours normal.
 
 ## 11. Notifications, actualités et appareils
 

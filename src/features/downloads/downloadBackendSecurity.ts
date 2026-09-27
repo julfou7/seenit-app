@@ -44,9 +44,9 @@ export function isAllowedServiceProxyPath(rawUrl: string, method: string): boole
     return false;
   }
   const allowed: Array<{ method: string; path: RegExp }> = [
-    { method: 'GET', path: /^\/api\/v3\/(?:system\/status|qualityprofile|rootfolder|series(?:\/lookup)?|episode|movie(?:\/lookup)?|queue|history|release|parse)$/ },
-    { method: 'POST', path: /^\/api\/v3\/(?:series|movie|command|release(?:\/push)?)$/ },
-    { method: 'PUT', path: /^\/api\/v3\/(?:series|movie)(?:\/\d+)?$|^\/api\/v3\/episode\/\d+$/ },
+    { method: 'GET', path: /^\/api\/v3\/(?:system\/status|qualityprofile|rootfolder|series(?:\/lookup)?|episode|movie(?:\/lookup)?|queue|history|release|parse|notification(?:\/schema)?)$/ },
+    { method: 'POST', path: /^\/api\/v3\/(?:series|movie|command|release(?:\/push)?|notification)$/ },
+    { method: 'PUT', path: /^\/api\/v3\/(?:series|movie)(?:\/\d+)?$|^\/api\/v3\/(?:episode|notification)\/\d+$/ },
     { method: 'DELETE', path: /^\/api\/v3\/queue\/\d+$/ },
     { method: 'GET', path: /^\/api\/v2\/(?:app\/version|torrents\/(?:info|files))$/ },
     { method: 'POST', path: /^\/api\/v2\/(?:auth\/login|torrents\/(?:add|delete|filePrio|pause|resume|stop|start))$/ }

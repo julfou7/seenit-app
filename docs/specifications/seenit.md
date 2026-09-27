@@ -806,6 +806,12 @@ pour le cache des sagas et univers.
 - Le téléchargement et l'installation des **mises à jour SeenIt** (`SEENIT-UPDATE-*`) sont explicitement hors de ce gate et restent accessibles indépendamment de `downloadsEnabled`.
 - Les URL et secrets C411/Sonarr/Radarr/qBittorrent appartiennent au compte SeenIt et sont
   modifiables depuis l'onglet Téléchargements lorsque la fonctionnalité est activée.
+- Lorsque Téléchargements est actif et qu'un client Sonarr/Radarr est configuré, SeenIt provisionne
+  automatiquement dans ce client un unique Connect Webhook géré par l'application. Il le crée s'il
+  manque et le répare si son endpoint, son secret ou ses déclencheurs Download/Upgrade deviennent
+  obsolètes, sans modifier les autres Connect de l'utilisateur. Cette réconciliation est rejouée après
+  hydratation du compte et après sauvegarde/rotation des réglages ; une indisponibilité temporaire du
+  client ne rend pas la sauvegarde de configuration invalide.
 - **SEENIT-SECURITY-001** — Le proxy backend n'autorise qu'une liste minimale de chemins et de
   méthodes nécessaires. La cible réseau est validée contre SSRF et DNS rebinding.
 - Le SID qBittorrent est indexé par UID, URL et utilisateur, puis invalidé uniquement sur une
@@ -879,7 +885,9 @@ pour le cache des sagas et univers.
 - **SEENIT-NOTIFICATION-001** — Chaque appareil possède son propre token FCM rattaché à un UID.
   Un webhook personnel notifie tous les appareils PWA/APK de ce UID et aucun autre compte.
 - Le secret webhook est personnel, comparé en temps constant, absent des query strings et des
-  logs. Les payloads complets et secrets ne sont jamais journalisés.
+  logs. Les payloads complets et secrets ne sont jamais journalisés. SeenIt configure ce secret lui-même
+  dans le Connect Webhook géré de Sonarr/Radarr à partir des URL et clés API déjà fournies ; une saisie
+  manuelle dans *Arr n'est pas un prérequis du parcours normal.
 - Un token FCM invalide est supprimé sans bloquer les appareils valides.
 - Les notifications système de fin de téléchargement proviennent des webhooks Sonarr/Radarr.
   Le polling local affiche uniquement un toast SeenIt afin d'éviter les doublons.

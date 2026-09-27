@@ -35,6 +35,11 @@ test('le proxy n’accepte que les chemins Sonarr Radarr et qBittorrent nécessa
   assert.equal(isAllowedServiceProxyPath('https://sonarr.example/api/v3/queue?page=1', 'GET'), true);
   assert.equal(isAllowedServiceProxyPath('https://sonarr.example/api/v3/parse?title=Dark.Matter.S01E01', 'GET'), true);
   assert.equal(isAllowedServiceProxyPath('https://radarr.example/api/v3/release/push', 'POST'), true);
+  assert.equal(isAllowedServiceProxyPath('https://sonarr.example/api/v3/notification', 'GET'), true);
+  assert.equal(isAllowedServiceProxyPath('https://sonarr.example/api/v3/notification/schema', 'GET'), true);
+  assert.equal(isAllowedServiceProxyPath('https://radarr.example/api/v3/notification', 'POST'), true);
+  assert.equal(isAllowedServiceProxyPath('https://radarr.example/api/v3/notification/42', 'PUT'), true);
+  assert.equal(isAllowedServiceProxyPath('https://radarr.example/api/v3/notification/test', 'POST'), false);
   assert.equal(isAllowedServiceProxyPath('https://qbit.example/api/v2/torrents/info?filter=all', 'GET'), true);
   assert.equal(isAllowedServiceProxyPath('https://qbit.example/api/v2/torrents/files?hash=abc', 'GET'), true);
   assert.equal(isAllowedServiceProxyPath('https://qbit.example/api/v2/torrents/filePrio', 'POST'), true);

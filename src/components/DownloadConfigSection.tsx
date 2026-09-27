@@ -27,6 +27,7 @@ import { fetchQualityProfiles, testServiceConnection } from '../services/sonarrR
 import { testC411Connection } from '../services/c411';
 import { authenticatedFetch } from '../lib/apiAuth';
 import { requestNotificationPermission } from '../lib/firebase';
+import { ensureDownloadNotificationWebhooks } from '../features/downloads/downloadWebhookProvisioning';
 import { ActionButton } from './ui/ActionButton';
 import {
   resolveAutoQualityProfile,
@@ -167,9 +168,18 @@ export function DownloadConfigSection({ defaultOpen = false, hideToggle = false 
       const data = await response.json();
       if (!response.ok) throw new Error(data?.error || 'Webhooks personnels indisponibles.');
       setWebhookConfig(data as PersonalWebhookConfig);
-      if (rotate) showToast('Secret webhook renouvelé. Mets à jour Sonarr et Radarr.', 'success');
-    } catch (error: any) {
-      setWebhookError(error?.message || 'Webhooks personnels indisponibles.');
+      if (rotate) {
+        const results = await ensureDownloadNotificationWebhooks(config);
+        const failed = results.filter(result => result.action === 'failed').map(result => result.service);
+        showToast(
+          failed.length > 0
+            ? `Secret renouvelé. SeenIt réparera les notifications dès que ${failed.join(' / ')} sera joignable.`
+            : 'Secret renouvelé et notifications Sonarr/Radarr resynchronisées.',
+          failed.length > 0 ? 'error' : 'success'
+        );
+      }
+    } catch (error: unknown) {
+      setWebhookError(error instanceof Error && error.message ? error.message : 'Webhooks personnels indisponibles.');
     } finally {
       setLoadingWebhooks(false);
     }
@@ -436,9 +446,9 @@ export function DownloadConfigSection({ defaultOpen = false, hideToggle = false 
           <section className="rounded-2xl border border-[#E5A93D]/20 bg-[#E5A93D]/[0.06] p-3 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h4 className="text-sm font-black text-white">Notifications personnelles</h4>
+                <h4 className="text-sm font-black text-white">Notifications automatiques</h4>
                 <p className="mt-1 text-xs leading-relaxed text-zinc-400">
-                  Chaque appareil PWA ou APK possède son propre token. Ces webhooks ne notifient que les appareils connectés à ton compte.
+                  SeenIt installe et répare automatiquement son webhook dans Sonarr et Radarr. Chaque appareil PWA ou APK conserve son propre token.
                 </p>
               </div>
               <button
@@ -465,7 +475,7 @@ export function DownloadConfigSection({ defaultOpen = false, hideToggle = false 
                   onToggle={() => setVisibleSecrets(previous => ({ ...previous, webhook: !previous.webhook }))}
                 />
                 <p className="text-xs leading-relaxed text-zinc-400">
-                  Dans Sonarr et Radarr, ajoute l’en-tête <code className="text-[#E5A93D]">{webhookConfig.headerName}</code>. Le secret n’est jamais placé dans l’URL ni écrit dans les logs.
+                  Aucune configuration manuelle n’est normalement nécessaire. Ces valeurs restent visibles pour le diagnostic ; le secret n’est jamais placé dans l’URL ni écrit dans les logs.
                 </p>
               </div>
             ) : webhookError ? (
