@@ -185,7 +185,8 @@ export async function ensureArrManagedWebhook(params: {
   const transport = params.transport || defaultTransport;
   const headers = {
     'X-Api-Key': apiKey.trim(),
-    'Accept': 'application/json'
+    'Accept': 'application/json',
+    'Content-Type': 'application/json'
   };
   const notificationsUrl = `${baseUrl}/api/v3/notification`;
   const schemaUrl = `${notificationsUrl}/schema`;
