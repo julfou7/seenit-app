@@ -127,7 +127,7 @@ async function readPersistedParentalEvidence(keys: string[]): Promise<Map<string
 }
 
 async function writePersistedParentalEvidence(
-  entries: Array<{ key: string; details: any }>,
+  entries: Array<{ key: string; details: unknown }>,
 ): Promise<void> {
   const safeEntries = entries
     .filter(entry => /^(movie|tv):[1-9]\d{0,12}$/.test(entry.key)

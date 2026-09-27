@@ -133,9 +133,9 @@ export default function App() {
                             errorMessage.toLowerCase().includes('offline') || 
                             errorCode === 'unavailable';
           if (isOffline) {
-            console.warn('[App] Client is offline, using local cached streaming platforms:', errorMessage);
+            appLogger.warn('system', '[App] Client is offline, using local cached streaming platforms', { errorMessage });
           } else {
-            console.error('[App] Error syncing user streaming platforms from cloud', e);
+            appLogger.error('system', '[App] Error syncing user streaming platforms from cloud', e);
           }
         }
       }
