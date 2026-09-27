@@ -155,4 +155,12 @@ test('SEENIT-DOWNLOAD-010 retire l’intention Firestore dès le handoff ou la p
     source,
     /shouldResolveMissingDownloadFromHistory\(oldItem, historyCheckNow\)/
   );
+  assert.doesNotMatch(
+    source,
+    /if \(oldItem\.isOptimistic \|\| removedSet\.has\(oldItem\.id\)\) continue;/
+  );
+  assert.match(
+    source,
+    /pendingOptimistic\.filter\(item => !historyResolvedOptimisticIds\.has\(item\.id\)\)/
+  );
 });
