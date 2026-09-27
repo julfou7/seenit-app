@@ -2,7 +2,6 @@ import type { LiveDownloadItem } from '../../services/sonarrRadarr.ts';
 import {
   getPhysicalDownloadIds,
   normalizeDownloadClientId,
-  normalizeDownloadRelease,
   normalizeQualityLabel
 } from './downloadIdentity.ts';
 
@@ -26,7 +25,7 @@ export interface DownloadHistoryOutcome {
   message?: string;
 }
 
-type HistoryMatchStrength = 'physical' | 'canonical-release' | 'canonical' | 'none';
+type HistoryMatchStrength = 'physical' | 'canonical' | 'none';
 
 interface HistoryRecord {
   eventType?: unknown;
@@ -107,17 +106,6 @@ function episodeScopeMatches(item: LiveDownloadItem, record: HistoryRecord): boo
   return true;
 }
 
-function releaseMatches(item: LiveDownloadItem, record: HistoryRecord): boolean {
-  const expected = normalizeDownloadRelease(item.releaseTitle || '');
-  const actual = normalizeDownloadRelease(
-    record.sourceTitle
-    ?? record.data?.sourceTitle
-    ?? record.data?.releaseTitle
-  );
-  if (!expected || !actual) return false;
-  return expected === actual || expected.includes(actual) || actual.includes(expected);
-}
-
 function matchStrength(item: LiveDownloadItem, record: HistoryRecord, checkedAt: number): HistoryMatchStrength {
   const itemIds = new Set(getPhysicalDownloadIds(item));
   const historyId = recordDownloadId(record);
@@ -134,19 +122,14 @@ function matchStrength(item: LiveDownloadItem, record: HistoryRecord, checkedAt:
     : checkedAt - 24 * 60 * 60_000;
   if (date && date < earliest) return 'none';
 
-  if (releaseMatches(item, record)) return 'canonical-release';
-
-  // Une intention optimiste peut ne jamais avoir observé le vrai nom de release.
   // Le TMDB exact + scope + fenêtre temporelle n'est accepté qu'après contrôle
-  // d'ambiguïté dans resolveDownloadHistoryOutcome.
-  if (item.isOptimistic || !item.releaseTitle) return 'canonical';
-
-  return 'none';
+  // d'ambiguïté dans resolveDownloadHistoryOutcome. Le nom de release n'intervient
+  // jamais pour choisir entre deux transferts du même média.
+  return 'canonical';
 }
 
 function matchRank(strength: HistoryMatchStrength): number {
-  if (strength === 'physical') return 3;
-  if (strength === 'canonical-release') return 2;
+  if (strength === 'physical') return 2;
   if (strength === 'canonical') return 1;
   return 0;
 }
