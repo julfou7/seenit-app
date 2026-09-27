@@ -1976,6 +1976,10 @@
         {
           "file": "tests/codexReviewTriage.test.ts",
           "contains": "SEENIT-QUALITY-004 réconcilie tous les findings après remplacement d’un run en attente"
+        },
+        {
+          "file": "tests/codexReviewTriage.test.ts",
+          "contains": "SEENIT-QUALITY-004 pagine les findings Codex au-delà de 50 pages"
         }
       ]
     },

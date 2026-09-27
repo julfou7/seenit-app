@@ -156,11 +156,11 @@ async function githubGraphql(query, variables = {}) {
   return parsed.data;
 }
 
-async function listAll(path, maxPages = 50) {
+async function listAll(path, request = githubRequest) {
   const values = [];
-  for (let page = 1; page <= maxPages; page += 1) {
+  for (let page = 1; ; page += 1) {
     const separator = path.includes('?') ? '&' : '?';
-    const batch = await githubRequest(`${path}${separator}per_page=100&page=${page}`);
+    const batch = await request(`${path}${separator}per_page=100&page=${page}`);
     if (!Array.isArray(batch)) throw new Error(`Réponse GitHub non paginable pour ${path}.`);
     values.push(...batch);
     if (batch.length < 100) break;
@@ -382,6 +382,7 @@ module.exports = {
   findingKey,
   findingMarker,
   isCodexAuthor,
+  listAll,
   parseFindingMarkers,
   pullNumberFromUrl,
   repositoryParts,

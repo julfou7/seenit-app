@@ -11,6 +11,7 @@ const {
   extractPriority,
   findingKey,
   isCodexAuthor,
+  listAll,
   parseFindingMarkers,
   pullNumberFromUrl
 } = require('../scripts/codex-review-triage.cjs') as {
@@ -20,6 +21,7 @@ const {
   extractPriority: (body: string) => number | null;
   findingKey: (finding: { kind: string; id: number }) => string;
   isCodexAuthor: (login?: string) => boolean;
+  listAll: (path: string, request?: (path: string) => Promise<unknown[]>) => Promise<unknown[]>;
   parseFindingMarkers: (body: string) => Set<string>;
   pullNumberFromUrl: (url: string) => number | null;
 };
@@ -126,4 +128,17 @@ test('SEENIT-QUALITY-004 réconcilie tous les findings après remplacement d’u
     assert.match(source, /chaque exécution survivante/i);
     assert.match(source, /remplac(?:e|é|ement)[^.]*run[^.]*attente/i);
   }
+});
+
+test('SEENIT-QUALITY-004 pagine les findings Codex au-delà de 50 pages', async () => {
+  const requestedPages: number[] = [];
+  const findings = await listAll('/repos/seenit/pulls/comments?sort=created&direction=asc', async path => {
+    const page = Number(new URL(path, 'https://api.github.test').searchParams.get('page'));
+    requestedPages.push(page);
+    if (page > 51) return [];
+    return Array.from({ length: 100 }, (_, index) => ({ id: ((page - 1) * 100) + index + 1 }));
+  });
+
+  assert.equal(findings.length, 5100);
+  assert.deepEqual(requestedPages, Array.from({ length: 52 }, (_, index) => index + 1));
 });

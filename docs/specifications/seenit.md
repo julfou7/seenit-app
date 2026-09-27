@@ -1337,8 +1337,9 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   fonctionnelle. Le marqueur de finding reste dans le corps du ticket et la déduplication inspecte les
   issues ouvertes et fermées ; les threads déjà résolus sont ignorés, seules les identités exactes du bot
   Codex sont acceptées et aucune écriture sur la PR fermée n'est requise. Sous un verrou global, chaque
-  exécution survivante réconcilie toutes les PR mergées : le remplacement d'un run encore en attente par
-  GitHub Actions ne peut donc pas perdre un finding. Le déclenchement manuel utilise la même réconciliation
+  exécution survivante réconcilie toutes les PR mergées et toutes les pages de commentaires, sans plafond fixe :
+  le remplacement d'un run encore en attente par GitHub Actions ne peut donc pas perdre un finding, y compris
+  au-delà de 5 000 commentaires inline. Le déclenchement manuel utilise la même réconciliation
   pour le **backfill historique** des PR mergées antérieures. Créer l'issue ne déclenche ni correctif, ni rollback,
   ni release : elle rejoint le backlog normal. La PR et le thread exact restent la preuve d'origine ; GitHub
   Issues est la trace canonique des actions restantes et le mail Codex n'est qu'une notification.
