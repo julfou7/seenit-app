@@ -11,6 +11,10 @@ const worker = readFileSync('android/app/src/main/java/com/seenit/app/PlexAvaila
 const service = readFileSync('android/app/src/main/java/com/seenit/app/SeenItMessagingService.java', 'utf8');
 const store = readFileSync('android/app/src/main/java/com/seenit/app/PlexBackgroundCredentialStore.java', 'utf8');
 const plugin = readFileSync('android/app/src/main/java/com/seenit/app/SeenItPlexBackgroundPlugin.kt', 'utf8');
+const diagnosticStore = readFileSync(
+  'android/app/src/main/java/com/seenit/app/PlexAvailabilityDiagnosticStore.java',
+  'utf8'
+);
 const app = readFileSync('src/App.tsx', 'utf8');
 const showDetail = readFileSync('src/screens/ShowDetailScreenCore.tsx', 'utf8');
 const plexStorage = readFileSync('src/features/plex/plexStorage.ts', 'utf8');
@@ -46,7 +50,8 @@ test('SEENIT-NOTIFICATION-003 vérifie Plex en arrière-plan sans exposer le tok
   assert.ok(worker.includes('season >= 0 && episode > 0'));
   assert.ok(plugin.includes('clearForUid'));
   assert.ok(plexStorage.includes('syncNativePlexBackgroundCredentials'));
-  assert.ok(worker.includes('getRunAttemptCount() + 1 < MAX_ATTEMPTS ? Result.retry() : Result.success()'));
+  assert.ok(worker.includes('boolean canRetry = attempt < MAX_ATTEMPTS;'));
+  assert.ok(worker.includes('return canRetry ? Result.retry() : Result.success();'));
   assert.ok(worker.includes('if (!expectedUidHash.equals(credentials.uidHash))'));
   assert.ok(worker.includes('showPlexAvailableNotification()'));
   assert.ok(!worker.includes('showNotification(false)'));
@@ -83,4 +88,27 @@ test('SEENIT-NOTIFICATION-003 préserve S0E1 du deep-link jusqu’à la fiche é
   assert.ok(showDetail.includes('initialSeason !== undefined && initialSeason !== null && initialEpisode'));
   assert.doesNotMatch(showDetail, /initialSeason \|\| getSmartDefaultSeason/);
   assert.doesNotMatch(showDetail, /if \(initialSeason && initialEpisode/);
+});
+
+
+test('SEENIT-NOTIFICATION-003 trace le pipeline natif sans média ni secret', () => {
+  assert.ok(server.includes("normalizePlexAvailabilityTraceBatch"));
+  assert.ok(server.includes("'/api/diagnostics/plex-availability'"));
+  assert.ok(delivery.includes('traceId'));
+  assert.ok(service.includes('"fcm_received"'));
+  assert.ok(worker.includes('recordDiagnostic("worker", "started"'));
+  assert.ok(worker.includes('"missing_retry"'));
+  assert.ok(worker.includes('"not_available_exhausted"'));
+  assert.ok(worker.includes('"security_error"'));
+  assert.ok(worker.includes('areNotificationsEnabled()'));
+  assert.ok(diagnosticStore.includes('MAX_EVENTS = 120'));
+  assert.ok(diagnosticStore.includes('getNoBackupFilesDir'));
+  assert.ok(diagnosticStore.includes('clearForUidBefore'));
+  assert.doesNotMatch(diagnosticStore, /tmdbId|eventKey|title|X-Plex-Token/);
+  assert.ok(plugin.includes('readDiagnostics'));
+  assert.ok(plugin.includes('clearDiagnostics'));
+  assert.ok(plexStorage.includes("/api/diagnostics/plex-availability"));
+  assert.ok(plexStorage.includes('clearDiagnostics({ uid, beforeTimestamp })'));
+  assert.ok(app.includes('flushNativePlexAvailabilityDiagnostics'));
+  assert.ok(app.includes('[Plex disponibilité] trace='));
 });

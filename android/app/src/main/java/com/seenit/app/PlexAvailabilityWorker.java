@@ -46,7 +46,13 @@ public class PlexAvailabilityWorker extends Worker {
     static void enqueue(Context context, Map<String, String> message) {
         int tmdbId = positiveInt(message.get("tmdbId"));
         String ownerUidHash = clean(message.get("ownerUidHash"), 16);
-        if (tmdbId <= 0 || ownerUidHash.length() != 16) return;
+        String traceId = clean(message.get("traceId"), 36);
+        if (tmdbId <= 0 || ownerUidHash.length() != 16) {
+            PlexAvailabilityDiagnosticStore.record(
+                context, ownerUidHash, traceId, "work_enqueue", "invalid_payload", 0
+            );
+            return;
+        }
 
         String mediaType = "movie".equals(message.get("mediaType")) ? "movie" : "tv";
         int season = nonNegativeInt(message.get("season"));
@@ -64,6 +70,7 @@ public class PlexAvailabilityWorker extends Worker {
             .putInt("episode", episode)
             .putString("title", clean(message.get("title"), 180))
             .putString("eventKey", eventKey)
+            .putString("traceId", traceId)
             .build();
 
         Constraints constraints = new Constraints.Builder()
@@ -79,24 +86,33 @@ public class PlexAvailabilityWorker extends Worker {
 
         String workName = "seenit-plex-availability-" + Integer.toUnsignedString(eventKey.hashCode());
         WorkManager.getInstance(context).enqueueUniqueWork(workName, ExistingWorkPolicy.KEEP, request);
+        PlexAvailabilityDiagnosticStore.record(
+            context, ownerUidHash, traceId, "work_enqueue", "enqueued", 0
+        );
     }
 
     @NonNull
     @Override
     public Result doWork() {
         String expectedUidHash = getInputData().getString("ownerUidHash");
+        int attempt = getRunAttemptCount() + 1;
+        recordDiagnostic("worker", "started", attempt);
         if (expectedUidHash == null || expectedUidHash.length() != 16) {
+            recordDiagnostic("input", "invalid_payload", attempt);
             return Result.failure();
         }
 
+        boolean canRetry = attempt < MAX_ATTEMPTS;
         Credentials credentials = PlexBackgroundCredentialStore.read(getApplicationContext());
         if (credentials == null) {
             // L'enregistrement FCM et la copie privée Plex sont asynchrones.
             // Une absence momentanée n'est pas un succès terminal.
-            return getRunAttemptCount() + 1 < MAX_ATTEMPTS ? Result.retry() : Result.success();
+            recordDiagnostic("credentials", canRetry ? "missing_retry" : "missing_exhausted", attempt);
+            return canRetry ? Result.retry() : Result.success();
         }
         if (!expectedUidHash.equals(credentials.uidHash)) {
             // Fail closed : un signal ancien ou d'un autre UID ne révèle aucun titre.
+            recordDiagnostic("identity", "uid_mismatch", attempt);
             return Result.success();
         }
 
@@ -105,22 +121,41 @@ public class PlexAvailabilityWorker extends Worker {
         int season = getInputData().getInt("season", -1);
         int episode = getInputData().getInt("episode", 0);
         if (tmdbId <= 0 || (!"movie".equals(mediaType) && !"tv".equals(mediaType))) {
+            recordDiagnostic("input", "invalid_payload", attempt);
             return Result.failure();
         }
 
         try {
             if (isAvailable(credentials.token, tmdbId, mediaType, season, episode)) {
-                showPlexAvailableNotification();
+                recordDiagnostic("plex_check", "available", attempt);
+                recordDiagnostic("notification", showPlexAvailableNotification(), attempt);
                 return Result.success();
             }
+            recordDiagnostic(
+                "plex_check",
+                canRetry ? "not_available_retry" : "not_available_exhausted",
+                attempt
+            );
         } catch (Exception ignored) {
             // Une panne réseau/Plex ne devient jamais une preuve d'indisponibilité.
+            recordDiagnostic("plex_check", canRetry ? "error_retry" : "error_exhausted", attempt);
         }
 
-        if (getRunAttemptCount() + 1 < MAX_ATTEMPTS) return Result.retry();
+        if (canRetry) return Result.retry();
 
         // « Import terminé » a déjà été livré par le webhook : pas de doublon.
         return Result.success();
+    }
+
+    private void recordDiagnostic(String stage, String outcome, int attempt) {
+        PlexAvailabilityDiagnosticStore.record(
+            getApplicationContext(),
+            getInputData().getString("ownerUidHash"),
+            getInputData().getString("traceId"),
+            stage,
+            outcome,
+            attempt
+        );
     }
 
     private boolean isAvailable(String token, int tmdbId, String mediaType, int season, int episode) throws Exception {
@@ -284,9 +319,10 @@ public class PlexAvailabilityWorker extends Worker {
         }
     }
 
-    private void showPlexAvailableNotification() {
+    private String showPlexAvailableNotification() {
         Context context = getApplicationContext();
         ensureChannel(context);
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return "disabled";
 
         String mediaType = getInputData().getString("mediaType");
         int tmdbId = getInputData().getInt("tmdbId", 0);
@@ -334,8 +370,10 @@ public class PlexAvailabilityWorker extends Worker {
                 1_300_000_000 + Math.abs(requestCode % 300_000_000),
                 builder.build()
             );
+            return "shown";
         } catch (SecurityException ignored) {
             // La permission Android reste sous le contrôle de l'utilisateur.
+            return "security_error";
         }
     }
 

@@ -12,6 +12,7 @@ export interface DownloadPushOptions {
 }
 
 export interface DownloadPushResult {
+  attempted: number;
   delivered: number;
   invalid: number;
 }
@@ -28,15 +29,29 @@ export async function deliverDownloadWebhookPresentation({
   ownerUidHash,
   presentation,
   sendPush,
+  traceId,
 }: {
   uid: string;
   ownerUidHash: string;
   presentation: DownloadWebhookDeliveryPresentation;
   sendPush: DownloadPushSender;
-}): Promise<{ delivered: number; invalidTokensRemoved: number }> {
+  traceId?: string;
+}): Promise<{
+  delivered: number;
+  invalidTokensRemoved: number;
+  plexCheckAttempted: number;
+  plexCheckDelivered: number;
+  plexCheckFailed: number;
+}> {
   if (presentation.eventType !== 'Download' || !presentation.plexAvailabilityData) {
     const result = await sendPush(uid, presentation.notification, presentation.data);
-    return { delivered: result.delivered, invalidTokensRemoved: result.invalid };
+    return {
+      delivered: result.delivered,
+      invalidTokensRemoved: result.invalid,
+      plexCheckAttempted: 0,
+      plexCheckDelivered: 0,
+      plexCheckFailed: 0,
+    };
   }
 
   // Le webhook Arr prouve déjà l'import : ce reçu reste visible partout.
@@ -46,6 +61,7 @@ export async function deliverDownloadWebhookPresentation({
     sendPush(uid, null, {
       ...presentation.plexAvailabilityData,
       ownerUidHash,
+      ...(traceId ? { traceId } : {}),
     }, {
       platform: 'android',
       androidHighPriority: true,
@@ -56,5 +72,8 @@ export async function deliverDownloadWebhookPresentation({
   return {
     delivered: importDelivery.delivered + plexCheckDelivery.delivered,
     invalidTokensRemoved: importDelivery.invalid + plexCheckDelivery.invalid,
+    plexCheckAttempted: plexCheckDelivery.attempted,
+    plexCheckDelivered: plexCheckDelivery.delivered,
+    plexCheckFailed: Math.max(0, plexCheckDelivery.attempted - plexCheckDelivery.delivered),
   };
 }

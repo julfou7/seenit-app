@@ -902,6 +902,13 @@ pour le cache des sagas et univers.
   natif reste compatible avec `minSdkVersion = 24` sans dépendre d'API Java plus récentes non désucrées.
   Pour les épisodes, la saison `0` est une saison valide réservée aux spéciaux et reste distincte d'une
   saison absente : une preuve Plex S0E1 exige donc bien l'épisode exact, comme pour toute autre saison.
+  Chaque vérification silencieuse Plex porte en plus un `traceId` aléatoire sans identité média. Le backend
+  journalise le routage FCM avec ce même identifiant ; Android conserve dans `noBackup` un journal borné
+  contenant uniquement `traceId`, étape, résultat, tentative et horodatage, puis l'envoie de façon
+  authentifiée au prochain démarrage de l'application. Aucun UID, token FCM/Plex, titre, TMDB ID, chemin,
+  URL serveur ou `eventKey` n'est exporté dans cette télémétrie. Les traces de succès restent `info` et
+  report-only : elles servent à localiser une rupture entre webhook, FCM, WorkManager, preuve Plex et
+  notification locale sans créer automatiquement une issue sur un parcours sain.
 - **SEENIT-NOTIFICATION-002** — Un rappel Film ou Série utilise, lorsqu'il existe, un visuel TMDB
   préparé dans le stockage privé et borné de l'application. Les chemins TMDB relatifs comme les anciennes
   URL absolues déjà persistées sont normalisés vers la taille propre au canal notification avant la clé

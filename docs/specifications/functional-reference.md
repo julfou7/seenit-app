@@ -68,6 +68,8 @@ Les routes backend produit sont :
 - `POST /api/c411/test` et `POST /api/c411/search` : test/recherche C411 ;
 - `POST /api/service-proxy` : allowlist Sonarr/Radarr/qBittorrent ;
 - `POST /api/devices/register` et `DELETE /api/devices/:installationId` : appareil de notification ;
+- `POST /api/diagnostics/plex-availability` : remontée authentifiée et bornée des étapes Android de
+  disponibilité Plex, uniquement sous forme redigée/corrélée sans média, UID ni secret ;
 - `POST /api/releases/notify` : signal post-release public borné, dont le run, le SHA, le tag, l'APK et
   son SHA-256 sont revalidés auprès du dépôt officiel avant toute notification Android ;
 - `GET /api/webhooks/config`, `POST /api/webhooks/config/rotate` et webhooks personnels : réception
@@ -647,6 +649,12 @@ explicite, aucun rappel film n'est programmé et aucune estimation J+120 n'est u
   remplacer ce reçu visible. « Disponible dans Plex » n'apparaît qu'après une preuve TMDB exacte
   (et saison/épisode exacts pour la TV). Associer ou retirer Plex rafraîchit immédiatement l'enregistrement
   de l'appareil déjà autorisé afin que cette capability serveur suive l'état natif sans redémarrage.
+  Ce second signal reçoit un `traceId` aléatoire : le backend trace son routage, puis Android journalise de
+  façon bornée les étapes réception FCM, enqueue/exécution WorkManager, état du credential, résultat Plex
+  et affichage local. Au prochain démarrage authentifié, ces breadcrumbs sont envoyés au backend puis
+  acquittés localement ; seuls `traceId`, étape, résultat, tentative et horodatage sont transportés, jamais
+  UID/token/titre/TMDB/URL/chemin. Les succès sont conservés en report-only pour permettre un diagnostic
+  de bout en bout sans transformer une télémétrie saine en alerte.
 - Les notifications profondes ouvrent le média/épisode exact, y compris après un démarrage à froid de
   l'APK ; l'APK peut exposer « Marquer comme vu ».
 - Pour « nouvel épisode le jour J », la notification système est l'unique alerte : aucun toast interne

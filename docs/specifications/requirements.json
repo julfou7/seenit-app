@@ -1373,6 +1373,22 @@
         {
           "file": "tests/downloadNotificationCapabilityRouting.test.ts",
           "contains": "SEENIT-NOTIFICATION-003 rafraîchit la capability après association ou retrait Plex"
+        },
+        {
+          "file": "tests/downloadWebhookDelivery.test.ts",
+          "contains": "SEENIT-NOTIFICATION-003 propage un traceId uniquement au contrôle Plex"
+        },
+        {
+          "file": "tests/plexAvailabilityDiagnostics.test.ts",
+          "contains": "SEENIT-NOTIFICATION-003 borne et redige les traces de disponibilité Plex"
+        },
+        {
+          "file": "tests/plexDownloadAvailabilityAndroid.test.ts",
+          "contains": "SEENIT-NOTIFICATION-003 trace le pipeline natif sans média ni secret"
+        },
+        {
+          "file": "tests/logAuditor.test.ts",
+          "contains": "SEENIT-NOTIFICATION-003 garde la télémétrie Plex en report-only"
         }
       ]
     },

@@ -33,10 +33,14 @@ import { parentalRatingKey } from './features/shows/parentalRating';
 import { markEpisodeWatched } from './features/shows/markEpisodeWatched';
 import { cleanOldCache } from './db/dexie';
 import './store/showsStore';
-import { activatePlexUserScope, syncNativePlexBackgroundCredentials } from './features/plex/plexStorage';
+import {
+  activatePlexUserScope,
+  flushNativePlexAvailabilityDiagnostics,
+  syncNativePlexBackgroundCredentials
+} from './features/plex/plexStorage';
 import { usePlexAvailabilityStore } from './features/plex/plexAvailability';
 import { readUserScopedJson, writeUserScopedJson } from './lib/userIsolation';
-import { activateLogUserScope } from './store/logStore';
+import { activateLogUserScope, appLogger } from './store/logStore';
 import { createCachedAsyncLoader, preloadInBackground } from './features/navigation/screenPreload';
 import { resolveRootNavigationTab, withNavigationResetToastContext } from './features/navigation/tabPresentation';
 
@@ -93,6 +97,20 @@ export default function App() {
       setCurrentUser(user);
       if (user) {
         void syncGrantedNotificationDevice();
+        void user.getIdToken()
+          .then(idToken => flushNativePlexAvailabilityDiagnostics(user.uid, idToken))
+          .then(({ events, uploaded }) => {
+            for (const event of events) {
+              appLogger.info(
+                'system',
+                `[Plex disponibilité] trace=${event.traceId} étape=${event.stage} résultat=${event.outcome} tentative=${event.attempt}`
+              );
+            }
+            if (events.length > 0 && !uploaded) {
+              appLogger.info('system', '[Plex disponibilité] traces conservées pour un prochain envoi.');
+            }
+          })
+          .catch(() => undefined);
         try {
           const prefRef = doc(db, 'users', user.uid, 'settings', 'preferences');
           const snap = await getDoc(prefRef);
@@ -115,9 +133,9 @@ export default function App() {
                             errorMessage.toLowerCase().includes('offline') || 
                             errorCode === 'unavailable';
           if (isOffline) {
-            console.warn('[App] Client is offline, using local cached streaming platforms:', errorMessage);
+            appLogger.warn('system', '[App] Client is offline, using local cached streaming platforms', { errorMessage });
           } else {
-            console.error('[App] Error syncing user streaming platforms from cloud', e);
+            appLogger.error('system', '[App] Error syncing user streaming platforms from cloud', e);
           }
         }
       }

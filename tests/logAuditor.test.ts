@@ -284,3 +284,38 @@ test('SEENIT-OBSERVABILITY-001 détecte un warning inconnu seulement après deux
   const uncovered = analyzeLogEntries([unknown('2026-09-10T11:30:00.000Z')], { now });
   assert.equal(uncovered.coverageStatus, 'no_covered_signal');
 });
+
+
+test('SEENIT-NOTIFICATION-003 garde la télémétrie Plex en report-only', () => {
+  assert.equal(RULES.PLEX_AVAILABILITY_TRACE.autoIssue, false);
+  const event = buildOperationalEvent(
+    {
+      code: 'PLEX_AVAILABILITY_TRACE',
+      context: {
+        stage: 'plex_check',
+        outcome: 'not_available_retry',
+        attempt: 3,
+        count: 1,
+        token: 'ne-doit-pas-sortir',
+        title: 'Titre privé',
+      },
+      domain: 'notifications',
+      level: 'info',
+    },
+    {
+      correlationId: '00000000-0000-4000-8000-000000000430',
+      now: new Date('2026-09-27T17:30:00.000Z'),
+    }
+  );
+  const analysis = analyzeLogEntries([event], { now: new Date('2026-09-27T17:31:00.000Z') });
+  assert.equal(analysis.candidates.length, 0);
+  assert.equal(analysis.groups[0].decision, 'known_report_only');
+  assert.equal(analysis.groups[0].level, 'info');
+  assert.deepEqual(analysis.groups[0].context, {
+    stage: 'plex_check',
+    outcome: 'not_available_retry',
+    attempt: 3,
+    count: 1,
+  });
+  assert.doesNotMatch(JSON.stringify(event), /ne-doit-pas-sortir|Titre privé/);
+});
