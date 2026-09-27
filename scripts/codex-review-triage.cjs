@@ -1,11 +1,14 @@
 const fs = require('node:fs');
 
-const CODEX_LOGIN_PREFIX = 'chatgpt-codex-connector';
-const TRIAGE_MARKER = 'seenit-codex-review-triage';
-const TARGET_MARKER = 'seenit-codex-review-target';
+const CODEX_LOGINS = new Set([
+  'chatgpt-codex-connector',
+  'chatgpt-codex-connector[bot]'
+]);
+const FINDING_MARKER = 'seenit-codex-review-finding';
+const ORIGIN_MARKER = 'seenit-codex-review-origin';
 
 function isCodexAuthor(login = '') {
-  return String(login).toLowerCase().startsWith(CODEX_LOGIN_PREFIX);
+  return CODEX_LOGINS.has(String(login).toLowerCase());
 }
 
 function extractPriority(body = '') {
@@ -16,43 +19,48 @@ function extractPriority(body = '') {
   return plain ? Number(plain[1]) : null;
 }
 
-function extractReferencedIssueNumbers(body = '', prNumber = null) {
-  const seen = new Set();
-  const numbers = [];
-  const referencePattern = /(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|refs?|traite|référence|issue)\s*:?\s*#(\d+)/gi;
-  for (const match of String(body).matchAll(referencePattern)) {
-    const value = Number(match[1]);
-    if (!Number.isInteger(value) || value <= 0 || value === Number(prNumber) || seen.has(value)) continue;
-    seen.add(value);
-    numbers.push(value);
-  }
-  return numbers;
-}
-
 function findingKey(finding) {
   return `${finding.kind}:${finding.id}`;
 }
 
-function parseTriageState(comments = []) {
-  const tracked = new Set();
-  let targetIssueNumber = null;
-  for (const comment of comments) {
-    const body = String(comment?.body || '');
-    for (const match of body.matchAll(/<!--\s*seenit-codex-review-triage\s+finding=([^\s>]+)\s*-->/g)) {
-      tracked.add(match[1]);
-    }
-    const target = body.match(/<!--\s*seenit-codex-review-target\s+issue=(\d+)\s*-->/);
-    if (target) targetIssueNumber = Number(target[1]);
-  }
-  return { tracked, targetIssueNumber };
+function findingMarker(finding) {
+  return `<!-- ${FINDING_MARKER} key=${findingKey(finding)} -->`;
 }
 
-function collectActionableFindings({ reviewComments = [], reviews = [], tracked = new Set() } = {}) {
+function parseFindingMarkers(body = '') {
+  const keys = new Set();
+  for (const match of String(body).matchAll(/<!--\s*seenit-codex-review-finding\s+key=([^\s>]+)\s*-->/g)) {
+    keys.add(match[1]);
+  }
+  return keys;
+}
+
+function compactBody(body, limit = 1200) {
+  const normalized = String(body).replace(/\r/g, '').trim();
+  if (normalized.length <= limit) return normalized;
+  return `${normalized.slice(0, limit - 1).trimEnd()}…`;
+}
+
+function extractFindingTitle(body = '', fallback = 'Finding Codex') {
+  const withoutImages = String(body)
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/[`*_>#]/g, ' ')
+    .replace(/\bP[1-4]\s+Badge\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const title = withoutImages || fallback;
+  return title.length > 100 ? `${title.slice(0, 99).trimEnd()}…` : title;
+}
+
+function collectActionableFindings({ reviewComments = [], reviews = [], resolvedCommentIds = new Set() } = {}) {
   const findings = [];
   const append = (kind, item) => {
     if (!isCodexAuthor(item?.user?.login)) return;
+    if (kind === 'comment' && resolvedCommentIds.has(Number(item?.id))) return;
+    if (kind === 'review' && String(item?.state || '').toUpperCase() === 'DISMISSED') return;
     const priority = extractPriority(item?.body || '');
-    if (priority !== 1 && priority !== 2) return;
+    if (![1, 2, 3, 4].includes(priority)) return;
     const finding = {
       kind,
       id: Number(item.id),
@@ -60,7 +68,7 @@ function collectActionableFindings({ reviewComments = [], reviews = [], tracked 
       body: String(item.body || ''),
       url: item.html_url || item.url || null
     };
-    if (!Number.isFinite(finding.id) || tracked.has(findingKey(finding))) return;
+    if (!Number.isFinite(finding.id)) return;
     findings.push(finding);
   };
   reviewComments.forEach(item => append('comment', item));
@@ -69,68 +77,38 @@ function collectActionableFindings({ reviewComments = [], reviews = [], tracked 
   return findings;
 }
 
-function highestPriority(findings) {
-  return findings.reduce((current, finding) => Math.min(current, finding.priority), 4);
-}
-
-function compactBody(body, limit = 900) {
-  const normalized = String(body).replace(/\r/g, '').trim();
-  if (normalized.length <= limit) return normalized;
-  return `${normalized.slice(0, limit - 1).trimEnd()}…`;
-}
-
-function buildFindingsMarkdown(findings) {
-  return findings.map(finding => {
-    const link = finding.url ? ` — ${finding.url}` : '';
-    return `### P${finding.priority} · ${finding.kind} ${finding.id}${link}\n\n${compactBody(finding.body)}`;
-  }).join('\n\n');
-}
-
-function buildIssueComment({ pr, findings }) {
-  const priority = highestPriority(findings);
-  return [
-    `## Code Review Codex post-merge — P${priority} à confirmer`,
-    '',
-    `La PR #${pr.number} est déjà mergée. Codex a publié ${findings.length} finding(s) P1/P2 non encore routé(s).`,
-    '',
-    '**Ce signalement n’est pas une preuve de bug.** Il doit être confirmé sur le chemin de production avant correction. S’il est valide : cause racine + portée complète + TNR ciblé, puis PR corrective. S’il est faux : documenter la preuve et résoudre le thread Codex.',
-    '',
-    buildFindingsMarkdown(findings),
-    '',
-    `PR : ${pr.html_url}`
-  ].join('\n');
-}
-
-function buildPrTrackingComment({ targetIssueNumber, findings }) {
-  const markers = findings.map(finding => `<!-- ${TRIAGE_MARKER} finding=${findingKey(finding)} -->`).join('\n');
-  return [
-    markers,
-    `<!-- ${TARGET_MARKER} issue=${targetIssueNumber} -->`,
-    `Codex post-merge : ${findings.length} nouveau(x) finding(s) P1/P2 routé(s) vers #${targetIssueNumber}. Le merge n’a pas été bloqué ; le finding reste à confirmer avant correction.`
-  ].join('\n');
-}
-
-function buildDedicatedIssue({ pr, findings }) {
-  const priority = highestPriority(findings);
+function buildDedicatedIssue({ pr, finding }) {
+  const source = finding.url ? `- Source : ${finding.url}` : '- Source : lien indisponible';
   return {
-    title: `[P${priority}][Code Review] Trier les findings Codex post-merge PR #${pr.number}`,
+    title: `[P${finding.priority}][Codex][PR #${pr.number}] ${extractFindingTitle(finding.body, `${finding.kind} ${finding.id}`)}`,
     body: [
-      `<!-- seenit-codex-review-origin pr=${pr.number} -->`,
-      '## Triage requis',
+      findingMarker(finding),
+      `<!-- ${ORIGIN_MARKER} pr=${pr.number} -->`,
+      '## Finding Codex à confirmer',
       '',
-      `La PR #${pr.number} est mergée et aucun ticket **ouvert** référencé par la PR n’est disponible pour recevoir ce suivi.`,
+      `- Priorité signalée : **P${finding.priority}**`,
+      `- PR source : ${pr.html_url || pr.url || `#${pr.number}`}`,
+      source,
+      '- État : **à confirmer** — ce ticket matérialise le backlog, il ne prouve pas à lui seul un bug.',
       '',
-      '**Les findings Codex sont des signaux à confirmer, pas des bugs prouvés.**',
+      '### Signal Codex',
       '',
-      buildFindingsMarkdown(findings),
+      compactBody(finding.body),
       '',
-      `PR : ${pr.html_url}`,
+      '### Critère de fin',
       '',
-      '## Critère de fin',
-      '- finding confirmé → cause racine, portée complète, TNR et PR corrective ;',
-      '- faux positif → preuve documentée et thread Codex résolu.'
+      '- finding confirmé → cause racine, portée complète, TNR puis correctif dans un chantier dédié ;',
+      '- faux positif / déjà corrigé → preuve documentée puis fermeture de cette issue.',
+      '',
+      'La création de ce ticket ne déclenche automatiquement ni correctif, ni rollback, ni release APK.'
     ].join('\n')
   };
+}
+
+function repositoryParts(repository) {
+  const [owner, name] = String(repository).split('/');
+  if (!owner || !name) throw new Error(`Repository invalide : ${repository}`);
+  return { owner, name };
 }
 
 async function githubRequest(path, { method = 'GET', body } = {}) {
@@ -157,9 +135,32 @@ async function githubRequest(path, { method = 'GET', body } = {}) {
   return parsed;
 }
 
-async function listAll(path) {
+async function githubGraphql(query, variables = {}) {
+  const token = process.env.GITHUB_TOKEN;
+  const apiUrl = process.env.GITHUB_API_URL || 'https://api.github.com';
+  const graphqlUrl = process.env.GITHUB_GRAPHQL_URL || `${apiUrl.replace(/\/api\/v3\/?$/, '/api/graphql').replace(/\/$/, '')}/graphql`;
+  if (!token) throw new Error('GITHUB_TOKEN absent.');
+  const response = await fetch(graphqlUrl, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${token}`,
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'seenit-codex-review-triage'
+    },
+    body: JSON.stringify({ query, variables })
+  });
+  const text = await response.text();
+  const parsed = text ? JSON.parse(text) : null;
+  if (!response.ok || parsed?.errors?.length) {
+    throw new Error(`GitHub GraphQL -> ${response.status}: ${parsed?.errors?.map(item => item.message).join('; ') || text}`);
+  }
+  return parsed.data;
+}
+
+async function listAll(path, maxPages = 50) {
   const values = [];
-  for (let page = 1; page <= 10; page += 1) {
+  for (let page = 1; page <= maxPages; page += 1) {
     const separator = path.includes('?') ? '&' : '?';
     const batch = await githubRequest(`${path}${separator}per_page=100&page=${page}`);
     if (!Array.isArray(batch)) throw new Error(`Réponse GitHub non paginable pour ${path}.`);
@@ -169,77 +170,208 @@ async function listAll(path) {
   return values;
 }
 
-async function getIssue(repository, number) {
-  try {
-    return await githubRequest(`/repos/${repository}/issues/${number}`);
-  } catch (error) {
-    if (error.status === 404) return null;
-    throw error;
-  }
+async function getResolvedCommentIds(repository, prNumber) {
+  const { owner, name } = repositoryParts(repository);
+  const resolved = new Set();
+  let after = null;
+  do {
+    const data = await githubGraphql(`
+      query SeenItCodexReviewThreads($owner: String!, $name: String!, $number: Int!, $after: String) {
+        repository(owner: $owner, name: $name) {
+          pullRequest(number: $number) {
+            reviewThreads(first: 100, after: $after) {
+              pageInfo { hasNextPage endCursor }
+              nodes {
+                isResolved
+                comments(first: 100) {
+                  nodes { databaseId }
+                }
+              }
+            }
+          }
+        }
+      }
+    `, { owner, name, number: prNumber, after });
+    const threads = data?.repository?.pullRequest?.reviewThreads;
+    if (!threads) throw new Error(`Threads de review introuvables pour PR #${prNumber}.`);
+    for (const thread of threads.nodes || []) {
+      if (!thread?.isResolved) continue;
+      for (const comment of thread.comments?.nodes || []) {
+        if (Number.isFinite(Number(comment?.databaseId))) resolved.add(Number(comment.databaseId));
+      }
+    }
+    after = threads.pageInfo?.hasNextPage ? threads.pageInfo.endCursor : null;
+  } while (after);
+  return resolved;
 }
 
-async function resolveTargetIssue({ repository, pr, prComments }) {
-  const { targetIssueNumber } = parseTriageState(prComments);
-  if (targetIssueNumber) {
-    const prior = await getIssue(repository, targetIssueNumber);
-    if (prior && prior.state === 'open' && !prior.pull_request) return prior;
+async function loadFindingIssueIndex(repository) {
+  const issues = await listAll(`/repos/${repository}/issues?state=all&sort=created&direction=asc`);
+  const index = new Map();
+  for (const issue of issues) {
+    if (issue.pull_request) continue;
+    for (const key of parseFindingMarkers(issue.body || '')) {
+      if (!index.has(key)) index.set(key, issue);
+    }
   }
-
-  for (const number of extractReferencedIssueNumbers(pr.body || '', pr.number)) {
-    const issue = await getIssue(repository, number);
-    if (issue && issue.state === 'open' && !issue.pull_request) return issue;
-  }
-  return null;
+  return index;
 }
 
-async function triage({ repository, prNumber }) {
+async function ensureFindingIssue({ repository, pr, finding, issueIndex }) {
+  const key = findingKey(finding);
+  const existing = issueIndex.get(key);
+  if (existing) return { created: false, issue: existing };
+  const issue = await githubRequest(`/repos/${repository}/issues`, {
+    method: 'POST',
+    body: buildDedicatedIssue({ pr, finding })
+  });
+  issueIndex.set(key, issue);
+  return { created: true, issue };
+}
+
+async function triage({ repository, prNumber, issueIndex = null }) {
   const pr = await githubRequest(`/repos/${repository}/pulls/${prNumber}`);
   if (!pr.merged_at) {
-    console.log(`[Codex Review Triage] PR #${prNumber} non mergée : aucun suivi post-merge créé.`);
-    return { status: 'not-merged', findings: [] };
+    console.log(`[Codex Review Triage] PR #${prNumber} non mergée : aucun ticket post-merge créé.`);
+    return { status: 'not-merged', created: 0, existing: 0, skippedResolved: 0 };
   }
 
-  const [reviewComments, reviews, prComments] = await Promise.all([
+  const [reviewComments, reviews, resolvedCommentIds] = await Promise.all([
     listAll(`/repos/${repository}/pulls/${prNumber}/comments`),
     listAll(`/repos/${repository}/pulls/${prNumber}/reviews`),
-    listAll(`/repos/${repository}/issues/${prNumber}/comments`)
+    getResolvedCommentIds(repository, prNumber)
+  ]);
+  const allCodexPriorities = [...reviewComments, ...reviews]
+    .filter(item => isCodexAuthor(item?.user?.login) && [1, 2, 3, 4].includes(extractPriority(item?.body || ''))).length;
+  const findings = collectActionableFindings({ reviewComments, reviews, resolvedCommentIds });
+  if (!findings.length) {
+    console.log(`[Codex Review Triage] PR #${prNumber} : aucun finding Codex non résolu à matérialiser.`);
+    return { status: 'nothing-to-do', created: 0, existing: 0, skippedResolved: allCodexPriorities };
+  }
+
+  const index = issueIndex || await loadFindingIssueIndex(repository);
+  let created = 0;
+  let existing = 0;
+  for (const finding of findings) {
+    const result = await ensureFindingIssue({ repository, pr, finding, issueIndex: index });
+    if (result.created) created += 1;
+    else existing += 1;
+  }
+  console.log(`[Codex Review Triage] PR #${prNumber} : ${created} issue(s) créée(s), ${existing} déjà présente(s), ${allCodexPriorities - findings.length} finding(s) résolu(s)/ignoré(s).`);
+  return { status: created ? 'routed' : 'already-routed', created, existing, skippedResolved: allCodexPriorities - findings.length };
+}
+
+function pullNumberFromUrl(url = '') {
+  const match = String(url).match(/\/pulls\/(\d+)(?:$|[/?#])/);
+  return match ? Number(match[1]) : null;
+}
+
+async function listMergedPrReviews(repository) {
+  const { owner, name } = repositoryParts(repository);
+  const merged = new Map();
+  let after = null;
+  do {
+    const data = await githubGraphql(`
+      query SeenItMergedPullRequests($owner: String!, $name: String!, $after: String) {
+        repository(owner: $owner, name: $name) {
+          pullRequests(states: MERGED, first: 50, after: $after, orderBy: { field: CREATED_AT, direction: ASC }) {
+            pageInfo { hasNextPage endCursor }
+            nodes {
+              number
+              url
+              reviews(first: 100) {
+                pageInfo { hasNextPage }
+                nodes {
+                  databaseId
+                  body
+                  url
+                  state
+                  author { login }
+                }
+              }
+            }
+          }
+        }
+      }
+    `, { owner, name, after });
+    const prs = data?.repository?.pullRequests;
+    if (!prs) throw new Error('Liste des PR mergées introuvable.');
+    for (const pr of prs.nodes || []) {
+      let reviews = (pr.reviews?.nodes || []).map(review => ({
+        id: review.databaseId,
+        body: review.body,
+        url: review.url,
+        html_url: review.url,
+        state: review.state,
+        user: { login: review.author?.login || '' }
+      }));
+      if (pr.reviews?.pageInfo?.hasNextPage) {
+        reviews = await listAll(`/repos/${repository}/pulls/${pr.number}/reviews`);
+      }
+      merged.set(pr.number, { number: pr.number, html_url: pr.url, reviews });
+    }
+    after = prs.pageInfo?.hasNextPage ? prs.pageInfo.endCursor : null;
+  } while (after);
+  return merged;
+}
+
+async function backfill({ repository }) {
+  const [issueIndex, mergedPrs, globalReviewComments] = await Promise.all([
+    loadFindingIssueIndex(repository),
+    listMergedPrReviews(repository),
+    listAll(`/repos/${repository}/pulls/comments?sort=created&direction=asc`)
   ]);
 
-  const state = parseTriageState(prComments);
-  const findings = collectActionableFindings({ reviewComments, reviews, tracked: state.tracked });
-  if (!findings.length) {
-    console.log(`[Codex Review Triage] PR #${prNumber} : aucun nouveau finding Codex P1/P2 à router.`);
-    return { status: 'nothing-to-do', findings: [] };
+  const commentsByPr = new Map();
+  for (const comment of globalReviewComments) {
+    if (!isCodexAuthor(comment?.user?.login)) continue;
+    if (![1, 2, 3, 4].includes(extractPriority(comment?.body || ''))) continue;
+    const prNumber = pullNumberFromUrl(comment.pull_request_url || '');
+    if (!prNumber || !mergedPrs.has(prNumber)) continue;
+    if (!commentsByPr.has(prNumber)) commentsByPr.set(prNumber, []);
+    commentsByPr.get(prNumber).push(comment);
   }
 
-  let target = await resolveTargetIssue({ repository, pr, prComments });
-  let created = false;
-  if (!target) {
-    const issue = buildDedicatedIssue({ pr, findings });
-    target = await githubRequest(`/repos/${repository}/issues`, {
-      method: 'POST',
-      body: issue
-    });
-    created = true;
+  const candidatePrNumbers = new Set(commentsByPr.keys());
+  for (const [prNumber, pr] of mergedPrs) {
+    if (pr.reviews.some(review => isCodexAuthor(review?.user?.login) && [1, 2, 3, 4].includes(extractPriority(review?.body || '')))) {
+      candidatePrNumbers.add(prNumber);
+    }
   }
 
-  await githubRequest(`/repos/${repository}/issues/${target.number}/comments`, {
-    method: 'POST',
-    body: { body: buildIssueComment({ pr, findings }) }
-  });
-  await githubRequest(`/repos/${repository}/issues/${pr.number}/comments`, {
-    method: 'POST',
-    body: { body: buildPrTrackingComment({ targetIssueNumber: target.number, findings }) }
-  });
+  let created = 0;
+  let existing = 0;
+  let skippedResolved = 0;
+  let findingsSeen = 0;
+  for (const prNumber of [...candidatePrNumbers].sort((a, b) => a - b)) {
+    const pr = mergedPrs.get(prNumber);
+    const reviewComments = commentsByPr.get(prNumber) || [];
+    const resolvedCommentIds = reviewComments.length ? await getResolvedCommentIds(repository, prNumber) : new Set();
+    findingsSeen += reviewComments.length + pr.reviews.filter(review => isCodexAuthor(review?.user?.login) && [1, 2, 3, 4].includes(extractPriority(review?.body || ''))).length;
+    const findings = collectActionableFindings({ reviewComments, reviews: pr.reviews, resolvedCommentIds });
+    skippedResolved += (reviewComments.length + pr.reviews.filter(review => isCodexAuthor(review?.user?.login) && [1, 2, 3, 4].includes(extractPriority(review?.body || ''))).length) - findings.length;
+    for (const finding of findings) {
+      const result = await ensureFindingIssue({ repository, pr, finding, issueIndex });
+      if (result.created) created += 1;
+      else existing += 1;
+    }
+  }
 
-  console.log(`[Codex Review Triage] PR #${prNumber} : ${findings.length} finding(s) routé(s) vers #${target.number}${created ? ' (issue créée)' : ''}.`);
-  return { status: 'routed', findings, targetIssueNumber: target.number, created };
+  console.log(`[Codex Review Triage] Backfill terminé : ${mergedPrs.size} PR mergées parcourues, ${findingsSeen} finding(s) Codex P1-P4 détecté(s), ${skippedResolved} résolu(s)/ignoré(s), ${created} issue(s) créée(s), ${existing} déjà présente(s).`);
+  return { mergedPrs: mergedPrs.size, findingsSeen, skippedResolved, created, existing };
 }
 
 async function main() {
   const repository = process.env.GITHUB_REPOSITORY;
   const eventPath = process.env.GITHUB_EVENT_PATH;
+  const eventName = process.env.GITHUB_EVENT_NAME;
   if (!repository || !eventPath) throw new Error('GITHUB_REPOSITORY/GITHUB_EVENT_PATH absent.');
+
+  if (eventName === 'workflow_dispatch') {
+    await backfill({ repository });
+    return;
+  }
+
   const event = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
   const prNumber = Number(event?.pull_request?.number || event?.number);
   if (!Number.isInteger(prNumber) || prNumber <= 0) throw new Error('Numéro de PR introuvable dans l’événement GitHub.');
@@ -247,20 +379,21 @@ async function main() {
 }
 
 module.exports = {
-  CODEX_LOGIN_PREFIX,
-  TRIAGE_MARKER,
-  TARGET_MARKER,
+  CODEX_LOGINS,
+  FINDING_MARKER,
+  ORIGIN_MARKER,
+  backfill,
   buildDedicatedIssue,
-  buildIssueComment,
-  buildPrTrackingComment,
   collectActionableFindings,
+  ensureFindingIssue,
+  extractFindingTitle,
   extractPriority,
-  extractReferencedIssueNumbers,
   findingKey,
-  highestPriority,
+  findingMarker,
   isCodexAuthor,
-  parseTriageState,
-  resolveTargetIssue,
+  parseFindingMarkers,
+  pullNumberFromUrl,
+  repositoryParts,
   triage
 };
 

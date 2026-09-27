@@ -205,26 +205,30 @@ synthétique n'est fabriquée.
 
 ## Revue Codex asynchrone post-merge
 
-La **Code Review Codex** complète la CI sans devenir un check requis. Elle est volontairement **non bloquante** :
+La **Code Review Codex** complète la CI sans devenir un check requis. Elle reste volontairement **non bloquante** :
 une PR dont les checks canoniques sont verts peut être mergée sans attendre Codex. Si un P1/P2 est déjà
-visible avant le merge, il est confirmé rapidement et corrigé dans la PR seulement lorsqu'il est valide ;
-les P3/P4 ne retardent pas le merge par défaut.
+visible avant le merge, il peut être confirmé et corrigé dans la PR lorsqu'il est valide ; les P3/P4 ne
+retardent pas le merge par défaut. Un thread résolu avant le merge ne génère pas de suivi supplémentaire.
 
-Le workflow `.github/workflows/codex-review-triage.yml` rend le suivi tardif exploitable sans polling :
+Le workflow `.github/workflows/codex-review-triage.yml` transforme les actions restantes en backlog durable :
 
 1. `pull_request_review: submitted` capte une review Codex arrivée après le merge ;
-2. `pull_request: closed` rebalaye une PR au moment du merge et rattrape une review arrivée juste avant ;
-3. seuls les auteurs `chatgpt-codex-connector*` et les findings P1/P2 sont actionnables automatiquement ;
-4. le routeur est **idempotent** par identifiant de review/commentaire et sérialisé par numéro de PR ;
-5. une **issue ouverte référencée par la PR** est réutilisée en priorité ; sans issue ouverte, une issue
-   de triage dédiée est créée, sans rouvrir automatiquement une issue fermée sur un signal encore **à confirmer** ;
-6. le suivi cite la PR et le thread exact, indique que le finding reste à confirmer et ne modifie jamais le code ;
-7. les P3/P4 restent dans la PR sauf décision explicite ou risque particulier.
+2. `pull_request: closed` rebalaye la PR au moment du merge ;
+3. chaque finding **P1/P2/P3/P4 non résolu** produit sa **propre issue dédiée** marquée **à confirmer** ;
+4. une issue fonctionnelle liée à la PR peut être citée comme contexte mais n'est jamais le seul suivi du finding ;
+5. l'idempotence repose sur l'identifiant stable `comment:<id>` / `review:<id>` conservé dans le corps du ticket,
+   et la recherche couvre les issues ouvertes **et fermées** avant toute création ;
+6. les seuls auteurs autorisés sont exactement `chatgpt-codex-connector` et
+   `chatgpt-codex-connector[bot]` ; aucun simple préfixe n'est accepté ;
+7. les threads inline déjà résolus et les reviews dismissées sont ignorés ; aucune écriture dans la PR fermée n'est nécessaire ;
+8. `workflow_dispatch` lance le **backfill historique** : toutes les PR mergées sont parcourues et chaque finding
+   non résolu encore absent est matérialisé avec la même clé idempotente.
 
-Un P1 est repris dès que le chantier courant atteint un point sûr. Un P2 reçoit un diagnostic ciblé et,
-s'il est confirmé, un correctif avec cause racine, portée complète et TNR. Un finding post-release ne
-déclenche pas de rollback automatique : il produit le même suivi ciblé. Le mail Codex reste une notification ;
-la PR GitHub et l'issue de suivi sont la trace canonique.
+Créer l'issue ne vaut jamais confirmation du bug et ne déclenche ni correction, ni rollback, ni APK. Le ticket
+rejoint le backlog normal avec sa priorité d'origine. S'il est confirmé, un chantier dédié applique cause racine,
+portée complète et TNR ; s'il est faux ou déjà corrigé, la preuve est documentée puis le ticket est fermé.
+Après fermeture d'une PR, **GitHub Issues** est donc la surface canonique des actions Codex encore ouvertes ;
+la PR et son thread restent la preuve source, et le mail Codex reste une simple notification.
 
 ## Gouvernance proportionnée
 

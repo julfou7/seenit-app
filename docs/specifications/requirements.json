@@ -1928,7 +1928,7 @@
     },
     {
       "id": "SEENIT-QUALITY-004",
-      "title": "Contexte GitHub complet, amélioration continue proactive, bail inter-conversations, revues Codex asynchrones et issues maintenues à jour",
+      "title": "Contexte GitHub complet, amélioration continue proactive, bail inter-conversations, backlog Codex durable et issues maintenues à jour",
       "targets": [
         "ci"
       ],
@@ -1971,7 +1971,7 @@
         },
         {
           "file": "tests/codexReviewTriage.test.ts",
-          "contains": "SEENIT-QUALITY-004 route les reviews Codex P1/P2 post-merge sans bloquer le merge"
+          "contains": "SEENIT-QUALITY-004 matérialise chaque finding Codex non résolu en issue dédiée"
         }
       ]
     },

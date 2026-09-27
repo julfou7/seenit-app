@@ -1331,11 +1331,15 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   vérifier un seul chemin attendu ne suffit pas et un clone ne sert pas de sonde d'egress.
   Les **Code Reviews Codex** restent un audit complémentaire asynchrone et **non bloquant** : une PR
   validée par les checks canoniques ne doit pas attendre Codex par principe. Si un P1/P2 est déjà visible
-  avant merge, il est confirmé et corrigé dans la PR seulement lorsqu'il est valide ; les P3/P4 ne bloquent
-  pas le merge par défaut. Après merge, le workflow `Codex Review Triage` route de manière **idempotente**
-  chaque nouveau P1/P2 vers une **issue ouverte référencée par la PR** ou, à défaut, vers une issue dédiée
-  explicitement **à confirmer**, sans rouvrir automatiquement une issue fermée ni modifier le code. La PR,
-  le thread exact et le ticket éventuel restent la trace canonique ; le mail Codex n'est qu'une notification.
+  avant merge, il peut être confirmé et corrigé dans la PR lorsqu'il est valide ; les P3/P4 ne bloquent
+  pas le merge. Après merge, chaque finding **P1/P2/P3/P4 non résolu** est matérialisé de manière
+  **idempotente dans une issue dédiée** explicitement **à confirmer**, même si la PR possède déjà une issue
+  fonctionnelle. Le marqueur de finding reste dans le corps du ticket et la déduplication inspecte les
+  issues ouvertes et fermées ; les threads déjà résolus sont ignorés, seules les identités exactes du bot
+  Codex sont acceptées et aucune écriture sur la PR fermée n'est requise. Un déclenchement manuel assure le
+  **backfill historique** des PR mergées antérieures. Créer l'issue ne déclenche ni correctif, ni rollback,
+  ni release : elle rejoint le backlog normal. La PR et le thread exact restent la preuve d'origine ; GitHub
+  Issues est la trace canonique des actions restantes et le mail Codex n'est qu'une notification.
 - **SEENIT-QUALITY-005** — Un import, une reconnexion ou une synchronisation AI Studio/GitHub est un
   transport non autoritatif. Avant tout commit depuis un workspace importé, le diff est comparé à la
   branche GitHub source et toute mutation automatique non demandée de Firebase/Firestore, Android,
