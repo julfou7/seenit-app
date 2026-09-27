@@ -97,7 +97,7 @@ test('SEENIT-QUALITY-004 matérialise chaque finding Codex non résolu en issue 
   assert.doesNotMatch(script, /resolveTargetIssue|extractReferencedIssueNumbers/);
 
   for (const source of [agents, bootstrap, delivery, spec].map(normalize)) {
-    assert.match(source, /Code Review Codex|revue Codex/i);
+    assert.match(source, /Code Reviews? Codex|revue Codex/i);
     assert.match(source, /non bloquant(?:e)?|ne .*bloqu/i);
     assert.match(source, /P1[\s\S]*P2[\s\S]*P3[\s\S]*P4/i);
     assert.match(source, /issue dédiée/i);
