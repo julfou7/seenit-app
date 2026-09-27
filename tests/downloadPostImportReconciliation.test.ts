@@ -183,4 +183,12 @@ test('SEENIT-DOWNLOAD-010 retire l’intention Firestore dès le handoff ou la p
     source,
     /for \(const latestLocal of latestLocalMutations\) \{\s+if \(historyResolvedOptimisticIds\.has\(latestLocal\.id\)\) continue;/
   );
+  assert.match(
+    source,
+    /if \(existing && !existing\.isOptimistic && patch\.isOptimistic\) \{[\s\S]*?return;/
+  );
+  assert.match(
+    source,
+    /for \(const request of sharedRequestsToRetire\.values\(\)\) \{\s+void removeSharedDownloadRequest\(request\);/
+  );
 });
