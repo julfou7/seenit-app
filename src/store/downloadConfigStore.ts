@@ -85,13 +85,13 @@ function provisionDownloadWebhooks(
         return true;
       }
       appLogger.warn(
-        'downloads',
+        'sync',
         `[DownloadConfig] Notifications Arr à réparer lorsque le service sera joignable : ${failedServices.join(', ')}.`
       );
       return false;
     })
     .catch(() => {
-      appLogger.warn('downloads', '[DownloadConfig] Provisioning automatique des notifications Arr indisponible.');
+      appLogger.warn('sync', '[DownloadConfig] Provisioning automatique des notifications Arr indisponible.');
       return false;
     })
     .finally(() => {
