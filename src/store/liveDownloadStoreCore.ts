@@ -992,6 +992,8 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           );
 
           for (const latestLocal of latestLocalMutations) {
+            if (historyResolvedOptimisticIds.has(latestLocal.id)) continue;
+
             if (isCancelledDownload(latestLocal)) {
               for (let index = finalItems.length - 1; index >= 0; index -= 1) {
                 if (sameCancellationIdentity(latestLocal, finalItems[index])) {
