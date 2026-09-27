@@ -50,12 +50,25 @@ test('SEENIT-NOTIFICATION-003 ne transforme jamais le titre en identité Plex', 
   assert.notEqual(first.plexAvailabilityData?.eventKey, second.plexAvailabilityData?.eventKey);
 });
 
+test('SEENIT-NOTIFICATION-003 ne transforme pas une saison absente en saison 0', () => {
+  for (const seasonNumber of [null, '', ' ', undefined, false]) {
+    const payload = buildDownloadWebhookPresentation('sonarr', {
+      eventType: 'Download',
+      downloadId: 'missing-season',
+      series: { title: 'Severance', tmdbId: 95396 },
+      episodes: [{ seasonNumber, episodeNumber: 1 }]
+    });
+    assert.equal(payload.plexAvailabilityData?.season, undefined);
+    assert.equal(payload.plexAvailabilityData?.episode, undefined);
+  }
+});
+
 test('SEENIT-NOTIFICATION-003 préserve la saison 0 des épisodes spéciaux', () => {
   const special = buildDownloadWebhookPresentation('sonarr', {
     eventType: 'Download',
     downloadId: 'special-001',
     series: { title: 'Severance', tmdbId: 95396 },
-    episodes: [{ seasonNumber: 0, episodeNumber: 1 }]
+    episodes: [{ seasonNumber: '0', episodeNumber: 1 }]
   });
   assert.equal(special.plexAvailabilityData?.season, '0');
   assert.equal(special.plexAvailabilityData?.episode, '1');

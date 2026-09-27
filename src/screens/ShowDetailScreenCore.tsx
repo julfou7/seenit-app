@@ -184,8 +184,8 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         useLiveDownloadStore.getState().startPolling(1000);
         useLiveDownloadStore.getState().fetchDownloads();
       } else showToast(res.message || "Erreur lors du lancement de la saison", "error");
-    } catch (err: any) {
-      showToast(err?.message || "Erreur réseau Sonarr", "error");
+    } catch (err: unknown) {
+      showToast(err instanceof Error && err.message ? err.message : "Erreur réseau Sonarr", "error");
     } finally {
       setIs1ClickDownloading(prev => ({ ...prev, [seasonKey]: false }));
     }
@@ -478,11 +478,11 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   useEffect(() => { initialAutoOpenRef.current = false; }, [effectiveTmdbId]);
   useEffect(() => {
     if (!tmdbDetails || !effectiveTmdbId || initialAutoOpenRef.current) return;
-    let targetSeason = initialSeason || getSmartDefaultSeason(show, tmdbDetails);
-    if (targetSeason) {
+    const targetSeason = initialSeason ?? getSmartDefaultSeason(show, tmdbDetails);
+    if (targetSeason !== undefined && targetSeason !== null) {
       initialAutoOpenRef.current = true;
       setExpandedSeason(targetSeason);
-      if (initialSeason && initialEpisode) {
+      if (initialSeason !== undefined && initialSeason !== null && initialEpisode) {
         setActiveTab('episodes');
         if (!seasonsCache[targetSeason]) {
           tmdb.getSeasonDetails(effectiveTmdbId, targetSeason).then(res => {
@@ -505,7 +505,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   }, [tmdbDetails, show, effectiveTmdbId, initialSeason, initialEpisode]);
 
   useEffect(() => {
-    if (initialSeason && initialEpisode && effectiveTmdbId) {
+    if (initialSeason !== undefined && initialSeason !== null && initialEpisode && effectiveTmdbId) {
       setActiveTab('episodes');
       setExpandedSeason(initialSeason);
       const tryOpenEpisode = (seasonData: any) => {

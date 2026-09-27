@@ -12,6 +12,7 @@ const service = readFileSync('android/app/src/main/java/com/seenit/app/SeenItMes
 const store = readFileSync('android/app/src/main/java/com/seenit/app/PlexBackgroundCredentialStore.java', 'utf8');
 const plugin = readFileSync('android/app/src/main/java/com/seenit/app/SeenItPlexBackgroundPlugin.kt', 'utf8');
 const app = readFileSync('src/App.tsx', 'utf8');
+const showDetail = readFileSync('src/screens/ShowDetailScreenCore.tsx', 'utf8');
 const plexStorage = readFileSync('src/features/plex/plexStorage.ts', 'utf8');
 
 test('SEENIT-NOTIFICATION-003 vérifie Plex en arrière-plan sans exposer le token', () => {
@@ -70,4 +71,16 @@ test('SEENIT-NOTIFICATION-003 ouvre la fiche exacte depuis la notification Plex'
   assert.ok(worker.includes('.appendQueryParameter("tmdbId"'));
   assert.ok(app.includes("rawUrl.startsWith('com.seenit.app://media')"));
   assert.ok(app.includes("'tmdb'"));
+});
+
+test('SEENIT-NOTIFICATION-003 préserve S0E1 du deep-link jusqu’à la fiche épisode', () => {
+  assert.ok(app.includes("const seasonParam = parsed.searchParams.get('season')"));
+  assert.ok(app.includes("seasonParam !== null && seasonParam.trim() ? Number(seasonParam) : NaN"));
+  assert.ok(app.includes('Number.isInteger(season) && season >= 0 ? season : undefined'));
+  assert.doesNotMatch(app, /season > 0 \? season : undefined/);
+
+  assert.ok(showDetail.includes('initialSeason ?? getSmartDefaultSeason(show, tmdbDetails)'));
+  assert.ok(showDetail.includes('initialSeason !== undefined && initialSeason !== null && initialEpisode'));
+  assert.doesNotMatch(showDetail, /initialSeason \|\| getSmartDefaultSeason/);
+  assert.doesNotMatch(showDetail, /if \(initialSeason && initialEpisode/);
 });

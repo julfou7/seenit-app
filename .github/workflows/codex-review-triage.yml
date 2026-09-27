@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: seenit-codex-review-triage-${{ github.event.pull_request.number || 'backfill' }}
+  group: seenit-codex-review-triage
   cancel-in-progress: false
 
 jobs:
