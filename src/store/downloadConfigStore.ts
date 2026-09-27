@@ -3,6 +3,7 @@ import { doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
 import { invalidateQbitCache } from '../services/sonarrRadarr';
+import { ensureDownloadNotificationWebhooks } from '../features/downloads/downloadWebhookProvisioning';
 import { appLogger } from './logStore';
 import {
   normalizeDownloadConfigPatch,
@@ -42,6 +43,66 @@ const DEFAULT_CONFIG: DownloadClientConfig = {
 };
 
 let downloadConfigEpoch = 0;
+let lastWebhookProvisionFingerprint = '';
+let activeWebhookProvisionFingerprint = '';
+let activeWebhookProvisionPromise: Promise<boolean> | null = null;
+
+function getWebhookProvisionFingerprint(config: DownloadClientConfig, uid: string): string {
+  return JSON.stringify([
+    uid,
+    config.downloadsEnabled === true,
+    config.sonarrUrl || '',
+    config.sonarrApiKey || '',
+    config.radarrUrl || '',
+    config.radarrApiKey || ''
+  ]);
+}
+
+function provisionDownloadWebhooks(
+  config: DownloadClientConfig,
+  uid: string,
+  force = false
+): Promise<boolean> {
+  const hasArrConfig = Boolean(
+    (config.sonarrUrl && config.sonarrApiKey) || (config.radarrUrl && config.radarrApiKey)
+  );
+  if (config.downloadsEnabled !== true || !hasArrConfig) return Promise.resolve(true);
+
+  const fingerprint = getWebhookProvisionFingerprint(config, uid);
+  if (!force && fingerprint === lastWebhookProvisionFingerprint) return Promise.resolve(true);
+  if (fingerprint === activeWebhookProvisionFingerprint && activeWebhookProvisionPromise) {
+    return activeWebhookProvisionPromise;
+  }
+
+  activeWebhookProvisionFingerprint = fingerprint;
+  const promise = ensureDownloadNotificationWebhooks(config)
+    .then(results => {
+      const failedServices = results
+        .filter(result => result.action === 'failed')
+        .map(result => result.service);
+      if (failedServices.length === 0) {
+        lastWebhookProvisionFingerprint = fingerprint;
+        return true;
+      }
+      appLogger.warn(
+        'downloads',
+        `[DownloadConfig] Notifications Arr à réparer lorsque le service sera joignable : ${failedServices.join(', ')}.`
+      );
+      return false;
+    })
+    .catch(() => {
+      appLogger.warn('downloads', '[DownloadConfig] Provisioning automatique des notifications Arr indisponible.');
+      return false;
+    })
+    .finally(() => {
+      if (activeWebhookProvisionFingerprint === fingerprint) {
+        activeWebhookProvisionFingerprint = '';
+        activeWebhookProvisionPromise = null;
+      }
+    });
+  activeWebhookProvisionPromise = promise;
+  return promise;
+}
 
 export const useDownloadConfigStore = create<DownloadConfigState>()((set, get) => ({
   ...DEFAULT_CONFIG,
@@ -85,11 +146,13 @@ export const useDownloadConfigStore = create<DownloadConfigState>()((set, get) =
       const snap = await getDoc(docRef);
       if (requestEpoch !== downloadConfigEpoch || auth.currentUser?.uid !== user.uid) return;
       if (snap.exists()) {
+        const parsed = parseDownloadConfigDocument(snap.data());
         set({
-          ...parseDownloadConfigDocument(snap.data()),
+          ...parsed,
           isHydrated: true,
           saveError: null
         });
+        void provisionDownloadWebhooks({ ...DEFAULT_CONFIG, ...parsed }, user.uid);
       } else {
         set({ isHydrated: true, saveError: null });
       }
@@ -134,6 +197,7 @@ export const useDownloadConfigStore = create<DownloadConfigState>()((set, get) =
 
       const docRef = doc(db, 'users', user.uid, 'settings', 'downloadConfig');
       await setDoc(docRef, dataToSave, { merge: true });
+      await provisionDownloadWebhooks(dataToSave, user.uid, true);
       if (requestEpoch !== downloadConfigEpoch || auth.currentUser?.uid !== user.uid) return true;
       set({ isSaving: false, saveError: null, isHydrated: true });
       return true;
@@ -158,6 +222,7 @@ if (typeof window !== 'undefined') {
 
   onAuthStateChanged(auth, user => {
     downloadConfigEpoch += 1;
+    lastWebhookProvisionFingerprint = '';
     const listenerEpoch = downloadConfigEpoch;
     const listenerUid = user?.uid;
     invalidateQbitCache();
@@ -186,11 +251,15 @@ if (typeof window !== 'undefined') {
         snapshot => {
           if (listenerEpoch !== downloadConfigEpoch || auth.currentUser?.uid !== listenerUid) return;
           if (snapshot.exists()) {
+            const parsed = parseDownloadConfigDocument(snapshot.data());
             useDownloadConfigStore.setState({
-              ...parseDownloadConfigDocument(snapshot.data()),
+              ...parsed,
               isHydrated: true,
               saveError: null
             });
+            if (listenerUid) {
+              void provisionDownloadWebhooks({ ...DEFAULT_CONFIG, ...parsed }, listenerUid);
+            }
           } else {
             useDownloadConfigStore.setState({ isHydrated: true });
           }
