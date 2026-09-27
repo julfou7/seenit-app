@@ -7,56 +7,70 @@ const require = createRequire(import.meta.url);
 const {
   buildDedicatedIssue,
   collectActionableFindings,
+  extractFindingTitle,
   extractPriority,
-  extractReferencedIssueNumbers,
-  parseTriageState
+  findingKey,
+  isCodexAuthor,
+  parseFindingMarkers,
+  pullNumberFromUrl
 } = require('../scripts/codex-review-triage.cjs') as {
-  buildDedicatedIssue: (input: { pr: { number: number; html_url: string }; findings: Array<{ kind: string; id: number; priority: number; body: string; url: string | null }> }) => { title: string; body: string };
-  collectActionableFindings: (input: { reviewComments?: unknown[]; reviews?: unknown[]; tracked?: Set<string> }) => Array<{ kind: string; id: number; priority: number }>;
+  buildDedicatedIssue: (input: { pr: { number: number; html_url: string }; finding: { kind: string; id: number; priority: number; body: string; url: string | null } }) => { title: string; body: string };
+  collectActionableFindings: (input: { reviewComments?: unknown[]; reviews?: unknown[]; resolvedCommentIds?: Set<number> }) => Array<{ kind: string; id: number; priority: number; body: string; url: string | null }>;
+  extractFindingTitle: (body: string, fallback?: string) => string;
   extractPriority: (body: string) => number | null;
-  extractReferencedIssueNumbers: (body: string, prNumber?: number | null) => number[];
-  parseTriageState: (comments: unknown[]) => { tracked: Set<string>; targetIssueNumber: number | null };
+  findingKey: (finding: { kind: string; id: number }) => string;
+  isCodexAuthor: (login?: string) => boolean;
+  parseFindingMarkers: (body: string) => Set<string>;
+  pullNumberFromUrl: (url: string) => number | null;
 };
 
-test('SEENIT-QUALITY-004 route les reviews Codex P1/P2 post-merge sans bloquer le merge', () => {
+test('SEENIT-QUALITY-004 matérialise chaque finding Codex non résolu en issue dédiée', () => {
   assert.equal(extractPriority('![P2 Badge](badge) Préservez la preuve exacte'), 2);
   assert.equal(extractPriority('[P1] Régression de sécurité'), 1);
+  assert.equal(extractPriority('P3 Badge dette mineure'), 3);
+  assert.equal(extractPriority('P4 Badge suggestion'), 4);
   assert.equal(extractPriority('### Codex Review\nAucun finding prioritaire.'), null);
-  assert.deepEqual(extractReferencedIssueNumbers('Closes #570\nRefs #430\nRefs #430', 575), [570, 430]);
 
-  const state = parseTriageState([
-    { body: '<!-- seenit-codex-review-triage finding=comment:41 -->\n<!-- seenit-codex-review-target issue=428 -->' }
-  ]);
-  assert.equal(state.targetIssueNumber, 428);
-  assert.deepEqual([...state.tracked], ['comment:41']);
+  assert.equal(isCodexAuthor('chatgpt-codex-connector'), true);
+  assert.equal(isCodexAuthor('chatgpt-codex-connector[bot]'), true);
+  assert.equal(isCodexAuthor('chatgpt-codex-connector-evil'), false);
+  assert.equal(isCodexAuthor('other-bot'), false);
 
   const findings = collectActionableFindings({
-    tracked: state.tracked,
+    resolvedCommentIds: new Set([42]),
     reviewComments: [
-      { id: 41, user: { login: 'chatgpt-codex-connector[bot]' }, body: 'P2 Badge déjà routé' },
-      { id: 42, user: { login: 'chatgpt-codex-connector[bot]' }, body: 'P2 Badge finding utile', html_url: 'https://github.test/finding/42' },
-      { id: 43, user: { login: 'other-bot' }, body: 'P1 Badge autre bot' },
-      { id: 44, user: { login: 'chatgpt-codex-connector[bot]' }, body: 'P3 Badge non routé' }
+      { id: 41, user: { login: 'chatgpt-codex-connector[bot]' }, body: 'P4 Badge suggestion encore ouverte', html_url: 'https://github.test/finding/41' },
+      { id: 42, user: { login: 'chatgpt-codex-connector[bot]' }, body: 'P2 Badge déjà résolu', html_url: 'https://github.test/finding/42' },
+      { id: 43, user: { login: 'chatgpt-codex-connector-evil' }, body: 'P1 Badge faux bot' }
     ],
     reviews: [
-      { id: 45, user: { login: 'chatgpt-codex-connector' }, body: '[P1] finding de review', html_url: 'https://github.test/review/45' }
+      { id: 44, user: { login: 'chatgpt-codex-connector' }, body: '[P3] finding de review', html_url: 'https://github.test/review/44', state: 'COMMENTED' },
+      { id: 45, user: { login: 'chatgpt-codex-connector' }, body: '[P1] review dismissed', html_url: 'https://github.test/review/45', state: 'DISMISSED' }
     ]
   });
   assert.deepEqual(findings.map(finding => `${finding.kind}:${finding.id}:P${finding.priority}`), [
-    'review:45:P1',
-    'comment:42:P2'
+    'review:44:P3',
+    'comment:41:P4'
   ]);
 
+  const finding = findings[0];
   const dedicated = buildDedicatedIssue({
     pr: { number: 575, html_url: 'https://github.test/pr/575' },
-    findings: [
-      { kind: 'comment', id: 42, priority: 2, body: 'P2 Badge finding utile', url: 'https://github.test/finding/42' }
-    ]
+    finding
   });
-  assert.match(dedicated.title, /^\[P2\]\[Code Review\].*#575$/);
-  assert.match(dedicated.body, /à confirmer|signaux à confirmer/i);
+  assert.match(dedicated.title, /^\[P3\]\[Codex\]\[PR #575\]/);
+  assert.match(dedicated.body, /seenit-codex-review-finding key=review:44/);
+  assert.match(dedicated.body, /à confirmer/i);
+  assert.match(dedicated.body, /ne déclenche automatiquement ni correctif, ni rollback, ni release APK/i);
+  assert.deepEqual([...parseFindingMarkers(dedicated.body)], ['review:44']);
+  assert.equal(findingKey(finding), 'review:44');
+
+  assert.equal(pullNumberFromUrl('https://api.github.com/repos/julfou7/seenit-app/pulls/579'), 579);
+  assert.equal(pullNumberFromUrl('https://github.com/julfou7/seenit-app/pull/579'), null);
+  assert.equal(extractFindingTitle('<sub>P2 Badge</sub>  Conserver la priorité erreur'), 'Conserver la priorité erreur');
 
   const workflow = fs.readFileSync('.github/workflows/codex-review-triage.yml', 'utf8');
+  const script = fs.readFileSync('scripts/codex-review-triage.cjs', 'utf8');
   const agents = fs.readFileSync('AGENTS.md', 'utf8');
   const bootstrap = fs.readFileSync('.agents/AGENTS.md', 'utf8');
   const delivery = fs.readFileSync('docs/process/delivery.md', 'utf8');
@@ -66,19 +80,33 @@ test('SEENIT-QUALITY-004 route les reviews Codex P1/P2 post-merge sans bloquer l
 
   assert.match(workflow, /pull_request_review:[\s\S]*submitted/);
   assert.match(workflow, /pull_request:[\s\S]*closed/);
+  assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /cancel-in-progress:\s*false/);
   assert.match(workflow, /issues:\s*write/);
   assert.match(workflow, /pull-requests:\s*read/);
+  assert.doesNotMatch(workflow, /pull-requests:\s*write/);
   assert.doesNotMatch(workflow, /contents:\s*write/);
+  assert.doesNotMatch(workflow, /startsWith\(github\.event\.review\.user\.login/);
+  assert.match(workflow, /github\.event\.review\.user\.login == 'chatgpt-codex-connector\[bot\]'/);
+  assert.match(workflow, /github\.event\.review\.user\.login == 'chatgpt-codex-connector'/);
+
+  assert.match(script, /pulls\/comments\?sort=created&direction=asc/);
+  assert.match(script, /reviewThreads\(first:\s*100/);
+  assert.match(script, /isResolved/);
+  assert.match(script, /Backfill terminé/);
+  assert.doesNotMatch(script, /resolveTargetIssue|extractReferencedIssueNumbers/);
 
   for (const source of [agents, bootstrap, delivery, spec].map(normalize)) {
     assert.match(source, /Codex Review|revue Codex/i);
-    assert.match(source, /ne (?:doit|devient) pas[^.]*bloqu|non bloquant(?:e)?/i);
-    assert.match(source, /P1[\s\S]*P2/);
-    assert.match(source, /P3[\s\S]*P4/);
-    assert.match(source, /issue ouverte[\s\S]*référencée|issue.*ouverte.*PR/i);
+    assert.match(source, /non bloquant(?:e)?|ne .*bloqu/i);
+    assert.match(source, /P1[\s\S]*P2[\s\S]*P3[\s\S]*P4/i);
+    assert.match(source, /issue dédiée/i);
+    assert.match(source, /finding[^.]*non résolu/i);
+    assert.match(source, /historique|backfill/i);
     assert.match(source, /idempot/i);
     assert.match(source, /à confirmer|confirmer/i);
   }
-  assert.match(registry, /USR-2026-09-26-003/);
+
+  assert.match(registry, /USR-2026-09-27-001/);
+  assert.match(registry, /superseded by USR-2026-09-27-001/);
 });
