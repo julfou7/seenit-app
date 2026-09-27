@@ -50,7 +50,8 @@ test('SEENIT-NOTIFICATION-003 vérifie Plex en arrière-plan sans exposer le tok
   assert.ok(worker.includes('season >= 0 && episode > 0'));
   assert.ok(plugin.includes('clearForUid'));
   assert.ok(plexStorage.includes('syncNativePlexBackgroundCredentials'));
-  assert.ok(worker.includes('getRunAttemptCount() + 1 < MAX_ATTEMPTS ? Result.retry() : Result.success()'));
+  assert.ok(worker.includes('boolean canRetry = attempt < MAX_ATTEMPTS;'));
+  assert.ok(worker.includes('return canRetry ? Result.retry() : Result.success();'));
   assert.ok(worker.includes('if (!expectedUidHash.equals(credentials.uidHash))'));
   assert.ok(worker.includes('showPlexAvailableNotification()'));
   assert.ok(!worker.includes('showNotification(false)'));

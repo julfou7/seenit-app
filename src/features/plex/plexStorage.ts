@@ -1,5 +1,5 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
-import { resolveSeenItApiUrl } from '../../lib/seenitApi';
+import { resolveSeenItApiUrl } from '../../lib/seenitApi.ts';
 
 interface SeenItPlexBackgroundPlugin {
   setCredentials(options: { uid: string; token: string }): Promise<void>;
