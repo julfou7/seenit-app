@@ -112,6 +112,15 @@ const RULES = Object.freeze({
     threshold: 5,
     title: 'Échecs répétés des notifications client'
   }),
+  PLEX_AVAILABILITY_TRACE: Object.freeze({
+    autoIssue: false,
+    domain: 'notifications',
+    impact: 'Trace redigée du pipeline Android de disponibilité Plex.',
+    investigation: 'Corréler les étapes webhook, FCM, WorkManager, Plex et notification locale sans exporter de donnée média ni de secret.',
+    priority: 'P2',
+    threshold: 1,
+    title: 'Trace de disponibilité Plex'
+  }),
   DOWNLOAD_CLIENT_SYNC_FAILED: Object.freeze({
     autoIssue: true,
     domain: 'downloads',
@@ -275,6 +284,27 @@ function normalizeRuleContext(code, context = {}) {
   if (code === 'PLEX_DELTA_SNAPSHOT_FAILED' || code === 'PLEX_FULL_SNAPSHOT_SEED_FAILED') {
     return { errorCode: normalizeErrorCode(context.errorCode, code) };
   }
+  if (code === 'PLEX_AVAILABILITY_TRACE') {
+    const stages = new Set([
+      'dispatch', 'fcm_received', 'work_enqueue', 'worker', 'credentials',
+      'identity', 'input', 'plex_check', 'notification'
+    ]);
+    const outcomes = new Set([
+      'fcm_accepted', 'fcm_failed', 'no_capable_device', 'received', 'enqueued',
+      'started', 'missing_retry', 'missing_exhausted', 'uid_mismatch',
+      'invalid_payload', 'available', 'not_available_retry',
+      'not_available_exhausted', 'error_retry', 'error_exhausted', 'shown',
+      'disabled', 'security_error'
+    ]);
+    const stage = String(context.stage || '').trim();
+    const outcome = String(context.outcome || '').trim();
+    return {
+      stage: stages.has(stage) ? stage : 'input',
+      outcome: outcomes.has(outcome) ? outcome : 'invalid_payload',
+      attempt: normalizeCount(context.attempt),
+      count: normalizeCount(context.count)
+    };
+  }
   if (code === 'PROVIDER_UPSTREAM_FAILED') {
     const provider = String(context.provider || '').trim().toLowerCase();
     return {
@@ -333,6 +363,7 @@ function fingerprintContext(code, context) {
   if (code === 'PLEX_SYNC_PARTIAL') return { mode: context.mode };
   if (code === 'PLEX_SNAPSHOT_STORE_FAILED') return { action: context.action, errorCode: context.errorCode };
   if (code === 'PLEX_DELTA_SNAPSHOT_FAILED' || code === 'PLEX_FULL_SNAPSHOT_SEED_FAILED') return { errorCode: context.errorCode };
+  if (code === 'PLEX_AVAILABILITY_TRACE') return { stage: context.stage, outcome: context.outcome };
   if (code === 'PROVIDER_UPSTREAM_FAILED') return { provider: context.provider, status: context.status };
   if (code === 'DOWNLOAD_C411_FAILED') return { action: context.action, errorCode: context.errorCode };
   if (code === 'DOWNLOAD_SERVICE_PROXY_FAILED' || code === 'UPDATE_CHECK_BACKEND_FAILED') return { errorCode: context.errorCode };
@@ -383,7 +414,7 @@ function normalizeEvent(entry) {
     context,
     correlationId,
     domain,
-    level: envelope.level === 'warn' ? 'warn' : 'error',
+    level: envelope.level === 'info' ? 'info' : (envelope.level === 'warn' ? 'warn' : 'error'),
     rule,
     timestamp: new Date(timestampMs).toISOString(),
     weight

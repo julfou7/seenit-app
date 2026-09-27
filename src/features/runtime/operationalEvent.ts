@@ -13,6 +13,7 @@ export type OperationalEventCode =
   | 'NOTIFICATION_CLIENT_FAILED'
   | 'PARENTAL_RATING_PROVIDER_FAILED'
   | 'PLEX_DELTA_SNAPSHOT_FAILED'
+  | 'PLEX_AVAILABILITY_TRACE'
   | 'PLEX_FULL_SNAPSHOT_SEED_FAILED'
   | 'PLEX_SNAPSHOT_STORE_FAILED'
   | 'PLEX_SYNC_PARTIAL'
@@ -29,7 +30,7 @@ export type OperationalEventDomain =
   | 'providers'
   | 'release'
   | 'runtime';
-export type OperationalEventLevel = 'error' | 'warn';
+export type OperationalEventLevel = 'error' | 'info' | 'warn';
 
 export interface OperationalEventEnvelope {
   seenitEvent: {
@@ -109,6 +110,28 @@ function normalizeContext(
           ? 'PLEX_DELTA_SNAPSHOT_FAILED'
           : 'PLEX_FULL_SNAPSHOT_SEED_FAILED'
       )
+    };
+  }
+
+  if (code === 'PLEX_AVAILABILITY_TRACE') {
+    const stages = new Set([
+      'dispatch', 'fcm_received', 'work_enqueue', 'worker', 'credentials',
+      'identity', 'input', 'plex_check', 'notification'
+    ]);
+    const outcomes = new Set([
+      'fcm_accepted', 'fcm_failed', 'no_capable_device', 'received', 'enqueued',
+      'started', 'missing_retry', 'missing_exhausted', 'uid_mismatch',
+      'invalid_payload', 'available', 'not_available_retry',
+      'not_available_exhausted', 'error_retry', 'error_exhausted', 'shown',
+      'disabled', 'security_error'
+    ]);
+    const stage = String(context.stage || '').trim();
+    const outcome = String(context.outcome || '').trim();
+    return {
+      stage: stages.has(stage) ? stage : 'input',
+      outcome: outcomes.has(outcome) ? outcome : 'invalid_payload',
+      attempt: normalizeCount(context.attempt),
+      count: normalizeCount(context.count)
     };
   }
 
@@ -192,9 +215,10 @@ export function buildOperationalEvent(
 
 export function emitOperationalEvent(
   input: Parameters<typeof buildOperationalEvent>[0],
-  sink?: (line: string) => void
+  sink?: (line: string) => void,
+  options: Parameters<typeof buildOperationalEvent>[1] = {}
 ): OperationalEventEnvelope {
-  const envelope = buildOperationalEvent(input);
+  const envelope = buildOperationalEvent(input, options);
   const write = sink || ((line: string) => process.stderr.write(`${line}\n`));
   write(JSON.stringify(envelope));
   return envelope;

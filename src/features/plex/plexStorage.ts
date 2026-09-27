@@ -1,13 +1,88 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
+import { resolveSeenItApiUrl } from '../../lib/seenitApi';
 
 interface SeenItPlexBackgroundPlugin {
   setCredentials(options: { uid: string; token: string }): Promise<void>;
   clearCredentials(options: { uid: string }): Promise<void>;
+  readDiagnostics(options: { uid: string }): Promise<{ events?: unknown[]; beforeTimestamp?: string }>;
+  clearDiagnostics(options: { uid: string; beforeTimestamp: string }): Promise<void>;
 }
 
 const SeenItPlexBackground = registerPlugin<SeenItPlexBackgroundPlugin>('SeenItPlexBackground');
 
 export const PLEX_BACKGROUND_CAPABILITY_CHANGED_EVENT = 'seenit-plex-background-capability-changed';
+
+export interface NativePlexAvailabilityDiagnosticEvent {
+  traceId: string;
+  stage: string;
+  outcome: string;
+  attempt: number;
+  timestamp: number;
+}
+
+export interface NativePlexAvailabilityDiagnosticFlush {
+  events: NativePlexAvailabilityDiagnosticEvent[];
+  uploaded: boolean;
+}
+
+const TRACE_ID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
+const TRACE_WORD_PATTERN = /^[a-z][a-z0-9_]{0,31}$/;
+
+function normalizeNativePlexAvailabilityEvents(value: unknown): NativePlexAvailabilityDiagnosticEvent[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 120).flatMap(raw => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
+    const event = raw as Record<string, unknown>;
+    const traceId = String(event.traceId || '').trim();
+    const stage = String(event.stage || '').trim();
+    const outcome = String(event.outcome || '').trim();
+    const attempt = Number(event.attempt);
+    const timestamp = Number(event.timestamp);
+    if (
+      !TRACE_ID_PATTERN.test(traceId)
+      || !TRACE_WORD_PATTERN.test(stage)
+      || !TRACE_WORD_PATTERN.test(outcome)
+      || !Number.isInteger(attempt)
+      || attempt < 0
+      || attempt > 12
+      || !Number.isFinite(timestamp)
+      || timestamp < 1
+    ) return [];
+    return [{ traceId, stage, outcome, attempt, timestamp: Math.floor(timestamp) }];
+  });
+}
+
+export async function flushNativePlexAvailabilityDiagnostics(
+  uid: string,
+  idToken: string,
+  options: { fetchImpl?: typeof fetch } = {}
+): Promise<NativePlexAvailabilityDiagnosticFlush> {
+  if (!Capacitor.isNativePlatform() || !uid || idToken.length < 20) {
+    return { events: [], uploaded: false };
+  }
+  const snapshot = await SeenItPlexBackground.readDiagnostics({ uid }).catch(() => null);
+  const events = normalizeNativePlexAvailabilityEvents(snapshot?.events);
+  const beforeTimestamp = String(snapshot?.beforeTimestamp || '');
+  if (events.length === 0) return { events, uploaded: false };
+
+  try {
+    const response = await (options.fetchImpl || fetch)(resolveSeenItApiUrl('/api/diagnostics/plex-availability'), {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ schemaVersion: 1, events }),
+    });
+    if (!response.ok) return { events, uploaded: false };
+    if (/^[1-9]\d{0,15}$/.test(beforeTimestamp)) {
+      await SeenItPlexBackground.clearDiagnostics({ uid, beforeTimestamp }).catch(() => undefined);
+    }
+    return { events, uploaded: true };
+  } catch {
+    return { events, uploaded: false };
+  }
+}
 
 function notifyPlexBackgroundCapabilityChanged(): void {
   if (typeof window === 'undefined' || !Capacitor.isNativePlatform()) return;

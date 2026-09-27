@@ -11,7 +11,7 @@ import dns from "node:dns/promises";
 import net from "node:net";
 import http from "node:http";
 import https from "node:https";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import {
   downloadSecretMatches,
   hashDownloadSecret,
@@ -23,6 +23,7 @@ import { buildC411SearchParams } from "./src/features/downloads/c411Query.ts";
 import { buildDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookNotification.ts";
 import { deliverDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookDelivery.ts";
 import { supportsPlexAvailabilityBackgroundV1 } from "./src/features/notifications/notificationCapabilities.ts";
+import { normalizePlexAvailabilityTraceBatch } from "./src/features/notifications/plexAvailabilityDiagnostics.ts";
 import { executeIdempotentMutation, type TimedMutationResult } from "./src/features/downloads/downloadIdempotency.ts";
 import { apiErrorMiddleware, backendHealthHandler, installAsyncRouteForwarding, seenItCorsMiddleware } from "./src/features/runtime/backendRuntime.ts";
 import { applySeenItServiceWorkerHeaders, createSeenItSecurityHeadersMiddleware } from "./src/features/runtime/pwaSecurityHeaders.ts";
@@ -186,7 +187,7 @@ async function sendPushToUserDevices(
   notification: { title: string; body: string } | null,
   data: Record<string, string> = {},
   options: UserPushOptions = {}
-): Promise<{ delivered: number; invalid: number }> {
+): Promise<{ attempted: number; delivered: number; invalid: number }> {
   const devicesSnapshot = await adminDb.collection(`users/${uid}/devices`).get();
   const selected = selectUserNotificationDevices(uid, devicesSnapshot.docs.map(device => ({
     ownerUid: String(device.get('ownerUid') || uid),
@@ -209,8 +210,9 @@ async function sendPushToUserDevices(
       .map(device => device.ref),
     token: candidate.token.trim()
   }));
-  if (!devices.length) return { delivered: 0, invalid: 0 };
+  if (!devices.length) return { attempted: 0, delivered: 0, invalid: 0 };
 
+  const attempted = devices.length;
   let delivered = 0;
   let invalid = 0;
   const messaging = getMessaging();
@@ -233,7 +235,7 @@ async function sendPushToUserDevices(
       adminDb.doc(`notificationInstallations/${ref.id}`).delete().catch(() => undefined)
     ]));
   }
-  return { delivered, invalid };
+  return { attempted, delivered, invalid };
 }
 
 function isPrivateOrReservedAddress(address: string): boolean {
@@ -2412,6 +2414,37 @@ async function startServer() {
     }
   );
 
+  app.post(
+    '/api/diagnostics/plex-availability',
+    requireAuth,
+    rateLimit('plex-availability-diagnostics', 10, 60 * 60_000),
+    (req: AuthRequest, res) => {
+      const events = normalizePlexAvailabilityTraceBatch(req.body);
+      if (!events) return res.status(400).json({ error: 'Lot de diagnostics Plex invalide.' });
+      const warningOutcomes = new Set([
+        'fcm_failed', 'missing_exhausted', 'uid_mismatch', 'invalid_payload',
+        'not_available_exhausted', 'error_exhausted', 'disabled', 'security_error'
+      ]);
+      for (const event of events) {
+        emitOperationalEvent({
+          code: 'PLEX_AVAILABILITY_TRACE',
+          context: {
+            stage: event.stage,
+            outcome: event.outcome,
+            attempt: event.attempt,
+            count: 1
+          },
+          domain: 'notifications',
+          level: warningOutcomes.has(event.outcome) ? 'warn' : 'info'
+        }, undefined, {
+          correlationId: event.traceId,
+          now: new Date(event.timestamp)
+        });
+      }
+      return res.status(204).end();
+    }
+  );
+
   app.get("/api/health", backendHealthHandler);
 
   app.post('/api/releases/notify', rateLimit('release-notification', 30, 60_000), async (req, res) => {
@@ -2729,19 +2762,49 @@ async function startServer() {
 
       const presentation = buildDownloadWebhookPresentation(source as 'sonarr' | 'radarr', payload);
       const ownerUidHash = createHash('sha256').update(uid).digest('hex').slice(0, 16);
+      const traceId = presentation.plexAvailabilityData ? randomUUID() : undefined;
 
-      const { delivered, invalidTokensRemoved } = await deliverDownloadWebhookPresentation({
+      const {
+        delivered,
+        invalidTokensRemoved,
+        plexCheckAttempted,
+        plexCheckDelivered,
+        plexCheckFailed
+      } = await deliverDownloadWebhookPresentation({
         uid,
         ownerUidHash,
         presentation,
         sendPush: sendPushToUserDevices,
+        traceId,
       });
+
+      if (traceId) {
+        const outcome = plexCheckAttempted === 0
+          ? 'no_capable_device'
+          : plexCheckDelivered > 0
+            ? 'fcm_accepted'
+            : 'fcm_failed';
+        emitOperationalEvent({
+          code: 'PLEX_AVAILABILITY_TRACE',
+          context: {
+            stage: 'dispatch',
+            outcome,
+            attempt: 0,
+            count: plexCheckAttempted
+          },
+          domain: 'notifications',
+          level: outcome === 'fcm_failed' ? 'warn' : 'info'
+        }, undefined, { correlationId: traceId });
+      }
 
       return res.json({
         success: true,
         eventType: presentation.eventType,
         delivered,
-        invalidTokensRemoved
+        invalidTokensRemoved,
+        plexCheckAttempted,
+        plexCheckDelivered,
+        plexCheckFailed
       });
     } catch (err: unknown) {
       emitOperationalEvent({

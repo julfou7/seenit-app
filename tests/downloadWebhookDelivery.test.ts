@@ -22,7 +22,7 @@ test('SEENIT-NOTIFICATION-003 garde l’import visible et ajoute la vérificatio
     presentation,
     sendPush: async (uid, notification, data = {}, options = {}) => {
       calls.push({ uid, notification, data, options });
-      return { delivered: 1, invalid: 0 };
+      return { attempted: 1, delivered: 1, invalid: 0 };
     },
   });
 
@@ -39,7 +39,38 @@ test('SEENIT-NOTIFICATION-003 garde l’import visible et ajoute la vérificatio
     androidHighPriority: true,
     plexAvailabilityBackground: 'required',
   });
-  assert.deepEqual(result, { delivered: 2, invalidTokensRemoved: 0 });
+  assert.deepEqual(result, {
+    delivered: 2,
+    invalidTokensRemoved: 0,
+    plexCheckAttempted: 1,
+    plexCheckDelivered: 1,
+    plexCheckFailed: 0,
+  });
+});
+
+test('SEENIT-NOTIFICATION-003 propage un traceId uniquement au contrôle Plex', async () => {
+  const presentation = buildDownloadWebhookPresentation('sonarr', {
+    eventType: 'Download',
+    downloadId: 'trace-episode',
+    series: { title: 'Trace', tmdbId: 123 },
+    episodes: [{ seasonNumber: 1, episodeNumber: 2 }],
+  });
+  const calls: Array<{ notification: unknown; data: Record<string, string> }> = [];
+  await deliverDownloadWebhookPresentation({
+    uid: 'owner-a',
+    ownerUidHash: '0123456789abcdef',
+    presentation,
+    traceId: '00000000-0000-4000-8000-000000000430',
+    sendPush: async (_uid, notification, data = {}) => {
+      calls.push({ notification, data });
+      return { attempted: 1, delivered: 1, invalid: 0 };
+    },
+  });
+
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].data.traceId, undefined);
+  assert.equal(calls[1].data.traceId, '00000000-0000-4000-8000-000000000430');
+  assert.equal(calls[1].data.type, 'PLEX_AVAILABILITY_CHECK');
 });
 
 test('SEENIT-NOTIFICATION-003 garde le reçu visible quand aucune identité Plex exacte n’existe', async () => {
@@ -55,7 +86,7 @@ test('SEENIT-NOTIFICATION-003 garde le reçu visible quand aucune identité Plex
     presentation,
     sendPush: async (_uid, notification) => {
       calls.push({ notification });
-      return { delivered: 1, invalid: 0 };
+      return { attempted: 1, delivered: 1, invalid: 0 };
     },
   });
 
