@@ -223,7 +223,8 @@ Le workflow `.github/workflows/codex-review-triage.yml` transforme les actions r
 7. les threads inline déjà résolus et les reviews dismissées sont ignorés ; aucune écriture dans la PR fermée n'est nécessaire ;
 8. un verrou de concurrence global empêche deux créations concurrentes ; comme GitHub Actions peut remplacer
    un run encore en attente dans ce groupe, **chaque exécution survivante** parcourt toutes les PR mergées et
-   matérialise les findings non résolus encore absents avec la même clé idempotente ;
+   toutes les pages de commentaires, sans plafond fixe, puis matérialise les findings non résolus encore absents
+   avec la même clé idempotente ;
 9. `workflow_dispatch` utilise exactement cette réconciliation pour lancer le **backfill historique**.
 
 Créer l'issue ne vaut jamais confirmation du bug et ne déclenche ni correction, ni rollback, ni APK. Le ticket
