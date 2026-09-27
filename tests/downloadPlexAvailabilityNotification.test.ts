@@ -11,8 +11,8 @@ test('SEENIT-NOTIFICATION-003 distingue l’import Arr de la disponibilité Plex
     downloadId: 'abc123',
     movie: { title: 'Dune', tmdbId: 438631 }
   });
-  assert.equal(radarr.notification.title, 'Import terminé 🍿');
-  assert.match(radarr.notification.body, /Plex s’actualise/);
+  assert.equal(radarr.notification.title, 'Dune');
+  assert.equal(radarr.notification.body, 'Import terminé · Vérification de Plex…');
   assert.doesNotMatch(radarr.notification.body, /disponible dans Plex|prêt et disponible/i);
   assert.equal(radarr.plexAvailabilityData?.type, PLEX_AVAILABILITY_CHECK_PUSH_TYPE);
   assert.equal(radarr.plexAvailabilityData?.tmdbId, '438631');
@@ -33,7 +33,8 @@ test('SEENIT-NOTIFICATION-003 distingue l’import Arr de la disponibilité Plex
     movie: { title: 'Titre sans identité' }
   });
   assert.equal(unresolved.plexAvailabilityData, null);
-  assert.match(unresolved.notification.body, /importé/i);
+  assert.equal(unresolved.notification.title, 'Titre sans identité');
+  assert.equal(unresolved.notification.body, 'Import terminé');
 });
 
 test('SEENIT-NOTIFICATION-003 ne transforme jamais le titre en identité Plex', () => {

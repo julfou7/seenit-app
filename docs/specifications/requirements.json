@@ -1354,7 +1354,7 @@
     },
     {
       "id": "SEENIT-NOTIFICATION-003",
-      "title": "Disponibilité Plex notifiée uniquement après preuve exacte sur Android",
+      "title": "Notification post-import média évolutive et disponibilité Plex exacte sur Android",
       "targets": [
         "backend",
         "apk"
@@ -1379,6 +1379,10 @@
         {
           "file": "tests/plexDownloadAvailabilityAndroid.test.ts",
           "contains": "SEENIT-NOTIFICATION-003 ouvre la fiche exacte depuis la notification Plex"
+        },
+        {
+          "file": "tests/plexDownloadAvailabilityAndroid.test.ts",
+          "contains": "SEENIT-NOTIFICATION-003 présente une notification média cohérente et une action Discover exacte"
         },
         {
           "file": "tests/downloadNotificationCapabilityRouting.test.ts",

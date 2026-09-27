@@ -222,7 +222,17 @@ async function sendPushToUserDevices(
       tokens: chunk.map(device => device.token),
       ...(notification ? { notification } : {}),
       data,
-      ...(options.androidHighPriority ? { android: { priority: 'high' as const } } : {})
+      ...(notification || options.androidHighPriority ? {
+        android: {
+          ...(options.androidHighPriority ? { priority: 'high' as const } : {}),
+          ...(notification ? {
+            notification: {
+              icon: 'ic_stat_seenit',
+              color: '#E5A93D'
+            }
+          } : {})
+        }
+      } : {})
     });
     delivered += result.successCount;
     const invalidRefs = result.responses
@@ -480,7 +490,7 @@ const PLEX_SERVERS_CACHE_MAX_ENTRIES = 100;
 
 // Le jeton Plex brut ne doit jamais devenir une clé persistante en mémoire.
 // L'UID SeenIt cloisonne deux comptes qui utiliseraient volontairement le même Plex.
-const plexServersCache = new Map<string, { servers: any[]; timestamp: number }>();
+const plexServersCache = new Map<string, { servers: Record<string, unknown>[]; timestamp: number }>();
 
 function getPlexServersCacheKey(token: string, userScope: string): string {
   const tokenDigest = createHash('sha256').update(token).digest('hex');

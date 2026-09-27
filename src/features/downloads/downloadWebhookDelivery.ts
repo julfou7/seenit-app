@@ -54,10 +54,10 @@ export async function deliverDownloadWebhookPresentation({
     };
   }
 
-  // Le webhook Arr prouve déjà l'import : ce reçu reste visible partout.
-  // La vérification Plex silencieuse est additionnelle et ne le remplace jamais.
-  const [importDelivery, plexCheckDelivery] = await Promise.all([
-    sendPush(uid, presentation.notification, presentation.data),
+  // Sur Android capable, un seul signal data-only haute priorité affiche immédiatement
+  // le reçu d'import local puis met à jour cette même notification après preuve Plex.
+  // Les APK legacy et la PWA conservent le reçu FCM visible classique.
+  const [plexCheckDelivery, androidLegacyDelivery, webDelivery] = await Promise.all([
     sendPush(uid, null, {
       ...presentation.plexAvailabilityData,
       ownerUidHash,
@@ -67,11 +67,18 @@ export async function deliverDownloadWebhookPresentation({
       androidHighPriority: true,
       plexAvailabilityBackground: 'required',
     }),
+    sendPush(uid, presentation.notification, presentation.data, {
+      platform: 'android',
+      plexAvailabilityBackground: 'legacy',
+    }),
+    sendPush(uid, presentation.notification, presentation.data, {
+      platform: 'web',
+    }),
   ]);
 
   return {
-    delivered: importDelivery.delivered + plexCheckDelivery.delivered,
-    invalidTokensRemoved: importDelivery.invalid + plexCheckDelivery.invalid,
+    delivered: plexCheckDelivery.delivered + androidLegacyDelivery.delivered + webDelivery.delivered,
+    invalidTokensRemoved: plexCheckDelivery.invalid + androidLegacyDelivery.invalid + webDelivery.invalid,
     plexCheckAttempted: plexCheckDelivery.attempted,
     plexCheckDelivered: plexCheckDelivery.delivered,
     plexCheckFailed: Math.max(0, plexCheckDelivery.attempted - plexCheckDelivery.delivered),

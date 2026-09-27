@@ -25,7 +25,9 @@ test('SEENIT-NOTIFICATION-003 vérifie Plex en arrière-plan sans exposer le tok
   assert.ok(delivery.includes('androidHighPriority: true'));
   assert.ok(delivery.includes('ownerUidHash'));
   assert.ok(delivery.includes('sendPush(uid, null'));
-  assert.ok(delivery.includes('sendPush(uid, presentation.notification, presentation.data)'));
+  assert.ok(delivery.includes("plexAvailabilityBackground: 'legacy'"));
+  assert.ok(delivery.includes("platform: 'web'"));
+  assert.ok(service.includes('PlexAvailabilityWorker.showImportNotification(this, data)'));
   assert.ok(service.includes('PlexAvailabilityWorker.enqueue'));
   assert.ok(service.includes('com.google.firebase.messaging.RemoteMessage'));
   assert.ok(service.includes('extends MessagingService'));
@@ -53,7 +55,7 @@ test('SEENIT-NOTIFICATION-003 vérifie Plex en arrière-plan sans exposer le tok
   assert.ok(worker.includes('boolean canRetry = attempt < MAX_ATTEMPTS;'));
   assert.ok(worker.includes('return canRetry ? Result.retry() : Result.success();'));
   assert.ok(worker.includes('if (!expectedUidHash.equals(credentials.uidHash))'));
-  assert.ok(worker.includes('showPlexAvailableNotification()'));
+  assert.ok(worker.includes('showPlexAvailableNotification(match, credentials.token)'));
   assert.ok(!worker.includes('showNotification(false)'));
   assert.ok(manifest.includes('com.capacitorjs.plugins.pushnotifications.MessagingService'));
   assert.ok(manifest.includes('tools:node="remove"'));
@@ -68,6 +70,22 @@ test('SEENIT-NOTIFICATION-003 reste compatible minSdk 24 et distingue la saison 
   assert.ok(worker.includes('nonNegativeInt(message.get("season"))'));
   assert.ok(worker.includes('season < 0 || episode <= 0'));
   assert.ok(worker.includes('season >= 0 && episode > 0'));
+});
+
+test('SEENIT-NOTIFICATION-003 présente une notification média cohérente et une action Discover exacte', () => {
+  assert.ok(server.includes("icon: 'ic_stat_seenit'"));
+  assert.ok(server.includes("color: '#E5A93D'"));
+  assert.ok(worker.includes('.setSmallIcon(R.drawable.ic_stat_seenit)'));
+  assert.ok(worker.includes('"Import terminé · Vérification de Plex…"'));
+  assert.ok(worker.includes('"Disponible dans Plex"'));
+  assert.ok(worker.includes('notificationId(eventKey, mediaType, tmdbId, season, episode)'));
+  assert.ok(worker.includes('builder.setLargeIcon(poster)'));
+  assert.ok(worker.includes('fitPosterInside(source, 160)'));
+  assert.ok(worker.includes('builder.addAction(0, "Ouvrir dans Plex", plexPendingIntent)'));
+  assert.ok(worker.includes('"https://metadata.provider.plex.tv/library/metadata/matches?guid="'));
+  assert.ok(worker.includes('"https://watch.plex.tv/" + ("movie".equals(mediaType) ? "movie" : "show") + "/" + slug'));
+  assert.ok(worker.includes('hasExactTmdbGuid(item, tmdbId)'));
+  assert.ok(worker.includes('Pas de fallback titre/année/accueil'));
 });
 
 test('SEENIT-NOTIFICATION-003 ouvre la fiche exacte depuis la notification Plex', () => {

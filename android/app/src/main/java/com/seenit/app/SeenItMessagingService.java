@@ -17,6 +17,7 @@ public class SeenItMessagingService extends MessagingService {
                 "received",
                 0
             );
+            PlexAvailabilityWorker.showImportNotification(this, data);
             PlexAvailabilityWorker.enqueue(this, data);
             return;
         }

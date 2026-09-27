@@ -5,6 +5,11 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.RectF;
 import android.net.Uri;
 import android.os.Build;
 import androidx.annotation.NonNull;
@@ -21,6 +26,7 @@ import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 import com.seenit.app.PlexBackgroundCredentialStore.Credentials;
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
@@ -126,9 +132,10 @@ public class PlexAvailabilityWorker extends Worker {
         }
 
         try {
-            if (isAvailable(credentials.token, tmdbId, mediaType, season, episode)) {
+            AvailabilityMatch match = findAvailabilityMatch(credentials.token, tmdbId, mediaType, season, episode);
+            if (match != null) {
                 recordDiagnostic("plex_check", "available", attempt);
-                recordDiagnostic("notification", showPlexAvailableNotification(), attempt);
+                recordDiagnostic("notification", showPlexAvailableNotification(match, credentials.token), attempt);
                 return Result.success();
             }
             recordDiagnostic(
@@ -158,7 +165,13 @@ public class PlexAvailabilityWorker extends Worker {
         );
     }
 
-    private boolean isAvailable(String token, int tmdbId, String mediaType, int season, int episode) throws Exception {
+    private AvailabilityMatch findAvailabilityMatch(
+        String token,
+        int tmdbId,
+        String mediaType,
+        int season,
+        int episode
+    ) throws Exception {
         JSONArray resources = fetchJsonArray(
             "https://plex.tv/api/v2/resources?includeHttps=1&includeRelay=1",
             token
@@ -178,16 +191,19 @@ public class PlexAvailabilityWorker extends Worker {
                 String uri = trimTrailingSlash(connection.optString("uri", ""));
                 if (uri.isEmpty()) continue;
                 try {
-                    if (isAvailableOnServer(uri, serverToken, tmdbId, mediaType, season, episode)) return true;
+                    AvailabilityMatch match = findAvailabilityOnServer(
+                        uri, serverToken, tmdbId, mediaType, season, episode
+                    );
+                    if (match != null) return match;
                 } catch (Exception ignored) {
                     // Essayer la connexion Plex suivante sans transformer une panne en absence.
                 }
             }
         }
-        return false;
+        return null;
     }
 
-    private boolean isAvailableOnServer(
+    private AvailabilityMatch findAvailabilityOnServer(
         String serverUri,
         String token,
         int tmdbId,
@@ -213,12 +229,17 @@ public class PlexAvailabilityWorker extends Worker {
             for (JSONObject item : extractItems(search)) {
                 String type = item.optString("type", "").toLowerCase();
                 if ("movie".equals(mediaType)) {
-                    if ("movie".equals(type) && hasExactTmdbGuid(item, tmdbId)) return true;
+                    if ("movie".equals(type) && hasExactTmdbGuid(item, tmdbId)) {
+                        return new AvailabilityMatch(serverUri, token, item.optString("thumb", ""));
+                    }
                     continue;
                 }
 
                 if (!("show".equals(type) || "series".equals(type)) || !hasExactTmdbGuid(item, tmdbId)) continue;
-                if (season < 0 || episode <= 0) return true;
+                String posterPath = item.optString("thumb", "");
+                if (season < 0 || episode <= 0) {
+                    return new AvailabilityMatch(serverUri, token, posterPath);
+                }
 
                 String ratingKey = item.optString("ratingKey", "").trim();
                 if (ratingKey.isEmpty()) continue;
@@ -229,11 +250,25 @@ public class PlexAvailabilityWorker extends Worker {
                 );
                 for (JSONObject leaf : extractItems(leaves)) {
                     if (!"episode".equalsIgnoreCase(leaf.optString("type", "episode"))) continue;
-                    if (leaf.optInt("parentIndex", -1) == season && leaf.optInt("index", -1) == episode) return true;
+                    if (leaf.optInt("parentIndex", -1) == season && leaf.optInt("index", -1) == episode) {
+                        return new AvailabilityMatch(serverUri, token, posterPath);
+                    }
                 }
             }
         }
-        return false;
+        return null;
+    }
+
+    private static final class AvailabilityMatch {
+        final String serverUri;
+        final String serverToken;
+        final String posterPath;
+
+        AvailabilityMatch(String serverUri, String serverToken, String posterPath) {
+            this.serverUri = serverUri;
+            this.serverToken = serverToken;
+            this.posterPath = posterPath == null ? "" : posterPath.trim();
+        }
     }
 
     private static boolean hasExactTmdbGuid(JSONObject item, int tmdbId) {
@@ -319,7 +354,41 @@ public class PlexAvailabilityWorker extends Worker {
         }
     }
 
-    private String showPlexAvailableNotification() {
+    static void showImportNotification(Context context, Map<String, String> message) {
+        ensureChannel(context);
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return;
+
+        String mediaType = "movie".equals(message.get("mediaType")) ? "movie" : "tv";
+        int tmdbId = positiveInt(message.get("tmdbId"));
+        int season = nonNegativeInt(message.get("season"));
+        int episode = positiveInt(message.get("episode"));
+        String title = clean(message.get("title"), 180);
+        if (title.isEmpty()) title = "Votre média";
+        String eventKey = clean(message.get("eventKey"), 128);
+        int notificationId = notificationId(eventKey, mediaType, tmdbId, season, episode);
+
+        PendingIntent seenItIntent = buildSeenItPendingIntent(
+            context, notificationId, tmdbId, mediaType, season, episode
+        );
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_seenit)
+            .setContentTitle(displayTitle(title, season, episode))
+            .setContentText("Import terminé · Vérification de Plex…")
+            .setStyle(new NotificationCompat.BigTextStyle().bigText("Import terminé · Vérification de Plex…"))
+            .setContentIntent(seenItIntent)
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_STATUS);
+
+        try {
+            NotificationManagerCompat.from(context).notify(notificationId, builder.build());
+        } catch (SecurityException ignored) {
+            // La permission Android reste sous le contrôle de l'utilisateur.
+        }
+    }
+
+    private String showPlexAvailableNotification(AvailabilityMatch match, String plexToken) {
         Context context = getApplicationContext();
         ensureChannel(context);
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return "disabled";
@@ -330,8 +399,55 @@ public class PlexAvailabilityWorker extends Worker {
         int episode = getInputData().getInt("episode", 0);
         String title = clean(getInputData().getString("title"), 180);
         if (title.isEmpty()) title = "Votre média";
-        String episodeSuffix = season >= 0 && episode > 0 ? " (S" + season + "E" + episode + ")" : "";
+        String eventKey = clean(getInputData().getString("eventKey"), 128);
+        int notificationId = notificationId(eventKey, mediaType, tmdbId, season, episode);
 
+        PendingIntent seenItIntent = buildSeenItPendingIntent(
+            context, notificationId, tmdbId, mediaType, season, episode
+        );
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_seenit)
+            .setContentTitle(displayTitle(title, season, episode))
+            .setContentText("Disponible dans Plex")
+            .setStyle(new NotificationCompat.BigTextStyle().bigText("Disponible dans Plex"))
+            .setContentIntent(seenItIntent)
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_STATUS);
+
+        Bitmap poster = fetchPosterBitmap(match);
+        if (poster != null) builder.setLargeIcon(poster);
+
+        String discoverUrl = resolvePlexDiscoverUrl(plexToken, tmdbId, mediaType);
+        if (discoverUrl != null) {
+            Intent plexIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(discoverUrl));
+            plexIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            PendingIntent plexPendingIntent = PendingIntent.getActivity(
+                context,
+                notificationId ^ 0x00504C58,
+                plexIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+            );
+            builder.addAction(0, "Ouvrir dans Plex", plexPendingIntent);
+        }
+
+        try {
+            NotificationManagerCompat.from(context).notify(notificationId, builder.build());
+            return "shown";
+        } catch (SecurityException ignored) {
+            return "security_error";
+        }
+    }
+
+    private static PendingIntent buildSeenItPendingIntent(
+        Context context,
+        int requestCode,
+        int tmdbId,
+        String mediaType,
+        int season,
+        int episode
+    ) {
         Uri.Builder deepLink = new Uri.Builder()
             .scheme("com.seenit.app")
             .authority("media")
@@ -341,40 +457,111 @@ public class PlexAvailabilityWorker extends Worker {
             deepLink.appendQueryParameter("season", String.valueOf(season));
             deepLink.appendQueryParameter("episode", String.valueOf(episode));
         }
-
         Intent intent = new Intent(Intent.ACTION_VIEW, deepLink.build(), context, MainActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        int requestCode = Math.abs(clean(getInputData().getString("eventKey"), 128).hashCode());
-        PendingIntent pendingIntent = PendingIntent.getActivity(
-            context,
-            requestCode,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        return PendingIntent.getActivity(
+            context, requestCode, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
+    }
 
-        String notificationTitle = "Disponible dans Plex 🍿";
-        String body = "\"" + title + episodeSuffix + "\" est maintenant disponible dans Plex. Touchez pour ouvrir sa fiche.";
+    private static int notificationId(String eventKey, String mediaType, int tmdbId, int season, int episode) {
+        String key = clean(eventKey, 128);
+        if (key.isEmpty()) key = mediaType + ":" + tmdbId + ":" + season + ":" + episode;
+        return 1_300_000_000 + Math.abs(key.hashCode() % 300_000_000);
+    }
 
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_seenit)
-            .setContentTitle(notificationTitle)
-            .setContentText(body)
-            .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
-            .setContentIntent(pendingIntent)
-            .setAutoCancel(true)
-            .setOnlyAlertOnce(true)
-            .setCategory(NotificationCompat.CATEGORY_STATUS);
+    private static String displayTitle(String title, int season, int episode) {
+        return season >= 0 && episode > 0 ? title + " · S" + season + "E" + episode : title;
+    }
 
+    private static String resolvePlexDiscoverUrl(String token, int tmdbId, String mediaType) {
+        if (token == null || token.trim().isEmpty() || tmdbId <= 0) return null;
         try {
-            NotificationManagerCompat.from(context).notify(
-                1_300_000_000 + Math.abs(requestCode % 300_000_000),
-                builder.build()
+            int plexType = "movie".equals(mediaType) ? 1 : 2;
+            String rawGuid = "tmdb://" + tmdbId;
+            JSONObject matches = fetchJsonObject(
+                "https://metadata.provider.plex.tv/library/metadata/matches?guid="
+                    + URLEncoder.encode(rawGuid, StandardCharsets.UTF_8)
+                    + "&type=" + plexType,
+                token
             );
-            return "shown";
-        } catch (SecurityException ignored) {
-            // La permission Android reste sous le contrôle de l'utilisateur.
-            return "security_error";
+            for (JSONObject item : extractItems(matches)) {
+                if (!hasExactTmdbGuid(item, tmdbId)) continue;
+                String slug = clean(item.optString("slug", ""), 160);
+                if (!slug.matches("[A-Za-z0-9][A-Za-z0-9-]{0,159}")) continue;
+                return "https://watch.plex.tv/" + ("movie".equals(mediaType) ? "movie" : "show") + "/" + slug;
+            }
+        } catch (Exception ignored) {
+            // Pas de fallback titre/année/accueil : sans slug exact, l'action Plex est omise.
         }
+        return null;
+    }
+
+    private static Bitmap fetchPosterBitmap(AvailabilityMatch match) {
+        if (match == null || match.posterPath.isEmpty()) return null;
+        String posterUrl = match.posterPath.startsWith("http://") || match.posterPath.startsWith("https://")
+            ? match.posterPath
+            : match.serverUri + (match.posterPath.startsWith("/") ? "" : "/") + match.posterPath;
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(posterUrl).openConnection();
+            connection.setConnectTimeout(4000);
+            connection.setReadTimeout(5000);
+            connection.setRequestProperty("Accept", "image/*");
+            connection.setRequestProperty("X-Plex-Token", match.serverToken);
+            connection.setRequestProperty("X-Plex-Client-Identifier", "seenit-android-background");
+            int status = connection.getResponseCode();
+            if (status < 200 || status >= 300) return null;
+            int declaredLength = connection.getContentLength();
+            if (declaredLength > 4_000_000) return null;
+
+            byte[] bytes;
+            try (InputStream stream = connection.getInputStream();
+                 ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+                byte[] buffer = new byte[8192];
+                int total = 0;
+                int read;
+                while ((read = stream.read(buffer)) >= 0) {
+                    if (read == 0) continue;
+                    total += read;
+                    if (total > 4_000_000) return null;
+                    output.write(buffer, 0, read);
+                }
+                bytes = output.toByteArray();
+            }
+
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bounds);
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null;
+            int sample = 1;
+            while (bounds.outWidth / sample > 512 || bounds.outHeight / sample > 512) sample *= 2;
+            BitmapFactory.Options decode = new BitmapFactory.Options();
+            decode.inSampleSize = sample;
+            Bitmap source = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, decode);
+            if (source == null) return null;
+            Bitmap fitted = fitPosterInside(source, 160);
+            if (fitted != source) source.recycle();
+            return fitted;
+        } catch (Exception ignored) {
+            return null;
+        } finally {
+            if (connection != null) connection.disconnect();
+        }
+    }
+
+    private static Bitmap fitPosterInside(Bitmap source, int sizePx) {
+        if (source.getWidth() <= 0 || source.getHeight() <= 0) return source;
+        Bitmap output = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(output);
+        float scale = Math.min(sizePx / (float) source.getWidth(), sizePx / (float) source.getHeight());
+        float width = source.getWidth() * scale;
+        float height = source.getHeight() * scale;
+        float left = (sizePx - width) / 2f;
+        float top = (sizePx - height) / 2f;
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        canvas.drawBitmap(source, null, new RectF(left, top, left + width, top + height), paint);
+        return output;
     }
 
     private static void ensureChannel(Context context) {
