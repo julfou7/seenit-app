@@ -1,4 +1,4 @@
-import { type Show } from '../../types';
+import { type Show } from '../../types.ts';
 
 export interface WatchEpisodePointer {
   season_number: number;
