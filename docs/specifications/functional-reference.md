@@ -658,8 +658,10 @@ explicite, aucun rappel film n'est programmé et aucune estimation J+120 n'est u
   la copie privée Plex est confirmée, le signal data-only affiche localement le média avec
   « Import terminé · Vérification de Plex… » puis réutilise le même identifiant pour passer à
   « Disponible dans Plex » après preuve TMDB exacte (et saison/épisode exacts pour la TV). Le tap ouvre
-  la fiche SeenIt exacte ; l'état final peut afficher le poster PMS exact à droite et n'expose
-  « Ouvrir dans Plex » que lorsqu'un slug Discover strictement résolu par TMDB permet l'URL
+  la fiche SeenIt exacte ; lorsque le poster PMS exact est disponible, l'état replié le conserve à
+  droite en contain sans crop et l'état développé l'affiche une seule fois, entier et centré dans le
+  BigPicture. « Ouvrir dans Plex » n'est exposé que lorsqu'un slug Discover strictement résolu par TMDB
+  permet l'URL
   `watch.plex.tv/movie|show/<slug>`. Aucun titre/année ni accueil Plex n'est un fallback. Associer ou
   retirer Plex rafraîchit immédiatement l'enregistrement de l'appareil déjà autorisé afin que cette
   capability serveur suive l'état natif sans redémarrage.
@@ -676,8 +678,10 @@ explicite, aucun rappel film n'est programmé et aucune estimation J+120 n'est u
   film conservent leur feedback interne existant.
 - Les clés locales de programmation évitent le doublon sur une même installation et leur schéma peut être
   versionné pour remplacer proprement une alarme persistée quand son payload doit évoluer.
-- Le receiver Android hydrate le grand pictogramme et le BigPicture depuis le fichier privé borné au
-  moment exact de la livraison. La préparation consulte d'abord ce cache persistant : une image déjà
+- Le receiver Android hydrate le `largeIcon` compact et le BigPicture depuis le fichier privé borné au
+  moment exact de la livraison. Le poster est composé en contain sans crop : carré centré pour l'état
+  replié, canevas BigPicture neutre pour l'état développé, où le `largeIcon` est masqué afin de ne montrer
+  qu'un seul visuel média. La préparation consulte d'abord ce cache persistant : une image déjà
   matérialisée n'est pas retéléchargée. Un cache miss est retenté de façon bornée et les téléchargements
   concurrents de la même image sont coalescés. Les métadonnées TMDB (dont les chemins d'image) continuent
   de bénéficier du cache public #410 ; ce cache de métadonnées ne duplique pas les octets du fichier image.

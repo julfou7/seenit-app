@@ -80,7 +80,9 @@ test('SEENIT-NOTIFICATION-003 présente une notification média cohérente et un
   assert.ok(worker.includes('"Disponible dans Plex"'));
   assert.ok(worker.includes('notificationId(eventKey, mediaType, tmdbId, season, episode)'));
   assert.ok(worker.includes('builder.setLargeIcon(poster)'));
-  assert.ok(worker.includes('fitPosterInside(source, 160)'));
+  assert.ok(worker.includes('fitPosterInside(poster, 160, 160)'));
+  assert.ok(worker.includes('fitPosterInside(poster, 512, 288)'));
+  assert.ok(worker.includes('.bigLargeIcon((Bitmap) null)'));
   assert.ok(worker.includes('builder.addAction(0, "Ouvrir dans Plex", plexPendingIntent)'));
   assert.ok(worker.includes('"https://metadata.provider.plex.tv/library/metadata/matches?guid="'));
   assert.ok(worker.includes('"https://watch.plex.tv/" + ("movie".equals(mediaType) ? "movie" : "show") + "/" + slug'));

@@ -154,11 +154,40 @@ const patchedResolver = `private fun resolveSeenItPrivateFile(context: Context, 
         return BitmapFactory.decodeFile(file.path, options)
     }
 
+    private fun fitSeenItBitmapInside(source: Bitmap, targetWidth: Int, targetHeight: Int): Bitmap {
+        if (source.width <= 0 || source.height <= 0 || targetWidth <= 0 || targetHeight <= 0) return source
+        val scale = Math.min(
+            targetWidth.toFloat() / source.width.toFloat(),
+            targetHeight.toFloat() / source.height.toFloat()
+        )
+        val fittedWidth = Math.max(1, (source.width * scale).toInt())
+        val fittedHeight = Math.max(1, (source.height * scale).toInt())
+        val left = (targetWidth - fittedWidth) / 2f
+        val top = (targetHeight - fittedHeight) / 2f
+        val output = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(output)
+        canvas.drawColor(android.graphics.Color.rgb(24, 24, 27))
+        val paint = android.graphics.Paint().apply {
+            isAntiAlias = true
+            isFilterBitmap = true
+        }
+        canvas.drawBitmap(
+            source,
+            null,
+            android.graphics.RectF(left, top, left + fittedWidth, top + fittedHeight),
+            paint
+        )
+        return output
+    }
+
     fun resolveLargeIcon(context: Context): Bitmap? {
         val icon = largeIcon ?: return null
         return try {
             if (icon.startsWith("seenit-data://")) {
-                decodeSeenItLocalBitmap(context, icon, 192, 288)
+                val source = decodeSeenItLocalBitmap(context, icon, 192, 288) ?: return null
+                val fitted = fitSeenItBitmapInside(source, 192, 192)
+                if (fitted !== source) source.recycle()
+                fitted
             } else {
                 val resId = AssetUtil.getResourceID(context, icon, "drawable")
                 if (resId != AssetUtil.RESOURCE_ID_ZERO_VALUE) {
@@ -178,7 +207,10 @@ const patchedResolver = `private fun resolveSeenItPrivateFile(context: Context, 
     fun resolveSeenItBigPicture(context: Context): Bitmap? {
         val value = attachments?.firstOrNull { it.id == "seenit-media" }?.url ?: return null
         return try {
-            decodeSeenItLocalBitmap(context, value, 512, 288)
+            val source = decodeSeenItLocalBitmap(context, value, 512, 768) ?: return null
+            val fitted = fitSeenItBitmapInside(source, 512, 288)
+            if (fitted !== source) source.recycle()
+            fitted
         } catch (e: Exception) {
             android.util.Log.w("LocalNotification", "Failed to resolve SeenIt private big picture: " + e.message)
             null
@@ -311,6 +343,7 @@ if (!manager.includes(BIG_PICTURE_MARKER)) {
             mBuilder.setStyle(
                 NotificationCompat.BigPictureStyle()
                     .bigPicture(seenItBigPicture)
+                    .bigLargeIcon(null as android.graphics.Bitmap?)
                     .setSummaryText(localNotification.summaryText)
             )
         } else if (localNotification.largeBody != null) {
@@ -393,6 +426,7 @@ if (!publisher.includes(DELIVERY_MEDIA_MARKER)) {
                     builder.setStyle(
                         android.app.Notification.BigPictureStyle()
                             .bigPicture(bigPicture)
+                            .bigLargeIcon(null as android.graphics.Bitmap?)
                             .setSummaryText(storedRequest.summaryText)
                     )
                 } else if (storedRequest.largeBody != null) {

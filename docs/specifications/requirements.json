@@ -1365,6 +1365,10 @@
         {
           "file": "tests/reminderToastSummary.test.ts",
           "contains": "#353 un nouvel épisode du jour n’ajoute aucun toast interne mais conserve l’envoi système"
+        },
+        {
+          "file": "tests/notificationPosterContain.test.ts",
+          "contains": "SEENIT-NOTIFICATION-002 et #443 conservent l’affiche complète sans doublon visuel Android"
         }
       ]
     },
@@ -1439,6 +1443,10 @@
         {
           "file": "tests/logAuditor.test.ts",
           "contains": "SEENIT-NOTIFICATION-003 garde la télémétrie Plex en report-only"
+        },
+        {
+          "file": "tests/notificationPosterContain.test.ts",
+          "contains": "SEENIT-NOTIFICATION-003 et #443 appliquent le même contain au post-import Plex"
         }
       ]
     },
