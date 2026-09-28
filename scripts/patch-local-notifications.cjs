@@ -102,7 +102,7 @@ const legacyFileResolver = `private fun decodeSeenItLocalBitmap(value: String, m
         }
     }
 
-    // ${BIG_PICTURE_MARKER}: only the dedicated local attachment is accepted.
+    // ${PREVIOUS_BIG_PICTURE_MARKER}: only the dedicated local attachment is accepted.
     // It is sampled before NotificationCompat sees it so the scheduled Notification
     // stays comfortably below the historical Binder transaction limit.
     fun resolveSeenItBigPicture(): Bitmap? {
@@ -349,7 +349,7 @@ if (!localNotification.includes(PATCH_MARKER)) {
 }
 
 if (!localNotification.includes(PATCH_MARKER) || !localNotification.includes(BIG_PICTURE_MARKER)) {
-  throw new Error('SeenIt LocalNotification V2 image patch markers are incomplete after patching.');
+  throw new Error('SeenIt LocalNotification image patch markers are incomplete after patching.');
 }
 if (localNotification.includes('android.util.Base64.decode') || localNotification.includes('data:image/')) {
   throw new Error('Unsafe Base64 notification image code remains in LocalNotification.kt.');
