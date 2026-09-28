@@ -1973,6 +1973,32 @@
       ]
     },
     {
+      "id": "SEENIT-UX-010",
+      "title": "Filmographie personne structurée par type et apparitions",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/personFilmography.test.ts",
+          "contains": "SEENIT-UX-010 sépare films séries et apparitions sans exclure les documentaires"
+        },
+        {
+          "file": "tests/personFilmography.test.ts",
+          "contains": "SEENIT-UX-010 conserve un vrai rôle fusionné et les personnages TMDB affichables"
+        },
+        {
+          "file": "tests/personFilmography.test.ts",
+          "contains": "SEENIT-UX-010 borne le premier rendu d’une très grande filmographie"
+        },
+        {
+          "file": "tests/personFilmography.test.ts",
+          "contains": "SEENIT-UX-010 adapte compteurs et grille à la catégorie active sur PWA et APK"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-QUALITY-002",
       "title": "Audits datés et reliés à un backlog priorisé",
       "targets": [

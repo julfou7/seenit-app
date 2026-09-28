@@ -516,6 +516,21 @@ Le contrat complet est `SEENIT-PERF-001` et son suivi est
 
 La machine d'états exhaustive et le mapping Plex sont autoritatifs dans `seenit.md` §5.3 à §5.5.
 
+### 8.5 Fiche personne et filmographie
+
+La fiche d'une personne conserve les onglets métier Joués, Réalisation et Équipe. Dans **Joués**, elle
+sépare la carrière en **Films**, **Séries** et **Apparitions**. Les crédits dont tous les personnages
+fusionnés sont explicitement `Self`, `Himself`, `Herself`, `Themself` ou `Themselves` sont relégués dans
+Apparitions ; dès qu'un vrai rôle existe, le média reste dans Films ou Séries. Le genre documentaire ne
+sert jamais à exclure ou à classer un crédit.
+
+Chaque catégorie conserve le tri chronologique des crédits et ses personnages TMDB. Son compteur, les
+filtres Tous/Vus/À voir et la barre Œuvres vues sont calculés uniquement sur la catégorie courante. Films
+et séries sont identifiés séparément par `mediaType + TMDB ID`, y compris lorsqu'ils partagent le même ID ;
+les anciennes séries suivies sans `mediaType` conservent le fallback historique `tv`. La grille monte au
+maximum 48 cartes à l'ouverture et après chaque changement de personne, onglet, catégorie ou filtre ;
+« Afficher … de plus » ajoute ensuite une tranche de 48. Ce parcours est commun à la PWA et à l'APK.
+
 ## 9. Plex
 
 ### 9.1 Association et ouverture

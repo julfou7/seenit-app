@@ -1097,6 +1097,13 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   lorsqu'il est déjà vu. Les cartes média séparent l'ouverture de fiche de leurs actions rapides via des
   contrôles frères accessibles au clavier ; leur appui long est annulé au mouvement, `pointercancel` et
   démontage, tandis que le menu contextuel du contrôle focalisable fournit l'alternative clavier.
+- **SEENIT-UX-010** — La filmographie d'une personne sépare ses crédits d'interprétation en Films,
+  Séries et Apparitions. Une apparition n'est reléguée que lorsque tous les personnages fusionnés du crédit
+  sont explicitement `Self`, `Himself`, `Herself`, `Themself` ou `Themselves` (variantes qualifiées comprises) ;
+  un vrai rôle reste donc dans Films ou Séries, y compris pour un documentaire. La déduplication repose sur
+  `mediaType + TMDB ID`, jamais sur le titre ni sur le genre, et conserve les personnages affichables. Les
+  compteurs Tous/Vus/À voir et la progression portent sur la catégorie active. Le premier rendu est borné à
+  48 crédits puis s'étend par action explicite, avec le même composant partagé en PWA et APK.
 - Les dialogues critiques utilisent un rôle adapté, sont fermables par Échap, placent le focus
   sur une action et ne déclenchent aucune suppression sans confirmation quand le transfert est
   actif.

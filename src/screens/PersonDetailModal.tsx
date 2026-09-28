@@ -9,6 +9,15 @@ import { useShows } from '../hooks/useShows';
 import { useToastStore } from '../store/toastStore';
 import { type Show } from '../types';
 import { isShowWatched } from '../hooks/useProAnalytics';
+import {
+  deduplicateAndSortPersonCredits,
+  type PersonActingCategory,
+  PERSON_FILMOGRAPHY_PAGE_SIZE,
+  personCreditIdentity,
+  partitionPersonActingCredits,
+  storedPersonShowIdentity,
+  takeVisiblePersonCredits
+} from '../features/people/personFilmography';
 
 interface Props {
   personId: number;
@@ -27,94 +36,16 @@ const getAge = (birthday: string, deathday?: string) => {
   return age;
 };
 
-const ASIAN_LANGUAGES = ['ja', 'ko', 'zh', 'cn', 'th', 'hi', 'ta', 'te'];
-
-const jobPriority = (job: string) => {
-  const j = (job || '').toLowerCase();
-  if (j.includes('director') || j.includes('réalisateur')) return 1;
-  if (j.includes('creator') || j.includes('créateur')) return 2;
-  if (j.includes('writer') || j.includes('screenplay') || j.includes('scénariste') || j.includes('story')) return 3;
-  if (j.includes('producer') || j.includes('producteur')) return 4;
-  return 5;
+const mediaIdentity = (media: Pick<TMDBMedia, 'id' | 'media_type' | 'first_air_date'>) => {
+  const mediaType = media.media_type === 'tv' || (!media.media_type && media.first_air_date !== undefined)
+    ? 'tv'
+    : 'movie';
+  return `${mediaType}:${Number(media.id)}`;
 };
-
-const translateJob = (job: string) => {
-  const map: Record<string, string> = {
-    'Director': 'Réalisateur',
-    'Writer': 'Scénariste',
-    'Screenplay': 'Scénariste',
-    'Story': 'Histoire originale',
-    'Producer': 'Producteur',
-    'Executive Producer': 'Producteur exécutif',
-    'Creator': 'Créateur',
-    'Author': 'Auteur',
-    'Novel': 'Roman',
-    'Co-Director': 'Co-réalisateur',
-    'Original Concept': 'Concept original'
-  };
-  return map[job] || job;
-};
-
-function deduplicateAndSortCredits(rawList: any[], type: 'cast' | 'crew') {
-  if (!Array.isArray(rawList)) return [];
-
-  const map = new Map<string, any>();
-
-  for (const item of rawList) {
-    if (!item || !item.id) continue;
-    
-    const lang = item.original_language;
-    if (lang && ASIAN_LANGUAGES.includes(lang)) {
-      const pop = item.popularity || 0;
-      const vote = item.vote_average || 0;
-      const count = item.vote_count || 0;
-      if (!(pop >= 35 || (vote >= 7.8 && count >= 100))) {
-        continue;
-      }
-    }
-
-    const mediaType = item.media_type || (item.first_air_date !== undefined ? 'tv' : 'movie');
-    const key = `${item.id}_${mediaType}`;
-
-    if (!map.has(key)) {
-      const clone = { ...item, media_type: mediaType };
-      if (type === 'crew') {
-        clone.rawJobs = item.job ? [item.job] : [];
-        clone.job = item.job ? translateJob(item.job) : '';
-      } else {
-        clone.rawCharacters = item.character ? [item.character] : [];
-        clone.character = item.character || '';
-      }
-      map.set(key, clone);
-    } else {
-      const existing = map.get(key);
-      if (type === 'crew') {
-        if (item.job && !existing.rawJobs.includes(item.job)) {
-          existing.rawJobs.push(item.job);
-          existing.rawJobs.sort((a: string, b: string) => jobPriority(a) - jobPriority(b));
-          existing.job = existing.rawJobs.map(translateJob).join(', ');
-        }
-      } else {
-        if (item.character && !existing.rawCharacters.includes(item.character)) {
-          existing.rawCharacters.push(item.character);
-          existing.character = existing.rawCharacters.join(' / ');
-        }
-      }
-      if (!existing.poster_path && item.poster_path) existing.poster_path = item.poster_path;
-      if (!existing.vote_average && item.vote_average) existing.vote_average = item.vote_average;
-    }
-  }
-
-  return Array.from(map.values()).sort((a: any, b: any) => {
-    const dateA = new Date(a.release_date || a.first_air_date || '1900-01-01').getTime();
-    const dateB = new Date(b.release_date || b.first_air_date || '1900-01-01').getTime();
-    return dateB - dateA;
-  });
-}
 
 async function translateToFrench(text: string): Promise<string> {
   if (!text || !text.trim()) return text;
-  
+
   const lower = text.toLowerCase();
   const englishWords = [' born ', ' is an ', ' was an ', ' actor ', ' actress ', ' known for ', ' career ', ' signed ', ' american '];
   const isEnglish = englishWords.some(w => lower.includes(w)) || (!lower.includes(' né ') && !lower.includes(' née ') && !lower.includes(' est un ') && !lower.includes(' est une '));
@@ -194,28 +125,36 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
   const [bioExpanded, setBioExpanded] = useState(false);
   const [isTranslatingBio, setIsTranslatingBio] = useState(false);
   const [activeTab, setActiveTab] = useState<'cast' | 'directing' | 'crew'>('cast');
+  const [actingCategory, setActingCategory] = useState<PersonActingCategory>('movies');
   const [statusFilter, setStatusFilter] = useState<'all' | 'watched' | 'unwatched'>('all');
+  const [visibleCreditWindow, setVisibleCreditWindow] = useState({
+    key: '',
+    limit: PERSON_FILMOGRAPHY_PAGE_SIZE
+  });
   const [previewMedia, setPreviewMedia] = useState<TMDBMedia | null>(null);
 
   const favPeopleStore = useFavoritePeopleStore();
   const { shows, addShow, updateShow, deleteShow } = useShows();
   const { showToast } = useToastStore();
 
-  const showsByTmdbId = React.useMemo(() => {
-    const map = new Map<number, Show>();
+  const showsByMediaIdentity = React.useMemo(() => {
+    const map = new Map<string, Show>();
     shows.forEach(s => {
-      if (s.tmdbId) map.set(Number(s.tmdbId), s);
+      const identity = storedPersonShowIdentity(s);
+      if (identity) map.set(identity, s);
     });
     return map;
   }, [shows]);
 
   const castCredits = React.useMemo(() => {
-    return deduplicateAndSortCredits(credits?.cast || [], 'cast');
+    return deduplicateAndSortPersonCredits(credits?.cast || [], 'cast');
   }, [credits]);
 
   const crewCredits = React.useMemo(() => {
-    return deduplicateAndSortCredits(credits?.crew || [], 'crew');
+    return deduplicateAndSortPersonCredits(credits?.crew || [], 'crew');
   }, [credits]);
+
+  const actingCredits = React.useMemo(() => partitionPersonActingCredits(castCredits), [castCredits]);
 
   const isDirectingJob = (job: string) => {
     const j = (job || '').toLowerCase();
@@ -223,13 +162,13 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
   };
 
   const directingCredits = React.useMemo(() => {
-    return crewCredits.filter((item: any) => 
+    return crewCredits.filter(item =>
       Array.isArray(item.rawJobs) && item.rawJobs.some(isDirectingJob)
     );
   }, [crewCredits]);
 
   const otherCrewCredits = React.useMemo(() => {
-    return crewCredits.filter((item: any) => 
+    return crewCredits.filter(item =>
       !Array.isArray(item.rawJobs) || !item.rawJobs.some(isDirectingJob)
     );
   }, [crewCredits]);
@@ -260,6 +199,13 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
       else if (castCredits.length > 0) setActiveTab('cast');
     }
   }, [activeTab, castCredits.length, directingCredits.length, otherCrewCredits.length, crewCredits.length, person?.known_for_department]);
+
+  useEffect(() => {
+    if (activeTab !== 'cast' || actingCredits[actingCategory].length > 0) return;
+    if (actingCredits.movies.length > 0) setActingCategory('movies');
+    else if (actingCredits.series.length > 0) setActingCategory('series');
+    else if (actingCredits.appearances.length > 0) setActingCategory('appearances');
+  }, [activeTab, actingCategory, actingCredits]);
 
   const handleAddClick = async (media: TMDBMedia) => {
     const isTv = media.media_type === 'tv' || (!media.media_type && media.first_air_date !== undefined);
@@ -293,7 +239,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
   };
 
   const handleToggleWatched = async (media: TMDBMedia) => {
-    const existingShow = showsByTmdbId.get(Number(media.id));
+    const existingShow = showsByMediaIdentity.get(mediaIdentity(media));
     const isTv = media.media_type === 'tv' || (!media.media_type && media.first_air_date !== undefined);
     if (existingShow) {
       if (!isTv) {
@@ -306,8 +252,8 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
             seenEpisodes: []
           });
           showToast(
-            `« ${existingShow.title} » marqué comme à voir`, 
-            'unfollow', 
+            `« ${existingShow.title} » marqué comme à voir`,
+            'unfollow',
             existingShow,
             async () => {
               await updateShow(existingShow.id, { status: oldStatus, seenEpisodes: oldSeen });
@@ -319,8 +265,8 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
             seenEpisodes: ['movie']
           });
           showToast(
-            `« ${existingShow.title} » marqué comme vu !`, 
-            'success', 
+            `« ${existingShow.title} » marqué comme vu !`,
+            'success',
             existingShow,
             async () => {
               await updateShow(existingShow.id, { status: oldStatus, seenEpisodes: oldSeen });
@@ -336,8 +282,8 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
             seenEpisodes: []
           });
           showToast(
-            `« ${existingShow.title} » réinitialisée`, 
-            'unfollow', 
+            `« ${existingShow.title} » réinitialisée`,
+            'unfollow',
             existingShow,
             async () => {
               await updateShow(existingShow.id, { status: oldStatus });
@@ -348,8 +294,8 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
             status: 'completed'
           });
           showToast(
-            `« ${existingShow.title} » marquée à jour`, 
-            'success', 
+            `« ${existingShow.title} » marquée à jour`,
+            'success',
             existingShow,
             async () => {
               await updateShow(existingShow.id, { status: oldStatus });
@@ -378,8 +324,8 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
       const newId = await addShow(newShowData);
       const savedShow = { ...newShowData, id: newId, userId: '' } as Show;
       showToast(
-        `« ${title} » marqué comme vu !`, 
-        'success', 
+        `« ${title} » marqué comme vu !`,
+        'success',
         savedShow,
         async () => {
           if (newId) await deleteShow(newId);
@@ -488,26 +434,32 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
     );
   }
 
-  const displayedCredits = activeTab === 'directing' 
-    ? directingCredits 
-    : activeTab === 'cast' 
-      ? castCredits 
+  const displayedCredits = activeTab === 'directing'
+    ? directingCredits
+    : activeTab === 'cast'
+      ? actingCredits[actingCategory]
       : (person.known_for_department === 'Directing' && directingCredits.length > 0 ? otherCrewCredits : crewCredits);
 
-  const watchedCount = displayedCredits.filter((item: any) => {
-    const show = showsByTmdbId.get(Number(item.id));
+  const watchedCount = displayedCredits.filter(item => {
+    const show = showsByMediaIdentity.get(personCreditIdentity(item));
     return isShowWatched(show);
   }).length;
   const unwatchedCount = displayedCredits.length - watchedCount;
   const completionCount = watchedCount;
   const completionPercentage = displayedCredits.length > 0 ? Math.round((completionCount / displayedCredits.length) * 100) : 0;
 
-  const filteredCredits = displayedCredits.filter((item: any) => {
-    const isWatched = isShowWatched(showsByTmdbId.get(Number(item.id)));
+  const filteredCredits = displayedCredits.filter(item => {
+    const isWatched = isShowWatched(showsByMediaIdentity.get(personCreditIdentity(item)));
     if (statusFilter === 'watched') return isWatched;
     if (statusFilter === 'unwatched') return !isWatched;
     return true;
   });
+  const creditListKey = `${personId}:${activeTab}:${actingCategory}:${statusFilter}`;
+  const visibleCreditLimit = visibleCreditWindow.key === creditListKey
+    ? visibleCreditWindow.limit
+    : PERSON_FILMOGRAPHY_PAGE_SIZE;
+  const visibleCredits = takeVisiblePersonCredits(filteredCredits, visibleCreditLimit);
+  const remainingCreditCount = Math.max(0, filteredCredits.length - visibleCredits.length);
 
   const isBioLong = person.biography && person.biography.length > 200;
 
@@ -531,7 +483,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex justify-center items-center">
-      <div 
+      <div
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -540,15 +492,15 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
         }}
         className={cn(
           "relative bg-black w-full max-w-md h-full overflow-y-auto pb-nav flex flex-col hide-scrollbar shadow-2xl border-x border-white/10",
-          isDragging 
-            ? "transition-none" 
+          isDragging
+            ? "transition-none"
             : "transition-transform duration-300 ease-out",
           !isExiting && dragX === 0 && "animate-in slide-in-from-right duration-300"
         )}
       >
         {/* Sticky Header */}
       <div className="relative pt-10 pb-2.5 px-4 flex items-center justify-between z-20 sticky top-0 bg-black/95 backdrop-blur-xl border-b border-white/10">
-        <button 
+        <button
           onPointerUp={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -563,7 +515,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
           <span>Retour</span>
         </button>
         <span className="text-white font-bold tracking-wider uppercase text-xs">{headerTitle}</span>
-        <button 
+        <button
           onClick={handleAnimatedClose}
           className="w-8 h-8 bg-zinc-900/90 rounded-full flex items-center justify-center border border-white/10 touch-manipulation cursor-pointer hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
         >
@@ -576,10 +528,10 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
           {/* Prominent high-res Star photo */}
           <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-full overflow-hidden bg-zinc-800 border-3 border-[#E5A93D]/70 shadow-2xl ring-4 ring-[#E5A93D]/20 mb-3 flex-shrink-0">
             {person.profile_path ? (
-              <img 
-                src={`https://image.tmdb.org/t/p/w500${person.profile_path}`} 
-                alt={person.name} 
-                className="w-full h-full object-cover object-top" 
+              <img
+                src={`https://image.tmdb.org/t/p/w500${person.profile_path}`}
+                alt={person.name}
+                className="w-full h-full object-cover object-top"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-zinc-500 font-bold text-3xl">
@@ -667,7 +619,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
                   {person.biography}
                </p>
                {isBioLong && (
-                 <button 
+                 <button
                    onClick={() => setBioExpanded(!bioExpanded)}
                    className="text-[#E5A93D] text-[10px] font-bold mt-1 uppercase tracking-wider hover:underline"
                  >
@@ -690,7 +642,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
               </span>
             </div>
             <div className="w-full h-2 bg-zinc-900 rounded-full overflow-hidden border border-white/5 relative">
-              <div 
+              <div
                 className="absolute top-0 left-0 h-full bg-gradient-to-r from-amber-600 to-[#E5A93D] rounded-full transition-all duration-700 ease-out"
                 style={{ width: `${completionPercentage}%` }}
               />
@@ -704,7 +656,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
             {person.known_for_department === 'Directing' ? (
               <>
                 {directingCredits.length > 0 && (
-                  <button 
+                  <button
                     onClick={() => {
                       setActiveTab('directing');
                       setStatusFilter('all');
@@ -718,7 +670,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
                   </button>
                 )}
                 {otherCrewCredits.length > 0 && (
-                  <button 
+                  <button
                     onClick={() => {
                       setActiveTab('crew');
                       setStatusFilter('all');
@@ -732,7 +684,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
                   </button>
                 )}
                 {castCredits.length > 0 && (
-                  <button 
+                  <button
                     onClick={() => {
                       setActiveTab('cast');
                       setStatusFilter('all');
@@ -749,7 +701,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
             ) : (
               <>
                 {castCredits.length > 0 && (
-                  <button 
+                  <button
                     onClick={() => {
                       setActiveTab('cast');
                       setStatusFilter('all');
@@ -763,7 +715,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
                   </button>
                 )}
                 {crewCredits.length > 0 && (
-                  <button 
+                  <button
                     onClick={() => {
                       setActiveTab('crew');
                       setStatusFilter('all');
@@ -781,38 +733,68 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
           </div>
         </div>
 
+        {activeTab === 'cast' && (
+          <div className="px-4 mb-3">
+            <div className="flex gap-1.5 overflow-x-auto hide-scrollbar max-w-md mx-auto" aria-label="Catégorie de filmographie">
+              {([
+                ['movies', 'Films', actingCredits.movies.length],
+                ['series', 'Séries', actingCredits.series.length],
+                ['appearances', 'Apparitions', actingCredits.appearances.length]
+              ] as const).map(([category, label, count]) => count > 0 && (
+                <button
+                  key={category}
+                  type="button"
+                  aria-pressed={actingCategory === category}
+                  onClick={() => {
+                    setActingCategory(category);
+                    setStatusFilter('all');
+                  }}
+                  className={cn(
+                    "min-h-11 shrink-0 px-3 py-2 text-[10px] font-bold uppercase tracking-wider rounded-xl border transition-all touch-manipulation cursor-pointer",
+                    actingCategory === category
+                      ? "bg-[#E5A93D]/15 text-[#E5A93D] border-[#E5A93D]/50"
+                      : "bg-zinc-900/60 text-zinc-400 border-white/5 hover:text-zinc-200"
+                  )}
+                >
+                  {label} ({count})
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Status Filter Bar (Tous / Vus / À voir) */}
         {displayedCredits.length > 0 && (
           <div className="px-4 mb-3.5 flex items-center justify-center gap-1.5 flex-wrap">
-            <button 
+            <button
               onClick={() => setStatusFilter('all')}
               className={cn(
                 "px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-xl border transition-all touch-manipulation cursor-pointer flex items-center gap-1",
-                statusFilter === 'all' 
-                  ? "bg-zinc-800 text-[#E5A93D] border-[#E5A93D]/40 shadow-sm" 
+                statusFilter === 'all'
+                  ? "bg-zinc-800 text-[#E5A93D] border-[#E5A93D]/40 shadow-sm"
                   : "bg-zinc-900/60 text-zinc-400 border-white/5 hover:text-zinc-200"
               )}
             >
               Tous ({displayedCredits.length})
             </button>
-            <button 
+            <button
               onClick={() => setStatusFilter('watched')}
               className={cn(
                 "px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-xl border transition-all touch-manipulation cursor-pointer flex items-center gap-1",
-                statusFilter === 'watched' 
-                  ? "bg-emerald-950/70 text-emerald-400 border-emerald-500/40 shadow-sm" 
+                statusFilter === 'watched'
+                  ? "bg-emerald-950/70 text-emerald-400 border-emerald-500/40 shadow-sm"
                   : "bg-zinc-900/60 text-zinc-400 border-white/5 hover:text-zinc-200"
               )}
             >
               <Check size={12} className="text-emerald-400 stroke-[3]" />
               Vus ({watchedCount})
             </button>
-            <button 
+            <button
               onClick={() => setStatusFilter('unwatched')}
               className={cn(
                 "px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-xl border transition-all touch-manipulation cursor-pointer flex items-center gap-1",
-                statusFilter === 'unwatched' 
-                  ? "bg-amber-950/70 text-amber-400 border-amber-500/40 shadow-sm" 
+                statusFilter === 'unwatched'
+                  ? "bg-amber-950/70 text-amber-400 border-amber-500/40 shadow-sm"
                   : "bg-zinc-900/60 text-zinc-400 border-white/5 hover:text-zinc-200"
               )}
             >
@@ -825,24 +807,38 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
         {/* Filmographie Grid (3 Cols on Mobile) */}
         <div className="px-3 pb-6">
           {filteredCredits.length > 0 ? (
-            <div className="relative z-0 grid grid-cols-3 sm:grid-cols-4 gap-2 gap-y-3">
-              {filteredCredits.map((credit, idx: number) => {
-                const show = showsByTmdbId.get(Number(credit.id));
-                return (
-                  <GridMediaCard
-                    key={`${credit.id}-${credit.media_type}-${idx}`}
-                    media={credit}
-                    show={show}
-                    onShowClick={(id, mediaType) => {
-                      onShowClick(id, mediaType);
-                    }}
-                    onAddClick={handleAddClick}
-                    onToggleWatched={handleToggleWatched}
-                    onLongPress={(media) => setPreviewMedia(media)}
-                  />
-                );
-              })}
-            </div>
+            <>
+              <div className="relative z-0 grid grid-cols-3 sm:grid-cols-4 gap-2 gap-y-3">
+                {visibleCredits.map((credit, idx: number) => {
+                  const show = showsByMediaIdentity.get(personCreditIdentity(credit));
+                  return (
+                    <GridMediaCard
+                      key={`${credit.id}-${credit.media_type}-${idx}`}
+                      media={credit}
+                      show={show}
+                      onShowClick={(id, mediaType) => {
+                        onShowClick(id, mediaType);
+                      }}
+                      onAddClick={handleAddClick}
+                      onToggleWatched={handleToggleWatched}
+                      onLongPress={(media) => setPreviewMedia(media)}
+                    />
+                  );
+                })}
+              </div>
+              {remainingCreditCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setVisibleCreditWindow({
+                    key: creditListKey,
+                    limit: visibleCreditLimit + PERSON_FILMOGRAPHY_PAGE_SIZE
+                  })}
+                  className="mt-5 min-h-11 w-full rounded-xl border border-white/10 bg-zinc-900/80 px-4 py-2 text-xs font-bold text-[#E5A93D] transition-colors hover:bg-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E5A93D]"
+                >
+                  Afficher {Math.min(PERSON_FILMOGRAPHY_PAGE_SIZE, remainingCreditCount)} de plus
+                </button>
+              )}
+            </>
           ) : (
             <div className="py-12 text-center text-zinc-500 text-xs flex flex-col items-center gap-2">
               <Film size={26} className="text-zinc-600 mb-1" />
@@ -855,8 +851,8 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
         {previewMedia && (
           <QuickPreviewModal
             media={previewMedia}
-            isAdded={Boolean(showsByTmdbId.get(Number(previewMedia.id)))}
-            isWatched={isShowWatched(showsByTmdbId.get(Number(previewMedia.id)))}
+            isAdded={Boolean(showsByMediaIdentity.get(mediaIdentity(previewMedia)))}
+            isWatched={isShowWatched(showsByMediaIdentity.get(mediaIdentity(previewMedia)))}
             onClose={() => setPreviewMedia(null)}
             onAddClick={handleAddClick}
             onToggleWatched={handleToggleWatched}
