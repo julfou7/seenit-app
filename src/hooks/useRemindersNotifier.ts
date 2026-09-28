@@ -29,6 +29,7 @@ import {
 
 const REMINDER_SCHEDULE_SCHEMA = 'v7';
 const REMINDER_TOAST_RECEIPT_SCHEMA = 'v1';
+const localConsole = globalThis.console;
 
 function toLocalDateKey(date: Date): string {
   const year = date.getFullYear();
@@ -385,6 +386,6 @@ export function useRemindersNotifier() {
         }
       }
     };
-    processReminders().catch(err => console.warn('Reminder scheduling error:', err));
+    processReminders().catch(err => localConsole.warn('Reminder scheduling error:', err));
   }, [shows, showToast]);
 }
