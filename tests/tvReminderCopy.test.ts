@@ -129,5 +129,7 @@ test('SEENIT-NOTIFICATION-002 et #623 reprogramment une alarme future si le cont
     source,
     /contentRevision = getMediaReminderNotificationId\(\`copy:\$\{summaryText\}:\$\{msgBody\}\`\)/,
   );
-  assert.match(source, /_c\$\{contentRevision\}/);
+  assert.doesNotMatch(source, /_c\$\{contentRevision\}/);
+  assert.match(source, /activeContentRevision !== contentRevision/);
+  assert.match(source, /writeUserScopedJson\(uid, scheduleKey, contentRevision\)/);
 });
