@@ -16,10 +16,9 @@ test('SEENIT-NOTIFICATION-002 et #443 conservent l’affiche complète sans doub
   );
   assert.ok(nativePatchSource.includes('fitSeenItBitmapInside(source, 192, 192)'));
   assert.ok(nativePatchSource.includes('fitSeenItBitmapInside(source, 512, 288)'));
-  assert.equal(
-    nativePatchSource.split('.bigLargeIcon(null as android.graphics.Bitmap?)').length - 1,
-    2,
-    'les chemins immédiat et AlarmManager doivent masquer le largeIcon dans l’état développé'
+  assert.ok(
+    nativePatchSource.split('.bigLargeIcon(null as android.graphics.Bitmap?)').length - 1 >= 4,
+    'les chemins immédiat et AlarmManager, y compris leur migration, doivent masquer le largeIcon dans l’état développé'
   );
   assert.doesNotMatch(
     nativePatchSource,
