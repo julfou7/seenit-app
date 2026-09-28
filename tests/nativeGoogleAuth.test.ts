@@ -7,7 +7,11 @@ const mainActivity = readFileSync('android/app/src/main/java/com/seenit/app/Main
 const appGradle = readFileSync('android/app/build.gradle', 'utf8');
 const rootGradle = readFileSync('android/build.gradle', 'utf8');
 const login = readFileSync('src/screens/LoginScreen.tsx', 'utf8');
+const settings = readFileSync('src/screens/SettingsScreenCore.tsx', 'utf8');
 const bridge = readFileSync('src/lib/auth/SeenItAuth.ts', 'utf8');
+const capacitorConfig = readFileSync('capacitor.config.ts', 'utf8');
+const packageJson = readFileSync('package.json', 'utf8');
+const packageLock = readFileSync('package-lock.json', 'utf8');
 
 test('SEENIT-AUTH-001 ouvre le sélecteur Google natif Credential Manager comme ATHIA', () => {
   assert.match(plugin, /@CapacitorPlugin\(name = "SeenItAuth"\)/);
@@ -27,11 +31,21 @@ test('SEENIT-AUTH-001 ouvre le sélecteur Google natif Credential Manager comme 
 
 test('SEENIT-AUTH-001 conserve le même compte Firebase et un fallback natif propre', () => {
   const primary = login.indexOf('SeenItAuth.signInWithGoogle()');
-  const fallback = login.indexOf('GoogleAuth.initialize');
-  assert.ok(primary >= 0 && fallback > primary, 'Credential Manager doit être tenté avant l’ancien fallback');
+  const fallback = login.indexOf('FirebaseAuthentication.signInWithGoogle');
+  assert.ok(primary >= 0 && fallback > primary, 'Credential Manager doit être tenté avant le fallback Firebase');
+  assert.match(login, /FirebaseAuthentication\.signInWithGoogle\(\{ useCredentialManager: false \}\)/);
+  assert.match(settings, /FirebaseAuthentication\.signInWithGoogle\(\{ useCredentialManager: false \}\)/);
   assert.match(login, /GoogleAuthProvider\.credential\(idToken\)/);
   assert.match(login, /signInWithCredential\(auth, credential\)/);
   assert.match(login, /signInWithPopup\(auth, googleAuthProvider\)/);
+});
+
+test('SEENIT-AUTH-001 utilise uniquement des plugins natifs compatibles Capacitor 8', () => {
+  assert.match(packageJson, /"@capacitor-firebase\/authentication": "\^8\.4\.0"/);
+  assert.doesNotMatch(`${packageJson}\n${packageLock}`, /@codetrix-studio\/capacitor-google-auth/);
+  assert.doesNotMatch(`${login}\n${settings}`, /@codetrix-studio\/capacitor-google-auth|GoogleAuth\.initialize/);
+  assert.doesNotMatch(capacitorConfig, /\bGoogleAuth:/);
+  assert.match(capacitorConfig, /FirebaseAuthentication:[\s\S]*skipNativeAuth: true/);
 });
 
 test('SEENIT-AUTH-001 traite l’annulation Google comme une sortie non bloquante', () => {

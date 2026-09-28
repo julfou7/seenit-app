@@ -2218,6 +2218,10 @@
           "contains": "SEENIT-AUTH-001 traite l’annulation Google comme une sortie non bloquante"
         },
         {
+          "file": "tests/nativeGoogleAuth.test.ts",
+          "contains": "SEENIT-AUTH-001 utilise uniquement des plugins natifs compatibles Capacitor 8"
+        },
+        {
           "file": "tests/profileAvatarFallback.test.ts",
           "contains": "issue #421 conserve les métadonnées photo du Credential Manager jusqu’au profil Firebase"
         }

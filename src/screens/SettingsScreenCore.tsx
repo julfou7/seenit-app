@@ -6,7 +6,7 @@ import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged, User } from 'firebase/auth';
-import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { cn } from '../lib/utils';
 import { CsvImporter } from '../components/CsvImporter';
 import { useToastStore } from '../store/toastStore';
@@ -87,7 +87,7 @@ export function SettingsScreen() {
   const [user, setUser] = useState<User | null>(null);
   const [userPlatforms, setUserPlatforms] = useState<number[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
-  
+
   const [notificationPrefs, setNotificationPrefs] = useState(() =>
     readUserScopedJson(auth.currentUser?.uid, 'notifications', DEFAULT_NOTIFICATION_PREFS)
   );
@@ -254,12 +254,12 @@ export function SettingsScreen() {
 
   useEffect(() => {
     setUserPlatforms(readUserScopedJson<number[]>(auth.currentUser?.uid, 'platforms', []));
-    
+
     const handleStorage = () => {
       setUserPlatforms(readUserScopedJson<number[]>(auth.currentUser?.uid, 'platforms', []));
     };
     window.addEventListener('storage', handleStorage);
-        
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       const scopeChanged = activatePlexUserScope(currentUser?.uid);
       if (scopeChanged) usePlexAvailabilityStore.getState().clearCache();
@@ -315,8 +315,8 @@ export function SettingsScreen() {
           }
         } catch (e: any) {
           const errorMessage = e?.message || String(e);
-          const isOffline = !navigator.onLine || 
-                            errorMessage.toLowerCase().includes('offline') || 
+          const isOffline = !navigator.onLine ||
+                            errorMessage.toLowerCase().includes('offline') ||
                             e?.code === 'unavailable';
           if (isOffline) {
             console.warn('[Settings] Client is offline, using local cached settings:', errorMessage);
@@ -350,7 +350,7 @@ export function SettingsScreen() {
         // Sauvegarder également les plateformes, notifications et plex
         const prefRef = doc(db, 'users', user.uid, 'settings', 'preferences');
         await setDoc(prefRef, { platforms: userPlatforms }, { merge: true });
-        
+
         const notifRef = doc(db, 'users', user.uid, 'settings', 'notifications');
         await setDoc(notifRef, notificationPrefs, { merge: true });
 
@@ -377,7 +377,7 @@ export function SettingsScreen() {
     showToast("Récupération des données depuis le Cloud...", "info");
     try {
       await useShowsStore.getState().fetchShows();
-      
+
       // Recharger plateformes
       const prefRef = doc(db, 'users', user.uid, 'settings', 'preferences');
       const snap = await getDoc(prefRef);
@@ -446,7 +446,7 @@ export function SettingsScreen() {
     const newPlatforms = userPlatforms.includes(id)
       ? userPlatforms.filter(p => p !== id)
       : [...userPlatforms, id];
-    
+
     setUserPlatforms(newPlatforms);
     writeUserScopedJson(auth.currentUser?.uid, 'platforms', newPlatforms);
     window.dispatchEvent(new Event('storage'));
@@ -464,13 +464,8 @@ export function SettingsScreen() {
   const handleLogin = async () => {
     try {
       if (Capacitor.isNativePlatform()) {
-        await GoogleAuth.initialize({
-          clientId: '799043440232-i9s1l0jaerljg58v3oooleuemnhnim4o.apps.googleusercontent.com',
-          scopes: ['profile', 'email'],
-          grantOfflineAccess: true,
-        });
-        const googleUser = await GoogleAuth.signIn();
-        const idToken = googleUser.authentication?.idToken || (googleUser as any)?.idToken;
+        const googleUser = await FirebaseAuthentication.signInWithGoogle({ useCredentialManager: false });
+        const idToken = googleUser.credential?.idToken;
         if (!idToken) {
           throw new Error("Jeton d'authentification Google manquant.");
         }
@@ -590,7 +585,7 @@ export function SettingsScreen() {
     <div className="flex-1 overflow-y-auto bg-black text-white px-4 sm:px-6 pt-4 sm:pt-5 pb-nav custom-scrollbar relative">
       <div className="max-w-md mx-auto w-full">
         <div className="absolute top-0 left-0 w-64 h-32 bg-[#E5A93D]/10 blur-[100px] -z-10 rounded-full mix-blend-screen pointer-events-none" />
-        
+
         {/* Header Mobile Compact */}
         <div className="mb-4">
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white mb-0.5">Réglages</h1>
@@ -600,7 +595,7 @@ export function SettingsScreen() {
         </div>
 
         <div className="space-y-3 sm:space-y-4">
-          
+
           {/* SECTION 1: MON COMPTE */}
           <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 sm:p-5">
             <h2 className="font-bold text-sm text-zinc-100 mb-3 flex items-center gap-2.5">
@@ -658,7 +653,7 @@ export function SettingsScreen() {
                     </button>
                   </div>
                 </div>
-                
+
                 <button
                   onClick={handleLogout}
                   className="w-full flex items-center justify-center gap-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 active:scale-95 font-bold py-2 px-4 rounded-xl transition-all text-xs border border-red-500/20 cursor-pointer"
@@ -679,7 +674,7 @@ export function SettingsScreen() {
             <p className="text-xs text-zinc-400 mb-4 leading-relaxed font-medium">
               Sélectionnez vos abonnements pour y accéder directement.
             </p>
-            
+
             <div className="grid grid-cols-2 gap-2">
               {STREAMING_PLATFORMS.map(platform => {
                 const isSelected = userPlatforms.includes(platform.id);
@@ -689,8 +684,8 @@ export function SettingsScreen() {
                     onClick={() => handleTogglePlatform(platform.id)}
                     className={cn(
                       "flex items-center justify-between px-3 py-2.5 rounded-xl border text-left transition-all active:scale-95 touch-manipulation",
-                      isSelected 
-                        ? "bg-[#E5A93D]/10 border-[#E5A93D]/40 text-[#E5A93D]" 
+                      isSelected
+                        ? "bg-[#E5A93D]/10 border-[#E5A93D]/40 text-[#E5A93D]"
                         : "bg-black/40 border-white/5 text-zinc-400 hover:bg-zinc-800/60"
                     )}
                   >
@@ -731,8 +726,8 @@ export function SettingsScreen() {
                 </div>
                 <div className="flex items-center gap-3">
                   <button onClick={() => triggerTestNotif('release_today_tv')} className="text-[10px] font-bold text-zinc-400 hover:text-white px-2 py-1 bg-zinc-800 rounded-md transition-colors">🧪 Test</button>
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     className="w-4 h-4 rounded text-[#E5A93D] focus:ring-[#E5A93D] bg-zinc-800 border-zinc-700 cursor-pointer"
                     checked={notificationPrefs.release_today_tv}
                     onChange={(e) => handleToggleNotif('release_today_tv', e.target.checked)}
@@ -747,8 +742,8 @@ export function SettingsScreen() {
                 </div>
                 <div className="flex items-center gap-3">
                   <button onClick={() => triggerTestNotif('season_d7')} className="text-[10px] font-bold text-zinc-400 hover:text-white px-2 py-1 bg-zinc-800 rounded-md transition-colors">🧪 Test</button>
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     className="w-4 h-4 rounded text-[#E5A93D] focus:ring-[#E5A93D] bg-zinc-800 border-zinc-700 cursor-pointer"
                     checked={notificationPrefs.season_d7}
                     onChange={(e) => handleToggleNotif('season_d7', e.target.checked)}
@@ -763,8 +758,8 @@ export function SettingsScreen() {
                 </div>
                 <div className="flex items-center gap-3">
                   <button onClick={() => triggerTestNotif('movie_theater')} className="text-[10px] font-bold text-zinc-400 hover:text-white px-2 py-1 bg-zinc-800 rounded-md transition-colors">🧪 Test</button>
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     className="w-4 h-4 rounded text-[#E5A93D] focus:ring-[#E5A93D] bg-zinc-800 border-zinc-700 cursor-pointer"
                     checked={notificationPrefs.movie_theater}
                     onChange={(e) => handleToggleNotif('movie_theater', e.target.checked)}
@@ -779,8 +774,8 @@ export function SettingsScreen() {
                 </div>
                 <div className="flex items-center gap-3">
                   <button onClick={() => triggerTestNotif('movie_dvd_vod')} className="text-[10px] font-bold text-zinc-400 hover:text-white px-2 py-1 bg-zinc-800 rounded-md transition-colors">🧪 Test</button>
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     className="w-4 h-4 rounded text-[#E5A93D] focus:ring-[#E5A93D] bg-zinc-800 border-zinc-700 cursor-pointer"
                     checked={notificationPrefs.movie_dvd_vod}
                     onChange={(e) => handleToggleNotif('movie_dvd_vod', e.target.checked)}
@@ -875,11 +870,11 @@ export function SettingsScreen() {
                     </button>
                   </div>
                   <div className="flex items-center justify-between mt-1 px-1">
-                    <button 
+                    <button
                       onClick={async () => {
                         const count = await purgeAllPlexSlugsInDb();
                         showToast(`🧹 ${count} slug(s) Plex nettoyé(s) avec succès !`, "success");
-                      }} 
+                      }}
                       className="text-[10px] text-amber-500/80 font-medium hover:text-amber-400 underline text-left"
                     >
                       Purger les slugs Plex en cache
@@ -924,7 +919,7 @@ export function SettingsScreen() {
                     <span className="text-[11px]">{syncStatus.total - syncStatus.pending + 1} / {syncStatus.total}</span>
                   </div>
                   <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                    <div 
+                    <div
                       className="bg-[#E5A93D] h-full transition-all duration-300"
                       style={{ width: `${Math.round(((syncStatus.total - syncStatus.pending + 1) / Math.max(1, syncStatus.total)) * 100)}%` }}
                     />
@@ -1021,7 +1016,7 @@ export function SettingsScreen() {
                   </div>
                 </div>
               )}
-              
+
               <div className="flex gap-2">
                 <button
                   onClick={handleCheckUpdates}
@@ -1071,7 +1066,7 @@ export function SettingsScreen() {
                     <span>{apkUpdateProgress.percent}%</span>
                   </div>
                   <div className="w-full bg-black/40 rounded-full h-1.5 overflow-hidden">
-                    <div 
+                    <div
                       className={cn(
                         "h-full transition-all duration-300",
                         apkUpdatePresentation?.tone === 'error'
@@ -1101,8 +1096,8 @@ export function SettingsScreen() {
                         onClick={() => setSelectedLogCategory(cat)}
                         className={cn(
                           "px-3 py-2 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-colors",
-                          selectedLogCategory === cat 
-                            ? "text-[#E5A93D] border-b-2 border-[#E5A93D] bg-black/40" 
+                          selectedLogCategory === cat
+                            ? "text-[#E5A93D] border-b-2 border-[#E5A93D] bg-black/40"
                             : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
                         )}
                       >
@@ -1110,7 +1105,7 @@ export function SettingsScreen() {
                       </button>
                     ))}
                   </div>
-                  
+
                   <div className="p-3 max-h-64 overflow-y-auto custom-scrollbar font-mono text-[10px]">
                     {logs.length === 0 ? (
                       <div className="text-zinc-500 text-center py-4">Aucun log enregistré</div>
@@ -1183,7 +1178,7 @@ export function SettingsScreen() {
 
       {/* Dedicated Version Notes Modal */}
       {showVersionNotesModal && createPortal(
-        <div 
+        <div
           className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-md flex items-center justify-center p-2.5 pb-6 sm:p-4 animate-in fade-in duration-200"
           onClick={() => {
             if (apkUpdateProgress?.status !== 'downloading') {
@@ -1191,7 +1186,7 @@ export function SettingsScreen() {
             }
           }}
         >
-          <div 
+          <div
             className="bg-[#121218] border border-white/10 rounded-3xl w-full max-w-lg sm:max-w-2xl overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.95)] flex flex-col my-auto animate-in zoom-in-95 duration-200 shrink-0"
             onClick={(e) => e.stopPropagation()}
             style={{ maxHeight: 'min(94vh, calc(100dvh - 16px))' }}
@@ -1224,9 +1219,9 @@ export function SettingsScreen() {
             </div>
 
             {/* Scrollable Body Content */}
-            <div 
+            <div
               className="p-4 sm:p-5 overflow-y-auto min-h-0 space-y-4 flex-1 text-sm text-zinc-300 custom-scrollbar overscroll-contain touch-pan-y"
-              style={{ 
+              style={{
                 WebkitOverflowScrolling: 'touch',
                 touchAction: 'pan-y',
                 overscrollBehavior: 'contain'
@@ -1235,7 +1230,7 @@ export function SettingsScreen() {
               <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
                 Tous les changelogs officiels
               </div>
-              
+
               <div className="bg-black/40 border border-white/5 rounded-2xl p-4 max-h-80 sm:max-h-[28rem] md:max-h-[32rem] overflow-y-auto custom-scrollbar">
                 {isLoadingReleaseHistory || (isCheckingUpdates && !latestRelease) ? (
                   <div className="py-8 flex flex-col items-center justify-center gap-2 text-zinc-400 text-xs">
@@ -1256,8 +1251,8 @@ export function SettingsScreen() {
               {apkUpdateProgress && apkUpdateProgress.status !== 'idle' && (
                 <div className={cn(
                   "border rounded-2xl p-3.5 space-y-2 animate-in fade-in duration-200",
-                  apkUpdateProgress.status === 'error' 
-                    ? "bg-red-500/10 border-red-500/30" 
+                  apkUpdateProgress.status === 'error'
+                    ? "bg-red-500/10 border-red-500/30"
                     : "bg-amber-500/10 border-amber-500/30"
                 )}>
                   <div className="flex items-center justify-between text-xs font-semibold">
@@ -1285,7 +1280,7 @@ export function SettingsScreen() {
                   </div>
 
                   <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden">
-                    <div 
+                    <div
                       className={cn(
                         "h-full rounded-full transition-all duration-300",
                         apkUpdateProgress.status === 'error' ? "bg-red-500" : "bg-gradient-to-r from-amber-400 to-amber-500"

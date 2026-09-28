@@ -63,7 +63,7 @@ jobs:
           cache: npm
 
       - name: Install pinned dependencies without lifecycle scripts
-        run: npm ci --legacy-peer-deps --ignore-scripts --prefer-offline --no-audit --no-fund
+        run: npm ci --ignore-scripts --prefer-offline --no-audit --no-fund
 
       - name: Authenticate with the temporary migration identity
         uses: google-github-actions/auth@v3

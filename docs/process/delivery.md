@@ -83,7 +83,9 @@ phases pour conserver le fail-fast et le cache :
 2. installation de **actionlint v1.7.12** verrouillé par version et SHA-256 ;
 3. `npm run validate:change -- --preflight`, qui exécute la politique/syntaxe des workflows puis l'intégrité SPEC ;
 4. restauration éventuelle d'un cache `node_modules` exact ;
-5. sur cache absent seulement, `npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund` ;
+5. sur cache absent seulement, `npm ci --prefer-offline --no-audit --no-fund` ; le graphe de
+   dépendances doit rester installable sans `--legacy-peer-deps`, et tout peer incompatible est remplacé
+   ou mis à niveau plutôt que masqué globalement ;
 6. `npm run validate:change -- --postinstall`, qui rematérialise Android, classe `light` / `backend` / `apk`, applique le contrat de changement, le typecheck global, le strict TypeScript progressif, le garde de dette `any`/console, le formatage minimal du diff, les tests unitaires, le contrat Android conditionnel, l'audit applicable et le build ;
 7. résumé du mode, du cache et des durées principales.
 

@@ -50,7 +50,8 @@ test('SEENIT-QUALITY-008 impose un préflight sans dépendances et un cache exac
   assert.match(validateJob, /hashFiles\('package\.json', 'package-lock\.json', 'scripts\/patch-local-notifications\.cjs', 'scripts\/materialize-android-config\.cjs'\)/);
   assert.doesNotMatch(validateJob, /restore-keys:/, 'aucune restauration approximative n’est autorisée');
   assert.match(validateJob, /steps\.node_modules_cache\.outputs\.cache-hit != 'true'/);
-  assert.match(validateJob, /npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund/);
+  assert.match(validateJob, /npm ci --prefer-offline --no-audit --no-fund/);
+  assert.doesNotMatch(validateJob, /legacy-peer-deps/);
 
   const save = position('Save Trusted node_modules Cache');
   const summary = position('Publish Validation Summary');

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, getRedirectResult, updateProfile } from 'firebase/auth';
-import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { auth, googleAuthProvider } from '../lib/firebase';
 import { LogIn, Tv2, Film, Clapperboard, Sparkles } from 'lucide-react';
 import { PWAInstallBanner } from '../components/PWAInstallBanner';
@@ -67,19 +67,14 @@ export function LoginScreen() {
         } catch (credentialError: any) {
           if (isGoogleAuthCancellation(credentialError)) return;
 
-          // Compatibilité : l'ancien flux natif reste disponible uniquement en fallback.
+          // Compatibilité : le flux natif Firebase Auth reste disponible uniquement en fallback.
           console.warn('Credential Manager indisponible, fallback Google Auth :', credentialError);
           try {
-            await GoogleAuth.initialize({
-              clientId: '799043440232-i9s1l0jaerljg58v3oooleuemnhnim4o.apps.googleusercontent.com',
-              scopes: ['profile', 'email'],
-              grantOfflineAccess: true,
-            });
-            const googleUser = await GoogleAuth.signIn();
-            idToken = googleUser.authentication?.idToken || (googleUser as any)?.idToken;
+            const googleUser = await FirebaseAuthentication.signInWithGoogle({ useCredentialManager: false });
+            idToken = googleUser.credential?.idToken;
             googleProfile = {
-              displayName: (googleUser as any)?.name?.trim() || undefined,
-              photoURL: (googleUser as any)?.imageUrl?.trim() || undefined,
+              displayName: googleUser.user?.displayName?.trim() || undefined,
+              photoURL: googleUser.user?.photoUrl?.trim() || undefined,
             };
           } catch (fallbackError: any) {
             if (isGoogleAuthCancellation(fallbackError)) return;
@@ -130,9 +125,9 @@ export function LoginScreen() {
       <div className="w-full max-w-md bg-premium-ambient h-[100dvh] flex flex-col relative shadow-2xl shadow-black/90 overflow-hidden pt-safe">
         <PWAInstallBanner />
         <AppUpdateBanner />
-        
+
         <div className="flex-1 flex flex-col items-center justify-center p-8 relative z-10">
-          
+
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             {/* Background elements to make it look premium */}
             <div className="absolute top-[-10%] right-[-20%] w-[150%] h-[50%] bg-[#E5A93D]/5 blur-[120px] rounded-full mix-blend-screen" />
@@ -152,7 +147,7 @@ export function LoginScreen() {
                 It
               </span>
             </h1>
-            
+
             <h2 className="text-xs font-semibold text-zinc-400 mb-6 tracking-widest uppercase">
               L'expérience cinéma & séries
             </h2>
@@ -164,7 +159,7 @@ export function LoginScreen() {
             {error && (
               <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs px-4 py-3 rounded-xl mb-6 w-full max-w-[280px] flex flex-col gap-3">
                 <div className="text-center">{error}</div>
-                <button 
+                <button
                   onClick={handleResetCache}
                   className="bg-red-500/20 hover:bg-red-500/30 text-red-300 py-2 rounded-lg font-medium transition-colors"
                 >
@@ -192,7 +187,7 @@ export function LoginScreen() {
                 </>
               )}
             </button>
-            
+
             <div className="mt-8 flex items-center justify-center gap-2 text-zinc-500 text-xs">
               <Sparkles className="w-4 h-4 text-zinc-600" />
               <span>Accès réservé. Connexion requise.</span>
