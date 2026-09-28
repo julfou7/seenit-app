@@ -79,7 +79,7 @@ test('SEENIT-NOTIFICATION-003 présente une notification média cohérente et un
   assert.ok(worker.includes('"Import terminé · Vérification de Plex…"'));
   assert.ok(worker.includes('"Disponible dans Plex"'));
   assert.ok(worker.includes('notificationId(eventKey, mediaType, tmdbId, season, episode)'));
-  assert.ok(worker.includes('builder.setLargeIcon(poster)'));
+  assert.ok(worker.includes('builder.setLargeIcon(largeIcon)'));
   assert.ok(worker.includes('fitPosterInside(poster, 160, 160)'));
   assert.ok(worker.includes('fitPosterInside(poster, 512, 288)'));
   assert.ok(worker.includes('.bigLargeIcon((Bitmap) null)'));
