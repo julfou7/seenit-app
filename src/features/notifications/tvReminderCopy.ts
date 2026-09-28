@@ -16,7 +16,7 @@ export interface TvEpisodeReminderCopy {
 export function formatTvEpisodeCode(episode: Pick<TvReminderEpisode, 'season_number' | 'episode_number'>): string {
   const season = String(episode.season_number).padStart(2, '0');
   const number = String(episode.episode_number).padStart(2, '0');
-  return `S${season}E${number}`;
+  return `S${season} | E${number}`;
 }
 
 function episodeLabel(episode: TvReminderEpisode): string {

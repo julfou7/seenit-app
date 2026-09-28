@@ -209,7 +209,7 @@ annulation.
 - Permet d'activer/désactiver un rappel pour l'épisode présenté.
 - Un rappel spécifique met à jour l'intention de notification du média et son document Firestore.
 - Sur Android, un rappel de nouvelle saison affiche aussi « Saison N » et un rappel de nouvel épisode
-  affiche son code « SxxEyy ». Si la série est en retard, le contexte visible bascule sur le prochain
+  affiche son code « Sxx | Eyy ». Si la série est en retard, le contexte visible bascule sur le prochain
   épisode réellement à voir et reprend le compteur « + X épisode(s) » de la carte À Regarder ; le corps
   peut nommer l'épisode de reprise et l'épisode nouvellement diffusé quand TMDB fournit leurs titres.
 

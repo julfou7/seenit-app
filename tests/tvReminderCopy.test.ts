@@ -56,8 +56,8 @@ test('SEENIT-NOTIFICATION-002 et #623 affichent le numéro de saison et le numé
   });
 
   const copy = buildTvEpisodeReminderCopy(show, released, today);
-  assert.equal(copy.summaryText, '🆕 Nouvel épisode · S02E03');
-  assert.equal(copy.body, "S02E03 · Le combat disponible aujourd'hui.");
+  assert.equal(copy.summaryText, '🆕 Nouvel épisode · S02 | E03');
+  assert.equal(copy.body, "S02 | E03 · Le combat disponible aujourd'hui.");
   assert.doesNotMatch(copy.summaryText, /\+ \d+/);
 });
 
@@ -73,10 +73,10 @@ test('SEENIT-NOTIFICATION-002 et #623 signalent un seul épisode supplémentaire
   const copy = buildTvEpisodeReminderCopy(show, released, today);
   assert.equal(
     copy.summaryText,
-    '🆕 Nouvel épisode · S02E03 · À voir S02E02 · + 1 épisode',
+    '🆕 Nouvel épisode · S02 | E03 · À voir S02 | E02 · + 1 épisode',
   );
-  assert.match(copy.body, /À voir : S02E02 · Demi-finale · \+ 1 épisode\./);
-  assert.match(copy.body, /Nouvel épisode : S02E03 · La finale disponible aujourd'hui\./);
+  assert.match(copy.body, /À voir : S02 | E02 · Demi-finale · \+ 1 épisode\./);
+  assert.match(copy.body, /Nouvel épisode : S02 | E03 · La finale disponible aujourd'hui\./);
 });
 
 test('SEENIT-NOTIFICATION-002 et #623 alignent le rappel en retard sur le prochain épisode à voir et le compteur de l’accueil', () => {
@@ -91,10 +91,10 @@ test('SEENIT-NOTIFICATION-002 et #623 alignent le rappel en retard sur le procha
   const copy = buildTvEpisodeReminderCopy(show, released, today);
   assert.equal(
     copy.summaryText,
-    '🆕 Nouvel épisode · S02E05 · À voir S02E02 · + 3 épisodes',
+    '🆕 Nouvel épisode · S02 | E05 · À voir S02 | E02 · + 3 épisodes',
   );
-  assert.match(copy.body, /S02E02 · Deuxième manche/);
-  assert.match(copy.body, /S02E05 · Cinquième manche/);
+  assert.match(copy.body, /S02 | E02 · Deuxième manche/);
+  assert.match(copy.body, /S02 | E05 · Cinquième manche/);
 
   const homeSource = readFileSync('src/components/cards/ContinueWatchingCard.tsx', 'utf8');
   assert.match(
@@ -113,8 +113,8 @@ test('SEENIT-NOTIFICATION-002 et #623 restent lisibles lorsque TMDB ne fournit p
   });
 
   const copy = buildTvEpisodeReminderCopy(show, released, today);
-  assert.equal(copy.summaryText, '🆕 Nouvel épisode · S01E02');
-  assert.equal(copy.body, "S01E02 disponible aujourd'hui.");
+  assert.equal(copy.summaryText, '🆕 Nouvel épisode · S01 | E02');
+  assert.equal(copy.body, "S01 | E02 disponible aujourd'hui.");
   assert.doesNotMatch(`${copy.summaryText} ${copy.body}`, /undefined|null/);
 });
 
