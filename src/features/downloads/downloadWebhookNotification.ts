@@ -148,7 +148,7 @@ export function buildDownloadWebhookPresentation(
     eventType,
     notification: {
       title: `${mediaTitle}${suffix}`,
-      body: tmdbId ? 'Import terminé · Vérification de Plex…' : 'Import terminé'
+      body: 'Import terminé'
     },
     data,
     plexAvailabilityData

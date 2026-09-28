@@ -99,10 +99,10 @@ function canonicalTmdbMatches(item: LiveDownloadItem, record: HistoryRecord): bo
 function episodeScopeMatches(item: LiveDownloadItem, record: HistoryRecord): boolean {
   if (item.mediaType !== 'tv') return true;
   const episode = record.episode;
-  if (item.seasonNumber != null && episode?.seasonNumber != null
-      && Number(item.seasonNumber) !== Number(episode.seasonNumber)) return false;
-  if (item.episodeNumber != null && episode?.episodeNumber != null
-      && Number(item.episodeNumber) !== Number(episode.episodeNumber)) return false;
+  if (item.seasonNumber != null
+      && (episode?.seasonNumber == null || Number(item.seasonNumber) !== Number(episode.seasonNumber))) return false;
+  if (item.episodeNumber != null
+      && (episode?.episodeNumber == null || Number(item.episodeNumber) !== Number(episode.episodeNumber))) return false;
   return true;
 }
 
@@ -118,7 +118,7 @@ function matchStrength(item: LiveDownloadItem, record: HistoryRecord, checkedAt:
   if (item.isOptimistic && (!requestAt || !date)) return 'none';
 
   const earliest = requestAt
-    ? requestAt - (item.isOptimistic ? 5_000 : 5 * 60_000)
+    ? item.isOptimistic ? requestAt : requestAt - 5 * 60_000
     : checkedAt - 24 * 60 * 60_000;
   if (date && date < earliest) return 'none';
 
@@ -175,7 +175,8 @@ export function shouldResolveMissingDownloadFromHistory(
   optimisticDelayMs = 3_000
 ): boolean {
   const status = String(item.status || '').toLowerCase();
-  if (status === 'completed' || status === 'cancelled' || status === 'error' || Number(item.progress || 0) >= 100) {
+  if (status === 'completed' || status === 'cancelled' || Number(item.progress || 0) >= 100
+      || (status === 'error' && item.isOptimistic)) {
     return false;
   }
   if (!item.isOptimistic) return true;

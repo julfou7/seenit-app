@@ -5,14 +5,14 @@ import {
   PLEX_AVAILABILITY_CHECK_PUSH_TYPE
 } from '../src/features/downloads/downloadWebhookNotification.ts';
 
-test('SEENIT-NOTIFICATION-003 distingue l’import Arr de la disponibilité Plex', () => {
+test('SEENIT-NOTIFICATION-003 réserve la vérification Plex au signal Android capable', () => {
   const radarr = buildDownloadWebhookPresentation('radarr', {
     eventType: 'Download',
     downloadId: 'abc123',
     movie: { title: 'Dune', tmdbId: 438631 }
   });
   assert.equal(radarr.notification.title, 'Dune');
-  assert.equal(radarr.notification.body, 'Import terminé · Vérification de Plex…');
+  assert.equal(radarr.notification.body, 'Import terminé');
   assert.doesNotMatch(radarr.notification.body, /disponible dans Plex|prêt et disponible/i);
   assert.equal(radarr.plexAvailabilityData?.type, PLEX_AVAILABILITY_CHECK_PUSH_TYPE);
   assert.equal(radarr.plexAvailabilityData?.tmdbId, '438631');
