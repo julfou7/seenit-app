@@ -65,7 +65,7 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
 
   const watched = show.seenEpisodes ? show.seenEpisodes.length : 0;
   const progressPercent = getAiredProgress(show);
-  const totalCount = show.totalAiredEpisodes || show.totalEpisodes || (show.seasonsCache ? show.seasonsCache.flatMap((s: any) => s.episodes || []).length : 0);
+  const totalCount = show.totalAiredEpisodes || show.totalEpisodes || (show.seasonsCache ? show.seasonsCache.flatMap(s => s.episodes || []).length : 0);
   const isUpToDate = progressPercent >= 100 || (watched > 0 && totalCount > 0 && watched >= totalCount);
 
   const parseTimestamp = (val: any): number => {
@@ -141,7 +141,7 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
     }
   }
 
-  const cachedSeason = show.seasonsCache?.find((s: any) => s.season_number === nextEpNum.season_number);
+  const cachedSeason = show.seasonsCache?.find(s => s.season_number === nextEpNum.season_number);
   let totalSeasonEpisodes = nextEpNum.episode_count || 
     cachedSeason?.episode_count || 
     cachedSeason?.episodes?.length || 
@@ -155,7 +155,7 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
   const todayStr = getTodayStr();
 
   if (cachedSeason?.episodes && cachedSeason.episodes.length > 0) {
-    const airedFromCache = cachedSeason.episodes.filter((ep: any) => ep.air_date && ep.air_date <= todayStr).length;
+    const airedFromCache = cachedSeason.episodes.filter(ep => ep.air_date && ep.air_date <= todayStr).length;
     if (airedFromCache > 0) {
       airedInSeason = airedFromCache;
       isAiringSeason = airedInSeason < totalSeasonEpisodes;
@@ -226,9 +226,9 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
   }
 
   if (!episodeStill && show.seasonsCache && Array.isArray(show.seasonsCache)) {
-    const s = show.seasonsCache.find((sc: any) => sc.season_number === sNum);
+    const s = show.seasonsCache.find(sc => sc.season_number === sNum);
     if (s && Array.isArray(s.episodes)) {
-      const ep = s.episodes.find((e: any) => e.episode_number === eNum);
+      const ep = s.episodes.find(e => e.episode_number === eNum);
       if (ep?.still_path) {
         episodeStill = ep.still_path;
       }
