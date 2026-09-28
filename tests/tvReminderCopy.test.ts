@@ -75,8 +75,10 @@ test('SEENIT-NOTIFICATION-002 et #623 signalent un seul épisode supplémentaire
     copy.summaryText,
     '🆕 Nouvel épisode · S02 | E03 · À voir S02 | E02 · + 1 épisode',
   );
-  assert.match(copy.body, /À voir : S02 | E02 · Demi-finale · \+ 1 épisode\./);
-  assert.match(copy.body, /Nouvel épisode : S02 | E03 · La finale disponible aujourd'hui\./);
+  assert.equal(
+    copy.body,
+    "À voir : S02 | E02 · Demi-finale · + 1 épisode. Nouvel épisode : S02 | E03 · La finale disponible aujourd'hui.",
+  );
 });
 
 test('SEENIT-NOTIFICATION-002 et #623 alignent le rappel en retard sur le prochain épisode à voir et le compteur de l’accueil', () => {
@@ -93,8 +95,10 @@ test('SEENIT-NOTIFICATION-002 et #623 alignent le rappel en retard sur le procha
     copy.summaryText,
     '🆕 Nouvel épisode · S02 | E05 · À voir S02 | E02 · + 3 épisodes',
   );
-  assert.match(copy.body, /S02 | E02 · Deuxième manche/);
-  assert.match(copy.body, /S02 | E05 · Cinquième manche/);
+  assert.equal(
+    copy.body,
+    "À voir : S02 | E02 · Deuxième manche · + 3 épisodes. Nouvel épisode : S02 | E05 · Cinquième manche disponible aujourd'hui.",
+  );
 
   const homeSource = readFileSync('src/components/cards/ContinueWatchingCard.tsx', 'utf8');
   assert.match(

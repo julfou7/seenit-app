@@ -38,6 +38,9 @@ test('SEENIT-UX-010 conserve un vrai rôle fusionné et les personnages TMDB aff
   assert.equal(groups.movies[0].character, 'Self / Capitaine');
   assert.deepEqual(groups.movies[0].rawCharacters, ['Self', 'Capitaine']);
   assert.equal(groups.movies[0].poster_path, '/captain.jpg');
+  assert.equal(isExplicitSelfAppearance('Self / Host'), true);
+  assert.equal(isExplicitSelfAppearance('Self, Host'), true);
+  assert.equal(isExplicitSelfAppearance('Self [archive footage]'), true);
   assert.equal(isExplicitSelfAppearance('Selfie Artist'), false);
 });
 

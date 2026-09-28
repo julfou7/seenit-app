@@ -329,11 +329,14 @@ export function useRemindersNotifier() {
 
           if (targetDate.getTime() > now.getTime()) {
             const contentRevision = getMediaReminderNotificationId(`copy:${summaryText}:${msgBody}`);
-            const scheduleKey = `scheduled_9am_${REMINDER_SCHEDULE_SCHEMA}_${s.id}_${tagPrefix}_S${sNum}E${eNum}_${targetStr}_c${contentRevision}`;
-            if (!readUserScopedJson(uid, scheduleKey, false)) {
+            const scheduleKey = `scheduled_9am_${REMINDER_SCHEDULE_SCHEMA}_${s.id}_${tagPrefix}_S${sNum}E${eNum}_${targetStr}`;
+            const activeContentRevision = readUserScopedJson<number | null>(uid, scheduleKey, null);
+            if (activeContentRevision !== contentRevision) {
               await cancelMediaReminderNotificationByTag(notificationTag);
               const result = await send(targetDate);
-              if (result.delivered && result.visualReady) writeUserScopedJson(uid, scheduleKey, true);
+              if (result.delivered && result.visualReady) {
+                writeUserScopedJson(uid, scheduleKey, contentRevision);
+              }
             }
           } else if (targetStr === todayStr) {
             const notifiedKey = `notified_today_${s.id}_${tagPrefix}_S${sNum}E${eNum}_${todayStr}`;

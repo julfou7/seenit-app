@@ -162,9 +162,9 @@ export function hasExactDownloadHandoffProof(
   a?: DownloadIdentityLike | null,
   b?: DownloadIdentityLike | null
 ): boolean {
-  return sameDownloadRequest(a, b)
-    || samePhysicalDownload(a, b)
-    || sameTransferPath(a, b);
+  if (sameDownloadRequest(a, b) || samePhysicalDownload(a, b)) return true;
+  if (hasConflictingStrongPhysicalIds(a, b)) return false;
+  return sameTransferPath(a, b);
 }
 
 
