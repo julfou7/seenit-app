@@ -22,8 +22,12 @@ import {
   buildReminderToastSummary,
   type ReminderToastCandidate,
 } from '../features/notifications/reminderToastSummary';
+import {
+  buildTvEpisodeReminderCopy,
+  buildTvSeasonReminderSummary,
+} from '../features/notifications/tvReminderCopy';
 
-const REMINDER_SCHEDULE_SCHEMA = 'v6';
+const REMINDER_SCHEDULE_SCHEMA = 'v7';
 const REMINDER_TOAST_RECEIPT_SCHEMA = 'v1';
 
 function toLocalDateKey(date: Date): string {
@@ -323,7 +327,8 @@ export function useRemindersNotifier() {
           };
 
           if (targetDate.getTime() > now.getTime()) {
-            const scheduleKey = `scheduled_9am_${REMINDER_SCHEDULE_SCHEMA}_${s.id}_${tagPrefix}_S${sNum}E${eNum}_${targetStr}`;
+            const contentRevision = getMediaReminderNotificationId(`copy:${summaryText}:${msgBody}`);
+            const scheduleKey = `scheduled_9am_${REMINDER_SCHEDULE_SCHEMA}_${s.id}_${tagPrefix}_S${sNum}E${eNum}_${targetStr}_c${contentRevision}`;
             if (!readUserScopedJson(uid, scheduleKey, false)) {
               await cancelMediaReminderNotificationByTag(notificationTag);
               const result = await send(targetDate);
@@ -351,18 +356,19 @@ export function useRemindersNotifier() {
             d7Date9Am,
             'd7',
             title,
-            '📅 Nouvelle saison',
+            buildTvSeasonReminderSummary(upcoming),
             `Saison ${upcoming.season_number} dans 7 jours.`
           );
         }
 
         if (userPrefs.release_today_tv || isSpecificReminder) {
+          const episodeCopy = buildTvEpisodeReminderCopy(s, upcoming, todayStr);
           await scheduleTvAlert(
             airDate9Am,
             'today',
             title,
-            '🆕 Nouvel épisode',
-            `S${sNum}E${eNum}${upcoming.name ? ` · ${upcoming.name}` : ''} disponible aujourd'hui.`,
+            episodeCopy.summaryText,
+            episodeCopy.body,
             true,
             false
           );
