@@ -2005,6 +2005,10 @@
         },
         {
           "file": "tests/issueTrackingGovernance.test.ts",
+          "contains": "SEENIT-QUALITY-004 priorise un relais APK délégué avant les PR ouvertes"
+        },
+        {
+          "file": "tests/issueTrackingGovernance.test.ts",
           "contains": "SEENIT-QUALITY-004 ouvre proactivement une issue d’amélioration continue pour toute difficulté corrigeable et réutilisable"
         },
         {
