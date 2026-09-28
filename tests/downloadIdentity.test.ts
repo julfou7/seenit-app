@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   getPhysicalDownloadId,
   getPhysicalDownloadIds,
+  hasExactDownloadHandoffProof,
   hasConflictingStrongPhysicalIds,
   canAttachRecentOptimisticRequest,
   mergeDownloadIdAliases,
@@ -107,6 +108,29 @@ test('rattache Radarr et qBittorrent par chemin de transfert quand le hash manqu
   assert.equal(sameTransferPath(
     { transferPath: 'D:\\Downloads\\Normal.2026.1080p', size: 10_000_000_000 },
     { transferPath: 'd:/downloads/Normal.2026.1080p/', size: 10_000_000_000 }
+  ), true);
+});
+
+test('SEENIT-DOWNLOAD-010 exige une preuve de handoff exacte avant retrait partagé', () => {
+  const request = {
+    requestId: 'opt_exact',
+    mediaType: 'movie',
+    tmdbId: 990001,
+    isOptimistic: true
+  };
+
+  assert.equal(hasExactDownloadHandoffProof(request, {
+    mediaType: 'movie',
+    tmdbId: 990001
+  }), false);
+  assert.equal(hasExactDownloadHandoffProof(request, { requestId: 'opt_exact' }), true);
+  assert.equal(hasExactDownloadHandoffProof(
+    { downloadIdAliases: ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'] },
+    { downloadId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }
+  ), true);
+  assert.equal(hasExactDownloadHandoffProof(
+    { transferPath: 'D:\\Downloads\\Exact.Release' },
+    { transferPath: 'd:/downloads/Exact.Release/' }
   ), true);
 });
 

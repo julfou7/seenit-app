@@ -904,7 +904,8 @@ pour le cache des sagas et univers.
   Le polling local affiche uniquement un toast SeenIt afin d'éviter les doublons.
 - **SEENIT-NOTIFICATION-003** — Un événement Sonarr/Radarr `Download` prouve uniquement que l'import
   Arr est terminé ; il ne prouve jamais à lui seul que Plex a indexé le média. La PWA et les APK legacy
-  reçoivent un reçu FCM visible. Sur un Android ayant confirmé la capability
+  reçoivent un reçu FCM visible dont le statut reste strictement « Import terminé », sans annoncer une
+  vérification Plex qu'ils ne lanceront pas. Sur un Android ayant confirmé la capability
   `plexAvailabilityBackgroundV1`, le backend envoie à la place un message data-only haute priorité :
   le service natif affiche immédiatement une notification média locale dont le titre est le nom du média
   et le statut « Import terminé · Vérification de Plex… », puis lance la vérification Plex bornée. Le même

@@ -158,6 +158,15 @@ export function sameTransferPath(
   return Boolean(aPath && bPath && aPath === bPath);
 }
 
+export function hasExactDownloadHandoffProof(
+  a?: DownloadIdentityLike | null,
+  b?: DownloadIdentityLike | null
+): boolean {
+  return sameDownloadRequest(a, b)
+    || samePhysicalDownload(a, b)
+    || sameTransferPath(a, b);
+}
+
 
 function identityResolutionBucket(item?: DownloadIdentityLike | null): '4k' | '1080p' | '720p' | null {
   const value = `${item?.quality || ''} ${item?.releaseTitle || ''}`.toLowerCase();

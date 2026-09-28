@@ -38,6 +38,30 @@ function snapshot(records: unknown[]): DownloadHistorySnapshot {
   };
 }
 
+function tvSnapshot(records: unknown[]): DownloadHistorySnapshot {
+  return {
+    checkedAt: now,
+    sonarr: { configured: true, ok: true, records },
+    radarr: { configured: false, ok: false, records: [] }
+  };
+}
+
+function tvIntent(patch: Partial<LiveDownloadItem> = {}): LiveDownloadItem {
+  return {
+    ...movieIntent(),
+    id: 'opt_exact_episode',
+    requestId: 'opt_exact_episode',
+    mediaType: 'tv',
+    title: 'Exact Show',
+    seriesTitle: 'Exact Show',
+    movieTitle: undefined,
+    tmdbId: 990002,
+    seasonNumber: 2,
+    episodeNumber: 8,
+    ...patch
+  };
+}
+
 test('SEENIT-DOWNLOAD-010 clôt une intention optimiste depuis un import Arr exact même si la queue a disparu', () => {
   const outcome = resolveDownloadHistoryOutcome(
     movieIntent(),
@@ -79,6 +103,67 @@ test('SEENIT-DOWNLOAD-010 refuse deux imports canoniques concurrents sans preuve
   );
 
   assert.equal(outcome.state, 'unknown');
+});
+
+test('SEENIT-DOWNLOAD-010 exige chaque composante du scope TV dans l’historique', () => {
+  const baseRecord = {
+    eventType: 'downloadFolderImported',
+    date: '2026-09-27T21:34:45Z',
+    series: { tmdbId: 990002 }
+  };
+
+  assert.equal(resolveDownloadHistoryOutcome(
+    tvIntent(),
+    tvSnapshot([{ ...baseRecord, episode: { seasonNumber: 2 } }])
+  ).state, 'unknown');
+  assert.equal(resolveDownloadHistoryOutcome(
+    tvIntent(),
+    tvSnapshot([{ ...baseRecord, episode: { episodeNumber: 8 } }])
+  ).state, 'unknown');
+  assert.equal(resolveDownloadHistoryOutcome(
+    tvIntent(),
+    tvSnapshot([{ ...baseRecord, episode: { seasonNumber: 2, episodeNumber: 8 } }])
+  ).state, 'completed');
+});
+
+test('SEENIT-DOWNLOAD-010 refuse un événement canonique antérieur à la demande', () => {
+  const outcome = resolveDownloadHistoryOutcome(
+    movieIntent({ addedAt: now - 20_000 }),
+    snapshot([{
+      eventType: 'downloadFolderImported',
+      date: '2026-09-27T21:34:38Z',
+      movie: { tmdbId: 990001 }
+    }])
+  );
+
+  assert.equal(outcome.state, 'unknown');
+});
+
+test('SEENIT-DOWNLOAD-010 réconcilie un transfert en erreur disparu avec downloadFailed', () => {
+  const hash = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const failedItem = movieIntent({
+    id: 'radarr_failed',
+    downloadId: hash,
+    isOptimistic: false,
+    status: 'error',
+    errorMessage: 'Erreur transitoire de la file'
+  });
+
+  assert.equal(shouldResolveMissingDownloadFromHistory(failedItem, now), true);
+  assert.equal(shouldResolveMissingDownloadFromHistory({ ...failedItem, isOptimistic: true }, now), false);
+  assert.deepEqual(resolveDownloadHistoryOutcome(
+    failedItem,
+    snapshot([{
+      eventType: 'downloadFailed',
+      date: '2026-09-27T21:34:45Z',
+      downloadId: hash,
+      data: { message: 'Import refusé par Radarr' }
+    }])
+  ), {
+    state: 'failed',
+    date: Date.parse('2026-09-27T21:34:45Z'),
+    message: 'Import refusé par Radarr'
+  });
 });
 
 test('un ancien import du même TMDB ne clôt jamais une nouvelle intention optimiste', () => {
@@ -157,7 +242,7 @@ test('SEENIT-DOWNLOAD-010 retire l’intention Firestore dès le handoff ou la p
 
   assert.match(
     source,
-    /if \(serverMatch\) \{[\s\S]*?sharedRequestsToRetire\.set\(sharedRequestDocId\(optimistic\), optimistic\);[\s\S]*?continue;/
+    /const exactServerHandoffIds = new Set\([\s\S]*?hasExactDownloadHandoffProof\(optimistic, serverItem\)[\s\S]*?serverItems\.forEach\(serverItem =>[\s\S]*?if \(exactServerHandoffIds\.has\(optimistic\.id\)\) \{[\s\S]*?sharedRequestsToRetire\.set\(sharedRequestDocId\(optimistic\), optimistic\);[\s\S]*?continue;/
   );
   assert.match(
     source,

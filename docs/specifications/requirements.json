@@ -1278,6 +1278,22 @@
         {
           "file": "tests/downloadPostImportReconciliation.test.ts",
           "contains": "SEENIT-DOWNLOAD-010 retire l’intention Firestore dès le handoff ou la preuve terminale"
+        },
+        {
+          "file": "tests/downloadPostImportReconciliation.test.ts",
+          "contains": "SEENIT-DOWNLOAD-010 exige chaque composante du scope TV dans l’historique"
+        },
+        {
+          "file": "tests/downloadIdentity.test.ts",
+          "contains": "SEENIT-DOWNLOAD-010 exige une preuve de handoff exacte avant retrait partagé"
+        },
+        {
+          "file": "tests/downloadPostImportReconciliation.test.ts",
+          "contains": "SEENIT-DOWNLOAD-010 réconcilie un transfert en erreur disparu avec downloadFailed"
+        },
+        {
+          "file": "tests/downloadPostImportReconciliation.test.ts",
+          "contains": "SEENIT-DOWNLOAD-010 refuse un événement canonique antérieur à la demande"
         }
       ]
     },
@@ -1362,7 +1378,7 @@
       "tests": [
         {
           "file": "tests/downloadPlexAvailabilityNotification.test.ts",
-          "contains": "SEENIT-NOTIFICATION-003 distingue l’import Arr de la disponibilité Plex"
+          "contains": "SEENIT-NOTIFICATION-003 réserve la vérification Plex au signal Android capable"
         },
         {
           "file": "tests/downloadWebhookDelivery.test.ts",

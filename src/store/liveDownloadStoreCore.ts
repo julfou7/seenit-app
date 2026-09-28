@@ -23,6 +23,7 @@ import {
   findMatchingShowForDownload,
   getPhysicalDownloadId,
   getStrongPhysicalDownloadIds,
+  hasExactDownloadHandoffProof,
   hasConflictingStrongPhysicalIds,
   mergeDownloadIdAliases,
   sameDownloadRequest,
@@ -626,6 +627,17 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             && !shouldSuppressUnresolvedQbit(item, pendingRequests, visibilityNow)
           );
           const localShows = useShowsStore.getState().shows || [];
+          // Capturer les preuves reçues du serveur avant tout enrichissement local :
+          // un requestId, un hash ou un chemin recopié depuis l'intention ne doit
+          // jamais transformer une simple égalité TMDB en preuve de handoff.
+          const exactServerHandoffIds = new Set(
+            currentDownloads
+              .filter(item => item.isOptimistic && !removedSet.has(item.id))
+              .filter(optimistic => serverItems.some(serverItem =>
+                hasExactDownloadHandoffProof(optimistic, serverItem)
+              ))
+              .map(optimistic => optimistic.id)
+          );
 
           serverItems.forEach(serverItem => {
             delete missingSince[serverItem.id];
@@ -736,8 +748,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           const sharedRequestsToRetire = new Map<string, LiveDownloadItem>();
 
           for (const optimistic of currentDownloads.filter(item => item.isOptimistic && !removedSet.has(item.id))) {
-            const serverMatch = serverItems.some(serverItem => sameDownloadIdentity(optimistic, serverItem));
-            if (serverMatch) {
+            if (exactServerHandoffIds.has(optimistic.id)) {
               delete optimisticTimestamps[optimistic.id];
               // Le document Firestore n'est qu'une intention de handoff. Une fois
               // le transfert physique prouvé, le conserver en "searching" pourrait
