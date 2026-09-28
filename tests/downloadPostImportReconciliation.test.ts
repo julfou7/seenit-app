@@ -151,6 +151,14 @@ test('SEENIT-DOWNLOAD-010 réconcilie un transfert en erreur disparu avec downlo
 
   assert.equal(shouldResolveMissingDownloadFromHistory(failedItem, now), true);
   assert.equal(shouldResolveMissingDownloadFromHistory({ ...failedItem, isOptimistic: true }, now), false);
+  assert.equal(resolveDownloadHistoryOutcome(
+    { ...failedItem, addedAt: now - 20_000, downloadId: undefined },
+    snapshot([{
+      eventType: 'downloadFolderImported',
+      date: '2026-09-27T21:34:35Z',
+      movie: { tmdbId: 990001 }
+    }])
+  ).state, 'unknown', 'un succès canonique plus ancien ne doit pas effacer l’erreur de la tentative courante');
   assert.deepEqual(resolveDownloadHistoryOutcome(
     failedItem,
     snapshot([{

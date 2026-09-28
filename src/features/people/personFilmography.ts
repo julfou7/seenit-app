@@ -154,7 +154,7 @@ export function isExplicitSelfAppearance(character: unknown): boolean {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ');
-  return /^(?:self|himself|herself|themself|themselves)(?:\s*(?:[-–—:(]|as\b).*)?$/.test(normalized);
+  return /^(?:self|himself|herself|themself|themselves)(?:\s*(?:[-–—:(/,\[]|as\b).*)?$/.test(normalized);
 }
 
 export function isSelfAppearanceCredit(credit: PersonCredit): boolean {
