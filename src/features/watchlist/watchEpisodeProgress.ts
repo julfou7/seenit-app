@@ -63,7 +63,10 @@ export function getExtraAvailableEpisodes(
   const cachedSeason = seasonsCache.find(
     season => season.season_number === nextEpisode.season_number,
   );
-  const nextEpisodeToAir = show.nextEpisodeToAir as WatchEpisodePointer | undefined;
+  const legacyShow = show as Show & { next_episode_to_air?: WatchEpisodePointer };
+  const nextEpisodeToAir = (
+    show.nextEpisodeToAir || legacyShow.next_episode_to_air
+  ) as WatchEpisodePointer | undefined;
 
   const totalSeasonEpisodes =
     positiveCount(nextEpisode.episode_count)
