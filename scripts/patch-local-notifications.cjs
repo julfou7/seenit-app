@@ -21,9 +21,12 @@ const localNotificationPath = path.join(pluginDir, 'LocalNotification.kt');
 const localNotificationManagerPath = path.join(pluginDir, 'LocalNotificationManager.kt');
 const timedNotificationPublisherPath = path.join(pluginDir, 'TimedNotificationPublisher.kt');
 const LEGACY_FILE_PATCH_MARKER = 'SEENIT_LOCAL_NOTIFICATION_FILE_ICON_PATCH';
-const PATCH_MARKER = 'SEENIT_LOCAL_NOTIFICATION_PRIVATE_DATA_V2_PATCH';
-const BIG_PICTURE_MARKER = 'SEENIT_LOCAL_NOTIFICATION_BOUNDED_BIG_PICTURE_PATCH';
-const DELIVERY_MEDIA_MARKER = 'SEENIT_LOCAL_NOTIFICATION_DELIVERY_MEDIA_V3_PATCH';
+const PREVIOUS_PATCH_MARKER = 'SEENIT_LOCAL_NOTIFICATION_PRIVATE_DATA_V2_PATCH';
+const PATCH_MARKER = 'SEENIT_LOCAL_NOTIFICATION_PRIVATE_DATA_V3_PATCH';
+const PREVIOUS_BIG_PICTURE_MARKER = 'SEENIT_LOCAL_NOTIFICATION_BOUNDED_BIG_PICTURE_PATCH';
+const BIG_PICTURE_MARKER = 'SEENIT_LOCAL_NOTIFICATION_BOUNDED_BIG_PICTURE_V2_PATCH';
+const PREVIOUS_DELIVERY_MEDIA_MARKER = 'SEENIT_LOCAL_NOTIFICATION_DELIVERY_MEDIA_V3_PATCH';
+const DELIVERY_MEDIA_MARKER = 'SEENIT_LOCAL_NOTIFICATION_DELIVERY_MEDIA_V4_PATCH';
 
 if (!fs.existsSync(localNotificationPath)) {
   throw new Error(`LocalNotifications Android source not found: ${localNotificationPath}`);
@@ -217,6 +220,73 @@ const patchedResolver = `private fun resolveSeenItPrivateFile(context: Context, 
         }
     }`;
 
+// Migrate the immediately previous SeenIt patch before marker guards run.
+// This is required when postinstall reuses a compatible node_modules tree:
+// a marker proves only that an older revision ran, not that today's body is present.
+if (!localNotification.includes(PATCH_MARKER) && localNotification.includes(PREVIOUS_PATCH_MARKER)) {
+  if (!localNotification.includes(PREVIOUS_BIG_PICTURE_MARKER)) {
+    throw new Error('SeenIt V2 LocalNotification marker found without its BigPicture companion.');
+  }
+  const previousLargeIconDecode = `if (icon.startsWith("seenit-data://")) {
+                decodeSeenItLocalBitmap(context, icon, 192, 288)
+            }`;
+  const migratedLargeIconDecode = `if (icon.startsWith("seenit-data://")) {
+                val source = decodeSeenItLocalBitmap(context, icon, 192, 288) ?: return null
+                val fitted = fitSeenItBitmapInside(source, 192, 192)
+                if (fitted !== source) source.recycle()
+                fitted
+            }`;
+  const previousBigPictureDecode = `return try {
+            decodeSeenItLocalBitmap(context, value, 512, 288)
+        } catch (e: Exception) {`;
+  const migratedBigPictureDecode = `return try {
+            val source = decodeSeenItLocalBitmap(context, value, 512, 768) ?: return null
+            val fitted = fitSeenItBitmapInside(source, 512, 288)
+            if (fitted !== source) source.recycle()
+            fitted
+        } catch (e: Exception) {`;
+  const fitFunction = `private fun fitSeenItBitmapInside(source: Bitmap, targetWidth: Int, targetHeight: Int): Bitmap {
+        if (source.width <= 0 || source.height <= 0 || targetWidth <= 0 || targetHeight <= 0) return source
+        val scale = Math.min(
+            targetWidth.toFloat() / source.width.toFloat(),
+            targetHeight.toFloat() / source.height.toFloat()
+        )
+        val fittedWidth = Math.max(1, (source.width * scale).toInt())
+        val fittedHeight = Math.max(1, (source.height * scale).toInt())
+        val left = (targetWidth - fittedWidth) / 2f
+        val top = (targetHeight - fittedHeight) / 2f
+        val output = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(output)
+        canvas.drawColor(android.graphics.Color.rgb(24, 24, 27))
+        val paint = android.graphics.Paint().apply {
+            isAntiAlias = true
+            isFilterBitmap = true
+        }
+        canvas.drawBitmap(
+            source,
+            null,
+            android.graphics.RectF(left, top, left + fittedWidth, top + fittedHeight),
+            paint
+        )
+        return output
+    }`;
+  const resolverAnchor = '    fun resolveLargeIcon(context: Context): Bitmap? {';
+
+  if (!localNotification.includes(previousLargeIconDecode)
+      || !localNotification.includes(previousBigPictureDecode)
+      || !localNotification.includes(resolverAnchor)) {
+    throw new Error('SeenIt V2 LocalNotification body cannot be migrated safely.');
+  }
+  if (!localNotification.includes('private fun fitSeenItBitmapInside(')) {
+    localNotification = localNotification.replace(resolverAnchor, `${fitFunction}\n\n${resolverAnchor}`);
+  }
+  localNotification = localNotification
+    .replace(previousLargeIconDecode, migratedLargeIconDecode)
+    .replace(previousBigPictureDecode, migratedBigPictureDecode)
+    .replace(PREVIOUS_PATCH_MARKER, PATCH_MARKER)
+    .replace(PREVIOUS_BIG_PICTURE_MARKER, BIG_PICTURE_MARKER);
+}
+
 // Migrate an already-installed node_modules tree from the historical SeenIt
 // Base64 patch. Fresh npm ci installations never enter this branch, but local
 // npm install must remain deterministic and safe.
@@ -329,6 +399,24 @@ manager = manager.replace(
   'val seenItBigPicture = localNotification.resolveSeenItBigPicture(context)'
 );
 
+if (!manager.includes(BIG_PICTURE_MARKER) && manager.includes(PREVIOUS_BIG_PICTURE_MARKER)) {
+  const previousBigPictureStyle = `.bigPicture(seenItBigPicture)
+                    .setSummaryText(localNotification.summaryText)`;
+  const migratedBigPictureStyle = `.bigPicture(seenItBigPicture)
+                    .bigLargeIcon(null as android.graphics.Bitmap?)
+                    .setSummaryText(localNotification.summaryText)`;
+  if (!manager.includes(previousBigPictureStyle)) {
+    throw new Error('SeenIt previous manager BigPicture body cannot be migrated safely.');
+  }
+  manager = manager
+    .replace(previousBigPictureStyle, migratedBigPictureStyle)
+    .replace(PREVIOUS_BIG_PICTURE_MARKER, BIG_PICTURE_MARKER);
+}
+
+if (!manager.includes(DELIVERY_MEDIA_MARKER) && manager.includes(PREVIOUS_DELIVERY_MEDIA_MARKER)) {
+  manager = manager.replace(PREVIOUS_DELIVERY_MEDIA_MARKER, DELIVERY_MEDIA_MARKER);
+}
+
 if (!manager.includes(BIG_PICTURE_MARKER)) {
   const stockStyleBlock = `if (localNotification.largeBody != null) {
             mBuilder.setStyle(
@@ -393,6 +481,20 @@ fs.writeFileSync(localNotificationManagerPath, manager, 'utf8');
 console.log('✅ Patched LocalNotificationManager.kt to keep future alarms bitmap-free.');
 
 let publisher = fs.readFileSync(timedNotificationPublisherPath, 'utf8');
+
+if (!publisher.includes(DELIVERY_MEDIA_MARKER) && publisher.includes(PREVIOUS_DELIVERY_MEDIA_MARKER)) {
+  const previousPublisherStyle = `.bigPicture(bigPicture)
+                            .setSummaryText(storedRequest.summaryText)`;
+  const migratedPublisherStyle = `.bigPicture(bigPicture)
+                            .bigLargeIcon(null as android.graphics.Bitmap?)
+                            .setSummaryText(storedRequest.summaryText)`;
+  if (!publisher.includes(previousPublisherStyle)) {
+    throw new Error('SeenIt previous publisher BigPicture body cannot be migrated safely.');
+  }
+  publisher = publisher
+    .replace(previousPublisherStyle, migratedPublisherStyle)
+    .replace(PREVIOUS_DELIVERY_MEDIA_MARKER, DELIVERY_MEDIA_MARKER);
+}
 
 if (!publisher.includes(DELIVERY_MEDIA_MARKER)) {
   const stockDeliveryBlock = `notification.\`when\` = System.currentTimeMillis()
