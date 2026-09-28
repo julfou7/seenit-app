@@ -119,8 +119,10 @@ test('SEENIT-NOTIFICATION-002 garde les images hors du pont Binder et borne le b
 
   assert.match(nativePatchSource, /candidate\.length\(\) > 512L \* 1024L/,
     'Android doit refaire la borne de taille avant décodage');
-  assert.match(nativePatchSource, /decodeSeenItLocalBitmap\(context, value, 512, 288\)/,
-    'le BigPicture doit être décodé avec une dimension maximale explicite');
+  assert.match(nativePatchSource, /decodeSeenItLocalBitmap\(context, value, 512, 768\)/,
+    'la source BigPicture doit rester décodée avec des dimensions maximales explicites');
+  assert.match(nativePatchSource, /fitSeenItBitmapInside\(source, 512, 288\)/,
+    'le BigPicture doit ensuite composer le poster entier dans le canevas Android');
   assert.match(nativePatchSource, /inPreferredConfig = Bitmap\.Config\.RGB_565/,
     'le bitmap de notification utilise une représentation mémoire bornée');
   assert.match(nativePatchSource, /NotificationCompat\.BigPictureStyle\(\)/,
