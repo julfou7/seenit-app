@@ -133,6 +133,18 @@ test('SEENIT-QUALITY-004 transmet une APK déléguée par un relais release dist
   assert.match(requestRegistry, /USR-2026-09-15-001/);
 });
 
+test('SEENIT-QUALITY-004 priorise un relais APK délégué avant les PR ouvertes', () => {
+  const agents = fs.readFileSync('AGENTS.md', 'utf8').replace(/\s+/g, ' ');
+  const bootstrap = fs.readFileSync('.agents/AGENTS.md', 'utf8').replace(/\s+/g, ' ');
+  const delivery = fs.readFileSync('docs/process/delivery.md', 'utf8').replace(/\s+/g, ' ');
+  const spec = fs.readFileSync('docs/specifications/seenit.md', 'utf8').replace(/\s+/g, ' ');
+
+  assert.match(agents, /prompt de reprise est générique[\s\S]*#102[\s\S]*HANDOFF_READY[\s\S]*prime sur toute PR ouverte/i);
+  for (const source of [bootstrap, delivery, spec]) {
+    assert.match(source, /reprise générique[\s\S]*relais[\s\S]*avant d.examiner les PR ouvertes/i);
+  }
+});
+
 test('SEENIT-QUALITY-004 ouvre proactivement une issue d’amélioration continue pour toute difficulté corrigeable et réutilisable', () => {
   const agents = fs.readFileSync('AGENTS.md', 'utf8');
   const bootstrap = fs.readFileSync('.agents/AGENTS.md', 'utf8');

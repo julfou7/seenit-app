@@ -1349,8 +1349,9 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   merge**, le propriétaire du chantier transmet séparément la release sur #102 avec le marqueur
   `<!-- seenit-apk-release-handoff -->`, un bail `HANDOFF_READY`, l'autorisation et le destinataire,
   le SHA `main`, la dernière release, le lot APK non publié, la prochaine version et les contrôles
-  restants. La tâche destinataire reprend ce relais avant une nouvelle issue, vérifie baux, `main`
-  et idempotence puis suit les commandes canoniques ; un `WAITING Terrain` sur l'issue fonctionnelle
+  restants. Lors d'une reprise générique, la tâche destinataire reprend ce relais avant d'examiner les PR
+  ouvertes ou une nouvelle issue, vérifie baux, `main` et idempotence puis suit les commandes canoniques ;
+  un `WAITING Terrain` sur l'issue fonctionnelle
   ne masque pas l'opération release. Aucun merge sans autorisation ne devient une release automatique.
   Avant toute commande de clone/acquisition locale, `SEENIT-QUALITY-004` exige désormais un reçu
   `<!-- seenit-workspace-acquisition -->` prouvant : recherche réelle d'un workspace existant, résultat

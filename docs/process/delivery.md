@@ -363,7 +363,8 @@ pour les tests sur appareil ; ce statut ne suspend pas le relais #102 lorsqu'auc
 n'est requis pour la publication. À l'inverse, un simple commentaire « une autre tâche s'en chargera »
 ou une CI `main` verte ne met aucune release en file.
 
-La tâche destinataire traite ce relais avant un nouveau chantier produit, acquiert le bail #102 puis
+Lors d'une reprise générique, la tâche destinataire traite ce relais avant d'examiner les PR ouvertes ou
+un nouveau chantier produit, acquiert le bail #102 puis
 revalide `main`, la dernière release, les baux concurrents et l'autorisation si `main` a avancé. Une
 release déjà publiée clôt le relais sans nouveau dispatch ; sinon elle reprend
 `/prepare-release-apk` → PR verte/merge → `/release-apk` via le contrôleur. La tâche à horaire fixe
