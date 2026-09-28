@@ -1,8 +1,8 @@
-import { type Show } from '../../types';
+import { type Show } from '../../types.ts';
 import {
   getExtraAvailableEpisodes,
   type WatchEpisodePointer,
-} from '../watchlist/watchEpisodeProgress';
+} from '../watchlist/watchEpisodeProgress.ts';
 
 export interface TvReminderEpisode extends WatchEpisodePointer {
   name?: string | null;
