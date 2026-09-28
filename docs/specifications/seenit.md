@@ -916,8 +916,10 @@ pour le cache des sagas et univers.
   saison + épisode exacts. Le titre n'est jamais une preuve d'identité. Une copie native momentanément
   absente est retentée de façon bornée ; une empreinte UID différente échoue fermée. Le tap principal des
   deux états ouvre la fiche SeenIt exacte. Après preuve Plex, l'affiche issue de la correspondance PMS
-  exacte peut être rendue comme grand pictogramme borné avec fallback texte, et l'action
-  « Ouvrir dans Plex » n'est exposée que si le slug Plex Discover est résolu strictement depuis ce TMDB ID ;
+  exacte suit le même contrat visuel : `largeIcon` carré en contain dans l'état replié, BigPicture
+  centré en contain dans l'état développé et `largeIcon` masqué dans ce style pour éviter le doublon.
+  Le fallback texte reste fonctionnel, et l'action « Ouvrir dans Plex » n'est exposée que si le slug
+  Plex Discover est résolu strictement depuis ce TMDB ID ;
   elle ouvre `https://watch.plex.tv/movie|show/<slug>`, application Plex puis Web, sans fallback
   titre/année ni accueil. Chaque réenregistrement recalcule la capability afin qu'un ancien client ou un
   stockage natif indisponible ne puisse jamais être déclaré capable par optimisme.
@@ -936,8 +938,10 @@ pour le cache des sagas et univers.
   préparé dans le stockage privé et borné de l'application. Les chemins TMDB relatifs comme les anciennes
   URL absolues déjà persistées sont normalisés vers la taille propre au canal notification avant la clé
   de cache et le téléchargement : affiche compacte pour `largeIcon`, visuel riche borné pour
-  `BigPictureStyle`. Un cache privé valide gagne toujours sur le réseau et ne déclenche aucun nouveau
-  téléchargement. Le sous-répertoire privé `notification-media` est persistant et sa préparation est
+  `BigPictureStyle`. Le rendu natif compose l'affiche en **contain** centré : l'état replié conserve
+  un `largeIcon` carré sans crop et l'état développé affiche un seul visuel, l'affiche complète dans
+  un canevas BigPicture neutre en masquant le `largeIcon` du style développé. Un cache privé valide
+  gagne toujours sur le réseau et ne déclenche aucun nouveau téléchargement. Le sous-répertoire privé `notification-media` est persistant et sa préparation est
   idempotente : son existence après un redémarrage ou une mise à jour est un état valide et ne doit jamais
   empêcher un nouveau cache miss de télécharger son image. Pour un rappel Android planifié, aucun bitmap
   n'est embarqué dans le `PendingIntent`

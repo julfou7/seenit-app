@@ -417,7 +417,18 @@ public class PlexAvailabilityWorker extends Worker {
             .setCategory(NotificationCompat.CATEGORY_STATUS);
 
         Bitmap poster = fetchPosterBitmap(match);
-        if (poster != null) builder.setLargeIcon(poster);
+        if (poster != null) {
+            Bitmap largeIcon = fitPosterInside(poster, 160, 160);
+            Bitmap bigPicture = fitPosterInside(poster, 512, 288);
+            builder.setLargeIcon(largeIcon);
+            builder.setStyle(
+                new NotificationCompat.BigPictureStyle()
+                    .bigPicture(bigPicture)
+                    .bigLargeIcon((Bitmap) null)
+                    .setSummaryText("Disponible dans Plex")
+            );
+            poster.recycle();
+        }
 
         String discoverUrl = resolvePlexDiscoverUrl(plexToken, tmdbId, mediaType);
         if (discoverUrl != null) {
@@ -540,9 +551,7 @@ public class PlexAvailabilityWorker extends Worker {
             decode.inSampleSize = sample;
             Bitmap source = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, decode);
             if (source == null) return null;
-            Bitmap fitted = fitPosterInside(source, 160);
-            if (fitted != source) source.recycle();
-            return fitted;
+            return source;
         } catch (Exception ignored) {
             return null;
         } finally {
@@ -550,15 +559,21 @@ public class PlexAvailabilityWorker extends Worker {
         }
     }
 
-    private static Bitmap fitPosterInside(Bitmap source, int sizePx) {
-        if (source.getWidth() <= 0 || source.getHeight() <= 0) return source;
-        Bitmap output = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+    private static Bitmap fitPosterInside(Bitmap source, int targetWidth, int targetHeight) {
+        if (source.getWidth() <= 0 || source.getHeight() <= 0 || targetWidth <= 0 || targetHeight <= 0) {
+            return source;
+        }
+        Bitmap output = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(output);
-        float scale = Math.min(sizePx / (float) source.getWidth(), sizePx / (float) source.getHeight());
+        canvas.drawColor(0xFF18181B);
+        float scale = Math.min(
+            targetWidth / (float) source.getWidth(),
+            targetHeight / (float) source.getHeight()
+        );
         float width = source.getWidth() * scale;
         float height = source.getHeight() * scale;
-        float left = (sizePx - width) / 2f;
-        float top = (sizePx - height) / 2f;
+        float left = (targetWidth - width) / 2f;
+        float top = (targetHeight - height) / 2f;
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
         canvas.drawBitmap(source, null, new RectF(left, top, left + width, top + height), paint);
         return output;
