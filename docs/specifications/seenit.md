@@ -949,8 +949,13 @@ pour le cache des sagas et univers.
   livraison. Une image absente, invalide ou trop grande conserve le rappel texte et ne bloque jamais les
   rappels suivants. Aucun octet/Base64 d'image ne traverse Capacitor/Binder. Pour un nouvel épisode le
   jour J, la notification système est l'unique alerte : le hook de rappels n'ajoute aucun toast interne
-  « disponible aujourd'hui », y compris au démarrage ou à la reprise. Les autres catégories de rappel
-  conservent leur feedback interne existant.
+  « disponible aujourd'hui », y compris au démarrage ou à la reprise. Le contexte visible d'un rappel
+  série nomme toujours la saison ou l'épisode concerné : « Nouvelle saison » précise « Saison N » et
+  « Nouvel épisode » précise « SxxEyy ». Quand la série possède déjà un prochain épisode non vu antérieur
+  à l'épisode nouvellement diffusé, la notification reprend ce prochain épisode réellement à voir et le
+  même compteur « + X épisode(s) » que la carte « À Regarder » ; le corps conserve aussi les noms
+  d'épisode disponibles afin de distinguer ce qui vient de sortir de ce qui doit être repris. Les autres
+  catégories de rappel conservent leur feedback interne existant.
 
 ### 8.1 Mise à jour intégrée
 
