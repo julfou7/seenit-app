@@ -132,6 +132,16 @@ test('SEENIT-DOWNLOAD-010 exige une preuve de handoff exacte avant retrait parta
     { transferPath: 'D:\\Downloads\\Exact.Release' },
     { transferPath: 'd:/downloads/Exact.Release/' }
   ), true);
+  assert.equal(hasExactDownloadHandoffProof(
+    {
+      downloadId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      transferPath: 'D:\\Downloads\\Reused.Release'
+    },
+    {
+      downloadId: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      transferPath: 'd:/downloads/Reused.Release/'
+    }
+  ), false, 'un chemin réutilisé ne doit jamais écraser un conflit de hash fort');
 });
 
 test('SEENIT-DOWNLOAD-001 un même basename et une même taille ne remplacent jamais un chemin exact', () => {
