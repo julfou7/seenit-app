@@ -29,9 +29,10 @@ test('SEENIT-RUNTIME-001 déploie le backend canonique uniquement après validat
 });
 
 test('SEENIT-RUNTIME-001 aligne les installations npm CI et Buildpacks', () => {
-  assert.match(workflow, /npm ci --legacy-peer-deps --ignore-scripts --prefer-offline --no-audit --no-fund/);
+  assert.match(workflow, /npm ci --ignore-scripts --prefer-offline --no-audit --no-fund/);
+  assert.doesNotMatch(workflow, /legacy-peer-deps/);
   assert.match(projectToml, /name = "NODE_ENV"\s+value = "development"/);
-  assert.match(projectToml, /name = "NPM_CONFIG_LEGACY_PEER_DEPS"\s+value = "true"/);
+  assert.doesNotMatch(projectToml, /NPM_CONFIG_LEGACY_PEER_DEPS/);
 });
 
 test('SEENIT-RUNTIME-001 utilise une WIF bornée au dépôt sans clé JSON durable', () => {

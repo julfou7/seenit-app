@@ -55,7 +55,6 @@ function installDependencies(baseDir = root) {
   const command = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   const result = spawnSync(command, [
     'ci',
-    '--legacy-peer-deps',
     '--prefer-offline',
     '--no-audit',
     '--no-fund'

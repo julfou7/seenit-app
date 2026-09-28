@@ -85,7 +85,7 @@ jobs:
 
       - name: Install dependencies on cache miss
         if: steps.node_modules_cache.outputs.cache-hit != 'true'
-        run: npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
+        run: npm ci --prefer-offline --no-audit --no-fund
 
       - name: Validate exact staging change
         run: npm run validate:change -- --postinstall

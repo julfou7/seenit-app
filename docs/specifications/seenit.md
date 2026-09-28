@@ -1529,5 +1529,9 @@ l'identité de l'APK et ses actifs.
   locales déterministes.
 - `setFilterByAuthorizedAccounts(false)` permet une reconnexion / un nouveau consentement lorsque nécessaire et `setAutoSelectEnabled(false)` conserve un choix explicite du compte.
 - Une annulation utilisateur du sélecteur est une sortie normale et ne doit afficher aucune erreur bloquante.
-- Si Credential Manager est indisponible ou échoue pour une raison de compatibilité, l'ancien flux natif Google Auth reste un fallback; la PWA conserve `signInWithPopup`.
+- Si le bridge Credential Manager SeenIt est indisponible ou échoue pour une raison de compatibilité,
+  `@capacitor-firebase/authentication` 8.x fournit le fallback natif avec son mode Credential Manager
+  désactivé pour garder un chemin indépendant ; son ID token est échangé dans le même Firebase Web SDK.
+  Aucun plugin dont les peer dependencies sont limitées à une ancienne version majeure de Capacitor ne
+  doit rester dans le graphe. La PWA conserve `signInWithPopup`.
 - TNR : toute régression vers le flux legacy comme parcours Android primaire, ou toute rupture de l'échange vers le Firebase UID existant, est interdite.

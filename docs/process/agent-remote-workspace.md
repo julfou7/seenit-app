@@ -35,7 +35,7 @@ quarantaine gouvernée ci-dessous.
 1. Vérifier `main` par l'API GitHub.
 2. Réutiliser le workspace SeenIt existant lorsqu'il est propre et cohérent avec le SHA du chantier.
 3. Dans le devcontainer canonique, `scripts/bootstrap-agent-workspace.cjs` calcule une empreinte à partir de Node, npm, `package.json`, `package-lock.json` et des scripts de postinstall. Le volume `node_modules` est réutilisé uniquement si cette empreinte et les modules sentinelles sont exacts.
-4. Si l'empreinte change, lancer une seule installation canonique `npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund`, puis enregistrer la nouvelle empreinte.
+4. Si l'empreinte change, lancer une seule installation canonique `npm ci --prefer-offline --no-audit --no-fund`, puis enregistrer la nouvelle empreinte. Le graphe de dépendances doit rester résoluble sans option globale de contournement des peer dependencies.
 5. Exécuter les tests ciblés pendant la mise au point puis `npm run validate:change` sur l'arbre exact avant le premier push vers la branche de chantier.
 
 Le devcontainer épingle Node 22, npm 10.9.3 et actionlint 1.7.12. Les volumes nommés du devcontainer conservent `node_modules` et le cache npm entre reconstructions compatibles. GitHub Codespaces peut utiliser directement `.devcontainer/devcontainer.json`; un prebuild Codespaces est recommandé lorsque les réglages du dépôt le permettent, mais son absence ne change pas le contrat de validation.

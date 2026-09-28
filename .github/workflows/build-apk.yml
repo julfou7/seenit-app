@@ -101,7 +101,7 @@ jobs:
         run: |
           started=$(date +%s)
           set +e
-          npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
+          npm ci --prefer-offline --no-audit --no-fund
           status=$?
           set -e
           now=$(date +%s)
@@ -207,7 +207,7 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Install Dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci
 
       - name: Materialize SeenIt Release Keystore
         run: node scripts/materialize-android-keystore.cjs
