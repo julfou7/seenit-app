@@ -6,6 +6,7 @@ const readSource = (file: string) => readFileSync(file, 'utf8').replace(/\r\n/g,
 const reminderSource = readSource('src/hooks/useRemindersNotifier.ts');
 const notificationMediaSource = readSource('src/features/notifications/notificationMedia.ts');
 const mediaReminderSource = readSource('src/features/notifications/mediaReminderNotification.ts');
+const tvReminderCopySource = readSource('src/features/notifications/tvReminderCopy.ts');
 const nativePatchSource = readSource('scripts/patch-local-notifications.cjs');
 const androidVariablesSource = readSource('android/variables.gradle');
 
@@ -19,10 +20,14 @@ test('SEENIT-NOTIFICATION-002 affiche un visuel média et un seul emoji par év�
   assert.match(reminderSource, /resolveNotificationMediaVisual\(iconUrl, tvImageUrl\)/,
     'les séries doivent préparer affiche et visuel épisode avant la notification');
 
-  assert.match(reminderSource, /title,\n\s+'🆕 Nouvel épisode'/,
-    'le titre média reste sans emoji et le contexte porte l’emoji épisode');
-  assert.match(reminderSource, /title,\n\s+'📅 Nouvelle saison'/,
-    'le titre média reste sans emoji et le contexte porte l’emoji saison');
+  assert.match(reminderSource, /episodeCopy\.summaryText/,
+    'le titre média reste séparé du contexte détaillé du nouvel épisode');
+  assert.match(reminderSource, /buildTvSeasonReminderSummary\(upcoming\)/,
+    'le rappel saison doit construire un contexte qui contient son numéro');
+  assert.match(tvReminderCopySource, /🆕 Nouvel épisode/,
+    'le contexte épisode conserve un seul emoji événementiel');
+  assert.match(tvReminderCopySource, /📅 Nouvelle saison/,
+    'le contexte saison conserve un seul emoji événementiel');
   assert.match(reminderSource, /title,\n\s+'🎬 Sortie cinéma'/,
     'le titre média reste sans emoji et le contexte porte l’emoji cinéma');
   assert.match(reminderSource, /title,\n\s+'📺 Sortie DVD \/ VOD'/,
@@ -164,6 +169,6 @@ test('SEENIT-NOTIFICATION-002 hydrate le bitmap seulement à la livraison Androi
     'le patch doit refuser explicitement toute réintroduction du recoverBuilder AndroidX');
   assert.match(hydratedDeliveryBlock, /notificationJson\?\.let \{ LocalNotification\.buildNotificationFromJSObject\(it\) \}/);
   assert.match(hydratedDeliveryBlock, /notificationManager\.notify\(id, deliveredNotification\)/);
-  assert.match(reminderSource, /REMINDER_SCHEDULE_SCHEMA = 'v6'/,
-    'les alarmes existantes doivent être recréées sans bitmap dans leur PendingIntent');
+  assert.match(reminderSource, /REMINDER_SCHEDULE_SCHEMA = 'v7'/,
+    'les alarmes existantes doivent être recréées avec la copie détaillée courante');
 });

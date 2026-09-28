@@ -7,13 +7,13 @@ const reminderSource = readFileSync('src/hooks/useRemindersNotifier.ts', 'utf8')
 const nativeSource = readFileSync('src/features/notifications/mediaReminderNotification.ts', 'utf8');
 const patchSource = readFileSync('scripts/patch-local-notifications.cjs', 'utf8');
 
-test('issue #106 remplace les alarmes V5 par la réparation visuelle V6 sans doublon', () => {
-  assert.match(reminderSource, /const REMINDER_SCHEDULE_SCHEMA = 'v6';/,
-    'le payload v6 doit invalider les clés v5 afin de reprogrammer les rappels avec cache visuel réparable');
-  assert.doesNotMatch(reminderSource, /REMINDER_SCHEDULE_SCHEMA = 'v5'/,
-    'l’ancien schéma ne doit plus figer une alarme future potentiellement créée sans visuel');
+test('issues #106 et #623 remplacent les alarmes V6 par le payload détaillé V7 sans doublon', () => {
+  assert.match(reminderSource, /const REMINDER_SCHEDULE_SCHEMA = 'v7';/,
+    'le payload v7 doit invalider les clés v6 afin de reprogrammer les rappels avec leur contexte détaillé');
+  assert.doesNotMatch(reminderSource, /REMINDER_SCHEDULE_SCHEMA = 'v6'/,
+    'l’ancien schéma ne doit plus figer une alarme future avec une copie générique');
   assert.match(reminderSource, /await cancelMediaReminderNotificationByTag\(notificationTag\);[\s\S]*?const result = await send\(targetDate\);[\s\S]*?if \(result\.delivered && result\.visualReady\) writeUserScopedJson\(uid, scheduleKey, true\);/,
-    'la clé v6 ne doit être persistée qu’après une planification réussie avec visuel matérialisé');
+    'la clé v7 ne doit être persistée qu’après une planification réussie avec visuel matérialisé');
   assert.match(reminderSource, /scheduled_9am_\$\{REMINDER_SCHEDULE_SCHEMA\}/,
     'les rappels film et série doivent rester versionnés par le schéma de payload');
   assert.match(nativeSource, /LocalNotifications\.cancel\(\{[\s\S]*?getMediaReminderNotificationId\(tag\)/,

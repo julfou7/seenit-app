@@ -61,8 +61,9 @@ test('watchlist disponibilité branche le garde de disponibilité sur le classem
   assert.doesNotMatch(cardSource, /!ep\.air_date\s*\|\|\s*ep\.air_date\s*<=\s*todayStr/,
     'une date absente ne prouve jamais qu’un épisode est diffusé');
 
-  const totalAiredBlock = cardSource.match(/const totalAiredCount = [\s\S]*?;\n/)?.[0] ?? '';
-  assert.ok(totalAiredBlock, 'le calcul du total diffusé doit rester identifiable');
+  const progressSource = fs.readFileSync('src/features/watchlist/watchEpisodeProgress.ts', 'utf8');
+  const totalAiredBlock = progressSource.match(/const totalAiredCount = [\s\S]*?;\n/)?.[0] ?? '';
+  assert.ok(totalAiredBlock, 'le calcul partagé du total diffusé doit rester identifiable');
   assert.doesNotMatch(totalAiredBlock, /show\.totalEpisodes/,
     'le nombre total planifié ne doit jamais être transformé en nombre diffusé');
 });

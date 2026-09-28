@@ -53,7 +53,7 @@ test('#353 un nouvel épisode du jour n’ajoute aucun toast interne mais conser
   assert.match(source, /if \(emitInternalToast\) \{\s+dueToastCandidates\.push\(/);
   assert.match(
     source,
-    /'today',[\s\S]*?'🆕 Nouvel épisode',[\s\S]*?true,\s+false\s+\);/,
+    /'today',[\s\S]*?episodeCopy\.summaryText,[\s\S]*?episodeCopy\.body,[\s\S]*?true,\s+false\s+\);/,
     'le rappel nouvel épisode doit explicitement désactiver le toast interne'
   );
   assert.match(source, /if \(\(await send\(\)\)\.delivered\) writeUserScopedJson\(uid, notifiedKey, true\)/,

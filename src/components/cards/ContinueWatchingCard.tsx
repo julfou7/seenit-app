@@ -5,6 +5,7 @@ import { getAiredProgress, cn, getTodayStr } from '../../lib/utils';
 import { getFormattedProviderLogo } from '../../utils/providerLogos';
 import { usePassiveWatchProvider } from '../../hooks/usePassiveWatchProvider';
 import { hasAiredEpisodeEvidence } from '../../features/watchlist/watchAvailability';
+import { getExtraAvailableEpisodes } from '../../features/watchlist/watchEpisodeProgress';
 
 interface Props {
   key?: React.Key;
@@ -64,7 +65,7 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
 
   const watched = show.seenEpisodes ? show.seenEpisodes.length : 0;
   const progressPercent = getAiredProgress(show);
-  const totalCount = show.totalAiredEpisodes || show.totalEpisodes || (show.seasonsCache ? show.seasonsCache.flatMap((s: any) => s.episodes || []).length : 0);
+  const totalCount = show.totalAiredEpisodes || show.totalEpisodes || (show.seasonsCache ? show.seasonsCache.flatMap(s => s.episodes || []).length : 0);
   const isUpToDate = progressPercent >= 100 || (watched > 0 && totalCount > 0 && watched >= totalCount);
 
   const parseTimestamp = (val: any): number => {
@@ -140,7 +141,7 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
     }
   }
 
-  const cachedSeason = show.seasonsCache?.find((s: any) => s.season_number === nextEpNum.season_number);
+  const cachedSeason = show.seasonsCache?.find(s => s.season_number === nextEpNum.season_number);
   let totalSeasonEpisodes = nextEpNum.episode_count || 
     cachedSeason?.episode_count || 
     cachedSeason?.episodes?.length || 
@@ -154,7 +155,7 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
   const todayStr = getTodayStr();
 
   if (cachedSeason?.episodes && cachedSeason.episodes.length > 0) {
-    const airedFromCache = cachedSeason.episodes.filter((ep: any) => ep.air_date && ep.air_date <= todayStr).length;
+    const airedFromCache = cachedSeason.episodes.filter(ep => ep.air_date && ep.air_date <= todayStr).length;
     if (airedFromCache > 0) {
       airedInSeason = airedFromCache;
       isAiringSeason = airedInSeason < totalSeasonEpisodes;
@@ -206,46 +207,11 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
     }
   }
 
-  // Calcul du nombre d'autres épisodes disponibles restant à voir AU-DELÀ de l'épisode courant
-  // Exemple: série de 3 saisons (24 épisodes sortis au total), l'utilisateur a vu 1 épisode et est sur S01|E02 -> il reste 22 épisodes disponibles, soit "+ 22"
-  // Si on est sur le dernier épisode disponible de la série, extraAvailableEpisodes = 0 -> pas de "+ X" affiché
-  let extraAvailableEpisodes = 0;
+  // Même calcul pour la carte d'accueil et les notifications : le « + X »
+  // compte uniquement les épisodes déjà diffusés restant APRÈS la reprise.
   const sNum = nextEpNum?.season_number ?? 1;
   const eNum = nextEpNum?.episode_number ?? 1;
-  const watchedCount = show.seenEpisodes ? show.seenEpisodes.length : 0;
-
-  // 1. Total des épisodes sortis/disponibles sur l'ensemble de la série
-  const totalAiredCount = (typeof show.totalAiredEpisodes === 'number' && show.totalAiredEpisodes > 0)
-    ? show.totalAiredEpisodes
-    : 0;
-
-  // 2. Épisodes non vus comptés depuis le cache des saisons si disponible
-  let cacheUnwatchedCount = 0;
-  if (show.seasonsCache && Array.isArray(show.seasonsCache) && show.seasonsCache.length > 0) {
-    const seenSet = new Set(show.seenEpisodes || []);
-    for (const s of show.seasonsCache) {
-      if (s.season_number > 0 && Array.isArray(s.episodes)) {
-        for (const ep of s.episodes) {
-          if (ep.air_date && ep.air_date <= todayStr) {
-            const key = `${s.season_number}x${ep.episode_number}`;
-            if (!seenSet.has(key)) {
-              cacheUnwatchedCount++;
-            }
-          }
-        }
-      }
-    }
-  }
-
-  if (totalAiredCount > 0) {
-    const unwatchedFromTotal = Math.max(0, totalAiredCount - watchedCount);
-    const effectiveUnwatched = Math.max(unwatchedFromTotal, cacheUnwatchedCount);
-    extraAvailableEpisodes = Math.max(0, effectiveUnwatched - 1);
-  } else if (cacheUnwatchedCount > 0) {
-    extraAvailableEpisodes = Math.max(0, cacheUnwatchedCount - 1);
-  } else {
-    extraAvailableEpisodes = Math.max(0, airedInSeason - eNum);
-  }
+  const extraAvailableEpisodes = getExtraAvailableEpisodes(show, nextEpNum, todayStr);
 
   let episodeStill: string | null = null;
 
@@ -260,9 +226,9 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
   }
 
   if (!episodeStill && show.seasonsCache && Array.isArray(show.seasonsCache)) {
-    const s = show.seasonsCache.find((sc: any) => sc.season_number === sNum);
+    const s = show.seasonsCache.find(sc => sc.season_number === sNum);
     if (s && Array.isArray(s.episodes)) {
-      const ep = s.episodes.find((e: any) => e.episode_number === eNum);
+      const ep = s.episodes.find(e => e.episode_number === eNum);
       if (ep?.still_path) {
         episodeStill = ep.still_path;
       }
