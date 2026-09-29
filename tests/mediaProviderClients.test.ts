@@ -138,6 +138,25 @@ test('issue #12 conserve recherche film/année, ID externe et biographie de seco
   assert.equal((await client.getPersonDetails(33)).value.biography, 'Biography');
 });
 
+test('issue #444 charge les portraits TMDB depuis l’identité personne exacte', async () => {
+  const fixture = await loadClient('src/features/shows/tmdbClient.ts', url => json({
+    id: 33,
+    profiles: [{ file_path: '/portrait-main.jpg' }, { file_path: '/portrait-alt.jpg' }],
+  }));
+  const client = new fixture.exports.TMDBClient();
+  const result = await client.getPersonImages(33);
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.value.profiles.map((profile: { file_path: string }) => profile.file_path), [
+    '/portrait-main.jpg',
+    '/portrait-alt.jpg',
+  ]);
+  assert.equal(fixture.calls.length, 1);
+  assert.equal(fixture.calls[0].pathname, '/api/media/tmdb/person/33/images');
+  assert.equal((await client.getPersonImages(0)).ok, false);
+  assert.equal(fixture.calls.length, 1, 'un identifiant invalide ne déclenche aucun appel réseau');
+});
+
 test('issue #12 permet de réessayer un détail après échec sans cacher une erreur', async () => {
   let attempt = 0;
   const fixture = await loadClient('src/features/shows/tmdbClient.ts', () => ++attempt === 1 ? json({}, 404) : json({ id: 42 }));

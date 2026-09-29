@@ -49,7 +49,7 @@ const TMDB_PATHS = [
   /^collection\/[1-9]\d{0,12}$/,
   /^discover\/(movie|tv)$/,
   /^trending\/(all|movie|tv|person)\/(day|week)$/,
-  /^person\/(popular|[1-9]\d{0,12}(\/combined_credits)?)$/,
+  /^person\/(popular|[1-9]\d{0,12}(\/(combined_credits|images))?)$/,
 ];
 const TMDB_QUERY = new Set([
   'query', 'language', 'page', 'external_source', 'primary_release_year', 'year',
@@ -130,9 +130,13 @@ export function extractExactTMDBRemoteId(remoteIds: unknown): number | null {
 export function extractExactTVDBSearchIdentity(results: unknown, mediaType: 'tv' | 'movie'): number | null {
   if (!Array.isArray(results)) return null;
   const matches = new Set<number>();
-  for (const result of results as any[]) {
-    if (!result || typeof result !== 'object') continue;
-    const nested = mediaType === 'movie' ? result.movie?.id : result.series?.id;
+  for (const candidate of results as unknown[]) {
+    if (!candidate || typeof candidate !== 'object') continue;
+    const result = candidate as Record<string, unknown>;
+    const nestedValue = mediaType === 'movie' ? result.movie : result.series;
+    const nested = nestedValue && typeof nestedValue === 'object'
+      ? (nestedValue as Record<string, unknown>).id
+      : undefined;
     let id = positiveInteger(nested);
     const resultType = String(result.type || '').toLowerCase();
     const expected = mediaType === 'movie' ? 'movie' : 'series';

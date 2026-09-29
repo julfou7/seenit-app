@@ -531,6 +531,15 @@ les anciennes séries suivies sans `mediaType` conservent le fallback historique
 maximum 48 cartes à l'ouverture et après chaque changement de personne, onglet, catégorie ou filtre ;
 « Afficher … de plus » ajoute ensuite une tranche de 48. Ce parcours est commun à la PWA et à l'APK.
 
+La fiche présente le portrait en cadrage vertical, sans masque circulaire. Son activation ouvre une galerie
+bornée aux douze premiers portraits TMDB de l'identifiant personne exact ; cette galerie n'est demandée
+qu'à la première ouverture. Retour Android et Échap la ferment avant la fiche, et les commandes précédente/
+suivante restent accessibles sans geste. Une sélection de quatre crédits au maximum met en avant les
+personnages nommés les mieux classés selon popularité, volume de votes et note TMDB ; elle n'affirme pas
+qu'une personne est « célèbre pour » ces œuvres. Chaque carte ouvre la fiche par type média et identifiant
+TMDB. Les détails biographiques restent disponibles dans un panneau repliable afin de laisser la
+filmographie visible plus tôt ; les affiches de la filmographie utilisent deux colonnes sur petit écran.
+
 ## 9. Plex
 
 ### 9.1 Association et ouverture
