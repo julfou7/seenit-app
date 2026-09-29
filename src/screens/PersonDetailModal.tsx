@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { tmdb, type TMDBMedia } from '../features/shows/tmdb';
 
-import { ChevronLeft, X, Heart, Check, Clock, Film, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Heart, Check, Clock, Film, Images, Loader2, MapPin, CalendarDays } from 'lucide-react';
 import { cn, checkIsUpToDate } from '../lib/utils';
 import { useFavoritePeopleStore } from '../store/favoritePeopleStore';
 import { GridMediaCard, QuickPreviewModal } from '../components/GridMediaCard';
@@ -11,6 +11,7 @@ import { type Show } from '../types';
 import { isShowWatched } from '../hooks/useProAnalytics';
 import {
   deduplicateAndSortPersonCredits,
+  isSelfAppearanceCredit,
   type PersonActingCategory,
   PERSON_FILMOGRAPHY_PAGE_SIZE,
   personCreditIdentity,
@@ -23,6 +24,23 @@ interface Props {
   personId: number;
   onClose: () => void;
   onShowClick: (tmdbId: number, mediaType?: 'tv' | 'movie') => void;
+}
+
+interface PersonDetails {
+  id: number;
+  name: string;
+  profile_path?: string | null;
+  known_for_department?: string;
+  birthday?: string | null;
+  deathday?: string | null;
+  place_of_birth?: string | null;
+  popularity?: number;
+  biography?: string;
+}
+
+interface PersonCreditsPayload {
+  cast?: unknown;
+  crew?: unknown;
 }
 
 const getAge = (birthday: string, deathday?: string) => {
@@ -104,6 +122,10 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
   const [isExiting, setIsExiting] = useState(false);
   const [dragX, setDragX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [personImages, setPersonImages] = useState<string[] | null>(null);
+  const [isLoadingImages, setIsLoadingImages] = useState(false);
+  const [activePortraitIndex, setActivePortraitIndex] = useState<number | null>(null);
+  const galleryOpenRef = useRef(false);
 
   const startXRef = useRef<number | null>(null);
   const startYRef = useRef<number | null>(null);
@@ -111,6 +133,10 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
   const isHorizontalSwipeRef = useRef<boolean | null>(null);
 
   const handleAnimatedClose = () => {
+    if (galleryOpenRef.current) {
+      closePortraitGallery();
+      return;
+    }
     if (isExiting) return;
     setIsExiting(true);
     setTimeout(() => {
@@ -120,8 +146,8 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
 
 
 
-  const [person, setPerson] = useState<any>(null);
-  const [credits, setCredits] = useState<any>(null);
+  const [person, setPerson] = useState<PersonDetails | null>(null);
+  const [credits, setCredits] = useState<PersonCreditsPayload | null>(null);
   const [bioExpanded, setBioExpanded] = useState(false);
   const [isTranslatingBio, setIsTranslatingBio] = useState(false);
   const [activeTab, setActiveTab] = useState<'cast' | 'directing' | 'crew'>('cast');
@@ -136,6 +162,62 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
   const favPeopleStore = useFavoritePeopleStore();
   const { shows, addShow, updateShow, deleteShow } = useShows();
   const { showToast } = useToastStore();
+
+  const closePortraitGallery = () => {
+    if (window.history.state?.isPersonImageLightbox) {
+      window.history.back();
+    } else {
+      galleryOpenRef.current = false;
+      setActivePortraitIndex(null);
+    }
+  };
+
+  const openPortraitGallery = async () => {
+    if (!person?.profile_path) return;
+    setActivePortraitIndex(0);
+    galleryOpenRef.current = true;
+    window.history.pushState({
+      ...window.history.state,
+      isModal: true,
+      isPersonDetailModal: true,
+      isPersonImageLightbox: true,
+      personId
+    }, '');
+    if (personImages) return;
+    setIsLoadingImages(true);
+    const result = await tmdb.getPersonImages(personId);
+    if (result.ok) {
+      const paths = Array.isArray(result.value?.profiles)
+        ? result.value.profiles.map((image: { file_path?: unknown }) => image.file_path)
+          .filter((path: unknown): path is string => typeof path === 'string' && /^\/[A-Za-z0-9._-]+$/.test(path))
+        : [];
+      setPersonImages(Array.from(new Set([person.profile_path, ...paths])).slice(0, 12));
+    } else {
+      setPersonImages([person.profile_path]);
+    }
+    setIsLoadingImages(false);
+  };
+
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (galleryOpenRef.current && !event.state?.isPersonImageLightbox) {
+        galleryOpenRef.current = false;
+        setActivePortraitIndex(null);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (activePortraitIndex === null) return;
+      if (event.key === 'Escape') closePortraitGallery();
+      if (event.key === 'ArrowRight') setActivePortraitIndex(index => index === null ? null : Math.min(index + 1, (personImages?.length || 1) - 1));
+      if (event.key === 'ArrowLeft') setActivePortraitIndex(index => index === null ? null : Math.max(0, index - 1));
+    };
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [activePortraitIndex, personImages]);
 
   const showsByMediaIdentity = React.useMemo(() => {
     const map = new Map<string, Show>();
@@ -166,6 +248,26 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
       Array.isArray(item.rawJobs) && item.rawJobs.some(isDirectingJob)
     );
   }, [crewCredits]);
+
+  const standoutCredits = React.useMemo(() => {
+    const source = person?.known_for_department === 'Directing'
+      ? directingCredits
+      : castCredits.filter(credit => credit.character && !isSelfAppearanceCredit(credit));
+    const score = (credit: typeof castCredits[number]) => Math.log1p(credit.popularity || 0) * 0.25
+      + Math.log1p(credit.vote_count || 0) * 0.45
+      + Math.max(0, Math.min(10, credit.vote_average || 0)) / 10 * 0.3;
+    const ranked = [...source].sort((a, b) => score(b) - score(a) || Number(b.id) - Number(a.id));
+    const seenCharacters = new Set<string>();
+    const selected = [] as typeof ranked;
+    for (const credit of ranked) {
+      const character = (credit.character || '').trim().toLocaleLowerCase('fr-FR');
+      if (character && seenCharacters.has(character)) continue;
+      if (character) seenCharacters.add(character);
+      selected.push(credit);
+      if (selected.length === 4) break;
+    }
+    return selected;
+  }, [castCredits, directingCredits, person?.known_for_department]);
 
   const otherCrewCredits = React.useMemo(() => {
     return crewCredits.filter(item =>
@@ -384,6 +486,10 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
 
   useEffect(() => {
     let isMounted = true;
+    setPersonImages(null);
+    setActivePortraitIndex(null);
+    setIsLoadingImages(false);
+    galleryOpenRef.current = false;
     setIsTranslatingBio(false);
 
     tmdb.getPersonDetails(personId).then(async res => {
@@ -393,7 +499,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
         if (p.name && /[\u4e00-\u9fa5]/.test(p.name)) {
           translateToFrench(p.name).then(frName => {
             if (frName && isMounted) {
-              setPerson((prev: any) => prev ? { ...prev, name: frName } : prev);
+              setPerson(prev => prev ? { ...prev, name: frName } : prev);
             }
           });
         }
@@ -407,7 +513,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
             try {
               const frBio = await translateToFrench(p.biography);
               if (isMounted && frBio) {
-                setPerson((prev: any) => prev ? { ...prev, biography: frBio } : prev);
+                setPerson(prev => prev ? { ...prev, biography: frBio } : prev);
               }
             } finally {
               if (isMounted) {
@@ -509,7 +615,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
           onClick={(e) => {
             e.stopPropagation();
           }}
-          className="flex items-center gap-1.5 px-3 py-1 bg-zinc-900/90 hover:bg-zinc-800 rounded-full border border-white/10 touch-manipulation select-none cursor-pointer text-white font-semibold text-xs transition-colors"
+          className="flex min-h-11 items-center gap-1.5 px-3 py-1 bg-zinc-900/90 hover:bg-zinc-800 rounded-full border border-white/10 touch-manipulation select-none cursor-pointer text-white font-semibold text-xs transition-colors"
         >
           <ChevronLeft size={18} className="text-[#E5A93D]" />
           <span>Retour</span>
@@ -517,32 +623,38 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
         <span className="text-white font-bold tracking-wider uppercase text-xs">{headerTitle}</span>
         <button
           onClick={handleAnimatedClose}
-          className="w-8 h-8 bg-zinc-900/90 rounded-full flex items-center justify-center border border-white/10 touch-manipulation cursor-pointer hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+          aria-label="Fermer la fiche"
+          className="min-h-11 min-w-11 bg-zinc-900/90 rounded-full flex items-center justify-center border border-white/10 touch-manipulation cursor-pointer hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
         >
           <X size={16} />
         </button>
       </div>
 
         {/* Profile Header Info */}
-        <div className="px-4 mt-3 flex flex-col items-center">
-          {/* Prominent high-res Star photo */}
-          <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-full overflow-hidden bg-zinc-800 border-3 border-[#E5A93D]/70 shadow-2xl ring-4 ring-[#E5A93D]/20 mb-3 flex-shrink-0">
+        <div className="w-full px-4 mt-4 flex items-start gap-4">
+          <button
+            type="button"
+            aria-label={`Voir les photos de ${person.name}`}
+            disabled={!person.profile_path}
+            onClick={openPortraitGallery}
+            className="relative h-32 w-24 shrink-0 overflow-hidden rounded-2xl border border-[#E5A93D]/40 bg-zinc-900 shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E5A93D] disabled:cursor-default"
+          >
             {person.profile_path ? (
               <img
                 src={`https://image.tmdb.org/t/p/w500${person.profile_path}`}
                 alt={person.name}
-                className="w-full h-full object-cover object-top"
+                className="h-full w-full object-cover object-center"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-zinc-500 font-bold text-3xl">
                 {person.name.charAt(0)}
               </div>
             )}
-          </div>
-          <h1 className="text-lg sm:text-xl font-black uppercase tracking-wide text-white mb-0.5 text-center">{person.name}</h1>
-          <p className="text-[11px] font-bold text-[#E5A93D] tracking-wider uppercase mb-2.5 text-center">
-            {jobLabel}
-          </p>
+            {person.profile_path && <span className="absolute inset-x-0 bottom-0 flex min-h-8 items-center justify-center gap-1 bg-black/75 text-[10px] font-semibold text-white"><Images size={13} /> Photos</span>}
+          </button>
+          <div className="min-w-0 flex-1 pt-1">
+          <h1 className="text-xl font-black leading-tight text-white">{person.name}</h1>
+          <p className="mt-1 text-xs font-bold text-[#E5A93D] tracking-wide uppercase">{jobLabel}</p>
 
           {/* Favorite Person Button */}
           {(() => {
@@ -555,18 +667,29 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
                   else addPerson({ id: person.id, name: person.name, profile_path: person.profile_path, known_for_department: person.known_for_department });
                 }}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-full border mb-3.5 transition-all touch-manipulation cursor-pointer active:scale-95",
+                  "mt-3 flex min-h-11 items-center gap-2 px-3 rounded-full border transition-all touch-manipulation cursor-pointer active:scale-95",
                   fav ? "bg-rose-500/20 border-rose-500/40 text-rose-500" : "bg-zinc-900 border-white/10 text-zinc-400 hover:text-white hover:bg-zinc-800"
                 )}
               >
-                <Heart size={13} className={cn(fav && "fill-rose-500")} />
-                <span className="text-[10px] font-bold tracking-wider uppercase">{fav ? 'En favoris' : 'Ajouter aux favoris'}</span>
+                <Heart size={16} className={cn(fav && "fill-rose-500")} />
+                <span className="text-[11px] font-bold tracking-wide uppercase">{fav ? 'En favoris' : 'Ajouter aux favoris'}</span>
               </button>
             );
           })()}
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-400">
+            {person.birthday && <span className="inline-flex items-center gap-1"><CalendarDays size={13} />{new Date(person.birthday).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>}
+            {person.place_of_birth && <span className="inline-flex items-center gap-1"><MapPin size={13} />{person.place_of_birth}</span>}
+          </div>
+          </div>
+
+          </div>
 
           {/* Quick Facts Grid */}
-          <div className="w-full grid grid-cols-2 gap-2 mb-4">
+          <details className="group w-full mt-4 rounded-xl border border-white/10 bg-zinc-900/50 px-4 py-1">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between text-sm font-semibold text-zinc-300 marker:hidden">
+              <span>Biographie et détails</span><ChevronRight size={16} className="text-zinc-500 transition-transform group-open:rotate-90" />
+            </summary>
+            <div className="grid grid-cols-2 gap-2 pb-3">
             {person.place_of_birth && (
               <div className="bg-zinc-900/60 p-2.5 rounded-xl border border-white/5">
                 <span className="block text-[8px] uppercase font-bold text-zinc-500 mb-0.5">Lieu de naissance</span>
@@ -594,7 +717,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
                 <span className="text-[11px] text-zinc-200 font-medium leading-snug">⭐ {person.popularity.toFixed(1)}</span>
               </div>
             )}
-          </div>
+            </div>
 
           {/* Biography with translation skeleton */}
           {isTranslatingBio ? (
@@ -628,20 +751,48 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
                )}
             </div>
           ) : null}
-        </div>
+          </details>
+
+        {standoutCredits.length > 0 && (
+          <section className="mt-6 px-4" aria-labelledby="person-highlights-heading">
+            <div className="mb-3 flex items-end justify-between">
+              <div>
+                <h2 id="person-highlights-heading" className="text-base font-bold text-white">{person.known_for_department === 'Directing' ? 'Œuvres marquantes' : 'Rôles marquants'}</h2>
+                <p className="mt-0.5 text-xs text-zinc-500">Sélection parmi ses crédits TMDB</p>
+              </div>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-2 hide-scrollbar snap-x" aria-label="Sélection de rôles marquants">
+              {standoutCredits.map(credit => {
+                const title = credit.title || credit.name || 'Œuvre sans titre';
+                const mediaType = credit.media_type;
+                return (
+                  <button
+                    key={`${mediaType}:${credit.id}`}
+                    type="button"
+                    onClick={() => onShowClick(Number(credit.id), mediaType)}
+                    className="w-28 shrink-0 snap-start overflow-hidden rounded-xl border border-white/10 bg-zinc-900 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#E5A93D]"
+                    aria-label={`${credit.character ? `${credit.character}, dans ` : ''}${title}`}
+                  >
+                    <div className="aspect-[2/3] bg-zinc-800">
+                      {credit.poster_path ? <img loading="lazy" src={`https://image.tmdb.org/t/p/w342${credit.poster_path}`} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center p-2 text-center text-xs text-zinc-500">{title}</div>}
+                    </div>
+                    <span className="block truncate px-2 pt-2 text-xs font-semibold text-white">{credit.character || credit.job || title}</span>
+                    <span className="block truncate px-2 pb-2 text-[11px] text-zinc-400">{title}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* Completion Progress Bar */}
         {displayedCredits.length > 0 && (
-          <div className="px-5 mb-5 w-full max-w-sm mx-auto">
-            <div className="flex justify-between items-end mb-1.5 px-1">
-              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                Oeuvres vues
-              </span>
-              <span className="text-xs font-black text-[#E5A93D]">
-                {completionCount} <span className="text-zinc-500 text-[10px]">/ {displayedCredits.length}</span>
-              </span>
+          <div className="mt-5 mb-3 w-full px-5">
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-base font-bold text-white">Filmographie</h2>
+              <span className="text-xs font-semibold text-zinc-400"><span className="text-[#E5A93D]">{completionCount}</span> / {displayedCredits.length} vues</span>
             </div>
-            <div className="w-full h-2 bg-zinc-900 rounded-full overflow-hidden border border-white/5 relative">
+            <div className="w-full h-1.5 bg-zinc-900 rounded-full overflow-hidden border border-white/5 relative" role="progressbar" aria-label="Œuvres vues" aria-valuenow={completionCount} aria-valuemin={0} aria-valuemax={displayedCredits.length}>
               <div
                 className="absolute top-0 left-0 h-full bg-gradient-to-r from-amber-600 to-[#E5A93D] rounded-full transition-all duration-700 ease-out"
                 style={{ width: `${completionPercentage}%` }}
@@ -662,7 +813,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
                       setStatusFilter('all');
                     }}
                     className={cn(
-                      "flex-1 py-1.5 px-2 text-[10px] font-bold tracking-wider uppercase transition-all rounded-full touch-manipulation truncate",
+                      "flex min-h-11 flex-1 items-center justify-center px-2 text-[10px] font-bold tracking-wider uppercase transition-all rounded-full touch-manipulation truncate",
                       activeTab === 'directing' ? "bg-[#E5A93D] text-black shadow-md" : "text-zinc-400 hover:text-white"
                     )}
                   >
@@ -676,7 +827,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
                       setStatusFilter('all');
                     }}
                     className={cn(
-                      "flex-1 py-1.5 px-2 text-[10px] font-bold tracking-wider uppercase transition-all rounded-full touch-manipulation truncate",
+                      "flex min-h-11 flex-1 items-center justify-center px-2 text-[10px] font-bold tracking-wider uppercase transition-all rounded-full touch-manipulation truncate",
                       activeTab === 'crew' ? "bg-[#E5A93D] text-black shadow-md" : "text-zinc-400 hover:text-white"
                     )}
                   >
@@ -690,7 +841,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
                       setStatusFilter('all');
                     }}
                     className={cn(
-                      "flex-1 py-1.5 px-2 text-[10px] font-bold tracking-wider uppercase transition-all rounded-full touch-manipulation truncate",
+                      "flex min-h-11 flex-1 items-center justify-center px-2 text-[10px] font-bold tracking-wider uppercase transition-all rounded-full touch-manipulation truncate",
                       activeTab === 'cast' ? "bg-[#E5A93D] text-black shadow-md" : "text-zinc-400 hover:text-white"
                     )}
                   >
@@ -707,7 +858,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
                       setStatusFilter('all');
                     }}
                     className={cn(
-                      "flex-1 py-1.5 px-2 text-[10px] font-bold tracking-wider uppercase transition-all rounded-full touch-manipulation truncate",
+                      "flex min-h-11 flex-1 items-center justify-center px-2 text-[10px] font-bold tracking-wider uppercase transition-all rounded-full touch-manipulation truncate",
                       activeTab === 'cast' ? "bg-[#E5A93D] text-black shadow-md" : "text-zinc-400 hover:text-white"
                     )}
                   >
@@ -721,7 +872,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
                       setStatusFilter('all');
                     }}
                     className={cn(
-                      "flex-1 py-1.5 px-2 text-[10px] font-bold tracking-wider uppercase transition-all rounded-full touch-manipulation truncate",
+                      "flex min-h-11 flex-1 items-center justify-center px-2 text-[10px] font-bold tracking-wider uppercase transition-all rounded-full touch-manipulation truncate",
                       activeTab === 'crew' ? "bg-[#E5A93D] text-black shadow-md" : "text-zinc-400 hover:text-white"
                     )}
                   >
@@ -765,11 +916,12 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
 
         {/* Status Filter Bar (Tous / Vus / À voir) */}
         {displayedCredits.length > 0 && (
-          <div className="px-4 mb-3.5 flex items-center justify-center gap-1.5 flex-wrap">
+          <div className="px-4 mb-3.5 flex items-center gap-1.5" role="group" aria-label="Filtrer les œuvres par statut">
             <button
+              aria-pressed={statusFilter === 'all'}
               onClick={() => setStatusFilter('all')}
               className={cn(
-                "px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-xl border transition-all touch-manipulation cursor-pointer flex items-center gap-1",
+                "min-h-11 min-w-0 flex-1 justify-center px-2 text-[10px] font-bold uppercase tracking-wide rounded-xl border transition-all touch-manipulation cursor-pointer flex items-center gap-1",
                 statusFilter === 'all'
                   ? "bg-zinc-800 text-[#E5A93D] border-[#E5A93D]/40 shadow-sm"
                   : "bg-zinc-900/60 text-zinc-400 border-white/5 hover:text-zinc-200"
@@ -778,9 +930,10 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
               Tous ({displayedCredits.length})
             </button>
             <button
+              aria-pressed={statusFilter === 'watched'}
               onClick={() => setStatusFilter('watched')}
               className={cn(
-                "px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-xl border transition-all touch-manipulation cursor-pointer flex items-center gap-1",
+                "min-h-11 min-w-0 flex-1 justify-center px-2 text-[10px] font-bold uppercase tracking-wide rounded-xl border transition-all touch-manipulation cursor-pointer flex items-center gap-1",
                 statusFilter === 'watched'
                   ? "bg-emerald-950/70 text-emerald-400 border-emerald-500/40 shadow-sm"
                   : "bg-zinc-900/60 text-zinc-400 border-white/5 hover:text-zinc-200"
@@ -790,9 +943,10 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
               Vus ({watchedCount})
             </button>
             <button
+              aria-pressed={statusFilter === 'unwatched'}
               onClick={() => setStatusFilter('unwatched')}
               className={cn(
-                "px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-xl border transition-all touch-manipulation cursor-pointer flex items-center gap-1",
+                "min-h-11 min-w-0 flex-1 justify-center px-2 text-[10px] font-bold uppercase tracking-wide rounded-xl border transition-all touch-manipulation cursor-pointer flex items-center gap-1",
                 statusFilter === 'unwatched'
                   ? "bg-amber-950/70 text-amber-400 border-amber-500/40 shadow-sm"
                   : "bg-zinc-900/60 text-zinc-400 border-white/5 hover:text-zinc-200"
@@ -804,11 +958,11 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
           </div>
         )}
 
-        {/* Filmographie Grid (3 Cols on Mobile) */}
+        {/* Filmography grid: two readable columns on narrow screens */}
         <div className="px-3 pb-6">
           {filteredCredits.length > 0 ? (
             <>
-              <div className="relative z-0 grid grid-cols-3 sm:grid-cols-4 gap-2 gap-y-3">
+              <div className="relative z-0 grid grid-cols-2 gap-x-3 gap-y-4 px-1">
                 {visibleCredits.map((credit, idx: number) => {
                   const show = showsByMediaIdentity.get(personCreditIdentity(credit));
                   return (
@@ -846,6 +1000,30 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
             </div>
           )}
         </div>
+
+        {activePortraitIndex !== null && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Photos de ${person.name}`}
+            className="fixed inset-0 z-[130] flex items-center justify-center bg-black/95 p-4 backdrop-blur-sm"
+            onClick={closePortraitGallery}
+            onTouchStart={event => event.stopPropagation()}
+          >
+            <button type="button" autoFocus aria-label="Fermer la galerie" onClick={event => { event.stopPropagation(); closePortraitGallery(); }} className="absolute right-4 top-[calc(env(safe-area-inset-top)+1rem)] z-10 flex min-h-11 min-w-11 items-center justify-center rounded-full border border-white/15 bg-zinc-900 text-white"><X size={20} /></button>
+            {isLoadingImages && <span className="absolute text-sm text-zinc-300">Chargement des photos…</span>}
+            {(personImages ? activePortraitIndex < personImages.length : Boolean(person.profile_path)) && (
+              <>
+                <img onClick={event => event.stopPropagation()} src={`https://image.tmdb.org/t/p/original${personImages?.[activePortraitIndex] || person.profile_path}`} alt={`Photo ${activePortraitIndex + 1} de ${person.name}`} className="max-h-[78dvh] max-w-[88vw] rounded-xl object-contain" />
+                {(personImages?.length || 0) > 1 && <>
+                  <button type="button" aria-label="Photo précédente" onClick={event => { event.stopPropagation(); setActivePortraitIndex(index => index === null ? null : (index - 1 + (personImages?.length || 1)) % (personImages?.length || 1)); }} className="absolute left-3 top-1/2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/70 text-white"><ChevronLeft size={22} /></button>
+                  <button type="button" aria-label="Photo suivante" onClick={event => { event.stopPropagation(); setActivePortraitIndex(index => index === null ? null : (index + 1) % (personImages?.length || 1)); }} className="absolute right-3 top-1/2 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/70 text-white"><ChevronRight size={22} /></button>
+                  <span className="absolute bottom-[calc(env(safe-area-inset-bottom)+1.5rem)] rounded-full bg-zinc-900/90 px-3 py-1 text-xs text-zinc-200">{activePortraitIndex + 1} / {personImages?.length}</span>
+                </>}
+              </>
+            )}
+          </div>
+        )}
 
         {/* Modal de prévisualisation partagée (QuickPreviewModal / long-press) */}
         {previewMedia && (

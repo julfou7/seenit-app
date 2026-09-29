@@ -93,6 +93,7 @@ test('SEENIT-SECURITY-001 conserve les paramètres TMDB utiles sans transmettre 
     'tmdb/discover/movie?region=FR&with_release_type=2%7C3&release_date.gte=2026-01-01',
     'tmdb/tv/42/watch/providers',
     'tmdb/person/42/combined_credits',
+    'tmdb/person/42/images',
   ]) assert.equal((await send(suffix)).status, 200, suffix);
   assert.equal(calls[0].url.searchParams.get('primary_release_year'), '1984');
   assert.equal(calls[0].url.searchParams.get('api_key'), 'test-tmdb-private');

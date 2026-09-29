@@ -70,6 +70,13 @@ export interface TMDBMedia {
   overview?: string;
 }
 
+interface TMDBPersonImages {
+  id?: number;
+  profiles?: Array<{ file_path: string; width?: number; height?: number; iso_639_1?: string | null }>;
+  status_code?: number;
+  status_message?: string;
+}
+
 export function isMovieAtCinema(media: any): boolean {
   if (!media) return false;
   const isTv = media.media_type === 'tv' || media.first_air_date !== undefined;
@@ -115,17 +122,19 @@ export function isMovieUpcoming(media: any): boolean {
   return releaseDate > futureCutoff;
 }
 
-export function isAdultOrParodyMedia(item: any): boolean {
-  if (!item) return false;
-  if (item.adult === true) return true;
+export function isAdultOrParodyMedia(item: unknown): boolean {
+  if (!item || typeof item !== 'object') return false;
+  const media = item as Record<string, unknown>;
+  if (media.adult === true) return true;
 
   const title = (
-    item.title ||
-    item.name ||
-    item.original_title ||
-    item.original_name ||
+    media.title ||
+    media.name ||
+    media.original_title ||
+    media.original_name ||
     ''
-  ).toLowerCase();
+  );
+  const normalizedTitle = typeof title === 'string' ? title.toLowerCase() : '';
 
   const adultTerms = [
     'porn', 'porno', 'xxx', 'hentai', 'erotic', 'erotique', 'érotique',
@@ -133,13 +142,15 @@ export function isAdultOrParodyMedia(item: any): boolean {
     'jedi hunter', 'cum join', 'sex parody', 'porno parody', 'adults only'
   ];
 
-  if (adultTerms.some(term => title.includes(term))) {
+  if (adultTerms.some(term => normalizedTitle.includes(term))) {
     return true;
   }
 
-  if (Array.isArray(item.genres)) {
-    if (item.genres.some((g: any) => {
-      const gName = (g.name || '').toLowerCase();
+  if (Array.isArray(media.genres)) {
+    if (media.genres.some((genre: unknown) => {
+      if (!genre || typeof genre !== 'object') return false;
+      const name = (genre as Record<string, unknown>).name;
+      const gName = typeof name === 'string' ? name.toLowerCase() : '';
       return gName.includes('erotic') || gName.includes('érotique') || gName.includes('adult') || gName.includes('porno');
     })) {
       return true;
@@ -1600,6 +1611,21 @@ export class TMDBClient {
         data.value.crew = data.value.crew.filter((m: any) => !isAdultOrParodyMedia(m));
       }
     }
+
+    return data;
+  }
+
+  async getPersonImages(personId: number): Promise<Result<TMDBPersonImages>> {
+    const safePersonId = Number(personId);
+    if (!Number.isInteger(safePersonId) || safePersonId <= 0) return err(new Error('Invalid TMDB person ID'));
+
+    const url = new URL(`${this.baseUrl}/person/${safePersonId}/images`);
+    const res = await tryCatch(authenticatedFetch(url.toString()));
+    if (res.ok === false) return err(res.error);
+    if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
+    const data = await tryCatch(res.value.json() as Promise<TMDBPersonImages>);
+    if (data.ok === false) return err(data.error);
+    if (data.value && data.value.status_code) return err(new Error(data.value.status_message || 'TMDB Error'));
 
     return data;
   }

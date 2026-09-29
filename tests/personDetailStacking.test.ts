@@ -13,7 +13,7 @@ test('la filmographie de la fiche personne enferme les cartes sous son header st
   );
   assert.ok(
     personDetail.includes(
-      'className="relative z-0 grid grid-cols-3 sm:grid-cols-4 gap-2 gap-y-3"'
+      'className="relative z-0 grid grid-cols-2 gap-x-3 gap-y-4 px-1"'
     )
   );
   assert.ok(
@@ -25,7 +25,7 @@ test('la filmographie de la fiche personne enferme les cartes sous son header st
 
 test('la prévisualisation reste hors du stacking context de la grille filmographie', () => {
   const gridIndex = personDetail.indexOf(
-    'className="relative z-0 grid grid-cols-3 sm:grid-cols-4 gap-2 gap-y-3"'
+    'className="relative z-0 grid grid-cols-2 gap-x-3 gap-y-4 px-1"'
   );
   const previewIndex = personDetail.indexOf(
     '{/* Modal de prévisualisation partagée (QuickPreviewModal / long-press) */}'
