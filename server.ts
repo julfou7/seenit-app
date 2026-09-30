@@ -2342,7 +2342,8 @@ async function startServer() {
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Accept': 'application/json',
-          'User-Agent': 'SeenIt-App'
+          'User-Agent': 'SeenIt-App',
+          'Referer': 'https://c411.org/torrents'
         },
         signal: c411Signal()
       });
