@@ -434,7 +434,6 @@ async function secureServerFetch(rawUrl: string, init: RequestInit = {}): Promis
 
 function startCronJobs() {
   // CRON disabled in preview environment due to missing Service Account credentials
-  console.log("[CRON] Scheduled jobs are disabled in this environment.");
   return;
   // Exécution tous les jours à 9h05 (Heure du serveur)
   cron.schedule("5 9 * * *", async () => {
@@ -2257,7 +2256,8 @@ async function startServer() {
           headers: {
             'Authorization': `Bearer ${apiKey}`,
             'Accept': 'application/json',
-            'User-Agent': 'SeenIt-App'
+            'User-Agent': 'SeenIt-App',
+            'Referer': 'https://c411.org/torrents'
           },
           signal: AbortSignal.timeout(8000)
         }
@@ -2349,12 +2349,13 @@ async function startServer() {
 
       if (!response.ok) {
         // Fallback sans filtre de sous-catégorie
-        const fallbackUrl = `https://c411.org/api/torrents?name=${encodeURIComponent(effectiveQuery)}&category=1`;
+        const fallbackUrl = `https://c411.org/api/torrents?name=${encodeURIComponent(effectiveQuery)}&page=1&perPage=100&viewMode=flat&category=1&page=1&perPage=100&viewMode=flat`;
         const fbRes = await fetch(fallbackUrl, {
           headers: {
             'Authorization': `Bearer ${apiKey}`,
             'Accept': 'application/json',
-            'User-Agent': 'SeenIt-App'
+            'User-Agent': 'SeenIt-App',
+            'Referer': 'https://c411.org/torrents'
           },
           signal: c411Signal()
         });
@@ -2375,7 +2376,8 @@ async function startServer() {
           headers: {
             'Authorization': `Bearer ${apiKey}`,
             'Accept': 'application/json',
-            'User-Agent': 'SeenIt-App'
+            'User-Agent': 'SeenIt-App',
+            'Referer': 'https://c411.org/torrents'
           },
           signal: c411Signal()
         });
