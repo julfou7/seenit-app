@@ -24,6 +24,6 @@ test('l’année C411 est utilisée une seule fois dans la recherche', () => {
 
 test('la route serveur C411 envoie le contexte attendu au tracker', () => {
   const server = readFileSync(new URL('../server.ts', import.meta.url), 'utf8');
-  assert.match(server, /Referer:\s*'https:\/\/c411\.org\/torrents'/);
+  assert.match(server, /'Referer':\s*'https:\/\/c411\.org\/torrents'/);
   assert.match(server, /page=1&perPage=100&viewMode=flat/);
 });
