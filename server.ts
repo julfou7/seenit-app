@@ -434,7 +434,6 @@ async function secureServerFetch(rawUrl: string, init: RequestInit = {}): Promis
 
 function startCronJobs() {
   // CRON disabled in preview environment due to missing Service Account credentials
-  console.log("[CRON] Scheduled jobs are disabled in this environment.");
   return;
   // Exécution tous les jours à 9h05 (Heure du serveur)
   cron.schedule("5 9 * * *", async () => {
