@@ -4,12 +4,15 @@ import { buildC411SearchParams } from '../src/features/downloads/c411Query.ts';
 
 test('le filtre C411 Tous ne devient jamais Film implicitement', () => {
   const params = buildC411SearchParams('Severance');
-  assert.equal(params.get('subcategory'), null);
+  assert.equal(params.get('subcat'), null);
+  assert.equal(params.get('viewMode'), 'flat');
+  assert.equal(params.get('page'), '1');
+  assert.equal(params.get('perPage'), '100');
 });
 
 test('les filtres C411 Film et Série utilisent leurs sous-catégories exactes', () => {
-  assert.equal(buildC411SearchParams('Dune', 'movie').get('subcategory'), '6');
-  assert.equal(buildC411SearchParams('Severance', 'tv').get('subcategory'), '7');
+  assert.equal(buildC411SearchParams('Dune', 'movie').get('subcat'), '6');
+  assert.equal(buildC411SearchParams('Severance', 'tv').get('subcat'), '7');
 });
 
 test('l’année C411 est utilisée une seule fois dans la recherche', () => {
