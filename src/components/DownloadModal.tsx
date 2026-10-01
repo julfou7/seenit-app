@@ -1,3 +1,4 @@
+import { DialogLayer } from './ui/DialogLayer';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
@@ -111,9 +112,6 @@ export function DownloadModal({
   const [sendingTorrentId, setSendingTorrentId] = useState<number | null>(null);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
-  const previousFocusRef = useRef<HTMLElement | null>(null);
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
 
   const getGeneratedQuery = (mode: ScopeMode, season: number, episode: number) => {
     const base = title.trim();
@@ -149,21 +147,6 @@ export function DownloadModal({
     setIsTriggeringAuto(false);
   }, [isOpen, title, year, initialSeason, initialEpisode]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const focusTimer = window.setTimeout(() => dialogRef.current?.focus(), 0);
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      onCloseRef.current();
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.clearTimeout(focusTimer);
-      document.removeEventListener('keydown', handleKeyDown);
-      previousFocusRef.current?.focus();
-    };
-  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen || mediaType !== 'tv') return;
@@ -396,8 +379,8 @@ export function DownloadModal({
         failDownloadRequest(requestId, result.message);
         showMediaDownloadToast(result.message, 'error');
       }
-    } catch (error: any) {
-      const message = error?.message || `Impossible de joindre ${client}.`;
+    } catch (error: unknown) {
+      const message = (error instanceof Error && error.message) || `Impossible de joindre ${client}.`;
       failDownloadRequest(requestId, message);
       showMediaDownloadToast(message, 'error');
     } finally {
@@ -569,17 +552,17 @@ export function DownloadModal({
   if (!isOpen) return null;
 
   return (
-    <div
+    <DialogLayer onDismiss={onClose} label="Télécharger" historyMode="local" role="dialog"
       className="fixed inset-0 z-[200] flex items-center justify-center p-3 pt-10 pb-20 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150"
-      role="presentation"
+
       onMouseDown={event => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
       <div
         ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
+
+
         aria-labelledby="download-dialog-title"
         tabIndex={-1}
         className="relative w-full max-w-md max-h-[88vh] overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-900 shadow-2xl flex flex-col outline-none"
@@ -881,13 +864,13 @@ export function DownloadModal({
       </div>
 
       {isSeasonPickerOpen && (
-        <div
+        <DialogLayer onDismiss={() => setIsSeasonPickerOpen(false)} label="Sélectionner une saison" historyMode="local" role="dialog"
           className="fixed inset-0 z-[220] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
           onClick={() => setIsSeasonPickerOpen(false)}
         >
           <div
-            role="dialog"
-            aria-modal="true"
+
+
             aria-labelledby="season-picker-title"
             className="w-full max-w-sm max-h-[70vh] overflow-y-auto rounded-2xl bg-zinc-900 border border-zinc-700 p-3 space-y-1.5"
             onClick={event => event.stopPropagation()}
@@ -920,17 +903,17 @@ export function DownloadModal({
               </button>
             ))}
           </div>
-        </div>
+        </DialogLayer>
       )}
 
       {isEpisodePickerOpen && (
-        <div
+        <DialogLayer onDismiss={() => setIsEpisodePickerOpen(false)} label="Sélectionner un épisode" historyMode="local" role="dialog"
           className="fixed inset-0 z-[220] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
           onClick={() => setIsEpisodePickerOpen(false)}
         >
           <div
-            role="dialog"
-            aria-modal="true"
+
+
             aria-labelledby="episode-picker-title"
             className="w-full max-w-sm max-h-[70vh] overflow-y-auto rounded-2xl bg-zinc-900 border border-zinc-700 p-3"
             onClick={event => event.stopPropagation()}
@@ -962,8 +945,8 @@ export function DownloadModal({
               ))}
             </div>
           </div>
-        </div>
+        </DialogLayer>
       )}
-    </div>
+    </DialogLayer>
   );
 }

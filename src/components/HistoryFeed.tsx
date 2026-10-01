@@ -1,3 +1,4 @@
+import { DialogLayer } from './ui/DialogLayer';
 import { useState, useMemo, useEffect } from 'react';
 import { useShows } from '../hooks/useShows';
 import { type Show } from '../types';
@@ -27,7 +28,7 @@ interface HistoryItem {
   watchedAt: number;
 }
 
-function normalizeTimestamp(val: any): number {
+function normalizeTimestamp(val: unknown): number {
   if (!val) return Date.now();
   if (typeof val === 'number') {
     if (isNaN(val) || val <= 0) return Date.now();
@@ -37,7 +38,7 @@ function normalizeTimestamp(val: any): number {
   if (!isNaN(num) && num > 0) {
     return num < 10000000000 ? num * 1000 : num;
   }
-  const parsed = Date.parse(val);
+  const parsed = Date.parse(String(val));
   return isNaN(parsed) || parsed <= 0 ? Date.now() : parsed;
 }
 
@@ -83,9 +84,9 @@ function HistoryRowItem({
   };
 
   return (
-    <div 
+    <div
       ref={cardRef}
-      key={`${item.showId}-${item.season}x${item.episode}-${idx}`} 
+      key={`${item.showId}-${item.season}x${item.episode}-${idx}`}
       onClick={handleRowClick}
       className="w-full flex items-stretch justify-between gap-3 bg-zinc-900/60 hover:bg-zinc-900/80 rounded-2xl overflow-hidden relative isolate transition-all active:scale-[0.98] cursor-pointer mb-3 group shadow-xl"
     >
@@ -99,21 +100,21 @@ function HistoryRowItem({
         </div>
       )}
 
-      <div 
+      <div
         onClick={(e) => { e.stopPropagation(); handleRowClick(); }}
         className="w-[60px] sm:w-[70px] shrink-0 bg-zinc-950 rounded-l-2xl overflow-hidden flex items-center justify-center relative z-20 cursor-pointer"
       >
         {Boolean(item.showPoster) && (
-          <img loading="lazy" decoding="async" 
-            src={item.showPoster!.startsWith('http') ? item.showPoster! : `https://image.tmdb.org/t/p/w200${item.showPoster}`} 
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
-            alt="" 
+          <img loading="lazy" decoding="async"
+            src={item.showPoster!.startsWith('http') ? item.showPoster! : `https://image.tmdb.org/t/p/w200${item.showPoster}`}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            alt=""
           />
         )}
       </div>
       <div className="flex-1 min-w-0 py-3 px-0.5 flex flex-col justify-center relative z-20">
         <div className={cn("flex items-center gap-2 min-w-0", networkLogo ? "pr-12" : "pr-1")}>
-          <h4 
+          <h4
             onClick={(e) => { e.stopPropagation(); handleRowClick(); }}
             className="text-[#E5A93D] font-extrabold text-xs sm:text-[13px] uppercase tracking-wider line-clamp-2 cursor-pointer hover:underline text-left leading-tight"
           >
@@ -155,16 +156,16 @@ function HistoryRowItem({
   );
 }
 
-export function HistoryFeed({ 
+export function HistoryFeed({
   onShowClick,
   onEpisodeClick
-}: { 
+}: {
   onShowClick?: (id: string, mediaType?: 'tv' | 'movie') => void;
   onEpisodeClick?: (showId: string, season: number, episode: number) => void;
 }) {
   const [page, setPage] = useState(1);
   const itemsPerPage = 20;
-  
+
   const { shows, loading, updateShow } = useShows();
   const { showToast } = useToastStore();
   const [fetchedEpisodeTitles, setFetchedEpisodeTitles] = useState<Record<string, string>>({});
@@ -172,13 +173,13 @@ export function HistoryFeed({
 
   const historyItems = useMemo(() => {
     if (!shows) return [];
-    
+
     const items: HistoryItem[] = [];
-    
+
     for (const show of shows) {
       if (!show.id) continue;
 
-      const isMovie = show.mediaType === 'movie' || 
+      const isMovie = show.mediaType === 'movie' ||
                       (show.seenEpisodes && show.seenEpisodes.includes('movie')) ||
                       (show.episodeRecords && 'movie' in show.episodeRecords);
 
@@ -186,7 +187,7 @@ export function HistoryFeed({
         // Un film est considéré vu s'il possède la clé 'movie' dans seenEpisodes OU un horodatage dans episodeRecords['movie']
         const hasSeenFlag = Array.isArray(show.seenEpisodes) && show.seenEpisodes.includes('movie');
         const hasRecord = !!(show.episodeRecords && show.episodeRecords['movie']?.watchedAt);
-        
+
         const isSeen = hasSeenFlag || hasRecord;
         if (isSeen) {
           const rawWatchedAt = (show.episodeRecords && show.episodeRecords['movie']?.watchedAt) ||
@@ -218,7 +219,7 @@ export function HistoryFeed({
 
           const [s, e] = epKey.split('x').map(Number);
           if (isNaN(s) || isNaN(e)) continue;
-          
+
           processedEpKeys.add(epKey);
           let episodeTitle = record.episodeTitle || record.name || record.title;
           if (!episodeTitle) {
@@ -265,8 +266,8 @@ export function HistoryFeed({
         }
       }
     }
-    
-    // Tri décroissant par date de visionnage. 
+
+    // Tri décroissant par date de visionnage.
     // En cas d'égalité (ex: Import CSV), tri de secours par Saison puis Épisode décroissant.
     return items.sort((a, b) => {
       if (b.watchedAt !== a.watchedAt) {
@@ -399,12 +400,12 @@ export function HistoryFeed({
     });
     scrollAllCarouselsToStart();
 
-    const epLabel = isMovie 
-      ? `« ${item.showTitle} »` 
+    const epLabel = isMovie
+      ? `« ${item.showTitle} »`
       : `« ${item.showTitle} » S${String(item.season).padStart(2, '0')}E${String(item.episode).padStart(2, '0')}`;
-    
+
     showToast(
-      `${epLabel} retiré de l'historique`, 
+      `${epLabel} retiré de l'historique`,
       'info',
       targetShow,
       async () => {
@@ -457,7 +458,7 @@ export function HistoryFeed({
       })}
 
       {hasMore && (
-        <button 
+        <button
           onClick={() => setPage(p => p + 1)}
           className="w-full py-3 mt-4 bg-zinc-900 border border-white/5 rounded-xl text-xs font-bold text-zinc-400 hover:text-white transition-colors"
         >
@@ -467,7 +468,7 @@ export function HistoryFeed({
 
       {/* Popup / Modal de confirmation de Retrait d'historique */}
       {unseenModalItem && (
-        <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <DialogLayer onDismiss={() => setUnseenModalItem(null)} label="Marquer comme non vu" historyMode="local" role="alertdialog" className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-zinc-900 border border-white/10 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex items-center gap-3 text-amber-400">
               <div className="w-10 h-10 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
@@ -475,7 +476,7 @@ export function HistoryFeed({
               </div>
               <h3 className="text-base font-bold text-white">Marquer comme non vu ?</h3>
             </div>
-            
+
             <p className="text-zinc-300 text-xs sm:text-sm leading-relaxed">
               Voulez-vous vraiment retirer <strong className="text-white">{unseenModalItem.showTitle}</strong> {unseenModalItem.mediaType === 'movie' ? 'de vos films vus' : `(S${String(unseenModalItem.season).padStart(2, '0')}E${String(unseenModalItem.episode).padStart(2, '0')})`} de votre historique ?
             </p>
@@ -484,6 +485,7 @@ export function HistoryFeed({
               <button
                 type="button"
                 onClick={() => setUnseenModalItem(null)}
+                data-dialog-initial-focus
                 className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-bold transition-colors cursor-pointer"
               >
                 Annuler
@@ -497,9 +499,8 @@ export function HistoryFeed({
               </button>
             </div>
           </div>
-        </div>
+        </DialogLayer>
       )}
     </div>
   );
 }
-

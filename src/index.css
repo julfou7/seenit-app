@@ -10,6 +10,37 @@ html, body {
 
 @import "tailwindcss";
 
+/* Portails indépendants des stacking contexts des écrans, bornés au clavier visible. */
+.seenit-dialog-layer {
+  top: var(--dialog-top, 0px) !important;
+  bottom: auto !important;
+  height: var(--dialog-height, 100dvh);
+  padding-top: max(0.75rem, var(--seenit-safe-area-top, env(safe-area-inset-top, 0px)));
+  padding-bottom: max(0.75rem, var(--seenit-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.seenit-dialog-layer > * {
+  max-height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+}
+.seenit-dialog-header {
+  padding-top: calc(0.75rem + var(--seenit-safe-area-top, env(safe-area-inset-top, 0px)));
+}
+.seenit-dialog-layer .seenit-dialog-header { padding-top: 0.75rem; }
+.seenit-sheet-header { padding-top: 0.75rem; }
+.seenit-dialog-layer[data-dialog-blocking="false"] {
+  height: calc(var(--dialog-height, 100dvh) - 5.25rem - var(--seenit-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+  padding-top: var(--seenit-safe-area-top, env(safe-area-inset-top, 0px));
+  padding-bottom: 0;
+}
+.seenit-dialog-layer .pb-nav { padding-bottom: 1rem; }
+.seenit-dialog-layer :focus-visible {
+  outline: 2px solid #E5A93D;
+  outline-offset: 3px;
+}
+
 @layer utilities {
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom, 20px);

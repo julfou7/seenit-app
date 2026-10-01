@@ -1,3 +1,4 @@
+import { DialogLayer, isTopDialogElement } from '../components/ui/DialogLayer';
 import React, { useEffect, useState, useRef } from 'react';
 import { tmdb, type TMDBMedia } from '../features/shows/tmdb';
 
@@ -126,6 +127,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
   const [isLoadingImages, setIsLoadingImages] = useState(false);
   const [activePortraitIndex, setActivePortraitIndex] = useState<number | null>(null);
   const galleryOpenRef = useRef(false);
+  const galleryRootRef = useRef<HTMLDivElement>(null);
 
   const startXRef = useRef<number | null>(null);
   const startYRef = useRef<number | null>(null);
@@ -206,6 +208,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
       }
     };
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isTopDialogElement(galleryRootRef.current)) return;
       if (activePortraitIndex === null) return;
       if (event.key === 'Escape') closePortraitGallery();
       if (event.key === 'ArrowRight') setActivePortraitIndex(index => index === null ? null : Math.min(index + 1, (personImages?.length || 1) - 1));
@@ -532,11 +535,11 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
 
   if (!person) {
     return (
-      <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex justify-center items-center">
+      <DialogLayer onDismiss={handleAnimatedClose} label="Fiche personne" historyMode="external" role="dialog" className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex justify-center items-center">
         <div className="bg-black w-full max-w-md h-full flex items-center justify-center border-x border-white/5">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#E5A93D]" />
         </div>
-      </div>
+      </DialogLayer>
     );
   }
 
@@ -588,7 +591,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
           : person.known_for_department;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex justify-center items-center">
+    <DialogLayer onDismiss={handleAnimatedClose} label="Fiche personne" historyMode="external" role="dialog" className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex justify-center items-center">
       <div
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -605,8 +608,9 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
         )}
       >
         {/* Sticky Header */}
-      <div className="relative pt-10 pb-2.5 px-4 flex items-center justify-between z-20 sticky top-0 bg-black/95 backdrop-blur-xl border-b border-white/10">
+      <div className="relative seenit-dialog-header pb-2.5 px-4 flex items-center justify-between z-20 sticky top-0 bg-black/95 backdrop-blur-xl border-b border-white/10">
         <button
+          type="button"
           onPointerUp={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -614,6 +618,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
           }}
           onClick={(e) => {
             e.stopPropagation();
+            if (e.detail === 0) handleAnimatedClose();
           }}
           className="flex min-h-11 items-center gap-1.5 px-3 py-1 bg-zinc-900/90 hover:bg-zinc-800 rounded-full border border-white/10 touch-manipulation select-none cursor-pointer text-white font-semibold text-xs transition-colors"
         >
@@ -1002,8 +1007,8 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
         </div>
 
         {activePortraitIndex !== null && (
-          <div
-            role="dialog"
+          <DialogLayer ref={galleryRootRef} onDismiss={closePortraitGallery} label="Galerie de portraits" historyMode="external" role="dialog"
+
             aria-modal="true"
             aria-label={`Photos de ${person.name}`}
             className="fixed inset-0 z-[130] flex items-center justify-center bg-black/95 p-4 backdrop-blur-sm"
@@ -1022,7 +1027,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
                 </>}
               </>
             )}
-          </div>
+          </DialogLayer>
         )}
 
         {/* Modal de prévisualisation partagée (QuickPreviewModal / long-press) */}
@@ -1041,6 +1046,6 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
           />
         )}
       </div>
-    </div>
+    </DialogLayer>
   );
 }

@@ -1,6 +1,8 @@
+import { type TrailerVideo } from './TrailerModal';
+import { DialogLayer } from './ui/DialogLayer';
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Star, Tv, Film, Ticket, Calendar, Plus, CheckCircle2, XCircle, 
+import {
+  Star, Tv, Film, Ticket, Calendar, Plus, CheckCircle2, XCircle,
   Archive, Play, X, Loader2, CheckCircle, Info, RotateCcw, Check
 } from 'lucide-react';
 import { tmdb, isMovieAtCinema, isMovieUpcoming, type TMDBMedia } from '../features/shows/tmdb';
@@ -22,12 +24,12 @@ export interface GridMediaCardProps {
   showProgress?: boolean;
 }
 
-export const GridMediaCard = React.memo(function GridMediaCard({ 
-  media, 
-  onShowClick, 
-  isNewlyLoaded, 
-  show, 
-  onAddClick, 
+export const GridMediaCard = React.memo(function GridMediaCard({
+  media,
+  onShowClick,
+  isNewlyLoaded,
+  show,
+  onAddClick,
   onToggleWatched,
   onLongPress,
   hideBadges,
@@ -50,10 +52,10 @@ export const GridMediaCard = React.memo(function GridMediaCard({
 
   const seenCount = isTv ? (show?.seenEpisodes?.length || 0) : 0;
   const totalEpisodes = show?.totalAiredEpisodes || show?.totalEpisodes || (media as any).number_of_episodes || 0;
-  const progressPercentage = isUpToDate 
-    ? 100 
-    : totalEpisodes > 0 
-      ? Math.min(100, Math.round((seenCount / totalEpisodes) * 100)) 
+  const progressPercentage = isUpToDate
+    ? 100
+    : totalEpisodes > 0
+      ? Math.min(100, Math.round((seenCount / totalEpisodes) * 100))
       : (seenCount > 0 ? 50 : 0);
 
   let actionInfo: { text: string; icon: React.ReactNode; className: string } | null = null;
@@ -194,12 +196,12 @@ export const GridMediaCard = React.memo(function GridMediaCard({
         >
         <div className="relative aspect-[2/3] w-full bg-zinc-800">
           {media.poster_path ? (
-            <img 
-              loading="lazy" 
-              decoding="async" 
-              src={`https://image.tmdb.org/t/p/w342${media.poster_path}`} 
-              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
-              alt={displayTitle} 
+            <img
+              loading="lazy"
+              decoding="async"
+              src={`https://image.tmdb.org/t/p/w342${media.poster_path}`}
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+              alt={displayTitle}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-zinc-600 bg-zinc-900/50 text-xs text-center p-2">
@@ -307,7 +309,7 @@ export const GridMediaCard = React.memo(function GridMediaCard({
                     {totalEpisodes > 0 ? `${totalEpisodes} épisodes` : 'À commencer'}
                   </span>
                 )}
-                
+
                 {seenCount > 0 && !isUpToDate && (
                   <span className="text-[#E5A93D] font-bold text-[10px] shrink-0 ml-1">
                     {progressPercentage}%
@@ -379,14 +381,14 @@ export interface PreviewModalProps {
   onShowClick: (id: any, mediaType: 'tv' | 'movie') => void;
 }
 
-export function PreviewModal({ 
-  media, 
+export function PreviewModal({
+  media,
   isAdded,
   isWatched,
-  onClose, 
+  onClose,
   onAddClick,
   onToggleWatched,
-  onShowClick 
+  onShowClick
 }: PreviewModalProps) {
   const isTv = media.media_type === 'tv' || (!media.media_type && media.first_air_date !== undefined);
   const type = isTv ? 'Série' : 'Film';
@@ -411,12 +413,12 @@ export function PreviewModal({
         if (active && res.ok && res.value) {
           setFullMedia(res.value);
           if (res.value?.videos?.results) {
-            const ytVideos = res.value.videos.results.filter((v: any) => v.site === 'YouTube' && v.key);
+            const ytVideos = res.value.videos.results.filter((v: TrailerVideo) => v.site === 'YouTube' && v.key);
             if (ytVideos.length > 0) {
-              const trailer = ytVideos.find((v: any) => v.type === 'Trailer' && v.iso_639_1 === 'fr') 
-                || ytVideos.find((v: any) => v.type === 'Trailer')
-                || ytVideos.find((v: any) => v.type === 'Teaser' && v.iso_639_1 === 'fr')
-                || ytVideos.find((v: any) => v.type === 'Teaser') 
+              const trailer = ytVideos.find((v: TrailerVideo) => v.type === 'Trailer' && v.iso_639_1 === 'fr')
+                || ytVideos.find((v: TrailerVideo) => v.type === 'Trailer')
+                || ytVideos.find((v: TrailerVideo) => v.type === 'Teaser' && v.iso_639_1 === 'fr')
+                || ytVideos.find((v: TrailerVideo) => v.type === 'Teaser')
                 || ytVideos[0];
               setTrailerKey(trailer.key);
             }
@@ -469,9 +471,9 @@ export function PreviewModal({
       onClose();
     };
   } else if (
-    show.isArchived || 
-    show.status === 'completed' || 
-    computeAutoArchiveStatus(show) || 
+    show.isArchived ||
+    show.status === 'completed' ||
+    computeAutoArchiveStatus(show) ||
     (isTv && checkIsUpToDate(show) && !show.nextEpisodeToAir) ||
     (isTv && Boolean(show.seenEpisodes && show.seenEpisodes.length > 0 && !show.nextEpisodeToWatch && !show.nextEpisodeToAir))
   ) {
@@ -563,7 +565,7 @@ export function PreviewModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <DialogLayer onDismiss={onClose} label="Aperçu du média" historyMode="local" role="dialog" className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-sm max-h-[85vh] bg-[#1a1a1a] rounded-[24px] overflow-hidden shadow-2xl border border-white/10 animate-in fade-in zoom-in-95 duration-200 flex flex-col">
         <div className="relative aspect-video w-full rounded-t-[24px] overflow-hidden bg-black shrink-0">
@@ -578,14 +580,14 @@ export function PreviewModal({
           ) : (
             <>
               {media.backdrop_path ? (
-                <img 
-                  src={`https://image.tmdb.org/t/p/w500${media.backdrop_path}`} 
+                <img
+                  src={`https://image.tmdb.org/t/p/w500${media.backdrop_path}`}
                   className="w-full h-full object-cover"
                   alt={displayTitle}
                 />
               ) : media.poster_path ? (
-                <img 
-                  src={`https://image.tmdb.org/t/p/w500${media.poster_path}`} 
+                <img
+                  src={`https://image.tmdb.org/t/p/w500${media.poster_path}`}
                   className="w-full h-full object-cover opacity-50"
                   alt={displayTitle}
                 />
@@ -598,14 +600,14 @@ export function PreviewModal({
               )}
             </>
           )}
-          <button 
+          <button
             onClick={onClose}
             className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-md hover:bg-black/80 transition-colors cursor-pointer"
           >
             <X size={18} />
           </button>
         </div>
-        
+
         <div className="p-6 bg-[#1a1a1a] rounded-b-[24px] flex flex-col gap-4 overflow-y-auto min-h-0">
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -626,7 +628,7 @@ export function PreviewModal({
               )}
             </div>
 
-            <h2 
+            <h2
               onClick={() => {
                 onShowClick(media.id, isTv ? 'tv' : 'movie');
                 onClose();
@@ -635,16 +637,16 @@ export function PreviewModal({
             >
               {displayTitle}
             </h2>
-            
+
             <div className="max-h-36 overflow-y-auto pr-1 text-sm text-zinc-300 leading-relaxed scrollbar-thin scrollbar-thumb-zinc-700">
               <p>
                 {overview || "Aucun synopsis disponible."}
               </p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2 mt-2 pt-2 shrink-0">
-            <button 
+            <button
               onClick={handleAction}
               className={cn(
                 "flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-transform active:scale-95 cursor-pointer",
@@ -655,7 +657,7 @@ export function PreviewModal({
               <span className="truncate">{buttonLabel}</span>
             </button>
 
-            <button 
+            <button
               onClick={() => {
                 onShowClick(media.id, isTv ? 'tv' : 'movie');
                 onClose();
@@ -668,7 +670,7 @@ export function PreviewModal({
           </div>
         </div>
       </div>
-    </div>
+    </DialogLayer>
   );
 }
 

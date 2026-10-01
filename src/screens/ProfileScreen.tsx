@@ -1,3 +1,4 @@
+import { DialogLayer } from '../components/ui/DialogLayer';
 import React, { Activity, startTransition, useCallback, useState, useEffect, useRef } from 'react';
 import { Settings, Calendar, ArrowLeft } from 'lucide-react';
 import { auth } from '../lib/firebase';
@@ -24,7 +25,7 @@ const ProfileStatsContent = React.memo(function ProfileStatsContent({
 export const ProfileScreen = React.memo(function ProfileScreen({
   initialShowSettings = false,
   onShowClick
-}: { 
+}: {
   initialShowSettings?: boolean;
   onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void;
 }) {
@@ -80,7 +81,8 @@ export const ProfileScreen = React.memo(function ProfileScreen({
         setSelectedPersonId(null);
       }
     };
-    const handleBackOneLevel = () => {
+    const handleBackOneLevel = (event: Event) => {
+      if (selectedPersonId !== null || showSettings || activeTab === 'library') event.preventDefault();
       if (selectedPersonId !== null) {
         setSelectedPersonId(null);
         return;
@@ -190,15 +192,15 @@ export const ProfileScreen = React.memo(function ProfileScreen({
     setAvatarLoadFailed(false);
   }, [user?.uid, avatarUrl]);
 
-  const creationYear = user?.metadata?.creationTime 
-    ? new Date(user.metadata.creationTime).getFullYear() 
+  const creationYear = user?.metadata?.creationTime
+    ? new Date(user.metadata.creationTime).getFullYear()
     : 2024;
   const profileContentVisible = isProfileVisible && !showSettings;
   const avatarInitials = getProfileInitials(user?.displayName, user?.email);
 
   return (
     <div ref={rootRef} className="flex-1 overflow-y-auto bg-transparent text-white pb-nav custom-scrollbar">
-      
+
       {/* 1. HERO SECTION */}
       <div className="px-6 pt-12 pb-6 relative">
         <div className="absolute top-0 left-0 w-64 h-32 bg-[#E5A93D]/10 blur-[100px] -z-10 rounded-full mix-blend-screen pointer-events-none" />
@@ -222,7 +224,7 @@ export const ProfileScreen = React.memo(function ProfileScreen({
                  </div>
                )}
              </div>
-             <button 
+             <button
                onClick={() => setShowSettings(true)}
                className="absolute bottom-0 right-0 bg-[#E5A93D] hover:bg-[#d49931] p-1.5 sm:p-2 rounded-full border-2 border-[#121212] shadow-md transition-transform active:scale-95"
                title="Réglages"
@@ -232,7 +234,7 @@ export const ProfileScreen = React.memo(function ProfileScreen({
           </div>
 
           <div className="flex gap-2">
-            <button 
+            <button
               onClick={() => setShowSettings(true)}
               className="bg-zinc-800/80 hover:bg-zinc-800 active:scale-95 text-zinc-200 px-3 py-2 rounded-xl transition-all border border-zinc-700/50 flex items-center gap-1.5 text-xs font-semibold"
             >
@@ -241,7 +243,7 @@ export const ProfileScreen = React.memo(function ProfileScreen({
             </button>
           </div>
         </div>
-        
+
         <h1 className="text-3xl font-black tracking-tight text-white flex items-center justify-between">
           <span>{user?.displayName || (user?.email?.split('@')[0]) || 'Utilisateur'}</span>
         </h1>
@@ -256,13 +258,13 @@ export const ProfileScreen = React.memo(function ProfileScreen({
       {/* 2. TAB SELECTOR */}
       <div className="px-4 pb-4">
         <div className="flex bg-zinc-900/80 rounded-xl p-1 border border-white/5">
-           <button 
+           <button
              onClick={() => handleProfileTabChange('stats')}
              className={cn("flex-1 text-sm font-bold py-2 rounded-lg transition-colors cursor-pointer", activeTab === 'stats' ? "bg-zinc-800 text-white shadow-sm" : "text-zinc-500")}
            >
              Statistiques
            </button>
-           <button 
+           <button
              onClick={() => handleProfileTabChange('library')}
              className={cn("flex-1 text-sm font-bold py-2 rounded-lg transition-colors cursor-pointer", activeTab === 'library' ? "bg-zinc-800 text-white shadow-sm" : "text-zinc-500")}
            >
@@ -307,13 +309,13 @@ export const ProfileScreen = React.memo(function ProfileScreen({
 
       {/* SETTINGS OVERLAY MODAL */}
       {showSettings && isProfileVisible && (
-        <div 
+        <DialogLayer onDismiss={handleAnimatedBackSettings} label="Réglages" historyMode="local" role="dialog"
           className={cn(
-            "fixed inset-0 bg-black z-50 flex flex-col transition-transform duration-300 ease-out",
+            "fixed inset-0 max-w-md mx-auto bg-black z-50 flex flex-col transition-transform duration-300 ease-out",
             isExitingSettings ? "translate-x-full" : "translate-x-0"
           )}
           style={
-            isDraggingSettings 
+            isDraggingSettings
               ? { transform: `translateX(${dragXSettings}px)`, transition: 'none' }
               : undefined
           }
@@ -321,10 +323,10 @@ export const ProfileScreen = React.memo(function ProfileScreen({
           onTouchMove={handleTouchMoveSettings}
           onTouchEnd={handleTouchEndSettings}
         >
-          <div className="flex items-center justify-between pt-10 pb-3.5 px-4 border-b border-white/10 bg-zinc-950/90 backdrop-blur-md sticky top-0 z-10">
-            <button 
-              onClick={handleAnimatedBackSettings} 
-              className="flex items-center gap-1.5 text-zinc-400 hover:text-white font-medium text-sm transition-colors"
+          <div className="flex items-center justify-between seenit-dialog-header pb-3.5 px-4 border-b border-white/10 bg-zinc-950/90 backdrop-blur-md sticky top-0 z-10">
+            <button
+              onClick={handleAnimatedBackSettings}
+              type="button" className="min-h-11 flex items-center gap-1.5 text-zinc-400 hover:text-white font-medium text-sm transition-colors"
             >
               <ArrowLeft size={18} />
               <span>Retour</span>
@@ -333,7 +335,7 @@ export const ProfileScreen = React.memo(function ProfileScreen({
             <div className="w-12" />
           </div>
           <SettingsScreen />
-        </div>
+        </DialogLayer>
       )}
     </div>
   );

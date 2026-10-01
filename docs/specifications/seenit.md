@@ -1107,6 +1107,11 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
 - Les dialogues critiques utilisent un rôle adapté, sont fermables par Échap, placent le focus
   sur une action et ne déclenchent aucune suppression sans confirmation quand le transfert est
   actif.
+- **SEENIT-UX-012** — Un dialogue nommé utilise une pile commune : Échap, Retour Android et appui
+  sur l'onglet actif ferment un seul niveau. Le focus reste contenu puis revient au déclencheur ;
+  le fond est inerte et une confirmation destructive focalise Garder/Annuler. Les portails sont
+  indépendants des stacking contexts des écrans. Les en-têtes racine, fiche et dialogue gardent
+  leurs variantes et respectent les safe areas ; les dialogues suivent le viewport visuel du clavier.
 
 ## 10. Performance et résilience
 

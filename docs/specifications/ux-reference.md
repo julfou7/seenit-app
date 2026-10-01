@@ -202,7 +202,8 @@ Entrée/Espace ; TalkBack/tactile restent une preuve terrain de candidate, pas u
 1. #178 : ordre, dimensions et contrat d'appui/reset livrés ; validation TalkBack terrain encore suivie.
 2. #179 : épisode précédent/suivant accessible avec TNR aux frontières des saisons.
 3. #180 : composants pilotes puis migration des cartes/boutons par écran.
-4. #181 : pile Retour, dialogues et en-têtes partagés.
+4. #181 : pile Retour et socle `DialogLayer` partagés ; fermeture d'un seul niveau, focus contenu/restauré,
+   fond inerte et safe areas communes. Les essais TalkBack et clavier Android restent des preuves terrain.
 5. #15, existante : contrôles de rendu et de parcours communs aux lots précédents.
 
 Les tests unitaires de logique ne certifient pas le confort tactile, le focus DOM ou les safe areas.

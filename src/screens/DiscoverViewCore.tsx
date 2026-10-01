@@ -1,3 +1,5 @@
+import { type DiscoverViewModel } from './discoverViewModel';
+import { DialogLayer } from '../components/ui/DialogLayer';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Search, Plus, Check, WifiOff, Star, X,
@@ -38,7 +40,7 @@ import {
 import { GridSkeletons, HeroCard, HeroProgressSkeleton, HeroSkeleton } from './DiscoverHero';
 
 interface DiscoverViewProps {
-  model: Record<string, any>;
+  model: DiscoverViewModel & { suppressEndOfResults?: boolean };
 }
 
 export function DiscoverView({ model }: DiscoverViewProps) {
@@ -183,7 +185,7 @@ export function DiscoverView({ model }: DiscoverViewProps) {
               </button>
 
               {isSortPickerOpen && (
-                <div
+                <DialogLayer onDismiss={() => setIsSortPickerOpen(false)} label="Trier les résultats" historyMode="local" role="dialog"
                   className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
                   onClick={() => setIsSortPickerOpen(false)}
                 >
@@ -228,7 +230,7 @@ export function DiscoverView({ model }: DiscoverViewProps) {
                       })}
                     </div>
                   </div>
-                </div>
+                </DialogLayer>
               )}
             </div>
           </div>

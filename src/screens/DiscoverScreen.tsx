@@ -595,12 +595,12 @@ export function DiscoverScreen({ onShowClick }: Props) {
 
         const trendAllPromise = page <= 5
           ? tmdb.getTrending('all', page, selectedPlatforms)
-          : Promise.resolve({ ok: false } as any);
+          : Promise.resolve({ ok: false } as const);
         const popTvPromise = tmdb.getPopular('tv', page, selectedPlatforms);
         const popMovPromise = tmdb.getPopular('movie', page, selectedPlatforms);
         const personPromise = page <= 3
           ? tmdb.getPopularPersons(page)
-          : Promise.resolve({ ok: false } as any);
+          : Promise.resolve({ ok: false } as const);
 
         const trendAllRes = await trendAllPromise;
         if (!isCurrentRequest()) return;
@@ -631,7 +631,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
       } else {
         const type = activeCategory === 'Films' ? 'movie' : 'tv';
         const [trendRes, popRes] = await Promise.all([
-          page <= 5 ? tmdb.getTrending(type, page, selectedPlatforms) : Promise.resolve({ ok: false } as any),
+          page <= 5 ? tmdb.getTrending(type, page, selectedPlatforms) : Promise.resolve({ ok: false } as const),
           tmdb.getPopular(type, page, selectedPlatforms)
         ]);
         if (!isCurrentRequest()) return;

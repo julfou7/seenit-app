@@ -8,7 +8,7 @@ const gridMediaCard = readFileSync('src/components/GridMediaCard.tsx', 'utf8');
 test('la filmographie de la fiche personne enferme les cartes sous son header sticky', () => {
   assert.ok(
     personDetail.includes(
-      'className="relative pt-10 pb-2.5 px-4 flex items-center justify-between z-20 sticky top-0'
+      'className="relative seenit-dialog-header pb-2.5 px-4 flex items-center justify-between z-20 sticky top-0'
     )
   );
   assert.ok(

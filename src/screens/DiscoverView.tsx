@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useSyncExternalStore } from 'react';
+import { type DiscoverViewModel } from './discoverViewModel';
 import {
   getProgressiveAgeSnapshot,
   subscribeProgressiveAgeSnapshot,
@@ -10,7 +11,7 @@ import {
 import { DiscoverView as DiscoverViewCore } from './DiscoverViewCore';
 
 interface DiscoverViewProps {
-  model: Record<string, any>;
+  model: DiscoverViewModel;
 }
 
 interface DiscoverViewMedia {
