@@ -104,7 +104,7 @@ test('SEENIT-PROVIDER-001 applique Mes plateformes > Plex > fallback public', ()
 });
 
 test('SEENIT-PROVIDER-001 les cartes historiques passent par le résolveur réactif', () => {
-  for (const file of ['components/cards/ContinueWatchingCard.tsx', 'components/cards/MovieWatchCard.tsx', 'components/cards/UpToDateShowCard.tsx', 'components/cards/UpcomingShowCard.tsx', 'components/EpisodeCard.tsx', 'components/HistoryFeed.tsx', 'screens/watchListPresentation.tsx']) {
+  for (const file of ['components/cards/ContinueWatchingCard.tsx', 'components/cards/MovieWatchCard.tsx', 'components/cards/UpToDateShowCard.tsx', 'components/cards/UpcomingShowCard.tsx', 'components/EpisodeCard.tsx', 'components/HistoryFeed.tsx', 'components/GridMediaCard.tsx', 'screens/watchListPresentation.tsx']) {
     const source = readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8');
     assert.match(source, /usePassiveWatchProvider\(/, file);
     assert.doesNotMatch(source, /hasKnownProvider:\s*Boolean\((?:show\.networks|item\.showNetworks)/, file);

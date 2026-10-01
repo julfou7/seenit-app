@@ -136,7 +136,7 @@ aucune route ou clé OMDb. Le TNR `tests/watchProviderPreference.test.ts` couvre
 que la séquence réelle où Plex est connu avant la fin de la résolution publique : aucun badge Plex
 provisoire n'est alors autorisé, puis le provider préféré doit apparaître dès que le payload TMDB ou la
 préférence de compte devient autoritatif.
-Le smoke Chromium #337 utilise les cartes `ContinueWatchingCard` et `MovieWatchCard`, le hook et la
+Le smoke Chromium #337 utilise les cartes `ContinueWatchingCard`, `MovieWatchCard` et `GridMediaCard`, le hook et la
 façade TMDB de production. Seuls les services externes sont simulés. Il couvre le cache hérité, la
 bascule ON/OFF/ON, une réponse cloud retardée, la déduplication effective des appels réseau et le
 fallback public lorsque Plex n'est pas disponible, sans remontage des cartes.

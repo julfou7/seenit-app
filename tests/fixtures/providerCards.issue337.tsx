@@ -2,6 +2,7 @@ import React, { StrictMode, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ContinueWatchingCard } from '../../src/components/cards/ContinueWatchingCard';
 import { MovieWatchCard } from '../../src/components/cards/MovieWatchCard';
+import { GridMediaCard } from '../../src/components/GridMediaCard';
 import { type Show } from '../../src/types';
 import { hydratePlatformPreferences } from '../../src/features/providers/platformPreferenceHydration';
 import { writeUserScopedJson } from '../../src/lib/userIsolation';
@@ -25,6 +26,7 @@ localStorage.setItem('seenit_watch_providers_v1', JSON.stringify({
   'tv:125359': { data: { results }, timestamp: Date.now(), retention: 'library' },
   'movie:42': { data: { results }, timestamp: Date.now(), retention: 'library' },
   'movie:84': { data: { results: { FR: { flatrate: [results.FR.flatrate[0]], buy: [results.FR.flatrate[1]] } } }, timestamp: Date.now() },
+  'tv:202': { data: { results: {} }, timestamp: Date.now() },
 }));
 usePlexAvailabilityStore.setState({ cache: Object.fromEntries([
   ['tv', 125359], ['movie', 42], ['movie', 84], ['tv', 104],
@@ -47,6 +49,9 @@ function Harness() {
       <section id="card-movie"><MovieWatchCard show={{ ...show, id: 'movie-42', tmdbId: 42, mediaType: 'movie' }} onMarkAsSeen={() => {}} /></section>
       <section id="card-unavailable"><MovieWatchCard show={{ ...show, id: 'movie-84', tmdbId: 84, mediaType: 'movie' }} onMarkAsSeen={() => {}} /></section>
       <section id="card-pending"><ContinueWatchingCard show={{ ...show, id: 'tv-104', tmdbId: 104, title: 'Média voisin' }} onMarkAsSeen={() => {}} /></section>
+      <section id="card-grid"><GridMediaCard media={{ id: 125359, name: 'Lioness', media_type: 'tv', first_air_date: '2023-01-01', poster_path: null }} show={show} onShowClick={() => {}} /></section>
+      <section id="card-grid-pending"><GridMediaCard media={{ id: 104, name: 'Média voisin', media_type: 'tv', first_air_date: '2023-01-01', poster_path: null }} show={{ ...show, tmdbId: 104 }} onShowClick={() => {}} /></section>
+      <section id="card-grid-negative"><GridMediaCard media={{ id: 202, name: 'Sans diffuseur', media_type: 'tv', first_air_date: '2023-01-01', poster_path: null }} show={{ ...show, tmdbId: 202 }} onShowClick={() => {}} /></section>
     </>}
   </main>;
 }
