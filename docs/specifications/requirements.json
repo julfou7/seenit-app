@@ -497,6 +497,10 @@
           "contains": "SEENIT-PARENTAL-001 synchronise les choix personnels sous le même UID Firestore"
         },
         {
+          "file": "tests/parentalRatingUi.test.ts",
+          "contains": "issue #651 retire le CTA de correction d’âge des fiches sans casser les overrides historiques"
+        },
+        {
           "file": "tests/parentalRatingPresentation.test.ts",
           "contains": "SEENIT-PARENTAL-001 supprime PEGI et les heuristiques parentales de genre"
         },
