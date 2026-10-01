@@ -378,9 +378,10 @@ titre n'est introduit.
 L'âge conseillé automatique met la traduction lisible au premier plan, par exemple `13+`, et conserve
 la certification originale et sa provenance sous une forme secondaire comme `PG-13 · US`, accessible
 au lecteur d'écran et au survol. « Tous publics » n'est affiché que lorsqu'une certification US
-explicite le prouve ; sinon SeenIt affiche « Âge à vérifier ». Une correction personnelle par média peut
-être choisie ; elle est synchronisée par UID, prioritaire, et clairement marquée « Choix personnel ».
-Cette correction est identifiée uniquement par type de média + TMDB ID et ne réécrit pas TMDB.
+explicite le prouve ; sinon SeenIt affiche « Âge à vérifier ». Les éventuelles corrections personnelles
+historiques déjà enregistrées par type de média + TMDB ID restent lues sous le même UID afin de préserver
+les données existantes, mais **aucun contrôle « Corriger l’âge » ni autre éditeur d’âge n’est exposé dans
+la fiche**. Ces données legacy ne réécrivent pas TMDB.
 
 Actions transverses : suivre/retirer, favori, note utilisateur, partage et archive lorsque disponible.
 Les actions de téléchargement n'existent dans la fiche que lorsque la fonctionnalité Téléchargements est
@@ -843,7 +844,7 @@ restent des TNR terrain lorsque le risque du changement UX l'exige ; ils ne sont
 |---|---|---|
 | Auth Google | Popup Firebase | Credential Manager, fallback natif |
 | Données compte | Firestore `default` | Même Firestore et même UID |
-| Âge conseillé personnel | Firestore du même UID | Même Firestore et même UID |
+| Overrides historiques d’âge conseillé | Lecture Firestore du même UID, aucune édition UI | Même comportement |
 | Backend | Même origine canonique | `https://seenit.ai.studio` explicite |
 | Retour | Historique navigateur | Modals → fiche → historique → À Voir → quitter |
 | Toast média À voir / Vu | Ouvre la fiche exacte par `mediaType + tmdbId` | Même comportement dans la WebView ; retrait/suppression non navigable |

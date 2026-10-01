@@ -279,10 +279,12 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
   `18+`. Une valeur absente, vide ou non reconnue devient **« Âge à vérifier »**, jamais « Tous publics ».
   L'affichage automatique expose la preuve sous une forme du type `PG-13 · US · 13+` afin de ne jamais
   faire passer cette traduction pour une classification CNC française.
-- Une correction personnelle peut remplacer ce résultat pour le média exact, identifié uniquement par
-  `mediaType + TMDB ID`. Elle est stockée sous le même UID Firestore, converge entre PWA et APK et a
-  priorité sur TMDB. Elle est toujours signalée comme **« Choix personnel »** et ne modifie pas la donnée
-  TMDB source. Une correction ne peut jamais être retrouvée par titre ou année.
+- Les éventuelles corrections personnelles historiques déjà stockées pour un média exact
+  (`mediaType + TMDB ID`) restent lisibles sous le même UID Firestore afin de ne pas casser les données
+  existantes et conservent leur priorité sur TMDB lorsqu'elles existent. **SeenIt n'expose plus aucun
+  contrôle dans la fiche permettant de créer, modifier ou supprimer une correction d'âge personnelle.**
+  Ces données legacy ne modifient jamais la donnée TMDB source et ne sont jamais retrouvées par titre
+  ou année.
 - Le filtre Explorer est nommé **« Âge conseillé »**. Il représente une borne maximale cumulative :
   par exemple `10 ans` conserve les classifications explicites « Tous publics », `7+` et `10+`, mais
   exclut `13+`, `14+`, `17+`, `18+` et toute valeur « Âge à vérifier ». Le mode « Tous » ne filtre pas.
