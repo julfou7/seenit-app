@@ -21,7 +21,6 @@ import { BottomNav } from './components/BottomNav';
 import { ToastContainer } from './components/ToastContainer';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { AppUpdateBanner } from './components/AppUpdateBanner';
-import { ParentalRatingEditor } from './components/ParentalRatingEditor';
 import { useNavigation } from './features/navigation/useNavigation';
 import { useDetailsSyncWorker } from './hooks/useDetailsSyncWorker';
 import { useRemindersNotifier } from './hooks/useRemindersNotifier';
@@ -656,10 +655,6 @@ function MainApp() {
                   onShowClick={openTmdbMedia}
                 />
               </Suspense>
-              <ParentalRatingEditor
-                tmdbId={selectedRatingTmdbId || null}
-                mediaType={selectedRatingMediaType}
-              />
             </DialogLayer>
           )}
         </div>
