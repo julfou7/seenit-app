@@ -62,14 +62,10 @@ function HistoryRowItem({
     tmdbId: item.tmdbId,
     mediaType: item.mediaType === 'movie' ? 'movie' : 'tv',
     title: item.showTitle,
-    hasKnownProvider: Boolean(item.showNetworks?.length),
     retainInLibraryCache: true,
   });
 
-  const networkLogo = getFormattedProviderLogo(
-    providerLogo || (item.showNetworks && item.showNetworks.length > 0 ? item.showNetworks[0].logo_path : null),
-    providerName || (item.showNetworks && item.showNetworks.length > 0 ? item.showNetworks[0].name : null)
-  );
+  const networkLogo = getFormattedProviderLogo(providerLogo, providerName);
 
   const handleRowClick = () => {
     if (item.mediaType === 'movie') {
@@ -332,7 +328,7 @@ export function HistoryFeed({
 
     let newLastWatchedAt: number | null = null;
     const remainingTimes = Object.values(newRecords)
-      .map((r: any) => r?.watchedAt)
+      .map(r => r?.watchedAt)
       .filter(Boolean);
     if (remainingTimes.length > 0) {
       newLastWatchedAt = Math.max(...(remainingTimes as number[]));

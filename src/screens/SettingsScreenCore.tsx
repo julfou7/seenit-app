@@ -1,4 +1,5 @@
 import { DialogLayer } from '../components/ui/DialogLayer';
+import { hydratePlatformPreferences } from '../features/providers/platformPreferenceHydration';
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Cloud, LogIn, LogOut, FileText, CheckCircle2, MonitorPlay, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronDown, ChevronUp, ChevronRight, Check, AlertCircle, Info, Bug, Sparkles, Download, X, UploadCloud, DownloadCloud } from 'lucide-react';
@@ -278,16 +279,15 @@ export function SettingsScreen() {
         try {
           // 1. Plateformes de streaming
           const prefRef = doc(db, 'users', currentUser.uid, 'settings', 'preferences');
-          const snap = await getDoc(prefRef);
-          const localPlatforms = readUserScopedJson<number[]>(currentUser.uid, 'platforms', []);
-
-          if (snap.exists() && Array.isArray(snap.data()?.platforms)) {
-            const cloudPlatforms: number[] = snap.data().platforms;
-            setUserPlatforms(cloudPlatforms);
-            writeUserScopedJson(currentUser.uid, 'platforms', cloudPlatforms);
-          } else if (localPlatforms.length > 0) {
-            await setDoc(prefRef, { platforms: localPlatforms }, { merge: true });
-          }
+          await hydratePlatformPreferences(currentUser.uid, {
+            read: async () => {
+              const snap = await getDoc(prefRef);
+              return snap.exists() ? snap.data()?.platforms : undefined;
+            },
+            save: platforms => setDoc(prefRef, { platforms }, { merge: true }),
+          });
+          if (auth.currentUser?.uid !== currentUser.uid) return;
+          setUserPlatforms(readUserScopedJson<number[]>(currentUser.uid, 'platforms', []));
 
           // 2. Préférences de notifications
           const notifRef = doc(db, 'users', currentUser.uid, 'settings', 'notifications');
@@ -314,11 +314,11 @@ export function SettingsScreen() {
             setPlexToken(null);
             clearPlexCredentials(currentUser.uid);
           }
-        } catch (e: any) {
-          const errorMessage = e?.message || String(e);
+        } catch (e: unknown) {
+          const errorMessage = e instanceof Error ? e.message : String(e);
           const isOffline = !navigator.onLine ||
                             errorMessage.toLowerCase().includes('offline') ||
-                            e?.code === 'unavailable';
+                            (typeof e === 'object' && e !== null && 'code' in e && e.code === 'unavailable');
           if (isOffline) {
             console.warn('[Settings] Client is offline, using local cached settings:', errorMessage);
           } else {

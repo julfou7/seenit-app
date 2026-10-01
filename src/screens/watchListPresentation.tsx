@@ -94,9 +94,8 @@ export function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClic
     tmdbId: show.tmdbId,
     mediaType: isMovie ? 'movie' : 'tv',
     title: show.title,
-    originalTitle: (show as any).originalTitle || (show as any).original_title,
+    originalTitle: show.originalTitle,
     year: show.firstAirDate?.slice(0, 4),
-    hasKnownProvider: Boolean(show.networks?.length),
     retainInLibraryCache: true,
     onEnrich: enrichMovieDetails,
   });
@@ -144,10 +143,7 @@ export function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClic
     ? (poster.startsWith('http') ? poster : `https://image.tmdb.org/t/p/w300${poster}`)
     : null;
 
-  const networkLogo = getFormattedProviderLogo(
-    providerLogo || (show.networks && show.networks.length > 0 ? show.networks[0].logo_path : null),
-    providerName || (show.networks && show.networks.length > 0 ? show.networks[0].name : (show as any).network || (show as any).platform)
-  );
+  const networkLogo = getFormattedProviderLogo(providerLogo, providerName);
 
   let subtitleText = '';
   if (!isMovie) {

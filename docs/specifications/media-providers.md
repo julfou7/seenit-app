@@ -33,10 +33,10 @@ des preuves éligibles ; `buy` et `rent` ne doivent jamais créer un badge de di
 Lorsque l'utilisateur a configuré **Profil > Mes plateformes**, SeenIt choisit en priorité, parmi les
 diffuseurs réellement disponibles pour le média, un provider dont l'ID TMDB figure dans cette liste.
 La préférence ne fabrique jamais une disponibilité : une plateforme cochée mais absente du payload
-TMDB du média est ignorée. Si aucune plateforme utilisateur ne correspond, le premier diffuseur public
-éligible conserve le rôle de fallback.
+TMDB du média est ignorée. Si aucune plateforme utilisateur ne correspond, Plex gagne lorsqu'une
+disponibilité personnelle est prouvée ; sinon le premier diffuseur public éligible reste le fallback.
 
-Une disponibilité Plex personnelle vient seulement après ce choix public. **Plex ne doit jamais
+L'ordre est **Mes plateformes > Plex > diffuseur public non sélectionné**. **Plex ne doit jamais
 masquer une plateforme de « Mes plateformes » réellement disponible.** Exemple TNR : si *Lioness* est
 disponible sur Paramount+ (`provider_id=531`) et dans Plex, et que 531 appartient à « Mes plateformes »,
 le badge attendu est Paramount+, pas Plex.
@@ -44,13 +44,18 @@ le badge attendu est Paramount+, pas Plex.
 Cette priorité s'applique aussi pendant l'enrichissement asynchrone des cartes. L'absence momentanée
 d'un provider public avant la fin de la résolution TMDB n'est **pas** une preuve d'absence : Plex ne doit
 pas être affiché comme fallback provisoire pendant cette fenêtre. Plex ne devient éligible qu'après un
-snapshot public frais déjà connu ou après une réponse TMDB réussie qui ne contient aucun provider public
+snapshot public frais déjà connu ou après une réponse TMDB réussie sans plateforme sélectionnée
 éligible. Une erreur réseau ne transforme pas un état public non résolu en preuve négative.
 
 Les IDs de **Mes plateformes** restent autoritatifs par compte via Firestore et leur miroir local UID ne
 sert qu'au démarrage rapide. Une hydratation Firestore ou une modification des plateformes après le
 premier rendu doit invalider le choix visible déjà monté et recalculer le provider à partir du payload
 TMDB disponible, sans rechargement d'écran ni listener Firestore individuel par carte.
+La session hydrate le miroir indépendamment de Réglages, déduplique les lectures simultanées par UID
+et préserve une modification locale survenue pendant la lecture cloud. Décocher puis recocher une
+plateforme recalcule la même carte sans nouvelle requête TMDB ni purge du cache public hérité.
+Les champs `networks`, `network` et `platform` historiques ne sont pas des preuves de streaming FR :
+ils ne court-circuitent pas le résolveur et ne servent pas de badge de disponibilité provisoire.
 
 ## Réseau et sécurité
 
@@ -131,6 +136,10 @@ aucune route ou clé OMDb. Le TNR `tests/watchProviderPreference.test.ts` couvre
 que la séquence réelle où Plex est connu avant la fin de la résolution publique : aucun badge Plex
 provisoire n'est alors autorisé, puis le provider préféré doit apparaître dès que le payload TMDB ou la
 préférence de compte devient autoritatif.
+Le smoke Chromium #337 utilise les cartes `ContinueWatchingCard` et `MovieWatchCard`, le hook et la
+façade TMDB de production. Seuls les services externes sont simulés. Il couvre le cache hérité, la
+bascule ON/OFF/ON, une réponse cloud retardée, la déduplication effective des appels réseau et le
+fallback public lorsque Plex n'est pas disponible, sans remontage des cartes.
 
 Tous les fichiers JS/sourcemaps du build Web embarqué dans Capacitor sont scannés. Ils ne doivent
 contenir ni `VITE_TMDB_API_KEY`, ni `VITE_OMDB_API_KEY`, ni `VITE_TVDB_API_KEY`, ni les hôtes API

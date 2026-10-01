@@ -7,6 +7,7 @@ export interface PassiveProviderState {
 }
 
 interface PublicProviderSnapshot {
+  provider_id?: number;
   logo_path?: string | null;
   provider_name?: string | null;
 }
@@ -21,8 +22,11 @@ export function resolvePassiveProviderState(
   publicProvider?: PublicProviderSnapshot | null,
   plexProvider?: PlexProviderSnapshot | null,
   publicResolutionSettled = true,
+  preferredProviderIds: readonly number[] = [],
 ): PassiveProviderState {
-  if (publicProvider?.logo_path || publicProvider?.provider_name) {
+  const hasPublicProvider = Boolean(publicProvider?.logo_path || publicProvider?.provider_name);
+  const isPreferred = preferredProviderIds.includes(Number(publicProvider?.provider_id));
+  if (hasPublicProvider && (isPreferred || !publicResolutionSettled || !plexProvider?.available)) {
     return {
       key,
       logo: publicProvider.logo_path || null,

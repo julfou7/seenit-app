@@ -617,6 +617,12 @@ n'est rouverte que par une nouvelle décision produit explicite.
   en `stale-if-error` pendant 7 jours au maximum. Le cache mémoire de session reste prioritaire et aucune
   donnée utilisateur ou secret Plex n'est stocké dans ce cache. Seul le territoire `FR` effectivement
   consommé par SeenIt est persisté ; les autres pays du payload TMDB restent hors du stockage local.
+- **SEENIT-PROVIDER-001** — Les badges suivent l'ordre Mes plateformes réellement disponibles en FR
+  (`flatrate`, `free`, `ads`) > Plex personnel disponible > diffuseur public non sélectionné. Achat/location
+  restent exclus. Une carte montée réagit aux bascules ON/OFF/ON et à l'hydratation cloud de la session,
+  sans Réglages, déco/reco, requête TMDB répétée ou purge du cache hérité. Un réseau de production
+  historique n'est pas une preuve de streaming. Une lecture cloud ne remplace pas une modification
+  locale faite pendant son attente ; la synchronisation simultanée est dédupliquée par UID.
 - Les caches **diffuseurs** et **classification parentale** restent spécialisés par décision d'architecture,
   et non par dette accidentelle. Le cache diffuseurs conserve deux compartiments de rétention
   (120 découverte + 240 bibliothèque), un payload FR compact et des écritures regroupées hors scroll :

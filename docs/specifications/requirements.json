@@ -2335,6 +2335,28 @@
       ]
     },
     {
+      "id": "SEENIT-PROVIDER-001",
+      "title": "Priorité des plateformes réactive sur les cartes montées",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/watchProviderPreference.test.ts",
+          "contains": "SEENIT-PROVIDER-001 applique Mes plateformes > Plex > fallback public"
+        },
+        {
+          "file": "tests/platformPreferenceHydration.test.ts",
+          "contains": "SEENIT-PROVIDER-001 préserve une bascule locale pendant l’hydratation"
+        },
+        {
+          "file": "tests/watchProviderPreference.test.ts",
+          "contains": "SEENIT-PROVIDER-001 les cartes historiques passent par le résolveur réactif"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-PERF-001",
       "title": "Cache chaud typé et réouverture instantanée des fiches média",
       "targets": [

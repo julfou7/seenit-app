@@ -4,6 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
 const { buildDialogHarness, testDialogHarness } = require('./dialog-browser-checks.cjs');
+const { buildProviderHarness, testProviderHarness } = require('./provider-browser-checks.cjs');
 
 const root = path.resolve(__dirname, '..');
 const configPath = path.join(root, 'docs', 'specifications', 'quality-gates.json');
@@ -483,6 +484,7 @@ async function main() {
   try {
     await buildComponentActionHarness();
     await buildDialogHarness(root);
+    await buildProviderHarness(root);
     const viteBin = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
     if (!fs.existsSync(viteBin)) throw new Error('Vite installé requis avant le smoke navigateur.');
     preview = spawn(process.execPath, [viteBin, 'preview', '--host', '127.0.0.1', '--port', '4173', '--strictPort'], {
@@ -538,6 +540,7 @@ async function main() {
     }
     const report = {
       dialogs: await testDialogHarness(client, root),
+      providers: await testProviderHarness(client, root),
       generatedAt: new Date().toISOString(),
       issue: config.issue,
       status: 'pass',
@@ -558,9 +561,10 @@ async function main() {
       '- Captures : mobile 360 px, mobile 412 px et desktop 1280 px.',
       '- #180 : comparaison rendue avant/après à 360/412 px, cible 44 px, action inverse, pending/disabled et double intention contrôlés.',
       '- #180 : captures `component-actions-before-after-mobile-360.png` et `component-actions-before-after-mobile-412.png`.',
+      '- #337 : cartes de production, cache hérité, hydratation session et bascule ON/OFF/ON sans remontage ni requête doublée, à 360/412 px.',
       '',
     ].join('\n'), 'utf8');
-    console.log('[PWA Browser] ✅ rendu 360/412/desktop, clavier, cible tactile, arbre d’accessibilité, actions #180 et dialogues #181 (focus/historique/paysage/clavier) validés.');
+    console.log('[PWA Browser] ✅ rendu 360/412/desktop, clavier, cible tactile, arbre d’accessibilité, actions #180, dialogues #181 et cartes/diffuseurs réactifs #337 validés.');
   } catch (error) {
     fs.mkdirSync(reportDir, { recursive: true });
     fs.writeFileSync(path.join(reportDir, 'pwa-browser-failure.txt'), `${error.stack || error.message}\n\n${diagnostics.join('\n')}\n`, 'utf8');
