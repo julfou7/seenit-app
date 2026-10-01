@@ -261,6 +261,11 @@ ou un enrichissement interrompu ne peut plus laisser un classement partiel comme
 Les diffuseurs des médias suivis occupent un compartiment persistant dédié et borné. Les navigations
 Explorer et le recyclage des rangées ne peuvent donc pas chasser les résultats positifs ou négatifs déjà
 obtenus pour Ma Liste ; seule l'expiration normale permet leur actualisation silencieuse.
+Les badges de cartes privilégient une plateforme de **Mes plateformes** réellement disponible en FR,
+puis Plex disponible, puis un autre diffuseur public. Décocher/recocher une plateforme recalcule les
+cartes déjà montées immédiatement. L'hydratation cloud démarre avec la session, préserve le miroir local
+pendant son attente et ne remplace pas une bascule faite entre-temps. Les anciens réseaux de production
+ne remplacent pas une preuve TMDB de streaming ; aucun passage par Réglages ni purge de cache n'est requis.
 
 Le bouton Réglages ouvre un écran superposé refermable par Retour ou swipe depuis le bord gauche.
 Le Profil n'expose pas d'action « Partager » : aucun profil public n'existe et aucune donnée de profil

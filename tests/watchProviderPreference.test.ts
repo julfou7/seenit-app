@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { extractOfficialStreamingProvider } from '../src/utils/providerLogos.ts';
 import { resolvePassiveProviderState } from '../src/features/providers/passiveProviderState.ts';
 
@@ -32,6 +33,7 @@ test('#337 le diffuseur public préféré reste prioritaire sur une disponibilit
     provider,
     { available: true, serverName: 'Maison' },
     true,
+    [531],
   );
 
   assert.equal(state.name, 'Paramount Plus');
@@ -88,4 +90,24 @@ test('#337 achat et location restent exclus du choix des diffuseurs', () => {
   }, [531]);
 
   assert.equal(provider, null);
+});
+
+test('SEENIT-PROVIDER-001 applique Mes plateformes > Plex > fallback public', () => {
+  const plex = { available: true, serverName: 'Maison' };
+  for (const preferred of [[531], [], [531], [99]]) {
+    const provider = extractOfficialStreamingProvider(lionessProviders, preferred);
+    const state = resolvePassiveProviderState('tv:125359', provider, plex, true, preferred);
+    assert.equal(state.name, preferred.includes(531) ? 'Paramount Plus' : 'Plex (Maison)');
+  }
+  assert.equal(resolvePassiveProviderState('tv:125359', extractOfficialStreamingProvider(lionessProviders), { available: false }, true, []).name, 'Netflix');
+  assert.equal(resolvePassiveProviderState('tv:125359', null, plex, false, []).name, null);
+});
+
+test('SEENIT-PROVIDER-001 les cartes historiques passent par le résolveur réactif', () => {
+  for (const file of ['components/cards/ContinueWatchingCard.tsx', 'components/cards/MovieWatchCard.tsx', 'components/cards/UpToDateShowCard.tsx', 'components/cards/UpcomingShowCard.tsx', 'components/EpisodeCard.tsx', 'components/HistoryFeed.tsx', 'screens/watchListPresentation.tsx']) {
+    const source = readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8');
+    assert.match(source, /usePassiveWatchProvider\(/, file);
+    assert.doesNotMatch(source, /hasKnownProvider:\s*Boolean\((?:show\.networks|item\.showNetworks)/, file);
+    assert.match(source, /getFormattedProviderLogo\(providerLogo, providerName\)/, file);
+  }
 });

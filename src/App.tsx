@@ -6,6 +6,7 @@
 import { Activity, lazy, Suspense, startTransition, useCallback, useState, useEffect, useRef } from 'react';
 import { closeTopDialog, closeTabSubview } from './features/navigation/dialogStack';
 import { DialogLayer } from './components/ui/DialogLayer';
+import { hydratePlatformPreferences } from './features/providers/platformPreferenceHydration';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
@@ -41,7 +42,6 @@ import {
   syncNativePlexBackgroundCredentials
 } from './features/plex/plexStorage';
 import { usePlexAvailabilityStore } from './features/plex/plexAvailability';
-import { readUserScopedJson, writeUserScopedJson } from './lib/userIsolation';
 import { activateLogUserScope, appLogger } from './store/logStore';
 import { createCachedAsyncLoader, preloadInBackground } from './features/navigation/screenPreload';
 import { resolveRootNavigationTab, withNavigationResetToastContext } from './features/navigation/tabPresentation';
@@ -115,16 +115,13 @@ export default function App() {
           .catch(() => undefined);
         try {
           const prefRef = doc(db, 'users', user.uid, 'settings', 'preferences');
-          const snap = await getDoc(prefRef);
-          const localPlatforms = readUserScopedJson<number[]>(user.uid, 'platforms', []);
-
-          if (snap.exists() && Array.isArray(snap.data()?.platforms)) {
-            const cloudPlatforms: number[] = snap.data().platforms;
-            writeUserScopedJson(user.uid, 'platforms', cloudPlatforms);
-            window.dispatchEvent(new Event('storage'));
-          } else if (localPlatforms.length > 0) {
-            await setDoc(prefRef, { platforms: localPlatforms }, { merge: true });
-          }
+          await hydratePlatformPreferences(user.uid, {
+            read: async () => {
+              const snap = await getDoc(prefRef);
+              return snap.exists() ? snap.data()?.platforms : undefined;
+            },
+            save: platforms => setDoc(prefRef, { platforms }, { merge: true }),
+          });
         } catch (e: unknown) {
           const errorDetails = typeof e === 'object' && e !== null
             ? e as { message?: unknown; code?: unknown }

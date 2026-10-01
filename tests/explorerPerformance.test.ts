@@ -144,12 +144,12 @@ test('SEENIT-PERF-001 réhydrate un diffuseur quand une carte virtualisée est r
 });
 
 test('SEENIT-PERF-001 conserve les résultats diffuseurs positifs et négatifs au recyclage', () => {
-  const publicProvider = { logo_path: '/netflix.png', provider_name: 'Netflix' };
+  const publicProvider = { provider_id: 8, logo_path: '/netflix.png', provider_name: 'Netflix' };
   const publicState = resolvePassiveProviderState('movie:42', publicProvider, {
     available: true,
     serverName: 'Salon',
-  });
-  assert.equal(publicState.logo, '/netflix.png', 'le diffuseur public reste prioritaire sur Plex');
+  }, true, [8]);
+  assert.equal(publicState.logo, '/netflix.png', 'le diffuseur public sélectionné reste prioritaire sur Plex');
   assert.equal(publicState.name, 'Netflix');
 
   const plexState = resolvePassiveProviderState('movie:84', null, {

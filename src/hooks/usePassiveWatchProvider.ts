@@ -16,7 +16,7 @@ import {
   resolvePassiveProviderState,
   type PassiveProviderState,
 } from '../features/providers/passiveProviderState';
-import { extractOfficialStreamingProvider } from '../utils/providerLogos';
+import { extractOfficialStreamingProvider, type WatchProviderResults } from '../utils/providerLogos';
 import { auth } from '../lib/firebase';
 import { readUserScopedJson, subscribeUserScopedStorageField } from '../lib/userIsolation';
 
@@ -34,7 +34,7 @@ interface PassiveWatchProviderParams {
 type OfficialProvider = ReturnType<typeof extractOfficialStreamingProvider>;
 
 type CachedProviderSnapshot = {
-  data: any;
+  data: { results?: WatchProviderResults };
   fresh: boolean;
   provider: OfficialProvider;
 };
@@ -124,6 +124,7 @@ export function usePassiveWatchProvider({
     renderSnapshot?.provider,
     cachedPlexInfo,
     Boolean(renderSnapshot?.fresh),
+    preferredProviderIds,
   );
   const [providerState, setProviderState] = useState<PassiveProviderState>(() => renderProviderState);
   const [loadingState, setLoadingState] = useState<ProviderLoadingState>(() => ({
@@ -200,10 +201,11 @@ export function usePassiveWatchProvider({
       initialSnapshot?.provider,
       usePlexAvailabilityStore.getState().getMediaAvailability(plexMediaKey),
       Boolean(initialSnapshot?.fresh),
+      preferredProviderIds,
     ));
     finishLoading();
 
-    const applyAuthoritativeTmdbPayload = (payload: any) => {
+    const applyAuthoritativeTmdbPayload = (payload: { results?: WatchProviderResults }) => {
       if (!isMounted) return;
       const stream = payload?.results
         ? extractOfficialStreamingProvider(payload.results, preferredProviderIds)
@@ -213,6 +215,7 @@ export function usePassiveWatchProvider({
         stream,
         usePlexAvailabilityStore.getState().getMediaAvailability(plexMediaKey),
         true,
+        preferredProviderIds,
       ));
       finishLoading();
     };
@@ -232,6 +235,7 @@ export function usePassiveWatchProvider({
           latestSnapshot?.provider,
           latestPlexInfo,
           true,
+          preferredProviderIds,
         ));
         finishLoading();
         return;
@@ -266,6 +270,7 @@ export function usePassiveWatchProvider({
           latestSnapshot?.provider,
           usePlexAvailabilityStore.getState().getMediaAvailability(plexMediaKey),
           true,
+          preferredProviderIds,
         ));
         finishLoading();
         return;

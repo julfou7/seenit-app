@@ -39,8 +39,22 @@ export function getFormattedProviderLogo(logoPath?: string | null, name?: string
  * Strictly ignores 'buy' (Achat VOD) and 'rent' (Location VOD) to avoid displaying Apple TV/Prime on movies not streaming.
  * When the user configured "Mes plateformes", an actually available matching provider wins before the generic TMDB order.
  */
+export interface StreamingProvider {
+  provider_id?: number;
+  logo_path: string;
+  provider_name?: string;
+}
+
+export type WatchProviderResults = Record<string, {
+  flatrate?: StreamingProvider[];
+  free?: StreamingProvider[];
+  ads?: StreamingProvider[];
+  buy?: StreamingProvider[];
+  rent?: StreamingProvider[];
+}>;
+
 export function extractOfficialStreamingProvider(
-  results: any,
+  results: WatchProviderResults | null | undefined,
   preferredProviderIds: readonly number[] = [],
 ): { logo_path: string; provider_name: string; provider_id?: number } | null {
   const fr = results?.FR;
@@ -50,7 +64,7 @@ export function extractOfficialStreamingProvider(
     ...(Array.isArray(fr.flatrate) ? fr.flatrate : []),
     ...(Array.isArray(fr.free) ? fr.free : []),
     ...(Array.isArray(fr.ads) ? fr.ads : []),
-  ].filter((provider: any) => Boolean(provider?.logo_path));
+  ].filter(provider => Boolean(provider?.logo_path));
 
   if (candidates.length === 0) return null;
 
@@ -59,7 +73,7 @@ export function extractOfficialStreamingProvider(
       .map(Number)
       .filter((id) => Number.isFinite(id) && id > 0),
   );
-  const stream = candidates.find((provider: any) => preferredIds.has(Number(provider?.provider_id))) || candidates[0];
+  const stream = candidates.find(provider => preferredIds.has(Number(provider?.provider_id))) || candidates[0];
 
   return {
     logo_path: stream.logo_path,

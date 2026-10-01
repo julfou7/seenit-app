@@ -33,9 +33,8 @@ export const MovieWatchCard = React.memo(function MovieWatchCard({ show, onShowC
     tmdbId: show.tmdbId,
     mediaType: 'movie',
     title: show.title,
-    originalTitle: (show as any).originalTitle || (show as any).original_title,
+    originalTitle: show.originalTitle,
     year: releaseYear || show.firstAirDate?.slice(0, 4),
-    hasKnownProvider: Boolean(show.networks?.length),
     retainInLibraryCache: true,
   });
 
@@ -135,10 +134,7 @@ export const MovieWatchCard = React.memo(function MovieWatchCard({ show, onShowC
 
         {/* Diffuseur / Provider logo */}
         {(() => {
-          const networkLogo = getFormattedProviderLogo(
-            providerLogo || (show.networks && show.networks.length > 0 ? show.networks[0].logo_path : null),
-            providerName || (show.networks && show.networks.length > 0 ? show.networks[0].name : (show as any).network || (show as any).platform)
-          );
+          const networkLogo = getFormattedProviderLogo(providerLogo, providerName);
           if (!networkLogo) return null;
           return (
             <div className="absolute top-0 right-0 bg-white/95 backdrop-blur-md w-7 h-7 rounded-bl-xl p-1 shadow-sm flex items-center justify-center z-20 pointer-events-none">

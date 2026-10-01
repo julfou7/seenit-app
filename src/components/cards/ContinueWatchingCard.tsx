@@ -239,9 +239,8 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
     tmdbId: show.tmdbId,
     mediaType: show.mediaType === 'movie' ? 'movie' : 'tv',
     title: show.title,
-    originalTitle: (show as any).originalTitle || (show as any).original_title,
+    originalTitle: show.originalTitle,
     year: show.firstAirDate?.slice(0, 4),
-    hasKnownProvider: Boolean(show.networks?.length),
     retainInLibraryCache: true,
   });
 
@@ -261,10 +260,7 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
     }
   };
 
-  const networkLogo = getFormattedProviderLogo(
-    providerLogo || (show.networks && show.networks.length > 0 ? show.networks[0].logo_path : null),
-    providerName || (show.networks && show.networks.length > 0 ? show.networks[0].name : (show as any).network || (show as any).platform)
-  );
+  const networkLogo = getFormattedProviderLogo(providerLogo, providerName);
 
   return (
     <div ref={cardRef} className="flex-shrink-0 w-64 flex flex-col cursor-pointer snap-start group" onClick={handleCardClick}>
