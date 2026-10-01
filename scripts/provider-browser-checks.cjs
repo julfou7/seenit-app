@@ -45,26 +45,26 @@ async function testProviderHarness(client, root) {
     await check(client, 'document.querySelector("#card-tv img") && window.__provider337.telemetry.reads === 1', 'cartes montées avant hydratation cloud');
     await evaluate(client, 'window.__card337 = document.querySelector("#card-tv > div"); window.__provider337.finishCloud([531])');
     const logo = id => `document.querySelector('#${id} img')?.getAttribute('src') || ''`;
-    await check(client, `(${logo('card-tv')}).includes('paramount.png') && (${logo('card-movie')}).includes('paramount.png')`, 'hydratation sans Réglages met à jour les cartes réelles et le cache hérité');
+    await check(client, `(${logo('card-tv')}).includes('paramount.png') && (${logo('card-movie')}).includes('paramount.png') && (${logo('card-grid')}).includes('paramount.png')`, 'hydratation sans Réglages met à jour les cartes réelles et le cache hérité');
     await check(client, `(${logo('card-unavailable')}).startsWith('data:image/svg')`, 'Paramount seulement en achat ne gagne pas sur Plex');
     await check(client, 'window.__provider337.telemetry.requests === 1', 'seul le média sans cache déclenche TMDB');
-    await check(client, `!document.querySelector('#card-pending img')`, 'aucun ancien badge ni Plex provisoire avant réponse TMDB');
+    await check(client, `!document.querySelector('#card-pending img') && !document.querySelector('#card-grid-pending img') && !document.querySelector('#card-grid-negative img')`, 'aucun réseau de production ni Plex provisoire avant réponse TMDB ou après résultat négatif');
     await evaluate(client, 'window.__provider337.finishProviderNetwork()');
-    await check(client, `(${logo('card-pending')}).includes('paramount.png')`, 'le média voisin utilise la réponse TMDB réelle du hook');
+    await check(client, `(${logo('card-pending')}).includes('paramount.png') && (${logo('card-grid-pending')}).includes('paramount.png')`, 'le média voisin utilise la réponse TMDB réelle du hook sur les deux surfaces');
     await evaluate(client, 'window.__provider337.setPlatforms([])');
-    await check(client, `(${logo('card-tv')}).startsWith('data:image/svg') && (${logo('card-movie')}).startsWith('data:image/svg')`, 'OFF affiche Plex sur les mêmes cartes');
+    await check(client, `(${logo('card-tv')}).startsWith('data:image/svg') && (${logo('card-movie')}).startsWith('data:image/svg') && (${logo('card-grid')}).startsWith('data:image/svg')`, 'OFF affiche Plex sur les mêmes cartes');
     await evaluate(client, 'window.__provider337.setPlatforms([531])');
-    await check(client, `(${logo('card-tv')}).includes('paramount.png') && (${logo('card-movie')}).includes('paramount.png')`, 'ON restaure Paramount sans refaire TMDB');
+    await check(client, `(${logo('card-tv')}).includes('paramount.png') && (${logo('card-movie')}).includes('paramount.png') && (${logo('card-grid')}).includes('paramount.png')`, 'ON restaure Paramount sans refaire TMDB');
     await evaluate(client, 'void window.__provider337.startHydration()');
     await check(client, 'window.__provider337.telemetry.reads === 2', 'refresh cloud démarré');
     await evaluate(client, 'window.__provider337.setPlatforms([]); window.__provider337.setPlatforms([531]); window.__provider337.finishCloud([])');
     await check(client, `(${logo('card-tv')}).includes('paramount.png') && window.__provider337.telemetry.saves[0]?.[0] === 531`, 'une réponse cloud retardée préserve ON/OFF/ON local');
     await evaluate(client, 'window.__provider337.setPlatforms([]); window.__provider337.setPlex(false)');
-    await check(client, `(${logo('card-tv')}).includes('netflix.png') && (${logo('card-unavailable')}).includes('netflix.png')`, 'Plex absent permet le fallback public');
+    await check(client, `(${logo('card-tv')}).includes('netflix.png') && (${logo('card-unavailable')}).includes('netflix.png') && (${logo('card-grid')}).includes('netflix.png') && !document.querySelector('#card-grid-negative img')`, 'Plex absent permet le fallback public sans inventer de disponibilité');
     await check(client, 'window.__card337 === document.querySelector("#card-tv > div") && window.__provider337.telemetry.requests === 1', 'les cartes restent montées sans purge ni requête doublée');
     const screenshot = await client.send('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync(path.join(root, 'quality-reports', `providers-${width}.png`), Buffer.from(screenshot.data, 'base64'));
-    reports.push({ width, status: 'pass', productionComponents: ['ContinueWatchingCard', 'MovieWatchCard'], requests: 1, cloudReads: 2 });
+    reports.push({ width, status: 'pass', productionComponents: ['ContinueWatchingCard', 'MovieWatchCard', 'GridMediaCard'], requests: 1, cloudReads: 2 });
   }
   return reports;
 }

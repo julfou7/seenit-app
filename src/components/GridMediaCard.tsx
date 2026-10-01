@@ -142,15 +142,12 @@ export const GridMediaCard = React.memo(function GridMediaCard({
     tmdbId: Number(media.id),
     mediaType,
     title: displayTitle,
-    originalTitle: (media as any).original_title || (media as any).original_name,
+    originalTitle: media.original_title || media.original_name,
     year,
     retainInLibraryCache: Boolean(show),
   });
 
-  const networkLogo = getFormattedProviderLogo(
-    providerLogo || (show?.networks && show.networks.length > 0 ? show.networks[0].logo_path : null),
-    providerName || (show?.networks && show.networks.length > 0 ? show.networks[0].name : (show as any)?.network || (show as any)?.platform)
-  );
+  const networkLogo = getFormattedProviderLogo(providerLogo, providerName);
 
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (isLongPressRef.current) {
