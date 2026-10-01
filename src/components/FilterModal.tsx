@@ -1,4 +1,5 @@
-import React, { useRef, useEffect, useState } from 'react';
+import { DialogLayer } from './ui/DialogLayer';
+import React, { useRef, useState } from 'react';
 import { cn } from '../lib/utils';
 import { Tv, Film, X, Sparkles, FileText, User, Ticket, Trophy } from 'lucide-react';
 import { isSearchCompatibleCategory, MOVIE_RELEASE_YEAR_MIN } from '../features/discover/filterPolicy';
@@ -96,13 +97,6 @@ export function FilterModal({
     }
   };
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
 
   const handleReset = () => {
     setDraftCategory('Tout');
@@ -114,7 +108,7 @@ export function FilterModal({
   };
 
   const handleValidate = () => {
-    const discoverRoot = overlayRef.current?.parentElement;
+    const discoverRoot = document.querySelector<HTMLElement>('[data-app-tab="discover"] .max-w-2xl');
     const scrollContainer = discoverRoot?.querySelector<HTMLElement>(':scope > .flex-1.overflow-y-auto');
     if (scrollContainer) {
       try {
@@ -138,7 +132,7 @@ export function FilterModal({
   const searchDisabled = (category: string) => isSearchActive && !isSearchCompatibleCategory(category);
 
   return (
-    <div
+    <DialogLayer onDismiss={onClose} label="Filtres" historyMode="local" role="dialog"
       ref={overlayRef}
       onClick={handleOverlayClick}
       className="fixed inset-0 z-[200] flex flex-col justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
@@ -150,7 +144,7 @@ export function FilterModal({
           <button onClick={handleReset} className="text-[13px] font-semibold text-zinc-400 hover:text-white transition-colors">
             Réinitialiser
           </button>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
+          <button type="button" aria-label="Fermer les filtres" data-dialog-initial-focus onClick={onClose} className="w-11 h-11 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
             <X size={16} />
           </button>
         </div>
@@ -335,6 +329,6 @@ export function FilterModal({
           </button>
         </div>
       </div>
-    </div>
+    </DialogLayer>
   );
 }

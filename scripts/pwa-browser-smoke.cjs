@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const esbuild = require('esbuild');
+const { buildDialogHarness, testDialogHarness } = require('./dialog-browser-checks.cjs');
 
 const root = path.resolve(__dirname, '..');
 const configPath = path.join(root, 'docs', 'specifications', 'quality-gates.json');
@@ -481,6 +482,7 @@ async function main() {
   let client;
   try {
     await buildComponentActionHarness();
+    await buildDialogHarness(root);
     const viteBin = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
     if (!fs.existsSync(viteBin)) throw new Error('Vite installé requis avant le smoke navigateur.');
     preview = spawn(process.execPath, [viteBin, 'preview', '--host', '127.0.0.1', '--port', '4173', '--strictPort'], {
@@ -535,6 +537,7 @@ async function main() {
       componentActions.push(await testComponentActionHarness(client, viewport, config.pwa.minTouchTargetCssPx));
     }
     const report = {
+      dialogs: await testDialogHarness(client, root),
       generatedAt: new Date().toISOString(),
       issue: config.issue,
       status: 'pass',
@@ -557,7 +560,7 @@ async function main() {
       '- #180 : captures `component-actions-before-after-mobile-360.png` et `component-actions-before-after-mobile-412.png`.',
       '',
     ].join('\n'), 'utf8');
-    console.log('[PWA Browser] ✅ rendu 360/412/desktop, clavier, cible tactile, arbre d’accessibilité et harness #180 validés.');
+    console.log('[PWA Browser] ✅ rendu 360/412/desktop, clavier, cible tactile, arbre d’accessibilité, actions #180 et dialogues #181 (focus/historique/paysage/clavier) validés.');
   } catch (error) {
     fs.mkdirSync(reportDir, { recursive: true });
     fs.writeFileSync(path.join(reportDir, 'pwa-browser-failure.txt'), `${error.stack || error.message}\n\n${diagnostics.join('\n')}\n`, 'utf8');

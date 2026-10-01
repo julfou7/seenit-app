@@ -1,3 +1,4 @@
+import { DialogLayer } from '../components/ui/DialogLayer';
 import React, { startTransition, useState, useEffect, useRef, useMemo, useCallback, type RefObject } from 'react';
 import { type Show } from '../types';
 import { cn, getNextEpisodeNumber, scrollAllCarouselsToStart, checkIsUpToDate, getAiredProgress } from '../lib/utils';
@@ -530,7 +531,7 @@ export function WatchListView({ model }: WatchListViewProps) {
       )}
 
       {pendingAction && (
-        <div
+        <DialogLayer onDismiss={() => setPendingAction(null)} label="Confirmer l’action" historyMode="local" role="alertdialog"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setPendingAction(null);
@@ -644,13 +645,15 @@ export function WatchListView({ model }: WatchListViewProps) {
               }}
               onClick={(e) => {
                 e.stopPropagation();
+                if (e.detail === 0) setPendingAction(null);
               }}
+              data-dialog-initial-focus
               className="w-full py-3 rounded-xl bg-zinc-800 text-zinc-300 font-bold [@media(hover:hover)]:hover:bg-zinc-700 active:bg-zinc-700 mb-2 active:scale-95 transition-all cursor-pointer touch-manipulation select-none"
             >
               Annuler
             </button>
           </div>
-        </div>
+        </DialogLayer>
       )}
     </div>
   );

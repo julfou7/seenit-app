@@ -1,3 +1,4 @@
+import { DialogLayer } from './ui/DialogLayer';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
@@ -145,8 +146,8 @@ export function DownloadConfigSection({ defaultOpen = false, hideToggle = false 
             setRadarrProfiles(profiles);
             setProfileErrors(previous => ({ ...previous, radarr: undefined }));
           }
-        } catch (error: any) {
-          if (!cancelled) setProfileErrors(previous => ({ ...previous, radarr: error?.message || 'Profils Radarr indisponibles.' }));
+        } catch (error: unknown) {
+          if (!cancelled) setProfileErrors(previous => ({ ...previous, radarr: (error instanceof Error && error.message) || 'Profils Radarr indisponibles.' }));
         }
       })());
       await Promise.all(requests);
@@ -701,18 +702,6 @@ function ProfilePicker({
   const displayValue = selectedProfile?.name
     || (value != null ? `Profil #${value}` : `Auto → ${autoProfile?.name || 'détection'}`);
 
-  useEffect(() => {
-    if (!isPickerOpen) return;
-    pickerDialogRef.current?.focus();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsPickerOpen(false);
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      pickerButtonRef.current?.focus();
-    };
-  }, [isPickerOpen]);
 
   return (
     <div className="space-y-1">
@@ -730,14 +719,14 @@ function ProfilePicker({
       </button>
 
       {isPickerOpen && (
-        <div
+        <DialogLayer onDismiss={() => setIsPickerOpen(false)} label="Choisir un profil qualité" historyMode="local" role="dialog"
           className="fixed inset-0 z-[320] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-4"
           onClick={() => setIsPickerOpen(false)}
         >
           <div
             ref={pickerDialogRef}
-            role="dialog"
-            aria-modal="true"
+
+
             aria-label={`Choisir le profil ${label}`}
             tabIndex={-1}
             className="w-full max-w-sm max-h-[76vh] overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl flex flex-col"
@@ -803,7 +792,7 @@ function ProfilePicker({
               })}
             </div>
           </div>
-        </div>
+        </DialogLayer>
       )}
     </div>
   );

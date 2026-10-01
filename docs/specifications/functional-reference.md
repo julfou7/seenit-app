@@ -160,6 +160,16 @@ ferme dans l'ordre : dialogue ou modal, fiche, historique interne, retour à À 
 Les deep links de notification acceptent `showId` ou `tmdbId`, `mediaType`, saison et épisode. Une
 action notification `mark_watched` peut marquer l'épisode exact après résolution de la fiche.
 
+Les superpositions utilisent `DialogLayer` : Échap, Retour Android et retour depuis l'onglet actif
+ferment uniquement le niveau supérieur. Les dialogues sont nommés, le fond est inerte et le focus
+reste dans le dialogue puis revient au déclencheur. Une confirmation destructive focalise d'abord
+Garder/Annuler. Les panneaux et dialogues réservent les safe areas et le viewport visuel du clavier.
+Les dialogues locaux ont leur propre entrée d'historique ; les fiches épisode/personne conservent
+leur entrée existante. Les trois familles d'en-têtes restent distinctes : racine, fiche et dialogue.
+La fiche média participe à cette pile en tant que panneau non modal et laisse la navigation basse
+accessible. Si elle est ouverte depuis une fiche personne de l'onglet, Retour restaure cette personne
+et le focus du bouton utilisé ; un dialogue bloquant couvre la navigation et rend le fond inerte.
+
 Les toasts internes qui confirment l'ajout à **À voir** ou le passage à **Vu / Terminée** sont aussi des
 raccourcis de navigation : leur surface principale ouvre la fiche Film/Série uniquement avec l'identité
 exacte `mediaType + tmdbId`. Aucun titre, année ou texte du toast ne sert de fallback. Un toast de retrait

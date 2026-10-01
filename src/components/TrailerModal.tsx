@@ -1,8 +1,11 @@
+import { DialogLayer } from './ui/DialogLayer';
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { X, Clapperboard, Play } from 'lucide-react';
 
+export interface TrailerVideo { site: string; key: string; name: string; iso_639_1?: string; type?: string; }
+
 interface TrailerModalProps {
-  videos: any[];
+  videos: TrailerVideo[];
   onClose: () => void;
 }
 
@@ -12,20 +15,20 @@ export function TrailerModal({ videos, onClose }: TrailerModalProps) {
   // Extraire toutes les vidéos YouTube
   const youtubeVideos = useMemo(() => {
     if (!videos || !Array.isArray(videos)) return [];
-    return videos.filter((v: any) => v.site === 'YouTube' && v.key);
+    return videos.filter((v) => v.site === 'YouTube' && v.key);
   }, [videos]);
 
   // Détecter la vidéo VOSTFR (Priorité absolue)
   const vostfrVideo = useMemo(() => {
     if (youtubeVideos.length === 0) return null;
     // 1. Chercher un trailer avec "VOSTFR" ou "VOST" ou "VO" dans le nom
-    const vostByName = youtubeVideos.find((v: any) => 
+    const vostByName = youtubeVideos.find((v) =>
       /vostfr|vost|\bvo\b/i.test(v.name)
     );
     if (vostByName) return vostByName;
-    
+
     // 2. Chercher la vidéo en langue originale ou en anglais ('en')
-    const originalOrEn = youtubeVideos.find((v: any) => v.iso_639_1 === 'en' || v.iso_639_1 !== 'fr');
+    const originalOrEn = youtubeVideos.find((v) => v.iso_639_1 === 'en' || v.iso_639_1 !== 'fr');
     if (originalOrEn) return originalOrEn;
 
     // 3. Fallback sur la première vidéo
@@ -36,13 +39,13 @@ export function TrailerModal({ videos, onClose }: TrailerModalProps) {
   const vfVideo = useMemo(() => {
     if (youtubeVideos.length === 0) return null;
     // Chercher une vidéo 'fr' qui NE contient PAS "VOST" dans le nom
-    const vfByName = youtubeVideos.find((v: any) => 
+    const vfByName = youtubeVideos.find((v) =>
       v.iso_639_1 === 'fr' && !/vostfr|vost/i.test(v.name)
     );
     if (vfByName) return vfByName;
-    
+
     // Chercher n'importe quelle vidéo contenant "VF" ou "French"
-    return youtubeVideos.find((v: any) => /\bvf\b|french/i.test(v.name)) || null;
+    return youtubeVideos.find((v) => /\bvf\b|french/i.test(v.name)) || null;
   }, [youtubeVideos]);
 
   // Vérifier les doublons entre VF et VOSTFR
@@ -79,23 +82,16 @@ export function TrailerModal({ videos, onClose }: TrailerModalProps) {
     }
   };
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
 
   if (!videoId) return null;
 
   const baseParams = "rel=0&modestbranding=1&iv_load_policy=3&playsinline=1&controls=1";
-  const urlParams = lang === 'vostfr' 
-    ? `autoplay=1&cc_lang_pref=fr&cc_load_policy=1&${baseParams}` 
+  const urlParams = lang === 'vostfr'
+    ? `autoplay=1&cc_lang_pref=fr&cc_load_policy=1&${baseParams}`
     : `autoplay=1&${baseParams}`;
 
   return (
-    <div 
+    <DialogLayer onDismiss={onClose} label="Bande-annonce" historyMode="local" role="dialog"
       ref={overlayRef}
       onClick={handleOverlayClick}
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/92 backdrop-blur-xl p-3 sm:p-5 landscape:p-1 overflow-y-auto animate-in fade-in duration-300"
@@ -127,8 +123,8 @@ export function TrailerModal({ videos, onClose }: TrailerModalProps) {
                     type="button"
                     onClick={() => setLang('vf')}
                     className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                      lang === 'vf' 
-                        ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-black shadow-md shadow-amber-500/25 scale-[1.02]' 
+                      lang === 'vf'
+                        ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-black shadow-md shadow-amber-500/25 scale-[1.02]'
                         : 'text-zinc-400 hover:text-white hover:bg-white/5'
                     }`}
                   >
@@ -140,8 +136,8 @@ export function TrailerModal({ videos, onClose }: TrailerModalProps) {
                     type="button"
                     onClick={() => setLang('vostfr')}
                     className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                      lang === 'vostfr' 
-                        ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-black shadow-md shadow-amber-500/25 scale-[1.02]' 
+                      lang === 'vostfr'
+                        ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-black shadow-md shadow-amber-500/25 scale-[1.02]'
                         : 'text-zinc-400 hover:text-white hover:bg-white/5'
                     }`}
                   >
@@ -172,6 +168,6 @@ export function TrailerModal({ videos, onClose }: TrailerModalProps) {
           ></iframe>
         </div>
       </div>
-    </div>
+    </DialogLayer>
   );
 }

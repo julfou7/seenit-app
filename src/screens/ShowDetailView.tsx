@@ -1,3 +1,4 @@
+import { DialogLayer } from '../components/ui/DialogLayer';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { type Show } from '../types';
 import { tmdb, isMovieAtCinema, isMovieUpcoming } from '../features/shows/tmdb';
@@ -83,13 +84,12 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
           {backdropUrl && <img loading="eager" decoding="async" fetchPriority="high" src={backdropUrl} alt="Backdrop" className="w-full h-full object-cover opacity-60" />}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent" />
         </div>
-        <div className="sticky top-0 z-40 pt-10 pb-2 px-4 flex justify-between items-center bg-gradient-to-b from-black/90 via-black/50 to-transparent">
-          <button type="button" onPointerUp={(e) => { e.preventDefault(); e.stopPropagation(); handleAnimatedBack(); }} onClick={(e) => e.stopPropagation()} className="w-10 h-10 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center border border-white/10 text-white hover:bg-black/80 transition-colors active:scale-95 touch-manipulation cursor-pointer z-50 select-none"><ChevronLeft size={24} /></button>
+        <div className="sticky top-0 z-40 seenit-sheet-header pb-2 px-4 flex justify-between items-center bg-gradient-to-b from-black/90 via-black/50 to-transparent">
+          <button type="button" onPointerUp={(e) => { e.preventDefault(); e.stopPropagation(); handleAnimatedBack(); }} onClick={(e) => { e.stopPropagation(); if (e.detail === 0) handleAnimatedBack(); }} aria-label="Retour" className="w-11 h-11 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center border border-white/10 text-white hover:bg-black/80 transition-colors active:scale-95 touch-manipulation cursor-pointer z-50 select-none"><ChevronLeft size={24} /></button>
           <div className="relative z-50">
-            <button type="button" onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }} className="w-10 h-10 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center border border-white/10 text-white hover:bg-black/80 transition-colors active:scale-95 touch-manipulation cursor-pointer"><MoreVertical size={20} /></button>
+            <button type="button" onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }} aria-label="Actions de la fiche" aria-expanded={showMenu} className="w-11 h-11 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center border border-white/10 text-white hover:bg-black/80 transition-colors active:scale-95 touch-manipulation cursor-pointer"><MoreVertical size={20} /></button>
             {showMenu && (
-              <><div className="fixed inset-0 z-40 bg-black/20" onClick={(e) => { e.stopPropagation(); setShowMenu(false); }} />
-              <div className="absolute right-0 top-12 w-56 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col py-1 animate-in fade-in duration-150">
+              <DialogLayer label="Actions de la fiche" onDismiss={() => setShowMenu(false)} className="fixed inset-0 bg-black/20" onClick={e => { if (e.target === e.currentTarget) setShowMenu(false); }}><div className="absolute right-4 top-16 w-56 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col py-1 animate-in fade-in duration-150">
                 {/* Action Téléchargement */}
                 <button type="button" onClick={(e) => { e.stopPropagation(); setShowMenu(false); setDownloadTargetSeason(undefined); setDownloadTargetEpisode(undefined); setIsDownloadModalOpen(true); }} className="w-full px-4 py-3 text-left text-sm text-blue-400 hover:bg-zinc-800 transition-colors flex items-center gap-3 font-semibold cursor-pointer active:bg-zinc-800"><Download size={16} className="text-blue-400 shrink-0" /><span>Téléchargement</span></button>
                 <div className="h-px bg-white/5 my-0.5" />
@@ -101,7 +101,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
                   <div className="h-px bg-white/5 my-1" />
                   <button type="button" onClick={(e) => { e.stopPropagation(); setShowMenu(false); handleDeleteShow(); }} className="w-full px-4 py-3 text-left text-sm text-red-500 hover:bg-red-500/10 transition-colors flex items-center gap-3 font-semibold cursor-pointer active:bg-zinc-800"><Trash2 size={16} /><span>{isSeries ? "Supprimer la série" : "Supprimer le film"}</span></button>
                 </>}
-              </div></>)}
+              </div></DialogLayer>)}
           </div>
         </div>
 
@@ -254,7 +254,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
           const castingPayloadKnown = isSeries
             ? Boolean(tmdbDetails?.aggregate_credits || tmdbDetails?.credits)
             : Boolean(tmdbDetails?.credits);
-          const cast = (tmdbDetails?.aggregate_credits?.cast || tmdbDetails?.credits?.cast || []) as any[];
+          const cast = (tmdbDetails?.aggregate_credits?.cast || tmdbDetails?.credits?.cast || []) as Array<{ id: number; name: string; profile_path?: string; character?: string; roles?: Array<{ character?: string }>; total_episode_count?: number; episode_count?: number }>;
           if (!tmdbDetails || !castingPayloadKnown) return <div data-seenit-casting-loading="true" className="grid grid-cols-3 sm:grid-cols-4 gap-4 py-2" aria-hidden="true">{Array.from({ length: 6 }, (_, actorIdx) => <div key={`actor_loader_${actorIdx}`} className="min-h-11 flex flex-col items-center animate-pulse"><div className="w-20 h-20 rounded-full bg-zinc-800/80 border border-white/10 mb-2" /><div className="h-3 w-16 bg-zinc-800/80 rounded mb-1.5" /><div className="h-2.5 w-14 bg-zinc-800/60 rounded" /></div>)}</div>;
           if (cast.length === 0) return <p className="text-xs text-zinc-500 italic">Aucun casting disponible.</p>;
           return <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 py-2">{cast.map((actor: any, actorIdx: number) => <button type="button" key={`actor_${actor.id}_${actorIdx}`} onClick={() => openPersonModal(actor.id)} aria-label={`Ouvrir la fiche de ${actor.name}`} className="min-h-11 flex flex-col items-center cursor-pointer group active:scale-95 transition-transform rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E5A93D]"><div className="w-20 h-20 rounded-full overflow-hidden bg-zinc-800 border border-white/10 shadow-md mb-2">{actor.profile_path ? <img loading="lazy" decoding="async" src={`https://image.tmdb.org/t/p/w185${actor.profile_path}`} className="w-full h-full object-cover object-[50%_25%] group-hover:scale-105 transition-transform duration-300" alt="" /> : <div className="w-full h-full flex items-center justify-center text-xs font-bold text-zinc-600">{actor.name?.charAt(0)}</div>}</div><p className="text-xs font-bold text-zinc-100 text-center line-clamp-2 min-h-[2.2em] w-full">{actor.name}</p><p className="text-[10px] text-zinc-500 text-center line-clamp-2 min-h-[2.2em] w-full mt-0.5">{actor.roles && actor.roles.length > 0 ? actor.roles.map((r: any) => r.character).filter(Boolean).join(' / ') || 'Rôle inconnu' : (actor.character || 'Rôle inconnu')}</p>{Number(actor.total_episode_count || actor.episode_count || 0) > 1 && <span className="mt-1 text-[9px] font-medium text-zinc-600">{actor.total_episode_count || actor.episode_count} ép.</span>}</button>)}</div>;

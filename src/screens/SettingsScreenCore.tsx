@@ -1,3 +1,4 @@
+import { DialogLayer } from '../components/ui/DialogLayer';
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Cloud, LogIn, LogOut, FileText, CheckCircle2, MonitorPlay, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronDown, ChevronUp, ChevronRight, Check, AlertCircle, Info, Bug, Sparkles, Download, X, UploadCloud, DownloadCloud } from 'lucide-react';
@@ -550,7 +551,7 @@ export function SettingsScreen() {
       } else {
         showToast(`Votre application est à jour (v${CURRENT_APP_VERSION}) !`, "success");
       }
-    } catch (err: any) {
+    } catch {
       showToast("Impossible de contacter le serveur de mise à jour.", "error");
     }
   };
@@ -1178,7 +1179,7 @@ export function SettingsScreen() {
 
       {/* Dedicated Version Notes Modal */}
       {showVersionNotesModal && createPortal(
-        <div
+        <DialogLayer onDismiss={() => { if (apkUpdateProgress?.status !== 'downloading') setShowVersionNotesModal(false); }} label="Notes de version" canDismiss={apkUpdateProgress?.status !== 'downloading'} historyMode="local" role="dialog"
           className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-md flex items-center justify-center p-2.5 pb-6 sm:p-4 animate-in fade-in duration-200"
           onClick={() => {
             if (apkUpdateProgress?.status !== 'downloading') {
@@ -1313,7 +1314,7 @@ export function SettingsScreen() {
               )}
             </div>
           </div>
-        </div>,
+        </DialogLayer>,
         document.body
       )}
     </div>

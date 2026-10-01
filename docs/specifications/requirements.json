@@ -1973,6 +1973,24 @@
       ]
     },
     {
+      "id": "SEENIT-UX-012",
+      "title": "Pile de dialogues, focus et safe areas partagés",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/dialogStack.test.ts",
+          "contains": "SEENIT-UX-012 ferme uniquement le dialogue supérieur"
+        },
+        {
+          "file": "tests/dialogStack.test.ts",
+          "contains": "SEENIT-UX-012 préserve le parent lors de la fermeture imbriquée"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-UX-010",
       "title": "Filmographie personne structurée par type et apparitions",
       "targets": [

@@ -1,3 +1,4 @@
+import { DialogLayer } from '../components/ui/DialogLayer';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
@@ -52,7 +53,7 @@ import { findMatchingShowForDownload } from '../features/downloads/downloadIdent
 import { isDownloadInHistorySection } from '../features/downloads/downloadStatePolicy';
 
 interface Props {
-  onShowClick?: (id: any, mediaType?: 'tv' | 'movie') => void;
+  onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void;
 }
 
 type ViewMode = 'downloads' | 'search';
@@ -340,7 +341,8 @@ export function DownloadsScreen({ onShowClick }: Props) {
       const scrollRoot = screenRootRef.current?.querySelector<HTMLElement>('.overflow-y-auto');
       if (scrollRoot) scrollRoot.scrollTop = 0;
     };
-    const handleBackOneLevel = () => {
+    const handleBackOneLevel = (event: Event) => {
+      if (pendingCancellation || showConfiguration || viewMode === 'search') event.preventDefault();
       if (pendingCancellation) {
         setPendingCancellation(null);
         return;
@@ -901,16 +903,16 @@ export function DownloadsScreen({ onShowClick }: Props) {
       </div>
 
       {pendingCancellation && (
-        <div
-          className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center bg-black/75 p-4"
-          role="presentation"
+        <DialogLayer onDismiss={() => setPendingCancellation(null)} label="Annuler le téléchargement" historyMode="local" role="alertdialog"
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/75 p-4"
+
           onMouseDown={event => {
             if (event.target === event.currentTarget) setPendingCancellation(null);
           }}
         >
           <div
-            role="alertdialog"
-            aria-modal="true"
+
+
             aria-labelledby="cancel-download-title"
             aria-describedby="cancel-download-description"
             className="w-full max-w-sm rounded-3xl border border-white/10 bg-zinc-950 p-5 shadow-2xl"
@@ -927,13 +929,13 @@ export function DownloadsScreen({ onShowClick }: Props) {
               <button
                 type="button"
                 onClick={() => setPendingCancellation(null)}
+                data-dialog-initial-focus
                 className="min-h-11 rounded-xl border border-white/10 bg-zinc-900 px-4 text-sm font-bold text-zinc-200"
               >
                 Garder
               </button>
               <button
                 type="button"
-                autoFocus
                 onClick={() => {
                   const item = pendingCancellation;
                   setPendingCancellation(null);
@@ -941,11 +943,11 @@ export function DownloadsScreen({ onShowClick }: Props) {
                 }}
                 className="min-h-11 rounded-xl bg-red-500 px-4 text-sm font-black text-white"
               >
-                Confirmer
+                Annuler le téléchargement
               </button>
             </div>
           </div>
-        </div>
+        </DialogLayer>
       )}
     </div>
   );

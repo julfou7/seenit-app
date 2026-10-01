@@ -1,15 +1,16 @@
+import { DialogLayer } from './ui/DialogLayer';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useUpdateStore } from '../store/updateStore';
 import { downloadAndInstallApk, UpdateProgress } from '../services/appUpdater';
 import { ReleaseChangelogViewer } from './ChangelogViewer';
-import { 
-  Download, 
-  Sparkles, 
-  X, 
-  Loader2, 
-  CheckCircle2, 
-  AlertCircle, 
+import {
+  Download,
+  Sparkles,
+  X,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
   ExternalLink,
   RefreshCw,
   ArrowRight
@@ -102,10 +103,10 @@ export function AppUpdateBanner() {
   return (
     <>
       {/* Top Floating Discreet Notification Capsule */}
-      <div 
+      <div
         id="seenit-update-banner"
         className="fixed left-4 right-4 z-50 animate-in slide-in-from-top duration-300 max-w-md mx-auto cursor-pointer select-none"
-        style={{ 
+        style={{
           top: 'calc(env(safe-area-inset-top, 32px) + 12px)',
           transform: `translateY(${dragY}px)`,
           opacity: isDismissing ? 0 : 1,
@@ -154,7 +155,7 @@ export function AppUpdateBanner() {
 
       {/* Detailed Changelog Modal - Rendered via Portal directly to document.body to stay above all navigation bars */}
       {showModal && createPortal(
-        <div 
+        <DialogLayer onDismiss={() => { if (downloadProgress?.status !== 'downloading') setShowModal(false); }} label="Mise à jour SeenIt" canDismiss={downloadProgress?.status !== 'downloading'} historyMode="local" role="dialog"
           className="fixed inset-0 z-[99999] bg-black/85 backdrop-blur-md flex items-center justify-center p-2.5 pb-6 sm:p-4 animate-in fade-in duration-200"
           onClick={() => {
             if (downloadProgress?.status !== 'downloading') {
@@ -162,7 +163,7 @@ export function AppUpdateBanner() {
             }
           }}
         >
-          <div 
+          <div
             className="bg-[#121218] border border-white/10 rounded-3xl w-full max-w-lg sm:max-w-2xl overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.95)] flex flex-col my-auto animate-in zoom-in-95 duration-200 shrink-0"
             onClick={(e) => e.stopPropagation()}
             style={{ maxHeight: 'min(94vh, calc(100dvh - 16px))' }}
@@ -195,9 +196,9 @@ export function AppUpdateBanner() {
             </div>
 
             {/* Scrollable Body Content */}
-            <div 
+            <div
               className="p-4 sm:p-5 overflow-y-auto min-h-0 space-y-4 flex-1 text-sm text-zinc-300 custom-scrollbar overscroll-contain touch-pan-y"
-              style={{ 
+              style={{
                 WebkitOverflowScrolling: 'touch',
                 touchAction: 'pan-y',
                 overscrollBehavior: 'contain'
@@ -206,7 +207,7 @@ export function AppUpdateBanner() {
               <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
                 Notes de version
               </div>
-              
+
               <div className="bg-black/40 border border-white/5 rounded-2xl p-4 max-h-80 sm:max-h-[28rem] md:max-h-[32rem] overflow-y-auto custom-scrollbar">
                 <ReleaseChangelogViewer release={latestRelease} />
               </div>
@@ -215,8 +216,8 @@ export function AppUpdateBanner() {
               {downloadProgress && downloadProgress.status !== 'idle' && (
                 <div className={cn(
                   "border rounded-2xl p-3.5 space-y-2 animate-in fade-in duration-200",
-                  downloadProgress.status === 'error' 
-                    ? "bg-red-500/10 border-red-500/30" 
+                  downloadProgress.status === 'error'
+                    ? "bg-red-500/10 border-red-500/30"
                     : "bg-amber-500/10 border-amber-500/30"
                 )}>
                   <div className="flex items-center justify-between text-xs font-semibold">
@@ -244,7 +245,7 @@ export function AppUpdateBanner() {
                   </div>
 
                   <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden">
-                    <div 
+                    <div
                       className={cn(
                         "h-full rounded-full transition-all duration-300",
                         downloadProgress.status === 'error' ? "bg-red-500" : "bg-gradient-to-r from-amber-400 to-amber-500"
@@ -318,7 +319,7 @@ export function AppUpdateBanner() {
               </button>
             </div>
           </div>
-        </div>,
+        </DialogLayer>,
         document.body
       )}
     </>

@@ -203,7 +203,8 @@ export function WatchListScreen({
   const [pendingAction, setPendingAction] = useState<{ type: 'archive' | 'unfollow' | 'drop'; item: Show } | null>(null);
 
   useEffect(() => {
-    const handleBackOneLevel = () => {
+    const handleBackOneLevel = (event: Event) => {
+      if (pendingAction || expandedSection || activeTab !== 'watch_next') event.preventDefault();
       if (pendingAction) {
         setPendingAction(null);
         return;
@@ -256,13 +257,13 @@ export function WatchListScreen({
   const handleDropShow = async (show: Show) => {
     if (!show.id) return;
     const previousStatus = show.status || 'watching';
-    await updateShow(show.id, { 
-      status: 'dropped', 
-      updatedAt: Date.now() 
+    await updateShow(show.id, {
+      status: 'dropped',
+      updatedAt: Date.now()
     });
     showToast(
-      `« ${show.title} » marquée comme abandonnée.`, 
-      'dropped', 
+      `« ${show.title} » marquée comme abandonnée.`,
+      'dropped',
       show,
       async () => {
         if (show.id) {
@@ -280,8 +281,8 @@ export function WatchListScreen({
       updatedAt: Date.now()
     });
     showToast(
-      `« ${show.title} » a été déplacée dans vos archives.`, 
-      'archive', 
+      `« ${show.title} » a été déplacée dans vos archives.`,
+      'archive',
       show,
       async () => {
         if (show.id) {
@@ -330,7 +331,7 @@ export function WatchListScreen({
         rafId = null;
         const upcomingRect = upcomingRef.current?.getBoundingClientRect();
         const historyRect = historyRef.current?.getBoundingClientRect();
-        
+
         const offset = 250;
 
         let newTab: 'watch_next' | 'upcoming' | 'history' = 'watch_next';
@@ -409,7 +410,7 @@ export function WatchListScreen({
       if (typeof s.totalAiredEpisodes === 'number' && s.totalAiredEpisodes > 0 && watchedCount >= s.totalAiredEpisodes) {
         return false;
       }
-      
+
       if (s.totalEpisodes && s.totalEpisodes > 0) {
         if (watchedCount >= s.totalEpisodes) {
           if (!s.nextEpisodeToWatch?.air_date) return false;
@@ -575,7 +576,7 @@ export function WatchListScreen({
 
   const markMovieAsSeen = useCallback(async (show: Show) => {
     if (!show.id) return;
-    
+
     const prevSeenEpisodes = [...(show.seenEpisodes || [])];
     const prevStatus = show.status;
     const prevLastWatchedAt = show.lastWatchedAt;
@@ -588,7 +589,7 @@ export function WatchListScreen({
       updatedAt: Date.now(),
       isSynced: false
     };
-    
+
     updatePayload['episodeRecords.movie'] = {
       watchedAt: Date.now(),
       episodeTitle: show.title || 'Film'
@@ -610,8 +611,8 @@ export function WatchListScreen({
         await updateDoc(docRef, updatePayload);
 
         useLogStore.getState().addLog(`[Firestore] Succès de la màj atomique pour le film ${stringId}`, "success");
-      } catch (error: any) {
-        useLogStore.getState().addLog(`[Firestore] ERREUR màj film ${show.id} : ${error.message}`, "error");
+      } catch (error: unknown) {
+        useLogStore.getState().addLog(`[Firestore] ERREUR màj film ${show.id} : ${error instanceof Error ? error.message : String(error)}`, "error");
       }
     }
 

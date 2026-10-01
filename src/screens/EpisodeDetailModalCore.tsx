@@ -1,3 +1,4 @@
+import { DialogLayer, isTopDialogElement } from '../components/ui/DialogLayer';
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate, useDragControls } from 'motion/react';
 import { type Show } from '../types';
@@ -35,6 +36,7 @@ interface EpisodeDetailModalProps {
 }
 
 export function EpisodeDetailModal({ show, season: initialSeason, episode: initialEpisode, isHydrating = false, tmdbShowTitle, tmdbShowId, onShowClick, onClose, onLoadSeason }: EpisodeDetailModalProps) {
+  const dialogRootRef = useRef<HTMLDivElement>(null);
   const [currentSeason, setCurrentSeason] = useState(initialSeason);
   const [currentEpisode, setCurrentEpisode] = useState(initialEpisode);
   const [isSynopsisExpanded, setIsSynopsisExpanded] = useState(false);
@@ -555,6 +557,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isTopDialogElement(dialogRootRef.current)) return;
       if (isHydrating || isDownloadOpen || showFutureConfirm || isLoadingEpisode) return;
       const direction = resolveEpisodeNavigationDirectionFromKey(event);
       if (!direction) return;
@@ -651,7 +654,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
           try {
             const seasonRes = await tmdb.getSeasonDetails(effectiveTmdb, currentSeason);
             if (seasonRes.ok && seasonRes.value?.episodes) {
-              const nextInSeason = seasonRes.value.episodes.find((x: any) => x.episode_number === currentEpisode.episode_number + 1);
+              const nextInSeason = seasonRes.value.episodes.find((x: { episode_number: number }) => x.episode_number === currentEpisode.episode_number + 1);
               if (nextInSeason) {
                 nextEpDetails = nextInSeason;
               } else {
@@ -829,7 +832,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   }) | undefined;
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col items-center">
+    <DialogLayer ref={dialogRootRef} onDismiss={onClose} label="Détail de l’épisode" historyMode="external" role="dialog" className="fixed inset-0 z-40 flex flex-col items-center">
       {/* Backdrop */}
       <motion.div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -858,7 +861,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -15, scale: 0.9 }}
               transition={{ type: 'spring', damping: 20, stiffness: 350 }}
-              style={{ top: 'calc(env(safe-area-inset-top, 0px) + 68px)' }}
+              style={{ top: '68px' }}
               className="absolute left-1/2 -translate-x-1/2 z-50 bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 text-black px-4 py-2 rounded-full font-black text-xs shadow-[0_4px_30px_rgba(245,158,11,0.6)] flex items-center gap-2 border border-amber-300 pointer-events-none uppercase tracking-wider whitespace-nowrap max-w-[92%]"
             >
               <Sparkles size={16} className="text-black shrink-0" />
@@ -951,7 +954,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                 transition={{ duration: 0.12 }}
                 aria-busy="true"
               >
-                <div className="absolute left-4 right-4 z-30 flex items-center justify-between pointer-events-auto" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 14px)' }}>
+                <div className="absolute left-4 right-4 z-30 flex items-center justify-between pointer-events-auto" style={{ top: '14px' }}>
                   <button type="button" onClick={(e) => {
                     e.stopPropagation();
                     const targetTmdbId = tmdbShowId || show?.tmdbId;
@@ -1004,7 +1007,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
             {/* 1. FLOATING BUTTONS (Positioned over the banner with safe-area support) */}
             <div
               className="absolute left-4 right-4 z-30 flex items-center justify-between pointer-events-auto"
-              style={{ top: 'calc(env(safe-area-inset-top, 0px) + 14px)' }}
+              style={{ top: '14px' }}
             >
               {/* Series Button */}
               <button
@@ -1328,6 +1331,6 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
       seasonsData={activeShowSeasonMeta?.seasons}
       onSuccessToast={showToast}
     />
-  </div>
+  </DialogLayer>
   );
 }

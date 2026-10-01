@@ -1,3 +1,4 @@
+import { DialogLayer } from './ui/DialogLayer';
 import React, { useEffect, useState } from 'react';
 import { collection, query, orderBy, getDocs, getDoc, doc, deleteDoc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
@@ -71,7 +72,7 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
       if (showDetails?.tmdbId) {
         let seasonMatch = (selectedNews.message + ' ' + (selectedNews.description || '')).match(/saison\s*(\d+)/i);
         let seasonNum = seasonMatch ? parseInt(seasonMatch[1], 10) : null;
-        
+
         const fetchTrailer = async () => {
           if (seasonNum) {
             const sRes = await tmdb.getSeasonDetails(showDetails.tmdbId, seasonNum);
@@ -104,7 +105,7 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
   const getShowDetails = (newsItem: ShowNews) => {
     // 1. Find matched show
     let show = shows.find(s => s.id === newsItem.showId || s.tmdbId?.toString() === newsItem.showId);
-    
+
     if (!show) {
       return null;
     }
@@ -113,10 +114,11 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
     const total = show.totalEpisodes || show.totalAiredEpisodes || 0;
     const seenCount = show.seenEpisodes?.length || 0;
     const progressPercent = total > 0 ? Math.round((seenCount / total) * 100) : 0;
-    const totalSeasons = (show as any).numberOfSeasons 
-      || (show as any).seasonsCount 
-      || (show as any).totalSeasons 
-      || (show.nextEpisodeToAir?.season_number) 
+    const seasonMetadata = show as typeof show & { numberOfSeasons?: number; seasonsCount?: number; totalSeasons?: number };
+    const totalSeasons = seasonMetadata.numberOfSeasons
+      || seasonMetadata.seasonsCount
+      || seasonMetadata.totalSeasons
+      || (show.nextEpisodeToAir?.season_number)
       || undefined;
 
     let statusText = 'Suivie';
@@ -271,7 +273,7 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
 
   const getSeasonText = (newsItem: ShowNews, showDetails: any) => {
     let seasons = showDetails?.totalSeasons || showDetails?.numberOfSeasons;
-    
+
     if (!seasons) {
       const match = (newsItem.message + ' ' + (newsItem.description || '')).match(/saison\s*(\d+)/i);
       if (match) {
@@ -311,17 +313,17 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
           const showDetails = getShowDetails(newsItem);
           const seasonText = getSeasonText(newsItem, showDetails);
           const isImageFailed = failedImages[newsItem.id];
-          const posterUrl = !isImageFailed && showDetails?.posterPath 
+          const posterUrl = !isImageFailed && showDetails?.posterPath
             ? (showDetails.posterPath.startsWith('http') ? showDetails.posterPath : `https://image.tmdb.org/t/p/w200${showDetails.posterPath}`)
             : null;
 
           return (
-            <div 
-              key={newsItem.id} 
+            <div
+              key={newsItem.id}
               onClick={() => setSelectedNews(newsItem)}
               className="snap-start shrink-0 w-[280px] bg-zinc-900 rounded-2xl p-3 border border-white/5 hover:border-white/10 hover:bg-zinc-800/80 transition-all active:scale-[0.98] cursor-pointer flex gap-3 relative group"
             >
-              <button 
+              <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); markNewsAsRead(newsItem.id); }}
                 className="absolute top-2 right-2 p-1 text-zinc-500 hover:text-white hover:bg-white/10 rounded-full transition-colors z-10"
@@ -329,14 +331,14 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
               >
                 <X size={14} />
               </button>
-              
+
               {/* Poster thumbnail */}
               <div className="w-14 aspect-[2/3] rounded-lg bg-zinc-950 flex items-center justify-center shrink-0 overflow-hidden border border-white/5 shadow-md">
                 {posterUrl ? (
-                  <img 
-                    src={posterUrl} 
-                    alt="" 
-                    className="w-full h-full object-cover" 
+                  <img
+                    src={posterUrl}
+                    alt=""
+                    className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"
                     onError={() => handleImageError(newsItem.id)}
                   />
@@ -376,31 +378,31 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
         const showDetails = getShowDetails(selectedNews);
         const seasonText = getSeasonText(selectedNews, showDetails);
         const isImageFailed = failedImages[selectedNews.id];
-        const posterUrl = !isImageFailed && showDetails?.posterPath 
+        const posterUrl = !isImageFailed && showDetails?.posterPath
           ? (showDetails.posterPath.startsWith('http') ? showDetails.posterPath : `https://image.tmdb.org/t/p/w342${showDetails.posterPath}`)
           : null;
 
         return (
-          <div 
+          <DialogLayer onDismiss={() => setSelectedNews(null)} label="Actualité du média" historyMode="local" role="dialog"
             onClick={(e) => {
               if (e.target === e.currentTarget) setSelectedNews(null);
             }}
             className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200"
           >
-            <div 
+            <div
               onClick={(e) => e.stopPropagation()}
               className="bg-zinc-900 border border-white/10 w-full max-w-md rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col items-start text-left gap-4 max-h-[90vh] overflow-y-auto my-auto"
             >
-              
+
               {/* Entête Mini-Fiche */}
               <div className="flex items-start justify-start text-left gap-4 w-full">
                 {/* Poster principal */}
                 <div className="w-20 sm:w-24 aspect-[2/3] rounded-2xl bg-zinc-950 flex items-center justify-center shrink-0 overflow-hidden border border-white/10 shadow-lg">
                   {posterUrl ? (
-                    <img 
-                      src={posterUrl} 
-                      alt="" 
-                      className="w-full h-full object-cover" 
+                    <img
+                      src={posterUrl}
+                      alt=""
+                      className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"
                       onError={() => handleImageError(selectedNews.id)}
                     />
@@ -415,7 +417,7 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
                     <div className="flex flex-wrap gap-1 items-center justify-start">
                       {renderBadge(selectedNews.type)}
                     </div>
-                    <button 
+                    <button
                       type="button"
                       onClick={() => setSelectedNews(null)}
                       className="w-7 h-7 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white shrink-0 active:scale-95 transition-transform"
@@ -424,7 +426,7 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
                     </button>
                   </div>
 
-                  <h3 
+                  <h3
                     onClick={() => handleNavigateOnly(selectedNews)}
                     className="text-lg sm:text-xl font-bold text-white hover:text-[#E5A93D] cursor-pointer transition-colors break-words leading-tight text-left"
                     title="Ouvrir la fiche de la série"
@@ -454,10 +456,10 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
 
                       {/* Networks logos */}
                       {showDetails.networks && showDetails.networks.slice(0, 2).map((network: any, idx: number) => network.logo_path && (
-                        <img 
+                        <img
                           key={idx}
-                          src={`https://image.tmdb.org/t/p/w92${network.logo_path}`} 
-                          alt={network.name} 
+                          src={`https://image.tmdb.org/t/p/w92${network.logo_path}`}
+                          alt={network.name}
                           className="h-3.5 object-contain bg-zinc-950/50 p-0.5 rounded"
                           referrerPolicy="no-referrer"
                         />
@@ -488,8 +490,8 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
                     {showDetails.total === 0 && showDetails.seenCount > 0 ? (
                       <div className="h-full w-full bg-zinc-700/50 animate-pulse rounded-full" />
                     ) : (
-                      <div 
-                        className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all duration-500 ease-out" 
+                      <div
+                        className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all duration-500 ease-out"
                         style={{ width: `${showDetails.progressPercent}%` }}
                       />
                     )}
@@ -552,7 +554,7 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
               </div>
 
             </div>
-          </div>
+          </DialogLayer>
         );
       })()}
       {trailerModalOpen && newsTrailerVideos && newsTrailerVideos.length > 0 && (
@@ -564,4 +566,3 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
     </div>
   );
 }
-

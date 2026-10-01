@@ -1,3 +1,4 @@
+import { DialogLayer } from './ui/DialogLayer';
 import React, { useEffect, useState } from 'react';
 import { Check, ChevronDown, Star, X } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -74,7 +75,7 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
 
   const seasonStats = React.useMemo(() => {
     const rated = episodes
-      .map((episode: any) => Number(episode?.vote_average || 0))
+      .map((episode: { vote_average?: number }) => Number(episode?.vote_average || 0))
       .filter((rating: number) => Number.isFinite(rating) && rating > 0);
     if (!rated.length) return null;
     return {
@@ -203,8 +204,8 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
       )}
 
       {isSeasonPickerOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setIsSeasonPickerOpen(false)} role="presentation">
-          <div className="bg-zinc-900 border border-white/10 rounded-2xl w-full max-w-xs p-4 space-y-3 shadow-2xl" onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Sélectionner une saison">
+        <DialogLayer onDismiss={() => setIsSeasonPickerOpen(false)} label="Sélectionner une saison" historyMode="local" role="dialog" className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setIsSeasonPickerOpen(false)} >
+          <div className="bg-zinc-900 border border-white/10 rounded-2xl w-full max-w-xs p-4 space-y-3 shadow-2xl" onClick={event => event.stopPropagation()}   aria-label="Sélectionner une saison">
             <div className="flex items-center justify-between pb-2 border-b border-white/10">
               <h4 className="text-sm font-extrabold text-white">Sélectionner une saison</h4>
               <button type="button" onClick={() => setIsSeasonPickerOpen(false)} className="w-11 h-11 inline-flex items-center justify-center text-zinc-400 hover:text-white rounded-xl hover:bg-white/10" aria-label="Fermer">
@@ -231,7 +232,7 @@ export const EpisodeRatingsChart: React.FC<EpisodeRatingsChartProps> = React.mem
               })}
             </div>
           </div>
-        </div>
+        </DialogLayer>
       )}
     </section>
   );

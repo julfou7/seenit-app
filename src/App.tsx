@@ -4,6 +4,8 @@
  */
 
 import { Activity, lazy, Suspense, startTransition, useCallback, useState, useEffect, useRef } from 'react';
+import { closeTopDialog, closeTabSubview } from './features/navigation/dialogStack';
+import { DialogLayer } from './components/ui/DialogLayer';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
@@ -76,11 +78,11 @@ const tabScreenPreloaders: Record<string, () => Promise<unknown>> = {
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null | undefined>(undefined);
-  
+
   const isNative = Capacitor.isNativePlatform();
 
   const isPWAStandalone = typeof window !== 'undefined' && (
-    window.matchMedia('(display-mode: standalone)').matches || 
+    window.matchMedia('(display-mode: standalone)').matches ||
     (window.navigator as Navigator & { standalone?: boolean }).standalone === true
   );
 
@@ -129,8 +131,8 @@ export default function App() {
             : {};
           const errorMessage = typeof errorDetails.message === 'string' ? errorDetails.message : String(e);
           const errorCode = typeof errorDetails.code === 'string' ? errorDetails.code : '';
-          const isOffline = !navigator.onLine || 
-                            errorMessage.toLowerCase().includes('offline') || 
+          const isOffline = !navigator.onLine ||
+                            errorMessage.toLowerCase().includes('offline') ||
                             errorCode === 'unavailable';
           if (isOffline) {
             appLogger.warn('system', '[App] Client is offline, using local cached streaming platforms', { errorMessage });
@@ -170,15 +172,15 @@ export default function App() {
   return (
     <>
       {showSplash && (
-        <SplashScreen 
+        <SplashScreen
           isReady={isReady}
           minimumDisplayTime={splashDuration}
           animate={true}
           onStartClose={() => setIsSplashClosing(true)}
-          onComplete={() => setShowSplash(false)} 
+          onComplete={() => setShowSplash(false)}
         />
       )}
-      
+
       {isReady && isSplashClosing ? (
         currentUser === null ? <LoginScreen /> : <MainApp />
       ) : (
@@ -306,10 +308,11 @@ function MainApp() {
 
     const setupBackButton = async () => {
       listenerHandler = await CapApp.addListener('backButton', ({ canGoBack }) => {
+        if (closeTopDialog()) return;
         const state = window.history.state;
         const isModalOpen = Boolean(
-          state?.isModal || 
-          state?.isEpisodeDetailModal || 
+          state?.isModal ||
+          state?.isEpisodeDetailModal ||
           state?.isPersonDetailModal
         );
 
@@ -322,6 +325,9 @@ function MainApp() {
           closeShow();
           return;
         }
+
+        const rootTab = resolveRootNavigationTab(currentTab);
+        if (rootTab && closeTabSubview(rootTab)) return;
 
         if (canGoBack && state && !state.isRoot) {
           window.history.back();
@@ -374,18 +380,18 @@ function MainApp() {
           markEpisodeWatched(effectiveId, Number(season), Number(episode), updateShow);
         }
         openShowSmooth(
-          effectiveId, 
-          'local', 
-          mediaType, 
-          tmdbId ? Number(tmdbId) : undefined, 
+          effectiveId,
+          'local',
+          mediaType,
+          tmdbId ? Number(tmdbId) : undefined,
           season ? Number(season) : undefined,
           episode ? Number(episode) : undefined
         );
       } else {
         openShowSmooth(
-          effectiveId, 
-          'local', 
-          mediaType, 
+          effectiveId,
+          'local',
+          mediaType,
           tmdbId ? Number(tmdbId) : undefined,
           season ? Number(season) : undefined,
           episode ? Number(episode) : undefined
@@ -440,7 +446,7 @@ function MainApp() {
       handleNativeMediaUrl(sessionStorage.getItem('seenit_pending_media_url'));
     }
 
-    const handleNotificationMessage = (data: any) => {
+    const handleNotificationMessage = (data: { type?: string; showId?: string | number; tmdbId?: string | number; mediaType?: 'tv' | 'movie'; season?: string | number; episode?: string | number }) => {
       if (!data) return;
 
       if (isAppUpdateAvailablePush(data)) {
@@ -460,9 +466,9 @@ function MainApp() {
         const idToOpen = data.showId || data.tmdbId;
         if (idToOpen) {
           openShowSmooth(
-            idToOpen, 
-            'local', 
-            data.mediaType || 'tv', 
+            idToOpen,
+            'local',
+            data.mediaType || 'tv',
             data.tmdbId ? Number(data.tmdbId) : undefined,
             data.season ? Number(data.season) : undefined,
             data.episode ? Number(data.episode) : undefined
@@ -474,7 +480,7 @@ function MainApp() {
         const idToWatch = data.showId || data.tmdbId;
         const season = data.season;
         const episode = data.episode;
-        
+
         if (idToWatch && season && episode) {
           markEpisodeWatched(idToWatch, Number(season), Number(episode), updateShow);
         }
@@ -546,7 +552,7 @@ function MainApp() {
   }, [handleTabChange, openShowSmooth, updateShow, showToast]);
 
   const handleActiveTabClick = () => {
-    window.dispatchEvent(new CustomEvent('app-close-modals'));
+    if (closeTopDialog()) return;
 
     if (
       typeof window !== 'undefined' &&
@@ -560,7 +566,7 @@ function MainApp() {
     } else {
       const rootTab = resolveRootNavigationTab(currentTab);
       if (rootTab) {
-        window.dispatchEvent(new CustomEvent(`${rootTab}-back-one-level`));
+        closeTabSubview(rootTab);
       }
     }
   };
@@ -574,13 +580,26 @@ function MainApp() {
     });
   };
 
+  useEffect(() => {
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      if (selectedShow) closeShow();
+      else {
+        const rootTab = resolveRootNavigationTab(currentTab);
+        if (rootTab) closeTabSubview(rootTab);
+      }
+    };
+    window.addEventListener('keydown', onEscape);
+    return () => window.removeEventListener('keydown', onEscape);
+  }, [selectedShow, currentTab, closeShow]);
+
   return (
     <div className="w-full min-h-[100dvh] bg-[#040406] flex justify-center selection:bg-[#E5A93D]/30">
       <div className="w-full max-w-md bg-premium-ambient h-[100dvh] flex flex-col relative shadow-2xl shadow-black/90 overflow-hidden pt-safe">
-        
+
         <PWAInstallBanner />
         <AppUpdateBanner />
-        
+
         <div className="flex-1 min-h-0 flex flex-col relative">
           <div className="flex-1 min-h-0 flex flex-col">
             <Suspense fallback={<div className="flex-1 bg-premium-ambient" aria-label="Chargement de l’écran" />}>
@@ -624,7 +643,7 @@ function MainApp() {
           </div>
 
           {selectedShow && (
-            <div 
+            <DialogLayer key={`${selectedShow.id}-${selectedShow.mediaType || 'tv'}`} label="Fiche média" onDismiss={closeShow} historyMode="external" blocking={false}
               className="fixed inset-0 z-[150] bg-black flex flex-col overflow-hidden max-w-md mx-auto animate-in slide-in-from-right duration-300 ease-out motion-reduce:animate-none pt-safe"
               style={{ willChange: 'transform' }}
             >
@@ -644,12 +663,12 @@ function MainApp() {
                 tmdbId={selectedRatingTmdbId || null}
                 mediaType={selectedRatingMediaType}
               />
-            </div>
+            </DialogLayer>
           )}
         </div>
 
-        <BottomNav 
-          currentTab={currentTab} 
+        <BottomNav
+          currentTab={currentTab}
           onTabChange={handleTabChange}
           onActiveTabClick={handleActiveTabClick}
           onActiveTabDoubleClick={handleActiveTabDoubleClick}
