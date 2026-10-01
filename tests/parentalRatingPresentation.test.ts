@@ -1,10 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const filterModal = readFileSync('src/components/FilterModal.tsx', 'utf8');
 const tmdbFacade = readFileSync('src/features/shows/tmdbCore.ts', 'utf8');
-const editor = readFileSync('src/components/ParentalRatingEditor.tsx', 'utf8');
 const app = readFileSync('src/App.tsx', 'utf8');
 
 test('SEENIT-PARENTAL-001 supprime PEGI et les heuristiques parentales de genre', () => {
@@ -21,6 +20,8 @@ test('SEENIT-PARENTAL-001 supprime PEGI et les heuristiques parentales de genre'
   assert.doesNotMatch(tmdbFacade, /without_genres/, 'la décision parentale canonique ne doit jamais reposer sur une exclusion de genres');
 });
 
-test('SEENIT-PARENTAL-001 expose la correction personnelle sur la fiche PWA et APK', () => {
-  assert.match(app, /<ParentalRatingEditor/); assert.match(app, /selectedRatingRevision/, 'une correction doit rafraîchir immédiatement la fiche ouverte'); assert.match(editor, /setOverride\(mediaType, Number\(tmdbId\), age\)/); assert.match(editor, /clearOverride\(mediaType, Number\(tmdbId\)\)/); assert.match(editor, /0 = Tous publics/); assert.doesNotMatch(editor, /\.(?:title|originalTitle)\b|\b(?:release_date|firstAirDate)\b/, 'la correction personnelle doit rester identifiée uniquement par type + TMDB ID');
+test('issue #651 retire l’éditeur personnel de la fiche PWA et APK', () => {
+  assert.equal(existsSync('src/components/ParentalRatingEditor.tsx'), false);
+  assert.doesNotMatch(app, /<ParentalRatingEditor|Corriger l’âge|Âge perso/);
+  assert.match(app, /selectedRatingRevision/, 'les overrides historiques synchronisés peuvent encore rafraîchir la fiche sans exposer d’éditeur');
 });
