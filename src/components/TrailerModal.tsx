@@ -1,8 +1,11 @@
 import { DialogLayer } from './ui/DialogLayer';
-import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { X, Clapperboard, Play } from 'lucide-react';
+import React, { useLayoutEffect, useRef, useState, useMemo } from 'react';
+import { X, Clapperboard, Maximize } from 'lucide-react';
+import { prepareTrailerVideos, trailerEmbedUrl, type TrailerVideo } from '../features/trailers/trailerPolicy';
+import { startTrailerPresentation } from '../features/trailers/trailerPresentation';
+import { isNativeTrailer, shouldAutoPresentTrailer, trailerPresentationAdapter } from '../features/trailers/trailerPlatform';
 
-export interface TrailerVideo { site: string; key: string; name: string; iso_639_1?: string; type?: string; }
+export type { TrailerVideo } from '../features/trailers/trailerPolicy';
 
 interface TrailerModalProps {
   videos: TrailerVideo[];
@@ -11,161 +14,89 @@ interface TrailerModalProps {
 
 export function TrailerModal({ videos, onClose }: TrailerModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const presentationRef = useRef<ReturnType<typeof startTrailerPresentation> | null>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  const choices = useMemo(() => prepareTrailerVideos(videos), [videos]);
+  const [selectedKey, setSelectedKey] = useState('');
+  const [fullscreen, setFullscreen] = useState(false);
+  const currentVideo = choices.find(video => video.key === selectedKey) || choices[0];
+  const hasVideo = Boolean(currentVideo);
+  const native = isNativeTrailer();
+  const immersive = native || fullscreen;
 
-  // Extraire toutes les vidéos YouTube
-  const youtubeVideos = useMemo(() => {
-    if (!videos || !Array.isArray(videos)) return [];
-    return videos.filter((v) => v.site === 'YouTube' && v.key);
-  }, [videos]);
-
-  // Détecter la vidéo VOSTFR (Priorité absolue)
-  const vostfrVideo = useMemo(() => {
-    if (youtubeVideos.length === 0) return null;
-    // 1. Chercher un trailer avec "VOSTFR" ou "VOST" ou "VO" dans le nom
-    const vostByName = youtubeVideos.find((v) =>
-      /vostfr|vost|\bvo\b/i.test(v.name)
-    );
-    if (vostByName) return vostByName;
-
-    // 2. Chercher la vidéo en langue originale ou en anglais ('en')
-    const originalOrEn = youtubeVideos.find((v) => v.iso_639_1 === 'en' || v.iso_639_1 !== 'fr');
-    if (originalOrEn) return originalOrEn;
-
-    // 3. Fallback sur la première vidéo
-    return youtubeVideos[0];
-  }, [youtubeVideos]);
-
-  // Détecter la vidéo VF
-  const vfVideo = useMemo(() => {
-    if (youtubeVideos.length === 0) return null;
-    // Chercher une vidéo 'fr' qui NE contient PAS "VOST" dans le nom
-    const vfByName = youtubeVideos.find((v) =>
-      v.iso_639_1 === 'fr' && !/vostfr|vost/i.test(v.name)
-    );
-    if (vfByName) return vfByName;
-
-    // Chercher n'importe quelle vidéo contenant "VF" ou "French"
-    return youtubeVideos.find((v) => /\bvf\b|french/i.test(v.name)) || null;
-  }, [youtubeVideos]);
-
-  // Vérifier les doublons entre VF et VOSTFR
-  const { finalVf, finalVostfr } = useMemo(() => {
-    let vf = vfVideo;
-    let vost = vostfrVideo;
-
-    if (vf && vost && vf.key === vost.key) {
-      if (/vostfr|vost|\bvo\b/i.test(vf.name) || vf.iso_639_1 !== 'fr') {
-        vf = null;
-      } else {
-        vost = null;
+  const present = () => {
+    const element = overlayRef.current;
+    if (!element || presentationRef.current) return;
+    const session = startTrailerPresentation(trailerPresentationAdapter(element));
+    presentationRef.current = session;
+    void session.ready.then(() => {
+      if (!native && document.fullscreenElement !== element && presentationRef.current === session) {
+        presentationRef.current = null;
       }
-    }
-    return { finalVf: vf, finalVostfr: vost };
-  }, [vfVideo, vostfrVideo]);
-
-  const [lang, setLang] = useState<'vf' | 'vostfr'>(() => (finalVf ? 'vf' : 'vostfr'));
-
-  useEffect(() => {
-    if (lang === 'vf' && !finalVf) {
-      setLang('vostfr');
-    } else if (lang === 'vostfr' && !finalVostfr && finalVf) {
-      setLang('vf');
-    }
-  }, [finalVf, finalVostfr, lang]);
-
-  const currentVideo = lang === 'vf' && finalVf ? finalVf : (finalVostfr || finalVf || youtubeVideos[0]);
-  const videoId = currentVideo?.key;
-
-  const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === overlayRef.current) {
-      onClose();
-    }
+    });
   };
 
+  useLayoutEffect(() => {
+    if (!hasVideo) return;
+    let wasFullscreen = false;
+    const onFullscreen = () => {
+      const active = document.fullscreenElement === overlayRef.current;
+      setFullscreen(active);
+      if (wasFullscreen && !active) closeRef.current();
+      wasFullscreen = active;
+    };
+    document.addEventListener('fullscreenchange', onFullscreen);
+    if (shouldAutoPresentTrailer()) present();
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullscreen);
+      void presentationRef.current?.close();
+      presentationRef.current = null;
+    };
+  }, [hasVideo]);
 
-  if (!videoId) return null;
+  if (!currentVideo) return null;
 
-  const baseParams = "rel=0&modestbranding=1&iv_load_policy=3&playsinline=1&controls=1";
-  const urlParams = lang === 'vostfr'
-    ? `autoplay=1&cc_lang_pref=fr&cc_load_policy=1&${baseParams}`
-    : `autoplay=1&${baseParams}`;
+  const handleOverlayClick = (event: React.MouseEvent) => {
+    if (event.target === overlayRef.current) onClose();
+  };
+  const selector = <select aria-label="Choisir une vidéo" value={currentVideo.key} onChange={event => setSelectedKey(event.target.value)}
+    className="w-full min-w-0 flex-1 min-h-11 bg-zinc-900 rounded-lg px-2 text-xs text-white focus-visible:outline-amber-400">
+    {choices.map(video => <option key={video.key} value={video.key}>{video.name} — {video.typeLabel} · {video.languageLabel}</option>)}
+  </select>;
 
   return (
-    <DialogLayer onDismiss={onClose} label="Bande-annonce" historyMode="local" role="dialog"
-      ref={overlayRef}
+    <DialogLayer onDismiss={onClose} label="Bande-annonce" historyMode="local" ref={overlayRef}
       onClick={handleOverlayClick}
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/92 backdrop-blur-xl p-3 sm:p-5 landscape:p-1 overflow-y-auto animate-in fade-in duration-300"
-    >
-      <div className="w-full max-w-3xl sm:max-w-4xl bg-gradient-to-b from-zinc-900 to-black rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(245,158,11,0.15)] border border-amber-500/25 flex flex-col mx-auto my-auto max-h-[95vh] landscape:max-h-[98vh]">
-        {/* En-tête compact et haut de gamme */}
-        <div className="flex items-center justify-between px-4 py-3 sm:px-5 sm:py-3.5 bg-zinc-950/90 border-b border-amber-500/15 relative z-10 gap-3 shrink-0">
-          <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-600/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 shadow-[0_0_12px_rgba(245,158,11,0.2)]">
-              <Clapperboard size={19} className="stroke-[2.2]" />
-            </div>
-            <div className="flex flex-col min-w-0">
-              <h3 className="text-white font-extrabold text-sm sm:text-base tracking-wide truncate">
-                Bande-annonce
-              </h3>
-              {currentVideo?.name && (
-                <span className="text-[11px] text-zinc-400 truncate max-w-[200px] sm:max-w-[320px]">
-                  {currentVideo.name}
-                </span>
-              )}
+      style={immersive ? {
+        paddingTop: 'var(--seenit-safe-area-top, env(safe-area-inset-top, 0px))',
+        paddingBottom: 'var(--seenit-safe-area-bottom, env(safe-area-inset-bottom, 0px))',
+        paddingLeft: 'var(--seenit-safe-area-left, env(safe-area-inset-left, 0px))',
+        paddingRight: 'var(--seenit-safe-area-right, env(safe-area-inset-right, 0px))',
+      } : undefined}
+      className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/92 backdrop-blur-xl overflow-y-auto ${immersive ? 'p-0' : 'p-3 sm:p-5 landscape:p-1'}`}>
+      <div className={`w-full bg-gradient-to-b from-zinc-900 to-black overflow-hidden shadow-xl flex flex-col mx-auto my-auto ${immersive ? 'h-full' : 'max-w-4xl rounded-3xl border border-amber-500/25 max-h-[95dvh]'}`}>
+        <div className="flex items-center justify-between px-3 py-2 bg-zinc-950/90 border-b border-amber-500/15 gap-2 shrink-0">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <Clapperboard size={20} className="text-amber-400 shrink-0" />
+            <div className="min-w-0 flex-1">
+              {immersive && choices.length > 1 ? selector : <h3 className="text-white font-bold text-sm truncate">{currentVideo.name}</h3>}
+              <p className="text-xs text-zinc-400">{currentVideo.typeLabel} · {currentVideo.languageLabel}</p>
             </div>
           </div>
-
-          <div className="flex items-center gap-3 shrink-0">
-            {(finalVf || finalVostfr) && (
-              <div className="flex items-center bg-zinc-900/90 rounded-xl p-1 border border-white/10 shadow-inner">
-                {finalVf && (
-                  <button
-                    type="button"
-                    onClick={() => setLang('vf')}
-                    className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                      lang === 'vf'
-                        ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-black shadow-md shadow-amber-500/25 scale-[1.02]'
-                        : 'text-zinc-400 hover:text-white hover:bg-white/5'
-                    }`}
-                  >
-                    VF
-                  </button>
-                )}
-                {finalVostfr && (
-                  <button
-                    type="button"
-                    onClick={() => setLang('vostfr')}
-                    className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                      lang === 'vostfr'
-                        ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-black shadow-md shadow-amber-500/25 scale-[1.02]'
-                        : 'text-zinc-400 hover:text-white hover:bg-white/5'
-                    }`}
-                  >
-                    VOSTFR
-                  </button>
-                )}
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-9 h-9 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/15 transition-all shrink-0 cursor-pointer active:scale-95"
-              aria-label="Fermer"
-            >
-              <X size={18} />
-            </button>
+          <div className="flex items-center gap-1 shrink-0">
+            {!native && <button type="button" onClick={present} aria-label="Plein écran" className="w-11 h-11 flex items-center justify-center rounded-full text-zinc-300 hover:bg-white/10 focus-visible:outline-amber-400"><Maximize size={19} /></button>}
+            <button type="button" onClick={onClose} aria-label="Fermer" className="w-11 h-11 flex items-center justify-center rounded-full text-zinc-300 hover:bg-white/10 focus-visible:outline-amber-400"><X size={20} /></button>
           </div>
         </div>
-
-        {/* Conteneur vidéo propre au bon ratio */}
-        <div className="relative w-full aspect-video bg-black overflow-hidden rounded-b-3xl">
-          <iframe
-            className="absolute inset-0 w-full h-full border-0"
-            src={`https://www.youtube.com/embed/${videoId}?${urlParams}`}
-            title="Bande-annonce"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-            allowFullScreen
-          ></iframe>
+        {!immersive && choices.length > 1 && <label className="flex items-center gap-2 px-3 py-1 text-xs text-zinc-400 shrink-0">
+          <span>Vidéo</span>
+          {selector}
+        </label>}
+        <div className={`relative w-full bg-black overflow-hidden ${immersive ? 'flex-1 min-h-0' : 'aspect-video'}`}>
+          <iframe key={currentVideo.key} className="absolute inset-0 w-full h-full border-0"
+            src={trailerEmbedUrl(currentVideo)} title={`${currentVideo.typeLabel} : ${currentVideo.name}`}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen" allowFullScreen />
         </div>
       </div>
     </DialogLayer>

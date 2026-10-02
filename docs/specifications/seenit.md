@@ -1121,6 +1121,18 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   indépendants des stacking contexts des écrans. Les en-têtes racine, fiche et dialogue gardent
   leurs variantes et respectent les safe areas ; les dialogues suivent le viewport visuel du clavier.
 
+- **SEENIT-UX-013** — Les vidéos TMDB sont parcourues par identité YouTube exacte, nom réel et type
+  (bande-annonce, teaser, extrait). Les trailers officiels sont privilégiés sans supprimer les autres
+  vidéos ni une variante explicitement qualifiée. VF, VOSTFR et VO exigent un libellé source explicite,
+  non contradictoire ; `iso_639_1` seul affiche une langue, jamais un doublage ou des sous-titres.
+  VOST seul ne prouve pas des sous-titres français et une préférence YouTube ne prouve aucune piste.
+  Sans preuve, le nom réel ou un libellé neutre est conservé. Sur téléphone Android, l'ouverture du
+  lecteur demande l'immersion native et le paysage ; fermeture/Retour restaure les barres système et
+  le portrait, y compris après fermeture pendant l'ouverture. La PWA mobile tente le vrai plein écran
+  uniquement pendant une activation utilisateur, puis le paysage lorsque supporté ; tout refus laisse
+  le lecteur utilisable avec ses contrôles YouTube et un bouton plein écran manuel. Le desktop conserve
+  la modal normale. Aucun changement d'identité média ni de position de la fiche n'est introduit.
+
 ## 10. Performance et résilience
 
 - Les appels indépendants sont parallélisés, mais les mutations destructrices restent

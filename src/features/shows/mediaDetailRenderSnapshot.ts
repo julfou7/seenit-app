@@ -1,3 +1,5 @@
+import { prepareTrailerVideos } from '../trailers/trailerPolicy.ts';
+
 export type MediaDetailRenderType = 'tv' | 'movie';
 
 export const MEDIA_DETAIL_RENDER_SCHEMA_VERSION = 2;
@@ -72,16 +74,30 @@ const compactSeason = (item: any) => {
   };
 };
 
-const compactVideo = (item: any) => {
+interface VideoSource {
+  id?: unknown;
+  key?: unknown;
+  name?: unknown;
+  site?: unknown;
+  type?: unknown;
+  official?: unknown;
+  iso_639_1?: string;
+  iso_3166_1?: string;
+  published_at?: string;
+}
+
+const compactVideo = (item: VideoSource | null | undefined) => {
   if (!item?.key || item.site !== 'YouTube') return null;
   return {
     id: item.id ? String(item.id) : undefined,
     key: String(item.key),
-    name: item.name ? String(item.name) : undefined,
+    name: item.name ? String(item.name) : '',
     site: 'YouTube',
     type: item.type ? String(item.type) : undefined,
-    official: Boolean(item.official),
+    official: item.official === true,
     iso_639_1: item.iso_639_1 || undefined,
+    iso_3166_1: item.iso_3166_1 || undefined,
+    published_at: item.published_at || undefined,
   };
 };
 
@@ -112,7 +128,9 @@ export function createMediaDetailRenderSnapshot(
     ? details.seasons.map(compactSeason).filter(Boolean).slice(0, MEDIA_DETAIL_RENDER_MAX_SEASONS)
     : [];
   const videos = Array.isArray(details?.videos?.results)
-    ? details.videos.results.map(compactVideo).filter(Boolean).slice(0, MEDIA_DETAIL_RENDER_MAX_VIDEOS)
+    ? prepareTrailerVideos(details.videos.results.map(compactVideo).filter(Boolean))
+        .slice(0, MEDIA_DETAIL_RENDER_MAX_VIDEOS)
+        .map(({ languageLabel: _languageLabel, typeLabel: _typeLabel, ...video }) => video)
     : [];
   const networks = Array.isArray(details?.networks)
     ? details.networks.map((network: any) => ({

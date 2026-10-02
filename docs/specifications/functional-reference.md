@@ -345,6 +345,17 @@ présence Plex/Arr, bande-annonce, âge conseillé, casting, ordre de visionnage
 Reddit. Les recommandations contextuelles restent dans Explorer. Les modals personne et épisode restent
 dans la pile Retour.
 
+Les bandes-annonces Film, Série, saisons, Explorer et actualités utilisent le même lecteur. Un sélecteur
+présente chaque vidéo avec son nom, sa nature et la langue/variante réellement documentée. Un simple
+code TMDB `fr`/`en` donne Français/Anglais ; VF/VOSTFR/VO nécessitent un libellé explicite non contradictoire.
+VOST seul et les paramètres de sous-titres YouTube ne prouvent pas une VOSTFR. Les trailers officiels
+passent en premier, les autres vidéos restent accessibles sans être présentées comme des versions du
+même montage. Sur téléphone Android, l'ouverture active l'immersion native en paysage ; Fermer/Retour
+revient au portrait et à la fiche existante. La PWA mobile utilise les API navigateur seulement lorsque
+supportées et activées par un geste, avec plein écran manuel en repli ; le desktop garde sa modal.
+La lecture automatique dépend toujours de l'autorisation YouTube/WebView. La validation réelle Android
+VF/VO/vidéo sans preuve de sous-titres, rotation et Retour reste un TNR terrain explicite (#447).
+
 Dans une fiche épisode, **Discussions Reddit** reste verrouillé avant visionnage. Après marquage vu, le CTA
 ouvre une recherche Reddit volontairement simple de la forme `English title S3 E1`. Le titre affiché dans
 SeenIt reste localisé en français ; au moment d'ouvrir Reddit, SeenIt résout séparément le titre TMDB
