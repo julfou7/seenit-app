@@ -66,6 +66,7 @@ type ScopeMode = 'all' | 'season' | 'episode';
 type DownloadActionResult = {
   success: boolean;
   message: string;
+  failureCode?: 'no_release';
   status?: 'searching' | 'queued';
   fallbackUsed?: boolean;
   downloadId?: string;
@@ -376,7 +377,7 @@ export function DownloadModal({
           showMediaDownloadToast(statusText, 'download');
         }
       } else {
-        failDownloadRequest(requestId, result.message);
+        failDownloadRequest(requestId, result.message, result.failureCode);
         showMediaDownloadToast(result.message, 'error');
       }
     } catch (error: unknown) {
@@ -402,8 +403,8 @@ export function DownloadModal({
       });
       setTorrents(results);
       setHasSearched(true);
-    } catch (error: any) {
-      const message = error?.message || 'C411 est momentanément indisponible.';
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'C411 est momentanément indisponible.';
       setTorrents([]);
       setHasSearched(true);
       setActionMessage({ text: message, type: 'error' });

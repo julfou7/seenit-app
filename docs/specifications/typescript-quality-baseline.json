@@ -65,6 +65,8 @@
     "src/features/downloads/downloadNetwork.ts",
     "src/features/downloads/qbitNativeSession.ts",
     "src/features/downloads/downloadIdentity.ts",
+    "src/features/downloads/downloadNoRelease.ts",
+    "src/features/downloads/downloadFailureNotification.ts",
     "src/features/logging/logPrivacy.ts"
   ],
   "touchedFilePolicy": {

@@ -1,5 +1,10 @@
 import { type LiveDownloadItem } from '../../services/sonarrRadarr';
 import { useLiveDownloadStore } from '../../store/liveDownloadStore';
+import { auth } from '../../lib/firebase';
+import { enqueueDownloadFailureNotification } from './downloadFailureNotificationClient';
+import { type DownloadFailureCode } from './downloadNoRelease';
+
+const requestOwners = new Map<string, string>();
 
 export interface BeginDownloadRequestInput {
   title: string;
@@ -19,7 +24,7 @@ export interface BeginDownloadRequestInput {
 }
 
 export function beginDownloadRequest(input: BeginDownloadRequestInput): string {
-  return useLiveDownloadStore.getState().addOptimisticDownload({
+  const id = useLiveDownloadStore.getState().addOptimisticDownload({
     title: input.title,
     seriesTitle: input.seriesTitle || (input.mediaType === 'tv' ? input.title : undefined),
     movieTitle: input.movieTitle || (input.mediaType === 'movie' ? input.title : undefined),
@@ -40,6 +45,8 @@ export function beginDownloadRequest(input: BeginDownloadRequestInput): string {
     isOptimistic: true,
     isRestored: false
   });
+  if (auth.currentUser) requestOwners.set(id, auth.currentUser.uid);
+  return id;
 }
 
 export function acceptDownloadRequest(
@@ -47,6 +54,9 @@ export function acceptDownloadRequest(
   statusText: string,
   status: 'searching' | 'queued' = 'searching'
 ): void {
+  const ownerUid = requestOwners.get(id);
+  if (ownerUid && ownerUid !== auth.currentUser?.uid) return;
+  requestOwners.delete(id);
   useLiveDownloadStore.getState().updateDownloadRequest(id, {
     progress: 0,
     status,
@@ -61,7 +71,9 @@ export function acceptDownloadRequest(
   void useLiveDownloadStore.getState().fetchDownloads();
 }
 
-export function failDownloadRequest(id: string, message: string): void {
+export function failDownloadRequest(id: string, message: string, failureCode?: DownloadFailureCode): void {
+  const ownerUid = requestOwners.get(id);
+  if (ownerUid && ownerUid !== auth.currentUser?.uid) return;
   useLiveDownloadStore.getState().updateDownloadRequest(id, {
     progress: 0,
     status: 'error',
@@ -70,6 +82,17 @@ export function failDownloadRequest(id: string, message: string): void {
     isOptimistic: true,
     isRestored: false
   });
+  const item = useLiveDownloadStore.getState().downloads.find(download => download.id === id);
+  if (failureCode === 'no_release' && ownerUid && item?.status === 'error' && item.tmdbId && item.mediaType) {
+    enqueueDownloadFailureNotification({
+      ownerUid, requestId: item.requestId || id, failureCode,
+      mediaType: item.mediaType, tmdbId: Number(item.tmdbId),
+      title: (item.seriesTitle || item.movieTitle || item.title).trim().slice(0, 180),
+      ...(item.seasonNumber !== undefined ? { season: item.seasonNumber } : {}),
+      ...(item.episodeNumber !== undefined ? { episode: item.episodeNumber } : {})
+    });
+  }
+  requestOwners.delete(id);
 }
 
 export function updateDownloadRequest(

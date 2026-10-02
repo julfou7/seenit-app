@@ -901,6 +901,20 @@ pour le cache des sagas et univers.
 
 ## 8. Webhooks et notifications
 
+- **SEENIT-NOTIFICATION-004** — Une demande explicite Sonarr/Radarr ne conclut « aucune release
+  compatible » qu'après une réponse interactive valide pour son scope exact et tous les fallbacks
+  autorisés (épisode puis pack saison ; série puis toutes ses saisons concernées). Un résultat absent,
+  invalide, un timeout, une panne d'indexer/client ou une erreur d'authentification reste une panne
+  distincte. Aucun délai ou poll vide ne constitue cette preuve. Les nouveaux médias sont ajoutés sans
+  lancer une recherche concurrente non observable. Le lifecycle commun place la demande en erreur et
+  transmet uniquement le résultat typé `no_release` à l'infrastructure FCM existante. Le titre et le
+  scope viennent de l'intention SeenIt, jamais du torrent. Le backend authentifié ne cible que le UID
+  courant et réserve transactionnellement une clé serveur `UID + requestId` avant l'envoi : un retry
+  ou une réponse perdue ne renvoie jamais une alerte déjà réservée. Un échec d'envoi ambigu n'est pas
+  rejoué automatiquement. Le client conserve un reçu en attente, isolé par UID, pour retenter un
+  échec de transport avant réservation à la reprise. Le tap ouvre la fiche TMDB exacte, avec saison/
+  épisode, en PWA comme dans l'APK. La recherche privée s'exécute sur le support qui l'a lancée ; sa
+  fermeture avant conclusion n'est jamais transformée en absence de résultat.
 - **SEENIT-NOTIFICATION-001** — Chaque appareil possède son propre token FCM rattaché à un UID.
   Un webhook personnel notifie tous les appareils PWA/APK de ce UID et aucun autre compte.
 - Le secret webhook est personnel, comparé en temps constant, absent des query strings et des

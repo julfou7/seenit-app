@@ -95,7 +95,7 @@ messaging.onBackgroundMessage((payload) => {
       season: season,
       episode: episode
     },
-    actions: [
+    actions: payload.data?.notificationKind === 'download_failure' ? [] : [
       {
         action: 'mark_watched',
         title: '✓ Marquer comme vu'
