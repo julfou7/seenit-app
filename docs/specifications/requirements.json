@@ -4,6 +4,24 @@
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
+      "id": "SEENIT-UX-013",
+      "title": "Bandes-annonces qualifiées par preuve et cycle paysage réversible",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/trailerPolicy.test.ts",
+          "contains": "SEENIT-UX-013 ne confond jamais langue, VO et sous-titres français"
+        },
+        {
+          "file": "tests/trailerPresentation.test.ts",
+          "contains": "SEENIT-UX-013 restaure la présentation même si le lecteur ferme pendant son ouverture"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-PLATFORM-001",
       "title": "Transport SeenIt cohérent entre PWA, preview AI Studio et APK",
       "targets": [

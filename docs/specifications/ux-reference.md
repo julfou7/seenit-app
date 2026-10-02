@@ -11,6 +11,15 @@ marquées comme livrées décrivent le comportement attendu du runtime courant.
 
 ## 1. Principes à préserver
 
+### Bandes-annonces — contrat #447
+
+Un appui ouvre le lecteur partagé ; choisir une vidéo ne change que l'identité YouTube de l'iframe.
+Le nom réel, le type et la langue sont visibles, chaque vidéo reste sélectionnable au clavier.
+Fermer, Échap et Retour dépilent uniquement le lecteur puis restaurent le focus et la fiche.
+Android téléphone utilise immersion/paysage natifs, avec restauration portrait et barres système.
+La PWA conserve le plein écran navigateur manuel lorsque l'ouverture automatique est refusée.
+Ce contrat automatisé ne vaut pas preuve de lecture ou de rotation sur un téléphone réel.
+
 - Même action, même sens, même libellé et mêmes états dans les écrans qui l'exposent.
 - Garder l'identité SeenIt sombre/or et son glyph de validation. L'or principal est `#E5A93D`.
 - Conserver les variantes utiles : affiche verticale, carte épisode horizontale, transfert avec
