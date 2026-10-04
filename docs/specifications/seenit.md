@@ -877,7 +877,7 @@ pour le cache des sagas et univers.
   polling est suspendu en arrière-plan dans la PWA et l'APK.
 - **SEENIT-DOWNLOAD-006** — Les actifs gardent l'ordre de lancement ; les historiques sont
   présentés du plus récent au plus ancien, indépendamment de l'ordre des réponses distantes.
-- **SEENIT-DOWNLOAD-007** — Les sections En cours, En erreur, Annulés et Terminés sont
+- **SEENIT-DOWNLOAD-007** — Les sections En cours, En attente, En erreur, Annulés et Terminés sont
   distinctes. Une erreur métier explicite (`errorMessage`), notamment un import *Arr refusé après un
   torrent arrivé à 100 %, reste prioritaire sur la progression physique et classe l'élément dans
   « En erreur », jamais dans « Terminés ». La fiche média applique la même priorité et ne déclenche
@@ -918,6 +918,22 @@ pour le cache des sagas et univers.
   push. Un refus ou un timeout ne déclenche aucune recherche automatique de remplacement.
 - Une annulation active demande confirmation, nomme le client et précise que qBittorrent garde
   les fichiers déjà téléchargés.
+- **SEENIT-DOWNLOAD-012** — Une demande SeenIt sans transfert ne disparaît jamais à cause d'un
+  délai, d'une file vide ou du redémarrage. Une absence de release prouvée devient « En attente de
+  disponibilité », dans une section En attente séparée des transferts actifs et des erreurs. Son
+  intention reste persistée par UID, localement et dans `downloadRequests`, jusqu'au transfert/import
+  prouvé ou au retrait explicite ; le TTL des intentions de handoff ne s'applique pas à cette attente.
+  Le téléchargement futur n'est promis qu'après confirmation du média/scope exact surveillé par
+  Sonarr/Radarr et du RSS actif (indexer RSS + intervalle positif). La surveillance ne lance aucune
+  recherche ni transfert supplémentaire. Une ancienne recherche sans résultat conclusif reste
+  conservée avec une attente de vérification, sans inventer une absence de release ou une surveillance.
+  Une panne conserve un état d'erreur explicite. Réouverture, snapshot partagé et polling ne rejouent
+  jamais automatiquement la soumission. Un transfert canonique non ambigu apparu après la demande
+  peut prendre le relais à long terme ; deux preuves physiques contradictoires restent distinctes.
+  Le choix manuel reste disponible en attente. Une suppression d'attente surveillée désactive d'abord
+  la surveillance de son scope exact, sans supprimer de fichier ni annuler un autre transfert. Le retrait
+  attend la confirmation de suppression du document partagé ; un marqueur local par requestId empêche
+  un ancien snapshot de ressusciter la même attente, sans masquer une nouvelle demande du même média.
 
 ## 8. Webhooks et notifications
 
@@ -926,7 +942,7 @@ pour le cache des sagas et univers.
   autorisés (épisode puis pack saison ; série puis toutes ses saisons concernées). Un résultat absent,
   invalide, un timeout, une panne d'indexer/client ou une erreur d'authentification reste une panne
   distincte. Aucun délai ou poll vide ne constitue cette preuve. Les nouveaux médias sont ajoutés sans
-  lancer une recherche concurrente non observable. Le lifecycle commun place la demande en erreur et
+  lancer une recherche concurrente non observable. Le lifecycle commun conserve la demande en attente et
   transmet uniquement le résultat typé `no_release` à l'infrastructure FCM existante. Le titre et le
   scope viennent de l'intention SeenIt, jamais du torrent. Le backend authentifié ne cible que le UID
   courant et réserve transactionnellement une clé serveur `UID + requestId` avant l'envoi : un retry

@@ -18,6 +18,7 @@ const runtime = await bundleDownloadRuntime(`export { useLiveDownloadStore } fro
   downloadConfigStore: `export const useDownloadConfigStore={getState:()=>({radarrUrl:'https://arr'+globalThis.__downloadStoreFixture.scope+'.example',radarrApiKey:'fixture'})};`,
   toastStore: `export const useToastStore={getState:()=>({showToast:()=>{}})};`,
   logStore: `export const appLogger={warn:()=>{},error:()=>{},info:()=>{}};`,
+  arrAvailabilityWatch: `export const cancelArrAvailabilityWatch=async()=>{};`,
   showsStore: `export const useShowsStore={getState:()=>({shows:[]})};`,
   episodeSeasonPackCleanup: `export const processTrackedSeasonPackFallbacks=async()=>({cleanedFallbacks:[],removedQueueIds:[]});export const removeTrackedSeasonPack=()=>{};`,
   sonarrRadarr: `export const fetchLiveDownloadsQueue=async()=>globalThis.__downloadStoreFixture.remotes;

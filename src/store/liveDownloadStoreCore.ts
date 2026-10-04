@@ -43,6 +43,8 @@ import { buildLiveDownloadStorageKey, isDownloadRequestScopeCurrent } from '../f
 import { normalizeUnresolvedQbitScope, shouldSuppressUnresolvedQbit } from '../features/downloads/downloadTransientVisibility';
 import { processTrackedSeasonPackFallbacks, removeTrackedSeasonPack } from '../features/downloads/episodeSeasonPackCleanup';
 import { normalizeDownloadClientId } from '../features/downloads/downloadIdentity';
+import { canHandoffAvailability, parseDownloadAvailability } from '../features/downloads/downloadAvailability';
+import { cancelArrAvailabilityWatch } from '../services/arrAvailabilityWatch';
 
 interface LiveDownloadState {
   downloads: LiveDownloadItem[];
@@ -77,6 +79,7 @@ const completionNotificationEligibility = new Set<string>();
 let localMutationRevision = 0;
 const localItemMutationRevision: Record<string, number> = {};
 let sharedDownloadUnsubscribe: (() => void) | null = null;
+const pendingAvailabilityRemovals = new Set<string>();
 const SHARED_DOWNLOAD_REQUEST_TTL_MS = 10 * 60_000;
 
 type SharedDownloadRequestDocument = Partial<LiveDownloadItem> & {
@@ -110,14 +113,16 @@ function serializeSharedDownloadRequest(item: LiveDownloadItem): Record<string, 
     episodeNumber: item.episodeNumber,
     quality: item.quality,
     releaseTitle: item.releaseTitle,
+    downloadClient: item.downloadClient,
     downloadId: isStrongTorrentHash(item.downloadId) ? normalizeDownloadClientId(item.downloadId) : undefined,
     progress: item.progress || 0,
     status: item.status,
     statusText: item.statusText,
     errorMessage: item.errorMessage,
+    availability: item.availability,
     addedAt: item.addedAt || Date.now(),
     sharedUpdatedAt: Date.now(),
-    sharedExpiresAt: Date.now() + SHARED_DOWNLOAD_REQUEST_TTL_MS
+    sharedExpiresAt: item.status === 'waiting' || item.status === 'error' ? Number.MAX_SAFE_INTEGER : Date.now() + SHARED_DOWNLOAD_REQUEST_TTL_MS
   };
   return Object.fromEntries(Object.entries(raw).filter(([, value]) => value !== undefined));
 }
@@ -138,10 +143,11 @@ async function publishSharedDownloadRequest(item: LiveDownloadItem) {
 
 async function removeSharedDownloadRequest(item: Pick<LiveDownloadItem, 'id' | 'requestId'>) {
   const user = auth.currentUser;
-  if (!user) return;
+  if (!user) return false;
   try {
     await deleteDoc(doc(db, 'users', user.uid, 'downloadRequests', sharedRequestDocId(item)));
-  } catch {}
+    return true;
+  } catch { return false; }
 }
 
 function stopSharedDownloadRequestSync() {
@@ -162,11 +168,16 @@ function startSharedDownloadRequestSync(uid: string) {
         snapshot.docChanges()
           .filter(change => change.type === 'removed')
           .map(change => change.doc.id)
+          .filter(id => !pendingAvailabilityRemovals.has(`${uid}:${id}`))
       );
       const remoteItems: LiveDownloadItem[] = [];
       for (const entry of snapshot.docs) {
         const data = entry.data() as SharedDownloadRequestDocument;
-        if (Number(data.sharedExpiresAt || 0) <= now) {
+        if (useLiveDownloadStore.getState().removedIds.includes(`request:${entry.id}`)) {
+          void deleteDoc(entry.ref).catch(() => {});
+          continue;
+        }
+        if (data.status !== 'waiting' && data.status !== 'error' && Number(data.sharedExpiresAt || 0) <= now) {
           void deleteDoc(entry.ref).catch(() => {});
           continue;
         }
@@ -187,6 +198,7 @@ function startSharedDownloadRequestSync(uid: string) {
           episodeNumber: data.episodeNumber != null ? Number(data.episodeNumber) : undefined,
           quality: data.quality,
           releaseTitle: data.releaseTitle || data.title,
+          downloadClient: data.downloadClient,
           downloadId: isStrongTorrentHash(data.downloadId) ? normalizeDownloadClientId(data.downloadId) || undefined : undefined,
           size: 0,
           sizeleft: 0,
@@ -194,6 +206,7 @@ function startSharedDownloadRequestSync(uid: string) {
           status: data.status || 'searching',
           statusText: data.statusText || 'Synchronisation du téléchargement…',
           errorMessage: data.errorMessage,
+          availability: parseDownloadAvailability(data.availability),
           addedAt: Number(data.addedAt || data.sharedUpdatedAt || now),
           isOptimistic: true,
           isRestored: false
@@ -215,6 +228,8 @@ function startSharedDownloadRequestSync(uid: string) {
           }
 
           const local = downloads[index];
+          if (local.status === 'waiting' && remote.requestId === local.requestId
+              && ['submitting', 'searching', 'queued'].includes(remote.status)) continue;
           if (!local.isOptimistic) {
             downloads[index] = mergeLateOptimisticMetadata(local, remote);
             markLocalItemMutation(local.id);
@@ -272,7 +287,6 @@ function startSharedDownloadRequestSync(uid: string) {
   );
 }
 const OPTIMISTIC_TTL_MS = 120_000;
-const OPTIMISTIC_ERROR_TTL_MS = 60_000;
 const MISSING_GRACE_MS = 10_000;
 const MISSING_WARNING_DELAY_MS = 20_000;
 
@@ -340,6 +354,7 @@ function sameDownloadIdentity(a: LiveDownloadItem, b: LiveDownloadItem): boolean
 
   if (hasConflictingStrongPhysicalIds(a, b)) return false;
   if (sameTransferPath(a, b)) return true;
+  if (a.status === 'waiting' || b.status === 'waiting') return false;
 
   const aResolution = resolutionBucket(a);
   const bResolution = resolutionBucket(b);
@@ -459,6 +474,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           downloadId: item.downloadId,
           downloadIdAliases: item.downloadIdAliases,
           transferPath: item.transferPath,
+          availability: item.availability,
           addedAt: item.addedAt || Date.now(),
           isRestored: false,
           isOptimistic: true
@@ -469,6 +485,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
         const existing = get().downloads.find(download =>
           !isTerminalDownload(download)
           && download.status !== 'error'
+          && download.status !== 'waiting'
           && sameRequestScope(download, candidate)
         );
 
@@ -480,9 +497,14 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           return existing.id;
         }
 
+        const waiting = get().downloads.find(download => download.status === 'waiting' && sameRequestScope(download, candidate));
+        if (waiting) {
+          candidate.id = waiting.id;
+          void removeSharedDownloadRequest(waiting);
+        }
         optimisticTimestamps[candidate.id] = Date.now();
         markLocalItemMutation(candidate.id);
-        set(state => ({ downloads: [candidate, ...state.downloads] }));
+        set(state => ({ downloads: [candidate, ...state.downloads.filter(download => download.id !== candidate.id)] }));
         void publishSharedDownloadRequest(candidate);
 
         if (!get().isPolling) get().startPolling(1000);
@@ -596,7 +618,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           const sourceHealth = getLastLiveDownloadSourceHealth();
           const normalizedServerItems = rawServerItems.map(normalizeUnresolvedQbitScope);
           const rawIds = new Set(normalizedServerItems.map(item => item.id));
-          const prunedRemovedIds = (get().removedIds || []).filter(id => rawIds.has(id));
+          const prunedRemovedIds = (get().removedIds || []).filter(id => id.startsWith('request:') || rawIds.has(id));
           const removedSet = new Set(prunedRemovedIds);
           const cancelledLocals = currentDownloads.filter(isCancelledDownload);
           const pendingRequests = currentDownloads.filter(item => item.isOptimistic && !isTerminalDownload(item));
@@ -621,6 +643,16 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               .map(optimistic => optimistic.id)
           );
 
+          const waitingRequests = currentDownloads.filter(item => item.status === 'waiting');
+          const waitingCandidates = waitingRequests.map(request => ({ request,
+            indexes: serverItems.flatMap((remote, index) => canHandoffAvailability(request, remote) ? [index] : []) }));
+          for (const entry of waitingCandidates) {
+            if (entry.indexes.length !== 1) continue;
+            const index = entry.indexes[0];
+            if (waitingCandidates.filter(other => other.indexes.includes(index)).length !== 1) continue;
+            serverItems[index] = mergeLateOptimisticMetadata(serverItems[index], entry.request);
+            exactServerHandoffIds.add(entry.request.id);
+          }
           serverItems.forEach(serverItem => {
             delete missingSince[serverItem.id];
 
@@ -741,12 +773,15 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
 
             if (!optimisticTimestamps[optimistic.id]) optimisticTimestamps[optimistic.id] = now;
             const age = now - optimisticTimestamps[optimistic.id];
-            const ttl = optimistic.status === 'error' ? OPTIMISTIC_ERROR_TTL_MS : OPTIMISTIC_TTL_MS;
+            const ttl = optimistic.status === 'waiting' || optimistic.status === 'error' ? Infinity : OPTIMISTIC_TTL_MS;
 
             if (age < ttl) {
               pendingOptimistic.push(optimistic);
             } else {
-              delete optimisticTimestamps[optimistic.id];
+              const waiting: LiveDownloadItem = { ...optimistic, status: 'waiting',
+                statusText: 'En attente de vérification', availability: { reason: 'unconfirmed', automatic: false } };
+              pendingOptimistic.push(waiting);
+              void publishSharedDownloadRequest(waiting);
             }
           }
 
@@ -1075,8 +1110,9 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
 
           if (!isCurrentScope()) return;
           set({
-            downloads: finalItems,
-            removedIds: prunedRemovedIds,
+            downloads: finalItems.filter(item => !(get().removedIds || []).includes(item.id)
+              && !(item.isOptimistic && (get().removedIds || []).includes(`request:${sharedRequestDocId(item)}`))),
+            removedIds: Array.from(new Set([...prunedRemovedIds, ...(get().removedIds || []).filter(id => id.startsWith('request:'))])),
             isLoading: false,
             lastUpdated: Date.now(),
             error: null
@@ -1116,6 +1152,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           const downloads = get().downloads || [];
           const hasActive = downloads.some(item =>
             item.status !== 'completed'
+            && item.status !== 'waiting'
             && item.status !== 'cancelled'
             && item.status !== 'error'
             && item.progress < 100
@@ -1146,21 +1183,54 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
       removeDownload: async item => {
         const config = useDownloadConfigStore.getState();
         const status = String(item.status || '').toLowerCase();
-        const shouldCancelRemote = !isTerminalDownload(item) && status !== 'error';
+        if (status === 'waiting' && item.tmdbId && (item.availability?.reason === 'no_release' || /sonarr|radarr/i.test(item.downloadClient || ''))) {
+          const ownerUid = auth.currentUser?.uid;
+          if (!ownerUid || (config.scopeUid && config.scopeUid !== ownerUid)) return false;
+          const service = item.mediaType === 'movie' ? 'radarr' : 'sonarr';
+          try {
+            await cancelArrAvailabilityWatch({ service, tmdbId: item.tmdbId, ownerUid,
+              season: item.seasonNumber, episode: item.episodeNumber,
+              url: service === 'radarr' ? config.radarrUrl : config.sonarrUrl,
+              apiKey: service === 'radarr' ? config.radarrApiKey : config.sonarrApiKey });
+          } catch { return false; }
+          if (auth.currentUser?.uid !== ownerUid) return false;
+          const current = get().downloads.find(download => download.id === item.id);
+          if (current?.requestId !== item.requestId || current?.status !== 'waiting') return false;
+        }
+        if (status === 'waiting') {
+          const ownerUid = auth.currentUser?.uid;
+          const removalKey = `${ownerUid}:${sharedRequestDocId(item)}`;
+          pendingAvailabilityRemovals.add(removalKey);
+          const removed = await removeSharedDownloadRequest(item);
+          pendingAvailabilityRemovals.delete(removalKey);
+          if (!removed) {
+            const current = get().downloads.find(download => download.id === item.id);
+            if (current?.status === 'waiting' && current.requestId === item.requestId) {
+              get().updateDownloadRequest(item.id, { availability: { reason: item.availability?.reason || 'unconfirmed', automatic: false } });
+            }
+            return false;
+          }
+          if (!ownerUid || auth.currentUser?.uid !== ownerUid) return false;
+          const current = get().downloads.find(download => download.id === item.id);
+          if (current && (current.requestId !== item.requestId || current.status !== 'waiting')) return false;
+        }
+        const shouldCancelRemote = !isTerminalDownload(item) && status !== 'error' && status !== 'waiting';
 
         if (item.downloadId) {
           removeTrackedSeasonPack(item.downloadId, activeDownloadStorageUid);
         }
 
         if (!shouldCancelRemote) {
-          const newRemovedIds = Array.from(new Set([...(get().removedIds || []), item.id]));
+          markLocalItemMutation(item.id);
+          const newRemovedIds = Array.from(new Set([...(get().removedIds || []), item.id,
+            ...(status === 'waiting' ? [`request:${sharedRequestDocId(item)}`] : [])]));
           set({
             removedIds: newRemovedIds,
             downloads: (get().downloads || []).filter(download => download.id !== item.id)
           });
           delete optimisticTimestamps[item.id];
           delete missingSince[item.id];
-          void removeSharedDownloadRequest(item);
+          if (status !== 'waiting') void removeSharedDownloadRequest(item);
           return true;
         }
 
@@ -1310,7 +1380,12 @@ function liveDownloadStorageKey(uid: string): string {
 }
 
 function prepareDownloadsForStorage(downloads: LiveDownloadItem[]): LiveDownloadItem[] {
-  return downloads.map(item => isTerminalDownload(item) || item.status === 'error'
+  return downloads.map(item => item.status === 'waiting' || (item.requestId
+      && (item.isOptimistic || item.isRestored) && !isTerminalDownload(item) && item.status !== 'error')
+    ? { ...item, status: 'waiting', progress: 0, isOptimistic: true, isRestored: false,
+        statusText: item.status === 'waiting' ? item.statusText : 'En attente de vérification',
+        availability: parseDownloadAvailability(item.availability) || { reason: 'unconfirmed', automatic: false } }
+    : isTerminalDownload(item) || item.status === 'error'
     ? { ...item, isRestored: false }
     : {
         ...item,
@@ -1333,7 +1408,7 @@ function readScopedDownloads(uid: string): PersistedLiveDownloads {
     if (!raw) return {};
     const parsed = JSON.parse(raw) as PersistedLiveDownloads;
     return {
-      downloads: Array.isArray(parsed.downloads) ? parsed.downloads : [],
+      downloads: Array.isArray(parsed.downloads) ? prepareDownloadsForStorage(parsed.downloads) : [],
       removedIds: Array.isArray(parsed.removedIds) ? parsed.removedIds.map(String) : []
     };
   } catch {
@@ -1370,6 +1445,7 @@ if (typeof window !== 'undefined') {
     Object.keys(optimisticTimestamps).forEach(key => delete optimisticTimestamps[key]);
     Object.keys(missingSince).forEach(key => delete missingSince[key]);
     completionNotificationEligibility.clear();
+    pendingAvailabilityRemovals.clear();
 
     const scoped = user ? readScopedDownloads(user.uid) : {};
     useLiveDownloadStore.setState({

@@ -78,8 +78,8 @@ test('les entrées de production relient les recherches au lifecycle et au FCM a
   const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
   assert.match(read('src/services/sonarrRadarrSearch.ts'), /executeProvenArrSearch/);
   assert.match(read('src/features/downloads/episodeSeasonPackFallback.ts'), /confirmNoArrRelease/);
-  assert.match(read('src/components/DownloadModal.tsx'), /failDownloadRequest\(requestId, result\.message, result\.failureCode\)/);
-  assert.match(read('src/screens/ShowDetailScreenCore.tsx'), /failDownloadRequest\(requestId, res\.message, res\.failureCode\)/);
+  assert.match(read('src/components/DownloadModal.tsx'), /failDownloadRequest\(requestId, result\.message, result\.failureCode, result\.availability\)/);
+  assert.match(read('src/screens/ShowDetailScreenCore.tsx'), /failDownloadRequest\(requestId, res\.message, res\.failureCode, res\.availability\)/);
   assert.match(read('server.ts'), /failure-notification', requireAuth/);
   const backend = read('src/features/downloads/downloadFailureNotificationBackend.ts');
   assert.match(backend, /adminDb\.runTransaction/);

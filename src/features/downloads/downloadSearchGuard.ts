@@ -27,7 +27,7 @@ export function hasActiveDownloadInScope(downloads: ActiveDownloadScopeItem[], s
 }): boolean {
   return downloads.some(item => item.mediaType === scope.mediaType && Boolean(scope.tmdbId)
     && Number(item.tmdbId) === Number(scope.tmdbId)
-    && item.status !== 'cancelled' && !hasExplicitDownloadError(item) && !isDownloadCompleted(item)
+    && item.status !== 'cancelled' && item.status !== 'waiting' && !hasExplicitDownloadError(item) && !isDownloadCompleted(item)
     && (scope.mediaType === 'movie' || (
       (item.seasonNumber == null || scope.seasonNumber == null || item.seasonNumber === scope.seasonNumber)
       && (item.episodeNumber == null || scope.episodeNumber == null || item.episodeNumber === scope.episodeNumber)

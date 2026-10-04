@@ -263,6 +263,18 @@ et TalkBack restent des preuves à produire sur la candidate de release, pas des
 
 ## Téléchargements — choix d'une autre release (#661)
 
+La section **En attente** (#664) conserve les demandes sans transfert, y compris après redémarrage.
+Un zéro résultat confirmé affiche **En attente de disponibilité**, avec une horloge et aucun faux
+pourcentage/spinner de téléchargement. Le message de lancement automatique est réservé à une
+surveillance Sonarr/Radarr et RSS confirmée ; sinon la carte indique que la surveillance reste à vérifier.
+Une recherche interrompue affiche **En attente de vérification** et ne promet pas de lancement futur.
+La section suit l'ordre des demandes ; elle est séparée d'En cours et d'En erreur.
+**Chercher une autre release** reste disponible et ouvre une consultation sans mutation. Une confirmation
+manuelle remplace l'attente par une seule intention. **Annuler l'attente** ouvre une confirmation,
+nomme le média, conserve les fichiers existants et ne retire la carte qu'après arrêt de la surveillance
+exacte si nécessaire. Retour/Garder ferme la confirmation sans effet. Le texte d'attente doit revenir
+à la ligne sur petit écran, avec des cibles de 44 px, et être accessible sans animation seule.
+
 Une carte terminée, annulée ou en erreur avec TMDB exact propose « Chercher une autre release ».
 Le dialogue respecte la pile Retour, le focus et les safe areas existants. Il consulte le client Arr
 configuré, affiche VFF/VFQ/MULTI, qualité, taille, seeders et refus, avec filtre audio ; une série entière

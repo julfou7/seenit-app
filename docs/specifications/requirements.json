@@ -2568,6 +2568,24 @@
           "contains": "SEENIT-DOWNLOAD-011 distingue MULTI VFF et MULTI VFQ sans inventer une variante"
         }
       ]
+    },
+    {
+      "id": "SEENIT-DOWNLOAD-012",
+      "title": "Attente durable sans transfert et surveillance future prouvée",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/downloadAvailabilityRuntime.test.ts",
+          "contains": "SEENIT-DOWNLOAD-012 le service et le lifecycle conservent zéro release en attente surveillée sans lancer de transfert"
+        },
+        {
+          "file": "tests/downloadAvailabilityRuntime.test.ts",
+          "contains": "SEENIT-DOWNLOAD-012 l’attente survit au vrai stockage et au redémarrage au-delà des anciens TTL"
+        }
+      ]
     }
   ]
 }

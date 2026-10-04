@@ -36,6 +36,7 @@ import {
 } from '../features/downloads/downloadLifecycle';
 import { resolveEffectiveQualityProfileId } from '../features/downloads/qualityProfileSelection';
 import { downloadEpisodeWithSeasonPackFallback } from '../features/downloads/episodeSeasonPackFallback';
+import { availabilityHint, type DownloadAvailability } from '../features/downloads/downloadAvailability';
 
 export interface SeasonInfo {
   season_number: number;
@@ -67,6 +68,7 @@ type DownloadActionResult = {
   success: boolean;
   message: string;
   failureCode?: 'no_release';
+  availability?: DownloadAvailability;
   status?: 'searching' | 'queued';
   fallbackUsed?: boolean;
   downloadId?: string;
@@ -377,8 +379,10 @@ export function DownloadModal({
           showMediaDownloadToast(statusText, 'download');
         }
       } else {
-        failDownloadRequest(requestId, result.message, result.failureCode);
-        showMediaDownloadToast(result.message, 'error');
+        failDownloadRequest(requestId, result.message, result.failureCode, result.availability);
+        showMediaDownloadToast(result.failureCode === 'no_release'
+          ? `En attente de disponibilité · ${availabilityHint(result.availability)}` : result.message,
+          result.failureCode === 'no_release' ? 'download' : 'error');
       }
     } catch (error: unknown) {
       const message = (error instanceof Error && error.message) || `Impossible de joindre ${client}.`;

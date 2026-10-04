@@ -5,6 +5,7 @@ import { buildFreshGetUrl, buildNoCacheHeaders } from '../features/downloads/dow
 import { extractQbitSessionCookie, isQbitAuthError } from '../features/downloads/qbitNativeSession';
 import { getPhysicalDownloadId, isStrongTorrentHash, mergeDownloadIdAliases, normalizeDownloadClientId, normalizeQualityLabel, samePhysicalDownload, sameTransferPath } from '../features/downloads/downloadIdentity';
 import { auth } from '../lib/firebase';
+import { enableArrAvailabilityWatch } from './arrAvailabilityWatch';
 import { buildQbitSessionScopeKey } from '../features/downloads/qbitSessionScope';
 import { nextDownloadSourceBackoffMs, shouldFetchNextArrQueuePage } from '../features/downloads/downloadPollingPolicy';
 import { executeDownloadMutationOnce } from '../features/downloads/downloadMutationPolicy';
@@ -912,14 +913,24 @@ async function launchPushReleaseDirectly(payload: {
 }
 
 export function searchAndDownloadInSonarr(params: Parameters<typeof launchSearchAndDownloadInSonarr>[0]) {
+  const ownerUid = auth.currentUser?.uid;
   const key = JSON.stringify([auth.currentUser?.uid, 'sonarr', cleanUrl(params.url), params.tmdbId,
     params.season ?? null, params.episode ?? null, params.ensureOnly === true]);
-  return shareDownloadSearch(key, () => launchSearchAndDownloadInSonarr(params));
+  return shareDownloadSearch(key, async () => {
+    const result = await launchSearchAndDownloadInSonarr(params);
+    return result.failureCode === 'no_release'
+      ? { ...result, availability: await enableArrAvailabilityWatch({ ...params, service: 'sonarr', ownerUid }) } : result;
+  });
 }
 
 export function searchAndDownloadInRadarr(params: Parameters<typeof launchSearchAndDownloadInRadarr>[0]) {
+  const ownerUid = auth.currentUser?.uid;
   const key = JSON.stringify([auth.currentUser?.uid, 'radarr', cleanUrl(params.url), params.tmdbId, params.ensureOnly === true]);
-  return shareDownloadSearch(key, () => launchSearchAndDownloadInRadarr(params));
+  return shareDownloadSearch(key, async () => {
+    const result = await launchSearchAndDownloadInRadarr(params);
+    return result.failureCode === 'no_release'
+      ? { ...result, availability: await enableArrAvailabilityWatch({ ...params, service: 'radarr', ownerUid }) } : result;
+  });
 }
 
 export function pushReleaseDirectly(payload: Parameters<typeof launchPushReleaseDirectly>[0]) {
