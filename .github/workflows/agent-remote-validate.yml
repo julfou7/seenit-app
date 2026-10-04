@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - 'agent-staging/**'
+  pull_request:
+    branches:
+      - 'agent-staging/23-remote-validation-base'
 
 permissions:
   contents: read
@@ -15,7 +18,7 @@ concurrency:
 jobs:
   validate:
     name: Validate exact staging SHA
-    if: startsWith(github.ref, 'refs/heads/agent-staging/')
+    if: startsWith(github.ref, 'refs/heads/agent-staging/') || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -25,7 +28,7 @@ jobs:
       - name: Checkout exact staging SHA
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
       - name: Resolve exact main merge-base
@@ -33,12 +36,13 @@ jobs:
         run: |
           set -euo pipefail
           test "$GITHUB_REF" != 'refs/heads/main'
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          expected_sha="${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
+          test "$(git rev-parse HEAD)" = "$expected_sha"
           git fetch --no-tags origin main:refs/remotes/origin/main
           base_sha="$(git merge-base HEAD refs/remotes/origin/main)"
           test -n "$base_sha"
           echo "SEENIT_VALIDATE_BASE_SHA=$base_sha" >> "$GITHUB_ENV"
-          echo "SEENIT_STAGING_HEAD_SHA=$GITHUB_SHA" >> "$GITHUB_ENV"
+          echo "SEENIT_STAGING_HEAD_SHA=$expected_sha" >> "$GITHUB_ENV"
           {
             echo '## Agent Remote Validate'
             echo
