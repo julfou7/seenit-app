@@ -47,6 +47,12 @@ report-only même au-dessus de leur seuil.
 Le bootstrap reste `bash scripts/bootstrap-gcp-log-auditor.sh` et ne recrée jamais le pool/provider
 WIF partagé.
 
+Les lectures Cloud Logging bornées par `--freshness` utilisent toujours `--order=desc`. Cette
+combinaison est nécessaire pour que gcloud applique réellement la fenêtre de fraîcheur ; les agrégateurs
+SeenIt réordonnent ou additionnent ensuite les événements à partir de leurs timestamps. Un ordre ascendant
+avec `--freshness` est interdit, car il peut ramener les plus anciens logs disponibles jusqu'à la limite
+et produire une baseline faussement présentée comme récente.
+
 ## Contrat de confidentialité
 
 Le backend exclut message, route, URL, en-têtes, UID, email, titre média et payload utilisateur des

@@ -50,6 +50,8 @@ test('SEENIT-OBSERVABILITY-001 exécute un batch Cloud Run en dry-run désactiva
   assert.doesNotMatch(deploymentBootstrap, /roles\/(?:viewer|logging\.viewer)/);
   assert.match(processDoc, /trois issues par run et trois issues/);
   assert.match(processDoc, /ne ferme jamais une issue/);
+  assert.match(processDoc, /--freshness[\s\S]*--order=desc/);
+  assert.match(processDoc, /ordre ascendant[\s\S]*interdit/);
 });
 
 test('SEENIT-OBSERVABILITY-001 borne réellement les lectures Cloud Logging à leur fenêtre récente', () => {
