@@ -85,6 +85,7 @@ jobs:
           set -euo pipefail
           filter='resource.type="cloud_run_revision" AND resource.labels.service_name="'"$GCP_SERVICE"'" AND jsonPayload.seenitEvent.schemaVersion=1'
           set +e
+          # `gcloud logging read --freshness` n'applique la fenêtre qu'avec un ordre descendant.
           gcloud logging read "$filter" \
             --project "$GCP_PROJECT_ID" \
             --freshness=12h \
@@ -111,6 +112,7 @@ jobs:
           set -euo pipefail
           filter='resource.type="cloud_run_revision" AND resource.labels.service_name="'"$GCP_SERVICE"'" AND jsonPayload.seenitDiagnostic.schemaVersion=1 AND jsonPayload.seenitDiagnostic.code="TMDB_REQUEST_CACHE_SUMMARY"'
           set +e
+          # `gcloud logging read --freshness` n'applique la fenêtre qu'avec un ordre descendant.
           gcloud logging read "$filter" \
             --project "$GCP_PROJECT_ID" \
             --freshness=6h \
@@ -137,6 +139,7 @@ jobs:
           set -euo pipefail
           filter='resource.type="cloud_run_revision" AND resource.labels.service_name="'"$GCP_SERVICE"'" AND log_id("run.googleapis.com/requests")'
           set +e
+          # `gcloud logging read --freshness` n'applique la fenêtre qu'avec un ordre descendant.
           gcloud logging read "$filter" \
             --project "$GCP_PROJECT_ID" \
             --freshness=6h \
