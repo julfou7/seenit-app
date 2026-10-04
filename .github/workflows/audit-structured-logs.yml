@@ -89,7 +89,7 @@ jobs:
             --project "$GCP_PROJECT_ID" \
             --freshness=12h \
             --limit=5000 \
-            --order=asc \
+            --order=desc \
             --format=json \
             > "$RUNNER_TEMP/seenit-structured-logs.json"
           status=$?
@@ -115,7 +115,7 @@ jobs:
             --project "$GCP_PROJECT_ID" \
             --freshness=6h \
             --limit=5000 \
-            --order=asc \
+            --order=desc \
             --format=json \
             > "$RUNNER_TEMP/seenit-tmdb-cache-diagnostics.json"
           status=$?
@@ -141,7 +141,7 @@ jobs:
             --project "$GCP_PROJECT_ID" \
             --freshness=6h \
             --limit=10000 \
-            --order=asc \
+            --order=desc \
             --format=json \
             > "$RUNNER_TEMP/seenit-cloud-run-traffic.json"
           status=$?

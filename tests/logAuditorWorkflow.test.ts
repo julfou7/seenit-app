@@ -52,6 +52,16 @@ test('SEENIT-OBSERVABILITY-001 exécute un batch Cloud Run en dry-run désactiva
   assert.match(processDoc, /ne ferme jamais une issue/);
 });
 
+test('SEENIT-OBSERVABILITY-001 borne réellement les lectures Cloud Logging à leur fenêtre récente', () => {
+  const freshnessReads = [...workflow.matchAll(
+    /gcloud logging read[\\s\\S]*?--freshness=(12h|6h)[\\s\\S]*?--order=(asc|desc)/g,
+  )];
+
+  assert.equal(freshnessReads.length, 3);
+  assert.deepEqual(freshnessReads.map(match => match[2]), ['desc', 'desc', 'desc']);
+  assert.doesNotMatch(workflow, /--freshness=(?:12h|6h)[\\s\\S]{0,100}--order=asc/);
+});
+
 test('SEENIT-OBSERVABILITY-001 réutilise le provider WIF canonique sans le recréer', () => {
   assert.doesNotMatch(
     bootstrap,
