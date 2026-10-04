@@ -260,3 +260,17 @@ pas les pixels d'une capture particulière.
 
 Ces règles décrivent le runtime commun PWA/APK. Les captures 360/412 px, le clavier, le texte agrandi
 et TalkBack restent des preuves à produire sur la candidate de release, pas des règles alternatives.
+
+## Téléchargements — choix d'une autre release (#661)
+
+Une carte terminée, annulée ou en erreur avec TMDB exact propose « Chercher une autre release ».
+Le dialogue respecte la pile Retour, le focus et les safe areas existants. Il consulte le client Arr
+configuré, affiche VFF/VFQ/MULTI, qualité, taille, seeders et refus, avec filtre audio ; une série entière
+permet de choisir sa saison. MULTI/FRENCH seul reste une variante inconnue. Le bouton confirme le seul
+candidat sélectionné ; les résultats incompatibles restent non lançables. Pendant l'envoi, la sélection
+est verrouillée. Ouvrir, filtrer ou fermer par Retour/Croix ne lance rien et ne modifie aucun profil.
+Un résultat ambigu n'entraîne jamais l'envoi d'un autre candidat. Les cartes affichent les badges audio
+indépendamment de la vidéo ; une version actuelle reconnue par hash exact reste non sélectionnable.
+Une demande active sur le même scope est signalée et bloque l'envoi jusqu'à sa fin ou son annulation.
+Les notifications confirment « ✅ Import terminé », puis
+« ✅ Disponible dans Plex » uniquement après preuve Plex exacte.

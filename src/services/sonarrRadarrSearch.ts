@@ -8,7 +8,8 @@ import { auth } from '../lib/firebase';
 import { buildQbitSessionScopeKey } from '../features/downloads/qbitSessionScope';
 import { nextDownloadSourceBackoffMs, shouldFetchNextArrQueuePage } from '../features/downloads/downloadPollingPolicy';
 import { executeDownloadMutationOnce } from '../features/downloads/downloadMutationPolicy';
-import { isSafeMagnetLink } from '../features/downloads/magnetLink';
+import { shareDownloadSearch } from '../features/downloads/downloadSearchGuard';
+import { getMagnetInfoHash, isSafeMagnetLink } from '../features/downloads/magnetLink';
 import {
   findExactSonarrSeries,
   pushExactSonarrRelease,
@@ -68,14 +69,13 @@ async function grabFirstWorkingRelease(
   contextPatch: Record<string, any> = {}
 ): Promise<{ success: boolean; release?: any; error?: string }> {
   let lastError = '';
-  for (const release of releases.slice(0, 8)) {
+  for (const release of releases.slice(0, 1)) {
     try {
       await executeArrInteractivePost(`${base}/api/v3/release`, { ...release, ...contextPatch }, headers);
       return { success: true, release };
     } catch (error: any) {
       lastError = error?.message || String(error);
-      // Une release peut être refusée par qBittorrent car elle est déjà présente :
-      // on essaie alors la release suivante plutôt que d'abandonner tout le flux.
+      // Un timeout peut suivre un grab réussi : aucun autre candidat n'est lancé.
     }
   }
   return { success: false, error: lastError || 'Aucune release compatible n’a pu être lancée.' };
@@ -114,6 +114,7 @@ async function forceGrabExistingSeason(
   if (seasonPack.length) {
     const grabbed = await grabFirstWorkingRelease(base, headers, seasonPack, { seriesId });
     if (grabbed.success) return { success: true, message: 'La saison existe déjà : un nouveau pack a été forcé.' };
+    return { success: false, message: grabbed.error || 'Résultat du lancement inconnu : vérifiez le client.' };
   }
 
   // Pas de pack : on force au maximum une release par épisode depuis le résultat
@@ -163,7 +164,7 @@ async function forceGrabExistingMovie(
 /**
  * Déclenche une recherche et un ajout automatique de Série dans Sonarr
  */
-export async function searchAndDownloadInSonarr(params: {
+async function launchSearchAndDownloadInSonarr(params: {
   url: string;
   apiKey: string;
   title: string;
@@ -546,7 +547,7 @@ export async function searchAndDownloadInSonarr(params: {
 /**
  * Déclenche une recherche et un ajout automatique de Film dans Radarr
  */
-export async function searchAndDownloadInRadarr(params: {
+async function launchSearchAndDownloadInRadarr(params: {
   url: string;
   apiKey: string;
   title: string;
@@ -555,7 +556,8 @@ export async function searchAndDownloadInRadarr(params: {
   year?: number | string;
   qualityProfileId?: number;
   qualityPreference?: '1080p' | '4k';
-}): Promise<ArrSearchOutcome> {
+  ensureOnly?: boolean;
+}): Promise<ArrSearchOutcome & { target?: { movieId: number; tmdbId: number } }> {
   const base = cleanUrl(params.url);
   if (!base || !params.apiKey) {
     return { success: false, message: 'Configuration Radarr incomplète' };
@@ -568,7 +570,7 @@ export async function searchAndDownloadInRadarr(params: {
   };
 
   try {
-    if (!params.tmdbId) {
+    if (!Number.isInteger(Number(params.tmdbId)) || Number(params.tmdbId) <= 0) {
       return {
         success: false,
         message: 'Identité Radarr incomplète : un identifiant TMDB vérifié est requis.'
@@ -588,7 +590,8 @@ export async function searchAndDownloadInRadarr(params: {
     }
 
     // 1. Vérifier si le film est déjà dans Radarr
-    const moviesList = await executeGet(`${base}/api/v3/movie`, headers).catch(() => []);
+    const moviesList = await executeGet(`${base}/api/v3/movie`, headers);
+    if (!Array.isArray(moviesList)) throw new Error('Réponse Radarr invalide : aucun ajout lancé.');
     let existingMovie: any = null;
     if (Array.isArray(moviesList)) {
       existingMovie = moviesList.find((m: any) => {
@@ -598,6 +601,8 @@ export async function searchAndDownloadInRadarr(params: {
     }
 
     if (existingMovie && existingMovie.id) {
+      if (params.ensureOnly) return { success: true, message: 'Film exact déjà présent dans Radarr.',
+        target: { movieId: Number(existingMovie.id), tmdbId: Number(params.tmdbId) } };
       // Ajuster le profil de qualité si différent
       if (existingMovie.qualityProfileId !== targetQualityProfileId) {
         try {
@@ -701,8 +706,15 @@ export async function searchAndDownloadInRadarr(params: {
     };
     if (lookupResult.overview) addPayload.overview = lookupResult.overview;
 
-    const created = await executePost(`${base}/api/v3/movie`, addPayload, headers);
+    const created: { id?: number; tmdbId?: number } = await executePost(`${base}/api/v3/movie`, addPayload, headers);
     if (!created?.id) return { success: false, message: 'Radarr n’a pas confirmé l’ajout du film exact.' };
+    if (params.ensureOnly) {
+      if (!Number.isInteger(created.id) || Number(created.id) <= 0 || Number(created.tmdbId) !== Number(params.tmdbId)) {
+        return { success: false, message: 'Le film ajouté ne peut pas être vérifié ; aucune release envoyée.' };
+      }
+      return { success: true, message: 'Film exact ajouté sans recherche automatique.',
+        target: { movieId: Number(created.id), tmdbId: Number(params.tmdbId) } };
+    }
     return executeProvenArrSearch({
       queries: [`release?movieId=${created.id}`],
       read: path => executeArrInteractiveGet(`${base}/api/v3/${path}`, headers),
@@ -721,7 +733,7 @@ export async function searchAndDownloadInRadarr(params: {
 /**
  * Envoie directement une release (Torrent / Magnet) vers Sonarr / Radarr / qBittorrent
  */
-export async function pushReleaseDirectly(payload: {
+async function launchPushReleaseDirectly(payload: {
   service: 'sonarr' | 'radarr' | 'qbittorrent';
   url: string;
   apiKey?: string;
@@ -797,11 +809,21 @@ export async function pushReleaseDirectly(payload: {
     // 2. Radarr Release Push
     if (payload.service === 'radarr') {
       if (!payload.apiKey) return { success: false, message: 'Clé API Radarr manquante' };
+      if (!payload.mediaInfo?.tmdbId) return { success: false, message: 'Le TMDB ID exact de la fiche est requis pour Radarr.' };
+      const ensured = await searchAndDownloadInRadarr({ url: payload.url, apiKey: payload.apiKey,
+        title: payload.mediaInfo.title, tmdbId: payload.mediaInfo.tmdbId, year: payload.mediaInfo.year, ensureOnly: true });
+      if (!ensured.success || !ensured.target) return ensured;
+      const parsed: { movie?: { id?: number; tmdbId?: number } } = await executeGet(
+        `${base}/api/v3/parse?title=${encodeURIComponent(payload.torrent.name)}`, { 'X-Api-Key': payload.apiKey, Accept: 'application/json' });
+      if (Number(parsed?.movie?.id) !== ensured.target.movieId || Number(parsed?.movie?.tmdbId) !== ensured.target.tmdbId) {
+        return { success: false, message: 'Radarr ne peut pas prouver le film exact de cette release ; aucun téléchargement lancé.' };
+      }
       const endpoint = `${base}/api/v3/release/push`;
       const body = {
         title: payload.torrent.name,
         downloadUrl: payload.torrent.magnetUri,
         protocol: 'torrent',
+        tmdbId: ensured.target.tmdbId,
         publishDate: payload.torrent.createdAt || new Date().toISOString()
       };
 
@@ -812,6 +834,9 @@ export async function pushReleaseDirectly(payload: {
       });
 
       const releaseResult = Array.isArray(resData) ? resData[0] : resData;
+      if (releaseResult?.mappedMovieId && Number(releaseResult.mappedMovieId) !== ensured.target.movieId) {
+        return { success: false, message: 'Radarr a renvoyé un autre film ; résultat rejeté.' };
+      }
       let rejections: string[] = [];
       if (releaseResult) {
         if (Array.isArray(releaseResult.rejections) && releaseResult.rejections.length > 0) {
@@ -823,36 +848,10 @@ export async function pushReleaseDirectly(payload: {
 
       if (rejections.length > 0) {
         const reasonStr = rejections.join(' • ');
-        const isUnknown = /unknown|absent|introuvable|not found/i.test(reasonStr);
-
-        if (isUnknown && payload.mediaInfo && payload.mediaInfo.title) {
-          const addRes = await searchAndDownloadInRadarr({
-            url: payload.url,
-            apiKey: payload.apiKey,
-            title: payload.mediaInfo.title,
-            tmdbId: payload.mediaInfo.tmdbId,
-            year: payload.mediaInfo.year
-          });
-
-          if (addRes.success) {
-            try {
-              const retryRes = await executePost(endpoint, body, {
-                'X-Api-Key': payload.apiKey,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-              });
-              const retryResult = Array.isArray(retryRes) ? retryRes[0] : retryRes;
-              if (!retryResult || (!retryResult.rejections?.length && retryResult.approved !== false)) {
-                return { success: true, message: `« ${payload.mediaInfo.title} » ajouté à Radarr et torrent envoyé au téléchargement !` };
-              }
-            } catch (retryErr) {}
-            return { success: true, message: `« ${payload.mediaInfo.title} » ajouté à Radarr ! Recherche automatique lancée.` };
-          }
-        }
 
         return {
           success: false,
-          message: `Radarr a refusé la release : ${reasonStr}. Cliquez sur « Lancer dans Radarr » pour ajouter d'abord le film.`
+          message: `Radarr a refusé la release : ${reasonStr}.`
         };
       }
 
@@ -904,11 +903,27 @@ export async function pushReleaseDirectly(payload: {
     }
 
     return { success: false, message: 'Service non supporté' };
-  } catch (err: any) {
-    console.error('[Push Release Error]', err);
+  } catch (err: unknown) {
     return {
       success: false,
-      message: `Erreur lors de l'envoi : ${err?.message || 'Vérifiez la connexion avec votre serveur'}`
+      message: `Erreur lors de l'envoi : ${err instanceof Error ? err.message : 'Vérifiez la connexion avec votre serveur'}`
     };
   }
+}
+
+export function searchAndDownloadInSonarr(params: Parameters<typeof launchSearchAndDownloadInSonarr>[0]) {
+  const key = JSON.stringify([auth.currentUser?.uid, 'sonarr', cleanUrl(params.url), params.tmdbId,
+    params.season ?? null, params.episode ?? null, params.ensureOnly === true]);
+  return shareDownloadSearch(key, () => launchSearchAndDownloadInSonarr(params));
+}
+
+export function searchAndDownloadInRadarr(params: Parameters<typeof launchSearchAndDownloadInRadarr>[0]) {
+  const key = JSON.stringify([auth.currentUser?.uid, 'radarr', cleanUrl(params.url), params.tmdbId, params.ensureOnly === true]);
+  return shareDownloadSearch(key, () => launchSearchAndDownloadInRadarr(params));
+}
+
+export function pushReleaseDirectly(payload: Parameters<typeof launchPushReleaseDirectly>[0]) {
+  const key = JSON.stringify([auth.currentUser?.uid, payload.service, cleanUrl(payload.url), payload.mediaType,
+    payload.mediaInfo?.tmdbId ?? null, getMagnetInfoHash(payload.torrent.magnetUri)]);
+  return shareDownloadSearch(key, () => launchPushReleaseDirectly(payload));
 }

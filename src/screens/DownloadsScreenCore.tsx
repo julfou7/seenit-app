@@ -51,6 +51,8 @@ import {
 } from '../features/downloads/downloadPosterStability';
 import { findMatchingShowForDownload } from '../features/downloads/downloadIdentity';
 import { isDownloadInHistorySection } from '../features/downloads/downloadStatePolicy';
+import { getReleaseAudio } from '../features/downloads/releaseAudio';
+import { AlternativeReleaseModal } from '../components/AlternativeReleaseModal';
 
 interface Props {
   onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void;
@@ -86,6 +88,7 @@ function DownloadItemCard({
   item: LiveDownloadItem;
   onShowClick?: Props['onShowClick'];
 }) {
+  const [choosingRelease, setChoosingRelease] = useState(false);
   const { cleanTitle, subTitle, isTv } = formatCleanMediaInfo(item);
   const libraryShow = useShowsStore(state => findMatchingShowForDownload(item, state.shows));
   const libraryPosterPath = libraryShow?.posterPath || undefined;
@@ -100,6 +103,7 @@ function DownloadItemCard({
   const progress = Math.min(100, Math.max(0, Number(item.progress || 0)));
   const progressPercent = truncateDownloadProgressPercent(progress);
   const qualityBadges = getQualityBadges(`${item.quality || ''} ${item.releaseTitle || ''}`);
+  const audioBadge = getReleaseAudio(item.releaseTitle).label;
   const downloadedBytes = item.size > 0 ? Math.max(0, item.size - item.sizeleft) : 0;
   const pendingWithoutProgress = isPending && progress <= 0;
   const progressLabel = isPending
@@ -221,7 +225,7 @@ function DownloadItemCard({
             {subTitle && <p className="mt-0.5 line-clamp-1 text-[10px] font-semibold text-zinc-400">{subTitle}</p>}
           </button>
 
-          {qualityBadges.length > 0 && (
+          {(qualityBadges.length > 0 || audioBadge) && (
             <div className="mt-1.5 flex flex-wrap gap-1">
               {qualityBadges.map((badge, index) => (
                 <span
@@ -235,6 +239,7 @@ function DownloadItemCard({
                   {badge}
                 </span>
               ))}
+              {audioBadge && <span className="rounded-md border border-violet-400/20 bg-violet-400/10 px-1.5 py-0.5 text-[9px] font-bold text-violet-200">{audioBadge}</span>}
             </div>
           )}
 
@@ -302,8 +307,15 @@ function DownloadItemCard({
               {item.errorMessage}
             </p>
           )}
+          {item.tmdbId && (isCompleted || isError || isCancelled) && (
+            <button type="button" onClick={event => { event.stopPropagation(); setChoosingRelease(true); }}
+              className="mt-2 flex min-h-11 items-center gap-1.5 rounded-lg border border-white/10 px-2 text-[11px] font-semibold text-zinc-200">
+              <Search size={14} />Chercher une autre release
+            </button>
+          )}
         </div>
       </div>
+      {choosingRelease && <AlternativeReleaseModal item={item} onClose={() => setChoosingRelease(false)} />}
     </div>
   );
 }
@@ -420,11 +432,11 @@ export function DownloadsScreen({ onShowClick }: Props) {
       if (searchRequestRef.current !== requestId) return;
       setTorrents(results);
       setHasSearched(true);
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (searchRequestRef.current !== requestId) return;
       setTorrents([]);
       setHasSearched(true);
-      showToast(error?.message || 'C411 est momentanément indisponible.', 'error');
+      showToast(error instanceof Error ? error.message : 'C411 est momentanément indisponible.', 'error');
     } finally {
       if (searchRequestRef.current === requestId) setIsSearching(false);
     }

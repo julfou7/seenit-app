@@ -23,6 +23,7 @@ import {
   findMatchingShowForDownload,
   getPhysicalDownloadId,
   getStrongPhysicalDownloadIds,
+  isStrongTorrentHash,
   hasExactDownloadHandoffProof,
   hasConflictingStrongPhysicalIds,
   mergeDownloadIdAliases,
@@ -109,6 +110,7 @@ function serializeSharedDownloadRequest(item: LiveDownloadItem): Record<string, 
     episodeNumber: item.episodeNumber,
     quality: item.quality,
     releaseTitle: item.releaseTitle,
+    downloadId: isStrongTorrentHash(item.downloadId) ? normalizeDownloadClientId(item.downloadId) : undefined,
     progress: item.progress || 0,
     status: item.status,
     statusText: item.statusText,
@@ -185,6 +187,7 @@ function startSharedDownloadRequestSync(uid: string) {
           episodeNumber: data.episodeNumber != null ? Number(data.episodeNumber) : undefined,
           quality: data.quality,
           releaseTitle: data.releaseTitle || data.title,
+          downloadId: isStrongTorrentHash(data.downloadId) ? normalizeDownloadClientId(data.downloadId) || undefined : undefined,
           size: 0,
           sizeleft: 0,
           progress: Number(data.progress || 0),
@@ -464,35 +467,14 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
         markCompletionNotificationEligible(candidate);
 
         const existing = get().downloads.find(download =>
-          download.status !== 'completed'
+          !isTerminalDownload(download)
           && download.status !== 'error'
           && sameRequestScope(download, candidate)
         );
 
         if (existing) {
-          optimisticTimestamps[existing.id] = Date.now();
-          markLocalItemMutation(existing.id);
-          set(state => ({
-            downloads: state.downloads.map(download =>
-              download.id === existing.id
-                ? {
-                    ...download,
-                    ...candidate,
-                    id: existing.id,
-                    posterPath: candidate.posterPath || download.posterPath,
-                    isOptimistic: true
-                  }
-                : download
-            )
-          }));
-          void publishSharedDownloadRequest({
-            ...existing,
-            ...candidate,
-            id: existing.id,
-            requestId: existing.requestId || candidate.requestId || existing.id,
-            posterPath: candidate.posterPath || existing.posterPath,
-            isOptimistic: true
-          });
+          // Un second appui rejoint la demande : ne pas effacer son hash, sa
+          // progression, sa date ou remplacer son requestId par une intention neuve.
           if (!get().isPolling) get().startPolling(1000);
           else void get().fetchDownloads();
           return existing.id;
@@ -838,6 +820,9 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               preservedItems.push({
                 ...oldItem,
                 quality: historyOutcome.quality || oldItem.quality,
+                downloadId: historyOutcome.downloadId || oldItem.downloadId,
+                downloadIdAliases: mergeDownloadIdAliases(oldItem, { downloadId: historyOutcome.downloadId }),
+                releaseTitle: historyOutcome.releaseTitle || oldItem.releaseTitle,
                 progress: 100,
                 status: 'completed',
                 statusText: 'Téléchargement terminé 🍿',

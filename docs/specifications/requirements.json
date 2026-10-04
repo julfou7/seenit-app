@@ -1316,6 +1316,10 @@
         {
           "file": "tests/downloadPostImportReconciliation.test.ts",
           "contains": "SEENIT-DOWNLOAD-010 refuse un événement canonique antérieur à la demande"
+        },
+        {
+          "file": "tests/downloadStoreReconciliationRuntime.test.ts",
+          "contains": "SEENIT-DOWNLOAD-010 le poll réunit intention 4K et import 1080p uniquement par le hash prouvé"
         }
       ]
     },
@@ -2544,6 +2548,24 @@
         {
           "file": "tests/tmdbCacheArchitecture.test.ts",
           "contains": "issue #410 route Explorer Tout par le cache Discover commun"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DOWNLOAD-011",
+      "title": "Audio prouvé et sélection unique d’une autre release du média exact",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/arrManualReleases.test.ts",
+          "contains": "SEENIT-DOWNLOAD-011 consulte le film exact sans aucune mutation"
+        },
+        {
+          "file": "tests/releaseAudio.test.ts",
+          "contains": "SEENIT-DOWNLOAD-011 distingue MULTI VFF et MULTI VFQ sans inventer une variante"
         }
       ]
     }

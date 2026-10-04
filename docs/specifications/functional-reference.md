@@ -667,6 +667,15 @@ et webhooks, qui ne doit pas être dupliquée dans les réglages généraux.
   une réponse invalide ou une recherche interrompue conserve un message distinct et ne produit jamais
   « aucune release ». Une erreur d'envoi vers SeenIt est conservée par UID pour reprise ; les retries
   ne rejouent pas une notification déjà réservée par le backend.
+- Une carte terminale possédant un TMDB exact propose « Chercher une autre release ». Le dialogue
+  consulte les releases du média déjà présent dans Arr, sans ajout ni lancement automatique. Il expose
+  audio VFF/VFQ/MULTI, qualité, taille, seeders et refus, avec filtre audio et scope TV exact. L'utilisateur
+  confirme le seul candidat sélectionné ; fermer ou revenir annule la consultation. Un échec d'envoi
+  n'entraîne jamais le lancement d'une autre release. Les cartes du suivi conservent ces badges audio ;
+  MULTI/FRENCH seul reste une variante inconnue.
+  Une version actuelle reconnue par hash reste non sélectionnable ; une demande active du même scope
+  bloque un nouvel envoi. C411 depuis une fiche Film ajoute si nécessaire le film exact sans recherche
+  automatique concurrente, vérifie le parseur Radarr et n'envoie que la release choisie.
 - C411 recherche avec filtres Tous/Film/Série, qualité Toutes/4K/1080p/720p et tri seeders/taille/date.
 - Film/Série est un filtre facultatif : le mode Tous reste utilisable jusqu'au téléchargement. Chaque
   résultat indique le type lorsque C411 fournit la sous-catégorie exacte (`6` Film ou `7` Série).
@@ -715,10 +724,10 @@ explicite, aucun rappel film n'est programmé et aucune estimation J+120 n'est u
 - Un téléphone et une PWA du même compte peuvent recevoir l'événement sans partager un token unique.
 - Déconnecter un appareil révoque son installation sans désactiver les autres.
 - Les webhooks Sonarr/Radarr ciblent seulement les installations du propriétaire de l'endpoint. Un
-  événement `Download` garde un reçu visible « Import terminé » sur PWA/APK legacy. Sur un Android dont
+  événement `Download` garde un reçu visible « ✅ Import terminé » sur PWA/APK legacy. Sur un Android dont
   la copie privée Plex est confirmée, le signal data-only affiche localement le média avec
-  « Import terminé · Vérification de Plex… » puis réutilise le même identifiant pour passer à
-  « Disponible dans Plex » après preuve TMDB exacte (et saison/épisode exacts pour la TV). Le tap ouvre
+  « ✅ Import terminé » puis réutilise le même identifiant pour passer à
+  « ✅ Disponible dans Plex » après preuve TMDB exacte (et saison/épisode exacts pour la TV). Le tap ouvre
   la fiche SeenIt exacte ; lorsque le poster PMS exact est disponible, l'état replié le conserve à
   droite en contain sans crop et l'état développé l'affiche une seule fois, entier et centré dans le
   BigPicture. « Ouvrir dans Plex » n'est exposé que lorsqu'un slug Discover strictement résolu par TMDB
