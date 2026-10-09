@@ -3,73 +3,119 @@ export interface HeroEpisodeRef {
   episode: number;
 }
 
-interface HeroSeasonEpisode {
+interface HeroEpisodePointer {
   season_number?: number;
+  episode_number?: number;
+  episode_count?: number | null;
+  is_final_season?: boolean;
+  series_ended?: boolean;
+}
+
+interface HeroSeasonEpisode {
   episode_number?: number;
 }
 
 interface HeroSeason {
   season_number?: number;
+  episode_count?: number | null;
   episodes?: HeroSeasonEpisode[];
 }
 
 interface HeroProgressSource {
   seenEpisodes?: string[];
   seasonsCache?: HeroSeason[];
-  nextEpisodeToWatch?: {
-    season_number?: number;
-    episode_number?: number;
-  } | null;
+  nextEpisodeToWatch?: HeroEpisodePointer | null;
+  nextEpisodeToAir?: HeroEpisodePointer | null;
+  seriesEnded?: boolean;
 }
 
-const episodeKey = (season: number, episode: number) => `${season}x${episode}`;
+function toPositiveInteger(value: unknown): number | null {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parseSeenEpisode(key: string): HeroEpisodeRef | null {
+  const match = /^(\d+)x(\d+)$/i.exec(key.trim());
+  if (!match) return null;
+
+  const season = toPositiveInteger(match[1]);
+  const episode = toPositiveInteger(match[2]);
+  return season && episode ? { season, episode } : null;
+}
+
+function pointerToEpisodeRef(pointer?: HeroEpisodePointer | null): HeroEpisodeRef | null {
+  const season = toPositiveInteger(pointer?.season_number);
+  const episode = toPositiveInteger(pointer?.episode_number);
+  return season && episode ? { season, episode } : null;
+}
+
+function isAfter(candidate: HeroEpisodeRef, reference: HeroEpisodeRef): boolean {
+  return candidate.season > reference.season
+    || (candidate.season === reference.season && candidate.episode > reference.episode);
+}
+
+function resolveKnownSeasonEpisodeCount(
+  show: HeroProgressSource,
+  seasonNumber: number,
+): number | null {
+  const derived = show.nextEpisodeToWatch;
+  if (toPositiveInteger(derived?.season_number) === seasonNumber) {
+    const count = toPositiveInteger(derived?.episode_count);
+    if (count) return count;
+  }
+
+  const nextToAir = show.nextEpisodeToAir;
+  if (toPositiveInteger(nextToAir?.season_number) === seasonNumber) {
+    const count = toPositiveInteger(nextToAir?.episode_count);
+    if (count) return count;
+  }
+
+  const cachedSeason = show.seasonsCache?.find(
+    season => toPositiveInteger(season.season_number) === seasonNumber,
+  );
+  const cachedCount = toPositiveInteger(cachedSeason?.episode_count)
+    || (cachedSeason?.episodes?.length ? cachedSeason.episodes.length : null);
+  return cachedCount || null;
+}
 
 /**
- * Resolves the next episode shown in Explorer's Hero from durable progress first.
+ * Resolves Explorer's resume episode without trusting stale derived metadata.
  *
- * `nextEpisodeToWatch` is derived metadata and may lag behind `seenEpisodes` after
- * a progress update. When a seasons cache is available, recomputing from the
- * persisted seen episode keys prevents the Hero from regressing to an already
- * watched episode. The derived value remains a fallback when the cache is absent
- * or incomplete.
+ * `seenEpisodes` is durable progress. `nextEpisodeToWatch` can legitimately carry
+ * richer metadata, so it is kept whenever it is still ahead of that progress.
+ * When the pointer regresses to an already passed episode, the Hero derives the
+ * next sequential episode from durable progress instead of displaying the stale
+ * pointer. `seasonsCache` is only a legacy last-resort source for season length.
  */
 export function resolveHeroNextEpisode(show: HeroProgressSource): HeroEpisodeRef | null {
-  const seen = new Set(show.seenEpisodes || []);
-  const seasons = Array.isArray(show.seasonsCache) ? show.seasonsCache : [];
+  const seenEpisodes = (show.seenEpisodes || [])
+    .map(parseSeenEpisode)
+    .filter((episode): episode is HeroEpisodeRef => Boolean(episode));
+  const derived = pointerToEpisodeRef(show.nextEpisodeToWatch);
 
-  if (seasons.length > 0) {
-    const orderedSeasons = [...seasons]
-      .filter((season) => Number(season.season_number) > 0)
-      .sort((a, b) => Number(a.season_number) - Number(b.season_number));
-
-    for (const season of orderedSeasons) {
-      const seasonNumber = Number(season.season_number);
-      const orderedEpisodes = [...(season.episodes || [])]
-        .filter((episode) => Number(episode.episode_number) > 0)
-        .sort((a, b) => Number(a.episode_number) - Number(b.episode_number));
-
-      for (const episode of orderedEpisodes) {
-        const episodeNumber = Number(episode.episode_number);
-        if (!seen.has(episodeKey(seasonNumber, episodeNumber))) {
-          return { season: seasonNumber, episode: episodeNumber };
-        }
-      }
-    }
+  if (seenEpisodes.length === 0) {
+    return derived;
   }
 
-  const derivedSeason = Number(show.nextEpisodeToWatch?.season_number);
-  const derivedEpisode = Number(show.nextEpisodeToWatch?.episode_number);
-  if (
-    Number.isFinite(derivedSeason)
-    && derivedSeason > 0
-    && Number.isFinite(derivedEpisode)
-    && derivedEpisode > 0
-    && !seen.has(episodeKey(derivedSeason, derivedEpisode))
-  ) {
-    return { season: derivedSeason, episode: derivedEpisode };
+  const latestSeen = seenEpisodes.reduce((latest, episode) => (
+    isAfter(episode, latest) ? episode : latest
+  ));
+
+  if (derived && isAfter(derived, latestSeen)) {
+    return derived;
   }
 
-  return null;
+  const seasonEpisodeCount = resolveKnownSeasonEpisodeCount(show, latestSeen.season);
+  if (seasonEpisodeCount && latestSeen.episode >= seasonEpisodeCount) {
+    const pointer = show.nextEpisodeToWatch;
+    const isKnownSeriesFinale = pointer?.is_final_season === true
+      && (pointer.series_ended === true || show.seriesEnded === true);
+    if (isKnownSeriesFinale) return null;
+
+    return { season: latestSeen.season + 1, episode: 1 };
+  }
+
+  return { season: latestSeen.season, episode: latestSeen.episode + 1 };
 }
 
 export function formatHeroEpisode(ref: HeroEpisodeRef): string {
@@ -81,9 +127,7 @@ export interface HeroOverviewPreview {
   truncated: boolean;
 }
 
-/**
- * Keeps the mobile synopsis compact without cutting the final word in half.
- */
+/** Keeps the mobile synopsis compact without cutting the final word in half. */
 export function buildHeroOverviewPreview(overview: string, maxCharacters = 128): HeroOverviewPreview {
   const normalized = overview.trim().replace(/\s+/g, ' ');
   if (normalized.length <= maxCharacters) {
