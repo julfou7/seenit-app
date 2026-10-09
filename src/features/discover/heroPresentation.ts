@@ -26,6 +26,7 @@ interface HeroProgressSource {
   seasonsCache?: HeroSeason[];
   nextEpisodeToWatch?: HeroEpisodePointer | null;
   nextEpisodeToAir?: HeroEpisodePointer | null;
+  totalAiredEpisodes?: number | null;
   seriesEnded?: boolean;
 }
 
@@ -105,6 +106,11 @@ export function resolveHeroNextEpisode(show: HeroProgressSource): HeroEpisodeRef
     return derived;
   }
 
+  const totalAiredEpisodes = toPositiveInteger(show.totalAiredEpisodes);
+  if (totalAiredEpisodes && seenEpisodes.length >= totalAiredEpisodes) {
+    return null;
+  }
+
   const seasonEpisodeCount = resolveKnownSeasonEpisodeCount(show, latestSeen.season);
   if (seasonEpisodeCount && latestSeen.episode >= seasonEpisodeCount) {
     const pointer = show.nextEpisodeToWatch;
@@ -128,7 +134,7 @@ export interface HeroOverviewPreview {
 }
 
 /** Keeps the mobile synopsis compact without cutting the final word in half. */
-export function buildHeroOverviewPreview(overview: string, maxCharacters = 128): HeroOverviewPreview {
+export function buildHeroOverviewPreview(overview: string, maxCharacters = 100): HeroOverviewPreview {
   const normalized = overview.trim().replace(/\s+/g, ' ');
   if (normalized.length <= maxCharacters) {
     return { text: normalized, truncated: false };
