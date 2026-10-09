@@ -6,28 +6,17 @@ import {
   resolveHeroNextEpisode,
 } from '../src/features/discover/heroPresentation.ts';
 
-test('le Hero recalcule la progression depuis les épisodes vus avant un nextEpisodeToWatch obsolète', () => {
+test('MobLand : E01/E02 vus font reprendre à E03 même avec un pointeur dérivé resté sur E01', () => {
   const next = resolveHeroNextEpisode({
     seenEpisodes: ['1x1', '1x2'],
-    nextEpisodeToWatch: { season_number: 1, episode_number: 1 },
-    seasonsCache: [
-      {
-        season_number: 1,
-        episodes: [
-          { season_number: 1, episode_number: 1 },
-          { season_number: 1, episode_number: 2 },
-          { season_number: 1, episode_number: 3 },
-          { season_number: 1, episode_number: 4 },
-        ],
-      },
-    ],
+    nextEpisodeToWatch: { season_number: 1, episode_number: 1, episode_count: 10 },
   });
 
   assert.deepEqual(next, { season: 1, episode: 3 });
   assert.equal(formatHeroEpisode(next!), 'S01E03');
 });
 
-test('le Hero conserve nextEpisodeToWatch comme fallback sans cache de saisons', () => {
+test('un nextEpisodeToWatch encore en avance sur la progression reste prioritaire', () => {
   assert.deepEqual(
     resolveHeroNextEpisode({
       seenEpisodes: ['1x1', '1x2'],
@@ -37,11 +26,38 @@ test('le Hero conserve nextEpisodeToWatch comme fallback sans cache de saisons',
   );
 });
 
-test('un nextEpisodeToWatch déjà vu ne fait pas régresser le CTA', () => {
-  assert.equal(
+test('un pointeur obsolète ne dépend pas de seasonsCache pour être corrigé', () => {
+  assert.deepEqual(
     resolveHeroNextEpisode({
       seenEpisodes: ['1x1', '1x2', '1x3'],
       nextEpisodeToWatch: { season_number: 1, episode_number: 1 },
+    }),
+    { season: 1, episode: 4 },
+  );
+});
+
+test('la reprise passe à la saison suivante quand la taille de saison est connue', () => {
+  assert.deepEqual(
+    resolveHeroNextEpisode({
+      seenEpisodes: ['1x9', '1x10'],
+      nextEpisodeToWatch: { season_number: 1, episode_number: 1, episode_count: 10 },
+    }),
+    { season: 2, episode: 1 },
+  );
+});
+
+test('une série terminée ne fabrique pas de saison suivante après le final connu', () => {
+  assert.equal(
+    resolveHeroNextEpisode({
+      seenEpisodes: ['1x10'],
+      seriesEnded: true,
+      nextEpisodeToWatch: {
+        season_number: 1,
+        episode_number: 1,
+        episode_count: 10,
+        is_final_season: true,
+        series_ended: true,
+      },
     }),
     null,
   );
