@@ -6,6 +6,7 @@ import {
   resolveHeroNextEpisode,
 } from '../src/features/discover/heroPresentation.ts';
 
+// TNR #665 : la progression persistée doit empêcher le Hero de régresser vers un pointeur dérivé obsolète.
 test('MobLand : E01/E02 vus font reprendre à E03 même avec un pointeur dérivé resté sur E01', () => {
   const next = resolveHeroNextEpisode({
     seenEpisodes: ['1x1', '1x2'],
