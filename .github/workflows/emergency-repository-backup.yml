@@ -1,0 +1,85 @@
+name: Emergency Repository Backup
+
+on:
+  push:
+    branches:
+      - backup/export-2026-10-11
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+  actions: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout full repository history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          lfs: true
+
+      - name: Fetch all branch and tag refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --force --prune origin '+refs/heads/*:refs/remotes/origin/*'
+          git fetch --force --tags origin
+          if command -v git-lfs >/dev/null 2>&1; then
+            git lfs fetch --all || true
+          fi
+
+      - name: Build restorable backup package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          OUT="repository-backup"
+          mkdir -p "$OUT/metadata"
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          SOURCE_SHA="$(git rev-parse refs/remotes/origin/main)"
+
+          git bundle create "$OUT/${REPO_NAME}-all-refs.bundle" --all
+          git bundle verify "$OUT/${REPO_NAME}-all-refs.bundle"
+          git archive --format=tar.gz -o "$OUT/${REPO_NAME}-main-snapshot.tar.gz" refs/remotes/origin/main
+          git show-ref > "$OUT/refs.txt"
+          git log --all --date=iso-strict --pretty=format:'%H%x09%P%x09%aI%x09%an%x09%s' > "$OUT/commit-history.tsv"
+
+          if [ -d .git/lfs/objects ] && [ -n "$(find .git/lfs/objects -type f -print -quit 2>/dev/null)" ]; then
+            tar -C .git/lfs -czf "$OUT/${REPO_NAME}-lfs-objects.tar.gz" objects
+          fi
+
+          gh api "/repos/${GITHUB_REPOSITORY}" > "$OUT/metadata/repository.json"
+          gh api --paginate "/repos/${GITHUB_REPOSITORY}/branches?per_page=100" --slurp > "$OUT/metadata/branches.json"
+          gh api --paginate "/repos/${GITHUB_REPOSITORY}/tags?per_page=100" --slurp > "$OUT/metadata/tags.json"
+          gh api --paginate "/repos/${GITHUB_REPOSITORY}/issues?state=all&per_page=100" --slurp > "$OUT/metadata/issues.json"
+          gh api --paginate "/repos/${GITHUB_REPOSITORY}/issues/comments?per_page=100" --slurp > "$OUT/metadata/issue-comments.json"
+          gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls?state=all&per_page=100" --slurp > "$OUT/metadata/pull-requests.json"
+          gh api --paginate "/repos/${GITHUB_REPOSITORY}/pulls/comments?per_page=100" --slurp > "$OUT/metadata/pull-review-comments.json"
+          gh api --paginate "/repos/${GITHUB_REPOSITORY}/releases?per_page=100" --slurp > "$OUT/metadata/releases.json"
+          gh api --paginate "/repos/${GITHUB_REPOSITORY}/labels?per_page=100" --slurp > "$OUT/metadata/labels.json"
+          gh api --paginate "/repos/${GITHUB_REPOSITORY}/milestones?state=all&per_page=100" --slurp > "$OUT/metadata/milestones.json"
+
+          cat > "$OUT/BACKUP-MANIFEST.txt" <<EOF
+          repository=${GITHUB_REPOSITORY}
+          source_branch=main
+          source_sha=${SOURCE_SHA}
+          generated_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          workflow_sha=${GITHUB_SHA}
+          note=GitHub Actions secret values are not exported by this backup.
+          EOF
+
+          (cd "$OUT" && sha256sum * metadata/* 2>/dev/null | sort > SHA256SUMS.txt)
+
+      - name: Upload repository backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SeenIt-emergency-backup-2026-10-11
+          path: repository-backup/
+          if-no-files-found: error
+          retention-days: 90
