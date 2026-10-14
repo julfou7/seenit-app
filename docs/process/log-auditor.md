@@ -47,11 +47,15 @@ report-only même au-dessus de leur seuil.
 Le bootstrap reste `bash scripts/bootstrap-gcp-log-auditor.sh` et ne recrée jamais le pool/provider
 WIF partagé.
 
-Les lectures Cloud Logging bornées par `--freshness` utilisent toujours `--order=desc`. Cette
-combinaison est nécessaire pour que gcloud applique réellement la fenêtre de fraîcheur ; les agrégateurs
-SeenIt réordonnent ou additionnent ensuite les événements à partir de leurs timestamps. Un ordre ascendant
-avec `--freshness` est interdit, car il peut ramener les plus anciens logs disponibles jusqu'à la limite
-et produire une baseline faussement présentée comme récente.
+Les trois lectures Cloud Logging utilisent une **fenêtre temporelle explicite** : le workflow calcule en
+UTC un timestamp de début et de fin, puis les injecte directement dans le filtre Logging avec
+`timestamp>=...` et `timestamp<=...`. `--freshness` seul est interdit : il avait permis à une lecture
+bornée par `--limit` de restituer des logs vieux de plusieurs semaines. L'ordre reste descendant pour
+commencer par les événements les plus récents.
+
+Pour le trafic Cloud Run, les timestamps exacts demandés sont aussi transmis au résumeur. Le rapport
+redigé enregistre séparément la fenêtre demandée et la fenêtre réellement observée. Une entrée située hors
+de la fenêtre rend le rapport `stale`; l'agrégat hors fenêtre n'est pas utilisé comme preuve FinOps.
 
 ## Contrat de confidentialité
 
@@ -120,6 +124,26 @@ Le statut de baseline est `ready` à partir de deux intervalles comparables et 5
 `partial` lorsqu'un delta existe, `insufficient` sinon, et `source_unavailable` en cas d'échec de
 lecture Cloud.
 
+## Agrégat Cloud Run FinOps
+
+La collecte de requêtes Cloud Run couvre six heures et s'arrête à **10 000** entrées. Le résumeur ne
+conserve que les buckets de routes redigés, les classes HTTP, les octets de réponse agrégés et les
+métadonnées de qualité nécessaires à l'audit.
+
+Le champ `quality.status` du rapport peut être :
+
+- `ok` : données présentes, dans la fenêtre et non saturées ;
+- `empty` : aucune requête dans une fenêtre récente valide ; cela reste un rapport complet ;
+- `stale` : au moins une requête source tombe hors de la fenêtre demandée ;
+- `saturated` : la collecte atteint 10 000 entrées ou le résumeur a dû tronquer l'entrée ;
+- `unavailable` : la source Cloud Logging n'est pas lisible ;
+- `off` : collecte volontairement désactivée par le kill switch.
+
+Un rapport `stale`, `saturated` ou `unavailable` a `quality.complete=false`. Le résumeur termine alors en
+échec contrôlé après avoir écrit l'artefact redigé. Grâce à `continue-on-error`, le workflow conserve la
+preuve technique, puis le watchdog voit `SEENIT_AUDITOR_TRAFFIC_SUMMARY_OUTCOME != success` et remonte
+l'état dégradé. Un tel rapport ne doit jamais servir à conclure sur le coût ou la répartition du trafic.
+
 ## Rejeu local redigé
 
 ```bash
@@ -143,9 +167,8 @@ structurés, baseline TMDB, trafic Cloud Run). Une dégradation ouvre une issue 
 l'enrichissent au plus toutes les six heures. Le watchdog n'ingère aucun log et n'exporte que run, SHA et
 états techniques allowlistés. Il ne ferme jamais l'issue automatiquement après récupération.
 
-Ainsi, une panne WIF, Cloud Logging, du résumeur ou du moteur d'audit ne dépend plus d'une lecture manuelle
-des logs ou de GitHub Actions pour être découverte.
-
+Ainsi, une panne WIF, Cloud Logging, un agrégat trafic périmé/saturé, une panne du résumeur ou du moteur
+d'audit ne dépend plus d'une lecture manuelle des logs ou de GitHub Actions pour être découverte.
 
 ## Exports Cloud Logging / Admin Activity hors auditeur
 
