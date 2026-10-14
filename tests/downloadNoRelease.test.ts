@@ -64,3 +64,5 @@ test('la série vérifie chaque saison diffusée et manquante, jamais le flux RS
   ]);
   assert.deepEqual(queries, ['release?seriesId=19&seasonNumber=1', 'release?seriesId=19&seasonNumber=2']);
 });
+
+// CI recovery 2026-10-14: no functional change; resynchronize PR checks after GitHub access restoration.
