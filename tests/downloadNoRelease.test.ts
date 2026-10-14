@@ -38,6 +38,7 @@ test('une panne, un timeout, une réponse invalide ou un grab refusé ne devient
   for (const message of ['timeout', 'HTTP 401', 'HTTP 503']) {
     const result = await executeProvenArrSearch({ queries: ['episode'], read: async () => { throw new Error(message); }, launch: async () => {} });
     assert.equal(result.failureCode, undefined);
+    assert.equal(result.success, false);
     assert.match(result.message, new RegExp(message));
   }
   const refused = await executeProvenArrSearch({ queries: ['episode'], read: async () => [{ approved: true }], launch: async () => { throw new Error('client indisponible'); } });
@@ -64,3 +65,5 @@ test('la série vérifie chaque saison diffusée et manquante, jamais le flux RS
   ]);
   assert.deepEqual(queries, ['release?seriesId=19&seasonNumber=1', 'release?seriesId=19&seasonNumber=2']);
 });
+
+// CI recovery 2026-10-14: revalidate the exact #430 staged tree after GitHub access restoration.
