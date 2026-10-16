@@ -22,6 +22,7 @@ interface HeroSeason {
 }
 
 interface HeroProgressSource {
+  status?: string;
   seenEpisodes?: string[];
   seasonsCache?: HeroSeason[];
   nextEpisodeToWatch?: HeroEpisodePointer | null;
@@ -83,16 +84,17 @@ function resolveKnownSeasonEpisodeCount(
  * Resolves Explorer's resume episode without trusting stale derived metadata.
  *
  * `seenEpisodes` is durable progress. `nextEpisodeToWatch` can legitimately carry
- * richer metadata, so it is kept whenever it is still ahead of that progress.
- * When the pointer regresses to an already passed episode, the Hero derives the
- * next sequential episode from durable progress instead of displaying the stale
- * pointer. `seasonsCache` is only a legacy last-resort source for season length.
+ * richer metadata, so an unseen pointer is kept even before a later seen episode.
+ * When the pointer names a seen episode, the Hero advances only across seen
+ * episodes, preserving gaps in independently imported or marked progress.
+ * `seasonsCache` is only a legacy last-resort source for season length.
  */
 export function resolveHeroNextEpisode(show: HeroProgressSource): HeroEpisodeRef | null {
   const seenEpisodes = (show.seenEpisodes || [])
     .map(parseSeenEpisode)
     .filter((episode): episode is HeroEpisodeRef => Boolean(episode));
   const derived = pointerToEpisodeRef(show.nextEpisodeToWatch);
+  const seenKeys = new Set(seenEpisodes.map(ref => `${ref.season}x${ref.episode}`));
 
   if (seenEpisodes.length === 0) {
     return derived;
@@ -102,26 +104,39 @@ export function resolveHeroNextEpisode(show: HeroProgressSource): HeroEpisodeRef
     isAfter(episode, latest) ? episode : latest
   ));
 
-  if (derived && isAfter(derived, latestSeen)) {
+  if (derived && !seenKeys.has(`${derived.season}x${derived.episode}`)) {
     return derived;
   }
 
   const totalAiredEpisodes = toPositiveInteger(show.totalAiredEpisodes);
-  if (totalAiredEpisodes && seenEpisodes.length >= totalAiredEpisodes) {
+  if (totalAiredEpisodes && seenKeys.size >= totalAiredEpisodes) {
     return null;
   }
 
-  const seasonEpisodeCount = resolveKnownSeasonEpisodeCount(show, latestSeen.season);
-  if (seasonEpisodeCount && latestSeen.episode >= seasonEpisodeCount) {
-    const pointer = show.nextEpisodeToWatch;
-    const isKnownSeriesFinale = pointer?.is_final_season === true
-      && (pointer.series_ended === true || show.seriesEnded === true);
-    if (isKnownSeriesFinale) return null;
-
-    return { season: latestSeen.season + 1, episode: 1 };
+  let candidate = derived || latestSeen;
+  for (let step = 0; step <= seenKeys.size; step += 1) {
+    if (!seenKeys.has(`${candidate.season}x${candidate.episode}`)) return candidate;
+    const seasonEpisodeCount = resolveKnownSeasonEpisodeCount(show, candidate.season);
+    if (seasonEpisodeCount && candidate.episode >= seasonEpisodeCount) {
+      const pointer = show.nextEpisodeToWatch;
+      const isKnownSeriesFinale = pointer?.is_final_season === true
+        && pointer.season_number === candidate.season
+        && (pointer.series_ended === true || show.seriesEnded === true);
+      if (isKnownSeriesFinale) return null;
+      candidate = { season: candidate.season + 1, episode: 1 };
+    } else {
+      candidate = { season: candidate.season, episode: candidate.episode + 1 };
+    }
   }
+  return candidate;
+}
 
-  return { season: latestSeen.season, episode: latestSeen.episode + 1 };
+export function resolveHeroResumeState(show: HeroProgressSource) {
+  const nextEpisode = resolveHeroNextEpisode(show);
+  return {
+    nextEpisode,
+    isCompleted: !nextEpisode && (show.status === 'completed' || Boolean(show.seenEpisodes?.length)),
+  };
 }
 
 export function formatHeroEpisode(ref: HeroEpisodeRef): string {

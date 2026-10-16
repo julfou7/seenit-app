@@ -24,7 +24,7 @@ import { useShowsStore } from '../store/showsStore';
 import {
   buildHeroOverviewPreview,
   formatHeroEpisode,
-  resolveHeroNextEpisode,
+  resolveHeroResumeState,
 } from '../features/discover/heroPresentation';
 import {
   DISCOVER_CRITICAL_GRID_ITEMS,
@@ -143,8 +143,7 @@ export const HeroCard = React.memo(function HeroCard({
     const seenCount = show.seenEpisodes?.length || 0;
 
     if (isTv) {
-      const nextEpisode = resolveHeroNextEpisode(show);
-      const isCompleted = show.status === 'completed' || (seenCount > 0 && !nextEpisode);
+      const { nextEpisode, isCompleted } = resolveHeroResumeState(show);
 
       if (isCompleted) {
         mainActionText = 'À jour sur la diffusion';
