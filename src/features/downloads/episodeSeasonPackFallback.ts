@@ -564,10 +564,10 @@ export async function downloadEpisodeWithSeasonPackFallback(
       sonarrHeaders
     );
     seasonReleases = rankSeasonPackReleases(requireArrReleaseArray(response), params.qualityPreference);
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       success: false,
-      message: `Aucune release d’épisode isolée et la recherche du pack Saison ${params.season} a échoué : ${error?.message || 'erreur Sonarr'}.`
+      message: `Aucune release d’épisode isolée et la recherche du pack Saison ${params.season} a échoué : ${error instanceof Error ? error.message : 'erreur Sonarr'}.`
     };
   }
 

@@ -2216,9 +2216,9 @@ async function startServer() {
         totalFound: normalizedHistory.length + normalizedWatchlist.length,
         cursor: syncCursor
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[Plex Sync Error]', err);
-      return res.status(500).json({ error: err?.message || 'Erreur lors de la synchronisation de l\'historique Plex' });
+      return res.status(500).json({ error: err instanceof Error ? err.message : 'Erreur lors de la synchronisation de l\'historique Plex' });
     }
   });
 

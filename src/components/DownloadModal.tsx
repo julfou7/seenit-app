@@ -521,8 +521,8 @@ export function DownloadModal({
         setActionMessage({ text: result.message, type: 'error' });
         showMediaDownloadToast(result.message, 'error');
       }
-    } catch (error: any) {
-      const message = error?.message || "Erreur lors de l'envoi de la release.";
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erreur lors de l'envoi de la release.";
       failDownloadRequest(requestId, message);
       setActionMessage({ text: message, type: 'error' });
       showMediaDownloadToast(message, 'error');
