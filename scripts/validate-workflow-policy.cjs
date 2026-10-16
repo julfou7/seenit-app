@@ -16,7 +16,7 @@ const WORKFLOW_WRITE_PERMISSIONS = Object.freeze({
   'discover-media-relations.yml': new Set([]),
   'firestore-default-migration.yml': new Set(['id-token', 'issues']),
   'release-control.yml': new Set(['actions', 'contents', 'issues', 'pull-requests']),
-  'release-update-push.yml': new Set(['issues']),
+  'release-update-push.yml': new Set(['actions', 'contents', 'issues']),
   'runtime-control.yml': new Set(['actions', 'issues'])
 });
 const ALLOWED_WORKFLOWS = new Set(Object.keys(WORKFLOW_WRITE_PERMISSIONS));

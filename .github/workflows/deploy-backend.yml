@@ -171,6 +171,7 @@ jobs:
               FAILURE|INTERNAL_ERROR|TIMEOUT|CANCELLED|EXPIRED|STATUS_UNKNOWN)
                 echo "Cloud Build terminé en échec: $build_status"
                 jq '{id, status, statusDetail, results, steps: [.steps[]? | {id, name, status, timing}]}' <<<"$build_json" || true
+                echo "Diagnostic lecture seule : Audit Structured SeenIt Logs, input cloud_build_id=$build_id"
                 exit 1
                 ;;
               *)

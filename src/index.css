@@ -36,6 +36,12 @@ html, body {
   padding-bottom: 0;
 }
 .seenit-dialog-layer .pb-nav { padding-bottom: 1rem; }
+/* La fiche média peut recevoir le focus avant le chargement de ses contrôles.
+   Elle ne doit jamais afficher l'outline UA autour de toute la WebView. */
+.seenit-dialog-layer[data-dialog-blocking="false"]:focus,
+.seenit-dialog-layer[data-dialog-blocking="false"]:focus-visible {
+  outline: none;
+}
 .seenit-dialog-layer :focus-visible {
   outline: 2px solid #E5A93D;
   outline-offset: 3px;

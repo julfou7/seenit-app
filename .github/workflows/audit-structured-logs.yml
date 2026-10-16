@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: '23 */6 * * *'
   workflow_dispatch:
+    inputs:
+      cloud_build_id:
+        description: UUID Cloud Build à diagnostiquer en lecture seule (vide pour l’audit habituel)
+        required: false
+        default: ''
+        type: string
   push:
     branches:
       - main
@@ -47,7 +53,7 @@ env:
 jobs:
   audit:
     name: Audit redacted operational events
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.cloud_build_id == '')
     runs-on: ubuntu-latest
     timeout-minutes: 8
 
@@ -83,13 +89,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          filter='resource.type="cloud_run_revision" AND resource.labels.service_name="'"$GCP_SERVICE"'" AND jsonPayload.seenitEvent.schemaVersion=1'
+          window_end="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          window_start="$(date -u -d '12 hours ago' +'%Y-%m-%dT%H:%M:%SZ')"
+          filter='resource.type="cloud_run_revision" AND resource.labels.service_name="'"$GCP_SERVICE"'" AND jsonPayload.seenitEvent.schemaVersion=1 AND timestamp>="'"$window_start"'" AND timestamp<="'"$window_end"'"'
           set +e
           gcloud logging read "$filter" \
             --project "$GCP_PROJECT_ID" \
-            --freshness=12h \
             --limit=5000 \
-            --order=asc \
+            --order=desc \
             --format=json \
             > "$RUNNER_TEMP/seenit-structured-logs.json"
           status=$?
@@ -109,13 +116,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          filter='resource.type="cloud_run_revision" AND resource.labels.service_name="'"$GCP_SERVICE"'" AND jsonPayload.seenitDiagnostic.schemaVersion=1 AND jsonPayload.seenitDiagnostic.code="TMDB_REQUEST_CACHE_SUMMARY"'
+          window_end="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          window_start="$(date -u -d '6 hours ago' +'%Y-%m-%dT%H:%M:%SZ')"
+          filter='resource.type="cloud_run_revision" AND resource.labels.service_name="'"$GCP_SERVICE"'" AND jsonPayload.seenitDiagnostic.schemaVersion=1 AND jsonPayload.seenitDiagnostic.code="TMDB_REQUEST_CACHE_SUMMARY" AND timestamp>="'"$window_start"'" AND timestamp<="'"$window_end"'"'
           set +e
           gcloud logging read "$filter" \
             --project "$GCP_PROJECT_ID" \
-            --freshness=6h \
             --limit=5000 \
-            --order=asc \
+            --order=desc \
             --format=json \
             > "$RUNNER_TEMP/seenit-tmdb-cache-diagnostics.json"
           status=$?
@@ -135,13 +143,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          filter='resource.type="cloud_run_revision" AND resource.labels.service_name="'"$GCP_SERVICE"'" AND log_id("run.googleapis.com/requests")'
+          window_end="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          window_start="$(date -u -d '6 hours ago' +'%Y-%m-%dT%H:%M:%SZ')"
+          echo "window_start=$window_start" >> "$GITHUB_OUTPUT"
+          echo "window_end=$window_end" >> "$GITHUB_OUTPUT"
+          filter='resource.type="cloud_run_revision" AND resource.labels.service_name="'"$GCP_SERVICE"'" AND log_id("run.googleapis.com/requests") AND timestamp>="'"$window_start"'" AND timestamp<="'"$window_end"'"'
           set +e
           gcloud logging read "$filter" \
             --project "$GCP_PROJECT_ID" \
-            --freshness=6h \
             --limit=10000 \
-            --order=asc \
+            --order=desc \
             --format=json \
             > "$RUNNER_TEMP/seenit-cloud-run-traffic.json"
           status=$?
@@ -170,6 +181,8 @@ jobs:
         continue-on-error: true
         env:
           SEENIT_CLOUD_RUN_TRAFFIC_SOURCE_STATUS: ${{ steps.collect_cloud_run_traffic.outputs.source_status || 'off' }}
+          SEENIT_CLOUD_RUN_TRAFFIC_WINDOW_START: ${{ steps.collect_cloud_run_traffic.outputs.window_start }}
+          SEENIT_CLOUD_RUN_TRAFFIC_WINDOW_END: ${{ steps.collect_cloud_run_traffic.outputs.window_end }}
         run: >-
           node scripts/summarize-cloud-run-traffic.cjs
           --input=${{ runner.temp }}/seenit-cloud-run-traffic.json
@@ -240,3 +253,35 @@ jobs:
         run: |
           echo 'L’auditeur a terminé en état dégradé. Le backend SeenIt reste indépendant de ce job.'
           exit 1
+
+  diagnose_cloud_build:
+    name: Diagnose exact Cloud Build (read-only)
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.cloud_build_id != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      CLOUD_BUILD_ID: ${{ inputs.cloud_build_id }}
+    steps:
+      - name: Authenticate read-only build log collector
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_AUDIT_SERVICE_ACCOUNT }}
+          project_id: ${{ env.GCP_PROJECT_ID }}
+      - name: Set up gcloud for read-only diagnostics
+        uses: google-github-actions/setup-gcloud@v3
+      - name: Read bounded logs for the exact build
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$CLOUD_BUILD_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+            echo 'UUID Cloud Build invalide'
+            exit 1
+          fi
+          gcloud logging read \
+            "resource.type=\"build\" AND resource.labels.build_id=\"${CLOUD_BUILD_ID}\"" \
+            --project "$GCP_PROJECT_ID" --freshness=24h --order=desc --limit=150 \
+            --format='value(textPayload)'

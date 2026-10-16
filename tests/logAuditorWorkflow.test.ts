@@ -11,7 +11,7 @@ test('SEENIT-OBSERVABILITY-001 exécute un batch Cloud Run en dry-run désactiva
   assert.match(workflow, /cron: '23 \*\/6 \* \* \*'/);
   assert.match(workflow, /vars\.SEENIT_LOG_AUDITOR_MODE \|\| 'dry-run'/);
   assert.match(workflow, /env\.SEENIT_LOG_AUDITOR_MODE != 'off'/);
-  assert.match(workflow, /jsonPayload\.seenitEvent\.schemaVersion=1[\s\S]*--freshness=12h/);
+  assert.match(workflow, /jsonPayload\.seenitEvent\.schemaVersion=1/);
   assert.match(workflow, /jsonPayload\.seenitDiagnostic\.code="TMDB_REQUEST_CACHE_SUMMARY"/);
   assert.match(workflow, /summarize-tmdb-cache-diagnostics\.cjs/);
   assert.match(workflow, /log_id\("run\.googleapis\.com\/requests"\)/);
@@ -20,8 +20,8 @@ test('SEENIT-OBSERVABILITY-001 exécute un batch Cloud Run en dry-run désactiva
   assert.match(workflow, /retention-days: 40/);
   assert.match(workflow, /seenit-tmdb-cache-baseline-\$\{\{ github\.run_id \}\}/);
   assert.match(workflow, /push:[\s\S]*branches:[\s\S]*main[\s\S]*summarize-tmdb-cache-diagnostics\.cjs/);
-  assert.match(workflow, /--freshness=6h/);
   assert.match(workflow, /--limit=5000/);
+  assert.match(workflow, /--limit=10000/);
   assert.match(workflow, /scripts\/audit-structured-logs\.cjs/);
   assert.match(workflow, /src\/features\/runtime\/operationalEvent\.ts/);
   assert.match(workflow, /src\/features\/runtime\/backendRuntime\.ts/);
@@ -35,6 +35,7 @@ test('SEENIT-OBSERVABILITY-001 exécute un batch Cloud Run en dry-run désactiva
   assert.match(workflow, /SEENIT_AUDITOR_STRUCTURED_SOURCE_STATUS/);
   assert.match(workflow, /SEENIT_AUDITOR_TMDB_SOURCE_STATUS/);
   assert.match(workflow, /SEENIT_AUDITOR_TRAFFIC_SOURCE_STATUS/);
+  assert.match(workflow, /SEENIT_AUDITOR_TRAFFIC_SUMMARY_OUTCOME/);
   assert.match(workflow, /steps\.health_watchdog\.outcome == 'failure'/);
   assert.match(workflow, /issues: write/);
   assert.match(workflow, /id: auth[\s\S]*continue-on-error: true/);
@@ -50,6 +51,35 @@ test('SEENIT-OBSERVABILITY-001 exécute un batch Cloud Run en dry-run désactiva
   assert.doesNotMatch(deploymentBootstrap, /roles\/(?:viewer|logging\.viewer)/);
   assert.match(processDoc, /trois issues par run et trois issues/);
   assert.match(processDoc, /ne ferme jamais une issue/);
+  assert.match(processDoc, /fenêtre temporelle explicite/);
+  assert.match(processDoc, /stale/);
+  assert.match(processDoc, /10 000/);
+});
+
+test('SEENIT-OBSERVABILITY-001 borne les lectures Cloud Logging par timestamps explicites', () => {
+  const audit = workflow.split('  diagnose_cloud_build:')[0];
+  assert.doesNotMatch(audit, /--freshness=/);
+  assert.equal((audit.match(/timestamp>=/g) || []).length, 3);
+  assert.equal((audit.match(/timestamp<=/g) || []).length, 3);
+  assert.equal((audit.match(/--order=desc/g) || []).length, 3);
+  assert.match(workflow, /date -u -d '12 hours ago'/);
+  assert.equal((workflow.match(/date -u -d '6 hours ago'/g) || []).length, 2);
+  assert.match(workflow, /echo "window_start=\$window_start" >> "\$GITHUB_OUTPUT"/);
+  assert.match(workflow, /echo "window_end=\$window_end" >> "\$GITHUB_OUTPUT"/);
+  assert.match(workflow, /SEENIT_CLOUD_RUN_TRAFFIC_WINDOW_START: \$\{\{ steps\.collect_cloud_run_traffic\.outputs\.window_start \}\}/);
+  assert.match(workflow, /SEENIT_CLOUD_RUN_TRAFFIC_WINDOW_END: \$\{\{ steps\.collect_cloud_run_traffic\.outputs\.window_end \}\}/);
+});
+
+test('SEENIT-RUNTIME-001 diagnostique un UUID de build en lecture seule sans rôle de déploiement', () => {
+  const job = workflow.split('  diagnose_cloud_build:')[1];
+  assert.ok(job);
+  assert.match(job, /github.ref == 'refs\/heads\/main'/);
+  assert.match(job, /inputs.cloud_build_id != ''/);
+  assert.match(job, /GCP_AUDIT_SERVICE_ACCOUNT/);
+  assert.match(job, /\^\[0-9a-f\]\{8\}/);
+  assert.match(job, /resource\.labels\.build_id=.*CLOUD_BUILD_ID/);
+  assert.match(job, /--order=desc --limit=150/);
+  assert.doesNotMatch(job, /gcloud (?:run|builds|iam)|issues: write|contents: write/);
 });
 
 test('SEENIT-OBSERVABILITY-001 réutilise le provider WIF canonique sans le recréer', () => {

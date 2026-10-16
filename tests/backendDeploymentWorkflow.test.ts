@@ -80,6 +80,10 @@ test('SEENIT-RUNTIME-001 suit Cloud Build sans exiger la lecture du bucket de lo
   assert.match(workflow, /FAILURE\|INTERNAL_ERROR\|TIMEOUT\|CANCELLED\|EXPIRED\|STATUS_UNKNOWN/);
   assert.match(workflow, /Cloud Build lancé sans streaming de logs/);
   assert.doesNotMatch(workflow, /gcloud builds log/);
+  const failure = workflow.indexOf('Cloud Build terminé en échec');
+  const diagnostics = workflow.indexOf('input cloud_build_id=$build_id', failure);
+  assert.ok(diagnostics > failure);
+  assert.ok(workflow.indexOf('exit 1', diagnostics) < resolveDigest);
 });
 
 test('SEENIT-RUNTIME-001 remplace le service exporté sans réutiliser le déploiement source hérité', () => {

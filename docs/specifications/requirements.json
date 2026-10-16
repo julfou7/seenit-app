@@ -916,7 +916,15 @@
         },
         {
           "file": "tests/cloudRunTrafficAudit.test.ts",
-          "contains": "SEENIT-COST-001 agrège le trafic Cloud Run par route sans conserver URL ni identifiant"
+          "contains": "SEENIT-COST-001 agrège le trafic récent par route sans conserver URL ni identifiant"
+        },
+        {
+          "file": "tests/cloudRunTrafficAudit.test.ts",
+          "contains": "SEENIT-COST-001 refuse comme stale une source hors de la fenêtre demandée"
+        },
+        {
+          "file": "tests/cloudRunTrafficAudit.test.ts",
+          "contains": "SEENIT-COST-001 signale la saturation à 10 000 entrées au lieu de prétendre le rapport complet"
         },
         {
           "file": "tests/plexResponseCompression.test.ts",

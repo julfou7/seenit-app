@@ -42,7 +42,11 @@ function syncBackground() {
   for (const [index, entry] of ordered.entries()) {
     const surface = surfaces.get(entry.id);
     if (!surface) continue;
-    surface.style.zIndex = String(1000 + index);
+    // Une surface non bloquante (la fiche média) conserve son z-index déclaré afin que
+    // la BottomNav reste au-dessus. Seuls les vrais dialogues bloquants sont promus
+    // dans la pile de portails.
+    if (surface.dataset.dialogBlocking === 'false') surface.style.removeProperty('z-index');
+    else surface.style.zIndex = String(1000 + index);
     if (surface.dataset.dialogBlocking === 'true') surface.setAttribute('aria-modal', String(entry.id === dialogStack.top()?.id));
     else surface.removeAttribute('aria-modal');
   }

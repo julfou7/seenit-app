@@ -168,6 +168,12 @@ intentions afin que la preuve avant/après reste discriminante.
 
 ## 6. En-têtes, dialogues et safe areas — proposition #181
 
+Le Hero Explorer (#665) calcule son CTA Reprendre depuis la progression persistée avant les pointeurs
+dérivés devenus obsolètes. Le code d'épisode reste explicite ; À jour sur la diffusion n'est pas remplacé
+par un faux prochain épisode lorsque tous les épisodes disponibles sont vus. Le synopsis conserve une
+hauteur compacte, coupe à une fin de mot et propose Voir plus/Voir moins sans déclencher l'ouverture de
+la fiche ou modifier le suivi.
+
 Trois familles suffisent : en-tête d'onglet racine, en-tête de fiche avec Retour et actions, en-tête de
 dialogue avec titre et fermeture. Elles partagent tailles de contrôle, espacement, noms accessibles et
 safe areas ; le hero d'un film peut conserver sa présentation propre.

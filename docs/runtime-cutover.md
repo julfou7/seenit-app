@@ -72,3 +72,8 @@ Le workflow automatise ce rollback si le smoke de l'origine canonique échoue ap
 - résultat du smoke spécifique au parcours modifié ;
 - heure de bascule et, si nécessaire, heure du rollback ;
 - lien vers l'issue GitHub de changement.
+
+En cas d'échec Buildpacks, le workflow publie l'UUID exact. Le diagnostic en lecture seule utilise
+`Audit Structured SeenIt Logs` sur main avec l'input `cloud_build_id` : le compte `seenit-log-auditor`
+lit au plus 150 entrées de ce build, sans rôle de déploiement ni artefact de logs bruts. Ce mode ne
+relance pas le build et ne change pas le trafic. La cause doit être prouvée avant un correctif de build.
