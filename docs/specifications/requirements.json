@@ -1740,6 +1740,18 @@
         {
           "file": "tests/developmentGovernance.test.ts",
           "contains": "SEENIT-RELEASE-002 la CI valide puis publie sans modifier automatiquement main"
+        },
+        {
+          "file": "tests/nativeDependencyAudit.test.ts",
+          "contains": "SEENIT-RELEASE-002 refuse les alertes natives même classées dev"
+        },
+        {
+          "file": "tests/nativeDependencyAudit.test.ts",
+          "contains": "SEENIT-RELEASE-002 refuse un rapport natif absent ou une erreur de registre"
+        },
+        {
+          "file": "tests/nativeDependencyAudit.test.ts",
+          "contains": "SEENIT-RELEASE-002 branche le contrôle natif dans la validation et la release"
         }
       ]
     },

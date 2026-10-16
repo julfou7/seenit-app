@@ -268,7 +268,9 @@ jobs:
 
       - name: Production Dependency Audit
         if: inputs.fast_terrain != true
-        run: npm audit --omit=dev --audit-level=high
+        run: |
+          npm audit --omit=dev --audit-level=high
+          node scripts/audit-native-dependencies.cjs
 
       - name: Build Web Assets
         run: npm run build

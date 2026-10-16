@@ -106,6 +106,31 @@ test('un nouvel épisode disponible prime sur un ancien statut completed du Hero
     status: 'completed', seenEpisodes: ['1x1', '1x2'],
     nextEpisodeToWatch: { season_number: 2, episode_number: 1 },
   });
-  assert.deepEqual(state, { nextEpisode: { season: 2, episode: 1 }, isCompleted: false });
+  assert.deepEqual(state, { nextEpisode: { season: 2, episode: 1 }, upcomingEpisode: null, isCompleted: false });
   assert.equal(resolveHeroResumeState({ status: 'completed', seenEpisodes: ['1x1'], totalAiredEpisodes: 1 }).isCompleted, true);
+});
+
+test('une saison future conserve le Hero à jour jusqu’au jour de diffusion', () => {
+  const show = {
+    status: 'completed', seenEpisodes: ['1x1'],
+    nextEpisodeToWatch: { season_number: 2, episode_number: 1, air_date: '2026-10-17' },
+  };
+  assert.deepEqual(resolveHeroResumeState(show, new Date(2026, 9, 16)), { nextEpisode: null, upcomingEpisode: null, isCompleted: true });
+  assert.deepEqual(resolveHeroResumeState(show, new Date(2026, 9, 17)), { nextEpisode: { season: 2, episode: 1 }, upcomingEpisode: null, isCompleted: false });
+});
+
+test('un statut completed sans pointeur connu ne fabrique aucun épisode', () => {
+  for (const nextEpisodeToWatch of [null, undefined]) {
+    assert.deepEqual(resolveHeroResumeState({ status: 'completed', seenEpisodes: ['1x1'], nextEpisodeToWatch }), { nextEpisode: null, upcomingEpisode: null, isCompleted: true });
+  }
+});
+
+test('une série non commencée affiche son épisode à venir au lieu de proposer S01E01', () => {
+  const show = { status: 'watching', seenEpisodes: [], nextEpisodeToWatch: { season_number: 2, episode_number: 3, air_date: '2026-10-17' } };
+  assert.deepEqual(resolveHeroResumeState(show, new Date(2026, 9, 16)), {
+    nextEpisode: null, upcomingEpisode: { season: 2, episode: 3 }, isCompleted: false,
+  });
+  assert.deepEqual(resolveHeroResumeState(show, new Date(2026, 9, 17)), {
+    nextEpisode: { season: 2, episode: 3 }, upcomingEpisode: null, isCompleted: false,
+  });
 });
