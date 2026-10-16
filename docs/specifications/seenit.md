@@ -1291,7 +1291,9 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   pousse sur `main`. Chaque push/PR exécute une validation rapide avec cache npm, tests et build, sans
   publier automatiquement d'APK. Le contrat Android n'est exécuté sur un push que si le diff affecte
   l'APK. L'audit des dépendances de production est limité aux changements de dépendances, au contrôle
-  périodique et aux releases. La construction Gradle, le smoke N → N+1 et la publication APK sont
+  périodique et aux releases. Le runtime natif Capacitor est également audité, même déclaré dans
+  `devDependencies` : une alerte high/critical Android/iOS ou un rapport invalide bloque la livraison.
+  Les outils de génération d'assets ne sont pas assimilés au runtime embarqué. La construction Gradle, le smoke N → N+1 et la publication APK sont
   déclenchés explicitement depuis `main`. La release produit l'APK et son SHA-256 depuis le même
   commit ; le tag `vX.Y.Z` désigne exactement ce commit.
 - **SEENIT-RELEASE-003** — Les notes publiques d'une version agrègent tous les commits compris entre

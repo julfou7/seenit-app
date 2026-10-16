@@ -139,6 +139,7 @@ function validatePostinstall() {
     }
     if (classification.dependenciesChanged || process.env.SEENIT_FORCE_DEPENDENCY_AUDIT === 'true') {
       runNpm(['audit', '--omit=dev', '--audit-level=high'], { label: 'Audit dépendances production' });
+      run('node', ['scripts/audit-native-dependencies.cjs'], { label: 'Audit runtime natif embarqué' });
     }
     runNpm(['run', 'build'], { label: 'Build Web + serveur', metric: 'SEENIT_BUILD_SECONDS' });
     run('node', ['scripts/quality-bundle-budget.cjs'], {
