@@ -661,6 +661,12 @@ et webhooks, qui ne doit pas être dupliquée dans les réglages généraux.
 
 ### 10.2 Recherche et lancement
 
+- Une recherche Sonarr/Radarr sans release admissible après les fallbacks autorisés place la demande
+  en erreur et envoie une alerte système unique aux appareils du compte, même si l'écran a été quitté.
+  L'alerte nomme le média SeenIt et son scope ; le tap ouvre sa fiche exacte. Une panne, un timeout,
+  une réponse invalide ou une recherche interrompue conserve un message distinct et ne produit jamais
+  « aucune release ». Une erreur d'envoi vers SeenIt est conservée par UID pour reprise ; les retries
+  ne rejouent pas une notification déjà réservée par le backend.
 - C411 recherche avec filtres Tous/Film/Série, qualité Toutes/4K/1080p/720p et tri seeders/taille/date.
 - Film/Série est un filtre facultatif : le mode Tous reste utilisable jusqu'au téléchargement. Chaque
   résultat indique le type lorsque C411 fournit la sous-catégorie exacte (`6` Film ou `7` Série).

@@ -24,6 +24,7 @@ import {
   type TorrentFileLike
 } from './episodePackSelection';
 import { registerTrackedSeasonPack } from './episodeSeasonPackCleanup';
+import { confirmNoArrRelease, requireArrReleaseArray, type DownloadFailureCode } from './downloadNoRelease';
 
 export interface EpisodeDownloadWithFallbackParams {
   url: string;
@@ -44,6 +45,7 @@ export interface EpisodeDownloadWithFallbackParams {
 export interface EpisodeDownloadWithFallbackResult {
   success: boolean;
   message: string;
+  failureCode?: DownloadFailureCode;
   status?: 'searching' | 'queued';
   fallbackUsed?: boolean;
   downloadId?: string;
@@ -499,7 +501,7 @@ export async function downloadEpisodeWithSeasonPackFallback(
   } catch {}
 
   if (!target) {
-    const normalResult = await searchAndDownloadInSonarr({
+    const ensured = await searchAndDownloadInSonarr({
       url: params.url,
       apiKey: params.apiKey,
       title: params.title,
@@ -509,22 +511,26 @@ export async function downloadEpisodeWithSeasonPackFallback(
       season: params.season,
       episode: params.episode,
       qualityProfileId: params.qualityProfileId,
-      qualityPreference: params.qualityPreference
+      qualityPreference: params.qualityPreference,
+      ensureOnly: true
     });
-    return {
-      ...normalResult,
-      status: normalResult.success ? 'searching' : undefined
-    };
+    if (!ensured.success) return ensured;
+    try {
+      target = await resolveExactTarget(base, sonarrHeaders, params, 4);
+    } catch (error: unknown) {
+      return { success: false, message: error instanceof Error ? error.message : 'Sonarr indisponible.' };
+    }
+    if (!target) return { success: false, message: 'Sonarr n’a pas confirmé l’épisode exact.' };
   }
 
   let episodeReleases: any[];
   try {
     const response = await interactiveGet(`${base}/api/v3/release?episodeId=${target.episode.id}`, sonarrHeaders);
-    episodeReleases = Array.isArray(response) ? response : [];
-  } catch (error: any) {
+    episodeReleases = requireArrReleaseArray(response);
+  } catch (error: unknown) {
     return {
       success: false,
-      message: `Sonarr n’a pas pu vérifier les releases de l’épisode : ${error?.message || 'recherche interactive impossible'}.`
+      message: `Sonarr n’a pas pu vérifier les releases de l’épisode : ${error instanceof Error ? error.message : 'recherche interactive impossible'}.`
     };
   }
 
@@ -541,10 +547,9 @@ export async function downloadEpisodeWithSeasonPackFallback(
       qualityProfileId: params.qualityProfileId,
       qualityPreference: params.qualityPreference
     });
-    return {
-      ...normalResult,
-      status: normalResult.success ? 'searching' : undefined
-    };
+    if (normalResult.success || normalResult.failureCode !== 'no_release') {
+      return { ...normalResult, status: normalResult.success ? 'searching' : undefined };
+    }
   }
 
   let seasonReleases: any[];
@@ -553,7 +558,7 @@ export async function downloadEpisodeWithSeasonPackFallback(
       `${base}/api/v3/release?seriesId=${target.series.id}&seasonNumber=${params.season}`,
       sonarrHeaders
     );
-    seasonReleases = rankSeasonPackReleases(Array.isArray(response) ? response : [], params.qualityPreference);
+    seasonReleases = rankSeasonPackReleases(requireArrReleaseArray(response), params.qualityPreference);
   } catch (error: any) {
     return {
       success: false,
@@ -562,8 +567,11 @@ export async function downloadEpisodeWithSeasonPackFallback(
   }
 
   if (!seasonReleases.length) {
+    const confirmed = await confirmNoArrRelease(path => executeGet(`${base}/api/v3/${path}`, sonarrHeaders));
+    if (!confirmed.failureCode) return confirmed;
     return {
       success: false,
+      failureCode: confirmed.failureCode,
       message: `Aucune release S${String(params.season).padStart(2, '0')}E${String(params.episode).padStart(2, '0')} isolée ni pack Saison ${params.season} compatible n’a été trouvé.`
     };
   }

@@ -1399,6 +1399,29 @@
       ]
     },
     {
+      "id": "SEENIT-NOTIFICATION-004",
+      "title": "Absence de release prouvée et notification unique liée à la demande SeenIt",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/downloadNoRelease.test.ts",
+          "contains": "SEENIT-NOTIFICATION-004 conclut uniquement après tous les scopes et fallbacks"
+        },
+        {
+          "file": "tests/downloadFailureNotification.test.ts",
+          "contains": "SEENIT-NOTIFICATION-004 notifie une seule fois le UID de la demande"
+        },
+        {
+          "file": "tests/downloadSearchRuntime.test.ts",
+          "contains": "les services réels distinguent zéro release, panne et lancement confirmé pour film/saison/série"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-NOTIFICATION-003",
       "title": "Notification post-import média évolutive et disponibilité Plex exacte sur Android",
       "targets": [

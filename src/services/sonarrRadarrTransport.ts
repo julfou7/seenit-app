@@ -747,8 +747,22 @@ export async function testServiceConnection(
 }
 
 
-export async function executeArrInteractiveGet(url: string, headers: Record<string, string>): Promise<any> {
-  if (!Capacitor.isNativePlatform()) return executeGet(url, headers);
+export async function executeArrInteractiveGet(url: string, headers: Record<string, string>): Promise<unknown> {
+  if (!Capacitor.isNativePlatform()) {
+    if (isLocalNetworkUrl(url)) {
+      const response = await fetch(url, { headers, signal: AbortSignal.timeout(30_000) });
+      if (!response.ok) throw new Error(`Erreur HTTP ${response.status}`);
+      return response.json();
+    }
+    const response = await authenticatedFetch('/api/service-proxy', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetUrl: url, method: 'GET', headers }),
+      signal: AbortSignal.timeout(35_000)
+    });
+    const result = await response.json();
+    if (!response.ok || !result.ok || result.error) throw new Error(result.message || result.error || `Erreur proxy ${response.status}`);
+    return result.data;
+  }
   try {
     const normHeaders = { ...headers };
     if (headers['X-Api-Key']) normHeaders['x-api-key'] = headers['X-Api-Key'];
@@ -766,8 +780,8 @@ export async function executeArrInteractiveGet(url: string, headers: Record<stri
       return data;
     }
     throw new Error(`Erreur HTTP ${response.status}`);
-  } catch (error: any) {
-    throw new Error(error?.message || 'Recherche interactive impossible');
+  } catch (error: unknown) {
+    throw new Error(error instanceof Error ? error.message : 'Recherche interactive impossible');
   }
 }
 

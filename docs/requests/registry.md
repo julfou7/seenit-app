@@ -2,6 +2,7 @@
 
 | ID | Date | Décision durable | Exigences / trace | Statut |
 |---|---|---|---|---|
+| USR-2026-10-02-430 | 2026-10-02 | Une absence de release Sonarr/Radarr prouvée après tous les fallbacks autorisés produit une erreur et une notification FCM unique par UID/requestId, liée à l'intention SeenIt et à sa fiche exacte. Une panne ou un résultat ambigu ne devient jamais une absence ; le transport est repris par UID sans rejouer un envoi réservé. | `SEENIT-NOTIFICATION-004`, [issue #430](https://github.com/julfou7/seenit-app/issues/430) | active |
 | USR-2026-10-02-447 | 2026-10-02 | Les bandes-annonces sont parcourues par nom/type/identité exacte avec libellés linguistiques limités aux preuves disponibles. Le téléphone Android ouvre le lecteur en immersion paysage et restaure portrait/barres à la fermeture ; la PWA conserve un fallback manuel si les API sont refusées. | `SEENIT-UX-013`, [issue #447](https://github.com/julfou7/seenit-app/issues/447) | active |
 | USR-2026-10-01-002 | 2026-10-01 | Les badges suivent Mes plateformes disponibles > Plex disponible > autre diffuseur FR ; les cartes montées réagissent aux bascules ON/OFF/ON et à l'hydratation session sans Réglages ni purge de cache. | `SEENIT-PROVIDER-001`, [issue #337](https://github.com/julfou7/seenit-app/issues/337) | active |
 | USR-2026-10-01-001 | 2026-10-01 | Les dialogues partagent une pile Retour, un nom accessible, un focus contenu/restauré, un fond inerte et des safe areas communes. | `SEENIT-UX-012`, [issue #181](https://github.com/julfou7/seenit-app/issues/181) | active |

@@ -22,6 +22,7 @@ import {
 import { buildC411SearchParams } from "./src/features/downloads/c411Query.ts";
 import { buildDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookNotification.ts";
 import { deliverDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookDelivery.ts";
+import { processDownloadFailureNotification } from "./src/features/downloads/downloadFailureNotificationBackend.ts";
 import { supportsPlexAvailabilityBackgroundV1 } from "./src/features/notifications/notificationCapabilities.ts";
 import { normalizePlexAvailabilityTraceBatch } from "./src/features/notifications/plexAvailabilityDiagnostics.ts";
 import { executeIdempotentMutation, type TimedMutationResult } from "./src/features/downloads/downloadIdempotency.ts";
@@ -471,8 +472,8 @@ function startCronJobs() {
           console.log(`[CRON] Notification envoyée pour ${data.showTitle} (${delivery.delivered} appareil(s))`);
           // On supprime le rappel une fois envoyé pour éviter les doublons
           batch.delete(doc.ref);
-        } catch (err: any) {
-          console.error(`[CRON] Échec de l'envoi du rappel ${doc.id}:`, err.message);
+        } catch (err: unknown) {
+          emitOperationalEvent({ code: 'NOTIFICATION_CLIENT_FAILED', domain: 'notifications', level: 'warn', context: { errorCode: operationalErrorCode(err, 'REMINDER_SEND_FAILED') } });
         }
       }
 
@@ -2565,7 +2566,7 @@ async function startServer() {
       const fetchOptions: RequestInit & { headers: Record<string, string> } = {
         method: normalizedMethod,
         headers: cleanHeaders,
-        signal: AbortSignal.timeout(10000)
+        signal: AbortSignal.timeout(normalizedMethod === 'GET' && /\/api\/v3\/release$/.test(new URL(targetUrl).pathname) ? 30_000 : 10_000)
       };
 
       if (normalizedMethod !== 'GET' && normalizedMethod !== 'HEAD' && body !== undefined && body !== null) {
@@ -2732,6 +2733,19 @@ async function startServer() {
       sonarrUrl: `${baseUrl}/api/webhook/sonarr/${config.endpointId}`,
       radarrUrl: `${baseUrl}/api/webhook/radarr/${config.endpointId}`
     });
+  });
+
+  app.post('/api/downloads/failure-notification', requireAuth, rateLimit('download-failure-notification', 30, 60_000), async (req: AuthRequest, res) => {
+    const uid = req.user?.uid;
+    if (!uid) return res.status(401).json({ error: 'Utilisateur non authentifié' });
+    const result = await processDownloadFailureNotification(uid, req.body, async (ownerUid, notification, data) => {
+      // Android affiche le FCM visible ; le SW Web reçoit un seul message data-only.
+      await Promise.all([
+        sendPushToUserDevices(ownerUid, notification, data, { platform: 'android' }),
+        sendPushToUserDevices(ownerUid, null, { ...data, title: notification.title, body: notification.body }, { platform: 'web' })
+      ]);
+    });
+    return res.status(result.accepted ? 200 : 400).json(result);
   });
 
   app.post('/api/webhooks/config/rotate', requireAuth, rateLimit('webhook-rotate', 5, 60_000), async (req: AuthRequest, res) => {

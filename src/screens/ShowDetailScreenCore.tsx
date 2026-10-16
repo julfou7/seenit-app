@@ -120,7 +120,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     const epKey = `S${seasonNumber}E${episodeNumber}`;
     setIs1ClickDownloading(prev => ({ ...prev, [epKey]: true }));
     const showTitle = show?.title || tmdbDetails?.name || tmdbDetails?.original_name || 'Série';
-    const tvdbId = tmdbDetails?.external_ids?.tvdb_id || (show as any)?.tvdbId;
+    const tvdbId = tmdbDetails?.external_ids?.tvdb_id || (show as { tvdbId?: number } | null)?.tvdbId;
     const imdbId = tmdbDetails?.external_ids?.imdb_id || (show as any)?.imdbId;
     const posterForDownload = tmdbDetails?.poster_path || show?.posterPath || undefined;
     const backdropForDownload = tmdbDetails?.backdrop_path || show?.backdropPath || undefined;
@@ -145,7 +145,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         useLiveDownloadStore.getState().startPolling(1000);
         void useLiveDownloadStore.getState().fetchDownloads();
       } else {
-        failDownloadRequest(requestId, res.message);
+        failDownloadRequest(requestId, res.message, res.failureCode);
         showToast(res.message || "Erreur lors du lancement dans Sonarr", "error");
       }
     } catch (err: unknown) {
@@ -173,19 +173,25 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     const tvdbId = tmdbDetails?.external_ids?.tvdb_id || (show as any)?.tvdbId;
     const posterForDownload = tmdbDetails?.poster_path || show?.posterPath || undefined;
     const backdropForDownload = tmdbDetails?.backdrop_path || show?.backdropPath || undefined;
-    useLiveDownloadStore.getState().addOptimisticDownload({
+    const requestId = beginDownloadRequest({
       mediaType: 'tv', title: `${showTitle} (Saison ${seasonNumber})`, seriesTitle: showTitle, tmdbId: effectiveTmdbId, tvdbId,
       seasonNumber, posterPath: posterForDownload, backdropPath: backdropForDownload, downloadClient: 'Sonarr', statusText: 'Préparation du téléchargement…'
     });
     try {
       const res = await searchAndDownloadInSonarr({ url: config.sonarrUrl, apiKey: config.sonarrApiKey, title: showTitle, tmdbId: effectiveTmdbId, tvdbId, season: seasonNumber, qualityPreference: '1080p' });
       if (res.success) {
+        acceptDownloadRequest(requestId, res.message);
         showToast(`Téléchargement de la Saison ${seasonNumber} lancé dans Sonarr !`, 'success');
         useLiveDownloadStore.getState().startPolling(1000);
         useLiveDownloadStore.getState().fetchDownloads();
-      } else showToast(res.message || "Erreur lors du lancement de la saison", "error");
+      } else {
+        failDownloadRequest(requestId, res.message, res.failureCode);
+        showToast(res.message || "Erreur lors du lancement de la saison", "error");
+      }
     } catch (err: unknown) {
-      showToast(err instanceof Error && err.message ? err.message : "Erreur réseau Sonarr", "error");
+      const message = err instanceof Error && err.message ? err.message : "Erreur réseau Sonarr";
+      failDownloadRequest(requestId, message);
+      showToast(message, "error");
     } finally {
       setIs1ClickDownloading(prev => ({ ...prev, [seasonKey]: false }));
     }
@@ -205,19 +211,25 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     const posterForDownload = tmdbDetails?.poster_path || show?.posterPath || undefined;
     const backdropForDownload = tmdbDetails?.backdrop_path || show?.backdropPath || undefined;
     setIs1ClickDownloading(prev => ({ ...prev, movie: true }));
-    useLiveDownloadStore.getState().addOptimisticDownload({
+    const requestId = beginDownloadRequest({
       mediaType: 'movie', title: movieTitle, movieTitle, tmdbId: effectiveTmdbId, posterPath: posterForDownload,
       backdropPath: backdropForDownload, downloadClient: 'Radarr', statusText: 'Préparation du téléchargement…'
     });
     try {
       const res = await searchAndDownloadInRadarr({ url: config.radarrUrl, apiKey: config.radarrApiKey, title: movieTitle, tmdbId: effectiveTmdbId, year: movieYear, imdbId, qualityPreference: '1080p' });
       if (res.success) {
+        acceptDownloadRequest(requestId, res.message);
         showToast(`Téléchargement de « ${movieTitle} » lancé dans Radarr !`, 'success');
         useLiveDownloadStore.getState().startPolling(1000);
         useLiveDownloadStore.getState().fetchDownloads();
-      } else showToast(res.message || "Erreur lors du lancement dans Radarr", "error");
+      } else {
+        failDownloadRequest(requestId, res.message, res.failureCode);
+        showToast(res.message || "Erreur lors du lancement dans Radarr", "error");
+      }
     } catch (err: unknown) {
-      showToast(err instanceof Error && err.message ? err.message : "Erreur réseau Radarr", "error");
+      const message = err instanceof Error && err.message ? err.message : "Erreur réseau Radarr";
+      failDownloadRequest(requestId, message);
+      showToast(message, "error");
     } finally {
       setIs1ClickDownloading(prev => ({ ...prev, movie: false }));
     }
