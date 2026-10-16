@@ -4,7 +4,8 @@
   "version": "1.4.208",
   "packageManager": "npm@10.9.3",
   "engines": {
-    "node": ">=22 <25"
+    "node": ">=22 <25",
+    "npm": "10.9.3"
   },
   "type": "module",
   "scripts": {

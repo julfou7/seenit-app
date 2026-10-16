@@ -29,6 +29,11 @@ test('SEENIT-RUNTIME-001 déploie le backend canonique uniquement après validat
 });
 
 test('SEENIT-RUNTIME-001 aligne les installations npm CI et Buildpacks', () => {
+  const packageJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
+  const lock = JSON.parse(fs.readFileSync(path.join(rootDir, 'package-lock.json'), 'utf8'));
+  assert.match(packageJson.engines.npm, /^\d+\.\d+\.\d+$/);
+  assert.equal(packageJson.packageManager, `npm@${packageJson.engines.npm}`);
+  assert.equal(lock.packages[''].engines.npm, packageJson.engines.npm);
   assert.match(workflow, /npm ci --ignore-scripts --prefer-offline --no-audit --no-fund/);
   assert.doesNotMatch(workflow, /legacy-peer-deps/);
   assert.match(projectToml, /name = "NODE_ENV"\s+value = "development"/);
