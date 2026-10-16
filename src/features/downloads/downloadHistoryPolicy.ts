@@ -21,6 +21,8 @@ export interface DownloadHistorySnapshot {
 export interface DownloadHistoryOutcome {
   state: 'completed' | 'failed' | 'unknown';
   quality?: string;
+  downloadId?: string;
+  releaseTitle?: string;
   date?: number;
   message?: string;
 }
@@ -110,6 +112,7 @@ function matchStrength(item: LiveDownloadItem, record: HistoryRecord, checkedAt:
   const itemIds = new Set(getPhysicalDownloadIds(item));
   const historyId = recordDownloadId(record);
   if (historyId && itemIds.has(historyId)) return 'physical';
+  if (historyId && itemIds.size > 0) return 'none';
 
   if (!canonicalTmdbMatches(item, record) || !episodeScopeMatches(item, record)) return 'none';
 
@@ -154,6 +157,8 @@ function outcomeFromRecord(record: HistoryRecord, date: number): DownloadHistory
     return {
       state: 'completed',
       date,
+      downloadId: recordDownloadId(record) || undefined,
+      releaseTitle: typeof record.sourceTitle === 'string' ? record.sourceTitle : undefined,
       quality: normalizeQualityLabel(
         record.sourceTitle,
         record.quality?.quality?.name

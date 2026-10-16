@@ -1,9 +1,11 @@
 export type DownloadFailureCode = 'no_release';
+import type { DownloadAvailability } from './downloadAvailability.ts';
 
 export interface ArrSearchOutcome {
   success: boolean;
   message: string;
   failureCode?: DownloadFailureCode;
+  availability?: DownloadAvailability;
 }
 
 export interface ArrRelease {

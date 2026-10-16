@@ -1324,6 +1324,10 @@
         {
           "file": "tests/downloadPostImportReconciliation.test.ts",
           "contains": "SEENIT-DOWNLOAD-010 refuse un événement canonique antérieur à la demande"
+        },
+        {
+          "file": "tests/downloadStoreReconciliationRuntime.test.ts",
+          "contains": "SEENIT-DOWNLOAD-010 le poll réunit intention 4K et import 1080p uniquement par le hash prouvé"
         }
       ]
     },
@@ -2552,6 +2556,42 @@
         {
           "file": "tests/tmdbCacheArchitecture.test.ts",
           "contains": "issue #410 route Explorer Tout par le cache Discover commun"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DOWNLOAD-011",
+      "title": "Audio prouvé et sélection unique d’une autre release du média exact",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/arrManualReleases.test.ts",
+          "contains": "SEENIT-DOWNLOAD-011 consulte le film exact sans aucune mutation"
+        },
+        {
+          "file": "tests/releaseAudio.test.ts",
+          "contains": "SEENIT-DOWNLOAD-011 distingue MULTI VFF et MULTI VFQ sans inventer une variante"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DOWNLOAD-012",
+      "title": "Attente durable sans transfert et surveillance future prouvée",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/downloadAvailabilityRuntime.test.ts",
+          "contains": "SEENIT-DOWNLOAD-012 le service et le lifecycle conservent zéro release en attente surveillée sans lancer de transfert"
+        },
+        {
+          "file": "tests/downloadAvailabilityRuntime.test.ts",
+          "contains": "SEENIT-DOWNLOAD-012 l’attente survit au vrai stockage et au redémarrage au-delà des anciens TTL"
         }
       ]
     }

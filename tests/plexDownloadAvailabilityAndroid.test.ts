@@ -76,8 +76,8 @@ test('SEENIT-NOTIFICATION-003 présente une notification média cohérente et un
   assert.ok(server.includes("icon: 'ic_stat_seenit'"));
   assert.ok(server.includes("color: '#E5A93D'"));
   assert.ok(worker.includes('.setSmallIcon(R.drawable.ic_stat_seenit)'));
-  assert.ok(worker.includes('"Import terminé · Vérification de Plex…"'));
-  assert.ok(worker.includes('"Disponible dans Plex"'));
+  assert.ok(worker.includes('"✅ Import terminé"'));
+  assert.ok(worker.includes('"✅ Disponible dans Plex"'));
   assert.ok(worker.includes('notificationId(eventKey, mediaType, tmdbId, season, episode)'));
   assert.ok(worker.includes('builder.setLargeIcon(largeIcon)'));
   assert.ok(worker.includes('fitPosterInside(poster, 160, 160)'));

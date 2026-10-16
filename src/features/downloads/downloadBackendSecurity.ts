@@ -44,7 +44,7 @@ export function isAllowedServiceProxyPath(rawUrl: string, method: string): boole
     return false;
   }
   const allowed: Array<{ method: string; path: RegExp }> = [
-    { method: 'GET', path: /^\/api\/v3\/(?:system\/status|qualityprofile|rootfolder|health|indexer|series(?:\/lookup)?|episode|movie(?:\/lookup)?|queue|history|release|parse|notification(?:\/schema)?)$/ },
+    { method: 'GET', path: /^\/api\/v3\/(?:system\/status|qualityprofile|rootfolder|health|indexer|config\/indexer|series(?:\/lookup)?|episode|movie(?:\/lookup)?|queue|history|release|parse|notification(?:\/schema)?)$/ },
     { method: 'POST', path: /^\/api\/v3\/(?:series|movie|command|release(?:\/push)?|notification)$/ },
     { method: 'PUT', path: /^\/api\/v3\/(?:series|movie)(?:\/\d+)?$|^\/api\/v3\/(?:episode|notification)\/\d+$/ },
     { method: 'DELETE', path: /^\/api\/v3\/queue\/\d+$/ },

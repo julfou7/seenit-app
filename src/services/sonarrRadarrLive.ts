@@ -1,5 +1,6 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import type { C411Torrent } from './c411';
+import type { DownloadAvailability } from '../features/downloads/downloadAvailability';
 import { authenticatedFetch } from '../lib/apiAuth';
 import { buildFreshGetUrl, buildNoCacheHeaders } from '../features/downloads/downloadNetwork';
 import { extractQbitSessionCookie, isQbitAuthError } from '../features/downloads/qbitNativeSession';
@@ -63,6 +64,8 @@ export interface LiveDownloadItem {
   isOptimistic?: boolean;
   /** Demande SeenIt d'origine, utilisée pour corréler *Arr et qBittorrent sans le nom. */
   requestId?: string;
+  /** Intention durable sans transfert ; automatic exige une preuve de surveillance Arr/RSS. */
+  availability?: DownloadAvailability;
 }
 
 export function extractQualityFromTitle(rawTitle?: string, fallbackQuality?: string): string | undefined {
@@ -801,8 +804,8 @@ export async function deleteLiveDownloadItem(
     }
 
     return { success: true, message: 'Élément retiré de la liste' };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.warn('[deleteLiveDownloadItem error]', err);
-    return { success: false, message: err?.message || 'Erreur lors de la suppression' };
+    return { success: false, message: err instanceof Error ? err.message : 'Erreur lors de la suppression' };
   }
 }

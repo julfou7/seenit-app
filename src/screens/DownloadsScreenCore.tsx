@@ -1,4 +1,5 @@
 import { DialogLayer } from '../components/ui/DialogLayer';
+import { availabilityHint } from '../features/downloads/downloadAvailability';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
@@ -51,6 +52,8 @@ import {
 } from '../features/downloads/downloadPosterStability';
 import { findMatchingShowForDownload } from '../features/downloads/downloadIdentity';
 import { isDownloadInHistorySection } from '../features/downloads/downloadStatePolicy';
+import { getReleaseAudio } from '../features/downloads/releaseAudio';
+import { AlternativeReleaseModal } from '../components/AlternativeReleaseModal';
 
 interface Props {
   onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void;
@@ -86,6 +89,7 @@ function DownloadItemCard({
   item: LiveDownloadItem;
   onShowClick?: Props['onShowClick'];
 }) {
+  const [choosingRelease, setChoosingRelease] = useState(false);
   const { cleanTitle, subTitle, isTv } = formatCleanMediaInfo(item);
   const libraryShow = useShowsStore(state => findMatchingShowForDownload(item, state.shows));
   const libraryPosterPath = libraryShow?.posterPath || undefined;
@@ -96,10 +100,12 @@ function DownloadItemCard({
   const isCancelled = status === 'cancelled';
   const isError = !isCancelled && (status === 'error' || Boolean(item.errorMessage));
   const isWarning = !isCancelled && status === 'warning';
-  const isPending = status === 'submitting' || status === 'searching' || status === 'queued';
+  const isWaiting = status === 'waiting';
+  const isPending = isWaiting || status === 'submitting' || status === 'searching' || status === 'queued';
   const progress = Math.min(100, Math.max(0, Number(item.progress || 0)));
   const progressPercent = truncateDownloadProgressPercent(progress);
   const qualityBadges = getQualityBadges(`${item.quality || ''} ${item.releaseTitle || ''}`);
+  const audioBadge = getReleaseAudio(item.releaseTitle).label;
   const downloadedBytes = item.size > 0 ? Math.max(0, item.size - item.sizeleft) : 0;
   const pendingWithoutProgress = isPending && progress <= 0;
   const progressLabel = isPending
@@ -159,10 +165,10 @@ function DownloadItemCard({
           ? 'Terminé'
           : 'Téléchargement';
 
-  const pendingLabel = status === 'searching'
+  const pendingLabel = isWaiting ? item.statusText || 'En attente de disponibilité' : status === 'searching'
     ? 'Recherche en cours'
     : 'Préparation du téléchargement';
-  const pendingHint = status === 'searching'
+  const pendingHint = isWaiting ? availabilityHint(item.availability) : status === 'searching'
     ? 'Sélection de la meilleure release disponible'
     : 'Connexion au client de téléchargement';
 
@@ -221,7 +227,7 @@ function DownloadItemCard({
             {subTitle && <p className="mt-0.5 line-clamp-1 text-[10px] font-semibold text-zinc-400">{subTitle}</p>}
           </button>
 
-          {qualityBadges.length > 0 && (
+          {(qualityBadges.length > 0 || audioBadge) && (
             <div className="mt-1.5 flex flex-wrap gap-1">
               {qualityBadges.map((badge, index) => (
                 <span
@@ -235,17 +241,18 @@ function DownloadItemCard({
                   {badge}
                 </span>
               ))}
+              {audioBadge && <span className="rounded-md border border-violet-400/20 bg-violet-400/10 px-1.5 py-0.5 text-[9px] font-bold text-violet-200">{audioBadge}</span>}
             </div>
           )}
 
           {pendingWithoutProgress ? (
             <div className="mt-2 flex min-w-0 items-center gap-2 rounded-xl border border-cyan-400/10 bg-cyan-400/[0.055] px-2.5 py-2">
               <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cyan-400/10 text-cyan-300 ring-1 ring-cyan-300/10">
-                {status === 'searching' ? <Search size={13} /> : <Loader2 size={13} className="animate-spin" />}
+                {isWaiting ? <Clock3 size={13} /> : status === 'searching' ? <Search size={13} /> : <Loader2 size={13} className="animate-spin" />}
               </div>
               <div className="min-w-0">
                 <div className="truncate text-[11px] font-bold text-cyan-200">{pendingLabel}</div>
-                <div className="truncate text-[9px] text-zinc-500">{pendingHint}</div>
+                <div className={`${isWaiting ? 'leading-relaxed' : 'truncate'} text-[10px] text-zinc-400`}>{pendingHint}</div>
               </div>
             </div>
           ) : (
@@ -302,8 +309,15 @@ function DownloadItemCard({
               {item.errorMessage}
             </p>
           )}
+          {item.tmdbId && (isCompleted || isError || isCancelled || isWaiting) && (
+            <button type="button" onClick={event => { event.stopPropagation(); setChoosingRelease(true); }}
+              className="mt-2 flex min-h-11 items-center gap-1.5 rounded-lg border border-white/10 px-2 text-[11px] font-semibold text-zinc-200">
+              <Search size={14} />Chercher une autre release
+            </button>
+          )}
         </div>
       </div>
+      {choosingRelease && <AlternativeReleaseModal item={item} onClose={() => setChoosingRelease(false)} />}
     </div>
   );
 }
@@ -388,7 +402,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
 
   const activeDownloads = useMemo(
     () => sortDownloadsByAddedAt(
-      downloads.filter(item => item.status !== 'completed' && item.status !== 'cancelled' && item.status !== 'error' && item.progress < 100),
+      downloads.filter(item => item.status !== 'waiting' && item.status !== 'completed' && item.status !== 'cancelled' && item.status !== 'error' && item.progress < 100),
       'asc'
     ),
     [downloads]
@@ -397,6 +411,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
     () => sortDownloadsByAddedAt(downloads.filter(item => isDownloadInHistorySection(item, 'error')), 'desc'),
     [downloads]
   );
+  const waitingDownloads = useMemo(() => sortDownloadsByAddedAt(downloads.filter(item => item.status === 'waiting'), 'asc'), [downloads]);
   const cancelledDownloads = useMemo(
     () => sortDownloadsByAddedAt(downloads.filter(item => isDownloadInHistorySection(item, 'cancelled')), 'desc'),
     [downloads]
@@ -420,11 +435,11 @@ export function DownloadsScreen({ onShowClick }: Props) {
       if (searchRequestRef.current !== requestId) return;
       setTorrents(results);
       setHasSearched(true);
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (searchRequestRef.current !== requestId) return;
       setTorrents([]);
       setHasSearched(true);
-      showToast(error?.message || 'C411 est momentanément indisponible.', 'error');
+      showToast(error instanceof Error ? error.message : 'C411 est momentanément indisponible.', 'error');
     } finally {
       if (searchRequestRef.current === requestId) setIsSearching(false);
     }
@@ -464,7 +479,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
     showToast({
       title: item.movieTitle || item.seriesTitle || item.title,
       action: success
-        ? (wasActive ? 'Téléchargement annulé' : 'Retiré de la liste')
+        ? (status === 'waiting' ? 'Attente annulée' : wasActive ? 'Téléchargement annulé' : 'Retiré de la liste')
         : (wasActive ? 'Annulation non confirmée' : 'Retrait non confirmé'),
       posterPath: item.posterPath
     }, success ? 'success' : 'info');
@@ -475,7 +490,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
       && item.status !== 'cancelled'
       && item.status !== 'error'
       && Number(item.progress || 0) < 100;
-    if (isActive) {
+    if (isActive || item.status === 'waiting') {
       setPendingCancellation(item);
       return;
     }
@@ -717,6 +732,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
             )}
 
             {activeDownloads.length > 0 && renderSection('En cours', activeDownloads, 'text-zinc-400')}
+            {waitingDownloads.length > 0 && renderSection('En attente', waitingDownloads, 'text-amber-300')}
             {errorDownloads.length > 0 && renderSection('En erreur', errorDownloads, 'text-red-400', 'error')}
             {cancelledDownloads.length > 0 && renderSection('Annulés', cancelledDownloads, 'text-zinc-500', 'cancelled')}
             {completedDownloads.length > 0 && renderSection('Terminés', completedDownloads, 'text-zinc-500', 'completed')}
@@ -920,9 +936,9 @@ export function DownloadsScreen({ onShowClick }: Props) {
               if (event.key === 'Escape') setPendingCancellation(null);
             }}
           >
-            <h2 id="cancel-download-title" className="text-lg font-black text-white">Annuler le téléchargement ?</h2>
+            <h2 id="cancel-download-title" className="text-lg font-black text-white">{pendingCancellation.status === 'waiting' ? 'Annuler l’attente ?' : 'Annuler le téléchargement ?'}</h2>
             <p id="cancel-download-description" className="mt-2 text-sm leading-relaxed text-zinc-300">
-              « {pendingCancellation.movieTitle || pendingCancellation.seriesTitle || pendingCancellation.title} » sera retiré de {pendingCancellation.downloadClient || 'son client distant'}.
+              « {pendingCancellation.movieTitle || pendingCancellation.seriesTitle || pendingCancellation.title} » {pendingCancellation.status === 'waiting' ? 'ne sera plus surveillé pour un téléchargement futur. Les fichiers existants seront conservés.' : `sera retiré de ${pendingCancellation.downloadClient || 'son client distant'}.`}
               {String(pendingCancellation.downloadClient || '').toLowerCase().includes('qbittorrent') && ' Les fichiers déjà téléchargés seront conservés.'}
             </p>
             <div className="mt-5 grid grid-cols-2 gap-2">
@@ -943,7 +959,7 @@ export function DownloadsScreen({ onShowClick }: Props) {
                 }}
                 className="min-h-11 rounded-xl bg-red-500 px-4 text-sm font-black text-white"
               >
-                Annuler le téléchargement
+                {pendingCancellation.status === 'waiting' ? 'Annuler l’attente' : 'Annuler le téléchargement'}
               </button>
             </div>
           </div>

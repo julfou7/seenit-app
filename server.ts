@@ -21,6 +21,7 @@ import {
 } from "./src/features/downloads/downloadBackendSecurity.ts";
 import { buildC411SearchParams } from "./src/features/downloads/c411Query.ts";
 import { buildDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookNotification.ts";
+import { downloadServiceTimeoutMs } from "./src/features/downloads/downloadServiceTimeout.ts";
 import { deliverDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookDelivery.ts";
 import { processDownloadFailureNotification } from "./src/features/downloads/downloadFailureNotificationBackend.ts";
 import { supportsPlexAvailabilityBackgroundV1 } from "./src/features/notifications/notificationCapabilities.ts";
@@ -2215,9 +2216,9 @@ async function startServer() {
         totalFound: normalizedHistory.length + normalizedWatchlist.length,
         cursor: syncCursor
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[Plex Sync Error]', err);
-      return res.status(500).json({ error: err?.message || 'Erreur lors de la synchronisation de l\'historique Plex' });
+      return res.status(500).json({ error: err instanceof Error ? err.message : 'Erreur lors de la synchronisation de l\'historique Plex' });
     }
   });
 
@@ -2566,7 +2567,7 @@ async function startServer() {
       const fetchOptions: RequestInit & { headers: Record<string, string> } = {
         method: normalizedMethod,
         headers: cleanHeaders,
-        signal: AbortSignal.timeout(normalizedMethod === 'GET' && /\/api\/v3\/release$/.test(new URL(targetUrl).pathname) ? 30_000 : 10_000)
+        signal: AbortSignal.timeout(downloadServiceTimeoutMs(normalizedMethod, targetUrl))
       };
 
       if (normalizedMethod !== 'GET' && normalizedMethod !== 'HEAD' && body !== undefined && body !== null) {
