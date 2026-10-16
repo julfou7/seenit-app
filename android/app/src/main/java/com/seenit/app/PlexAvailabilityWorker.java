@@ -374,8 +374,8 @@ public class PlexAvailabilityWorker extends Worker {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_seenit)
             .setContentTitle(displayTitle(title, season, episode))
-            .setContentText("Import terminé · Vérification de Plex…")
-            .setStyle(new NotificationCompat.BigTextStyle().bigText("Import terminé · Vérification de Plex…"))
+            .setContentText("✅ Import terminé")
+            .setStyle(new NotificationCompat.BigTextStyle().bigText("✅ Import terminé"))
             .setContentIntent(seenItIntent)
             .setAutoCancel(true)
             .setOnlyAlertOnce(true)
@@ -409,8 +409,8 @@ public class PlexAvailabilityWorker extends Worker {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_seenit)
             .setContentTitle(displayTitle(title, season, episode))
-            .setContentText("Disponible dans Plex")
-            .setStyle(new NotificationCompat.BigTextStyle().bigText("Disponible dans Plex"))
+            .setContentText("✅ Disponible dans Plex")
+            .setStyle(new NotificationCompat.BigTextStyle().bigText("✅ Disponible dans Plex"))
             .setContentIntent(seenItIntent)
             .setAutoCancel(true)
             .setOnlyAlertOnce(true)
@@ -425,7 +425,7 @@ public class PlexAvailabilityWorker extends Worker {
                 new NotificationCompat.BigPictureStyle()
                     .bigPicture(bigPicture)
                     .bigLargeIcon((Bitmap) null)
-                    .setSummaryText("Disponible dans Plex")
+                    .setSummaryText("✅ Disponible dans Plex")
             );
             poster.recycle();
         }

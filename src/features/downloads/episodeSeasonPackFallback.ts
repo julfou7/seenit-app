@@ -1,5 +1,6 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { authenticatedFetch } from '../../lib/apiAuth';
+import { auth } from '../../lib/firebase';
 import {
   cleanUrl,
   executeDelete,
@@ -25,6 +26,8 @@ import {
 } from './episodePackSelection';
 import { registerTrackedSeasonPack } from './episodeSeasonPackCleanup';
 import { confirmNoArrRelease, requireArrReleaseArray, type DownloadFailureCode } from './downloadNoRelease';
+import { enableArrAvailabilityWatch } from '../../services/arrAvailabilityWatch';
+import type { DownloadAvailability } from './downloadAvailability';
 
 export interface EpisodeDownloadWithFallbackParams {
   url: string;
@@ -46,6 +49,7 @@ export interface EpisodeDownloadWithFallbackResult {
   success: boolean;
   message: string;
   failureCode?: DownloadFailureCode;
+  availability?: DownloadAvailability;
   status?: 'searching' | 'queued';
   fallbackUsed?: boolean;
   downloadId?: string;
@@ -477,6 +481,7 @@ async function selectOnlyEpisodeInQbit(
 export async function downloadEpisodeWithSeasonPackFallback(
   initialParams: EpisodeDownloadWithFallbackParams
 ): Promise<EpisodeDownloadWithFallbackResult> {
+  const ownerUid = auth.currentUser?.uid;
   const params = await enrichExactExternalIds(initialParams);
   if (!params) {
     return {
@@ -559,10 +564,10 @@ export async function downloadEpisodeWithSeasonPackFallback(
       sonarrHeaders
     );
     seasonReleases = rankSeasonPackReleases(requireArrReleaseArray(response), params.qualityPreference);
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       success: false,
-      message: `Aucune release d’épisode isolée et la recherche du pack Saison ${params.season} a échoué : ${error?.message || 'erreur Sonarr'}.`
+      message: `Aucune release d’épisode isolée et la recherche du pack Saison ${params.season} a échoué : ${error instanceof Error ? error.message : 'erreur Sonarr'}.`
     };
   }
 
@@ -572,6 +577,7 @@ export async function downloadEpisodeWithSeasonPackFallback(
     return {
       success: false,
       failureCode: confirmed.failureCode,
+      availability: await enableArrAvailabilityWatch({ ...params, service: 'sonarr', ownerUid }),
       message: `Aucune release S${String(params.season).padStart(2, '0')}E${String(params.episode).padStart(2, '0')} isolée ni pack Saison ${params.season} compatible n’a été trouvé.`
     };
   }

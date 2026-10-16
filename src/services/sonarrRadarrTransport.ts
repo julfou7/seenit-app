@@ -747,22 +747,23 @@ export async function testServiceConnection(
 }
 
 
-export async function executeArrInteractiveGet(url: string, headers: Record<string, string>): Promise<unknown> {
-  if (!Capacitor.isNativePlatform()) {
-    if (isLocalNetworkUrl(url)) {
-      const response = await fetch(url, { headers, signal: AbortSignal.timeout(30_000) });
-      if (!response.ok) throw new Error(`Erreur HTTP ${response.status}`);
-      return response.json();
-    }
-    const response = await authenticatedFetch('/api/service-proxy', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ targetUrl: url, method: 'GET', headers }),
-      signal: AbortSignal.timeout(35_000)
-    });
-    const result = await response.json();
-    if (!response.ok || !result.ok || result.error) throw new Error(result.message || result.error || `Erreur proxy ${response.status}`);
-    return result.data;
+async function executeArrInteractiveWeb(method: 'GET' | 'POST', url: string, headers: Record<string, string>, body?: unknown): Promise<unknown> {
+  if (isLocalNetworkUrl(url)) {
+    const response = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(30_000) });
+    if (!response.ok) throw new Error(`Erreur HTTP ${response.status}`);
+    return response.json();
   }
+  const response = await authenticatedFetch('/api/service-proxy', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ targetUrl: url, method, headers, body }), signal: AbortSignal.timeout(35_000)
+  });
+  const result = await response.json();
+  if (!response.ok || !result.ok || result.error) throw new Error(result.message || result.error || `Erreur proxy ${response.status}`);
+  return result.data;
+}
+
+export async function executeArrInteractiveGet(url: string, headers: Record<string, string>): Promise<unknown> {
+  if (!Capacitor.isNativePlatform()) return executeArrInteractiveWeb('GET', url, headers);
   try {
     const normHeaders = { ...headers };
     if (headers['X-Api-Key']) normHeaders['x-api-key'] = headers['X-Api-Key'];
@@ -785,19 +786,21 @@ export async function executeArrInteractiveGet(url: string, headers: Record<stri
   }
 }
 
-export async function executeArrInteractivePost(url: string, body: any, headers: Record<string, string>): Promise<any> {
-  if (!Capacitor.isNativePlatform()) return executePost(url, body, headers);
+export async function executeArrInteractivePost(url: string, body: unknown, headers: Record<string, string>): Promise<unknown> {
+  const mutationHeaders = { ...headers, 'Content-Type': 'application/json',
+    'X-SeenIt-Request-Id': headers['X-SeenIt-Request-Id'] || crypto.randomUUID() };
+  if (!Capacitor.isNativePlatform()) return executeArrInteractiveWeb('POST', url, mutationHeaders, body);
   try {
     const response = await CapacitorHttp.post({
       url,
-      headers: { ...headers, 'Content-Type': 'application/json' },
+      headers: mutationHeaders,
       data: body,
       connectTimeout: 10000,
       readTimeout: 30000
     });
     if (response.status >= 200 && response.status < 300) return response.data || { success: true };
     throw new Error(`Erreur HTTP ${response.status}`);
-  } catch (error: any) {
-    throw new Error(error?.message || 'Grab de la release impossible');
+  } catch (error: unknown) {
+    throw new Error(error instanceof Error ? error.message : 'Grab de la release impossible');
   }
 }

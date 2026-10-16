@@ -877,7 +877,7 @@ pour le cache des sagas et univers.
   polling est suspendu en arrière-plan dans la PWA et l'APK.
 - **SEENIT-DOWNLOAD-006** — Les actifs gardent l'ordre de lancement ; les historiques sont
   présentés du plus récent au plus ancien, indépendamment de l'ordre des réponses distantes.
-- **SEENIT-DOWNLOAD-007** — Les sections En cours, En erreur, Annulés et Terminés sont
+- **SEENIT-DOWNLOAD-007** — Les sections En cours, En attente, En erreur, Annulés et Terminés sont
   distinctes. Une erreur métier explicite (`errorMessage`), notamment un import *Arr refusé après un
   torrent arrivé à 100 %, reste prioritaire sur la progression physique et classe l'élément dans
   « En erreur », jamais dans « Terminés ». La fiche média applique la même priorité et ne déclenche
@@ -896,8 +896,44 @@ pour le cache des sagas et univers.
   déplacement du fichier, poll ou réouverture de l'application.
 - La progression distante garde ses décimales ; l'interface affiche un entier tronqué. La phase
   de recherche n'invente ni pourcentage ni message technique du client.
+- **SEENIT-DOWNLOAD-011** — Les cartes et les résultats de recherche qualifient l'audio depuis des
+  marqueurs explicites de la release : VFF, VFQ et MULTI. MULTI/FRENCH seul ne prouve aucune variante
+  française. Ces marqueurs ne servent jamais à identifier le média. « Chercher une autre release »,
+  disponible sur une carte terminale identifiée par TMDB, ouvre une recherche interactive du film,
+  de la saison ou de l'épisode exact dans son client Arr existant. La consultation ne crée pas de média,
+  ne change pas de profil et ne lance aucun transfert. La liste indique audio, qualité, taille, seeders
+  et refus du client ; un choix explicite envoie uniquement ce candidat une fois, sans recherche
+  automatique ni candidat de secours après un résultat ambigu. Fermer/Retour annule la consultation.
+  Si Arr fournit un infohash valide, l'intention le conserve aussi dans le document partagé du même UID ;
+  une réhydratation ne perd pas cette preuve physique. La version actuelle, reconnue par hash exact,
+  est signalée et ne peut pas être sélectionnée comme une autre release.
+  Une demande déjà active sur le même scope bloque un nouvel envoi manuel jusqu'à sa fin ou son annulation.
+- Une preuve terminale provenant de l'historique conserve son downloadId et son nom de release :
+  ces métadonnées permettent de réunir ses représentations physiques exactes et d'afficher l'audio
+  réellement importé, même si la qualité diffère de l'intention. Deux hash différents restent séparés.
+- Deux recherches automatiques simultanées du même compte, client et scope exact partagent le même
+  lancement. Une relance de release après un timeout ne passe jamais automatiquement à un autre candidat.
+- Une release C411 choisie depuis une fiche Film canonique assure d'abord la présence du TMDB exact
+  dans Radarr avec `searchForMovie=false`, puis vérifie le mapping du parseur vers ce film avant un seul
+  push. Un refus ou un timeout ne déclenche aucune recherche automatique de remplacement.
 - Une annulation active demande confirmation, nomme le client et précise que qBittorrent garde
   les fichiers déjà téléchargés.
+- **SEENIT-DOWNLOAD-012** — Une demande SeenIt sans transfert ne disparaît jamais à cause d'un
+  délai, d'une file vide ou du redémarrage. Une absence de release prouvée devient « En attente de
+  disponibilité », dans une section En attente séparée des transferts actifs et des erreurs. Son
+  intention reste persistée par UID, localement et dans `downloadRequests`, jusqu'au transfert/import
+  prouvé ou au retrait explicite ; le TTL des intentions de handoff ne s'applique pas à cette attente.
+  Le téléchargement futur n'est promis qu'après confirmation du média/scope exact surveillé par
+  Sonarr/Radarr et du RSS actif (indexer RSS + intervalle positif). La surveillance ne lance aucune
+  recherche ni transfert supplémentaire. Une ancienne recherche sans résultat conclusif reste
+  conservée avec une attente de vérification, sans inventer une absence de release ou une surveillance.
+  Une panne conserve un état d'erreur explicite. Réouverture, snapshot partagé et polling ne rejouent
+  jamais automatiquement la soumission. Un transfert canonique non ambigu apparu après la demande
+  peut prendre le relais à long terme ; deux preuves physiques contradictoires restent distinctes.
+  Le choix manuel reste disponible en attente. Une suppression d'attente surveillée désactive d'abord
+  la surveillance de son scope exact, sans supprimer de fichier ni annuler un autre transfert. Le retrait
+  attend la confirmation de suppression du document partagé ; un marqueur local par requestId empêche
+  un ancien snapshot de ressusciter la même attente, sans masquer une nouvelle demande du même média.
 
 ## 8. Webhooks et notifications
 
@@ -906,7 +942,7 @@ pour le cache des sagas et univers.
   autorisés (épisode puis pack saison ; série puis toutes ses saisons concernées). Un résultat absent,
   invalide, un timeout, une panne d'indexer/client ou une erreur d'authentification reste une panne
   distincte. Aucun délai ou poll vide ne constitue cette preuve. Les nouveaux médias sont ajoutés sans
-  lancer une recherche concurrente non observable. Le lifecycle commun place la demande en erreur et
+  lancer une recherche concurrente non observable. Le lifecycle commun conserve la demande en attente et
   transmet uniquement le résultat typé `no_release` à l'infrastructure FCM existante. Le titre et le
   scope viennent de l'intention SeenIt, jamais du torrent. Le backend authentifié ne cible que le UID
   courant et réserve transactionnellement une clé serveur `UID + requestId` avant l'envoi : un retry
@@ -926,13 +962,13 @@ pour le cache des sagas et univers.
   Le polling local affiche uniquement un toast SeenIt afin d'éviter les doublons.
 - **SEENIT-NOTIFICATION-003** — Un événement Sonarr/Radarr `Download` prouve uniquement que l'import
   Arr est terminé ; il ne prouve jamais à lui seul que Plex a indexé le média. La PWA et les APK legacy
-  reçoivent un reçu FCM visible dont le statut reste strictement « Import terminé », sans annoncer une
+  reçoivent un reçu FCM visible dont le statut reste strictement « ✅ Import terminé », sans annoncer une
   vérification Plex qu'ils ne lanceront pas. Sur un Android ayant confirmé la capability
   `plexAvailabilityBackgroundV1`, le backend envoie à la place un message data-only haute priorité :
   le service natif affiche immédiatement une notification média locale dont le titre est le nom du média
-  et le statut « Import terminé · Vérification de Plex… », puis lance la vérification Plex bornée. Le même
+  et le statut « ✅ Import terminé », puis lance la vérification Plex bornée. Le même
   identifiant de notification est réutilisé ; une preuve Plex exacte met donc cet élément à jour vers
-  « Disponible dans Plex » au lieu d'empiler une seconde alerte. Si la preuve n'arrive jamais, le reçu
+  « ✅ Disponible dans Plex » au lieu d'empiler une seconde alerte. Si la preuve n'arrive jamais, le reçu
   d'import reste visible. Le téléphone compare l'empreinte du UID actif, conserve le jeton Plex uniquement
   dans son stockage privé exclu des sauvegardes et vérifie par TMDB ID exact et, pour un épisode, par
   saison + épisode exacts. Le titre n'est jamais une preuve d'identité. Une copie native momentanément

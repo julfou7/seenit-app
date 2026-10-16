@@ -13,7 +13,7 @@ const bundle = await build({
     builder.onResolve({ filter: /^@capacitor\/core$/ }, () => ({ path: 'capacitor', namespace: 'fixture' }));
     builder.onLoad({ filter: /.*/, namespace: 'fixture' }, args => {
       if (args.path === 'tmdb') return { contents: `export const tmdb={getShowDetails:async()=>({ok:true,value:{id:11,external_ids:{tvdb_id:123}}})};` };
-      if (args.path === 'firebase') return { contents: `export const auth={currentUser:null};` };
+      if (args.path === 'firebase') return { contents: `export const auth={get currentUser(){return {uid:globalThis.__seenitDownloadFixture?.scopeUid}}};` };
       if (args.path === 'apiAuth') return { contents: `export const authenticatedFetch=()=>{throw new Error('transport inattendu')};` };
       if (args.path === 'capacitor') return { contents: `export const Capacitor={isNativePlatform:()=>false};export const CapacitorHttp={};` };
       if (args.path === 'episodeSeasonPackCleanup') return { contents: `export const registerTrackedSeasonPack=()=>{};` };
@@ -32,11 +32,15 @@ const bundle = await build({
 });
 const runtime = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 
+let fixtureScope = 0;
 function fixture(extra: (path: string) => unknown = () => undefined) {
   const calls: string[] = [];
   const posts: Array<{ path: string; body: Record<string, unknown> }> = [];
   const episode = { id: 2, seasonNumber: 1, episodeNumber: 1, monitored: true, hasFile: false, airDateUtc: '2020-01-01' };
   const ports = {
+    // Chaque scénario représente un compte isolé ; le garde de double appui
+    // n'est pas neutralisé pour contourner son cache de lancement réel.
+    scopeUid: `fixture-${++fixtureScope}`,
     get: async (url: string) => {
       const path = url.split('/api/v3/')[1]; calls.push(path);
       const value = extra(path);

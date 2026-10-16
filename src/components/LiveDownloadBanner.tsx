@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { type LiveDownloadItem, formatBytes } from '../services/sonarrRadarr';
 import { truncateDownloadProgressPercent } from '../features/downloads/downloadPresentation';
+import { availabilityHint } from '../features/downloads/downloadAvailability';
 
 interface LiveDownloadBannerProps {
   items: LiveDownloadItem[];
@@ -29,6 +30,7 @@ function getPhase(item: LiveDownloadItem) {
   if (isError) return { kind: 'error' as const, label: item.statusText || 'Erreur' };
   if (isWarning) return { kind: 'warning' as const, label: item.statusText || 'Vérification en cours' };
   if (isCompleted) return { kind: 'completed' as const, label: 'Téléchargement terminé 🍿' };
+  if (status === 'waiting') return { kind: 'waiting' as const, label: item.statusText || 'En attente de disponibilité' };
   if (isSubmitting) return { kind: 'submitting' as const, label: item.statusText || 'Demande prise en compte…' };
   if (isSearching) return { kind: 'searching' as const, label: item.statusText || 'Recherche de release en cours…' };
   if (isQueued) return { kind: 'queued' as const, label: item.statusText || 'En file d’attente' };
@@ -42,7 +44,7 @@ function PhaseIcon({ kind }: { kind: ReturnType<typeof getPhase>['kind'] }) {
   if (kind === 'completed') return <CheckCircle2 size={14} className="text-emerald-400" />;
   if (kind === 'submitting') return <Loader2 size={14} className="text-blue-400 animate-spin" />;
   if (kind === 'searching') return <Search size={14} className="text-cyan-400" />;
-  if (kind === 'queued') return <Clock size={14} className="text-zinc-300" />;
+  if (kind === 'queued' || kind === 'waiting') return <Clock size={14} className="text-zinc-300" />;
   return <Download size={14} className="text-cyan-400" />;
 }
 
@@ -62,7 +64,7 @@ export const LiveDownloadBanner: React.FC<LiveDownloadBannerProps> = ({ items, c
           ? '100%'
           : phase.kind === 'downloading'
             ? `${truncateDownloadProgressPercent(item.progress)}%`
-            : '';
+            : phase.kind === 'waiting' ? 'En attente' : '';
 
     return (
       <div
@@ -132,6 +134,7 @@ export const LiveDownloadBanner: React.FC<LiveDownloadBannerProps> = ({ items, c
                 {item.errorMessage}
               </div>
             )}
+            {phase.kind === 'waiting' && <p className="mt-2 text-[11px] text-zinc-400">{availabilityHint(item.availability)}</p>}
 
             {showIndeterminate ? (
               <div className="mt-3 flex h-2 items-center gap-1.5" aria-label="Activité en cours">

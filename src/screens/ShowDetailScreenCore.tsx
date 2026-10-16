@@ -28,6 +28,7 @@ import { useMediaPresenceStore } from '../store/mediaPresenceStore';
 import { searchAndDownloadInSonarr, searchAndDownloadInRadarr } from '../services/sonarrRadarr';
 import { downloadEpisodeWithSeasonPackFallback } from '../features/downloads/episodeSeasonPackFallback';
 import { acceptDownloadRequest, beginDownloadRequest, failDownloadRequest, updateDownloadRequest } from '../features/downloads/downloadLifecycle';
+import { availabilityHint } from '../features/downloads/downloadAvailability';
 import { hasExplicitDownloadError, isDownloadCompleted } from '../features/downloads/downloadStatePolicy';
 import { readUserScopedJson } from '../lib/userIsolation';
 import { mediaKeyFrom, toMediaKey } from '../features/shows/mediaRelations';
@@ -145,8 +146,8 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         useLiveDownloadStore.getState().startPolling(1000);
         void useLiveDownloadStore.getState().fetchDownloads();
       } else {
-        failDownloadRequest(requestId, res.message, res.failureCode);
-        showToast(res.message || "Erreur lors du lancement dans Sonarr", "error");
+        failDownloadRequest(requestId, res.message, res.failureCode, res.availability);
+        showToast(res.failureCode === 'no_release' ? `En attente de disponibilité · ${availabilityHint(res.availability)}` : res.message || 'Erreur lors du lancement dans Sonarr', res.failureCode === 'no_release' ? 'download' : 'error');
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Erreur réseau Sonarr";
@@ -185,8 +186,8 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         useLiveDownloadStore.getState().startPolling(1000);
         useLiveDownloadStore.getState().fetchDownloads();
       } else {
-        failDownloadRequest(requestId, res.message, res.failureCode);
-        showToast(res.message || "Erreur lors du lancement de la saison", "error");
+        failDownloadRequest(requestId, res.message, res.failureCode, res.availability);
+        showToast(res.failureCode === 'no_release' ? `En attente de disponibilité · ${availabilityHint(res.availability)}` : res.message || 'Erreur lors du lancement de la saison', res.failureCode === 'no_release' ? 'download' : 'error');
       }
     } catch (err: unknown) {
       const message = err instanceof Error && err.message ? err.message : "Erreur réseau Sonarr";
@@ -223,8 +224,8 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         useLiveDownloadStore.getState().startPolling(1000);
         useLiveDownloadStore.getState().fetchDownloads();
       } else {
-        failDownloadRequest(requestId, res.message, res.failureCode);
-        showToast(res.message || "Erreur lors du lancement dans Radarr", "error");
+        failDownloadRequest(requestId, res.message, res.failureCode, res.availability);
+        showToast(res.failureCode === 'no_release' ? `En attente de disponibilité · ${availabilityHint(res.availability)}` : res.message || 'Erreur lors du lancement dans Radarr', res.failureCode === 'no_release' ? 'download' : 'error');
       }
     } catch (err: unknown) {
       const message = err instanceof Error && err.message ? err.message : "Erreur réseau Radarr";
@@ -247,7 +248,6 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       if (res.success) showToast(`« ${show.title} » a été synchronisé(e) avec succès !`, "success");
       else showToast(`Erreur : ${res.error || 'Échec de la synchronisation'}`, "error");
     } catch (err) {
-      console.error(err);
       showToast("Erreur lors de la synchronisation", "error");
     } finally {
       setIsSyncingSingle(false);

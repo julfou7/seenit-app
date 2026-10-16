@@ -148,7 +148,7 @@ export function buildDownloadWebhookPresentation(
     eventType,
     notification: {
       title: `${mediaTitle}${suffix}`,
-      body: 'Import terminé'
+      body: '✅ Import terminé'
     },
     data,
     plexAvailabilityData

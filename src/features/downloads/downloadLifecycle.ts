@@ -3,6 +3,7 @@ import { useLiveDownloadStore } from '../../store/liveDownloadStore';
 import { auth } from '../../lib/firebase';
 import { enqueueDownloadFailureNotification } from './downloadFailureNotificationClient';
 import { type DownloadFailureCode } from './downloadNoRelease';
+import type { DownloadAvailability } from './downloadAvailability';
 
 const requestOwners = new Map<string, string>();
 
@@ -71,19 +72,20 @@ export function acceptDownloadRequest(
   void useLiveDownloadStore.getState().fetchDownloads();
 }
 
-export function failDownloadRequest(id: string, message: string, failureCode?: DownloadFailureCode): void {
+export function failDownloadRequest(id: string, message: string, failureCode?: DownloadFailureCode, availability?: DownloadAvailability): void {
   const ownerUid = requestOwners.get(id);
   if (ownerUid && ownerUid !== auth.currentUser?.uid) return;
   useLiveDownloadStore.getState().updateDownloadRequest(id, {
     progress: 0,
-    status: 'error',
-    statusText: 'Impossible de lancer le téléchargement',
-    errorMessage: message,
+    status: failureCode === 'no_release' ? 'waiting' : 'error',
+    statusText: failureCode === 'no_release' ? 'En attente de disponibilité' : 'Impossible de lancer le téléchargement',
+    errorMessage: failureCode === 'no_release' ? undefined : message,
+    availability: failureCode === 'no_release' ? availability || { reason: 'no_release', automatic: false } : undefined,
     isOptimistic: true,
     isRestored: false
   });
   const item = useLiveDownloadStore.getState().downloads.find(download => download.id === id);
-  if (failureCode === 'no_release' && ownerUid && item?.status === 'error' && item.tmdbId && item.mediaType) {
+  if (failureCode === 'no_release' && ownerUid && item?.status === 'waiting' && item.tmdbId && item.mediaType) {
     enqueueDownloadFailureNotification({
       ownerUid, requestId: item.requestId || id, failureCode,
       mediaType: item.mediaType, tmdbId: Number(item.tmdbId),

@@ -18,6 +18,9 @@
     "src/features/downloads/downloadIdentity.ts",
     "src/features/downloads/downloadNoRelease.ts",
     "src/features/downloads/downloadFailureNotification.ts",
-    "src/features/logging/logPrivacy.ts"
+    "src/features/logging/logPrivacy.ts",
+    "src/features/downloads/releaseAudio.ts",
+    "src/features/downloads/downloadSearchGuard.ts",
+    "src/features/downloads/downloadAvailability.ts"
   ]
 }

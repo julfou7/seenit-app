@@ -260,3 +260,29 @@ pas les pixels d'une capture particulière.
 
 Ces règles décrivent le runtime commun PWA/APK. Les captures 360/412 px, le clavier, le texte agrandi
 et TalkBack restent des preuves à produire sur la candidate de release, pas des règles alternatives.
+
+## Téléchargements — choix d'une autre release (#661)
+
+La section **En attente** (#664) conserve les demandes sans transfert, y compris après redémarrage.
+Un zéro résultat confirmé affiche **En attente de disponibilité**, avec une horloge et aucun faux
+pourcentage/spinner de téléchargement. Le message de lancement automatique est réservé à une
+surveillance Sonarr/Radarr et RSS confirmée ; sinon la carte indique que la surveillance reste à vérifier.
+Une recherche interrompue affiche **En attente de vérification** et ne promet pas de lancement futur.
+La section suit l'ordre des demandes ; elle est séparée d'En cours et d'En erreur.
+**Chercher une autre release** reste disponible et ouvre une consultation sans mutation. Une confirmation
+manuelle remplace l'attente par une seule intention. **Annuler l'attente** ouvre une confirmation,
+nomme le média, conserve les fichiers existants et ne retire la carte qu'après arrêt de la surveillance
+exacte si nécessaire. Retour/Garder ferme la confirmation sans effet. Le texte d'attente doit revenir
+à la ligne sur petit écran, avec des cibles de 44 px, et être accessible sans animation seule.
+
+Une carte terminée, annulée ou en erreur avec TMDB exact propose « Chercher une autre release ».
+Le dialogue respecte la pile Retour, le focus et les safe areas existants. Il consulte le client Arr
+configuré, affiche VFF/VFQ/MULTI, qualité, taille, seeders et refus, avec filtre audio ; une série entière
+permet de choisir sa saison. MULTI/FRENCH seul reste une variante inconnue. Le bouton confirme le seul
+candidat sélectionné ; les résultats incompatibles restent non lançables. Pendant l'envoi, la sélection
+est verrouillée. Ouvrir, filtrer ou fermer par Retour/Croix ne lance rien et ne modifie aucun profil.
+Un résultat ambigu n'entraîne jamais l'envoi d'un autre candidat. Les cartes affichent les badges audio
+indépendamment de la vidéo ; une version actuelle reconnue par hash exact reste non sélectionnable.
+Une demande active sur le même scope est signalée et bloque l'envoi jusqu'à sa fin ou son annulation.
+Les notifications confirment « ✅ Import terminé », puis
+« ✅ Disponible dans Plex » uniquement après preuve Plex exacte.
