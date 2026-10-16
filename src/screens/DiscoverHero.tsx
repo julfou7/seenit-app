@@ -143,9 +143,12 @@ export const HeroCard = React.memo(function HeroCard({
     const seenCount = show.seenEpisodes?.length || 0;
 
     if (isTv) {
-      const { nextEpisode, isCompleted } = resolveHeroResumeState(show);
+      const { nextEpisode, upcomingEpisode, isCompleted } = resolveHeroResumeState(show);
 
-      if (isCompleted) {
+      if (upcomingEpisode) {
+        mainActionText = `À venir · ${formatHeroEpisode(upcomingEpisode)}`;
+        MainActionIcon = Calendar;
+      } else if (isCompleted) {
         mainActionText = 'À jour sur la diffusion';
         buttonStyleClass = 'bg-emerald-500 text-black hover:bg-emerald-400 shadow-[0_4px_15px_rgba(16,185,129,0.25)]';
       } else {

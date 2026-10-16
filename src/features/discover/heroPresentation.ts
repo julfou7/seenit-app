@@ -52,6 +52,14 @@ function pointerToEpisodeRef(pointer?: HeroEpisodePointer | null): HeroEpisodeRe
   return season && episode ? { season, episode } : null;
 }
 
+function resolveFutureEpisode(pointer: HeroEpisodePointer | null | undefined, now: Date): HeroEpisodeRef | null {
+  const ref = pointerToEpisodeRef(pointer);
+  const airDate = pointer?.air_date;
+  if (!ref || !airDate || !/^\d{4}-\d{2}-\d{2}$/.test(airDate)) return null;
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return airDate > today ? ref : null;
+}
+
 function isAfter(candidate: HeroEpisodeRef, reference: HeroEpisodeRef): boolean {
   return candidate.season > reference.season
     || (candidate.season === reference.season && candidate.episode > reference.episode);
@@ -97,9 +105,7 @@ export function resolveHeroNextEpisode(show: HeroProgressSource, now = new Date(
   const derived = pointerToEpisodeRef(show.nextEpisodeToWatch);
   const seenKeys = new Set(seenEpisodes.map(ref => `${ref.season}x${ref.episode}`));
   if (show.status === 'completed' && !derived) return null;
-  const airDate = show.nextEpisodeToWatch?.air_date;
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  if (derived && airDate && /^\d{4}-\d{2}-\d{2}$/.test(airDate) && airDate > today) return null;
+  if (resolveFutureEpisode(show.nextEpisodeToWatch, now)) return null;
 
   if (seenEpisodes.length === 0) {
     return derived;
@@ -138,8 +144,12 @@ export function resolveHeroNextEpisode(show: HeroProgressSource, now = new Date(
 
 export function resolveHeroResumeState(show: HeroProgressSource, now = new Date()) {
   const nextEpisode = resolveHeroNextEpisode(show, now);
+  const upcomingEpisode = !show.seenEpisodes?.length && show.status !== 'completed'
+    ? resolveFutureEpisode(show.nextEpisodeToWatch, now)
+    : null;
   return {
     nextEpisode,
+    upcomingEpisode,
     isCompleted: !nextEpisode && (show.status === 'completed' || Boolean(show.seenEpisodes?.length)),
   };
 }
