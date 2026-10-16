@@ -2,7 +2,7 @@
 
 - **Identifiant** : AUDIT-2026-09-20-GCP-FINOPS
 - **Date** : 20 septembre 2026
-- **Dernière vérification** : 21 septembre 2026
+- **Dernière vérification** : 4 octobre 2026
 - **Statut** : ouvert — migration Firestore option 1 autorisée et contrôleur de bascule sécurisé préparé ; preuve temporelle 0 € encore requise
 - **Baseline** : `main` `5a68cd2ddec7fa9176ad15e50fa4a0ccae5bdfb9`
 - **Commit observé** : `5a68cd2ddec7fa9176ad15e50fa4a0ccae5bdfb9`
@@ -114,6 +114,37 @@ Comme le même service sert aujourd'hui le shell PWA et les API, une migration d
 la catégorie de coût sans supprimer nécessairement l'egress public. La cible à évaluer est donc un frontal
 statique sous quota gratuit qui relaie les API vers un Cloud Run colocalisé avec Firestore, pas un simple
 changement de constante `GCP_REGION`.
+
+## Preuve post-correctifs — 4 octobre 2026
+
+La capture Cloud Billing du mois d'octobre, regroupée par SKU, confirme que la dérive réseau survit aux
+nettoyages précédents : **Cloud Run Network Internet Data Transfer Out Intercontinental (Excl Oceania,
+Africa and China)** (SKU `DBAA-7594-B9FA`) totalise déjà **0,09 GiB / 0,01 €**. Sur la même vue,
+la mémoire Cloud Run en facturation liée aux requêtes reste à **0,00 €**, tandis que Firestore et les
+lignes Storage visibles sont à **0,00 €**. Le propriétaire indique avoir très peu utilisé SeenIt sur
+cette fenêtre.
+
+La cause résiduelle est donc désormais attribuée sans ambiguïté à la **sortie Internet
+intercontinentale** de Cloud Run ; elle n'est plus une extrapolation du mois de septembre. Les
+optimisations Firestore, Storage, compute et gzip Plex ne suffisent pas à satisfaire l'objectif strict
+de 0,00 €.
+
+### Défaut de fraîcheur de l'agrégat route par route
+
+Le run d'audit structuré du 02/10/2026 (`36970447540`) a encore produit un artefact trafic dont la
+fenêtre va du **02/09 au 08/09**, avec exactement 10 000 requêtes. Le workflow demandait pourtant
+`--freshness=6h`. Le collecteur associait cette option à `gcloud logging read --order=asc` ; dans
+cette combinaison la borne de fraîcheur n'était pas appliquée et la limite ramenait les plus vieux logs
+disponibles.
+
+Le correctif impose `--order=desc` aux trois lectures Cloud Logging bornées (événements structurés,
+diagnostics TMDB et trafic Cloud Run). Les résumeurs sont indépendants de l'ordre d'entrée : TMDB trie
+explicitement ses snapshots par timestamp, l'auditeur calcule ses fenêtres depuis les timestamps et
+l'agrégateur trafic additionne les requêtes. Un TNR de workflow interdit désormais de réintroduire
+`--freshness` avec un ordre ascendant.
+
+Cette correction de mesure doit produire immédiatement après fusion un agrégat réellement récent. Ce
+nouvel agrégat remplace la répartition historique pré-gzip avant toute décision d'architecture réseau.
 
 ## Garde-fous durables
 
