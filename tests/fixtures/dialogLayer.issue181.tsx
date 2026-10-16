@@ -41,6 +41,7 @@ function Harness() {
       window.history.pushState({ selectedShow: { id: 42 }, tab }, ''); setSheet(true);
     }}>Ouvrir la fiche</button>
     <button id="background" onClick={back}>Retour de navigation</button>
+    <div id="bottom-nav" className="fixed bottom-0 inset-x-0 z-[160]">Navigation basse</div>
     <button id="open-origin-person" onClick={() => {
       window.history.pushState({ tab, selectedShow: null, isOriginPerson: true }, '');
       setOriginPerson(true);
@@ -50,14 +51,14 @@ function Harness() {
         window.history.pushState({ tab, selectedShow: { id: 42 } }, ''); setSheet(true);
       }}>Ouvrir un média de cette personne</button>
     </DialogLayer>}
-    {sheet && <DialogLayer id="sheet" label="Fiche média" blocking={false} historyMode="external" onDismiss={() => window.history.back()} className="fixed inset-0 bg-zinc-950 p-4">
+    {sheet && <DialogLayer id="sheet" label="Fiche média" blocking={false} historyMode="external" onDismiss={() => window.history.back()} className="fixed inset-0 z-[150] bg-zinc-950 p-4">
       <h2>Fiche média</h2>
       <button id="open-dialog" onClick={() => setDialog(true)}>Ouvrir le dialogue</button>
       <button id="open-external" onClick={() => {
         window.history.pushState({ ...window.history.state, isPersonDetailModal: true }, '');
         setExternal(true);
       }}>Ouvrir la fiche personne</button>
-      {dialog && <DialogLayer label="Dialogue parent" onDismiss={() => setDialog(false)} className="fixed inset-0 flex items-center justify-center p-4 bg-black/70">
+      {dialog && <DialogLayer id="parent-dialog" label="Dialogue parent" onDismiss={() => setDialog(false)} className="fixed inset-0 flex items-center justify-center p-4 bg-black/70">
         <section className="w-full max-w-sm bg-zinc-950 p-5 rounded-2xl space-y-4">
           <h2>Dialogue parent</h2>
           <button id="parent-close" data-dialog-initial-focus onClick={() => setDialog(false)}>Fermer</button>

@@ -52,7 +52,12 @@ async function testDialogHarness(client, root) {
     if (viewport.largeText) await evaluate(client, 'document.documentElement.style.fontSize="32px"');
     const originalHistory = await evaluate(client, 'navigation.currentEntry.index');
     await click(client, 'open-sheet');
+    await check(client, `Number(getComputedStyle(document.getElementById("bottom-nav")).zIndex) > Number(getComputedStyle(document.getElementById("sheet")).zIndex)`, 'la fiche média non bloquante reste sous la navigation basse');
+    await check(client, `!document.getElementById("bottom-nav").inert`, 'la navigation basse reste interactive sur la fiche média');
+    await evaluate(client, `document.getElementById("sheet").focus()`);
+    await check(client, `getComputedStyle(document.getElementById("sheet")).outlineStyle === "none"`, 'la surface média focalisée n’affiche aucun cadre UA plein écran');
     await click(client, 'open-dialog');
+    await check(client, `Number(getComputedStyle(document.getElementById("parent-dialog")).zIndex) > Number(getComputedStyle(document.getElementById("bottom-nav")).zIndex)`, 'un vrai dialogue bloquant passe au-dessus de la navigation basse');
     await check(client, 'navigation.currentEntry.index === ' + (originalHistory + 2), 'StrictMode ajoute une seule entrée par niveau');
     await check(client, 'document.getElementById("root").inert && document.activeElement.id === "parent-close"', 'focus initial et fond inerte');
     await evaluate(client, 'document.getElementById("replace").focus()');
