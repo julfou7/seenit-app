@@ -353,16 +353,20 @@ présence Plex/Arr, bande-annonce, âge conseillé, casting, ordre de visionnage
 Reddit. Les recommandations contextuelles restent dans Explorer. Les modals personne et épisode restent
 dans la pile Retour.
 
-Les bandes-annonces Film, Série, saisons, Explorer et actualités utilisent le même lecteur. Un sélecteur
-présente chaque vidéo avec son nom, sa nature et la langue/variante réellement documentée. Un simple
-code TMDB `fr`/`en` donne Français/Anglais ; VF/VOSTFR/VO nécessitent un libellé explicite non contradictoire.
-VOST seul et les paramètres de sous-titres YouTube ne prouvent pas une VOSTFR. Les trailers officiels
-passent en premier, les autres vidéos restent accessibles sans être présentées comme des versions du
-même montage. Sur téléphone Android, l'ouverture active l'immersion native en paysage ; Fermer/Retour
-revient au portrait et à la fiche existante. La PWA mobile utilise les API navigateur seulement lorsque
-supportées et activées par un geste, avec plein écran manuel en repli ; le desktop garde sa modal.
+Les bandes-annonces Film, Série, saisons, Explorer et actualités utilisent le même lecteur. Le nom courant
+et une seule ligne nature/langue restent lisibles dans l'en-tête ; lorsqu'il existe plusieurs vidéos, leur
+sélecteur reste dans une ligne dédiée plutôt que de remplacer la barre supérieure. Un simple code TMDB
+`fr`/`en` donne Français/Anglais ; VF/VOSTFR/VO nécessitent un libellé explicite non contradictoire. VOST
+seul et les paramètres de sous-titres YouTube ne prouvent pas une VOSTFR. Les trailers officiels passent
+en premier, les autres vidéos restent accessibles sans être présentées comme des versions du même montage.
+Sur téléphone Android, l'ouverture garde la modal normale en portrait et **ne force plus le paysage**.
+Le bouton **Plein écran** SeenIt déclenche ensuite, sur action explicite, l'immersion native et le paysage ;
+Fermer/Retour restaure les barres système, le portrait et la fiche existante. La PWA suit le même principe :
+modal normale à l'ouverture, puis vrai plein écran/paysage seulement depuis l'action utilisateur lorsque les
+API navigateur le permettent ; un refus laisse le lecteur utilisable. Le desktop garde sa modal normale.
 La lecture automatique dépend toujours de l'autorisation YouTube/WebView. La validation réelle Android
-VF/VO/vidéo sans preuve de sous-titres, rotation et Retour reste un TNR terrain explicite (#447).
+VF/VO/vidéo sans preuve de sous-titres, ouverture portrait, plein écran paysage et Retour reste un TNR terrain
+explicite (#447).
 
 Dans une fiche épisode, **Discussions Reddit** reste verrouillé avant visionnage. Après marquage vu, le CTA
 ouvre une recherche Reddit volontairement simple de la forme `English title S3 E1`. Le titre affiché dans

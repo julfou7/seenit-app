@@ -421,7 +421,7 @@ points d'entrée créent `watching` sans épisode est suivi par
 |---|---|---|---|
 | Non suivie | Suivre / Watchlist Plex ajoutée | `plan_to_watch` | Crée la fiche TMDB, progression vide. |
 | `plan_to_watch` | Premier épisode vu | `watching` | Ajoute l'épisode/record, `lastWatchedAt`, recalcule le prochain épisode. |
-| `watching` | Épisode ou saison vu(e) | `watching` ou `completed` | Une saison manuelle ne marque que les épisodes déjà diffusés lorsque TMDB les fournit. |
+| `watching` | Épisode ou saison vu(e) | `watching` ou `completed` | Une saison manuelle ne marque que les épisodes déjà diffusés lorsque TMDB les distingue. |
 | `completed` | Un épisode repasse non vu | `watching` | Désarchive si nécessaire et désigne le premier épisode restant. |
 | `plan_to_watch` ou `watching` | Abandonner | `dropped` | Conserve progression, note, favori et métadonnées. |
 | `dropped` | Reprendre | `plan_to_watch` si aucune progression, sinon `watching` | Conserve la progression existante et recalcule l'état actif. |
@@ -1176,12 +1176,16 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   vidéos ni une variante explicitement qualifiée. VF, VOSTFR et VO exigent un libellé source explicite,
   non contradictoire ; `iso_639_1` seul affiche une langue, jamais un doublage ou des sous-titres.
   VOST seul ne prouve pas des sous-titres français et une préférence YouTube ne prouve aucune piste.
-  Sans preuve, le nom réel ou un libellé neutre est conservé. Sur téléphone Android, l'ouverture du
-  lecteur demande l'immersion native et le paysage ; fermeture/Retour restaure les barres système et
-  le portrait, y compris après fermeture pendant l'ouverture. La PWA mobile tente le vrai plein écran
-  uniquement pendant une activation utilisateur, puis le paysage lorsque supporté ; tout refus laisse
-  le lecteur utilisable avec ses contrôles YouTube et un bouton plein écran manuel. Le desktop conserve
-  la modal normale. Aucun changement d'identité média ni de position de la fiche n'est introduit.
+  Sans preuve, le nom réel ou un libellé neutre est conservé. Le nom courant et une seule ligne
+  type/langue restent lisibles dans l'en-tête ; lorsqu'il existe plusieurs vidéos, leur sélecteur reste
+  sur une ligne dédiée au lieu de remplacer la barre supérieure. Sur téléphone Android, l'ouverture du
+  lecteur reste dans la modal normale en portrait et ne demande ni immersion ni paysage. Le bouton SeenIt
+  « Plein écran » déclenche ensuite, sur action explicite, l'immersion native et le paysage ;
+  fermeture/Retour restaure les barres système, l'orientation et la fiche existante, y compris après une
+  fermeture pendant l'ouverture. La PWA suit la même séquence : modal normale à l'ouverture, puis vrai
+  plein écran et paysage seulement après action utilisateur lorsque les API navigateur le permettent ;
+  tout refus laisse le lecteur utilisable. Le desktop conserve la modal normale. Aucun changement
+  d'identité média ni de position de la fiche n'est introduit.
 
 ## 10. Performance et résilience
 
