@@ -40,6 +40,8 @@ rapport existant et son historique.
 | AUDIT-2026-09-20-GCP-FINOPS | 2026-09-20 | 1.4.174 (`6f33296`) | Firestore, Storage, Cloud Run, egress, bornes et preuve 0 € | [Audit FinOps GCP](./audit-finops-gcp-2026-09-20.md) | [Issue #23](https://github.com/julfou7/seenit-app/issues/23) |
 | AUDIT-2026-09-21-WARNING-COVERAGE | 2026-09-21 | 1.4.174 (`faec21a`) | warnings Cloud Run, règles actionnables, récurrence multi-fenêtres, budget de logs | [Audit couverture warnings](./audit-log-warning-coverage-2026-09-21.md) | [Issue #27](https://github.com/julfou7/seenit-app/issues/27) |
 
+| AUDIT-2026-10-14-GCP-FINOPS | 2026-10-14 | 1.4.208 (`7c6ba27`) | fraîcheur des agrégats Cloud Run, egress et reprise GitHub | [Audit FinOps de reprise](./audit-finops-gcp-2026-10-14.md) | [#23](https://github.com/julfou7/seenit-app/issues/23), [#506](https://github.com/julfou7/seenit-app/issues/506) |
+
 L'audit historique des téléchargements antérieur à ce protocole reste disponible dans
 [`../audit-telechargements-2026-08-30.md`](../audit-telechargements-2026-08-30.md). Ses corrections
 déjà livrées sont couvertes par les exigences `SEENIT-DOWNLOAD-*` et leurs tests.

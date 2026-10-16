@@ -34,9 +34,9 @@ Le correctif #506 remplace cette preuve invalide par un contrat plus strict :
 
 ## Reprise GitHub
 
-GitHub Support a levé le 14 octobre la restriction qui bloquait le compte. GitHub Actions déclenche de
-nouveau. Le changement complet est remis dans le chemin canonique `agent-staging/**` afin que le SHA
-exact passe `Agent Remote Validate` avant toute promotion vers une branche de livraison.
+Le propriétaire a confirmé le rétablissement des accès le 16 octobre. GitHub Actions déclenche de
+nouveau et le workspace local est opérationnel. Le changement préparé est repris dans la PR
+d'intégration des chantiers d'octobre, avec validation locale puis CI canonique du SHA livré.
 
 ## Prochaine preuve
 

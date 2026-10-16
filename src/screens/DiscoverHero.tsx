@@ -44,14 +44,18 @@ export const HeroCard = React.memo(function HeroCard({
 }: {
   key?: React.Key;
   media: TMDBMedia;
-  details?: any;
+  details?: Partial<TMDBMedia> & {
+    genres?: { name: string }[];
+    networks?: { name: string }[];
+    production_companies?: { name: string }[];
+  };
   onShowClick: (id: number, mediaType?: 'tv' | 'movie') => void;
   onOpenTrailer?: (id: number, mediaType: 'tv' | 'movie') => void;
   rank: number;
   activeCategory?: string;
-  show?: any;
-  addShow?: any;
-  deleteShow?: any;
+  show?: Show;
+  addShow?: (showData: Omit<Show, 'id' | 'userId'>) => Promise<string>;
+  deleteShow?: (id: string) => Promise<void>;
 }) {
   const [isExpanded, setIsExpanded] = React.useState(false);
   const { showToast } = useToastStore();
@@ -66,7 +70,7 @@ export const HeroCard = React.memo(function HeroCard({
     : details?.vote_average
       ? details.vote_average.toFixed(1)
       : null;
-  const genres = details?.genres?.slice(0, 2).map((genre: any) => genre.name).join(' · ');
+  const genres = details?.genres?.slice(0, 2).map(genre => genre.name).join(' · ');
   const providerName = isTv
     ? details?.networks?.[0]?.name
     : details?.production_companies?.[0]?.name;
