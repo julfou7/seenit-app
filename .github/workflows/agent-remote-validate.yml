@@ -102,7 +102,7 @@ jobs:
           name: SeenIt-Agent-Quality-Gates-${{ github.run_id }}
           path: quality-reports
           if-no-files-found: warn
-          retention-days: 30
+          retention-days: 7
 
       - name: Save trusted staging node_modules cache
         if: success() && steps.node_modules_cache.outputs.cache-hit != 'true'

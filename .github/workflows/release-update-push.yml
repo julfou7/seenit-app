@@ -18,24 +18,27 @@ on:
         required: true
         default: false
         type: boolean
+  schedule:
+    - cron: '17 3 * * *'
 
 permissions:
-  actions: read
-  contents: read
+  actions: write
+  contents: write
   issues: write
 
 concurrency:
-  group: seenit-release-update-${{ github.event.client_payload.release_run_id || inputs.release_run_id }}
+  group: seenit-release-update-${{ github.event.client_payload.release_run_id || inputs.release_run_id || github.event_name }}
   cancel-in-progress: false
 
 jobs:
   notify_android_update:
-    name: Notify Android Update
+    name: Notify Android Update / prune GitHub storage
     if: >-
+      github.event_name == 'schedule' ||
       github.event_name == 'repository_dispatch' ||
       github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 10
 
     steps:
       - name: Checkout trusted notification workflow revision
@@ -47,6 +50,7 @@ jobs:
           node-version: '22'
 
       - name: Wait for source workflow, notify installations and checkpoint release
+        if: github.event_name != 'schedule'
         run: node scripts/notify-release-update.cjs
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -56,3 +60,11 @@ jobs:
           RELEASE_HEAD_SHA: ${{ github.event.client_payload.release_head_sha || inputs.release_head_sha }}
           RELEASE_FAST_TERRAIN: ${{ github.event.client_payload.fast_terrain || inputs.fast_terrain || false }}
           RELEASE_WAIT_FOR_COMPLETION: 'true'
+
+      - name: Prune old releases and transient artifacts
+        run: node scripts/prune-github-storage.cjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          SEENIT_STORAGE_APPLY: 'true'
+          SEENIT_STORAGE_KEEP_HEAD_SHA: ${{ github.event.client_payload.release_head_sha || inputs.release_head_sha || '' }}
