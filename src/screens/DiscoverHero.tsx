@@ -268,7 +268,7 @@ export const HeroCard = React.memo(function HeroCard({
               }
             }}
             className={cn(
-              'flex-[1.16] min-w-0 flex items-center justify-center gap-1.5 py-3 px-2 rounded-xl font-extrabold text-[10.5px] sm:text-xs uppercase tracking-wide transition-transform active:scale-95 shadow-lg cursor-pointer',
+              'flex-[1.16] min-h-[44px] min-w-0 flex items-center justify-center gap-1.5 py-3 px-2 rounded-xl font-extrabold text-[10.5px] sm:text-xs uppercase tracking-wide transition-transform active:scale-95 shadow-lg cursor-pointer',
               buttonStyleClass,
             )}
           >
@@ -286,7 +286,7 @@ export const HeroCard = React.memo(function HeroCard({
                 onShowClick(media.id, isTv ? 'tv' : 'movie');
               }
             }}
-            className="flex-[0.84] min-w-0 flex items-center justify-center gap-2 py-3 px-2 rounded-xl font-extrabold text-[11px] sm:text-xs uppercase tracking-wide text-white bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 transition-transform active:scale-95 shadow-lg cursor-pointer"
+            className="flex-[0.84] min-h-[44px] min-w-0 flex items-center justify-center gap-2 py-3 px-2 rounded-xl font-extrabold text-[11px] sm:text-xs uppercase tracking-wide text-white bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 transition-transform active:scale-95 shadow-lg cursor-pointer"
           >
             <Play size={16} className="fill-white shrink-0" />
             <span className="whitespace-nowrap">Trailer</span>
