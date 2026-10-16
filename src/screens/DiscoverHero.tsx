@@ -45,7 +45,7 @@ export const HeroCard = React.memo(function HeroCard({
   key?: React.Key;
   media: TMDBMedia;
   details?: any;
-  onShowClick: (id: any, mediaType?: 'tv' | 'movie') => void;
+  onShowClick: (id: number, mediaType?: 'tv' | 'movie') => void;
   onOpenTrailer?: (id: number, mediaType: 'tv' | 'movie') => void;
   rank: number;
   activeCategory?: string;
