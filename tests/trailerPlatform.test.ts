@@ -36,6 +36,18 @@ test('le refus orientation ne bloque ni la lecture ni la sortie et un plein écr
   assert.equal(exits, 1);
 });
 
+test('SEENIT-UX-013 garde l’ouverture du lecteur en portrait et réserve le paysage au plein écran explicite', () => {
+  const modal = readFileSync('src/components/TrailerModal.tsx', 'utf8');
+  const platform = readFileSync('src/features/trailers/trailerPlatform.ts', 'utf8');
+  assert.doesNotMatch(modal, /shouldAutoPresentTrailer/);
+  assert.doesNotMatch(platform, /shouldAutoPresentTrailer/);
+  assert.match(modal, /const immersive = fullscreen \|\| nativeImmersive/);
+  assert.match(modal, /!immersive && <button type="button" onClick={present} aria-label="Plein écran"/);
+  assert.doesNotMatch(modal, /!native && <button type="button" onClick={present}/);
+  assert.doesNotMatch(modal, /immersive && choices\.length > 1 \? selector/);
+  assert.match(modal, /choices\.length > 1 && <label/);
+});
+
 test('le lecteur partagé et le bridge Android conservent la pile Retour et restaurent le réglage de lecture', () => {
   const modal = readFileSync('src/components/TrailerModal.tsx', 'utf8');
   const activity = readFileSync('android/app/src/main/java/com/seenit/app/MainActivity.java', 'utf8');

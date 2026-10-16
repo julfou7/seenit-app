@@ -27,7 +27,3 @@ export function trailerPresentationAdapter(element: HTMLElement): TrailerPresent
     },
   };
 }
-
-export function shouldAutoPresentTrailer(): boolean {
-  return isNativeTrailer() || (window.matchMedia('(pointer: coarse)').matches && navigator.userActivation?.isActive === true);
-}
