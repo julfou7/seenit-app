@@ -1,6 +1,9 @@
 # Audit FinOps GCP — reprise après rétablissement GitHub
 
-- **Date** : 14 octobre 2026
+- **Identifiant** : AUDIT-2026-10-14-GCP-FINOPS
+- **Date** : 14 octobre 2026 ; dernière vérification : 16 octobre 2026
+- **Périmètre** : qualité des preuves Cloud Run, egress et reprise de la livraison GitHub
+- **Version / commit observés** : 1.4.208, `7c6ba27cd27edaa6766ba36110ae3fe3933ef232`
 - **Suivi** : #23 et #506
 - **Baseline GitHub** : `main` `7c6ba27cd27edaa6766ba36110ae3fe3933ef232`
 - **Statut** : en validation — mesure Cloud Run fiabilisée, preuve réseau 0 € encore à obtenir
@@ -44,3 +47,14 @@ Après merge, le workflow `Audit Structured SeenIt Logs` doit produire un agrég
 La répartition réelle des octets de cette fenêtre déterminera le correctif réseau de #23 : payload API
 encore dominant, frontend statique servi par Cloud Run, ou autre route mesurée. Aucune migration de
 région ne doit être décidée sur l'ancienne baseline de septembre.
+
+## Matrice exhaustive des constats
+
+| Constat | Priorité | Suivi et critère de sortie |
+|---|---|---|
+| Agrégats anciens ou saturés présentés comme récents | P2 | [#506](https://github.com/julfou7/seenit-app/issues/506) : bornes et qualité testées, puis agrégat récent complet du workflow canonique. |
+| Coût réseau résiduel observé dans Billing | P2 | [#23](https://github.com/julfou7/seenit-app/issues/23) : attribution sur une fenêtre récente, puis sept jours et une période de facturation complète de preuve. |
+
+Les bornes, la redaction et les tests de non-régression constituent les points solides à conserver.
+Limites : la capture Billing rapportée ne remplace pas un export mesuré après livraison ; aucun coût
+nul futur ni diagnostic de route dominant ne peut être déduit de l'ancien agrégat de septembre.
