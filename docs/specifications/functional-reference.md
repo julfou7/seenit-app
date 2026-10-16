@@ -304,7 +304,9 @@ Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, 
 - Tri Populaires, Mieux notés, Plus récents ou Ordre alphabétique.
 - Hero Top 10, chargement infini, aperçu long-press et cache utilisable lors d'une panne réseau.
 - Le bouton Reprendre du Hero suit les épisodes vus persistés : un ancien pointeur de reprise ne
-  réaffiche pas un épisode déjà dépassé. Une série à jour conserve son état À jour sur la diffusion.
+  réaffiche pas un épisode déjà vu. Un épisode antérieur encore non vu reste proposé si la progression
+  contient des trous. Un nouvel épisode disponible prime sur un ancien statut « terminé » ; seule
+  une série sans prochain épisode conserve son état À jour sur la diffusion.
   Le synopsis compact se coupe sur une fin de mot et Voir plus permet de lire le texte entier.
   Les pages Discover récemment obtenues sont réutilisées directement sur l'appareil pour un retour écran,
   une combinaison identique ou une page déjà parcourue. Cela inclut le flux par défaut **Tout**

@@ -4,6 +4,7 @@ import {
   buildHeroOverviewPreview,
   formatHeroEpisode,
   resolveHeroNextEpisode,
+  resolveHeroResumeState,
 } from '../src/features/discover/heroPresentation.ts';
 
 // TNR #665 : la progression persistée doit empêcher le Hero de régresser vers un pointeur dérivé obsolète.
@@ -52,7 +53,7 @@ test('le Hero reste à jour quand tous les épisodes diffusés sont déjà vus',
 test('la reprise passe à la saison suivante quand la taille de saison est connue', () => {
   assert.deepEqual(
     resolveHeroNextEpisode({
-      seenEpisodes: ['1x9', '1x10'],
+      seenEpisodes: Array.from({ length: 10 }, (_, i) => `1x${i + 1}`),
       nextEpisodeToWatch: { season_number: 1, episode_number: 1, episode_count: 10 },
     }),
     { season: 2, episode: 1 },
@@ -62,7 +63,7 @@ test('la reprise passe à la saison suivante quand la taille de saison est connu
 test('une série terminée ne fabrique pas de saison suivante après le final connu', () => {
   assert.equal(
     resolveHeroNextEpisode({
-      seenEpisodes: ['1x10'],
+      seenEpisodes: Array.from({ length: 10 }, (_, i) => `1x${i + 1}`),
       seriesEnded: true,
       nextEpisodeToWatch: {
         season_number: 1,
@@ -83,4 +84,28 @@ test('le synopsis compact coupe sur une frontière de mot', () => {
   assert.equal(preview.truncated, true);
   assert.equal(preview.text, "Deux familles du crime s'affrontent dans une lutte à mort qui menace de faire tomber des empires.");
   assert.doesNotMatch(preview.text, /\bPr$/);
+});
+
+test('un épisode antérieur non vu reste éligible malgré une progression non contiguë', () => {
+  assert.deepEqual(resolveHeroNextEpisode({
+    seenEpisodes: ['1x2'],
+    nextEpisodeToWatch: { season_number: 1, episode_number: 1 },
+  }), { season: 1, episode: 1 });
+  assert.deepEqual(resolveHeroNextEpisode({
+    seenEpisodes: ['1x1', '1x3'],
+    nextEpisodeToWatch: { season_number: 1, episode_number: 1 },
+  }), { season: 1, episode: 2 });
+  assert.deepEqual(resolveHeroNextEpisode({
+    seenEpisodes: ['1x9', '1x10'],
+    nextEpisodeToWatch: { season_number: 1, episode_number: 1, episode_count: 10 },
+  }), { season: 1, episode: 1 });
+});
+
+test('un nouvel épisode disponible prime sur un ancien statut completed du Hero', () => {
+  const state = resolveHeroResumeState({
+    status: 'completed', seenEpisodes: ['1x1', '1x2'],
+    nextEpisodeToWatch: { season_number: 2, episode_number: 1 },
+  });
+  assert.deepEqual(state, { nextEpisode: { season: 2, episode: 1 }, isCompleted: false });
+  assert.equal(resolveHeroResumeState({ status: 'completed', seenEpisodes: ['1x1'], totalAiredEpisodes: 1 }).isCompleted, true);
 });
