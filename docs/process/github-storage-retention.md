@@ -46,6 +46,13 @@ Les suppressions exigent explicitement `SEENIT_STORAGE_APPLY=true`. Une exécuti
 - Si aucune release officielle n'est prouvée, aucune release n'est supprimée.
 - Le script ne possède aucun chemin de suppression de tag/ref Git.
 - Les suppressions sont idempotentes par ID GitHub ; une nouvelle exécution recalcule le plan depuis l'état distant.
+- La maintenance protège toujours `latest`, même si le déclencheur de notification concerne une version
+  antérieure ; les brouillons, préreleases et publications postérieures à la version protégée sont exclus.
+- Les mutations sont séquentielles, espacées de 1,5 seconde et bornées à 100 suppressions par passage.
+  Le reliquat du stock historique reste annoncé pour le passage suivant ; la notification et la purge
+  partagent une concurrence globale. Une limitation GitHub arrête le passage sans rejeu aveugle.
+  Cette cadence reste prudente après la réactivation, conformément aux
+  [limites et bonnes pratiques GitHub](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api).
 - Les permissions `contents: write` et `actions: write` sont bornées au workflow post-release/maintenance par `scripts/validate-workflow-policy.cjs`.
 
 ## Restriction de compte en cours au 13 octobre 2026

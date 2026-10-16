@@ -27,7 +27,7 @@ permissions:
   issues: write
 
 concurrency:
-  group: seenit-release-update-${{ github.event.client_payload.release_run_id || inputs.release_run_id || github.event_name }}
+  group: seenit-release-update-storage
   cancel-in-progress: false
 
 jobs:

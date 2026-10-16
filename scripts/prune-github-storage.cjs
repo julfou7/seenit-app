@@ -1,12 +1,14 @@
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CANONICAL_REPOSITORY = 'julfou7/seenit-app';
 const API_VERSION = '2022-11-28';
+const MAX_DELETIONS_PER_RUN = 100;
+const MUTATION_DELAY_MS = 1500;
 
 const ARTIFACT_RETENTION_POLICIES = Object.freeze([
   {
     id: 'apk-intermediate',
     days: 1,
-    patterns: [/^seenit-(?:android-)?apk-/i]
+    patterns: [/^seenit-(?:android-)?apk-(?!upgrade-smoke-)/i]
   },
   {
     id: 'android-test-harness',
@@ -47,7 +49,10 @@ function buildStoragePlan({ protectedRelease, releases = [], artifacts = [], now
   }
 
   const releasesToDelete = protectedId
-    ? releaseList.filter(release => Number(release?.id) > 0 && Number(release.id) !== protectedId)
+    ? releaseList.filter(release => Number(release?.id) > 0 && Number(release.id) !== protectedId
+      && !release.draft && !release.prerelease
+      && (!protectedRelease.published_at || (release.published_at
+        && Date.parse(release.published_at) <= Date.parse(protectedRelease.published_at))))
     : [];
 
   const artifactsToDelete = artifactList.filter(artifact => {
@@ -138,12 +143,15 @@ async function resolveProtectedRelease({ releases, request = githubRequest } = {
       !release?.draft && String(release?.target_commitish || '').toLowerCase() === expectedHeadSha.toLowerCase()
     );
     if (!exact) throw new Error(`Release publiée introuvable pour le SHA protégé ${expectedHeadSha}`);
-    return exact;
+    const latest = await request('/releases/latest');
+    if (!Number(latest?.id)) throw new Error('Dernière release officielle non vérifiable');
+    return latest;
   }
   return request('/releases/latest', { allow404: true });
 }
 
-async function runMaintenance({ request = githubRequest, nowMs = Date.now() } = {}) {
+async function runMaintenance({ request = githubRequest, nowMs = Date.now(),
+  sleep = ms => new Promise(resolve => setTimeout(resolve, ms)) } = {}) {
   const releases = await listPaginated('/releases', 'releases', { request });
   const protectedRelease = await resolveProtectedRelease({ releases, request });
   const artifactsPayload = await listPaginated('/actions/artifacts', 'artifacts', { request });
@@ -157,15 +165,24 @@ async function runMaintenance({ request = githubRequest, nowMs = Date.now() } = 
 
   if (!apply) return plan;
 
+  let deleted = 0;
   for (const release of plan.releasesToDelete) {
+    if (deleted >= MAX_DELETIONS_PER_RUN) break;
+    if (deleted > 0) await sleep(MUTATION_DELAY_MS);
     await request(`/releases/${release.id}`, { method: 'DELETE' });
+    deleted += 1;
     console.log(`[Storage] release supprimée : ${release.tag_name || release.id}`);
   }
   for (const artifact of plan.artifactsToDelete) {
+    if (deleted >= MAX_DELETIONS_PER_RUN) break;
+    if (deleted > 0) await sleep(MUTATION_DELAY_MS);
     await request(`/actions/artifacts/${artifact.id}`, { method: 'DELETE' });
+    deleted += 1;
     console.log(`[Storage] artefact supprimé : ${artifact.name || artifact.id}`);
   }
-  return plan;
+  const remaining = plan.releasesToDelete.length + plan.artifactsToDelete.length - deleted;
+  console.log(`[Storage] suppressions confirmées : ${deleted} ; restantes : ${remaining} (prochaine maintenance)`);
+  return { ...plan, deleted, remaining };
 }
 
 module.exports = {
@@ -173,6 +190,8 @@ module.exports = {
   ARTIFACT_RETENTION_POLICIES,
   CANONICAL_REPOSITORY,
   DAY_MS,
+  MAX_DELETIONS_PER_RUN,
+  MUTATION_DELAY_MS,
   ageInDays,
   buildStoragePlan,
   formatBytes,

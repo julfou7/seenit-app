@@ -8,6 +8,7 @@ const {
   buildStoragePlan,
   retentionPolicyForArtifact
 } = require('../scripts/prune-github-storage.cjs');
+const { runMaintenance, resolveProtectedRelease, MAX_DELETIONS_PER_RUN, MUTATION_DELAY_MS } = require('../scripts/prune-github-storage.cjs');
 
 test('garde uniquement la release protégée sans planifier de suppression de tag', () => {
   const latest = { id: 208, tag_name: 'v1.4.208', assets: [{ size: 13_000_000 }] };
@@ -72,4 +73,55 @@ test('supprime seulement les artefacts SeenIt ayant dépassé leur fenêtre', ()
   const plan = buildStoragePlan({ protectedRelease: null, releases: [], artifacts, nowMs });
   assert.deepEqual(plan.artifactsToDelete.map((artifact: { id: number }) => artifact.id), [2, 4, 6]);
   assert.equal(plan.estimatedBytes.artifacts, 21);
+});
+
+test('préserve les publications plus récentes, brouillons et préreleases pendant une purge retardée', () => {
+  const protectedRelease = { id: 208, tag_name: 'v1.4.208', published_at: '2026-10-01T12:00:00Z' };
+  const plan = buildStoragePlan({ protectedRelease, releases: [protectedRelease,
+    { id: 207, published_at: '2026-09-30T12:00:00Z' },
+    { id: 209, published_at: '2026-10-02T12:00:00Z' },
+    { id: 210, draft: true }, { id: 211, prerelease: true }, { id: 212 }
+  ] });
+  assert.deepEqual(plan.releasesToDelete.map((release: { id: number }) => release.id), [207]);
+});
+
+test('la maintenance sérialise et borne les suppressions réelles, puis conserve le travail restant', async () => {
+  const apply = process.env.SEENIT_STORAGE_APPLY;
+  process.env.SEENIT_STORAGE_APPLY = 'true';
+  const latest = { id: 208, tag_name: 'v1.4.208' };
+  const releases = [latest, ...Array.from({ length: 120 }, (_, index) => ({ id: index + 1, tag_name: `old-${index}` }))];
+  const deleted: string[] = []; const delays: number[] = [];
+  try {
+    const request = async (route: string, options?: { method?: string }) => {
+      if (options?.method === 'DELETE') { deleted.push(route); return null; }
+      if (route === '/releases/latest') return latest;
+      if (route.startsWith('/actions/artifacts')) return { artifacts: [] };
+      const page = Number(new URL('https://api.github.com' + route).searchParams.get('page'));
+      return releases.slice((page - 1) * 100, page * 100);
+    };
+    const result = await runMaintenance({ request, sleep: async (ms: number) => { delays.push(ms); } });
+    assert.equal(deleted.length, MAX_DELETIONS_PER_RUN);
+    assert.equal(deleted.includes('/releases/208'), false);
+    assert.equal(delays.length, MAX_DELETIONS_PER_RUN - 1);
+    assert.ok(delays.every(value => value === MUTATION_DELAY_MS));
+    assert.equal(result.remaining, 120 - MAX_DELETIONS_PER_RUN);
+  } finally {
+    if (apply === undefined) delete process.env.SEENIT_STORAGE_APPLY;
+    else process.env.SEENIT_STORAGE_APPLY = apply;
+  }
+});
+
+test('un ancien événement de release protège la dernière publication plutôt que sa propre version', async () => {
+  const previous = process.env.SEENIT_STORAGE_KEEP_HEAD_SHA;
+  const sha = 'a'.repeat(40);
+  process.env.SEENIT_STORAGE_KEEP_HEAD_SHA = sha;
+  try {
+    const latest = { id: 209, tag_name: 'v1.4.209' };
+    const result = await resolveProtectedRelease({ releases: [{ id: 208, target_commitish: sha }, latest],
+      request: async (route: string) => { assert.equal(route, '/releases/latest'); return latest; } });
+    assert.equal(result.id, 209);
+  } finally {
+    if (previous === undefined) delete process.env.SEENIT_STORAGE_KEEP_HEAD_SHA;
+    else process.env.SEENIT_STORAGE_KEEP_HEAD_SHA = previous;
+  }
 });
