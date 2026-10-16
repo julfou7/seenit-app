@@ -307,6 +307,8 @@ Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, 
   réaffiche pas un épisode déjà vu. Un épisode antérieur encore non vu reste proposé si la progression
   contient des trous. Un nouvel épisode disponible prime sur un ancien statut « terminé » ; seule
   une série sans prochain épisode conserve son état À jour sur la diffusion.
+  Un épisode annoncé avec une date future ne devient pas une reprise avant sa diffusion ; une série
+  terminée sans pointeur de prochain épisode n'en invente pas en attendant sa synchronisation.
   Le synopsis compact se coupe sur une fin de mot et Voir plus permet de lire le texte entier.
   Les pages Discover récemment obtenues sont réutilisées directement sur l'appareil pour un retour écran,
   une combinaison identique ou une page déjà parcourue. Cela inclut le flux par défaut **Tout**

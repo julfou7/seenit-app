@@ -4,6 +4,7 @@ export interface HeroEpisodeRef {
 }
 
 interface HeroEpisodePointer {
+  air_date?: string | null;
   season_number?: number;
   episode_number?: number;
   episode_count?: number | null;
@@ -89,12 +90,16 @@ function resolveKnownSeasonEpisodeCount(
  * episodes, preserving gaps in independently imported or marked progress.
  * `seasonsCache` is only a legacy last-resort source for season length.
  */
-export function resolveHeroNextEpisode(show: HeroProgressSource): HeroEpisodeRef | null {
+export function resolveHeroNextEpisode(show: HeroProgressSource, now = new Date()): HeroEpisodeRef | null {
   const seenEpisodes = (show.seenEpisodes || [])
     .map(parseSeenEpisode)
     .filter((episode): episode is HeroEpisodeRef => Boolean(episode));
   const derived = pointerToEpisodeRef(show.nextEpisodeToWatch);
   const seenKeys = new Set(seenEpisodes.map(ref => `${ref.season}x${ref.episode}`));
+  if (show.status === 'completed' && !derived) return null;
+  const airDate = show.nextEpisodeToWatch?.air_date;
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  if (derived && airDate && /^\d{4}-\d{2}-\d{2}$/.test(airDate) && airDate > today) return null;
 
   if (seenEpisodes.length === 0) {
     return derived;
@@ -131,8 +136,8 @@ export function resolveHeroNextEpisode(show: HeroProgressSource): HeroEpisodeRef
   return candidate;
 }
 
-export function resolveHeroResumeState(show: HeroProgressSource) {
-  const nextEpisode = resolveHeroNextEpisode(show);
+export function resolveHeroResumeState(show: HeroProgressSource, now = new Date()) {
+  const nextEpisode = resolveHeroNextEpisode(show, now);
   return {
     nextEpisode,
     isCompleted: !nextEpisode && (show.status === 'completed' || Boolean(show.seenEpisodes?.length)),
