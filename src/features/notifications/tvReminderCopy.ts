@@ -29,6 +29,22 @@ function backlogSuffix(extraAvailableEpisodes: number): string {
   return ` · + ${extraAvailableEpisodes} épisode${extraAvailableEpisodes > 1 ? 's' : ''}`;
 }
 
+function validEpisodePointer(value: unknown): TvReminderEpisode | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<TvReminderEpisode>;
+  const seasonNumber = candidate.season_number;
+  const episodeNumber = candidate.episode_number;
+  if (
+    !Number.isInteger(seasonNumber)
+    || !Number.isInteger(episodeNumber)
+    || Number(seasonNumber) <= 0
+    || Number(episodeNumber) <= 0
+  ) {
+    return null;
+  }
+  return candidate as TvReminderEpisode;
+}
+
 export function buildTvSeasonReminderSummary(episode: TvReminderEpisode): string {
   return `📅 Nouvelle saison · Saison ${episode.season_number}`;
 }
@@ -40,8 +56,10 @@ export function buildTvEpisodeReminderCopy(
 ): TvEpisodeReminderCopy {
   const releasedCode = formatTvEpisodeCode(releasedEpisode);
   const defaultBody = `${episodeLabel(releasedEpisode)} disponible aujourd'hui.`;
-  const nextToWatch = show.nextEpisodeToWatch as TvReminderEpisode | undefined;
+  const nextToWatch = validEpisodePointer(show.nextEpisodeToWatch);
 
+  // Un pointeur dérivé ancien/incomplet ne doit jamais fabriquer un épisode de retard.
+  // Fail closed : on conserve uniquement l'information certaine, l'épisode diffusé.
   if (!nextToWatch) {
     return {
       summaryText: `🆕 Nouvel épisode · ${releasedCode}`,

@@ -122,6 +122,20 @@ test('SEENIT-NOTIFICATION-002 et #623 restent lisibles lorsque TMDB ne fournit p
   assert.doesNotMatch(`${copy.summaryText} ${copy.body}`, /undefined|null/);
 });
 
+test('SEENIT-NOTIFICATION-002 et #623 ignorent un pointeur incomplet sans fabriquer +1 épisode', () => {
+  const released = episode(2, 5, 'Finale');
+  const show = showFixture({
+    seenEpisodes: ['2x1', '2x2', '2x3', '2x4'],
+    totalAiredEpisodes: 5,
+    nextEpisodeToWatch: { air_date: today } as any,
+  });
+
+  const copy = buildTvEpisodeReminderCopy(show, released, today);
+  assert.equal(copy.summaryText, '🆕 Nouvel épisode · S02 | E05');
+  assert.equal(copy.body, "S02 | E05 · Finale disponible aujourd'hui.");
+  assert.doesNotMatch(`${copy.summaryText} ${copy.body}`, /undefined|null|\+\s*1\s+épisode/);
+});
+
 test('SEENIT-NOTIFICATION-002 et #623 reprogramment une alarme future si le contexte de progression change', () => {
   const source = readFileSync('src/hooks/useRemindersNotifier.ts', 'utf8');
   assert.match(source, /REMINDER_SCHEDULE_SCHEMA = 'v7'/);
