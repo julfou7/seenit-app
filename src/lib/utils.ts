@@ -437,20 +437,29 @@ export function sanitizeSearchQuery(str: string): string {
     .trim();
 }
 
-export function getBestLogoPath(images: any): string | null {
+type TMDBLogo = {
+  iso_639_1?: string | null;
+  file_path: string;
+};
+
+type TMDBImages = {
+  logos?: TMDBLogo[] | null;
+};
+
+export function getBestLogoPath(images: TMDBImages | null | undefined): string | null {
   if (!images?.logos || !Array.isArray(images.logos) || images.logos.length === 0) {
     return null;
   }
   // Priorité 1 : Logo français
-  const frLogo = images.logos.find((l: any) => l.iso_639_1 === 'fr');
+  const frLogo = images.logos.find((logo) => logo.iso_639_1 === 'fr');
   if (frLogo) return frLogo.file_path;
 
   // Priorité 2 : Logo anglais
-  const enLogo = images.logos.find((l: any) => l.iso_639_1 === 'en');
+  const enLogo = images.logos.find((logo) => logo.iso_639_1 === 'en');
   if (enLogo) return enLogo.file_path;
 
   // Priorité 3 : Logo sans langue (null / undefined / empty)
-  const nullLogo = images.logos.find((l: any) => !l.iso_639_1);
+  const nullLogo = images.logos.find((logo) => !logo.iso_639_1);
   if (nullLogo) return nullLogo.file_path;
 
   // Priorité 4 : Premier logo disponible
