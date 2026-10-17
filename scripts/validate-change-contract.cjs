@@ -180,12 +180,31 @@ function isBehavioralFile(file) {
     || normalized === 'capacitor.config.ts';
 }
 
-function findBehavioralChanges(changedFiles, readPatch) {
+function isCanonicalVersionOnlyBehaviorChange(file, patch, readAfter) {
+  const normalized = normalizePath(file);
+  if (!isVersionOnlyPatch(normalized, patch)) return false;
+  if (normalized !== 'server.ts') return true;
+  if (typeof readAfter !== 'function') return false;
+
+  const packageVersion = JSON.parse(String(readAfter('package.json') || '')).version;
+  const serverSource = String(readAfter('server.ts') || '');
+  const plexVersion = serverSource.match(/'X-Plex-Version':\s*'(\d+\.\d+\.\d+)'/)?.[1];
+
+  return typeof packageVersion === 'string'
+    && typeof plexVersion === 'string'
+    && plexVersion === packageVersion;
+}
+
+function findBehavioralChanges(changedFiles, readPatch, readAfter) {
   return changedFiles.filter(file => {
     const normalized = normalizePath(file);
     if (!isBehavioralFile(normalized)) return false;
     if (!VERSION_ONLY_PATTERNS[normalized]) return true;
-    return !isVersionOnlyPatch(normalized, readPatch(normalized));
+    return !isCanonicalVersionOnlyBehaviorChange(
+      normalized,
+      readPatch(normalized),
+      readAfter
+    );
   });
 }
 
@@ -278,7 +297,11 @@ function main() {
 
   let behavioralFiles;
   try {
-    behavioralFiles = findBehavioralChanges(changedFiles, readPatch);
+    behavioralFiles = findBehavioralChanges(
+      changedFiles,
+      readPatch,
+      file => readAt(head, file)
+    );
   } catch (error) {
     console.error('[SPEC] Impossible d’identifier les changements comportementaux :', error.message);
     return 1;
@@ -329,6 +352,7 @@ module.exports = {
   getChangedContentLines,
   isAndroidLocalUnitTestFile,
   isBehavioralFile,
+  isCanonicalVersionOnlyBehaviorChange,
   isVersionOnlyJsonChange,
   isVersionOnlyPatch,
   isPureVersionAlignment,
