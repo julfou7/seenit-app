@@ -180,6 +180,15 @@ function isBehavioralFile(file) {
     || normalized === 'capacitor.config.ts';
 }
 
+function findBehavioralChanges(changedFiles, readPatch) {
+  return changedFiles.filter(file => {
+    const normalized = normalizePath(file);
+    if (!isBehavioralFile(normalized)) return false;
+    if (!VERSION_ONLY_PATTERNS[normalized]) return true;
+    return !isVersionOnlyPatch(normalized, readPatch(normalized));
+  });
+}
+
 function requiresSpecification(file) {
   const normalized = normalizePath(file);
   return (normalized.startsWith('android/app/src/') && !isAndroidLocalUnitTestFile(normalized))
@@ -267,7 +276,13 @@ function main() {
     return 0;
   }
 
-  const behavioralFiles = changedFiles.filter(isBehavioralFile);
+  let behavioralFiles;
+  try {
+    behavioralFiles = findBehavioralChanges(changedFiles, readPatch);
+  } catch (error) {
+    console.error('[SPEC] Impossible d’identifier les changements comportementaux :', error.message);
+    return 1;
+  }
   if (behavioralFiles.length === 0) {
     console.log('[SPEC] Aucun comportement applicatif modifié.');
     return 0;
@@ -310,6 +325,7 @@ module.exports = {
   VERSION_ONLY_JSON_FIELDS,
   analyzeRequirementsChurn,
   countLineChurn,
+  findBehavioralChanges,
   getChangedContentLines,
   isAndroidLocalUnitTestFile,
   isBehavioralFile,
