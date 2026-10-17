@@ -2,16 +2,27 @@
 
 Statut : extension opérationnelle de `docs/process/delivery.md` et de `docs/specifications/release-control.md` pour la sobriété des releases et artefacts GitHub.
 
+## Politique de rétention GitHub
+
+Cette section clarifie et rend explicite l'invariant déjà appliqué par la maintenance de #668 : les gros binaires générés ne constituent jamais l'historique durable de SeenIt.
+
+- **Règle active : GitHub conserve exactement une seule version distribuable, la dernière GitHub Release officielle.**
+- Une conservation temporaire de **deux releases au maximum** n'est admissible que si le même changement introduit un besoin opérationnel explicite et documenté **et** un mécanisme technique d'exemption compris par la purge, couvert par un TNR. Sans cette protection implémentée et validée, la deuxième release est interdite.
+- Toute exemption future doit être retirée dès que son besoin disparaît ; elle ne doit jamais devenir une accumulation historique.
+- Le flux APK canonique actuel télécharge sa baseline N avant de publier N+1 : il ne nécessite donc **pas** de conserver deux releases après publication. La cible actuelle reste exactement **1 release**.
+- Les tags Git et commits restent conservés : ils portent l'historique et la traçabilité sans dupliquer les APK.
+- Les artefacts Actions suivent les durées bornées définies ci-dessous ; aucun nouveau producteur ne doit introduire une conservation longue de binaires sans justification documentée dans ce fichier.
+
 ## Objectif
 
 SeenIt conserve la traçabilité Git sans conserver indéfiniment les gros binaires générés. Le dépôt Git, ses commits et ses tags SemVer restent l'historique durable. Les objets GitHub Release et les artefacts Actions sont des surfaces de distribution ou de preuve à durée bornée.
 
 ## Releases officielles
 
-- Une seule GitHub Release officielle est conservée : la dernière release stable retournée par GitHub, ou la release exacte du SHA publié pendant le post-traitement d'une nouvelle release.
+- En régime normal, une seule GitHub Release officielle est conservée : la dernière release stable retournée par GitHub, ou la release exacte du SHA publié pendant le post-traitement d'une nouvelle release.
 - La purge ne commence jamais tant qu'une release à préserver n'est pas prouvée.
 - Lors du post-traitement d'une nouvelle APK, le SHA `main` publié protège la release correspondante avant toute suppression. Cela évite qu'un éventuel délai de mise à jour de `releases/latest` protège encore N au lieu de N+1.
-- Une fois N+1 effectivement publiée, les objets GitHub Release plus anciens et leurs assets sont supprimés.
+- Une fois N+1 effectivement publiée, les objets GitHub Release plus anciens et leurs assets sont supprimés. Une éventuelle exception à deux releases n'existe que si une exemption technique dédiée est d'abord implémentée et testée dans le même changement.
 - **Les tags Git ne sont jamais supprimés par cette maintenance.** Ils restent disponibles pour l'historique, les comparaisons, les notes de version et les diagnostics.
 - Le smoke N → N+1 télécharge sa baseline **avant** la publication de N+1 ; la purge post-release n'affaiblit donc pas `SEENIT-APK-003`.
 
@@ -55,12 +66,8 @@ Les suppressions exigent explicitement `SEENIT_STORAGE_APPLY=true`. Une exécuti
   [limites et bonnes pratiques GitHub](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api).
 - Les permissions `contents: write` et `actions: write` sont bornées au workflow post-release/maintenance par `scripts/validate-workflow-policy.cjs`.
 
-## Restriction de compte en cours au 13 octobre 2026
+## État opérationnel au 17 octobre 2026
 
-La restriction GitHub du compte empêche actuellement GitHub Actions et dégrade certaines collections API. Tant que cette restriction n'est pas levée :
+La purge historique de #668 est achevée. GitHub ne conserve plus qu'une seule release officielle, `v1.4.210`, et le dernier passage de maintenance a ramené à **0** le reliquat d'anciennes releases et d'artefacts reconnus dépassant leur durée de rétention. Les tags et commits Git historiques ont été conservés.
 
-- le code de maintenance peut être préparé/validé en quarantaine mais aucun run Actions ne peut exécuter la purge ;
-- la collection `/releases` peut apparaître vide alors que `/releases/latest` reste accessible ; dans cet état, aucune suppression automatique ne doit être tentée ;
-- la purge réelle de l'historique existant reprend après restauration du compte, puis une mesure avant/après est consignée dans l'issue #668.
-
-Le volume de stockage n'est pas traité comme une preuve de la cause du flag anti-abus : ce lien ne peut être confirmé que par GitHub Support.
+La maintenance quotidienne et le post-traitement des nouvelles releases continuent d'appliquer automatiquement cette politique. Le volume de stockage n'est pas traité comme une preuve de la cause du précédent flag anti-abus : ce lien ne peut être confirmé que par GitHub Support.
