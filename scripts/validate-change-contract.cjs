@@ -180,6 +180,34 @@ function isBehavioralFile(file) {
     || normalized === 'capacitor.config.ts';
 }
 
+function isCanonicalVersionOnlyBehaviorChange(file, patch, readAfter) {
+  const normalized = normalizePath(file);
+  if (!isVersionOnlyPatch(normalized, patch)) return false;
+  if (normalized !== 'server.ts') return true;
+  if (typeof readAfter !== 'function') return false;
+
+  const packageVersion = JSON.parse(String(readAfter('package.json') || '')).version;
+  const serverSource = String(readAfter('server.ts') || '');
+  const plexVersion = serverSource.match(/'X-Plex-Version':\s*'(\d+\.\d+\.\d+)'/)?.[1];
+
+  return typeof packageVersion === 'string'
+    && typeof plexVersion === 'string'
+    && plexVersion === packageVersion;
+}
+
+function findBehavioralChanges(changedFiles, readPatch, readAfter) {
+  return changedFiles.filter(file => {
+    const normalized = normalizePath(file);
+    if (!isBehavioralFile(normalized)) return false;
+    if (!VERSION_ONLY_PATTERNS[normalized]) return true;
+    return !isCanonicalVersionOnlyBehaviorChange(
+      normalized,
+      readPatch(normalized),
+      readAfter
+    );
+  });
+}
+
 function requiresSpecification(file) {
   const normalized = normalizePath(file);
   return (normalized.startsWith('android/app/src/') && !isAndroidLocalUnitTestFile(normalized))
@@ -267,7 +295,17 @@ function main() {
     return 0;
   }
 
-  const behavioralFiles = changedFiles.filter(isBehavioralFile);
+  let behavioralFiles;
+  try {
+    behavioralFiles = findBehavioralChanges(
+      changedFiles,
+      readPatch,
+      file => readAt(head, file)
+    );
+  } catch (error) {
+    console.error('[SPEC] Impossible d’identifier les changements comportementaux :', error.message);
+    return 1;
+  }
   if (behavioralFiles.length === 0) {
     console.log('[SPEC] Aucun comportement applicatif modifié.');
     return 0;
@@ -310,9 +348,11 @@ module.exports = {
   VERSION_ONLY_JSON_FIELDS,
   analyzeRequirementsChurn,
   countLineChurn,
+  findBehavioralChanges,
   getChangedContentLines,
   isAndroidLocalUnitTestFile,
   isBehavioralFile,
+  isCanonicalVersionOnlyBehaviorChange,
   isVersionOnlyJsonChange,
   isVersionOnlyPatch,
   isPureVersionAlignment,

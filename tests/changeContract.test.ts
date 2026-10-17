@@ -6,6 +6,7 @@ import test from 'node:test';
 const require = createRequire(import.meta.url);
 const {
   analyzeRequirementsChurn,
+  findBehavioralChanges,
   isBehavioralFile,
   isVersionOnlyJsonChange,
   isVersionOnlyPatch,
@@ -18,6 +19,11 @@ const {
     lineBudget: number;
     changedRequirements: string[];
   };
+  findBehavioralChanges: (
+    files: string[],
+    readPatch: (file: string) => string,
+    readAfter?: (file: string) => string
+  ) => string[];
   isBehavioralFile: (file: string) => boolean;
   isVersionOnlyJsonChange: (file: string, before: string, after: string) => boolean;
   isVersionOnlyPatch: (file: string, patch: string) => boolean;
@@ -73,6 +79,49 @@ test('le contrat SPEC reconnaît un alignement version:sync complet comme non co
   assert.equal(
     isPureVersionAlignment(Object.keys(patches), file => patches[file]),
     true
+  );
+});
+
+test('le contrat SPEC ignore le bump serveur canonique au sein d’un diff de maintenance mixte', () => {
+  const patches: Record<string, string> = {
+    'server.ts': "@@ -560 +560 @@\n- 'X-Plex-Version': '1.4.210',\n+ 'X-Plex-Version': '1.4.211',"
+  };
+  const after: Record<string, string> = {
+    'package.json': '{"version":"1.4.211"}',
+    'server.ts': "const headers = { 'X-Plex-Version': '1.4.211' };"
+  };
+  const changedFiles = [
+    'scripts/validate-change-contract.cjs',
+    'server.ts',
+    'package.json'
+  ];
+
+  assert.deepEqual(
+    findBehavioralChanges(
+      changedFiles,
+      file => patches[file] || '',
+      file => after[file] || ''
+    ),
+    []
+  );
+});
+
+test('le contrat SPEC refuse d’exempter un header Plex désaligné de la version canonique', () => {
+  const patches: Record<string, string> = {
+    'server.ts': "@@ -560 +560 @@\n- 'X-Plex-Version': '1.4.210',\n+ 'X-Plex-Version': '1.4.999',"
+  };
+  const after: Record<string, string> = {
+    'package.json': '{"version":"1.4.211"}',
+    'server.ts': "const headers = { 'X-Plex-Version': '1.4.999' };"
+  };
+
+  assert.deepEqual(
+    findBehavioralChanges(
+      ['server.ts', 'package.json'],
+      file => patches[file] || '',
+      file => after[file] || ''
+    ),
+    ['server.ts']
   );
 });
 
