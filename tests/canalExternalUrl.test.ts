@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolveCanalProviderTarget } from '../src/features/shows/canalProviderLink.ts';
 import { CANAL_ANDROID_PACKAGE, CANAL_WEB_URL, isCanalWebUrl } from '../src/lib/canalExternalUrl.ts';
+import { getProviderLinkPresentation } from '../src/features/providers/providerLink.ts';
 
 const presentationSource = readFileSync(new URL('../src/screens/showDetailPresentation.ts', import.meta.url), 'utf8');
 const viewSource = readFileSync(new URL('../src/screens/ShowDetailView.tsx', import.meta.url), 'utf8');
@@ -25,8 +26,10 @@ test('issue #446 ne réintroduit ni recherche CANAL ni faux recours TMDB', () =>
   assert.doesNotMatch(resolverSource, /themoviedb\.org/i);
   assert.doesNotMatch(presentationSource, /canalplus\.com\/recherche/i);
   assert.doesNotMatch(presentationSource, /Rechercher sur Canal/);
-  assert.match(presentationSource, /label: 'Canal'/);
-  assert.match(presentationSource, /title: 'Ouvrir Canal'/);
+  assert.match(presentationSource, /getProviderLinkPresentation.*from '\.\.\/features\/providers\/providerLink'/);
+  assert.deepEqual(getProviderLinkPresentation({ providerId: 381, providerName: 'Canal+', title: 'Film', fallbackLink: 'https://www.themoviedb.org/movie/42/watch' }), {
+    url: CANAL_WEB_URL, label: 'Canal', title: 'Ouvrir Canal', kind: 'provider-app-home',
+  });
 });
 
 test('issue #446 câble le tap Canal vers le package Android officiel au point d’entrée réel', () => {

@@ -1187,6 +1187,16 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   Les deux synchronisations de détails conservent dans `seasonProgress` les preuves publiques de
   finale datée et de dernière saison avant suppression du cache déprécié ; ces métadonnées ne sont
   jamais des preuves de visionnage. Le badge de récence est demandé par la section des séries anciennes.
+- **SEENIT-UX-015** — L'historique 16d mélange films et épisodes dans une chronologie par jour local,
+  avec le cadre 8f partagé. Seule l'heure réellement connue apparaît sur la carte ; une date seule
+  ou un repli legacy ne crée jamais une heure. « Hier » suit le calendrier local, y compris au
+  changement d'heure. Le still de l'épisode et la collection TMDB du film utilisent leurs identités
+  exactes et les enrichissements passifs bornés existants. La coche et l'heure sont décoratives ;
+  un tap ouvre l'épisode ou le film, l'appui long/clavier ouvre Non vu, Date/heure, Revoir et Série.
+  Non vu conserve la confirmation et Annuler ; la correction de date préserve les métadonnées et
+  offre Annuler. Revoir réutilise le diffuseur/cache déjà résolu, sans requête fournisseur directe.
+  Les épisodes présents sous des clés legacy sont normalisés par saison/épisode sans doublon ;
+  une preuve explicitement retirée de seenEpisodes ne réapparaît pas depuis un record orphelin.
 - **SEENIT-UX-012** — Un dialogue nommé utilise une pile commune : Échap, Retour Android et appui
   sur l'onglet actif ferment un seul niveau. Le focus reste contenu puis revient au déclencheur ;
   le fond est inerte et une confirmation destructive focalise Garder/Annuler. Les portails sont

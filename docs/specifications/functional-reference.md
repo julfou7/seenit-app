@@ -245,11 +245,13 @@ annulation.
 
 ### 5.3 Historique et actualités
 
-- L'historique est trié depuis les `watchedAt` des épisodes/films.
+- L'[historique mixte 16d](../design/history-16d.md) mélange films et épisodes, groupés par jour local
+  et triés depuis leurs `watchedAt`. La date apparaît dans le groupe ; une heure inconnue reste masquée.
 - « Marquer comme non vu » retire uniquement la progression ciblée et propose Annuler.
-- Une entrée série réutilise la carte 8f : épisode concerné mis en évidence, heure de visionnage et
-  ouverture du détail d'épisode. L'heure ouvre les actions ; « Marquer comme non vu » conserve la
-  confirmation existante et ne devient pas une coche immédiate.
+- Films et épisodes réutilisent le cadre 8f : épisode ou film de collection mis en évidence, durée
+  connue, still/backdrop et diffuseur passif. La coche et l'heure sont décoratives. Le tap ouvre
+  l'épisode exact ou le film ; l'appui long/menu clavier propose Non vu (confirmation et Annuler),
+  Changer la date/heure (heure facultative et Annuler), Revoir et Ouvrir la série.
 - Le fil Actualités affiche les événements non lus de séries encore présentes : nouvelle saison,
   diffusion, renouvellement/annulation et informations générées par le worker de détails.
 - Une actualité lue est retirée et son état est partagé entre appareils.

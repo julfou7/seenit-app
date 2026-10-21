@@ -58,11 +58,13 @@ async function testSeriesCardHarness(client, root) {
     await check(client, 'window.__series8f.reminders===1 && window.__series8f.opens===0 && document.querySelector("#upcoming-0 button.series-8f__days").getAttribute("aria-pressed")==="true"', 'le rappel reste indépendant de l’ouverture');
     await check(client, 'document.querySelector("#upcoming-0 .series-8f__days--today") && document.querySelector("#upcoming-5 .series-8f__days--soon") && document.querySelector("#upcoming-31 .series-8f__days--later")', 'les trois urgences ont leur présentation');
     await click(client, '#history .series-8f__history');
-    await check(client, 'document.querySelector("[role=dialog]") && window.__series8f.unseen===0 && !document.querySelector("#history .series-8f__check")', 'l’heure historique ouvre les actions sans mutation');
+    await check(client, '!document.querySelector("[role=dialog]") && window.__series8f.episodes===1 && window.__series8f.unseen===0 && !document.querySelector("#history .series-8f__check")', 'l’heure décorative laisse ouvrir l’épisode sans mutation');
+    await evaluate(client, 'document.querySelector("#history .series-8f__open").dispatchEvent(new MouseEvent("contextmenu", {bubbles:true,cancelable:true}))');
+    await check(client, 'document.querySelector("[role=dialog]") && window.__series8f.unseen===0', 'le menu contextuel expose les actions historiques');
     await evaluate(client, '[...document.querySelectorAll("[role=dialog] button")].find(el=>el.textContent==="Marquer comme non vu").click()');
     await check(client, 'window.__series8f.unseen===1', 'l’historique transmet la demande au propriétaire');
     await click(client, '#history .series-8f__open');
-    await check(client, 'window.__series8f.episodes===1 && window.__series8f.opens===0', 'la carte historique ouvre son épisode');
+    await check(client, 'window.__series8f.episodes===2 && window.__series8f.opens===0', 'la carte historique ouvre son épisode');
     await click(client, '#watch .series-8f__open');
     await check(client, 'window.__series8f.opens===1', 'un appui court ouvre la série');
     await evaluate(client, 'document.querySelector("#watch .series-8f__open").focus()');
