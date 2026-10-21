@@ -129,8 +129,7 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
       </div>
       <div className="series-8f__text">
         <h3 id={titleId}>{show.title}</h3>
-        <div className="series-8f__code"><strong>{code}</strong>{context.kind !== 'history' && visibleDetail && (detailIsBadge ? <span className="series-8f__badge">{visibleDetail}</span> : <span> · {visibleDetail}</span>)}</div>
-        {context.kind === 'history' && visibleDetail && <div className="series-8f__detail">{visibleDetail}</div>}
+        <div className="series-8f__code"><strong>{code}</strong>{visibleDetail && (detailIsBadge ? <span className="series-8f__badge">{visibleDetail}</span> : <span> · {visibleDetail}</span>)}</div>
         {subtitle && <p>{subtitle}</p>}
       </div>
       <div className="series-8f__season">
