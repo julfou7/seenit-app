@@ -20,6 +20,9 @@ Les carrousels restent libres et virtualisés ; une carte y prend la largeur mob
 (420 px sur grand écran). La même carte en liste prend la largeur disponible. Les films
 gardent leur présentation actuelle. Aucun nouveau chargement TMDB par carte pour la couleur
 ou les segments : métadonnées déjà connues, affiche existante et cache local borné.
+Pour le cartouche affiche, `posterPath` reste prioritaire ; s'il est absent ou cassé, le
+backdrop/still déjà injecté dans la carte est réutilisé avant le fallback aux initiales,
+sans ajouter d'appel fournisseur.
 
 L'ouverture de série, la coche Vu, les rappels et les actions d'historique sont séparés.
 La coche réutilise l'écriture et le toast Annuler existants. À venir affiche les jours

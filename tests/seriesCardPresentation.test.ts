@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildSeriesSeasonProgress, seriesEpisodeCode, upcomingCardTone } from '../src/features/watchlist/seriesCardPresentation.ts';
+import { buildSeriesSeasonProgress, seriesCardPosterCandidates, seriesEpisodeCode, upcomingCardTone } from '../src/features/watchlist/seriesCardPresentation.ts';
 import { dominantPosterHue, readPosterHue, rememberPosterHue, POSTER_HUE_CACHE_LIMIT } from '../src/features/watchlist/posterHue.ts';
 
 test('SEENIT-UX-014 conserve les états de saison sans inventer les diffusions', () => {
@@ -55,6 +55,19 @@ test('la couleur 8f provient des pixels dominants et son cache reste borné', ()
   for (let i = 0; i <= POSTER_HUE_CACHE_LIMIT; i++) rememberPosterHue(`fixture:${i}`, i);
   assert.equal(readPosterHue('fixture:0'), undefined);
   assert.equal(readPosterHue(`fixture:${POSTER_HUE_CACHE_LIMIT}`), POSTER_HUE_CACHE_LIMIT);
+});
+
+test('la carte 8f réutilise un visuel déjà connu quand le poster manque ou casse', () => {
+  assert.deepEqual(
+    seriesCardPosterCandidates({ posterPath: null, backdropPath: '/into-the-night-backdrop.jpg' }),
+    ['https://image.tmdb.org/t/p/w300/into-the-night-backdrop.jpg'],
+  );
+  assert.deepEqual(
+    seriesCardPosterCandidates({ posterPath: '/poster.jpg', backdropPath: '/backdrop.jpg' }),
+    ['https://image.tmdb.org/t/p/w185/poster.jpg', 'https://image.tmdb.org/t/p/w300/backdrop.jpg'],
+  );
+  const same = 'https://cdn.example.test/card.jpg';
+  assert.deepEqual(seriesCardPosterCandidates({ posterPath: same, backdropPath: same }), [same]);
 });
 
 test('la carte 8f reste partagée par les adapters de production et leurs actions existantes', () => {
