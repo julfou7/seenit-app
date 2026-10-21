@@ -1,4 +1,4 @@
-import { resolveCanalProviderTarget } from '../shows/canalProviderLink';
+import { resolveCanalProviderTarget } from '../shows/canalProviderLink.ts';
 
 export const getProviderDirectLink = (providerId: number, title: string, fallbackLink: string) => {
   const query = encodeURIComponent(title);
