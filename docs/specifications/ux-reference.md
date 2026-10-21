@@ -43,7 +43,7 @@ Ce contrat automatisé ne vaut pas preuve de lecture ou de rotation sur un tél�
 | Double appui Profil | Reset + remontée | Ferme Réglages/personne, revient à Statistiques et nettoie l'état local de Ma Liste | Ne modifie aucun suivi ni statistique. |
 | Double appui À voir | Reset + remontée | Revient à À Regarder, replie les sections et remet les carrousels au début | Ne modifie aucune progression. |
 | Double appui Télécharger | Reset + remontée | Revient à Mes téléchargements, ferme la configuration, vide recherche/filtres/résultats locaux | N'annule ni n'efface aucun transfert. |
-| Carrousel réduit « À Regarder » | Glissement horizontal | Parcourt librement les cartes ; la suite est préchargée automatiquement par lots avant la fin du rail, sans marqueur terminal | Aucun scroll-snap. Le vrai bouton « Voir tout » de l'en-tête reste l'alternative accessible vers la liste verticale exhaustive. |
+| Carrousels séries réduits « À Regarder » | Glissement horizontal | Avance carte par carte avec snap horizontal obligatoire ; la suite reste virtualisée/préchargée sans marqueur terminal | Chaque carte est un arrêt. Le rail Films à voir conserve son défilement libre. Le vrai bouton « Voir tout » de l'en-tête reste l'alternative accessible vers la liste verticale exhaustive. |
 | Modal épisode | Glisser vers la gauche | Épisode suivant, puis saison suivante si disponible | Aucune progression vue ajoutée par la navigation. |
 | Modal épisode | Glisser vers la droite | Épisode précédent, puis fin de saison précédente si disponible | Même série exacte ; limites sans bouclage. |
 | Modal épisode | Déplacement > 60 px ou vitesse > 200 | Déclenche précédent/suivant si disponible, sinon retour en place | Le swipe reste disponible ; boutons Précédent/Suivant et ←/→ clavier partagent désormais la même intention via `SEENIT-UX-008`. |
@@ -87,7 +87,6 @@ Le contrat d'appui/reset de #178 est distinct de cet ordre visuel et désormais 
   ni préférences cloud. L'onglet actif est annoncé aux technologies d'assistance.
 - Le double appui applicatif ne remplace pas l'activation standard du lecteur d'écran. Les tests
   TalkBack doivent vérifier son comportement réel.
-
 ## 3.1 Fiche épisode — navigation accessible livrée #179
 
 - Le swipe horizontal reste inchangé : gauche → épisode suivant, droite → épisode précédent.
@@ -143,8 +142,10 @@ obligation d'architecture. Les cartes et en-têtes consomment ces rôles plutôt
 La [carte 8f](../design/card-8f.md) devient le socle partagé des séries dans À voir,
 À venir et Historique : affiche débordante, fond teinté, titre sur deux lignes,
 code saison/épisode explicite et saison segmentée. Seule l'action de contexte change.
-Les carrousels restent libres/virtualisés ; leurs cartes utilisent la largeur mobile
-utile pour conserver la lisibilité de la composition. Les listes utilisent la même carte.
+Les trois carrousels séries réduits de À Regarder restent virtualisés mais avancent désormais
+carte par carte avec snap horizontal obligatoire et arrêt sur chaque carte ; le rail Films à voir
+conserve son défilement libre. Les cartes séries utilisent la largeur mobile utile pour conserver
+la lisibilité de la composition. Les listes utilisent la même carte.
 Les films ne sont pas migrés dans ce lot. Les états de diffusion inconnus, les absences
 d'image et les saisons longues gardent un rendu honnête et accessible. Le traitement
 local de couleur utilise l'affiche déjà chargée et un cache borné, sans appel fournisseur.
