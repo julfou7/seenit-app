@@ -73,9 +73,16 @@ export function WatchNextSection({ allShows, groups, movies, active, filmsExpand
   const markSeries = async (show: Show) => {
     const resume = resolveWatchCardResume(show, getTodayStr());
     if (!resume.episode || resume.upToDate) return false;
+    const previousReceipt = retained[show.id];
+    const restoreReceipt = () => setRetained(previous => {
+      const next = { ...previous };
+      if (previousReceipt) next[show.id] = previousReceipt;
+      else delete next[show.id];
+      return next;
+    });
     setRetained(previous => ({ ...previous, [show.id]: { episode: resume.episode! } }));
-    try { return await onMarkSeries(show); }
-    catch (error) { setRetained(previous => { const next = { ...previous }; delete next[show.id]; return next; }); throw error; }
+    try { const result = await onMarkSeries(show); if (result === false) restoreReceipt(); return result; }
+    catch (error) { restoreReceipt(); throw error; }
   };
   const toggleMovie = async (show: Show) => {
     setMovieOrder(previous => previous || orderedMovies.map(movie => movie.id));

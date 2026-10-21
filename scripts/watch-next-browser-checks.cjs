@@ -56,9 +56,12 @@ async function testWatchNextHarness(client, root) {
       const actionCapture = await client.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
       fs.writeFileSync(path.join(root, 'quality-reports', 'watch-next-18c-series-action-360.png'), Buffer.from(actionCapture.data, 'base64'));
     }
+    await evaluate(client, 'window.__watch18c.clearToasts();window.__watch18c.telemetry.failNext=true');
+    await click(client, '#watch-next-series .series-8f__check');
+    await check(client, 'window.__watch18c.telemetry.writes.length===2 && window.__watch18c.snapshot()[0].seenEpisodes.length===2 && document.querySelector("#watch-next-series [data-error=true]") && !(document.querySelector(".series-8f__ghost")?.textContent || "").includes("E03")', 'échec série restauré sans nouveau tampon ni preuve de marquage réussie');
     await evaluate(client, 'window.__watch18c.clearToasts()');
     await click(client, '#watch-next-series .series-8f__check');
-    await check(client, 'document.querySelector("#watch-next-series .series-8f__code").textContent.includes("à jour") && (document.querySelector(".series-8f__ghost")?.textContent || "").includes("E03") && document.querySelector(".series-8f__check--watched") && window.__watch18c.telemetry.writes.length===2', 'deuxième animation et état à jour conservé à sa place');
+    await check(client, 'document.querySelector("#watch-next-series .series-8f__code").textContent.includes("à jour") && (document.querySelector(".series-8f__ghost")?.textContent || "").includes("E03") && document.querySelector(".series-8f__check--watched") && window.__watch18c.telemetry.writes.length===3', 'deuxième animation et état à jour conservé à sa place');
     await evaluate(client, 'window.__watch18c.clearToasts()');
     await click(client, '#watch-next-series .series-8f__check');
     await check(client, 'document.querySelector("#watch-next-series .series-8f__code").textContent.includes("E03") && window.__watch18c.snapshot()[0].seenEpisodes.length===2 && !document.querySelector(".series-8f__ghost")', 'à jour revient uniquement sur le dernier épisode marqué');
