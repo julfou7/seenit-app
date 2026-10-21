@@ -39,8 +39,8 @@ rapport existant et son historique.
 | AUDIT-2026-09-11-EXPLORER-FILTERS | 2026-09-11 | 1.4.143 (`ecaec22`) | vidéo Android, filtres, tri, recherche, pagination, HERO, grille et diffuseurs Explorer | [Audit Explorer](./AUDIT-2026-09-11-EXPLORER-FILTERS.md) | [Issue #294](https://github.com/julfou7/seenit-app/issues/294) |
 | AUDIT-2026-09-20-GCP-FINOPS | 2026-09-20 | 1.4.174 (`6f33296`) | Firestore, Storage, Cloud Run, egress, bornes et preuve 0 € | [Audit FinOps GCP](./audit-finops-gcp-2026-09-20.md) | [Issue #23](https://github.com/julfou7/seenit-app/issues/23) |
 | AUDIT-2026-09-21-WARNING-COVERAGE | 2026-09-21 | 1.4.174 (`faec21a`) | warnings Cloud Run, règles actionnables, récurrence multi-fenêtres, budget de logs | [Audit couverture warnings](./audit-log-warning-coverage-2026-09-21.md) | [Issue #27](https://github.com/julfou7/seenit-app/issues/27) |
-
 | AUDIT-2026-10-14-GCP-FINOPS | 2026-10-14 | 1.4.208 (`7c6ba27`) | fraîcheur des agrégats Cloud Run, egress et reprise GitHub | [Audit FinOps de reprise](./audit-finops-gcp-2026-10-14.md) | [#23](https://github.com/julfou7/seenit-app/issues/23), [#506](https://github.com/julfou7/seenit-app/issues/506) |
+| AUDIT-2026-10-21-VITE | 2026-10-21 | 1.4.211 (`bbe88b67`) | trois avis launch-editor/Vite, audit npm production et blocage de candidate APK | [Audit Vite ciblé](./dependency-vite-2026-10-21.md) | [#695](https://github.com/julfou7/seenit-app/issues/695), PR #696 |
 
 L'audit historique des téléchargements antérieur à ce protocole reste disponible dans
 [`../audit-telechargements-2026-08-30.md`](../audit-telechargements-2026-08-30.md). Ses corrections
