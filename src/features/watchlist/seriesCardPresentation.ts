@@ -86,12 +86,14 @@ export function seriesCardStaleDetail(
   }));
   if (seen.size === 0) return undefined;
 
-  let latest = timestamp(show.lastWatchedAt);
+  let latest = 0;
   for (const [key, record] of Object.entries(show.episodeRecords || {})) {
     const normalized = normalizeEpisodeKey(key);
     if (!normalized || !seen.has(`${normalized.season}x${normalized.episode}`)) continue;
-    latest = Math.max(latest, timestamp(record?.watchedAt));
+    const watchedAt = timestamp(record?.watchedAt);
+    if (watchedAt <= now) latest = Math.max(latest, watchedAt);
   }
+  if (!latest) latest = timestamp(show.lastWatchedAt);
   if (!latest || latest > now) return undefined;
 
   const days = Math.max(0, calendarDayIndex(now) - calendarDayIndex(latest));
@@ -125,17 +127,17 @@ export function buildSeriesSeasonProgress(
   const advertisedTotal = pointers.map(pointer => count(pointer.episode_count)).find(value => value !== null && value > 0)
     ?? count(cached?.episode_count)
     ?? null;
-  const cachedKnown = Math.max(0, ...(cached?.episodes || []).map(item => count(item.episode_number) || 0));
+  const cachedKnown = (cached?.episodes || []).reduce((highest, item) => Math.max(highest, count(item.episode_number) || 0), 0);
   const pointerKnown = Math.max(0, ...pointers.map(pointer => count(pointer.known_episodes_in_season) || 0));
-  const seenKnown = Math.max(0, ...[...seen]);
+  const seenKnown = [...seen].reduce((highest, number) => Math.max(highest, count(number) || 0), 0);
   const sameSeasonNextToAir = show.nextEpisodeToAir as SeriesCardEpisode | undefined;
   const knownEpisodes = Math.max(
     1,
-    episode.episode_number,
+    count(episode.episode_number) || 0,
     cachedKnown,
     pointerKnown,
     seenKnown,
-    sameSeasonNextToAir?.season_number === season ? sameSeasonNextToAir.episode_number : 0,
+    sameSeasonNextToAir?.season_number === season ? count(sameSeasonNextToAir.episode_number) || 0 : 0,
     advertisedTotal || 0,
   );
 
@@ -147,25 +149,26 @@ export function buildSeriesSeasonProgress(
     ...seenEntries.map(item => item.season),
   );
   const isLatestSeason = season === lastSeasonNumber;
-  const explicitUnknown = pointers.some(pointer => pointer.season_total_unknown === true);
-  const explicitKnown = pointers.some(pointer => pointer.season_total_unknown === false);
+  // L'épisode présenté est le premier candidat : une nouvelle preuve ne doit pas être
+  // invalidée par l'ancien pointeur encore stocké sur le Show.
+  const explicitTotalState = pointers.find(pointer => typeof pointer.season_total_unknown === 'boolean')?.season_total_unknown;
   const cachedLast = [...(cached?.episodes || [])]
     .filter(item => typeof item.episode_number === 'number')
     .sort((a, b) => b.episode_number - a.episode_number)[0];
-  const lastKnownType = pointers.map(pointer => pointer.last_known_episode_type || pointer.episode_type).find(Boolean)
+  const lastPointer = pointers.find(pointer => pointer.episode_number === knownEpisodes);
+  const lastKnownType = pointers.map(pointer => pointer.last_known_episode_type).find(Boolean)
     || cachedLast?.episode_type
+    || lastPointer?.episode_type
     || null;
   const lastKnownAirDate = pointers.map(pointer => pointer.last_known_episode_air_date).find(Boolean)
     || cachedLast?.air_date
+    || lastPointer?.air_date
     || null;
-  const nextAirSameSeason = sameSeasonNextToAir?.season_number === season;
-  const providerCountLooksOpen = Boolean(nextAirSameSeason && advertisedTotal && advertisedTotal === knownEpisodes);
-
+  const datedFinale = lastKnownType === 'finale' && Boolean(lastKnownAirDate);
   const unknownTail = !statusEnded && isLatestSeason && (
-    explicitUnknown
-    || (!explicitKnown && (lastKnownType !== 'finale' || !lastKnownAirDate || providerCountLooksOpen))
+    explicitTotalState === true || (explicitTotalState !== false && !datedFinale)
   );
-  const totalUnknown = unknownTail || advertisedTotal === null;
+  const totalUnknown = unknownTail || (advertisedTotal === null && !datedFinale);
   const renderTotal = Math.max(1, totalUnknown ? knownEpisodes : (advertisedTotal || knownEpisodes));
   const watched = [...seen].filter(number => number <= renderTotal).length;
   const label = `S${season} · ${watched}/${totalUnknown ? '?' : renderTotal}`;

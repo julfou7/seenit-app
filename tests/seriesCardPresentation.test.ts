@@ -63,6 +63,10 @@ test('SEENIT-UX-014 représente Harry Potter et toute saison ouverte sans faux t
   }, 'watch', '2026-11-02');
   assert.equal(finale.unknownTail, false, 'une preuve explicite de finale retire la traîne inconnue');
   assert.equal(finale.label, 'S1 · 2/4');
+  const cachedFinale = buildSeriesSeasonProgress({ ...show, nextEpisodeToWatch: null, nextEpisodeToAir: null,
+    seasonsCache: [{ season_number: 1, episode_count: 4, episodes: [{ episode_number: 4, episode_type: 'finale', air_date: '2026-11-01' }] }],
+  }, { season_number: 1, episode_number: 3, episode_type: 'standard' }, 'watch', '2026-11-02');
+  assert.equal(cachedFinale.unknownTail, false, 'le type de l’épisode courant ne remplace pas celui du dernier épisode');
 });
 
 test('SEENIT-UX-014 restaure le nombre de jours pour une série laissée de côté', () => {
@@ -76,6 +80,7 @@ test('SEENIT-UX-014 restaure le nombre de jours pour une série laissée de côt
   assert.equal(seriesCardStaleDetail(show, now), '⏳ Il y a 81 jours');
   assert.equal(seriesCardStaleDetail({ ...show, episodeRecords: { '1x1': { watchedAt: now - (60 * 86_400_000) } } }, now), undefined);
   assert.equal(seriesCardStaleDetail({ seenEpisodes: [], episodeRecords: {}, lastWatchedAt: watchedAt }, now), undefined, 'une série jamais commencée ne reçoit pas une fausse date de visionnage');
+  assert.equal(seriesCardStaleDetail({ ...show, lastWatchedAt: now, episodeRecords: { '1x1': { watchedAt }, '1x2': { watchedAt: now } } }, now), '⏳ Il y a 81 jours', 'les épisodes retirés de Vu ne modifient pas la récence');
 });
 
 test('SEENIT-UX-014 borne le rendu des saisons longues et conserve les proportions', () => {
@@ -88,6 +93,8 @@ test('SEENIT-UX-014 borne le rendu des saisons longues et conserve les proportio
   const invalid = buildSeriesSeasonProgress({ seenEpisodes: [], seriesEnded: true, tmdbStatus: 'Ended' }, { ...episode, episode_count: Number.MAX_SAFE_INTEGER }, 'watch', '2026-10-21');
   assert.equal(invalid.segments.length, 3, 'le pointeur de reprise garde une progression minimale même si le total est invalide');
   assert.equal(invalid.totalUnknown, true);
+  const malformed = buildSeriesSeasonProgress({ seenEpisodes: [`1x${Number.MAX_SAFE_INTEGER}`], nextEpisodeToAir: { season_number: 1, episode_number: Number.MAX_SAFE_INTEGER } }, { ...episode, episode_count: 4 }, 'watch', '2026-10-21');
+  assert.equal(malformed.knownEpisodes, 4, 'les identifiants corrompus ne provoquent pas une boucle non bornée');
 });
 
 test('la carte 8f respecte les dates et les épisodes vus indépendamment', () => {

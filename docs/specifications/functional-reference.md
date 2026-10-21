@@ -209,6 +209,10 @@ l'arrêt du scroll. Les cartes film réduites réutilisent les détails déjà e
 chargement décoratif supplémentaire ; la vue exhaustive complète ces détails après stabilisation du geste,
 avec une concurrence bornée.
 Les médias abandonnés, archivés ou terminés ne reviennent pas dans le parcours actif.
+La progression ne dépend pas du cache de saison déprécié : les épisodes prouvés restent segmentés,
+avec une traîne « ? » pour une dernière saison sans total confirmé. Une finale datée ou une confirmation
+explicite permet de retirer la traîne ; un ancien pointeur ne doit pas annuler cette preuve.
+Les séries laissées de côté retrouvent le nombre de jours depuis leur dernier visionnage encore vu.
 
 Les séries de ces trois rails et de leur vue « Voir tout » partagent la [carte 8f](../design/card-8f.md)
 avec À Venir et l'historique (`SEENIT-UX-014`). L'affiche inclinée déborde sur un fond teinté ; le titre

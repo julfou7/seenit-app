@@ -1169,6 +1169,11 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   affiche débordante, teinte locale mise en cache, titre sur deux lignes et progression de saison.
   Vu, prochain, futur et entrée d'historique se distinguent autrement que par la couleur ; les saisons
   longues utilisent une barre proportionnelle, les totaux et diffusions inconnus ne sont pas inventés.
+  Un cache de saison absent n'efface pas les épisodes prouvés par la progression ou les pointeurs.
+  Une dernière saison ouverte ajoute une traîne en tirets et « ? » ; une preuve de finale datée ou
+  de total explicitement confirmé retire cette incertitude. Les métadonnées de l'épisode présenté
+  priment sur un ancien pointeur contradictoire. La récence des séries laissées de côté provient
+  des visionnages encore vus, puis de leur horodatage de repli, sans nouvel appel fournisseur.
   La coche Vu, le rappel et les actions d'historique sont des contrôles séparés d'au moins 44 px.
   Les opérations réutilisent leurs handlers et Annuler existants. Appui long, menu contextuel et clavier
   partagent les mêmes actions, sans clic d'ouverture après un appui long ni timer persistant au scroll.
