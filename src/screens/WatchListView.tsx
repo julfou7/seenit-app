@@ -1,3 +1,4 @@
+import { WatchNextSection } from './WatchNextSection';
 import { DialogLayer } from '../components/ui/DialogLayer';
 import React, { startTransition, useState, useEffect, useRef, useMemo, useCallback, type RefObject } from 'react';
 import { type Show } from '../types';
@@ -58,8 +59,9 @@ interface WatchListViewModel {
   historyRef: RefObject<HTMLDivElement>;
   isQuotaExceeded: boolean;
   loading: boolean;
-  markMovieAsSeen: (show: Show) => void | Promise<void>;
-  markNextEpisodeAsSeen: (show: Show) => void | Promise<void>;
+  markMovieAsSeen: (show: Show) => void | Promise<void | boolean>;
+  markNextEpisodeAsSeen: (show: Show) => void | Promise<void | boolean>;
+  markAsUnseen: (show: Show, episode: import('../features/watchlist/seriesCardPresentation').SeriesCardEpisode | null) => Promise<void | boolean>;
   nouveautesShows: Show[];
   onShowClick: (id: string, mediaType?: 'tv' | 'movie') => void;
   onShowClickProp: (id: string, mediaType?: 'tv' | 'movie') => void;
@@ -84,7 +86,7 @@ interface WatchListViewProps {
 }
 
 export function WatchListView({ model }: WatchListViewProps) {
-  const { activeTab, allShows, continueWatchingShows, executeUnfollow, expandedSection, filmsAVoirShows, handleArchiveShow, handleDropShow, handleEpisodeClick, handleEpisodeParentClick, handleToggleVoirTout, historyRef, isQuotaExceeded, loading, markMovieAsSeen, markNextEpisodeAsSeen, nouveautesShows, onShowClick, onShowClickProp, openPersonModal, pasVuDepuisUnMomentShows, pendingAction, scrollToSection, selectedEpisodeModal, selectedPersonId, setPendingAction, setSelectedEpisodeModal, setSelectedPersonId, setVisibleCount, upcomingRef, upcomingShows, visibleCount, watchNextRef } = model;
+  const { activeTab, allShows, continueWatchingShows, executeUnfollow, expandedSection, filmsAVoirShows, handleArchiveShow, handleDropShow, handleEpisodeClick, handleEpisodeParentClick, handleToggleVoirTout, historyRef, isQuotaExceeded, loading, markMovieAsSeen, markNextEpisodeAsSeen, markAsUnseen, nouveautesShows, onShowClick, onShowClickProp, openPersonModal, pasVuDepuisUnMomentShows, pendingAction, scrollToSection, selectedEpisodeModal, selectedPersonId, setPendingAction, setSelectedEpisodeModal, setSelectedPersonId, setVisibleCount, upcomingRef, upcomingShows, visibleCount, watchNextRef } = model;
   const seriesActions = (show: Show): SeriesCardAction[] => [
     { label: 'Archiver la série', onSelect: () => setPendingAction({ type: 'archive', item: show }) },
     { label: 'Abandonner la série', onSelect: () => setPendingAction({ type: 'drop', item: show }) },
@@ -198,253 +200,14 @@ export function WatchListView({ model }: WatchListViewProps) {
             <div ref={watchNextRef} className="scroll-mt-36">
           <ShowNewsFeed onShowClick={onShowClickProp} onNavigateToShow={onShowClickProp} />
 
-          {continueWatchingShows.length > 0 && (
-            <div className="mt-1">
-              <div className="flex items-center justify-between mb-2 px-4 sm:px-6">
-                <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                  <span className="text-lg">⏯️</span>
-                  <span>Continuer à regarder</span>
-                </h2>
-                <button
-                  onClick={() => handleToggleVoirTout('continueWatching')}
-                  className="text-xs font-bold text-[#E5A93D] hover:underline cursor-pointer"
-                >
-                  {expandedSection === 'continueWatching' ? 'Réduire' : 'Voir tout'}
-                </button>
-              </div>
-
-              {expandedSection === 'continueWatching' ? (
-                <div className="flex flex-col gap-3 my-2 px-4 sm:px-6">
-                  {continueWatchingShows.slice(0, visibleCount).map((show) => (
-                    <SwipeableCard
-                      key={`cw_exp_${show.id}`}
-                      onSwipeLeft={() => setPendingAction({ type: 'unfollow', item: show })}
-                      onSwipeRight={() => setPendingAction({ type: 'drop', item: show })}
-                    >
-                      <ExpandedItemCard
-                        show={show}
-                        sectionType="watchNext"
-                        onShowClick={onShowClick}
-                        onEpisodeClick={handleEpisodeClick}
-                        onMarkAsSeen={markNextEpisodeAsSeen} actions={seriesActions(show)}
-                        onPersonClick={openPersonModal}
-                      />
-                    </SwipeableCard>
-                  ))}
-                  {visibleCount < continueWatchingShows.length && (
-                    <button
-                      onClick={() => setVisibleCount(prev => prev + WATCHLIST_BATCH_SIZE)}
-                      className="w-full py-3.5 mt-2 bg-zinc-900 border border-white/10 rounded-2xl text-xs font-bold text-zinc-300 hover:bg-zinc-800 active:scale-[0.98] transition-all"
-                    >
-                      Charger plus
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <ProgressiveWatchlistCarousel
-                  id="continue-watching-carousel"
-                  data={continueWatchingShows}
-                  renderCard={(show) => (
-                    <ContinueWatchingCard
-                      key={`cw_${show.id}`}
-                      show={show}
-                      onShowClick={onShowClick}
-                      onEpisodeClick={handleEpisodeClick}
-                      onMarkAsSeen={markNextEpisodeAsSeen} actions={seriesActions(show)}
-                    />
-                  )}
-                />
-              )}
-            </div>
-          )}
-
-          {nouveautesShows.length > 0 && (
-            <div className="mt-8">
-              <div className="flex items-center justify-between mb-2 px-4 sm:px-6">
-                <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                  <span className="text-lg">✨</span>
-                  <span>Nouveautés</span>
-                </h2>
-                <button
-                  onClick={() => handleToggleVoirTout('nouveautes')}
-                  className="text-xs font-bold text-[#E5A93D] hover:underline cursor-pointer"
-                >
-                  {expandedSection === 'nouveautes' ? 'Réduire' : 'Voir tout'}
-                </button>
-              </div>
-
-              {expandedSection === 'nouveautes' ? (
-                <div className="flex flex-col gap-3 my-2 px-4 sm:px-6">
-                  {nouveautesShows.slice(0, visibleCount).map((show) => (
-                    <SwipeableCard
-                      key={`nouveautes_swipe_${show.id}`}
-                      onSwipeLeft={() => setPendingAction({ type: 'unfollow', item: show })}
-                      onSwipeRight={() => setPendingAction({ type: 'drop', item: show })}
-                    >
-                      <ExpandedItemCard
-                        show={show}
-                        sectionType="watchNext"
-                        onShowClick={onShowClick}
-                        onEpisodeClick={handleEpisodeClick}
-                        onMarkAsSeen={markNextEpisodeAsSeen} actions={seriesActions(show)}
-                        onPersonClick={openPersonModal}
-                      />
-                    </SwipeableCard>
-                  ))}
-                  {visibleCount < nouveautesShows.length && (
-                    <button
-                      onClick={() => setVisibleCount(prev => prev + WATCHLIST_BATCH_SIZE)}
-                      className="w-full py-3.5 mt-2 bg-zinc-900 border border-white/10 rounded-2xl text-xs font-bold text-zinc-300 hover:bg-zinc-800 active:scale-[0.98] transition-all"
-                    >
-                      Charger plus
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <ProgressiveWatchlistCarousel
-                  id="nouveautes-carousel"
-                  data={nouveautesShows}
-                  renderCard={(show) => (
-                    <ContinueWatchingCard
-                      key={`nouveautes_card_${show.id}`}
-                      show={show}
-                      onShowClick={onShowClick}
-                      onEpisodeClick={handleEpisodeClick}
-                      onMarkAsSeen={markNextEpisodeAsSeen} actions={seriesActions(show)}
-                    />
-                  )}
-                />
-              )}
-            </div>
-          )}
-
-          {pasVuDepuisUnMomentShows.length > 0 && (
-            <div className="mt-8">
-              <div className="flex items-center justify-between mb-2 px-4 sm:px-6">
-                <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                  <span className="text-lg">⏳</span>
-                  <span>Pas vu depuis un moment</span>
-                </h2>
-                <button
-                  onClick={() => handleToggleVoirTout('notWatched')}
-                  className="text-xs font-bold text-[#E5A93D] hover:underline cursor-pointer"
-                >
-                  {expandedSection === 'notWatched' ? 'Réduire' : 'Voir tout'}
-                </button>
-              </div>
-
-              {expandedSection === 'notWatched' ? (
-                <div className="flex flex-col gap-3 my-2 px-4 sm:px-6">
-                  {pasVuDepuisUnMomentShows.slice(0, visibleCount).map((show) => (
-                    <SwipeableCard
-                      key={`notwatched_swipe_${show.id}`}
-                      onSwipeLeft={() => setPendingAction({ type: 'unfollow', item: show })}
-                      onSwipeRight={() => setPendingAction({ type: 'drop', item: show })}
-                    >
-                      <ExpandedItemCard
-                        show={show}
-                        sectionType="notWatched"
-                        onShowClick={onShowClick}
-                        onEpisodeClick={handleEpisodeClick}
-                        onMarkAsSeen={markNextEpisodeAsSeen} actions={seriesActions(show)}
-                        onPersonClick={openPersonModal}
-                      />
-                    </SwipeableCard>
-                  ))}
-                  {visibleCount < pasVuDepuisUnMomentShows.length && (
-                    <button
-                      onClick={() => setVisibleCount(prev => prev + WATCHLIST_BATCH_SIZE)}
-                      className="w-full py-3.5 mt-2 bg-zinc-900 border border-white/10 rounded-2xl text-xs font-bold text-zinc-300 hover:bg-zinc-800 active:scale-[0.98] transition-all"
-                    >
-                      Charger plus
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <ProgressiveWatchlistCarousel
-                  id="pas-vu-depuis-un-moment-carousel"
-                  data={pasVuDepuisUnMomentShows}
-                  renderCard={(show) => (
-                    <ContinueWatchingCard
-                      key={`notwatched_card_${show.id}`}
-                      show={show}
-                      showStaleDetail
-                      onShowClick={onShowClick}
-                      onEpisodeClick={handleEpisodeClick}
-                      onMarkAsSeen={markNextEpisodeAsSeen} actions={seriesActions(show)}
-                    />
-                  )}
-                />
-              )}
-            </div>
-          )}
-
-          {filmsAVoirShows.length > 0 && (
-            <div className="mt-8">
-              <div className="flex items-center justify-between mb-2 px-4 sm:px-6">
-                <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                  <span className="text-lg">🎬</span>
-                  <span>Films à voir</span>
-                </h2>
-                <button
-                  onClick={() => handleToggleVoirTout('filmsAVoir')}
-                  className="text-xs font-bold text-[#E5A93D] hover:underline cursor-pointer"
-                >
-                  {expandedSection === 'filmsAVoir' ? 'Réduire' : 'Voir tout'}
-                </button>
-              </div>
-
-              {expandedSection === 'filmsAVoir' ? (
-                <div className="flex flex-col gap-3 my-2 px-4 sm:px-6">
-                  {filmsAVoirShows.slice(0, visibleCount).map((show) => (
-                    <SwipeableCard
-                      key={`films_swipe_${show.id}`}
-                      onSwipeLeft={() => setPendingAction({ type: 'unfollow', item: show })}
-                      onSwipeRight={() => setPendingAction({ type: 'drop', item: show })}
-                    >
-                      <ExpandedItemCard
-                        show={show}
-                        sectionType="watchNext"
-                        onShowClick={onShowClick}
-                        onEpisodeClick={handleEpisodeClick}
-                        onMarkAsSeen={markMovieAsSeen}
-                        onPersonClick={openPersonModal}
-                      />
-                    </SwipeableCard>
-                  ))}
-                  {visibleCount < filmsAVoirShows.length && (
-                    <button
-                      onClick={() => setVisibleCount(prev => prev + WATCHLIST_BATCH_SIZE)}
-                      className="w-full py-3.5 mt-2 bg-zinc-900 border border-white/10 rounded-2xl text-xs font-bold text-zinc-300 hover:bg-zinc-800 active:scale-[0.98] transition-all"
-                    >
-                      Charger plus
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <ProgressiveWatchlistCarousel
-                  id="films-a-voir-carousel"
-                  data={filmsAVoirShows}
-                  renderCard={(show) => (
-                    <MovieWatchCard
-                      key={`films_card_${show.id}`}
-                      show={show}
-                      onShowClick={onShowClick}
-                      onMarkAsSeen={markMovieAsSeen}
-                    />
-                  )}
-                />
-              )}
-            </div>
-          )}
-
-          {continueWatchingShows.length === 0 && nouveautesShows.length === 0 && pasVuDepuisUnMomentShows.length === 0 && filmsAVoirShows.length === 0 && (
-            <div className="py-8 text-center text-zinc-500 text-sm px-4 sm:px-6">
-              Rien à afficher dans À Regarder pour le moment.
-            </div>
-          )}
+          <WatchNextSection key={auth.currentUser?.uid || 'anonymous'}
+            allShows={allShows} groups={[continueWatchingShows, nouveautesShows, pasVuDepuisUnMomentShows]}
+            movies={filmsAVoirShows} active={activeTab === 'watch_next'} filmsExpanded={expandedSection === 'filmsAVoir'}
+            filmCount={visibleCount} onToggleFilms={() => handleToggleVoirTout('filmsAVoir')}
+            onMoreFilms={() => setVisibleCount(count => count + WATCHLIST_BATCH_SIZE)}
+            onOpen={onShowClick} onEpisode={handleEpisodeClick} onMarkSeries={markNextEpisodeAsSeen}
+            onMarkMovie={markMovieAsSeen} onUnseen={markAsUnseen} actions={seriesActions} />
         </div>
-
         <div ref={upcomingRef} className="scroll-mt-36 px-4 sm:px-6 mt-8">
           <h2 className="text-xl font-bold text-white mb-2 tracking-tight flex items-center gap-2">
             <span className="text-lg">📅</span>

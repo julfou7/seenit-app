@@ -25,12 +25,14 @@ export async function markEpisodeWatched(
 
   if (!targetShow || !targetShow.id) {
     console.warn(`[markEpisodeWatched] Show not found: ${typeof showOrId === 'object' ? showOrId?.id : showOrId}`);
-    return;
+    return false;
   }
 
   const sNum = Number(season);
   const eNum = Number(episode);
-  if (isNaN(sNum) || isNaN(eNum)) return;
+  if (isNaN(sNum) || isNaN(eNum)) return false;
+  const initiatingUid = auth.currentUser?.uid;
+  if (!initiatingUid || targetShow.userId && targetShow.userId !== initiatingUid) return false;
 
   const epKey = `${sNum}x${eNum}`;
   const sNumStr = String(sNum).padStart(2, '0');
@@ -115,13 +117,16 @@ export async function markEpisodeWatched(
 
   const episodeTitle = fetchedEpTitle || optimisticNextEp?.name || null;
 
+  if (auth.currentUser?.uid !== initiatingUid) return false;
   // 1. Mise à jour optimiste dans le store local Zustand pour réactivité instantanée UI
   const localUpdates: Partial<Show> = {
     seenEpisodes: newSeenArray,
     episodeRecords: {
       ...prevEpisodeRecords,
       [epKey]: {
+        ...prevEpisodeRecords[epKey],
         watchedAt: Date.now(),
+        watchedTimeKnown: true,
         episodeTitle
       }
     },
@@ -142,7 +147,7 @@ export async function markEpisodeWatched(
     useLogStore.getState().addLog(`[Firestore] Début màj atomique pour ${stringId} (${targetShow.title}) - En ligne : ${isOnline}`, "info");
 
     try {
-      const updatePayload: any = {
+      const updatePayload: Record<string, unknown> = {
         seenEpisodes: arrayUnion(epKey),
         lastWatchedAt: Date.now(),
         updatedAt: Date.now(),
@@ -152,7 +157,9 @@ export async function markEpisodeWatched(
       // C'est ICI qu'on utilise la VRAIE notation pointée de Firestore pour mettre à jour
       // UNE SEULE CLÉ dans le dictionnaire distant, SANS lire ni écraser le reste.
       updatePayload[`episodeRecords.${epKey}`] = {
+        ...prevEpisodeRecords[epKey],
         watchedAt: Date.now(),
+        watchedTimeKnown: true,
         episodeTitle: fetchedEpTitle || optimisticNextEp?.name || null
       };
 
@@ -174,10 +181,10 @@ export async function markEpisodeWatched(
       useLogStore.getState().addLog(`[Firestore] Envoi payload (${Object.keys(updatePayload).join(', ')}) pour la série ${stringId}`, "info");
 
       const docRef = doc(db, 'users', user.uid, 'shows', stringId);
-      
+
       // Configuration d'un timeout de 4 secondes pour lever une alerte claire si le réseau ou le cache bloque
       const updatePromise = updateDoc(docRef, updatePayload);
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("Délai d'attente dépassé (4s) - Écriture Firestore en attente")), 4000)
       );
 
@@ -188,6 +195,14 @@ export async function markEpisodeWatched(
       useLogStore.getState().addLog(`[Firestore] ERREUR lors de la màj pour la série ${targetShow.id} : ${error.message}`, "error");
       console.error("Firestore update error:", error);
       useLogStore.getState().addLog(`[Système] Erreur de mise à jour Firestore: ${error.message || String(error)}`, 'error', error);
+      if (auth.currentUser?.uid === initiatingUid) {
+        useShowsStore.getState().updateShowOptimistic(targetShow.id, {
+          seenEpisodes: prevSeenEpisodes, episodeRecords: prevEpisodeRecords, lastWatchedAt: prevLastWatchedAt,
+          nextEpisodeToWatch: prevNextEpisodeToWatch, status: prevStatus,
+        });
+        useToastStore.getState().showToast('L’épisode n’a pas pu être marqué vu.', 'error');
+      }
+      return false;
     }
   } else {
     if (!user) {
@@ -198,6 +213,7 @@ export async function markEpisodeWatched(
     }
   }
 
+  if (auth.currentUser?.uid !== initiatingUid) return false;
   scrollAllCarouselsToStart();
 
   useToastStore.getState().showToast(
@@ -205,6 +221,7 @@ export async function markEpisodeWatched(
     'success',
     targetShow,
     async () => {
+      if (auth.currentUser?.uid !== initiatingUid) return;
       const rollbackUpdates: Partial<Show> = {
         seenEpisodes: prevSeenEpisodes,
         episodeRecords: prevEpisodeRecords,
@@ -233,4 +250,5 @@ export async function markEpisodeWatched(
       scrollAllCarouselsToStart();
     }
   );
+  return true;
 }

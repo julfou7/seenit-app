@@ -1,0 +1,2 @@
+.seenit-watched-stamp { position:absolute; left:50%; height:34px; padding:0 12px; border-radius:8px; border:2.5px solid #E5A93D; background:#09090b8c; color:#F2C36B; display:flex; align-items:center; justify-content:center; gap:7px; font-size:16px; font-weight:900; letter-spacing:.12em; white-space:nowrap; pointer-events:none; }
+.seenit-watched-stamp svg { width:22px; height:22px; flex-shrink:0; }

@@ -10,6 +10,7 @@ const continueCardSource = readFileSync(new URL('../src/components/cards/Continu
 const movieCardSource = readFileSync(new URL('../src/components/cards/MovieWatchCard.tsx', import.meta.url), 'utf8');
 const seriesCardSource = readFileSync(new URL('../src/components/cards/SeriesEpisodeCard.tsx', import.meta.url), 'utf8');
 const seriesCardCss = readFileSync(new URL('../src/components/cards/seriesEpisodeCard.css', import.meta.url), 'utf8');
+const nextCss = readFileSync(new URL('../src/screens/watchNext18c.css', import.meta.url), 'utf8');
 
 const WATCHLIST_CAROUSEL_IDS = [
   'continue-watching-carousel',
@@ -31,13 +32,10 @@ test('#229 conserve un premier lot borné puis rend les quatre carrousels progre
   assert.match(watchListSource, /leadingSpacerSize/);
   assert.match(watchListSource, /trailingSpacerSize/);
 
-  for (const id of WATCHLIST_CAROUSEL_IDS) {
-    assert.match(
-      watchListSource,
-      new RegExp(`id="${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`),
-      `${id} doit utiliser le rail progressif`
-    );
-  }
+  // 18c remplace les quatre rails par une liste séries et un rail de tickets bornés.
+  assert.match(watchListSource, /series\.slice\(0, seriesCount\)/);
+  assert.match(watchListSource, /orderedMovies\.slice\(0, filmsExpanded \? filmCount : 8\)/);
+  assert.match(watchListSource, /id="films-a-voir-18c"/);
 
   assert.doesNotMatch(
     watchListSource,
@@ -46,16 +44,14 @@ test('#229 conserve un premier lot borné puis rend les quatre carrousels progre
   );
 });
 
-test('#690 fait avancer les rails séries 8f carte par carte sans modifier le rail films', () => {
+test('#712 remplace les rails séries par la liste 18c et donne un snap aux tickets films', () => {
   assert.match(mainSource, /import '\.\/styles\/watchlistCarouselUx\.css';/);
-  assert.match(carouselUxCss, /scroll-snap-type:\s*x mandatory !important;/);
-  assert.match(carouselUxCss, /#films-a-voir-carousel\s*\{\s*scroll-snap-type:\s*none !important;/);
+  assert.match(nextCss, /scroll-snap-type:x proximity/);
+  assert.match(nextCss, /\.watch-next-18c__series\s*\{[^}]*flex-direction:column/);
   assert.match(seriesCardCss, /\.series-8f-host\s*\{[^}]*scroll-snap-align:start;[^}]*scroll-snap-stop:always;/);
   assert.match(seriesCardCss, /\.series-8f--rail\s*\{[^}]*width:88vw;/);
 
-  for (const id of SERIES_CAROUSEL_IDS) {
-    assert.match(carouselUxCss, new RegExp(`#${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
-  }
+  for (const id of SERIES_CAROUSEL_IDS) assert.doesNotMatch(watchListSource, new RegExp(`id="${id}"`));
 });
 
 test('#229 recycle les cartes hors écran au lieu d’accumuler le DOM', () => {
@@ -65,13 +61,12 @@ test('#229 recycle les cartes hors écran au lieu d’accumuler le DOM', () => {
   assert.doesNotMatch(watchListSource, /preloadSentinelRef/);
 });
 
-test('#229 retire le faux Voir tout terminal et conserve le vrai bouton d’en-tête', () => {
+test('#712 conserve deux vrais accès Voir tout vers la même grille paginée', () => {
   assert.doesNotMatch(carouselUxCss, /::after/);
   assert.doesNotMatch(carouselUxCss, /Suite\\A|Voir tout/);
-  assert.ok(
-    (watchListSource.match(/'Voir tout'/g) || []).length >= 4,
-    'chaque section conserve son vrai bouton Voir tout dans l’en-tête'
-  );
+  assert.match(watchListSource, /className="watch-next-18c__all-films" onClick=\{onToggleFilms\}/);
+  assert.match(watchListSource, /onClick=\{onToggleFilms\}>\{filmsExpanded \? 'Réduire' : 'Voir tout'\}/);
+  assert.match(watchListSource, /filmCount < orderedMovies\.length/);
 });
 
 test('#690 aligne la hiérarchie 8f et retire les compteurs redondants', () => {
@@ -102,9 +97,5 @@ test('#690 aligne la hiérarchie 8f et retire les compteurs redondants', () => {
     /min-(?:block-size|height):\s*\d+(?:\.\d+)?px/,
     'la stabilisation ne doit pas reposer sur une hauteur fixe en pixels'
   );
-  assert.match(
-    watchListSource,
-    /\{nouveautesShows\.length > 0 && \(\s*<div className="mt-8">/,
-    'l’espace validé avant Nouveautés doit rester inchangé'
-  );
+  assert.match(watchListSource, /groups=\{\[continueWatchingShows, nouveautesShows, pasVuDepuisUnMomentShows\]\}/);
 });

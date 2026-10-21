@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildSeriesSeasonProgress, seriesCardPosterCandidates, seriesCardPosterCrossOrigin, seriesCardStaleDetail, seriesEpisodeCode, upcomingCardTone } from '../src/features/watchlist/seriesCardPresentation.ts';
+import { buildSeriesSeasonProgress, seriesCardPosterCandidates, seriesCardPosterCrossOrigin, seriesCardStaleDetail, seriesCompletionLabel, seriesEpisodeCode, upcomingCardTone } from '../src/features/watchlist/seriesCardPresentation.ts';
 import { dominantPosterHue, readPosterHue, rememberPosterHue, POSTER_HUE_CACHE_LIMIT } from '../src/features/watchlist/posterHue.ts';
 
 test('SEENIT-UX-014 conserve les états de saison sans inventer les diffusions', () => {
+  assert.equal(seriesCompletionLabel({ tmdbStatus: 'Ended' }), 'Série terminée');
+  assert.equal(seriesCompletionLabel({ tmdbStatus: 'Canceled' }), 'Série annulée');
+  assert.equal(seriesCompletionLabel({ tmdbStatus: 'Returning Series' }), 'Prochain épisode bientôt');
   const episode = { season_number: 5, episode_number: 4, episode_count: 8, aired_episodes_in_season: 5 };
   const show = { seenEpisodes: ['5x1', '5x2', '5x3'], seasonsCache: [], nextEpisodeToWatch: episode, nextEpisodeToAir: null, seriesEnded: true, tmdbStatus: 'Ended' };
   const progress = buildSeriesSeasonProgress(show, episode, 'watch', '2026-10-21');

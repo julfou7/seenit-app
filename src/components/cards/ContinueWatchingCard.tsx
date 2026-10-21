@@ -13,7 +13,10 @@ interface Props {
   show: Show;
   onShowClick?: (id: string, mediaType?: 'tv' | 'movie') => void;
   onEpisodeClick?: (show: Show, seasonNumber: number, episodeNumber: number) => void;
-  onMarkAsSeen: (show: Show) => void | Promise<void>;
+  onMarkAsSeen: (show: Show) => void | boolean | Promise<void | boolean>;
+  onMarkUnseen?: (show: Show, episode: SeriesCardEpisode) => Promise<void | boolean>;
+  lastMarkedEpisode?: SeriesCardEpisode;
+  animateSeen?: boolean;
   layout?: 'rail' | 'list';
   actions?: SeriesCardAction[];
   showStaleDetail?: boolean;
@@ -34,13 +37,15 @@ export const ContinueWatchingCard = React.memo(function ContinueWatchingCard(pro
   return <ContinueWatchingCardContent {...props} />;
 });
 
-function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMarkAsSeen, layout = 'rail', actions, showStaleDetail = false }: Props) {
+function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMarkAsSeen, onMarkUnseen, lastMarkedEpisode, animateSeen, layout = 'rail', actions, showStaleDetail = false }: Props) {
   const { cardRef, providerLogo, providerName } = usePassiveWatchProvider({
     tmdbId: show.tmdbId, mediaType: 'tv', title: show.title, originalTitle: show.originalTitle,
     year: show.firstAirDate?.slice(0, 4), retainInLibraryCache: true,
   });
   const todayStr = getTodayStr();
-  const { episode: nextEpNum, upToDate: isUpToDate } = resolveWatchCardResume(show, todayStr);
+  const resume = resolveWatchCardResume(show, todayStr);
+  const isUpToDate = resume.upToDate;
+  const nextEpNum = resume.episode || (isUpToDate ? lastMarkedEpisode : null);
   const cachedSeason = nextEpNum ? show.seasonsCache?.find(season => season.season_number === nextEpNum.season_number) : undefined;
   const cachedEpisode = cachedSeason?.episodes?.find((episode: SeriesCardEpisode) => episode.episode_number === nextEpNum?.episode_number) as (SeriesCardEpisode & { still_path?: string }) | undefined;
   const episodeStill = nextEpNum?.still_path || cachedEpisode?.still_path;
@@ -55,7 +60,10 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
     <SeriesEpisodeCard
       show={{ ...show, backdropPath: rawPath }}
       episode={nextEpNum ? { ...nextEpNum, name: nextEpNum.name || cachedEpisode?.name } : null}
-      context={{ kind: 'watch', upToDate: isUpToDate, onMarkSeen: nextEpNum ? () => onMarkAsSeen(show) : undefined }}
+      context={{ kind: 'watch', upToDate: isUpToDate, animateSeen,
+        onMarkSeen: resume.episode ? () => onMarkAsSeen(show) : undefined,
+        onMarkUnseen: isUpToDate && lastMarkedEpisode && onMarkUnseen ? () => onMarkUnseen(show, lastMarkedEpisode) : undefined,
+      }}
       detail={freshnessBadge || staleDetail}
       providerLogo={getFormattedProviderLogo(providerLogo, providerName)} providerName={providerName}
       onOpen={() => { if (onShowClick) onShowClick(show.id, 'tv'); else openEpisode?.(); }}

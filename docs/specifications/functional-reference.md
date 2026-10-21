@@ -197,31 +197,25 @@ connue relève de **À Venir** ; sans date exploitable, la série reste suivie s
 regardable. Les cartes ne fabriquent donc pas `S01 | E01` / « SAISON DISPO » depuis des métadonnées
 inconnues.
 
-Les règles exactes de frontière sont dans `seenit.md` §5.1. Chaque carrousel matérialise une fenêtre d'au
-moins huit cartes et recycle celles qui quittent largement le viewport ; des espaceurs transparents
-préservent la largeur totale et la position du rail. Les trois rails séries réduits de À Regarder avancent
-carte par carte avec un scroll-snap horizontal obligatoire et un arrêt sur chaque carte, tout en conservant
-la virtualisation et le préchargement. Le rail **Films à voir** conserve l'inertie native libre sans
-scroll-snap. Aucun marqueur terminal **« Voir tout »** n'est injecté dans le rail. Le vrai bouton **« Voir
-tout »** de l'en-tête reste l'alternative accessible et ouvre la vue verticale exhaustive, paginée par lots
-de huit. Une carte passive conserve son visuel initial et reporte tout enrichissement diffuseur jusqu'à
-l'arrêt du scroll. Les cartes film réduites réutilisent les détails déjà en cache sans déclencher de
-chargement décoratif supplémentaire ; la vue exhaustive complète ces détails après stabilisation du geste,
-avec une concurrence bornée.
-Les médias abandonnés, archivés ou terminés ne reviennent pas dans le parcours actif.
-La progression ne dépend pas du cache de saison déprécié : les épisodes prouvés restent segmentés,
-avec une traîne « ? » pour une dernière saison sans total confirmé. Une finale datée ou une confirmation
-explicite permet de retirer la traîne ; un ancien pointeur ne doit pas annuler cette preuve.
-Les séries laissées de côté retrouvent le nombre de jours depuis leur dernier visionnage encore vu.
+La [vue 18c](../design/watch-next-18c.md) réunit ces trois catégories dans une liste
+« Continuer à regarder », dans leur ordre actuel : trois cartes, puis trois par appui sur le
+bouton verre avec mini-affiches, compteur en attente et Réduire. Le cadre 8f reste partagé
+avec À Venir et Historique. La progression ne dépend pas du cache saison déprécié ; les épisodes
+prouvés et la traîne « ? » signalent les saisons ouvertes. Le badge de récence reste propre aux
+séries anciennes. Vu anime la reprise réellement avancée et son tampon SeenIt. À jour propose
+le retour du dernier épisode explicitement marqué dans cette session, avec Annuler.
 
-Les séries de ces trois rails et de leur vue « Voir tout » partagent la [carte 8f](../design/card-8f.md)
-avec À Venir et l'historique (`SEENIT-UX-014`). L'affiche inclinée déborde sur un fond teinté ; le titre
-peut occuper deux lignes. Le code épisode, son titre et les segments de saison rendent la progression
-lisible : vus en or, prochain entouré, futurs hachurés, dates inconnues signalées. Une saison longue
-utilise une barre proportionnelle. La couleur vient de l'affiche déjà chargée et les métadonnées du
-cache existant ; aucun total ou diffuseur n'est inventé. La coche marque le prochain épisode connu
-via l'action existante et son annulation. Un appui court ouvre la série ; l'appui long, le menu
-contextuel ou Maj+F10 donnent accès aux actions. Les cartes film gardent leur présentation.
+Les films sont des tickets déchirables, triés par heure de fin croissante (durée inconnue en dernier).
+Le talon indique l'année et la fin calculée chaque minute depuis Maintenant ou « Je lance à » ;
+la fin devient orange après le minuit suivant le lancement. Sans durée, seule l'année apparaît.
+Une coche aboutie déchire le talon, assombrit l'affiche et conserve le tampon Vu ; la coche inverse
+ou Annuler recolle le ticket. Le film garde sa place pendant la session et disparaît au prochain
+rafraîchissement/réouverture. Le premier rail est borné à huit tickets ; le bouton Voir tout et
+la tuile finale ouvrent la même grille par lots de huit. Les enrichissements restent passifs,
+bornés et fondés sur l'identité canonique. Les préférences de diffuseur et le fallback d'image
+Android sont conservés. Les médias archivés/abandonnés ne reviennent pas dans la liste ; l'état
+visuel de session est réinitialisé lors d'un changement de compte. Clavier, cibles 44 px, annonces
+live et réduction des animations partagent les mêmes actions en PWA et APK.
 La reprise et l'action Vu partagent leur résolution : une diffusion future ne remplace pas un pointeur
 de reprise absent. Le cache des épisodes déjà diffusés et la progression enregistrée permettent le repli ;
 sans preuve suffisante, la carte demande une actualisation et ne propose pas une coche sans effet.
@@ -240,7 +234,8 @@ annulation.
 - Un rappel spécifique met à jour l'intention de notification du média et son document Firestore.
 - Sur Android, un rappel de nouvelle saison affiche aussi « Saison N » et un rappel de nouvel épisode
   affiche son code « Sxx | Eyy ». Si la série est en retard, le contexte visible bascule sur le prochain
-  épisode réellement à voir et reprend le compteur « + X épisode(s) » de la carte À Regarder ; le corps
+  épisode réellement à voir et son compteur de reprise « + X épisode(s) », indépendant de l'affichage
+  de la carte À Regarder ; le corps
   peut nommer l'épisode de reprise et l'épisode nouvellement diffusé quand TMDB fournit leurs titres.
 
 ### 5.3 Historique et actualités

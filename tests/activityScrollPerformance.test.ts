@@ -84,13 +84,13 @@ test('#229 borne le rendu initial des carrousels progressifs et conserve Voir to
   assert.match(watchListSource, /data\.slice\(range\.start, range\.end\)/);
   assert.match(watchListSource, /leadingSpacerSize/);
   assert.match(watchListSource, /trailingSpacerSize/);
-  assert.match(watchListSource, /data=\{continueWatchingShows\}/);
-  assert.match(watchListSource, /data=\{nouveautesShows\}/);
-  assert.match(watchListSource, /data=\{pasVuDepuisUnMomentShows\}/);
-  assert.match(watchListSource, /data=\{filmsAVoirShows\}/);
+  assert.match(watchListSource, /groups=\{\[continueWatchingShows, nouveautesShows, pasVuDepuisUnMomentShows\]\}/);
+  assert.match(watchListSource, /movies=\{filmsAVoirShows\}/);
+  assert.match(watchListSource, /series\.slice\(0, seriesCount\)/);
+  assert.match(watchListSource, /orderedMovies\.slice\(0, filmsExpanded \? filmCount : 8\)/);
 
-  assert.match(watchListSource, /continueWatchingShows\.slice\(0, visibleCount\)\.map/);
-  assert.match(watchListSource, /setVisibleCount\(prev => prev \+ WATCHLIST_BATCH_SIZE\)/);
+  assert.match(watchListSource, /setSeriesCount\(count => count \+ 3\)/);
+  assert.match(watchListSource, /setVisibleCount\(count => count \+ WATCHLIST_BATCH_SIZE\)/);
   assert.doesNotMatch(watchListSource, /\{continueWatchingShows\.map\(/);
   assert.doesNotMatch(watchListSource, /\{nouveautesShows\.map\(/);
   assert.doesNotMatch(watchListSource, /\{pasVuDepuisUnMomentShows\.map\(/);

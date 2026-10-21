@@ -47,5 +47,6 @@ test('SEENIT-UX-014 les deux synchronisations conservent la finale avant de supp
     assert.equal(refreshed.nextEpisodeToWatch?.season_total_unknown, false);
     assert.equal(buildSeriesSeasonProgress(refreshed, refreshed.nextEpisodeToWatch, 'watch', '2026-10-21').unknownTail, false);
     assert.equal(buildSeriesSeasonProgress({ ...refreshed, nextEpisodeToWatch: null }, { season_number: 1, episode_number: 2 }, 'history', '2026-10-21').unknownTail, false);
+    assert.equal(buildSeriesSeasonProgress({ ...refreshed, nextEpisodeToWatch: null }, { season_number: 1, episode_number: 2 }, 'history', '2026-10-21').totalUnknown, false);
   }
 });

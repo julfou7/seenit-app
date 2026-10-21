@@ -4,13 +4,14 @@ import { Bell, X } from 'lucide-react';
 import type { Show } from '../../types';
 import { SeenItCheckButton } from '../SeenItCheckButton';
 import { DialogLayer } from '../ui/DialogLayer';
-import { buildSeriesSeasonProgress, imageUrl, seriesCardPosterCandidates, seriesCardPosterCrossOrigin, seriesEpisodeCode, upcomingCardTone, type SeriesCardEpisode, type SeriesSeasonProgress, type SeasonSegmentState } from '../../features/watchlist/seriesCardPresentation';
+import { buildSeriesSeasonProgress, imageUrl, seriesCardPosterCandidates, seriesCardPosterCrossOrigin, seriesCompletionLabel, seriesEpisodeCode, upcomingCardTone, type SeriesCardEpisode, type SeriesSeasonProgress, type SeasonSegmentState } from '../../features/watchlist/seriesCardPresentation';
 import { dominantPosterHue, POSTER_HUE_FALLBACK, readPosterHue, rememberPosterHue } from '../../features/watchlist/posterHue';
 import './seriesEpisodeCard.css';
+import { SeenItWatchedStamp } from './SeenItWatchedStamp';
 
 export interface SeriesCardAction { label: string; onSelect: () => void | Promise<void>; destructive?: boolean }
 type Context =
-  | { kind: 'watch'; onMarkSeen?: () => void | Promise<void>; upToDate?: boolean }
+  | { kind: 'watch'; onMarkSeen?: () => void | boolean | Promise<void | boolean>; onMarkUnseen?: () => Promise<void | boolean>; upToDate?: boolean; animateSeen?: boolean }
   | { kind: 'upcoming'; days: number; reminder: boolean; pending: boolean; onToggleReminder: (event: React.MouseEvent) => void | Promise<void> }
   | { kind: 'history'; watchedAt: number; watchedTimeKnown?: boolean; onUnseen: () => void };
 
@@ -55,6 +56,19 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
   const [hue, setHue] = useState(() => readPosterHue(poster) ?? POSTER_HUE_FALLBACK);
   const [menuOpen, setMenuOpen] = useState(false);
   const [actionPending, setActionPending] = useState(false);
+  const [feedback, setFeedback] = useState<{ sequence: number; code: string; name: string; season: number; episode: number } | null>(null);
+  const [markError, setMarkError] = useState(false);
+  const [markingSnapshot, setMarkingSnapshot] = useState<{ code: string; subtitle: string | null } | null>(null);
+  const markPending = useRef(false);
+  useEffect(() => {
+    if (!feedback) return;
+    const key = `${feedback.season}x${feedback.episode}`;
+    const seen = show.seenEpisodes.some(value => {
+      const match = /^(?:s\s*)?(\d+)\s*(?:x|e)\s*(\d+)$/i.exec(value.trim());
+      return match && `${Number(match[1])}x${Number(match[2])}` === key;
+    });
+    if (!seen) setFeedback(null);
+  }, [feedback, show.seenEpisodes]);
   const titleId = useId();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const held = useRef(false);
@@ -70,7 +84,8 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
   const progress = presentation?.progress ?? (episode
     ? buildSeriesSeasonProgress(show, episode, context.kind, today)
     : { label: 'À actualiser', description: 'Épisode de reprise à confirmer', continuous: false, segments: [], totalUnknown: true, unknownTail: false, knownEpisodes: 0, availableUnseen: 0 });
-  const code = presentation?.code ?? (episode ? seriesEpisodeCode(episode) : 'Épisode à confirmer');
+  const reversibleComplete = context.kind === 'watch' && context.upToDate && Boolean(context.onMarkUnseen);
+  const code = presentation?.code ?? (reversibleComplete && episode ? `S${String(episode.season_number).padStart(2, '0')} · à jour` : episode ? seriesEpisodeCode(episode) : 'Épisode à confirmer');
   const requestedDetail = detail?.trim() && !REMAINING_DETAIL.test(detail) ? detail.trim() : undefined;
   const visibleDetail = requestedDetail || progress.detail;
   const detailIsBadge = visibleDetail ? BADGE_DETAIL.test(visibleDetail) : false;
@@ -84,7 +99,8 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
   const defaultMenuActions: SeriesCardAction[] = [
     { label: 'Ouvrir la série', onSelect: onOpenSeries || onOpen },
     ...(onOpenEpisode ? [{ label: 'Voir l’épisode', onSelect: onOpenEpisode }] : []),
-    ...(context.kind === 'watch' && context.onMarkSeen && !context.upToDate ? [{ label: 'Marquer cet épisode comme vu', onSelect: context.onMarkSeen }] : []),
+    ...(context.kind === 'watch' && context.onMarkSeen && !context.upToDate ? [{ label: 'Marquer cet épisode comme vu', onSelect: () => handleSeen() }] : []),
+    ...(reversibleComplete ? [{ label: 'Marquer le dernier épisode comme non vu', onSelect: () => handleSeen() }] : []),
     ...(context.kind === 'history' ? [{ label: 'Marquer comme non vu', onSelect: context.onUnseen }] : []),
     ...actions,
   ];
@@ -92,11 +108,25 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
   const subtitle = presentation
     ? presentation.subtitle
     : context.kind === 'watch' && context.upToDate
-      ? 'À jour'
+      ? reversibleComplete ? seriesCompletionLabel(show) : 'À jour'
       : episode?.name || (episode ? `Épisode ${episode.episode_number}` : 'Reprise à actualiser');
   const backdropPath = presentation?.backdropPath === undefined ? show.backdropPath : presentation.backdropPath;
   const openLabel = presentation?.ariaLabel || `Ouvrir ${show.title}, ${code}${episode?.name ? `, ${episode.name}` : ''}`;
   const openMenu = () => { if (menuActions.length > 0) setMenuOpen(true); };
+  async function handleSeen() {
+    if (context.kind !== 'watch' || markPending.current) return;
+    markPending.current = true; setMarkError(false);
+    try {
+      if (context.upToDate) { if (await context.onMarkUnseen?.() === false) { setMarkError(true); return; } setFeedback(null); return; }
+      setMarkingSnapshot({ code, subtitle: subtitle || null });
+      const completed = await context.onMarkSeen?.();
+      if (completed === false) { setMarkError(true); return; }
+      if (!context.animateSeen || !episode) return;
+      try { navigator.vibrate?.(15); } catch { /* Le feedback visuel reste disponible. */ }
+      setFeedback(previous => ({ sequence: (previous?.sequence || 0) + 1, code, name: subtitle || '', season: episode.season_number, episode: episode.episode_number }));
+    } catch { setMarkError(true); }
+    finally { markPending.current = false; setMarkingSnapshot(null); }
+  }
   const handlePosterLoad = (image: HTMLImageElement) => {
     if (!poster) return;
     const cachedHue = readPosterHue(poster);
@@ -127,27 +157,34 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
       <div className="series-8f__poster" aria-hidden="true">
         <span>{initials}</span>
         {poster && <img src={poster} crossOrigin={posterCrossOrigin} alt="" loading="lazy" decoding="async" onLoad={event => handlePosterLoad(event.currentTarget)} onError={() => setPosterIndex(index => index + 1)} />}
+        {feedback && <SeenItWatchedStamp key={feedback.sequence} className="series-8f__stamp" />}
       </div>
       <div className="series-8f__text">
         <h3 id={titleId}>{show.title}</h3>
-        <div className="series-8f__code"><strong>{code}</strong>{visibleDetail && (detailIsBadge ? <span className="series-8f__badge">{visibleDetail}</span> : <span> · {visibleDetail}</span>)}</div>
-        {subtitle && <p>{subtitle}</p>}
+        <div className="series-8f__episode-block">
+          <div key={feedback?.sequence || 0} className={feedback ? 'series-8f__incoming' : undefined}>
+            <div className="series-8f__code"><strong>{markingSnapshot?.code || code}</strong>{visibleDetail && (detailIsBadge ? <span className="series-8f__badge">{visibleDetail}</span> : <span> · {visibleDetail}</span>)}</div>
+            {(markingSnapshot ? markingSnapshot.subtitle : subtitle) && <p>{markingSnapshot ? markingSnapshot.subtitle : subtitle}</p>}
+          </div>
+          {feedback && <div key={`ghost-${feedback.sequence}`} className="series-8f__ghost" aria-hidden="true"><strong>✓ {feedback.code}</strong><p>{feedback.name}</p></div>}
+        </div>
       </div>
       <div className="series-8f__season">
         <div className={`series-8f__segments${progress.continuous ? ' series-8f__segments--continuous' : ''}`} role="img" aria-label={progress.description}>
-          {progress.segments.map((segment, index) => <span key={index} className={`series-8f__segment series-8f__segment--${segment.state}`} style={{ flexGrow: segment.count }} title={`${segment.episode ? `Épisode ${segment.episode} : ` : ''}${segmentNames[segment.state]}`} />)}
+          {progress.segments.map((segment, index) => <span key={`${index}-${feedback?.sequence || 0}`} className={`series-8f__segment series-8f__segment--${segment.state}${feedback && feedback.season === episode?.season_number && (segment.episode === feedback.episode || progress.continuous && segment.state === 'seen') ? ' series-8f__segment--pop' : ''}`} style={{ flexGrow: segment.count }} title={`${segment.episode ? `Épisode ${segment.episode} : ` : ''}${segmentNames[segment.state]}`} />)}
           {progress.unknownTail && <><span className="series-8f__unknown-tail" aria-hidden="true" /><span className="series-8f__unknown-mark" aria-hidden="true" title="Nombre d'épisodes encore inconnu">?</span></>}
         </div>
         {providerLogo && <button type="button" className="series-8f__provider" aria-label={`Où regarder ${show.title} : ${providerName || 'diffuseur'}`} onClick={() => { void (onProviderOpen ? onProviderOpen() : (onOpenSeries || onOpen)()); }}><img src={providerLogo} alt="" loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} /></button>}
       </div>
       <div className="series-8f__action">
-        {context.kind === 'watch' && !context.upToDate && context.onMarkSeen && <SeenItCheckButton size={34} className="series-8f__check" title={`Marquer ${show.title} ${code} comme vu`} onClick={async () => { await context.onMarkSeen?.(); }} />}
+        {context.kind === 'watch' && ((!context.upToDate && context.onMarkSeen) || reversibleComplete) && <SeenItCheckButton size={34} error={markError} isWatched={reversibleComplete} className={`series-8f__check${reversibleComplete ? ' series-8f__check--watched' : ''}`} title={reversibleComplete ? `Marquer le dernier épisode de ${show.title} comme non vu` : `Marquer ${show.title} ${code} comme vu`} onClick={handleSeen} />}
         {context.kind === 'upcoming' && <button type="button" className={`series-8f__days series-8f__days--${upcomingCardTone(context.days)}`} disabled={context.pending} aria-busy={context.pending || undefined} aria-pressed={context.reminder} aria-label={`${context.reminder ? 'Désactiver' : 'Activer'} le rappel de ${show.title} ${code}, ${context.days === 0 ? 'aujourd’hui' : `dans ${context.days} jours`}`} onClick={context.onToggleReminder}>
           <span className={`series-8f__bell${context.reminder ? ' series-8f__bell--active' : ''}`}><Bell size={14} fill={context.reminder ? 'currentColor' : 'none'} /></span>
           <strong>{context.days <= 0 ? '🔥' : context.days}</strong><small>{context.days <= 0 ? 'ce soir' : 'jours'}</small>
         </button>}
         {context.kind === 'history' && <div className="series-8f__history" aria-hidden="true"><span>✓</span>{watchedTime && <time dateTime={validWatchedDate ? watchedDate.toISOString() : undefined}>{watchedTime}</time>}</div>}
       </div>
+      <span className="sr-only" role="status" aria-live="polite">{markError ? 'Le visionnage n’a pas pu être enregistré.' : feedback ? `${show.title} ${feedback.code} marqué vu` : ''}</span>
     </article>
     {menuOpen && <DialogLayer label={`Actions de ${show.title}`} onDismiss={() => setMenuOpen(false)} className="fixed inset-0 flex items-end sm:items-center justify-center bg-black/65 p-4 pb-nav">
       <section className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-950 p-4 shadow-2xl">
