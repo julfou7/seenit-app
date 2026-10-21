@@ -2042,6 +2042,24 @@
       ]
     },
     {
+      "id": "SEENIT-UX-014",
+      "title": "Carte série 8f partagée entre suivi, calendrier et historique",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/seriesCardPresentation.test.ts",
+          "contains": "SEENIT-UX-014 conserve les états de saison sans inventer les diffusions"
+        },
+        {
+          "file": "tests/seriesCardPresentation.test.ts",
+          "contains": "SEENIT-UX-014 borne le rendu des saisons longues et conserve les proportions"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-UX-012",
       "title": "Pile de dialogues, focus et safe areas partagés",
       "targets": [

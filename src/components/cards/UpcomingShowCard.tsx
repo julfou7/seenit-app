@@ -9,6 +9,7 @@ import { cn, getTodayStr, getCalendarDaysDiff, formatAirDateSafe, getEpisodeRela
 import { getFormattedProviderLogo } from '../../utils/providerLogos';
 import { usePassiveWatchProvider } from '../../hooks/usePassiveWatchProvider';
 import { readUserScopedJson, removeUserScopedValue, writeUserScopedJson } from '../../lib/userIsolation';
+import { SeriesEpisodeCard, type SeriesCardAction } from './SeriesEpisodeCard';
 
 export interface UpcomingEpisodeInfo {
   season_number: number;
@@ -89,12 +90,16 @@ interface Props {
   show: Show;
   onShowClick?: (id: string, mediaType?: 'tv' | 'movie') => void;
   onEpisodeClick: (show: Show, seasonNumber: number, episodeNumber: number) => void;
+  actions?: SeriesCardAction[];
 }
 
-export const UpcomingShowCard = React.memo(function UpcomingShowCard({ show, onShowClick, onEpisodeClick }: Props) {
+export const UpcomingShowCard = React.memo(function UpcomingShowCard({ show, onShowClick, onEpisodeClick, actions }: Props) {
   const ep = getUpcomingEpisodeInfo(show);
   if (!ep) return null;
+  return <UpcomingShowCardContent key={`${show.id}_${ep.season_number}x${ep.episode_number}`} show={show} ep={ep} onShowClick={onShowClick} onEpisodeClick={onEpisodeClick} actions={actions} />;
+});
 
+function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, actions }: Props & { ep: UpcomingEpisodeInfo }) {
   const storageField = `reminder_${show.id}_S${ep.season_number}E${ep.episode_number}`;
   const [isReminderSet, setIsReminderSet] = useState<boolean>(() => {
     if (show.notificationsEnabled) return true;
@@ -151,7 +156,7 @@ export const UpcomingShowCard = React.memo(function UpcomingShowCard({ show, onS
             season: ep.season_number,
             episode: ep.episode_number
           }
-        } as any);
+        });
       } catch (err) {
         console.warn("sendNativeNotification failed:", err);
       }
@@ -237,6 +242,15 @@ export const UpcomingShowCard = React.memo(function UpcomingShowCard({ show, onS
   });
 
   const networkLogo = getFormattedProviderLogo(providerLogo, providerName);
+
+  if (show.mediaType !== 'movie') return <div ref={cardRef} className="series-8f-host">
+    <SeriesEpisodeCard show={show} episode={ep}
+      context={{ kind: 'upcoming', days: diffDays, reminder: isReminderSet, pending: loadingReminder, onToggleReminder: toggleReminder }}
+      detail={diffDays === 0 ? 'ce soir' : capitalizedShortDate}
+      providerLogo={networkLogo} providerName={providerName}
+      onOpen={() => { if (onShowClick) onShowClick(show.id, 'tv'); else onEpisodeClick(show, ep.season_number, ep.episode_number); }}
+      onOpenEpisode={() => onEpisodeClick(show, ep.season_number, ep.episode_number)} actions={actions} />
+  </div>;
 
   return (
     <div 
@@ -326,5 +340,5 @@ export const UpcomingShowCard = React.memo(function UpcomingShowCard({ show, onS
       </div>
     </div>
   );
-});
+}
 

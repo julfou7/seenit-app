@@ -2,6 +2,7 @@ import React, { startTransition, useState, useEffect, useRef, useMemo, useCallba
 import { type Show } from '../types';
 import { cn, getNextEpisodeNumber, scrollAllCarouselsToStart, checkIsUpToDate, getAiredProgress } from '../lib/utils';
 import { ContinueWatchingCard } from '../components/cards/ContinueWatchingCard';
+import type { SeriesCardAction } from '../components/cards/SeriesEpisodeCard';
 import { MovieWatchCard } from '../components/cards/MovieWatchCard';
 import { ShowNewsFeed } from '../components/ShowNewsFeed';
 import { UpToDateShowCard, getUpToDateOrNewSeasonCategory } from '../components/cards/UpToDateShowCard';
@@ -40,8 +41,9 @@ interface ExpandedItemCardProps {
   sectionType: 'watchNext' | 'notWatched' | 'upToDate';
   onShowClick: (id: string, mediaType?: 'tv' | 'movie') => void;
   onEpisodeClick: (show: Show, seasonNumber: number, episodeNumber: number) => void;
-  onMarkAsSeen: (show: Show) => void;
+  onMarkAsSeen: (show: Show) => void | Promise<void>;
   onPersonClick?: (personId: number) => void;
+  actions?: SeriesCardAction[];
 }
 
 function formatRuntime(minutes?: number) {
@@ -52,12 +54,17 @@ function formatRuntime(minutes?: number) {
   return `${m}min`;
 }
 
-export function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMarkAsSeen, onPersonClick }: ExpandedItemCardProps) {
+export function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMarkAsSeen, onPersonClick, actions }: ExpandedItemCardProps) {
+  if (show.mediaType === 'tv' && sectionType !== 'upToDate') return <ContinueWatchingCard show={show} layout="list" onShowClick={onShowClick} onEpisodeClick={onEpisodeClick} onMarkAsSeen={onMarkAsSeen} actions={actions} />;
+  return <ExpandedLegacyItemCard show={show} sectionType={sectionType} onShowClick={onShowClick} onEpisodeClick={onEpisodeClick} onMarkAsSeen={onMarkAsSeen} onPersonClick={onPersonClick} />;
+}
+
+function ExpandedLegacyItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMarkAsSeen, onPersonClick }: ExpandedItemCardProps) {
   const isMovie = show.mediaType === 'movie';
   const cachedMovieDetails = isMovie && show.tmdbId
     ? tmdb.peekMediaDetails(show.tmdbId, 'movie')
     : null;
-  const [movieRuntime, setMovieRuntime] = useState<number | null>((show as any).runtime || cachedMovieDetails?.runtime || null);
+  const [movieRuntime, setMovieRuntime] = useState<number | null>((show as Show & { runtime?: number }).runtime || cachedMovieDetails?.runtime || null);
   const [movieDetails, setMovieDetails] = useState<any>(cachedMovieDetails);
   const isMountedRef = useRef(true);
   const requestedMovieDetailsRef = useRef<number | null>(cachedMovieDetails ? show.tmdbId : null);

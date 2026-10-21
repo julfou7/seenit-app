@@ -3,6 +3,7 @@ import React, { startTransition, useState, useEffect, useRef, useMemo, useCallba
 import { type Show } from '../types';
 import { cn, getNextEpisodeNumber, scrollAllCarouselsToStart, checkIsUpToDate, getAiredProgress } from '../lib/utils';
 import { ContinueWatchingCard } from '../components/cards/ContinueWatchingCard';
+import type { SeriesCardAction } from '../components/cards/SeriesEpisodeCard';
 import { MovieWatchCard } from '../components/cards/MovieWatchCard';
 import { ShowNewsFeed } from '../components/ShowNewsFeed';
 import { UpToDateShowCard, getUpToDateOrNewSeasonCategory } from '../components/cards/UpToDateShowCard';
@@ -84,6 +85,11 @@ interface WatchListViewProps {
 
 export function WatchListView({ model }: WatchListViewProps) {
   const { activeTab, allShows, continueWatchingShows, executeUnfollow, expandedSection, filmsAVoirShows, handleArchiveShow, handleDropShow, handleEpisodeClick, handleEpisodeParentClick, handleToggleVoirTout, historyRef, isQuotaExceeded, loading, markMovieAsSeen, markNextEpisodeAsSeen, nouveautesShows, onShowClick, onShowClickProp, openPersonModal, pasVuDepuisUnMomentShows, pendingAction, scrollToSection, selectedEpisodeModal, selectedPersonId, setPendingAction, setSelectedEpisodeModal, setSelectedPersonId, setVisibleCount, upcomingRef, upcomingShows, visibleCount, watchNextRef } = model;
+  const seriesActions = (show: Show): SeriesCardAction[] => [
+    { label: 'Archiver la série', onSelect: () => setPendingAction({ type: 'archive', item: show }) },
+    { label: 'Abandonner la série', onSelect: () => setPendingAction({ type: 'drop', item: show }) },
+    { label: 'Retirer du suivi', destructive: true, onSelect: () => setPendingAction({ type: 'unfollow', item: show }) },
+  ];
   return (
     <div id="watchlist-container" className="flex-1 overflow-y-auto bg-transparent text-white pb-nav">
       <div className="sticky top-0 z-40 px-4 sm:px-6 pt-6 pb-4 flex flex-col gap-3 bg-zinc-950/60 backdrop-blur-xl">
@@ -220,7 +226,7 @@ export function WatchListView({ model }: WatchListViewProps) {
                         sectionType="watchNext"
                         onShowClick={onShowClick}
                         onEpisodeClick={handleEpisodeClick}
-                        onMarkAsSeen={markNextEpisodeAsSeen}
+                        onMarkAsSeen={markNextEpisodeAsSeen} actions={seriesActions(show)}
                         onPersonClick={openPersonModal}
                       />
                     </SwipeableCard>
@@ -244,7 +250,7 @@ export function WatchListView({ model }: WatchListViewProps) {
                       show={show}
                       onShowClick={onShowClick}
                       onEpisodeClick={handleEpisodeClick}
-                      onMarkAsSeen={markNextEpisodeAsSeen}
+                      onMarkAsSeen={markNextEpisodeAsSeen} actions={seriesActions(show)}
                     />
                   )}
                 />
@@ -280,7 +286,7 @@ export function WatchListView({ model }: WatchListViewProps) {
                         sectionType="watchNext"
                         onShowClick={onShowClick}
                         onEpisodeClick={handleEpisodeClick}
-                        onMarkAsSeen={markNextEpisodeAsSeen}
+                        onMarkAsSeen={markNextEpisodeAsSeen} actions={seriesActions(show)}
                         onPersonClick={openPersonModal}
                       />
                     </SwipeableCard>
@@ -304,7 +310,7 @@ export function WatchListView({ model }: WatchListViewProps) {
                       show={show}
                       onShowClick={onShowClick}
                       onEpisodeClick={handleEpisodeClick}
-                      onMarkAsSeen={markNextEpisodeAsSeen}
+                      onMarkAsSeen={markNextEpisodeAsSeen} actions={seriesActions(show)}
                     />
                   )}
                 />
@@ -340,7 +346,7 @@ export function WatchListView({ model }: WatchListViewProps) {
                         sectionType="notWatched"
                         onShowClick={onShowClick}
                         onEpisodeClick={handleEpisodeClick}
-                        onMarkAsSeen={markNextEpisodeAsSeen}
+                        onMarkAsSeen={markNextEpisodeAsSeen} actions={seriesActions(show)}
                         onPersonClick={openPersonModal}
                       />
                     </SwipeableCard>
@@ -364,7 +370,7 @@ export function WatchListView({ model }: WatchListViewProps) {
                       show={show}
                       onShowClick={onShowClick}
                       onEpisodeClick={handleEpisodeClick}
-                      onMarkAsSeen={markNextEpisodeAsSeen}
+                      onMarkAsSeen={markNextEpisodeAsSeen} actions={seriesActions(show)}
                     />
                   )}
                 />
@@ -455,6 +461,7 @@ export function WatchListView({ model }: WatchListViewProps) {
                     show={show}
                     onShowClick={onShowClick}
                     onEpisodeClick={handleEpisodeClick}
+                    actions={seriesActions(show)}
                   />
                 </SwipeableCard>
               ))}

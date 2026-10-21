@@ -17,6 +17,7 @@ async function buildProviderHarness(root) {
   fs.writeFileSync(path.join(dist, '__seenit-providers.html'), `<!doctype html><html lang="fr"><head>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     ${css.map(file => `<link rel="stylesheet" href="/assets/${file}">`).join('')}
+    <link rel="stylesheet" href="/__seenit-providers.css">
     <style>body{background:#08080c;color:white}button{padding:8px 12px;border:1px solid #777}</style>
     </head><body><div id="root"></div><script>window.__providerFixtureErrors=[];window.addEventListener('error',event=>window.__providerFixtureErrors.push(event.message));</script><script src="/__seenit-providers.js"></script></body></html>`);
 }

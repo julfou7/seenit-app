@@ -208,6 +208,15 @@ en cache sans déclencher de chargement décoratif supplémentaire ; la vue exha
 après stabilisation du geste, avec une concurrence bornée.
 Les médias abandonnés, archivés ou terminés ne reviennent pas dans le parcours actif.
 
+Les séries de ces trois rails et de leur vue « Voir tout » partagent la [carte 8f](../design/card-8f.md)
+avec À Venir et l'historique (`SEENIT-UX-014`). L'affiche inclinée déborde sur un fond teinté ; le titre
+peut occuper deux lignes. Le code épisode, son titre et les segments de saison rendent la progression
+lisible : vus en or, prochain entouré, futurs hachurés, dates inconnues signalées. Une saison longue
+utilise une barre proportionnelle. La couleur vient de l'affiche déjà chargée et les métadonnées du
+cache existant ; aucun total ou diffuseur n'est inventé. La coche marque le prochain épisode connu
+via l'action existante et son annulation. Un appui court ouvre la série ; l'appui long, le menu
+contextuel ou Maj+F10 donnent accès aux actions. Les cartes film gardent leur présentation.
+
 Sur une carte série, un swipe permet de retirer le suivi (avec confirmation) ou d'abandonner la
 série ; les actions sont aussi accessibles au clavier. Une action destructive possède un toast avec
 annulation.
@@ -217,6 +226,8 @@ annulation.
 - Liste les prochains épisodes connus avec leur date relative.
 - Ouvre directement la fiche ou le détail d'épisode.
 - Permet d'activer/désactiver un rappel pour l'épisode présenté.
+- La carte série 8f affiche le nombre de jours exact, une flamme pour aujourd'hui et la cloche d'état ;
+  cette cible de rappel est indépendante de l'ouverture de fiche.
 - Un rappel spécifique met à jour l'intention de notification du média et son document Firestore.
 - Sur Android, un rappel de nouvelle saison affiche aussi « Saison N » et un rappel de nouvel épisode
   affiche son code « Sxx | Eyy ». Si la série est en retard, le contexte visible bascule sur le prochain
@@ -227,6 +238,9 @@ annulation.
 
 - L'historique est trié depuis les `watchedAt` des épisodes/films.
 - « Marquer comme non vu » retire uniquement la progression ciblée et propose Annuler.
+- Une entrée série réutilise la carte 8f : épisode concerné mis en évidence, heure de visionnage et
+  ouverture du détail d'épisode. L'heure ouvre les actions ; « Marquer comme non vu » conserve la
+  confirmation existante et ne devient pas une coche immédiate.
 - Le fil Actualités affiche les événements non lus de séries encore présentes : nouvelle saison,
   diffusion, renouvellement/annulation et informations générées par le worker de détails.
 - Une actualité lue est retirée et son état est partagé entre appareils.

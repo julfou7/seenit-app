@@ -8,6 +8,7 @@ const mainSource = readFileSync(new URL('../src/main.tsx', import.meta.url), 'ut
 const carouselUxCss = readFileSync(new URL('../src/styles/watchlistCarouselUx.css', import.meta.url), 'utf8');
 const continueCardSource = readFileSync(new URL('../src/components/cards/ContinueWatchingCard.tsx', import.meta.url), 'utf8');
 const movieCardSource = readFileSync(new URL('../src/components/cards/MovieWatchCard.tsx', import.meta.url), 'utf8');
+const seriesCardCss = readFileSync(new URL('../src/components/cards/seriesEpisodeCard.css', import.meta.url), 'utf8');
 
 const WATCHLIST_CAROUSEL_IDS = [
   'continue-watching-carousel',
@@ -69,14 +70,11 @@ test('#229 retire le faux Voir tout terminal et conserve le vrai bouton d’en-t
   );
 });
 
-test('#269 stabilise les trois rails séries sur une ligne sans toucher aux films', () => {
-  assert.match(continueCardSource, /line-clamp-2/);
+test('#690 remplace le titre mono-ligne des séries par la 8f sans toucher aux films', () => {
+  assert.match(continueCardSource, /<SeriesEpisodeCard/);
   assert.match(movieCardSource, /line-clamp-2/);
-  assert.match(
-    carouselUxCss,
-    /:is\(\s*#continue-watching-carousel,\s*#nouveautes-carousel,\s*#pas-vu-depuis-un-moment-carousel\s*\) \.line-clamp-2\s*\{[\s\S]*?-webkit-line-clamp:\s*1;[\s\S]*?min-block-size:\s*1lh;/,
-    'Continuer, Nouveautés et Pas vu depuis un moment doivent partager le même titre mono-ligne compact'
-  );
+  assert.doesNotMatch(carouselUxCss, /-webkit-line-clamp:\s*1/);
+  assert.match(seriesCardCss, /\.series-8f__text h3,\.series-8f__text p\s*\{[^}]*-webkit-line-clamp:2/);
   assert.match(
     carouselUxCss,
     /#films-a-voir-carousel \.line-clamp-2\s*\{\s*min-block-size:\s*2lh;/,
