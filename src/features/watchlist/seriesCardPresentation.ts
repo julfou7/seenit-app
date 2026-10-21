@@ -5,6 +5,12 @@ export interface SeriesCardEpisode {
   episode_number: number;
   episode_count?: number | null;
   aired_episodes_in_season?: number | null;
+  known_episodes_in_season?: number | null;
+  season_total_unknown?: boolean | null;
+  last_season_number?: number | null;
+  last_known_episode_type?: string | null;
+  last_known_episode_air_date?: string | null;
+  episode_type?: string | null;
   name?: string | null;
   air_date?: string | null;
 }
@@ -12,7 +18,7 @@ export interface SeriesCardEpisode {
 interface SeasonData {
   season_number: number;
   episode_count?: number;
-  episodes?: Array<{ episode_number: number; air_date?: string | null }>;
+  episodes?: Array<{ episode_number: number; air_date?: string | null; episode_type?: string | null }>;
 }
 
 export type SeasonSegmentState = 'seen' | 'current' | 'unseen' | 'future' | 'history' | 'unknown';
@@ -22,10 +28,75 @@ export interface SeriesSeasonProgress {
   description: string;
   continuous: boolean;
   segments: SeasonSegment[];
+  totalUnknown: boolean;
+  unknownTail: boolean;
+  knownEpisodes: number;
+  availableUnseen: number;
+  detail?: string;
 }
 
 function count(value: unknown): number | null {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 10_000 ? value : null;
+}
+
+function normalizeEpisodeKey(key: string): { season: number; episode: number } | null {
+  const match = /^(?:s\s*)?(\d+)\s*(?:x|e)\s*(\d+)$/i.exec(key.trim());
+  if (!match) return null;
+  const season = Number(match[1]);
+  const episode = Number(match[2]);
+  return Number.isInteger(season) && Number.isInteger(episode) && episode > 0 ? { season, episode } : null;
+}
+
+function timestamp(value: unknown): number {
+  if (!value) return 0;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return 0;
+    return value > 0 && value < 10_000_000_000 ? value * 1000 : value;
+  }
+  if (typeof value === 'string') {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 0) return numeric < 10_000_000_000 ? numeric * 1000 : numeric;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  if (typeof value === 'object') {
+    const candidate = value as { toMillis?: () => number; seconds?: number; _seconds?: number };
+    if (typeof candidate.toMillis === 'function') {
+      const millis = candidate.toMillis();
+      return Number.isFinite(millis) ? millis : 0;
+    }
+    const seconds = candidate.seconds ?? candidate._seconds;
+    return typeof seconds === 'number' && Number.isFinite(seconds) ? seconds * 1000 : 0;
+  }
+  return 0;
+}
+
+function calendarDayIndex(value: number): number {
+  const date = new Date(value);
+  return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000);
+}
+
+export function seriesCardStaleDetail(
+  show: Pick<Show, 'seenEpisodes' | 'episodeRecords' | 'lastWatchedAt'>,
+  now = Date.now(),
+): string | undefined {
+  const seen = new Set((show.seenEpisodes || []).flatMap(key => {
+    const normalized = normalizeEpisodeKey(key);
+    return normalized ? [`${normalized.season}x${normalized.episode}`] : [];
+  }));
+  if (seen.size === 0) return undefined;
+
+  let latest = timestamp(show.lastWatchedAt);
+  for (const [key, record] of Object.entries(show.episodeRecords || {})) {
+    const normalized = normalizeEpisodeKey(key);
+    if (!normalized || !seen.has(`${normalized.season}x${normalized.episode}`)) continue;
+    latest = Math.max(latest, timestamp(record?.watchedAt));
+  }
+  if (!latest || latest > now) return undefined;
+
+  const days = Math.max(0, calendarDayIndex(now) - calendarDayIndex(latest));
+  if (days <= 60) return undefined;
+  return `⏳ Il y a ${days} jour${days > 1 ? 's' : ''}`;
 }
 
 export function seriesEpisodeCode(episode: SeriesCardEpisode): string {
@@ -33,31 +104,78 @@ export function seriesEpisodeCode(episode: SeriesCardEpisode): string {
 }
 
 export function buildSeriesSeasonProgress(
-  show: Pick<Show, 'seenEpisodes' | 'seasonsCache' | 'nextEpisodeToWatch' | 'nextEpisodeToAir'>,
+  show: Pick<Show, 'seenEpisodes' | 'seasonsCache' | 'nextEpisodeToWatch' | 'nextEpisodeToAir' | 'seriesEnded' | 'tmdbStatus'>,
   episode: SeriesCardEpisode,
   context: 'watch' | 'upcoming' | 'history',
   today: string,
 ): SeriesSeasonProgress {
   const season = episode.season_number;
-  const pointers = [episode, show.nextEpisodeToWatch, show.nextEpisodeToAir]
-    .filter((pointer): pointer is SeriesCardEpisode => pointer?.season_number === season);
-  const cached = (show.seasonsCache as SeasonData[] | undefined)?.find(item => item.season_number === season);
-  const total = pointers.map(pointer => count(pointer.episode_count)).find(value => value !== null && value > 0)
-    ?? count(cached?.episode_count) ?? count(cached?.episodes?.length);
-  const seen = new Set((show.seenEpisodes || []).flatMap(key => {
-    const match = /^(?:s\s*)?(\d+)\s*(?:x|e)\s*(\d+)$/i.exec(key.trim());
-    return match && Number(match[1]) === season && Number(match[2]) > 0 ? [Number(match[2])] : [];
-  }));
-  const watched = [...seen].filter(number => total === null || number <= total).length;
-  const label = `S${season} · ${watched}/${total ?? '—'}`;
-  if (!total) return { label, description: `Saison ${season}, ${watched} vus, total inconnu`, continuous: false, segments: [] };
+  const allPointers = [episode, show.nextEpisodeToWatch, show.nextEpisodeToAir]
+    .filter((pointer): pointer is SeriesCardEpisode => Boolean(pointer && typeof pointer.season_number === 'number'));
+  const pointers = allPointers.filter(pointer => pointer.season_number === season);
+  const cachedSeasons = (show.seasonsCache as SeasonData[] | undefined) || [];
+  const cached = cachedSeasons.find(item => item.season_number === season);
+
+  const seenEntries = (show.seenEpisodes || []).flatMap(key => {
+    const normalized = normalizeEpisodeKey(key);
+    return normalized ? [normalized] : [];
+  });
+  const seen = new Set(seenEntries.filter(item => item.season === season).map(item => item.episode));
+
+  const advertisedTotal = pointers.map(pointer => count(pointer.episode_count)).find(value => value !== null && value > 0)
+    ?? count(cached?.episode_count)
+    ?? null;
+  const cachedKnown = Math.max(0, ...(cached?.episodes || []).map(item => count(item.episode_number) || 0));
+  const pointerKnown = Math.max(0, ...pointers.map(pointer => count(pointer.known_episodes_in_season) || 0));
+  const seenKnown = Math.max(0, ...[...seen]);
+  const sameSeasonNextToAir = show.nextEpisodeToAir as SeriesCardEpisode | undefined;
+  const knownEpisodes = Math.max(
+    1,
+    episode.episode_number,
+    cachedKnown,
+    pointerKnown,
+    seenKnown,
+    sameSeasonNextToAir?.season_number === season ? sameSeasonNextToAir.episode_number : 0,
+    advertisedTotal || 0,
+  );
+
+  const statusEnded = show.seriesEnded === true || show.tmdbStatus === 'Ended' || show.tmdbStatus === 'Canceled';
+  const lastSeasonNumber = Math.max(
+    season,
+    ...allPointers.map(pointer => count(pointer.last_season_number) || pointer.season_number || 0),
+    ...cachedSeasons.map(item => item.season_number || 0),
+    ...seenEntries.map(item => item.season),
+  );
+  const isLatestSeason = season === lastSeasonNumber;
+  const explicitUnknown = pointers.some(pointer => pointer.season_total_unknown === true);
+  const explicitKnown = pointers.some(pointer => pointer.season_total_unknown === false);
+  const cachedLast = [...(cached?.episodes || [])]
+    .filter(item => typeof item.episode_number === 'number')
+    .sort((a, b) => b.episode_number - a.episode_number)[0];
+  const lastKnownType = pointers.map(pointer => pointer.last_known_episode_type || pointer.episode_type).find(Boolean)
+    || cachedLast?.episode_type
+    || null;
+  const lastKnownAirDate = pointers.map(pointer => pointer.last_known_episode_air_date).find(Boolean)
+    || cachedLast?.air_date
+    || null;
+  const nextAirSameSeason = sameSeasonNextToAir?.season_number === season;
+  const providerCountLooksOpen = Boolean(nextAirSameSeason && advertisedTotal && advertisedTotal === knownEpisodes);
+
+  const unknownTail = !statusEnded && isLatestSeason && (
+    explicitUnknown
+    || (!explicitKnown && (lastKnownType !== 'finale' || !lastKnownAirDate || providerCountLooksOpen))
+  );
+  const totalUnknown = unknownTail || advertisedTotal === null;
+  const renderTotal = Math.max(1, totalUnknown ? knownEpisodes : (advertisedTotal || knownEpisodes));
+  const watched = [...seen].filter(number => number <= renderTotal).length;
+  const label = `S${season} · ${watched}/${totalUnknown ? '?' : renderTotal}`;
 
   const aired = pointers.map(pointer => count(pointer.aired_episodes_in_season)).find(value => value !== null);
   const nextToAir = show.nextEpisodeToAir as SeriesCardEpisode | undefined;
   const episodeDates = new Map(cached?.episodes?.map(item => [item.episode_number, item.air_date]));
   const counts: Record<SeasonSegmentState, number> = { seen: 0, current: 0, unseen: 0, future: 0, history: 0, unknown: 0 };
   const segments: SeasonSegment[] = [];
-  for (let number = 1; number <= total; number += 1) {
+  for (let number = 1; number <= renderTotal; number += 1) {
     const cachedAirDate = episodeDates.get(number);
     const isTarget = number === episode.episode_number;
     let state: SeasonSegmentState;
@@ -70,15 +188,32 @@ export function buildSeriesSeasonProgress(
     else if (episode.air_date && episode.air_date <= today && number < episode.episode_number) state = 'unseen';
     else state = 'unknown';
     counts[state] += 1;
-    if (total <= 30) segments.push({ state, count: 1, episode: number });
+    if (renderTotal <= 30) segments.push({ state, count: 1, episode: number });
   }
+
+  const watchedAired = aired === undefined || aired === null ? 0 : [...seen].filter(number => number <= aired).length;
+  const availableUnseen = aired === undefined || aired === null
+    ? counts.unseen + (context === 'watch' && counts.current > 0 ? counts.current : 0)
+    : Math.max(0, aired - watchedAired);
+  const detail = unknownTail && context === 'watch'
+    ? (availableUnseen > 0 ? `${availableUnseen} dispo · total inconnu` : 'suite annoncée · total inconnu')
+    : undefined;
+  const description = unknownTail
+    ? `Saison ${season} : ${watched} épisode${watched > 1 ? 's' : ''} vu${watched > 1 ? 's' : ''} sur ${renderTotal} connu${renderTotal > 1 ? 's' : ''}, nombre total encore inconnu`
+    : `Saison ${season}, ${watched} épisodes vus sur ${renderTotal}, ${counts.future} à venir, ${counts.unknown} diffusions à confirmer`;
+
   return {
     label,
-    description: `Saison ${season}, ${watched} épisodes vus sur ${total}, ${counts.future} à venir, ${counts.unknown} diffusions à confirmer`,
-    continuous: total > 30,
-    segments: total > 30
+    description,
+    continuous: renderTotal > 30,
+    segments: renderTotal > 30
       ? (Object.entries(counts) as Array<[SeasonSegmentState, number]>).filter(([, amount]) => amount > 0).map(([state, amount]) => ({ state, count: amount }))
       : segments,
+    totalUnknown,
+    unknownTail,
+    knownEpisodes: renderTotal,
+    availableUnseen,
+    detail,
   };
 }
 

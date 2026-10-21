@@ -56,9 +56,12 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
   useEffect(() => cancel, []);
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const progress = episode ? buildSeriesSeasonProgress(show, episode, context.kind, today) : { label: 'À actualiser', description: 'Épisode de reprise à confirmer', continuous: false, segments: [] };
+  const progress = episode ? buildSeriesSeasonProgress(show, episode, context.kind, today) : {
+    label: 'À actualiser', description: 'Épisode de reprise à confirmer', continuous: false, segments: [], totalUnknown: true, unknownTail: false, knownEpisodes: 0, availableUnseen: 0,
+  };
   const code = episode ? seriesEpisodeCode(episode) : 'Épisode à confirmer';
-  const visibleDetail = detail?.trim() && !REMAINING_DETAIL.test(detail) ? detail.trim() : undefined;
+  const requestedDetail = detail?.trim() && !REMAINING_DETAIL.test(detail) ? detail.trim() : undefined;
+  const visibleDetail = requestedDetail || progress.detail;
   const detailIsBadge = visibleDetail ? BADGE_DETAIL.test(visibleDetail) : false;
   const watchedDate = context.kind === 'history' ? new Date(context.watchedAt) : null;
   const validWatchedDate = watchedDate && Number.isFinite(watchedDate.getTime());
@@ -110,6 +113,7 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
       <div className="series-8f__season">
         <div className={`series-8f__segments${progress.continuous ? ' series-8f__segments--continuous' : ''}`} role="img" aria-label={progress.description}>
           {progress.segments.map((segment, index) => <span key={index} className={`series-8f__segment series-8f__segment--${segment.state}`} style={{ flexGrow: segment.count }} title={`${segment.episode ? `Épisode ${segment.episode} : ` : ''}${segmentNames[segment.state]}`} />)}
+          {progress.unknownTail && <><span className="series-8f__unknown-tail" aria-hidden="true" /><span className="series-8f__unknown-mark" aria-hidden="true" title="Nombre d'épisodes encore inconnu">?</span></>}
         </div>
         {providerLogo && <button type="button" className="series-8f__provider" aria-label={`Où regarder ${show.title} : ${providerName || 'diffuseur'}`} onClick={onOpenSeries || onOpen}><img src={providerLogo} alt="" loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} /></button>}
       </div>

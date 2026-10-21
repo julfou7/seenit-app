@@ -3,8 +3,10 @@
 Demande du 21 octobre 2026, suivi #690. Référence fournie par le propriétaire :
 `Connexion du repository seenit-app.zip`, `handoff-8f/SPEC-CARTE-8F.md`, le prototype
 `handoff-8f/SeenIt Card8f.dc.html` et la section `#8f` de `SeenIt Cartes.dc.html`.
-Les retours terrain du propriétaire sur les APK 1.4.212/1.4.213/1.4.214 priment sur les passages
-plus anciens du handoff en cas de contradiction.
+Le complément terrain `handoff-episodes-inconnus/SPEC-EPISODES-INCONNUS.md` précise le cas
+d'une dernière saison ouverte dont seuls quelques épisodes sont encore connus. Les retours
+terrain du propriétaire sur les APK 1.4.212 à 1.4.215 priment sur les passages plus anciens
+du handoff en cas de contradiction.
 
 La carte partagée mesure 156 px, avec 20 px réservés au débordement de l'affiche.
 Affiche 86 × 129 px inclinée de −3°, à gauche 14 px et en haut −20 px ; fond arrondi
@@ -14,15 +16,32 @@ est blanc et 13 px/800. Le titre d'épisode reste blanc 14 px/600 sur deux ligne
 
 Le compteur textuel `N restant(s)` est supprimé de la carte : l'espace est réservé aux
 badges contextuels. Pour un épisode de reprise diffusé récemment, la carte peut afficher
-`🔥 Sorti aujourd’hui`, `🌟 Sorti hier` ou `🆕 Il y a N jours`. Les compteurs de retard
-restent autorisés dans les notifications, où ils répondent à un autre besoin.
+`🔥 Sorti aujourd’hui`, `🌟 Sorti hier` ou `🆕 Il y a N jours`. Dans `Pas vu depuis un moment`,
+si la série a déjà été commencée et que le dernier visionnage prouvé date de plus de 60 jours,
+la même zone peut rappeler `⏳ Il y a N jours`. Cette valeur vient des épisodes encore marqués vus
+et de `lastWatchedAt`, jamais d'une simple date de mise à jour. Les compteurs de retard restent
+autorisés dans les notifications, où ils répondent à un autre besoin.
 
 Le libellé redondant `S5 · 3/8` sous l'affiche est supprimé. La ligne basse contient seulement
 les segments de progression et, lorsqu'il est connu, le logo diffuseur 26 × 26 px dans une
 cible de 44 px. Un épisode vu est or, le prochain a un contour blanc, un futur est hachuré ;
 l'entrée d'historique est mise en évidence. Une diffusion inconnue reste explicitement inconnue.
 Au-delà de 30 épisodes, une barre continue exprime les proportions sans multiplier le DOM.
-L'absence de taille de saison ne doit jamais produire un faux total.
+L'absence de taille de saison ne doit jamais produire un faux total ni une ligne de progression vide :
+la carte rend au minimum les épisodes dont l'existence est prouvée par le prochain épisode, les
+épisodes vus ou les pointeurs de diffusion connus.
+
+Pour la dernière saison d'une série non `Ended`/`Canceled`, SeenIt traite le total comme inconnu
+lorsque les métadonnées disponibles ne prouvent pas une fin de saison. Les épisodes connus gardent
+leurs segments puis une traîne hachurée `repeating-linear-gradient(90deg,#52525B 0 4px,transparent 4px 8px)`
+s'efface vers la droite et se termine par `?`, avec le titre « Nombre d'épisodes encore inconnu ».
+L'accessibilité annonce par exemple « Saison 1 : 2 épisodes vus sur 4 connus, nombre total encore
+inconnu ». Dans un contexte de reprise, si aucun badge plus spécifique n'est prioritaire, la ligne
+secondaire affiche `N dispo · total inconnu` ou `suite annoncée · total inconnu`. Sont interdits dans
+cet état : « saison finie », `N restants` et tout total numérique présenté comme définitif. Les
+nouveaux épisodes remplacent progressivement la traîne ; une preuve explicite de finale ou un statut
+final de série permet de revenir au comportement à total connu. En l'absence de cette preuve, le `?`
+reste préférable à une complétude inventée. Cette règle reprend et généralise le garde-fou #659.
 
 Dans les trois rails séries réduits de À Regarder (`Continuer`, `Nouveautés`, `Pas vu depuis`),
 le défilement n'est plus libre : `scroll-snap-type: x mandatory`, chaque carte est un arrêt

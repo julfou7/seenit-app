@@ -8,7 +8,7 @@ Object.assign(window, { __series8f: telemetry });
 const base: Show = {
   id: 'series-8f', userId: 'fixture', tmdbId: 66732, title: 'Stranger Things', mediaType: 'tv',
   posterPath: 'http://127.0.0.1:4173/__8f-poster.svg', backdropPath: 'http://127.0.0.1:4173/__8f-backdrop.svg',
-  status: 'watching', isArchived: false, createdAt: 1, updatedAt: 1,
+  status: 'watching', isArchived: false, createdAt: 1, updatedAt: 1, seriesEnded: true, tmdbStatus: 'Ended',
   seenEpisodes: ['5x1', '5x2', '5x3'], episodeRecords: {},
   nextEpisodeToWatch: { season_number: 5, episode_number: 4, episode_count: 8, aired_episodes_in_season: 8, name: 'Sorcerer' },
 };
@@ -21,6 +21,16 @@ function Harness() {
   const [pending, setPending] = useState(false);
   const show = marked ? { ...base, seenEpisodes: [...base.seenEpisodes, '5x4'] } : base;
   const next = { ...base.nextEpisodeToWatch!, episode_number: marked ? 5 : 4 };
+  const harryEpisode = {
+    season_number: 1, episode_number: 3, episode_count: 4, aired_episodes_in_season: 3,
+    known_episodes_in_season: 4, season_total_unknown: true, last_season_number: 1,
+    last_known_episode_type: 'standard', last_known_episode_air_date: null, name: 'Épisode 3',
+  };
+  const harry = {
+    ...base, id: 'harry-potter', title: 'Harry Potter', seriesEnded: false, tmdbStatus: 'Returning Series',
+    seenEpisodes: ['1x1', '1x2'], nextEpisodeToWatch: harryEpisode,
+    nextEpisodeToAir: { season_number: 1, episode_number: 4, episode_count: 4, air_date: '2026-11-01' },
+  } as Show;
   return <main style={{ padding: '20px 16px', maxWidth: 452, margin: 'auto' }}>
     <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 16 }}>Cartes séries · 8f</h1>
     <section id="watch" className="series-8f-host"><SeriesEpisodeCard show={show} episode={next} detail="5 restants" providerLogo={provider} providerName="Netflix" onOpen={open} onOpenEpisode={episode}
@@ -31,7 +41,7 @@ function Harness() {
     <section id="history" className="series-8f-host"><SeriesEpisodeCard show={{ ...base, title: 'Breaking Bad' }} episode={{ ...next, episode_number: 3, name: 'Le crime paie' }} detail="lundi 15 juin" providerLogo={provider} providerName="Netflix" onOpen={episode} onOpenSeries={open} onOpenEpisode={episode} context={{ kind: 'history', watchedAt: new Date(2026, 5, 15, 22, 7).getTime(), onUnseen: () => { telemetry.unseen++; } }} /></section>
     <section id="season-24" className="series-8f-host"><SeriesEpisodeCard show={{ ...base, title: 'Saison de 24 épisodes' }} episode={{ ...next, episode_count: 24 }} onOpen={open} context={{ kind: 'watch', upToDate: true }} /></section>
     <section id="season-40" className="series-8f-host"><SeriesEpisodeCard show={{ ...base, title: 'Saison de 40 épisodes', posterPath: 'http://127.0.0.1:4173/__8f-absent.jpg' }} episode={{ ...next, episode_count: 40 }} onOpen={open} context={{ kind: 'watch', onMarkSeen: () => {} }} /></section>
-    <section id="unknown" className="series-8f-host"><SeriesEpisodeCard show={{ ...base, title: 'Métadonnées absentes', posterPath: null, backdropPath: null, nextEpisodeToWatch: null, nextEpisodeToAir: null }} episode={{ season_number: 1, episode_number: 1 }} onOpen={open} context={{ kind: 'watch', upToDate: true }} /></section>
+    <section id="unknown" className="series-8f-host"><SeriesEpisodeCard show={harry} episode={harryEpisode} onOpen={open} providerLogo={provider} providerName="Max" context={{ kind: 'watch' }} /></section>
   </main>;
 }
 createRoot(document.getElementById('root')!).render(<Harness />);

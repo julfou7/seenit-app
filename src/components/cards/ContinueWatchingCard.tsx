@@ -4,7 +4,7 @@ import { getCalendarDaysDiff, getTodayStr } from '../../lib/utils';
 import { getFormattedProviderLogo } from '../../utils/providerLogos';
 import { usePassiveWatchProvider } from '../../hooks/usePassiveWatchProvider';
 import { hasAiredEpisodeEvidence } from '../../features/watchlist/watchAvailability';
-import type { SeriesCardEpisode } from '../../features/watchlist/seriesCardPresentation';
+import { seriesCardStaleDetail, type SeriesCardEpisode } from '../../features/watchlist/seriesCardPresentation';
 import { resolveWatchCardResume } from '../../features/watchlist/watchCardResume';
 import { SeriesEpisodeCard, type SeriesCardAction } from './SeriesEpisodeCard';
 
@@ -49,12 +49,13 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
   const rawPath = episodeStill || currentSeasonArtwork || showBackdrop || showPoster;
   const openEpisode = onEpisodeClick && nextEpNum ? () => onEpisodeClick(show, nextEpNum.season_number, nextEpNum.episode_number) : undefined;
   const freshnessBadge = isUpToDate ? undefined : episodeFreshnessBadge(nextEpNum, todayStr);
+  const staleDetail = seriesCardStaleDetail(show);
   return <div ref={cardRef} className="series-8f-host">
     <SeriesEpisodeCard
       show={{ ...show, backdropPath: rawPath }}
       episode={nextEpNum ? { ...nextEpNum, name: nextEpNum.name || cachedEpisode?.name } : null}
       context={{ kind: 'watch', upToDate: isUpToDate, onMarkSeen: nextEpNum ? () => onMarkAsSeen(show) : undefined }}
-      detail={freshnessBadge}
+      detail={freshnessBadge || staleDetail}
       providerLogo={getFormattedProviderLogo(providerLogo, providerName)} providerName={providerName}
       onOpen={() => { if (onShowClick) onShowClick(show.id, 'tv'); else openEpisode?.(); }}
       onOpenEpisode={openEpisode} actions={actions} layout={layout}
