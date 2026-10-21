@@ -2078,7 +2078,10 @@
     {
       "id": "SEENIT-UX-015",
       "title": "Historique mixte 16d par jour, heure prouvée et actions réversibles",
-      "targets": ["pwa", "apk"],
+      "targets": [
+        "pwa",
+        "apk"
+      ],
       "tests": [
         {
           "file": "tests/history16d.test.ts",
