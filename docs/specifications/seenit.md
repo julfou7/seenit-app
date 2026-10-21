@@ -1165,6 +1165,14 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
 - Les dialogues critiques utilisent un rôle adapté, sont fermables par Échap, placent le focus
   sur une action et ne déclenchent aucune suppression sans confirmation quand le transfert est
   actif.
+- **SEENIT-UX-014** — Les séries de À voir, À venir et Historique partagent la carte 8f :
+  affiche débordante, teinte locale mise en cache, titre sur deux lignes et progression de saison.
+  Vu, prochain, futur et entrée d'historique se distinguent autrement que par la couleur ; les saisons
+  longues utilisent une barre proportionnelle, les totaux et diffusions inconnus ne sont pas inventés.
+  La coche Vu, le rappel et les actions d'historique sont des contrôles séparés d'au moins 44 px.
+  Les opérations réutilisent leurs handlers et Annuler existants. Appui long, menu contextuel et clavier
+  partagent les mêmes actions, sans clic d'ouverture après un appui long ni timer persistant au scroll.
+  La carte conserve les rails libres/virtualisés et se réutilise en liste, sans modifier les films.
 - **SEENIT-UX-012** — Un dialogue nommé utilise une pile commune : Échap, Retour Android et appui
   sur l'onglet actif ferment un seul niveau. Le focus reste contenu puis revient au déclencheur ;
   le fond est inerte et une confirmation destructive focalise Garder/Annuler. Les portails sont

@@ -138,6 +138,17 @@ obligation d'architecture. Les cartes et en-têtes consomment ces rôles plutôt
 
 ## 5. Cartes — contrat SEENIT-UX-009 / #180
 
+### Carte série 8f — #690
+
+La [carte 8f](../design/card-8f.md) devient le socle partagé des séries dans À voir,
+À venir et Historique : affiche débordante, fond teinté, titre sur deux lignes,
+code saison/épisode explicite et saison segmentée. Seule l'action de contexte change.
+Les carrousels restent libres/virtualisés ; leurs cartes utilisent la largeur mobile
+utile pour conserver la lisibilité de la composition. Les listes utilisent la même carte.
+Les films ne sont pas migrés dans ce lot. Les états de diffusion inconnus, les absences
+d'image et les saisons longues gardent un rendu honnête et accessible. Le traitement
+local de couleur utilise l'affiche déjà chargée et un cache borné, sans appel fournisseur.
+
 L'action d'ouverture de fiche et les actions rapides sont deux zones distinctes, accessibles au
 clavier et sans bouton imbriqué dans un autre bouton. Entrée/Espace ouvre la fiche focalisée ; agir
 sur Vu, favori ou téléchargement ne doit pas ouvrir aussi la fiche. Les raccourcis ne capturent jamais

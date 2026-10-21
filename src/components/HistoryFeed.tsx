@@ -8,6 +8,7 @@ import { getFormattedProviderLogo } from '../utils/providerLogos';
 import { useToastStore } from '../store/toastStore';
 import { cn, scrollAllCarouselsToStart } from '../lib/utils';
 import { usePassiveWatchProvider } from '../hooks/usePassiveWatchProvider';
+import { SeriesEpisodeCard } from './cards/SeriesEpisodeCard';
 import {
   createWatchProviderRequestLimiter,
   scheduleWatchProviderCardEnrichment,
@@ -48,7 +49,8 @@ function HistoryRowItem({
   epTitle,
   onShowClick,
   onEpisodeClick,
-  setUnseenModalItem
+  setUnseenModalItem,
+  show
 }: {
   key?: string;
   item: HistoryItem;
@@ -57,6 +59,7 @@ function HistoryRowItem({
   onShowClick?: (id: string, mediaType?: 'tv' | 'movie') => void;
   onEpisodeClick?: (showId: string, season: number, episode: number) => void;
   setUnseenModalItem: (item: HistoryItem) => void;
+  show?: Show;
 }) {
   const { cardRef, providerLogo, providerName } = usePassiveWatchProvider({
     tmdbId: item.tmdbId,
@@ -78,6 +81,15 @@ function HistoryRowItem({
       }
     }
   };
+
+  if (item.mediaType !== 'movie' && show) return <div ref={cardRef} className="series-8f-host">
+    <SeriesEpisodeCard show={show} episode={{ season_number: item.season, episode_number: item.episode, name: epTitle }}
+      context={{ kind: 'history', watchedAt: item.watchedAt, onUnseen: () => setUnseenModalItem(item) }}
+      detail={new Date(item.watchedAt).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' })}
+      providerLogo={networkLogo} providerName={providerName}
+      onOpen={handleRowClick} onOpenEpisode={handleRowClick}
+      onOpenSeries={() => onShowClick?.(item.showId, 'tv')} />
+  </div>;
 
   return (
     <div
@@ -163,6 +175,7 @@ export function HistoryFeed({
   const itemsPerPage = 20;
 
   const { shows, loading, updateShow } = useShows();
+  const showsById = useMemo(() => new Map(shows.map(show => [show.id, show])), [shows]);
   const { showToast } = useToastStore();
   const [fetchedEpisodeTitles, setFetchedEpisodeTitles] = useState<Record<string, string>>({});
   const [unseenModalItem, setUnseenModalItem] = useState<HistoryItem | null>(null);
@@ -353,7 +366,7 @@ export function HistoryFeed({
     } else {
       let epDetails: any = null;
       if (targetShow.seasonsCache && Array.isArray(targetShow.seasonsCache)) {
-        const s = targetShow.seasonsCache.find((sc: any) => sc.season_number === item.season);
+        const s = targetShow.seasonsCache.find(sc => sc.season_number === item.season);
         if (s && Array.isArray(s.episodes)) {
           epDetails = s.episodes.find((e: any) => e.episode_number === item.episode);
         }
@@ -444,6 +457,7 @@ export function HistoryFeed({
           <HistoryRowItem
             key={`${item.showId}-${item.season}x${item.episode}-${idx}`}
             item={item}
+            show={showsById.get(item.showId)}
             idx={idx}
             epTitle={epTitle}
             onShowClick={onShowClick}

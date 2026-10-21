@@ -5,6 +5,7 @@ const path = require('node:path');
 const esbuild = require('esbuild');
 const { buildDialogHarness, testDialogHarness } = require('./dialog-browser-checks.cjs');
 const { buildProviderHarness, testProviderHarness } = require('./provider-browser-checks.cjs');
+const { buildSeriesCardHarness, testSeriesCardHarness } = require('./series-card-browser-checks.cjs');
 
 const root = path.resolve(__dirname, '..');
 const configPath = path.join(root, 'docs', 'specifications', 'quality-gates.json');
@@ -485,6 +486,7 @@ async function main() {
     await buildComponentActionHarness();
     await buildDialogHarness(root);
     await buildProviderHarness(root);
+    await buildSeriesCardHarness(root);
     const viteBin = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
     if (!fs.existsSync(viteBin)) throw new Error('Vite installé requis avant le smoke navigateur.');
     preview = spawn(process.execPath, [viteBin, 'preview', '--host', '127.0.0.1', '--port', '4173', '--strictPort'], {
@@ -541,6 +543,7 @@ async function main() {
     const report = {
       dialogs: await testDialogHarness(client, root),
       providers: await testProviderHarness(client, root),
+      seriesCards: await testSeriesCardHarness(client, root),
       generatedAt: new Date().toISOString(),
       issue: config.issue,
       status: 'pass',
@@ -562,6 +565,7 @@ async function main() {
       '- #180 : comparaison rendue avant/après à 360/412 px, cible 44 px, action inverse, pending/disabled et double intention contrôlés.',
       '- #180 : captures `component-actions-before-after-mobile-360.png` et `component-actions-before-after-mobile-412.png`.',
       '- #337 : cartes de production, cache hérité, hydratation session et bascule ON/OFF/ON sans remontage ni requête doublée, à 360/412 px.',
+      '- #690 : carte 8f réelle à 360/412/1280 px, cibles 44 px, progression, rappels, historique, clavier et appui long isolés.',
       '',
     ].join('\n'), 'utf8');
     console.log('[PWA Browser] ✅ rendu 360/412/desktop, clavier, cible tactile, arbre d’accessibilité, actions #180, dialogues #181 et cartes/diffuseurs réactifs #337 validés.');

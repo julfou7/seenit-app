@@ -5,10 +5,8 @@
  * React ne garde qu'une fenêtre DOM bornée et les espaceurs préservent
  * la position horizontale.
  *
- * Les trois rails séries sont volontairement compacts : leur titre est
- * stabilisé sur une seule ligne, car les lignes épisode/action et "Vu"
- * apportent déjà le contexte. "Films à voir" conserve deux lignes de titre,
- * sa carte n'ayant pas ces lignes de contexte supplémentaires.
+ * Les séries utilisent désormais le composant 8f et son titre sur deux
+ * lignes. "Films à voir" conserve son propre slot titre sur deux lignes.
  */
 :is(
   #continue-watching-carousel,
@@ -17,15 +15,6 @@
   #films-a-voir-carousel
 ) {
   scroll-snap-type: none !important;
-}
-
-:is(
-  #continue-watching-carousel,
-  #nouveautes-carousel,
-  #pas-vu-depuis-un-moment-carousel
-) .line-clamp-2 {
-  -webkit-line-clamp: 1;
-  min-block-size: 1lh;
 }
 
 #films-a-voir-carousel .line-clamp-2 {
