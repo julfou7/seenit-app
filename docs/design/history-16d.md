@@ -14,6 +14,8 @@ Le titre de groupe est l'unique endroit où la date calendaire est affichée. À
 les entrées avec une heure connue sont triées par heure décroissante ; une heure inconnue n'est jamais
 fabriquée pour l'interface.
 
+Une date seule, même explicite, ne constitue pas une heure. Le calcul de « Hier » suit le calendrier
+local et non une soustraction de 24 heures au passage heure d'été/hiver.
 Une donnée legacy sans `watchedAt` explicite peut conserver un jour de repli afin de ne pas disparaître
 de l'historique, mais ce repli ne devient pas une heure de visionnage. L'interface masque alors l'heure
 et affiche uniquement la coche décorative. `00:00` et l'heure courante ne sont jamais inventés.
@@ -64,6 +66,10 @@ L'identité reste `mediaType + TMDB ID`. Le titre, l'année ou la position dans 
 requêtes passives restent bornées et réutilisent les caches existants. Le diffuseur continue d'utiliser
 le résolveur SeenIt existant ; une provenance Plex explicitement persistée peut forcer le visuel Plex pour
 ce visionnage, sinon la préférence de plateforme existante s'applique.
+`Revoir` utilise cette résolution et le cache public existant ; il ne lance pas de seconde requête
+directe aux plateformes. À défaut de destination connue, l'utilisateur peut ouvrir la fiche exacte.
+Les variantes de clé épisode sont normalisées avant déduplication et mutation. Lorsque la liste
+`seenEpisodes` existe, elle fait foi : un record orphelin ne ressuscite pas un épisode retiré.
 
 Les écritures de changement d'horodatage et de retrait non vu conservent les autres métadonnées du record,
 recalculent `lastWatchedAt` à partir des preuves restantes et offrent un rollback utilisateur. PWA et APK

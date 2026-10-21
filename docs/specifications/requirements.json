@@ -2064,6 +2064,25 @@
       ]
     },
     {
+      "id": "SEENIT-UX-015",
+      "title": "Historique mixte 16d par jour, heure prouvée et actions réversibles",
+      "targets": ["pwa", "apk"],
+      "tests": [
+        {
+          "file": "tests/history16d.test.ts",
+          "contains": "SEENIT-UX-015 ne fabrique jamais une heure de visionnage legacy"
+        },
+        {
+          "file": "tests/history16d.test.ts",
+          "contains": "SEENIT-UX-015 groupe les jours"
+        },
+        {
+          "file": "tests/history16d.test.ts",
+          "contains": "SEENIT-UX-015 normalise les preuves"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-UX-012",
       "title": "Pile de dialogues, focus et safe areas partagés",
       "targets": [

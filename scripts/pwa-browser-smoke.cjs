@@ -6,6 +6,7 @@ const esbuild = require('esbuild');
 const { buildDialogHarness, testDialogHarness } = require('./dialog-browser-checks.cjs');
 const { buildProviderHarness, testProviderHarness } = require('./provider-browser-checks.cjs');
 const { buildSeriesCardHarness, testSeriesCardHarness } = require('./series-card-browser-checks.cjs');
+const { buildHistoryHarness, testHistoryHarness } = require('./history-browser-checks.cjs');
 
 const root = path.resolve(__dirname, '..');
 const configPath = path.join(root, 'docs', 'specifications', 'quality-gates.json');
@@ -487,6 +488,7 @@ async function main() {
     await buildDialogHarness(root);
     await buildProviderHarness(root);
     await buildSeriesCardHarness(root);
+    await buildHistoryHarness(root);
     const viteBin = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
     if (!fs.existsSync(viteBin)) throw new Error('Vite installé requis avant le smoke navigateur.');
     preview = spawn(process.execPath, [viteBin, 'preview', '--host', '127.0.0.1', '--port', '4173', '--strictPort'], {
@@ -544,6 +546,7 @@ async function main() {
       dialogs: await testDialogHarness(client, root),
       providers: await testProviderHarness(client, root),
       seriesCards: await testSeriesCardHarness(client, root),
+      history: await testHistoryHarness(client, root),
       generatedAt: new Date().toISOString(),
       issue: config.issue,
       status: 'pass',

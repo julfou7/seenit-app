@@ -11,6 +11,9 @@ export interface HistoryCollectionPart {
 }
 
 function parseTimestamp(value: unknown): number | null {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+    return parseHistoryLocalDateTime(value.trim(), '')?.watchedAt ?? null;
+  }
   if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
     return value < 10_000_000_000 ? value * 1000 : value;
   }
@@ -27,7 +30,7 @@ function parseTimestamp(value: unknown): number | null {
 
 export function resolveHistoryTimestamp(explicit: unknown, ...fallbacks: unknown[]): HistoryResolvedTimestamp | null {
   const direct = parseTimestamp(explicit);
-  if (direct !== null) return { watchedAt: direct, timeKnown: true };
+  if (direct !== null) return { watchedAt: direct, timeKnown: !(typeof explicit === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(explicit.trim())) };
   for (const fallback of fallbacks) {
     const value = parseTimestamp(fallback);
     if (value !== null) return { watchedAt: value, timeKnown: false };
@@ -53,12 +56,12 @@ function capitalize(value: string): string {
 export function formatHistoryDayLabel(timestamp: number, now: number = Date.now()): string {
   const day = startOfLocalDay(timestamp);
   const today = startOfLocalDay(now);
-  const oneDay = 24 * 60 * 60 * 1000;
+  const current = new Date(now);
+  const yesterday = new Date(current.getFullYear(), current.getMonth(), current.getDate() - 1).getTime();
   if (day === today) return "Aujourd'hui";
-  if (day === today - oneDay) return 'Hier';
+  if (day === yesterday) return 'Hier';
 
   const date = new Date(timestamp);
-  const current = new Date(now);
   const formatted = new Intl.DateTimeFormat('fr-FR', {
     weekday: 'long',
     day: 'numeric',
@@ -146,7 +149,8 @@ export function buildMovieCollectionProgress(
   watchedMovieIds: ReadonlySet<number>,
   today: string,
 ): SeriesSeasonProgress {
-  const normalized = (parts || [])
+  const unique = new Map((parts || []).map(part => [part.id, part]));
+  const normalized = [...unique.values()]
     .filter(part => Number.isInteger(part.id) && part.id > 0)
     .map(part => ({ id: Number(part.id), releaseDate: part.releaseDate || null }))
     .sort((left, right) => {

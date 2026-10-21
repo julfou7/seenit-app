@@ -14,6 +14,9 @@ import {
   scheduleWatchProviderCardEnrichment,
 } from '../features/providers/watchProviderRequestPolicy';
 import { openPlexWatchUrl } from '../features/plex/plexLinks';
+import { readWatchProviderCache } from '../features/providers/watchProviderCache';
+import { getProviderLinkPresentation } from '../features/providers/providerLink';
+import { historyEpisodeEntries, historyEpisodeKey, historyRecordsWithoutTarget } from '../features/history/historyRecords';
 import {
   buildHistoryAriaLabel,
   buildMovieCollectionProgress,
@@ -115,7 +118,7 @@ function isMovieShow(show: Show): boolean {
 
 function isMovieWatched(show: Show): boolean {
   const record = getRecord(show, 'movie');
-  return isMovieShow(show) && (Boolean(show.seenEpisodes?.includes('movie')) || Boolean(record?.watchedAt));
+  return isMovieShow(show) && (Array.isArray(show.seenEpisodes) ? show.seenEpisodes.includes('movie') : Boolean(record?.watchedAt));
 }
 
 function getMetadataKey(item: HistoryItem): string {
@@ -286,10 +289,7 @@ export function HistoryFeed({
         continue;
       }
 
-      const processedEpKeys = new Set<string>();
-      for (const [epKey, rawRecord] of Object.entries(show.episodeRecords || {})) {
-        const record = asRecord(rawRecord);
-        if (!record?.watchedAt) continue;
+      for (const { key: epKey, record } of historyEpisodeEntries(show)) {
         const match = /^(\d+)x(\d+)$/i.exec(epKey.trim());
         if (!match) continue;
         const season = Number(match[1]);
@@ -297,7 +297,6 @@ export function HistoryFeed({
         if (!Number.isInteger(season) || !Number.isInteger(episode) || episode <= 0) continue;
         const timing = resolveRecordTime(show, record);
         if (!timing) continue;
-        processedEpKeys.add(epKey);
         items.push({
           key: `${show.id}:${epKey}`,
           showId: show.id,
@@ -313,28 +312,6 @@ export function HistoryFeed({
         });
       }
 
-      for (const epKey of show.seenEpisodes || []) {
-        if (epKey === 'movie' || processedEpKeys.has(epKey)) continue;
-        const match = /^(?:s\s*)?(\d+)\s*(?:x|e)\s*(\d+)$/i.exec(epKey.trim());
-        if (!match) continue;
-        const season = Number(match[1]);
-        const episode = Number(match[2]);
-        if (!Number.isInteger(season) || !Number.isInteger(episode) || episode <= 0) continue;
-        const timing = resolveHistoryTimestamp(undefined, show.lastWatchedAt, show.updatedAt, show.createdAt);
-        if (!timing) continue;
-        items.push({
-          key: `${show.id}:${season}x${episode}:legacy`,
-          showId: show.id,
-          tmdbId: show.tmdbId,
-          showTitle: show.title,
-          mediaType: 'tv',
-          season,
-          episode,
-          watchedAt: timing.watchedAt,
-          watchedTimeKnown: false,
-          plexImported: false,
-        });
-      }
     }
 
     return items.sort((left, right) => {
@@ -441,11 +418,17 @@ export function HistoryFeed({
       showToast('Diffuseur indisponible pour ce visionnage.', 'info');
       return;
     }
-    const result = await tmdb.getWatchProviders(item.tmdbId, item.mediaType);
-    const payload = result.ok ? asRecord(result.value) : null;
+    const payload = asRecord(tmdb.peekWatchProviders(item.tmdbId, item.mediaType)
+      ?? readWatchProviderCache(item.tmdbId, item.mediaType, { allowStale: true })?.data);
     const results = asRecord(payload?.results);
     const france = asRecord(results?.FR);
-    const link = asString(france?.link);
+    const candidates = [france?.flatrate, france?.free, france?.ads].flatMap(value => Array.isArray(value) ? value : []);
+    const provider = candidates.map(asRecord).find(value => value?.provider_name === providerName);
+    const destination = provider ? getProviderLinkPresentation({
+      providerId: Number(provider.provider_id), providerName: providerName || '',
+      title: show.title, fallbackLink: asString(france?.link) || '',
+    }).url : asString(france?.link);
+    const link = destination && destination !== '#' ? destination : null;
     if (!link || !await openExternalUrl(link, { title: show.title, mediaType: show.mediaType, tmdbId: show.tmdbId })) {
       showToast('Impossible d’ouvrir le diffuseur pour le moment.', 'info');
     }
@@ -463,9 +446,10 @@ export function HistoryFeed({
     const epKey = editingItem.mediaType === 'movie' ? 'movie' : `${editingItem.season}x${editingItem.episode}`;
     const previousRecords = { ...(targetShow.episodeRecords || {}) };
     const previousLastWatchedAt = targetShow.lastWatchedAt || null;
-    const previousRecord = asRecord(previousRecords[epKey]) || {};
+    const previousRecord = editingItem.mediaType === 'movie' ? asRecord(previousRecords.movie) || {}
+      : historyEpisodeEntries(targetShow).find(entry => entry.key === epKey)?.record || {};
     const nextRecords = {
-      ...previousRecords,
+      ...historyRecordsWithoutTarget(previousRecords, epKey),
       [epKey]: {
         ...previousRecord,
         watchedAt: parsed.watchedAt,
@@ -504,10 +488,8 @@ export function HistoryFeed({
 
     const isMovie = item.mediaType === 'movie' || targetShow.mediaType === 'movie';
     const epKey = isMovie ? 'movie' : `${item.season}x${item.episode}`;
-    const newSeenEpisodes = (targetShow.seenEpisodes || []).filter(key => key !== epKey && (isMovie ? key !== 'movie' : true));
-    const newRecords = { ...(targetShow.episodeRecords || {}) };
-    delete newRecords[epKey];
-    if (isMovie) delete newRecords.movie;
+    const newSeenEpisodes = (targetShow.seenEpisodes || []).filter(key => (historyEpisodeKey(key) || key) !== epKey);
+    const newRecords = historyRecordsWithoutTarget(targetShow.episodeRecords, epKey);
     const newLastWatchedAt = recalculateLastWatchedAt(newRecords);
 
     const prevSeenEpisodes = targetShow.seenEpisodes || [];

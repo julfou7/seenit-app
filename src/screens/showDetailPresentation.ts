@@ -30,7 +30,7 @@ import { acceptDownloadRequest, beginDownloadRequest, failDownloadRequest, updat
 import { readUserScopedJson } from '../lib/userIsolation';
 import { mediaKeyFrom, toMediaKey } from '../features/shows/mediaRelations';
 import { getParentalRatingColorClass, resolveParentalRating } from '../features/shows/parentalRating';
-import { resolveCanalProviderTarget } from '../features/shows/canalProviderLink';
+
 
 
 export interface ShowDetailScreenProps {
@@ -109,59 +109,7 @@ export const getCleanProviderName = (provider: ProviderNameInput) => {
     .trim();
 };
 
-export const getProviderDirectLink = (providerId: number, title: string, fallbackLink: string) => {
-  const query = encodeURIComponent(title);
-  switch (providerId) {
-    case 8: return `https://www.netflix.com/search?q=${query}`;
-    case 119: return `https://www.primevideo.com/search/ref=atv_sr_sug_1?phrase=${query}`;
-    case 337: return `https://www.disneyplus.com/search?q=${query}`;
-    case 381: return 'https://www.canalplus.com/';
-    case 350: return `https://tv.apple.com/fr/search?q=${query}`;
-    case 531: return `https://www.paramountplus.com/search/?q=${query}`;
-    case 1899: return `https://www.max.com/search?q=${query}`;
-    case 234: return `https://www.france.tv/recherche/?q=${query}`;
-    case 239: return `https://www.arte.tv/fr/search/?q=${query}`;
-    default: return fallbackLink || '#';
-  }
-};
-
-export type ProviderLinkKind = 'provider-link' | 'provider-app-home';
-
-export interface ProviderLinkPresentation {
-  url: string | null;
-  label: string;
-  title: string;
-  kind: ProviderLinkKind;
-}
-
-export const getProviderLinkPresentation = ({
-  providerId,
-  providerName,
-  title,
-  fallbackLink,
-}: {
-  providerId: number;
-  providerName: string;
-  title: string;
-  fallbackLink: string;
-}): ProviderLinkPresentation => {
-  if (providerId === 381) {
-    const canalTarget = resolveCanalProviderTarget();
-    return {
-      url: canalTarget.url,
-      label: 'Canal',
-      title: 'Ouvrir Canal',
-      kind: canalTarget.kind,
-    };
-  }
-
-  return {
-    url: getProviderDirectLink(providerId, title, fallbackLink),
-    label: providerName,
-    title: `Ouvrir ${providerName}`,
-    kind: 'provider-link',
-  };
-};
+export { getProviderDirectLink, getProviderLinkPresentation, type ProviderLinkKind, type ProviderLinkPresentation } from '../features/providers/providerLink';
 
 interface KeywordDetails {
   keywords?: {
@@ -184,7 +132,7 @@ export const getKeywordsFromDetails = (details: KeywordDetails | null | undefine
     .slice(0, 5);
 };
 
-export const getSmartDefaultSeason = (show: any, tmdbDetails: any): number => {
+export const getSmartDefaultSeason = (show: Pick<Show, 'nextEpisodeToWatch' | 'nextEpisodeToAir' | 'seenEpisodes'> | null | undefined, tmdbDetails: any): number => {
   if (show?.nextEpisodeToWatch?.season_number) return show.nextEpisodeToWatch.season_number;
   if (show?.nextEpisodeToAir?.season_number) return show.nextEpisodeToAir.season_number;
   if (show?.seenEpisodes && show.seenEpisodes.length > 0) {
