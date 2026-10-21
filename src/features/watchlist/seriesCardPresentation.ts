@@ -90,6 +90,10 @@ export function imageUrl(path?: string | null, size = 'w342'): string | null {
   return path ? path.startsWith('http') ? path : `https://image.tmdb.org/t/p/${size}${path}` : null;
 }
 
+export function seriesCardPosterCrossOrigin(path: string | null, native: boolean): 'anonymous' | undefined {
+  return path?.startsWith('https://image.tmdb.org/') && !native ? 'anonymous' : undefined;
+}
+
 export function seriesCardPosterCandidates(show: Pick<Show, 'posterPath' | 'backdropPath'>): string[] {
   const candidates = [
     { path: show.posterPath, size: 'w185' },

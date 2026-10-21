@@ -1,9 +1,10 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { Bell, X } from 'lucide-react';
 import type { Show } from '../../types';
 import { SeenItCheckButton } from '../SeenItCheckButton';
 import { DialogLayer } from '../ui/DialogLayer';
-import { buildSeriesSeasonProgress, imageUrl, seriesCardPosterCandidates, seriesEpisodeCode, upcomingCardTone, type SeriesCardEpisode, type SeasonSegmentState } from '../../features/watchlist/seriesCardPresentation';
+import { buildSeriesSeasonProgress, imageUrl, seriesCardPosterCandidates, seriesCardPosterCrossOrigin, seriesEpisodeCode, upcomingCardTone, type SeriesCardEpisode, type SeasonSegmentState } from '../../features/watchlist/seriesCardPresentation';
 import { dominantPosterHue, POSTER_HUE_FALLBACK, readPosterHue, rememberPosterHue } from '../../features/watchlist/posterHue';
 import './seriesEpisodeCard.css';
 
@@ -39,6 +40,7 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
   const posterCandidatesKey = posterCandidates.join('\u0000');
   const [posterIndex, setPosterIndex] = useState(0);
   const poster = posterCandidates[posterIndex] ?? null;
+  const posterCrossOrigin = seriesCardPosterCrossOrigin(poster, Capacitor.isNativePlatform());
   const [hue, setHue] = useState(() => readPosterHue(poster) ?? POSTER_HUE_FALLBACK);
   const [menuOpen, setMenuOpen] = useState(false);
   const [actionPending, setActionPending] = useState(false);
@@ -98,7 +100,7 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
         onKeyDown={event => { if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) { event.preventDefault(); setMenuOpen(true); } }} />
       <div className="series-8f__poster" aria-hidden="true">
         <span>{initials}</span>
-        {poster && <img src={poster} crossOrigin={poster.startsWith('https://image.tmdb.org/') ? 'anonymous' : undefined} alt="" loading="lazy" decoding="async" onLoad={event => handlePosterLoad(event.currentTarget)} onError={() => setPosterIndex(index => index + 1)} />}
+        {poster && <img src={poster} crossOrigin={posterCrossOrigin} alt="" loading="lazy" decoding="async" onLoad={event => handlePosterLoad(event.currentTarget)} onError={() => setPosterIndex(index => index + 1)} />}
       </div>
       <div className="series-8f__text">
         <h3 id={titleId}>{show.title}</h3>
