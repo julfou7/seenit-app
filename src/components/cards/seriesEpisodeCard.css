@@ -18,14 +18,16 @@
 .series-8f__code > span:not(.series-8f__badge) { overflow:hidden; text-overflow:ellipsis; white-space:pre; }
 .series-8f__badge { display:inline-flex; align-items:center; max-width:100%; height:24px; padding:0 7px; border-radius:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#FDBA74; background:#fb923c24; box-shadow:inset 0 0 0 1px #fb923c52; font-size:11px; font-weight:800; line-height:24px; }
 .series-8f__season { position:absolute; left:16px; right:14px; bottom:13px; height:26px; display:flex; align-items:center; gap:10px; pointer-events:none; }
-.series-8f__segments { display:flex; flex:1; min-width:0; gap:3px; }
+.series-8f__segments { display:flex; align-items:center; flex:1; min-width:0; gap:3px; }
 .series-8f__segment { flex-basis:0; min-width:0; height:8px; border-radius:3px; background:#3f3f46; }
 .series-8f__segment--seen { background:#E5A93D; }
 .series-8f__segment--current { background:transparent; box-shadow:inset 0 0 0 2px white; }
 .series-8f__segment--future { background:repeating-linear-gradient(45deg,#3f3f46 0 2px,transparent 2px 5px); box-shadow:inset 0 0 0 1px #3f3f46; }
 .series-8f__segment--history { background:#F2C36B; box-shadow:0 0 0 2px #f2c36b59; }
 .series-8f__segment--unknown { background:transparent; border:1px dotted #71717a; }
-.series-8f__segments--continuous { gap:0; border-radius:3px; overflow:hidden; }
+.series-8f__unknown-tail { flex:2.2 1 0; min-width:18px; height:8px; border-radius:3px; background:repeating-linear-gradient(90deg,#52525B 0 4px,transparent 4px 8px); mask-image:linear-gradient(90deg,#000 20%,transparent); }
+.series-8f__unknown-mark { flex:0 0 auto; padding-left:2px; color:#A1A1AA; font-size:11px; font-weight:800; line-height:1; }
+.series-8f__segments--continuous { gap:0; border-radius:3px; overflow:visible; }
 .series-8f__segments--continuous .series-8f__segment { border-radius:0; }
 .series-8f__provider { width:44px; height:44px; margin:-9px; flex-shrink:0; position:relative; pointer-events:auto; cursor:pointer; display:grid; place-items:center; border-radius:12px; }
 .series-8f__provider img { width:26px; height:26px; object-fit:cover; border-radius:7px; box-shadow:0 2px 8px #0009; }

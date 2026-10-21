@@ -368,6 +368,7 @@ export function WatchListView({ model }: WatchListViewProps) {
                     <ContinueWatchingCard
                       key={`notwatched_card_${show.id}`}
                       show={show}
+                      showStaleDetail
                       onShowClick={onShowClick}
                       onEpisodeClick={handleEpisodeClick}
                       onMarkAsSeen={markNextEpisodeAsSeen} actions={seriesActions(show)}

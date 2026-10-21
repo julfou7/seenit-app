@@ -164,6 +164,7 @@ export function buildMovieCollectionProgress(
       label: 'Film',
       description: 'Film vu, sans collection TMDB exploitable',
       continuous: false,
+      totalUnknown: false, unknownTail: false, knownEpisodes: 1, availableUnseen: 0,
       segments: [{ state: 'history', count: 1 }],
     };
   }
@@ -183,6 +184,7 @@ export function buildMovieCollectionProgress(
     label: `Collection · ${normalized.length}`,
     description: `Collection de ${normalized.length} films, ${counts.seen + counts.history} vus, ${counts.future} à venir, ${counts.unknown} dates à confirmer`,
     continuous: normalized.length > 30,
+    totalUnknown: false, unknownTail: false, knownEpisodes: normalized.length, availableUnseen: counts.unseen,
     segments: normalized.length > 30
       ? (Object.entries(counts) as Array<[SeasonSegmentState, number]>)
         .filter(([, amount]) => amount > 0)

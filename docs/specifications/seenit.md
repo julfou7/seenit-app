@@ -1169,6 +1169,11 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   affiche débordante, teinte locale mise en cache, titre sur deux lignes et progression de saison.
   Vu, prochain, futur et entrée d'historique se distinguent autrement que par la couleur ; les saisons
   longues utilisent une barre proportionnelle, les totaux et diffusions inconnus ne sont pas inventés.
+  Un cache de saison absent n'efface pas les épisodes prouvés par la progression ou les pointeurs.
+  Une dernière saison ouverte ajoute une traîne en tirets et « ? » ; une preuve de finale datée ou
+  de total explicitement confirmé retire cette incertitude. Les métadonnées de l'épisode présenté
+  priment sur un ancien pointeur contradictoire. La récence des séries laissées de côté provient
+  des visionnages encore vus, puis de leur horodatage de repli, sans nouvel appel fournisseur.
   La coche Vu, le rappel et les actions d'historique sont des contrôles séparés d'au moins 44 px.
   Les opérations réutilisent leurs handlers et Annuler existants. Appui long, menu contextuel et clavier
   partagent les mêmes actions, sans clic d'ouverture après un appui long ni timer persistant au scroll.
@@ -1179,6 +1184,9 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   future ne devient jamais une reprise. Si le pointeur de reprise manque, les épisodes diffusés du
   cache et la progression persistée servent de preuve ; une reprise inconnue est « À actualiser »,
   sans faux « À jour » ni écriture d'épisode inventé.
+  Les deux synchronisations de détails conservent dans `seasonProgress` les preuves publiques de
+  finale datée et de dernière saison avant suppression du cache déprécié ; ces métadonnées ne sont
+  jamais des preuves de visionnage. Le badge de récence est demandé par la section des séries anciennes.
 - **SEENIT-UX-015** — L'historique 16d mélange films et épisodes dans une chronologie par jour local,
   avec le cadre 8f partagé. Seule l'heure réellement connue apparaît sur la carte ; une date seule
   ou un repli legacy ne crée jamais une heure. « Hier » suit le calendrier local, y compris au
