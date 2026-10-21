@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildSeriesSeasonProgress, seriesCardPosterCandidates, seriesEpisodeCode, upcomingCardTone } from '../src/features/watchlist/seriesCardPresentation.ts';
+import { buildSeriesSeasonProgress, seriesCardPosterCandidates, seriesCardPosterCrossOrigin, seriesEpisodeCode, upcomingCardTone } from '../src/features/watchlist/seriesCardPresentation.ts';
 import { dominantPosterHue, readPosterHue, rememberPosterHue, POSTER_HUE_CACHE_LIMIT } from '../src/features/watchlist/posterHue.ts';
 
 test('SEENIT-UX-014 conserve les états de saison sans inventer les diffusions', () => {
@@ -68,6 +68,18 @@ test('la carte 8f réutilise un visuel déjà connu quand le poster manque ou ca
   );
   const same = 'https://cdn.example.test/card.jpg';
   assert.deepEqual(seriesCardPosterCandidates({ posterPath: same, backdropPath: same }), [same]);
+});
+
+test('la carte 8f ne sacrifie pas le poster Android au calcul de teinte CORS', () => {
+  const tmdbPoster = 'https://image.tmdb.org/t/p/w185/slow-horses.jpg';
+  assert.equal(seriesCardPosterCrossOrigin(tmdbPoster, true), undefined);
+  assert.equal(seriesCardPosterCrossOrigin(tmdbPoster, false), 'anonymous');
+  assert.equal(seriesCardPosterCrossOrigin('https://cdn.example.test/poster.jpg', false), undefined);
+
+  const cardSource = readFileSync(new URL('../src/components/cards/SeriesEpisodeCard.tsx', import.meta.url), 'utf8');
+  assert.match(cardSource, /seriesCardPosterCrossOrigin\(poster, Capacitor\.isNativePlatform\(\)\)/);
+  assert.match(cardSource, /<img src=\{poster\} crossOrigin=\{posterCrossOrigin\}/);
+  assert.match(cardSource, /catch \{ \/\* Une image sans CORS garde sa présentation et la teinte de secours\. \*\/ \}/);
 });
 
 test('la carte 8f reste partagée par les adapters de production et leurs actions existantes', () => {
