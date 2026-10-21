@@ -55,7 +55,7 @@ function formatRuntime(minutes?: number) {
 }
 
 export function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMarkAsSeen, onPersonClick, actions }: ExpandedItemCardProps) {
-  if (show.mediaType === 'tv' && sectionType !== 'upToDate') return <ContinueWatchingCard show={show} layout="list" onShowClick={onShowClick} onEpisodeClick={onEpisodeClick} onMarkAsSeen={onMarkAsSeen} actions={actions} />;
+  if (show.mediaType === 'tv' && sectionType !== 'upToDate') return <ContinueWatchingCard show={show} layout="list" showStaleDetail={sectionType === 'notWatched'} onShowClick={onShowClick} onEpisodeClick={onEpisodeClick} onMarkAsSeen={onMarkAsSeen} actions={actions} />;
   return <ExpandedLegacyItemCard show={show} sectionType={sectionType} onShowClick={onShowClick} onEpisodeClick={onEpisodeClick} onMarkAsSeen={onMarkAsSeen} onPersonClick={onPersonClick} />;
 }
 
@@ -420,12 +420,12 @@ export function ProgressiveWatchlistCarousel({ id, data, renderCard }: Progressi
   );
 }
 
-export const parseTimestamp = (val: any): number => {
+export const parseTimestamp = (val: unknown): number => {
   if (!val) return 0;
   if (typeof val === 'number') return isNaN(val) ? 0 : val;
   const num = Number(val);
   if (!isNaN(num) && num > 1000000000) return num;
-  const parsed = Date.parse(val);
+  const parsed = typeof val === 'string' ? Date.parse(val) : NaN;
   return isNaN(parsed) ? 0 : parsed;
 };
 

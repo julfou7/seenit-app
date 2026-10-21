@@ -14,6 +14,15 @@ export interface TrackingProvenance {
   importedAt: number;
 }
 
+export interface SeasonProgressEvidence {
+  season_number: number;
+  known_episodes_in_season: number;
+  last_season_number: number;
+  season_total_unknown: boolean;
+  last_known_episode_type: string | null;
+  last_known_episode_air_date: string | null;
+}
+
 export interface Show {
   id: string; // Document ID from Firestore
   userId: string;
@@ -45,9 +54,10 @@ export interface Show {
   totalAiredEpisodes?: number;
   firstAirDate?: string;
   seasonsCache?: any[]; // Deprecated, kept only to clean it up from Firestore
+  seasonProgress?: Record<string, SeasonProgressEvidence>;
   nextEpisodeToAir?: any;
   nextEpisodeToWatch?: any;
-  networks?: any[];
+  networks?: Array<{ id?: number; name?: string; logo_path?: string | null }>;
   userRating?: number;
   seriesEnded?: boolean;
   tmdbStatus?: string;

@@ -106,13 +106,13 @@ export function seriesEpisodeCode(episode: SeriesCardEpisode): string {
 }
 
 export function buildSeriesSeasonProgress(
-  show: Pick<Show, 'seenEpisodes' | 'seasonsCache' | 'nextEpisodeToWatch' | 'nextEpisodeToAir' | 'seriesEnded' | 'tmdbStatus'>,
+  show: Pick<Show, 'seenEpisodes' | 'seasonsCache' | 'seasonProgress' | 'nextEpisodeToWatch' | 'nextEpisodeToAir' | 'seriesEnded' | 'tmdbStatus'>,
   episode: SeriesCardEpisode,
   context: 'watch' | 'upcoming' | 'history',
   today: string,
 ): SeriesSeasonProgress {
   const season = episode.season_number;
-  const allPointers = [episode, show.nextEpisodeToWatch, show.nextEpisodeToAir]
+  const allPointers = [episode, show.seasonProgress?.[String(season)], show.nextEpisodeToWatch, show.nextEpisodeToAir]
     .filter((pointer): pointer is SeriesCardEpisode => Boolean(pointer && typeof pointer.season_number === 'number'));
   const pointers = allPointers.filter(pointer => pointer.season_number === season);
   const cachedSeasons = (show.seasonsCache as SeasonData[] | undefined) || [];

@@ -16,6 +16,7 @@ interface Props {
   onMarkAsSeen: (show: Show) => void | Promise<void>;
   layout?: 'rail' | 'list';
   actions?: SeriesCardAction[];
+  showStaleDetail?: boolean;
 }
 
 function episodeFreshnessBadge(episode: SeriesCardEpisode | null | undefined, todayStr: string): string | undefined {
@@ -33,7 +34,7 @@ export const ContinueWatchingCard = React.memo(function ContinueWatchingCard(pro
   return <ContinueWatchingCardContent {...props} />;
 });
 
-function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMarkAsSeen, layout = 'rail', actions }: Props) {
+function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMarkAsSeen, layout = 'rail', actions, showStaleDetail = false }: Props) {
   const { cardRef, providerLogo, providerName } = usePassiveWatchProvider({
     tmdbId: show.tmdbId, mediaType: 'tv', title: show.title, originalTitle: show.originalTitle,
     year: show.firstAirDate?.slice(0, 4), retainInLibraryCache: true,
@@ -49,7 +50,7 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
   const rawPath = episodeStill || currentSeasonArtwork || showBackdrop || showPoster;
   const openEpisode = onEpisodeClick && nextEpNum ? () => onEpisodeClick(show, nextEpNum.season_number, nextEpNum.episode_number) : undefined;
   const freshnessBadge = isUpToDate ? undefined : episodeFreshnessBadge(nextEpNum, todayStr);
-  const staleDetail = seriesCardStaleDetail(show);
+  const staleDetail = showStaleDetail ? seriesCardStaleDetail(show) : undefined;
   return <div ref={cardRef} className="series-8f-host">
     <SeriesEpisodeCard
       show={{ ...show, backdropPath: rawPath }}

@@ -27,6 +27,9 @@ const missingResume: Show = { ...show, id: 'missing-resume', seenEpisodes: [], n
   nextEpisodeToAir: { season_number: 1, episode_number: 7, air_date: '2099-12-01' },
   seasonsCache: [{ season_number: 1, episode_count: 8, episodes: [{ episode_number: 1, air_date: '2023-01-01', name: 'Pilote diffusé' }, { episode_number: 7, air_date: '2099-12-01' }] }],
 };
+const staleShow: Show = { ...show, lastWatchedAt: Date.now() - 90 * 86_400_000,
+  episodeRecords: { '1x1': { watchedAt: Date.now() - 90 * 86_400_000 } },
+};
 localStorage.clear();
 localStorage.setItem('seenit_watch_providers_v1', JSON.stringify({
   'tv:125359': { data: { results }, timestamp: Date.now(), retention: 'library' },
@@ -52,6 +55,8 @@ function Harness() {
     }}>Démarrer la session sans Réglages</button>
     {loggedIn && <>
       <section id="card-tv"><ContinueWatchingCard show={show} onMarkAsSeen={() => {}} /></section>
+      <section id="card-stale"><ContinueWatchingCard show={staleShow} showStaleDetail onMarkAsSeen={() => {}} /></section>
+      <section id="card-new-season"><ContinueWatchingCard show={staleShow} onMarkAsSeen={() => {}} /></section>
       <section id="card-movie"><MovieWatchCard show={{ ...show, id: 'movie-42', tmdbId: 42, mediaType: 'movie' }} onMarkAsSeen={() => {}} /></section>
       <section id="card-unavailable"><MovieWatchCard show={{ ...show, id: 'movie-84', tmdbId: 84, mediaType: 'movie' }} onMarkAsSeen={() => {}} /></section>
       <section id="card-pending"><ContinueWatchingCard show={{ ...show, id: 'tv-104', tmdbId: 104, title: 'Média voisin' }} onMarkAsSeen={() => {}} /></section>

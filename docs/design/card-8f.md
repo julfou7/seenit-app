@@ -42,6 +42,11 @@ cet état : « saison finie », `N restants` et tout total numérique présenté
 nouveaux épisodes remplacent progressivement la traîne ; une preuve explicite de finale ou un statut
 final de série permet de revenir au comportement à total connu. En l'absence de cette preuve, le `?`
 reste préférable à une complétude inventée. Cette règle reprend et généralise le garde-fou #659.
+Les deux synchronisations de production (globale et unitaire) persistent les preuves publiques
+TMDB de saison dans `seasonProgress` et sur leurs pointeurs : dernier épisode connu, type/date,
+dernière saison et total ouvert. Elles survivent à la suppression du cache saison déprécié et
+restent disponibles à l'historique, même sans épisode de reprise. La carte ne crée pas ces preuves.
+Le détail de récence est activé uniquement par la section « Pas vu depuis un moment ».
 
 Dans les trois rails séries réduits de À Regarder (`Continuer`, `Nouveautés`, `Pas vu depuis`),
 le défilement n'est plus libre : `scroll-snap-type: x mandatory`, chaque carte est un arrêt

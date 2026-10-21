@@ -1184,6 +1184,9 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   future ne devient jamais une reprise. Si le pointeur de reprise manque, les épisodes diffusés du
   cache et la progression persistée servent de preuve ; une reprise inconnue est « À actualiser »,
   sans faux « À jour » ni écriture d'épisode inventé.
+  Les deux synchronisations de détails conservent dans `seasonProgress` les preuves publiques de
+  finale datée et de dernière saison avant suppression du cache déprécié ; ces métadonnées ne sont
+  jamais des preuves de visionnage. Le badge de récence est demandé par la section des séries anciennes.
 - **SEENIT-UX-012** — Un dialogue nommé utilise une pile commune : Échap, Retour Android et appui
   sur l'onglet actif ferment un seul niveau. Le focus reste contenu puis revient au déclencheur ;
   le fond est inerte et une confirmation destructive focalise Garder/Annuler. Les portails sont
