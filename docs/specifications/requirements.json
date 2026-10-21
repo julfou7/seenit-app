@@ -2056,6 +2056,10 @@
         {
           "file": "tests/seriesCardPresentation.test.ts",
           "contains": "SEENIT-UX-014 borne le rendu des saisons longues et conserve les proportions"
+        },
+        {
+          "file": "tests/watchCardResume.test.ts",
+          "contains": "#693 la façade de production marque exactement la reprise affichée et conserve le Show original"
         }
       ]
     },

@@ -216,6 +216,9 @@ utilise une barre proportionnelle. La couleur vient de l'affiche déjà chargée
 cache existant ; aucun total ou diffuseur n'est inventé. La coche marque le prochain épisode connu
 via l'action existante et son annulation. Un appui court ouvre la série ; l'appui long, le menu
 contextuel ou Maj+F10 donnent accès aux actions. Les cartes film gardent leur présentation.
+La reprise et l'action Vu partagent leur résolution : une diffusion future ne remplace pas un pointeur
+de reprise absent. Le cache des épisodes déjà diffusés et la progression enregistrée permettent le repli ;
+sans preuve suffisante, la carte demande une actualisation et ne propose pas une coche sans effet.
 
 Sur une carte série, un swipe permet de retirer le suivi (avec confirmation) ou d'abandonner la
 série ; les actions sont aussi accessibles au clavier. Une action destructive possède un toast avec

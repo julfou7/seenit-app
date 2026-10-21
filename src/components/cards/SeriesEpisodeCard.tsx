@@ -15,7 +15,7 @@ type Context =
 
 interface Props {
   show: Show;
-  episode: SeriesCardEpisode;
+  episode: SeriesCardEpisode | null;
   context: Context;
   detail?: string;
   providerLogo?: string | null;
@@ -48,8 +48,8 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
   useEffect(() => cancel, []);
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const progress = buildSeriesSeasonProgress(show, episode, context.kind, today);
-  const code = seriesEpisodeCode(episode);
+  const progress = episode ? buildSeriesSeasonProgress(show, episode, context.kind, today) : { label: 'À actualiser', description: 'Épisode de reprise à confirmer', continuous: false, segments: [] };
+  const code = episode ? seriesEpisodeCode(episode) : 'Épisode à confirmer';
   const watchedDate = context.kind === 'history' ? new Date(context.watchedAt) : null;
   const validWatchedDate = watchedDate && Number.isFinite(watchedDate.getTime());
   const watchedTime = validWatchedDate ? watchedDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'Heure inconnue';
@@ -82,7 +82,7 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
         {show.backdropPath && <img className="series-8f__backdrop" src={imageUrl(show.backdropPath, 'w500')!} loading="lazy" decoding="async" alt="" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} />}
         <div className="series-8f__veil" />
       </div>
-      <button type="button" className="series-8f__open" aria-label={`Ouvrir ${show.title}, ${code}${episode.name ? `, ${episode.name}` : ''}`} aria-haspopup="dialog" onClick={event => { const ignore = event.detail > 0 && (held.current || moved.current); held.current = false; moved.current = false; if (!ignore) onOpen(); }}
+      <button type="button" className="series-8f__open" aria-label={`Ouvrir ${show.title}, ${code}${episode?.name ? `, ${episode.name}` : ''}`} aria-haspopup="dialog" onClick={event => { const ignore = event.detail > 0 && (held.current || moved.current); held.current = false; moved.current = false; if (!ignore) onOpen(); }}
         onPointerDown={event => { if (event.button !== 0) return; cancel(); pointerActive.current = true; held.current = false; moved.current = false; origin.current = { x: event.clientX, y: event.clientY }; timer.current = setTimeout(() => { held.current = true; setMenuOpen(true); }, 480); }}
         onPointerMove={event => { if (pointerActive.current && Math.hypot(event.clientX - origin.current.x, event.clientY - origin.current.y) > 8) { moved.current = true; cancel(); } }}
         onPointerUp={cancel} onPointerCancel={cancel} onPointerLeave={cancel}
@@ -95,7 +95,7 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
       <div className="series-8f__text">
         <h3 id={titleId}>{show.title}</h3>
         <div className="series-8f__code"><strong>{code}</strong>{detail && <span> · {detail}</span>}</div>
-        <p>{context.kind === 'watch' && context.upToDate ? 'À jour' : episode.name || `Épisode ${episode.episode_number}`}</p>
+        <p>{context.kind === 'watch' && context.upToDate ? 'À jour' : episode?.name || (episode ? `Épisode ${episode.episode_number}` : 'Reprise à actualiser')}</p>
       </div>
       <div className="series-8f__season">
         <span className="series-8f__season-label">{progress.label}</span>

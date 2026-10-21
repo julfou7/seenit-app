@@ -1173,6 +1173,10 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   Les opérations réutilisent leurs handlers et Annuler existants. Appui long, menu contextuel et clavier
   partagent les mêmes actions, sans clic d'ouverture après un appui long ni timer persistant au scroll.
   La carte conserve les rails libres/virtualisés et se réutilise en liste, sans modifier les films.
+  Le prochain épisode à voir et l'action Vu utilisent le même résolveur : un pointeur de diffusion
+  future ne devient jamais une reprise. Si le pointeur de reprise manque, les épisodes diffusés du
+  cache et la progression persistée servent de preuve ; une reprise inconnue est « À actualiser »,
+  sans faux « À jour » ni écriture d'épisode inventé.
 - **SEENIT-UX-012** — Un dialogue nommé utilise une pile commune : Échap, Retour Android et appui
   sur l'onglet actif ferment un seul niveau. Le focus reste contenu puis revient au déclencheur ;
   le fond est inerte et une confirmation destructive focalise Garder/Annuler. Les portails sont

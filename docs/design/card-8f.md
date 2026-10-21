@@ -29,3 +29,9 @@ au mouvement/démontage. Les gestes de retrait existants gardent confirmations e
 
 Ce contrat est limité au composant et à ses intégrations. Les propositions fonctionnelles
 non encore câblées dans le handoff ne deviennent pas des comportements fictifs.
+
+Le résolveur partagé de reprise est aussi utilisé par l'action Vu. Il ne prend jamais le
+prochain épisode à diffuser comme prochain à voir. Un pointeur manquant se replie sur des
+épisodes du cache dont la diffusion est prouvée, puis sur le premier épisode si la série
+n'a jamais été commencée et possède une preuve positive de diffusion. Sans preuve suffisante,
+la carte demande une actualisation plutôt que d'annoncer « À jour » ou d'inventer une écriture.
