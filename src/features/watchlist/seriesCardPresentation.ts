@@ -89,3 +89,17 @@ export function upcomingCardTone(days: number): 'today' | 'soon' | 'later' {
 export function imageUrl(path?: string | null, size = 'w342'): string | null {
   return path ? path.startsWith('http') ? path : `https://image.tmdb.org/t/p/${size}${path}` : null;
 }
+
+export function seriesCardPosterCandidates(show: Pick<Show, 'posterPath' | 'backdropPath'>): string[] {
+  const candidates = [
+    { path: show.posterPath, size: 'w185' },
+    { path: show.backdropPath, size: 'w300' },
+  ];
+  const seen = new Set<string>();
+  return candidates.flatMap(({ path, size }) => {
+    if (!path || seen.has(path)) return [];
+    seen.add(path);
+    const url = imageUrl(path, size);
+    return url ? [url] : [];
+  });
+}

@@ -3,7 +3,7 @@ import { Bell, X } from 'lucide-react';
 import type { Show } from '../../types';
 import { SeenItCheckButton } from '../SeenItCheckButton';
 import { DialogLayer } from '../ui/DialogLayer';
-import { buildSeriesSeasonProgress, imageUrl, seriesEpisodeCode, upcomingCardTone, type SeriesCardEpisode, type SeasonSegmentState } from '../../features/watchlist/seriesCardPresentation';
+import { buildSeriesSeasonProgress, imageUrl, seriesCardPosterCandidates, seriesEpisodeCode, upcomingCardTone, type SeriesCardEpisode, type SeasonSegmentState } from '../../features/watchlist/seriesCardPresentation';
 import { dominantPosterHue, POSTER_HUE_FALLBACK, readPosterHue, rememberPosterHue } from '../../features/watchlist/posterHue';
 import './seriesEpisodeCard.css';
 
@@ -32,8 +32,10 @@ const segmentNames: Record<SeasonSegmentState, string> = {
 };
 
 export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo, providerName, onOpen, onOpenSeries, onOpenEpisode, actions = [], layout = 'list' }: Props) {
-  const poster = imageUrl(show.posterPath, 'w185');
-  const [imageFailed, setImageFailed] = useState(false);
+  const posterCandidates = seriesCardPosterCandidates(show);
+  const posterCandidatesKey = posterCandidates.join('\u0000');
+  const [posterIndex, setPosterIndex] = useState(0);
+  const poster = posterCandidates[posterIndex] ?? null;
   const [hue, setHue] = useState(() => readPosterHue(poster) ?? POSTER_HUE_FALLBACK);
   const [menuOpen, setMenuOpen] = useState(false);
   const [actionPending, setActionPending] = useState(false);
@@ -44,7 +46,8 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
   const pointerActive = useRef(false);
   const origin = useRef({ x: 0, y: 0 });
   const cancel = () => { if (timer.current) clearTimeout(timer.current); timer.current = null; pointerActive.current = false; };
-  useEffect(() => { setImageFailed(false); setHue(readPosterHue(poster) ?? POSTER_HUE_FALLBACK); }, [poster]);
+  useEffect(() => { setPosterIndex(0); }, [posterCandidatesKey]);
+  useEffect(() => { setHue(readPosterHue(poster) ?? POSTER_HUE_FALLBACK); }, [poster]);
   useEffect(() => cancel, []);
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -90,7 +93,7 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
         onKeyDown={event => { if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) { event.preventDefault(); setMenuOpen(true); } }} />
       <div className="series-8f__poster" aria-hidden="true">
         <span>{initials}</span>
-        {poster && !imageFailed && <img src={poster} crossOrigin={poster.startsWith('https://image.tmdb.org/') ? 'anonymous' : undefined} alt="" loading="lazy" decoding="async" onLoad={event => handlePosterLoad(event.currentTarget)} onError={() => setImageFailed(true)} />}
+        {poster && <img src={poster} crossOrigin={poster.startsWith('https://image.tmdb.org/') ? 'anonymous' : undefined} alt="" loading="lazy" decoding="async" onLoad={event => handlePosterLoad(event.currentTarget)} onError={() => setPosterIndex(index => index + 1)} />}
       </div>
       <div className="series-8f__text">
         <h3 id={titleId}>{show.title}</h3>
