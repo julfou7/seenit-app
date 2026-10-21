@@ -5,12 +5,12 @@ import { useToastStore } from '../../src/store/toastStore';
 import { telemetry } from './history16dRuntime';
 
 Object.assign(window, { __history16d: telemetry });
-window.open = (url?: string | URL) => { telemetry.playback.push(String(url)); return null; };
+window.open = (url?: string | URL) => { telemetry.playback.push(String(url)); return window; };
 function Harness() {
   const undo = useToastStore(state => state.onUndo);
   return <main style={{ maxWidth: 620, margin: 'auto', padding: 16 }}>
     <h1>Historique</h1>
-    <button id="history-undo" style={{ minHeight: 44, padding: 10 }} disabled={!undo} onClick={() => { void undo?.(); }}>Annuler la dernière action</button>
+    <button id="history-undo" style={{ minHeight: 44, padding: 10 }} disabled={!undo} onClick={async () => { await undo?.(); useToastStore.getState().clearQueue(); }}>Annuler la dernière action</button>
     <HistoryFeed onShowClick={(id, type) => telemetry.movieOpens.push(`${type}:${id}`)} onEpisodeClick={(id, season, episode) => telemetry.episodeOpens.push(`${id}:${season}x${episode}`)} />
   </main>;
 }

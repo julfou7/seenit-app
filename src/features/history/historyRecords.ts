@@ -1,4 +1,5 @@
 import type { Show } from '../../types';
+import { resolveHistoryTimestamp } from './historyPresentation.ts';
 
 export function historyEpisodeKey(value: string): string | null {
   const match = /^(?:s\s*)?(\d+)\s*(?:x|e)\s*(\d+)$/i.exec(value.trim());
@@ -23,4 +24,15 @@ export function historyEpisodeEntries(show: Pick<Show, 'seenEpisodes' | 'episode
 
 export function historyRecordsWithoutTarget(records: Show['episodeRecords'], key: string): Show['episodeRecords'] {
   return Object.fromEntries(Object.entries(records || {}).filter(([rawKey]) => (historyEpisodeKey(rawKey) || rawKey) !== key));
+}
+
+export function historyLastWatchedAt(records: Show['episodeRecords'], seenEpisodes: readonly string[]): number | null {
+  const seen = new Set(seenEpisodes.map(key => historyEpisodeKey(key) || key));
+  let latest: number | null = null;
+  for (const [key, record] of Object.entries(records)) {
+    if (!seen.has(historyEpisodeKey(key) || key)) continue;
+    const timing = resolveHistoryTimestamp(record.watchedAt);
+    if (timing) latest = Math.max(latest || 0, timing.watchedAt);
+  }
+  return latest;
 }

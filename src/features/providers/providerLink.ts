@@ -53,4 +53,3 @@ export const getProviderLinkPresentation = ({
     kind: 'provider-link',
   };
 };
-

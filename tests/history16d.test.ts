@@ -10,7 +10,7 @@ import {
   parseHistoryLocalDateTime,
   resolveHistoryTimestamp,
 } from '../src/features/history/historyPresentation.ts';
-import { historyEpisodeEntries, historyEpisodeKey, historyRecordsWithoutTarget } from '../src/features/history/historyRecords.ts';
+import { historyEpisodeEntries, historyEpisodeKey, historyRecordsWithoutTarget, historyLastWatchedAt } from '../src/features/history/historyRecords.ts';
 
 test('SEENIT-UX-015 ne fabrique jamais une heure de visionnage legacy', () => {
   const explicit = resolveHistoryTimestamp(1_760_000_000_000, 1_750_000_000_000);
@@ -50,6 +50,8 @@ test('SEENIT-UX-015 normalise les preuves sans doublon ni résurrection et retir
   assert.equal(historyEpisodeKey(' S01 E02 '), '1x2');
   assert.deepEqual(historyRecordsWithoutTarget(source.episodeRecords, '1x2'), { '1x8': { watchedAt: 300 } });
   assert.deepEqual(historyEpisodeEntries({ ...source, seenEpisodes: [] }), []);
+  assert.equal(historyLastWatchedAt(source.episodeRecords, source.seenEpisodes), 200_000);
+  assert.equal(historyLastWatchedAt(source.episodeRecords, ['1x3']), null);
 });
 
 test('SEENIT-UX-015 conserve une heure facultative lors de la correction manuelle', () => {

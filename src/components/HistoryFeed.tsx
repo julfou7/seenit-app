@@ -16,7 +16,7 @@ import {
 import { openPlexWatchUrl } from '../features/plex/plexLinks';
 import { readWatchProviderCache } from '../features/providers/watchProviderCache';
 import { getProviderLinkPresentation } from '../features/providers/providerLink';
-import { historyEpisodeEntries, historyEpisodeKey, historyRecordsWithoutTarget } from '../features/history/historyRecords';
+import { historyEpisodeEntries, historyEpisodeKey, historyRecordsWithoutTarget, historyLastWatchedAt } from '../features/history/historyRecords';
 import {
   buildHistoryAriaLabel,
   buildMovieCollectionProgress,
@@ -125,14 +125,6 @@ function getMetadataKey(item: HistoryItem): string {
   return item.mediaType === 'movie'
     ? `movie:${item.tmdbId || item.showId}`
     : `tv:${item.tmdbId || item.showId}:${item.season}x${item.episode}`;
-}
-
-function recalculateLastWatchedAt(records: Record<string, unknown>): number | null {
-  const times = Object.values(records).flatMap(record => {
-    const watchedAt = asPositiveNumber(asRecord(record)?.watchedAt);
-    return watchedAt ? [watchedAt < 10_000_000_000 ? watchedAt * 1000 : watchedAt] : [];
-  });
-  return times.length > 0 ? Math.max(...times) : null;
 }
 
 function localTodayKey(): string {
@@ -456,7 +448,7 @@ export function HistoryFeed({
         watchedTimeKnown: parsed.timeKnown,
       },
     };
-    const nextLastWatchedAt = recalculateLastWatchedAt(nextRecords);
+    const nextLastWatchedAt = historyLastWatchedAt(nextRecords, targetShow.seenEpisodes || [epKey]);
     setEditingItem(null);
     await updateShow(targetShow.id, {
       episodeRecords: nextRecords,
@@ -490,7 +482,7 @@ export function HistoryFeed({
     const epKey = isMovie ? 'movie' : `${item.season}x${item.episode}`;
     const newSeenEpisodes = (targetShow.seenEpisodes || []).filter(key => (historyEpisodeKey(key) || key) !== epKey);
     const newRecords = historyRecordsWithoutTarget(targetShow.episodeRecords, epKey);
-    const newLastWatchedAt = recalculateLastWatchedAt(newRecords);
+    const newLastWatchedAt = historyLastWatchedAt(newRecords, newSeenEpisodes);
 
     const prevSeenEpisodes = targetShow.seenEpisodes || [];
     const prevEpisodeRecords = targetShow.episodeRecords || {};
