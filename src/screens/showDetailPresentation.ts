@@ -132,7 +132,7 @@ export const getKeywordsFromDetails = (details: KeywordDetails | null | undefine
     .slice(0, 5);
 };
 
-export const getSmartDefaultSeason = (show: Pick<Show, 'nextEpisodeToWatch' | 'nextEpisodeToAir' | 'seenEpisodes'> | null | undefined, tmdbDetails: any): number => {
+export const getSmartDefaultSeason = (show: Pick<Show, 'nextEpisodeToWatch' | 'nextEpisodeToAir' | 'seenEpisodes'> | null | undefined, tmdbDetails: { seasons?: Array<{ season_number: number }> } | null | undefined): number => {
   if (show?.nextEpisodeToWatch?.season_number) return show.nextEpisodeToWatch.season_number;
   if (show?.nextEpisodeToAir?.season_number) return show.nextEpisodeToAir.season_number;
   if (show?.seenEpisodes && show.seenEpisodes.length > 0) {

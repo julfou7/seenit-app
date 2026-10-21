@@ -5,7 +5,7 @@ export const telemetry = { writes: [] as Array<{ id: string; updates: Partial<Sh
 const today = new Date();
 const at = (days: number, hour: number, minute = 0) => new Date(today.getFullYear(), today.getMonth(), today.getDate() + days, hour, minute).getTime();
 const base: Show = { id: 'tv', userId: 'fixture', tmdbId: 42, title: 'Breaking Bad', mediaType: 'tv',
-  posterPath: '/__8f-poster.svg', backdropPath: '/__8f-backdrop.svg', status: 'watching', isArchived: false,
+  posterPath: 'http://127.0.0.1:4173/__8f-poster.svg', backdropPath: 'http://127.0.0.1:4173/__8f-backdrop.svg', status: 'watching', isArchived: false,
   createdAt: at(-90, 12), updatedAt: at(0, 22, 7), lastWatchedAt: at(0, 22, 7),
   seenEpisodes: ['S05E14', '5x13'], episodeRecords: { S05E14: { watchedAt: at(0, 22, 7), rating: 9, emotion: '♥', episodeTitle: 'Ozymandias' }, '5x13': { watchedAt: at(-1, 12), watchedTimeKnown: false }, '5x9': { watchedAt: at(0, 23) } },
   seasonsCache: [{ season_number: 5, episode_count: 16 }], seriesEnded: true,
