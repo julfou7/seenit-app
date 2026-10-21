@@ -1,14 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildSeriesSeasonProgress, seriesCardPosterCandidates, seriesCardPosterCrossOrigin, seriesEpisodeCode, upcomingCardTone } from '../src/features/watchlist/seriesCardPresentation.ts';
+import { buildSeriesSeasonProgress, seriesCardPosterCandidates, seriesCardPosterCrossOrigin, seriesCardStaleDetail, seriesEpisodeCode, upcomingCardTone } from '../src/features/watchlist/seriesCardPresentation.ts';
 import { dominantPosterHue, readPosterHue, rememberPosterHue, POSTER_HUE_CACHE_LIMIT } from '../src/features/watchlist/posterHue.ts';
 
 test('SEENIT-UX-014 conserve les états de saison sans inventer les diffusions', () => {
   const episode = { season_number: 5, episode_number: 4, episode_count: 8, aired_episodes_in_season: 5 };
-  const show = { seenEpisodes: ['5x1', '5x2', '5x3'], seasonsCache: [], nextEpisodeToWatch: episode, nextEpisodeToAir: null };
+  const show = { seenEpisodes: ['5x1', '5x2', '5x3'], seasonsCache: [], nextEpisodeToWatch: episode, nextEpisodeToAir: null, seriesEnded: true, tmdbStatus: 'Ended' };
   const progress = buildSeriesSeasonProgress(show, episode, 'watch', '2026-10-21');
   assert.equal(progress.label, 'S5 · 3/8');
+  assert.equal(progress.unknownTail, false);
   assert.deepEqual(progress.segments.map(item => item.state), ['seen', 'seen', 'seen', 'current', 'unseen', 'future', 'future', 'future']);
   assert.equal(seriesEpisodeCode(episode), 'S05 · E04');
   const legacy = buildSeriesSeasonProgress({ ...show, seenEpisodes: ['S05E01', '5x1', 's05e02', '5x3'] }, episode, 'watch', '2026-10-21');
@@ -19,32 +20,93 @@ test('SEENIT-UX-014 conserve les états de saison sans inventer les diffusions',
   const unknown = buildSeriesSeasonProgress(show, { season_number: 3, episode_number: 2, episode_count: 4 }, 'upcoming', '2026-10-21');
   assert.equal(unknown.segments[0].state, 'unknown');
   assert.equal(unknown.segments[1].state, 'current');
-  const missing = buildSeriesSeasonProgress(show, { season_number: 3, episode_number: 2 }, 'watch', '2026-10-21');
-  assert.equal(missing.label, 'S3 · 0/—');
-  assert.deepEqual(missing.segments, []);
+  const missing = buildSeriesSeasonProgress({ seenEpisodes: [], seasonsCache: [], nextEpisodeToWatch: null, nextEpisodeToAir: null, seriesEnded: false, tmdbStatus: 'Returning Series' }, { season_number: 3, episode_number: 2 }, 'watch', '2026-10-21');
+  assert.equal(missing.label, 'S3 · 0/?');
+  assert.deepEqual(missing.segments.map(item => item.state), ['unknown', 'current']);
+  assert.equal(missing.unknownTail, true, 'une vieille fiche sans cache garde les épisodes prouvés et une suite inconnue');
+});
+
+test('SEENIT-UX-014 représente Harry Potter et toute saison ouverte sans faux total', () => {
+  const episode = {
+    season_number: 1,
+    episode_number: 3,
+    episode_count: 4,
+    aired_episodes_in_season: 3,
+    known_episodes_in_season: 4,
+    season_total_unknown: true,
+    last_season_number: 1,
+    last_known_episode_type: 'standard',
+    last_known_episode_air_date: null,
+  };
+  const show = {
+    seenEpisodes: ['1x1', '1x2'],
+    seasonsCache: [],
+    nextEpisodeToWatch: episode,
+    nextEpisodeToAir: { season_number: 1, episode_number: 4, episode_count: 4, air_date: '2026-11-01' },
+    seriesEnded: false,
+    tmdbStatus: 'Returning Series',
+  };
+  const progress = buildSeriesSeasonProgress(show, episode, 'watch', '2026-10-21');
+  assert.equal(progress.label, 'S1 · 2/?');
+  assert.equal(progress.unknownTail, true);
+  assert.equal(progress.knownEpisodes, 4);
+  assert.equal(progress.availableUnseen, 1);
+  assert.equal(progress.detail, '1 dispo · total inconnu');
+  assert.deepEqual(progress.segments.map(item => item.state), ['seen', 'seen', 'current', 'future']);
+  assert.equal(progress.description, 'Saison 1 : 2 épisodes vus sur 4 connus, nombre total encore inconnu');
+
+  const finale = buildSeriesSeasonProgress({ ...show, nextEpisodeToAir: null }, {
+    ...episode,
+    season_total_unknown: false,
+    last_known_episode_type: 'finale',
+    last_known_episode_air_date: '2026-11-01',
+  }, 'watch', '2026-11-02');
+  assert.equal(finale.unknownTail, false, 'une preuve explicite de finale retire la traîne inconnue');
+  assert.equal(finale.label, 'S1 · 2/4');
+  const cachedFinale = buildSeriesSeasonProgress({ ...show, nextEpisodeToWatch: null, nextEpisodeToAir: null,
+    seasonsCache: [{ season_number: 1, episode_count: 4, episodes: [{ episode_number: 4, episode_type: 'finale', air_date: '2026-11-01' }] }],
+  }, { season_number: 1, episode_number: 3, episode_type: 'standard' }, 'watch', '2026-11-02');
+  assert.equal(cachedFinale.unknownTail, false, 'le type de l’épisode courant ne remplace pas celui du dernier épisode');
+});
+
+test('SEENIT-UX-014 restaure le nombre de jours pour une série laissée de côté', () => {
+  const now = Date.UTC(2026, 9, 21, 12, 0, 0);
+  const watchedAt = Date.UTC(2026, 7, 1, 20, 0, 0);
+  const show = {
+    seenEpisodes: ['1x1'],
+    episodeRecords: { 'S01E01': { watchedAt } },
+    lastWatchedAt: watchedAt - 86_400_000,
+  };
+  assert.equal(seriesCardStaleDetail(show, now), '⏳ Il y a 81 jours');
+  assert.equal(seriesCardStaleDetail({ ...show, episodeRecords: { '1x1': { watchedAt: now - (60 * 86_400_000) } } }, now), undefined);
+  assert.equal(seriesCardStaleDetail({ seenEpisodes: [], episodeRecords: {}, lastWatchedAt: watchedAt }, now), undefined, 'une série jamais commencée ne reçoit pas une fausse date de visionnage');
+  assert.equal(seriesCardStaleDetail({ ...show, lastWatchedAt: now, episodeRecords: { '1x1': { watchedAt }, '1x2': { watchedAt: now } } }, now), '⏳ Il y a 81 jours', 'les épisodes retirés de Vu ne modifient pas la récence');
 });
 
 test('SEENIT-UX-014 borne le rendu des saisons longues et conserve les proportions', () => {
   const episode = { season_number: 1, episode_number: 3, episode_count: 40, aired_episodes_in_season: 20 };
-  const progress = buildSeriesSeasonProgress({ seenEpisodes: ['1x1', '1x2'], nextEpisodeToWatch: episode }, episode, 'watch', '2026-10-21');
+  const progress = buildSeriesSeasonProgress({ seenEpisodes: ['1x1', '1x2'], nextEpisodeToWatch: episode, seriesEnded: true, tmdbStatus: 'Ended' }, episode, 'watch', '2026-10-21');
   assert.equal(progress.continuous, true);
   assert.ok(progress.segments.length <= 6);
   assert.equal(progress.segments.reduce((total, segment) => total + segment.count, 0), 40);
   assert.equal(progress.segments.find(segment => segment.state === 'future')?.count, 20);
-  const invalid = buildSeriesSeasonProgress({ seenEpisodes: [] }, { ...episode, episode_count: Number.MAX_SAFE_INTEGER }, 'watch', '2026-10-21');
-  assert.deepEqual(invalid.segments, []);
+  const invalid = buildSeriesSeasonProgress({ seenEpisodes: [], seriesEnded: true, tmdbStatus: 'Ended' }, { ...episode, episode_count: Number.MAX_SAFE_INTEGER }, 'watch', '2026-10-21');
+  assert.equal(invalid.segments.length, 3, 'le pointeur de reprise garde une progression minimale même si le total est invalide');
+  assert.equal(invalid.totalUnknown, true);
+  const malformed = buildSeriesSeasonProgress({ seenEpisodes: [`1x${Number.MAX_SAFE_INTEGER}`], nextEpisodeToAir: { season_number: 1, episode_number: Number.MAX_SAFE_INTEGER } }, { ...episode, episode_count: 4 }, 'watch', '2026-10-21');
+  assert.equal(malformed.knownEpisodes, 4, 'les identifiants corrompus ne provoquent pas une boucle non bornée');
 });
 
 test('la carte 8f respecte les dates et les épisodes vus indépendamment', () => {
   const episode = { season_number: 0, episode_number: 2 };
   const progress = buildSeriesSeasonProgress({
-    seenEpisodes: ['0x3', '1x1'], seasonsCache: [{ season_number: 0, episodes: [
+    seenEpisodes: ['0x3', '1x1'], seriesEnded: true, tmdbStatus: 'Ended', seasonsCache: [{ season_number: 0, episodes: [
       { episode_number: 1, air_date: '2026-10-20' }, { episode_number: 2, air_date: '2026-10-21' },
       { episode_number: 3, air_date: '2026-11-01' }, { episode_number: 4, air_date: '2026-11-02' },
     ] }],
   }, episode, 'watch', '2026-10-21');
   assert.deepEqual(progress.segments.map(item => item.state), ['unseen', 'current', 'seen', 'future']);
-  assert.equal(progress.label, 'S0 · 1/4');
+  assert.equal(progress.label, 'S0 · 1/?');
   assert.deepEqual([0, 1, 7, 8, 365].map(upcomingCardTone), ['today', 'soon', 'soon', 'later', 'later']);
 });
 
@@ -88,6 +150,11 @@ test('la carte 8f reste partagée par les adapters de production et leurs action
     assert.match(source, /<SeriesEpisodeCard/);
     assert.match(source, /usePassiveWatchProvider/);
   }
+  const continueWatching = readFileSync(new URL('../src/components/cards/ContinueWatchingCard.tsx', import.meta.url), 'utf8');
+  assert.match(continueWatching, /seriesCardStaleDetail\(show\)/, 'le rail réel restaure la récence sans dépendre du cache saison');
+  const card = readFileSync(new URL('../src/components/cards/SeriesEpisodeCard.tsx', import.meta.url), 'utf8');
+  assert.match(card, /series-8f__unknown-tail/);
+  assert.match(card, /Nombre d'épisodes encore inconnu/);
   const history = readFileSync(new URL('../src/components/HistoryFeed.tsx', import.meta.url), 'utf8');
   assert.match(history, /onUnseen: \(\) => setUnseenModalItem\(item\)/);
   assert.match(history, /onOpen=\{handleRowClick\}/);

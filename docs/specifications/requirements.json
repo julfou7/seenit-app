@@ -2058,6 +2058,18 @@
           "contains": "SEENIT-UX-014 borne le rendu des saisons longues et conserve les proportions"
         },
         {
+          "file": "tests/detailsSyncProgress.test.ts",
+          "contains": "SEENIT-UX-014 les deux synchronisations conservent la finale"
+        },
+        {
+          "file": "tests/seriesCardPresentation.test.ts",
+          "contains": "SEENIT-UX-014 représente Harry Potter et toute saison ouverte sans faux total"
+        },
+        {
+          "file": "tests/seriesCardPresentation.test.ts",
+          "contains": "SEENIT-UX-014 restaure le nombre de jours pour une série laissée de côté"
+        },
+        {
           "file": "tests/watchCardResume.test.ts",
           "contains": "#693 la façade de production marque exactement la reprise affichée et conserve le Show original"
         }

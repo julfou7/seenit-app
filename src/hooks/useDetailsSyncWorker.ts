@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { buildSeasonProgressEvidence } from '../features/shows/seasonProgressEvidence';
 import { db, auth, sendNativeNotification } from '../lib/firebase';
 import { doc, updateDoc, getDoc, getDocs, collection, addDoc } from 'firebase/firestore';
 import { tmdb } from '../features/shows/tmdb';
@@ -192,6 +193,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
 
         const nextEp = getNextEpisodeNumber(seasonsCache, showToSync.seenEpisodes || []);
         const isEnded = details.status === 'Ended' || details.status === 'Canceled';
+        const seasonProgress = buildSeasonProgressEvidence(seasonsCache, isEnded);
         const lastSeasonNum = Math.max(...seasonsCache.map(s => s.season_number), 0);
         const isFinalSeason = (sNum: number) => (sNum === lastSeasonNum) && (isEnded && (lastSeasonNum > 1 || details.type === 'Miniseries'));
 
@@ -209,6 +211,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         }
 
         const nextEpisodeToWatch = nextEp ? {
+          ...seasonProgress[String(nextEp.season)],
           season_number: nextEp.season,
           episode_number: nextEp.episode,
           air_date: nextEp.episodeData?.air_date || null,
@@ -224,6 +227,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         if (details.next_episode_to_air && (!details.next_episode_to_air.air_date || details.next_episode_to_air.air_date >= todayStr)) {
           const sNum = details.next_episode_to_air.season_number;
           nextEpisodeToAir = {
+            ...seasonProgress[String(sNum)],
             season_number: sNum,
             episode_number: details.next_episode_to_air.episode_number,
             air_date: details.next_episode_to_air.air_date,
@@ -239,6 +243,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
             for (const ep of s.episodes || []) {
               if (ep.air_date && ep.air_date >= todayStr) {
                 futureEpisodes.push({
+                  ...seasonProgress[String(s.season_number)],
                   season_number: s.season_number,
                   episode_number: ep.episode_number,
                   air_date: ep.air_date,
@@ -360,7 +365,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         const hasNextToWatchChanged = JSON.stringify(showToSync.nextEpisodeToWatch || null) !== JSON.stringify(nextEpisodeToWatch || null);
         const hasNextToAirChanged = JSON.stringify(showToSync.nextEpisodeToAir || null) !== JSON.stringify(nextEpisodeToAir || null);
         const hasTotalChanged = showToSync.totalEpisodes !== totalEpisodes || showToSync.totalAiredEpisodes !== totalAiredEpisodes;
-        const hasSeasonsCacheToDelete = !!showToSync.seasonsCache;
+        const hasSeasonsCacheToDelete = !!showToSync.seasonsCache || JSON.stringify(showToSync.seasonProgress || {}) !== JSON.stringify(seasonProgress);
         const hasArchivedChanged = showToSync.isArchived !== shouldBeArchived;
         const hasSeriesEndedChanged = showToSync.seriesEnded !== isEnded;
         const hasTmdbStatusChanged = showToSync.tmdbStatus !== (details.status || null);
@@ -404,7 +409,8 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
            continue;
         }
 
-        const updatePayload: any = {
+        const updatePayload: Record<string, unknown> = {
+          seasonProgress,
           nextEpisodeToWatch: nextEpisodeToWatch || null,
           nextEpisodeToAir: nextEpisodeToAir || null,
           totalEpisodes: totalEpisodes,
@@ -624,6 +630,7 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
 
     const nextEp = getNextEpisodeNumber(seasonsCache, showToSync.seenEpisodes || []);
     const isEnded = details.status === 'Ended' || details.status === 'Canceled';
+    const seasonProgress = buildSeasonProgressEvidence(seasonsCache, isEnded);
     const lastSeasonNum = Math.max(...seasonsCache.map(s => s.season_number), 0);
     const isFinalSeason = (sNum: number) => (sNum === lastSeasonNum) && (isEnded && (lastSeasonNum > 1 || details.type === 'Miniseries'));
 
@@ -641,6 +648,7 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
     }
 
     const nextEpisodeToWatch = nextEp ? {
+      ...seasonProgress[String(nextEp.season)],
       season_number: nextEp.season,
       episode_number: nextEp.episode,
       air_date: nextEp.episodeData?.air_date || null,
@@ -656,6 +664,7 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
     if (details.next_episode_to_air && (!details.next_episode_to_air.air_date || details.next_episode_to_air.air_date >= todayStr)) {
       const sNum = details.next_episode_to_air.season_number;
       nextEpisodeToAir = {
+        ...seasonProgress[String(sNum)],
         season_number: sNum,
         episode_number: details.next_episode_to_air.episode_number,
         air_date: details.next_episode_to_air.air_date,
@@ -671,6 +680,7 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
         for (const ep of s.episodes || []) {
           if (ep.air_date && ep.air_date >= todayStr) {
             futureEpisodes.push({
+              ...seasonProgress[String(s.season_number)],
               season_number: s.season_number,
               episode_number: ep.episode_number,
               air_date: ep.air_date,
@@ -712,7 +722,8 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
       nextEpisodeToAir
     });
 
-    const updatePayload: any = {
+    const updatePayload: Record<string, unknown> = {
+      seasonProgress,
       nextEpisodeToWatch: nextEpisodeToWatch || null,
       nextEpisodeToAir: nextEpisodeToAir || null,
       totalEpisodes: totalEpisodes,
