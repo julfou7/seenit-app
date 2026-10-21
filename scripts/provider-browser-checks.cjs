@@ -63,6 +63,9 @@ async function testProviderHarness(client, root) {
     await evaluate(client, 'window.__provider337.setPlatforms([]); window.__provider337.setPlex(false)');
     await check(client, `(${logo('card-tv')}).includes('netflix.png') && (${logo('card-unavailable')}).includes('netflix.png') && (${logo('card-grid')}).includes('netflix.png') && !document.querySelector('#card-grid-negative img')`, 'Plex absent permet le fallback public sans inventer de disponibilité');
     await check(client, 'window.__card337 === document.querySelector("#card-tv > div") && window.__provider337.telemetry.requests === 1', 'les cartes restent montées sans purge ni requête doublée');
+    await check(client, 'document.querySelector("#card-resume .series-8f__code").textContent.includes("S01 · E01") && !document.querySelector("#card-resume .series-8f__text").textContent.includes("À jour")', '#693 la carte réelle montre la reprise diffusée même sans pointeur');
+    await evaluate(client, 'document.querySelector("#card-resume .series-8f__check").click()');
+    await check(client, 'window.__provider337.telemetry.marks.length===1 && window.__provider337.telemetry.marks[0].id==="missing-resume" && window.__provider337.telemetry.marks[0].season===1 && window.__provider337.telemetry.marks[0].episode===1', '#693 la carte et la façade de production visent le même épisode sans toucher la diffusion future');
     const screenshot = await client.send('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync(path.join(root, 'quality-reports', `providers-${width}.png`), Buffer.from(screenshot.data, 'base64'));
     reports.push({ width, status: 'pass', productionComponents: ['ContinueWatchingCard', 'MovieWatchCard', 'GridMediaCard'], requests: 1, cloudReads: 2 });

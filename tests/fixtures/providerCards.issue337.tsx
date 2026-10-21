@@ -4,6 +4,8 @@ import { ContinueWatchingCard } from '../../src/components/cards/ContinueWatchin
 import { MovieWatchCard } from '../../src/components/cards/MovieWatchCard';
 import { GridMediaCard } from '../../src/components/GridMediaCard';
 import { type Show } from '../../src/types';
+import { markWatchCardEpisode } from '../../src/features/watchlist/watchCardResume';
+import { getTodayStr } from '../../src/lib/utils';
 import { hydratePlatformPreferences } from '../../src/features/providers/platformPreferenceHydration';
 import { writeUserScopedJson } from '../../src/lib/userIsolation';
 import { auth, telemetry, results, usePlexAvailabilityStore, finishProviderNetwork } from './providerRuntime.issue337';
@@ -20,6 +22,10 @@ const show: Show = {
   seenEpisodes: ['1x1'], episodeRecords: {},
   nextEpisodeToWatch: { season_number: 1, episode_number: 2, air_date: '2023-01-02', name: 'Épisode suivant' },
   networks: [{ name: 'Ancien badge Plex', logo_path: '/legacy-network.png' }],
+};
+const missingResume: Show = { ...show, id: 'missing-resume', seenEpisodes: [], nextEpisodeToWatch: null,
+  nextEpisodeToAir: { season_number: 1, episode_number: 7, air_date: '2099-12-01' },
+  seasonsCache: [{ season_number: 1, episode_count: 8, episodes: [{ episode_number: 1, air_date: '2023-01-01', name: 'Pilote diffusé' }, { episode_number: 7, air_date: '2099-12-01' }] }],
 };
 localStorage.clear();
 localStorage.setItem('seenit_watch_providers_v1', JSON.stringify({
@@ -52,6 +58,7 @@ function Harness() {
       <section id="card-grid"><GridMediaCard media={{ id: 125359, name: 'Lioness', media_type: 'tv', first_air_date: '2023-01-01', poster_path: null }} show={show} onShowClick={() => {}} /></section>
       <section id="card-grid-pending"><GridMediaCard media={{ id: 104, name: 'Média voisin', media_type: 'tv', first_air_date: '2023-01-01', poster_path: null }} show={{ ...show, tmdbId: 104 }} onShowClick={() => {}} /></section>
       <section id="card-grid-negative"><GridMediaCard media={{ id: 202, name: 'Sans diffuseur', media_type: 'tv', first_air_date: '2023-01-01', poster_path: null }} show={{ ...show, tmdbId: 202 }} onShowClick={() => {}} /></section>
+      <section id="card-resume"><ContinueWatchingCard show={missingResume} onMarkAsSeen={async target => { await markWatchCardEpisode(target, getTodayStr(), async (original, season, episode) => { telemetry.marks.push({ id: original.id, season, episode }); }); }} /></section>
     </>}
   </main>;
 }

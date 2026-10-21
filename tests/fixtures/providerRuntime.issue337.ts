@@ -5,7 +5,7 @@ export const auth = {
   onAuthStateChanged: (_listener: unknown) => () => {},
 };
 export const db = {};
-export const telemetry = { requests: 0, requestIds: [] as number[], reads: 0, saves: [] as number[][] };
+export const telemetry = { requests: 0, requestIds: [] as number[], reads: 0, saves: [] as number[][], marks: [] as Array<{ id: string; season: number; episode: number }> };
 export const results = { FR: { flatrate: [
   { provider_id: 8, provider_name: 'Netflix', logo_path: '/netflix.png' },
   { provider_id: 531, provider_name: 'Paramount Plus', logo_path: '/paramount.png' },

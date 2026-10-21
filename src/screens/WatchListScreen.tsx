@@ -1,6 +1,6 @@
 import React, { startTransition, useState, useEffect, useRef, useMemo, useCallback, type RefObject } from 'react';
 import { type Show } from '../types';
-import { cn, getNextEpisodeNumber, scrollAllCarouselsToStart, checkIsUpToDate, getAiredProgress } from '../lib/utils';
+import { cn, getNextEpisodeNumber, scrollAllCarouselsToStart, checkIsUpToDate, getAiredProgress, getTodayStr } from '../lib/utils';
 import { ContinueWatchingCard } from '../components/cards/ContinueWatchingCard';
 import { MovieWatchCard } from '../components/cards/MovieWatchCard';
 import { ShowNewsFeed } from '../components/ShowNewsFeed';
@@ -11,6 +11,7 @@ import { EpisodeDetailModal } from './EpisodeDetailModal';
 import { PersonDetailModal } from './PersonDetailModal';
 import { tmdb } from '../features/shows/tmdb';
 import { markEpisodeWatched } from '../features/shows/markEpisodeWatched';
+import { markWatchCardEpisode } from '../features/watchlist/watchCardResume';
 import { getFormattedProviderLogo } from '../utils/providerLogos';
 import { User, Circle, CheckCircle2, Trash2, Archive, X, Clock, Ban } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
@@ -90,7 +91,7 @@ export function WatchListScreen({
     openingEpisodeRef.current = true;
 
     const upcomingEp = getUpcomingEpisodeInfo(show);
-    const candidates = [show.nextEpisodeToWatch, upcomingEp].filter(Boolean) as any[];
+    const candidates = [show.nextEpisodeToWatch, upcomingEp].filter(Boolean) as Array<{ season_number: number; episode_number: number; name?: string; air_date?: string | null; still_path?: string | null }>;
     const knownEpisode = candidates.find(ep =>
       Number(ep?.season_number) === Number(seasonNumber)
       && Number(ep?.episode_number) === Number(episodeNumber)
@@ -547,11 +548,8 @@ export function WatchListScreen({
   }, [allShows]);
 
   const markNextEpisodeAsSeen = useCallback(async (show: Show) => {
-    if (!show.id || !show.nextEpisodeToWatch) return;
-    const { season_number, episode_number } = show.nextEpisodeToWatch;
     const wasInPasVu = pasVuDepuisUnMomentShows.some(s => s.id === show.id);
-
-    await markEpisodeWatched(show, season_number, episode_number);
+    if (!await markWatchCardEpisode(show, getTodayStr(), markEpisodeWatched)) return;
 
     if (wasInPasVu) {
       setTimeout(() => {
