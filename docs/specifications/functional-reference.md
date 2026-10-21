@@ -199,13 +199,15 @@ inconnues.
 
 Les règles exactes de frontière sont dans `seenit.md` §5.1. Chaque carrousel matérialise une fenêtre d'au
 moins huit cartes et recycle celles qui quittent largement le viewport ; des espaceurs transparents
-préservent la largeur totale et la position du rail. Le glissement horizontal conserve l'inertie native du
-geste : aucun scroll-snap n'est appliqué et aucun marqueur terminal **« Voir tout »** n'est injecté dans le
-rail. Le vrai bouton **« Voir tout »** de l'en-tête reste l'alternative accessible et ouvre la vue verticale
-exhaustive, paginée par lots de huit. Une carte passive conserve son visuel initial et reporte tout
-enrichissement diffuseur jusqu'à l'arrêt du scroll. Les cartes film réduites réutilisent les détails déjà
-en cache sans déclencher de chargement décoratif supplémentaire ; la vue exhaustive complète ces détails
-après stabilisation du geste, avec une concurrence bornée.
+préservent la largeur totale et la position du rail. Les trois rails séries réduits de À Regarder avancent
+carte par carte avec un scroll-snap horizontal obligatoire et un arrêt sur chaque carte, tout en conservant
+la virtualisation et le préchargement. Le rail **Films à voir** conserve l'inertie native libre sans
+scroll-snap. Aucun marqueur terminal **« Voir tout »** n'est injecté dans le rail. Le vrai bouton **« Voir
+tout »** de l'en-tête reste l'alternative accessible et ouvre la vue verticale exhaustive, paginée par lots
+de huit. Une carte passive conserve son visuel initial et reporte tout enrichissement diffuseur jusqu'à
+l'arrêt du scroll. Les cartes film réduites réutilisent les détails déjà en cache sans déclencher de
+chargement décoratif supplémentaire ; la vue exhaustive complète ces détails après stabilisation du geste,
+avec une concurrence bornée.
 Les médias abandonnés, archivés ou terminés ne reviennent pas dans le parcours actif.
 
 Les séries de ces trois rails et de leur vue « Voir tout » partagent la [carte 8f](../design/card-8f.md)
@@ -297,7 +299,6 @@ Firestore privé.
 
 Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, **Pépites**,
 **Au cinéma**, **Documentaires** et **Personnes**.
-
 - Recherche multi-pages TMDB, regroupée en personnes, séries et films.
 - Filtres par plateformes choisies dans les réglages, genres, **Âge conseillé** maximal et note minimale.
 - Le filtre **Films · sortis après** accepte une année de 1900 à l'année courante. Choisir `Y` force
@@ -497,7 +498,6 @@ swipes de suppression/abandon sur les cartes.
 - Les notes d'épisodes utilisent uniquement TMDB. Le graphique complet est affiché exclusivement dans
   l'onglet **Épisodes**, sans légende permanente ni répétition de source/votes, avec nombres visibles,
   scroll horizontal pour les saisons longues et ouverture du détail par une cible de 44 px.
-
 ### 8.4 Ordre de visionnage et franchise / univers
 
 La cible produit des fiches est volontairement simple :
@@ -597,7 +597,6 @@ TMDB. Les détails biographiques restent disponibles dans un panneau repliable a
 filmographie visible plus tôt ; les affiches de la filmographie utilisent deux colonnes sur petit écran.
 
 ## 9. Plex
-
 ### 9.1 Association et ouverture
 
 - L'association utilise le PIN Plex dans une page externe, sondée toutes les trois secondes jusqu'au

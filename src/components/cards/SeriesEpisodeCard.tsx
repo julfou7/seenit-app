@@ -31,6 +31,9 @@ const segmentNames: Record<SeasonSegmentState, string> = {
   seen: 'Vu', current: 'Prochain épisode', unseen: 'Diffusé, non vu', future: 'À venir', history: 'Épisode de cet historique', unknown: 'Diffusion à confirmer',
 };
 
+const BADGE_DETAIL = /^(?:🔥|🌟|🆕|🏁|⏳)/u;
+const REMAINING_DETAIL = /\brestant(?:s)?\b/i;
+
 export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo, providerName, onOpen, onOpenSeries, onOpenEpisode, actions = [], layout = 'list' }: Props) {
   const posterCandidates = seriesCardPosterCandidates(show);
   const posterCandidatesKey = posterCandidates.join('\u0000');
@@ -53,6 +56,8 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const progress = episode ? buildSeriesSeasonProgress(show, episode, context.kind, today) : { label: 'À actualiser', description: 'Épisode de reprise à confirmer', continuous: false, segments: [] };
   const code = episode ? seriesEpisodeCode(episode) : 'Épisode à confirmer';
+  const visibleDetail = detail?.trim() && !REMAINING_DETAIL.test(detail) ? detail.trim() : undefined;
+  const detailIsBadge = visibleDetail ? BADGE_DETAIL.test(visibleDetail) : false;
   const watchedDate = context.kind === 'history' ? new Date(context.watchedAt) : null;
   const validWatchedDate = watchedDate && Number.isFinite(watchedDate.getTime());
   const watchedTime = validWatchedDate ? watchedDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'Heure inconnue';
@@ -97,11 +102,10 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
       </div>
       <div className="series-8f__text">
         <h3 id={titleId}>{show.title}</h3>
-        <div className="series-8f__code"><strong>{code}</strong>{detail && <span> · {detail}</span>}</div>
+        <div className="series-8f__code"><strong>{code}</strong>{visibleDetail && (detailIsBadge ? <span className="series-8f__badge">{visibleDetail}</span> : <span> · {visibleDetail}</span>)}</div>
         <p>{context.kind === 'watch' && context.upToDate ? 'À jour' : episode?.name || (episode ? `Épisode ${episode.episode_number}` : 'Reprise à actualiser')}</p>
       </div>
       <div className="series-8f__season">
-        <span className="series-8f__season-label">{progress.label}</span>
         <div className={`series-8f__segments${progress.continuous ? ' series-8f__segments--continuous' : ''}`} role="img" aria-label={progress.description}>
           {progress.segments.map((segment, index) => <span key={index} className={`series-8f__segment series-8f__segment--${segment.state}`} style={{ flexGrow: segment.count }} title={`${segment.episode ? `Épisode ${segment.episode} : ` : ''}${segmentNames[segment.state]}`} />)}
         </div>

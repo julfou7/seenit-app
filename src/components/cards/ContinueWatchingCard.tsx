@@ -1,10 +1,9 @@
 import React from 'react';
 import type { Show } from '../../types';
-import { getTodayStr } from '../../lib/utils';
+import { getCalendarDaysDiff, getTodayStr } from '../../lib/utils';
 import { getFormattedProviderLogo } from '../../utils/providerLogos';
 import { usePassiveWatchProvider } from '../../hooks/usePassiveWatchProvider';
 import { hasAiredEpisodeEvidence } from '../../features/watchlist/watchAvailability';
-import { getExtraAvailableEpisodes } from '../../features/watchlist/watchEpisodeProgress';
 import type { SeriesCardEpisode } from '../../features/watchlist/seriesCardPresentation';
 import { resolveWatchCardResume } from '../../features/watchlist/watchCardResume';
 import { SeriesEpisodeCard, type SeriesCardAction } from './SeriesEpisodeCard';
@@ -17,6 +16,15 @@ interface Props {
   onMarkAsSeen: (show: Show) => void | Promise<void>;
   layout?: 'rail' | 'list';
   actions?: SeriesCardAction[];
+}
+
+function episodeFreshnessBadge(episode: SeriesCardEpisode | null | undefined, todayStr: string): string | undefined {
+  if (!episode?.air_date) return undefined;
+  const days = getCalendarDaysDiff(episode.air_date, todayStr);
+  if (days === 0) return '🔥 Sorti aujourd’hui';
+  if (days === -1) return '🌟 Sorti hier';
+  if (days <= -2 && days >= -7) return `🆕 Il y a ${Math.abs(days)} jours`;
+  return undefined;
 }
 
 export const ContinueWatchingCard = React.memo(function ContinueWatchingCard(props: Props) {
@@ -32,7 +40,6 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
   });
   const todayStr = getTodayStr();
   const { episode: nextEpNum, upToDate: isUpToDate } = resolveWatchCardResume(show, todayStr);
-  const extraAvailableEpisodes = nextEpNum ? getExtraAvailableEpisodes(show, nextEpNum, todayStr) : 0;
   const cachedSeason = nextEpNum ? show.seasonsCache?.find(season => season.season_number === nextEpNum.season_number) : undefined;
   const cachedEpisode = cachedSeason?.episodes?.find((episode: SeriesCardEpisode) => episode.episode_number === nextEpNum?.episode_number) as (SeriesCardEpisode & { still_path?: string }) | undefined;
   const episodeStill = nextEpNum?.still_path || cachedEpisode?.still_path;
@@ -41,12 +48,13 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
   const showPoster = show.posterPath;
   const rawPath = episodeStill || currentSeasonArtwork || showBackdrop || showPoster;
   const openEpisode = onEpisodeClick && nextEpNum ? () => onEpisodeClick(show, nextEpNum.season_number, nextEpNum.episode_number) : undefined;
+  const freshnessBadge = isUpToDate ? undefined : episodeFreshnessBadge(nextEpNum, todayStr);
   return <div ref={cardRef} className="series-8f-host">
     <SeriesEpisodeCard
       show={{ ...show, backdropPath: rawPath }}
       episode={nextEpNum ? { ...nextEpNum, name: nextEpNum.name || cachedEpisode?.name } : null}
       context={{ kind: 'watch', upToDate: isUpToDate, onMarkSeen: nextEpNum ? () => onMarkAsSeen(show) : undefined }}
-      detail={isUpToDate ? 'À jour' : nextEpNum ? `${extraAvailableEpisodes + 1} restant${extraAvailableEpisodes ? 's' : ''}` : 'À actualiser'}
+      detail={freshnessBadge}
       providerLogo={getFormattedProviderLogo(providerLogo, providerName)} providerName={providerName}
       onOpen={() => { if (onShowClick) onShowClick(show.id, 'tv'); else openEpisode?.(); }}
       onOpenEpisode={openEpisode} actions={actions} layout={layout}

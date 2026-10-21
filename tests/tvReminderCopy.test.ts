@@ -100,12 +100,12 @@ test('SEENIT-NOTIFICATION-002 et #623 alignent le rappel en retard sur le procha
     "À voir : S02 | E02 · Deuxième manche · + 3 épisodes. Nouvel épisode : S02 | E05 · Cinquième manche disponible aujourd'hui.",
   );
 
+  // Le nom de ce TNR est conservé pour l'ancrage SEENIT-NOTIFICATION-002 historique.
+  // Depuis #690, la carte 8f réserve cet emplacement aux badges et ne répète plus le compteur.
   const homeSource = readFileSync('src/components/cards/ContinueWatchingCard.tsx', 'utf8');
-  assert.match(
-    homeSource,
-    /getExtraAvailableEpisodes\(show, nextEpNum, todayStr\)/,
-    'la carte À Regarder doit utiliser le même calcul de + X que les notifications',
-  );
+  assert.doesNotMatch(homeSource, /getExtraAvailableEpisodes/);
+  assert.doesNotMatch(homeSource, /restant/);
+  assert.match(homeSource, /episodeFreshnessBadge/);
 });
 
 test('SEENIT-NOTIFICATION-002 et #623 restent lisibles lorsque TMDB ne fournit pas de nom d’épisode', () => {

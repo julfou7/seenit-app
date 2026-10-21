@@ -8,6 +8,7 @@ const mainSource = readFileSync(new URL('../src/main.tsx', import.meta.url), 'ut
 const carouselUxCss = readFileSync(new URL('../src/styles/watchlistCarouselUx.css', import.meta.url), 'utf8');
 const continueCardSource = readFileSync(new URL('../src/components/cards/ContinueWatchingCard.tsx', import.meta.url), 'utf8');
 const movieCardSource = readFileSync(new URL('../src/components/cards/MovieWatchCard.tsx', import.meta.url), 'utf8');
+const seriesCardSource = readFileSync(new URL('../src/components/cards/SeriesEpisodeCard.tsx', import.meta.url), 'utf8');
 const seriesCardCss = readFileSync(new URL('../src/components/cards/seriesEpisodeCard.css', import.meta.url), 'utf8');
 
 const WATCHLIST_CAROUSEL_IDS = [
@@ -15,6 +16,12 @@ const WATCHLIST_CAROUSEL_IDS = [
   'nouveautes-carousel',
   'pas-vu-depuis-un-moment-carousel',
   'films-a-voir-carousel',
+];
+
+const SERIES_CAROUSEL_IDS = [
+  'continue-watching-carousel',
+  'nouveautes-carousel',
+  'pas-vu-depuis-un-moment-carousel',
 ];
 
 test('#229 conserve un premier lot borné puis rend les quatre carrousels progressifs', () => {
@@ -39,17 +46,14 @@ test('#229 conserve un premier lot borné puis rend les quatre carrousels progre
   );
 });
 
-test('#229 rend le scroll horizontal réellement libre, sans snap obligatoire ni de proximité', () => {
+test('#690 fait avancer les rails séries 8f carte par carte sans modifier le rail films', () => {
   assert.match(mainSource, /import '\.\/styles\/watchlistCarouselUx\.css';/);
-  assert.match(carouselUxCss, /scroll-snap-type:\s*none !important;/);
-  assert.doesNotMatch(carouselUxCss, /scroll-snap-type:\s*x\s+(?:mandatory|proximity)/);
-  assert.doesNotMatch(
-    watchListSource,
-    /scroll-px-4 sm:scroll-px-6 scrollbar-none snap-x snap-mandatory/,
-    'les rails À Regarder ne doivent plus demander de snap à Tailwind'
-  );
+  assert.match(carouselUxCss, /scroll-snap-type:\s*x mandatory !important;/);
+  assert.match(carouselUxCss, /#films-a-voir-carousel\s*\{\s*scroll-snap-type:\s*none !important;/);
+  assert.match(seriesCardCss, /\.series-8f-host\s*\{[^}]*scroll-snap-align:start;[^}]*scroll-snap-stop:always;/);
+  assert.match(seriesCardCss, /\.series-8f--rail\s*\{[^}]*width:88vw;/);
 
-  for (const id of WATCHLIST_CAROUSEL_IDS) {
+  for (const id of SERIES_CAROUSEL_IDS) {
     assert.match(carouselUxCss, new RegExp(`#${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
   }
 });
@@ -70,9 +74,17 @@ test('#229 retire le faux Voir tout terminal et conserve le vrai bouton d’en-t
   );
 });
 
-test('#690 remplace le titre mono-ligne des séries par la 8f sans toucher aux films', () => {
+test('#690 aligne la hiérarchie 8f et retire les compteurs redondants', () => {
   assert.match(continueCardSource, /<SeriesEpisodeCard/);
   assert.match(movieCardSource, /line-clamp-2/);
+  assert.match(seriesCardCss, /\.series-8f__text h3\s*\{[^}]*color:#F2C36B;/);
+  assert.match(seriesCardCss, /\.series-8f__code strong\s*\{[^}]*color:#fff;/);
+  assert.match(seriesCardCss, /\.series-8f__check\s*\{[^}]*background:#0B0B0F !important;/);
+  assert.doesNotMatch(seriesCardSource, /series-8f__season-label/);
+  assert.doesNotMatch(continueCardSource, /restant/);
+  assert.match(continueCardSource, /Sorti aujourd’hui/);
+  assert.match(continueCardSource, /Sorti hier/);
+  assert.match(seriesCardSource, /REMAINING_DETAIL/);
   assert.doesNotMatch(carouselUxCss, /-webkit-line-clamp:\s*1/);
   assert.match(seriesCardCss, /\.series-8f__text h3,\.series-8f__text p\s*\{[^}]*-webkit-line-clamp:2/);
   assert.match(

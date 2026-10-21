@@ -1172,7 +1172,9 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   La coche Vu, le rappel et les actions d'historique sont des contrôles séparés d'au moins 44 px.
   Les opérations réutilisent leurs handlers et Annuler existants. Appui long, menu contextuel et clavier
   partagent les mêmes actions, sans clic d'ouverture après un appui long ni timer persistant au scroll.
-  La carte conserve les rails libres/virtualisés et se réutilise en liste, sans modifier les films.
+  Les trois rails séries réduits de À Regarder restent virtualisés mais avancent carte par carte avec
+  un snap horizontal obligatoire et un arrêt sur chaque carte ; le rail Films à voir conserve son
+  défilement libre. La carte se réutilise en liste sans modifier les films.
   Le prochain épisode à voir et l'action Vu utilisent le même résolveur : un pointeur de diffusion
   future ne devient jamais une reprise. Si le pointeur de reprise manque, les épisodes diffusés du
   cache et la progression persistée servent de preuve ; une reprise inconnue est « À actualiser »,

@@ -1,19 +1,24 @@
 /*
  * À Voir — carrousels réduits.
  *
- * Le rail conserve l'inertie native du geste, sans aucun scroll snap.
- * React ne garde qu'une fenêtre DOM bornée et les espaceurs préservent
- * la position horizontale.
+ * Les trois rails séries 8f avancent désormais carte par carte : snap obligatoire,
+ * arrêt sur chaque carte et aperçu de la suivante. React conserve sa fenêtre DOM
+ * bornée et les espaceurs préservent la position horizontale.
  *
- * Les séries utilisent désormais le composant 8f et son titre sur deux
- * lignes. "Films à voir" conserve son propre slot titre sur deux lignes.
+ * "Films à voir" garde l'inertie native libre de #229 et son propre slot titre
+ * sur deux lignes.
  */
 :is(
   #continue-watching-carousel,
   #nouveautes-carousel,
-  #pas-vu-depuis-un-moment-carousel,
-  #films-a-voir-carousel
+  #pas-vu-depuis-un-moment-carousel
 ) {
+  scroll-snap-type: x mandatory !important;
+  scroll-padding-inline: 16px;
+  overscroll-behavior-inline: contain;
+}
+
+#films-a-voir-carousel {
   scroll-snap-type: none !important;
 }
 
