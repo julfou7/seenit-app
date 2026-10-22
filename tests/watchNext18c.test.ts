@@ -51,4 +51,8 @@ test('SEENIT-UX-016 exécute les composants réels dans Chromium et respecte les
   assert.match(css, /prefers-reduced-motion:reduce/);
   assert.match(css, /movie-ticket--watched/);
   assert.match(css, /scroll-snap-type:x proximity/);
+  const actions = readFileSync(new URL('../scripts/watch-next-browser-checks.cjs', import.meta.url), 'utf8');
+  assert.match(actions, /await delay\(4300\)/);
+  assert.match(actions, /aucun rollback, faux échec ou succès prématuré/);
+  assert.match(actions, /succès annoncé seulement après confirmation Firestore/);
 });

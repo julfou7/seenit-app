@@ -8,7 +8,7 @@ import { getTodayStr } from '../../src/lib/utils';
 import { useToastStore } from '../../src/store/toastStore';
 import { auth, telemetry, useShowsStore, updateShow, releaseWrite, switchAccount, advanceClock } from './watchNext18cRuntime';
 Object.defineProperty(navigator, 'vibrate', { value: (milliseconds: number) => { telemetry.vibrations.push(milliseconds); return true; } });
-Object.assign(window, { __watch18c: { telemetry, releaseWrite, switchAccount, advanceClock, clearToasts: () => useToastStore.getState().clearQueue(), snapshot: () => useShowsStore.getState().shows } });
+Object.assign(window, { __watch18c: { telemetry, releaseWrite, switchAccount, advanceClock, clearToasts: () => useToastStore.getState().clearQueue(), toasts: () => [useToastStore.getState().currentToast, ...useToastStore.getState().queue].filter(Boolean), snapshot: () => useShowsStore.getState().shows } });
 function Harness() {
   const allShows = useShowsStore(state => state.shows);
   const [expanded, setExpanded] = useState(false);

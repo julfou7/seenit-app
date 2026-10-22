@@ -170,10 +170,11 @@ export async function markEpisodeWatched(
       await updateDoc(docRef, updatePayload);
 
       useLogStore.getState().addLog(`[Firestore] Succès de la màj atomique pour ${stringId} (Ep: ${epKey})`, "success");
-    } catch (error: any) {
-      useLogStore.getState().addLog(`[Firestore] ERREUR lors de la màj pour la série ${targetShow.id} : ${error.message}`, "error");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      useLogStore.getState().addLog(`[Firestore] ERREUR lors de la màj pour la série ${targetShow.id} : ${message}`, "error");
       console.error("Firestore update error:", error);
-      useLogStore.getState().addLog(`[Système] Erreur de mise à jour Firestore: ${error.message || String(error)}`, 'error', error);
+      useLogStore.getState().addLog(`[Système] Erreur de mise à jour Firestore: ${message}`, 'error', error);
       if (auth.currentUser?.uid === initiatingUid) {
         useShowsStore.getState().updateShowOptimistic(targetShow.id, {
           seenEpisodes: prevSeenEpisodes, episodeRecords: prevEpisodeRecords, lastWatchedAt: prevLastWatchedAt,

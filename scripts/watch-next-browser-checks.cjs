@@ -49,8 +49,14 @@ async function testWatchNextHarness(client, root) {
     await check(client, 'document.querySelectorAll("#watch-next-series article").length===8 && !document.querySelector(".watch-next-18c__more")', 'dernier lot');
     await click(client, '.watch-next-18c__reduce');
     await check(client, 'document.querySelectorAll("#watch-next-series article").length===3', 'Réduire à trois');
+    await evaluate(client, 'window.__watch18c.clearToasts();window.__watch18c.telemetry.holdNext=true');
     await click(client, '#watch-next-series .series-8f__check');
+    await check(client, 'window.__watch18c.telemetry.writes.length===1 && window.__watch18c.snapshot()[0].seenEpisodes.includes("1x2")', 'écriture série réellement engagée et état optimiste présent');
+    await delay(4300);
+    await check(client, 'window.__watch18c.snapshot()[0].seenEpisodes.includes("1x2") && !document.querySelector("#watch-next-series [data-error=true]") && window.__watch18c.toasts().length===0 && !document.querySelector(".series-8f__ghost")', 'Firestore lent au-delà de quatre secondes : aucun rollback, faux échec ou succès prématuré');
+    await evaluate(client, 'window.__watch18c.releaseWrite()');
     await check(client, 'document.querySelector("#watch-next-series .series-8f__code").textContent.includes("E03") && (document.querySelector(".series-8f__ghost")?.textContent || "").includes("E02") && window.__watch18c.telemetry.writes.length===1 && window.__watch18c.telemetry.opens.length===0', 'la façade réelle marque exactement E02 et anime la reprise E03');
+    await check(client, 'window.__watch18c.toasts().some(toast=>toast.type==="success")', 'succès annoncé seulement après confirmation Firestore');
     if (width === 360) {
       await delay(300);
       const actionCapture = await client.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });

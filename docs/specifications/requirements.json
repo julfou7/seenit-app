@@ -2077,7 +2077,7 @@
     },
     {
       "id": "SEENIT-UX-016",
-      "title": "À Regarder 18c, séries par trois et tickets films réversibles",
+      "title": "À Regarder 18c, séries par trois, tickets réversibles et confirmation Firestore réelle",
       "targets": [
         "pwa",
         "apk"
