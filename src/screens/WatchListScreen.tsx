@@ -42,15 +42,18 @@ import {
   parseTimestamp,
 } from './watchListPresentation';
 import { WatchListView } from './WatchListView';
+import { useTabShortcut } from '../features/navigation/useTabShortcut';
 import { type EpisodeDetailData } from './episodeDetailTypes';
 
 export function WatchListScreen({
   onShowClick: onShowClickProp,
   onEpisodeParentClick: onEpisodeParentClickProp,
+  navigationShortcut,
 }: {
   onShowClick: (id: string, mediaType?: 'tv' | 'movie') => void;
   onEpisodeParentClick?: (id: string, mediaType?: 'tv' | 'movie') => void;
   onOpenProfile?: () => void;
+  navigationShortcut?: number;
 }) {
   const onShowClick = useCallback((id: string, mediaType?: 'tv' | 'movie') => {
     sessionStorage.setItem('home_scroll', window.scrollY.toString());
@@ -58,6 +61,11 @@ export function WatchListScreen({
   }, [onShowClickProp]);
 
   const [activeTab, setActiveTab] = useState<'watch_next' | 'upcoming' | 'history'>('watch_next');
+  useTabShortcut(navigationShortcut, () => {
+    setActiveTab('watch_next');
+    const frame = requestAnimationFrame(() => document.getElementById('watchlist-container')?.scrollTo({ top: 0, behavior: 'smooth' }));
+    return () => cancelAnimationFrame(frame);
+  });
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [selectedEpisodeModal, setSelectedEpisodeModal] = useState<{ show: Show; season: number; episode: EpisodeDetailData; isHydrating: boolean } | null>(null);
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);

@@ -19,7 +19,7 @@ test('Explorer place Top 100 dans le type de contenu et plus dans les tris', () 
 
 test('le panneau de filtres reste au-dessus de la navigation basse', () => {
   const filterZ = Number(filterSource.match(/z-\[(\d+)\]/)?.[1]);
-  const navZ = Number(bottomNavSource.match(/z-\[(\d+)\]/)?.[1]);
+  const navZ = Number(readFileSync('src/components/bottomNav.css', 'utf8').match(/z-index:(\d+)/)?.[1]);
   assert.ok(Number.isFinite(filterZ) && Number.isFinite(navZ), 'les deux couches doivent avoir un z-index explicite');
   assert.ok(filterZ > navZ, `FilterModal (z=${filterZ}) doit passer au-dessus de BottomNav (z=${navZ})`);
   assert.match(filterSource, /Afficher les résultats/);

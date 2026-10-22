@@ -2076,6 +2076,28 @@
       ]
     },
     {
+      "id": "SEENIT-UX-017",
+      "title": "Navigation flottante 13j, gestes locaux et point de téléchargement",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/navbar13j.test.ts",
+          "contains": "SEENIT-UX-017 privilégie les transferts actifs"
+        },
+        {
+          "file": "tests/navbar13j.test.ts",
+          "contains": "SEENIT-UX-017 acquitte uniquement les transferts terminés consultés"
+        },
+        {
+          "file": "tests/bottomNavigationLayout.test.ts",
+          "contains": "SEENIT-UX-017 conserve l’ordre"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-UX-016",
       "title": "À Regarder 18c, séries par trois, tickets réversibles et confirmation Firestore réelle",
       "targets": [

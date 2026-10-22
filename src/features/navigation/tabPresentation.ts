@@ -10,8 +10,8 @@ export interface NavigationTabPresentation {
 export const NAVIGATION_TABS: readonly NavigationTabPresentation[] = [
   { id: 'watchlist', label: 'À Voir', symbol: 'watch' },
   { id: 'discover', label: 'Explorer', symbol: 'discover' },
+  { id: 'profile', label: 'Moi', symbol: 'profile' },
   { id: 'downloads', label: 'Télécharger', symbol: 'download' },
-  { id: 'profile', label: 'Profil', symbol: 'profile' },
 ] as const;
 
 const NAVIGATION_TAB_BY_ID = new Map<RootNavigationTab, NavigationTabPresentation>(

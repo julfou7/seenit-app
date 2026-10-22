@@ -4,7 +4,8 @@ import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { isDownloadFeatureEnabled } from '../features/downloads/downloadFeatureVisibility';
 
 interface Props {
-  onShowClick?: (id: any, mediaType?: 'tv' | 'movie') => void;
+  onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void;
+  navigationShortcut?: number;
 }
 
 const DownloadsScreenCore = lazy(() => import('./DownloadsScreenCore').then(module => ({ default: module.DownloadsScreen })));

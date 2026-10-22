@@ -12,6 +12,7 @@ import { SeenItLogo } from '../components/SeenItLogo';
 import { LibraryScreen } from './LibraryScreen';
 import { useToastStore } from '../store/toastStore';
 import { getProfileAvatarUrl, getProfileInitials } from '../features/profile/profileAvatar';
+import { useTabShortcut } from '../features/navigation/useTabShortcut';
 
 const ProfileStatsContent = React.memo(function ProfileStatsContent({
   onPersonClick,
@@ -24,12 +25,17 @@ const ProfileStatsContent = React.memo(function ProfileStatsContent({
 
 export const ProfileScreen = React.memo(function ProfileScreen({
   initialShowSettings = false,
-  onShowClick
+  onShowClick,
+  onQuickSettings,
+  navigationShortcut,
 }: {
   initialShowSettings?: boolean;
   onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void;
+  onQuickSettings?: () => void;
+  navigationShortcut?: number;
 }) {
   const [showSettings, setShowSettings] = useState(initialShowSettings);
+  useTabShortcut(navigationShortcut, () => setShowSettings(true));
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
   // App ne monte le Profil qu'après résolution de Firebase Auth : reprendre la
   // valeur déjà disponible évite une frame « Utilisateur » au redémarrage.
@@ -241,6 +247,7 @@ export const ProfileScreen = React.memo(function ProfileScreen({
               <Settings size={15} className="text-[#E5A93D]" />
               <span>Réglages</span>
             </button>
+            {onQuickSettings && <button type="button" onClick={onQuickSettings} className="min-h-11 rounded-xl border border-white/10 px-3 text-xs font-semibold text-zinc-200">Réglages rapides</button>}
           </div>
         </div>
 

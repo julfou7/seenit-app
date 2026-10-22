@@ -41,7 +41,8 @@ export function useDebounce<T>(value: T, delay: number): [T] {
 }
 
 export interface Props {
-  onShowClick: (id: any, mediaType?: 'tv' | 'movie') => void;
+  navigationShortcut?: number;
+  onShowClick: (id: string | number, mediaType?: 'tv' | 'movie') => void;
 }
 
 export const DISCOVER_GRID_INITIAL_ITEMS = 30;

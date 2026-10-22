@@ -31,7 +31,7 @@ html, body {
 .seenit-dialog-layer .seenit-dialog-header { padding-top: 0.75rem; }
 .seenit-sheet-header { padding-top: 0.75rem; }
 .seenit-dialog-layer[data-dialog-blocking="false"] {
-  height: calc(var(--dialog-height, 100dvh) - 5.25rem - var(--seenit-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+  height: var(--dialog-height, 100dvh);
   padding-top: var(--seenit-safe-area-top, env(safe-area-inset-top, 0px));
   padding-bottom: 0;
 }
@@ -69,12 +69,12 @@ html, body {
   }
 }
 
-/* Le conteneur Toast reste l'unique surface fixe des toasts. On ajoute une
-   respiration de 0,75rem au-dessus de la BottomNav, en conservant la safe area
-   et sans réduire le contenu ou les cibles tactiles des variantes compactes/média. */
+/* Position globale 13j : respiration au-dessus de l'îlot et repli sans barre. */
 #toast-notification-wrapper {
-  bottom: calc(6.25rem + env(safe-area-inset-bottom, 0px)) !important;
-  bottom: calc(6.25rem + var(--seenit-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
+  bottom: calc(80px + var(--seenit-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
+}
+body:has([data-dialog-layer]) #toast-notification-wrapper {
+  bottom: calc(24px + var(--seenit-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
 }
 
 /* Le bandeau Film/Série des cartes Téléchargements est un élément sous l'affiche,
