@@ -1192,6 +1192,8 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   un seul compteur en attente. L'ordre des groupes existants et leur éligibilité sont conservés.
   Un Vu abouti anime l'épisode quitté, la nouvelle reprise réelle, le segment et un tampon SeenIt ;
   à jour permet le retour du dernier épisode explicitement marqué dans la session, avec Annuler.
+  Une écriture Firestore encore en attente reste en cours, sans faux échec ni rollback local sur
+  délai arbitraire ; seul son rejet définitif restaure l'état antérieur. Le succès attend son acquittement.
   Les films sont des tickets 144 px : année et fin depuis Maintenant ou l'heure de lancement choisie,
   actualisée chaque minute et orange après minuit ; sans durée, aucune fin inventée. Le tri place les
   durées connues en ordre croissant, les inconnues après ; une coche conserve sa place pendant la session,

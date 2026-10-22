@@ -26,6 +26,9 @@ série préserve les autres records et offre le même toast Annuler. Les cibles 
 Voir tout et du sélecteur ont une surface interactive d'au moins 44 px.
 Une écriture échouée restaure l'optimisme et n'anime aucun succès ; un changement d'UID
 pendant une action ou avant Annuler interdit d'appliquer son résultat au nouveau compte.
+Une écriture Firestore lente reste en attente : aucun délai local non annulable ne peut
+annoncer un échec ou restaurer l'épisode pendant que cette écriture peut encore réussir.
+Le TNR Chromium suspend la vraie façade plus de quatre secondes, puis confirme son succès.
 
 Référence visuelle : `SeenIt Cartes Films.dc.html` → colonne **#18c** (Tour 18, tout en haut). Ouvrir dans un navigateur et cliquer : coches, « Afficher plus », sélecteur « Je lance à ».
 Specs liées (dans ce dossier) : `SPEC-CARTE-8F.md` (carte série), `SPEC-EPISODES-INCONNUS.md`, `SPEC-HISTORIQUE-16D.md`.
