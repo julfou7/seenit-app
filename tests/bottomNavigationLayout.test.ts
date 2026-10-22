@@ -2,24 +2,22 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { NAVIGATION_TABS } from '../src/features/navigation/tabPresentation.ts';
-
-const bottomNavSource = readFileSync(
-  new URL('../src/components/BottomNav.tsx', import.meta.url),
-  'utf8'
-);
-
-test('la navigation basse garde Profil à droite et Télécharger en troisième position lorsqu’il est visible', () => {
-  assert.deepEqual(
-    NAVIGATION_TABS.map(tab => tab.id),
-    ['watchlist', 'discover', 'downloads', 'profile'],
-  );
-  assert.match(bottomNavSource, /NAVIGATION_TABS\.filter\(tab => tab\.id !== 'downloads'\)/);
+const nav = readFileSync('src/components/BottomNav.tsx', 'utf8');
+const button = readFileSync('src/components/NavigationTabButton.tsx', 'utf8');
+const css = readFileSync('src/components/bottomNav.css', 'utf8');
+test('SEENIT-UX-017 conserve l’ordre À Voir Explorer Moi puis Télécharger optionnel', () => {
+  assert.deepEqual(NAVIGATION_TABS.map(tab => tab.id), ['watchlist', 'discover', 'profile', 'downloads']);
+  assert.equal(NAVIGATION_TABS[2].label, 'Moi');
+  assert.match(nav, /NAVIGATION_TABS.filter\(tab => tab.id !== 'downloads'\)/);
+  assert.match(nav, /aria-label="Navigation principale"/);
 });
-
-test('la navigation basse exploite sa largeur avec des icônes et cibles tactiles lisibles', () => {
-  assert.match(bottomNavSource, /size=\{28\}/);
-  assert.match(bottomNavSource, /min-h-\[52px\] min-w-\[44px\] flex-1/);
-  assert.match(bottomNavSource, /text-\[10px\] sm:text-\[11px\]/);
-  assert.doesNotMatch(bottomNavSource, /max-w-\[(72|80)px\]/);
-  assert.match(bottomNavSource, /aria-current=\{isActive \? 'page' : undefined\}/);
+test('SEENIT-UX-017 réserve des cibles 46 par 68 dans un îlot de verre sans repli au scroll', () => {
+  assert.match(button, /size=\{24\}/);
+  assert.match(button, /aria-current=\{active \? 'page' : undefined\}/);
+  assert.match(css, /min-height:46px;min-width:68px/);
+  assert.match(css, /min-height:58px/);
+  assert.match(css, /blur\(22px\) saturate\(170%\)/);
+  assert.match(css, /96px/);
+  assert.match(css, /prefers-reduced-motion/);
+  assert.doesNotMatch(nav, /scrollY|addEventListener\('scroll'/);
 });

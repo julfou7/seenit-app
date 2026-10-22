@@ -8,8 +8,8 @@ const toast = readFileSync('src/components/ToastContainer.tsx', 'utf8');
 test('le conteneur toast conserve une respiration globale compatible safe area', () => {
   assert.ok(toast.includes('id="toast-notification-wrapper"'));
   assert.ok(css.includes('#toast-notification-wrapper'));
-  assert.ok(css.includes('bottom: calc(6.25rem + env(safe-area-inset-bottom, 0px)) !important;'));
-  assert.ok(css.includes('bottom: calc(6.25rem + var(--seenit-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;'));
+  assert.ok(css.includes('bottom: calc(80px + var(--seenit-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;'));
+  assert.ok(css.includes('bottom: calc(24px + var(--seenit-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;'));
 });
 
 test('le correctif ne réduit pas le contenu tactile des toasts compacts ou média', () => {

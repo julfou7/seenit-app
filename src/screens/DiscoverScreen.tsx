@@ -20,8 +20,9 @@ import {
   useDebounce,
 } from './discoverPresentation';
 import { DiscoverView } from './DiscoverView';
+import { useNavigationSearchShortcut } from '../features/navigation/useTabShortcut';
 
-export function DiscoverScreen({ onShowClick }: Props) {
+export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
   const { showToast } = useToastStore();
   const { shows, addShow, updateShow, deleteShow } = useShows();
   
@@ -153,6 +154,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
   const handleLongPress = useCallback((media: TMDBMedia) => setPreviewMedia(media), []);
 
   const [isSearchVisible, setIsSearchVisible] = useState(true);
+  useNavigationSearchShortcut(navigationShortcut, () => setIsSearchVisible(true), '[data-app-tab="discover"] [data-navigation-search]');
   const [showScrollTop, setShowScrollTop] = useState(false);
   const lastScrollY = useRef(0);
   const pendingScrollY = useRef(0);
@@ -798,7 +800,7 @@ export function DiscoverScreen({ onShowClick }: Props) {
     }
 
     if (selectedGenres.length > 0 && qClean && activeCategory !== 'Personnes') {
-      list = list.filter((item: any) => matchesSelectedGenres(item, selectedGenres));
+      list = list.filter(item => matchesSelectedGenres(item, selectedGenres));
     }
 
     if (minRating !== 'Toutes' && qClean && activeCategory !== 'Personnes') {
@@ -987,8 +989,6 @@ export function DiscoverScreen({ onShowClick }: Props) {
     return () => observer.disconnect();
   }, [criticalHomeSliceActive, debouncedQuery, handleLoadMore, hasMore, isLoadingMore, loading]);
 
-  const searchQuery = query;
-  const setSearchQuery = setQuery;
   const showHeroSurface = !debouncedQuery.trim()
     && !hasActiveFilters
     && sortBy === 'popular'

@@ -69,7 +69,8 @@ test('la borne temporelle et le triple appui sont déterministes', () => {
 
 test('SEENIT-UX-005 adresse un reset local distinct à chaque onglet', () => {
   assert.doesNotMatch(appSource, /document\.querySelectorAll\(/);
-  assert.match(appSource, /new CustomEvent\(`\$\{rootTab\}-reset-all`\)/);
+  assert.match(appSource, /resetCurrentNavigationTab\(rootTab\)/);
+  assert.match(readFileSync('src/features/navigation/navigationActions.ts', 'utf8'), /new CustomEvent\(`\$\{tab\}-reset-all`\)/);
   assert.match(discoverSource, /addEventListener\('discover-reset-all'/);
   assert.match(watchlistSource, /addEventListener\('watchlist-reset-all'/);
   assert.match(downloadsCoreSource, /addEventListener\('downloads-reset-all'/);

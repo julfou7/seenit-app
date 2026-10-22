@@ -20,8 +20,8 @@ test('#292 partage le même mapping glyph entre barre basse et toast de reset', 
     [
       ['watchlist', 'watch'],
       ['discover', 'discover'],
-      ['downloads', 'download'],
       ['profile', 'profile'],
+      ['downloads', 'download'],
     ],
   );
 
@@ -48,8 +48,10 @@ test('#292 borne le contexte de reset au dispatch synchrone', () => {
 });
 
 test('#292 câble le reset réel vers le contexte puis vers le toast', () => {
-  assert.match(appSource, /withNavigationResetToastContext\(rootTab, \(\) => \{/);
-  assert.match(appSource, /new CustomEvent\(`\$\{rootTab\}-reset-all`\)/);
+  assert.match(appSource, /resetCurrentNavigationTab\(rootTab\)/);
+  const actions = readFileSync('src/features/navigation/navigationActions.ts', 'utf8');
+  assert.match(actions, /withNavigationResetToastContext\(tab, \(\) => \{/);
+  assert.match(actions, /new CustomEvent\(`\$\{tab\}-reset-all`\)/);
   assert.match(toastStoreSource, /getActiveNavigationResetPresentation\(\)/);
   assert.match(toastStoreSource, /iconSymbol: resetPresentation\.symbol/);
   assert.match(toastContainerSource, /if \(parsed\.iconSymbol\)/);

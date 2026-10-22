@@ -136,24 +136,34 @@ La barre basse possède trois destinations toujours visibles, dans cet ordre :
 
 1. **À Voir** : accueil opérationnel ;
 2. **Explorer** : recherche et découverte TMDB ;
-3. **Profil** : statistiques, Ma Liste et accès Réglages.
+3. **Moi** (`profile`) : statistiques, Ma Liste et accès Réglages.
 
 La destination **Télécharger** n'apparaît que lorsque le compte courant a explicitement activé la
 fonctionnalité personnelle Téléchargements dans Réglages. Lorsqu'elle est visible, elle s'insère en
-**troisième position**, ce qui donne **À Voir → Explorer → Télécharger → Profil** : Profil reste donc
-toujours la destination la plus à droite. Son badge compte alors les transferts actifs ou qui demandent
-une attention. Une navigation historique ou directe vers `downloads` alors que la fonctionnalité est
+**dernière position** après un séparateur, ce qui donne **À Voir → Explorer → Moi │ Télécharger**.
+Son point indique en priorité les transferts actifs (or, nombre au-delà de un), une action requise
+(rouge), puis un transfert terminé non consulté (vert). Le vert s'efface à l'ouverture sans toucher
+aux transferts. Une navigation historique ou directe vers `downloads` alors que la fonctionnalité est
 désactivée revient sur « À Voir ».
 
-Les destinations se partagent toute la largeur utile de la barre au lieu d'être limitées à une petite
-largeur fixe. Les glyphes de navigation sont rendus à 28 px, les libellés mobiles à 10 px et chaque
-contrôle conserve une cible tactile d'au moins 44 × 44 CSS px ainsi que la safe area basse.
+La [barre 13j](../design/navbar-13j.md) est un îlot verre flottant centré, haut de 58 px, détaché de
+10 px plus safe area, avec fondu progressif inférieur de 96 px. Sans Télécharger, seul le dernier
+onglet et le séparateur disparaissent. Glyphes 24 px, libellés 10 px et cibles minimales 46 × 68 px.
+Pas de repli au scroll. Le contenu réserve 84 px plus safe area ; les toasts restent au-dessus à
+80 px plus safe area, ou 24 px sur une fiche/dialogue sans barre. La fiche média occupe tout le viewport.
 
 L'onglet actif et ses glyphes utilisent l'or SeenIt et son bouton expose `aria-current="page"`. Un appui
-sur l'onglet actif ferme exactement le niveau courant. Un double appui ramène la page en haut, ferme ses
+sur l'onglet actif ferme exactement le niveau courant, ou remonte en haut doucement à la racine sans
+vider les filtres. Un double appui à moins de 350 ms ramène la page en haut, ferme ses
 panneaux et restaure sa sous-vue, ses recherches, filtres et expansions à leurs valeurs initiales. Explorer,
 À Voir, Télécharger et Profil affichent chacun un toast de confirmation propre ; aucune donnée métier
 n'est modifiée.
+Un appui long (480 ms), un clic droit ou Maj+F10 ouvre Ce soir/À Regarder pour À Voir, la recherche
+avec focus pour Explorer, les réglages rapides du compte pour Moi et Recherche C411 pour Télécharger.
+Le prototype Ce soir réouvre À Regarder : le raccourci réutilise cette vue réelle sans inventer un
+planificateur. Ces raccourcis ont des boutons visibles ; déplacement/annulation/démontage neutralisent
+le geste et un appui long ne produit jamais aussi un tap/double tap. L'accès compte de l'en-tête
+Accueil est retiré ; les informations de synchronisation restent visibles.
 
 L'ouverture d'une fiche est un niveau de navigation au-dessus de l'onglet courant. Le Retour Android
 ferme dans l'ordre : dialogue ou modal, fiche, historique interne, retour à À Voir, puis application.
@@ -166,8 +176,8 @@ reste dans le dialogue puis revient au déclencheur. Une confirmation destructiv
 Garder/Annuler. Les panneaux et dialogues réservent les safe areas et le viewport visuel du clavier.
 Les dialogues locaux ont leur propre entrée d'historique ; les fiches épisode/personne conservent
 leur entrée existante. Les trois familles d'en-têtes restent distinctes : racine, fiche et dialogue.
-La fiche média participe à cette pile en tant que panneau non modal et laisse la navigation basse
-accessible. Si elle est ouverte depuis une fiche personne de l'onglet, Retour restaure cette personne
+La fiche média participe à cette pile en tant que panneau non modal plein écran et masque la navigation
+basse. Si elle est ouverte depuis une fiche personne de l'onglet, Retour restaure cette personne
 et le focus du bouton utilisé ; un dialogue bloquant couvre la navigation et rend le fond inerte.
 
 Les toasts internes qui confirment l'ajout à **À voir** ou le passage à **Vu / Terminée** sont aussi des

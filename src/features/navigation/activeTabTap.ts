@@ -1,4 +1,4 @@
-export const ACTIVE_TAB_DOUBLE_TAP_MS = 450;
+export const ACTIVE_TAB_DOUBLE_TAP_MS = 350;
 
 export interface ActiveTabTapState {
   tabId: string;

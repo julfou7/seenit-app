@@ -54,9 +54,11 @@ import { findMatchingShowForDownload } from '../features/downloads/downloadIdent
 import { isDownloadInHistorySection } from '../features/downloads/downloadStatePolicy';
 import { getReleaseAudio } from '../features/downloads/releaseAudio';
 import { AlternativeReleaseModal } from '../components/AlternativeReleaseModal';
+import { useTabShortcut } from '../features/navigation/useTabShortcut';
 
 interface Props {
   onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void;
+  navigationShortcut?: number;
 }
 
 type ViewMode = 'downloads' | 'search';
@@ -322,7 +324,7 @@ function DownloadItemCard({
   );
 }
 
-export function DownloadsScreen({ onShowClick }: Props) {
+export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
   const {
     downloads,
     fetchDownloads,
@@ -336,6 +338,11 @@ export function DownloadsScreen({ onShowClick }: Props) {
   const sendInFlightRef = useRef(false);
 
   const [viewMode, setViewMode] = useState<ViewMode>('downloads');
+  useTabShortcut(navigationShortcut, () => {
+    setViewMode('search');
+    const frame = requestAnimationFrame(() => screenRootRef.current?.querySelector<HTMLInputElement>('[data-navigation-search]')?.focus({ preventScroll: true }));
+    return () => cancelAnimationFrame(frame);
+  });
   const [showConfiguration, setShowConfiguration] = useState(false);
   const [clearingSection, setClearingSection] = useState<'completed' | 'cancelled' | 'error' | null>(null);
   const [pendingCancellation, setPendingCancellation] = useState<LiveDownloadItem | null>(null);
@@ -764,6 +771,8 @@ export function DownloadsScreen({ onShowClick }: Props) {
                   value={searchQuery}
                   onChange={event => setSearchQuery(event.target.value)}
                   placeholder="Film, série, S02E05…"
+                  data-navigation-search
+                  aria-label="Rechercher une release C411"
                   className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 text-xs text-white outline-none focus:border-[#E5A93D]"
                 />
                 {searchQuery && (

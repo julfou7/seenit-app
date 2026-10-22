@@ -30,7 +30,8 @@ export function SeenItGlyph({
   glow = true,
   active = true,
   idPrefix = 'seenit',
-  color
+  color,
+  navigation = false
 }: { 
   size?: number; 
   className?: string; 
@@ -39,6 +40,7 @@ export function SeenItGlyph({
   active?: boolean;
   idPrefix?: string;
   color?: 'gold' | 'blue';
+  navigation?: boolean;
 }) {
   const isBlue = color === 'blue' || (color === undefined && symbol === 'download');
   const gradientId = isBlue ? `${idPrefix}-blue-grad` : `${idPrefix}-gold-grad`;
@@ -46,10 +48,11 @@ export function SeenItGlyph({
   const glassId = `${idPrefix}-glass-grad`;
 
   // Scale stroke width slightly for small sizes to maintain crisp visibility
-  const strokeW = size <= 28 ? 4.8 : size <= 36 ? 4.2 : 3.6;
+  const strokeW = navigation ? 5.5 : size <= 28 ? 4.8 : size <= 36 ? 4.2 : 3.6;
 
-  const frameStroke = active ? `url(#${gradientId})` : '#71717A';
-  const symbolFill = active ? `url(#${playGradId})` : '#71717A';
+  const inactiveColor = navigation ? '#8A8A93' : '#71717A';
+  const frameStroke = active ? `url(#${gradientId})` : inactiveColor;
+  const symbolFill = active ? `url(#${playGradId})` : inactiveColor;
 
   return (
     <svg

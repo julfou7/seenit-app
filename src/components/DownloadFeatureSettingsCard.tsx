@@ -52,18 +52,20 @@ export function DownloadFeatureSettingsCard() {
           aria-label="Afficher la fonctionnalité Téléchargements"
           disabled={!isHydrated || isSaving}
           onClick={() => void handleToggle()}
-          className={`relative h-7 w-12 shrink-0 rounded-full border transition-colors disabled:opacity-50 ${
+          className="relative h-11 w-12 shrink-0 flex items-center rounded-full disabled:opacity-50"
+        >
+          <span className={`relative block h-7 w-12 rounded-full border transition-colors ${
             enabled
               ? 'border-[#E5A93D]/60 bg-[#E5A93D]'
               : 'border-zinc-700 bg-zinc-800'
-          }`}
-        >
+          }`}>
           <span
             className={`absolute top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow transition-transform ${
               enabled ? 'translate-x-6' : 'translate-x-0.5'
             }`}
           >
             {isSaving && <Loader2 size={11} className="animate-spin text-zinc-700" />}
+          </span>
           </span>
         </button>
       </div>

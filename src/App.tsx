@@ -43,7 +43,10 @@ import {
 import { usePlexAvailabilityStore } from './features/plex/plexAvailability';
 import { activateLogUserScope, appLogger } from './store/logStore';
 import { createCachedAsyncLoader, preloadInBackground } from './features/navigation/screenPreload';
-import { resolveRootNavigationTab, withNavigationResetToastContext } from './features/navigation/tabPresentation';
+import { resolveRootNavigationTab } from './features/navigation/tabPresentation';
+import { activateCurrentNavigationTab, resetCurrentNavigationTab } from './features/navigation/navigationActions';
+import type { RootNavigationTab } from './features/navigation/tabPresentation';
+const QuickAccountSheet = lazy(() => import('./components/QuickAccountSheet').then(module => ({ default: module.QuickAccountSheet })));
 
 const loadProfileScreen = createCachedAsyncLoader(() => import('./screens/ProfileScreen').then(module => ({ default: module.ProfileScreen })));
 const loadShowDetailScreen = createCachedAsyncLoader(() => import('./screens/ShowDetailScreen').then(module => ({ default: module.ShowDetailScreen })));
@@ -203,6 +206,9 @@ function MainApp() {
   useRemindersNotifier();
   const { currentTab, changeTab, selectedShow, openShow, closeShow } = useNavigation();
   const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => new Set(['watchlist', currentTab]));
+  const [shortcut, setShortcut] = useState<{ tab: RootNavigationTab; request: number } | null>(null);
+  const shortcutSequence = useRef(0);
+  const [quickAccountOpen, setQuickAccountOpen] = useState(false);
 
   const selectedLocalShow = selectedShow?.type === 'local'
     ? shows.find(show => String(show.id) === String(selectedShow.id) || String(show.tmdbId) === String(selectedShow.id))
@@ -562,7 +568,7 @@ function MainApp() {
     } else {
       const rootTab = resolveRootNavigationTab(currentTab);
       if (rootTab) {
-        closeTabSubview(rootTab);
+        activateCurrentNavigationTab(rootTab);
       }
     }
   };
@@ -571,9 +577,13 @@ function MainApp() {
     const rootTab = resolveRootNavigationTab(currentTab);
     if (!rootTab) return;
 
-    withNavigationResetToastContext(rootTab, () => {
-      window.dispatchEvent(new CustomEvent(`${rootTab}-reset-all`));
-    });
+    resetCurrentNavigationTab(rootTab);
+  };
+
+  const handleNavigationLongPress = (tab: RootNavigationTab) => {
+    if (tab === 'profile') { setQuickAccountOpen(true); return; }
+    handleTabChange(tab);
+    setShortcut({ tab, request: ++shortcutSequence.current });
   };
 
   useEffect(() => {
@@ -602,7 +612,7 @@ function MainApp() {
               {mountedTabs.has('watchlist') && (
                 <Activity mode={currentTab === 'watchlist' ? 'visible' : 'hidden'}>
                   <div data-app-tab="watchlist" className="flex-1 min-h-0 flex flex-col">
-                    <WatchListScreen onShowClick={openLocalMedia} onEpisodeParentClick={openLocalMediaImmediate} />
+                    <WatchListScreen onShowClick={openLocalMedia} onEpisodeParentClick={openLocalMediaImmediate} navigationShortcut={currentTab === 'watchlist' && shortcut?.tab === 'watchlist' ? shortcut.request : undefined} />
                   </div>
                 </Activity>
               )}
@@ -612,6 +622,8 @@ function MainApp() {
                   <div data-app-tab="profile" className="flex-1 min-h-0 flex flex-col">
                     <ProfileScreen
                       initialShowSettings={currentTab === 'settings'}
+                      onQuickSettings={() => setQuickAccountOpen(true)}
+                      navigationShortcut={currentTab === 'profile' && shortcut?.tab === 'profile' ? shortcut.request : undefined}
                       onShowClick={openTmdbMedia}
                     />
                   </div>
@@ -624,14 +636,14 @@ function MainApp() {
                   className={currentTab === 'discover' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}
                   aria-hidden={currentTab !== 'discover'}
                 >
-                  <DiscoverScreen onShowClick={openTmdbMedia} />
+                  <DiscoverScreen onShowClick={openTmdbMedia} navigationShortcut={currentTab === 'discover' && shortcut?.tab === 'discover' ? shortcut.request : undefined} />
                 </div>
               )}
 
               {mountedTabs.has('downloads') && (
                 <Activity mode={currentTab === 'downloads' ? 'visible' : 'hidden'}>
                   <div data-app-tab="downloads" className="flex-1 min-h-0 flex flex-col">
-                    <DownloadsScreen onShowClick={openTmdbMedia} />
+                    <DownloadsScreen onShowClick={openTmdbMedia} navigationShortcut={currentTab === 'downloads' && shortcut?.tab === 'downloads' ? shortcut.request : undefined} />
                   </div>
                 </Activity>
               )}
@@ -664,7 +676,10 @@ function MainApp() {
           onTabChange={handleTabChange}
           onActiveTabClick={handleActiveTabClick}
           onActiveTabDoubleClick={handleActiveTabDoubleClick}
+          onLongPress={handleNavigationLongPress}
         />
+
+        {quickAccountOpen && <Suspense fallback={null}><QuickAccountSheet onClose={() => setQuickAccountOpen(false)} onSettings={() => { setQuickAccountOpen(false); handleTabChange('profile'); setShortcut({ tab: 'profile', request: ++shortcutSequence.current }); }} /></Suspense>}
 
         <ToastContainer />
       </div>

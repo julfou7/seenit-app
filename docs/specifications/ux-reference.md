@@ -37,7 +37,7 @@ Ce contrat automatisé ne vaut pas preuve de lecture ou de rotation sur un tél�
 |---|---|---|---|
 | Navigation basse, autre onglet | Appui | Ouvre l'onglet, ferme les superpositions via l'événement global | Le changement de destination ne compte jamais dans le prochain double appui. |
 | Navigation basse, onglet actif | Appui simple | Émet `app-close-modals`, puis recule l'historique si modal, sinon ferme la fiche | Intention de retour utile ; vérifier qu'un seul niveau se ferme. |
-| Navigation basse | Deux taps espacés de moins de 450 ms | Le premier appui revient d'un niveau, le second réinitialise la page active | Contrat livré par `SEENIT-UX-005`, avec portée locale et toast propre à l'écran. |
+| Navigation basse | Deux taps espacés de moins de 350 ms | Le premier appui revient d'un niveau ou remonte à la racine, le second réinitialise la page active | Contrat `SEENIT-UX-005`, portée locale et toast propre à l'écran ; A → B → B exclu. |
 | Double appui Explorer | Reset + remontée | Recherche vide, catégorie Tout, plateformes/genres vides, âge Tous, note Toutes, tri populaire descendant, hero première carte | Préserver ce raccourci volontaire, montrer son effet ; jamais effacer les préférences du compte. |
 | Explorer, liste verticale | Swipe / défilement vertical | La descente masque la barre de recherche ; seule une remontée la réaffiche | Le geste tactile et le `scrollTop` réel gardent la même sémantique ; un swipe de descente ne doit jamais rouvrir la recherche. |
 | Double appui Profil | Reset + remontée | Ferme Réglages/personne, revient à Statistiques et nettoie l'état local de Ma Liste | Ne modifie aucun suivi ni statistique. |
@@ -59,21 +59,24 @@ Le reset est local à la racine de l'onglet actif. Il ne scrolle jamais un écra
 
 ## 3. Navigation — ordre livré et cible #178
 
-L'organisation de la barre basse est désormais explicite et stable :
+La [navigation 13j](../design/navbar-13j.md) remplace la barre pleine largeur :
 
-- sans la fonctionnalité Téléchargements : **À Voir → Explorer → Profil** ;
-- avec Téléchargements activés : **À Voir → Explorer → Télécharger → Profil** ;
-- **Profil reste toujours à droite** et **Télécharger occupe toujours la troisième position** lorsqu'il
-  est visible ; son masquage continue de dépendre exclusivement du réglage personnel déjà défini ;
-- chaque destination se partage la largeur utile au lieu d'être enfermée dans une largeur maximale
-  étroite ; le contrôle conserve au moins **44 × 44 CSS px**, les glyphes de la barre sont rendus à
-  **28 px** et les libellés mobiles à **10 px** afin de rester lisibles sans agrandir inutilement la barre ;
+- sans Téléchargements : **À Voir → Explorer → Moi** ; avec : **À Voir → Explorer → Moi │ Télécharger** ;
+- îlot centré en verre de 58 px, détaché de 10 px plus safe area, boutons 46 × 68 px minimum,
+  glyphes 24 px, libellés 10 px, fondu inférieur progressif de 96 px ; pas de repli au défilement ;
+- le dernier onglet et son séparateur disparaissent selon le réglage personnel existant ;
+- point Télécharger actif or (nombre au-delà de un), attention rouge, puis terminé non consulté vert,
+  acquitté à l'ouverture sans modifier les transferts ; aucun polling supplémentaire ;
+- appui long 480 ms/clic droit/Maj+F10 : Ce soir/À Regarder, recherche Explorer avec focus,
+  réglages rapides Moi, Recherche C411 ; le mouvement/cancel/démontage annule le geste et son clic final ;
+- fiches/dialogues plein écran masquent la barre ; contenu à 84 px plus safe area et toasts à
+  80 px avec barre, 24 px sans barre. L'avatar de l'accueil disparaît, les informations de sync restent ;
 - l'onglet actif est annoncé par `aria-current` en plus de son état visuel or.
 
 Le contrat d'appui/reset de #178 est distinct de cet ordre visuel et désormais livré :
 
 - Une activation d'un autre onglet change de destination sans reset.
-- Un appui sur l'onglet actif revient d'un seul niveau visible ; à la racine il n'efface rien.
+- Un appui sur l'onglet actif revient d'un seul niveau visible ; à la racine il remonte doucement sans effacer les filtres.
 - Deux appuis sur le même onglet déjà actif constituent un raccourci de reset de sa vue uniquement.
   Le passage A → B → B ne doit pas consommer le premier tap comme un reset inattendu.
 - Chaque page restaure sa sous-vue initiale, replie ses panneaux et efface ses recherches, filtres et

@@ -540,6 +540,8 @@ export function DiscoverView({ model }: DiscoverViewProps) {
               <input
                 type="text"
                 placeholder="Séries, films, acteurs..."
+                data-navigation-search
+                aria-label="Rechercher une série, un film ou un acteur"
                 value={query}
                 onChange={(e) => {
                   const nextQuery = e.target.value;

@@ -1119,11 +1119,26 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   destinés à l'utilisateur, l'état inverse de « vu » est nommé **« non vu »** ; le terme « dé-vu » n'est
   plus utilisé.
 - **SEENIT-UX-005** — Sur un onglet déjà actif, un appui simple ferme exactement le niveau visible
-  courant sans effacer l'état racine. Deux appuis sur ce même onglet en moins de 450 ms réinitialisent
+  courant sans effacer l'état racine ; à la racine il remonte en haut doucement sans vider les filtres.
+  Deux appuis sur ce même onglet en moins de 350 ms réinitialisent
   uniquement sa vue : retour en haut, fermeture des panneaux/modales, sous-vue racine et effacement des
   recherches, filtres ou expansions locales. Aucun suivi, progression, préférence ou téléchargement n'est
   modifié. Chaque reset abouti affiche un toast nommant la page réinitialisée. Un trajet A → B → B ne
   compte jamais le changement d'onglet comme le premier appui du double geste.
+- **SEENIT-UX-017** — La navigation 13j est un îlot verre flottant de 58 px, à 10 px de la safe area,
+  avec fondu inférieur progressif de 96 px, sans repli au défilement. Ordre : À Voir, Explorer, Moi,
+  puis séparateur et Télécharger si la fonctionnalité personnelle est activée. Les glyphes SeenIt
+  utilisent le même or, les cibles mesurent au moins 46 × 68 px, le focus et aria-current restent visibles.
+  La barre disparaît sur les fiches/dialogues plein écran ; le contenu réserve 84 px plus safe area,
+  les toasts se placent à 80 px plus safe area avec la barre, 24 px sans elle. Le point Télécharger
+  reflète les données live existantes : actifs or (nombre seulement au-delà de un), attention rouge,
+  puis terminé non consulté vert, acquitté à l'ouverture sans mutation de transfert. Aucune nouvelle
+  boucle de polling ; la fonctionnalité désactivée ne charge pas le badge et revient à À Voir.
+  Appui long 480 ms, clic droit ou Maj+F10 : À Voir ouvre sa vue Ce soir existante/À Regarder,
+  Explorer révèle et focalise la recherche, Moi ouvre les réglages rapides du compte, Télécharger
+  ouvre Recherche C411. Un mouvement, une annulation ou un démontage annule le geste ; son clic final
+  ne déclenche ni navigation simple ni reset. Les mêmes fonctions ont des alternatives visibles.
+  Les doubles taps restent locaux selon UX-005, les animations respectent reduced-motion.
 - **SEENIT-UX-006** — Un toast interne qui confirme l'ajout d'un film ou d'une série à « À voir »
   (`follow`) ou son passage à l'état vu/terminé (`success`) ouvre la fiche exacte uniquement lorsque le
   toast transporte un `mediaType` et un TMDB ID valides. Le titre, l'année et le texte du toast ne servent
