@@ -1,0 +1,59 @@
+import { create } from 'zustand';
+import type { Show } from '../../src/types';
+export const auth = { currentUser: { uid: 'fixture-a' } };
+export const db = {};
+export const telemetry = { writes: [] as Array<{ path: string[]; payload: Record<string, unknown> }>, details: [] as number[], opens: [] as string[], failNext: false, holdNext: false, vibrations: [] as number[] };
+export const fixtureNow = new Date(2026, 9, 21, 22, 30).getTime();
+let clock = fixtureNow;
+Date.now = () => clock;
+export const advanceClock = (minutes: number) => { clock += minutes * 60_000; };
+const poster = 'http://127.0.0.1:4173/__8f-poster.svg';
+const backdrop = 'http://127.0.0.1:4173/__8f-backdrop.svg';
+const base: Show = { id: 'series-0', userId: 'fixture-a', tmdbId: 10, title: 'Stranger Things', mediaType: 'tv', posterPath: poster, backdropPath: backdrop, status: 'watching', isArchived: false, createdAt: fixtureNow - 100 * 86_400_000, updatedAt: fixtureNow,
+  firstAirDate: '2020-01-01', totalAiredEpisodes: 3, totalEpisodes: 3, seenEpisodes: ['1x1'], episodeRecords: { '1x1': { watchedAt: fixtureNow - 2 * 86_400_000 } },
+  nextEpisodeToWatch: { season_number: 1, episode_number: 2, episode_count: 3, aired_episodes_in_season: 3, name: 'Épisode deux', air_date: '2020-01-01' },
+};
+const durations = [150, 80, null, 100, 100, 169, 90, 120, 130, 200];
+export const initialShows: Show[] = [
+  ...Array.from({ length: 8 }, (_, index) => ({ ...base, id: `series-${index}`, tmdbId: 10 + index, title: ['Stranger Things', 'Game of Thrones', 'The Boys', 'Dark', 'Mercredi', 'Arcane', 'Slow Horses', 'Le Bureau des légendes'][index] })),
+  ...durations.map((runtime, index) => ({ ...base, id: `movie-${index}`, tmdbId: 100 + index, mediaType: 'movie' as const, title: ['Dune : Deuxième partie', 'Le Robot sauvage', 'Durée inconnue et titre de film très long sur deux lignes', 'Jurassic Park', 'Retour vers le futur', 'Interstellar', 'Zootopie', 'Un film', 'Un autre film', 'Oppenheimer'][index],
+    seenEpisodes: [], episodeRecords: {}, runtime, firstAirDate: '2024-01-01',
+    posterPath: index === 2 ? null : index === 3 ? 'http://127.0.0.1:4173/absent-poster.png' : poster,
+    backdropPath: index === 2 ? null : backdrop,
+  })),
+];
+interface State { shows: Show[]; updateShowOptimistic: (id: string, patch: Partial<Show>) => void }
+export const useShowsStore = create<State>(set => ({ shows: initialShows, updateShowOptimistic: (id, patch) => set(state => ({ shows: state.shows.map(show => show.id === id ? { ...show, ...patch } : show) })) }));
+export const updateShow = async (id: string, patch: Partial<Show>) => {
+  await updateDoc(['users', auth.currentUser.uid, 'shows', id], patch);
+  useShowsStore.getState().updateShowOptimistic(id, patch);
+};
+export const doc = (_db: unknown, ...path: string[]) => path;
+export const arrayUnion = (...values: string[]) => ({ union: values });
+let releaseHeld: () => void = () => {};
+export const releaseWrite = () => releaseHeld();
+export async function updateDoc(path: string[], payload: Record<string, unknown>) {
+  telemetry.writes.push({ path, payload });
+  if (telemetry.holdNext) { telemetry.holdNext = false; await new Promise<void>(resolve => { releaseHeld = resolve; }); }
+  else await new Promise(resolve => setTimeout(resolve, 30));
+  if (telemetry.failNext) { telemetry.failNext = false; throw new Error('Échec de transport simulé'); }
+}
+export const switchAccount = () => {
+  auth.currentUser = { uid: 'fixture-b' };
+  useShowsStore.setState({ shows: initialShows.map(show => ({ ...show, userId: 'fixture-b' })) });
+};
+export const useLogStore = { getState: () => ({ addLog: () => {} }) };
+export const appLogger = { info() {}, warn() {}, error() {}, debug() {} };
+export const usePlexAvailabilityStore = create(() => ({ cache: { 'movie:100': { available: true, serverName: 'Thomas' } } as Record<string, { available: boolean; serverName: string }>, getMediaAvailability: (key: string) => usePlexAvailabilityStore.getState().cache[key] }));
+export const getPlexMediaKey = (id: number, type: string) => `${type}:${id}`;
+const providers = { results: { FR: { flatrate: [{ provider_id: 8, provider_name: 'Netflix', logo_path: 'http://127.0.0.1:4173/__history-provider.svg' }] } } };
+export const tmdb = {
+  peekWatchProviders: () => providers,
+  getWatchProviders: async () => ({ ok: true, value: providers }),
+  peekMediaDetails: (id: number) => ({ runtime: durations[id - 100] ?? null, release_date: '2024-01-01' }),
+  getMovieDetails: async (id: number) => { telemetry.details.push(id); return { ok: true, value: tmdb.peekMediaDetails(id) }; },
+  getSeasonDetails: async (_id: number, season: number) => {
+    await new Promise(resolve => setTimeout(resolve, 20));
+    return { ok: true, value: { season_number: season, episodes: [1, 2, 3].map(episode => ({ season_number: season, episode_number: episode, name: `Épisode ${episode}`, air_date: '2020-01-01', still_path: backdrop })) } };
+  },
+};

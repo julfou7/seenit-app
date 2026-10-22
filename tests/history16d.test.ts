@@ -10,7 +10,7 @@ import {
   parseHistoryLocalDateTime,
   resolveHistoryTimestamp,
 } from '../src/features/history/historyPresentation.ts';
-import { historyEpisodeEntries, historyEpisodeKey, historyRecordsWithoutTarget, historyLastWatchedAt } from '../src/features/history/historyRecords.ts';
+import { historyEpisodeEntries, historyEpisodeKey, historyRecordsWithoutTarget, historyLastWatchedAt, materializeHistoryRecords } from '../src/features/history/historyRecords.ts';
 
 test('SEENIT-UX-015 ne fabrique jamais une heure de visionnage legacy', () => {
   const explicit = resolveHistoryTimestamp(1_760_000_000_000, 1_750_000_000_000);
@@ -63,6 +63,17 @@ test('SEENIT-UX-015 conserve une heure facultative lors de la correction manuell
   assert.equal(dateOnly?.timeKnown, false);
   assert.equal(historyTimeInputValue(dateOnly!.watchedAt, dateOnly!.timeKnown), '');
   assert.equal(parseHistoryLocalDateTime('2026-02-31', ''), null);
+});
+
+test('SEENIT-UX-015 conserve le jour des épisodes legacy voisins avant édition ou retrait', () => {
+  const source = { seenEpisodes: ['1x1', '1x2', '1x3'], episodeRecords: {}, lastWatchedAt: new Date(2026, 8, 1, 12).getTime(), createdAt: 1, updatedAt: Date.now() };
+  const records = materializeHistoryRecords(source);
+  const edited = { ...records, '1x1': { watchedAt: new Date(2026, 9, 21, 20).getTime() } };
+  assert.equal(edited['1x2'].watchedAt, source.lastWatchedAt);
+  assert.equal(edited['1x2'].watchedTimeKnown, false);
+  const removed = historyRecordsWithoutTarget(records, '1x1');
+  assert.equal(historyLastWatchedAt(removed, ['1x2', '1x3']), source.lastWatchedAt);
+  assert.deepEqual(source.episodeRecords, {}, 'la lecture ne modifie pas le record original utilisé par Annuler');
 });
 
 test('SEENIT-UX-015 présente les collections film avec le film courant distinct', () => {

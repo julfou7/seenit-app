@@ -40,9 +40,9 @@ export function resolveWatchCardResume(show: Show, today: string): WatchCardResu
 }
 
 /** Façade appelée par le handler de production, sans altérer le Show ni l'undo existant. */
-export async function markWatchCardEpisode(show: Show, today: string, mark: (show: Show, season: number, episode: number) => Promise<void>): Promise<boolean> {
+export async function markWatchCardEpisode(show: Show, today: string, mark: (show: Show, season: number, episode: number) => Promise<void | boolean>): Promise<boolean> {
   const resume = resolveWatchCardResume(show, today);
   if (!show.id || !resume.episode || resume.upToDate) return false;
-  await mark(show, resume.episode.season_number, resume.episode.episode_number);
+  if (await mark(show, resume.episode.season_number, resume.episode.episode_number) === false) return false;
   return true;
 }

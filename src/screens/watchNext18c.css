@@ -1,0 +1,59 @@
+.watch-next-18c { padding:4px 16px 8px; }
+.watch-next-18c h2 { display:flex; align-items:baseline; gap:8px; color:#fff; font-size:17px; font-weight:700; line-height:26px; margin:0; }
+.watch-next-18c h2 > span { color:#71717a; font-size:13px; font-weight:600; }
+.watch-next-18c__series { display:flex; flex-direction:column; gap:8px; }
+.watch-next-18c__series .series-8f-host { padding:0; height:176px; }
+.watch-next-18c__more { display:flex; align-items:center; gap:12px; width:100%; min-height:52px; margin-top:10px; border-radius:26px; padding:0 16px 0 10px; background:#18181bb3; box-shadow:inset 0 0 0 1px #ffffff1a,inset 0 1px 0 #ffffff14; cursor:pointer; }
+.watch-next-18c__more strong { flex:1; text-align:left; font-size:14px; font-weight:700; }
+.watch-next-18c__more > span:last-child { color:#71717a; font-size:12px; font-weight:600; white-space:nowrap; }
+.watch-next-18c__avatars { display:flex; padding-left:8px; flex-shrink:0; }
+.watch-next-18c__avatars > span { width:30px; height:30px; border-radius:50%; margin-left:-8px; overflow:hidden; background:#292233; box-shadow:0 0 0 2px #08080c; }
+.watch-next-18c__avatars img,.watch-next-18c__fan img { width:100%; height:100%; object-fit:cover; }
+.watch-next-18c__reduce { display:block; min-height:44px; padding:0 12px; margin:auto; color:#71717a; font-size:12px; font-weight:700; cursor:pointer; }
+.watch-next-18c__movie-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:20px; }
+.watch-next-18c__movie-heading > button { min-height:44px; padding:0 8px; font-size:13px; font-weight:700; color:#E5A93D; cursor:pointer; }
+.watch-next-18c__launch { position:relative; display:flex; align-items:center; gap:6px; overflow-x:auto; margin:0 -16px 4px; padding:0 16px 6px; white-space:nowrap; scrollbar-width:none; }
+.watch-next-18c__launch > span { font-size:12px; color:#a1a1aa; font-weight:600; }
+.watch-next-18c__launch button,.watch-next-18c__launch input { flex-shrink:0; min-height:44px; padding:0 10px; border-radius:22px; box-shadow:inset 0 0 0 1px #ffffff2e; font-size:12px; font-weight:700; color:#e4e4e7; background:#111114; cursor:pointer; }
+.watch-next-18c__launch input { width:100px; color-scheme:dark; }
+.watch-next-18c__launch button[aria-pressed="true"] { background:#E5A93D; color:#08080c; }
+.movie-ticket-rail { display:flex; gap:12px; overflow-x:auto; margin:0 -16px; padding:4px 16px 16px; scroll-snap-type:x proximity; scroll-padding-inline:16px; overscroll-behavior-inline:contain; scrollbar-width:none; }
+.movie-ticket-grid { display:grid; grid-template-columns:repeat(auto-fill,144px); justify-content:space-between; gap:16px 12px; padding-top:4px; }
+.movie-ticket { position:relative; width:144px; flex:0 0 144px; scroll-snap-align:start; --ticket-hue:260; }
+.movie-ticket__body { position:relative; height:252px; }
+.movie-ticket__open { position:absolute; inset:0; z-index:2; border-radius:14px; cursor:pointer; }
+.movie-ticket__poster { position:absolute; inset:0 0 auto; height:212px; border-radius:14px 14px 4px 4px; overflow:hidden; background:linear-gradient(135deg,hsl(var(--ticket-hue) 35% 26%),#111114); box-shadow:0 12px 22px #0007; display:grid; place-items:center; color:#ffffff73; font-size:20px; font-weight:800; pointer-events:none; }
+.movie-ticket__poster > img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transition:opacity .4s .3s; }
+.movie-ticket__provider { position:absolute; z-index:3; top:7px; right:7px; width:26px; height:26px; border-radius:7px; overflow:hidden; background:#111; box-shadow:0 2px 8px #0009; pointer-events:none; }
+.movie-ticket__provider img { width:100%; height:100%; object-fit:cover; }
+.movie-ticket__server { position:absolute; top:37px; right:7px; z-index:3; max-width:130px; padding:2px 5px; border-radius:5px; background:#09090bbf; color:#f4f4f5; font-size:10px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; pointer-events:none; }
+.movie-ticket__check { position:absolute; z-index:4; top:164px; right:2px; width:44px; height:44px; padding:0; border-radius:50%; background:radial-gradient(circle,#09090bb3 0 18px,transparent 19px); }
+.movie-ticket__check > div { inset:4px; border-radius:50%; box-shadow:inset 0 0 0 1px #ffffff2e; opacity:1; backdrop-filter:blur(8px); }
+.movie-ticket__check svg g path { stroke:#E4E4E7 !important; opacity:1 !important; transform:none !important; }
+.movie-ticket__check[aria-pressed="true"] svg g path { stroke:#F2C36B !important; }
+.movie-ticket__check svg text,.movie-ticket__check svg circle { display:none; }
+.movie-ticket__stub { position:absolute; top:214px; left:0; right:0; height:36px; padding:0 11px; display:flex; align-items:center; justify-content:space-between; gap:6px; border-radius:4px 4px 12px 12px; background:linear-gradient(180deg,oklch(.3 .07 var(--ticket-hue)),oklch(.2 .04 var(--ticket-hue))); box-shadow:0 10px 18px #0006; transform-origin:left top; pointer-events:none; }
+.movie-ticket__stub::before { content:""; position:absolute; top:-1px; left:10px; right:10px; border-top:2px dashed #fff3; }
+.movie-ticket__stub::after { content:""; position:absolute; inset:-7px -7px auto; height:14px; background:radial-gradient(circle at 7px 7px,#08080c 7px,transparent 7.5px) left/14px 14px no-repeat,radial-gradient(circle at 7px 7px,#08080c 7px,transparent 7.5px) right/14px 14px no-repeat; }
+.movie-ticket__stub > span { color:#d4d4d8; font-size:11px; font-weight:600; }
+.movie-ticket__stub strong { font-size:13px; font-weight:800; color:#fff; white-space:nowrap; }
+.movie-ticket__stub strong.movie-ticket__late { color:#FDBA74; }
+.movie-ticket h3 { height:32px; margin:2px 0 0; font-size:13px; font-weight:800; line-height:1.22; color:#F2C36B; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.movie-ticket__stamp { top:78px; transform:translateX(-50%) rotate(-9deg); }
+.movie-ticket--watched .movie-ticket__poster { -webkit-mask:linear-gradient(#000 0 0) top/100% calc(100% - 6px) no-repeat,linear-gradient(135deg,#000 4.3px,transparent 4.4px) bottom left/9px 6px repeat-x,linear-gradient(225deg,#000 4.3px,transparent 4.4px) bottom left/9px 6px repeat-x; mask:linear-gradient(#000 0 0) top/100% calc(100% - 6px) no-repeat,linear-gradient(135deg,#000 4.3px,transparent 4.4px) bottom left/9px 6px repeat-x,linear-gradient(225deg,#000 4.3px,transparent 4.4px) bottom left/9px 6px repeat-x; }
+.movie-ticket--watched .movie-ticket__poster > img { opacity:.4; }
+.movie-ticket--watched .movie-ticket__stub { opacity:0; }
+.movie-ticket--tear.movie-ticket--watched .movie-ticket__stub { animation:tkTear .75s cubic-bezier(.45,0,.75,.35) both; }
+.movie-ticket--tear .movie-ticket__stamp { animation:tkStamp .28s .42s both; }
+.movie-ticket--back:not(.movie-ticket--watched) .movie-ticket__stub { animation:tkBack .35s ease-out both; }
+.watch-next-18c__all-films { width:118px; height:252px; flex:0 0 118px; border-radius:14px; background:#111114; box-shadow:inset 0 0 0 1px #ffffff14; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; color:#E5A93D; font-size:13px; font-weight:800; line-height:1.3; cursor:pointer; }
+.watch-next-18c__fan { display:flex; padding-left:12px; }
+.watch-next-18c__fan > span { width:34px; height:51px; margin-left:-12px; border-radius:6px; overflow:hidden; background:#292233; box-shadow:0 4px 10px #0008,0 0 0 1px #ffffff1f; }
+.watch-next-18c__more-films { width:100%; min-height:44px; margin-top:12px; border-radius:22px; background:#18181b; color:#d4d4d8; font-size:13px; font-weight:700; cursor:pointer; }
+.watch-next-18c__empty { padding:32px 0; text-align:center; font-size:14px; color:#71717a; }
+.watch-next-18c button:focus-visible,.watch-next-18c input:focus-visible { outline:2px solid #F2C36B; outline-offset:2px; }
+@keyframes tkTear { 0%{transform:none;opacity:1}16%{transform:rotate(-3deg) translateY(1px)}32%{transform:rotate(5deg) translate(3px,4px)}100%{transform:translate(30px,80px) rotate(24deg);opacity:0} }
+@keyframes tkStamp { from{transform:translateX(-50%) rotate(-9deg) scale(1.7);opacity:0}to{transform:translateX(-50%) rotate(-9deg) scale(1);opacity:1} }
+@keyframes tkBack { from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1} }
+@media (min-width:640px) { .watch-next-18c { padding-inline:24px; } .movie-ticket-rail { margin-inline:-24px; padding-inline:24px; } }
+@media (prefers-reduced-motion:reduce) { .watch-next-18c *, .watch-next-18c *::before,.watch-next-18c *::after { animation-duration:.01s !important; animation-delay:0s !important; transition-duration:.01s !important; transition-delay:0s !important; } }

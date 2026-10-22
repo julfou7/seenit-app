@@ -13,6 +13,11 @@ const base: Show = { id: 'tv', userId: 'fixture', tmdbId: 42, title: 'Breaking B
 const initial = [base, { ...base, id: 'movie', tmdbId: 2, mediaType: 'movie' as const, title: 'Dune : Deuxième partie', seenEpisodes: ['movie'], episodeRecords: { movie: { watchedAt: at(0, 19, 12), plexImported: true } } },
   { ...base, id: 'legacy', tmdbId: 4, mediaType: 'movie' as const, title: 'Interstellar', seenEpisodes: ['movie'], episodeRecords: {}, lastWatchedAt: at(-1, 12) }];
 const store = create<{ shows: Show[] }>(() => ({ shows: initial }));
+export const makeRecordlessHistory = () => {
+  const day = at(-10, 12);
+  store.setState(state => ({ shows: state.shows.map(show => show.id === 'tv' ? { ...show, episodeRecords: {}, lastWatchedAt: day } : show) }));
+  return day;
+};
 export function useShows() {
   return { shows: store(state => state.shows), loading: false, updateShow: async (id: string, updates: Partial<Show>) => {
     telemetry.writes.push({ id, updates });

@@ -74,3 +74,6 @@ Les variantes de clé épisode sont normalisées avant déduplication et mutatio
 Les écritures de changement d'horodatage et de retrait non vu conservent les autres métadonnées du record,
 recalculent `lastWatchedAt` à partir des preuves restantes et offrent un rollback utilisateur. PWA et APK
 partagent exactement la même logique métier et le même rendu responsive 360/412/desktop.
+Avant une mutation, les épisodes legacy encore vus mais sans record conservent explicitement leur ancien
+jour de repli dans un record à heure inconnue. Modifier/retirer un voisin ne les déplace donc jamais à
+la nouvelle date agrégée ou à aujourd'hui. Annuler restaure les records originaux.

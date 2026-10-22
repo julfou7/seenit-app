@@ -36,3 +36,15 @@ export function historyLastWatchedAt(records: Show['episodeRecords'], seenEpisod
   }
   return latest;
 }
+
+/** Fige le jour legacy avant qu'une mutation voisine ne change le repli du Show. */
+export function materializeHistoryRecords(show: Pick<Show, 'episodeRecords' | 'seenEpisodes' | 'lastWatchedAt' | 'updatedAt' | 'createdAt'>): Show['episodeRecords'] {
+  const records = { ...show.episodeRecords };
+  const fallback = resolveHistoryTimestamp(undefined, show.lastWatchedAt, show.updatedAt, show.createdAt);
+  if (!fallback) return records;
+  for (const entry of historyEpisodeEntries(show)) {
+    if (resolveHistoryTimestamp(entry.record?.watchedAt)) continue;
+    records[entry.key] = { ...entry.record, watchedAt: fallback.watchedAt, watchedTimeKnown: false };
+  }
+  return records;
+}

@@ -48,11 +48,9 @@ dernière saison et total ouvert. Elles survivent à la suppression du cache sai
 restent disponibles à l'historique, même sans épisode de reprise. La carte ne crée pas ces preuves.
 Le détail de récence est activé uniquement par la section « Pas vu depuis un moment ».
 
-Dans les trois rails séries réduits de À Regarder (`Continuer`, `Nouveautés`, `Pas vu depuis`),
-le défilement n'est plus libre : `scroll-snap-type: x mandatory`, chaque carte est un arrêt
-`scroll-snap-stop: always` et une carte mobile occupe environ 88 % du viewport afin de laisser
-un aperçu de la suivante à droite. Le rail Films à voir conserve son défilement libre issu de
-#229. Les listes verticales et les films ne changent pas.
+À Regarder suit désormais le [contrat 18c](watch-next-18c.md) : liste verticale de séries
+par trois et rail de tickets films. Les anciens rails séries à snap de #702 sont remplacés
+par cette liste bornée ; la géométrie 8f reste partagée avec À Venir et Historique.
 
 La coche SeenIt de la 8f suit la maquette v2 : cible 48 × 48 px, pictogramme 34 px, écran plein
 `#0B0B0F`, cadre `#A1A1AA` 4,5 px et coche `#E4E4E7` 6,5 px. Elle doit rester très lisible sur

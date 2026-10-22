@@ -1,3 +1,5 @@
+import { markMovieWatched, markWatchRecordUnseen } from '../features/watchlist/watchProgressActions';
+import type { SeriesCardEpisode } from '../features/watchlist/seriesCardPresentation';
 import React, { startTransition, useState, useEffect, useRef, useMemo, useCallback, type RefObject } from 'react';
 import { type Show } from '../types';
 import { cn, getNextEpisodeNumber, scrollAllCarouselsToStart, checkIsUpToDate, getAiredProgress, getTodayStr } from '../lib/utils';
@@ -548,106 +550,10 @@ export function WatchListScreen({
   }, [allShows]);
 
   const markNextEpisodeAsSeen = useCallback(async (show: Show) => {
-    const wasInPasVu = pasVuDepuisUnMomentShows.some(s => s.id === show.id);
-    if (!await markWatchCardEpisode(show, getTodayStr(), markEpisodeWatched)) return;
-
-    if (wasInPasVu) {
-      setTimeout(() => {
-        const container = document.getElementById('watchlist-container');
-        if (container) {
-          container.style.scrollBehavior = 'smooth';
-          container.scrollTop = 0;
-        }
-        const continueCarousel = document.getElementById('continue-watching-carousel');
-        if (continueCarousel) {
-          continueCarousel.style.scrollBehavior = 'smooth';
-          continueCarousel.scrollLeft = 0;
-        }
-        scrollAllCarouselsToStart();
-        setTimeout(() => {
-          if (container) container.style.scrollBehavior = 'auto';
-          if (continueCarousel) continueCarousel.style.scrollBehavior = 'auto';
-        }, 600);
-      }, 350);
-    }
-  }, [pasVuDepuisUnMomentShows]);
-
-  const markMovieAsSeen = useCallback(async (show: Show) => {
-    if (!show.id) return;
-
-    const prevSeenEpisodes = [...(show.seenEpisodes || [])];
-    const prevStatus = show.status;
-    const prevLastWatchedAt = show.lastWatchedAt;
-    const prevEpisodeRecords = show.episodeRecords ? { ...show.episodeRecords } : {};
-
-    const updatePayload: any = {
-      seenEpisodes: arrayUnion('movie'),
-      status: 'completed',
-      lastWatchedAt: Date.now(),
-      updatedAt: Date.now(),
-      isSynced: false
-    };
-
-    updatePayload['episodeRecords.movie'] = {
-      watchedAt: Date.now(),
-      episodeTitle: show.title || 'Film'
-    };
-
-    useShowsStore.getState().updateShowOptimistic(show.id, {
-      seenEpisodes: [...(show.seenEpisodes || []), 'movie'],
-      status: 'completed',
-      lastWatchedAt: Date.now(),
-      updatedAt: Date.now()
-    });
-
-    if (auth.currentUser && show.id) {
-      try {
-        const stringId = String(show.id);
-        useLogStore.getState().addLog(`[Firestore] Tentative de màj atomique pour le film ${stringId}`, "info");
-
-        const docRef = doc(db, 'users', auth.currentUser.uid, 'shows', stringId);
-        await updateDoc(docRef, updatePayload);
-
-        useLogStore.getState().addLog(`[Firestore] Succès de la màj atomique pour le film ${stringId}`, "success");
-      } catch (error: unknown) {
-        useLogStore.getState().addLog(`[Firestore] ERREUR màj film ${show.id} : ${error instanceof Error ? error.message : String(error)}`, "error");
-      }
-    }
-
-    scrollAllCarouselsToStart();
-    useToastStore.getState().showToast(
-      `« ${show.title} » marqué comme vu !`,
-      'success',
-      show,
-      async () => {
-        const rollbackUpdates: Partial<Show> = {
-          seenEpisodes: prevSeenEpisodes,
-          status: prevStatus,
-          lastWatchedAt: prevLastWatchedAt,
-          episodeRecords: prevEpisodeRecords,
-          updatedAt: Date.now(),
-          isSynced: false
-        };
-
-        useShowsStore.getState().updateShowOptimistic(show.id, rollbackUpdates);
-        const user = auth.currentUser;
-        if (user && show.id) {
-          try {
-            const stringId = String(show.id);
-            const cleanRollback: any = {};
-            Object.entries(rollbackUpdates).forEach(([key, val]) => {
-              cleanRollback[key] = val === undefined ? null : val;
-            });
-            const docRef = doc(db, 'users', user.uid, 'shows', stringId);
-            await updateDoc(docRef, cleanRollback);
-          } catch (e) {
-            console.error('[markMovieAsSeen] Rollback failed:', e);
-          }
-        }
-        scrollAllCarouselsToStart();
-      }
-    );
+    return markWatchCardEpisode(show, getTodayStr(), markEpisodeWatched);
   }, []);
 
-  return <WatchListView model={{ activeTab, allShows, continueWatchingShows, executeUnfollow, expandedSection, filmsAVoirShows, handleArchiveShow, handleDropShow, handleEpisodeClick, handleEpisodeParentClick, handleToggleVoirTout, historyRef, isQuotaExceeded, loading, markMovieAsSeen, markNextEpisodeAsSeen, nouveautesShows, onShowClick, onShowClickProp, openPersonModal, pasVuDepuisUnMomentShows, pendingAction, scrollToSection, selectedEpisodeModal, selectedPersonId, setPendingAction, setSelectedEpisodeModal, setSelectedPersonId, setVisibleCount, upcomingRef, upcomingShows, visibleCount, watchNextRef }} />;
+  const markMovieAsSeen = useCallback((show: Show) => markMovieWatched(show, updateShow), [updateShow]);
+  const markAsUnseen = useCallback((show: Show, episode: SeriesCardEpisode | null) => markWatchRecordUnseen(show, episode, updateShow), [updateShow]);
+  return <WatchListView model={{ activeTab, allShows, continueWatchingShows, executeUnfollow, expandedSection, filmsAVoirShows, handleArchiveShow, handleDropShow, handleEpisodeClick, handleEpisodeParentClick, handleToggleVoirTout, historyRef, isQuotaExceeded, loading, markMovieAsSeen, markNextEpisodeAsSeen, markAsUnseen, nouveautesShows, onShowClick, onShowClickProp, openPersonModal, pasVuDepuisUnMomentShows, pendingAction, scrollToSection, selectedEpisodeModal, selectedPersonId, setPendingAction, setSelectedEpisodeModal, setSelectedPersonId, setVisibleCount, upcomingRef, upcomingShows, visibleCount, watchNextRef }} />;
 }

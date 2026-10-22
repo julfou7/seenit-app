@@ -2076,6 +2076,32 @@
       ]
     },
     {
+      "id": "SEENIT-UX-016",
+      "title": "À Regarder 18c, séries par trois et tickets films réversibles",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/watchNext18c.test.ts",
+          "contains": "SEENIT-UX-016 calcule une fin locale"
+        },
+        {
+          "file": "tests/watchNext18c.test.ts",
+          "contains": "SEENIT-UX-016 conserve l’ordre"
+        },
+        {
+          "file": "tests/watchNext18c.test.ts",
+          "contains": "SEENIT-UX-016 retire uniquement le visionnage ciblé"
+        },
+        {
+          "file": "tests/watchNext18c.test.ts",
+          "contains": "SEENIT-UX-016 exécute les composants réels dans Chromium"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-UX-015",
       "title": "Historique mixte 16d par jour, heure prouvée et actions réversibles",
       "targets": [
@@ -2094,6 +2120,10 @@
         {
           "file": "tests/history16d.test.ts",
           "contains": "SEENIT-UX-015 normalise les preuves"
+        },
+        {
+          "file": "tests/history16d.test.ts",
+          "contains": "SEENIT-UX-015 conserve le jour des épisodes legacy voisins"
         }
       ]
     },

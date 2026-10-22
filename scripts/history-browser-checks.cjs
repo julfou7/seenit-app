@@ -58,6 +58,22 @@ async function testHistoryHarness(client, root) {
     await evaluate(client, 'window.scrollTo(0,0)');
     const screenshot = await client.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
     fs.writeFileSync(path.join(root, 'quality-reports', `history-16d-${width}.png`), Buffer.from(screenshot.data, 'base64'));
+    await evaluate(client, 'window.__legacyDay=window.__history16d.makeLegacy()');
+    await check(client, 'document.querySelectorAll(".series-8f__history time").length===1', 'les épisodes recordless gardent leur heure inconnue');
+    const legacyOpen = `document.querySelector(${JSON.stringify('.series-8f__open[aria-label*="épisode 14"]')})`;
+    await evaluate(client, `${legacyOpen}.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}))`);
+    await evaluate(client, '[...document.querySelectorAll("[role=dialog] button")].find(button=>button.textContent==="Changer la date/heure").click()');
+    await check(client, 'document.querySelector("input[type=date]")', 'éditeur legacy');
+    await evaluate(client, `(()=>{const el=document.querySelector('input[type=date]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,'2026-10-25');el.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+    await evaluate(client, '[...document.querySelectorAll("[role=dialog] button")].find(button=>button.textContent==="Enregistrer").click()');
+    await check(client, 'window.__history16d.writes.at(-1).updates.episodeRecords["5x13"].watchedAt===window.__legacyDay && window.__history16d.writes.at(-1).updates.episodeRecords["5x13"].watchedTimeKnown===false', 'éditer un legacy préserve le jour de son voisin');
+    await evaluate(client, 'document.getElementById("history-undo").click()');
+    await check(client, 'Object.keys(window.__history16d.writes.at(-1).updates.episodeRecords).length===0', 'Annuler restaure les records legacy originaux');
+    await evaluate(client, `${legacyOpen}.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}))`);
+    await evaluate(client, '[...document.querySelectorAll("[role=dialog] button")].find(button=>button.textContent==="Marquer non vu").click()');
+    await check(client, 'document.querySelector("[role=alertdialog]")', 'confirmation legacy');
+    await evaluate(client, '[...document.querySelectorAll("[role=alertdialog] button")].find(button=>button.textContent==="Oui, marquer non vu").click()');
+    await check(client, 'window.__history16d.writes.at(-1).updates.episodeRecords["5x13"].watchedAt===window.__legacyDay && window.__history16d.writes.at(-1).updates.lastWatchedAt===window.__legacyDay', 'retirer un legacy ne déplace pas son voisin à aujourd’hui');
     reports.push({ width, status: 'pass', productionComponent: 'HistoryFeed', dateUndo: true, unseenUndo: true });
   }
   return reports;

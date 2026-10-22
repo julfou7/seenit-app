@@ -12,6 +12,7 @@ const featureFiles = {
     'src/screens/WatchListScreen.tsx',
     'src/screens/WatchListView.tsx',
     'src/screens/watchListPresentation.tsx',
+    'src/screens/WatchNextSection.tsx',
   ],
   showDetail: [
     'src/screens/ShowDetailScreenCore.tsx',

@@ -13,6 +13,7 @@ export interface SeriesCardEpisode {
   episode_type?: string | null;
   name?: string | null;
   air_date?: string | null;
+  still_path?: string | null;
 }
 
 interface SeasonData {
@@ -105,6 +106,12 @@ export function seriesEpisodeCode(episode: SeriesCardEpisode): string {
   return `S${String(episode.season_number).padStart(2, '0')} · E${String(episode.episode_number).padStart(2, '0')}`;
 }
 
+export function seriesCompletionLabel(show: Pick<Show, 'seriesEnded' | 'tmdbStatus'>): string {
+  if (show.tmdbStatus === 'Canceled') return 'Série annulée';
+  if (show.seriesEnded || show.tmdbStatus === 'Ended') return 'Série terminée';
+  return 'Prochain épisode bientôt';
+}
+
 export function buildSeriesSeasonProgress(
   show: Pick<Show, 'seenEpisodes' | 'seasonsCache' | 'seasonProgress' | 'nextEpisodeToWatch' | 'nextEpisodeToAir' | 'seriesEnded' | 'tmdbStatus'>,
   episode: SeriesCardEpisode,
@@ -124,7 +131,7 @@ export function buildSeriesSeasonProgress(
   });
   const seen = new Set(seenEntries.filter(item => item.season === season).map(item => item.episode));
 
-  const advertisedTotal = pointers.map(pointer => count(pointer.episode_count)).find(value => value !== null && value > 0)
+  const advertisedTotal = pointers.map(pointer => count(pointer.episode_count ?? (pointer.season_total_unknown === false ? pointer.known_episodes_in_season : null))).find(value => value !== null && value > 0)
     ?? count(cached?.episode_count)
     ?? null;
   const cachedKnown = (cached?.episodes || []).reduce((highest, item) => Math.max(highest, count(item.episode_number) || 0), 0);

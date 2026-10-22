@@ -16,7 +16,7 @@ import {
 import { openPlexWatchUrl } from '../features/plex/plexLinks';
 import { readWatchProviderCache } from '../features/providers/watchProviderCache';
 import { getProviderLinkPresentation } from '../features/providers/providerLink';
-import { historyEpisodeEntries, historyEpisodeKey, historyRecordsWithoutTarget, historyLastWatchedAt } from '../features/history/historyRecords';
+import { historyEpisodeEntries, historyEpisodeKey, historyRecordsWithoutTarget, historyLastWatchedAt, materializeHistoryRecords } from '../features/history/historyRecords';
 import {
   buildHistoryAriaLabel,
   buildMovieCollectionProgress,
@@ -441,7 +441,7 @@ export function HistoryFeed({
     const previousRecord = editingItem.mediaType === 'movie' ? asRecord(previousRecords.movie) || {}
       : historyEpisodeEntries(targetShow).find(entry => entry.key === epKey)?.record || {};
     const nextRecords = {
-      ...historyRecordsWithoutTarget(previousRecords, epKey),
+      ...historyRecordsWithoutTarget(materializeHistoryRecords(targetShow), epKey),
       [epKey]: {
         ...previousRecord,
         watchedAt: parsed.watchedAt,
@@ -481,7 +481,7 @@ export function HistoryFeed({
     const isMovie = item.mediaType === 'movie' || targetShow.mediaType === 'movie';
     const epKey = isMovie ? 'movie' : `${item.season}x${item.episode}`;
     const newSeenEpisodes = (targetShow.seenEpisodes || []).filter(key => (historyEpisodeKey(key) || key) !== epKey);
-    const newRecords = historyRecordsWithoutTarget(targetShow.episodeRecords, epKey);
+    const newRecords = historyRecordsWithoutTarget(materializeHistoryRecords(targetShow), epKey);
     const newLastWatchedAt = historyLastWatchedAt(newRecords, newSeenEpisodes);
 
     const prevSeenEpisodes = targetShow.seenEpisodes || [];

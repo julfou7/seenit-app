@@ -1011,7 +1011,8 @@ pour le cache des sagas et univers.
   série nomme toujours la saison ou l'épisode concerné : « Nouvelle saison » précise « Saison N » et
   « Nouvel épisode » précise « Sxx | Eyy ». Quand la série possède déjà un prochain épisode non vu antérieur
   à l'épisode nouvellement diffusé, la notification reprend ce prochain épisode réellement à voir et le
-  même compteur « + X épisode(s) » que la carte « À Regarder » ; le corps conserve aussi les noms
+  compteur de reprise « + X épisode(s) », calculé indépendamment de la présentation de la carte
+  À Regarder qui n'affiche plus ce compteur ; le corps conserve aussi les noms
   d'épisode disponibles afin de distinguer ce qui vient de sortir de ce qui doit être repris. Les autres
   catégories de rappel conservent leur feedback interne existant.
 
@@ -1177,9 +1178,8 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   La coche Vu, le rappel et les actions d'historique sont des contrôles séparés d'au moins 44 px.
   Les opérations réutilisent leurs handlers et Annuler existants. Appui long, menu contextuel et clavier
   partagent les mêmes actions, sans clic d'ouverture après un appui long ni timer persistant au scroll.
-  Les trois rails séries réduits de À Regarder restent virtualisés mais avancent carte par carte avec
-  un snap horizontal obligatoire et un arrêt sur chaque carte ; le rail Films à voir conserve son
-  défilement libre. La carte se réutilise en liste sans modifier les films.
+  À Regarder utilise désormais la liste progressive et les tickets films de `SEENIT-UX-016` ;
+  la carte 8f reste partagée avec le calendrier et l'historique.
   Le prochain épisode à voir et l'action Vu utilisent le même résolveur : un pointeur de diffusion
   future ne devient jamais une reprise. Si le pointeur de reprise manque, les épisodes diffusés du
   cache et la progression persistée servent de preuve ; une reprise inconnue est « À actualiser »,
@@ -1187,6 +1187,18 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   Les deux synchronisations de détails conservent dans `seasonProgress` les preuves publiques de
   finale datée et de dernière saison avant suppression du cache déprécié ; ces métadonnées ne sont
   jamais des preuves de visionnage. Le badge de récence est demandé par la section des séries anciennes.
+- **SEENIT-UX-016** — À Regarder 18c réunit les séries éligibles en une liste de trois cartes 8f,
+  extensible de trois en trois puis réductible. Le bouton verre présente les trois suivantes et
+  un seul compteur en attente. L'ordre des groupes existants et leur éligibilité sont conservés.
+  Un Vu abouti anime l'épisode quitté, la nouvelle reprise réelle, le segment et un tampon SeenIt ;
+  à jour permet le retour du dernier épisode explicitement marqué dans la session, avec Annuler.
+  Les films sont des tickets 144 px : année et fin depuis Maintenant ou l'heure de lancement choisie,
+  actualisée chaque minute et orange après minuit ; sans durée, aucune fin inventée. Le tri place les
+  durées connues en ordre croissant, les inconnues après ; une coche conserve sa place pendant la session,
+  puis la liste est rafraîchie à sa réouverture/réinitialisation. Déchirure, état vu persistant et
+  recollement suivent les écritures métier réversibles existantes. Rail initial borné à huit tickets,
+  tuile terminale et en-tête ouvrent la même grille paginée. Cibles >=44 px, clavier, annonces live et
+  reduced-motion sont communs PWA/APK ; identité, preuve de diffusion et diffuseur ne sont pas réinventés.
 - **SEENIT-UX-015** — L'historique 16d mélange films et épisodes dans une chronologie par jour local,
   avec le cadre 8f partagé. Seule l'heure réellement connue apparaît sur la carte ; une date seule
   ou un repli legacy ne crée jamais une heure. « Hier » suit le calendrier local, y compris au
