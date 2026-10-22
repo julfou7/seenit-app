@@ -38,7 +38,6 @@ export async function markEpisodeWatched(
   const sNumStr = String(sNum).padStart(2, '0');
   const eNumStr = String(eNum).padStart(2, '0');
 
-  // Sauvegarde de l'état précédent pour l'annulation (undo)
   const prevSeenEpisodes = targetShow.seenEpisodes || [];
   const prevEpisodeRecords = targetShow.episodeRecords || {};
   const prevLastWatchedAt = targetShow.lastWatchedAt || null;
@@ -49,7 +48,6 @@ export async function markEpisodeWatched(
   newSeenSet.add(epKey);
   const newSeenArray = Array.from(newSeenSet);
 
-  // Recherche du titre de l'épisode et du prochain épisode via TMDB
   let fetchedEpTitle: string | null = null;
   let optimisticNextEp: any = null;
   const totalEps = targetShow.totalAiredEpisodes || targetShow.totalEpisodes || 0;
@@ -59,14 +57,11 @@ export async function markEpisodeWatched(
       const seasonRes = await tmdb.getSeasonDetails(targetShow.tmdbId, sNum);
       if (seasonRes.ok && seasonRes.value?.episodes) {
         const curEp = seasonRes.value.episodes.find((x: any) => x.episode_number === eNum);
-        if (curEp && curEp.name) {
-          fetchedEpTitle = curEp.name;
-        }
+        if (curEp && curEp.name) fetchedEpTitle = curEp.name;
 
         if (totalEps > 0 && newSeenArray.length >= totalEps) {
           optimisticNextEp = null;
         } else {
-          // Trouver le premier épisode non vu de la saison
           const nextInSeason = seasonRes.value.episodes.find((x: any) => x.episode_number > eNum && !newSeenSet.has(`${sNum}x${x.episode_number}`));
           if (nextInSeason) {
             optimisticNextEp = {
@@ -106,19 +101,15 @@ export async function markEpisodeWatched(
     }
   }
 
-  // Fallback si TMDB n'a pas répondu ou est indisponible
   if (!optimisticNextEp && (totalEps === 0 || newSeenArray.length < totalEps)) {
     let checkEp = eNum + 1;
-    while (newSeenSet.has(`${sNum}x${checkEp}`) && checkEp <= 100) {
-      checkEp++;
-    }
+    while (newSeenSet.has(`${sNum}x${checkEp}`) && checkEp <= 100) checkEp++;
     optimisticNextEp = { season_number: sNum, episode_number: checkEp };
   }
 
   const episodeTitle = fetchedEpTitle || optimisticNextEp?.name || null;
 
   if (auth.currentUser?.uid !== initiatingUid) return false;
-  // 1. Mise à jour optimiste dans le store local Zustand pour réactivité instantanée UI
   const localUpdates: Partial<Show> = {
     seenEpisodes: newSeenArray,
     episodeRecords: {
@@ -139,7 +130,6 @@ export async function markEpisodeWatched(
 
   useShowsStore.getState().updateShowOptimistic(targetShow.id, localUpdates);
 
-  // 2. Envoi strict et ciblé à Firestore avec la VRAIE notation pointée (dot-notation)
   const user = auth.currentUser;
   if (user && targetShow.id) {
     const stringId = String(targetShow.id);
@@ -154,8 +144,6 @@ export async function markEpisodeWatched(
         isSynced: false
       };
 
-      // C'est ICI qu'on utilise la VRAIE notation pointée de Firestore pour mettre à jour
-      // UNE SEULE CLÉ dans le dictionnaire distant, SANS lire ni écraser le reste.
       updatePayload[`episodeRecords.${epKey}`] = {
         ...prevEpisodeRecords[epKey],
         watchedAt: Date.now(),
@@ -164,31 +152,22 @@ export async function markEpisodeWatched(
       };
 
       if (optimisticNextEp !== undefined) {
-        // Firebase refuse le type undefined. On assainit l'objet en remplaçant undefined par null.
         const cleanNextEp: any = { ...optimisticNextEp };
         Object.keys(cleanNextEp).forEach(key => {
-          if (cleanNextEp[key] === undefined) {
-            cleanNextEp[key] = null;
-          }
+          if (cleanNextEp[key] === undefined) cleanNextEp[key] = null;
         });
         updatePayload.nextEpisodeToWatch = cleanNextEp;
       }
 
-      if (targetShow.status === 'plan_to_watch') {
-        updatePayload.status = 'watching';
-      }
+      if (targetShow.status === 'plan_to_watch') updatePayload.status = 'watching';
 
       useLogStore.getState().addLog(`[Firestore] Envoi payload (${Object.keys(updatePayload).join(', ')}) pour la série ${stringId}`, "info");
 
       const docRef = doc(db, 'users', user.uid, 'shows', stringId);
 
-      // Configuration d'un timeout de 4 secondes pour lever une alerte claire si le réseau ou le cache bloque
-      const updatePromise = updateDoc(docRef, updatePayload);
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Délai d'attente dépassé (4s) - Écriture Firestore en attente")), 4000)
-      );
-
-      await Promise.race([updatePromise, timeoutPromise]);
+      // Firestore ne permet pas d'annuler updateDoc : attendre son résultat réel évite
+      // un rollback local sur timeout alors que l'écriture distante peut encore réussir.
+      await updateDoc(docRef, updatePayload);
 
       useLogStore.getState().addLog(`[Firestore] Succès de la màj atomique pour ${stringId} (Ep: ${epKey})`, "success");
     } catch (error: any) {
@@ -205,12 +184,8 @@ export async function markEpisodeWatched(
       return false;
     }
   } else {
-    if (!user) {
-      useLogStore.getState().addLog(`[Firestore] Échec màj : Aucun utilisateur connecté`, "error");
-    }
-    if (!targetShow.id) {
-      useLogStore.getState().addLog(`[Firestore] Échec màj : ID de série manquant`, "error");
-    }
+    if (!user) useLogStore.getState().addLog(`[Firestore] Échec màj : Aucun utilisateur connecté`, "error");
+    if (!targetShow.id) useLogStore.getState().addLog(`[Firestore] Échec màj : ID de série manquant`, "error");
   }
 
   if (auth.currentUser?.uid !== initiatingUid) return false;
