@@ -17,6 +17,8 @@ de recommandations ou planificateur n'est créé. Explorer révèle et focalise 
 Moi ouvre une feuille de réglages rapides (fonctionnalité Téléchargements et accès Réglages),
 Télécharger ouvre sa vraie Recherche C411. Les boutons existants ou ajoutés rendent les
 fonctions accessibles sans geste caché. Aucun reset ne modifie la bibliothèque ou les transferts.
+Les raccourcis actifs ne repoussent pas leur propre onglet dans l'historique. Tous les réglages
+attend la fermeture par la pile DialogLayer avant d'ouvrir Moi/Réglages, sans entrée fantôme.
 
 L'état du badge est une présentation des données live existantes. Actif or > action rouge >
 terminé non consulté vert ; acquittement UI local par identité technique et compte courant,

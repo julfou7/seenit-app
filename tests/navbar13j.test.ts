@@ -1,8 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { acknowledgeCompletedDownloads, completionKey, resolveDownloadNavState } from '../src/features/navigation/downloadNavState.ts';
+import { activateNavigationShortcut, openNavigationSettings } from '../src/features/navigation/navigationShortcuts.ts';
+import type { RootNavigationTab } from '../src/features/navigation/tabPresentation.ts';
 const active = { id: 'hash-a', status: 'downloading', progress: 30 };
 const ready = { id: 'hash-b', status: 'completed', progress: 100, addedAt: 123 };
+test('SEENIT-UX-017 les raccourcis actifs et les réglages évitent les entrées historiques identiques', () => {
+  const changes: RootNavigationTab[] = [], requests: RootNavigationTab[] = [];
+  let quick = 0;
+  const actions = { changeTab: (tab: RootNavigationTab) => changes.push(tab), request: (tab: RootNavigationTab) => requests.push(tab), quickAccount: () => { quick++; } };
+  activateNavigationShortcut('discover', 'discover', actions);
+  activateNavigationShortcut('downloads', 'downloads', actions);
+  openNavigationSettings('profile', actions);
+  openNavigationSettings('settings', actions);
+  assert.deepEqual(changes, []);
+  assert.deepEqual(requests, ['discover', 'downloads', 'profile', 'profile']);
+  activateNavigationShortcut('discover', 'profile', actions);
+  assert.equal(quick, 1);
+  assert.deepEqual(changes, []);
+  openNavigationSettings('discover', actions);
+  assert.deepEqual(changes, ['profile']);
+});
 test('SEENIT-UX-017 privilégie les transferts actifs puis les actions requises et les terminés non consultés', () => {
   assert.equal(resolveDownloadNavState([active, ready, { id: 'error', status: 'error' }], []).kind, 'active');
   assert.deepEqual(resolveDownloadNavState([active], []), { kind: 'active', count: 1, label: 'Télécharger · en cours' });

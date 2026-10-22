@@ -14,6 +14,7 @@ export function useLiveDownloadStore<T>(select: (state: ReturnType<typeof live.g
   return select(useSyncExternalStore(subscribe, live.getState, live.getState));
 }
 export const useShows = () => ({ updateShow: async () => { telemetry.mutations++; } });
+export const useShowsStore = { getState: () => ({ shows: [] }) };
 export const useLogStore = { getState: () => ({ addLog() {} }) };
 export const appLogger = { info() {}, warn() {}, error() {}, debug() {} };
 export const api = {
