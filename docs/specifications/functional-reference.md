@@ -204,6 +204,10 @@ avec À Venir et Historique. La progression ne dépend pas du cache saison dépr
 prouvés et la traîne « ? » signalent les saisons ouvertes. Le badge de récence reste propre aux
 séries anciennes. Vu anime la reprise réellement avancée et son tampon SeenIt. À jour propose
 le retour du dernier épisode explicitement marqué dans cette session, avec Annuler.
+Pendant une écriture Firestore lente, le marquage reste en attente : aucun délai arbitraire
+ne provoque de faux échec ni de restauration locale alors que l'écriture peut encore réussir.
+Le succès et son animation attendent l'acquittement réel ; seul un rejet définitif restaure
+l'état précédent et affiche l'erreur. Un changement de compte ignore le résultat pour le nouvel UID.
 
 Les films sont des tickets déchirables, triés par heure de fin croissante (durée inconnue en dernier).
 Le talon indique l'année et la fin calculée chaque minute depuis Maintenant ou « Je lance à » ;
