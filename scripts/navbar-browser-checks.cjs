@@ -23,9 +23,9 @@ async function tap(client, selector, button='left', hold=0) {
 }
 async function buildNavbarHarness(root) {
   const ports=path.join(root,'tests/fixtures/navbar13jRuntime.ts');
-  await esbuild.build({entryPoints:[path.join(root,'tests/fixtures/navbar13j.tsx')],outfile:path.join(root,'dist/__seenit-navbar.js'),bundle:true,platform:'browser',format:'iife',target:['chrome120'],logLevel:'silent',plugins:[{name:'navbar-external-ports',setup(builder){builder.onResolve({filter:/\/(?:downloadConfigStore|liveDownloadStore|useShows|logStore)$/},()=>({path:ports}));}}]});
+  await esbuild.build({entryPoints:[path.join(root,'tests/fixtures/navbar13j.tsx')],outfile:path.join(root,'dist/__seenit-navbar.js'),bundle:true,platform:'browser',format:'iife',target:['chrome120'],logLevel:'silent',plugins:[{name:'navbar-external-ports',setup(builder){builder.onResolve({filter:/\/(?:downloadConfigStore|liveDownloadStore|useShows|showsStore|logStore|SettingsScreen)$/},()=>({path:ports}));}}]});
   const css=fs.readdirSync(path.join(root,'dist/assets')).filter(file=>file.endsWith('.css'));
-  fs.writeFileSync(path.join(root,'dist/__seenit-navbar.html'),`<!doctype html><html lang="fr"><head><meta name="viewport" content="width=device-width,initial-scale=1">${css.map(file=>`<link rel="stylesheet" href="/assets/${file}">`).join('')}<link rel="stylesheet" href="/__seenit-navbar.css"><style>body{margin:0;background:#08080c;color:white}</style></head><body><div id="root"></div><script>sessionStorage.removeItem("seenit-nav-consulted:nav-a");sessionStorage.removeItem("seenit-nav-consulted:nav-b");</script><script src="/__seenit-navbar.js"></script></body></html>`);
+  fs.writeFileSync(path.join(root,'dist/__seenit-navbar.html'),`<!doctype html><html lang="fr"><head><meta name="viewport" content="width=device-width,initial-scale=1">${css.map(file=>`<link rel="stylesheet" href="/assets/${file}">`).join('')}<link rel="stylesheet" href="/__seenit-navbar.css"><style>body{margin:0;background:#08080c;color:white}</style></head><body><div id="root"></div><script>history.replaceState({tab:"watchlist",selectedShow:null,isRoot:true}, "");sessionStorage.removeItem("seenit-nav-consulted:nav-a");sessionStorage.removeItem("seenit-nav-consulted:nav-b");</script><script src="/__seenit-navbar.js"></script></body></html>`);
 }
 async function testNavbarHarness(client, root) {
   const reports=[];
@@ -61,6 +61,11 @@ async function testNavbarHarness(client, root) {
     for(const tab of ['watchlist','discover','downloads']) {
       await tap(client,selector(tab),'left',530);
       await check(client,`window.__nav13j.telemetry.shortcuts.filter(t=>t===${JSON.stringify(tab)}).length===1`,'appui long unique '+tab);
+      if(tab==='discover'||tab==='downloads') {
+        const index=await evaluate(client,'navigation.currentEntry.index');
+        await tap(client,selector(tab),'left',530);
+        await check(client,`navigation.currentEntry.index===${index} && window.__nav13j.telemetry.shortcuts.filter(t=>t===${JSON.stringify(tab)}).length===2`,'raccourci actif sans entrée historique doublonnée');
+      }
     }
     await tap(client,selector('profile'),'right');
     await check(client,'document.querySelector(".nav-quick-account") && getComputedStyle(document.querySelector(".bottom-nav-shell")).display==="none"','clic droit ouvre réglages et masque barre');
@@ -83,6 +88,22 @@ async function testNavbarHarness(client, root) {
       await check(client,`window.__nav13j.telemetry.shortcuts.length===${shortcutCount}`,'pointercancel annule le timer');
     }
     // États live, acquittement et isolation par compte.
+    await tap(client,selector('discover'));
+    const beforeSettings=await evaluate(client,'navigation.currentEntry.index');
+    await tap(client,selector('profile'),'right');
+    await check(client,'document.querySelector(".nav-quick-account")','feuille depuis Explorer');
+    await tap(client,'.nav-quick-account > button');
+    await check(client,`window.__nav13j.tab()==="discover" && document.querySelector(".nav-account-settings [data-settings-content]") && navigation.currentEntry.index===${beforeSettings+1} && history.state.seenitDialog`,'Tous les réglages réutilise le vrai niveau modal sans navigation sous-jacente');
+    await evaluate(client,'history.back()');
+    await check(client,`window.__nav13j.tab()==="discover" && !document.querySelector("[data-dialog-layer]") && navigation.currentEntry.index===${beforeSettings}`,'Retour après Réglages rejoint directement Explorer');
+    await tap(client,selector('profile'));
+    const profileIndex=await evaluate(client,'navigation.currentEntry.index');
+    await tap(client,selector('profile'),'right');
+    await check(client,'document.querySelector(".nav-quick-account")','feuille depuis Moi');
+    await tap(client,'.nav-quick-account > button');
+    await check(client,`window.__nav13j.tab()==="profile" && document.querySelector(".nav-account-settings [data-settings-content]") && navigation.currentEntry.index===${profileIndex+1} && history.state.seenitDialog`,'Moi conserve une seule entrée modale utile');
+    await evaluate(client,'history.back()');
+    await check(client,'window.__nav13j.tab()==="profile" && !document.querySelector("[data-dialog-layer]") && navigation.currentEntry.index===' + profileIndex,'un Retour ferme les réglages et retrouve Moi');
     if(width===360) {
       await evaluate(client,'document.querySelector("[data-navigation-tab=profile]").focus()');
       await client.send('Input.dispatchKeyEvent',{type:'keyDown',key:'F10',code:'F10',modifiers:8});

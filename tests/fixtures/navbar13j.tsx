@@ -6,9 +6,12 @@ import { ToastContainer } from '../../src/components/ToastContainer';
 import { DialogLayer } from '../../src/components/ui/DialogLayer';
 import { activateCurrentNavigationTab, resetCurrentNavigationTab } from '../../src/features/navigation/navigationActions';
 import { useTabShortcut } from '../../src/features/navigation/useTabShortcut';
+import { useNavigation } from '../../src/features/navigation/useNavigation';
+import { activateNavigationShortcut } from '../../src/features/navigation/navigationShortcuts';
+import { resolveRootNavigationTab } from '../../src/features/navigation/tabPresentation';
 import { NAVIGATION_TABS, type RootNavigationTab } from '../../src/features/navigation/tabPresentation';
 import { useToastStore } from '../../src/store/toastStore';
-import { api, telemetry, useDownloadConfigStore } from './navbar13jRuntime';
+import { api, telemetry } from './navbar13jRuntime';
 Object.defineProperty(navigator, 'vibrate', { value: (ms: number) => { telemetry.vibrations.push(ms); return true; } });
 function Screen({ tab, active, shortcut }: { tab: RootNavigationTab; active: boolean; shortcut?: number }) {
   const [view, setView] = useState('secondary');
@@ -34,23 +37,20 @@ function Screen({ tab, active, shortcut }: { tab: RootNavigationTab; active: boo
   </div>;
 }
 function Harness() {
-  const [tab, setTab] = useState<RootNavigationTab>('watchlist');
-  const enabled = useDownloadConfigStore(state=>state.downloadsEnabled);
+  const { currentTab: tab, changeTab: setTab } = useNavigation();
+  const rootTab = resolveRootNavigationTab(tab) || 'watchlist';
   const [shortcut, setShortcut] = useState<{tab:RootNavigationTab;id:number}|null>(null);
   const sequence = useRef(0);
   const [quick, setQuick] = useState(false);
   const [detail, setDetail] = useState(false);
   useEffect(()=>{ const open=()=>setDetail(true);window.addEventListener('nav-detail',open);return()=>window.removeEventListener('nav-detail',open);},[]);
-  useEffect(()=>{ if(!enabled&&tab==='downloads')setTab('watchlist'); },[enabled,tab]);
-  const long = (target:RootNavigationTab) => {
-    if(target==='profile'){telemetry.shortcuts.push('profile');setQuick(true);return;}
-    setTab(target);setShortcut({tab:target,id:++sequence.current});
-  };
+  const request = (target: RootNavigationTab) => setShortcut({ tab: target, id: ++sequence.current });
+  const long = (target:RootNavigationTab) => activateNavigationShortcut(tab, target, { changeTab: setTab, request, quickAccount: () => { telemetry.shortcuts.push('profile');setQuick(true); } });
   Object.assign(window,{__nav13j:{...api,clearToasts:()=>useToastStore.getState().clearQueue(),toast:()=>useToastStore.getState().showToast('Une confirmation lisible au-dessus de la barre.','info'),detail:()=>setDetail(true),tab:()=>tab}});
   return <div>
     {NAVIGATION_TABS.map(item=><Screen key={item.id} tab={item.id} active={tab===item.id} shortcut={tab===item.id&&shortcut?.tab===item.id?shortcut.id:undefined}/>)}
-    <BottomNav currentTab={tab} onTabChange={setTab} onActiveTabClick={()=>activateCurrentNavigationTab(tab)} onActiveTabDoubleClick={()=>resetCurrentNavigationTab(tab)} onLongPress={long}/>
-    {quick&&<QuickAccountSheet onClose={()=>setQuick(false)} onSettings={()=>{setQuick(false);setTab('profile');}}/>}
+    <BottomNav currentTab={tab} onTabChange={setTab} onActiveTabClick={()=>activateCurrentNavigationTab(rootTab)} onActiveTabDoubleClick={()=>resetCurrentNavigationTab(rootTab)} onLongPress={long}/>
+    {quick&&<QuickAccountSheet onClose={()=>setQuick(false)}/>}
     {detail&&<DialogLayer label="Fiche média" blocking={false} historyMode="external" onDismiss={()=>setDetail(false)} className="fixed inset-0 bg-zinc-950"><h2>Fiche média</h2><button type="button" style={{minHeight:44,padding:16}} onClick={()=>setDetail(false)}>Retour à la liste</button></DialogLayer>}
     <ToastContainer />
   </div>;

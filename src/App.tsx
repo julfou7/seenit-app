@@ -46,6 +46,7 @@ import { createCachedAsyncLoader, preloadInBackground } from './features/navigat
 import { resolveRootNavigationTab } from './features/navigation/tabPresentation';
 import { activateCurrentNavigationTab, resetCurrentNavigationTab } from './features/navigation/navigationActions';
 import type { RootNavigationTab } from './features/navigation/tabPresentation';
+import { activateNavigationShortcut } from './features/navigation/navigationShortcuts';
 const QuickAccountSheet = lazy(() => import('./components/QuickAccountSheet').then(module => ({ default: module.QuickAccountSheet })));
 
 const loadProfileScreen = createCachedAsyncLoader(() => import('./screens/ProfileScreen').then(module => ({ default: module.ProfileScreen })));
@@ -581,9 +582,11 @@ function MainApp() {
   };
 
   const handleNavigationLongPress = (tab: RootNavigationTab) => {
-    if (tab === 'profile') { setQuickAccountOpen(true); return; }
-    handleTabChange(tab);
-    setShortcut({ tab, request: ++shortcutSequence.current });
+    activateNavigationShortcut(currentTab, tab, {
+      changeTab: handleTabChange,
+      request: target => setShortcut({ tab: target, request: ++shortcutSequence.current }),
+      quickAccount: () => setQuickAccountOpen(true),
+    });
   };
 
   useEffect(() => {
@@ -623,7 +626,6 @@ function MainApp() {
                     <ProfileScreen
                       initialShowSettings={currentTab === 'settings'}
                       onQuickSettings={() => setQuickAccountOpen(true)}
-                      navigationShortcut={currentTab === 'profile' && shortcut?.tab === 'profile' ? shortcut.request : undefined}
                       onShowClick={openTmdbMedia}
                     />
                   </div>
@@ -679,7 +681,7 @@ function MainApp() {
           onLongPress={handleNavigationLongPress}
         />
 
-        {quickAccountOpen && <Suspense fallback={null}><QuickAccountSheet onClose={() => setQuickAccountOpen(false)} onSettings={() => { setQuickAccountOpen(false); handleTabChange('profile'); setShortcut({ tab: 'profile', request: ++shortcutSequence.current }); }} /></Suspense>}
+        {quickAccountOpen && <Suspense fallback={null}><QuickAccountSheet onClose={() => setQuickAccountOpen(false)} /></Suspense>}
 
         <ToastContainer />
       </div>

@@ -2092,6 +2092,10 @@
           "contains": "SEENIT-UX-017 acquitte uniquement les transferts terminés consultés"
         },
         {
+          "file": "tests/navbar13j.test.ts",
+          "contains": "SEENIT-UX-017 les raccourcis actifs et les réglages évitent les entrées historiques identiques"
+        },
+        {
           "file": "tests/bottomNavigationLayout.test.ts",
           "contains": "SEENIT-UX-017 conserve l’ordre"
         }
