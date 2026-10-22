@@ -165,8 +165,8 @@ planificateur. Ces raccourcis ont des boutons visibles ; déplacement/annulation
 le geste et un appui long ne produit jamais aussi un tap/double tap. L'accès compte de l'en-tête
 Accueil est retiré ; les informations de synchronisation restent visibles.
 Un raccourci sur l'onglet déjà actif n'ajoute pas d'entrée identique à l'historique. Depuis les
-réglages rapides, Tous les réglages dépile d'abord la feuille, puis ouvre les réglages de Moi ;
-Retour retrouve ainsi la destination précédente sans étape fantôme.
+réglages rapides, Tous les réglages réutilise le même niveau modal et conserve l'onglet courant ;
+un Retour retrouve ainsi l'écran visible avant la feuille, sans étape fantôme.
 
 L'ouverture d'une fiche est un niveau de navigation au-dessus de l'onglet courant. Le Retour Android
 ferme dans l'ordre : dialogue ou modal, fiche, historique interne, retour à À Voir, puis application.

@@ -9,7 +9,3 @@ export function activateNavigationShortcut(currentTab: string, target: RootNavig
   if (resolveRootNavigationTab(currentTab) !== target) actions.changeTab(target);
   actions.request(target);
 }
-export function openNavigationSettings(currentTab: string, actions: Pick<NavigationShortcutActions, 'changeTab' | 'request'>) {
-  if (resolveRootNavigationTab(currentTab) !== 'profile') actions.changeTab('profile');
-  actions.request('profile');
-}

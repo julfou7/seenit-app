@@ -7,7 +7,7 @@ import { DialogLayer } from '../../src/components/ui/DialogLayer';
 import { activateCurrentNavigationTab, resetCurrentNavigationTab } from '../../src/features/navigation/navigationActions';
 import { useTabShortcut } from '../../src/features/navigation/useTabShortcut';
 import { useNavigation } from '../../src/features/navigation/useNavigation';
-import { activateNavigationShortcut, openNavigationSettings } from '../../src/features/navigation/navigationShortcuts';
+import { activateNavigationShortcut } from '../../src/features/navigation/navigationShortcuts';
 import { resolveRootNavigationTab } from '../../src/features/navigation/tabPresentation';
 import { NAVIGATION_TABS, type RootNavigationTab } from '../../src/features/navigation/tabPresentation';
 import { useToastStore } from '../../src/store/toastStore';
@@ -50,7 +50,7 @@ function Harness() {
   return <div>
     {NAVIGATION_TABS.map(item=><Screen key={item.id} tab={item.id} active={tab===item.id} shortcut={tab===item.id&&shortcut?.tab===item.id?shortcut.id:undefined}/>)}
     <BottomNav currentTab={tab} onTabChange={setTab} onActiveTabClick={()=>activateCurrentNavigationTab(rootTab)} onActiveTabDoubleClick={()=>resetCurrentNavigationTab(rootTab)} onLongPress={long}/>
-    {quick&&<QuickAccountSheet onClose={()=>setQuick(false)} onSettings={()=>{setQuick(false);openNavigationSettings(tab,{changeTab:setTab,request});}}/>}
+    {quick&&<QuickAccountSheet onClose={()=>setQuick(false)}/>}
     {detail&&<DialogLayer label="Fiche média" blocking={false} historyMode="external" onDismiss={()=>setDetail(false)} className="fixed inset-0 bg-zinc-950"><h2>Fiche média</h2><button type="button" style={{minHeight:44,padding:16}} onClick={()=>setDetail(false)}>Retour à la liste</button></DialogLayer>}
     <ToastContainer />
   </div>;

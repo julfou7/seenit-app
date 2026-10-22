@@ -1139,7 +1139,8 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   ouvre Recherche C411. Un mouvement, une annulation ou un démontage annule le geste ; son clic final
   ne déclenche ni navigation simple ni reset. Les mêmes fonctions ont des alternatives visibles.
   Un raccourci déjà sur son onglet ne crée aucune entrée historique identique ; Tous les réglages
-  attend le dépilement effectif de la feuille rapide avant d'ouvrir la destination Réglages.
+  réutilise le niveau modal de la feuille rapide sans changer d'onglet. Un Retour retrouve l'écran
+  qui était visible avant la feuille, sans étape fantôme.
   Les doubles taps restent locaux selon UX-005, les animations respectent reduced-motion.
 - **SEENIT-UX-006** — Un toast interne qui confirme l'ajout d'un film ou d'une série à « À voir »
   (`follow`) ou son passage à l'état vu/terminé (`success`) ouvre la fiche exacte uniquement lorsque le

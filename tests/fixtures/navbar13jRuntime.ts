@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createStore } from 'zustand/vanilla';
-import { useSyncExternalStore } from 'react';
+import { createElement, useSyncExternalStore } from 'react';
 import type { NavigationDownload } from '../../src/features/navigation/downloadNavState';
 export const telemetry = { liveSubscriptions: 0, mutations: 0, resets: [] as string[], shortcuts: [] as string[], vibrations: [] as number[] };
 export const useDownloadConfigStore = create(() => ({
@@ -17,6 +17,7 @@ export const useShows = () => ({ updateShow: async () => { telemetry.mutations++
 export const useShowsStore = { getState: () => ({ shows: [] }) };
 export const useLogStore = { getState: () => ({ addLog() {} }) };
 export const appLogger = { info() {}, warn() {}, error() {}, debug() {} };
+export const SettingsScreen = () => createElement('section', { 'data-settings-content': true }, 'Contenu des réglages sans API');
 export const api = {
   telemetry,
   downloads: (downloads: NavigationDownload[], error: string | null = null) => live.setState({ downloads, error }),
