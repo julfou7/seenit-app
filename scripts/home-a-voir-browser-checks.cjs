@@ -6,7 +6,7 @@ async function buildHomeHarness(root) {
   const runtime = path.join(root, 'tests/fixtures/homeAVoirRuntime.ts');
   await esbuild.build({ entryPoints: [path.join(root, 'tests/fixtures/homeAVoir.tsx')], outfile: path.join(dist, '__seenit-home.js'), bundle: true, platform: 'browser', format: 'iife', target: ['chrome120'], logLevel: 'silent',
     plugins: [{ name: 'home-ports', setup(builder) {
-      builder.onResolve({ filter: /^firebase\/(?:firestore|auth)$|\/(?:firebase|tmdb|showsStore|logStore|plexAvailability|plexLinks|useShows|downloadConfigStore|updateStore|liveDownloadStore|EpisodeDetailModal|PersonDetailModal)$/ }, () => ({ path: runtime }));
+      builder.onResolve({ filter: /^firebase\/(?:firestore|auth)$|\/(?:favoritePeopleStore|useShows|firebase|tmdb|showsStore|logStore|plexAvailability|plexLinks|useShows|downloadConfigStore|updateStore|liveDownloadStore|EpisodeDetailModal|PersonDetailModal)$/ }, () => ({ path: runtime }));
     } }],
   });
   const css = fs.readdirSync(path.join(dist, 'assets')).filter(file=>file.endsWith('.css'));
@@ -55,7 +55,7 @@ async function testHomeHarness(client, root) {
     fs.writeFileSync(path.join(root,'quality-reports',`home-history-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
     await click(client,'.home-notification-bell');
     await check(client,'document.querySelector(".home-notifications") && document.querySelectorAll(".home-notice").length>=2','feuille notifications réelles');
-    await check(client,'!document.querySelector(".home-notice button[aria-label=\\"Marquer Stranger Things comme vu\\"]") && document.querySelector(".home-notice button[aria-label=\\"Marquer Dune : Deuxième partie comme vu\\"]")','la vraie feuille refuse Vu pour une série partielle et conserve le film Plex exact');
+    await check(client,'!document.querySelector(".home-notice button[aria-label=\\"Marquer Stranger Things comme vu\\"]") && document.querySelector(".home-notice button[aria-label=\\"Marquer The Punisher : One Last Kill comme vu\\"]")','la vraie feuille refuse Vu pour une série partielle et conserve le film Plex exact');
     fs.writeFileSync(path.join(root,'quality-reports',`home-notifications-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
     await evaluate(client,'window.__homeAVoir.clear()');
     const notice='[data-notice-id="update:1.4.999"]';

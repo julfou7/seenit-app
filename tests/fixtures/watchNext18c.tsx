@@ -16,8 +16,8 @@ function Harness() {
   const movies = allShows.filter(show => show.mediaType === 'movie' && !show.seenEpisodes.includes('movie'));
   return <main style={{ maxWidth: 700, margin: 'auto' }}>
     <button id="watch-undo" disabled={!undo} style={{ minHeight: 44, padding: 10 }} onClick={async () => { await undo?.(); useToastStore.getState().clearQueue(); }}>Annuler la dernière action</button>
-    <WatchNextSection key={auth.currentUser.uid} allShows={allShows} groups={[series.slice(0, 3), series.slice(3, 6), series.slice(6)]} movies={movies}
-      active
+    <WatchNextSection key={auth.currentUser.uid} allShows={allShows} groups={[series, [{...series[3], id:'news-only',tmdbId:210}], [{...series[6], id:'stale-only',tmdbId:211}]]} movies={movies}
+      onPerson={id => telemetry.opens.push(`person:${id}`)} onOpenMedia={(id,type)=>telemetry.opens.push(`${type}:${id}`)} active
       onOpen={(id, type) => telemetry.opens.push(`${type}:${id}`)} onEpisode={(show, season, episode) => telemetry.opens.push(`${show.id}:${season}x${episode}`)}
       onMarkSeries={show => markWatchCardEpisode(show, getTodayStr(), markEpisodeWatched)} onMarkMovie={show => markMovieWatched(show, updateShow)}
       onUnseen={(show, episode) => markWatchRecordUnseen(show, episode, updateShow)} actions={() => []} />

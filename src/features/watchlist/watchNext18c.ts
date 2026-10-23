@@ -59,3 +59,8 @@ export function removeWatchRecord(show: Show, episode: SeriesCardEpisode | null,
     updatedAt: now, isSynced: false,
   } };
 }
+
+/** Stable even when the provider fills missing runtimes or refreshes the source array. */
+export function orderWatchMovies(movies: Show[]): Show[] {
+  return [...movies].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0) || a.tmdbId - b.tmdbId || a.id.localeCompare(b.id));
+}

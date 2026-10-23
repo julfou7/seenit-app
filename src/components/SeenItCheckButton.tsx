@@ -8,6 +8,7 @@ export interface SeenItCheckButtonProps {
   disabled?: boolean;
   error?: boolean;
   size?: number;
+  glyph?: 'signature' | 'screen';
   className?: string;
   title?: string;
 }
@@ -23,6 +24,7 @@ export function SeenItCheckButton({
   disabled = false,
   error = false,
   size = 28,
+  glyph = 'signature',
   className = '',
   title
 }: SeenItCheckButtonProps) {
@@ -79,17 +81,17 @@ export function SeenItCheckButton({
       style={{ touchAction: 'manipulation' }}
     >
       {/* Subtle Hover / Active Gold Aura */}
-      <div 
+      <div
         className={cn(
           "absolute inset-0 rounded-xl transition-all duration-300 pointer-events-none",
-          active 
-            ? "bg-amber-500/20 shadow-[0_0_14px_rgba(245,197,24,0.4)] opacity-100" 
+          active
+            ? "bg-amber-500/20 shadow-[0_0_14px_rgba(245,197,24,0.4)] opacity-100"
             : "opacity-0 group-hover:opacity-100 group-hover:bg-amber-500/10 group-hover:shadow-[0_0_10px_rgba(245,197,24,0.2)]"
         )}
       />
 
-      {/* Bespoke Cinema TV Emblem SVG */}
-      <svg
+      {/* Shared compact screen from the home reference; identical on series and films. */}
+      {glyph === 'screen' ? <svg className="seenit-screen-glyph relative z-10" width={size} height={size * .74} viewBox="0 0 100 74" fill="none" stroke="#F2C36B" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="6" y="4" width="88" height="56" rx="16" /><path d="M36 70H64" /><g><path d="M33 32 45 44 67 21" stroke="#fff" /></g></svg> : <svg
         width={size}
         height={size}
         viewBox="0 0 100 100"
@@ -129,8 +131,8 @@ export function SeenItCheckButton({
           rx="10"
           className={cn(
             "transition-all duration-300",
-            active 
-              ? "fill-[#0B0B10] stroke-[url(#btn-gold-grad)]" 
+            active
+              ? "fill-[#0B0B10] stroke-[url(#btn-gold-grad)]"
               : "fill-black/40 stroke-zinc-600/80 group-hover:stroke-[url(#btn-gold-grad)] group-hover:fill-[#0B0B10]"
           )}
           strokeWidth={active ? "4.2" : "3.6"}
@@ -150,8 +152,8 @@ export function SeenItCheckButton({
           d="M 50 70 L 50 79"
           className={cn(
             "transition-all duration-300",
-            active 
-              ? "stroke-[url(#btn-gold-grad)]" 
+            active
+              ? "stroke-[url(#btn-gold-grad)]"
               : "stroke-zinc-600/80 group-hover:stroke-[url(#btn-gold-grad)]"
           )}
           strokeWidth="3.6"
@@ -163,8 +165,8 @@ export function SeenItCheckButton({
           d="M 32 80 C 32 80 41 78.5 50 78.5 C 59 78.5 68 80 68 80"
           className={cn(
             "transition-all duration-300",
-            active 
-              ? "stroke-[url(#btn-gold-grad)]" 
+            active
+              ? "stroke-[url(#btn-gold-grad)]"
               : "stroke-zinc-600/80 group-hover:stroke-[url(#btn-gold-grad)]"
           )}
           strokeWidth="3.6"
@@ -197,7 +199,7 @@ export function SeenItCheckButton({
             className={cn(
               "transition-all duration-200",
               active && !isTapped
-                ? "stroke-[url(#btn-gold-grad)] opacity-100" 
+                ? "stroke-[url(#btn-gold-grad)] opacity-100"
                 : "stroke-zinc-500/70 group-hover:stroke-amber-300/90 opacity-60 group-hover:opacity-100",
               isTapped ? "opacity-0 scale-75" : "scale-100"
             )}
@@ -218,7 +220,7 @@ export function SeenItCheckButton({
             />
           )}
         </g>
-      </svg>
+      </svg>}
     </button>
   );
 }

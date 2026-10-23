@@ -219,7 +219,7 @@ regardable. Les cartes ne fabriquent donc pas `S01 | E01` / « SAISON DISPO » d
 inconnues.
 
 La [refonte accueil](../design/home-a-voir.md) conserve les trois sections séries Continuer à regarder,
-Nouveautés et Pas vu depuis un moment ; Films à voir précède cette dernière. Chaque section série affiche un rail de trois
+Nouveautés et Pas vu depuis un moment ; Films à voir précède cette dernière. Chaque section série affiche un rail de six
 cartes 8f, puis la bascule à deux icônes ouvre la liste progressive (douze par lot) ou le carrousel.
 Les sections vides sont masquées. Les badges statut, sans emoji, sont à côté du code épisode dans la carte compacte ; Vu est centré verticalement. Les séries anciennes conservent leur nombre de jours exact. En liste, le swipe gauche
 révèle Archiver/Supprimer ; l’appui long et le clavier ouvrent les mêmes actions avec confirmation et
@@ -238,10 +238,9 @@ ne provoque de faux échec ni de restauration locale alors que l'écriture peut 
 Le succès et son animation attendent l'acquittement réel ; seul un rejet définitif restaure
 l'état précédent et affiche l'erreur. Un changement de compte ignore le résultat pour le nouvel UID.
 
-Les films sont des billets déchirables en carrousel affiche ou liste horizontale, triés par durée connue croissante, inconnues après.
+Les films sont des billets déchirables en carrousel affiche ou liste horizontale, triés par ajout récent puis identité, sans déplacement lors de l’enrichissement.
 Le talon affiche en grand l’heure de fin calculée depuis Maintenant, actualisée chaque minute, orange
-après minuit. Sans durée, aucune fin n’est inventée. Trois films sont visibles, puis Afficher N de plus
-en ajoute trois. La bascule carrousel/liste conserve cette limite et le même marquage.
+après minuit. Sans durée, aucune fin n’est inventée. Six films sont visibles, puis Voir en liste donne accès à la liste paginée par douze. La bascule carrousel/liste conserve le même marquage.
 Une coche aboutie déchire le talon et conserve le tampon Vu ; toucher ce tampon ou Annuler recolle
 le billet. Le film garde sa place pendant la session et disparaît au prochain retour à À regarder.
 Les enrichissements restent passifs,
@@ -986,3 +985,8 @@ horizontaux du prototype. Le header sticky prolonge son flou sous les filtres. L
 une vignette et se retirent une par une par swipe/bouton, avec Annuler et persistance locale par UID.
 Un compte TMDB provisoire de liste partielle reste inconnu sans preuve de fin/planning complet/total
 annoncé au-delà de la liste ; les anciennes preuves sont réactualisées une fois. Aucun override par titre.
+
+Réouverture Plex (#741) : les synchronisations automatiques Plex/détails attendent respectivement 2/5 secondes après retour visible, avec un seul départ malgré focus/visibilité/activité Android. Le travail différé est annulé quand l’app redevient cachée. Une limitation HTTP429, y compris une réponse texte, est une pause compréhensible ; Retry-After ou 60s par défaut est conservé localement par compte après redémarrage. Aucun cache/progrès/curseur n’est remplacé à cause de cette erreur, et aucune nouvelle origine/transport n’est essayé immédiatement. La source distante réelle de la saturation et les temps de frame du téléphone restent à confirmer.
+
+
+À voir, ZIP(9) (#729) : six cartes par rail puis Voir en liste ; listes par12, toutes accessibles. Films triés par ajout récent et identité, stables pendant enrichissement et navigation. Acteur top10 : favori puis titres vus puis premier rôle, uniquement depuis cache ; mini-fiche avec favoris, titres connus, ajout À voir et filmographie existante. Billets liste104px : titre entier sur2lignes, acteur, diffuseur+année, heure au talon. Actions8f au centre de la zone supérieure (58px), groupes À venir13px neutres, glyphe Vu partagé.

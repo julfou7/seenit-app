@@ -10,7 +10,7 @@ export const MEDIA_DETAIL_RENDER_MAX_CAST = 12;
 export const MEDIA_DETAIL_RENDER_MAX_SEASONS = 40;
 export const MEDIA_DETAIL_RENDER_MAX_VIDEOS = 8;
 
-const compactNamedItem = (item: any) => {
+const compactNamedItem = (item: { id?: unknown; name?: unknown } | null | undefined) => {
   if (!item) return null;
   return {
     id: Number.isFinite(Number(item.id)) ? Number(item.id) : undefined,
@@ -52,6 +52,7 @@ const compactCastMember = (item: any) => {
 
   return {
     id,
+    ...(Number.isFinite(Number(item.order)) ? { order: Number(item.order) } : {}),
     name: String(item.name),
     profile_path: item.profile_path || null,
     ...(item.character ? { character: String(item.character) } : {}),

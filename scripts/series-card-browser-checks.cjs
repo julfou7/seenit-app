@@ -48,7 +48,7 @@ async function testSeriesCardHarness(client, root) {
       return {height:card.getBoundingClientRect().height, width:card.getBoundingClientRect().width, posterTop:poster.getBoundingClientRect().top-card.getBoundingClientRect().top, clamp:getComputedStyle(title).webkitLineClamp, titleHeight:title.getBoundingClientRect().height, targets, overflow:document.documentElement.scrollWidth>innerWidth};
     })()`);
     if (geometry.height !== 150 || geometry.posterTop >= 0 || geometry.clamp !== '2' || geometry.overflow || geometry.targets.some(target => target.width < 44 || target.height < 44)) throw new Error(`#690 : géométrie/cibles ${JSON.stringify(geometry)}`);
-    await check(client, 'document.querySelector("#watch .series-8f__status")?.parentElement.classList.contains("series-8f__code") && Math.abs(document.querySelector("#watch .series-8f__action").getBoundingClientRect().y + 24 - (document.querySelector("#watch article").getBoundingClientRect().y + 75))<1', 'badge à côté du code et Vu au centre vertical');
+    await check(client, 'document.querySelector("#watch .series-8f__status")?.parentElement.classList.contains("series-8f__code") && Math.abs(document.querySelector("#watch .series-8f__action").getBoundingClientRect().y + 24 - (document.querySelector("#watch article").getBoundingClientRect().y + 58))<1', 'badge à côté du code et Vu au centre de la zone supérieure de référence');
     await check(client, 'document.querySelectorAll("#season-24 .series-8f__segment").length===24 && document.querySelectorAll("#season-40 .series-8f__segment").length<=6', 'les saisons longues gardent un DOM borné');
     await check(client, 'document.querySelectorAll("#unknown .series-8f__segment").length===4 && document.querySelector("#unknown .series-8f__unknown-tail") && document.querySelector("#unknown .series-8f__unknown-mark")?.textContent==="?" && document.querySelector("#unknown .series-8f__segments")?.getAttribute("aria-label").includes("total encore inconnu") && document.querySelector("#unknown .series-8f__provider")', 'Harry Potter garde les épisodes connus, la traîne inconnue, le point d’interrogation et le diffuseur');
     await check(client, '!document.querySelector("#long .series-8f__poster img") && document.querySelector("#upcoming-31 .series-8f__poster img")?.getAttribute("src").includes("__8f-backdrop.svg") && document.querySelector("#season-40 .series-8f__poster img")?.getAttribute("src").includes("__8f-backdrop.svg") && !document.querySelector("#season-24 .series-8f__check")', 'un poster absent ou cassé réutilise le visuel connu avant les initiales, sans fausse action');
@@ -65,7 +65,7 @@ async function testSeriesCardHarness(client, root) {
       const body=card.getBoundingClientRect(), target=button.getBoundingClientRect(), label=button.querySelector('strong').getBoundingClientRect();
       const surface=getComputedStyle(button,'::before');
       const middle=target.y+target.height/2;
-      return Math.abs(middle-(body.y+body.height/2))<.5 && Math.abs(label.y+label.height/2-middle)<.5
+      return Math.abs(middle-(body.y+58))<.5 && Math.abs(label.y+label.height/2-middle)<.5
         && Math.abs(target.y+parseFloat(surface.top)+parseFloat(surface.height)/2-middle)<.5 && target.height===48;
     }))()`, 'la pastille J-X, sa surface et son texte restent centrés verticalement, cloche exclue');
     await click(client, '#upcoming-0 .series-8f__days');

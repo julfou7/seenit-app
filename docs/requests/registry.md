@@ -130,3 +130,7 @@
 Complément USR-2026-10-23-002 / #729 : nouvelle PJ `Connexion du repository seenit-app (8).zip`, SPEC-ACCUEIL v3 et prototype actualisé. Intégrer la liste historique compacte sans groupes/barres (92×52, dix puis Voir plus), les rappels J-X/auj. neutres et l’ouverture de l’épisode dans À venir. Conserver les décisions utilisateur badge près du numéro et anciennes séries en dernier. L’APK reste différée pendant la collecte des retours.
 
 Complément USR-2026-10-23-002 : « Go apk attention au centrage vertical du bouton ici » (capture home-upcoming-412.jpg). La publication est de nouveau autorisée ; stabiliser et vérifier le centrage de la pastille J-X/auj., de son texte et de sa surface, indépendamment de la cloche, puis publier le lot #739.
+
+| USR-2026-10-23-003 | 2026-10-23 | Corriger l’erreur Plex Rate exceeded/JSON et les relances accompagnant de petits lags à la réouverture. Statut HTTP avant parsing, délai429 par UID et travail automatique différé en foreground. | SEENIT-PLEX-002/003/004, [#741](https://github.com/julfou7/seenit-app/issues/741) | active |
+
+| USR-2026-10-23-004 | 2026-10-23 | Terrain219 : rails exhaustifs, tri films stable, glyphes/centrage8f, Punisher rogné, groupes À venir ; ZIP(9) acteurs et mini-fiche. | SEENIT-UX-018, [#729](https://github.com/julfou7/seenit-app/issues/729) | active |
