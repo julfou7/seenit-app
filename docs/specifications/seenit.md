@@ -1194,7 +1194,8 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   si la finale n'est pas typée/datée ou si un ancien indicateur `season_total_unknown` vaut true.
   En présence de cet ancien indicateur, seul le total fournisseur conservé dans `seasonProgress`
   ou une confirmation explicite plus récente le neutralise ; un compte de pointeur inféré ne suffit pas.
-  Le worker réactualise une fois les anciennes preuves sans champ de total fournisseur, puis retrouve
+  Le worker réactualise une fois toutes les anciennes preuves sans champ de total fournisseur,
+  indépendamment de leur ancien booléen et du statut terminé/archivé, puis retrouve
   sa politique normale de fraîcheur, y compris quand le fournisseur confirme que le total manque.
   Le nombre d'épisodes actuellement listés ne devient jamais un total à lui seul. Les métadonnées de l'épisode présenté
   priment sur un ancien pointeur contradictoire. La récence des séries laissées de côté provient
