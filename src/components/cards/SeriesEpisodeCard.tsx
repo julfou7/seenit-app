@@ -186,9 +186,9 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
       </div>
       <div className="series-8f__action">
         {context.kind === 'watch' && ((!context.upToDate && context.onMarkSeen) || reversibleComplete) && <SeenItCheckButton size={34} error={markError} isWatched={reversibleComplete} className={`series-8f__check${reversibleComplete ? ' series-8f__check--watched' : ''}`} title={reversibleComplete ? `Marquer le dernier épisode de ${show.title} comme non vu` : `Marquer ${show.title} ${code} comme vu`} onClick={handleSeen} />}
-        {context.kind === 'upcoming' && <button type="button" className={`series-8f__days series-8f__days--${upcomingCardTone(context.days)}`} disabled={context.pending} aria-busy={context.pending || undefined} aria-pressed={context.reminder} aria-label={`${context.reminder ? 'Désactiver' : 'Activer'} le rappel de ${show.title} ${code}, ${context.days === 0 ? 'aujourd’hui' : `dans ${context.days} jours`}`} onClick={context.onToggleReminder}>
+        {context.kind === 'upcoming' && <button type="button" className={`series-8f__days series-8f__days--${upcomingCardTone(context.days)}${context.days >= 100 ? ' series-8f__days--long' : ''}`} disabled={context.pending} aria-busy={context.pending || undefined} aria-pressed={context.reminder} aria-label={`${context.days === 0 ? 'Aujourd’hui' : `Dans ${context.days} jours`} · rappel ${context.reminder ? 'activé' : 'désactivé'} · ${show.title} ${code}`}  onClick={context.onToggleReminder}>
           <span className={`series-8f__bell${context.reminder ? ' series-8f__bell--active' : ''}`}><Bell size={14} fill={context.reminder ? 'currentColor' : 'none'} /></span>
-          <strong>{Math.max(0, context.days)}</strong><small>{context.days <= 0 ? 'aujourd’hui' : context.days === 1 ? 'jour' : 'jours'}</small>
+          <strong>{context.days <= 0 ? 'auj.' : `J-${context.days}`}</strong>
         </button>}
         {context.kind === 'history' && <div className="series-8f__history" aria-hidden="true"><span>✓</span>{watchedTime && <time dateTime={validWatchedDate ? watchedDate.toISOString() : undefined}>{watchedTime}</time>}</div>}
       </div>

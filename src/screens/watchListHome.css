@@ -7,8 +7,8 @@
 .home-notification-bell { position:relative; width:44px; height:44px; flex-shrink:0; border-radius:50%; background:#ffffff08; display:grid; place-items:center; color:#e4e4e7; cursor:pointer; }
 .home-notification-bell > span { position:absolute; width:7px; height:7px; border-radius:50%; background:#e5a93d; right:10px; top:8px; box-shadow:0 0 0 3px #0b0b0f; }
 .home-tabs { display:flex; gap:4px; padding:4px; border-radius:26px; background:#18181b; box-shadow:inset 0 0 0 1px #ffffff0a; }
-.home-tabs > button { display:flex; flex:1; align-items:center; justify-content:center; min-width:0; height:44px; border-radius:22px; color:#a1a1aa; font-size:13px; font-weight:700; line-height:1; cursor:pointer; }
-.home-tabs > button[aria-selected="true"] { background:#e5a93d; color:#0b0b0f; font-weight:800; }
+.home-tabs > button { display:flex; flex:1; align-items:center; justify-content:center; min-width:0; height:44px; border-radius:22px; color:#a1a1aa; font-size:13px; font-weight:600; line-height:1; text-box:trim-both cap alphabetic; cursor:pointer; }
+.home-tabs > button[aria-selected="true"] { background:#e5a93d; color:#000; font-weight:700; }
 .home-watchlist button:focus-visible { outline:2px solid #f2c36b; outline-offset:3px; }
 .home-panel-content { padding:6px 16px 24px; }
 .home-watchlist [hidden] { display:none !important; }
@@ -34,7 +34,7 @@
 .home-skeleton { padding:10px 16px; }.home-skeleton > div { margin-bottom:28px; }.home-skeleton span { display:block; width:54%; height:22px; border-radius:8px; background:#27272a; margin-bottom:20px; }.home-skeleton > div > div { height:180px; border-radius:22px; background:linear-gradient(100deg,#18181b,#27272a,#18181b); background-size:200% 100%; animation:homeSkeleton 1.8s infinite; }
 .home-swipe { position:relative; overflow:hidden; border-radius:22px; padding-top:4px; touch-action:pan-y; }
 .home-swipe__card { position:relative; transition:transform .25s; }.home-swipe--open .home-swipe__card { transform:translateX(-164px); }
-.home-swipe__actions { position:absolute; right:0; top:24px; bottom:0; display:flex; align-items:stretch; gap:4px; }
+.home-swipe__actions { visibility:hidden; position:absolute; right:0; top:24px; bottom:0; display:flex; align-items:stretch; gap:4px; }
 .home-swipe__actions button { width:78px; border-radius:14px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; background:#e5a93d26; color:#f2c36b; font-size:11px; font-weight:800; cursor:pointer; }.home-swipe__actions button:last-child { background:#fb718526; color:#fda4af; }
 .home-swipe__close { position:relative; min-height:44px; width:100%; color:#a1a1aa; font-size:12px; }
 .home-notifications { width:100%; max-width:500px; max-height:82dvh; display:flex; flex-direction:column; padding:16px; border-radius:28px; border:1px solid #ffffff1a; background:#111114; color:#f4f4f5; box-shadow:0 24px 70px #000a; }
@@ -66,3 +66,6 @@
 .home-notice__dismiss { flex-shrink:0; width:44px; min-height:44px; display:grid; place-items:center; color:#71717a; cursor:pointer; }
 .home-notice [data-notice-action] > button { min-width:44px; min-height:44px; }
 @media (prefers-reduced-motion:reduce) { .home-notice-swipe__front { transition:none; } }
+
+.home-swipe--open .home-swipe__actions { visibility:visible; }
+.home-explore { min-height:44px; padding:0 22px; border-radius:22px; background:#e5a93d; color:#0b0b0f; font-size:14px; font-weight:800; cursor:pointer; }

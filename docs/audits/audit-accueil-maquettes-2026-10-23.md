@@ -3,7 +3,7 @@
 Identifiant : AUDIT-2026-10-23-ACCUEIL-MAQUETTES.
 Date : 23 octobre 2026. Baseline : v1.4.218, commit `b8fa793b55250c5377f09f9a5dd72772d879a392`.
 Périmètre : header, trois onglets À voir, cartes 8f, billets, notifications et leurs gestes.
-Références : archive SPEC-ACCUEIL, Prototype.dc.html, Card8f.dc.html, Row.dc.html ;
+Références : archive `Connexion du repository seenit-app (8).zip`, SPEC-ACCUEIL v3, Prototype.dc.html actualisé, Card8f.dc.html, Row.dc.html ;
 capture utilisateur 1000166106.jpg. Suivi unique : [#729](https://github.com/julfou7/seenit-app/issues/729).
 
 Le terrain invalide la précédente déclaration de conformité : les smokes vérifiaient une géométrie
@@ -29,8 +29,8 @@ prototype pour les icônes. Les dernières décisions utilisateur priment pour b
 | Billets affiche | Mode grille initial divergent du rail du prototype | P2, rail initial et bascule icônes vers liste |
 | Billet horizontal | 116 px, glyph caché, genre à la place durée, talon mal découpé | P2, 104 px / affiche 70 / talon 96, fin, durée, fournisseur et glyphe visibles |
 | Animation film Vu/Annuler | Talon retiré mais découpe appliquée à l’enveloppe entière | P2, découper le corps au raccord et annuler depuis tampon, acquittement réel conservé |
-| À venir | Trois groupes, jours exacts et rappels présents | Conserver, contrôle centré et barre inconnue partagés |
-| Historique | Mixte, dix puis plus, date discrète et gestes présents | Conserver, vérifier carte compacte et statut utilisateur |
+| À venir | V3 : J-X/auj., rectangle neutre, date courte et ouverture épisode | P2, remplacer le rond/les couleurs de délai, J-7 inclus et aucun badge statut |
+| Historique | V3 : liste compacte unique au lieu du cadre 8f et des groupes | P2, vignette 92×52, date par ligne, sans barres, dix puis Voir plus, actions et Annuler conservés |
 | Notifications visuelles | Vignettes et fond non lu absents | P2, rétablir l’aspect du prototype avec sources réelles |
 | Retrait individuel notification | Aucun geste ni bouton | P2, swipe gauche, alternative accessible, Annuler, persistance UID |
 | États/gestes transversaux | Skeleton/cache/offline/reset/undo et confirmations existent | Conserver, cibles 44 px et reduced-motion |
@@ -47,3 +47,7 @@ consomme la preuve produite avec un ancien pointeur contradictoire. TypeScript e
 Toutes les sorties relèvent de #729 ; la validation canonique finale est requise avant push.
 Aucune APK à publier pendant la collecte des retours. Aucun test sur téléphone réel n’est déduit
 du smoke navigateur ; la reprise de v1.4.218 et la preuve de total sont versionnées une seule fois.
+
+## Réception du ZIP (8) — SPEC v3
+
+Le ZIP actualisé a été identifié après le premier lot 2625ab8 ; la déclaration précédente « SPEC à jour » concernait encore le ZIP (7). La nouvelle source est comparée avant clôture de ce lot. Les différences v3 À venir/Historique sont intégrées dans la même PR #739. Les consignes utilisateur gardent priorité pour badge et dernière section. Les billets horizontaux suivent le prototype (année/durée et fin en talon) lorsque le texte v3 est contradictoire. Le nouveau smoke complet Chromium 360/412/1280 est vert : liste historique unique 92×52 sans groupes/progression, appui long sans ouverture au relâchement, clavier, Revoir passif, édition/retrait et Annuler legacy, J-132, J-X/auj., ouverture épisode et CTA Explorer des trois états vides. Captures historique et À venir inspectées. Les anciens tests liés au logo/cadre 8f historique ont été adaptés au contrat v3, sans retirer la résolution de Revoir. Validation canonique finale requise avant push.

@@ -22,6 +22,14 @@
         {
           "file": "tests/homePresentation.test.ts",
           "contains": "SEENIT-UX-018 refuse une preuve Plex globale de série pour proposer Vu"
+        },
+        {
+          "file": "tests/homeNoticeSwipe.test.ts",
+          "contains": "SEENIT-UX-018 le swipe retire une notification sans confondre scroll clic et action métier"
+        },
+        {
+          "file": "tests/watchlistCarouselUx.test.ts",
+          "contains": "#729 conserve les accès aux listes complètes par les icônes de vue"
         }
       ]
     },
@@ -2175,7 +2183,7 @@
         },
         {
           "file": "tests/history16d.test.ts",
-          "contains": "SEENIT-UX-015 groupe les jours"
+          "contains": "SEENIT-UX-015 conserve les jours calendaires"
         },
         {
           "file": "tests/history16d.test.ts",

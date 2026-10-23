@@ -1,5 +1,7 @@
 # Carte série 8f
 
+Actualisation accueil v3, 23 octobre 2026 (#729) : la 8f est conservée dans À regarder et À venir. Historique suit désormais la liste compacte de `home-a-voir.md` et `history-16d.md`, sans barre de progression ; les règles de preuve de saison restent communes aux données.
+
 Demande du 21 octobre 2026, suivi #690. Référence fournie par le propriétaire :
 `Connexion du repository seenit-app.zip`, `handoff-8f/SPEC-CARTE-8F.md`, le prototype
 `handoff-8f/SeenIt Card8f.dc.html` et la section `#8f` de `SeenIt Cartes.dc.html`.

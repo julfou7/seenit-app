@@ -91,3 +91,5 @@
 @keyframes tkHide { to { visibility:hidden; } }
 
 .movie-ticket__undo-stamp { transform:translateX(-50%) rotate(-8deg); }.movie-ticket--horizontal .movie-ticket__check[data-error="true"] { outline:2px solid #fb7185; outline-offset:-3px; }.movie-ticket--horizontal .movie-ticket__check { transform:none; }.home-watch .movie-ticket-grid { grid-template-columns:repeat(auto-fill,minmax(144px,1fr)); justify-items:center; }
+
+.movie-ticket--poster > h3 { margin-top:10px; }

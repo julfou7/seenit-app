@@ -14,6 +14,7 @@ import { HomeLayoutSwitch } from '../components/cards/HomeLayoutSwitch';
 import { ChevronUp } from 'lucide-react';
 
 interface Props {
+  onExplore?: () => void;
   allShows: Show[];
   groups: [Show[], Show[], Show[]];
   movies: Show[];
@@ -25,7 +26,7 @@ interface Props {
   onUnseen: (show: Show, episode: SeriesCardEpisode | null) => Promise<void | boolean>;
   actions: (show: Show) => SeriesCardAction[];
 }
-export function WatchNextSection({ allShows, groups, movies, active, onOpen, onEpisode, onMarkSeries, onMarkMovie, onUnseen, actions }: Props) {
+export function WatchNextSection({ onExplore, allShows, groups, movies, active, onOpen, onEpisode, onMarkSeries, onMarkMovie, onUnseen, actions }: Props) {
   const candidates = mergeWatchGroups(...groups);
   const latestSeriesOrder = useRef(candidates.map(show => show.id));
   latestSeriesOrder.current = candidates.map(show => show.id);
@@ -133,6 +134,6 @@ export function WatchNextSection({ allShows, groups, movies, active, onOpen, onE
       {movieCount < orderedMovies.length && <button type="button" className="watch-next-18c__more-films" onClick={() => setMovieCount(count => count + 3)}>Afficher {Math.min(3, orderedMovies.length - movieCount)} de plus</button>}
     </>}
     {renderSeriesGroup(2)}
-    {series.length === 0 && orderedMovies.length === 0 && <p className="watch-next-18c__empty">Rien à afficher dans À Regarder pour le moment.</p>}
+    {series.length === 0 && orderedMovies.length === 0 && <div className="home-empty"><h2>Rien à regarder pour le moment</h2>{onExplore && <button type="button" className="home-explore" onClick={onExplore}>Explorer</button>}</div>}
   </section>;
 }

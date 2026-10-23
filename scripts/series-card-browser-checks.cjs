@@ -40,7 +40,7 @@ async function testSeriesCardHarness(client, root) {
   for (const width of [360, 412, 1280]) {
     await client.send('Emulation.setDeviceMetricsOverride', { width, height: 915, deviceScaleFactor: 1, mobile: width < 640 });
     await client.send('Page.navigate', { url: 'http://127.0.0.1:4173/__seenit-series-8f.html' });
-    await check(client, 'document.querySelectorAll("[data-series-card]").length===10', 'les trois contextes et leurs cas limites sont montés');
+    await check(client, 'document.querySelectorAll("[data-series-card]").length===11', 'les trois contextes et leurs cas limites sont montés');
     await check(client, 'document.querySelectorAll("#known-total .series-8f__segment").length===10 && document.querySelector("#known-total .series-8f__segments")?.getAttribute("aria-label").includes("2 épisodes vus sur 10") && !document.querySelector("#known-total .series-8f__unknown-tail") && !document.querySelector("#known-total .series-8f__unknown-mark")', 'MobLand affiche son total connu sans point d’interrogation malgré un ancien indicateur inconnu');
     const geometry = await evaluate(client, `(() => {
       const card=document.querySelector('#watch article'), poster=card.querySelector('.series-8f__poster'), title=document.querySelector('#long h3');
@@ -59,6 +59,7 @@ async function testSeriesCardHarness(client, root) {
     await check(client, 'window.__series8f.marks===1', 'le deuxième appui est ignoré tant que l’écriture est en attente');
     await evaluate(client, 'window.__series8f.releaseMark()');
     await check(client, 'window.__series8f.marks===1 && window.__series8f.opens===0 && document.querySelector("#watch .series-8f__code").textContent.includes("E05")', 'une coche avance une fois sans ouvrir la fiche');
+    await check(client, 'document.querySelector("#upcoming-132 .series-8f__days strong").textContent==="J-132" && getComputedStyle(document.querySelector("#upcoming-132 .series-8f__days strong")).fontSize==="15px" && document.querySelector("#upcoming-0 .series-8f__days strong").textContent==="auj."', 'J-X v3, auj. et trois chiffres lisibles');
     await click(client, '#upcoming-0 .series-8f__days');
     await check(client, 'window.__series8f.reminders===1 && window.__series8f.opens===0 && document.querySelector("#upcoming-0 button.series-8f__days").getAttribute("aria-pressed")==="true"', 'le rappel reste indépendant de l’ouverture');
     await check(client, 'document.querySelector("#upcoming-0 .series-8f__days--today") && document.querySelector("#upcoming-5 .series-8f__days--soon") && document.querySelector("#upcoming-31 .series-8f__days--later")', 'les trois urgences ont leur présentation');

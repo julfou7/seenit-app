@@ -11,7 +11,7 @@ export function canOfferPlexWatchedAction(mediaType: 'movie' | 'tv', available: 
 export function upcomingGroup(date: string, today: string): 'Aujourd’hui' | 'Cette semaine' | 'Plus tard' {
   const ordinal = (value: string) => { const [year, month, day] = value.split('-').map(Number); return Date.UTC(year, month - 1, day) / 86_400_000; };
   const days = ordinal(date) - ordinal(today);
-  return days <= 0 ? 'Aujourd’hui' : days < 7 ? 'Cette semaine' : 'Plus tard';
+  return days <= 0 ? 'Aujourd’hui' : days <= 7 ? 'Cette semaine' : 'Plus tard';
 }
 export type StatusTone = 'today' | 'new' | 'remaining' | 'available' | 'final' | 'stale';
 export function seriesStatus(detail?: string): { label: string; tone: StatusTone } | null {

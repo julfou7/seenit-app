@@ -142,16 +142,16 @@ obligation d'architecture. Les cartes et en-têtes consomment ces rôles plutôt
 
 La [refonte À voir](../design/home-a-voir.md), #729 / `SEENIT-UX-018`, sépare trois panneaux
 sans scrollspy ni swipe entre panneaux. À regarder retrouve ses trois sections séries, chacune
-en rail de trois cartes avec Voir tout en liste. Les films horizontaux et leur grille progressent
+en rail de trois cartes avec bascule à icônes vers la liste. Le carrousel affiche et la liste de billets horizontaux progressent
 par trois ; toucher Vu ou Annuler recolle le billet. L’historique progresse par dix, les sorties
-par Aujourd’hui/Cette semaine/Plus tard. Les badges sans emoji suivent le titre épisode, la cloche
+par Aujourd’hui/Cette semaine/Plus tard (jusqu’à J-7 inclus). Les badges sans emoji sont près du code épisode, la cloche
 du header ouvre les notifications ; les commandes et confirmations métier restent partagées.
 
 ### Carte série 8f — #690
 
 La [carte 8f](../design/card-8f.md) devient le socle partagé des séries dans À voir,
-À venir et Historique : affiche débordante, fond teinté, titre sur deux lignes,
-code saison/épisode explicite et saison segmentée. Seule l'action de contexte change.
+À venir : affiche débordante, fond teinté, titre sur deux lignes,
+code saison/épisode explicite et saison segmentée. À venir n’a pas de badge de statut et utilise une pastille rectangulaire J-X (auj. aujourd’hui) avec rappel indépendant, sans cercle de progression. La date courte n’ajoute pas de jour de semaine. Historique suit désormais la liste compacte v3 : une seule liste sans groupes de date ni progression, vignette 92×52, date dans chaque ligne, dix puis Voir plus. Les opérations réversibles et les actions clavier restent partagées.
 Les trois carrousels séries réduits de À Regarder restent virtualisés mais avancent désormais
 carte par carte avec snap horizontal obligatoire et arrêt sur chaque carte ; le rail Films à voir
 conserve son défilement libre. Les cartes séries utilisent la largeur mobile utile pour conserver

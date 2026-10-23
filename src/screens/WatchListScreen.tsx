@@ -49,10 +49,12 @@ export function WatchListScreen({
   onShowClick: onShowClickProp,
   onEpisodeParentClick: onEpisodeParentClickProp,
   navigationShortcut,
+  onExplore,
 }: {
   onShowClick: (id: string, mediaType?: 'tv' | 'movie') => void;
   onEpisodeParentClick?: (id: string, mediaType?: 'tv' | 'movie') => void;
   onOpenProfile?: () => void;
+  onExplore?: () => void;
   navigationShortcut?: number;
 }) {
   const onShowClick = useCallback((id: string, mediaType?: 'tv' | 'movie') => {
@@ -510,5 +512,5 @@ export function WatchListScreen({
 
   const markMovieAsSeen = useCallback((show: Show) => markMovieWatched(show, updateShow), [updateShow]);
   const markAsUnseen = useCallback((show: Show, episode: SeriesCardEpisode | null) => markWatchRecordUnseen(show, episode, updateShow), [updateShow]);
-  return <WatchListView model={{ activeTab, allShows, continueWatchingShows, executeUnfollow, expandedSection, filmsAVoirShows, handleArchiveShow, handleDropShow, handleEpisodeClick, handleEpisodeParentClick, handleToggleVoirTout, historyRef, isQuotaExceeded, loading, markMovieAsSeen, markNextEpisodeAsSeen, markAsUnseen, nouveautesShows, onShowClick, onShowClickProp, openPersonModal, pasVuDepuisUnMomentShows, pendingAction, scrollToSection, selectedEpisodeModal, selectedPersonId, setPendingAction, setSelectedEpisodeModal, setSelectedPersonId, setVisibleCount, upcomingRef, upcomingShows, visibleCount, watchNextRef }} />;
+  return <WatchListView model={{ onExplore, activeTab, allShows, continueWatchingShows, executeUnfollow, expandedSection, filmsAVoirShows, handleArchiveShow, handleDropShow, handleEpisodeClick, handleEpisodeParentClick, handleToggleVoirTout, historyRef, isQuotaExceeded, loading, markMovieAsSeen, markNextEpisodeAsSeen, markAsUnseen, nouveautesShows, onShowClick, onShowClickProp, openPersonModal, pasVuDepuisUnMomentShows, pendingAction, scrollToSection, selectedEpisodeModal, selectedPersonId, setPendingAction, setSelectedEpisodeModal, setSelectedPersonId, setVisibleCount, upcomingRef, upcomingShows, visibleCount, watchNextRef }} />;
 }

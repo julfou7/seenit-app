@@ -44,12 +44,14 @@ async function testHomeHarness(client, root) {
     fs.writeFileSync(path.join(root,'quality-reports',`home-films-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
     await click(client,'#home-tab-upcoming');
     await check(client,'document.querySelectorAll(".home-upcoming-group").length===3 && document.querySelectorAll("#home-panel-upcoming .series-8f__days").length===3','groupes Aujourd’hui Cette semaine Plus tard');
-    await check(client,'[...document.querySelectorAll(".series-8f__days strong")].map(el=>el.textContent).join(",")==="0,3,12"','jours exacts et aucun emoji');
+    await check(client,'[...document.querySelectorAll(".series-8f__days strong")].map(el=>el.textContent).join(",")==="auj.,J-3,J-12"','J-X et auj. exacts de la SPEC v3');
     fs.writeFileSync(path.join(root,'quality-reports',`home-upcoming-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+    await click(client,'#home-panel-upcoming .series-8f__open');
+    await check(client,'window.__homeAVoir.telemetry.opens.at(-1).includes(":2x1")', 'un tap À venir ouvre l’épisode exact');
     await click(client,'#home-tab-history');
-    await check(client,'document.querySelectorAll("#home-panel-history article").length===10','historique initial de dix');
+    await check(client,'document.querySelectorAll("#home-panel-history [data-history-row]").length===10','historique initial de dix');
     await click(client,'#home-panel-history > div > button');
-    await check(client,'document.querySelectorAll("#home-panel-history article").length>10','suite historique');
+    await check(client,'document.querySelectorAll("#home-panel-history [data-history-row]").length>10','suite historique');
     fs.writeFileSync(path.join(root,'quality-reports',`home-history-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
     await click(client,'.home-notification-bell');
     await check(client,'document.querySelector(".home-notifications") && document.querySelectorAll(".home-notice").length>=2','feuille notifications réelles');
@@ -78,6 +80,15 @@ async function testHomeHarness(client, root) {
     await check(client,'!document.querySelector(".home-notifications")','Échap ferme la feuille');
     await click(client,'#home-tab-watch_next');
     await check(client,'document.querySelector("#home-tab-watch_next").getAttribute("aria-selected")==="true" && window.__homeErrors.length===0','retour À regarder sans erreur');
+    if (width===412) {
+      await evaluate(client,'window.__homeAVoir.empty()');
+      for (const tab of ['watch_next','upcoming','history']) {
+        await click(client,`#home-tab-${tab}`);
+        await check(client,`document.querySelector('#home-panel-${tab} .home-explore')`, 'CTA Explorer de chaque onglet vide');
+        await click(client,`#home-panel-${tab} .home-explore`);
+        await check(client,'window.__homeAVoir.telemetry.opens.at(-1)==="discover"', 'CTA Explorer branché');
+      }
+    }
     reports.push({width,status:'pass',tabs:3,upcomingGroups:3,historyPage:10,notifications:true});
   }
   return reports;
