@@ -40,7 +40,8 @@ async function testSeriesCardHarness(client, root) {
   for (const width of [360, 412, 1280]) {
     await client.send('Emulation.setDeviceMetricsOverride', { width, height: 915, deviceScaleFactor: 1, mobile: width < 640 });
     await client.send('Page.navigate', { url: 'http://127.0.0.1:4173/__seenit-series-8f.html' });
-    await check(client, 'document.querySelectorAll("[data-series-card]").length===9', 'les trois contextes et leurs cas limites sont montés');
+    await check(client, 'document.querySelectorAll("[data-series-card]").length===10', 'les trois contextes et leurs cas limites sont montés');
+    await check(client, 'document.querySelectorAll("#known-total .series-8f__segment").length===10 && document.querySelector("#known-total .series-8f__segments")?.getAttribute("aria-label").includes("2 épisodes vus sur 10") && !document.querySelector("#known-total .series-8f__unknown-tail") && !document.querySelector("#known-total .series-8f__unknown-mark")', 'MobLand affiche son total connu sans point d’interrogation malgré un ancien indicateur inconnu');
     const geometry = await evaluate(client, `(() => {
       const card=document.querySelector('#watch article'), poster=card.querySelector('.series-8f__poster'), title=document.querySelector('#long h3');
       const targets=[...document.querySelectorAll('article button')].map(el=>({label:el.getAttribute('aria-label'),width:el.getBoundingClientRect().width,height:el.getBoundingClientRect().height}));
@@ -52,7 +53,10 @@ async function testSeriesCardHarness(client, root) {
     await check(client, '!document.querySelector("#long .series-8f__poster img") && document.querySelector("#upcoming-31 .series-8f__poster img")?.getAttribute("src").includes("__8f-backdrop.svg") && document.querySelector("#season-40 .series-8f__poster img")?.getAttribute("src").includes("__8f-backdrop.svg") && !document.querySelector("#season-24 .series-8f__check")', 'un poster absent ou cassé réutilise le visuel connu avant les initiales, sans fausse action');
     await check(client, '["watch","upcoming-0","upcoming-5","upcoming-31","history","season-24"].every(id=>document.querySelector(`#${id} article`).style.getPropertyValue("--series-hue") !== "260")', 'les cartes partageant une affiche réutilisent sa teinte sans second calcul');
     await click(client, '#watch .series-8f__check');
+    await check(client, 'window.__series8f.marks===1 && document.querySelector("#watch .series-8f__check").disabled', 'la vraie écriture reste en attente');
     await click(client, '#watch .series-8f__check');
+    await check(client, 'window.__series8f.marks===1', 'le deuxième appui est ignoré tant que l’écriture est en attente');
+    await evaluate(client, 'window.__series8f.releaseMark()');
     await check(client, 'window.__series8f.marks===1 && window.__series8f.opens===0 && document.querySelector("#watch .series-8f__code").textContent.includes("E05")', 'une coche avance une fois sans ouvrir la fiche');
     await click(client, '#upcoming-0 .series-8f__days');
     await check(client, 'window.__series8f.reminders===1 && window.__series8f.opens===0 && document.querySelector("#upcoming-0 button.series-8f__days").getAttribute("aria-pressed")==="true"', 'le rappel reste indépendant de l’ouverture');

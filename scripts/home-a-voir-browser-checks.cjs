@@ -48,6 +48,7 @@ async function testHomeHarness(client, root) {
     fs.writeFileSync(path.join(root,'quality-reports',`home-history-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
     await click(client,'.home-notification-bell');
     await check(client,'document.querySelector(".home-notifications") && document.querySelectorAll(".home-notice").length>=2','feuille notifications réelles');
+    await check(client,'!document.querySelector(".home-notice button[aria-label=\\"Marquer Stranger Things comme vu\\"]") && document.querySelector(".home-notice button[aria-label=\\"Marquer Dune : Deuxième partie comme vu\\"]")','la vraie feuille refuse Vu pour une série partielle et conserve le film Plex exact');
     fs.writeFileSync(path.join(root,'quality-reports',`home-notifications-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
     if (await evaluate(client,'Boolean(document.querySelector(".home-notifications__read"))')) await click(client,'.home-notifications__read');
     await check(client,'!document.querySelector(".home-notification-bell > span")','Tout marquer lu acquitté');

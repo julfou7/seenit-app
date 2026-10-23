@@ -1189,8 +1189,10 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   Vu, prochain, futur et entrée d'historique se distinguent autrement que par la couleur ; les saisons
   longues utilisent une barre proportionnelle, les totaux et diffusions inconnus ne sont pas inventés.
   Un cache de saison absent n'efface pas les épisodes prouvés par la progression ou les pointeurs.
-  Une dernière saison ouverte ajoute une traîne en tirets et « ? » ; une preuve de finale datée ou
-  de total explicitement confirmé retire cette incertitude. Les métadonnées de l'épisode présenté
+  Une saison sans total fournisseur ajoute une traîne en tirets et « ? » ; un `episode_count` positif
+  fourni par TMDB ou une preuve de finale retire cette incertitude, même si la série est renouvelée,
+  si la finale n'est pas typée/datée ou si un ancien indicateur `season_total_unknown` vaut true.
+  Le nombre d'épisodes actuellement listés ne devient jamais un total à lui seul. Les métadonnées de l'épisode présenté
   priment sur un ancien pointeur contradictoire. La récence des séries laissées de côté provient
   des visionnages encore vus, puis de leur horodatage de repli, sans nouvel appel fournisseur.
   La coche Vu, le rappel et les actions d'historique sont des contrôles séparés d'au moins 44 px.
@@ -1203,11 +1205,14 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   cache et la progression persistée servent de preuve ; une reprise inconnue est « À actualiser »,
   sans faux « À jour » ni écriture d'épisode inventé.
   Les deux synchronisations de détails conservent dans `seasonProgress` les preuves publiques de
-  finale datée et de dernière saison avant suppression du cache déprécié ; ces métadonnées ne sont
+  total fournisseur, de finale et de dernière saison avant suppression du cache déprécié ; ces métadonnées ne sont
   jamais des preuves de visionnage. Le badge de récence est demandé par la section des séries anciennes.
 - **SEENIT-UX-018** — L’accueil À voir suit `docs/design/home-a-voir.md` : trois panneaux indépendants
   À regarder, À venir et Historique, sans changement au scroll ni swipe entre panneaux. Le header
   seenit● ouvre une feuille Notifications, avec état non lu isolé par compte et Tout marquer lu.
+  Une disponibilité Plex globale de série ne prouve jamais la disponibilité de l’épisode de reprise :
+  sans preuve Plex par épisode, elle ne crée ni notification épisode ni action Vu. Les films dont
+  l’identité exacte est disponible conservent leur notification et leur action réversible.
   À regarder conserve trois sections distinctes (Continuer, Nouveautés, Pas vu depuis un moment),
   chacune en rail de trois cartes puis Voir tout en liste. Les badges statut sans emoji sont placés
   sous le titre de l’épisode ; le rappel de sortie utilise un rond sombre et les jours exacts.

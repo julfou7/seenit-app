@@ -4,6 +4,10 @@ export const HOME_TABS: ReadonlyArray<{ id: WatchListTab; label: string }> = [
 ];
 export const HOME_PAGE_SIZE = 3;
 export const HISTORY_PAGE_SIZE = 10;
+export function canOfferPlexWatchedAction(mediaType: 'movie' | 'tv', available: boolean, watched: boolean): boolean {
+  // Le cache global Plex prouve l'identité d'un film, jamais la présence d'un épisode de série.
+  return mediaType === 'movie' && available && !watched;
+}
 export function upcomingGroup(date: string, today: string): 'Aujourd’hui' | 'Cette semaine' | 'Plus tard' {
   const ordinal = (value: string) => { const [year, month, day] = value.split('-').map(Number); return Date.UTC(year, month - 1, day) / 86_400_000; };
   const days = ordinal(date) - ordinal(today);

@@ -176,7 +176,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
           if (seasonDetailsRes.ok) {
             seasonsCache.push({
               ...seasonDetailsRes.value,
-              episode_count: season.episode_count || seasonDetailsRes.value.episodes?.length || 0
+              episode_count: season.episode_count || 0
             });
           } else {
             console.warn(`[SyncWorker] Could not fetch episodes for Season ${season.season_number} of ${showToSync.title}`);
@@ -217,7 +217,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
           air_date: nextEp.episodeData?.air_date || null,
           name: nextEp.episodeData?.name || null,
           still_path: nextEp.episodeData?.still_path || null,
-          episode_count: seasonForNextEp?.episode_count || 1,
+          episode_count: seasonForNextEp?.episode_count || null,
           aired_episodes_in_season: airedEpisodesInSeason,
           is_final_season: isFinalSeason(nextEp.season),
           series_ended: isEnded
@@ -233,7 +233,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
             air_date: details.next_episode_to_air.air_date,
             name: details.next_episode_to_air.name,
             still_path: details.next_episode_to_air.still_path || null,
-            episode_count: seasonsCache.find(s => s.season_number === sNum)?.episode_count || 1,
+            episode_count: seasonsCache.find(s => s.season_number === sNum)?.episode_count || null,
             is_final_season: isFinalSeason(sNum),
             series_ended: isEnded
           };
@@ -249,7 +249,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
                   air_date: ep.air_date,
                   name: ep.name,
                   still_path: ep.still_path || null,
-                  episode_count: s.episode_count || 1,
+                  episode_count: s.episode_count || null,
                   is_final_season: isFinalSeason(s.season_number),
                   series_ended: isEnded
                 });
@@ -297,26 +297,26 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         // 2. DÉTECTION DE DATE D'EPISODE / NOUVELLE SAISON / DERNIÈRE SAISON
         if (nextEpisodeToAir && nextEpisodeToAir.air_date) {
           const hadNoAirDate = !showToSync.nextEpisodeToAir || !showToSync.nextEpisodeToAir.air_date;
-          const isNewerSeason = showToSync.nextEpisodeToAir && 
-            typeof showToSync.nextEpisodeToAir.season_number === 'number' && 
+          const isNewerSeason = showToSync.nextEpisodeToAir &&
+            typeof showToSync.nextEpisodeToAir.season_number === 'number' &&
             nextEpisodeToAir.season_number > showToSync.nextEpisodeToAir.season_number;
 
           if (hadNoAirDate || isNewerSeason) {
             try {
               const isFinal = isEnded && (lastSeasonNum > 1 || details.type === 'Miniseries');
-              const newsType = isFinal 
-                ? 'FINAL_SEASON' 
+              const newsType = isFinal
+                ? 'FINAL_SEASON'
                 : (nextEpisodeToAir.episode_number === 1 ? 'NEW_SEASON' : 'DATE_ANNOUNCED');
-              const msg = isFinal 
+              const msg = isFinal
                 ? `La Saison ${nextEpisodeToAir.season_number} sera la dernière de la série !`
                 : `La Saison ${nextEpisodeToAir.season_number} arrive le ${nextEpisodeToAir.air_date}.`;
-              const desc = isFinal 
+              const desc = isFinal
                 ? `Il a été officiellement confirmé que la Saison ${nextEpisodeToAir.season_number} sera l'ultime chapitre qui conclura « ${showToSync.title} ».`
                 : (nextEpisodeToAir.episode_number === 1
                     ? `Une nouvelle saison arrive prochainement pour « ${showToSync.title} ». Le premier épisode est prévu pour le ${nextEpisodeToAir.air_date}.`
                     : `La diffusion se poursuit avec l'épisode ${nextEpisodeToAir.episode_number} de la saison ${nextEpisodeToAir.season_number} prévu le ${nextEpisodeToAir.air_date}.`);
 
-              const docData: Record<string, any> = {
+              const docData: Record<string, unknown> = {
                 type: newsType,
                 showId: showId,
                 showTitle: showToSync.title,
@@ -369,7 +369,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         const hasArchivedChanged = showToSync.isArchived !== shouldBeArchived;
         const hasSeriesEndedChanged = showToSync.seriesEnded !== isEnded;
         const hasTmdbStatusChanged = showToSync.tmdbStatus !== (details.status || null);
-        
+
         // Notification pour les saisons renouvelées
         if (showToSync.tmdbStatus && (showToSync.tmdbStatus === 'Ended' || showToSync.tmdbStatus === 'Canceled') && details.status === 'Returning Series') {
            sendNativeNotification(showToSync.title, {
@@ -394,9 +394,9 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
 
         if (!hasNextToWatchChanged && !hasNextToAirChanged && !hasTotalChanged && !hasSeasonsCacheToDelete && !hasArchivedChanged && !hasSeriesEndedChanged && !hasTmdbStatusChanged) {
            console.log(`[SyncWorker] No major changes for ${showToSync.title}, saving sync markers to Firestore.`);
-           
-           await updateDoc(docRef, { 
-             isSynced: true, 
+
+           await updateDoc(docRef, {
+             isSynced: true,
              lastSyncedAt: Date.now(),
              seriesEnded: isEnded,
              tmdbStatus: details.status || null,
@@ -404,7 +404,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
            });
            changesMade = true;
            syncedCount++;
-           
+
            await new Promise(resolve => setTimeout(resolve, 500));
            continue;
         }
@@ -424,28 +424,28 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
           tmdbStatus: details.status || null,
           isArchived: shouldBeArchived
         };
-        
+
         if (details.status === 'Canceled' || details.status === 'Ended') {
           updatePayload.status = details.status;
         }
-        
-        updatePayload['seasonsCache'] = null; 
+
+        updatePayload['seasonsCache'] = null;
 
         await updateDoc(docRef, updatePayload);
         changesMade = true;
         syncedCount++;
 
         console.log(`[SyncWorker] Successfully synced details for ${showToSync.title}`);
-        
+
         // Add a delay between shows to not hammer TMDB/Firestore
         await new Promise(resolve => setTimeout(resolve, 500));
 
       } catch (err: any) {
         console.error(`[SyncWorker] Error syncing details for ${showToSync.title}:`, err);
         const errStr = err?.message || String(err);
-        const isQuotaError = 
-          err?.code === 'resource-exhausted' || 
-          errStr.toLowerCase().includes('quota exceeded') || 
+        const isQuotaError =
+          err?.code === 'resource-exhausted' ||
+          errStr.toLowerCase().includes('quota exceeded') ||
           errStr.toLowerCase().includes('quota-exceeded') ||
           errStr.toLowerCase().includes('resource-exhausted') ||
           errStr.toLowerCase().includes('resource_exhausted');
@@ -458,7 +458,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         }
       }
     }
-    
+
     setSyncStatus(null);
     return { success: true, syncedCount };
   } catch (err: any) {
@@ -614,7 +614,7 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
       if (seasonDetailsRes.ok) {
         seasonsCache.push({
           ...seasonDetailsRes.value,
-          episode_count: season.episode_count || seasonDetailsRes.value.episodes?.length || 0
+          episode_count: season.episode_count || 0
         });
       } else {
         seasonsCache.push({
@@ -654,7 +654,7 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
       air_date: nextEp.episodeData?.air_date || null,
       name: nextEp.episodeData?.name || null,
       still_path: nextEp.episodeData?.still_path || null,
-      episode_count: seasonForNextEp?.episode_count || 1,
+      episode_count: seasonForNextEp?.episode_count || null,
       aired_episodes_in_season: airedEpisodesInSeason,
       is_final_season: isFinalSeason(nextEp.season),
       series_ended: isEnded
@@ -670,7 +670,7 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
         air_date: details.next_episode_to_air.air_date,
         name: details.next_episode_to_air.name,
         still_path: details.next_episode_to_air.still_path || null,
-        episode_count: seasonsCache.find(s => s.season_number === sNum)?.episode_count || 1,
+        episode_count: seasonsCache.find(s => s.season_number === sNum)?.episode_count || null,
         is_final_season: isFinalSeason(sNum),
         series_ended: isEnded
       };
@@ -686,7 +686,7 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
               air_date: ep.air_date,
               name: ep.name,
               still_path: ep.still_path || null,
-              episode_count: s.episode_count || 1,
+              episode_count: s.episode_count || null,
               is_final_season: isFinalSeason(s.season_number),
               series_ended: isEnded
             });

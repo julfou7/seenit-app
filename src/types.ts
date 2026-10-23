@@ -16,6 +16,7 @@ export interface TrackingProvenance {
 
 export interface SeasonProgressEvidence {
   season_number: number;
+  episode_count?: number | null;
   known_episodes_in_season: number;
   last_season_number: number;
   season_total_unknown: boolean;
@@ -41,7 +42,7 @@ export interface Show {
   updatedAt: number;
   createdAt: number;
   seenEpisodes: string[];
-  episodeRecords: Record<string, { rating?: number; emotion?: string; watchedAt?: number; [key: string]: any }>;
+  episodeRecords: Record<string, { rating?: number; emotion?: string; watchedAt?: number; [key: string]: unknown }>;
   detailsSyncedAt?: number;
   plexSlug?: string;
   plexGuid?: string;

@@ -37,16 +37,24 @@ test('SEENIT-UX-014 les deux synchronisations conservent la finale avant de supp
   const module = { exports: {} as { syncSingleItem: (id: string, silent: boolean) => Promise<{ success: boolean }>; performDetailsSync: (force: boolean) => Promise<{ success: boolean }> } };
   const context = vm.createContext({ module, __ports: ports, console: { log() {}, warn() {}, error() {} }, setTimeout: (callback: () => void) => { callback(); return 1; }, clearTimeout() {} });
   vm.runInContext(bundle.outputFiles[0].text, context);
-  for (const invoke of [() => module.exports.syncSingleItem('series', true), () => module.exports.performDetailsSync(true)]) {
-    ports.writes.length = 0;
-    assert.equal((await invoke()).success, true);
-    const payload = ports.writes.find(value => value.seasonsCache === null);
-    assert.ok(payload, 'la synchronisation de production a écrit les détails et supprimé le cache');
-    const refreshed = { ...show, ...JSON.parse(JSON.stringify(payload)) } as Show;
-    assert.equal(refreshed.seasonProgress?.['1']?.last_known_episode_type, 'finale');
-    assert.equal(refreshed.nextEpisodeToWatch?.season_total_unknown, false);
-    assert.equal(buildSeriesSeasonProgress(refreshed, refreshed.nextEpisodeToWatch, 'watch', '2026-10-21').unknownTail, false);
-    assert.equal(buildSeriesSeasonProgress({ ...refreshed, nextEpisodeToWatch: null }, { season_number: 1, episode_number: 2 }, 'history', '2026-10-21').unknownTail, false);
-    assert.equal(buildSeriesSeasonProgress({ ...refreshed, nextEpisodeToWatch: null }, { season_number: 1, episode_number: 2 }, 'history', '2026-10-21').totalUnknown, false);
+  for (const total of [4, 10, 0]) {
+    ports.details.seasons[0].episode_count = total;
+    ports.season.episodes[3].episode_type = total === 4 ? 'finale' : 'standard';
+    for (const invoke of [() => module.exports.syncSingleItem('series', true), () => module.exports.performDetailsSync(true)]) {
+      ports.writes.length = 0;
+      assert.equal((await invoke()).success, true);
+      const payload = ports.writes.find(value => value.seasonsCache === null);
+      assert.ok(payload, 'la synchronisation de production a écrit les détails et supprimé le cache');
+      const refreshed = { ...show, ...JSON.parse(JSON.stringify(payload)) } as Show;
+      assert.equal(refreshed.seasonProgress?.['1']?.last_known_episode_type, total === 4 ? 'finale' : 'standard');
+      assert.equal(refreshed.seasonProgress?.['1']?.episode_count, total || null);
+      assert.equal(refreshed.nextEpisodeToWatch?.season_total_unknown, total === 0);
+      const watch = buildSeriesSeasonProgress(refreshed, refreshed.nextEpisodeToWatch, 'watch', '2026-10-21');
+      const history = buildSeriesSeasonProgress({ ...refreshed, nextEpisodeToWatch: null }, { season_number: 1, episode_number: 2 }, 'history', '2026-10-21');
+      assert.equal(watch.unknownTail, total === 0);
+      assert.equal(history.totalUnknown, total === 0);
+      assert.equal(watch.label, `S1 · 0/${total || '?'}`);
+      assert.equal(history.label, watch.label, 'le total survit au nettoyage du cache et à l’absence de reprise');
+    }
   }
 });

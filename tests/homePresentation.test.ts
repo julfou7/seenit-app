@@ -1,7 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { HOME_TABS, HOME_PAGE_SIZE, HISTORY_PAGE_SIZE, upcomingGroup, seriesStatus } from '../src/features/watchlist/homePresentation.ts';
+import { HOME_TABS, HOME_PAGE_SIZE, HISTORY_PAGE_SIZE, upcomingGroup, seriesStatus, canOfferPlexWatchedAction } from '../src/features/watchlist/homePresentation.ts';
 import { readFileSync } from 'node:fs';
+
+test('SEENIT-UX-018 refuse une preuve Plex globale de série pour proposer Vu', () => {
+  assert.equal(canOfferPlexWatchedAction('tv', true, false), false, 'série partielle : aucun épisode prouvé');
+  assert.equal(canOfferPlexWatchedAction('tv', false, false), false);
+  assert.equal(canOfferPlexWatchedAction('movie', true, false), true, 'film exact disponible et non vu');
+  assert.equal(canOfferPlexWatchedAction('movie', false, false), false);
+  assert.equal(canOfferPlexWatchedAction('movie', true, true), false);
+});
 
 test('SEENIT-UX-018 classe les sorties par jour local sans dérive au changement d’heure', () => {
   for (const today of ['2026-10-22', '2026-10-25', '2026-03-29']) {

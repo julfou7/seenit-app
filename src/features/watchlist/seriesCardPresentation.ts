@@ -132,7 +132,7 @@ export function buildSeriesSeasonProgress(
   const seen = new Set(seenEntries.filter(item => item.season === season).map(item => item.episode));
 
   const advertisedTotal = pointers.map(pointer => count(pointer.episode_count ?? (pointer.season_total_unknown === false ? pointer.known_episodes_in_season : null))).find(value => value !== null && value > 0)
-    ?? count(cached?.episode_count)
+    ?? (count(cached?.episode_count) || null)
     ?? null;
   const cachedKnown = (cached?.episodes || []).reduce((highest, item) => Math.max(highest, count(item.episode_number) || 0), 0);
   const pointerKnown = Math.max(0, ...pointers.map(pointer => count(pointer.known_episodes_in_season) || 0));
@@ -172,7 +172,7 @@ export function buildSeriesSeasonProgress(
     || lastPointer?.air_date
     || null;
   const datedFinale = lastKnownType === 'finale' && Boolean(lastKnownAirDate);
-  const unknownTail = !statusEnded && isLatestSeason && (
+  const unknownTail = advertisedTotal === null && !datedFinale && !statusEnded && isLatestSeason && (
     explicitTotalState === true || (explicitTotalState !== false && !datedFinale)
   );
   const totalUnknown = unknownTail || (advertisedTotal === null && !datedFinale);
