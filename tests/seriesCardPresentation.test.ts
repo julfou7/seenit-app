@@ -29,6 +29,7 @@ test('SEENIT-UX-014 affiche le total fourni de MobLand et des séries renouvelé
   const oldEvidence = { ...partial['1'] };
   delete oldEvidence.episode_count;
   assert.equal(needsSeasonProgressRefresh({ seasonProgress: { '1': oldEvidence } }), true);
+  assert.equal(needsSeasonProgressRefresh({ seasonProgress: { '1': { ...oldEvidence, season_total_unknown: false } } }), true, 'l’ancien false lié à une saison terminée ne prouve pas un total fournisseur');
   assert.equal(needsSeasonProgressRefresh({ nextEpisodeToWatch: episode }), true, 'les anciens pointeurs sans preuve de saison sont également réparés');
   assert.equal(needsSeasonProgressRefresh({ seasonProgress: partial }), false, 'une absence fournisseur confirmée ne déclenche pas une boucle de refresh');
   assert.equal(needsSeasonProgressRefresh(show), false);

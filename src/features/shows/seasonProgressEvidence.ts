@@ -2,8 +2,8 @@ import type { SeasonProgressEvidence, Show } from '../../types';
 
 /** Répare une seule fois les anciennes preuves qui confondaient liste et total. */
 export function needsSeasonProgressRefresh(show: Pick<Show, 'seasonProgress' | 'nextEpisodeToWatch' | 'nextEpisodeToAir'>): boolean {
-  return Object.values(show.seasonProgress || {}).some(evidence => evidence.season_total_unknown && !Object.hasOwn(evidence, 'episode_count'))
-    || [show.nextEpisodeToWatch, show.nextEpisodeToAir].some(pointer => pointer?.season_total_unknown === true
+  return Object.values(show.seasonProgress || {}).some(evidence => !Object.hasOwn(evidence, 'episode_count'))
+    || [show.nextEpisodeToWatch, show.nextEpisodeToAir].some(pointer => typeof pointer?.season_total_unknown === 'boolean'
       && !Object.hasOwn(show.seasonProgress?.[String(pointer.season_number)] || {}, 'episode_count'));
 }
 
