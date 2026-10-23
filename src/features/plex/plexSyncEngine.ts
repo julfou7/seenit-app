@@ -147,11 +147,14 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           authToken: plexToken,
           username: getStoredPlexUsername(user.uid) || cloudPlexState.username || ''
         }, { merge: true });
-      } catch (error: any) {
-        const message = `Impossible de sécuriser les réglages Plex du compte : ${error?.message || error}`;
+      } catch (error) {
+        const message = `Impossible de sécuriser les réglages Plex du compte : ${error instanceof Error ? error.message : String(error)}`;
         appLogger.error('plex', message);
         return { success: false, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [], error: message };
       }
+    }
+    if (auth.currentUser?.uid !== user.uid) {
+      return { success: false, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [], error: 'Compte SeenIt modifié pendant la migration Plex' };
     }
     const clientId = getPlexClientId();
     const localLastSyncTimestamp = getPlexLastSyncTimestamp(user.uid);
@@ -205,7 +208,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
     };
 
     try {
-      const plexData = await fetchPlexHistoryData(plexToken, clientId, delta, delta ? lastSyncTimestamp : undefined);
+      const plexData = await fetchPlexHistoryData(user.uid, plexToken, clientId, delta, delta ? lastSyncTimestamp : undefined);
       if (auth.currentUser?.uid !== user.uid) {
         throw new Error('Compte SeenIt modifié pendant la synchronisation Plex');
       }
