@@ -36,8 +36,12 @@ function readPayload(raw: unknown): PlexHistoryPayload {
   return value as PlexHistoryPayload;
 }
 
-export async function fetchPlexHistoryData(token: string, clientId: string, delta: boolean, since?: number): Promise<PlexHistoryPayload> {
-  const uid = auth.currentUser?.uid;
+function assertCurrentUser(uid: string): void {
+  if (auth.currentUser?.uid !== uid) throw new Error('Compte SeenIt modifié pendant la synchronisation Plex');
+}
+
+export async function fetchPlexHistoryData(uid: string, token: string, clientId: string, delta: boolean, since?: number): Promise<PlexHistoryPayload> {
+  assertCurrentUser(uid);
   const retryAt = getPlexSyncRetryAt(uid);
   if (retryAt) throw new PlexSyncHttpError(429, retryAt);
   const isNative = Capacitor.isNativePlatform();
@@ -46,6 +50,7 @@ export async function fetchPlexHistoryData(token: string, clientId: string, delt
   const payload = { clientId, delta, since };
   const headers = { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Plex-Token': token };
   const webRequest = async (url: string) => {
+    assertCurrentUser(uid);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -59,7 +64,9 @@ export async function fetchPlexHistoryData(token: string, clientId: string, delt
     const data = isNative ? await executeBackendAttempts({
       attempts: buildNativeBackendAttempts({ urls,
         nativeRequest: async url => {
-          const response = await CapacitorHttp.post({ url, headers: await getAuthenticatedHeaders(headers), data: payload, connectTimeout: Math.min(timeoutMs, 15_000), readTimeout: timeoutMs });
+          const authenticatedHeaders = await getAuthenticatedHeaders(headers);
+          assertCurrentUser(uid);
+          const response = await CapacitorHttp.post({ url, headers: authenticatedHeaders, data: payload, connectTimeout: Math.min(timeoutMs, 15_000), readTimeout: timeoutMs });
           const retryAfter = Object.entries(response.headers || {}).find(([key]) => key.toLowerCase() === 'retry-after')?.[1];
           checkStatus(response.status, retryAfter);
           return readPayload(response.data);

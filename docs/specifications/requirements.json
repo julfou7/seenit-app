@@ -702,6 +702,14 @@
         {
           "file": "tests/plexStorage.test.ts",
           "contains": "isole le jeton et le curseur Plex par UID SeenIt"
+        },
+        {
+          "file": "tests/plexResumeRateLimit.test.ts",
+          "contains": "SEENIT-PLEX-004 annule le compte capturé"
+        },
+        {
+          "file": "tests/plexResumeRateLimit.test.ts",
+          "contains": "SEENIT-PLEX-004 conserve l’UID d’origine"
         }
       ]
     },

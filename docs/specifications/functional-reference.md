@@ -990,3 +990,6 @@ Réouverture Plex (#741) : les synchronisations automatiques Plex/détails atten
 
 
 À voir, ZIP(9) (#729) : six cartes par rail puis Voir en liste ; listes par12, toutes accessibles. Films triés par ajout récent et identité, stables pendant enrichissement et navigation. Acteur top10 : favori puis titres vus puis premier rôle, uniquement depuis cache ; mini-fiche avec favoris, titres connus, ajout À voir et filmographie existante. Billets liste104px : titre entier sur2lignes, acteur, diffuseur+année, heure au talon. Actions8f au centre de la zone supérieure (58px), groupes À venir13px neutres, glyphe Vu partagé.
+
+
+Plex (#744) : le compte capturé est un paramètre obligatoire du transport. Un changement pendant la migration ou les en-têtes annule l’envoi ; la pause d’une réponse déjà en vol reste dans le compte d’origine.
