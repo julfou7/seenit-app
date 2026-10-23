@@ -1197,6 +1197,8 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   Le worker réactualise une fois toutes les anciennes preuves sans champ de total fournisseur,
   indépendamment de leur ancien booléen et du statut terminé/archivé, puis retrouve
   sa politique normale de fraîcheur, y compris quand le fournisseur confirme que le total manque.
+  Cette réparation conserve le statut de suivi utilisateur ; Ended/Canceled restent uniquement
+  des métadonnées fournisseur (`tmdbStatus`/`seriesEnded`), jamais des valeurs de `Show.status`.
   Le nombre d'épisodes actuellement listés ne devient jamais un total à lui seul. Les métadonnées de l'épisode présenté
   priment sur un ancien pointeur contradictoire. La récence des séries laissées de côté provient
   des visionnages encore vus, puis de leur horodatage de repli, sans nouvel appel fournisseur.

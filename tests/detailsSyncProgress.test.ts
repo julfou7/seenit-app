@@ -58,16 +58,22 @@ test('SEENIT-UX-014 les deux synchronisations conservent la finale avant de supp
     }
   }
   // Une installation existante doit être réparée sans pull-to-refresh, puis s'arrêter.
-  for (const oldFlag of [true, false]) {
-  ports.show = { ...show, isArchived: !oldFlag, seriesEnded: !oldFlag, isSynced: true, lastSyncedAt: Date.now(), seasonProgress: { '1': {
+  for (const providerStatus of ['Returning Series', 'Ended', 'Canceled']) for (const oldFlag of [true, false]) {
+  ports.details.status = providerStatus;
+  ports.show = { ...show, status: oldFlag ? 'watching' : 'completed', isArchived: !oldFlag, seriesEnded: !oldFlag, isSynced: true, lastSyncedAt: Date.now(), seasonProgress: { '1': {
     season_number: 1, known_episodes_in_season: 10, season_total_unknown: oldFlag,
     last_season_number: 1, last_known_episode_type: 'standard', last_known_episode_air_date: null,
   } }, nextEpisodeToWatch: { season_number: 1, episode_number: 1, air_date: '2099-01-01' } };
   ports.details.seasons[0].episode_count = 10;
   ports.writes.length = 0;
+  await module.exports.syncSingleItem('series', true);
+  assert.equal(ports.writes.find(value => value.seasonProgress)?.status, undefined, 'la synchronisation manuelle conserve aussi le statut utilisateur');
+  ports.writes.length = 0;
   await module.exports.performDetailsSync(false);
   const repaired = ports.writes.find(value => value.seasonProgress);
   assert.ok(repaired, 'l’ancienne preuve déclenche la réparation même avec une date future et un cache récent');
+  assert.equal(repaired.status, undefined, 'le statut fournisseur ne remplace jamais le statut de suivi utilisateur');
+  assert.equal(repaired.tmdbStatus, providerStatus);
   ports.show = { ...ports.show, ...JSON.parse(JSON.stringify(repaired)) };
   ports.writes.length = 0;
   await module.exports.performDetailsSync(false);

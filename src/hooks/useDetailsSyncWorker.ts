@@ -162,7 +162,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         // 1. Fetch main TV show details from TMDB
         const detailsRes = await tmdb.getMediaDetails(tmdbIdNum, showToSync.mediaType || 'tv');
         if (!detailsRes.ok) {
-          const errMsg = 'error' in detailsRes ? (typeof detailsRes.error === 'object' && detailsRes.error !== null && 'message' in detailsRes.error ? (detailsRes.error as any).message : String(detailsRes.error)) : 'Unknown error';
+          const errMsg = 'error' in detailsRes ? (typeof detailsRes.error === 'object' && detailsRes.error !== null && 'message' in detailsRes.error ? detailsRes.error.message : String(detailsRes.error)) : 'Unknown error';
           console.warn(`[SyncWorker] Could not fetch details for ${showToSync.title}: ${errMsg}`);
           continue;
         }
@@ -426,10 +426,6 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
           tmdbStatus: details.status || null,
           isArchived: shouldBeArchived
         };
-
-        if (details.status === 'Canceled' || details.status === 'Ended') {
-          updatePayload.status = details.status;
-        }
 
         updatePayload['seasonsCache'] = null;
 
@@ -740,9 +736,6 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
       isArchived: shouldBeArchived
     };
 
-    if (details.status === 'Canceled' || details.status === 'Ended') {
-      updatePayload.status = details.status;
-    }
     updatePayload['seasonsCache'] = null;
 
     await updateDoc(showRef, updatePayload);
