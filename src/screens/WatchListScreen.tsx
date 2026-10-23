@@ -60,6 +60,12 @@ export function WatchListScreen({
     onShowClickProp(id, mediaType);
   }, [onShowClickProp]);
 
+  const tabScrollPositions = useRef<Record<string, number>>({});
+  const [today, setToday] = useState(() => getTodayStr());
+  useEffect(() => {
+    const timer = setInterval(() => setToday(getTodayStr()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
   const [activeTab, setActiveTab] = useState<'watch_next' | 'upcoming' | 'history'>('watch_next');
   useTabShortcut(navigationShortcut, () => {
     setActiveTab('watch_next');
@@ -226,6 +232,7 @@ export function WatchListScreen({
         return;
       }
       if (activeTab !== 'watch_next') {
+        tabScrollPositions.current = {};
         setActiveTab('watch_next');
         requestAnimationFrame(() => {
           const container = document.getElementById('watchlist-container');
@@ -240,6 +247,7 @@ export function WatchListScreen({
       setPendingAction(null);
       setExpandedSection(null);
       setVisibleCount(WATCHLIST_BATCH_SIZE);
+      tabScrollPositions.current = {};
       setActiveTab('watch_next');
       requestAnimationFrame(() => {
         const container = document.getElementById('watchlist-container');
@@ -324,72 +332,11 @@ export function WatchListScreen({
     );
   };
 
-  const activeTabRef = useRef(activeTab);
-  activeTabRef.current = activeTab;
-
-  useEffect(() => {
-    if (loading) return;
-
-    let isScrollingFromTab = false;
-    let scrollTimeout: NodeJS.Timeout;
-    let rafId: number | null = null;
-
-    const handleScroll = () => {
-      if (isScrollingFromTab) return;
-      if (rafId !== null) return;
-
-      rafId = requestAnimationFrame(() => {
-        rafId = null;
-        const upcomingRect = upcomingRef.current?.getBoundingClientRect();
-        const historyRect = historyRef.current?.getBoundingClientRect();
-
-        const offset = 250;
-
-        let newTab: 'watch_next' | 'upcoming' | 'history' = 'watch_next';
-        if (historyRect && historyRect.top < offset) {
-          newTab = 'history';
-        } else if (upcomingRect && upcomingRect.top < offset) {
-          newTab = 'upcoming';
-        }
-
-        if (activeTabRef.current !== newTab) {
-          setActiveTab(newTab);
-        }
-      });
-    };
-
+  const scrollToSection = (_ref: React.RefObject<HTMLDivElement>, tab: 'watch_next' | 'upcoming' | 'history') => {
     const container = document.getElementById('watchlist-container');
-    if (container) {
-      container.addEventListener('scroll', handleScroll, { passive: true });
-    } else {
-      window.addEventListener('scroll', handleScroll, { passive: true });
-    }
-
-    const handleTabScroll = () => {
-      isScrollingFromTab = true;
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
-        isScrollingFromTab = false;
-      }, 800);
-    };
-
-    window.addEventListener('tab-scroll', handleTabScroll);
-
-    return () => {
-      if (container) {
-        container.removeEventListener('scroll', handleScroll);
-      }
-      window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('tab-scroll', handleTabScroll);
-      clearTimeout(scrollTimeout);
-      if (rafId !== null) cancelAnimationFrame(rafId);
-    };
-  }, [loading]);
-
-  const scrollToSection = (ref: React.RefObject<HTMLDivElement>, tab: 'watch_next' | 'upcoming' | 'history') => {
+    if (container) tabScrollPositions.current[activeTab] = container.scrollTop;
     setActiveTab(tab);
-    window.dispatchEvent(new CustomEvent('tab-scroll'));
-    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    requestAnimationFrame(() => { if (container) container.scrollTop = tabScrollPositions.current[tab] || 0; });
   };
 
   const {
@@ -401,7 +348,7 @@ export function WatchListScreen({
     upcomingShows
   } = useMemo(() => {
     const shows = allShows.filter(s => s.mediaType !== 'movie');
-    const todayIso = new Date().toISOString().slice(0, 10);
+    const todayIso = today;
 
     const isNotUpToDate = (s: Show): boolean => {
       if (s.isArchived) return false;
@@ -555,7 +502,7 @@ export function WatchListScreen({
       filmsAVoirShows,
       upcomingShows
     };
-  }, [allShows]);
+  }, [allShows, today]);
 
   const markNextEpisodeAsSeen = useCallback(async (show: Show) => {
     return markWatchCardEpisode(show, getTodayStr(), markEpisodeWatched);

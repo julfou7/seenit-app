@@ -8,6 +8,7 @@ import { buildSeriesSeasonProgress, imageUrl, seriesCardPosterCandidates, series
 import { dominantPosterHue, POSTER_HUE_FALLBACK, readPosterHue, rememberPosterHue } from '../../features/watchlist/posterHue';
 import './seriesEpisodeCard.css';
 import { SeenItWatchedStamp } from './SeenItWatchedStamp';
+import { seriesStatus } from '../../features/watchlist/homePresentation';
 
 export interface SeriesCardAction { label: string; onSelect: () => void | Promise<void>; destructive?: boolean }
 type Context =
@@ -89,6 +90,11 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
   const requestedDetail = detail?.trim() && !REMAINING_DETAIL.test(detail) ? detail.trim() : undefined;
   const visibleDetail = requestedDetail || progress.detail;
   const detailIsBadge = visibleDetail ? BADGE_DETAIL.test(visibleDetail) : false;
+  const status = context.kind === 'watch' && !context.upToDate ? seriesStatus(visibleDetail) || (episode?.episode_type === 'finale'
+    ? { label: show.seriesEnded ? 'Final' : 'Fin de saison', tone: 'final' as const }
+    : !progress.totalUnknown && progress.availableUnseen > 0 && progress.availableUnseen <= 2
+      ? { label: `Plus que ${progress.availableUnseen}`, tone: 'remaining' as const }
+      : { label: 'Dispo', tone: 'available' as const }) : null;
   const watchedDate = context.kind === 'history' ? new Date(context.watchedAt) : null;
   const validWatchedDate = watchedDate && Number.isFinite(watchedDate.getTime());
   const watchedTimeKnown = context.kind === 'history' && context.watchedTimeKnown !== false;
@@ -163,8 +169,11 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
         <h3 id={titleId}>{show.title}</h3>
         <div className="series-8f__episode-block">
           <div key={feedback?.sequence || 0} className={feedback ? 'series-8f__incoming' : undefined}>
-            <div className="series-8f__code"><strong>{markingSnapshot?.code || code}</strong>{visibleDetail && (detailIsBadge ? <span className="series-8f__badge">{visibleDetail}</span> : <span> · {visibleDetail}</span>)}</div>
+            <div className="series-8f__code"><strong>{markingSnapshot?.code || code}</strong>{visibleDetail && !status && !detailIsBadge && <span> · {visibleDetail}</span>}</div>
             {(markingSnapshot ? markingSnapshot.subtitle : subtitle) && <p>{markingSnapshot ? markingSnapshot.subtitle : subtitle}</p>}
+            {status && <span className={`series-8f__status series-8f__status--${status.tone}`}><svg viewBox="0 0 20 16" aria-hidden="true"><rect x="1" y="1" width="18" height="12" rx="3" /><path d="m6 7 3 3 5-6M6 15h8" /></svg>{status.label}</span>}
+            {status?.tone === 'stale' && <small className="series-8f__stale">{visibleDetail}</small>}
+
           </div>
           {feedback && <div key={`ghost-${feedback.sequence}`} className="series-8f__ghost" aria-hidden="true"><strong>✓ {feedback.code}</strong><p>{feedback.name}</p></div>}
         </div>
@@ -180,7 +189,7 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
         {context.kind === 'watch' && ((!context.upToDate && context.onMarkSeen) || reversibleComplete) && <SeenItCheckButton size={34} error={markError} isWatched={reversibleComplete} className={`series-8f__check${reversibleComplete ? ' series-8f__check--watched' : ''}`} title={reversibleComplete ? `Marquer le dernier épisode de ${show.title} comme non vu` : `Marquer ${show.title} ${code} comme vu`} onClick={handleSeen} />}
         {context.kind === 'upcoming' && <button type="button" className={`series-8f__days series-8f__days--${upcomingCardTone(context.days)}`} disabled={context.pending} aria-busy={context.pending || undefined} aria-pressed={context.reminder} aria-label={`${context.reminder ? 'Désactiver' : 'Activer'} le rappel de ${show.title} ${code}, ${context.days === 0 ? 'aujourd’hui' : `dans ${context.days} jours`}`} onClick={context.onToggleReminder}>
           <span className={`series-8f__bell${context.reminder ? ' series-8f__bell--active' : ''}`}><Bell size={14} fill={context.reminder ? 'currentColor' : 'none'} /></span>
-          <strong>{context.days <= 0 ? '🔥' : context.days}</strong><small>{context.days <= 0 ? 'ce soir' : 'jours'}</small>
+          <strong>{Math.max(0, context.days)}</strong><small>{context.days <= 0 ? 'aujourd’hui' : context.days === 1 ? 'jour' : 'jours'}</small>
         </button>}
         {context.kind === 'history' && <div className="series-8f__history" aria-hidden="true"><span>✓</span>{watchedTime && <time dateTime={validWatchedDate ? watchedDate.toISOString() : undefined}>{watchedTime}</time>}</div>}
       </div>

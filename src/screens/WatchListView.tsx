@@ -1,44 +1,20 @@
+import React, { useEffect, useRef, useState, type RefObject } from 'react';
+import type { Show } from '../types';
 import { WatchNextSection } from './WatchNextSection';
 import { DialogLayer } from '../components/ui/DialogLayer';
-import React, { startTransition, useState, useEffect, useRef, useMemo, useCallback, type RefObject } from 'react';
-import { type Show } from '../types';
-import { cn, getNextEpisodeNumber, scrollAllCarouselsToStart, checkIsUpToDate, getAiredProgress } from '../lib/utils';
-import { ContinueWatchingCard } from '../components/cards/ContinueWatchingCard';
 import type { SeriesCardAction } from '../components/cards/SeriesEpisodeCard';
-import { MovieWatchCard } from '../components/cards/MovieWatchCard';
-import { ShowNewsFeed } from '../components/ShowNewsFeed';
-import { UpToDateShowCard, getUpToDateOrNewSeasonCategory } from '../components/cards/UpToDateShowCard';
 import { UpcomingShowCard, getUpcomingEpisodeInfo } from '../components/cards/UpcomingShowCard';
 import { HistoryFeed } from '../components/HistoryFeed';
+import { HomeNotifications } from '../components/HomeNotifications';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
 import { PersonDetailModal } from './PersonDetailModal';
-import { tmdb } from '../features/shows/tmdb';
-import { markEpisodeWatched } from '../features/shows/markEpisodeWatched';
-import { getFormattedProviderLogo } from '../utils/providerLogos';
-import { User, Circle, CheckCircle2, Trash2, Archive, X, Clock, Ban } from 'lucide-react';
-import { auth, db } from '../lib/firebase';
-import { doc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { SyncStatusIndicator } from '../components/SyncStatusIndicator';
-import { useShows } from '../hooks/useShows';
-import { useToastStore } from '../store/toastStore';
 import { useSyncStore } from '../store/syncStore';
-import { useShowsStore } from '../store/showsStore';
-import { useLogStore } from '../store/logStore';
-import { SwipeableCard } from '../components/cards/SwipeableCard';
-import { SeenItLogo } from '../components/SeenItLogo';
-import { SeenItCheckButton } from '../components/SeenItCheckButton';
-import { useHorizontalVirtualWindow } from '../hooks/useBoundedVirtualWindow';
-import { usePassiveWatchProvider } from '../hooks/usePassiveWatchProvider';
-import { createWatchProviderRequestLimiter } from '../features/providers/watchProviderRequestPolicy';
-import { createPassiveCardEnrichmentGate } from '../features/providers/passiveCardEnrichmentPolicy';
-import { hasAiredEpisodeEvidence } from '../features/watchlist/watchAvailability';
-import {
-  ExpandedItemCard,
-  ProgressiveWatchlistCarousel,
-  WATCHLIST_BATCH_SIZE,
-} from './watchListPresentation';
+import { auth } from '../lib/firebase';
+import { getTodayStr } from '../lib/utils';
+import { HOME_TABS, upcomingGroup } from '../features/watchlist/homePresentation';
+import { Trash2, Archive, Ban } from 'lucide-react';
 import { type EpisodeDetailData } from './episodeDetailTypes';
+import './watchListHome.css';
 
 type WatchListTab = 'watch_next' | 'upcoming' | 'history';
 type WatchListPendingAction = { type: 'archive' | 'unfollow' | 'drop'; item: Show } | null;
@@ -92,171 +68,54 @@ export function WatchListView({ model }: WatchListViewProps) {
     { label: 'Abandonner la série', onSelect: () => setPendingAction({ type: 'drop', item: show }) },
     { label: 'Retirer du suivi', destructive: true, onSelect: () => setPendingAction({ type: 'unfollow', item: show }) },
   ];
+  const [online, setOnline] = useState(() => navigator.onLine);
+  const [today, setToday] = useState(() => getTodayStr());
+  const syncMessage = useSyncStore(state => state.plexSyncStatus?.message || (state.syncStatus ? 'Synchronisation en cours' : ''));
+  useEffect(() => {
+    const timer = setInterval(() => setToday(getTodayStr()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  const tabButtons = useRef<Array<HTMLButtonElement | null>>([]);
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener('online', update); window.addEventListener('offline', update);
+    return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update); };
+  }, []);
+  const refs = { watch_next: watchNextRef, upcoming: upcomingRef, history: historyRef };
+  const upcomingGroups = ['Aujourd’hui', 'Cette semaine', 'Plus tard'].map(label => ({ label, shows: upcomingShows.filter(show => {
+    const episode = getUpcomingEpisodeInfo(show);
+    return episode && upcomingGroup(episode.air_date, today) === label;
+  }) }));
   return (
-    <div id="watchlist-container" className="flex-1 overflow-y-auto bg-transparent text-white pb-nav">
-      <div className="sticky top-0 z-40 px-4 sm:px-6 pt-6 pb-4 flex flex-col gap-3 bg-zinc-950/60 backdrop-blur-xl">
-        <div className="absolute top-0 left-0 w-72 h-40 bg-[#E5A93D]/15 blur-[120px] -z-10 rounded-full mix-blend-screen pointer-events-none" />
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 shrink-0">
-            <SeenItLogo variant="horizontal" size={48} symbol="watch" animated />
-          </div>
-          <div className="min-w-0 flex-1 flex justify-end overflow-hidden">
-            <SyncStatusIndicator />
-          </div>
+    <div id="watchlist-container" className="home-watchlist flex-1 overflow-y-auto text-white pb-nav">
+      <header className="home-header">
+        <div className="home-header__top"><span className="home-wordmark" aria-label="SeenIt">seenit<span aria-hidden="true">●</span></span>
+          <div className="home-header__tools">{syncMessage && <span className={`home-sync${/terminé|à jour|erreur/i.test(syncMessage) ? ' home-sync--settled' : ''}`} role="status" aria-label={syncMessage} title={syncMessage} />}<HomeNotifications key={auth.currentUser?.uid || 'anonymous'} shows={allShows} onOpen={onShowClick} onSeen={show => show.mediaType === 'movie' ? markMovieAsSeen(show) : markNextEpisodeAsSeen(show)} /></div>
         </div>
-        <div className="bg-zinc-900/70 p-1 rounded-2xl border border-white/10 flex w-full backdrop-blur-md shadow-inner">
-          <button
-            className={cn("flex-1 text-center py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5", activeTab === 'watch_next' ? "bg-[#E5A93D] text-zinc-950 font-extrabold text-xs shadow-lg shadow-[#E5A93D]/20 scale-[1.01]" : "text-zinc-400 font-semibold text-xs hover:text-white hover:bg-white/5")}
-            onClick={() => scrollToSection(watchNextRef, 'watch_next')}
-          >
-            <span>🍿</span>
-            <span>À Regarder</span>
-          </button>
-          <button
-            className={cn("flex-1 text-center py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5", activeTab === 'upcoming' ? "bg-[#E5A93D] text-zinc-950 font-extrabold text-xs shadow-lg shadow-[#E5A93D]/20 scale-[1.01]" : "text-zinc-400 font-semibold text-xs hover:text-white hover:bg-white/5")}
-            onClick={() => scrollToSection(upcomingRef, 'upcoming')}
-          >
-            <span>📅</span>
-            <span>À Venir</span>
-          </button>
-          <button
-            className={cn("flex-1 text-center py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5", activeTab === 'history' ? "bg-[#E5A93D] text-zinc-950 font-extrabold text-xs shadow-lg shadow-[#E5A93D]/20 scale-[1.01]" : "text-zinc-400 font-semibold text-xs hover:text-white hover:bg-white/5")}
-            onClick={() => scrollToSection(historyRef, 'history')}
-          >
-            <span>📜</span>
-            <span>Historique</span>
-          </button>
+        <div className="home-tabs" role="tablist" aria-label="À voir">
+          {HOME_TABS.map((tab, index) => <button key={tab.id} ref={element => { tabButtons.current[index] = element; }} type="button" id={`home-tab-${tab.id}`} role="tab" aria-selected={activeTab === tab.id} aria-controls={`home-panel-${tab.id}`} tabIndex={activeTab === tab.id ? 0 : -1} onClick={() => scrollToSection(refs[tab.id], tab.id)} onKeyDown={event => {
+            const next = event.key === 'ArrowRight' ? (index + 1) % 3 : event.key === 'ArrowLeft' ? (index + 2) % 3 : event.key === 'Home' ? 0 : event.key === 'End' ? 2 : null;
+            if (next === null) return;
+            event.preventDefault(); scrollToSection(refs[HOME_TABS[next].id], HOME_TABS[next].id); tabButtons.current[next]?.focus();
+          }}>{tab.label}</button>)}
         </div>
-      </div>
-
-      <div className="pb-4 space-y-4">
-        {isQuotaExceeded && (
-          <div className="mx-4 sm:mx-6 mb-4 mt-2 p-4 bg-red-950/40 border border-red-500/20 rounded-2xl text-red-200 flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-semibold mb-1 flex items-center gap-2 text-red-400">
-                <span>⚠️</span> Quota quotidien précédemment atteint
-              </h3>
-              <p className="text-xs leading-relaxed opacity-90">
-                Le quota Firestore avait été atteint. Si vous venez de basculer sur la nouvelle base de données réinitialisée, vous pouvez réinitialiser cet avertissement.
-              </p>
-            </div>
-            <button
-              onClick={() => useSyncStore.getState().resetQuotaError()}
-              className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-200 font-semibold rounded-xl text-xs transition-colors shrink-0"
-            >
-              Réessayer
-            </button>
-          </div>
-        )}
-
-        {loading ? (
-          <div className="space-y-6 pt-2 pb-nav">
-            <div className="mb-8 mt-4">
-              <div className="flex items-center gap-2 mb-4 px-4 sm:px-6">
-                <div className="h-6 w-6 bg-zinc-800 rounded-full animate-pulse" />
-                <div className="h-6 w-40 bg-zinc-800 rounded animate-pulse" />
-              </div>
-              <div className="flex overflow-x-auto gap-4 px-4 sm:px-6 hide-scrollbar pb-4">
-                {[1, 2].map(i => (
-                  <div key={i} className="w-[280px] shrink-0 h-[120px] bg-zinc-900 rounded-2xl border border-white/5 animate-pulse" />
-                ))}
-              </div>
-            </div>
-
-            <div className="mb-6 mt-1">
-              <div className="flex items-center justify-between mb-4 px-4 sm:px-6">
-                <div className="h-7 w-48 bg-zinc-800 rounded animate-pulse" />
-                <div className="h-4 w-12 bg-zinc-800 rounded animate-pulse" />
-              </div>
-              <div className="flex overflow-x-auto gap-4 px-4 sm:px-6 hide-scrollbar pb-1">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="w-64 shrink-0 flex flex-col">
-                    <div className="w-full aspect-[4/3] rounded-2xl bg-zinc-900 animate-pulse mb-3" />
-                    <div className="h-3 w-3/4 bg-zinc-800 rounded-full animate-pulse mb-1.5" />
-                    <div className="h-4 w-1/2 bg-zinc-800 rounded-full animate-pulse" />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="mb-6 mt-1">
-              <div className="flex items-center justify-between mb-4 px-4 sm:px-6">
-                <div className="h-7 w-48 bg-zinc-800 rounded animate-pulse" />
-                <div className="h-4 w-12 bg-zinc-800 rounded animate-pulse" />
-              </div>
-              <div className="flex overflow-x-auto gap-4 px-4 sm:px-6 hide-scrollbar pb-1">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="w-64 shrink-0 flex flex-col">
-                    <div className="w-full aspect-[4/3] rounded-2xl bg-zinc-900 animate-pulse mb-3" />
-                    <div className="h-3 w-3/4 bg-zinc-800 rounded-full animate-pulse mb-1.5" />
-                    <div className="h-4 w-1/2 bg-zinc-800 rounded-full animate-pulse" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div ref={watchNextRef} className="scroll-mt-36">
-          <ShowNewsFeed onShowClick={onShowClickProp} onNavigateToShow={onShowClickProp} />
-
-          <WatchNextSection key={auth.currentUser?.uid || 'anonymous'}
-            allShows={allShows} groups={[continueWatchingShows, nouveautesShows, pasVuDepuisUnMomentShows]}
-            movies={filmsAVoirShows} active={activeTab === 'watch_next'} filmsExpanded={expandedSection === 'filmsAVoir'}
-            filmCount={visibleCount} onToggleFilms={() => handleToggleVoirTout('filmsAVoir')}
-            onMoreFilms={() => setVisibleCount(count => count + WATCHLIST_BATCH_SIZE)}
-            onOpen={onShowClick} onEpisode={handleEpisodeClick} onMarkSeries={markNextEpisodeAsSeen}
-            onMarkMovie={markMovieAsSeen} onUnseen={markAsUnseen} actions={seriesActions} />
+      </header>
+      {!online && <p className="home-offline" role="status">Hors ligne · votre bibliothèque en cache reste accessible.</p>}
+      {isQuotaExceeded && <p className="home-offline" role="status">Synchronisation en pause. <button type="button" onClick={() => useSyncStore.getState().resetQuotaError()}>Réessayer</button></p>}
+      {loading ? <div className="home-skeleton" role="status" aria-label="Chargement de votre bibliothèque">{[0, 1, 2].map(index => <div key={index}><span /><div /></div>)}</div> : <>
+        <div ref={watchNextRef} id="home-panel-watch_next" role="tabpanel" aria-labelledby="home-tab-watch_next" hidden={activeTab !== 'watch_next'} tabIndex={0}>
+          <WatchNextSection key={auth.currentUser?.uid || 'anonymous'} allShows={allShows} groups={[continueWatchingShows, nouveautesShows, pasVuDepuisUnMomentShows]} movies={filmsAVoirShows} active={activeTab === 'watch_next'} onOpen={onShowClick} onEpisode={handleEpisodeClick} onMarkSeries={markNextEpisodeAsSeen} onMarkMovie={markMovieAsSeen} onUnseen={markAsUnseen} actions={seriesActions} />
         </div>
-        <div ref={upcomingRef} className="scroll-mt-36 px-4 sm:px-6 mt-8">
-          <h2 className="text-xl font-bold text-white mb-2 tracking-tight flex items-center gap-2">
-            <span className="text-lg">📅</span>
-            <span>À Venir</span>
-          </h2>
-          {upcomingShows.length > 0 ? (
-            <div className="space-y-3">
-              {upcomingShows.map((show, idx) => (
-                <SwipeableCard
-                  key={`upcoming_swipe_${show.id}_${idx}`}
-                  onSwipeLeft={() => setPendingAction({ type: 'unfollow', item: show })}
-                  onSwipeRight={() => setPendingAction({ type: 'drop', item: show })}
-                >
-                  <UpcomingShowCard
-                    show={show}
-                    onShowClick={onShowClick}
-                    onEpisodeClick={handleEpisodeClick}
-                    actions={seriesActions(show)}
-                  />
-                </SwipeableCard>
-              ))}
-            </div>
-          ) : (
-            <div className="py-8 text-center text-zinc-500 text-sm">
-              Aucun épisode à venir.
-            </div>
-          )}
+        <div ref={upcomingRef} id="home-panel-upcoming" role="tabpanel" aria-labelledby="home-tab-upcoming" hidden={activeTab !== 'upcoming'} tabIndex={0} className="home-panel-content">
+          {activeTab === 'upcoming' && (upcomingShows.length ? upcomingGroups.filter(group => group.shows.length).map(group => <section key={group.label} className="home-upcoming-group"><h2>{group.label}</h2>{group.shows.map(show => <UpcomingShowCard key={show.id} show={show} onShowClick={onShowClick} onEpisodeClick={handleEpisodeClick} actions={seriesActions(show)} />)}</section>) : <div className="home-empty"><h2>Rien de prévu pour le moment</h2><p>Les prochaines sorties de vos films et séries suivis apparaîtront ici.</p></div>)}
         </div>
-
-        <div ref={historyRef} className="scroll-mt-36 px-4 sm:px-6 mt-8">
-          <h2 className="text-xl font-bold text-white mb-2 tracking-tight flex items-center gap-2">
-            <span className="text-lg">📜</span>
-            <span>Historique</span>
-          </h2>
-          <HistoryFeed
-            onShowClick={onShowClick}
-            onEpisodeClick={(showId, season, episode) => {
-              const show = allShows?.find(s => s.id === showId || s.tmdbId?.toString() === showId);
-              if (show) {
-                handleEpisodeClick(show, season, episode);
-              } else if (onShowClick) {
-                onShowClick(showId, 'tv');
-              }
-            }}
-          />
+        <div ref={historyRef} id="home-panel-history" role="tabpanel" aria-labelledby="home-tab-history" hidden={activeTab !== 'history'} tabIndex={0} className="home-panel-content">
+          {activeTab === 'history' && <HistoryFeed onShowClick={onShowClick} onEpisodeClick={(showId, season, episode) => {
+            const show = allShows.find(item => item.id === showId || String(item.tmdbId) === showId);
+            if (show) handleEpisodeClick(show, season, episode); else onShowClick(showId, 'tv');
+          }} />}
         </div>
-        </>
-        )}
-      </div>
+      </>}
 
       {selectedEpisodeModal && (
         <EpisodeDetailModal
@@ -326,17 +185,11 @@ export function WatchListView({ model }: WatchListViewProps) {
                 </p>
                 <button
                   type="button"
-                  onPointerUp={async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
+                  onClick={async event => {
+                    event.stopPropagation();
                     const item = pendingAction.item;
-                    handleDropShow(item);
-                    setTimeout(() => {
-                      setPendingAction(null);
-                    }, 100);
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
+                    setPendingAction(null);
+                    await handleDropShow(item);
                   }}
                   className="w-full py-3 rounded-xl bg-amber-500/20 text-amber-400 font-bold border border-amber-500/30 [@media(hover:hover)]:hover:bg-amber-500/30 active:bg-amber-500/30 mb-2 active:scale-95 transition-all cursor-pointer touch-manipulation select-none"
                 >
@@ -354,17 +207,11 @@ export function WatchListView({ model }: WatchListViewProps) {
                 </p>
                 <button
                   type="button"
-                  onPointerUp={async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
+                  onClick={async event => {
+                    event.stopPropagation();
                     const item = pendingAction.item;
-                    handleArchiveShow(item);
-                    setTimeout(() => {
-                      setPendingAction(null);
-                    }, 100);
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
+                    setPendingAction(null);
+                    await handleArchiveShow(item);
                   }}
                   className="w-full py-3 rounded-xl bg-blue-500/20 text-blue-400 font-bold border border-blue-500/30 [@media(hover:hover)]:hover:bg-blue-500/30 active:bg-blue-500/30 mb-2 active:scale-95 transition-all cursor-pointer touch-manipulation select-none"
                 >
@@ -386,17 +233,11 @@ export function WatchListView({ model }: WatchListViewProps) {
                 </p>
                 <button
                   type="button"
-                  onPointerUp={async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
+                  onClick={async event => {
+                    event.stopPropagation();
                     const item = pendingAction.item;
-                    executeUnfollow(item);
-                    setTimeout(() => {
-                      setPendingAction(null);
-                    }, 100);
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
+                    setPendingAction(null);
+                    await executeUnfollow(item);
                   }}
                   className="w-full py-3 rounded-xl bg-red-500/20 text-red-500 font-bold border border-red-500/30 [@media(hover:hover)]:hover:bg-red-500/30 active:bg-red-500/30 mb-2 active:scale-95 transition-all cursor-pointer touch-manipulation select-none"
                 >

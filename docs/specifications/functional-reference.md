@@ -192,8 +192,12 @@ en PWA et APK et un toast navigable s'active au clavier avec Entrée/Espace (`SE
 
 ## 5. Écran « À Voir »
 
-L'écran comporte une navigation haute entre **À Regarder**, **À Venir** et **Historique**, ainsi que
-le fil d'actualités des médias suivis.
+L’écran comporte trois panneaux indépendants **À regarder**, **À venir** et **Historique**. Le scroll
+ne change jamais d’onglet ; aucun swipe ne navigue entre panneaux. Le header `seenit●` conserve l’état
+de synchronisation et ouvre les Notifications avec une cloche et un point or si non lu. La feuille réunit
+les preuves Plex en cache, rappels du jour, téléchargements terminés, dates films confirmées, actualités
+et mise à jour. Tout marquer lu conserve l’état par compte ; les actualités réutilisent les préférences
+cloud existantes. Ouvrir un média et marquer Vu restent des actions séparées.
 
 ### 5.1 À Regarder
 
@@ -210,25 +214,27 @@ connue relève de **À Venir** ; sans date exploitable, la série reste suivie s
 regardable. Les cartes ne fabriquent donc pas `S01 | E01` / « SAISON DISPO » depuis des métadonnées
 inconnues.
 
-La [vue 18c](../design/watch-next-18c.md) réunit ces trois catégories dans une liste
-« Continuer à regarder », dans leur ordre actuel : trois cartes, puis trois par appui sur le
-bouton verre avec mini-affiches, compteur en attente et Réduire. Le cadre 8f reste partagé
-avec À Venir et Historique. La progression ne dépend pas du cache saison déprécié ; les épisodes
-prouvés et la traîne « ? » signalent les saisons ouvertes. Le badge de récence reste propre aux
-séries anciennes. Vu anime la reprise réellement avancée et son tampon SeenIt. À jour propose
-le retour du dernier épisode explicitement marqué dans cette session, avec Annuler.
+La [refonte accueil](../design/home-a-voir.md) conserve trois sections distinctes dans l’ordre
+Continuer à regarder, Nouveautés, Pas vu depuis un moment. Chaque section affiche un rail de trois
+cartes 8f, puis Voir tout ouvre la liste progressive (douze par lot) ; Revenir en carrousel la replie.
+Les sections vides sont masquées. Les badges statut, sans emoji, sont dans le bloc texte sous le titre
+de l’épisode. Les séries anciennes conservent leur nombre de jours exact. En liste, le swipe gauche
+révèle Archiver/Supprimer ; l’appui long et le clavier ouvrent les mêmes actions avec confirmation et
+Annuler. Dans les rails, le glissement fait défiler les cartes sans déclencher de suppression.
+Le cadre 8f reste partagé avec À venir et Historique. Vu anime la reprise réellement avancée et son
+tampon SeenIt ; À jour permet de revenir sur le dernier épisode marqué pendant cette session.
 Pendant une écriture Firestore lente, le marquage reste en attente : aucun délai arbitraire
 ne provoque de faux échec ni de restauration locale alors que l'écriture peut encore réussir.
 Le succès et son animation attendent l'acquittement réel ; seul un rejet définitif restaure
 l'état précédent et affiche l'erreur. Un changement de compte ignore le résultat pour le nouvel UID.
 
-Les films sont des tickets déchirables, triés par heure de fin croissante (durée inconnue en dernier).
-Le talon indique l'année et la fin calculée chaque minute depuis Maintenant ou « Je lance à » ;
-la fin devient orange après le minuit suivant le lancement. Sans durée, seule l'année apparaît.
-Une coche aboutie déchire le talon, assombrit l'affiche et conserve le tampon Vu ; la coche inverse
-ou Annuler recolle le ticket. Le film garde sa place pendant la session et disparaît au prochain
-rafraîchissement/réouverture. Le premier rail est borné à huit tickets ; le bouton Voir tout et
-la tuile finale ouvrent la même grille par lots de huit. Les enrichissements restent passifs,
+Les films sont des billets horizontaux déchirables, triés par durée connue croissante, inconnues après.
+Le talon affiche en grand l’heure de fin calculée depuis Maintenant, actualisée chaque minute, orange
+après minuit. Sans durée, aucune fin n’est inventée. Trois films sont visibles, puis Afficher N de plus
+en ajoute trois. La bascule grille/liste conserve cette limite et le même marquage.
+Une coche aboutie déchire le talon et conserve le tampon Vu ; toucher ce tampon ou Annuler recolle
+le billet. Le film garde sa place pendant la session et disparaît au prochain retour à À regarder.
+Les enrichissements restent passifs,
 bornés et fondés sur l'identité canonique. Les préférences de diffuseur et le fallback d'image
 Android sont conservés. Les médias archivés/abandonnés ne reviennent pas dans la liste ; l'état
 visuel de session est réinitialisé lors d'un changement de compte. Clavier, cibles 44 px, annonces
@@ -237,16 +243,16 @@ La reprise et l'action Vu partagent leur résolution : une diffusion future ne r
 de reprise absent. Le cache des épisodes déjà diffusés et la progression enregistrée permettent le repli ;
 sans preuve suffisante, la carte demande une actualisation et ne propose pas une coche sans effet.
 
-Sur une carte série, un swipe permet de retirer le suivi (avec confirmation) ou d'abandonner la
-série ; les actions sont aussi accessibles au clavier. Une action destructive possède un toast avec
+Sur une carte série, un appui long permet de retirer le suivi, archiver ou abandonner la
+série (avec confirmation) ; les actions sont aussi accessibles au clavier. Une action destructive possède un toast avec
 annulation.
 
 ### 5.2 À Venir
 
-- Liste les prochains épisodes connus avec leur date relative.
+- Groupe les prochaines sorties en Aujourd’hui, Cette semaine (les six jours suivants), Plus tard, selon les jours calendaires locaux.
 - Ouvre directement la fiche ou le détail d'épisode.
 - Permet d'activer/désactiver un rappel pour l'épisode présenté.
-- La carte série 8f affiche le nombre de jours exact, une flamme pour aujourd'hui et la cloche d'état ;
+- La carte série 8f affiche le nombre de jours exact, un rond sombre homogène (0 aujourd’hui) et une pastille cloche or si le rappel est actif ;
   cette cible de rappel est indépendante de l'ouverture de fiche.
 - Un rappel spécifique met à jour l'intention de notification du média et son document Firestore.
 - Sur Android, un rappel de nouvelle saison affiche aussi « Saison N » et un rappel de nouvel épisode
@@ -264,7 +270,8 @@ annulation.
   connue, still/backdrop et diffuseur passif. La coche et l'heure sont décoratives. Le tap ouvre
   l'épisode exact ou le film ; l'appui long/menu clavier propose Non vu (confirmation et Annuler),
   Changer la date/heure (heure facultative et Annuler), Revoir et Ouvrir la série.
-- Le fil Actualités affiche les événements non lus de séries encore présentes : nouvelle saison,
+- La liste affiche dix entrées puis Afficher N de plus (dix maximum par lot), avec dates/heures discrètes.
+- Le fil Actualités, désormais dans la feuille Notifications, affiche les événements non lus de séries encore présentes : nouvelle saison,
   diffusion, renouvellement/annulation et informations générées par le worker de détails.
 - Une actualité lue est retirée et son état est partagé entre appareils.
 

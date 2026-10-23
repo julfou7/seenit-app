@@ -1,4 +1,5 @@
 import { DialogLayer } from './ui/DialogLayer';
+import { HISTORY_PAGE_SIZE } from '../features/watchlist/homePresentation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useShows } from '../hooks/useShows';
 import type { Show } from '../types';
@@ -243,7 +244,7 @@ export function HistoryFeed({
   onEpisodeClick?: (showId: string, season: number, episode: number) => void;
 }) {
   const [page, setPage] = useState(1);
-  const itemsPerPage = 20;
+  const itemsPerPage = HISTORY_PAGE_SIZE;
   const { shows, loading, updateShow } = useShows();
   const showsById = useMemo(() => new Map(shows.map(show => [show.id, show])), [shows]);
   const { showToast } = useToastStore();
@@ -598,8 +599,8 @@ export function HistoryFeed({
       ))}
 
       {hasMore && (
-        <button onClick={() => setPage(value => value + 1)} className="w-full py-3 mt-4 bg-zinc-900 border border-white/5 rounded-xl text-xs font-bold text-zinc-400 hover:text-white transition-colors">
-          Charger plus
+        <button type="button" onClick={() => setPage(value => value + 1)} className="w-full min-h-11 py-3 mt-4 bg-zinc-900 border border-white/5 rounded-xl text-xs font-bold text-zinc-400 hover:text-white transition-colors">
+          Afficher {Math.min(itemsPerPage, historyItems.length - displayedItems.length)} de plus
         </button>
       )}
 

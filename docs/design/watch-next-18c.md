@@ -1,5 +1,8 @@
 # À Regarder 18c : spec d'implémentation (SeenIt)
 
+La [refonte complète de l’accueil](home-a-voir.md), #729, remplace la disposition et les limites
+initiales ci-dessous. Les règles de confirmation des écritures et d’annulation restent applicables.
+
 Contrat `SEENIT-UX-016`, suivi #712. Handoff propriétaire du 21 octobre 2026,
 archive `Connexion du repository seenit-app (4).zip`. Cette vue remplace les trois rails
 séries de À Regarder, en conservant leurs règles d'éligibilité et leur ordre interne :

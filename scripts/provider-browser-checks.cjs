@@ -44,7 +44,7 @@ async function testProviderHarness(client, root) {
     await check(client, 'document.getElementById("login")', 'fixture montée');
     await evaluate(client, 'window.IntersectionObserver = undefined; document.getElementById("login").click()');
     await check(client, 'document.querySelector("#card-tv img") && window.__provider337.telemetry.reads === 1', 'cartes montées avant hydratation cloud');
-    await check(client, 'document.querySelector("#card-stale .series-8f__code").textContent.includes("Il y a 90 jours") && !document.querySelector("#card-new-season .series-8f__code").textContent.includes("Il y a 90 jours")', 'la récence est réservée à la section des séries anciennes, sans contaminer une nouvelle saison');
+    await check(client, 'document.querySelector("#card-stale .series-8f__text").textContent.includes("Pas vu depuis 90 jours") && !document.querySelector("#card-new-season .series-8f__text").textContent.includes("Pas vu depuis 90 jours")', 'la récence est réservée à la section des séries anciennes, sans contaminer une nouvelle saison');
     await evaluate(client, 'window.__card337 = document.querySelector("#card-tv > div"); window.__provider337.finishCloud([531])');
     const logo = id => `document.querySelector('#${id} img')?.getAttribute('src') || ''`;
     await check(client, `(${logo('card-tv')}).includes('paramount.png') && (${logo('card-movie')}).includes('paramount.png') && (${logo('card-grid')}).includes('paramount.png')`, 'hydratation sans Réglages met à jour les cartes réelles et le cache hérité');

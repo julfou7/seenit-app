@@ -1205,19 +1205,28 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   Les deux synchronisations de détails conservent dans `seasonProgress` les preuves publiques de
   finale datée et de dernière saison avant suppression du cache déprécié ; ces métadonnées ne sont
   jamais des preuves de visionnage. Le badge de récence est demandé par la section des séries anciennes.
-- **SEENIT-UX-016** — À Regarder 18c réunit les séries éligibles en une liste de trois cartes 8f,
-  extensible de trois en trois puis réductible. Le bouton verre présente les trois suivantes et
-  un seul compteur en attente. L'ordre des groupes existants et leur éligibilité sont conservés.
+- **SEENIT-UX-018** — L’accueil À voir suit `docs/design/home-a-voir.md` : trois panneaux indépendants
+  À regarder, À venir et Historique, sans changement au scroll ni swipe entre panneaux. Le header
+  seenit● ouvre une feuille Notifications, avec état non lu isolé par compte et Tout marquer lu.
+  À regarder conserve trois sections distinctes (Continuer, Nouveautés, Pas vu depuis un moment),
+  chacune en rail de trois cartes puis Voir tout en liste. Les badges statut sans emoji sont placés
+  sous le titre de l’épisode ; le rappel de sortie utilise un rond sombre et les jours exacts.
+  À venir groupe Aujourd’hui, Cette semaine (six jours suivants), Plus tard selon le calendrier local.
+  L’historique mixte est paginé par dix. Les sections vides disparaissent et les états chargement,
+  cache hors ligne et synchronisation restent explicites. Les billets horizontaux films affichent
+  trois entrées puis trois de plus, avec bascule grille/liste ; toucher le tampon Vu annule le marquage.
+- **SEENIT-UX-016** — Les cartes 8f et les tickets films réutilisent les écritures réversibles existantes.
+  La séparation des groupes et leur présentation suivent désormais `SEENIT-UX-018`.
   Un Vu abouti anime l'épisode quitté, la nouvelle reprise réelle, le segment et un tampon SeenIt ;
   à jour permet le retour du dernier épisode explicitement marqué dans la session, avec Annuler.
   Une écriture Firestore encore en attente reste en cours, sans faux échec ni rollback local sur
   délai arbitraire ; seul son rejet définitif restaure l'état antérieur. Le succès attend son acquittement.
-  Les films sont des tickets 144 px : année et fin depuis Maintenant ou l'heure de lancement choisie,
+  Les films sont des billets : année et fin depuis Maintenant ou l'heure de lancement choisie,
   actualisée chaque minute et orange après minuit ; sans durée, aucune fin inventée. Le tri place les
   durées connues en ordre croissant, les inconnues après ; une coche conserve sa place pendant la session,
   puis la liste est rafraîchie à sa réouverture/réinitialisation. Déchirure, état vu persistant et
-  recollement suivent les écritures métier réversibles existantes. Rail initial borné à huit tickets,
-  tuile terminale et en-tête ouvrent la même grille paginée. Cibles >=44 px, clavier, annonces live et
+  recollement suivent les écritures métier réversibles existantes. Liste et grille paginées par trois.
+  Cibles >=44 px, clavier, annonces live et
   reduced-motion sont communs PWA/APK ; identité, preuve de diffusion et diffuseur ne sont pas réinventés.
 - **SEENIT-UX-015** — L'historique 16d mélange films et épisodes dans une chronologie par jour local,
   avec le cadre 8f partagé. Seule l'heure réellement connue apparaît sur la carte ; une date seule
