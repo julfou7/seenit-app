@@ -86,11 +86,11 @@ test('#229 borne le rendu initial des carrousels progressifs et conserve Voir to
   assert.match(watchListSource, /trailingSpacerSize/);
   assert.match(watchListSource, /groups=\{\[continueWatchingShows, nouveautesShows, pasVuDepuisUnMomentShows\]\}/);
   assert.match(watchListSource, /movies=\{filmsAVoirShows\}/);
-  assert.match(watchListSource, /series\.slice\(0, seriesCount\)/);
-  assert.match(watchListSource, /orderedMovies\.slice\(0, filmsExpanded \? filmCount : 8\)/);
+  assert.match(watchListSource, /items\.slice\(0, expanded \? limit : 3\)/);
+  assert.match(watchListSource, /orderedMovies\.slice\(0, movieCount\)/);
 
-  assert.match(watchListSource, /setSeriesCount\(count => count \+ 3\)/);
-  assert.match(watchListSource, /setVisibleCount\(count => count \+ WATCHLIST_BATCH_SIZE\)/);
+  assert.match(watchListSource, /setMovieCount\(count => count \+ 3\)/);
+  assert.match(watchListSource, /limit \+ 12/);
   assert.doesNotMatch(watchListSource, /\{continueWatchingShows\.map\(/);
   assert.doesNotMatch(watchListSource, /\{nouveautesShows\.map\(/);
   assert.doesNotMatch(watchListSource, /\{pasVuDepuisUnMomentShows\.map\(/);

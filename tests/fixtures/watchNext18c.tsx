@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { WatchNextSection } from '../../src/screens/WatchNextSection';
 import { markMovieWatched, markWatchRecordUnseen } from '../../src/features/watchlist/watchProgressActions';
@@ -11,15 +11,13 @@ Object.defineProperty(navigator, 'vibrate', { value: (milliseconds: number) => {
 Object.assign(window, { __watch18c: { telemetry, releaseWrite, switchAccount, advanceClock, clearToasts: () => useToastStore.getState().clearQueue(), toasts: () => [useToastStore.getState().currentToast, ...useToastStore.getState().queue].filter(Boolean), snapshot: () => useShowsStore.getState().shows } });
 function Harness() {
   const allShows = useShowsStore(state => state.shows);
-  const [expanded, setExpanded] = useState(false);
-  const [count, setCount] = useState(8);
   const undo = useToastStore(state => state.onUndo);
   const series = allShows.filter(show => show.mediaType === 'tv' && show.seenEpisodes.length < 3);
   const movies = allShows.filter(show => show.mediaType === 'movie' && !show.seenEpisodes.includes('movie'));
   return <main style={{ maxWidth: 700, margin: 'auto' }}>
     <button id="watch-undo" disabled={!undo} style={{ minHeight: 44, padding: 10 }} onClick={async () => { await undo?.(); useToastStore.getState().clearQueue(); }}>Annuler la dernière action</button>
     <WatchNextSection key={auth.currentUser.uid} allShows={allShows} groups={[series.slice(0, 3), series.slice(3, 6), series.slice(6)]} movies={movies}
-      active filmsExpanded={expanded} filmCount={count} onToggleFilms={() => { setExpanded(value => !value); setCount(8); }} onMoreFilms={() => setCount(value => value + 8)}
+      active
       onOpen={(id, type) => telemetry.opens.push(`${type}:${id}`)} onEpisode={(show, season, episode) => telemetry.opens.push(`${show.id}:${season}x${episode}`)}
       onMarkSeries={show => markWatchCardEpisode(show, getTodayStr(), markEpisodeWatched)} onMarkMovie={show => markMovieWatched(show, updateShow)}
       onUnseen={(show, episode) => markWatchRecordUnseen(show, episode, updateShow)} actions={() => []} />

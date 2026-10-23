@@ -32,9 +32,9 @@ test('#229 conserve un premier lot borné puis rend les quatre carrousels progre
   assert.match(watchListSource, /leadingSpacerSize/);
   assert.match(watchListSource, /trailingSpacerSize/);
 
-  // 18c remplace les quatre rails par une liste séries et un rail de tickets bornés.
-  assert.match(watchListSource, /series\.slice\(0, seriesCount\)/);
-  assert.match(watchListSource, /orderedMovies\.slice\(0, filmsExpanded \? filmCount : 8\)/);
+  // La refonte accueil borne chaque rail à trois cartes, puis ouvre une liste par lots.
+  assert.match(watchListSource, /items\.slice\(0, expanded \? limit : 3\)/);
+  assert.match(watchListSource, /orderedMovies\.slice\(0, movieCount\)/);
   assert.match(watchListSource, /id="films-a-voir-18c"/);
 
   assert.doesNotMatch(
@@ -61,12 +61,12 @@ test('#229 recycle les cartes hors écran au lieu d’accumuler le DOM', () => {
   assert.doesNotMatch(watchListSource, /preloadSentinelRef/);
 });
 
-test('#712 conserve deux vrais accès Voir tout vers la même grille paginée', () => {
+test('#729 conserve les accès aux listes complètes et la bascule grille films', () => {
   assert.doesNotMatch(carouselUxCss, /::after/);
-  assert.doesNotMatch(carouselUxCss, /Suite\\A|Voir tout/);
-  assert.match(watchListSource, /className="watch-next-18c__all-films" onClick=\{onToggleFilms\}/);
-  assert.match(watchListSource, /onClick=\{onToggleFilms\}>\{filmsExpanded \? 'Réduire' : 'Voir tout'\}/);
-  assert.match(watchListSource, /filmCount < orderedMovies\.length/);
+  assert.match(watchListSource, /aria-expanded=\{expanded\}/);
+  assert.match(watchListSource, /Revenir en carrousel/);
+  assert.match(watchListSource, /Films en grille/);
+  assert.match(watchListSource, /movieCount < orderedMovies\.length/);
 });
 
 test('#690 aligne la hiérarchie 8f et retire les compteurs redondants', () => {

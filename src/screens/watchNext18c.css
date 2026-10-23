@@ -57,3 +57,21 @@
 @keyframes tkBack { from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1} }
 @media (min-width:640px) { .watch-next-18c { padding-inline:24px; } .movie-ticket-rail { margin-inline:-24px; padding-inline:24px; } }
 @media (prefers-reduced-motion:reduce) { .watch-next-18c *, .watch-next-18c *::before,.watch-next-18c *::after { animation-duration:.01s !important; animation-delay:0s !important; transition-duration:.01s !important; transition-delay:0s !important; } }
+.movie-ticket__undo { position:absolute; z-index:5; top:60px; left:50%; transform:translateX(-50%); width:100px; height:64px; cursor:pointer; }
+.movie-ticket__undo-stamp { top:12px; }.movie-ticket--watched .movie-ticket__stub { visibility:hidden; }.movie-ticket--tear.movie-ticket--watched .movie-ticket__stub { visibility:visible; animation:tkTear .7s both,tkHide 0s .7s forwards; }
+.movie-ticket--horizontal { width:100%; flex-basis:auto; height:116px; display:block; }
+.movie-ticket--horizontal .movie-ticket__body { height:116px; width:100%; border-radius:18px; background:linear-gradient(105deg,oklch(.3 .07 var(--ticket-hue)),#141418 80%); box-shadow:inset 0 0 0 1px #ffffff14; }
+.movie-ticket--horizontal .movie-ticket__poster { left:0; top:0; bottom:0; width:76px; height:116px; border-radius:18px 0 0 18px; box-shadow:none; }
+.movie-ticket--horizontal .movie-ticket__open { right:88px; border-radius:18px 0 0 18px; }
+.movie-ticket--horizontal .movie-ticket__provider { left:48px; top:6px; right:auto; width:22px; height:22px; border-radius:6px; }
+.movie-ticket--horizontal > h3 { position:absolute; left:90px; right:98px; top:21px; height:auto; max-height:39px; margin:0; font-size:16px; line-height:1.2; pointer-events:none; }
+.movie-ticket__metadata { position:absolute; left:90px; right:98px; top:70px; color:#a1a1aa; font-size:11px; line-height:1.4; pointer-events:none; }
+.movie-ticket--horizontal .movie-ticket__stub { left:auto; right:0; top:0; width:88px; height:116px; border-radius:0 18px 18px 0; flex-direction:column; justify-content:center; gap:5px; padding:8px; transform-origin:top left; pointer-events:none; background:#ffffff04; box-shadow:none; }
+.movie-ticket--horizontal .movie-ticket__stub::before { top:10px; bottom:10px; left:0; right:auto; border-top:0; border-left:1.5px dashed #ffffff30; }.movie-ticket--horizontal .movie-ticket__stub::after { display:none; }
+.movie-ticket--horizontal .movie-ticket__stub > span { font-size:10px; text-transform:uppercase; letter-spacing:.8px; color:#a1a1aa; }.movie-ticket--horizontal .movie-ticket__stub strong { font-size:24px; letter-spacing:-1px; }.movie-ticket--horizontal .movie-ticket__stub small { color:#a1a1aa; font-size:11px; }
+.movie-ticket--horizontal .movie-ticket__check { top:0; right:0; width:88px; height:116px; border-radius:0 18px 18px 0; background:transparent; }.movie-ticket--horizontal .movie-ticket__check > div,.movie-ticket--horizontal .movie-ticket__check svg { opacity:0; }.movie-ticket--horizontal .movie-ticket__check:focus-visible { outline-offset:-4px; }.movie-ticket--horizontal .movie-ticket__check[aria-busy="true"] svg { opacity:1; }
+.movie-ticket--horizontal .movie-ticket__undo { left:auto; right:0; top:0; transform:none; width:88px; height:116px; }.movie-ticket--horizontal .movie-ticket__undo-stamp { top:40px; font-size:12px; gap:3px; padding:5px; width:70px; }.movie-ticket--horizontal .movie-ticket__undo-stamp svg { width:18px; }.movie-ticket--horizontal .movie-ticket__poster > .movie-ticket__stamp { display:none; }.movie-ticket--horizontal.movie-ticket--watched .movie-ticket__check { visibility:hidden; }
+.movie-ticket--horizontal.movie-ticket--watched .movie-ticket__body { mask:linear-gradient(#000 0 0) left/calc(100% - 7px) 100% no-repeat,linear-gradient(45deg,#000 4px,transparent 4.2px) right/7px 10px repeat-y,linear-gradient(135deg,#000 4px,transparent 4.2px) right/7px 10px repeat-y; }
+@keyframes tkHide { to { visibility:hidden; } }
+
+.movie-ticket__undo-stamp { transform:translateX(-50%) rotate(-8deg); }.movie-ticket--horizontal .movie-ticket__check[data-error="true"] { outline:2px solid #fb7185; outline-offset:-3px; }.movie-ticket--horizontal .movie-ticket__check { transform:none; }.home-watch .movie-ticket-grid { grid-template-columns:repeat(auto-fill,minmax(144px,1fr)); justify-items:center; }

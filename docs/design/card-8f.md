@@ -8,11 +8,17 @@ d'une dernière saison ouverte dont seuls quelques épisodes sont encore connus.
 terrain du propriétaire sur les APK 1.4.212 à 1.4.215 priment sur les passages plus anciens
 du handoff en cas de contradiction.
 
-La carte partagée mesure 156 px, avec 20 px réservés au débordement de l'affiche.
+La carte partagée mesure 156 px (180 px dans À regarder depuis la [refonte accueil](home-a-voir.md)
+pour placer le badge sous le titre épisode), avec 20 px réservés au débordement de l'affiche.
 Affiche 86 × 129 px inclinée de −3°, à gauche 14 px et en haut −20 px ; fond arrondi
 22 px teinté par la couleur de l'affiche (fallback 260), backdrop à droite et voile sombre.
 Le titre de série est or clair `#F2C36B`, 17 px/800 sur deux lignes ; le code `S05 · E04`
 est blanc et 13 px/800. Le titre d'épisode reste blanc 14 px/600 sur deux lignes.
+
+Depuis #729, un unique badge « écran SeenIt » de 24 px, sans emoji, suit le titre de l’épisode :
+Aujourd’hui, Nouveau, Plus que N, Dispo, Final/Fin de saison ou Délaissé. Les jours de récence
+restent affichés sous Délaissé ; le rond sombre À venir utilise le nombre exact, zéro aujourd’hui.
+Ces dispositions remplacent les anciens badges emoji décrits ci-dessous.
 
 Le compteur textuel `N restant(s)` est supprimé de la carte : l'espace est réservé aux
 badges contextuels. Pour un épisode de reprise diffusé récemment, la carte peut afficher

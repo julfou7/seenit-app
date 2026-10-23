@@ -4,6 +4,24 @@
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
+      "id": "SEENIT-UX-018",
+      "title": "Accueil À voir à trois panneaux indépendants, sections et pagination dédiées",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/homePresentation.test.ts",
+          "contains": "SEENIT-UX-018 classe les sorties par jour local"
+        },
+        {
+          "file": "tests/homePresentation.test.ts",
+          "contains": "SEENIT-UX-018 conserve trois onglets sans compteurs"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-UX-013",
       "title": "Bandes-annonces qualifiées par preuve et cycle paysage réversible",
       "targets": [
@@ -2103,7 +2121,7 @@
     },
     {
       "id": "SEENIT-UX-016",
-      "title": "À Regarder 18c, séries par trois, tickets réversibles et confirmation Firestore réelle",
+      "title": "Actions de suivi, tickets réversibles et confirmation Firestore réelle",
       "targets": [
         "pwa",
         "apk"

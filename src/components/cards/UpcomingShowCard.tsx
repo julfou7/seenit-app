@@ -10,6 +10,7 @@ import { getFormattedProviderLogo } from '../../utils/providerLogos';
 import { usePassiveWatchProvider } from '../../hooks/usePassiveWatchProvider';
 import { readUserScopedJson, removeUserScopedValue, writeUserScopedJson } from '../../lib/userIsolation';
 import { SeriesEpisodeCard, type SeriesCardAction } from './SeriesEpisodeCard';
+import { appLogger } from '../../store/logStore';
 
 export interface UpcomingEpisodeInfo {
   season_number: number;
@@ -125,7 +126,7 @@ function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, action
       try {
         fcmToken = await requestNotificationPermission();
       } catch (err) {
-        console.warn("FCM / Notification token request warning:", err);
+        appLogger.warn('system', 'Autorisation des notifications indisponible', err);
       }
 
       setIsReminderSet(true);
@@ -205,7 +206,7 @@ function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, action
   };
 
   const diffDays = getCalendarDaysDiff(ep.air_date);
-  
+
   let relativeStr = '';
   if (diffDays === 0) {
     relativeStr = "Aujourd'hui";
@@ -228,7 +229,7 @@ function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, action
   const epTitle = ep.name && ep.name.trim() !== '' ? ep.name : `Épisode ${ep.episode_number}`;
 
   const poster = show.posterPath || show.backdropPath;
-  const imgSrc = poster 
+  const imgSrc = poster
     ? (poster.startsWith('http') ? poster : `https://image.tmdb.org/t/p/w300${poster}`)
     : null;
 
@@ -243,102 +244,14 @@ function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, action
 
   const networkLogo = getFormattedProviderLogo(providerLogo, providerName);
 
-  if (show.mediaType !== 'movie') return <div ref={cardRef} className="series-8f-host">
-    <SeriesEpisodeCard show={show} episode={ep}
+  const movie = show.mediaType === 'movie';
+  return <div ref={cardRef} className="series-8f-host">
+    <SeriesEpisodeCard show={{ ...show, backdropPath: ep.still_path || show.backdropPath }} episode={movie ? null : ep}
       context={{ kind: 'upcoming', days: diffDays, reminder: isReminderSet, pending: loadingReminder, onToggleReminder: toggleReminder }}
-      detail={diffDays === 0 ? 'ce soir' : capitalizedShortDate}
+      detail={diffDays === 0 ? 'Aujourd’hui' : capitalizedShortDate}
+      presentation={movie ? { code: 'Film', subtitle: capitalizedShortDate, progress: { label: 'Sortie', description: 'Date de sortie du film', continuous: false, totalUnknown: false, unknownTail: false, knownEpisodes: 0, availableUnseen: 0, segments: [] } } : undefined}
       providerLogo={networkLogo} providerName={providerName}
-      onOpen={() => { if (onShowClick) onShowClick(show.id, 'tv'); else onEpisodeClick(show, ep.season_number, ep.episode_number); }}
-      onOpenEpisode={() => onEpisodeClick(show, ep.season_number, ep.episode_number)} actions={actions} />
+      onOpen={() => { if (onShowClick) onShowClick(show.id, movie ? 'movie' : 'tv'); else if (!movie) onEpisodeClick(show, ep.season_number, ep.episode_number); }}
+      onOpenEpisode={movie ? undefined : () => onEpisodeClick(show, ep.season_number, ep.episode_number)} actions={actions} />
   </div>;
-
-  return (
-    <div 
-      ref={cardRef}
-      onClick={() => {
-        if (show.mediaType === 'movie') {
-          if (onShowClick && show.id) onShowClick(show.id, 'movie');
-        } else {
-          onEpisodeClick(show, ep.season_number, ep.episode_number);
-        }
-      }}
-      className="w-full flex items-stretch justify-between gap-3 bg-zinc-900/60 hover:bg-zinc-900/80 rounded-2xl overflow-hidden relative isolate transition-all active:scale-[0.98] cursor-pointer group shadow-xl"
-    >
-      {/* OVERLAY PREMIUM : Bordure interne parfaite + Effet lumière */}
-      <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/10 group-hover:ring-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)] transition-all z-20" />
-      <div className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-br from-white/[0.04] to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-10" />
-
-      {networkLogo && (
-        <div className="absolute top-0 right-0 z-30 bg-white/95 backdrop-blur-md w-7 h-7 rounded-bl-xl flex items-center justify-center shrink-0 p-1 shadow-sm pointer-events-none">
-          <img src={networkLogo} alt="" className="w-5 h-5 object-contain rounded-[3px]" />
-        </div>
-      )}
-
-      {/* Poster */}
-      <div className="w-[60px] sm:w-[70px] shrink-0 bg-zinc-950 rounded-l-2xl overflow-hidden flex items-center justify-center relative z-20">
-        {imgSrc ? (
-          <img loading="lazy" decoding="async" 
-            src={imgSrc}
-            alt={show.title}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-[10px] text-zinc-600 p-1 text-center font-bold">{show.title}</div>
-        )}
-      </div>
-
-      {/* Info */}
-      <div className="flex-1 min-w-0 py-3 px-0.5 flex flex-col justify-center relative z-20">
-        <div className={cn("flex items-center gap-2 min-w-0", networkLogo ? "pr-10" : "pr-1")}>
-          <button 
-            className="text-[#E5A93D] font-extrabold text-xs sm:text-[13px] uppercase tracking-wider line-clamp-2 text-left hover:underline leading-tight"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (onShowClick && show.id) {
-                onShowClick(show.id, show.mediaType);
-              }
-            }}
-          >
-            {show.title}
-          </button>
-        </div>
-        {show.mediaType === 'movie' ? (
-          <p className="text-indigo-400 font-medium text-xs line-clamp-1 leading-snug my-0.5">
-            Sortie cinéma / streaming
-          </p>
-        ) : (
-          <p className="text-white font-bold text-sm line-clamp-1 leading-snug my-0.5">
-            S{sNum} | E{eNum} • {epTitle}
-          </p>
-        )}
-        <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
-          <div className="text-emerald-400 text-xs font-semibold flex items-center gap-1 truncate">
-            <Calendar size={12} className="shrink-0" />
-            <span className="truncate">{fullDateLabel}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Bell Reminder Button */}
-      <div className={cn("pr-3.5 flex items-center justify-center shrink-0 relative z-20", networkLogo && "pt-3.5")}>
-        <button 
-          onClick={toggleReminder}
-          className={cn(
-            "w-9 h-9 rounded-full border flex items-center justify-center transition-all shrink-0",
-            isReminderSet 
-              ? "border-[#E5A93D] bg-[#E5A93D]/20 text-[#E5A93D] shadow-lg shadow-[#E5A93D]/20" 
-              : "border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/40 text-zinc-400 hover:text-white"
-          )}
-          title={isReminderSet ? "Rappel activé" : "Programmer un rappel"}
-        >
-          <Bell 
-            size={18} 
-            className={cn("transition-transform", isReminderSet && "fill-[#E5A93D]")} 
-            strokeWidth={isReminderSet ? 2 : 1.75} 
-          />
-        </button>
-      </div>
-    </div>
-  );
 }
-

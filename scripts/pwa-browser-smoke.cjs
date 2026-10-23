@@ -8,6 +8,7 @@ const { buildProviderHarness, testProviderHarness } = require('./provider-browse
 const { buildSeriesCardHarness, testSeriesCardHarness } = require('./series-card-browser-checks.cjs');
 const { buildHistoryHarness, testHistoryHarness } = require('./history-browser-checks.cjs');
 const { buildWatchNextHarness, testWatchNextHarness } = require('./watch-next-browser-checks.cjs');
+const { buildHomeHarness, testHomeHarness } = require('./home-a-voir-browser-checks.cjs');
 const { buildNavbarHarness, testNavbarHarness } = require('./navbar-browser-checks.cjs');
 
 const root = path.resolve(__dirname, '..');
@@ -493,6 +494,7 @@ async function main() {
     await buildHistoryHarness(root);
     await buildWatchNextHarness(root);
     await buildNavbarHarness(root);
+    await buildHomeHarness(root);
     const viteBin = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
     if (!fs.existsSync(viteBin)) throw new Error('Vite installé requis avant le smoke navigateur.');
     preview = spawn(process.execPath, [viteBin, 'preview', '--host', '127.0.0.1', '--port', '4173', '--strictPort'], {
@@ -562,6 +564,8 @@ async function main() {
       accessibility,
       componentActions,
     };
+    const homeReport = await testHomeHarness(client, root);
+    fs.writeFileSync(path.join(reportDir, 'home-a-voir.json'), JSON.stringify(homeReport, null, 2));
     fs.writeFileSync(path.join(reportDir, 'pwa-browser.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
     fs.writeFileSync(path.join(reportDir, 'pwa-browser.md'), [
       '# Smoke navigateur PWA SeenIt',

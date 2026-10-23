@@ -55,7 +55,7 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
   const rawPath = episodeStill || currentSeasonArtwork || showBackdrop || showPoster;
   const openEpisode = onEpisodeClick && nextEpNum ? () => onEpisodeClick(show, nextEpNum.season_number, nextEpNum.episode_number) : undefined;
   const freshnessBadge = isUpToDate ? undefined : episodeFreshnessBadge(nextEpNum, todayStr);
-  const staleDetail = showStaleDetail ? seriesCardStaleDetail(show) : undefined;
+  const staleDetail = showStaleDetail ? seriesCardStaleDetail(show)?.replace(/^(?:⏳ )?Il y a /u, 'Pas vu depuis ') : undefined;
   return <div ref={cardRef} className="series-8f-host">
     <SeriesEpisodeCard
       show={{ ...show, backdropPath: rawPath }}

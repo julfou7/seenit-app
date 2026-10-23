@@ -140,6 +140,13 @@ obligation d'architecture. Les cartes et en-têtes consomment ces rôles plutôt
 
 ## 5. Cartes — contrat SEENIT-UX-009 / #180
 
+La [refonte À voir](../design/home-a-voir.md), #729 / `SEENIT-UX-018`, sépare trois panneaux
+sans scrollspy ni swipe entre panneaux. À regarder retrouve ses trois sections séries, chacune
+en rail de trois cartes avec Voir tout en liste. Les films horizontaux et leur grille progressent
+par trois ; toucher Vu ou Annuler recolle le billet. L’historique progresse par dix, les sorties
+par Aujourd’hui/Cette semaine/Plus tard. Les badges sans emoji suivent le titre épisode, la cloche
+du header ouvre les notifications ; les commandes et confirmations métier restent partagées.
+
 ### Carte série 8f — #690
 
 La [carte 8f](../design/card-8f.md) devient le socle partagé des séries dans À voir,
