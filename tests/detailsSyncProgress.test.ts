@@ -57,6 +57,19 @@ test('SEENIT-UX-014 les deux synchronisations conservent la finale avant de supp
       assert.equal(history.label, watch.label, 'le total survit au nettoyage du cache et à l’absence de reprise');
     }
   }
+  // Le compte positif d'une liste partielle TMDB ne confirme pas sa taille finale.
+  ports.details.seasons[0].episode_count = 4;
+  ports.season.episodes[3].episode_type = 'standard';
+  ports.season.episodes[3].air_date = '';
+  for (const invoke of [() => module.exports.syncSingleItem('series', true), () => module.exports.performDetailsSync(true)]) {
+    ports.writes.length = 0;
+    await invoke();
+    const partial = ports.writes.find(value => value.seasonProgress);
+    assert.ok(partial);
+    const refreshed = { ...show, ...JSON.parse(JSON.stringify(partial)) } as Show;
+    assert.equal(refreshed.seasonProgress?.['1'].episode_count, null);
+    assert.equal(buildSeriesSeasonProgress(refreshed, { ...refreshed.nextEpisodeToWatch, episode_count: 4, season_total_unknown: false }, 'watch', '2026-10-23').unknownTail, true, 'Harry Potter : la vraie synchronisation conserve ? malgré un ancien pointeur trop affirmatif');
+  }
   // Une installation existante doit être réparée sans pull-to-refresh, puis s'arrêter.
   for (const providerStatus of ['Returning Series', 'Ended', 'Canceled']) for (const oldFlag of [true, false]) {
   ports.details.status = providerStatus;

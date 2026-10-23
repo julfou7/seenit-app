@@ -5,7 +5,7 @@ import { requestNotificationPermission, auth, db, sendNativeNotification } from 
 import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { useToastStore } from '../../store/toastStore';
 import { useShows } from '../../hooks/useShows';
-import { cn, getTodayStr, getCalendarDaysDiff, formatAirDateSafe, getEpisodeRelativeAirDate } from '../../lib/utils';
+import { cn, getTodayStr, getCalendarDaysDiff, getEpisodeRelativeAirDate } from '../../lib/utils';
 import { getFormattedProviderLogo } from '../../utils/providerLogos';
 import { usePassiveWatchProvider } from '../../hooks/usePassiveWatchProvider';
 import { readUserScopedJson, removeUserScopedValue, writeUserScopedJson } from '../../lib/userIsolation';
@@ -159,7 +159,7 @@ function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, action
           }
         });
       } catch (err) {
-        console.warn("sendNativeNotification failed:", err);
+        appLogger.warn('system', 'Notification locale de rappel indisponible', err);
       }
 
       try {
@@ -179,7 +179,7 @@ function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, action
           });
         }
       } catch (err) {
-        console.error("Error setting reminder in Firestore:", err);
+        appLogger.error('system', 'Enregistrement du rappel impossible', err);
       } finally {
         setLoadingReminder(false);
       }
@@ -198,7 +198,7 @@ function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, action
           await deleteDoc(reminderRef);
         }
       } catch (err) {
-        console.error("Error deleting reminder:", err);
+        appLogger.error('system', 'Suppression du rappel impossible', err);
       } finally {
         setLoadingReminder(false);
       }
@@ -220,7 +220,7 @@ function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, action
     relativeStr = `Il y a ${Math.abs(diffDays)} jours`;
   }
 
-  const formattedShortDate = formatAirDateSafe(ep.air_date, 'short');
+  const formattedShortDate = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(new Date(`${ep.air_date}T12:00:00`));
   const capitalizedShortDate = formattedShortDate ? (formattedShortDate.charAt(0).toUpperCase() + formattedShortDate.slice(1)) : '';
   const fullDateLabel = capitalizedShortDate ? `${relativeStr} • ${capitalizedShortDate}` : relativeStr;
 
@@ -248,10 +248,10 @@ function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, action
   return <div ref={cardRef} className="series-8f-host">
     <SeriesEpisodeCard show={{ ...show, backdropPath: ep.still_path || show.backdropPath }} episode={movie ? null : ep}
       context={{ kind: 'upcoming', days: diffDays, reminder: isReminderSet, pending: loadingReminder, onToggleReminder: toggleReminder }}
-      detail={diffDays === 0 ? 'Aujourd’hui' : capitalizedShortDate}
-      presentation={movie ? { code: 'Film', subtitle: capitalizedShortDate, progress: { label: 'Sortie', description: 'Date de sortie du film', continuous: false, totalUnknown: false, unknownTail: false, knownEpisodes: 0, availableUnseen: 0, segments: [] } } : undefined}
+      detail={movie ? undefined : capitalizedShortDate}
+      presentation={movie ? { code: 'Film · salle', subtitle: capitalizedShortDate, progress: { label: 'Sortie', description: 'Date de sortie du film', continuous: false, totalUnknown: false, unknownTail: false, knownEpisodes: 0, availableUnseen: 0, segments: [] } } : undefined}
       providerLogo={networkLogo} providerName={providerName}
-      onOpen={() => { if (onShowClick) onShowClick(show.id, movie ? 'movie' : 'tv'); else if (!movie) onEpisodeClick(show, ep.season_number, ep.episode_number); }}
+      onOpen={() => { if (!movie) onEpisodeClick(show, ep.season_number, ep.episode_number); else onShowClick?.(show.id, 'movie'); }}
       onOpenEpisode={movie ? undefined : () => onEpisodeClick(show, ep.season_number, ep.episode_number)} actions={actions} />
   </div>;
 }

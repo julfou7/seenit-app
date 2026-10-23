@@ -5,6 +5,7 @@ import {
   buildHistoryAriaLabel,
   buildMovieCollectionProgress,
   formatHistoryDayLabel,
+  formatHistoryRowDate,
   formatHistoryRuntime,
   historyTimeInputValue,
   parseHistoryLocalDateTime,
@@ -24,8 +25,10 @@ test('SEENIT-UX-015 ne fabrique jamais une heure de visionnage legacy', () => {
   assert.equal(new Date(dateOnly!.watchedAt).getDate(), 21);
 });
 
-test('SEENIT-UX-015 groupe les jours et formate les durées sans répéter la date dans les cartes', () => {
+test('SEENIT-UX-015 conserve les jours calendaires et présente la date courte de la liste v3', () => {
   const now = new Date(2026, 9, 21, 23, 0).getTime();
+  assert.equal(formatHistoryRowDate(new Date(2026, 9, 21, 8).getTime(), now), 'ce soir');
+  assert.equal(formatHistoryRowDate(new Date(2026, 9, 13, 8).getTime(), now), '13 oct.');
   assert.equal(formatHistoryDayLabel(new Date(2026, 9, 21, 8, 0).getTime(), now), "Aujourd'hui");
   assert.equal(formatHistoryDayLabel(new Date(2026, 9, 20, 8, 0).getTime(), now), 'Hier');
   assert.match(formatHistoryDayLabel(new Date(2026, 9, 13, 8, 0).getTime(), now), /^Mardi 13 octobre$/);
@@ -89,15 +92,16 @@ test('SEENIT-UX-015 présente les collections film avec le film courant distinct
   assert.deepEqual(standalone.segments, [{ state: 'history', count: 1 }]);
 });
 
-test('SEENIT-UX-015 expose une carte unique, une heure décorative et les actions d’historique', () => {
+test('SEENIT-UX-015 expose la liste compacte v3 et conserve les actions d’historique', () => {
   const source = readFileSync(new URL('../src/components/HistoryFeed.tsx', import.meta.url), 'utf8');
-  assert.match(source, /<SeriesEpisodeCard/);
+  assert.match(source, /<HistoryEntryRow/);
+  assert.doesNotMatch(source, /<SeriesEpisodeCard|displayedGroups|collectionParts/);
   assert.doesNotMatch(source, /CheckCircle2|RotateCcw/);
   assert.match(source, /Marquer non vu/);
   assert.match(source, /Changer la date\/heure/);
   assert.match(source, /Revoir/);
-  assert.match(source, /history-16d__group-title/);
-  assert.match(source, /onUnseen: \(\) => setUnseenModalItem\(item\)/);
+  assert.match(source, /history-entry-list/);
+  assert.match(source, /label: 'Marquer non vu', onSelect: \(\) => setUnseenModalItem\(item\)/);
   assert.match(source, /onOpen=\{handleRowClick\}/);
 
   const card = readFileSync(new URL('../src/components/cards/SeriesEpisodeCard.tsx', import.meta.url), 'utf8');

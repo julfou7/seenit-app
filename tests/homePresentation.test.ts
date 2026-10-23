@@ -18,7 +18,8 @@ test('SEENIT-UX-018 classe les sorties par jour local sans dérive au changement
     assert.equal(upcomingGroup(today, today), 'Aujourd’hui');
     assert.equal(upcomingGroup(day(1), today), 'Cette semaine');
     assert.equal(upcomingGroup(day(6), today), 'Cette semaine');
-    assert.equal(upcomingGroup(day(7), today), 'Plus tard');
+    assert.equal(upcomingGroup(day(7), today), 'Cette semaine');
+    assert.equal(upcomingGroup(day(8), today), 'Plus tard');
     assert.equal(upcomingGroup(day(30), today), 'Plus tard');
   }
 });

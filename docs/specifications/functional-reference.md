@@ -1,6 +1,7 @@
 # SeenIt — Référence fonctionnelle canonique
 
 Dernière vérification : 14 septembre 2026
+Mise à jour ciblée À voir : 23 octobre 2026, corrections de conformité maquettes et gestes (#729).
 Baseline observée avant correction : **1.4.150**, `main` `6189bafed525fb510c1a81c87a04e19c01f92393`
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : composante obligatoire de la SPEC SeenIt
@@ -217,31 +218,30 @@ connue relève de **À Venir** ; sans date exploitable, la série reste suivie s
 regardable. Les cartes ne fabriquent donc pas `S01 | E01` / « SAISON DISPO » depuis des métadonnées
 inconnues.
 
-La [refonte accueil](../design/home-a-voir.md) conserve trois sections distinctes dans l’ordre
-Continuer à regarder, Nouveautés, Pas vu depuis un moment. Chaque section affiche un rail de trois
-cartes 8f, puis Voir tout ouvre la liste progressive (douze par lot) ; Revenir en carrousel la replie.
-Les sections vides sont masquées. Les badges statut, sans emoji, sont dans le bloc texte sous le titre
-de l’épisode. Les séries anciennes conservent leur nombre de jours exact. En liste, le swipe gauche
+La [refonte accueil](../design/home-a-voir.md) conserve les trois sections séries Continuer à regarder,
+Nouveautés et Pas vu depuis un moment ; Films à voir précède cette dernière. Chaque section série affiche un rail de trois
+cartes 8f, puis la bascule à deux icônes ouvre la liste progressive (douze par lot) ou le carrousel.
+Les sections vides sont masquées. Les badges statut, sans emoji, sont à côté du code épisode dans la carte compacte ; Vu est centré verticalement. Les séries anciennes conservent leur nombre de jours exact. En liste, le swipe gauche
 révèle Archiver/Supprimer ; l’appui long et le clavier ouvrent les mêmes actions avec confirmation et
 Annuler. Dans les rails, le glissement fait défiler les cartes sans déclencher de suppression.
-Le total positif de saison fourni par TMDB reste affiché dans les trois contextes, même pour une
+Le total confirmé de saison fourni par TMDB reste affiché dans les cartes qui présentent la progression, même pour une
 série renouvelée ou sans finale datée. Un ancien indicateur de total inconnu ne masque pas ce nombre.
 Sans total fournisseur ni preuve de finale, les épisodes listés restent une borne connue et « ? » est conservé.
 Le marquage Vu préserve cette distinction ; les anciennes preuves ambiguës sont réactualisées une fois
 par le worker de détails, sans demander une actualisation manuelle.
 Cette réparation inclut les anciens booléens false et les séries terminées ou archivées.
 Elle conserve le statut de suivi utilisateur, distinct du statut de diffusion TMDB.
-Le cadre 8f reste partagé avec À venir et Historique. Vu anime la reprise réellement avancée et son
+Le cadre 8f reste partagé avec À venir. Historique utilise la liste compacte v3. Vu anime la reprise réellement avancée et son
 tampon SeenIt ; À jour permet de revenir sur le dernier épisode marqué pendant cette session.
 Pendant une écriture Firestore lente, le marquage reste en attente : aucun délai arbitraire
 ne provoque de faux échec ni de restauration locale alors que l'écriture peut encore réussir.
 Le succès et son animation attendent l'acquittement réel ; seul un rejet définitif restaure
 l'état précédent et affiche l'erreur. Un changement de compte ignore le résultat pour le nouvel UID.
 
-Les films sont des billets horizontaux déchirables, triés par durée connue croissante, inconnues après.
+Les films sont des billets déchirables en carrousel affiche ou liste horizontale, triés par durée connue croissante, inconnues après.
 Le talon affiche en grand l’heure de fin calculée depuis Maintenant, actualisée chaque minute, orange
 après minuit. Sans durée, aucune fin n’est inventée. Trois films sont visibles, puis Afficher N de plus
-en ajoute trois. La bascule grille/liste conserve cette limite et le même marquage.
+en ajoute trois. La bascule carrousel/liste conserve cette limite et le même marquage.
 Une coche aboutie déchire le talon et conserve le tampon Vu ; toucher ce tampon ou Annuler recolle
 le billet. Le film garde sa place pendant la session et disparaît au prochain retour à À regarder.
 Les enrichissements restent passifs,
@@ -259,10 +259,10 @@ annulation.
 
 ### 5.2 À Venir
 
-- Groupe les prochaines sorties en Aujourd’hui, Cette semaine (les six jours suivants), Plus tard, selon les jours calendaires locaux.
+- Groupe les prochaines sorties en Aujourd’hui, Cette semaine (les sept jours suivants), Plus tard, selon les jours calendaires locaux.
 - Ouvre directement la fiche ou le détail d'épisode.
 - Permet d'activer/désactiver un rappel pour l'épisode présenté.
-- La carte série 8f affiche le nombre de jours exact, un rond sombre homogène (0 aujourd’hui) et une pastille cloche or si le rappel est actif ;
+- La carte série 8f, sans badge de statut, affiche J-X (auj. aujourd’hui), une pastille rectangulaire sombre 48×40 dans une cible 52×48 et une cloche or si le rappel est actif ;
   cette cible de rappel est indépendante de l'ouverture de fiche.
 - Un rappel spécifique met à jour l'intention de notification du média et son document Firestore.
 - Sur Android, un rappel de nouvelle saison affiche aussi « Saison N » et un rappel de nouvel épisode
@@ -273,14 +273,12 @@ annulation.
 
 ### 5.3 Historique et actualités
 
-- L'[historique mixte 16d](../design/history-16d.md) mélange films et épisodes, groupés par jour local
-  et triés depuis leurs `watchedAt`. La date apparaît dans le groupe ; une heure inconnue reste masquée.
+- L'[historique mixte](../design/history-16d.md) suit la liste compacte de la SPEC accueil v3 : un bloc arrondi, films et épisodes triés depuis leurs `watchedAt`, sans groupes de date ni barres de progression. La date courte apparaît dans chaque ligne (ce soir aujourd’hui) ; une heure inconnue reste inconnue.
 - « Marquer comme non vu » retire uniquement la progression ciblée et propose Annuler.
-- Films et épisodes réutilisent le cadre 8f : épisode ou film de collection mis en évidence, durée
-  connue, still/backdrop et diffuseur passif. La coche et l'heure sont décoratives. Le tap ouvre
+- Films et épisodes ont la même ligne (minimum 76 px), vignette still/backdrop 92×52, titre or, code/date et titre d’épisode, pastille SeenIt or 26 px. Un film n’affiche ni année ni mention Film. Le tap ouvre
   l'épisode exact ou le film ; l'appui long/menu clavier propose Non vu (confirmation et Annuler),
   Changer la date/heure (heure facultative et Annuler), Revoir et Ouvrir la série.
-- La liste affiche dix entrées puis Afficher N de plus (dix maximum par lot), avec dates/heures discrètes.
+- La liste affiche dix entrées puis Voir plus avec le nombre restant (dix maximum par lot). Les heures connues sont conservées dans les libellés accessibles et l’édition.
 - Le fil Actualités, désormais dans la feuille Notifications, affiche les événements non lus de séries encore présentes : nouvelle saison,
   diffusion, renouvellement/annulation et informations générées par le worker de détails.
 - Une actualité lue est retirée et son état est partagé entre appareils.
@@ -981,3 +979,10 @@ elle est nécessaire à la plateforme et explicitement documentée.
   retire de sa matrice un écart seulement après preuve de correction.
 - Pour chaque changement, vérifier au minimum : écran d'entrée, état avant/après, Firestore et cache,
   PWA, APK/Retour/intents/safe areas, erreurs réseau, isolation UID, notifications et tests.
+
+Clarification terrain v1.4.218 (#729) : Films à voir précède la section Pas vu depuis un moment,
+toujours en dernier. Les films démarrent en rail affiche et passent par icône à la liste de billets
+horizontaux du prototype. Le header sticky prolonge son flou sous les filtres. Les notifications ont
+une vignette et se retirent une par une par swipe/bouton, avec Annuler et persistance locale par UID.
+Un compte TMDB provisoire de liste partielle reste inconnu sans preuve de fin/planning complet/total
+annoncé au-delà de la liste ; les anciennes preuves sont réactualisées une fois. Aucun override par titre.

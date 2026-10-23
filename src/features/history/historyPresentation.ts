@@ -71,6 +71,11 @@ export function formatHistoryDayLabel(timestamp: number, now: number = Date.now(
   return capitalize(formatted);
 }
 
+export function formatHistoryRowDate(timestamp: number, now: number = Date.now()): string {
+  if (historyLocalDayKey(timestamp) === historyLocalDayKey(now)) return 'ce soir';
+  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(new Date(timestamp));
+}
+
 export function formatHistoryClock(timestamp: number, timeKnown: boolean): string | null {
   if (!timeKnown) return null;
   const date = new Date(timestamp);

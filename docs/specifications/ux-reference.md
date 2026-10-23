@@ -43,7 +43,7 @@ Ce contrat automatisé ne vaut pas preuve de lecture ou de rotation sur un tél�
 | Double appui Profil | Reset + remontée | Ferme Réglages/personne, revient à Statistiques et nettoie l'état local de Ma Liste | Ne modifie aucun suivi ni statistique. |
 | Double appui À voir | Reset + remontée | Revient à À Regarder, replie les sections et remet les carrousels au début | Ne modifie aucune progression. |
 | Double appui Télécharger | Reset + remontée | Revient à Mes téléchargements, ferme la configuration, vide recherche/filtres/résultats locaux | N'annule ni n'efface aucun transfert. |
-| Carrousels séries réduits « À Regarder » | Glissement horizontal | Avance carte par carte avec snap horizontal obligatoire ; la suite reste virtualisée/préchargée sans marqueur terminal | Chaque carte est un arrêt. Le rail Films à voir conserve son défilement libre. Le vrai bouton « Voir tout » de l'en-tête reste l'alternative accessible vers la liste verticale exhaustive. |
+| Carrousels séries réduits « À Regarder » | Glissement horizontal | Avance carte par carte avec snap horizontal obligatoire ; la suite reste virtualisée/préchargée sans marqueur terminal | Chaque carte est un arrêt. Le rail Films à voir conserve son défilement libre. La bascule à deux icônes Carrousel/Liste de l’en-tête reste l’alternative accessible vers la liste verticale exhaustive (#729). |
 | Modal épisode | Glisser vers la gauche | Épisode suivant, puis saison suivante si disponible | Aucune progression vue ajoutée par la navigation. |
 | Modal épisode | Glisser vers la droite | Épisode précédent, puis fin de saison précédente si disponible | Même série exacte ; limites sans bouclage. |
 | Modal épisode | Déplacement > 60 px ou vitesse > 200 | Déclenche précédent/suivant si disponible, sinon retour en place | Le swipe reste disponible ; boutons Précédent/Suivant et ←/→ clavier partagent désormais la même intention via `SEENIT-UX-008`. |
@@ -142,16 +142,16 @@ obligation d'architecture. Les cartes et en-têtes consomment ces rôles plutôt
 
 La [refonte À voir](../design/home-a-voir.md), #729 / `SEENIT-UX-018`, sépare trois panneaux
 sans scrollspy ni swipe entre panneaux. À regarder retrouve ses trois sections séries, chacune
-en rail de trois cartes avec Voir tout en liste. Les films horizontaux et leur grille progressent
+en rail de trois cartes avec bascule à icônes vers la liste. Le carrousel affiche et la liste de billets horizontaux progressent
 par trois ; toucher Vu ou Annuler recolle le billet. L’historique progresse par dix, les sorties
-par Aujourd’hui/Cette semaine/Plus tard. Les badges sans emoji suivent le titre épisode, la cloche
+par Aujourd’hui/Cette semaine/Plus tard (jusqu’à J-7 inclus). Les badges sans emoji sont près du code épisode, la cloche
 du header ouvre les notifications ; les commandes et confirmations métier restent partagées.
 
 ### Carte série 8f — #690
 
 La [carte 8f](../design/card-8f.md) devient le socle partagé des séries dans À voir,
-À venir et Historique : affiche débordante, fond teinté, titre sur deux lignes,
-code saison/épisode explicite et saison segmentée. Seule l'action de contexte change.
+À venir : affiche débordante, fond teinté, titre sur deux lignes,
+code saison/épisode explicite et saison segmentée. À venir n’a pas de badge de statut et utilise une pastille rectangulaire J-X (auj. aujourd’hui) avec rappel indépendant, sans cercle de progression. La date courte n’ajoute pas de jour de semaine. Historique suit désormais la liste compacte v3 : une seule liste sans groupes de date ni progression, vignette 92×52, date dans chaque ligne, dix puis Voir plus. Les opérations réversibles et les actions clavier restent partagées.
 Les trois carrousels séries réduits de À Regarder restent virtualisés mais avancent désormais
 carte par carte avec snap horizontal obligatoire et arrêt sur chaque carte ; le rail Films à voir
 conserve son défilement libre. Les cartes séries utilisent la largeur mobile utile pour conserver

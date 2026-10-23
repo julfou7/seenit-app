@@ -9,7 +9,8 @@ import { getTodayStr } from '../../src/lib/utils';
 import { useToastStore } from '../../src/store/toastStore';
 import type { Show } from '../../src/types';
 import { ToastContainer } from '../../src/components/ToastContainer';
-Object.assign(window, { __homeAVoir: { telemetry, releaseWrite, snapshot: () => useShowsStore.getState().shows, reset: () => window.dispatchEvent(new Event('watchlist-reset-all')), clear: () => useToastStore.getState().clearQueue(), toasts: () => [useToastStore.getState().currentToast, ...useToastStore.getState().queue].filter(Boolean) } });
+import { writeUserScopedJson } from '../../src/lib/userIsolation';
+Object.assign(window, { __homeAVoir: { telemetry, releaseWrite, empty: () => useShowsStore.setState({ shows: [] }), clearDismissed: () => writeUserScopedJson(auth.currentUser?.uid, 'home_dismissed_notifications', []), snapshot: () => useShowsStore.getState().shows, reset: () => window.dispatchEvent(new Event('watchlist-reset-all')), clear: () => useToastStore.getState().clearQueue(), toasts: () => [useToastStore.getState().currentToast, ...useToastStore.getState().queue].filter(Boolean) } });
 function Harness() {
   const shows = useShowsStore(state => state.shows);
   const [tab, setTab] = useState<'watch_next' | 'upcoming' | 'history'>('watch_next');
@@ -19,7 +20,7 @@ function Harness() {
   const mark = (show: Show) => markWatchCardEpisode(show, getTodayStr(), markEpisodeWatched);
   const open = (id: string, type?: string) => { telemetry.opens.push(`${type}:${id}`); };
   return <main style={{ height: '100dvh', display: 'flex', flexDirection: 'column' }}><WatchListView model={{
-    activeTab: tab, allShows: shows, continueWatchingShows: series.slice(0,3), nouveautesShows: series.slice(3,6), pasVuDepuisUnMomentShows: series.slice(6), filmsAVoirShows: shows.filter(show=>show.id.startsWith('movie-')&&!show.seenEpisodes.includes('movie')),
+    onExplore: () => telemetry.opens.push('discover'), activeTab: tab, allShows: shows, continueWatchingShows: series.slice(0,3), nouveautesShows: series.slice(3,6), pasVuDepuisUnMomentShows: series.slice(6), filmsAVoirShows: shows.filter(show=>show.id.startsWith('movie-')&&!show.seenEpisodes.includes('movie')),
     upcomingShows: shows.filter(show=>show.id.startsWith('upcoming-')), loading:false, isQuotaExceeded:false,
     watchNextRef:watch, upcomingRef:upcoming, historyRef:history,
     scrollToSection: (_ref, next) => { setTab(next); document.getElementById('watchlist-container')?.scrollTo(0,0); },

@@ -615,7 +615,7 @@ function MainApp() {
               {mountedTabs.has('watchlist') && (
                 <Activity mode={currentTab === 'watchlist' ? 'visible' : 'hidden'}>
                   <div data-app-tab="watchlist" className="flex-1 min-h-0 flex flex-col">
-                    <WatchListScreen onShowClick={openLocalMedia} onEpisodeParentClick={openLocalMediaImmediate} navigationShortcut={currentTab === 'watchlist' && shortcut?.tab === 'watchlist' ? shortcut.request : undefined} />
+                    <WatchListScreen onExplore={() => handleTabChange('discover')} onShowClick={openLocalMedia} onEpisodeParentClick={openLocalMediaImmediate} navigationShortcut={currentTab === 'watchlist' && shortcut?.tab === 'watchlist' ? shortcut.request : undefined} />
                   </div>
                 </Activity>
               )}

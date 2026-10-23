@@ -61,11 +61,10 @@ test('#229 recycle les cartes hors écran au lieu d’accumuler le DOM', () => {
   assert.doesNotMatch(watchListSource, /preloadSentinelRef/);
 });
 
-test('#729 conserve les accès aux listes complètes et la bascule grille films', () => {
+test('#729 conserve les accès aux listes complètes par les icônes de vue', () => {
   assert.doesNotMatch(carouselUxCss, /::after/);
-  assert.match(watchListSource, /aria-expanded=\{expanded\}/);
-  assert.match(watchListSource, /Revenir en carrousel/);
-  assert.match(watchListSource, /Films en grille/);
+  assert.match(watchListSource, /<HomeLayoutSwitch label=\{label\} list=\{expanded\}/);
+  assert.match(watchListSource, /<HomeLayoutSwitch label="Films"/);
   assert.match(watchListSource, /movieCount < orderedMovies\.length/);
 });
 
@@ -74,7 +73,7 @@ test('#690 aligne la hiérarchie 8f et retire les compteurs redondants', () => {
   assert.match(movieCardSource, /line-clamp-2/);
   assert.match(seriesCardCss, /\.series-8f__text h3\s*\{[^}]*color:#F2C36B;/);
   assert.match(seriesCardCss, /\.series-8f__code strong\s*\{[^}]*color:#fff;/);
-  assert.match(seriesCardCss, /\.series-8f__check\s*\{[^}]*background:#0B0B0F !important;/);
+  assert.match(seriesCardCss, /\.series-8f__check\s*\{[^}]*border-radius:50%;/);
   assert.doesNotMatch(seriesCardSource, /series-8f__season-label/);
   assert.doesNotMatch(continueCardSource, /restant/);
   assert.match(continueCardSource, /Sorti aujourd’hui/);

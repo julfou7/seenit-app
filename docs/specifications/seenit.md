@@ -1,6 +1,6 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
-Dernière mise à jour : 20 septembre 2026
+Dernière mise à jour : 23 octobre 2026
 Version applicative : **1.4.218**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
@@ -1184,13 +1184,13 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
 - Les dialogues critiques utilisent un rôle adapté, sont fermables par Échap, placent le focus
   sur une action et ne déclenchent aucune suppression sans confirmation quand le transfert est
   actif.
-- **SEENIT-UX-014** — Les séries de À voir, À venir et Historique partagent la carte 8f :
+- **SEENIT-UX-014** — Les séries de À regarder et À venir partagent la carte 8f ; Historique suit la liste compacte v3 de `SEENIT-UX-015` :
   affiche débordante, teinte locale mise en cache, titre sur deux lignes et progression de saison.
   Vu, prochain, futur et entrée d'historique se distinguent autrement que par la couleur ; les saisons
   longues utilisent une barre proportionnelle, les totaux et diffusions inconnus ne sont pas inventés.
   Un cache de saison absent n'efface pas les épisodes prouvés par la progression ou les pointeurs.
-  Une saison sans total fournisseur ajoute une traîne en tirets et « ? » ; un `episode_count` positif
-  fourni par TMDB ou une preuve de finale retire cette incertitude, même si la série est renouvelée,
+  Une saison sans total fournisseur ajoute une traîne en tirets et « ? » ; un total fournisseur confirmé
+  ou une preuve de finale retire cette incertitude, même si la série est renouvelée,
   si la finale n'est pas typée/datée ou si un ancien indicateur `season_total_unknown` vaut true.
   En présence de cet ancien indicateur, seul le total fournisseur conservé dans `seasonProgress`
   ou une confirmation explicite plus récente le neutralise ; un compte de pointeur inféré ne suffit pas.
@@ -1199,14 +1199,16 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   sa politique normale de fraîcheur, y compris quand le fournisseur confirme que le total manque.
   Cette réparation conserve le statut de suivi utilisateur ; Ended/Canceled restent uniquement
   des métadonnées fournisseur (`tmdbStatus`/`seriesEnded`), jamais des valeurs de `Show.status`.
-  Le nombre d'épisodes actuellement listés ne devient jamais un total à lui seul. Les métadonnées de l'épisode présenté
+  Le nombre d’épisodes actuellement listés ne devient jamais un total à lui seul, même dans un
+  `episode_count` TMDB provisoire. Une finale, une saison terminée/antérieure, un planning complet daté
+  ou un total annoncé au-delà de la liste confirme le total. Sans cette preuve, conserver « ? ». Les métadonnées de l'épisode présenté
   priment sur un ancien pointeur contradictoire. La récence des séries laissées de côté provient
   des visionnages encore vus, puis de leur horodatage de repli, sans nouvel appel fournisseur.
   La coche Vu, le rappel et les actions d'historique sont des contrôles séparés d'au moins 44 px.
   Les opérations réutilisent leurs handlers et Annuler existants. Appui long, menu contextuel et clavier
   partagent les mêmes actions, sans clic d'ouverture après un appui long ni timer persistant au scroll.
   À Regarder utilise désormais la liste progressive et les tickets films de `SEENIT-UX-016` ;
-  la carte 8f reste partagée avec le calendrier et l'historique.
+  la carte 8f reste partagée avec le calendrier. La liste historique conserve les mêmes opérations métier.
   Le prochain épisode à voir et l'action Vu utilisent le même résolveur : un pointeur de diffusion
   future ne devient jamais une reprise. Si le pointeur de reprise manque, les épisodes diffusés du
   cache et la progression persistée servent de preuve ; une reprise inconnue est « À actualiser »,
@@ -1221,30 +1223,36 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   sans preuve Plex par épisode, elle ne crée ni notification épisode ni action Vu. Les films dont
   l’identité exacte est disponible conservent leur notification et leur action réversible.
   À regarder conserve trois sections distinctes (Continuer, Nouveautés, Pas vu depuis un moment),
-  chacune en rail de trois cartes puis Voir tout en liste. Les badges statut sans emoji sont placés
-  sous le titre de l’épisode ; le rappel de sortie utilise un rond sombre et les jours exacts.
-  À venir groupe Aujourd’hui, Cette semaine (six jours suivants), Plus tard selon le calendrier local.
+  chacune en rail de trois cartes puis liste progressive via la bascule à deux icônes. Les badges
+  statut sans emoji sont à côté du code épisode ; le rappel de sortie utilise une pastille rectangulaire J-X (auj. aujourd’hui), sans cercle de progression ni badge de statut dans À venir.
+  Films à voir précède Pas vu depuis un moment, qui reste en dernière position.
+  À venir groupe Aujourd’hui, Cette semaine (sept jours suivants), Plus tard selon le calendrier local.
   L’historique mixte est paginé par dix. Les sections vides disparaissent et les états chargement,
-  cache hors ligne et synchronisation restent explicites. Les billets horizontaux films affichent
-  trois entrées puis trois de plus, avec bascule grille/liste ; toucher le tampon Vu annule le marquage.
+  cache hors ligne et synchronisation restent explicites. Les films affichent trois billets puis trois
+  de plus, avec bascule carrousel/liste ; toucher le tampon Vu annule le marquage.
 - **SEENIT-UX-016** — Les cartes 8f et les tickets films réutilisent les écritures réversibles existantes.
   La séparation des groupes et leur présentation suivent désormais `SEENIT-UX-018`.
   Un Vu abouti anime l'épisode quitté, la nouvelle reprise réelle, le segment et un tampon SeenIt ;
   à jour permet le retour du dernier épisode explicitement marqué dans la session, avec Annuler.
   Une écriture Firestore encore en attente reste en cours, sans faux échec ni rollback local sur
   délai arbitraire ; seul son rejet définitif restaure l'état antérieur. Le succès attend son acquittement.
-  Les films sont des billets : année et fin depuis Maintenant ou l'heure de lancement choisie,
+  Les films sont des billets en carrousel affiche ou liste horizontale : fin depuis Maintenant,
   actualisée chaque minute et orange après minuit ; sans durée, aucune fin inventée. Le tri place les
   durées connues en ordre croissant, les inconnues après ; une coche conserve sa place pendant la session,
   puis la liste est rafraîchie à sa réouverture/réinitialisation. Déchirure, état vu persistant et
-  recollement suivent les écritures métier réversibles existantes. Liste et grille paginées par trois.
+  recollement suivent les écritures métier réversibles existantes. Carrousel et liste paginés par trois.
   Cibles >=44 px, clavier, annonces live et
   reduced-motion sont communs PWA/APK ; identité, preuve de diffusion et diffuseur ne sont pas réinventés.
-- **SEENIT-UX-015** — L'historique 16d mélange films et épisodes dans une chronologie par jour local,
-  avec le cadre 8f partagé. Seule l'heure réellement connue apparaît sur la carte ; une date seule
+- **SEENIT-UX-015** — L'historique mélange films et épisodes dans une seule liste compacte v3,
+  sans en-têtes de date ni progression. Chaque ligne (minimum 76 px) contient une vignette 92×52,
+  le titre or, le code épisode blanc et la date courte (ou « ce soir » aujourd’hui), puis le titre
+  d’épisode sur deux lignes maximum ; un film n’affiche ni code, ni année, ni mention Film.
+  La pastille SeenIt or 26 px est décorative dans une cible d’actions 44 px. Dix lignes puis « Voir plus »
+  avec le nombre restant. L’heure réellement connue reste accessible dans le libellé ; une date seule
   ou un repli legacy ne crée jamais une heure. « Hier » suit le calendrier local, y compris au
-  changement d'heure. Le still de l'épisode et la collection TMDB du film utilisent leurs identités
-  exactes et les enrichissements passifs bornés existants. La coche et l'heure sont décoratives ;
+  changement d'heure. Le still de l’épisode et le backdrop du film utilisent leurs identités
+  exactes et les enrichissements passifs bornés existants. Aucune collection n’est demandée pour
+  une progression retirée. La pastille est un repère vu, l’heure reste dans le libellé accessible ;
   un tap ouvre l'épisode ou le film, l'appui long/clavier ouvre Non vu, Date/heure, Revoir et Série.
   Non vu conserve la confirmation et Annuler ; la correction de date préserve les métadonnées et
   offre Annuler. Revoir réutilise le diffuseur/cache déjà résolu, sans requête fournisseur directe.
@@ -1718,3 +1726,17 @@ l'identité de l'APK et ses actifs.
   Aucun plugin dont les peer dependencies sont limitées à une ancienne version majeure de Capacitor ne
   doit rester dans le graphe. La PWA conserve `signInWithPopup`.
 - TNR : toute régression vers le flux legacy comme parcours Android primaire, ou toute rupture de l'échange vers le Firebase UID existant, est interdite.
+
+### Clarifications accueil après terrain v1.4.218 — SEENIT-UX-014/018
+
+Les dernières consignes du 23 octobre priment sur le handoff initial : carte 8f de 150 px, badge à côté
+du code épisode et Vu centré ; bascules de présentation à deux icônes, sans « Voir tout » ; films avant
+Pas vu depuis un moment, qui reste dernier ; billets horizontaux de 104 px conformes au prototype
+(affiche 70 px, informations et fournisseur au centre, talon 96 px avec heure de fin et glyphe Vu).
+Le header sticky conserve un fondu de flou progressif de 26 px sous les filtres.
+Chaque notification se retire individuellement par swipe gauche ou bouton accessible, avec Annuler ;
+les retraits sont locaux et UID-scopés, ne modifient ni le média ni le journal source et sont exclus du
+point non lu. La feuille conserve les vignettes et les actions métier existantes.
+Le total provisoire d’une liste partielle ne retire jamais « ? ». Les deux synchronisations conservent
+une version de preuve du total afin de réparer une fois les anciennes preuves ambiguës.
+La collecte différée est close par la demande explicite « Go apk » du 23 octobre. Le centrage J-X/auj. est vérifié sur la carte, la surface et le texte, indépendamment de la cloche.
