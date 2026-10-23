@@ -8,6 +8,7 @@ import { type SeriesCardEpisode } from '../features/watchlist/seriesCardPresenta
 import { mergeWatchGroups, orderWatchMovies } from '../features/watchlist/watchNext18c';
 import { tmdb } from '../features/shows/tmdb';
 import { selectTicketActor, type TicketActor } from '../features/people/movieActors';
+import { useCardLayoutAnchor } from '../hooks/useCardLayoutAnchor';
 import { useMovieActors } from '../hooks/useMovieActors';
 import { useFavoritePeopleStore } from '../store/favoritePeopleStore';
 import { MovieActorSheet } from '../components/MovieActorSheet';
@@ -40,6 +41,9 @@ export function WatchNextSection({ onExplore, onPerson, onOpenMedia, allShows, g
   const candidates = mergeWatchGroups(...groups);
   const latestSeriesOrder = useRef(candidates.map(show => show.id));
   latestSeriesOrder.current = candidates.map(show => show.id);
+  const preserveLayout = useCardLayoutAnchor();
+  const [railLimits, setRailLimits] = useState<Record<number, number>>({});
+  const [movieRailLimit, setMovieRailLimit] = useState(HOME_PAGE_SIZE);
   const [expandedGroups, setExpandedGroups] = useState<Record<number, boolean>>({});
   const [groupLimits, setGroupLimits] = useState<Record<number, number>>({});
   const [movieList, setMovieList] = useState(false);
@@ -49,7 +53,7 @@ export function WatchNextSection({ onExplore, onPerson, onOpenMedia, allShows, g
   const [retained, setRetained] = useState<Record<string, { episode?: SeriesCardEpisode }>>({});
   const [movieOrder, setMovieOrder] = useState<string[] | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const reset = useCallback(() => { setActorSheet(null); setRetained({}); setMovieOrder(null); setExpandedGroups({}); setGroupLimits({}); setMovieList(false); setMovieCount(12); setSeriesOrder(latestSeriesOrder.current); setNow(Date.now()); }, []);
+  const reset = useCallback(() => { setActorSheet(null); setRetained({}); setMovieOrder(null); setExpandedGroups({}); setGroupLimits({}); setRailLimits({}); setMovieRailLimit(HOME_PAGE_SIZE); setMovieList(false); setMovieCount(12); setSeriesOrder(latestSeriesOrder.current); setNow(Date.now()); }, []);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 60_000);
     const refresh = () => { setNow(Date.now()); };
@@ -105,11 +109,20 @@ export function WatchNextSection({ onExplore, onPerson, onOpenMedia, allShows, g
     const back = (event: Event) => {
       const group = Object.keys(expandedGroups).find(index => expandedGroups[Number(index)]);
       if (group !== undefined) { event.preventDefault(); setExpandedGroups(previous => ({ ...previous, [Number(group)]: false })); }
-      else if (movieList || movieCount > 12) { event.preventDefault(); setMovieList(false); setMovieCount(12); }
+      else if (movieList) { event.preventDefault(); switchMovies(false); }
+      else if (movieCount > 12) { event.preventDefault(); setMovieCount(12); }
     };
     window.addEventListener('watchlist-back-one-level', back);
     return () => window.removeEventListener('watchlist-back-one-level', back);
   }, [active, expandedGroups, movieList, movieCount]);
+  const switchMovies = (value: boolean) => {
+    if (value === movieList) return;
+    preserveLayout('films-a-voir-18c', 'data-movie-ticket', value, first => {
+      if (value) setMovieCount(count => Math.max(count, first + 1));
+      else setMovieRailLimit(count => Math.max(count, first + HOME_PAGE_SIZE));
+      setMovieList(value);
+    });
+  };
   const start = now;
   const renderSeriesGroup = (index: number) => {
       const label = ['Continuer à regarder', 'Nouveautés', 'Pas vu depuis un moment'][index];
@@ -117,29 +130,38 @@ export function WatchNextSection({ onExplore, onPerson, onOpenMedia, allShows, g
       if (!items.length) return null;
       const expanded = Boolean(expandedGroups[index]);
       const limit = groupLimits[index] || 12;
+      const switchLayout = (value: boolean) => {
+        if (value === expanded) return;
+        preserveLayout(`home-series-${index}`, 'data-series-id', value, first => {
+          setExpandedGroups(previous => ({ ...previous, [index]: value }));
+          if (value) setGroupLimits(previous => ({ ...previous, [index]: Math.max(previous[index] || 12, first + 1) }));
+          else setRailLimits(previous => ({ ...previous, [index]: Math.max(previous[index] || HOME_PAGE_SIZE, first + HOME_PAGE_SIZE) }));
+        });
+      };
       return <section key={label} className="home-series-section" aria-labelledby={`home-section-${index}`}>
-        <header className="home-section-heading"><h2 id={`home-section-${index}`}>{label} <span>{items.length}</span></h2><HomeLayoutSwitch label={label} list={expanded} onChange={value => { setExpandedGroups(previous => ({ ...previous, [index]: value })); setGroupLimits(previous => ({ ...previous, [index]: 12 })); }} /></header>
+        <header className="home-section-heading"><h2 id={`home-section-${index}`}>{label} <span>{items.length}</span></h2><HomeLayoutSwitch label={label} list={expanded} onChange={switchLayout} /></header>
         <div className={expanded ? 'home-series-list' : 'home-series-rail'} id={`home-series-${index}`}>
-          {items.slice(0, expanded ? limit : HOME_PAGE_SIZE).map(show => {
+          {items.slice(0, expanded ? limit : (railLimits[index] || HOME_PAGE_SIZE)).map(show => {
             const card = <ContinueWatchingCard show={show} layout={expanded ? 'list' : 'rail'} animateSeen showStaleDetail={staleIds.has(show.id)} lastMarkedEpisode={retained[show.id]?.episode} onMarkUnseen={onUnseen} onMarkAsSeen={markSeries} onShowClick={onOpen} onEpisodeClick={onEpisode} actions={actions(show)} />;
             return expanded && index > 0 ? <HomeSwipeCard key={show.id} onArchive={() => actions(show).find(action => action.label.startsWith('Archiver'))?.onSelect()} onRemove={() => actions(show).find(action => action.destructive)?.onSelect()}>{card}</HomeSwipeCard> : <React.Fragment key={show.id}>{card}</React.Fragment>;
           })}
-          {!expanded && items.length > HOME_PAGE_SIZE && <button type="button" className="home-rail-more" onClick={() => { setExpandedGroups(previous => ({ ...previous, [index]: true })); setGroupLimits(previous => ({ ...previous, [index]: 12 })); }}><ArrowDown size={22} /><span>Voir en liste<small>{items.length} séries</small></span></button>}
+          {!expanded && items.length > HOME_PAGE_SIZE && <button type="button" className="home-rail-more" onClick={() => switchLayout(true)}><ArrowDown size={22} /><span>Voir en liste<small>{items.length} séries</small></span></button>}
         </div>
         {expanded && items.length > limit && <button type="button" className="watch-next-18c__more-films" onClick={() => setGroupLimits(previous => ({ ...previous, [index]: limit + 12 }))}>Afficher {Math.min(12, items.length - limit)} de plus</button>}
-        {expanded && <button type="button" className="home-series-collapse" onClick={() => setExpandedGroups(previous => ({ ...previous, [index]: false }))}><ChevronUp size={16} />Revenir en carrousel</button>}
+        {expanded && <button type="button" className="home-series-collapse" onClick={() => switchLayout(false)}><ChevronUp size={16} />Revenir en carrousel</button>}
       </section>;
   };
   return <section className="watch-next-18c home-watch" aria-label="À regarder">
     {[0, 1].map(renderSeriesGroup)}
     {orderedMovies.length > 0 && <>
-      <div className="home-section-heading"><h2>Films à voir <span>{movies.length}</span></h2><HomeLayoutSwitch label="Films" list={movieList} onChange={setMovieList} /></div>
+      <div className="home-section-heading"><h2>Films à voir <span>{movies.length}</span></h2><HomeLayoutSwitch label="Films" list={movieList} onChange={switchMovies} /></div>
       <p className="home-movie-order">Ajouts les plus récents</p>
       <div className={movieList ? 'home-movie-list' : 'movie-ticket-rail'} id="films-a-voir-18c">
-        {orderedMovies.slice(0, movieList ? movieCount : HOME_PAGE_SIZE).map(show => <MovieTicketCard key={show.id} show={show} layout={movieList ? 'horizontal' : 'poster'} start={start} onOpen={onOpen} onToggle={toggleMovie} onRuntime={onRuntime} actor={selectTicketActor(actorMetadata.get(`movie:${show.tmdbId}`) || tmdb.peekRenderableMediaDetails(show.tmdbId, 'movie'), favorites, actorIndex)} onActor={actor => setActorSheet({ actor, origin: show })} />)}
-        {!movieList && orderedMovies.length > HOME_PAGE_SIZE && <button type="button" className="home-rail-more home-rail-more--movies" onClick={() => { setMovieList(true); setMovieCount(12); }}><ArrowDown size={22} /><span>Voir en liste<small>{orderedMovies.length} films</small></span></button>}
+        {orderedMovies.slice(0, movieList ? movieCount : movieRailLimit).map(show => <MovieTicketCard key={show.id} show={show} layout={movieList ? 'horizontal' : 'poster'} start={start} onOpen={onOpen} onToggle={toggleMovie} onRuntime={onRuntime} actor={selectTicketActor(actorMetadata.get(`movie:${show.tmdbId}`) || tmdb.peekRenderableMediaDetails(show.tmdbId, 'movie'), favorites, actorIndex)} onActor={actor => setActorSheet({ actor, origin: show })} />)}
+        {!movieList && orderedMovies.length > HOME_PAGE_SIZE && <button type="button" className="home-rail-more home-rail-more--movies" onClick={() => switchMovies(true)}><ArrowDown size={22} /><span>Voir en liste<small>{orderedMovies.length} films</small></span></button>}
       </div>
       {movieList && movieCount < orderedMovies.length && <button type="button" className="watch-next-18c__more-films" onClick={() => setMovieCount(count => count + 12)}>Afficher {Math.min(12, orderedMovies.length - movieCount)} de plus</button>}
+      {movieList && <button type="button" className="home-series-collapse home-movie-collapse" onClick={() => switchMovies(false)}><ChevronUp size={16} />Revenir en carrousel</button>}
     </>}
     {actorSheet && <MovieActorSheet actor={{ ...actorSheet.actor, seen: actorIndex[actorSheet.actor.id]?.seen || [] }} origin={actorSheet.origin} shows={allShows} onClose={() => setActorSheet(null)} onPerson={id => onPerson?.(id)} onOpen={(id, type) => { const known = allShows.find(show => show.tmdbId === id && show.mediaType === type); if (known) onOpen(known.id, type); else onOpenMedia?.(id, type); }} />}
     {renderSeriesGroup(2)}

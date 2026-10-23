@@ -25,7 +25,7 @@
 .home-layout-switch { display:flex; padding:2px; gap:0; border-radius:24px; box-shadow:inset 0 0 0 1px #ffffff14; background:#ffffff0a; }
 .home-layout-switch button { width:44px; height:44px; display:grid; place-items:center; border-radius:50%; color:#71717a; cursor:pointer; }
 .home-layout-switch button[aria-pressed="true"] { background:#e5a93d33; color:#f2c36b; }
-.home-movie-list { display:flex; flex-direction:column; gap:12px; padding-top:10px; }
+.home-movie-list { display:flex; flex-direction:column; gap:12px; padding-top:4px; }
 .home-upcoming-group { padding:4px 0 18px; }
 .home-upcoming-group > h2 { margin:8px 0 10px; }
 .home-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:240px; text-align:center; gap:10px; padding:24px; }
@@ -45,7 +45,7 @@
 .home-sync { width:15px; height:15px; flex-shrink:0; border:2px solid #e5a93d33; border-top-color:#e5a93d; border-radius:50%; animation:homeSync 1s linear infinite; }.home-sync--settled { animation:none; border-color:#e5a93d; width:8px; height:8px; }
 @keyframes homeSync { to { transform:rotate(360deg); } }
 @media (min-width:640px) { .home-header { padding-inline:24px; }.home-panel-content { padding-inline:24px; }.home-series-rail { margin-inline:-24px; padding-inline:24px; scroll-padding-inline:24px; }.home-tabs { max-width:600px; }.home-watchlist { max-width:1100px; width:100%; margin-inline:auto; } }
-@media (prefers-reduced-motion:reduce) { .home-watchlist *, .home-watchlist *::before,.home-watchlist *::after { animation-duration:.01ms !important; transition-duration:.01ms !important; } }
+@media (prefers-reduced-motion:reduce) { .home-watchlist *, .home-watchlist *::before,.home-watchlist *::after { animation-duration:.01ms !important; transition-duration:0s !important; } }
 
 .home-header::after { content:""; position:absolute; left:0; right:0; bottom:-26px; height:26px; pointer-events:none; background:linear-gradient(#08080cdb,#08080c00); backdrop-filter:blur(18px) saturate(160%); -webkit-backdrop-filter:blur(18px) saturate(160%); mask-image:linear-gradient(#000,transparent); -webkit-mask-image:linear-gradient(#000,transparent); }
 .home-layout-switch svg { width:18px; height:18px; fill:currentColor; }
@@ -75,3 +75,5 @@
 .home-rail-more svg { box-sizing:content-box; padding:12px; border-radius:50%; background:#e5a93d26; }.home-rail-more > span { max-width:80px; line-height:1.35; }.home-rail-more small { display:block; margin-top:4px; font-size:10px; color:#a1a1aa; font-weight:600; }
 .home-rail-more--movies { height:252px; margin-top:0; border-radius:14px; }
 .home-movie-order { font-size:11px; color:#a1a1aa; margin:0 0 6px; }
+
+.home-series-rail::after,.movie-ticket-rail::after { content:""; flex:0 0 var(--layout-anchor-tail,0px); pointer-events:none; }

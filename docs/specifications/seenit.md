@@ -1760,3 +1760,6 @@ Tap acteur ouvre une feuille88% radius30, Retour/Échap/fond/swipe bas ferment e
 Plex, précision UID (#744) : le transport exige l’UID capturé par la synchronisation, sans le redéduire de l’auth globale. Après toute attente de migration des identifiants et de préparation des en-têtes, un changement de compte annule la requête ; un refus déjà en vol ne met en pause que son compte d’origine.
 
 Le contrôle post-en-têtes Web se fait dans authenticatedFetch avec expectedUid, immédiatement avant fetch ; le transport Plex transmet ce scope pour la PWA et le secours WebView Android. Le TNR traverse cette façade réelle, getIdToken suspendu, en plus de la voie CapacitorHttp.
+
+
+À voir, retour vidéo (#729) : la bascule carrousel/liste conserve la carte affichée et son ancrage visuel, sans retourner au début ni réordonner la sélection. Capturer l’identité et la position dans le conteneur avant le changement, inclure l’élément même après une liste paginée, puis restaurer le défilement horizontal/vertical sur cette identité. L’icône de mode déjà actif est sans effet. Premier film sans défilement : même bord supérieur dans les deux modes (padding4px). Réinitialiser l’onglet remet explicitement les rails au début.

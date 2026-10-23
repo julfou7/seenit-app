@@ -149,7 +149,7 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
   };
 
   return <>
-    <article className={`series-8f series-8f--${layout}`} aria-labelledby={titleId} style={{ '--series-hue': hue } as React.CSSProperties} data-series-card="8f" data-context={context.kind}>
+    <article className={`series-8f series-8f--${layout}`} aria-labelledby={titleId} style={{ '--series-hue': hue } as React.CSSProperties} data-series-card="8f" data-series-id={show.id} data-context={context.kind}>
       <div className="series-8f__surface" aria-hidden="true">
         {backdropPath && <img className="series-8f__backdrop" src={imageUrl(backdropPath, 'w500')!} loading="lazy" decoding="async" alt="" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} />}
         <div className="series-8f__veil" />

@@ -55,8 +55,8 @@
 @keyframes tkTear { 0%{transform:none;opacity:1}16%{transform:rotate(-3deg) translateY(1px)}32%{transform:rotate(5deg) translate(3px,4px)}100%{transform:translate(30px,80px) rotate(24deg);opacity:0} }
 @keyframes tkStamp { from{transform:translateX(-50%) rotate(-9deg) scale(1.7);opacity:0}to{transform:translateX(-50%) rotate(-9deg) scale(1);opacity:1} }
 @keyframes tkBack { from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1} }
-@media (min-width:640px) { .watch-next-18c { padding-inline:24px; } .movie-ticket-rail { margin-inline:-24px; padding-inline:24px; } }
-@media (prefers-reduced-motion:reduce) { .watch-next-18c *, .watch-next-18c *::before,.watch-next-18c *::after { animation-duration:.01s !important; animation-delay:0s !important; transition-duration:.01s !important; transition-delay:0s !important; } }
+@media (min-width:640px) { .watch-next-18c { padding-inline:24px; } .movie-ticket-rail { margin-inline:-24px; padding-inline:24px; scroll-padding-inline:24px; } }
+@media (prefers-reduced-motion:reduce) { .watch-next-18c *, .watch-next-18c *::before,.watch-next-18c *::after { animation-duration:.01s !important; animation-delay:0s !important; transition-duration:0s !important; transition-delay:0s !important; } }
 .movie-ticket__undo { position:absolute; z-index:5; top:60px; left:50%; transform:translateX(-50%); width:100px; height:64px; cursor:pointer; }
 .movie-ticket__undo-stamp { top:12px; }.movie-ticket--watched .movie-ticket__stub { visibility:hidden; }.movie-ticket--tear.movie-ticket--watched .movie-ticket__stub { visibility:visible; animation:tkTear .7s both,tkHide 0s .7s forwards; }
 /* Billet horizontal 16d : corps 70 px + texte, talon indépendant 96 px. */
