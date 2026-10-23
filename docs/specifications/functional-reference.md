@@ -198,6 +198,9 @@ de synchronisation et ouvre les Notifications avec une cloche et un point or si 
 les preuves Plex en cache, rappels du jour, téléchargements terminés, dates films confirmées, actualités
 et mise à jour. Tout marquer lu conserve l’état par compte ; les actualités réutilisent les préférences
 cloud existantes. Ouvrir un média et marquer Vu restent des actions séparées.
+La présence globale d’une série dans Plex ne produit pas de notification pour son épisode de reprise
+et ne propose pas Vu : ce cache ne contient aucune preuve par épisode. Les films disponibles gardent
+leur action Vu ; les rappels et actualités des séries restent visibles.
 
 ### 5.1 À Regarder
 
@@ -221,6 +224,11 @@ Les sections vides sont masquées. Les badges statut, sans emoji, sont dans le b
 de l’épisode. Les séries anciennes conservent leur nombre de jours exact. En liste, le swipe gauche
 révèle Archiver/Supprimer ; l’appui long et le clavier ouvrent les mêmes actions avec confirmation et
 Annuler. Dans les rails, le glissement fait défiler les cartes sans déclencher de suppression.
+Le total positif de saison fourni par TMDB reste affiché dans les trois contextes, même pour une
+série renouvelée ou sans finale datée. Un ancien indicateur de total inconnu ne masque pas ce nombre.
+Sans total fournisseur ni preuve de finale, les épisodes listés restent une borne connue et « ? » est conservé.
+Le marquage Vu préserve cette distinction ; les anciennes preuves ambiguës sont réactualisées une fois
+par le worker de détails, sans demander une actualisation manuelle.
 Le cadre 8f reste partagé avec À venir et Historique. Vu anime la reprise réellement avancée et son
 tampon SeenIt ; À jour permet de revenir sur le dernier épisode marqué pendant cette session.
 Pendant une écriture Firestore lente, le marquage reste en attente : aucun délai arbitraire

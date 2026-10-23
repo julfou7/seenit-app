@@ -9,7 +9,7 @@ import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useUpdateStore } from '../store/updateStore';
 import type { LiveDownloadItem } from '../services/sonarrRadarr';
 import { getUpcomingEpisodeInfo } from './cards/UpcomingShowCard';
-import { resolveWatchCardResume } from '../features/watchlist/watchCardResume';
+import { canOfferPlexWatchedAction } from '../features/watchlist/homePresentation';
 import { getTodayStr } from '../lib/utils';
 import { DialogLayer } from './ui/DialogLayer';
 import { SeenItCheckButton } from './SeenItCheckButton';
@@ -73,9 +73,8 @@ export function HomeNotifications({ shows, onOpen, onSeen }: { shows: Show[]; on
   const notices: Notice[] = [];
   for (const show of userShows) {
     if (show.isArchived || show.status === 'dropped') continue;
-    const resume = show.mediaType === 'tv' ? resolveWatchCardResume(show, today) : null;
     const available = plex[getPlexMediaKey(show.tmdbId, show.mediaType, uid)];
-    if (available?.available && (show.mediaType === 'movie' ? !show.seenEpisodes.includes('movie') : resume?.episode && !resume.upToDate)) notices.push({ id: `plex:${show.id}:${show.mediaType === 'movie' ? 'movie' : `${resume?.episode?.season_number}x${resume?.episode?.episode_number}`}`, title: show.title, detail: 'Disponible sur Plex', show, mark: true });
+    if (canOfferPlexWatchedAction(show.mediaType, available?.available === true, show.seenEpisodes.includes('movie'))) notices.push({ id: `plex:${show.id}:movie`, title: show.title, detail: 'Disponible sur Plex', show, mark: true });
     const upcoming = getUpcomingEpisodeInfo(show);
     if (upcoming && show.notificationsEnabled && upcoming.air_date === today) notices.push({ id: `reminder:${show.id}:${today}`, title: show.title, detail: 'Rappel de sortie · aujourd’hui', show });
     if (show.mediaType === 'movie' && upcoming && show.firstAirDate && show.firstAirDate >= today) notices.push({ id: `date:${show.id}:${show.firstAirDate}`, title: show.title, detail: `Sortie confirmée · ${new Date(`${show.firstAirDate}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`, show });

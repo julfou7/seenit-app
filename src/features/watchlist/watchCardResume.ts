@@ -26,7 +26,7 @@ export function resolveWatchCardResume(show: Show, today: string): WatchCardResu
     && (!pointer.air_date || isAiredDate(pointer.air_date, today))) return { episode: pointer, upToDate: false };
 
   const seasons = (show.seasonsCache || []) as CachedSeason[];
-  const cachedEpisodes = seasons.filter(season => season.season_number > 0).flatMap(season => (season.episodes || []).map(episode => ({ ...episode, season_number: season.season_number, episode_count: season.episode_count || season.episodes?.length })));
+  const cachedEpisodes = seasons.filter(season => season.season_number > 0).flatMap(season => (season.episodes || []).map(episode => ({ ...episode, season_number: season.season_number, episode_count: season.episode_count || null })));
   const nextCached = cachedEpisodes.filter(episode => validEpisode(episode) && !seen.has(`${episode.season_number}x${episode.episode_number}`) && isAiredDate(episode.air_date, today))
     .sort((a, b) => a.season_number - b.season_number || a.episode_number - b.episode_number)[0];
   if (nextCached) return { episode: nextCached, upToDate: false };

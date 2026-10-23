@@ -3,6 +3,36 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { buildSeriesSeasonProgress, seriesCardPosterCandidates, seriesCardPosterCrossOrigin, seriesCardStaleDetail, seriesCompletionLabel, seriesEpisodeCode, upcomingCardTone } from '../src/features/watchlist/seriesCardPresentation.ts';
 import { dominantPosterHue, readPosterHue, rememberPosterHue, POSTER_HUE_CACHE_LIMIT } from '../src/features/watchlist/posterHue.ts';
+import { buildSeasonProgressEvidence, needsSeasonProgressRefresh } from '../src/features/shows/seasonProgressEvidence.ts';
+
+test('SEENIT-UX-014 affiche le total fourni de MobLand et des séries renouvelées', () => {
+  const episode = { season_number: 1, episode_number: 3, episode_count: 10, season_total_unknown: true, last_season_number: 1, last_known_episode_type: 'standard', last_known_episode_air_date: null };
+  const evidence = buildSeasonProgressEvidence([{ season_number: 1, episode_count: 10, episodes: [{ episode_number: 3, episode_type: 'standard' }] }], false);
+  const show = { seenEpisodes: ['1x1', '1x2'], nextEpisodeToWatch: episode, seasonProgress: evidence, tmdbStatus: 'Returning Series', seriesEnded: false };
+  for (const context of ['watch', 'upcoming', 'history'] as const) {
+    const progress = buildSeriesSeasonProgress(show, episode, context, '2026-10-23');
+    assert.equal(progress.label, 'S1 · 2/10');
+    assert.equal(progress.totalUnknown, false);
+    assert.equal(progress.unknownTail, false, 'le renouvellement et un ancien flag ne masquent pas le total fourni');
+    assert.equal(progress.segments.length, 10);
+  }
+  assert.equal(evidence['1'].episode_count, 10);
+  assert.equal(evidence['1'].season_total_unknown, false);
+  assert.equal(buildSeriesSeasonProgress({ ...show, nextEpisodeToWatch: null, seasonProgress: evidence }, { season_number: 1, episode_number: 3 }, 'history', '2026-10-23').label, 'S1 · 2/10');
+  assert.equal(buildSeriesSeasonProgress({ ...show, nextEpisodeToWatch: null, seasonsCache: [{ season_number: 1, episode_count: 10 }] }, { season_number: 1, episode_number: 3 }, 'watch', '2026-10-23').label, 'S1 · 2/10');
+  const partial = buildSeasonProgressEvidence([{ season_number: 1, episodes: [{ episode_number: 4 }] }], false);
+  assert.equal(partial['1'].episode_count, null, 'quatre épisodes listés ne prouvent pas un total de quatre');
+  assert.equal(partial['1'].season_total_unknown, true);
+  const inferred = { ...episode, episode_count: 4, known_episodes_in_season: 4 };
+  const legacy = { ...show, seasonProgress: { '1': { ...partial['1'], episode_count: undefined } }, nextEpisodeToWatch: inferred };
+  assert.equal(buildSeriesSeasonProgress(legacy, inferred, 'watch', '2026-10-23').label, 'S1 · 2/?', 'un ancien compte de liste ne neutralise pas la preuve inconnue');
+  const oldEvidence = { ...partial['1'] };
+  delete oldEvidence.episode_count;
+  assert.equal(needsSeasonProgressRefresh({ seasonProgress: { '1': oldEvidence } }), true);
+  assert.equal(needsSeasonProgressRefresh({ nextEpisodeToWatch: episode }), true, 'les anciens pointeurs sans preuve de saison sont également réparés');
+  assert.equal(needsSeasonProgressRefresh({ seasonProgress: partial }), false, 'une absence fournisseur confirmée ne déclenche pas une boucle de refresh');
+  assert.equal(needsSeasonProgressRefresh(show), false);
+});
 
 test('SEENIT-UX-014 conserve les états de saison sans inventer les diffusions', () => {
   assert.equal(seriesCompletionLabel({ tmdbStatus: 'Ended' }), 'Série terminée');
@@ -33,7 +63,7 @@ test('SEENIT-UX-014 représente Harry Potter et toute saison ouverte sans faux t
   const episode = {
     season_number: 1,
     episode_number: 3,
-    episode_count: 4,
+    episode_count: null,
     aired_episodes_in_season: 3,
     known_episodes_in_season: 4,
     season_total_unknown: true,
@@ -45,7 +75,7 @@ test('SEENIT-UX-014 représente Harry Potter et toute saison ouverte sans faux t
     seenEpisodes: ['1x1', '1x2'],
     seasonsCache: [],
     nextEpisodeToWatch: episode,
-    nextEpisodeToAir: { season_number: 1, episode_number: 4, episode_count: 4, air_date: '2026-11-01' },
+    nextEpisodeToAir: { season_number: 1, episode_number: 4, episode_count: null, air_date: '2026-11-01' },
     seriesEnded: false,
     tmdbStatus: 'Returning Series',
   };
@@ -60,6 +90,7 @@ test('SEENIT-UX-014 représente Harry Potter et toute saison ouverte sans faux t
 
   const finale = buildSeriesSeasonProgress({ ...show, nextEpisodeToAir: null }, {
     ...episode,
+    episode_count: 4,
     season_total_unknown: false,
     last_known_episode_type: 'finale',
     last_known_episode_air_date: '2026-11-01',

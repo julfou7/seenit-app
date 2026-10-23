@@ -18,6 +18,10 @@
         {
           "file": "tests/homePresentation.test.ts",
           "contains": "SEENIT-UX-018 conserve trois onglets sans compteurs"
+        },
+        {
+          "file": "tests/homePresentation.test.ts",
+          "contains": "SEENIT-UX-018 refuse une preuve Plex globale de série pour proposer Vu"
         }
       ]
     },
@@ -2070,6 +2074,14 @@
         {
           "file": "tests/seriesCardPresentation.test.ts",
           "contains": "SEENIT-UX-014 conserve les états de saison sans inventer les diffusions"
+        },
+        {
+          "file": "tests/seriesCardPresentation.test.ts",
+          "contains": "SEENIT-UX-014 affiche le total fourni de MobLand et des séries renouvelées"
+        },
+        {
+          "file": "tests/markEpisodeSeasonTotal.test.ts",
+          "contains": "SEENIT-UX-014 Vu conserve le total fournisseur sans transformer la liste partielle en total"
         },
         {
           "file": "tests/seriesCardPresentation.test.ts",

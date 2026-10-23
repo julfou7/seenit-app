@@ -131,8 +131,10 @@ export function buildSeriesSeasonProgress(
   });
   const seen = new Set(seenEntries.filter(item => item.season === season).map(item => item.episode));
 
-  const advertisedTotal = pointers.map(pointer => count(pointer.episode_count ?? (pointer.season_total_unknown === false ? pointer.known_episodes_in_season : null))).find(value => value !== null && value > 0)
-    ?? count(cached?.episode_count)
+  const explicitTotalState = pointers.find(pointer => typeof pointer.season_total_unknown === 'boolean')?.season_total_unknown;
+  const advertisedTotal = (count(show.seasonProgress?.[String(season)]?.episode_count) || null)
+    ?? (explicitTotalState === true ? null : pointers.map(pointer => count(pointer.episode_count === undefined && pointer.season_total_unknown === false ? pointer.known_episodes_in_season : pointer.episode_count)).find(value => value !== null && value > 0)
+      ?? (count(cached?.episode_count) || null))
     ?? null;
   const cachedKnown = (cached?.episodes || []).reduce((highest, item) => Math.max(highest, count(item.episode_number) || 0), 0);
   const pointerKnown = Math.max(0, ...pointers.map(pointer => count(pointer.known_episodes_in_season) || 0));
@@ -158,7 +160,6 @@ export function buildSeriesSeasonProgress(
   const isLatestSeason = season === lastSeasonNumber;
   // L'épisode présenté est le premier candidat : une nouvelle preuve ne doit pas être
   // invalidée par l'ancien pointeur encore stocké sur le Show.
-  const explicitTotalState = pointers.find(pointer => typeof pointer.season_total_unknown === 'boolean')?.season_total_unknown;
   const cachedLast = [...(cached?.episodes || [])]
     .filter(item => typeof item.episode_number === 'number')
     .sort((a, b) => b.episode_number - a.episode_number)[0];
@@ -172,7 +173,7 @@ export function buildSeriesSeasonProgress(
     || lastPointer?.air_date
     || null;
   const datedFinale = lastKnownType === 'finale' && Boolean(lastKnownAirDate);
-  const unknownTail = !statusEnded && isLatestSeason && (
+  const unknownTail = advertisedTotal === null && !datedFinale && !statusEnded && isLatestSeason && (
     explicitTotalState === true || (explicitTotalState !== false && !datedFinale)
   );
   const totalUnknown = unknownTail || (advertisedTotal === null && !datedFinale);

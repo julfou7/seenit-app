@@ -11,6 +11,10 @@ const date = (days: number) => { const value = new Date(); value.setDate(value.g
 const extra: Show[] = [0, 3, 12].map((days, index) => ({ ...base.initialShows[0], id: `upcoming-${index}`, title: ['Sortie du jour', 'Épisode cette semaine', 'Sortie plus tard'][index], notificationsEnabled: true, nextEpisodeToAir: { season_number: 2, episode_number: 1, name: 'Un nouvel épisode', air_date: date(days) }, nextEpisodeToWatch: null }));
 const history: Show[] = Array.from({ length: 12 }, (_, index) => ({ ...base.initialShows[8], id: `history-${index}`, title: `Film vu ${index+1}`, status: 'completed', seenEpisodes: ['movie'], episodeRecords: { movie: { watchedAt: Date.now()-index*60_000 } } }));
 base.useShowsStore.setState({ shows: [...base.initialShows, ...extra, ...history] });
+base.usePlexAvailabilityStore.setState({ cache: {
+  ...base.usePlexAvailabilityStore.getState().cache,
+  'tv:10': { available: true, serverName: 'Série partielle' },
+} });
 export function useShows() { return { shows: base.useShowsStore(state => state.shows), loading: false, updateShow: base.updateShow }; }
 export const useDownloadConfigStore = create(() => ({ downloadsEnabled: false, userPlatforms: [] }));
 export const useLiveDownloadStore = create(() => ({ downloads: [] }));
