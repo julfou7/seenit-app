@@ -69,3 +69,9 @@
 
 .home-swipe--open .home-swipe__actions { visibility:visible; }
 .home-explore { min-height:44px; padding:0 22px; border-radius:22px; background:#e5a93d; color:#0b0b0f; font-size:14px; font-weight:800; cursor:pointer; }
+
+.home-upcoming-group > h2 { font-size:13px; line-height:18px; font-weight:700; color:#a1a1aa; letter-spacing:0; margin:8px 4px 10px; }
+.home-rail-more { flex:0 0 106px; width:106px; height:150px; margin-top:20px; border-radius:22px; background:#111114; box-shadow:inset 0 0 0 1px #ffffff14; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; color:#f2c36b; font-size:13px; font-weight:800; text-align:center; scroll-snap-align:start; cursor:pointer; }
+.home-rail-more svg { box-sizing:content-box; padding:12px; border-radius:50%; background:#e5a93d26; }.home-rail-more > span { max-width:80px; line-height:1.35; }.home-rail-more small { display:block; margin-top:4px; font-size:10px; color:#a1a1aa; font-weight:600; }
+.home-rail-more--movies { height:252px; margin-top:0; border-radius:14px; }
+.home-movie-order { font-size:11px; color:#a1a1aa; margin:0 0 6px; }

@@ -93,3 +93,29 @@
 .movie-ticket__undo-stamp { transform:translateX(-50%) rotate(-8deg); }.movie-ticket--horizontal .movie-ticket__check[data-error="true"] { outline:2px solid #fb7185; outline-offset:-3px; }.movie-ticket--horizontal .movie-ticket__check { transform:none; }.home-watch .movie-ticket-grid { grid-template-columns:repeat(auto-fill,minmax(144px,1fr)); justify-items:center; }
 
 .movie-ticket--poster > h3 { margin-top:10px; }
+
+/* ZIP(9): readable two-line titles, actor row, year-only metadata. */
+.movie-ticket__info { display:flex; flex-direction:column; gap:7px; z-index:3; }
+.movie-ticket__info h3 { flex-shrink:0; height:auto; min-height:18px; max-height:none; line-height:18px; overflow:hidden; }
+.movie-ticket__info p { flex-shrink:0; margin:0; height:18px; font-weight:600; }
+.movie-ticket__main { gap:12px; padding-right:10px; }
+.movie-ticket--horizontal .movie-ticket__info { max-height:104px; }
+.movie-actor-slot { height:34px; position:relative; margin-top:0; }
+.movie-ticket--poster > .movie-actor-slot { margin-top:-10px; height:44px; }
+.movie-actor-line { position:relative; min-height:44px; width:100%; display:flex; align-items:center; gap:7px; text-align:left; z-index:4; pointer-events:auto; cursor:pointer; }
+.movie-actor-line > span:last-child { display:flex; flex-direction:column; gap:1px; min-width:0; }
+.movie-actor-line strong,.movie-actor-line small { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.2; }
+.movie-actor-line strong { font-size:11px; font-weight:700; color:#e4e4e7; }
+.movie-actor-line small { font-size:10px; font-weight:700; color:#f2c36b; }
+.movie-actor-line--neutral strong { color:#a1a1aa; }
+.movie-actor-avatar { width:26px; height:26px; flex-shrink:0; position:relative; display:grid; place-items:center; border-radius:50%; overflow:hidden; background:hsl(var(--ticket-hue,260) 30% 26%); color:#ffffffd9; font-size:9px; font-weight:800; box-shadow:0 0 0 1px #ffffff38; }
+.movie-actor-avatar img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.movie-actor-avatar--favorite { box-shadow:0 0 0 2px #e5a93d; }.movie-actor-avatar--known { box-shadow:0 0 0 1.5px #f2c36b8c; }
+.movie-actor-slot--list { height:32px; flex-shrink:0; }
+.movie-actor-slot--list .movie-actor-line { height:44px; min-height:44px; top:-6px; gap:8px; }
+
+.movie-actor-slot--list strong { font-size:12px; }.movie-actor-slot--list small { font-size:11px; }
+.movie-ticket__check svg.seenit-screen-glyph { height:19.24px; width:26px; }
+.movie-ticket__check svg.seenit-screen-glyph rect { stroke:#f2c36b; stroke-width:8px; }
+.movie-ticket__check svg.seenit-screen-glyph > path { stroke:#f2c36b; }
+.movie-ticket--horizontal .movie-ticket__check svg.seenit-screen-glyph { bottom:20.38px; }

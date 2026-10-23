@@ -1,3 +1,4 @@
+import { getPlexSyncRetryAt, PlexSyncHttpError } from './plexSyncRetry';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { db, auth } from '../../lib/firebase';
 import { collection, doc, writeBatch, getDocs, getDocFromServer, runTransaction, setDoc, updateDoc, deleteField } from 'firebase/firestore';
@@ -118,6 +119,12 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       return { success: false, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [], error: 'Utilisateur non connecté' };
     }
 
+    const retryAt = getPlexSyncRetryAt(user.uid);
+    if (retryAt) {
+      const message = new PlexSyncHttpError(429, retryAt).message;
+      if (!silent) useToastStore.getState().showToast(message, 'info');
+      return { success: false, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [], error: message };
+    }
     let cloudPlexState: Record<string, any>;
     try {
       cloudPlexState = await loadPlexCloudState(user.uid);
@@ -1103,13 +1110,15 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         syncedItems,
         ...(canCommitCursor ? {} : { error: describeIncompletePlexSync(plexData?.integrity, retryableUnresolvedCount) })
       };
-    } catch (err: any) {
-      const technicalErrorMsg = err?.message || String(err);
+    } catch (err: unknown) {
+      if (auth.currentUser?.uid !== user.uid) return { success: false, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [], error: 'Compte SeenIt modifié pendant la synchronisation' };
+      const technicalErrorMsg = err instanceof Error ? err.message : String(err);
       const errorMsg = describeBackendNetworkFailure(err);
       appLogger.error('plex', 'Exception lors de la synchronisation Plex', { error: technicalErrorMsg });
-      clearPlexSyncStatusDelayed(`Erreur Plex : ${errorMsg}`, 4000);
+      const limited = err instanceof PlexSyncHttpError && err.retryAt > 0;
+      clearPlexSyncStatusDelayed(limited ? 'Synchronisation Plex en pause' : `Erreur Plex : ${errorMsg}`, 4000);
       if (!silent) {
-        useToastStore.getState().showToast(`Erreur de synchronisation Plex : ${errorMsg}`, 'error');
+        useToastStore.getState().showToast(limited ? errorMsg : `Erreur de synchronisation Plex : ${errorMsg}`, limited ? 'info' : 'error');
       }
       return { success: false, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [], error: errorMsg };
     }

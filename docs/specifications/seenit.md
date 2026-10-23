@@ -716,6 +716,15 @@ pour le cache des sagas et univers.
   redécouverte forcée échoue, la dernière liste de serveurs connue reste le fallback. Un timeout, une
   panne réseau, un `401` ou un `5xx` conserve l'état connu et ne devient jamais `available:false` ; seul un
   `2xx` explicite contenant `available:false` autorise l'alimentation du cache négatif.
+  Pour la synchronisation, un statut HTTP est contrôlé avant tout décodage JSON, en natif comme en Web.
+  Une réponse 429 texte ne provoque ni exception de parsing ni tentative immédiate sur une autre
+  origine/transport. Retry-After (secondes ou date HTTP) est respecté ; sans délai valide, pause de
+  60 secondes. Le délai est local et cloisonné par UID, survit au remontage/redémarrage et n’est pas
+  contourné par ignoreCooldown. Un refus ne modifie ni progression, ni cache, ni curseur de réussite.
+  À la reprise, les événements focus/visibilité/activité native sont regroupés ; Plex est différé
+  de 2 secondes, les détails de 5 secondes, puis les throttles habituels restent applicables.
+  Le retour en arrière-plan, la déconnexion et le démontage annulent les travaux différés ;
+  aucun polling du worker Plex en arrière-plan WebView. Les tâches natives dédiées restent séparées.
 - **SEENIT-PLEX-003** — Le curseur n'est validé qu'après collecte suffisamment complète,
   résolution sans échec transitoire et écritures Firestore réussies.
 - **SEENIT-PLEX-004** — Jeton Plex, curseur et caches de résolution/disponibilité sont cloisonnés
@@ -1223,13 +1232,12 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   sans preuve Plex par épisode, elle ne crée ni notification épisode ni action Vu. Les films dont
   l’identité exacte est disponible conservent leur notification et leur action réversible.
   À regarder conserve trois sections distinctes (Continuer, Nouveautés, Pas vu depuis un moment),
-  chacune en rail de trois cartes puis liste progressive via la bascule à deux icônes. Les badges
+  chacune en rail de six cartes puis tuile Voir en liste et liste par douze via la bascule à deux icônes. Les badges
   statut sans emoji sont à côté du code épisode ; le rappel de sortie utilise une pastille rectangulaire J-X (auj. aujourd’hui), sans cercle de progression ni badge de statut dans À venir.
   Films à voir précède Pas vu depuis un moment, qui reste en dernière position.
   À venir groupe Aujourd’hui, Cette semaine (sept jours suivants), Plus tard selon le calendrier local.
   L’historique mixte est paginé par dix. Les sections vides disparaissent et les états chargement,
-  cache hors ligne et synchronisation restent explicites. Les films affichent trois billets puis trois
-  de plus, avec bascule carrousel/liste ; toucher le tampon Vu annule le marquage.
+  cache hors ligne et synchronisation restent explicites. Les films affichent six billets puis Voir en liste, avec pagination par douze ; toucher le tampon Vu annule le marquage.
 - **SEENIT-UX-016** — Les cartes 8f et les tickets films réutilisent les écritures réversibles existantes.
   La séparation des groupes et leur présentation suivent désormais `SEENIT-UX-018`.
   Un Vu abouti anime l'épisode quitté, la nouvelle reprise réelle, le segment et un tampon SeenIt ;
@@ -1237,10 +1245,8 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   Une écriture Firestore encore en attente reste en cours, sans faux échec ni rollback local sur
   délai arbitraire ; seul son rejet définitif restaure l'état antérieur. Le succès attend son acquittement.
   Les films sont des billets en carrousel affiche ou liste horizontale : fin depuis Maintenant,
-  actualisée chaque minute et orange après minuit ; sans durée, aucune fin inventée. Le tri place les
-  durées connues en ordre croissant, les inconnues après ; une coche conserve sa place pendant la session,
-  puis la liste est rafraîchie à sa réouverture/réinitialisation. Déchirure, état vu persistant et
-  recollement suivent les écritures métier réversibles existantes. Carrousel et liste paginés par trois.
+  actualisée chaque minute et orange après minuit ; sans durée, aucune fin inventée. Le tri visible par ajout récent puis identité est stable pendant l’enrichissement et la navigation ; une coche conserve sa place pendant la session. Déchirure, état vu persistant et
+  recollement suivent les écritures métier réversibles existantes. Carrousel de six films puis liste paginée par douze.
   Cibles >=44 px, clavier, annonces live et
   reduced-motion sont communs PWA/APK ; identité, preuve de diffusion et diffuseur ne sont pas réinventés.
 - **SEENIT-UX-015** — L'historique mélange films et épisodes dans une seule liste compacte v3,
@@ -1740,3 +1746,12 @@ point non lu. La feuille conserve les vignettes et les actions métier existante
 Le total provisoire d’une liste partielle ne retire jamais « ? ». Les deux synchronisations conservent
 une version de preuve du total afin de réparer une fois les anciennes preuves ambiguës.
 La collecte différée est close par la demande explicite « Go apk » du 23 octobre. Le centrage J-X/auj. est vérifié sur la carte, la surface et le texte, indépendamment de la cloche.
+
+
+### À voir — retour terrain v1.4.219 et ZIP (9), 23 octobre 2026 (#729)
+
+Les rails séries et films montrent six cartes puis une tuile « Voir en liste », alternative à la bascule d’en-tête. La liste expose tous les éléments par lots de douze. L’ordre films est stable par date d’ajout (récent en premier, identité exacte en départage) : ni les durées chargées en arrière-plan, ni les passages entre onglets, ni les heures de fin ne le modifient. Ce choix explicite remplace le tri implicite par durée devenu instable au chargement. Les heures de fin continuent à utiliser la durée réelle.
+Les actions Vu et J-X des cartes 8f sont centrées dans la zone supérieure de contenu (centre à58px dans le corps150px, référence ckTop34 + cible48), au-dessus de la saison segmentée ; la cloche indépendante ne participe pas au centrage. Les groupes À venir utilisent13px/700 neutre, selon la maquette. Le même glyphe écran/check de la référence est partagé entre cartes séries et billets films.
+
+La spécification jointe SPEC-ACTEURS-FILMS.md / SeenIt Prototype.dc.html du ZIP(9) est intégrée : un acteur du top10 ordonné du casting en cache, premier favori sinon maximum de titres vus puis order, sinon premier rôle neutre. Aucun appel supplémentaire pour afficher un acteur ; absent si casting inconnu, emplacement34px réservé dans le rail. Index local par UID recalculé après mise à jour des métadonnées/synchronisation et Vu/Non vu, depuis les castings déjà persistés. Favori/raison/initiales/anneaux et nom initiale+nom conformes au ZIP. Billet104px : titre15px sur deux lignes sans rognage, acteur26px, diffuseur18px et année seule, aucune durée dans cette ligne.
+Tap acteur ouvre une feuille88% radius30, Retour/Échap/fond/swipe bas ferment et restaurent le focus. Bandeau150px, avatar76px, rôle d’origine, favoris via favoritePeopleStore avec toast, titres vus96×144, suggestions non vues3 maximum (suivi prioritaire puis disponibilité déjà connue), ajout via useShows existant, filmographie vers PersonDetailModal. combined_credits chargé uniquement à l’ouverture et mis en cache ; erreur réessayable sans données inventées. Heures ensemble affichées uniquement si toutes les durées nécessaires sont connues. Les quatre autres concepts du fichier Acteurs restent hors périmètre.

@@ -30,6 +30,14 @@
         {
           "file": "tests/watchlistCarouselUx.test.ts",
           "contains": "#729 conserve les accès aux listes complètes par les icônes de vue"
+        },
+        {
+          "file": "tests/movieActors.test.ts",
+          "contains": "SEENIT-UX-018 choisit le favori puis le plus connu"
+        },
+        {
+          "file": "tests/movieActors.test.ts",
+          "contains": "SEENIT-UX-018 conserve le même ordre malgré"
         }
       ]
     },
@@ -653,6 +661,14 @@
         {
           "file": "tests/plexAvailabilityBackend.test.ts",
           "contains": "SEENIT-PLEX-002 force la redécouverte des serveurs sans affaiblir le cache normal"
+        },
+        {
+          "file": "tests/plexResumeRateLimit.test.ts",
+          "contains": "SEENIT-PLEX-002 le transport réel conserve le refus HTTP natif et son délai sans parsing ni rafale"
+        },
+        {
+          "file": "tests/plexResumeWorker.test.ts",
+          "contains": "SEENIT-PLEX-002 le worker réel regroupe et annule les reprises hors écran"
         }
       ]
     },
@@ -668,6 +684,10 @@
         {
           "file": "tests/plexSyncIntegrity.test.ts",
           "contains": "ne valide le curseur qu’après collecte, résolution et écritures complètes"
+        },
+        {
+          "file": "tests/plexResumeRateLimit.test.ts",
+          "contains": "SEENIT-PLEX-003 la synchronisation réelle ne touche pas au curseur"
         }
       ]
     },

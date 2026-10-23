@@ -208,7 +208,7 @@ export class TMDBClient {
       const fallback = queued || cached;
 
       const response = await tryCatch(authenticatedFetch(url.toString()));
-      if (!response.ok) return fallback ? ok(fallback.data) : err((response as any).error);
+      if (response.ok === false) return fallback ? ok(fallback.data) : err(response.error);
       if (!response.value.ok) {
         return fallback && isPublicMetadataFallbackStatus(response.value.status)
           ? ok(fallback.data)
@@ -239,7 +239,7 @@ export class TMDBClient {
       const fallback = queued || cached;
 
       const response = await tryCatch(authenticatedFetch(requestUrl.toString()));
-      if (!response.ok) return fallback ? ok(fallback.data) : err((response as any).error);
+      if (response.ok === false) return fallback ? ok(fallback.data) : err(response.error);
       if (!response.value.ok) {
         return fallback && isPublicMetadataFallbackStatus(response.value.status)
           ? ok(fallback.data)
@@ -474,6 +474,7 @@ export class TMDBClient {
     this.detailRenderCache.set(cacheKey, snapshot);
     if (persist) {
       writePublicMetadataCache('detail_render', cacheKey, snapshot, storedAt ? { now: storedAt } : undefined);
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof Event === 'function') window.dispatchEvent(new Event('seenit-metadata-cached'));
     }
     return snapshot;
   }
@@ -693,7 +694,7 @@ export class TMDBClient {
       const endpoint = type === 'movie' ? 'release_dates' : 'content_ratings';
       const url = new URL(`${this.baseUrl}/${type}/${normalizedId}/${endpoint}`);
       const response = await tryCatch(authenticatedFetch(url.toString()));
-      if (!response.ok) return err((response as any).error);
+      if (response.ok === false) return err(response.error);
       if (!response.value.ok) return err(new Error(`TMDB Error: ${response.value.status}`));
       const data = await tryCatch(response.value.json());
       if (!data.ok) return err((data as any).error);

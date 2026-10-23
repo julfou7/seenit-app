@@ -142,8 +142,8 @@ obligation d'architecture. Les cartes et en-têtes consomment ces rôles plutôt
 
 La [refonte À voir](../design/home-a-voir.md), #729 / `SEENIT-UX-018`, sépare trois panneaux
 sans scrollspy ni swipe entre panneaux. À regarder retrouve ses trois sections séries, chacune
-en rail de trois cartes avec bascule à icônes vers la liste. Le carrousel affiche et la liste de billets horizontaux progressent
-par trois ; toucher Vu ou Annuler recolle le billet. L’historique progresse par dix, les sorties
+en rail de six cartes puis Voir en liste avec bascule à icônes vers la liste. Le carrousel affiche six films et la liste de billets horizontaux progresse
+par douze ; toucher Vu ou Annuler recolle le billet. L’historique progresse par dix, les sorties
 par Aujourd’hui/Cette semaine/Plus tard (jusqu’à J-7 inclus). Les badges sans emoji sont près du code épisode, la cloche
 du header ouvre les notifications ; les commandes et confirmations métier restent partagées.
 

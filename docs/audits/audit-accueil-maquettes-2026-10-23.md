@@ -55,3 +55,24 @@ Le ZIP actualisé a été identifié après le premier lot 2625ab8 ; la déclara
 ## Contrôle avant APK — centrage demandé
 
 L’utilisateur autorise désormais la publication et signale le centrage du bouton sur home-upcoming-412.jpg. La colonne d’action réserve explicitement 48 px et centre son contenu ; la cloche reste hors flux. Le contrôle navigateur mesure séparément cible, surface et texte pour auj., J-5, J-31 et J-132, à 360/412/1280 px, avec un écart maximal de 0,5 px au centre du corps de carte. Cette demande lève le report de publication après les validations.
+
+
+## Retour terrain v1.4.219 et réception ZIP (9)
+
+Baseline59022f331d6e30d115e91d52ce4221664961a783. Source : quatre captures du23octobre18h46/19h18 et SPEC-ACTEURS-FILMS.md / SeenIt Prototype.dc.html (ZIP9). Terrain KO du centrage précédent : l’hypothèse du centre du corps entier était erronée. La référence expose ckTop34px + cible48px, donc centre58px dans le corps150px, et non75px. Le nouveau TNR passe par SeriesEpisodeCard réel et mesure ce repère de référence.
+
+| Constat | Frontière de production / cause | Correction attendue et preuve | Suivi |
+|---|---|---|---|
+| Rail séries limité à3 | WatchNextSection slice3 sans tuile terminale | six puis Voir en liste, liste par12 ; clic réel Chromium vers8séries | #729 |
+| Films limités et ordre mouvant | slice3 ; sort sur durées enrichies en asynchrone | six puis liste, ajout récent/identité stable, libellé visible ; TNR permutation source/durée | #729 |
+| Glyphes films/séries différents | SVG signature100×100 avec marges internes vs compact maquette100×74 | variante partagée écran/check, mêmes proportions | #729 |
+| Vu/J-X trop bas | contrôle centré sur150px au lieu de la zone supérieure116px | centre58px, cloche hors flux ; mesures360/412/1280 | #729 |
+| Groupes À venir trop gros | règle partagée20px des titres de sections |13px/700 neutres selon prototype | #729 |
+| Punisher rogné | titre deux lignes borné et métriques CSS | titre15px/18px, deux lignes complètes, aucun overflow104px | #729 |
+| Liste films peu informative | absence du module acteur du ZIP9 | acteur local top10/favori/connu/neutre, année seule, métadonnées100px dans corps104 | #729 |
+| Mini-fiche acteur | nouvelle évolution explicite ZIP9 | DialogLayer/favoris/addShow/PersonDetailModal réutilisés, demande unique combined_credits à l’ouverture, cache UID, focus/Retour | #729 |
+
+Validation en cours : tests de sélection/ordre et transport Plex verts, compilation TypeScript en cours de confirmation, smoke Chromium en cours. Aucune validation téléphone physique déduite des captures navigateur. Les anciennes assertions de centre75px et de rail3 sont remplacées par les références ZIP9, sans masquer les effets métier. Difficulté effectivement rencontrée : TNR textuels anciens contraignant la valeur3 malgré le nouveau besoin ; ils suivent maintenant HOME_PAGE_SIZE et des interactions de composants réels vérifient l’accès exhaustif. Le suivi #729 porte ces constats, sans issue doublon.
+
+
+Validation finale du lot ZIP9/Plex :1019/1019 tests unitaires verts ; smoke Chromium complet360/412/1280 vert, notamment accès aux8séries et22films par tuile/lots, Punisher sur2lignes dans104px, filmographie à l’ouverture/réouverture en cache, favoritisme et ajout via les handlers, Échap/Retour et focus, isolation au changement de compte. Captures mini-fiche412, billets360 et À venir412 inspectées. Les mesures8f utilisent58px et non l’ancien centre75px. La première fixture ne reproduisait pas le reset favoris à l’authentification : alignée sur le listener réel avant le TNR d’isolation. Les tests réseau localhost/Git temporaires requièrent le contexte de validation autorisé sous Windows ; leur relance autorisée est verte. Validation canonique APK requise avant push ; téléphone physique et latence réelle restent à vérifier dans la prochaine APK groupée.

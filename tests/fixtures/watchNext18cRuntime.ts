@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { Show } from '../../src/types';
 export const auth = { currentUser: { uid: 'fixture-a' } };
 export const db = {};
-export const telemetry = { writes: [] as Array<{ path: string[]; payload: Record<string, unknown> }>, details: [] as number[], opens: [] as string[], failNext: false, holdNext: false, vibrations: [] as number[] };
+export const telemetry = { writes: [] as Array<{ path: string[]; payload: Record<string, unknown> }>, details: [] as number[], opens: [] as string[], failNext: false, holdNext: false, vibrations: [] as number[], actorRequests: 0 };
 export const fixtureNow = new Date(2026, 9, 21, 22, 30).getTime();
 let clock = fixtureNow;
 Date.now = () => clock;
@@ -13,10 +13,10 @@ const base: Show = { id: 'series-0', userId: 'fixture-a', tmdbId: 10, title: 'St
   firstAirDate: '2020-01-01', totalAiredEpisodes: 3, totalEpisodes: 3, seenEpisodes: ['1x1'], episodeRecords: { '1x1': { watchedAt: fixtureNow - 2 * 86_400_000 } },
   nextEpisodeToWatch: { season_number: 1, episode_number: 2, episode_count: 3, aired_episodes_in_season: 3, name: 'Épisode deux', air_date: '2020-01-01' },
 };
-const durations = [150, 80, null, 100, 100, 169, 90, 120, 130, 200];
+const durations = [150, 80, null, 100, 100, 169, 90, 120, 130, 200, ...Array.from({length:12},()=>95)];
 export const initialShows: Show[] = [
   ...Array.from({ length: 8 }, (_, index) => ({ ...base, id: `series-${index}`, tmdbId: 10 + index, title: ['Stranger Things', 'Game of Thrones', 'The Boys', 'Dark', 'Mercredi', 'Arcane', 'Slow Horses', 'Le Bureau des légendes'][index] })),
-  ...durations.map((runtime, index) => ({ ...base, id: `movie-${index}`, tmdbId: 100 + index, mediaType: 'movie' as const, title: ['Dune : Deuxième partie', 'Le Robot sauvage', 'Durée inconnue et titre de film très long sur deux lignes', 'Jurassic Park', 'Retour vers le futur', 'Interstellar', 'Zootopie', 'Un film', 'Un autre film', 'Oppenheimer'][index],
+  ...durations.map((runtime, index) => ({ ...base, id: `movie-${index}`, tmdbId: 100 + index, mediaType: 'movie' as const, title: ['The Punisher : One Last Kill', 'Le Robot sauvage', 'Durée inconnue et titre de film très long sur deux lignes', 'Jurassic Park', 'Retour vers le futur', 'Interstellar', 'Zootopie', 'Un film', 'Un autre film', 'Oppenheimer'][index] || `Film ${index + 1}`,
     seenEpisodes: [], episodeRecords: {}, runtime, firstAirDate: '2024-01-01',
     posterPath: index === 2 ? null : index === 3 ? 'http://127.0.0.1:4173/absent-poster.png' : poster,
     backdropPath: index === 2 ? null : backdrop,
@@ -40,7 +40,8 @@ export async function updateDoc(path: string[], payload: Record<string, unknown>
 }
 export const switchAccount = () => {
   auth.currentUser = { uid: 'fixture-b' };
-  useShowsStore.setState({ shows: initialShows.map(show => ({ ...show, userId: 'fixture-b' })) });
+  useFavoritePeopleStore.setState({people:[]}); // Same scope reset as the production auth listener.
+  useShowsStore.setState({ shows: initialShows.map(show => ({ ...show, userId: 'fixture-b', seenEpisodes: [], episodeRecords: {} })) });
 };
 export const useLogStore = { getState: () => ({ addLog: () => {} }) };
 export const appLogger = { info() {}, warn() {}, error() {}, debug() {} };
@@ -50,10 +51,16 @@ const providers = { results: { FR: { flatrate: [{ provider_id: 8, provider_name:
 export const tmdb = {
   peekWatchProviders: () => providers,
   getWatchProviders: async () => ({ ok: true, value: providers }),
-  peekMediaDetails: (id: number) => ({ runtime: durations[id - 100] ?? null, release_date: '2024-01-01' }),
+  peekMediaDetails: (id: number) => ({ runtime: durations[id - 100] ?? null, release_date: '2024-01-01', credits: id === 102 ? undefined : {cast: id < 100 ? [{id:501,name:'Sean Astin',character:'Bob',order:0}] : [{id:502,name:'Premier Rôle',order:0},{id:501,name:'Sean Astin',character:'Mikey Walsh',order:1}] } }),
+  peekRenderableMediaDetails: (id: number) => tmdb.peekMediaDetails(id),
+  primeMediaRenderSnapshotFromPersistentCache: async () => true,
+  getPersonCredits: async () => { telemetry.actorRequests++; return { ok: true, value: { cast: [...Array.from({length:8},(_,i)=>({id:10+i,media_type:'tv',name:`Série ${i}`,character:'Bob'})),{id:100,media_type:'movie',title:'The Punisher : One Last Kill',character:'Mikey Walsh'},{id:999,media_type:'movie',title:'Film à ajouter',character:'Un rôle'}] } }; },
   getMovieDetails: async (id: number) => { telemetry.details.push(id); return { ok: true, value: tmdb.peekMediaDetails(id) }; },
   getSeasonDetails: async (_id: number, season: number) => {
     await new Promise(resolve => setTimeout(resolve, 20));
     return { ok: true, value: { season_number: season, episodes: [1, 2, 3].map(episode => ({ season_number: season, episode_number: episode, name: `Épisode ${episode}`, air_date: '2020-01-01', still_path: backdrop })) } };
   },
 };
+
+export const useFavoritePeopleStore = create<{ people: Array<{id: number; name: string}>; addPerson: (person: {id: number; name: string}) => void; removePerson: (id: number) => void }>(set => ({ people: [], addPerson: person => set(state => ({people:[...state.people,person]})), removePerson: id => set(state => ({people:state.people.filter(person=>person.id!==id)})) }));
+export function useShows() { return { shows: useShowsStore(state => state.shows), addShow: async (data: Omit<Show,'id'|'userId'>) => { const id=`added-${data.tmdbId}`; useShowsStore.setState(state=>({shows:[...state.shows,{...data,id,userId:auth.currentUser.uid}]})); return id; }, updateShow }; }

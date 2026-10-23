@@ -1,3 +1,7 @@
+import { appLogger } from '../store/logStore';
+import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
+import { getPlexSyncRetryAt } from '../features/plex/plexSyncRetry';
 import { useEffect, useRef } from 'react';
 import { buildSeasonProgressEvidence, needsSeasonProgressRefresh } from '../features/shows/seasonProgressEvidence';
 import { db, auth, sendNativeNotification } from '../lib/firebase';
@@ -459,81 +463,63 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
 
     setSyncStatus(null);
     return { success: true, syncedCount };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[SyncWorker] Error fetching shows to sync:", err);
     setSyncStatus(null);
-    return { success: false, syncedCount, error: err?.message || String(err) };
+    return { success: false, syncedCount, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
 export function useDetailsSyncWorker() {
-  const lastRunRef = useRef<number>(0);
-  const lastPlexRunRef = useRef<number>(0);
-
+  const lastRunRef = useRef(new Map<string, number>());
+  const lastPlexRunRef = useRef(new Map<string, number>());
   useEffect(() => {
+    let disposed = false;
+    let nativeActive = true;
+    let plexTimer: ReturnType<typeof setTimeout> | null = null;
+    let detailsTimer: ReturnType<typeof setTimeout> | null = null;
+    const visible = () => !disposed && nativeActive && document.visibilityState === 'visible';
+    const logWorkerError = (error: unknown) => appLogger.warn('system', 'Synchronisation automatique interrompue', { error: error instanceof Error ? error.message : 'Erreur inconnue' });
+    const cancelPending = () => {
+      if (plexTimer !== null) clearTimeout(plexTimer);
+      if (detailsTimer !== null) clearTimeout(detailsTimer);
+      plexTimer = null; detailsTimer = null;
+    };
     const runSync = () => {
-      const now = Date.now();
-      // Limiter les vérifications automatiques à au moins 12 heures d'intervalle (throttle anti-spam)
-      if (now - lastRunRef.current < 12 * 60 * 60 * 1000) return;
-      lastRunRef.current = now;
-
-      performDetailsSync(false);
+      const uid = auth.currentUser?.uid;
+      if (!uid || !visible()) return;
+      const now = Date.now(), last = lastRunRef.current.get(uid);
+      if (last !== undefined && now - last < 12 * 60 * 60 * 1000) return;
+      lastRunRef.current.set(uid, now);
+      void performDetailsSync(false).catch(logWorkerError);
     };
-
     const runPlexSync = () => {
-      const now = Date.now();
-      // Verifier si une synchronisation Plex a eu lieu lors des 30 dernieres minutes (persiste dans localStorage)
-      const currentUser = auth.currentUser;
-      const lastSyncTimestamp = getPlexLastSyncTimestamp(currentUser?.uid);
-      if (lastSyncTimestamp && now - lastSyncTimestamp < 30 * 60 * 1000) {
-        return;
-      }
-
-      if (now - lastPlexRunRef.current < 15 * 60 * 1000) return;
-      lastPlexRunRef.current = now;
-
-      const hasPlexToken = getStoredPlexToken(currentUser?.uid);
-      if (currentUser && hasPlexToken) {
-        performPlexSync({ delta: true, silent: false }).catch(console.error);
-      }
+      const uid = auth.currentUser?.uid;
+      if (!uid || !visible() || !getStoredPlexToken(uid) || getPlexSyncRetryAt(uid)) return;
+      const now = Date.now(), lastSuccess = getPlexLastSyncTimestamp(uid), lastAttempt = lastPlexRunRef.current.get(uid);
+      if (lastSuccess && now - lastSuccess < 30 * 60 * 1000) return;
+      if (lastAttempt !== undefined && now - lastAttempt < 15 * 60 * 1000) return;
+      lastPlexRunRef.current.set(uid, now);
+      void performPlexSync({ delta: true, silent: false }).catch(logWorkerError);
     };
-
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (!user) return;
-      runSync();
-      runPlexSync();
-    });
-
-    const handleFocus = () => {
-      if (auth.currentUser) {
-        runSync();
-        runPlexSync();
-      }
+    const schedule = () => {
+      if (!visible() || !auth.currentUser) { cancelPending(); return; }
+      if (plexTimer === null) plexTimer = setTimeout(() => { plexTimer = null; runPlexSync(); }, 2000);
+      if (detailsTimer === null) detailsTimer = setTimeout(() => { detailsTimer = null; runSync(); }, 5000);
     };
-
-    window.addEventListener('focus', handleFocus);
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && auth.currentUser) {
-        runSync();
-        runPlexSync();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    // Periodic check every 15 minutes in the background
-    const plexInterval = setInterval(() => {
-      const currentUser = auth.currentUser;
-      const hasPlexToken = getStoredPlexToken(currentUser?.uid);
-      if (currentUser && hasPlexToken) {
-        runPlexSync();
-      }
-    }, 15 * 60 * 1000);
-
+    const unsubscribe = auth.onAuthStateChanged(() => { cancelPending(); schedule(); });
+    window.addEventListener('focus', schedule);
+    document.addEventListener('visibilitychange', schedule);
+    const nativeListener = Capacitor.isNativePlatform() ? CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+      if (disposed) return;
+      nativeActive = isActive; schedule();
+    }) : null;
+    const interval = setInterval(schedule, 15 * 60 * 1000);
     return () => {
-      unsubscribe();
-      clearInterval(plexInterval);
-      window.removeEventListener('focus', handleFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      disposed = true; cancelPending(); unsubscribe(); clearInterval(interval);
+      window.removeEventListener('focus', schedule);
+      document.removeEventListener('visibilitychange', schedule);
+      void nativeListener?.then(listener => listener.remove()).catch(logWorkerError);
     };
   }, []);
 }

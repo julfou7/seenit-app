@@ -36,23 +36,23 @@ En cas de doute, **la maquette fait foi** sur cette spec.
 
 Les sections s'affichent dans cet ordre. Une section vide est masquée.
 
-1. **Continuer à regarder** : carte 8f en rail horizontal, 3 cartes.
+1. **Continuer à regarder** : carte 8f en rail horizontal, six cartes puis Voir en liste.
    - L'icône liste dans l'en-tête de section bascule en liste verticale ; un chevron or « Revenir en carrousel » ramène au rail.
-   - Pas de carte « Voir tout » en fin de rail.
+   - Une tuile « Voir en liste » donne accès à tous les éléments.
 2. **Nouveautés** : même carte et même comportement.
-3. **Films à voir** : billet horizontal.
+3. **Films à voir** : billets en rail affiches, bascule vers la liste horizontale104px.
    - Image qui remplit la gauche, fondu sans ligne visible vers la partie texte.
    - **Heure de fin en gros** sous la forme « fin à 23:28 ». Si la fin tombe après minuit, afficher « après minuit » en `#FDBA74`.
-   - Ni année ni mention « Film ».
+   - Acteur en cache, puis diffuseur et année seule selon ZIP9.
    - La même icône liste que les séries bascule entre rail et liste.
-   - Tri par durée croissante. 3 visibles, puis « Afficher N de plus » (18c).
+   - Tri stable par ajout récent puis identité, libellé visible. Six billets, puis Voir en liste ; liste progressive par douze.
 
 4. **Pas vu depuis un moment** (plus de 60 jours) : toujours en dernier, après les films, selon la dernière consigne utilisateur. Carte 8f de poids visuel inférieur, « Pas vu depuis N jours » en neutre.
 
 **Carte série 8f — rappels**
 - Titre de la série en or, code `S05 · E04` en blanc 800, titre de l'épisode en dessous.
 - Barre de saison en segments.
-- Coche « vu » centrée verticalement dans la colonne droite.
+- Coche « vu » au centre de la zone supérieure (58px), dans la colonne droite au-dessus de la progression.
 
 **Badge de statut**
 - Placé **à côté du numéro d’épisode**, selon la dernière consigne utilisateur prioritaire sur le ZIP v3. Le badge ne change pas la hauteur de carte (corps 150 px).
@@ -151,10 +151,13 @@ Le prototype utilise des données de démo : vraies images TMDB, épisodes de Br
 
 ## Provenance et décisions prioritaires
 
-Source reçue : `Connexion du repository seenit-app (8).zip`, `SPEC-ACCUEIL.md` v3 et `SeenIt Prototype.dc.html` actualisé. Les décisions utilisateur du 23 octobre priment pour badge près du code et séries anciennes en dernier. Le prototype prime en cas de contradiction interne : le billet horizontal conserve ses métadonnées année/durée et son talon de fin 96 px, conformément à son rendu.
+Source reçue : `Connexion du repository seenit-app (8).zip`, `SPEC-ACCUEIL.md` v3 et `SeenIt Prototype.dc.html` actualisé. Les décisions utilisateur du 23 octobre priment pour badge près du code et séries anciennes en dernier. Le prototype prime en cas de contradiction interne : le billet horizontal affiche désormais acteur et année seule (ZIP9) et son talon de fin 96 px, conformément à son rendu.
 
 Le header sticky se prolonge par un fondu de flou 26 px sous les filtres, sans intercepter les gestes. Les notifications illustrées se retirent individuellement par swipe gauche ou bouton accessible, avec Annuler et persistance par compte.
 
 Un count TMDB provisoire ne suffit pas à confirmer un total : finale, saison terminée/antérieure, planning entièrement daté ou total annoncé au-delà de la liste le confirment. Sinon segments ouverts et « ? » (Harry Potter), sans exception par titre ; MobLand au total confirmé conserve 10.
 
-Après la collecte des retours, l’utilisateur a explicitement autorisé la publication (« Go apk », 23 octobre). Avant publication, contrôler le centrage vertical de J-X/auj. : cible 52×48 et surface 48×40 centrées sur le corps de carte, texte centré dans la pastille, cloche absolue exclue du calcul.
+Après la collecte des retours, l’utilisateur a explicitement autorisé la publication (« Go apk », 23 octobre). Avant publication, contrôler le centrage vertical de J-X/auj. : cible 52×48 et surface 48×40 centrées dans la zone supérieure, à58px du haut du corps, selon ckTop34 de la maquette, texte centré dans la pastille, cloche absolue exclue du calcul.
+
+
+ZIP(9), SPEC-ACTEURS-FILMS.md : acteur en cache et mini-fiche (règles détaillées dans seenit.md), six cartes par rail puis tuile Voir en liste, liste par12, tri film visible par ajout récent stable. Groupes À venir13px neutres. Le retour terrain219 invalide le centrage au milieu du corps entier : centre de référence58px au-dessus de la progression.

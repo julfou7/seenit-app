@@ -2,7 +2,7 @@ export type WatchListTab = 'watch_next' | 'upcoming' | 'history';
 export const HOME_TABS: ReadonlyArray<{ id: WatchListTab; label: string }> = [
   { id: 'watch_next', label: 'À regarder' }, { id: 'upcoming', label: 'À venir' }, { id: 'history', label: 'Historique' },
 ];
-export const HOME_PAGE_SIZE = 3;
+export const HOME_PAGE_SIZE = 6;
 export const HISTORY_PAGE_SIZE = 10;
 export function canOfferPlexWatchedAction(mediaType: 'movie' | 'tv', available: boolean, watched: boolean): boolean {
   // Le cache global Plex prouve l'identité d'un film, jamais la présence d'un épisode de série.

@@ -25,7 +25,7 @@ test('SEENIT-UX-018 classe les sorties par jour local sans dérive au changement
 });
 test('SEENIT-UX-018 conserve trois onglets sans compteurs et les limites des deux paginations', () => {
   assert.deepEqual(HOME_TABS.map(tab => tab.label), ['À regarder', 'À venir', 'Historique']);
-  assert.equal(HOME_PAGE_SIZE, 3);
+  assert.equal(HOME_PAGE_SIZE, 6);
   assert.equal(HISTORY_PAGE_SIZE, 10);
   const screen = readFileSync(new URL('../src/screens/WatchListScreen.tsx', import.meta.url), 'utf8');
   assert.doesNotMatch(screen, /getBoundingClientRect\(\)|activeTabRef|tab-scroll/);

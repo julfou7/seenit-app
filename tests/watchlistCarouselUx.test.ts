@@ -32,9 +32,9 @@ test('#229 conserve un premier lot borné puis rend les quatre carrousels progre
   assert.match(watchListSource, /leadingSpacerSize/);
   assert.match(watchListSource, /trailingSpacerSize/);
 
-  // La refonte accueil borne chaque rail à trois cartes, puis ouvre une liste par lots.
-  assert.match(watchListSource, /items\.slice\(0, expanded \? limit : 3\)/);
-  assert.match(watchListSource, /orderedMovies\.slice\(0, movieCount\)/);
+  // La refonte accueil borne chaque rail à six cartes, puis ouvre une liste par lots.
+  assert.match(watchListSource, /items\.slice\(0, expanded \? limit : HOME_PAGE_SIZE\)/);
+  assert.match(watchListSource, /orderedMovies\.slice\(0, movieList \? movieCount : HOME_PAGE_SIZE\)/);
   assert.match(watchListSource, /id="films-a-voir-18c"/);
 
   assert.doesNotMatch(
