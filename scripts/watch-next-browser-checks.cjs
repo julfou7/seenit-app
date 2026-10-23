@@ -1,11 +1,13 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const esbuild = require('esbuild');
+const { execFileSync } = require('node:child_process');
 async function buildWatchNextHarness(root) {
   const dist = path.join(root, 'dist');
   const ports = path.join(root, 'tests/fixtures/watchNext18cRuntime.ts');
   await esbuild.build({ entryPoints: [path.join(root, 'tests/fixtures/watchNext18c.tsx')], outfile: path.join(dist, '__seenit-watch-next.js'), bundle: true, platform: 'browser', format: 'iife', target: ['chrome120'], logLevel: 'silent',
     plugins: [{ name: 'watch-next-ports', setup(builder) {
+      if (process.env.SEENIT_LAYOUT_BASELINE) builder.onLoad({filter:/[\\/]screens[\\/]WatchNextSection\.tsx$/}, args => ({contents:execFileSync('git',['show',`${process.env.SEENIT_LAYOUT_BASELINE}:src/screens/WatchNextSection.tsx`],{cwd:root,encoding:'utf8'}),loader:'tsx',resolveDir:path.dirname(args.path)}));
       builder.onResolve({ filter: /^firebase\/firestore$|\/(?:favoritePeopleStore|useShows|firebase|tmdb|showsStore|logStore|plexAvailability)$/ }, () => ({ path: ports }));
     } }],
   });
@@ -20,7 +22,7 @@ async function evaluate(client, expression) {
 }
 async function check(client, expression, label) {
   for (let index = 0; index < 60; index++) { if (await evaluate(client, `Boolean(${expression})`)) return; await delay(50); }
-  throw new Error(`#712 ${label}: ${JSON.stringify(await evaluate(client, '({telemetry:window.__watch18c?.telemetry,errors:window.__watch18cErrors,text:document.body.innerText})'))}`);
+  throw new Error(`#712 ${label}: ${JSON.stringify(await evaluate(client, '({telemetry:window.__watch18c?.telemetry,errors:window.__watch18cErrors,anchor:window.__layoutAnchor,card:window.__layoutAnchor&&document.querySelector("[data-movie-ticket=\\""+window.__layoutAnchor.id+"\\"]")?.getBoundingClientRect().toJSON(),scroll:document.scrollingElement.scrollTop,text:document.body.innerText})'))}`);
 }
 async function click(client, selector) {
   await evaluate(client, `document.querySelector(${JSON.stringify(selector)}).scrollIntoView({block:'center',inline:'center',behavior:'instant'})`);
@@ -34,8 +36,26 @@ async function testWatchNextHarness(client, root) {
   const reports = [];
   for (const width of [360, 412, 1280]) {
     await client.send('Emulation.setDeviceMetricsOverride', { width, height: 915, deviceScaleFactor: 1, mobile: width < 640 });
+    await client.send('Emulation.setEmulatedMedia', {features:[{name:'prefers-reduced-motion',value:width===412?'reduce':'no-preference'}]});
+    await evaluate(client, 'window.__watch18c=undefined');
     await client.send('Page.navigate', { url: 'http://127.0.0.1:4173/__seenit-watch-next.html' });
-    await check(client, 'document.querySelectorAll("#home-series-0 article").length===6 && document.querySelectorAll("[data-movie-ticket]").length===6', 'rails de six billets films');
+    // Video regression: keep movie-2 at the same reading point on both layouts.
+    await check(client, 'window.__watch18c && document.querySelectorAll("[data-movie-ticket]").length===6', 'films prêts avant la bascule');
+    if (width===360) await evaluate(client, `(()=>{const main=document.querySelector('main');main.style.height='915px';main.style.overflowY='auto';const header=document.createElement('header');header.className='home-header';header.style.height='110px';header.textContent='Accueil';main.prepend(header);})()`);
+    await evaluate(client, `(()=>{const rail=document.querySelector('#films-a-voir-18c');rail.scrollLeft=312;
+      document.querySelector('[aria-label="Films en liste"]').addEventListener('pointerdown',()=>{const card=rail.querySelector('[data-movie-ticket="movie-2"]');window.__layoutAnchor={id:card.dataset.movieTicket,top:card.getBoundingClientRect().top,left:card.getBoundingClientRect().left};},{once:true});})()`);
+    if (width===412) fs.writeFileSync(path.join(root,'quality-reports','movie-anchor-rail-412.png'),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+    await click(client, '[aria-label="Films en liste"]');
+    await check(client, `(()=>{const before=window.__layoutAnchor,card=document.querySelector('[data-movie-ticket="'+before.id+'"]');return card?.classList.contains('movie-ticket--horizontal') && Math.abs(card.getBoundingClientRect().top-before.top)<1 && Math.abs(card.getBoundingClientRect().left-before.left)<1;})()`, 'la carte film défilée garde son identité et ses coordonnées à la bascule liste');
+    if (width===412) fs.writeFileSync(path.join(root,'quality-reports','movie-anchor-list-412.png'),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+    await evaluate(client, `document.querySelector('.home-movie-collapse').addEventListener('pointerdown',()=>{const top=document.querySelector('.home-header')?.getBoundingClientRect().bottom||0;const card=[...document.querySelectorAll('[data-movie-ticket]')].find(el=>el.getBoundingClientRect().bottom>top+20);window.__layoutAnchor={id:card.dataset.movieTicket,top:card.getBoundingClientRect().top};},{once:true})`);
+    await click(client, '.home-movie-collapse');
+    await check(client, `(()=>{const before=window.__layoutAnchor,card=document.querySelector('[data-movie-ticket="'+before.id+'"]');return card && !card.classList.contains('movie-ticket--horizontal') && Math.abs(card.getBoundingClientRect().top-before.top)<1 && Math.abs(card.getBoundingClientRect().left-document.querySelector('#films-a-voir-18c').getBoundingClientRect().left-parseFloat(getComputedStyle(document.querySelector('#films-a-voir-18c')).paddingLeft))<1;})()`, 'la première carte visible en liste reste ancrée au retour carrousel, même au-delà des six premières');
+    await evaluate(client, 'window.dispatchEvent(new Event("watchlist-reset-all"))');
+    await check(client, 'document.querySelectorAll("[data-movie-ticket]").length===6 && document.querySelector("[data-movie-ticket]").dataset.movieTicket==="movie-0" && document.querySelector("#films-a-voir-18c").scrollLeft===0', 'seul le reset explicite revient au premier film');
+    await evaluate(client, 'window.__watch18c=undefined');
+    await client.send('Page.navigate', { url: 'http://127.0.0.1:4173/__seenit-watch-next.html' });
+    await check(client, 'window.__watch18c && document.querySelectorAll("#home-series-0 article").length===6 && document.querySelectorAll("[data-movie-ticket]").length===6', 'rails de six billets films');
     await check(client, 'document.querySelectorAll(".home-series-section").length===3 && document.documentElement.scrollWidth<=innerWidth', 'trois sections distinctes sans débordement');
     await click(client, '#home-series-0 .home-rail-more');
     await check(client, 'document.querySelectorAll("#home-series-0 article").length===8', 'la tuile donne accès aux huit séries réelles');

@@ -134,3 +134,5 @@ Complément USR-2026-10-23-002 : « Go apk attention au centrage vertical du bou
 | USR-2026-10-23-003 | 2026-10-23 | Corriger l’erreur Plex Rate exceeded/JSON et les relances accompagnant de petits lags à la réouverture. Statut HTTP avant parsing, délai429 par UID et travail automatique différé en foreground. | SEENIT-PLEX-002/003/004, [#741](https://github.com/julfou7/seenit-app/issues/741) | active |
 
 | USR-2026-10-23-004 | 2026-10-23 | Terrain219 : rails exhaustifs, tri films stable, glyphes/centrage8f, Punisher rogné, groupes À venir ; ZIP(9) acteurs et mini-fiche. | SEENIT-UX-018, [#729](https://github.com/julfou7/seenit-app/issues/729) | active |
+
+Complément USR-2026-10-23-004 / #729 : vidéo du23octobre19h32, précisée « Carrousel ↔ liste des films ». Conserver le film visible et son point de lecture lors des deux bascules, y compris après pagination ; seul le reset explicite revient au début. Aucun changement du tri.

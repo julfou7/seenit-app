@@ -993,3 +993,6 @@ Réouverture Plex (#741) : les synchronisations automatiques Plex/détails atten
 
 
 Plex (#744) : le compte capturé est un paramètre obligatoire du transport. Un changement pendant la migration ou les en-têtes annule l’envoi ; la pause d’une réponse déjà en vol reste dans le compte d’origine.
+
+
+Bascule de vue À voir (#729, vidéo19h32) : la carte affichée reste ancrée à l’écran entre carrousel et liste, même après défilement et au retour depuis un élément au-delà du rail initial. Les données gardent leur ordre ; seul le défilement est restauré. Une icône déjà active ne réinitialise pas la vue. Revenir en carrousel reste accessible en pied de liste films, comme pour les séries. Seul le reset explicite revient au début.
