@@ -8,31 +8,36 @@ const storage = () => {
   const values = new Map<string, string>();
   return { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); }, removeItem: (key: string) => { values.delete(key); }, values };
 };
-const bundle = build({ entryPoints: ['src/features/plex/plexHistoryTransport.ts'], bundle: true, write: false, format: 'cjs', platform: 'node',
+const compileTransport = (realWebAuth = false) => build({ entryPoints: ['src/features/plex/plexHistoryTransport.ts'], bundle: true, write: false, format: 'cjs', platform: 'node',
   plugins: [{ name: 'transport-ports', setup(builder) {
-    builder.onResolve({ filter: /^@capacitor\/core$|\/(?:firebase|apiAuth|seenitApi|logStore)$/ }, () => ({ path: 'ports', namespace: 'ports' }));
+    builder.onResolve({ filter: /^@capacitor\/core$|\/(?:firebase|apiAuth|seenitApi|logStore|updateStore|clientOperationalDiagnostics\.ts)$/ }, args => realWebAuth && args.path.endsWith('/apiAuth') ? undefined : ({ path: 'ports', namespace: 'ports' }));
     builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: `
       const p=()=>globalThis.__ports;
       export const auth={get currentUser(){return p().user}};
       export const Capacitor={isNativePlatform:()=>p().native};
-      export const CapacitorHttp={post:async request=>{p().nativeCalls.push(request);if(p().switchDuringReply)p().user={uid:'user-b'};if(p().dnsFailure&&p().nativeCalls.length===1)throw new Error('Unable to resolve host');return p().reply}};
+      export const CapacitorHttp={post:async request=>{p().nativeCalls.push(request);if(p().switchDuringReply)p().user={uid:'user-b'};if(p().allNativeDnsFailure||p().dnsFailure&&p().nativeCalls.length===1)throw new Error('Unable to resolve host');return p().reply}};
       export const getAuthenticatedHeaders=async headers=>{if(p().switchDuringHeaders)p().user={uid:'user-b'};return {...headers,Authorization:'opaque-auth'}};
       export const authenticatedFetch=async (url,request)=>{p().webCalls.push({url,request});return p().webReply};
       export const resolveSeenItApiCandidates=()=>['https://primary.invalid/api/plex/history','https://secondary.invalid/api/plex/history'];
       export const appLogger={info:()=>{},warn:()=>{},success:()=>{}};
+      export const CURRENT_APP_VERSION='1.4.219';export const flushClientOperationalSignals=()=>Promise.resolve();
+      export const resolveSeenItApiUrl=value=>value;export const isSeenItApiRequest=()=>true;export const isUnexpectedHtmlApiResponse=()=>false;
     ` }));
   } }],
 });
-async function harness(memory = storage()) {
+const bundle = compileTransport();
+const webBundle = compileTransport(true);
+async function harness(memory = storage(), realWebAuth = false) {
   const clock = { now };
   class Clock extends Date { static now() { return clock.now; } }
-  const ports = { user: { uid: 'user-a' }, native: true, nativeCalls: [] as unknown[], webCalls: [] as unknown[], dnsFailure: false, switchDuringReply: false, switchDuringHeaders: false,
+  const ports = { user: { uid: 'user-a' } as {uid: string;getIdToken?:()=>Promise<string>}, native: true, nativeCalls: [] as unknown[], webCalls: [] as unknown[], dnsFailure: false, allNativeDnsFailure: false, headerLookups: 0, switchDuringWebToken: false, switchDuringReply: false, switchDuringHeaders: false,
     reply: { status: 200, headers: {} as Record<string, string>, data: '{"history":[],"watchlist":[]}' },
     webReply: new Response('{"history":[],"watchlist":[]}', { status: 200 }),
   };
+  ports.user.getIdToken = async () => { ports.headerLookups++; if (ports.switchDuringWebToken && (!ports.native || ports.headerLookups > 2)) ports.user = {uid:'user-b'}; return 'opaque-id'; };
   const module = { exports: {} as { fetchPlexHistoryData: (uid: string, token: string, clientId: string, delta: boolean) => Promise<{ history: unknown[] }> } };
-  const context = vm.createContext({ module, __ports: ports, Date: Clock, localStorage: memory, setTimeout, clearTimeout, AbortController });
-  vm.runInContext((await bundle).outputFiles[0].text, context);
+  const context = vm.createContext({ module, __ports: ports, Date: Clock, localStorage: memory, setTimeout, clearTimeout, AbortController, Headers, fetch: async (url: string, request: unknown) => { ports.webCalls.push({url,request});return ports.webReply; } });
+  vm.runInContext((await (realWebAuth ? webBundle : bundle)).outputFiles[0].text, context);
   return { ports, clock, memory, run: () => module.exports.fetchPlexHistoryData(ports.user.uid, 'opaque-plex', 'client', true) };
 }
 
@@ -155,4 +160,16 @@ test('SEENIT-PLEX-004 conserve l’UID d’origine après une réponse en vol et
   await assert.rejects(headers.run, /Compte SeenIt modifié/);
   assert.equal(headers.ports.nativeCalls.length, 0);
   assert.equal(headers.ports.webCalls.length, 0);
+});
+
+
+test('SEENIT-PLEX-004 le vrai authenticatedFetch annule aussi après les en-têtes Web et WebView', async () => {
+  for (const native of [false,true]) {
+    const h = await harness(storage(), true);
+    h.ports.native = native; h.ports.allNativeDnsFailure = native; h.ports.switchDuringWebToken = true;
+    await assert.rejects(h.run, /Compte SeenIt modifié/);
+    assert.equal(h.ports.webCalls.length, 0, 'aucun fetch après le changement pendant getIdToken');
+    assert.equal(h.ports.nativeCalls.length, native ? 2 : 0, 'le secours WebView utilise aussi la façade authentifiée réelle');
+    assert.equal(h.memory.getItem('seenit_user:user-b:plex_sync_retry_at'), null);
+  }
 });

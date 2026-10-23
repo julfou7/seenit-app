@@ -1758,3 +1758,5 @@ Tap acteur ouvre une feuille88% radius30, Retour/Échap/fond/swipe bas ferment e
 
 
 Plex, précision UID (#744) : le transport exige l’UID capturé par la synchronisation, sans le redéduire de l’auth globale. Après toute attente de migration des identifiants et de préparation des en-têtes, un changement de compte annule la requête ; un refus déjà en vol ne met en pause que son compte d’origine.
+
+Le contrôle post-en-têtes Web se fait dans authenticatedFetch avec expectedUid, immédiatement avant fetch ; le transport Plex transmet ce scope pour la PWA et le secours WebView Android. Le TNR traverse cette façade réelle, getIdToken suspendu, en plus de la voie CapacitorHttp.

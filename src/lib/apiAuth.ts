@@ -73,11 +73,15 @@ async function logPlexDeltaDiagnostics(
 
 export async function authenticatedFetch(
   input: RequestInfo | URL,
-  init: RequestInit = {}
+  init: RequestInit = {},
+  expectedUid?: string
 ): Promise<Response> {
   const originalString = typeof input === 'string' ? input : null;
   const resolvedInput = originalString ? resolveSeenItApiUrl(originalString) : input;
   const authenticatedHeaders = await getAuthenticatedHeaders(init.headers);
+  if (expectedUid !== undefined && auth.currentUser?.uid !== expectedUid) {
+    throw new Error('Compte SeenIt modifié pendant la préparation de la requête');
+  }
   const response = await fetch(resolvedInput, {
     ...init,
     headers: authenticatedHeaders

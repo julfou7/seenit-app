@@ -54,7 +54,7 @@ export async function fetchPlexHistoryData(uid: string, token: string, clientId:
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const response = await authenticatedFetch(url, { method: 'POST', headers, body: JSON.stringify(payload), signal: controller.signal });
+      const response = await authenticatedFetch(url, { method: 'POST', headers, body: JSON.stringify(payload), signal: controller.signal }, uid);
       checkStatus(response.status, response.headers.get('retry-after'));
       return readPayload(await response.text());
     } finally { clearTimeout(timer); }

@@ -710,6 +710,10 @@
         {
           "file": "tests/plexResumeRateLimit.test.ts",
           "contains": "SEENIT-PLEX-004 conserve l’UID d’origine"
+        },
+        {
+          "file": "tests/plexResumeRateLimit.test.ts",
+          "contains": "SEENIT-PLEX-004 le vrai authenticatedFetch"
         }
       ]
     },
