@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { buildSeasonProgressEvidence } from '../features/shows/seasonProgressEvidence';
+import { buildSeasonProgressEvidence, needsSeasonProgressRefresh } from '../features/shows/seasonProgressEvidence';
 import { db, auth, sendNativeNotification } from '../lib/firebase';
 import { doc, updateDoc, getDoc, getDocs, collection, addDoc } from 'firebase/firestore';
 import { tmdb } from '../features/shows/tmdb';
@@ -72,6 +72,8 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         // En synchronisation forcée (ex: pull-to-refresh), on prend toutes les séries TV
         return true;
       }
+
+      if (needsSeasonProgressRefresh(s)) return true;
 
       // En mode automatique, pas les séries archivées, terminées ou avec statut finalisé
       if (s.isArchived || s.seriesEnded || s.tmdbStatus === 'Ended' || s.tmdbStatus === 'Canceled' || s.status === 'completed') {

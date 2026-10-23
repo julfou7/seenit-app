@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { buildSeriesSeasonProgress, seriesCardPosterCandidates, seriesCardPosterCrossOrigin, seriesCardStaleDetail, seriesCompletionLabel, seriesEpisodeCode, upcomingCardTone } from '../src/features/watchlist/seriesCardPresentation.ts';
 import { dominantPosterHue, readPosterHue, rememberPosterHue, POSTER_HUE_CACHE_LIMIT } from '../src/features/watchlist/posterHue.ts';
-import { buildSeasonProgressEvidence } from '../src/features/shows/seasonProgressEvidence.ts';
+import { buildSeasonProgressEvidence, needsSeasonProgressRefresh } from '../src/features/shows/seasonProgressEvidence.ts';
 
 test('SEENIT-UX-014 affiche le total fourni de MobLand et des séries renouvelées', () => {
   const episode = { season_number: 1, episode_number: 3, episode_count: 10, season_total_unknown: true, last_season_number: 1, last_known_episode_type: 'standard', last_known_episode_air_date: null };
-  const show = { seenEpisodes: ['1x1', '1x2'], nextEpisodeToWatch: episode, tmdbStatus: 'Returning Series', seriesEnded: false };
+  const evidence = buildSeasonProgressEvidence([{ season_number: 1, episode_count: 10, episodes: [{ episode_number: 3, episode_type: 'standard' }] }], false);
+  const show = { seenEpisodes: ['1x1', '1x2'], nextEpisodeToWatch: episode, seasonProgress: evidence, tmdbStatus: 'Returning Series', seriesEnded: false };
   for (const context of ['watch', 'upcoming', 'history'] as const) {
     const progress = buildSeriesSeasonProgress(show, episode, context, '2026-10-23');
     assert.equal(progress.label, 'S1 · 2/10');
@@ -15,7 +16,6 @@ test('SEENIT-UX-014 affiche le total fourni de MobLand et des séries renouvelé
     assert.equal(progress.unknownTail, false, 'le renouvellement et un ancien flag ne masquent pas le total fourni');
     assert.equal(progress.segments.length, 10);
   }
-  const evidence = buildSeasonProgressEvidence([{ season_number: 1, episode_count: 10, episodes: [{ episode_number: 3, episode_type: 'standard' }] }], false);
   assert.equal(evidence['1'].episode_count, 10);
   assert.equal(evidence['1'].season_total_unknown, false);
   assert.equal(buildSeriesSeasonProgress({ ...show, nextEpisodeToWatch: null, seasonProgress: evidence }, { season_number: 1, episode_number: 3 }, 'history', '2026-10-23').label, 'S1 · 2/10');
@@ -23,6 +23,15 @@ test('SEENIT-UX-014 affiche le total fourni de MobLand et des séries renouvelé
   const partial = buildSeasonProgressEvidence([{ season_number: 1, episodes: [{ episode_number: 4 }] }], false);
   assert.equal(partial['1'].episode_count, null, 'quatre épisodes listés ne prouvent pas un total de quatre');
   assert.equal(partial['1'].season_total_unknown, true);
+  const inferred = { ...episode, episode_count: 4, known_episodes_in_season: 4 };
+  const legacy = { ...show, seasonProgress: { '1': { ...partial['1'], episode_count: undefined } }, nextEpisodeToWatch: inferred };
+  assert.equal(buildSeriesSeasonProgress(legacy, inferred, 'watch', '2026-10-23').label, 'S1 · 2/?', 'un ancien compte de liste ne neutralise pas la preuve inconnue');
+  const oldEvidence = { ...partial['1'] };
+  delete oldEvidence.episode_count;
+  assert.equal(needsSeasonProgressRefresh({ seasonProgress: { '1': oldEvidence } }), true);
+  assert.equal(needsSeasonProgressRefresh({ nextEpisodeToWatch: episode }), true, 'les anciens pointeurs sans preuve de saison sont également réparés');
+  assert.equal(needsSeasonProgressRefresh({ seasonProgress: partial }), false, 'une absence fournisseur confirmée ne déclenche pas une boucle de refresh');
+  assert.equal(needsSeasonProgressRefresh(show), false);
 });
 
 test('SEENIT-UX-014 conserve les états de saison sans inventer les diffusions', () => {

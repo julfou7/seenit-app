@@ -49,7 +49,7 @@ export async function markEpisodeWatched(
   const newSeenArray = Array.from(newSeenSet);
 
   let fetchedEpTitle: string | null = null;
-  let optimisticNextEp: any = null;
+  let optimisticNextEp: Show['nextEpisodeToWatch'] = null;
   const totalEps = targetShow.totalAiredEpisodes || targetShow.totalEpisodes || 0;
 
   if (targetShow.tmdbId) {
@@ -64,13 +64,17 @@ export async function markEpisodeWatched(
         } else {
           const nextInSeason = seasonRes.value.episodes.find((x: any) => x.episode_number > eNum && !newSeenSet.has(`${sNum}x${x.episode_number}`));
           if (nextInSeason) {
+            const evidence = targetShow.seasonProgress?.[String(sNum)];
+            const previous = targetShow.nextEpisodeToWatch?.season_number === sNum ? targetShow.nextEpisodeToWatch : null;
             optimisticNextEp = {
+              ...evidence,
               season_number: nextInSeason.season_number,
               episode_number: nextInSeason.episode_number,
               air_date: nextInSeason.air_date || null,
               name: nextInSeason.name || null,
               still_path: nextInSeason.still_path || null,
-              episode_count: seasonRes.value.episodes?.length || targetShow.nextEpisodeToWatch?.episode_count || 1,
+              episode_count: evidence?.episode_count ?? (evidence?.season_total_unknown || previous?.season_total_unknown ? null : previous?.episode_count || null),
+              known_episodes_in_season: Math.max(evidence?.known_episodes_in_season || 0, ...seasonRes.value.episodes.map((ep: { episode_number: number }) => ep.episode_number)),
               aired_episodes_in_season: targetShow.nextEpisodeToWatch?.aired_episodes_in_season,
               is_final_season: targetShow.nextEpisodeToWatch?.is_final_season,
               series_ended: targetShow.nextEpisodeToWatch?.series_ended || targetShow.seriesEnded
@@ -80,13 +84,16 @@ export async function markEpisodeWatched(
             if (nextSeasonRes.ok && nextSeasonRes.value?.episodes) {
               const nextSeasonUnseen = nextSeasonRes.value.episodes.find((x: any) => !newSeenSet.has(`${sNum + 1}x${x.episode_number}`));
               if (nextSeasonUnseen) {
+                const evidence = targetShow.seasonProgress?.[String(sNum + 1)];
                 optimisticNextEp = {
+                  ...evidence,
                   season_number: nextSeasonUnseen.season_number,
                   episode_number: nextSeasonUnseen.episode_number,
                   air_date: nextSeasonUnseen.air_date || null,
                   name: nextSeasonUnseen.name || null,
                   still_path: nextSeasonUnseen.still_path || null,
-                  episode_count: nextSeasonRes.value.episodes?.length || 1,
+                  episode_count: evidence?.episode_count || null,
+                  known_episodes_in_season: Math.max(evidence?.known_episodes_in_season || 0, ...nextSeasonRes.value.episodes.map((ep: { episode_number: number }) => ep.episode_number)),
                   aired_episodes_in_season: nextSeasonRes.value.episodes?.filter((ep: any) => ep.air_date && ep.air_date <= new Date().toISOString().slice(0, 10)).length || 1,
                   is_final_season: targetShow.nextEpisodeToWatch?.is_final_season,
                   series_ended: targetShow.nextEpisodeToWatch?.series_ended || targetShow.seriesEnded

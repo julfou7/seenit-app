@@ -1192,6 +1192,10 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   Une saison sans total fournisseur ajoute une traîne en tirets et « ? » ; un `episode_count` positif
   fourni par TMDB ou une preuve de finale retire cette incertitude, même si la série est renouvelée,
   si la finale n'est pas typée/datée ou si un ancien indicateur `season_total_unknown` vaut true.
+  En présence de cet ancien indicateur, seul le total fournisseur conservé dans `seasonProgress`
+  ou une confirmation explicite plus récente le neutralise ; un compte de pointeur inféré ne suffit pas.
+  Le worker réactualise une fois les anciennes preuves sans champ de total fournisseur, puis retrouve
+  sa politique normale de fraîcheur, y compris quand le fournisseur confirme que le total manque.
   Le nombre d'épisodes actuellement listés ne devient jamais un total à lui seul. Les métadonnées de l'épisode présenté
   priment sur un ancien pointeur contradictoire. La récence des séries laissées de côté provient
   des visionnages encore vus, puis de leur horodatage de repli, sans nouvel appel fournisseur.

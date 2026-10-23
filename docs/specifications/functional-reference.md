@@ -227,6 +227,8 @@ Annuler. Dans les rails, le glissement fait défiler les cartes sans déclencher
 Le total positif de saison fourni par TMDB reste affiché dans les trois contextes, même pour une
 série renouvelée ou sans finale datée. Un ancien indicateur de total inconnu ne masque pas ce nombre.
 Sans total fournisseur ni preuve de finale, les épisodes listés restent une borne connue et « ? » est conservé.
+Le marquage Vu préserve cette distinction ; les anciennes preuves ambiguës sont réactualisées une fois
+par le worker de détails, sans demander une actualisation manuelle.
 Le cadre 8f reste partagé avec À venir et Historique. Vu anime la reprise réellement avancée et son
 tampon SeenIt ; À jour permet de revenir sur le dernier épisode marqué pendant cette session.
 Pendant une écriture Firestore lente, le marquage reste en attente : aucun délai arbitraire

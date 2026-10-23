@@ -43,7 +43,7 @@ function Harness() {
     <section id="season-24" className="series-8f-host"><SeriesEpisodeCard show={{ ...base, title: 'Saison de 24 épisodes' }} episode={{ ...next, episode_count: 24 }} onOpen={open} context={{ kind: 'watch', upToDate: true }} /></section>
     <section id="season-40" className="series-8f-host"><SeriesEpisodeCard show={{ ...base, title: 'Saison de 40 épisodes', posterPath: 'http://127.0.0.1:4173/__8f-absent.jpg' }} episode={{ ...next, episode_count: 40 }} onOpen={open} context={{ kind: 'watch', onMarkSeen: () => {} }} /></section>
     <section id="unknown" className="series-8f-host"><SeriesEpisodeCard show={harry} episode={harryEpisode} onOpen={open} providerLogo={provider} providerName="Max" context={{ kind: 'watch' }} /></section>
-    <section id="known-total" className="series-8f-host"><SeriesEpisodeCard show={{ ...harry, id: 'mobland', title: 'MobLand' }} episode={{ ...harryEpisode, episode_count: 10 }} onOpen={open} context={{ kind: 'watch' }} /></section>
+    <section id="known-total" className="series-8f-host"><SeriesEpisodeCard show={{ ...harry, id: 'mobland', title: 'MobLand', seasonProgress: { '1': { ...harryEpisode, episode_count: 10 } } }} episode={{ ...harryEpisode, episode_count: 10 }} onOpen={open} context={{ kind: 'watch' }} /></section>
   </main>;
 }
 createRoot(document.getElementById('root')!).render(<Harness />);

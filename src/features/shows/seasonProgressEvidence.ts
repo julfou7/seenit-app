@@ -1,4 +1,11 @@
-import type { SeasonProgressEvidence } from '../../types';
+import type { SeasonProgressEvidence, Show } from '../../types';
+
+/** Répare une seule fois les anciennes preuves qui confondaient liste et total. */
+export function needsSeasonProgressRefresh(show: Pick<Show, 'seasonProgress' | 'nextEpisodeToWatch' | 'nextEpisodeToAir'>): boolean {
+  return Object.values(show.seasonProgress || {}).some(evidence => evidence.season_total_unknown && !Object.hasOwn(evidence, 'episode_count'))
+    || [show.nextEpisodeToWatch, show.nextEpisodeToAir].some(pointer => pointer?.season_total_unknown === true
+      && !Object.hasOwn(show.seasonProgress?.[String(pointer.season_number)] || {}, 'episode_count'));
+}
 
 interface EpisodeEvidence { episode_number?: number; episode_type?: string | null; air_date?: string | null }
 interface SeasonEvidence { season_number: number; episode_count?: number; episodes?: EpisodeEvidence[] }

@@ -57,4 +57,18 @@ test('SEENIT-UX-014 les deux synchronisations conservent la finale avant de supp
       assert.equal(history.label, watch.label, 'le total survit au nettoyage du cache et à l’absence de reprise');
     }
   }
+  // Une installation existante doit être réparée sans pull-to-refresh, puis s'arrêter.
+  ports.show = { ...show, isSynced: true, lastSyncedAt: Date.now(), seasonProgress: { '1': {
+    season_number: 1, known_episodes_in_season: 10, season_total_unknown: true,
+    last_season_number: 1, last_known_episode_type: 'standard', last_known_episode_air_date: null,
+  } }, nextEpisodeToWatch: { season_number: 1, episode_number: 1, air_date: '2099-01-01' } };
+  ports.details.seasons[0].episode_count = 10;
+  ports.writes.length = 0;
+  await module.exports.performDetailsSync(false);
+  const repaired = ports.writes.find(value => value.seasonProgress);
+  assert.ok(repaired, 'l’ancienne preuve déclenche la réparation même avec une date future et un cache récent');
+  ports.show = { ...ports.show, ...JSON.parse(JSON.stringify(repaired)) };
+  ports.writes.length = 0;
+  await module.exports.performDetailsSync(false);
+  assert.equal(ports.writes.length, 0, 'la réparation ne se répète pas');
 });
