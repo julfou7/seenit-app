@@ -1739,4 +1739,4 @@ les retraits sont locaux et UID-scopés, ne modifient ni le média ni le journal
 point non lu. La feuille conserve les vignettes et les actions métier existantes.
 Le total provisoire d’une liste partielle ne retire jamais « ? ». Les deux synchronisations conservent
 une version de preuve du total afin de réparer une fois les anciennes preuves ambiguës.
-L’APK est explicitement différée pendant la collecte progressive des retours utilisateur.
+La collecte différée est close par la demande explicite « Go apk » du 23 octobre. Le centrage J-X/auj. est vérifié sur la carte, la surface et le texte, indépendamment de la cloche.

@@ -51,3 +51,7 @@ du smoke navigateur ; la reprise de v1.4.218 et la preuve de total sont versionn
 ## Réception du ZIP (8) — SPEC v3
 
 Le ZIP actualisé a été identifié après le premier lot 2625ab8 ; la déclaration précédente « SPEC à jour » concernait encore le ZIP (7). La nouvelle source est comparée avant clôture de ce lot. Les différences v3 À venir/Historique sont intégrées dans la même PR #739. Les consignes utilisateur gardent priorité pour badge et dernière section. Les billets horizontaux suivent le prototype (année/durée et fin en talon) lorsque le texte v3 est contradictoire. Le nouveau smoke complet Chromium 360/412/1280 est vert : liste historique unique 92×52 sans groupes/progression, appui long sans ouverture au relâchement, clavier, Revoir passif, édition/retrait et Annuler legacy, J-132, J-X/auj., ouverture épisode et CTA Explorer des trois états vides. Captures historique et À venir inspectées. Les anciens tests liés au logo/cadre 8f historique ont été adaptés au contrat v3, sans retirer la résolution de Revoir. Validation canonique finale requise avant push.
+
+## Contrôle avant APK — centrage demandé
+
+L’utilisateur autorise désormais la publication et signale le centrage du bouton sur home-upcoming-412.jpg. La colonne d’action réserve explicitement 48 px et centre son contenu ; la cloche reste hors flux. Le contrôle navigateur mesure séparément cible, surface et texte pour auj., J-5, J-31 et J-132, à 360/412/1280 px, avec un écart maximal de 0,5 px au centre du corps de carte. Cette demande lève le report de publication après les validations.

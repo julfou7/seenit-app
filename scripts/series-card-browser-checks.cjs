@@ -60,6 +60,14 @@ async function testSeriesCardHarness(client, root) {
     await evaluate(client, 'window.__series8f.releaseMark()');
     await check(client, 'window.__series8f.marks===1 && window.__series8f.opens===0 && document.querySelector("#watch .series-8f__code").textContent.includes("E05")', 'une coche avance une fois sans ouvrir la fiche');
     await check(client, 'document.querySelector("#upcoming-132 .series-8f__days strong").textContent==="J-132" && getComputedStyle(document.querySelector("#upcoming-132 .series-8f__days strong")).fontSize==="15px" && document.querySelector("#upcoming-0 .series-8f__days strong").textContent==="auj."', 'J-X v3, auj. et trois chiffres lisibles');
+    await check(client, `(() => [0,5,31,132].every(days => {
+      const card=document.querySelector('#upcoming-'+days+' article'), button=card.querySelector('.series-8f__days');
+      const body=card.getBoundingClientRect(), target=button.getBoundingClientRect(), label=button.querySelector('strong').getBoundingClientRect();
+      const surface=getComputedStyle(button,'::before');
+      const middle=target.y+target.height/2;
+      return Math.abs(middle-(body.y+body.height/2))<.5 && Math.abs(label.y+label.height/2-middle)<.5
+        && Math.abs(target.y+parseFloat(surface.top)+parseFloat(surface.height)/2-middle)<.5 && target.height===48;
+    }))()`, 'la pastille J-X, sa surface et son texte restent centrés verticalement, cloche exclue');
     await click(client, '#upcoming-0 .series-8f__days');
     await check(client, 'window.__series8f.reminders===1 && window.__series8f.opens===0 && document.querySelector("#upcoming-0 button.series-8f__days").getAttribute("aria-pressed")==="true"', 'le rappel reste indépendant de l’ouverture');
     await check(client, 'document.querySelector("#upcoming-0 .series-8f__days--today") && document.querySelector("#upcoming-5 .series-8f__days--soon") && document.querySelector("#upcoming-31 .series-8f__days--later")', 'les trois urgences ont leur présentation');

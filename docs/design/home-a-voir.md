@@ -157,4 +157,4 @@ Le header sticky se prolonge par un fondu de flou 26 px sous les filtres, sans i
 
 Un count TMDB provisoire ne suffit pas à confirmer un total : finale, saison terminée/antérieure, planning entièrement daté ou total annoncé au-delà de la liste le confirment. Sinon segments ouverts et « ? » (Harry Potter), sans exception par titre ; MobLand au total confirmé conserve 10.
 
-Aucune génération ni publication d’APK pendant la collecte des retours, jusqu’à nouvelle demande utilisateur.
+Après la collecte des retours, l’utilisateur a explicitement autorisé la publication (« Go apk », 23 octobre). Avant publication, contrôler le centrage vertical de J-X/auj. : cible 52×48 et surface 48×40 centrées sur le corps de carte, texte centré dans la pastille, cloche absolue exclue du calcul.
