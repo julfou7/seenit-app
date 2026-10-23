@@ -37,8 +37,8 @@ async function testWatchNextHarness(client, root) {
     await client.send('Page.navigate', { url: 'http://127.0.0.1:4173/__seenit-watch-next.html' });
     await check(client, 'document.querySelectorAll("#home-series-0 article").length===3 && document.querySelectorAll("[data-movie-ticket]").length===3', 'trois cartes par rail et trois billets films');
     await check(client, 'document.querySelectorAll(".home-series-section").length===3 && document.documentElement.scrollWidth<=innerWidth', 'trois sections distinctes sans débordement');
-    await click(client, '.home-series-section button[aria-expanded]');
-    await check(client, 'document.querySelector("#home-series-0.home-series-list")', 'Voir tout ouvre la liste');
+    await click(client, '[aria-label="Continuer à regarder en liste"]');
+    await check(client, 'document.querySelector("#home-series-0.home-series-list")', 'l’icône liste ouvre la liste');
     const seriesCheck = '#home-series-0 .series-8f__check';
     await evaluate(client, 'window.__watch18c.telemetry.holdNext=true');
     await click(client, seriesCheck);
@@ -61,8 +61,8 @@ async function testWatchNextHarness(client, root) {
     await check(client, `!document.querySelector('${movie}.movie-ticket--watched') && document.querySelector('${movie}.movie-ticket--back')`, 'tap tampon Vu recolle le billet');
     await click(client, '.watch-next-18c__more-films');
     await check(client, 'document.querySelectorAll("[data-movie-ticket]").length===6', 'pagination films de trois en trois');
-    await click(client, '[aria-label="Films en grille"]');
-    await check(client, 'document.querySelector(".movie-ticket-grid") && document.querySelectorAll("[data-movie-ticket]").length===6', 'grille conserve les films chargés');
+    await click(client, '[aria-label="Films en liste"]');
+    await check(client, 'document.querySelector(".home-movie-list") && document.querySelectorAll("[data-movie-ticket]").length===6', 'la liste de billets conserve les films chargés');
     await client.send('Emulation.setEmulatedMedia', { media: '', features: [{ name:'prefers-reduced-motion',value:'reduce' }] });
     await click(client, `${movie} .movie-ticket__check`);
     await check(client, `document.querySelector('${movie}.movie-ticket--watched') && parseFloat(getComputedStyle(document.querySelector('${movie} .movie-ticket__stub')).animationDuration)<=.01`, 'animations réduites et même résultat métier');

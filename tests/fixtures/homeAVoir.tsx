@@ -9,7 +9,8 @@ import { getTodayStr } from '../../src/lib/utils';
 import { useToastStore } from '../../src/store/toastStore';
 import type { Show } from '../../src/types';
 import { ToastContainer } from '../../src/components/ToastContainer';
-Object.assign(window, { __homeAVoir: { telemetry, releaseWrite, snapshot: () => useShowsStore.getState().shows, reset: () => window.dispatchEvent(new Event('watchlist-reset-all')), clear: () => useToastStore.getState().clearQueue(), toasts: () => [useToastStore.getState().currentToast, ...useToastStore.getState().queue].filter(Boolean) } });
+import { writeUserScopedJson } from '../../src/lib/userIsolation';
+Object.assign(window, { __homeAVoir: { telemetry, releaseWrite, clearDismissed: () => writeUserScopedJson(auth.currentUser?.uid, 'home_dismissed_notifications', []), snapshot: () => useShowsStore.getState().shows, reset: () => window.dispatchEvent(new Event('watchlist-reset-all')), clear: () => useToastStore.getState().clearQueue(), toasts: () => [useToastStore.getState().currentToast, ...useToastStore.getState().queue].filter(Boolean) } });
 function Harness() {
   const shows = useShowsStore(state => state.shows);
   const [tab, setTab] = useState<'watch_next' | 'upcoming' | 'history'>('watch_next');

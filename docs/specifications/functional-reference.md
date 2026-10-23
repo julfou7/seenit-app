@@ -218,13 +218,12 @@ regardable. Les cartes ne fabriquent donc pas `S01 | E01` / « SAISON DISPO » d
 inconnues.
 
 La [refonte accueil](../design/home-a-voir.md) conserve trois sections distinctes dans l’ordre
-Continuer à regarder, Nouveautés, Pas vu depuis un moment. Chaque section affiche un rail de trois
-cartes 8f, puis Voir tout ouvre la liste progressive (douze par lot) ; Revenir en carrousel la replie.
-Les sections vides sont masquées. Les badges statut, sans emoji, sont dans le bloc texte sous le titre
-de l’épisode. Les séries anciennes conservent leur nombre de jours exact. En liste, le swipe gauche
+Continuer à regarder, Nouveautés, puis Films à voir et Pas vu depuis un moment en dernier. Chaque section affiche un rail de trois
+cartes 8f, puis la bascule à deux icônes ouvre la liste progressive (douze par lot) ou le carrousel.
+Les sections vides sont masquées. Les badges statut, sans emoji, sont à côté du code épisode dans la carte compacte ; Vu est centré verticalement. Les séries anciennes conservent leur nombre de jours exact. En liste, le swipe gauche
 révèle Archiver/Supprimer ; l’appui long et le clavier ouvrent les mêmes actions avec confirmation et
 Annuler. Dans les rails, le glissement fait défiler les cartes sans déclencher de suppression.
-Le total positif de saison fourni par TMDB reste affiché dans les trois contextes, même pour une
+Le total confirmé de saison fourni par TMDB reste affiché dans les trois contextes, même pour une
 série renouvelée ou sans finale datée. Un ancien indicateur de total inconnu ne masque pas ce nombre.
 Sans total fournisseur ni preuve de finale, les épisodes listés restent une borne connue et « ? » est conservé.
 Le marquage Vu préserve cette distinction ; les anciennes preuves ambiguës sont réactualisées une fois
@@ -238,10 +237,10 @@ ne provoque de faux échec ni de restauration locale alors que l'écriture peut 
 Le succès et son animation attendent l'acquittement réel ; seul un rejet définitif restaure
 l'état précédent et affiche l'erreur. Un changement de compte ignore le résultat pour le nouvel UID.
 
-Les films sont des billets horizontaux déchirables, triés par durée connue croissante, inconnues après.
+Les films sont des billets déchirables en carrousel affiche ou liste horizontale, triés par durée connue croissante, inconnues après.
 Le talon affiche en grand l’heure de fin calculée depuis Maintenant, actualisée chaque minute, orange
 après minuit. Sans durée, aucune fin n’est inventée. Trois films sont visibles, puis Afficher N de plus
-en ajoute trois. La bascule grille/liste conserve cette limite et le même marquage.
+en ajoute trois. La bascule carrousel/liste conserve cette limite et le même marquage.
 Une coche aboutie déchire le talon et conserve le tampon Vu ; toucher ce tampon ou Annuler recolle
 le billet. Le film garde sa place pendant la session et disparaît au prochain retour à À regarder.
 Les enrichissements restent passifs,
@@ -981,3 +980,10 @@ elle est nécessaire à la plateforme et explicitement documentée.
   retire de sa matrice un écart seulement après preuve de correction.
 - Pour chaque changement, vérifier au minimum : écran d'entrée, état avant/après, Firestore et cache,
   PWA, APK/Retour/intents/safe areas, erreurs réseau, isolation UID, notifications et tests.
+
+Clarification terrain v1.4.218 (#729) : Films à voir précède la section Pas vu depuis un moment,
+toujours en dernier. Les films démarrent en rail affiche et passent par icône à la liste de billets
+horizontaux du prototype. Le header sticky prolonge son flou sous les filtres. Les notifications ont
+une vignette et se retirent une par une par swipe/bouton, avec Annuler et persistance locale par UID.
+Un compte TMDB provisoire de liste partielle reste inconnu sans preuve de fin/planning complet/total
+annoncé au-delà de la liste ; les anciennes preuves sont réactualisées une fois. Aucun override par titre.

@@ -97,6 +97,21 @@ export function MovieTicketCard({ show, start, onOpen, onToggle, onRuntime, layo
     } catch { if (mounted.current) setError(true); }
     finally { inFlight.current = false; if (mounted.current) setPendingFrom(null); }
   }
+  if (layout === 'horizontal') return <div ref={cardRef} className={`movie-ticket movie-ticket--horizontal${visibleWatched ? ' movie-ticket--watched' : ''}${phase ? ` movie-ticket--${phase.kind}` : ''}`} data-movie-ticket={show.id} style={{ '--ticket-hue': hue } as React.CSSProperties}>
+    <div className="movie-ticket__body">
+      <div className="movie-ticket__main">
+        {poster && <img className="movie-ticket__ambient" src={poster} alt="" aria-hidden="true" loading="lazy" />}
+        <div className="movie-ticket__tint" aria-hidden="true" />
+        <button className="movie-ticket__open" type="button" aria-label={`Ouvrir ${show.title}, film${year ? ` de ${year}` : ''}`} onClick={() => onOpen(show.id, 'movie')} />
+        <div className="movie-ticket__poster" aria-hidden="true"><span>{initials}</span>{poster && <img src={poster} crossOrigin={posterCrossOrigin} alt="" loading="lazy" onLoad={event => handlePosterLoad(event.currentTarget)} onError={() => setPosterIndex(index => index + 1)} />}</div>
+        <div className="movie-ticket__info"><h3>{show.title}</h3><p>{provider && <img src={provider} alt={providerName || 'Diffuseur'} title={providerName || undefined} loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} />}<span>{[year, runtime ? `${Math.floor(runtime / 60)}h${String(runtime % 60).padStart(2, '0')}` : 'Durée inconnue'].filter(Boolean).join(' · ')}</span></p></div>
+        {visibleWatched && <button type="button" className="movie-ticket__undo" aria-label={`Annuler le visionnage de ${show.title}`} disabled={pendingFrom !== null} onClick={toggle}><SeenItWatchedStamp className="movie-ticket__undo-stamp" /></button>}
+      </div>
+      <div key={phase?.sequence || 0} className="movie-ticket__stub" aria-hidden="true"><span>{end?.afterMidnight ? 'après minuit' : 'fin à'}</span><strong className={end?.afterMidnight ? 'movie-ticket__late' : undefined}>{end ? end.label.replace('fin ', '') : '—'}</strong></div>
+      <SeenItCheckButton size={24} className="movie-ticket__check" error={error} isWatched={visibleWatched} pending={pendingFrom !== null} title={`Marquer ${show.title} comme ${watched ? 'non vu' : 'vu'}`} onClick={toggle} />
+    </div>
+    <span className="sr-only" role="status" aria-live="polite">{error ? 'Le visionnage n’a pas pu être enregistré.' : phase ? `${show.title} marqué ${visibleWatched ? 'vu' : 'non vu'}` : ''}</span>
+  </div>;
   return <div ref={cardRef} className={`movie-ticket movie-ticket--${layout}${visibleWatched ? ' movie-ticket--watched' : ''}${phase ? ` movie-ticket--${phase.kind}` : ''}`} data-movie-ticket={show.id} style={{ '--ticket-hue': hue } as React.CSSProperties}>
     <div className="movie-ticket__body">
       <button className="movie-ticket__open" type="button" aria-label={`Ouvrir ${show.title}, film${year ? ` de ${year}` : ''}${end ? `, ${end.label}` : ''}`} onClick={() => onOpen(show.id, 'movie')} />
@@ -107,10 +122,9 @@ export function MovieTicketCard({ show, start, onOpen, onToggle, onRuntime, layo
       {providerName?.startsWith('Plex (') && <span className="movie-ticket__server">Plex · {providerName.slice(6, -1)}</span>}
       <SeenItCheckButton size={24} className="movie-ticket__check" error={error} isWatched={visibleWatched} pending={pendingFrom !== null} title={`Marquer ${show.title} comme ${watched ? 'non vu' : 'vu'}`} onClick={toggle} />
       {visibleWatched && <button type="button" className="movie-ticket__undo" aria-label={`Annuler le visionnage de ${show.title}`} disabled={pendingFrom !== null} onClick={toggle}><SeenItWatchedStamp className="movie-ticket__undo-stamp" /></button>}
-      <div key={phase?.sequence || 0} className="movie-ticket__stub" aria-hidden="true"><span>{layout === 'horizontal' ? 'Fin à' : year}</span>{end && <strong className={end.afterMidnight ? 'movie-ticket__late' : undefined}>{end.label.replace('fin ', '')}</strong>}{layout === 'horizontal' && <small>{runtime ? `${Math.floor(runtime / 60)}h${String(runtime % 60).padStart(2, '0')}` : 'Durée inconnue'}</small>}</div>
+      <div key={phase?.sequence || 0} className="movie-ticket__stub" aria-hidden="true"><span>{year}</span>{end && <strong className={end.afterMidnight ? 'movie-ticket__late' : undefined}>{end.label.replace('fin ', '')}</strong>}</div>
     </div>
     <h3>{show.title}</h3>
-    {layout === 'horizontal' && <p className="movie-ticket__metadata">{[year, movieDetails?.genres?.[0]?.name].filter(Boolean).join(' · ') || 'Film'}</p>}
     <span className="sr-only" role="status" aria-live="polite">{error ? 'Le visionnage n’a pas pu être enregistré.' : phase ? `${show.title} marqué ${visibleWatched ? 'vu' : 'non vu'}` : ''}</span>
   </div>;
 }

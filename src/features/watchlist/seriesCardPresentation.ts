@@ -1,4 +1,5 @@
 import type { Show } from '../../types';
+import { isCurrentSeasonProgress } from '../shows/seasonProgressEvidence.ts';
 
 export interface SeriesCardEpisode {
   season_number: number;
@@ -119,7 +120,9 @@ export function buildSeriesSeasonProgress(
   today: string,
 ): SeriesSeasonProgress {
   const season = episode.season_number;
-  const allPointers = [episode, show.seasonProgress?.[String(season)], show.nextEpisodeToWatch, show.nextEpisodeToAir]
+  const evidence = show.seasonProgress?.[String(season)];
+  const currentEvidence = isCurrentSeasonProgress(evidence) ? evidence : null;
+  const allPointers = [currentEvidence, episode, evidence, show.nextEpisodeToWatch, show.nextEpisodeToAir]
     .filter((pointer): pointer is SeriesCardEpisode => Boolean(pointer && typeof pointer.season_number === 'number'));
   const pointers = allPointers.filter(pointer => pointer.season_number === season);
   const cachedSeasons = (show.seasonsCache as SeasonData[] | undefined) || [];
@@ -132,7 +135,7 @@ export function buildSeriesSeasonProgress(
   const seen = new Set(seenEntries.filter(item => item.season === season).map(item => item.episode));
 
   const explicitTotalState = pointers.find(pointer => typeof pointer.season_total_unknown === 'boolean')?.season_total_unknown;
-  const advertisedTotal = (count(show.seasonProgress?.[String(season)]?.episode_count) || null)
+  const advertisedTotal = currentEvidence ? (count(currentEvidence.episode_count) || null) : (count(evidence?.episode_count) || null)
     ?? (explicitTotalState === true ? null : pointers.map(pointer => count(pointer.episode_count === undefined && pointer.season_total_unknown === false ? pointer.known_episodes_in_season : pointer.episode_count)).find(value => value !== null && value > 0)
       ?? (count(cached?.episode_count) || null))
     ?? null;

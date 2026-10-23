@@ -35,6 +35,23 @@ test('SEENIT-UX-014 affiche le total fourni de MobLand et des séries renouvelé
   assert.equal(needsSeasonProgressRefresh(show), false);
 });
 
+test('SEENIT-UX-014 distingue le total annoncé de la liste provisoire Harry Potter', () => {
+  const episodes = Array.from({ length: 4 }, (_, index) => ({ episode_number: index + 1, episode_type: 'standard', air_date: index < 3 ? '2026-10-01' : null }));
+  const partial = buildSeasonProgressEvidence([{ season_number: 1, episode_count: 4, episodes }], false);
+  const show = { seenEpisodes: ['1x1', '1x2'], seasonProgress: partial, tmdbStatus: 'Returning Series' };
+  assert.equal(partial['1'].episode_count, null);
+  for (const context of ['watch', 'upcoming', 'history'] as const) {
+    const progress = buildSeriesSeasonProgress(show, { season_number: 1, episode_number: 3, episode_count: 4, season_total_unknown: false }, context, '2026-10-23');
+    assert.equal(progress.label, 'S1 · 2/?');
+    assert.equal(progress.unknownTail, true, 'la preuve récente gagne sur l’ancien pointeur qui prétendait connaître le total');
+  }
+  assert.equal(buildSeasonProgressEvidence([{ season_number: 1, episode_count: 10, episodes }], false)['1'].episode_count, 10, 'un nombre annoncé au-delà de la liste est une vraie preuve');
+  assert.equal(buildSeasonProgressEvidence([{ season_number: 1, episode_count: 4, episodes: [] }], false)['1'].episode_count, null, 'une liste indisponible ne confirme pas le compte provisoire');
+  assert.equal(buildSeasonProgressEvidence([{ season_number: 1, episode_count: 4, episodes: episodes.map(ep => ({ ...ep, air_date: '2026-11-01' })) }], false)['1'].episode_count, 4, 'le planning complet confirme le total sans obliger un type finale');
+  const oldProof = { ...partial['1'], total_evidence_version: undefined };
+  assert.equal(needsSeasonProgressRefresh({ seasonProgress: { '1': oldProof } }), true, 'les preuves de v1.4.218 sont réparées une fois');
+});
+
 test('SEENIT-UX-014 conserve les états de saison sans inventer les diffusions', () => {
   assert.equal(seriesCompletionLabel({ tmdbStatus: 'Ended' }), 'Série terminée');
   assert.equal(seriesCompletionLabel({ tmdbStatus: 'Canceled' }), 'Série annulée');

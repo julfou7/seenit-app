@@ -1189,8 +1189,8 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   Vu, prochain, futur et entrée d'historique se distinguent autrement que par la couleur ; les saisons
   longues utilisent une barre proportionnelle, les totaux et diffusions inconnus ne sont pas inventés.
   Un cache de saison absent n'efface pas les épisodes prouvés par la progression ou les pointeurs.
-  Une saison sans total fournisseur ajoute une traîne en tirets et « ? » ; un `episode_count` positif
-  fourni par TMDB ou une preuve de finale retire cette incertitude, même si la série est renouvelée,
+  Une saison sans total fournisseur ajoute une traîne en tirets et « ? » ; un total fournisseur confirmé
+  ou une preuve de finale retire cette incertitude, même si la série est renouvelée,
   si la finale n'est pas typée/datée ou si un ancien indicateur `season_total_unknown` vaut true.
   En présence de cet ancien indicateur, seul le total fournisseur conservé dans `seasonProgress`
   ou une confirmation explicite plus récente le neutralise ; un compte de pointeur inféré ne suffit pas.
@@ -1199,7 +1199,9 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   sa politique normale de fraîcheur, y compris quand le fournisseur confirme que le total manque.
   Cette réparation conserve le statut de suivi utilisateur ; Ended/Canceled restent uniquement
   des métadonnées fournisseur (`tmdbStatus`/`seriesEnded`), jamais des valeurs de `Show.status`.
-  Le nombre d'épisodes actuellement listés ne devient jamais un total à lui seul. Les métadonnées de l'épisode présenté
+  Le nombre d’épisodes actuellement listés ne devient jamais un total à lui seul, même dans un
+  `episode_count` TMDB provisoire. Une finale, une saison terminée/antérieure, un planning complet daté
+  ou un total annoncé au-delà de la liste confirme le total. Sans cette preuve, conserver « ? ». Les métadonnées de l'épisode présenté
   priment sur un ancien pointeur contradictoire. La récence des séries laissées de côté provient
   des visionnages encore vus, puis de leur horodatage de repli, sans nouvel appel fournisseur.
   La coche Vu, le rappel et les actions d'historique sont des contrôles séparés d'au moins 44 px.
@@ -1221,12 +1223,13 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   sans preuve Plex par épisode, elle ne crée ni notification épisode ni action Vu. Les films dont
   l’identité exacte est disponible conservent leur notification et leur action réversible.
   À regarder conserve trois sections distinctes (Continuer, Nouveautés, Pas vu depuis un moment),
-  chacune en rail de trois cartes puis Voir tout en liste. Les badges statut sans emoji sont placés
-  sous le titre de l’épisode ; le rappel de sortie utilise un rond sombre et les jours exacts.
+  chacune en rail de trois cartes puis liste progressive via la bascule à deux icônes. Les badges
+  statut sans emoji sont à côté du code épisode ; le rappel de sortie utilise un rond sombre et les jours exacts.
+  Films à voir précède Pas vu depuis un moment, qui reste en dernière position.
   À venir groupe Aujourd’hui, Cette semaine (six jours suivants), Plus tard selon le calendrier local.
   L’historique mixte est paginé par dix. Les sections vides disparaissent et les états chargement,
-  cache hors ligne et synchronisation restent explicites. Les billets horizontaux films affichent
-  trois entrées puis trois de plus, avec bascule grille/liste ; toucher le tampon Vu annule le marquage.
+  cache hors ligne et synchronisation restent explicites. Les films affichent trois billets puis trois
+  de plus, avec bascule carrousel/liste ; toucher le tampon Vu annule le marquage.
 - **SEENIT-UX-016** — Les cartes 8f et les tickets films réutilisent les écritures réversibles existantes.
   La séparation des groupes et leur présentation suivent désormais `SEENIT-UX-018`.
   Un Vu abouti anime l'épisode quitté, la nouvelle reprise réelle, le segment et un tampon SeenIt ;
@@ -1718,3 +1721,17 @@ l'identité de l'APK et ses actifs.
   Aucun plugin dont les peer dependencies sont limitées à une ancienne version majeure de Capacitor ne
   doit rester dans le graphe. La PWA conserve `signInWithPopup`.
 - TNR : toute régression vers le flux legacy comme parcours Android primaire, ou toute rupture de l'échange vers le Firebase UID existant, est interdite.
+
+### Clarifications accueil après terrain v1.4.218 — SEENIT-UX-014/018
+
+Les dernières consignes du 23 octobre priment sur le handoff initial : carte 8f de 150 px, badge à côté
+du code épisode et Vu centré ; bascules de présentation à deux icônes, sans « Voir tout » ; films avant
+Pas vu depuis un moment, qui reste dernier ; billets horizontaux de 104 px conformes au prototype
+(affiche 70 px, informations et fournisseur au centre, talon 96 px avec heure de fin et glyphe Vu).
+Le header sticky conserve un fondu de flou progressif de 26 px sous les filtres.
+Chaque notification se retire individuellement par swipe gauche ou bouton accessible, avec Annuler ;
+les retraits sont locaux et UID-scopés, ne modifient ni le média ni le journal source et sont exclus du
+point non lu. La feuille conserve les vignettes et les actions métier existantes.
+Le total provisoire d’une liste partielle ne retire jamais « ? ». Les deux synchronisations conservent
+une version de preuve du total afin de réparer une fois les anciennes preuves ambiguës.
+L’APK est explicitement différée pendant la collecte progressive des retours utilisateur.

@@ -169,9 +169,8 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
         <h3 id={titleId}>{show.title}</h3>
         <div className="series-8f__episode-block">
           <div key={feedback?.sequence || 0} className={feedback ? 'series-8f__incoming' : undefined}>
-            <div className="series-8f__code"><strong>{markingSnapshot?.code || code}</strong>{visibleDetail && !status && !detailIsBadge && <span> · {visibleDetail}</span>}</div>
+            <div className="series-8f__code"><strong>{markingSnapshot?.code || code}</strong>{status && <span className={`series-8f__status series-8f__status--${status.tone}`} title={status.tone === 'stale' ? visibleDetail : undefined}><svg viewBox="0 0 20 16" aria-hidden="true"><rect x="1" y="1" width="18" height="12" rx="3" /><path d="m6 7 3 3 5-6M6 15h8" /></svg>{status.label}</span>}{visibleDetail && !status && !detailIsBadge && <span> · {visibleDetail}</span>}</div>
             {(markingSnapshot ? markingSnapshot.subtitle : subtitle) && <p>{markingSnapshot ? markingSnapshot.subtitle : subtitle}</p>}
-            {status && <span className={`series-8f__status series-8f__status--${status.tone}`}><svg viewBox="0 0 20 16" aria-hidden="true"><rect x="1" y="1" width="18" height="12" rx="3" /><path d="m6 7 3 3 5-6M6 15h8" /></svg>{status.label}</span>}
             {status?.tone === 'stale' && <small className="series-8f__stale">{visibleDetail}</small>}
 
           </div>

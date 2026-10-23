@@ -14,6 +14,8 @@ import { getTodayStr } from '../lib/utils';
 import { DialogLayer } from './ui/DialogLayer';
 import { SeenItCheckButton } from './SeenItCheckButton';
 import { useToastStore } from '../store/toastStore';
+import { HomeNoticeSwipe } from './cards/HomeNoticeSwipe';
+import { imageUrl } from '../features/watchlist/seriesCardPresentation';
 
 interface Notice { id: string; title: string; detail: string; show?: Show; newsId?: string; update?: boolean; mark?: boolean }
 interface News { id: string; showId: string; message: string; description?: string }
@@ -23,6 +25,7 @@ export function HomeNotifications({ shows, onOpen, onSeen }: { shows: Show[]; on
   const [news, setNews] = useState<News[]>([]);
   const [read, setRead] = useState<string[]>([]);
   const [readNews, setReadNews] = useState<string[]>([]);
+  const [dismissed, setDismissed] = useState<string[]>([]);
   const [downloads, setDownloads] = useState<LiveDownloadItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [clock, setClock] = useState(() => Date.now());
@@ -39,10 +42,11 @@ export function HomeNotifications({ shows, onOpen, onSeen }: { shows: Show[]; on
   useEffect(() => {
     let current = true;
     setNews(readUserScopedJson<News[]>(uid, 'home_news', [])); setLoading(Boolean(uid));
-    const refresh = () => { setRead(readUserScopedJson<string[]>(uid, 'home_read_notifications', [])); setReadNews(readUserScopedJson<string[]>(uid, 'read_news_ids', [])); };
+    const refresh = () => { setRead(readUserScopedJson<string[]>(uid, 'home_read_notifications', [])); setReadNews(readUserScopedJson<string[]>(uid, 'read_news_ids', [])); setDismissed(readUserScopedJson<string[]>(uid, 'home_dismissed_notifications', [])); };
     refresh();
     const unsubscribe = subscribeUserScopedStorageField(uid, 'home_read_notifications', refresh);
     const unsubscribeNews = subscribeUserScopedStorageField(uid, 'read_news_ids', refresh);
+    const unsubscribeDismissed = subscribeUserScopedStorageField(uid, 'home_dismissed_notifications', refresh);
     if (uid) void getDocs(query(collection(db, 'users', uid, 'news'), orderBy('createdAt', 'desc'), limit(50))).then(snapshot => {
       if (current) {
         const items = snapshot.docs.map(item => ({ ...item.data(), id: item.id }) as News);
@@ -55,7 +59,7 @@ export function HomeNotifications({ shows, onOpen, onSeen }: { shows: Show[]; on
       const ids = [...new Set([...readUserScopedJson<string[]>(uid, 'read_news_ids', []), ...remote.filter((id): id is string => typeof id === 'string')])];
       setReadNews(ids); writeUserScopedJson(uid, 'read_news_ids', ids);
     }).catch(() => {});
-    return () => { current = false; unsubscribe(); unsubscribeNews(); };
+    return () => { current = false; unsubscribe(); unsubscribeNews(); unsubscribeDismissed(); };
   }, [uid]);
   useEffect(() => {
     if (!downloadsEnabled) { setDownloads([]); return; }
@@ -90,7 +94,18 @@ export function HomeNotifications({ shows, onOpen, onSeen }: { shows: Show[]; on
   }
   if (hasUpdate && release) notices.unshift({ id: `update:${release.version}`, title: `SeenIt ${release.version}`, detail: 'Une mise à jour est disponible', update: true });
   const isRead = (notice: Notice) => read.includes(notice.id) || Boolean(notice.newsId && readNews.includes(notice.newsId));
-  const unread = notices.filter(notice => !isRead(notice));
+  const visibleNotices = notices.filter(notice => !dismissed.includes(notice.id));
+  const unread = visibleNotices.filter(notice => !isRead(notice));
+  const dismiss = (notice: Notice) => {
+    if (!uid || auth.currentUser?.uid !== uid) return;
+    const next = [...new Set([...readUserScopedJson<string[]>(uid, 'home_dismissed_notifications', []), notice.id])].slice(-500);
+    setDismissed(next); writeUserScopedJson(uid, 'home_dismissed_notifications', next);
+    useToastStore.getState().showToast('Notification retirée', 'info', undefined, () => {
+      if (auth.currentUser?.uid !== uid) return;
+      const restored = readUserScopedJson<string[]>(uid, 'home_dismissed_notifications', []).filter(id => id !== notice.id);
+      setDismissed(restored); writeUserScopedJson(uid, 'home_dismissed_notifications', restored);
+    });
+  };
   const markRead = async (items: Notice[]) => {
     const next = [...new Set([...read, ...items.map(item => item.id)])].slice(-500);
     setRead(next); writeUserScopedJson(uid, 'home_read_notifications', next);
@@ -108,11 +123,12 @@ export function HomeNotifications({ shows, onOpen, onSeen }: { shows: Show[]; on
       <section className="home-notifications"><header><h2>Notifications</h2><button type="button" aria-label="Fermer les notifications" data-dialog-initial-focus onClick={() => setOpen(false)}><X size={20} /></button></header>
         {unread.length > 0 && <button type="button" className="home-notifications__read" onClick={() => { void markRead(notices); }}><CheckCheck size={16} />Tout marquer lu</button>}
         {loading && <p role="status">Chargement des notifications…</p>}
-        {!loading && !notices.length && <p>Aucune notification pour le moment.</p>}
-        <div className="home-notifications__list">{notices.map(notice => <div key={notice.id} className={`home-notice${isRead(notice) ? ' home-notice--read' : ''}`}>
-          <button type="button" onClick={() => { void markRead([notice]); setOpen(false); if (notice.update) useUpdateStore.getState().requestUpdateModal(); else if (notice.show) onOpen(notice.show.id, notice.show.mediaType); }}><span className="home-notice__dot" /><span><strong>{notice.title}</strong><small>{notice.detail}</small></span></button>
-          {notice.mark && notice.show && <SeenItCheckButton size={28} title={`Marquer ${notice.title} comme vu`} onClick={async () => { if (await onSeen(notice.show!) !== false) await markRead([notice]); }} />}
-        </div>)}</div>
+        {!loading && !visibleNotices.length && <p>Aucune notification pour le moment.</p>}
+        <div className="home-notifications__list">{visibleNotices.map(notice => <HomeNoticeSwipe key={notice.id} onDismiss={() => dismiss(notice)}><div data-notice-id={notice.id} className={`home-notice${isRead(notice) ? ' home-notice--read' : ''}`}>
+          <button type="button" onClick={() => { void markRead([notice]); setOpen(false); if (notice.update) useUpdateStore.getState().requestUpdateModal(); else if (notice.show) onOpen(notice.show.id, notice.show.mediaType); }}><span className="home-notice__image" aria-hidden="true">{notice.show?.posterPath ? <img src={imageUrl(notice.show.posterPath, 'w185')!} alt="" loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} /> : <Bell size={23} />}</span><span className="home-notice__text"><strong>{!isRead(notice) && <i className="home-notice__dot" />}{notice.title}</strong><small>{notice.detail}</small></span></button>
+          {notice.mark && notice.show && <span data-notice-action><SeenItCheckButton size={28} title={`Marquer ${notice.title} comme vu`} onClick={async () => { if (await onSeen(notice.show!) !== false) await markRead([notice]); }} /></span>}
+          <button type="button" data-notice-action className="home-notice__dismiss" aria-label={`Retirer la notification ${notice.title}`} onClick={() => dismiss(notice)}><X size={16} /></button>
+        </div></HomeNoticeSwipe>)}</div>
       </section>
     </DialogLayer>}
   </>;

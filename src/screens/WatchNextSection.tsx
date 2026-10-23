@@ -10,7 +10,8 @@ import { tmdb } from '../features/shows/tmdb';
 import { getTodayStr } from '../lib/utils';
 import './watchNext18c.css';
 import { HomeSwipeCard } from '../components/cards/HomeSwipeCard';
-import { ChevronUp, LayoutGrid, List } from 'lucide-react';
+import { HomeLayoutSwitch } from '../components/cards/HomeLayoutSwitch';
+import { ChevronUp } from 'lucide-react';
 
 interface Props {
   allShows: Show[];
@@ -30,7 +31,7 @@ export function WatchNextSection({ allShows, groups, movies, active, onOpen, onE
   latestSeriesOrder.current = candidates.map(show => show.id);
   const [expandedGroups, setExpandedGroups] = useState<Record<number, boolean>>({});
   const [groupLimits, setGroupLimits] = useState<Record<number, number>>({});
-  const [movieGrid, setMovieGrid] = useState(false);
+  const [movieList, setMovieList] = useState(false);
   const memberships = useRef(new Map<string, number>());
   groups.forEach((group, index) => group.forEach(show => memberships.current.set(show.id, index)));
   const [seriesOrder, setSeriesOrder] = useState(() => candidates.map(show => show.id));
@@ -38,7 +39,7 @@ export function WatchNextSection({ allShows, groups, movies, active, onOpen, onE
   const [movieOrder, setMovieOrder] = useState<string[] | null>(null);
   const [runtimes, setRuntimes] = useState<Record<string, number>>({});
   const [now, setNow] = useState(() => Date.now());
-  const reset = useCallback(() => { setRetained({}); setMovieOrder(null); setExpandedGroups({}); setGroupLimits({}); setMovieGrid(false); setMovieCount(3); setSeriesOrder(latestSeriesOrder.current); setNow(Date.now()); }, []);
+  const reset = useCallback(() => { setRetained({}); setMovieOrder(null); setExpandedGroups({}); setGroupLimits({}); setMovieList(false); setMovieCount(3); setSeriesOrder(latestSeriesOrder.current); setNow(Date.now()); }, []);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 60_000);
     const refresh = () => { setNow(Date.now()); };
@@ -98,20 +99,20 @@ export function WatchNextSection({ allShows, groups, movies, active, onOpen, onE
     const back = (event: Event) => {
       const group = Object.keys(expandedGroups).find(index => expandedGroups[Number(index)]);
       if (group !== undefined) { event.preventDefault(); setExpandedGroups(previous => ({ ...previous, [Number(group)]: false })); }
-      else if (movieGrid || movieCount > 3) { event.preventDefault(); setMovieGrid(false); setMovieCount(3); }
+      else if (movieList || movieCount > 3) { event.preventDefault(); setMovieList(false); setMovieCount(3); }
     };
     window.addEventListener('watchlist-back-one-level', back);
     return () => window.removeEventListener('watchlist-back-one-level', back);
-  }, [active, expandedGroups, movieGrid, movieCount]);
+  }, [active, expandedGroups, movieList, movieCount]);
   const start = now;
-  return <section className="watch-next-18c home-watch" aria-label="À regarder">
-    {['Continuer à regarder', 'Nouveautés', 'Pas vu depuis un moment'].map((label, index) => {
+  const renderSeriesGroup = (index: number) => {
+      const label = ['Continuer à regarder', 'Nouveautés', 'Pas vu depuis un moment'][index];
       const items = series.filter(show => memberships.current.get(show.id) === index);
       if (!items.length) return null;
       const expanded = Boolean(expandedGroups[index]);
       const limit = groupLimits[index] || 12;
       return <section key={label} className="home-series-section" aria-labelledby={`home-section-${index}`}>
-        <header className="home-section-heading"><h2 id={`home-section-${index}`}>{label}</h2><button type="button" aria-expanded={expanded} aria-controls={`home-series-${index}`} onClick={() => { setExpandedGroups(previous => ({ ...previous, [index]: !expanded })); setGroupLimits(previous => ({ ...previous, [index]: 12 })); }}>{expanded ? <><ChevronUp size={16} />Revenir en carrousel</> : 'Voir tout'}</button></header>
+        <header className="home-section-heading"><h2 id={`home-section-${index}`}>{label} <span>{items.length}</span></h2><HomeLayoutSwitch label={label} list={expanded} onChange={value => { setExpandedGroups(previous => ({ ...previous, [index]: value })); setGroupLimits(previous => ({ ...previous, [index]: 12 })); }} /></header>
         <div className={expanded ? 'home-series-list' : 'home-series-rail'} id={`home-series-${index}`}>
           {items.slice(0, expanded ? limit : 3).map(show => {
             const card = <ContinueWatchingCard show={show} layout={expanded ? 'list' : 'rail'} animateSeen showStaleDetail={staleIds.has(show.id)} lastMarkedEpisode={retained[show.id]?.episode} onMarkUnseen={onUnseen} onMarkAsSeen={markSeries} onShowClick={onOpen} onEpisodeClick={onEpisode} actions={actions(show)} />;
@@ -119,15 +120,19 @@ export function WatchNextSection({ allShows, groups, movies, active, onOpen, onE
           })}
         </div>
         {expanded && items.length > limit && <button type="button" className="watch-next-18c__more-films" onClick={() => setGroupLimits(previous => ({ ...previous, [index]: limit + 12 }))}>Afficher {Math.min(12, items.length - limit)} de plus</button>}
+        {expanded && <button type="button" className="home-series-collapse" onClick={() => setExpandedGroups(previous => ({ ...previous, [index]: false }))}><ChevronUp size={16} />Revenir en carrousel</button>}
       </section>;
-    })}
+  };
+  return <section className="watch-next-18c home-watch" aria-label="À regarder">
+    {[0, 1].map(renderSeriesGroup)}
     {orderedMovies.length > 0 && <>
-      <div className="home-section-heading"><h2>Films à voir <span>{movies.length}</span></h2><div className="home-layout-switch" role="group" aria-label="Présentation des films"><button type="button" aria-label="Films en grille" aria-pressed={movieGrid} onClick={() => setMovieGrid(true)}><LayoutGrid size={18} /></button><button type="button" aria-label="Films en liste" aria-pressed={!movieGrid} onClick={() => setMovieGrid(false)}><List size={18} /></button></div></div>
-      <div className={movieGrid ? 'movie-ticket-grid' : 'home-movie-list'} id="films-a-voir-18c">
-        {orderedMovies.slice(0, movieCount).map(show => <MovieTicketCard key={show.id} show={show} layout={movieGrid ? 'poster' : 'horizontal'} start={start} onOpen={onOpen} onToggle={toggleMovie} onRuntime={onRuntime} />)}
+      <div className="home-section-heading"><h2>Films à voir <span>{movies.length}</span></h2><HomeLayoutSwitch label="Films" list={movieList} onChange={setMovieList} /></div>
+      <div className={movieList ? 'home-movie-list' : 'movie-ticket-rail'} id="films-a-voir-18c">
+        {orderedMovies.slice(0, movieCount).map(show => <MovieTicketCard key={show.id} show={show} layout={movieList ? 'horizontal' : 'poster'} start={start} onOpen={onOpen} onToggle={toggleMovie} onRuntime={onRuntime} />)}
       </div>
       {movieCount < orderedMovies.length && <button type="button" className="watch-next-18c__more-films" onClick={() => setMovieCount(count => count + 3)}>Afficher {Math.min(3, orderedMovies.length - movieCount)} de plus</button>}
     </>}
+    {renderSeriesGroup(2)}
     {series.length === 0 && orderedMovies.length === 0 && <p className="watch-next-18c__empty">Rien à afficher dans À Regarder pour le moment.</p>}
   </section>;
 }

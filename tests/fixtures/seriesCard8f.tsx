@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { SeriesEpisodeCard } from '../../src/components/cards/SeriesEpisodeCard';
+import { buildSeasonProgressEvidence } from '../../src/features/shows/seasonProgressEvidence';
 import type { Show } from '../../src/types';
 
 let finishMark: (() => void) | null = null;
@@ -23,13 +24,14 @@ function Harness() {
   const show = marked ? { ...base, seenEpisodes: [...base.seenEpisodes, '5x4'] } : base;
   const next = { ...base.nextEpisodeToWatch!, episode_number: marked ? 5 : 4 };
   const harryEpisode = {
-    season_number: 1, episode_number: 3, episode_count: null, aired_episodes_in_season: 3,
+    season_number: 1, episode_number: 3, episode_count: 4, aired_episodes_in_season: 3,
     known_episodes_in_season: 4, season_total_unknown: true, last_season_number: 1,
     last_known_episode_type: 'standard', last_known_episode_air_date: null, name: 'Épisode 3',
   };
   const harry = {
     ...base, id: 'harry-potter', title: 'Harry Potter', seriesEnded: false, tmdbStatus: 'Returning Series',
     seenEpisodes: ['1x1', '1x2'], nextEpisodeToWatch: harryEpisode,
+    seasonProgress: buildSeasonProgressEvidence([{ season_number: 1, episode_count: 4, episodes: [{ episode_number: 4, episode_type: 'standard' }] }], false),
     nextEpisodeToAir: { season_number: 1, episode_number: 4, episode_count: null, air_date: '2026-11-01' },
   } as Show;
   return <main style={{ padding: '20px 16px', maxWidth: 452, margin: 'auto' }}>
@@ -43,7 +45,7 @@ function Harness() {
     <section id="season-24" className="series-8f-host"><SeriesEpisodeCard show={{ ...base, title: 'Saison de 24 épisodes' }} episode={{ ...next, episode_count: 24 }} onOpen={open} context={{ kind: 'watch', upToDate: true }} /></section>
     <section id="season-40" className="series-8f-host"><SeriesEpisodeCard show={{ ...base, title: 'Saison de 40 épisodes', posterPath: 'http://127.0.0.1:4173/__8f-absent.jpg' }} episode={{ ...next, episode_count: 40 }} onOpen={open} context={{ kind: 'watch', onMarkSeen: () => {} }} /></section>
     <section id="unknown" className="series-8f-host"><SeriesEpisodeCard show={harry} episode={harryEpisode} onOpen={open} providerLogo={provider} providerName="Max" context={{ kind: 'watch' }} /></section>
-    <section id="known-total" className="series-8f-host"><SeriesEpisodeCard show={{ ...harry, id: 'mobland', title: 'MobLand', seasonProgress: { '1': { ...harryEpisode, episode_count: 10 } } }} episode={{ ...harryEpisode, episode_count: 10 }} onOpen={open} context={{ kind: 'watch' }} /></section>
+    <section id="known-total" className="series-8f-host"><SeriesEpisodeCard show={{ ...harry, id: 'mobland', title: 'MobLand', seasonProgress: buildSeasonProgressEvidence([{ season_number: 1, episode_count: 10, episodes: [{ episode_number: 4 }] }], false) }} episode={{ ...harryEpisode, episode_count: 10 }} onOpen={open} context={{ kind: 'watch' }} /></section>
   </main>;
 }
 createRoot(document.getElementById('root')!).render(<Harness />);

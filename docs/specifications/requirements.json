@@ -2080,6 +2080,10 @@
           "contains": "SEENIT-UX-014 affiche le total fourni de MobLand et des séries renouvelées"
         },
         {
+          "file": "tests/seriesCardPresentation.test.ts",
+          "contains": "SEENIT-UX-014 distingue le total annoncé de la liste provisoire Harry Potter"
+        },
+        {
           "file": "tests/markEpisodeSeasonTotal.test.ts",
           "contains": "SEENIT-UX-014 Vu conserve le total fournisseur sans transformer la liste partielle en total"
         },
