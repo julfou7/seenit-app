@@ -113,3 +113,19 @@ Preuves ciblées :47tests verts ; Chromium360/412/1280 vert pour ancrage complet
 Revue #750, finding4366417266 P2 confirmé : ShowDetail marque parfois une saison entière avec le même watchedAt ; le tri lexical de HistoryFeed produisait E1,E10,E11… et cassait le regroupement. Reproduction rouge sur le vrai HistoryFeed :12épisodes simultanés rendaient10lignes paginées au lieu de la session×12. Le comparateur de production ordonne les égalités par série puis saison/épisode décroissants (heure attestée seulement), avant regroupement/pagination. TNR pur du même comparateur et scénario navigateur réel ajoutés ; films ex æquo séparés et heures inconnues non regroupées. Validation finale du correctif requise avant push.
 
 Revue #750, finding4366455643 P2 confirmé : attribution optimiste de show.id remonte le contenu de rappel avant la confirmation de l’ajout. TNR rouge avec ajout suspendu : la nouvelle cloche n’était plus en attente. Correction : clé canonique média/TMDB/épisode stable ; après ajout et confirmation, état activé visible sans réouverture, second appui supprime le rappel. Le transport simulé reproduit désormais une vraie attente de persistance après ajout optimiste ; le précédent mock immédiat masquait cette frontière. Validation finale requise avant push.
+
+
+## Terrain v1.4.221 — 24 octobre2026
+Baseline commit `df03a1710b4c2ef7f5aad9cdddca3b0bd06e055e`, APK1.4.221. Périmètre : quatre captures utilisateur184037/184014/184005/183940 et retours À venir.
+
+| Symptôme | Cause racine / classe affectée | Correctif / preuves |
+|---|---|---|
+| Descendante g coupée et libellé ancien tronqué | Interligne1 + text-box cap/alphabetic + overflow hidden ; titre de section rigide20px | Une règle commune16–18px/1.25 sans clip dans les trois panneaux, labels entiers. Chromium360/412/1280 avec police de production. |
+| Vaiana coupé / titre long À venir | Hauteurs de titres absolues et clamp2, sans métriques de police suffisantes | Trois lignes avec hauteur en lh pour films, trois lignes et bloc complet pour À venir ; acteur/code/épisode sans chevauchement. |
+| Bas sous navigation | Réserve82px sans safe-area Android ; harnais précédent sans navigation réelle | Réserve84px+safe-area, retrait du surplus final ; BottomNav réel et safe-area28px : espace final16px dans chaque panneau. |
+| Knight encore inconnu | Preuvev3 avec totalnull considérée définitive, filtre automatique sautant les séries déjà synchronisées ; cache TV chaud pouvant rendre l’ancienne valeur | TNR rouge puis vert via performDetailsSync(false), pointeur et rendu, client TMDB réel/cache chaud/transport503 ; réparation bornée et aucune exception par titre. Les données personnelles de production n’ont pas été lues. |
+| Cloche après3–4s | État visuel attendait permission/jeton ; erreurs aval non propagées | Retour optimiste immédiat en attente, confirmation après écriture, rollback préférences/affichage sur erreur, garde UID/ref et aucun succès local avant persistance ; vrai handler suspendu dans Chromium. |
+| Aujourd’hui / ce soir | Libellé « ce soir » constant pour toute lecture du jour | Heure locale prouvée ou heure inconnue, plage réelle des sessions, titres sans troncature. |
+| Badge dans anciennes séries | Badge automatique de la carte partagé sans politique de section | Suppression explicite par section, quels que soient récence/finale/nombre disponible. |
+
+Preuves automatisées : tests/homeTerrain221.test.ts, detailsSyncProgress.test.ts, scripts/home-terrain221-browser-checks.cjs et captures terrain221-* dans quality-reports/artifact CI. Risque résiduel : test physique du nouvel APK à recevoir ; aucun FPS Android déduit des mesures navigateur. Validation canonique/CI et release enregistrées dans le checkpoint stable #729/6359352808 et #102.

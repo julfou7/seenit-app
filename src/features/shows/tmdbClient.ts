@@ -518,10 +518,10 @@ export class TMDBClient {
     return this.primeMediaRenderSnapshotFromPersistentCache(id, type);
   }
 
-  private async getCachedMediaDetails(id: number, type: RelationMediaType): Promise<Result<any>> {
+  private async getCachedMediaDetails(id: number, type: RelationMediaType, refresh = false) {
     const cacheKey = `${type}_${Number(id)}`;
     const cached = this.detailsCache.get(cacheKey);
-    if (cached) {
+    if (!refresh && cached) {
       if (!this.detailRenderCache.get(cacheKey)) {
         this.cacheMediaDetailRenderSnapshot(cacheKey, cached, type, undefined, false);
       }
@@ -529,7 +529,7 @@ export class TMDBClient {
     }
 
     const persisted = await readPublicMetadataCache<any>('details', cacheKey, { allowStale: true });
-    if (persisted?.fresh) {
+    if (!refresh && persisted?.fresh) {
       this.detailsCache.set(cacheKey, persisted.data);
       this.cacheMediaDetailRenderSnapshot(cacheKey, persisted.data, type, persisted.storedAt);
       return ok(persisted.data);
@@ -537,10 +537,10 @@ export class TMDBClient {
 
     return runPublicMetadataSingleFlight('details', cacheKey, async (): Promise<Result<any>> => {
       const queuedMemory = this.detailsCache.get(cacheKey);
-      if (queuedMemory) return ok(queuedMemory);
+      if (!refresh && queuedMemory) return ok(queuedMemory);
 
       const queuedPersistent = await readPublicMetadataCache<any>('details', cacheKey, { allowStale: true });
-      if (queuedPersistent?.fresh) {
+      if (!refresh && queuedPersistent?.fresh) {
         this.detailsCache.set(cacheKey, queuedPersistent.data);
         this.cacheMediaDetailRenderSnapshot(cacheKey, queuedPersistent.data, type, queuedPersistent.storedAt);
         return ok(queuedPersistent.data);
@@ -553,7 +553,7 @@ export class TMDBClient {
       const url = new URL(`${this.baseUrl}/${type}/${id}?language=fr-FR&append_to_response=${appended}&include_video_language=fr,en,null&include_image_language=fr,en,null,de,es,it,ja,ko`);
       const res = await tryCatch(authenticatedFetch(url.toString()));
       if (!res.ok) {
-        if (fallback) {
+        if (!refresh && fallback) {
           this.detailsCache.set(cacheKey, fallback.data);
           this.cacheMediaDetailRenderSnapshot(cacheKey, fallback.data, type, fallback.storedAt);
           return ok(fallback.data);
@@ -561,7 +561,7 @@ export class TMDBClient {
         return err((res as any).error);
       }
       if (!res.value.ok) {
-        if (fallback && isPublicMetadataFallbackStatus(res.value.status)) {
+        if (!refresh && fallback && isPublicMetadataFallbackStatus(res.value.status)) {
           this.detailsCache.set(cacheKey, fallback.data);
           this.cacheMediaDetailRenderSnapshot(cacheKey, fallback.data, type, fallback.storedAt);
           return ok(fallback.data);
@@ -570,7 +570,7 @@ export class TMDBClient {
       }
       const data = await tryCatch(res.value.json());
       if (!data.ok) {
-        if (fallback) {
+        if (!refresh && fallback) {
           this.detailsCache.set(cacheKey, fallback.data);
           this.cacheMediaDetailRenderSnapshot(cacheKey, fallback.data, type, fallback.storedAt);
           return ok(fallback.data);
@@ -578,7 +578,7 @@ export class TMDBClient {
         return err((data as any).error);
       }
       if (data.value && data.value.status_code) {
-        if (fallback) {
+        if (!refresh && fallback) {
           this.detailsCache.set(cacheKey, fallback.data);
           this.cacheMediaDetailRenderSnapshot(cacheKey, fallback.data, type, fallback.storedAt);
           return ok(fallback.data);
@@ -604,16 +604,16 @@ export class TMDBClient {
     });
   }
 
-  async getShowDetails(id: number): Promise<Result<any>> {
-    return this.getCachedMediaDetails(id, 'tv');
+  async getShowDetails(id: number, refresh = false) {
+    return this.getCachedMediaDetails(id, 'tv', refresh);
   }
 
   async getMovieDetails(id: number): Promise<Result<any>> {
     return this.getCachedMediaDetails(id, 'movie');
   }
 
-  async getMediaDetails(id: number, type: 'tv' | 'movie' = 'tv'): Promise<Result<any>> {
-    return type === 'movie' ? this.getMovieDetails(id) : this.getShowDetails(id);
+  async getMediaDetails(id: number, type: 'tv' | 'movie' = 'tv', refresh = false) {
+    return type === 'movie' ? this.getMovieDetails(id) : this.getShowDetails(id, refresh);
   }
 
   async getEnglishMediaTitle(

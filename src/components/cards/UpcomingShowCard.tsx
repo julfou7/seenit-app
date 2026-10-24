@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Calendar, Bell } from 'lucide-react';
 import { type Show } from '../../types';
 import { requestNotificationPermission, auth, db, sendNativeNotification } from '../../lib/firebase';
@@ -111,6 +111,9 @@ function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, action
     return readUserScopedJson(auth.currentUser?.uid, storageField, false);
   });
   const [loadingReminder, setLoadingReminder] = useState(false);
+  const reminderFlight = useRef(false);
+  const [optimisticReminder, setOptimisticReminder] = useState<boolean | null>(null);
+  const displayedReminder = optimisticReminder ?? isReminderSet;
   const { showToast } = useToastStore();
   const { updateShow, shows } = useShows();
   const [visible, setVisible] = useState(false);
@@ -122,114 +125,69 @@ function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, action
     return () => { current = false; };
   }, [show.tmdbId, show.mediaType, visible, compact]);
 
-  const performReminder = async (show: Show, ownerUid: string) => {
-    const targetStorageField = `reminder_${show.id}_S${ep.season_number}E${ep.episode_number}`;
-    const nextState = !isReminderSet;
+  const performReminder = async (target: Show, ownerUid: string, nextState: boolean) => {
+    const targetStorageField = `reminder_${target.id}_S${ep.season_number}E${ep.episode_number}`;
     const sNumStr = String(ep.season_number).padStart(2, '0');
     const eNumStr = String(ep.episode_number).padStart(2, '0');
     const episodeString = `S${sNumStr}E${eNumStr}`;
-    const reminderId = `${show.id}_${episodeString}`;
-
+    let fcmToken: string | null = null;
     if (nextState) {
-      setLoadingReminder(true);
-      let fcmToken: string | null = null;
-      try {
-        fcmToken = await requestNotificationPermission();
-      } catch (err) {
-        appLogger.warn('system', 'Autorisation des notifications indisponible', err);
-      }
-
+      try { fcmToken = await requestNotificationPermission(); }
+      catch (error) { appLogger.warn('system', 'Autorisation des notifications indisponible', error); }
+    }
+    if (auth.currentUser?.uid !== ownerUid) return;
+    const preferenceChanged = Boolean(target.notificationsEnabled) !== nextState;
+    try {
+      if (preferenceChanged) await updateShow(target.id, { notificationsEnabled: nextState });
       if (auth.currentUser?.uid !== ownerUid) return;
-      setIsReminderSet(true);
-      writeUserScopedJson(ownerUid, targetStorageField, true);
-
-      if (show.id && !show.notificationsEnabled) { await updateShow(show.id, { notificationsEnabled: true }); }
-      if (auth.currentUser?.uid !== ownerUid) return;
-      showToast(`« ${show.title} » S${sNumStr}E${eNumStr} • Rappel activé`, 'reminder', show);
-
-      try {
-        const epStill = ep.still_path || show.nextEpisodeToAir?.still_path || show.nextEpisodeToWatch?.still_path;
-        const posterUrl = show.posterPath
-          ? (show.posterPath.startsWith('http') ? show.posterPath : `https://image.tmdb.org/t/p/w185${show.posterPath}`)
-          : 'https://seenit.app/icon-192.png';
-        const backdropUrl = epStill
-          ? (epStill.startsWith('http') ? epStill : `https://image.tmdb.org/t/p/w780${epStill}`)
-          : (show.backdropPath
-              ? (show.backdropPath.startsWith('http') ? show.backdropPath : `https://image.tmdb.org/t/p/w780${show.backdropPath}`)
-              : posterUrl);
-
-        sendNativeNotification(`🔔 Rappel programmé : ${show.title}`, {
-          body: `Rappel enregistré pour l'épisode S${sNumStr}E${eNumStr} (${ep.name || 'Prochainement'})`,
-          icon: posterUrl,
-          image: backdropUrl,
-          data: {
-            showId: show.id,
-            tmdbId: show.tmdbId,
-            mediaType: show.mediaType || 'tv',
-            season: ep.season_number,
-            episode: ep.episode_number
-          }
-        });
-      } catch (err) {
-        appLogger.warn('system', 'Notification locale de rappel indisponible', err);
+      const reminderRef = doc(db, 'users', ownerUid, 'reminders', `${target.id}_${episodeString}`);
+      if (nextState) await setDoc(reminderRef, {
+        showId: target.id, showTitle: target.title, episodeString,
+        seasonNumber: ep.season_number, episodeNumber: ep.episode_number,
+        episodeTitle: ep.name || '', air_date: ep.air_date,
+        fcmToken: fcmToken || '', createdAt: Date.now(),
+      });
+      else await deleteDoc(reminderRef);
+    } catch (error) {
+      if (preferenceChanged && auth.currentUser?.uid === ownerUid) {
+        try { await updateShow(target.id, { notificationsEnabled: Boolean(target.notificationsEnabled) }); }
+        catch (rollbackError) { appLogger.warn('system', 'Restauration du rappel impossible', rollbackError); }
       }
-
+      throw error;
+    }
+    if (auth.currentUser?.uid !== ownerUid) return;
+    setIsReminderSet(nextState);
+    if (nextState) writeUserScopedJson(ownerUid, targetStorageField, true);
+    else removeUserScopedValue(ownerUid, targetStorageField);
+    showToast(`« ${target.title} » S${sNumStr}E${eNumStr} • Rappel ${nextState ? 'activé' : 'désactivé'}`, 'reminder', target);
+    if (nextState) {
+      const posterUrl = target.posterPath ? target.posterPath.startsWith('http') ? target.posterPath : `https://image.tmdb.org/t/p/w185${target.posterPath}` : 'https://seenit.app/icon-192.png';
+      const still = ep.still_path || target.nextEpisodeToAir?.still_path || target.nextEpisodeToWatch?.still_path || target.backdropPath;
       try {
-        const user = auth.currentUser;
-        if (user?.uid === ownerUid) {
-          const reminderRef = doc(db, 'users', user.uid, 'reminders', reminderId);
-          await setDoc(reminderRef, {
-            showId: show.id,
-            showTitle: show.title,
-            episodeString,
-            seasonNumber: ep.season_number,
-            episodeNumber: ep.episode_number,
-            episodeTitle: ep.name || '',
-            air_date: ep.air_date,
-            fcmToken: fcmToken || '',
-            createdAt: Date.now()
-          });
-        }
-      } catch (err) {
-        appLogger.error('system', 'Enregistrement du rappel impossible', err);
-      } finally {
-        setLoadingReminder(false);
-      }
-    } else {
-      setLoadingReminder(true);
-      setIsReminderSet(false);
-      removeUserScopedValue(ownerUid, targetStorageField);
-
-      if (show.id && show.notificationsEnabled) { await updateShow(show.id, { notificationsEnabled: false }); }
-      if (auth.currentUser?.uid !== ownerUid) return;
-      showToast(`« ${show.title} » S${sNumStr}E${eNumStr} • Rappel désactivé`, 'reminder', show);
-
-      try {
-        const user = auth.currentUser;
-        if (user?.uid === ownerUid) {
-          const reminderRef = doc(db, 'users', user.uid, 'reminders', reminderId);
-          await deleteDoc(reminderRef);
-        }
-      } catch (err) {
-        appLogger.error('system', 'Suppression du rappel impossible', err);
-      } finally {
-        setLoadingReminder(false);
-      }
+        void sendNativeNotification(`🔔 Rappel programmé : ${target.title}`, {
+          body: `Rappel enregistré pour l'épisode ${episodeString} (${ep.name || 'Prochainement'})`,
+          icon: posterUrl, image: still ? still.startsWith('http') ? still : `https://image.tmdb.org/t/p/w780${still}` : posterUrl,
+          data: { showId: target.id, tmdbId: target.tmdbId, mediaType: target.mediaType || 'tv', season: ep.season_number, episode: ep.episode_number },
+        }).catch(error => appLogger.warn('system', 'Notification locale de rappel indisponible', error));
+      } catch (error) { appLogger.warn('system', 'Notification locale de rappel indisponible', error); }
     }
   };
   const toggleReminder = async (event: React.MouseEvent) => {
     event.stopPropagation();
     const ownerUid = auth.currentUser?.uid;
-    if (loadingReminder || !ownerUid) return;
+    if (reminderFlight.current || !ownerUid) return;
+    reminderFlight.current = true;
+    const nextState = !isReminderSet;
+    setOptimisticReminder(nextState);
     setLoadingReminder(true);
     try {
       const tracked = ensureTracked ? await ensureTracked() : show;
       if (!tracked.id || auth.currentUser?.uid !== ownerUid) return;
-      await performReminder(tracked, ownerUid);
+      await performReminder(tracked, ownerUid, nextState);
     } catch (error) {
       if (auth.currentUser?.uid === ownerUid) showToast('Rappel impossible. Réessaie.', 'error');
       appLogger.warn('system', 'Activation du rappel impossible', error);
-    } finally { setLoadingReminder(false); }
+    } finally { reminderFlight.current = false; setLoadingReminder(false); setOptimisticReminder(null); }
   };
 
   const diffDays = getCalendarDaysDiff(ep.air_date);
@@ -278,11 +236,11 @@ function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, action
     <button type="button" className="actor-upcoming__media" onClick={() => onShowClick?.(show.id, show.mediaType)}>
       {imgSrc && <img src={imgSrc} alt="" loading="lazy" />}<span><strong>{show.title}</strong><small>{providerName?.startsWith('Plex') ? 'Plex' : providerName || (movie ? 'Au cinéma' : 'Série')} · {capitalizedShortDate}{networkLogo && <img src={networkLogo} alt={providerName || 'Diffuseur'} />}</small></span>
     </button>
-    <button type="button" className={`actor-upcoming__reminder${isReminderSet ? ' is-set' : ''}`} aria-label={`${isReminderSet ? 'Désactiver' : 'Activer'} le rappel pour ${show.title}`} aria-pressed={isReminderSet} disabled={loadingReminder} onClick={toggleReminder}>{diffDays === 0 ? 'auj.' : diffDays > 0 ? `J−${diffDays}` : 'Sorti'}<Bell size={12} fill={isReminderSet ? 'currentColor' : 'none'} /></button>
+    <button type="button" className={`actor-upcoming__reminder${displayedReminder ? ' is-set' : ''}`} aria-label={`${displayedReminder ? 'Désactiver' : 'Activer'} le rappel pour ${show.title}`} aria-pressed={displayedReminder} aria-busy={loadingReminder || undefined} disabled={loadingReminder} onClick={toggleReminder}>{diffDays === 0 ? 'auj.' : diffDays > 0 ? `J−${diffDays}` : 'Sorti'}<Bell size={12} fill={displayedReminder ? 'currentColor' : 'none'} /></button>
   </div>;
   return <div ref={cardRef} className="series-8f-host">
     <SeriesEpisodeCard show={{ ...show, backdropPath: ep.still_path || show.backdropPath }} episode={movie ? null : ep}
-      context={{ kind: 'upcoming', days: diffDays, reminder: isReminderSet, pending: loadingReminder, onToggleReminder: toggleReminder }}
+      context={{ kind: 'upcoming', days: diffDays, reminder: displayedReminder, pending: loadingReminder, onToggleReminder: toggleReminder }}
       detail={movie ? undefined : capitalizedShortDate}
       presentation={movie ? { code: 'Film · salle', subtitle: capitalizedShortDate, progress: collectionProgress || { label: 'Sortie', description: 'Date de sortie du film', continuous: false, totalUnknown: false, unknownTail: false, knownEpisodes: 0, availableUnseen: 0, segments: [] } } : undefined}
       providerLogo={networkLogo} providerName={providerName}

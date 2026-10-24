@@ -1,3 +1,4 @@
+import type { Show } from '../types';
 import { appLogger } from '../store/logStore';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -45,7 +46,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
       return { success: true, syncedCount: 0 };
     }
 
-    const shows = showsSnap.docs.map(doc => ({ ...doc.data(), id: String(doc.id) } as any));
+    const shows = showsSnap.docs.map(doc => ({ ...doc.data(), id: String(doc.id) } as Show & { tmdb_id?: number; seasons?: unknown[] }));
 
     // 0. MASS UPDATE PASS: Auto-archive or unarchive existing TV shows
     for (const s of shows) {
@@ -164,7 +165,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
 
       try {
         // 1. Fetch main TV show details from TMDB
-        const detailsRes = await tmdb.getMediaDetails(tmdbIdNum, showToSync.mediaType || 'tv');
+        const detailsRes = await tmdb.getMediaDetails(tmdbIdNum, showToSync.mediaType || 'tv', needsSeasonProgressRefresh(showToSync));
         if (!detailsRes.ok) {
           const errMsg = 'error' in detailsRes ? (typeof detailsRes.error === 'object' && detailsRes.error !== null && 'message' in detailsRes.error ? detailsRes.error.message : String(detailsRes.error)) : 'Unknown error';
           console.warn(`[SyncWorker] Could not fetch details for ${showToSync.title}: ${errMsg}`);
@@ -269,7 +270,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         }
 
         // 1. DÉTECTION D'ANNULATION
-        if (showToSync.status !== 'Canceled' && details.status === 'Canceled') {
+        if (String(showToSync.status) !== 'Canceled' && details.status === 'Canceled') {
           try {
             await addDoc(collection(db, 'users', userUid, 'news'), {
               type: 'CANCELED',
@@ -582,7 +583,7 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
     }
 
     // TV Show Sync
-    const detailsRes = await tmdb.getShowDetails(tmdbIdNum);
+    const detailsRes = await tmdb.getShowDetails(tmdbIdNum, needsSeasonProgressRefresh(showToSync));
     if (!detailsRes.ok) {
       if (!silent) setSyncStatus(null);
       return { success: false, error: 'Erreur lors de la récupération des détails TMDB' };

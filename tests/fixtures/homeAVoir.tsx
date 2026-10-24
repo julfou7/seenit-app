@@ -9,9 +9,11 @@ import { markEpisodeWatched } from '../../src/features/shows/markEpisodeWatched'
 import { getTodayStr } from '../../src/lib/utils';
 import { useToastStore } from '../../src/store/toastStore';
 import type { Show } from '../../src/types';
+import { BottomNav } from '../../src/components/BottomNav';
+import { reminderControl, terrain221Examples } from './homeAVoirRuntime';
 import { ToastContainer } from '../../src/components/ToastContainer';
 import { writeUserScopedJson } from '../../src/lib/userIsolation';
-Object.assign(window, { __homeAVoir: { examples:addProgressExamples, sync: (message:string|null) => useSyncStore.getState().setPlexSyncStatus(message?{message}:null), telemetry, releaseWrite, empty: () => useShowsStore.setState({ shows: [] }), clearDismissed: () => writeUserScopedJson(auth.currentUser?.uid, 'home_dismissed_notifications', []), snapshot: () => useShowsStore.getState().shows, reset: () => window.dispatchEvent(new Event('watchlist-reset-all')), clear: () => useToastStore.getState().clearQueue(), toasts: () => [useToastStore.getState().currentToast, ...useToastStore.getState().queue].filter(Boolean) } });
+Object.assign(window, { __homeAVoir: { auth, reminderControl, terrain221Examples, examples:addProgressExamples, sync: (message:string|null) => useSyncStore.getState().setPlexSyncStatus(message?{message}:null), telemetry, releaseWrite, empty: () => useShowsStore.setState({ shows: [] }), clearDismissed: () => writeUserScopedJson(auth.currentUser?.uid, 'home_dismissed_notifications', []), snapshot: () => useShowsStore.getState().shows, reset: () => window.dispatchEvent(new Event('watchlist-reset-all')), clear: () => useToastStore.getState().clearQueue(), toasts: () => [useToastStore.getState().currentToast, ...useToastStore.getState().queue].filter(Boolean) } });
 function Harness() {
   const shows = useShowsStore(state => state.shows);
   const [tab, setTab] = useState<'watch_next' | 'upcoming' | 'history'>('watch_next');
@@ -31,6 +33,6 @@ function Harness() {
     expandedSection:null,handleToggleVoirTout:()=>{},visibleCount:3,setVisibleCount:()=>{},
     markNextEpisodeAsSeen:mark,markMovieAsSeen:show=>markMovieWatched(show,updateShow),markAsUnseen:(show,episode)=>markWatchRecordUnseen(show,episode,updateShow),
     selectedEpisodeModal:null,setSelectedEpisodeModal:()=>{},selectedPersonId:null,setSelectedPersonId:()=>{},
-  }}/><ToastContainer /></main>;
+  }}/><ToastContainer /><BottomNav currentTab="watchlist" onTabChange={()=>{}} onLongPress={()=>{}} /></main>;
 }
 createRoot(document.getElementById('root')!).render(<Harness key={auth.currentUser.uid}/>);

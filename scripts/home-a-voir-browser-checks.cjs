@@ -10,8 +10,9 @@ async function buildHomeHarness(root) {
       builder.onResolve({ filter: /^firebase\/(?:firestore|auth)$|\/(?:favoritePeopleStore|useShows|firebase|tmdb|showsStore|logStore|plexAvailability|plexLinks|useShows|downloadConfigStore|updateStore|liveDownloadStore|EpisodeDetailModal|PersonDetailModal)$/ }, () => ({ path: runtime }));
     } }],
   });
+  const fonts = fs.readFileSync(path.join(root,'index.html'),'utf8').match(/<link[^>]+fonts.googleapis.com\/css[^>]*>/)?.[0] || '';
   const css = fs.readdirSync(path.join(dist, 'assets')).filter(file=>file.endsWith('.css'));
-  fs.writeFileSync(path.join(dist, '__seenit-home.html'), `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${css.map(file=>`<link rel="stylesheet" href="/assets/${file}">`).join('')}<link rel="stylesheet" href="/__seenit-home.css"><style>body{margin:0;background:#0b0b0f;color:white}</style></head><body><div id="root"></div><script>window.__homeErrors=[];addEventListener('error',e=>__homeErrors.push(e.message));addEventListener('unhandledrejection',e=>__homeErrors.push(String(e.reason)));</script><script src="/__seenit-home.js"></script></body></html>`);
+  fs.writeFileSync(path.join(dist, '__seenit-home.html'), `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${fonts}${css.map(file=>`<link rel="stylesheet" href="/assets/${file}">`).join('')}<link rel="stylesheet" href="/__seenit-home.css"><style>body{margin:0;background:#0b0b0f;color:white}</style></head><body><div id="root"></div><script>window.__homeErrors=[];addEventListener('error',e=>__homeErrors.push(e.message));addEventListener('unhandledrejection',e=>__homeErrors.push(String(e.reason)));</script><script src="/__seenit-home.js"></script></body></html>`);
 }
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function evaluate(client, expression) {

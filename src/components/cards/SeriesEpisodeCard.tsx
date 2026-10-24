@@ -30,6 +30,7 @@ interface Props {
   episode: SeriesCardEpisode | null;
   context: Context;
   detail?: string;
+  hideStatus?: boolean;
   providerLogo?: string | null;
   providerName?: string | null;
   onOpen: () => void;
@@ -49,7 +50,7 @@ const segmentNames: Record<SeasonSegmentState, string> = {
 const BADGE_DETAIL = /^(?:🔥|🌟|🆕|🏁|⏳)/u;
 const REMAINING_DETAIL = /\brestant(?:s)?\b/i;
 
-export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo, providerName, onOpen, onOpenSeries, onOpenEpisode, onProviderOpen, actions = [], historyActions, presentation, layout = 'list' }: Props) {
+export function SeriesEpisodeCard({ show, episode, context, detail, hideStatus = false, providerLogo, providerName, onOpen, onOpenSeries, onOpenEpisode, onProviderOpen, actions = [], historyActions, presentation, layout = 'list' }: Props) {
   const [animatedBadges] = useAnimatedBadges();
   const posterCandidates = seriesCardPosterCandidates(show);
   const posterCandidatesKey = posterCandidates.join('\u0000');
@@ -93,7 +94,7 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
   const visibleDetail = requestedDetail || progress.detail;
   const detailIsBadge = visibleDetail ? BADGE_DETAIL.test(visibleDetail) : false;
   const freshness = seriesStatus(visibleDetail);
-  const status = context.kind === 'watch' && !context.upToDate ? freshness?.tone === 'today' || freshness?.tone === 'final' ? freshness : episode?.episode_type === 'finale'
+  const status = !hideStatus && context.kind === 'watch' && !context.upToDate ? freshness?.tone === 'today' || freshness?.tone === 'final' ? freshness : episode?.episode_type === 'finale'
     ? { label: show.seriesEnded ? '🏁 Final' : '🎬 Fin de saison', tone: 'final' as const }
     : !progress.totalUnknown && progress.availableUnseen > 0 && progress.availableUnseen <= 2
       ? { label: `⚡ Plus que ${progress.availableUnseen}`, tone: 'remaining' as const }

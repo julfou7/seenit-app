@@ -25,3 +25,10 @@
 .history-entry-list { display:flex; flex-direction:column; gap:8px; overflow:visible; background:none; box-shadow:none; border-radius:0; }.history-entry-host { position:relative; }.history-entry-host::before { content:""; position:absolute; width:10px; height:10px; left:-24px; top:43px; border-radius:50%; background:#3f3f46; box-shadow:0 0 0 4px #0b0b0f; }.history-period--today .history-entry-host::before { background:#e5a93d; box-shadow:0 0 0 4px #e5a93d38; }.history-entry-host + .history-entry-host { border:0; }
 .history-entry { height:96px; min-height:96px; padding:0 12px 0 0; gap:14px; border-radius:18px; background:linear-gradient(100deg,oklch(.32 .07 var(--history-hue,260)/.42),oklch(.2 .04 var(--history-hue,260)/.14) 55%,transparent),#141418b8; box-shadow:inset 0 0 0 1px #ffffff12; }.history-entry__open { border-radius:18px; }.history-entry__image { width:64px; height:96px; border-radius:18px 0 0 18px; box-shadow:none; }.history-entry__image::after { content:""; position:absolute; inset:0 0 0 auto; width:18px; background:linear-gradient(90deg,transparent,#1414188c); }.history-entry__group { position:absolute; z-index:1; bottom:5px; left:5px; min-width:22px; height:22px; padding:0 6px; display:grid; place-items:center; border-radius:11px; background:#e5a93d; color:#0b0b0f; font-size:11px; font-weight:900; }
 .history-entry__text { justify-content:center; }.history-entry__text > div { font-size:12px; }.history-entry__actions { margin-right:-9px; }.history-entry__action-group { margin-top:4px; }.history-entry__action-group summary { min-height:44px; padding:10px; color:#f2c36b; cursor:pointer; }.history-entry__action-group button { display:block; min-height:44px; width:100%; padding:10px 20px; text-align:left; }
+
+/* Terrain221 : titre entier et métriques de police sans hauteur coupante. */
+.history-entry { height:auto; min-height:96px; }
+.history-entry__text { padding-block:9px; }
+.history-entry__text h3 { white-space:normal; overflow:visible; text-overflow:clip; overflow-wrap:anywhere; line-height:1.25; }
+.history-entry__text > div { white-space:normal; line-height:1.35; }
+.history-period:last-of-type { padding-bottom:0; }

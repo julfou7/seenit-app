@@ -27,7 +27,7 @@ test('SEENIT-UX-015 ne fabrique jamais une heure de visionnage legacy', () => {
 
 test('SEENIT-UX-015 conserve les jours calendaires et présente la date courte de la liste v3', () => {
   const now = new Date(2026, 9, 21, 23, 0).getTime();
-  assert.equal(formatHistoryRowDate(new Date(2026, 9, 21, 8).getTime(), now), 'ce soir');
+  assert.equal(formatHistoryRowDate(new Date(2026, 9, 21, 8).getTime(), now), 'Aujourd’hui');
   assert.equal(formatHistoryRowDate(new Date(2026, 9, 13, 8).getTime(), now), '13 oct.');
   assert.equal(formatHistoryDayLabel(new Date(2026, 9, 21, 8, 0).getTime(), now), "Aujourd'hui");
   assert.equal(formatHistoryDayLabel(new Date(2026, 9, 20, 8, 0).getTime(), now), 'Hier');

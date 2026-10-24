@@ -23,6 +23,7 @@ import { historyEpisodeEntries, historyEpisodeKey, historyRecordsWithoutTarget, 
 import {
   buildHistoryAriaLabel,
   formatHistoryRowDate,
+  formatHistoryClock,
   historyDateInputValue,
   historyLocalDayKey,
   historyTimeInputValue,
@@ -191,6 +192,11 @@ function HistoryRowItem({
     ...(target.mediaType === 'tv' ? [{ label: 'Ouvrir la série', onSelect: () => onShowClick?.(target.showId, 'tv') }] : []),
   ];
   const grouped = row.members.length > 1;
+  const clocks = row.members.map(member => formatHistoryClock(member.watchedAt, member.watchedTimeKnown));
+  const latestClock = clocks[0];
+  const earliestClock = clocks.at(-1);
+  const clock = clocks.every(Boolean) ? grouped && latestClock !== earliestClock ? `${earliestClock}–${latestClock}` : latestClock : null;
+  const dateLabel = historyLocalDayKey(item.watchedAt) === localTodayKey() ? clock || 'heure inconnue' : `${formatHistoryRowDate(item.watchedAt)} · ${clock || 'heure inconnue'}`;
   const historyActions = grouped ? [{ label: 'Ouvrir la série', onSelect: () => onShowClick?.(item.showId, 'tv') }] : actionsFor(item);
   const actionGroups = grouped ? [...row.members].reverse().map(target => ({ label: `S${target.season} · E${target.episode}`, actions: actionsFor(target) })) : undefined;
 
@@ -198,7 +204,7 @@ function HistoryRowItem({
   return <div ref={cardRef} className="history-entry-host">
     <HistoryEntryRow title={item.showTitle} episodeTitle={grouped ? `${row.members.length} épisodes d’affilée` : item.mediaType === 'tv' ? episodeTitle || `Épisode ${item.episode}` : movieMetadata?.genres[0]}
       code={historyGroupCode(row)} groupCount={row.members.length} actionGroups={actionGroups}
-      date={formatHistoryRowDate(item.watchedAt)} today={historyLocalDayKey(item.watchedAt) === localTodayKey()} timestamp={item.watchedAt}
+      date={dateLabel} today={historyLocalDayKey(item.watchedAt) === localTodayKey()} timestamp={item.watchedAt}
       images={[show.posterPath, show.backdropPath]}
       label={grouped ? `${show.title}, ${row.members.length} épisodes d’affilée, ${historyGroupCode(row)}` : ariaLabel} onOpen={handleRowClick} actions={historyActions} />
   </div>;
