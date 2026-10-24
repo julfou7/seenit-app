@@ -1818,6 +1818,10 @@
         {
           "file": "tests/nativeDependencyAudit.test.ts",
           "contains": "SEENIT-RELEASE-002 branche le contrôle natif dans la validation et la release"
+        },
+        {
+          "file": "tests/backendDependencySecurity.test.ts",
+          "contains": "SEENIT-RELEASE-002 verrouille le parseur HTTP corrigé contre les corps compressés"
         }
       ]
     },
