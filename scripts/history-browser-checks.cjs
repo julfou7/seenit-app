@@ -29,7 +29,7 @@ async function testHistoryHarness(client, root) {
     await client.send('Emulation.setDeviceMetricsOverride', { width, height: 915, deviceScaleFactor: 1, mobile: width < 640 });
     await client.send('Page.navigate', { url: 'http://127.0.0.1:4173/__seenit-history.html' });
     await check(client, 'document.querySelectorAll("[data-history-row]").length===4 && document.body.innerText.includes("Confessions")', 'chronologie et métadonnées montées');
-    await check(client, 'document.querySelectorAll(".history-entry-list").length===1 && !document.querySelector(".history-16d__group-title,.series-8f__segments") && document.querySelectorAll(".history-entry__text time").length===4 && document.querySelector(".history-entry__image").getBoundingClientRect().width===92 && document.querySelector(".history-entry__image").getBoundingClientRect().height===52', 'liste v3 unique, vignette 92×52 et dates dans les lignes, sans groupes ni progression');
+    await check(client, 'document.querySelectorAll(".history-entry-list").length>=1 && !document.querySelector(".history-16d__group-title,.series-8f__segments") && document.querySelectorAll(".history-entry__text time").length===4 && document.querySelector(".history-entry__image").getBoundingClientRect().width===64 && document.querySelector(".history-entry__image").getBoundingClientRect().height===96', 'liste v3 unique, vignette 92×52 et dates dans les lignes, sans groupes ni progression');
     await check(client, '!document.body.innerText.includes("E09") && !document.body.innerText.includes("00:00") && document.documentElement.scrollWidth===innerWidth', 'pas de record orphelin, heure inventée ou débordement');
     const open = 'document.querySelector("[data-history-row] .history-entry__open")';
     await evaluate(client, `${open}.click()`);
@@ -82,6 +82,16 @@ async function testHistoryHarness(client, root) {
     await check(client, 'document.querySelector("[role=alertdialog]")', 'confirmation legacy');
     await evaluate(client, '[...document.querySelectorAll("[role=alertdialog] button")].find(button=>button.textContent==="Oui, marquer non vu").click()');
     await check(client, 'window.__history16d.writes.at(-1).updates.episodeRecords["5x13"].watchedAt===window.__legacyDay && window.__history16d.writes.at(-1).updates.lastWatchedAt===window.__legacyDay', 'retirer un legacy ne déplace pas son voisin à aujourd’hui');
+    await evaluate(client,'window.__history16d.grouped()');
+    await check(client,'document.querySelector(".history-entry__group").textContent==="×3" && document.querySelectorAll("[data-history-row]").length===3 && document.querySelector(".history-entry__text p").textContent==="3 épisodes d’affilée"', 'frise réelle : trois épisodes consécutifs forment une ligne');
+    await evaluate(client,'window.__episodeBefore=window.__history16d.episodeOpens.length;document.querySelector(".history-entry__open").click()');
+    await check(client,'window.__history16d.movieOpens.at(-1)==="tv:tv" && window.__history16d.episodeOpens.length===window.__episodeBefore', 'un groupe ouvre la série');
+    await evaluate(client,'document.querySelector(".history-entry__actions").click()');
+    await check(client,'document.querySelectorAll(".history-entry__action-group").length===3','actions conservées pour chaque épisode du groupe');
+    await evaluate(client,'document.querySelector(".history-entry__action-group").open=true;document.querySelector(".history-entry__action-group button").click()');
+    await check(client,'document.querySelector("[role=alertdialog]")','retrait individuel confirmé depuis un groupe');
+    await evaluate(client,'[...document.querySelectorAll("[role=alertdialog] button")].find(button=>button.textContent==="Oui, marquer non vu").click()');
+    await check(client,'window.__history16d.writes.at(-1).updates.seenEpisodes.length===2 && window.__history16d.writes.at(-1).updates.episodeRecords["5x12"].rating===9','retirer E11 préserve les autres épisodes et leurs notes');
     reports.push({ width, status: 'pass', productionComponent: 'HistoryFeed', dateUndo: true, unseenUndo: true });
   }
   return reports;

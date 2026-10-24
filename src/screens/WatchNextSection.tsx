@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import './watchListHome.css';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Show } from '../types';
 import type { SeriesCardAction } from '../components/cards/SeriesEpisodeCard';
 import { ContinueWatchingCard } from '../components/cards/ContinueWatchingCard';
@@ -11,13 +12,13 @@ import { selectTicketActor, type TicketActor } from '../features/people/movieAct
 import { useCardLayoutAnchor } from '../hooks/useCardLayoutAnchor';
 import { useMovieActors } from '../hooks/useMovieActors';
 import { useFavoritePeopleStore } from '../store/favoritePeopleStore';
-import { MovieActorSheet } from '../components/MovieActorSheet';
+import { MovieActorProfile } from '../components/MovieActorProfile';
 import { HOME_PAGE_SIZE } from '../features/watchlist/homePresentation';
 import { getTodayStr } from '../lib/utils';
 import './watchNext18c.css';
 import { HomeSwipeCard } from '../components/cards/HomeSwipeCard';
 import { HomeLayoutSwitch } from '../components/cards/HomeLayoutSwitch';
-import { ArrowDown, ChevronUp } from 'lucide-react';
+import { HomeLoadMore } from '../components/cards/HomeLoadMore';
 
 interface Props {
   onExplore?: () => void;
@@ -34,8 +35,8 @@ interface Props {
   onUnseen: (show: Show, episode: SeriesCardEpisode | null) => Promise<void | boolean>;
   actions: (show: Show) => SeriesCardAction[];
 }
-export function WatchNextSection({ onExplore, onPerson, onOpenMedia, allShows, groups, movies, active, onOpen, onEpisode, onMarkSeries, onMarkMovie, onUnseen, actions }: Props) {
-  const { index: actorIndex, metadata: actorMetadata } = useMovieActors(allShows);
+export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, movies, active, onOpen, onEpisode, onMarkSeries, onMarkMovie, onUnseen, actions }: Props) {
+  const { index: actorIndex, metadata: actorMetadata } = useMovieActors(allShows, active);
   const favorites = useFavoritePeopleStore(state => state.people);
   const [actorSheet, setActorSheet] = useState<{ actor: TicketActor; origin: Show } | null>(null);
   const candidates = mergeWatchGroups(...groups);
@@ -47,13 +48,34 @@ export function WatchNextSection({ onExplore, onPerson, onOpenMedia, allShows, g
   const [expandedGroups, setExpandedGroups] = useState<Record<number, boolean>>({});
   const [groupLimits, setGroupLimits] = useState<Record<number, number>>({});
   const [movieList, setMovieList] = useState(false);
+  const activeRef = useRef(active); activeRef.current = active;
+  const mounted = useRef(true);
+  const originLocks = useRef(new Map<string, number>());
+  const transferTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const pendingScroll = useRef<string | null>(null);
+  const [arrivals, setArrivals] = useState<Set<string>>(() => new Set());
   const memberships = useRef(new Map<string, number>());
-  groups.forEach((group, index) => group.forEach(show => memberships.current.set(show.id, index)));
+  groups.forEach((group, index) => group.forEach(show => { if (!originLocks.current.has(show.id) && !arrivals.has(show.id)) memberships.current.set(show.id, index); }));
   const [seriesOrder, setSeriesOrder] = useState(() => candidates.map(show => show.id));
   const [retained, setRetained] = useState<Record<string, { episode?: SeriesCardEpisode }>>({});
   const [movieOrder, setMovieOrder] = useState<string[] | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const reset = useCallback(() => { setActorSheet(null); setRetained({}); setMovieOrder(null); setExpandedGroups({}); setGroupLimits({}); setRailLimits({}); setMovieRailLimit(HOME_PAGE_SIZE); setMovieList(false); setMovieCount(12); setSeriesOrder(latestSeriesOrder.current); setNow(Date.now()); }, []);
+  const clearTransfers = useCallback(() => { for (const timer of transferTimers.current.values()) clearTimeout(timer); transferTimers.current.clear(); originLocks.current.clear(); pendingScroll.current = null; }, []);
+  const reset = useCallback(() => { clearTransfers(); setArrivals(new Set()); setActorSheet(null); setRetained({}); setMovieOrder(null); setExpandedGroups({}); setGroupLimits({}); setRailLimits({}); setMovieRailLimit(HOME_PAGE_SIZE); setMovieList(false); setMovieCount(3); setSeriesOrder(latestSeriesOrder.current); setNow(Date.now()); }, [clearTransfers]);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; clearTransfers(); }; }, [clearTransfers]);
+  useEffect(() => { if (!active) clearTransfers(); }, [active, clearTransfers]);
+  useLayoutEffect(() => {
+    if (!pendingScroll.current || !active) return;
+    pendingScroll.current = null;
+    const rail = document.getElementById('home-series-0');
+    if (!rail) return;
+    rail.scrollLeft = 0;
+    const heading = rail.previousElementSibling as HTMLElement | null;
+    if (heading) {
+      heading.style.scrollMarginTop = `${(document.querySelector('.home-header')?.getBoundingClientRect().height || 0) + 12}px`;
+      heading.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion:reduce)').matches ? 'instant' : 'smooth' });
+    }
+  }, [arrivals, active]);
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 60_000);
     const refresh = () => { setNow(Date.now()); };
@@ -86,6 +108,9 @@ export function WatchNextSection({ onExplore, onPerson, onOpenMedia, allShows, g
     const resume = resolveWatchCardResume(show, getTodayStr());
     if (!resume.episode || resume.upToDate) return false;
     const previousReceipt = retained[show.id];
+    const origin = memberships.current.get(show.id) || 0;
+    originLocks.current.set(show.id, origin);
+    clearTimeout(transferTimers.current.get(show.id));
     const restoreReceipt = () => setRetained(previous => {
       const next = { ...previous };
       if (previousReceipt) next[show.id] = previousReceipt;
@@ -93,8 +118,23 @@ export function WatchNextSection({ onExplore, onPerson, onOpenMedia, allShows, g
       return next;
     });
     setRetained(previous => ({ ...previous, [show.id]: { episode: resume.episode! } }));
-    try { const result = await onMarkSeries(show); if (result === false) restoreReceipt(); return result; }
-    catch (error) { restoreReceipt(); throw error; }
+    try {
+      const result = await onMarkSeries(show);
+      if (result === false) { originLocks.current.delete(show.id); restoreReceipt(); return result; }
+      if (origin > 0 && mounted.current && activeRef.current) {
+        transferTimers.current.set(show.id, setTimeout(() => {
+          transferTimers.current.delete(show.id);
+          if (!mounted.current || !activeRef.current) return;
+          originLocks.current.delete(show.id);
+          memberships.current.set(show.id, 0);
+          pendingScroll.current = show.id;
+          setSeriesOrder(previous => [show.id, ...previous.filter(id => id !== show.id)]);
+          setArrivals(previous => new Set([...previous, show.id]));
+        }, matchMedia('(prefers-reduced-motion:reduce)').matches ? 80 : 800));
+      } else originLocks.current.delete(show.id);
+      return result;
+    }
+    catch (error) { originLocks.current.delete(show.id); restoreReceipt(); throw error; }
   };
   const toggleMovie = async (show: Show) => {
     setMovieOrder(previous => previous || orderedMovies.map(movie => movie.id));
@@ -102,15 +142,14 @@ export function WatchNextSection({ onExplore, onPerson, onOpenMedia, allShows, g
     try { return show.seenEpisodes.includes('movie') ? await onUnseen(show, null) : await onMarkMovie(show); }
     catch (error) { setRetained(previous => { const next = { ...previous }; delete next[show.id]; return next; }); throw error; }
   };
-  const [movieCount, setMovieCount] = useState(12);
-  useEffect(() => { if (active) setMovieCount(12); }, [active]);
+  const [movieCount, setMovieCount] = useState(3);
   useEffect(() => {
     if (!active) return;
     const back = (event: Event) => {
       const group = Object.keys(expandedGroups).find(index => expandedGroups[Number(index)]);
-      if (group !== undefined) { event.preventDefault(); setExpandedGroups(previous => ({ ...previous, [Number(group)]: false })); }
+      if (group !== undefined) { event.preventDefault(); preserveLayout(`home-series-${group}`, 'data-series-id', false, () => { setExpandedGroups(previous => ({ ...previous, [Number(group)]: false })); setRailLimits(previous => ({ ...previous, [Number(group)]: HOME_PAGE_SIZE })); }); }
       else if (movieList) { event.preventDefault(); switchMovies(false); }
-      else if (movieCount > 12) { event.preventDefault(); setMovieCount(12); }
+      else if (movieCount > 3) { event.preventDefault(); setMovieCount(3); }
     };
     window.addEventListener('watchlist-back-one-level', back);
     return () => window.removeEventListener('watchlist-back-one-level', back);
@@ -118,8 +157,8 @@ export function WatchNextSection({ onExplore, onPerson, onOpenMedia, allShows, g
   const switchMovies = (value: boolean) => {
     if (value === movieList) return;
     preserveLayout('films-a-voir-18c', 'data-movie-ticket', value, first => {
-      if (value) setMovieCount(count => Math.max(count, first + 1));
-      else setMovieRailLimit(count => Math.max(count, first + HOME_PAGE_SIZE));
+      if (value) setMovieCount(Math.max(3, first + 1));
+      else setMovieRailLimit(HOME_PAGE_SIZE);
       setMovieList(value);
     });
   };
@@ -129,41 +168,39 @@ export function WatchNextSection({ onExplore, onPerson, onOpenMedia, allShows, g
       const items = series.filter(show => memberships.current.get(show.id) === index);
       if (!items.length) return null;
       const expanded = Boolean(expandedGroups[index]);
-      const limit = groupLimits[index] || 12;
+      const limit = expanded ? groupLimits[index] || 3 : railLimits[index] || HOME_PAGE_SIZE;
       const switchLayout = (value: boolean) => {
         if (value === expanded) return;
         preserveLayout(`home-series-${index}`, 'data-series-id', value, first => {
           setExpandedGroups(previous => ({ ...previous, [index]: value }));
-          if (value) setGroupLimits(previous => ({ ...previous, [index]: Math.max(previous[index] || 12, first + 1) }));
-          else setRailLimits(previous => ({ ...previous, [index]: Math.max(previous[index] || HOME_PAGE_SIZE, first + HOME_PAGE_SIZE) }));
+          if (value) setGroupLimits(previous => ({ ...previous, [index]: Math.max(3, first + 1) }));
+          else setRailLimits(previous => ({ ...previous, [index]: HOME_PAGE_SIZE }));
         });
       };
       return <section key={label} className="home-series-section" aria-labelledby={`home-section-${index}`}>
-        <header className="home-section-heading"><h2 id={`home-section-${index}`}>{label} <span>{items.length}</span></h2><HomeLayoutSwitch label={label} list={expanded} onChange={switchLayout} /></header>
+        <header className="home-section-heading"><h2 id={`home-section-${index}`}><span className="home-section-name">{label}</span><span className="home-count">{items.length}</span></h2><HomeLayoutSwitch label={label} list={expanded} onChange={switchLayout} /></header>
         <div className={expanded ? 'home-series-list' : 'home-series-rail'} id={`home-series-${index}`}>
-          {items.slice(0, expanded ? limit : (railLimits[index] || HOME_PAGE_SIZE)).map(show => {
+          {items.slice(0, limit).map(show => {
             const card = <ContinueWatchingCard show={show} layout={expanded ? 'list' : 'rail'} animateSeen showStaleDetail={staleIds.has(show.id)} lastMarkedEpisode={retained[show.id]?.episode} onMarkUnseen={onUnseen} onMarkAsSeen={markSeries} onShowClick={onOpen} onEpisodeClick={onEpisode} actions={actions(show)} />;
-            return expanded && index > 0 ? <HomeSwipeCard key={show.id} onArchive={() => actions(show).find(action => action.label.startsWith('Archiver'))?.onSelect()} onRemove={() => actions(show).find(action => action.destructive)?.onSelect()}>{card}</HomeSwipeCard> : <React.Fragment key={show.id}>{card}</React.Fragment>;
+            return expanded && index > 0 ? <HomeSwipeCard key={show.id} onArchive={() => actions(show).find(action => action.label.startsWith('Archiver'))?.onSelect()} onRemove={() => actions(show).find(action => action.destructive)?.onSelect()}>{card}</HomeSwipeCard> : <div key={show.id} className={arrivals.has(show.id) ? 'home-series-arrival' : undefined}>{card}</div>;
           })}
-          {!expanded && items.length > HOME_PAGE_SIZE && <button type="button" className="home-rail-more" onClick={() => switchLayout(true)}><ArrowDown size={22} /><span>Voir en liste<small>{items.length} séries</small></span></button>}
+          {!expanded && <HomeLoadMore tile items={items.slice(limit)} onLoad={() => setRailLimits(previous => ({ ...previous, [index]: limit + HOME_PAGE_SIZE }))} />}
         </div>
-        {expanded && items.length > limit && <button type="button" className="watch-next-18c__more-films" onClick={() => setGroupLimits(previous => ({ ...previous, [index]: limit + 12 }))}>Afficher {Math.min(12, items.length - limit)} de plus</button>}
-        {expanded && <button type="button" className="home-series-collapse" onClick={() => switchLayout(false)}><ChevronUp size={16} />Revenir en carrousel</button>}
+        {expanded && <HomeLoadMore items={items.slice(limit)} onLoad={() => setGroupLimits(previous => ({ ...previous, [index]: limit + HOME_PAGE_SIZE }))} />}
       </section>;
   };
   return <section className="watch-next-18c home-watch" aria-label="À regarder">
     {[0, 1].map(renderSeriesGroup)}
     {orderedMovies.length > 0 && <>
-      <div className="home-section-heading"><h2>Films à voir <span>{movies.length}</span></h2><HomeLayoutSwitch label="Films" list={movieList} onChange={switchMovies} /></div>
+      <div className="home-section-heading"><h2><span className="home-section-name">Films à voir</span><span className="home-count">{movies.length}</span></h2><HomeLayoutSwitch label="Films" list={movieList} onChange={switchMovies} /></div>
       <p className="home-movie-order">Ajouts les plus récents</p>
       <div className={movieList ? 'home-movie-list' : 'movie-ticket-rail'} id="films-a-voir-18c">
         {orderedMovies.slice(0, movieList ? movieCount : movieRailLimit).map(show => <MovieTicketCard key={show.id} show={show} layout={movieList ? 'horizontal' : 'poster'} start={start} onOpen={onOpen} onToggle={toggleMovie} onRuntime={onRuntime} actor={selectTicketActor(actorMetadata.get(`movie:${show.tmdbId}`) || tmdb.peekRenderableMediaDetails(show.tmdbId, 'movie'), favorites, actorIndex)} onActor={actor => setActorSheet({ actor, origin: show })} />)}
-        {!movieList && orderedMovies.length > HOME_PAGE_SIZE && <button type="button" className="home-rail-more home-rail-more--movies" onClick={() => switchMovies(true)}><ArrowDown size={22} /><span>Voir en liste<small>{orderedMovies.length} films</small></span></button>}
+        {!movieList && <HomeLoadMore tile items={orderedMovies.slice(movieRailLimit)} onLoad={() => setMovieRailLimit(count => count + HOME_PAGE_SIZE)} />}
       </div>
-      {movieList && movieCount < orderedMovies.length && <button type="button" className="watch-next-18c__more-films" onClick={() => setMovieCount(count => count + 12)}>Afficher {Math.min(12, orderedMovies.length - movieCount)} de plus</button>}
-      {movieList && <button type="button" className="home-series-collapse home-movie-collapse" onClick={() => switchMovies(false)}><ChevronUp size={16} />Revenir en carrousel</button>}
+      {movieList && <HomeLoadMore items={orderedMovies.slice(movieCount)} onLoad={() => setMovieCount(count => count + HOME_PAGE_SIZE)} />}
     </>}
-    {actorSheet && <MovieActorSheet actor={{ ...actorSheet.actor, seen: actorIndex[actorSheet.actor.id]?.seen || [] }} origin={actorSheet.origin} shows={allShows} onClose={() => setActorSheet(null)} onPerson={id => onPerson?.(id)} onOpen={(id, type) => { const known = allShows.find(show => show.tmdbId === id && show.mediaType === type); if (known) onOpen(known.id, type); else onOpenMedia?.(id, type); }} />}
+    {actorSheet && <MovieActorProfile actor={{ ...actorSheet.actor, seen: actorIndex[actorSheet.actor.id]?.seen || [] }} origin={actorSheet.origin} shows={allShows} onClose={() => setActorSheet(null)} onOpen={(id, type) => { const known = allShows.find(show => show.tmdbId === id && show.mediaType === type); if (known) onOpen(known.id, type); else onOpenMedia?.(id, type); }} />}
     {renderSeriesGroup(2)}
     {series.length === 0 && orderedMovies.length === 0 && <div className="home-empty"><h2>Rien à regarder pour le moment</h2>{onExplore && <button type="button" className="home-explore" onClick={onExplore}>Explorer</button>}</div>}
   </section>;

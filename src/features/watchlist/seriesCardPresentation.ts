@@ -135,10 +135,12 @@ export function buildSeriesSeasonProgress(
   const seen = new Set(seenEntries.filter(item => item.season === season).map(item => item.episode));
 
   const explicitTotalState = pointers.find(pointer => typeof pointer.season_total_unknown === 'boolean')?.season_total_unknown;
-  const advertisedTotal = currentEvidence ? (count(currentEvidence.episode_count) || null) : (count(evidence?.episode_count) || null)
-    ?? (explicitTotalState === true ? null : pointers.map(pointer => count(pointer.episode_count === undefined && pointer.season_total_unknown === false ? pointer.known_episodes_in_season : pointer.episode_count)).find(value => value !== null && value > 0)
-      ?? (count(cached?.episode_count) || null))
-    ?? null;
+  const endedForTotal = show.seriesEnded === true || show.tmdbStatus === 'Ended' || show.tmdbStatus === 'Canceled';
+  const laterSeason = [...allPointers.map(pointer => pointer.last_season_number || pointer.season_number), ...cachedSeasons.map(item => item.season_number)].some(number => number > season);
+  const finaleForTotal = pointers.some(pointer => pointer.episode_type === 'finale' || pointer.last_known_episode_type === 'finale') || cached?.episodes?.some(item => item.episode_type === 'finale');
+  const declared = currentEvidence?.total_evidence_version === 3 ? [currentEvidence.episode_count] : [currentEvidence?.episode_count, evidence?.episode_count,
+    ...pointers.filter(pointer => pointer.season_total_unknown !== true).map(pointer => pointer.episode_count), cached?.episode_count];
+  const advertisedTotal = declared.map(value => count(value)).find(value => value !== null && value > 0 && (value > 1 || endedForTotal || laterSeason || finaleForTotal)) ?? null;
   const cachedKnown = (cached?.episodes || []).reduce((highest, item) => Math.max(highest, count(item.episode_number) || 0), 0);
   const pointerKnown = Math.max(0, ...pointers.map(pointer => count(pointer.known_episodes_in_season) || 0));
   const seenKnown = [...seen].reduce((highest, number) => Math.max(highest, count(number) || 0), 0);

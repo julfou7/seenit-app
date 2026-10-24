@@ -1,3 +1,4 @@
+import { useAnimatedBadges } from '../hooks/useAnimatedBadges';
 import { DialogLayer } from '../components/ui/DialogLayer';
 import { hydratePlatformPreferences } from '../features/providers/platformPreferenceHydration';
 import { useState, useEffect, useRef } from 'react';
@@ -65,6 +66,7 @@ type PlexAuthSession = Readonly<{
 }>;
 
 export function SettingsScreen() {
+  const [animatedBadges, setAnimatedBadges] = useAnimatedBadges();
   const { showToast } = useToastStore();
   const syncStatus = useSyncStore(state => state.syncStatus);
   const shows = useShowsStore(state => state.shows);
@@ -103,7 +105,7 @@ export function SettingsScreen() {
         const notifRef = doc(db, 'users', auth.currentUser.uid, 'settings', 'notifications');
         await setDoc(notifRef, newPrefs, { merge: true });
       } catch (e) {
-        console.error('[Settings] Error saving notification prefs to Firestore', e);
+        appLogger.error('system', 'Enregistrement des préférences de notifications impossible', e);
       }
     }
   };
@@ -665,6 +667,10 @@ export function SettingsScreen() {
               </div>
             )}
           </div>
+
+          <section className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 sm:p-5">
+            <label className="flex min-h-11 items-center justify-between gap-3 text-sm font-bold"><span>Badges animés<small className="block mt-1 text-xs font-normal text-zinc-400">Animation des sorties du jour dans À voir.</small></span><input type="checkbox" checked={animatedBadges} onChange={event => setAnimatedBadges(event.target.checked)} className="h-6 w-6 accent-[#E5A93D]" /></label>
+          </section>
 
           {/* SECTION 2: PLATEFORMES */}
           <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 sm:p-5">

@@ -35,21 +35,29 @@ test('SEENIT-UX-014 affiche le total fourni de MobLand et des séries renouvelé
   assert.equal(needsSeasonProgressRefresh(show), false);
 });
 
-test('SEENIT-UX-014 distingue le total annoncé de la liste provisoire Harry Potter', () => {
-  const episodes = Array.from({ length: 4 }, (_, index) => ({ episode_number: index + 1, episode_type: 'standard', air_date: index < 3 ? '2026-10-01' : null }));
-  const partial = buildSeasonProgressEvidence([{ season_number: 1, episode_count: 4, episodes }], false);
-  const show = { seenEpisodes: ['1x1', '1x2'], seasonProgress: partial, tmdbStatus: 'Returning Series' };
-  assert.equal(partial['1'].episode_count, null);
+test('SEENIT-UX-014 conserve le total annoncé de Knight malgré des dates partielles', () => {
+  const episodes = Array.from({ length: 6 }, (_, index) => ({ episode_number: index + 1, episode_type: 'standard', air_date: index < 3 ? '2026-10-01' : null }));
+  const evidence = buildSeasonProgressEvidence([{ season_number: 1, episode_count: 6, episodes }], false);
+  assert.equal(evidence['1'].episode_count, 6);
   for (const context of ['watch', 'upcoming', 'history'] as const) {
-    const progress = buildSeriesSeasonProgress(show, { season_number: 1, episode_number: 3, episode_count: 4, season_total_unknown: false }, context, '2026-10-23');
-    assert.equal(progress.label, 'S1 · 2/?');
-    assert.equal(progress.unknownTail, true, 'la preuve récente gagne sur l’ancien pointeur qui prétendait connaître le total');
+    const progress = buildSeriesSeasonProgress({ seenEpisodes: ['1x1', '1x2'], seasonProgress: evidence }, { season_number: 1, episode_number: 3 }, context, '2026-10-23');
+    assert.equal(progress.label, 'S1 · 2/6');
+    assert.equal(progress.unknownTail, false);
   }
-  assert.equal(buildSeasonProgressEvidence([{ season_number: 1, episode_count: 10, episodes }], false)['1'].episode_count, 10, 'un nombre annoncé au-delà de la liste est une vraie preuve');
-  assert.equal(buildSeasonProgressEvidence([{ season_number: 1, episode_count: 4, episodes: [] }], false)['1'].episode_count, null, 'une liste indisponible ne confirme pas le compte provisoire');
-  assert.equal(buildSeasonProgressEvidence([{ season_number: 1, episode_count: 4, episodes: episodes.map(ep => ({ ...ep, air_date: '2026-11-01' })) }], false)['1'].episode_count, 4, 'le planning complet confirme le total sans obliger un type finale');
-  const oldProof = { ...partial['1'], total_evidence_version: undefined };
-  assert.equal(needsSeasonProgressRefresh({ seasonProgress: { '1': oldProof } }), true, 'les preuves de v1.4.218 sont réparées une fois');
+  assert.equal(buildSeasonProgressEvidence([{ season_number: 1, episode_count: 6, episodes: [] }], false)['1'].episode_count, 6);
+});
+
+test('SEENIT-UX-014 Harry Potter : un épisode provisoire ne vaut pas une saison complète', () => {
+  const seasons = [{ season_number: 1, episode_count: 1, episodes: [{ episode_number: 1, air_date: '2026-12-26' }] }];
+  const evidence = buildSeasonProgressEvidence(seasons, false);
+  assert.equal(evidence['1'].episode_count, null);
+  const progress = buildSeriesSeasonProgress({ seenEpisodes: [], seasonProgress: evidence }, { season_number: 1, episode_number: 1, episode_count: 1 }, 'upcoming', '2026-10-23');
+  assert.equal(progress.unknownTail, true);
+  assert.equal(progress.label, 'S1 · 0/?');
+  assert.equal(buildSeasonProgressEvidence(seasons, true)['1'].episode_count, 1, 'une vraie mini-série terminée à un épisode garde son total');
+  const legacy = { ...evidence['1'], total_evidence_version: 2 };
+  assert.equal(needsSeasonProgressRefresh({ seasonProgress: { '1': legacy } }), true);
+  assert.equal(needsSeasonProgressRefresh({ seasonProgress: evidence }), false, 'pas de refresh en boucle après réparation');
 });
 
 test('SEENIT-UX-014 conserve les états de saison sans inventer les diffusions', () => {
@@ -208,7 +216,7 @@ test('la carte 8f reste partagée par les adapters de production et leurs action
   assert.match(card, /series-8f__unknown-tail/);
   assert.match(card, /Nombre d'épisodes encore inconnu/);
   const history = readFileSync(new URL('../src/components/HistoryFeed.tsx', import.meta.url), 'utf8');
-  assert.match(history, /label: 'Marquer non vu', onSelect: \(\) => setUnseenModalItem\(item\)/);
+  assert.match(history, /label: 'Marquer non vu', onSelect: \(\) => setUnseenModalItem\(target\)/);
   assert.match(history, /onOpen=\{handleRowClick\}/);
   const expanded = readFileSync(new URL('../src/screens/watchListPresentation.tsx', import.meta.url), 'utf8');
   assert.match(expanded, /<ContinueWatchingCard show=\{show\} layout="list"/);

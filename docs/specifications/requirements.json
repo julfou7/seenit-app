@@ -12,6 +12,10 @@
       ],
       "tests": [
         {
+          "file": "tests/homeV4.test.ts",
+          "contains": "SEENIT-UX-018 fiche acteur"
+        },
+        {
           "file": "tests/homePresentation.test.ts",
           "contains": "SEENIT-UX-018 classe les sorties par jour local"
         },
@@ -2112,6 +2116,10 @@
       ],
       "tests": [
         {
+          "file": "tests/homeV4.test.ts",
+          "contains": "SEENIT-UX-014 film 3"
+        },
+        {
           "file": "tests/seriesCardPresentation.test.ts",
           "contains": "SEENIT-UX-014 conserve les états de saison sans inventer les diffusions"
         },
@@ -2121,7 +2129,7 @@
         },
         {
           "file": "tests/seriesCardPresentation.test.ts",
-          "contains": "SEENIT-UX-014 distingue le total annoncé de la liste provisoire Harry Potter"
+          "contains": "SEENIT-UX-014 conserve le total annoncé de Knight malgré des dates partielles"
         },
         {
           "file": "tests/markEpisodeSeasonTotal.test.ts",
@@ -2209,6 +2217,14 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/homeV4.test.ts",
+          "contains": "SEENIT-UX-015 regroupe seulement"
+        },
+        {
+          "file": "tests/homeV4.test.ts",
+          "contains": "SEENIT-UX-015 périodes calendaires"
+        },
         {
           "file": "tests/history16d.test.ts",
           "contains": "SEENIT-UX-015 ne fabrique jamais une heure de visionnage legacy"

@@ -67,9 +67,20 @@ test('SEENIT-UX-014 les deux synchronisations conservent la finale avant de supp
     const partial = ports.writes.find(value => value.seasonProgress);
     assert.ok(partial);
     const refreshed = { ...show, ...JSON.parse(JSON.stringify(partial)) } as Show;
-    assert.equal(refreshed.seasonProgress?.['1'].episode_count, null);
-    assert.equal(buildSeriesSeasonProgress(refreshed, { ...refreshed.nextEpisodeToWatch, episode_count: 4, season_total_unknown: false }, 'watch', '2026-10-23').unknownTail, true, 'Harry Potter : la vraie synchronisation conserve ? malgré un ancien pointeur trop affirmatif');
+    assert.equal(refreshed.seasonProgress?.['1'].episode_count, 4);
+    assert.equal(buildSeriesSeasonProgress(refreshed, { ...refreshed.nextEpisodeToWatch, episode_count: 4, season_total_unknown: false }, 'watch', '2026-10-23').unknownTail, false, 'la synchronisation garde un total TMDB explicite malgré une date manquante');
   }
+  const originalEpisodes = ports.season.episodes;
+  ports.details.seasons[0].episode_count = 1;
+  ports.season.episodes = [{episode_number:1,air_date:'2026-12-26',episode_type:'standard'}];
+  for (const invoke of [() => module.exports.syncSingleItem('series', true), () => module.exports.performDetailsSync(true)]) {
+    ports.writes.length = 0; await invoke();
+    const patch = ports.writes.find(value=>value.seasonProgress);
+    const refreshed = {...show,...JSON.parse(JSON.stringify(patch))} as Show;
+    assert.equal(refreshed.seasonProgress?.['1'].episode_count,null,'Harry Potter : la vraie synchronisation ne confirme pas un placeholder1');
+    assert.equal(buildSeriesSeasonProgress(refreshed,{season_number:1,episode_number:1},'upcoming','2026-10-24').unknownTail,true);
+  }
+  ports.season.episodes = originalEpisodes;
   // Une installation existante doit être réparée sans pull-to-refresh, puis s'arrêter.
   for (const providerStatus of ['Returning Series', 'Ended', 'Canceled']) for (const oldFlag of [true, false]) {
   ports.details.status = providerStatus;

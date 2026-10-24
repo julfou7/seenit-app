@@ -88,4 +88,24 @@ Revue de #745 (4362748684) : la garde native était verte mais authenticatedFetc
 
 Baseline40eed2a854436b3c3acc32ddad2a31cb4b577eae. Source : Screen_Recording_20261023_193241_SeenIt.mp4 et précision utilisateur « Carrousel ↔ liste des films ». Le rail conservait scrollLeft, mais la liste reprenait au début sans ancrage vertical. Le tri restait identique. La bascule mémorise désormais l’identité exacte et la coordonnée de la première carte lisible, restaure le défilement avant affichage et conserve assez de cartes chargées au retour. Le bouton inférieur permet de revenir depuis une liste paginée ; reset et démontage nettoient les compensations locales. Aucune progression métier ni ordre média modifié. TNR Chromium de production : défilement jusqu’au troisième film, bascule dans les deux sens, retour depuis les derniers films chargés et reset ; baseline rouge sur la conservation des coordonnées, correction à confirmer à360/412/1280.
 
-Deux fronti�res CSS suppl�mentaires mesur�es : la r�duction des animations cr�ait une transition implicite sur toutes les marges ; sa dur�e passe �0s. Sur �cran large, le padding24px du rail gardait un scroll-padding16px ; les deux valent d�sormais24px. Les TNR v�rifient les coordonn�es avant/apr�s avec et sans mouvement r�duit, sans tol�rance �largie.
+Deux frontières CSS supplémentaires mesurées : la réduction des animations créait une transition implicite sur toutes les marges ; sa durée passe à0s. Sur écran large, le padding24px du rail gardait un scroll-padding16px ; les deux valent désormais24px. Les TNR vérifient les coordonnées avant/après avec et sans mouvement réduit, sans tolérance élargie.
+
+
+## Terrain220 KO et ZIP10 — V4 du24octobre
+
+Les captures terrain invalident la preuve220 : elle ne couvrait ni le déplacement collatéral de l’en-tête/section précédente ni le changement de groupe optimiste lors de Vu. La V4 conservée dans `docs/design/home-a-voir-v4.md` remplace les descriptions intermédiaires ci-dessus (v3, popup acteur et listes par12).
+
+| Retour / évolution | Frontière réelle et correction | Suivi |
+|---|---|---|
+| Bascule qui décale les cartes | wrappers rail/liste et hauteur variable avec badge ; hôte170 et mêmes marges, ancrage conservé ; mesure carte/en-tête/section précédente/scroll<1px | #729 |
+| Swipe déformé et premier tap perdu | fermeture en flux et actions trop hautes ; boutons150, fermeture absolue, clic synthétique isolé et garde relâchée sur action explicite | #729 |
+| Animation Nouveautés perdue | store optimiste changeant le groupe avant acquittement ; source retenue puis animation800ms et transfert en tête/scroll, jamais après échec | #729 |
+| Totaux Knight/Harry | preuvev2 confondant planning et compte positif, placeholder1 confirmé ; v3 garde un total déclaré>1 et laisse1 inconnu sur saison ouverte, réparationv2 ciblée | #729 |
+| Film3 sans barres | adaptateur film sans progression ; collection TMDB explicite, identités exactes, tri dates et états locaux, aucune déduction du titre | #729 |
+| Billets rognés / serveur | corps120/affiche80/talon84 ; titre/acteur séparés dans le rail ; nom serveur retiré, logo gardé | #729 |
+| Rythme, badges, chargement | titres40/20, espaces28, barrebottom7, voile gauche sans flou, emoji22 et réglage animation ; rail6+tuile, liste3+6 sans Revenir | #729 |
+| Historique V4 | frise, durées réellement connues (partiel signalé), groupes adjacents même jour et épisodes consécutifs, affiche64×96, actions individuelles préservées | #729 |
+| Fiche acteur V4 | plein écran, Ton lien unique, futurs/rappels existants, À voir4, Vus rail, grille9+9 sans doublons, bio tronquée selon débord réel ; cachefr-FR/UID | #729 |
+| FPS lancement/Plex | abonnement global aux messages, réhydratations disque en rafale, historique masqué actif ; abonnement isolé, disque par4/index par20 hors premier rendu, historique différé | #741 |
+
+Preuves ciblées :47tests verts ; Chromium360/412/1280 vert pour ancrage complet, swipe tactile150/170, vraie confirmation Firestore avant animation/transfert/scroll et messages Plex sans rerendre la liste. Stress412 :192identités hydratées, puis12mises à jour sans nouvelle lecture et0filmographie avant ouverture. Les variantes fiche acteur/frise/collection, les rappels acteur, le réglage des badges et le retour système passent aussi le smoke complet. La validation canonique confirme1027tests verts, TypeScript, contrats, sécurité et budgets du build. Un TNR plus strict a ensuite trouvé un décalage de2,5px entre premiers titres : même gabarit40px et même alignement flex désormais imposés aux trois onglets, avec mesure du texte±1px. Les résultats du SHA final sont consignés dans le checkpoint #729/#741 et la PR. Les fournisseurs et écritures sont simulés derrière les façades de production ; aucun compte personnel ni appel Firestore réel. Pas de résultat FPS téléphone revendiqué. Aucune APK ni version supplémentaire pendant la collecte utilisateur.

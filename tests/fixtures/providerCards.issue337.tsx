@@ -43,6 +43,7 @@ usePlexAvailabilityStore.setState({ cache: Object.fromEntries([
 Object.assign(window, { __provider337: {
   telemetry, finishCloud: (value: unknown) => finishCloud(value), finishProviderNetwork,
   startHydration,
+  setBadges: (value: boolean) => writeUserScopedJson('account-a', 'home_animated_badges', value),
   setPlatforms: (ids: number[]) => writeUserScopedJson('account-a', 'platforms', ids),
   setPlex: (available: boolean) => usePlexAvailabilityStore.setState(state => ({ cache: Object.fromEntries(Object.entries(state.cache).map(([key, info]) => [key, { ...info, available }])) })),
 } });
@@ -55,6 +56,7 @@ function Harness() {
     }}>Démarrer la session sans Réglages</button>
     {loggedIn && <>
       <section id="card-tv"><ContinueWatchingCard show={show} onMarkAsSeen={() => {}} /></section>
+      <section id="card-hot"><ContinueWatchingCard show={{...show,id:'hot-card',nextEpisodeToWatch:{...show.nextEpisodeToWatch,air_date:getTodayStr()}}} onMarkAsSeen={() => {}} /></section>
       <section id="card-stale"><ContinueWatchingCard show={staleShow} showStaleDetail onMarkAsSeen={() => {}} /></section>
       <section id="card-new-season"><ContinueWatchingCard show={staleShow} onMarkAsSeen={() => {}} /></section>
       <section id="card-movie"><MovieWatchCard show={{ ...show, id: 'movie-42', tmdbId: 42, mediaType: 'movie' }} onMarkAsSeen={() => {}} /></section>

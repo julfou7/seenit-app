@@ -1,13 +1,13 @@
 import type { SeasonProgressEvidence, Show } from '../../types';
 
-type ConfirmedSeasonEvidence = SeasonProgressEvidence & { total_evidence_version: 2 };
+type ConfirmedSeasonEvidence = SeasonProgressEvidence & { total_evidence_version: 2 | 3 };
 export function isCurrentSeasonProgress(evidence: SeasonProgressEvidence | undefined): evidence is ConfirmedSeasonEvidence {
-  return Boolean(evidence && Object.hasOwn(evidence, 'episode_count') && 'total_evidence_version' in evidence && evidence.total_evidence_version === 2);
+  return Boolean(evidence && Object.hasOwn(evidence, 'episode_count') && 'total_evidence_version' in evidence && [2, 3].includes(Number(evidence.total_evidence_version)));
 }
 
 /** Répare une seule fois les anciennes preuves qui confondaient liste et total. */
 export function needsSeasonProgressRefresh(show: Pick<Show, 'seasonProgress' | 'nextEpisodeToWatch' | 'nextEpisodeToAir'>): boolean {
-  return Object.values(show.seasonProgress || {}).some(evidence => !isCurrentSeasonProgress(evidence))
+  return Object.values(show.seasonProgress || {}).some(evidence => !isCurrentSeasonProgress(evidence) || evidence.total_evidence_version === 2 && (evidence.episode_count === null || evidence.episode_count === 1 && evidence.season_number === evidence.last_season_number && evidence.last_known_episode_type !== 'finale'))
     || [show.nextEpisodeToWatch, show.nextEpisodeToAir].some(pointer => typeof pointer?.season_total_unknown === 'boolean'
       && !isCurrentSeasonProgress(show.seasonProgress?.[String(pointer.season_number)]));
 }
@@ -24,12 +24,9 @@ export function buildSeasonProgressEvidence(seasons: readonly SeasonEvidence[], 
     const total = typeof season.episode_count === 'number' && Number.isInteger(season.episode_count) && season.episode_count > 0 && season.episode_count <= 10_000 ? season.episode_count : null;
     const known = Math.max(total || 0, last?.episode_number || 0);
     const datedFinale = last?.episode_type === 'finale' && /^\d{4}-\d{2}-\d{2}$/.test(last.air_date || '') && Number(last.episode_number) >= known;
-    const listed = Number(last?.episode_number || 0);
-    const dated = new Set((season.episodes || []).filter(ep => Number(ep.episode_number) > 0 && Number(ep.episode_number) <= (total || 0) && /^\d{4}-\d{2}-\d{2}$/.test(ep.air_date || '')).map(ep => ep.episode_number));
-    const completeSchedule = total !== null && dated.size >= total;
-    const confirmed = total !== null && (ended || season.season_number < lastSeason || listed > 0 && total > listed || last?.episode_type === 'finale' || completeSchedule);
+    const confirmed = total !== null && (total > 1 || ended || season.season_number < lastSeason || last?.episode_type === 'finale');
     return [String(season.season_number), {
-      total_evidence_version: 2,
+      total_evidence_version: 3,
       season_number: season.season_number, episode_count: confirmed ? total : null, known_episodes_in_season: known,
       last_season_number: lastSeason,
       season_total_unknown: !confirmed && !datedFinale,

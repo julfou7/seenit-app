@@ -31,9 +31,14 @@ export const getPlexMediaKey = (id: number, type: string) => `${type}:${id}`;
 export const openPlexWatchUrl = async () => { telemetry.playback.push('plex'); };
 const providers = { results: { FR: { link: 'https://www.themoviedb.org/tv/42/watch', flatrate: [{ provider_id: 8, provider_name: 'Netflix', logo_path: 'http://127.0.0.1:4173/__history-provider.svg' }] } } };
 export const tmdb = {
+  peekRenderableMediaDetails: (_id: number, type: string) => type==='tv' ? {episode_run_time:[47]} : {runtime:169},
   peekWatchProviders: () => providers,
   getWatchProviders: async () => { telemetry.providerRequests++; throw new Error('Requête fournisseur directe interdite'); },
   getEpisodeDetails: async (_id: number, season: number, episode: number) => ({ ok: true, value: { name: episode === 14 ? 'Ozymandias' : 'Confessions', runtime: 47, still_path: 'http://127.0.0.1:4173/__8f-backdrop.svg', air_date: '2013-01-01', season_number: season, episode_number: episode } }),
   getMovieDetails: async (id: number) => ({ ok: true, value: { runtime: id === 2 ? 166 : 169, release_date: id === 2 ? '2024-03-01' : '2014-01-01', genres: [{ name: 'Science-fiction' }, { name: 'Aventure' }], backdrop_path: 'http://127.0.0.1:4173/__8f-backdrop.svg', belongs_to_collection: id === 2 ? { id: 20 } : null } }),
   getCollectionDetails: async () => ({ ok: true, value: { parts: [{ id: 1, release_date: '2021-01-01' }, { id: 2, release_date: '2024-03-01' }, { id: 3, release_date: '2030-01-01' }] } }),
 };
+
+export function makeGroupedHistory() {
+  store.setState({shows:[{...base,seenEpisodes:['5x11','5x12','5x13'],episodeRecords:Object.fromEntries([11,12,13].map(number=>[`5x${number}`,{watchedAt:at(0,22,number),rating:9}]))},initial[1],initial[2]]});
+}

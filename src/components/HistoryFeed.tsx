@@ -1,3 +1,5 @@
+import { groupHistoryRows, historyGroupCode, historyPeriod, historyPeriodSummary, type TimelineRow } from '../features/history/historyTimeline';
+import { HomeLoadMore } from './cards/HomeLoadMore';
 import { DialogLayer } from './ui/DialogLayer';
 import { HISTORY_PAGE_SIZE } from '../features/watchlist/homePresentation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -130,6 +132,7 @@ function localTodayKey(): string {
 
 function HistoryRowItem({
   item,
+  row,
   metadata,
   show,
   onShowClick,
@@ -139,6 +142,7 @@ function HistoryRowItem({
   onRewatch,
 }: {
   item: HistoryItem;
+  row: TimelineRow<HistoryItem>;
   metadata?: HistoryMetadata;
   show: Show;
   onShowClick?: (id: string, mediaType?: 'tv' | 'movie') => void;
@@ -158,7 +162,8 @@ function HistoryRowItem({
   const effectiveProviderName = forcePlex ? 'Plex' : providerName;
 
   const handleRowClick = () => {
-    if (item.mediaType === 'movie') {
+    if (row.members.length > 1) { onShowClick?.(item.showId, 'tv'); }
+    else if (item.mediaType === 'movie') {
       onShowClick?.(item.showId, 'movie');
     } else if (onEpisodeClick) {
       onEpisodeClick(item.showId, item.season, item.episode);
@@ -179,23 +184,28 @@ function HistoryRowItem({
     watchedAt: item.watchedAt,
     timeKnown: item.watchedTimeKnown,
   });
-  const historyActions: SeriesCardAction[] = [
-    { label: 'Marquer non vu', onSelect: () => setUnseenModalItem(item) },
-    { label: 'Changer la date/heure', onSelect: () => onEdit(item) },
-    { label: 'Revoir', onSelect: () => onRewatch(item, show, effectiveProviderName) },
-    ...(item.mediaType === 'tv' ? [{ label: 'Ouvrir la série', onSelect: () => onShowClick?.(item.showId, 'tv') }] : []),
+  const actionsFor = (target: HistoryItem): SeriesCardAction[] => [
+    { label: 'Marquer non vu', onSelect: () => setUnseenModalItem(target) },
+    { label: 'Changer la date/heure', onSelect: () => onEdit(target) },
+    { label: 'Revoir', onSelect: () => onRewatch(target, show, effectiveProviderName) },
+    ...(target.mediaType === 'tv' ? [{ label: 'Ouvrir la série', onSelect: () => onShowClick?.(target.showId, 'tv') }] : []),
   ];
+  const grouped = row.members.length > 1;
+  const historyActions = grouped ? [{ label: 'Ouvrir la série', onSelect: () => onShowClick?.(item.showId, 'tv') }] : actionsFor(item);
+  const actionGroups = grouped ? [...row.members].reverse().map(target => ({ label: `S${target.season} · E${target.episode}`, actions: actionsFor(target) })) : undefined;
+
 
   return <div ref={cardRef} className="history-entry-host">
-    <HistoryEntryRow title={item.showTitle} episodeTitle={item.mediaType === 'tv' ? episodeTitle || `Épisode ${item.episode}` : undefined}
-      code={item.mediaType === 'tv' ? `S${String(item.season).padStart(2, '0')}·E${String(item.episode).padStart(2, '0')}` : undefined}
+    <HistoryEntryRow title={item.showTitle} episodeTitle={grouped ? `${row.members.length} épisodes d’affilée` : item.mediaType === 'tv' ? episodeTitle || `Épisode ${item.episode}` : movieMetadata?.genres[0]}
+      code={historyGroupCode(row)} groupCount={row.members.length} actionGroups={actionGroups}
       date={formatHistoryRowDate(item.watchedAt)} today={historyLocalDayKey(item.watchedAt) === localTodayKey()} timestamp={item.watchedAt}
-      images={[item.mediaType === 'movie' ? movieMetadata?.backdropPath : episodeMetadata?.stillPath, show.backdropPath, show.posterPath]}
-      label={ariaLabel} onOpen={handleRowClick} actions={historyActions} />
+      images={[show.posterPath, show.backdropPath]}
+      label={grouped ? `${show.title}, ${row.members.length} épisodes d’affilée, ${historyGroupCode(row)}` : ariaLabel} onOpen={handleRowClick} actions={historyActions} />
   </div>;
 }
 
 export function HistoryFeed({
+  active = true,
   onExplore,
   onShowClick,
   onEpisodeClick
@@ -203,11 +213,12 @@ export function HistoryFeed({
   onShowClick?: (id: string, mediaType?: 'tv' | 'movie') => void;
   onEpisodeClick?: (showId: string, season: number, episode: number) => void;
   onExplore?: () => void;
+  active?: boolean;
 }) {
   const [page, setPage] = useState(1);
   const itemsPerPage = HISTORY_PAGE_SIZE;
   const { shows, loading, updateShow } = useShows();
-  const showsById = useMemo(() => new Map(shows.map(show => [show.id, show])), [shows]);
+  const showsById = useMemo(() => new Map((active ? shows : []).map(show => [show.id, show])), [shows, active]);
   const { showToast } = useToastStore();
   const [metadataByKey, setMetadataByKey] = useState<Record<string, HistoryMetadata>>({});
   const [unseenModalItem, setUnseenModalItem] = useState<HistoryItem | null>(null);
@@ -216,6 +227,7 @@ export function HistoryFeed({
   const [editTime, setEditTime] = useState('');
 
   const historyItems = useMemo(() => {
+    if (!active) return [];
     if (!shows) return [];
     const items: HistoryItem[] = [];
 
@@ -276,9 +288,11 @@ export function HistoryFeed({
       if (left.watchedTimeKnown && right.watchedTimeKnown && left.watchedAt !== right.watchedAt) return right.watchedAt - left.watchedAt;
       return left.key.localeCompare(right.key);
     });
-  }, [shows]);
+  }, [shows, active]);
 
-  const displayedItems = useMemo(() => historyItems.slice(0, page * itemsPerPage), [historyItems, page]);
+  const rows = useMemo(() => groupHistoryRows(historyItems, (id, season) => showsById.get(id)?.seasonProgress?.[String(season)]?.episode_count || showsById.get(id)?.seasonsCache?.find(item => item.season_number === season)?.episode_count || null), [historyItems, showsById]);
+  const displayedRows = useMemo(() => rows.slice(0, page * itemsPerPage), [rows, page]);
+  const displayedItems = useMemo(() => displayedRows.map(row => row.item), [displayedRows]);
 
   useEffect(() => {
     let mounted = true;
@@ -488,29 +502,47 @@ export function HistoryFeed({
     );
   }, [showToast, shows, updateShow]);
 
+  if (!active) return null;
   if (loading) {
     return <div className="history-entry-list" role="status" aria-label="Chargement de l’historique">{[0, 1, 2, 3, 4].map(index => <div key={index} className="history-entry history-entry--skeleton"><div className="history-entry__image" /><div className="history-entry__text"><span /><span /></div></div>)}</div>;
   }
 
-  const hasMore = displayedItems.length < historyItems.length;
+  const hasMore = displayedRows.length < rows.length;
+  const periods = new Map<string, { label: string; today: boolean; rows: TimelineRow<HistoryItem>[] }>();
+  for (const row of displayedRows) {
+    const period = historyPeriod(row.item.watchedAt);
+    if (!periods.has(period.key)) periods.set(period.key, { ...period, rows: [] });
+    periods.get(period.key)!.rows.push(row);
+  }
+  const minutes = (item: HistoryItem): number | null => {
+    const metadata = metadataByKey[getMetadataKey(item)];
+    const cached = item.tmdbId ? tmdb.peekRenderableMediaDetails(item.tmdbId, item.mediaType) : null;
+    const value = metadata?.runtime || (item.mediaType === 'movie' ? cached?.runtime : cached?.episode_run_time?.[0]);
+    return asPositiveNumber(value) || null;
+  };
 
   return (
-    <div className="pb-8">
+    <div className="history-timeline">
       {historyItems.length === 0 && (
-        <div className="home-empty"><h2>Aucun historique de visionnage</h2>{onExplore && <button type="button" className="home-explore" onClick={onExplore}>Explorer</button>}</div>
+        <div className="home-empty"><h2>Rien de vu pour l’instant</h2>{onExplore && <button type="button" className="home-explore" onClick={onExplore}>Explorer</button>}</div>
       )}
 
-      {displayedItems.length > 0 && <div className="history-entry-list">
-        {displayedItems.map(item => {
-          const show = showsById.get(item.showId);
-          return show ? <HistoryRowItem key={item.key} item={item} metadata={metadataByKey[getMetadataKey(item)]} show={show}
-            onShowClick={onShowClick} onEpisodeClick={onEpisodeClick} setUnseenModalItem={setUnseenModalItem}
-            onEdit={handleEdit} onRewatch={handleRewatch} /> : null;
-        })}
-      </div>}
-      {hasMore && <button type="button" onClick={() => setPage(value => value + 1)} className="history-entry-more">
-        Voir plus<span>{historyItems.length - displayedItems.length} de plus</span>
-      </button>}
+      {[...periods].map(([key, period]) => {
+        const allPeriodRows = rows.filter(row => historyPeriod(row.item.watchedAt).key === key);
+        const summary = historyPeriodSummary(allPeriodRows, minutes);
+        return <section key={key} className={`history-period${period.today ? ' history-period--today' : ''}`}>
+          <h2 className="history-period__heading"><span className="home-section-name">{period.label}</span></h2>
+          <p className="history-period__summary">{[summary.episodes ? `${summary.episodes} épisode${summary.episodes > 1 ? 's' : ''}` : '', summary.films ? `${summary.films} film${summary.films > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ')}{summary.duration && <> · <strong>{summary.duration}</strong></>}</p>
+          <div className="history-entry-list">{period.rows.map(row => {
+            const item = row.item, show = showsById.get(item.showId);
+            return show ? <HistoryRowItem key={row.key} item={item} row={row} metadata={metadataByKey[getMetadataKey(item)]} show={show}
+              onShowClick={onShowClick} onEpisodeClick={onEpisodeClick} setUnseenModalItem={setUnseenModalItem}
+              onEdit={handleEdit} onRewatch={handleRewatch} /> : null;
+          })}</div>
+        </section>;
+      })}
+      {hasMore && <HomeLoadMore step={HISTORY_PAGE_SIZE} lastLabel="Afficher la dernière" items={rows.slice(displayedRows.length).flatMap(row => { const show = showsById.get(row.item.showId); return show ? [show] : []; })} onLoad={() => setPage(value => value + 1)} />}
+
 
       {editingItem && (
         <DialogLayer onDismiss={() => setEditingItem(null)} label="Changer la date et l’heure" historyMode="local" role="dialog" className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">

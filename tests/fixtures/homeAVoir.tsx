@@ -1,7 +1,8 @@
+import { useSyncStore } from '../../src/store/syncStore';
 import { useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { WatchListView } from '../../src/screens/WatchListView';
-import { useShowsStore, telemetry, updateShow, auth, releaseWrite } from './homeAVoirRuntime';
+import { useShowsStore, telemetry, updateShow, auth, releaseWrite, addProgressExamples } from './homeAVoirRuntime';
 import { markMovieWatched, markWatchRecordUnseen } from '../../src/features/watchlist/watchProgressActions';
 import { markWatchCardEpisode } from '../../src/features/watchlist/watchCardResume';
 import { markEpisodeWatched } from '../../src/features/shows/markEpisodeWatched';
@@ -10,7 +11,7 @@ import { useToastStore } from '../../src/store/toastStore';
 import type { Show } from '../../src/types';
 import { ToastContainer } from '../../src/components/ToastContainer';
 import { writeUserScopedJson } from '../../src/lib/userIsolation';
-Object.assign(window, { __homeAVoir: { telemetry, releaseWrite, empty: () => useShowsStore.setState({ shows: [] }), clearDismissed: () => writeUserScopedJson(auth.currentUser?.uid, 'home_dismissed_notifications', []), snapshot: () => useShowsStore.getState().shows, reset: () => window.dispatchEvent(new Event('watchlist-reset-all')), clear: () => useToastStore.getState().clearQueue(), toasts: () => [useToastStore.getState().currentToast, ...useToastStore.getState().queue].filter(Boolean) } });
+Object.assign(window, { __homeAVoir: { examples:addProgressExamples, sync: (message:string|null) => useSyncStore.getState().setPlexSyncStatus(message?{message}:null), telemetry, releaseWrite, empty: () => useShowsStore.setState({ shows: [] }), clearDismissed: () => writeUserScopedJson(auth.currentUser?.uid, 'home_dismissed_notifications', []), snapshot: () => useShowsStore.getState().shows, reset: () => window.dispatchEvent(new Event('watchlist-reset-all')), clear: () => useToastStore.getState().clearQueue(), toasts: () => [useToastStore.getState().currentToast, ...useToastStore.getState().queue].filter(Boolean) } });
 function Harness() {
   const shows = useShowsStore(state => state.shows);
   const [tab, setTab] = useState<'watch_next' | 'upcoming' | 'history'>('watch_next');

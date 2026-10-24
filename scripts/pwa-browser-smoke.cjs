@@ -8,6 +8,7 @@ const { buildProviderHarness, testProviderHarness } = require('./provider-browse
 const { buildSeriesCardHarness, testSeriesCardHarness } = require('./series-card-browser-checks.cjs');
 const { buildHistoryHarness, testHistoryHarness } = require('./history-browser-checks.cjs');
 const { buildWatchNextHarness, testWatchNextHarness } = require('./watch-next-browser-checks.cjs');
+const { testTerrain220Harness } = require('./home-terrain220-browser-checks.cjs');
 const { buildHomeHarness, testHomeHarness } = require('./home-a-voir-browser-checks.cjs');
 const { buildNavbarHarness, testNavbarHarness } = require('./navbar-browser-checks.cjs');
 
@@ -556,6 +557,7 @@ async function main() {
       navbar: await testNavbarHarness(client, root),
       // L'horloge virtuelle de la minuterie 18c reste la dernière vérification du client CDP.
       watchNext: await testWatchNextHarness(client, root),
+      homeV4: await testTerrain220Harness(client, root),
       generatedAt: new Date().toISOString(),
       issue: config.issue,
       status: 'pass',

@@ -6,6 +6,7 @@ async function buildHomeHarness(root) {
   const runtime = path.join(root, 'tests/fixtures/homeAVoirRuntime.ts');
   await esbuild.build({ entryPoints: [path.join(root, 'tests/fixtures/homeAVoir.tsx')], outfile: path.join(dist, '__seenit-home.js'), bundle: true, platform: 'browser', format: 'iife', target: ['chrome120'], logLevel: 'silent',
     plugins: [{ name: 'home-ports', setup(builder) {
+      builder.onLoad({filter:/[\\/]screens[\\/]WatchNextSection\.tsx$/}, args => ({contents:fs.readFileSync(args.path,'utf8').replace(/(export function WatchNextSection[^\n]+\{)\r?\n/,'$1\n  window.__homeListRenders = (window.__homeListRenders || 0) + 1;\n'),loader:'tsx',resolveDir:path.dirname(args.path)}));
       builder.onResolve({ filter: /^firebase\/(?:firestore|auth)$|\/(?:favoritePeopleStore|useShows|firebase|tmdb|showsStore|logStore|plexAvailability|plexLinks|useShows|downloadConfigStore|updateStore|liveDownloadStore|EpisodeDetailModal|PersonDetailModal)$/ }, () => ({ path: runtime }));
     } }],
   });
@@ -39,7 +40,7 @@ async function testHomeHarness(client, root) {
     await check(client,'document.documentElement.scrollWidth<=innerWidth && document.querySelectorAll("[role=tabpanel]:not([hidden])").length===1','un panneau visible sans débordement');
     fs.writeFileSync(path.join(root,'quality-reports',`home-watch-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
     await click(client,'[aria-label="Films en liste"]');
-    await check(client,'document.querySelector(".movie-ticket--horizontal").getBoundingClientRect().height===104 && document.querySelector(".movie-ticket--horizontal .movie-ticket__poster").getBoundingClientRect().width===70 && document.querySelector(".movie-ticket--horizontal .movie-ticket__stub").getBoundingClientRect().width===96 && getComputedStyle(document.querySelector(".movie-ticket--horizontal .movie-ticket__check svg")).opacity==="1"','billet 104 px conforme au prototype avec glyphe Vu visible');
+    await check(client,'document.querySelector(".movie-ticket--horizontal").getBoundingClientRect().height===120 && document.querySelector(".movie-ticket--horizontal .movie-ticket__poster").getBoundingClientRect().width===80 && document.querySelector(".movie-ticket--horizontal .movie-ticket__stub").getBoundingClientRect().width===84 && getComputedStyle(document.querySelector(".movie-ticket--horizontal .movie-ticket__check svg")).opacity==="1"','billet 120 px conforme au prototype avec glyphe Vu visible');
     await evaluate(client,'document.querySelector("#films-a-voir-18c").scrollIntoView({block:"center"})');
     fs.writeFileSync(path.join(root,'quality-reports',`home-films-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
     await click(client,'#home-tab-upcoming');
@@ -50,7 +51,7 @@ async function testHomeHarness(client, root) {
     await check(client,'window.__homeAVoir.telemetry.opens.at(-1).includes(":2x1")', 'un tap À venir ouvre l’épisode exact');
     await click(client,'#home-tab-history');
     await check(client,'document.querySelectorAll("#home-panel-history [data-history-row]").length===10','historique initial de dix');
-    await click(client,'#home-panel-history > div > button');
+    await click(client,'#home-panel-history .home-load-more');
     await check(client,'document.querySelectorAll("#home-panel-history [data-history-row]").length>10','suite historique');
     fs.writeFileSync(path.join(root,'quality-reports',`home-history-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
     await click(client,'.home-notification-bell');

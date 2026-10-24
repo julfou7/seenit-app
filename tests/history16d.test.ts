@@ -101,7 +101,7 @@ test('SEENIT-UX-015 expose la liste compacte v3 et conserve les actions d’hist
   assert.match(source, /Changer la date\/heure/);
   assert.match(source, /Revoir/);
   assert.match(source, /history-entry-list/);
-  assert.match(source, /label: 'Marquer non vu', onSelect: \(\) => setUnseenModalItem\(item\)/);
+  assert.match(source, /label: 'Marquer non vu', onSelect: \(\) => setUnseenModalItem\(target\)/);
   assert.match(source, /onOpen=\{handleRowClick\}/);
 
   const card = readFileSync(new URL('../src/components/cards/SeriesEpisodeCard.tsx', import.meta.url), 'utf8');

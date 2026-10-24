@@ -112,6 +112,6 @@ test('SEENIT-PROVIDER-001 les cartes historiques passent par le résolveur réac
   }
   const history = readFileSync(new URL('../src/components/HistoryFeed.tsx', import.meta.url), 'utf8');
   assert.match(history, /usePassiveWatchProvider\(/, 'Revoir garde la résolution passive même sans logo dans la liste v3');
-  assert.match(history, /onRewatch\(item, show, effectiveProviderName\)/);
+  assert.match(history, /onRewatch\(target, show, effectiveProviderName\)/);
   assert.doesNotMatch(history, /getFormattedProviderLogo|tmdb\.getWatchProviders\(/);
 });

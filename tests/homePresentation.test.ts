@@ -33,13 +33,14 @@ test('SEENIT-UX-018 conserve trois onglets sans compteurs et les limites des deu
   assert.match(view, /hidden=\{activeTab !== 'upcoming'\}/);
   assert.match(view, /role="tablist"/);
 });
-test('SEENIT-UX-018 présente les statuts sans emoji ni compteur restant redondant', () => {
-  assert.deepEqual(seriesStatus('🔥 Sorti aujourd’hui'), { label: 'Aujourd’hui', tone: 'today' });
-  assert.deepEqual(seriesStatus('🆕 Il y a 3 jours'), { label: 'Nouveau', tone: 'new' });
-  assert.equal(seriesStatus('Pas vu depuis 72 jours')?.tone, 'stale');
+test('SEENIT-UX-018 présente les statuts avec emoji et sans badge Dispo redondant', () => {
+  assert.deepEqual(seriesStatus('🔥 Sorti aujourd’hui'), { label: '🔥 Sorti aujourd’hui', tone: 'today' });
+  assert.deepEqual(seriesStatus('🆕 Il y a 3 jours'), { label: '🆕 Il y a 3 j', tone: 'new' });
+  assert.deepEqual(seriesStatus('Pas vu depuis 90 jours'), {label:'⏳ 12 sem.',tone:'stale'});
+  assert.deepEqual(seriesStatus('⏳ Il y a 90 jours'), {label:'⏳ 12 sem.',tone:'stale'});
   assert.equal(seriesStatus('Final de saison')?.tone, 'final');
   assert.equal(seriesStatus('Plus que 2')?.tone, 'remaining');
-  assert.equal(seriesStatus('Dispo')?.tone, 'available');
+  assert.equal(seriesStatus('Dispo'), null);
   assert.equal(seriesStatus('2 restants'), null);
   assert.equal(seriesStatus(), null);
 });
