@@ -93,3 +93,7 @@ Un import/sync AI Studio n'est jamais une migration implicite. GitHub reste cano
 - Une exigence décrit un résultat observable ou un invariant durable, pas un détail temporaire de CI.
 - Un test référencé existe réellement et son intitulé correspond au catalogue.
 - Les validations terrain impossibles à automatiser restent explicites dans la SPEC ou un runbook/TNR.
+
+## Accueil À voir — référence V4
+
+La [SPEC-DEV-V4 importée du ZIP10](../design/home-a-voir-v4.md) remplace les états intermédiaires pour la géométrie, les badges, le chargement progressif, la frise historique et la fiche acteur. Les données de maquette ne constituent jamais des données de production.

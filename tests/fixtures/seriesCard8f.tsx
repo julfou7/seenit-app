@@ -31,7 +31,7 @@ function Harness() {
   const harry = {
     ...base, id: 'harry-potter', title: 'Harry Potter', seriesEnded: false, tmdbStatus: 'Returning Series',
     seenEpisodes: ['1x1', '1x2'], nextEpisodeToWatch: harryEpisode,
-    seasonProgress: buildSeasonProgressEvidence([{ season_number: 1, episode_count: 4, episodes: [{ episode_number: 4, episode_type: 'standard' }] }], false),
+    seasonProgress: buildSeasonProgressEvidence([{ season_number: 1, episodes: [{ episode_number: 4, episode_type: 'standard' }] }], false),
     nextEpisodeToAir: { season_number: 1, episode_number: 4, episode_count: null, air_date: '2026-11-01' },
   } as Show;
   return <main style={{ padding: '20px 16px', maxWidth: 452, margin: 'auto' }}>

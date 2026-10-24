@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Calendar, Bell } from 'lucide-react';
 import { type Show } from '../../types';
 import { requestNotificationPermission, auth, db, sendNativeNotification } from '../../lib/firebase';
@@ -10,6 +10,8 @@ import { getFormattedProviderLogo } from '../../utils/providerLogos';
 import { usePassiveWatchProvider } from '../../hooks/usePassiveWatchProvider';
 import { readUserScopedJson, removeUserScopedValue, writeUserScopedJson } from '../../lib/userIsolation';
 import { SeriesEpisodeCard, type SeriesCardAction } from './SeriesEpisodeCard';
+import { buildMovieCollectionProgress, type CollectionPart } from '../../features/watchlist/movieCollectionProgress';
+import { loadMovieCollection } from '../../features/watchlist/movieCollectionLoader';
 import { appLogger } from '../../store/logStore';
 
 export interface UpcomingEpisodeInfo {
@@ -92,15 +94,17 @@ interface Props {
   onShowClick?: (id: string, mediaType?: 'tv' | 'movie') => void;
   onEpisodeClick: (show: Show, seasonNumber: number, episodeNumber: number) => void;
   actions?: SeriesCardAction[];
+  compact?: boolean;
+  ensureTracked?: () => Promise<Show>;
 }
 
-export const UpcomingShowCard = React.memo(function UpcomingShowCard({ show, onShowClick, onEpisodeClick, actions }: Props) {
-  const ep = getUpcomingEpisodeInfo(show);
+export const UpcomingShowCard = React.memo(function UpcomingShowCard({ show, onShowClick, onEpisodeClick, actions, compact, ensureTracked }: Props) {
+  const ep = compact && show.firstAirDate ? { season_number: 1, episode_number: 1, air_date: show.firstAirDate, name: 'Épisode 1' } : getUpcomingEpisodeInfo(show);
   if (!ep) return null;
-  return <UpcomingShowCardContent key={`${show.id}_${ep.season_number}x${ep.episode_number}`} show={show} ep={ep} onShowClick={onShowClick} onEpisodeClick={onEpisodeClick} actions={actions} />;
+  return <UpcomingShowCardContent key={`${show.mediaType}:${show.tmdbId}:${ep.season_number}x${ep.episode_number}`} show={show} ep={ep} onShowClick={onShowClick} onEpisodeClick={onEpisodeClick} actions={actions} compact={compact} ensureTracked={ensureTracked} />;
 });
 
-function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, actions }: Props & { ep: UpcomingEpisodeInfo }) {
+function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, actions, compact, ensureTracked }: Props & { ep: UpcomingEpisodeInfo }) {
   const storageField = `reminder_${show.id}_S${ep.season_number}E${ep.episode_number}`;
   const [isReminderSet, setIsReminderSet] = useState<boolean>(() => {
     if (show.notificationsEnabled) return true;
@@ -108,12 +112,18 @@ function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, action
   });
   const [loadingReminder, setLoadingReminder] = useState(false);
   const { showToast } = useToastStore();
-  const { updateShow } = useShows();
+  const { updateShow, shows } = useShows();
+  const [visible, setVisible] = useState(false);
+  const [collection, setCollection] = useState<CollectionPart[]>([]);
+  useEffect(() => {
+    if (!visible || compact || show.mediaType !== 'movie') return;
+    let current = true;
+    void loadMovieCollection(show.tmdbId).then(parts => { if (current) setCollection(parts); }).catch(() => {});
+    return () => { current = false; };
+  }, [show.tmdbId, show.mediaType, visible, compact]);
 
-  const toggleReminder = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (loadingReminder) return;
-
+  const performReminder = async (show: Show, ownerUid: string) => {
+    const targetStorageField = `reminder_${show.id}_S${ep.season_number}E${ep.episode_number}`;
     const nextState = !isReminderSet;
     const sNumStr = String(ep.season_number).padStart(2, '0');
     const eNumStr = String(ep.episode_number).padStart(2, '0');
@@ -129,10 +139,12 @@ function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, action
         appLogger.warn('system', 'Autorisation des notifications indisponible', err);
       }
 
+      if (auth.currentUser?.uid !== ownerUid) return;
       setIsReminderSet(true);
-      writeUserScopedJson(auth.currentUser?.uid, storageField, true);
+      writeUserScopedJson(ownerUid, targetStorageField, true);
 
-      if (show.id && !show.notificationsEnabled) { updateShow(show.id, { notificationsEnabled: true }); }
+      if (show.id && !show.notificationsEnabled) { await updateShow(show.id, { notificationsEnabled: true }); }
+      if (auth.currentUser?.uid !== ownerUid) return;
       showToast(`« ${show.title} » S${sNumStr}E${eNumStr} • Rappel activé`, 'reminder', show);
 
       try {
@@ -164,7 +176,7 @@ function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, action
 
       try {
         const user = auth.currentUser;
-        if (user) {
+        if (user?.uid === ownerUid) {
           const reminderRef = doc(db, 'users', user.uid, 'reminders', reminderId);
           await setDoc(reminderRef, {
             showId: show.id,
@@ -186,14 +198,15 @@ function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, action
     } else {
       setLoadingReminder(true);
       setIsReminderSet(false);
-      removeUserScopedValue(auth.currentUser?.uid, storageField);
+      removeUserScopedValue(ownerUid, targetStorageField);
 
-      if (show.id && show.notificationsEnabled) { updateShow(show.id, { notificationsEnabled: false }); }
+      if (show.id && show.notificationsEnabled) { await updateShow(show.id, { notificationsEnabled: false }); }
+      if (auth.currentUser?.uid !== ownerUid) return;
       showToast(`« ${show.title} » S${sNumStr}E${eNumStr} • Rappel désactivé`, 'reminder', show);
 
       try {
         const user = auth.currentUser;
-        if (user) {
+        if (user?.uid === ownerUid) {
           const reminderRef = doc(db, 'users', user.uid, 'reminders', reminderId);
           await deleteDoc(reminderRef);
         }
@@ -203,6 +216,20 @@ function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, action
         setLoadingReminder(false);
       }
     }
+  };
+  const toggleReminder = async (event: React.MouseEvent) => {
+    event.stopPropagation();
+    const ownerUid = auth.currentUser?.uid;
+    if (loadingReminder || !ownerUid) return;
+    setLoadingReminder(true);
+    try {
+      const tracked = ensureTracked ? await ensureTracked() : show;
+      if (!tracked.id || auth.currentUser?.uid !== ownerUid) return;
+      await performReminder(tracked, ownerUid);
+    } catch (error) {
+      if (auth.currentUser?.uid === ownerUid) showToast('Rappel impossible. Réessaie.', 'error');
+      appLogger.warn('system', 'Activation du rappel impossible', error);
+    } finally { setLoadingReminder(false); }
   };
 
   const diffDays = getCalendarDaysDiff(ep.air_date);
@@ -239,17 +266,25 @@ function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, action
     title: show.title,
     originalTitle: show.originalTitle,
     year: show.firstAirDate?.slice(0, 4),
-    retainInLibraryCache: true,
+    retainInLibraryCache: !compact,
+    onEnrich: show.mediaType === 'movie' && !compact ? () => setVisible(true) : undefined,
   });
 
   const networkLogo = getFormattedProviderLogo(providerLogo, providerName);
 
   const movie = show.mediaType === 'movie';
+  const collectionProgress = movie ? buildMovieCollectionProgress(collection, show.tmdbId, shows, getTodayStr()) : undefined;
+  if (compact) return <div ref={cardRef} className="actor-upcoming">
+    <button type="button" className="actor-upcoming__media" onClick={() => onShowClick?.(show.id, show.mediaType)}>
+      {imgSrc && <img src={imgSrc} alt="" loading="lazy" />}<span><strong>{show.title}</strong><small>{providerName?.startsWith('Plex') ? 'Plex' : providerName || (movie ? 'Au cinéma' : 'Série')} · {capitalizedShortDate}{networkLogo && <img src={networkLogo} alt={providerName || 'Diffuseur'} />}</small></span>
+    </button>
+    <button type="button" className={`actor-upcoming__reminder${isReminderSet ? ' is-set' : ''}`} aria-label={`${isReminderSet ? 'Désactiver' : 'Activer'} le rappel pour ${show.title}`} aria-pressed={isReminderSet} disabled={loadingReminder} onClick={toggleReminder}>{diffDays === 0 ? 'auj.' : diffDays > 0 ? `J−${diffDays}` : 'Sorti'}<Bell size={12} fill={isReminderSet ? 'currentColor' : 'none'} /></button>
+  </div>;
   return <div ref={cardRef} className="series-8f-host">
     <SeriesEpisodeCard show={{ ...show, backdropPath: ep.still_path || show.backdropPath }} episode={movie ? null : ep}
       context={{ kind: 'upcoming', days: diffDays, reminder: isReminderSet, pending: loadingReminder, onToggleReminder: toggleReminder }}
       detail={movie ? undefined : capitalizedShortDate}
-      presentation={movie ? { code: 'Film · salle', subtitle: capitalizedShortDate, progress: { label: 'Sortie', description: 'Date de sortie du film', continuous: false, totalUnknown: false, unknownTail: false, knownEpisodes: 0, availableUnseen: 0, segments: [] } } : undefined}
+      presentation={movie ? { code: 'Film · salle', subtitle: capitalizedShortDate, progress: collectionProgress || { label: 'Sortie', description: 'Date de sortie du film', continuous: false, totalUnknown: false, unknownTail: false, knownEpisodes: 0, availableUnseen: 0, segments: [] } } : undefined}
       providerLogo={networkLogo} providerName={providerName}
       onOpen={() => { if (!movie) onEpisodeClick(show, ep.season_number, ep.episode_number); else onShowClick?.(show.id, 'movie'); }}
       onOpenEpisode={movie ? undefined : () => onEpisodeClick(show, ep.season_number, ep.episode_number)} actions={actions} />

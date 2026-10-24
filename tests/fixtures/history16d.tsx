@@ -2,9 +2,9 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { HistoryFeed } from '../../src/components/HistoryFeed';
 import { useToastStore } from '../../src/store/toastStore';
-import { telemetry, makeRecordlessHistory } from './history16dRuntime';
+import { telemetry, makeRecordlessHistory, makeGroupedHistory, makeBulkSeasonHistory } from './history16dRuntime';
 
-Object.assign(window, { __history16d: Object.assign(telemetry, { makeLegacy: makeRecordlessHistory }) });
+Object.assign(window, { __history16d: Object.assign(telemetry, { makeLegacy: makeRecordlessHistory, grouped:makeGroupedHistory, bulk:makeBulkSeasonHistory }) });
 window.open = (url?: string | URL) => { telemetry.playback.push(String(url)); return window; };
 function Harness() {
   const undo = useToastStore(state => state.onUndo);

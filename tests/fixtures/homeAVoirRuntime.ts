@@ -9,13 +9,13 @@ export const auth = { currentUser: { uid: 'fixture-a' }, onAuthStateChanged: (ca
 export const onAuthStateChanged = (_auth: unknown, callback: (user: {uid: string}) => void) => auth.onAuthStateChanged(callback);
 const date = (days: number) => { const value = new Date(); value.setDate(value.getDate() + days); return `${value.getFullYear()}-${String(value.getMonth()+1).padStart(2,'0')}-${String(value.getDate()).padStart(2,'0')}`; };
 const extra: Show[] = [0, 3, 12].map((days, index) => ({ ...base.initialShows[0], id: `upcoming-${index}`, title: ['Sortie du jour', 'Épisode cette semaine', 'Sortie plus tard'][index], notificationsEnabled: true, nextEpisodeToAir: { season_number: 2, episode_number: 1, name: 'Un nouvel épisode', air_date: date(days) }, nextEpisodeToWatch: null }));
-const history: Show[] = Array.from({ length: 12 }, (_, index) => ({ ...base.initialShows[8], id: `history-${index}`, title: `Film vu ${index+1}`, status: 'completed', seenEpisodes: ['movie'], episodeRecords: { movie: { watchedAt: Date.now()-index*60_000 } } }));
+const history: Show[] = Array.from({ length: 12 }, (_, index) => ({ ...base.initialShows.find(show => show.id === 'movie-0')!, id: `history-${index}`, title: `Film vu ${index+1}`, status: 'completed', seenEpisodes: ['movie'], episodeRecords: { movie: { watchedAt: Date.now()-index*60_000 } } }));
 base.useShowsStore.setState({ shows: [...base.initialShows, ...extra, ...history] });
 base.usePlexAvailabilityStore.setState({ cache: {
   ...base.usePlexAvailabilityStore.getState().cache,
   'tv:10': { available: true, serverName: 'Série partielle' },
 } });
-export function useShows() { return { shows: base.useShowsStore(state => state.shows), loading: false, updateShow: base.updateShow }; }
+export function useShows() { return { shows: base.useShowsStore(state => state.shows), loading: false, updateShow: base.updateShow, addShow: base.addShow }; }
 export const useDownloadConfigStore = create(() => ({ downloadsEnabled: false, userPlatforms: [] }));
 export const useLiveDownloadStore = create(() => ({ downloads: [] }));
 export const useUpdateStore = create(() => ({ hasUpdate: true, latestRelease: { version: '1.4.999' }, requestUpdateModal: () => base.telemetry.opens.push('update') }));
@@ -33,5 +33,10 @@ export const EpisodeDetailModal = () => createElement('div', null, 'Fiche épiso
 export const PersonDetailModal = () => null;
 export const tmdb = { ...base.tmdb,
   getEpisodeDetails: async (_id: number, season: number, episode: number) => ({ ok: true, value: { name: `Épisode ${episode}`, runtime: 42, season_number: season, episode_number: episode } }),
-  getCollectionDetails: async () => ({ ok: true, value: { parts: [] } }),
+  getMovieDetails: async (id: number) => id===303 ? {ok:true,value:{belongs_to_collection:{id:555}}} : base.tmdb.getMovieDetails(id),
+  getCollectionDetails: async () => ({ ok: true, value: { parts: [{id:301,release_date:'2018-01-01'},{id:302,release_date:'2021-01-01'},{id:303,release_date:date(12)}] } }),
 };
+
+export function addProgressExamples() {
+  base.useShowsStore.setState(state=>({shows:[...state.shows,...[1,6].map(count=>({...base.initialShows[0],id:`upcoming-count-${count}`,tmdbId:300+count,title:count===1?'Harry Potter':'A Knight of the Seven Kingdoms',seenEpisodes:[],episodeRecords:{},seasonProgress:undefined, nextEpisodeToWatch:null,nextEpisodeToAir:{season_number:1,episode_number:1,episode_count:count,air_date:date(12)}})),{...base.initialShows.find(show=>show.id==='movie-0')!,id:'upcoming-collection',tmdbId:303,title:'Sans un bruit 3',firstAirDate:date(12)}]}));
+}

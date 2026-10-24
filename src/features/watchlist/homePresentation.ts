@@ -17,11 +17,19 @@ export type StatusTone = 'today' | 'new' | 'remaining' | 'available' | 'final' |
 export function seriesStatus(detail?: string): { label: string; tone: StatusTone } | null {
   if (!detail?.trim()) return null;
   const clean = detail.replace(/^[\p{Extended_Pictographic}\uFE0F\s]+/u, '').trim();
-  if (/aujourd|ce soir/i.test(clean)) return { label: 'Aujourd’hui', tone: 'today' };
-  if (/hier|il y a \d+ jours|nouve|sorti/i.test(clean)) return { label: 'Nouveau', tone: 'new' };
-  if (/final|fin de saison/i.test(clean)) return { label: clean, tone: 'final' };
-  if (/pas vu|délaissé/i.test(clean)) return { label: 'Délaissé', tone: 'stale' };
-  if (/plus que/i.test(clean)) return { label: clean, tone: 'remaining' };
-  if (/dispo/i.test(clean)) return { label: 'Dispo', tone: 'available' };
+  if (/aujourd|ce soir/i.test(clean)) return { label: "🔥 Sorti aujourd’hui", tone: 'today' };
+  if (/final de série|^final$/i.test(clean)) return { label: '🏁 Final', tone: 'final' };
+  if (/fin de saison|final/i.test(clean)) return { label: '🎬 Fin de saison', tone: 'final' };
+  const remaining = /plus que (\d+)/i.exec(clean);
+  if (remaining) return { label: `⚡ Plus que ${remaining[1]}`, tone: 'remaining' };
+  const available = /^(\d+) dispo/i.exec(clean);
+  if (available) return { label: `🍿 ${available[1]} dispo`, tone: 'available' };
+  if (/hier/i.test(clean)) return { label: '🌟 Sorti hier', tone: 'new' };
+  if (/^\s*⏳/u.test(detail)) { const days = /il y a (\d+) jours?/i.exec(clean); if (days) return { label: `⏳ ${Math.max(1, Math.floor(Number(days[1]) / 7))} sem.`, tone: 'stale' }; }
+  const age = /il y a (\d+) jours/i.exec(clean);
+  if (age) return { label: `🆕 Il y a ${age[1]} j`, tone: 'new' };
+  const stale = /pas vu depuis (\d+) jours/i.exec(clean);
+  if (stale) return { label: `⏳ ${Math.max(1, Math.floor(Number(stale[1]) / 7))} sem.`, tone: 'stale' };
+  if (/nouveau/i.test(clean)) return { label: '🆕 Nouveau', tone: 'new' };
   return null;
 }

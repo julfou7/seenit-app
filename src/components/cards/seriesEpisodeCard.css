@@ -106,3 +106,19 @@
 .series-8f__action { top:58px; }
 .series-8f__check svg.seenit-screen-glyph { width:26px; height:19.24px; }
 .series-8f__check svg.seenit-screen-glyph > path { opacity:1 !important; }
+
+/* Terrain220 : informations utiles, sans effet glossy ni animation permanente. */
+.series-8f__status { height:18px; padding:0 5px; gap:0; border:0; border-radius:5px; font-size:10px; font-weight:700; color:#c4b5fd; background:#a78bfa1c; animation:none; }
+.series-8f__status::before,.series-8f__status svg { display:none; }
+.series-8f__status--today { color:#fdba74; background:#fb923c1f; }.series-8f__status--new { color:#6ee7b7; background:#34d3991c; }.series-8f__status--final { color:#f2c36b; background:#e5a93d1f; }
+.series-8f__season { bottom:6px; }
+
+/* V4 fixed geometry, including the poster overflow. */
+.series-8f-host { height:170px; padding:0; }.series-8f__text { top:8px; bottom:34px; height:auto; justify-content:center; }.series-8f__episode-block { flex:0 1 auto; }.series-8f__text h3 { flex-shrink:0; }.series-8f__season { bottom:7px; height:26px; }.series-8f__code { flex-wrap:wrap; column-gap:6px; row-gap:3px; min-height:22px; white-space:normal; }
+.series-8f__left-veil { position:absolute; left:0; top:0; bottom:0; width:34%; border-radius:22px 0 0 22px; background:linear-gradient(90deg,#0009 0%,#0006 45%,#0000002e 75%,transparent); }
+.series-8f__status { display:inline-flex; height:22px; padding:0 8px; gap:4px; border-radius:7px; background:#09090bd1; color:#f4f4f5; box-shadow:inset 0 0 0 1px #ffffff24; font-size:11px; font-weight:800; line-height:1; white-space:nowrap; }
+.series-8f__status--today { background:#fb923c38; color:#fed7aa; box-shadow:inset 0 0 0 1px #fb923c99; animation:sbPulse 1.6s ease-in-out infinite; }.series-8f__status--new,.series-8f__status--remaining,.series-8f__status--available,.series-8f__status--final,.series-8f__status--stale { background:#09090bd1; color:#f4f4f5; }
+.series-8f__text:has(.series-8f__status--long) p { -webkit-line-clamp:1; }@keyframes sbPulse { 50% { transform:scale(1.06); box-shadow:inset 0 0 0 1px #fb923c99,0 0 10px #fb923c44; } }
+@media (prefers-reduced-motion:reduce) { .series-8f__status { animation:none; } }
+
+.series-8f[data-animated-badges="false"] .series-8f__status { animation: none; }

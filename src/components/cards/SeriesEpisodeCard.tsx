@@ -8,6 +8,7 @@ import { buildSeriesSeasonProgress, imageUrl, seriesCardPosterCandidates, series
 import { dominantPosterHue, POSTER_HUE_FALLBACK, readPosterHue, rememberPosterHue } from '../../features/watchlist/posterHue';
 import './seriesEpisodeCard.css';
 import { SeenItWatchedStamp } from './SeenItWatchedStamp';
+import { useAnimatedBadges } from '../../hooks/useAnimatedBadges';
 import { seriesStatus } from '../../features/watchlist/homePresentation';
 
 export interface SeriesCardAction { label: string; onSelect: () => void | Promise<void>; destructive?: boolean }
@@ -49,6 +50,7 @@ const BADGE_DETAIL = /^(?:🔥|🌟|🆕|🏁|⏳)/u;
 const REMAINING_DETAIL = /\brestant(?:s)?\b/i;
 
 export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo, providerName, onOpen, onOpenSeries, onOpenEpisode, onProviderOpen, actions = [], historyActions, presentation, layout = 'list' }: Props) {
+  const [animatedBadges] = useAnimatedBadges();
   const posterCandidates = seriesCardPosterCandidates(show);
   const posterCandidatesKey = posterCandidates.join('\u0000');
   const [posterIndex, setPosterIndex] = useState(0);
@@ -90,11 +92,17 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
   const requestedDetail = detail?.trim() && !REMAINING_DETAIL.test(detail) ? detail.trim() : undefined;
   const visibleDetail = requestedDetail || progress.detail;
   const detailIsBadge = visibleDetail ? BADGE_DETAIL.test(visibleDetail) : false;
-  const status = context.kind === 'watch' && !context.upToDate ? seriesStatus(visibleDetail) || (episode?.episode_type === 'finale'
-    ? { label: show.seriesEnded ? 'Final' : 'Fin de saison', tone: 'final' as const }
+  const freshness = seriesStatus(visibleDetail);
+  const status = context.kind === 'watch' && !context.upToDate ? freshness?.tone === 'today' || freshness?.tone === 'final' ? freshness : episode?.episode_type === 'finale'
+    ? { label: show.seriesEnded ? '🏁 Final' : '🎬 Fin de saison', tone: 'final' as const }
     : !progress.totalUnknown && progress.availableUnseen > 0 && progress.availableUnseen <= 2
-      ? { label: `Plus que ${progress.availableUnseen}`, tone: 'remaining' as const }
-      : { label: 'Dispo', tone: 'available' as const }) : null;
+      ? { label: `⚡ Plus que ${progress.availableUnseen}`, tone: 'remaining' as const }
+      : episode?.episode_number === 1 && episode.season_number > 1
+        ? { label: `🆕 S${episode.season_number} dispo`, tone: 'available' as const }
+        : progress.availableUnseen > 1 ? { label: `🍿 ${progress.availableUnseen} dispo`, tone: 'available' as const }
+          : freshness : null;
+  const staleDetail = visibleDetail && /pas vu|délaissé/i.test(visibleDetail) ? visibleDetail : null;
+  const secondaryDetail = visibleDetail && !staleDetail && !/plus que|restant|dispo/i.test(visibleDetail) ? visibleDetail : null;
   const watchedDate = context.kind === 'history' ? new Date(context.watchedAt) : null;
   const validWatchedDate = watchedDate && Number.isFinite(watchedDate.getTime());
   const watchedTimeKnown = context.kind === 'history' && context.watchedTimeKnown !== false;
@@ -149,10 +157,10 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
   };
 
   return <>
-    <article className={`series-8f series-8f--${layout}`} aria-labelledby={titleId} style={{ '--series-hue': hue } as React.CSSProperties} data-series-card="8f" data-series-id={show.id} data-context={context.kind}>
+    <article className={`series-8f series-8f--${layout}`} aria-labelledby={titleId} style={{ '--series-hue': hue } as React.CSSProperties} data-animated-badges={animatedBadges} data-series-card="8f" data-series-id={show.id} data-context={context.kind}>
       <div className="series-8f__surface" aria-hidden="true">
         {backdropPath && <img className="series-8f__backdrop" src={imageUrl(backdropPath, 'w500')!} loading="lazy" decoding="async" alt="" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} />}
-        <div className="series-8f__veil" />
+        <div className="series-8f__veil" /><div className="series-8f__left-veil" />
       </div>
       <button type="button" className="series-8f__open" aria-label={openLabel} aria-haspopup={menuActions.length > 0 ? 'dialog' : undefined} onClick={event => { const ignore = event.detail > 0 && (held.current || moved.current); held.current = false; moved.current = false; if (!ignore) onOpen(); }}
         onPointerDown={event => { if (event.button !== 0) return; cancel(); pointerActive.current = true; held.current = false; moved.current = false; origin.current = { x: event.clientX, y: event.clientY }; timer.current = setTimeout(() => { held.current = true; openMenu(); }, 480); }}
@@ -169,9 +177,9 @@ export function SeriesEpisodeCard({ show, episode, context, detail, providerLogo
         <h3 id={titleId}>{show.title}</h3>
         <div className="series-8f__episode-block">
           <div key={feedback?.sequence || 0} className={feedback ? 'series-8f__incoming' : undefined}>
-            <div className="series-8f__code"><strong>{markingSnapshot?.code || code}</strong>{status && <span className={`series-8f__status series-8f__status--${status.tone}`} title={status.tone === 'stale' ? visibleDetail : undefined}><svg viewBox="0 0 20 16" aria-hidden="true"><rect x="1" y="1" width="18" height="12" rx="3" /><path d="m6 7 3 3 5-6M6 15h8" /></svg>{status.label}</span>}{visibleDetail && !status && !detailIsBadge && <span> · {visibleDetail}</span>}</div>
+            <div className="series-8f__code"><strong>{markingSnapshot?.code || code}</strong>{status && <span className={`series-8f__status series-8f__status--${status.tone}${status.label.length > 14 ? ' series-8f__status--long' : ''}`}>{status.label}</span>}{secondaryDetail && !status && !detailIsBadge && <span> · {secondaryDetail}</span>}</div>
             {(markingSnapshot ? markingSnapshot.subtitle : subtitle) && <p>{markingSnapshot ? markingSnapshot.subtitle : subtitle}</p>}
-            {status?.tone === 'stale' && <small className="series-8f__stale">{visibleDetail}</small>}
+            {staleDetail && status?.tone !== 'stale' && <small className="series-8f__stale">{staleDetail}</small>}
 
           </div>
           {feedback && <div key={`ghost-${feedback.sequence}`} className="series-8f__ghost" aria-hidden="true"><strong>✓ {feedback.code}</strong><p>{feedback.name}</p></div>}

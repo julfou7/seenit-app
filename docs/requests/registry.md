@@ -136,3 +136,7 @@ Complément USR-2026-10-23-002 : « Go apk attention au centrage vertical du bou
 | USR-2026-10-23-004 | 2026-10-23 | Terrain219 : rails exhaustifs, tri films stable, glyphes/centrage8f, Punisher rogné, groupes À venir ; ZIP(9) acteurs et mini-fiche. | SEENIT-UX-018, [#729](https://github.com/julfou7/seenit-app/issues/729) | active |
 
 Complément USR-2026-10-23-004 / #729 : vidéo du23octobre19h32, précisée « Carrousel ↔ liste des films ». Conserver le film visible et son point de lecture lors des deux bascules, y compris après pagination ; seul le reset explicite revient au début. Aucun changement du tri.
+
+| USR-2026-10-23-005 | 2026-10-23 | Terrain220 KO : cinq captures, pagination6 avec bouton illustré, FPS lancement/Plex, détail synchro, badges utiles, ancrage séries/swipe/barre, transfert animé Nouveautés→Continuer, films plus hauts. Traiter pendant la collecte, aucune APK avant nouveau feu vert. | SEENIT-UX-018, #729, #741 | active |
+
+Complément USR-2026-10-23-005 : ZIP(10) SPEC-DEV-V4.md reçue24/10, complète (frise/acteur plein écran inclus), maquette prioritaire ; derniers retours cartes films/Plex, total saison Knight/Harry et collection films À venir. Aucune APK demandée.

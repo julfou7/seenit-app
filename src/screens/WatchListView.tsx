@@ -9,6 +9,7 @@ import { HomeNotifications } from '../components/HomeNotifications';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
 import { PersonDetailModal } from './PersonDetailModal';
 import { useSyncStore } from '../store/syncStore';
+import { HomeSyncIndicator } from '../components/HomeSyncIndicator';
 import { auth } from '../lib/firebase';
 import { getTodayStr } from '../lib/utils';
 import { HOME_TABS, upcomingGroup } from '../features/watchlist/homePresentation';
@@ -71,7 +72,6 @@ export function WatchListView({ model }: WatchListViewProps) {
   ];
   const [online, setOnline] = useState(() => navigator.onLine);
   const [today, setToday] = useState(() => getTodayStr());
-  const syncMessage = useSyncStore(state => state.plexSyncStatus?.message || (state.syncStatus ? 'Synchronisation en cours' : ''));
   useEffect(() => {
     const timer = setInterval(() => setToday(getTodayStr()), 60_000);
     return () => clearInterval(timer);
@@ -91,7 +91,7 @@ export function WatchListView({ model }: WatchListViewProps) {
     <div id="watchlist-container" className="home-watchlist flex-1 overflow-y-auto text-white pb-nav">
       <header className="home-header">
         <div className="home-header__top"><span className="home-wordmark" aria-label="SeenIt">seen<span className="home-wordmark__accent">it</span><i aria-hidden="true" /></span>
-          <div className="home-header__tools">{syncMessage && <span className={`home-sync${/terminé|à jour|erreur/i.test(syncMessage) ? ' home-sync--settled' : ''}`} role="status" aria-label={syncMessage} title={syncMessage} />}<HomeNotifications key={auth.currentUser?.uid || 'anonymous'} shows={allShows} onOpen={onShowClick} onSeen={show => show.mediaType === 'movie' ? markMovieAsSeen(show) : markNextEpisodeAsSeen(show)} /></div>
+          <div className="home-header__tools"><HomeSyncIndicator /><HomeNotifications key={auth.currentUser?.uid || 'anonymous'} shows={allShows} onOpen={onShowClick} onSeen={show => show.mediaType === 'movie' ? markMovieAsSeen(show) : markNextEpisodeAsSeen(show)} /></div>
         </div>
         <div className="home-tabs" role="tablist" aria-label="À voir">
           {HOME_TABS.map((tab, index) => <button key={tab.id} ref={element => { tabButtons.current[index] = element; }} type="button" id={`home-tab-${tab.id}`} role="tab" aria-selected={activeTab === tab.id} aria-controls={`home-panel-${tab.id}`} tabIndex={activeTab === tab.id ? 0 : -1} onClick={() => scrollToSection(refs[tab.id], tab.id)} onKeyDown={event => {
@@ -108,10 +108,10 @@ export function WatchListView({ model }: WatchListViewProps) {
           <WatchNextSection onPerson={openPersonModal} onOpenMedia={(id, type) => onShowClickProp(String(id), type)} onExplore={onExplore} key={auth.currentUser?.uid || 'anonymous'} allShows={allShows} groups={[continueWatchingShows, nouveautesShows, pasVuDepuisUnMomentShows]} movies={filmsAVoirShows} active={activeTab === 'watch_next'} onOpen={onShowClick} onEpisode={handleEpisodeClick} onMarkSeries={markNextEpisodeAsSeen} onMarkMovie={markMovieAsSeen} onUnseen={markAsUnseen} actions={seriesActions} />
         </div>
         <div ref={upcomingRef} id="home-panel-upcoming" role="tabpanel" aria-labelledby="home-tab-upcoming" hidden={activeTab !== 'upcoming'} tabIndex={0} className="home-panel-content">
-          {activeTab === 'upcoming' && (upcomingShows.length ? upcomingGroups.filter(group => group.shows.length).map(group => <section key={group.label} className="home-upcoming-group"><h2>{group.label}</h2>{group.shows.map(show => <UpcomingShowCard key={show.id} show={show} onShowClick={onShowClick} onEpisodeClick={handleEpisodeClick} actions={seriesActions(show)} />)}</section>) : <div className="home-empty"><h2>Rien de prévu pour le moment</h2><p>Les prochaines sorties de vos films et séries suivis apparaîtront ici.</p>{onExplore && <button type="button" className="home-explore" onClick={onExplore}>Explorer</button>}</div>)}
+          {activeTab === 'upcoming' && (upcomingShows.length ? upcomingGroups.filter(group => group.shows.length).map(group => <section key={group.label} className="home-upcoming-group"><h2><span className="home-section-name">{group.label}</span></h2>{group.shows.map(show => <UpcomingShowCard key={show.id} show={show} onShowClick={onShowClick} onEpisodeClick={handleEpisodeClick} actions={seriesActions(show)} />)}</section>) : <div className="home-empty"><h2>Rien de prévu pour le moment</h2><p>Les prochaines sorties de vos films et séries suivis apparaîtront ici.</p>{onExplore && <button type="button" className="home-explore" onClick={onExplore}>Explorer</button>}</div>)}
         </div>
         <div ref={historyRef} id="home-panel-history" role="tabpanel" aria-labelledby="home-tab-history" hidden={activeTab !== 'history'} tabIndex={0} className="home-panel-content">
-          {activeTab === 'history' && <HistoryFeed onExplore={onExplore} onShowClick={onShowClick} onEpisodeClick={(showId, season, episode) => {
+          {activeTab === 'history' && <HistoryFeed active={activeTab === 'history'} onExplore={onExplore} onShowClick={onShowClick} onEpisodeClick={(showId, season, episode) => {
             const show = allShows.find(item => item.id === showId || String(item.tmdbId) === showId);
             if (show) handleEpisodeClick(show, season, episode); else onShowClick(showId, 'tv');
           }} />}

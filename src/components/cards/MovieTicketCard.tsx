@@ -123,7 +123,6 @@ export function MovieTicketCard({ actor = null, onActor, show, start, onOpen, on
         {visibleWatched && <SeenItWatchedStamp key={phase?.sequence || 0} className="movie-ticket__stamp" />}
       </div>
       {provider && <span className="movie-ticket__provider" role="img" aria-label={providerName || 'Diffuseur'} title={providerName || undefined}><img src={provider} alt="" loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} /></span>}
-      {providerName?.startsWith('Plex (') && <span className="movie-ticket__server">Plex · {providerName.slice(6, -1)}</span>}
       <SeenItCheckButton glyph="screen" size={26} className="movie-ticket__check" error={error} isWatched={visibleWatched} pending={pendingFrom !== null} title={`Marquer ${show.title} comme ${watched ? 'non vu' : 'vu'}`} onClick={toggle} />
       {visibleWatched && <button type="button" className="movie-ticket__undo" aria-label={`Annuler le visionnage de ${show.title}`} disabled={pendingFrom !== null} onClick={toggle}><SeenItWatchedStamp className="movie-ticket__undo-stamp" /></button>}
       <div key={phase?.sequence || 0} className="movie-ticket__stub" aria-hidden="true"><span>{year}</span>{end && <strong className={end.afterMidnight ? 'movie-ticket__late' : undefined}>{end.label.replace('fin ', '')}</strong>}</div>
