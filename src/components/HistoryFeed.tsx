@@ -1,4 +1,4 @@
-import { groupHistoryRows, historyGroupCode, historyPeriod, historyPeriodSummary, type TimelineRow } from '../features/history/historyTimeline';
+import { compareHistoryEntries, groupHistoryRows, historyGroupCode, historyPeriod, historyPeriodSummary, type TimelineRow } from '../features/history/historyTimeline';
 import { HomeLoadMore } from './cards/HomeLoadMore';
 import { DialogLayer } from './ui/DialogLayer';
 import { HISTORY_PAGE_SIZE } from '../features/watchlist/homePresentation';
@@ -280,14 +280,7 @@ export function HistoryFeed({
 
     }
 
-    return items.sort((left, right) => {
-      const leftDay = historyLocalDayKey(left.watchedAt);
-      const rightDay = historyLocalDayKey(right.watchedAt);
-      if (leftDay !== rightDay) return rightDay.localeCompare(leftDay);
-      if (left.watchedTimeKnown !== right.watchedTimeKnown) return left.watchedTimeKnown ? -1 : 1;
-      if (left.watchedTimeKnown && right.watchedTimeKnown && left.watchedAt !== right.watchedAt) return right.watchedAt - left.watchedAt;
-      return left.key.localeCompare(right.key);
-    });
+    return items.sort(compareHistoryEntries);
   }, [shows, active]);
 
   const rows = useMemo(() => groupHistoryRows(historyItems, (id, season) => showsById.get(id)?.seasonProgress?.[String(season)]?.episode_count || showsById.get(id)?.seasonsCache?.find(item => item.season_number === season)?.episode_count || null), [historyItems, showsById]);

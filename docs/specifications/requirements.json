@@ -2219,6 +2219,10 @@
       "tests": [
         {
           "file": "tests/homeV4.test.ts",
+          "contains": "SEENIT-UX-015 saison entière"
+        },
+        {
+          "file": "tests/homeV4.test.ts",
           "contains": "SEENIT-UX-015 regroupe seulement"
         },
         {

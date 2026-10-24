@@ -4,6 +4,22 @@ export interface TimelineEntry { key: string; showId: string; mediaType: 'tv' | 
 export interface TimelineRow<T extends TimelineEntry> { key: string; item: T; members: T[]; day: string }
 const ordinal = (day: string) => { const [year, month, date] = day.split('-').map(Number); return Date.UTC(year, month - 1, date) / 86_400_000; };
 
+/** Bulk season writes share one timestamp: order their episodes numerically before grouping. */
+export function compareHistoryEntries(left: TimelineEntry, right: TimelineEntry): number {
+  const leftDay = historyLocalDayKey(left.watchedAt), rightDay = historyLocalDayKey(right.watchedAt);
+  if (leftDay !== rightDay) return rightDay.localeCompare(leftDay);
+  const leftKnown = left.watchedTimeKnown !== false, rightKnown = right.watchedTimeKnown !== false;
+  if (leftKnown !== rightKnown) return leftKnown ? -1 : 1;
+  if (leftKnown && left.watchedAt !== right.watchedAt) return right.watchedAt - left.watchedAt;
+  const showOrder = left.showId.localeCompare(right.showId);
+  if (showOrder) return showOrder;
+  if (leftKnown && left.mediaType === 'tv' && right.mediaType === 'tv') {
+    const episodeOrder = right.season - left.season || right.episode - left.episode;
+    if (episodeOrder) return episodeOrder;
+  }
+  return left.key.localeCompare(right.key);
+}
+
 /** Only adjacent viewings are grouped. A film, a gap or a new day ends a run. */
 export function groupHistoryRows<T extends TimelineEntry>(items: readonly T[], seasonTotal: (showId: string, season: number) => number | null): TimelineRow<T>[] {
   const rows: TimelineRow<T>[] = [];

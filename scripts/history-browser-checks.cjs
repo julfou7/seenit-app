@@ -92,6 +92,8 @@ async function testHistoryHarness(client, root) {
     await check(client,'document.querySelector("[role=alertdialog]")','retrait individuel confirmé depuis un groupe');
     await evaluate(client,'[...document.querySelectorAll("[role=alertdialog] button")].find(button=>button.textContent==="Oui, marquer non vu").click()');
     await check(client,'window.__history16d.writes.at(-1).updates.seenEpisodes.length===2 && window.__history16d.writes.at(-1).updates.episodeRecords["5x12"].rating===9','retirer E11 préserve les autres épisodes et leurs notes');
+    await evaluate(client,'window.__history16d.bulk()');
+    await check(client,'document.querySelector(".history-entry__group")?.textContent==="×12" && document.querySelectorAll("[data-history-row]").length===2 && document.querySelector(".history-entry__text strong").textContent==="S01·E01 → E12"','saison marquée en une fois : douze horodatages identiques forment une seule ligne avant pagination');
     reports.push({ width, status: 'pass', productionComponent: 'HistoryFeed', dateUndo: true, unseenUndo: true });
   }
   return reports;

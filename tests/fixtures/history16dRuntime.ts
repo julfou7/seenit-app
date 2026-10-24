@@ -42,3 +42,8 @@ export const tmdb = {
 export function makeGroupedHistory() {
   store.setState({shows:[{...base,seenEpisodes:['5x11','5x12','5x13'],episodeRecords:Object.fromEntries([11,12,13].map(number=>[`5x${number}`,{watchedAt:at(0,22,number),rating:9}]))},initial[1],initial[2]]});
 }
+
+export function makeBulkSeasonHistory() {
+  const watchedAt=at(0,22);
+  store.setState({shows:[{...base,seenEpisodes:Array.from({length:12},(_,index)=>`1x${index+1}`),episodeRecords:Object.fromEntries(Array.from({length:12},(_,index)=>[`1x${index+1}`,{watchedAt}])),seasonsCache:[{season_number:1,episode_count:12}]},initial[1]]});
+}

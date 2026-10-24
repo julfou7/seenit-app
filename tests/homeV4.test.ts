@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { groupHistoryRows, historyGroupCode, historyPeriod, historyPeriodSummary, type TimelineEntry } from '../src/features/history/historyTimeline.ts';
+import { compareHistoryEntries, groupHistoryRows, historyGroupCode, historyPeriod, historyPeriodSummary, type TimelineEntry } from '../src/features/history/historyTimeline.ts';
 import { buildMovieCollectionProgress } from '../src/features/watchlist/movieCollectionProgress.ts';
 import { actorAge, actorCreditKey, actorRole, partitionActorCredits } from '../src/features/people/actorProfile.ts';
 
@@ -41,4 +41,16 @@ test('SEENIT-UX-018 fiche acteur : sections disjointes, liste prioritaire et rô
   assert.equal(all.length,15);assert.equal(new Set(all).size,15,'aucun titre dupliqué entre sections');
   assert.equal(actorRole('Buzz (voice)'),'Buzz · voix');
   assert.equal(actorAge({birthday:'1971-02-25'},new Date(2026,1,24)),54);
+});
+
+test('SEENIT-UX-015 saison entière : les égalités du vrai tri précèdent le regroupement et la pagination', () => {
+  const entries=Array.from({length:12},(_,index)=>({...episode(`series:1x${index+1}`,index+1),watchedTimeKnown:true}));
+  const sorted=entries.sort(compareHistoryEntries);
+  assert.deepEqual(sorted.map(item=>item.episode),[12,11,10,9,8,7,6,5,4,3,2,1]);
+  const rows=groupHistoryRows(sorted,()=>12);
+  assert.equal(rows.length,1);assert.equal(rows[0].members.length,12);assert.equal(historyGroupCode(rows[0]),'S01·E01 → E12');
+  const mixed=[...entries,{...episode('film:movie',0),showId:'film',mediaType:'movie' as const}].sort(compareHistoryEntries);
+  assert.equal(groupHistoryRows(mixed,()=>12).length,2,'le film ex æquo reste une ligne distincte');
+  const unknown=entries.map(item=>({...item,watchedTimeKnown:false})).sort(compareHistoryEntries);
+  assert.equal(groupHistoryRows(unknown,()=>12).length,12,'une heure non prouvée ne devient pas un visionnage consécutif');
 });
