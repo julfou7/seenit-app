@@ -6,7 +6,7 @@ export const auth = { currentUser: { uid: 'fixture-a' } };
 
 export const db = {};
 
-export const telemetry = { writes: [] as Array<{ path: string[]; payload: Record<string, unknown> }>, details: [] as number[], opens: [] as string[], failNext: false, holdNext: false, vibrations: [] as number[], actorRequests: 0, actorPrimes: 0 };
+export const telemetry = { writes: [] as Array<{ path: string[]; payload: Record<string, unknown> }>, details: [] as number[], opens: [] as string[], failNext: false, holdNext: false, holdAddNext: false, vibrations: [] as number[], actorRequests: 0, actorPrimes: 0 };
 
 export const fixtureNow = new Date(2026, 9, 21, 22, 30).getTime();
 
@@ -70,6 +70,8 @@ export const arrayUnion = (...values: string[]) => ({ union: values });
 let releaseHeld: () => void = () => {};
 
 export const releaseWrite = () => releaseHeld();
+let releaseHeldAdd: () => void = () => {};
+export const releaseAddWrite = () => releaseHeldAdd();
 
 export async function updateDoc(path: string[], payload: Record<string, unknown>) {
 
@@ -137,7 +139,7 @@ export const tmdb = {
 
 export const useFavoritePeopleStore = create<{ people: Array<{id: number; name: string}>; addPerson: (person: {id: number; name: string}) => void; removePerson: (id: number) => void }>(set => ({ people: [], addPerson: person => set(state => ({people:[...state.people,person]})), removePerson: id => set(state => ({people:state.people.filter(person=>person.id!==id)})) }));
 
-export const addShow = async (data: Omit<Show,'id'|'userId'>) => { const id=`added-${data.tmdbId}`; useShowsStore.setState(state=>({shows:[...state.shows,{...data,id,userId:auth.currentUser.uid}]})); return id; };
+export const addShow = async (data: Omit<Show,'id'|'userId'>) => { const id=`added-${data.tmdbId}`; useShowsStore.setState(state=>({shows:[...state.shows,{...data,id,userId:auth.currentUser.uid}]})); if (telemetry.holdAddNext) { telemetry.holdAddNext=false; await new Promise<void>(resolve=>{releaseHeldAdd=resolve;}); } else await new Promise(resolve=>setTimeout(resolve,30)); return id; };
 export function useShows() { return { shows: useShowsStore(state => state.shows), addShow, updateShow }; }
 
 

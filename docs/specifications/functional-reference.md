@@ -1006,3 +1006,5 @@ V4 canonique reçue le24/10/2026, archive ZIP(10) : voir docs/design/home-a-voir
 V4, coût au lancement : l’Historique masqué ne normalise ni ne regroupe les visionnages et n’enrichit pas ses lignes ; sa page et ses métadonnées restent en mémoire pour la prochaine ouverture. La fiche acteur réutilise le rappel individuel À venir et suit un projet absent uniquement après le geste explicite sur sa cloche.
 
 Frise V4 : les marquages de saison partagent parfois le même instant ; le tri de production départage alors leurs épisodes numériquement (saison/épisode décroissants), puis groupe et pagine les lignes. Le tri lexical ne doit pas séparer E1, E10 et E2.
+
+Bientôt dans la fiche acteur : le passage d’un projet non suivi à son document de suivi conserve l’état et l’attente de la cloche ; sa clé est l’identité TMDB avec média/épisode, jamais l’identifiant attribué pendant l’ajout.

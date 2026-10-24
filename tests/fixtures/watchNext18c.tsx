@@ -6,9 +6,9 @@ import { markWatchCardEpisode } from '../../src/features/watchlist/watchCardResu
 import { markEpisodeWatched } from '../../src/features/shows/markEpisodeWatched';
 import { getTodayStr } from '../../src/lib/utils';
 import { useToastStore } from '../../src/store/toastStore';
-import { auth, telemetry, useShowsStore, updateShow, releaseWrite, switchAccount, advanceClock } from './watchNext18cRuntime';
+import { auth, telemetry, useShowsStore, updateShow, releaseWrite, releaseAddWrite, switchAccount, advanceClock } from './watchNext18cRuntime';
 Object.defineProperty(navigator, 'vibrate', { value: (milliseconds: number) => { telemetry.vibrations.push(milliseconds); return true; } });
-Object.assign(window, { __watch18c: { burst: async () => { for(let i=0;i<12;i++) { window.dispatchEvent(new Event('seenit-metadata-cached'));useShowsStore.setState({shows:useShowsStore.getState().shows.map(show=>({...show,updatedAt:Date.now()+i}))});await new Promise(resolve=>setTimeout(resolve,20)); } }, stress: () => { const shows=useShowsStore.getState().shows;useShowsStore.setState({shows:[...shows,...Array.from({length:160},(_,i)=>({...shows[0],id:`stress-${i}`,tmdbId:500+i}))]}); }, telemetry, releaseWrite, switchAccount, advanceClock, clearToasts: () => useToastStore.getState().clearQueue(), toasts: () => [useToastStore.getState().currentToast, ...useToastStore.getState().queue].filter(Boolean), snapshot: () => useShowsStore.getState().shows } });
+Object.assign(window, { __watch18c: { burst: async () => { for(let i=0;i<12;i++) { window.dispatchEvent(new Event('seenit-metadata-cached'));useShowsStore.setState({shows:useShowsStore.getState().shows.map(show=>({...show,updatedAt:Date.now()+i}))});await new Promise(resolve=>setTimeout(resolve,20)); } }, stress: () => { const shows=useShowsStore.getState().shows;useShowsStore.setState({shows:[...shows,...Array.from({length:160},(_,i)=>({...shows[0],id:`stress-${i}`,tmdbId:500+i}))]}); }, telemetry, releaseWrite, releaseAddWrite, switchAccount, advanceClock, clearToasts: () => useToastStore.getState().clearQueue(), toasts: () => [useToastStore.getState().currentToast, ...useToastStore.getState().queue].filter(Boolean), snapshot: () => useShowsStore.getState().shows } });
 function Harness() {
   const allShows = useShowsStore(state => state.shows);
   const undo = useToastStore(state => state.onUndo);

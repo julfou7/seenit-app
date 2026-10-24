@@ -97,8 +97,15 @@ async function testWatchNextHarness(client, root) {
     await check(client, 'window.__watch18c.telemetry.actorRequests===1 && document.querySelectorAll(".actor-profile__seen > button").length===8', 'filmographie à la demande et vrais titres vus');
     await check(client, 'document.querySelector(".actor-profile__header").getBoundingClientRect().height===290 && document.querySelector(".actor-profile__portrait").getBoundingClientRect().width===96 && document.querySelectorAll(".actor-profile__upcoming .actor-upcoming").length===2 && document.querySelectorAll(".actor-profile__grid > button").length===9 && document.querySelectorAll(".actor-profile__tabs > button").length===3', 'fiche V4 complète : bandeau, portrait, Bientôt, grille et filtres conditionnels');
     await check(client, '(()=>{const keys=[...document.querySelectorAll("[data-actor-credit]")].map(el=>el.dataset.actorCredit);return keys.length===new Set(keys).size})() && !document.querySelector(".actor-profile__chips") && [...document.querySelectorAll(".actor-profile__grid small")].some(el=>el.textContent.includes("· voix"))', 'sections disjointes, rôles normalisés et compteurs concentrés dans Ton lien');
+    await evaluate(client,'window.__watch18c.telemetry.holdAddNext=true');
     await click(client, '[data-actor-credit="movie:998"] .actor-upcoming__reminder');
+    await check(client,`window.__watch18c.snapshot().some(show=>show.tmdbId===998) && document.querySelector('[data-actor-credit="movie:998"] .actor-upcoming__reminder').disabled`,'ajout optimiste : la cloche reste en attente après attribution de son identifiant');
+    await evaluate(client,'window.__watch18c.releaseAddWrite()');
+
     await check(client, 'window.__watch18c.snapshot().some(show=>show.tmdbId===998 && show.notificationsEnabled) && window.__watch18c.telemetry.writes.some(write=>write.path.includes("reminders") && write.path[1]==="fixture-a")', 'rappel acteur réutilise le vrai suivi et le rappel UID de À venir');
+    await check(client,`document.querySelector('[data-actor-credit="movie:998"] .actor-upcoming__reminder').getAttribute("aria-pressed")==="true" && !document.querySelector('[data-actor-credit="movie:998"] .actor-upcoming__reminder').disabled`,'la cloche du projet ajouté reflète le rappel confirmé sans réouverture');
+    await click(client,'[data-actor-credit="movie:998"] .actor-upcoming__reminder');
+    await check(client,`document.querySelector('[data-actor-credit="movie:998"] .actor-upcoming__reminder').getAttribute("aria-pressed")==="false" && window.__watch18c.telemetry.writes.some(write=>write.path.includes("reminders") && write.payload.deleted) && window.__watch18c.snapshot().find(show=>show.tmdbId===998).notificationsEnabled===false`,'second appui : suppression du rappel et état désactivé');
     await check(client, 'document.querySelector(".actor-profile__bio button")', 'Lire la suite seulement pour une bio qui déborde');
     await click(client, '.actor-profile__more');
     await check(client, 'document.querySelectorAll(".actor-profile__grid > button").length>9', 'filmographie neuf puis neuf');

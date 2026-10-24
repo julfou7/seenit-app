@@ -101,7 +101,7 @@ interface Props {
 export const UpcomingShowCard = React.memo(function UpcomingShowCard({ show, onShowClick, onEpisodeClick, actions, compact, ensureTracked }: Props) {
   const ep = compact && show.firstAirDate ? { season_number: 1, episode_number: 1, air_date: show.firstAirDate, name: 'Épisode 1' } : getUpcomingEpisodeInfo(show);
   if (!ep) return null;
-  return <UpcomingShowCardContent key={`${show.id}_${ep.season_number}x${ep.episode_number}`} show={show} ep={ep} onShowClick={onShowClick} onEpisodeClick={onEpisodeClick} actions={actions} compact={compact} ensureTracked={ensureTracked} />;
+  return <UpcomingShowCardContent key={`${show.mediaType}:${show.tmdbId}:${ep.season_number}x${ep.episode_number}`} show={show} ep={ep} onShowClick={onShowClick} onEpisodeClick={onEpisodeClick} actions={actions} compact={compact} ensureTracked={ensureTracked} />;
 });
 
 function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, actions, compact, ensureTracked }: Props & { ep: UpcomingEpisodeInfo }) {
