@@ -72,7 +72,7 @@ export function formatHistoryDayLabel(timestamp: number, now: number = Date.now(
 }
 
 export function formatHistoryRowDate(timestamp: number, now: number = Date.now()): string {
-  if (historyLocalDayKey(timestamp) === historyLocalDayKey(now)) return 'ce soir';
+  if (historyLocalDayKey(timestamp) === historyLocalDayKey(now)) return 'Aujourd’hui';
   return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(new Date(timestamp));
 }
 

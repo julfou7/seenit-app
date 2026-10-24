@@ -97,7 +97,6 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
   const seriesKey = seriesIds.join('\0');
   useEffect(() => { setSeriesOrder(seriesKey ? seriesKey.split('\0') : []); }, [seriesKey]);
   const series = seriesIds.flatMap(id => { const show = seriesById.get(id); return show ? [show] : []; });
-  const staleIds = new Set(groups[2].map(show => show.id));
   const sortedMovies = orderWatchMovies([...movieById.values()]);
   const orderedMovies = movieOrder ? [
     ...movieOrder.flatMap(id => { const show = movieById.get(id); return show ? [show] : []; }),
@@ -181,7 +180,7 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
         <header className="home-section-heading"><h2 id={`home-section-${index}`}><span className="home-section-name">{label}</span><span className="home-count">{items.length}</span></h2><HomeLayoutSwitch label={label} list={expanded} onChange={switchLayout} /></header>
         <div className={expanded ? 'home-series-list' : 'home-series-rail'} id={`home-series-${index}`}>
           {items.slice(0, limit).map(show => {
-            const card = <ContinueWatchingCard show={show} layout={expanded ? 'list' : 'rail'} animateSeen showStaleDetail={staleIds.has(show.id)} lastMarkedEpisode={retained[show.id]?.episode} onMarkUnseen={onUnseen} onMarkAsSeen={markSeries} onShowClick={onOpen} onEpisodeClick={onEpisode} actions={actions(show)} />;
+            const card = <ContinueWatchingCard show={show} layout={expanded ? 'list' : 'rail'} animateSeen showStaleDetail={index === 2} lastMarkedEpisode={retained[show.id]?.episode} onMarkUnseen={onUnseen} onMarkAsSeen={markSeries} onShowClick={onOpen} onEpisodeClick={onEpisode} actions={actions(show)} />;
             return expanded && index > 0 ? <HomeSwipeCard key={show.id} onArchive={() => actions(show).find(action => action.label.startsWith('Archiver'))?.onSelect()} onRemove={() => actions(show).find(action => action.destructive)?.onSelect()}>{card}</HomeSwipeCard> : <div key={show.id} className={arrivals.has(show.id) ? 'home-series-arrival' : undefined}>{card}</div>;
           })}
           {!expanded && <HomeLoadMore tile items={items.slice(limit)} onLoad={() => setRailLimits(previous => ({ ...previous, [index]: limit + HOME_PAGE_SIZE }))} />}

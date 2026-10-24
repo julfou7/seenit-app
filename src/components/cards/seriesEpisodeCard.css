@@ -122,3 +122,10 @@
 @media (prefers-reduced-motion:reduce) { .series-8f__status { animation:none; } }
 
 .series-8f[data-animated-badges="false"] .series-8f__status { animation: none; }
+
+/* Terrain221 : trois lignes pour les titres longs À venir, dans la géométrie commune. */
+.series-8f[data-context="upcoming"] .series-8f__text h3 { -webkit-line-clamp:3; font-size:clamp(13px,3.65vw,15px); line-height:1.18; }
+.series-8f[data-context="upcoming"] .series-8f__text { overflow:visible; }
+.series-8f[data-context="upcoming"] .series-8f__code { line-height:1.3; }
+
+.series-8f[data-context="upcoming"] .series-8f__text p { font-size:12px; line-height:1.25; }

@@ -64,7 +64,8 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
         onMarkSeen: resume.episode ? () => onMarkAsSeen(show) : undefined,
         onMarkUnseen: isUpToDate && lastMarkedEpisode && onMarkUnseen ? () => onMarkUnseen(show, lastMarkedEpisode) : undefined,
       }}
-      detail={freshnessBadge || staleDetail}
+      hideStatus={showStaleDetail}
+      detail={showStaleDetail ? staleDetail : freshnessBadge}
       providerLogo={getFormattedProviderLogo(providerLogo, providerName)} providerName={providerName}
       onOpen={() => { if (onShowClick) onShowClick(show.id, 'tv'); else openEpisode?.(); }}
       onOpenEpisode={openEpisode} actions={actions} layout={layout}

@@ -81,6 +81,20 @@ test('SEENIT-UX-014 les deux synchronisations conservent la finale avant de supp
     assert.equal(buildSeriesSeasonProgress(refreshed,{season_number:1,episode_number:1},'upcoming','2026-10-24').unknownTail,true);
   }
   ports.season.episodes = originalEpisodes;
+  // Terrain221: a valid v3 unknown proof was skipped forever after a past release.
+  ports.details.seasons[0].episode_count = 6;
+  ports.show = { ...show, isSynced:true, lastSyncedAt:Date.now(), nextEpisodeToWatch:{season_number:1,episode_number:2,air_date:'2026-01-01'}, seasonProgress:{'1':{
+    total_evidence_version:3,season_number:1,episode_count:null,known_episodes_in_season:6,season_total_unknown:true,last_season_number:1,last_known_episode_type:'standard',last_known_episode_air_date:null,
+  }} } as Show;
+  ports.writes.length=0;
+  await module.exports.performDetailsSync(false);
+  const terrainRepair=ports.writes.find(value=>value.seasonProgress);
+  assert.ok(terrainRepair,'Knight: la vraie synchronisation automatique doit revisiter une preuve v3 inconnue figée');
+  const terrainShow={...ports.show,...JSON.parse(JSON.stringify(terrainRepair))};
+  assert.equal(buildSeriesSeasonProgress(terrainShow,terrainShow.nextEpisodeToWatch,'watch','2026-10-24').totalUnknown,false);
+  ports.show=terrainShow;ports.writes.length=0;
+  await module.exports.performDetailsSync(false);
+  assert.equal(ports.writes.length,0,'aucune boucle après réparation');
   // Une installation existante doit être réparée sans pull-to-refresh, puis s'arrêter.
   for (const providerStatus of ['Returning Series', 'Ended', 'Canceled']) for (const oldFlag of [true, false]) {
   ports.details.status = providerStatus;

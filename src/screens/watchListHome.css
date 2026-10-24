@@ -95,10 +95,10 @@
 
 /* SPEC-DEV-V4 : same rhythm in the three panels. */
 .home-watchlist.pb-nav { padding-bottom:0; }
-.home-panel-content,.home-watch.watch-next-18c { padding:14px 16px 82px; }
+.home-panel-content,.home-watch.watch-next-18c { padding:14px 16px calc(84px + var(--seenit-safe-area-bottom,env(safe-area-inset-bottom,0px))); }
 .home-section-heading { height:40px; min-height:40px; margin:0 0 6px; }
-.home-section-heading h2,.home-watch .home-section-heading h2,.home-upcoming-group > h2,.history-period__heading { min-width:0; font-size:20px; font-weight:800; letter-spacing:-.025em; line-height:1; text-box:trim-both cap alphabetic; white-space:nowrap; color:#fff; }
-.home-section-heading h2 { height:40px; flex:1; display:flex; align-items:center; gap:8px; overflow:hidden; }.home-section-name { min-width:0; overflow:hidden; text-overflow:ellipsis; font-size:inherit !important; font-weight:inherit !important; color:inherit !important; }.home-count { flex-shrink:0; }
+.home-section-heading h2,.home-watch .home-section-heading h2,.home-upcoming-group > h2,.history-period__heading { min-width:0; font-size:clamp(16px,4.3vw,18px); font-weight:800; letter-spacing:-.025em; line-height:1.25; text-box:normal; white-space:normal; color:#fff; }
+.home-section-heading h2 { height:40px; flex:1; display:flex; align-items:center; gap:8px; overflow:visible; }.home-section-name { min-width:0; overflow:visible; overflow-wrap:normal; font-size:inherit !important; font-weight:inherit !important; color:inherit !important; }.home-count { flex-shrink:0; }
 .home-series-section { margin-bottom:28px; }.home-series-rail { gap:10px; margin-top:6px; padding-block:0; }.home-series-list { padding-top:0; margin-top:6px; gap:14px; }.home-series-rail > div { flex:0 0 auto; }
 .home-upcoming-group { padding:0; margin-bottom:28px; }.home-upcoming-group > h2 { display:flex; align-items:center; height:40px; margin:0 0 12px; }.home-upcoming-group .series-8f-host + .series-8f-host { margin-top:14px; }
 .home-swipe__actions { top:20px; }.home-swipe__card { min-height:170px; }
@@ -107,3 +107,7 @@
 .home-movie-order { margin-top:0; }.home-movie-list { margin:6px 0 28px; }.home-watch .movie-ticket-rail { margin-top:6px; margin-bottom:28px; padding-top:0; }
 
 .home-watch .home-section-heading h2 { align-items:center; }
+
+.home-watch > .home-series-section:last-child,.home-upcoming-group:last-child { margin-bottom:0; }
+
+.home-watch > .movie-ticket-rail:last-child,.home-watch > .home-movie-list:last-child { margin-bottom:0; }

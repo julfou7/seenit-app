@@ -193,6 +193,8 @@ en PWA et APK et un toast navigable s'active au clavier avec Entrée/Espace (`SE
 
 ## 5. Écran « À Voir »
 
+Le retour terrain221 impose des titres de section homogènes16–18px non rognés dans les trois panneaux, une réserve basse incluant la zone système, aucun badge dans les anciennes séries et des titres longs lisibles. La frise affiche les heures locales de visionnage réellement connues, jamais « ce soir » à la place d’une heure. Les rappels réagissent immédiatement avec confirmation/échec explicite.
+
 L’écran comporte trois panneaux indépendants **À regarder**, **À venir** et **Historique**. Le scroll
 ne change jamais d’onglet ; aucun swipe ne navigue entre panneaux. Le header `seenit●` conserve l’état
 de synchronisation et ouvre les Notifications avec une cloche et un point or si non lu. La feuille réunit

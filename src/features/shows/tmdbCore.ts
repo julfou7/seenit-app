@@ -48,15 +48,15 @@ export function isMovieAtCinema(media: unknown): boolean {
   return hasFrenchTheatricalCinemaEvidence(candidate);
 }
 
-const withoutDetailRecommendations = (details: any) => {
+const withoutDetailRecommendations = <T extends { similar?: unknown; recommendations?: unknown }>(details: T) => {
   if (!details) return details;
   const { similar: _similar, recommendations: _recommendations, ...rest } = details;
   return rest;
 };
 
 const originalGetShowDetails = tmdbClient.getShowDetails.bind(tmdbClient);
-tmdbClient.getShowDetails = (async (id: number) => {
-  const result = await originalGetShowDetails(id);
+tmdbClient.getShowDetails = (async (id: number, refresh = false) => {
+  const result = await originalGetShowDetails(id, refresh);
   if (!result.ok || !result.value) return result;
   const details = withoutDetailRecommendations(result.value);
   convergeTrackedMediaTitleFromTmdb('tv', Number(id), details);

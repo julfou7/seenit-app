@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { buildSeasonProgressEvidence } from '../../src/features/shows/seasonProgressEvidence';
 import { createElement } from 'react';
 import * as base from './watchNext18cRuntime';
 import type { Show } from '../../src/types';
@@ -8,7 +9,7 @@ export const openPlexWatchUrl = async () => { base.telemetry.opens.push('plex');
 export const auth = { currentUser: { uid: 'fixture-a' }, onAuthStateChanged: (callback: (user: {uid: string}) => void) => { callback(auth.currentUser); return () => {}; } };
 export const onAuthStateChanged = (_auth: unknown, callback: (user: {uid: string}) => void) => auth.onAuthStateChanged(callback);
 const date = (days: number) => { const value = new Date(); value.setDate(value.getDate() + days); return `${value.getFullYear()}-${String(value.getMonth()+1).padStart(2,'0')}-${String(value.getDate()).padStart(2,'0')}`; };
-const extra: Show[] = [0, 3, 12].map((days, index) => ({ ...base.initialShows[0], id: `upcoming-${index}`, title: ['Sortie du jour', 'Épisode cette semaine', 'Sortie plus tard'][index], notificationsEnabled: true, nextEpisodeToAir: { season_number: 2, episode_number: 1, name: 'Un nouvel épisode', air_date: date(days) }, nextEpisodeToWatch: null }));
+const extra: Show[] = [0, 3, 12].map((days, index) => ({ ...base.initialShows[0], id: `upcoming-${index}`, title: ['Sortie du jour', 'Épisode cette semaine', 'Sortie plus tard'][index], notificationsEnabled: false, nextEpisodeToAir: { season_number: 2, episode_number: 1, name: 'Un nouvel épisode', air_date: date(days) }, nextEpisodeToWatch: null }));
 const history: Show[] = Array.from({ length: 12 }, (_, index) => ({ ...base.initialShows.find(show => show.id === 'movie-0')!, id: `history-${index}`, title: `Film vu ${index+1}`, status: 'completed', seenEpisodes: ['movie'], episodeRecords: { movie: { watchedAt: Date.now()-index*60_000 } } }));
 base.useShowsStore.setState({ shows: [...base.initialShows, ...extra, ...history] });
 base.usePlexAvailabilityStore.setState({ cache: {
@@ -25,9 +26,13 @@ export const orderBy = (...args: unknown[]) => args;
 export const limit = (count: number) => count;
 export const getDocs = async () => ({ docs: [{ id: 'news-1', data: () => ({ showId: 'series-0', message: 'Nouvelle saison annoncée' }) }] });
 export const getDoc = async () => ({ exists: () => true, data: () => ({ readNewsIds: [] }) });
-export const setDoc = async () => {};
-export const deleteDoc = async () => {};
-export const requestNotificationPermission = async () => 'fixture-token';
+export const reminderControl = { holdPermission:false, failWrite:false, permissionCalls:0, release:()=>{} };
+export const setDoc = async (path:string[],payload:Record<string,unknown>) => {
+ if (reminderControl.failWrite && path.includes('reminders')) { reminderControl.failWrite=false; throw new Error('fixture reminder write failed'); }
+ base.telemetry.writes.push({path,payload});
+};
+export const deleteDoc = async (path:string[]) => { base.telemetry.writes.push({path,payload:{deleted:true}}); };
+export const requestNotificationPermission = async () => { reminderControl.permissionCalls++; if(reminderControl.holdPermission) await new Promise<void>(resolve=>{reminderControl.release=resolve;}); return 'fixture-token'; };
 export const sendNativeNotification = async () => {};
 export const EpisodeDetailModal = () => createElement('div', null, 'Fiche épisode');
 export const PersonDetailModal = () => null;
@@ -39,4 +44,8 @@ export const tmdb = { ...base.tmdb,
 
 export function addProgressExamples() {
   base.useShowsStore.setState(state=>({shows:[...state.shows,...[1,6].map(count=>({...base.initialShows[0],id:`upcoming-count-${count}`,tmdbId:300+count,title:count===1?'Harry Potter':'A Knight of the Seven Kingdoms',seenEpisodes:[],episodeRecords:{},seasonProgress:undefined, nextEpisodeToWatch:null,nextEpisodeToAir:{season_number:1,episode_number:1,episode_count:count,air_date:date(12)}})),{...base.initialShows.find(show=>show.id==='movie-0')!,id:'upcoming-collection',tmdbId:303,title:'Sans un bruit 3',firstAirDate:date(12)}]}));
+}
+
+export function terrain221Examples() {
+ base.useShowsStore.setState(state=>({shows:state.shows.map(show=>show.id==='series-0'?{...show,title:'A Knight of the Seven Kingdoms',seenEpisodes:['1x1'],seriesEnded:false,seasonProgress:buildSeasonProgressEvidence([{season_number:1,episode_count:6}],false),nextEpisodeToWatch:{...show.nextEpisodeToWatch,name:'Bœuf salé',episode_count:6,season_total_unknown:true}}:show.id==='movie-0'?{...show,title:'Vaiana, la légende du bout du monde'}:show.id==='upcoming-2'?{...show,title:'Le Seigneur des anneaux : Les Anneaux de Pouvoir',nextEpisodeToAir:{...show.nextEpisodeToAir,name:'Le prix de la lumière'}}:show.id==='history-0'?{...show,title:'A Knight of the Seven Kingdoms',mediaType:'tv',seenEpisodes:['1x1'],episodeRecords:{'1x1':{episodeTitle:'Le chevalier errant',watchedAt:new Date(new Date(Date.now()).setHours(8,13,0,0)).getTime(),watchedTimeKnown:true}}}:show)}));
 }

@@ -44,7 +44,7 @@ async function testProviderHarness(client, root) {
     await check(client, 'document.getElementById("login")', 'fixture montée');
     await evaluate(client, 'window.IntersectionObserver = undefined; document.getElementById("login").click()');
     await check(client, 'document.querySelector("#card-tv img") && window.__provider337.telemetry.reads === 1', 'cartes montées avant hydratation cloud');
-    await check(client, 'document.querySelector("#card-stale .series-8f__text").textContent.includes("⏳ 12 sem.") && !document.querySelector("#card-new-season .series-8f__text").textContent.includes("⏳ 12 sem.")', 'la récence est réservée à la section des séries anciennes, sans contaminer une nouvelle saison');
+    await check(client, 'document.querySelector("#card-stale .series-8f__text").textContent.includes("Pas vu depuis") && !document.querySelector("#card-stale .series-8f__status") && !document.querySelector("#card-new-season .series-8f__text").textContent.includes("Pas vu depuis")', 'les anciennes séries gardent un texte discret sans aucun badge, sans contaminer une nouvelle saison');
     await client.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
     await check(client,'getComputedStyle(document.querySelector("#card-hot .series-8f__status")).animationName==="sbPulse"','badge chaud animé par défaut');
     await evaluate(client,'window.__provider337.setBadges(false)');

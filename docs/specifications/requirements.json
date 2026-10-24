@@ -2120,6 +2120,10 @@
       ],
       "tests": [
         {
+          "file": "tests/homeTerrain221.test.ts",
+          "contains": "SEENIT-UX-014 la façade TMDB répare un total malgré ses caches chauds"
+        },
+        {
           "file": "tests/homeV4.test.ts",
           "contains": "SEENIT-UX-014 film 3"
         },
@@ -2221,6 +2225,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/homeTerrain221.test.ts",
+          "contains": "SEENIT-UX-015 affiche le jour et la vraie heure sans ce soir ni heure inventée"
+        },
         {
           "file": "tests/homeV4.test.ts",
           "contains": "SEENIT-UX-015 saison entière"
