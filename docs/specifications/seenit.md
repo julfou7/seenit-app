@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.220**
+Version applicative : **1.4.221**
 Plateformes : **PWA Web** et **APK Android Capacitor**  
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
