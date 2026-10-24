@@ -1,5 +1,6 @@
 const http = require('node:http');
 const { spawn } = require('node:child_process');
+const { gzipSync } = require('node:zlib');
 
 const child = spawn(process.execPath, ['build/server.cjs'], {
   env: {
@@ -27,9 +28,16 @@ child.once('exit', code => {
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-function requestHealth() {
+function requestHealth(body, contentType) {
   return new Promise((resolve, reject) => {
-    const req = http.get('http://127.0.0.1:3000/api/health', { timeout: 1500 }, res => {
+    const req = http.request('http://127.0.0.1:3000/api/health', {
+      timeout: 1500,
+      ...(body ? { headers: {
+        'Content-Type': contentType,
+        'Content-Encoding': 'gzip',
+        'Content-Length': body.length
+      } } : {})
+    }, res => {
       const chunks = [];
       res.on('data', chunk => chunks.push(chunk));
       res.on('end', () => {
@@ -43,6 +51,7 @@ function requestHealth() {
     });
     req.on('timeout', () => req.destroy(new Error('health timeout')));
     req.on('error', reject);
+    req.end(body);
   });
 }
 
@@ -68,7 +77,21 @@ async function stopChild() {
         && health.body?.identity === 'canonical'
         && String(health.headers['x-seenit-backend'] || '').toLowerCase() === 'canonical'
       ) {
+        // GHSA-27r3-jxmh-p828: exercise the real production middleware in an
+        // isolated process, including bytes delivered after the gzip frame.
+        for (const [contentType, payload] of [
+          ['application/json', '{"probe":true}'],
+          ['application/x-www-form-urlencoded', 'probe=true']
+        ]) {
+          const body = Buffer.concat([gzipSync(payload), Buffer.from([0]), Buffer.alloc(100 * 1024, 0x58)]);
+          const compressed = await requestHealth(body, contentType);
+          if (compressed.statusCode !== 200) throw new Error(`corps compressé refusé: ${contentType}`);
+          await sleep(200);
+          const after = await requestHealth();
+          if (exited || after.statusCode !== 200) throw new Error(`serveur arrêté après ${contentType}`);
+        }
         console.log('[BackendProductionSmoke] build/server.cjs démarre et /api/health est canonique.');
+        console.log('[BackendProductionSmoke] JSON/formulaire compressés avec octets résiduels: processus conservé.');
         await stopChild();
         process.exit(0);
       }
