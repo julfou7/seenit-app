@@ -21,6 +21,7 @@ import {
 } from './parentalRating';
 import { getParentalRatingOverride, getParentalRatingOverridesSnapshot } from '../../store/parentalRatingStore';
 import { convergeTrackedMediaTitleFromTmdb } from './trackedMediaTitle';
+import { convergeTrackedSeasonProgress } from './trackedSeasonProgress';
 import { mediaKeyFrom } from './mediaRelations';
 import { getTVDBFranchiseRelation } from '../../services/tvdb';
 import { readWatchProviderCache, writeWatchProviderCache } from '../providers/watchProviderCache';
@@ -69,6 +70,15 @@ tmdbClient.getShowDetails = (async (id: number, refresh = false) => {
 }) as typeof tmdbClient.getShowDetails;
 
 const originalGetMovieDetails = tmdbClient.getMovieDetails.bind(tmdbClient);
+const originalGetSeasonDetails = tmdbClient.getSeasonDetails.bind(tmdbClient);
+tmdbClient.getSeasonDetails = (async (id: number, seasonNumber: number, refresh = false) => {
+  const result = await originalGetSeasonDetails(id, seasonNumber, refresh);
+  if (result.ok && result.value) {
+    const details = tmdbClient.peekMediaDetails(id, 'tv');
+    if (details) convergeTrackedSeasonProgress(Number(id), details, result.value);
+  }
+  return result;
+}) as typeof tmdbClient.getSeasonDetails;
 tmdbClient.getMovieDetails = (async (id: number) => {
   const result = await originalGetMovieDetails(id);
   if (result.ok && result.value) {
@@ -144,7 +154,7 @@ const resolveExactTmdbCollection = async (media: any, mediaType: 'tv' | 'movie')
   if (!result.ok || !Array.isArray(result.value?.parts)) return [];
 
   const parts = result.value.parts
-    .filter((part: any) => Number.isInteger(Number(part?.id)) && Number(part.id) > 0 && !isAdultOrParodyMedia(part))
+    .filter((part: { id?: unknown }) => Number.isInteger(Number(part?.id)) && Number(part.id) > 0 && !isAdultOrParodyMedia(part))
     .map((part: any) => ({ ...part, id: Number(part.id), media_type: 'movie' as const }))
     .sort((left: any, right: any) => {
       const leftDate = String(left.release_date || '9999-12-31');

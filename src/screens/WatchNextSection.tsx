@@ -45,21 +45,21 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
   const preserveLayout = useCardLayoutAnchor();
   const [railLimits, setRailLimits] = useState<Record<number, number>>({});
   const [movieRailLimit, setMovieRailLimit] = useState(HOME_PAGE_SIZE);
-  const revealAnchor = useRef<{ rail: string; attribute: string; id: string } | null>(null);
+  const revealAnchor = useRef<{ rail: string; left: number; top: number } | null>(null);
+  const rememberReveal = (id: string) => { const rail = document.getElementById(id); if (rail) { rail.style.scrollSnapType = 'none'; revealAnchor.current = { rail: id, left: rail.scrollLeft, top: window.scrollY }; } };
   useLayoutEffect(() => {
     const anchor = revealAnchor.current;
     if (!anchor) return;
     revealAnchor.current = null;
     const rail = document.getElementById(anchor.rail);
-    const item = rail && [...rail.querySelectorAll<HTMLElement>(`[${anchor.attribute}]`)].find(element => element.getAttribute(anchor.attribute) === anchor.id);
-    if (!rail || !item) return;
-    const previousSnap = rail.style.scrollSnapType;
-    rail.style.scrollSnapType = 'none';
-    const target = rail.scrollLeft + item.getBoundingClientRect().left - rail.getBoundingClientRect().left - (parseFloat(getComputedStyle(rail).scrollPaddingInlineStart) || 16);
+    if (!rail) return;
     const oldTail = parseFloat(rail.style.getPropertyValue('--layout-anchor-tail')) || 0;
-    rail.style.setProperty('--layout-anchor-tail', `${Math.max(0, target - (rail.scrollWidth - rail.clientWidth - oldTail))}px`);
-    rail.scrollLeft = target;
-    requestAnimationFrame(() => { rail.style.scrollSnapType = previousSnap; });
+    rail.style.setProperty('--layout-anchor-tail', `${Math.max(0, anchor.left - (rail.scrollWidth - rail.clientWidth - oldTail))}px`);
+    rail.scrollLeft = anchor.left;
+    // Re-snap only on the next deliberate gesture, never while replacing the tile.
+    const resumeSnap = () => { rail.style.scrollSnapType = ''; rail.removeEventListener('pointerdown', resumeSnap); rail.removeEventListener('wheel', resumeSnap); };
+    rail.addEventListener('pointerdown', resumeSnap, { once: true });
+    rail.addEventListener('wheel', resumeSnap, { once: true, passive: true });
   }, [railLimits, movieRailLimit]);
   const [expandedGroups, setExpandedGroups] = useState<Record<number, boolean>>({});
   const [groupLimits, setGroupLimits] = useState<Record<number, number>>({});
@@ -200,7 +200,7 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
             const card = <ContinueWatchingCard show={show} layout={expanded ? 'list' : 'rail'} animateSeen showStaleDetail={index === 2} lastMarkedEpisode={retained[show.id]?.episode} onMarkUnseen={onUnseen} onMarkAsSeen={markSeries} onShowClick={onOpen} onEpisodeClick={onEpisode} actions={actions(show)} />;
             return expanded && index > 0 ? <HomeSwipeCard key={show.id} onArchive={() => actions(show).find(action => action.label.startsWith('Archiver'))?.onSelect()} onRemove={() => actions(show).find(action => action.destructive)?.onSelect()}>{card}</HomeSwipeCard> : <div key={show.id} className={arrivals.has(show.id) ? 'home-series-arrival' : undefined}>{card}</div>;
           })}
-          {!expanded && <HomeLoadMore tile items={items.slice(limit)} onLoad={() => { revealAnchor.current = { rail: `home-series-${index}`, attribute: 'data-series-id', id: items[limit].id }; setRailLimits(previous => ({ ...previous, [index]: limit + HOME_PAGE_SIZE })); }} />}
+          {!expanded && <HomeLoadMore tile items={items.slice(limit)} onLoad={() => { rememberReveal(`home-series-${index}`); setRailLimits(previous => ({ ...previous, [index]: limit + HOME_PAGE_SIZE })); }} />}
         </div>
         {expanded && <HomeLoadMore items={items.slice(limit)} onLoad={() => setGroupLimits(previous => ({ ...previous, [index]: limit + HOME_PAGE_SIZE }))} />}
       </section>;
@@ -212,7 +212,7 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
       <p className="home-movie-order">Ajouts les plus récents</p>
       <div className={movieList ? 'home-movie-list' : 'movie-ticket-rail'} id="films-a-voir-18c">
         {orderedMovies.slice(0, movieList ? movieCount : movieRailLimit).map(show => <MovieTicketCard key={show.id} show={show} layout={movieList ? 'horizontal' : 'poster'} start={start} onOpen={onOpen} onToggle={toggleMovie} onRuntime={onRuntime} actor={selectTicketActor(actorMetadata.get(`movie:${show.tmdbId}`) || tmdb.peekRenderableMediaDetails(show.tmdbId, 'movie'), favorites, actorIndex)} onActor={actor => setActorSheet({ actor, origin: show })} />)}
-        {!movieList && <HomeLoadMore tile items={orderedMovies.slice(movieRailLimit)} onLoad={() => { revealAnchor.current = { rail: 'films-a-voir-18c', attribute: 'data-movie-ticket', id: orderedMovies[movieRailLimit].id }; setMovieRailLimit(count => count + HOME_PAGE_SIZE); }} />}
+        {!movieList && <HomeLoadMore tile items={orderedMovies.slice(movieRailLimit)} onLoad={() => { rememberReveal('films-a-voir-18c'); setMovieRailLimit(count => count + HOME_PAGE_SIZE); }} />}
       </div>
       {movieList && <HomeLoadMore items={orderedMovies.slice(movieCount)} onLoad={() => setMovieCount(count => count + HOME_PAGE_SIZE)} />}
     </>}

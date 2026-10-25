@@ -6,6 +6,7 @@ import { buildSeasonProgressEvidence, needsSeasonProgressRefresh } from '../src/
 import { formatHistoryClock, formatHistoryRowDate } from '../src/features/history/historyPresentation.ts';
 
 test('SEENIT-UX-014 réévalue les totaux inconnus sans polling ni boucle de migration', () => {
+  assert.equal(needsSeasonProgressRefresh({ nextEpisodeToWatch: { season_number:1, episode_number:1, episode_count:1 } }),true,'les anciennes fiches sans preuve ni flag sont réparées sans ouverture du détail');
   const old = { ...buildSeasonProgressEvidence([{ season_number:1, episodes:[{episode_number:6}] }], false)['1'] };
   delete old.total_checked_at;
   assert.equal(needsSeasonProgressRefresh({seasonProgress:{'1':old}}),true);

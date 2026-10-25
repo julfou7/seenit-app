@@ -124,3 +124,11 @@
 .home-sync-sheet__metrics { background:#09090b80; border-radius:14px; overflow:hidden; margin:12px 0; }.home-sync-sheet__metrics > div { display:flex; justify-content:space-between; gap:10px; padding:12px; border-bottom:1px solid #ffffff0a; font-size:12px; }.home-sync-sheet__metrics dt { color:#f4f4f5; font-weight:700; }.home-sync-sheet__metrics dd { color:#f2c36b; text-align:right; }
 .home-sync-sheet h3 { font-size:12px; font-weight:700; color:#a1a1aa; }.home-sync-sheet__servers { list-style:none; padding:0; display:grid; gap:8px; margin:8px 0 12px; }.home-sync-sheet__servers li { padding:12px; background:#09090b80; border-radius:12px; font-size:12px; }.home-sync-sheet__servers strong { color:#f4f4f5; }.home-sync-sheet__servers small { color:#a1a1aa; margin-left:6px; }.home-sync-sheet__servers span { float:right; color:#f2c36b; }.home-sync-sheet__servers i { display:block; height:3px; background:#3f3f46; margin-top:8px; border-radius:2px; }.home-sync-sheet__servers i[data-complete="true"] { background:#e5a93d; }
 .home-sync-sheet__pause { width:100%; min-height:44px; margin-top:10px; border-radius:15px; box-shadow:inset 0 0 0 1px #ffffff29; color:#fff; font-size:13px; font-weight:700; }
+
+/* Terrain223: centered within the usable viewport, long reports scroll inside. */
+.home-sync-dialog { align-items:center; }
+.home-sync-sheet { max-height:100%; overflow-y:auto; overscroll-behavior:contain; padding-bottom:20px; }
+.home-sync-sheet header { position:sticky; top:-20px; z-index:2; padding-block:10px; background:#141417; }
+.home-sync-sheet__servers li { flex-wrap:wrap; }
+.home-sync-ring svg { display:block; }
+.home-wordmark img { display:block; width:148px; height:auto; }

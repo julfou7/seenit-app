@@ -29,102 +29,115 @@
       "path": "public/icon-192.png",
       "width": 192,
       "height": 192,
-      "sha256": "c699ecde360f699dea84ed8c7630d6eb2be0d7561c8ec58cc79c9158fdcdf20e"
+      "sha256": "e5198c24e2527016179ae299a28d972afe5a730f2d4631e7248749c609f73d01"
     },
     {
       "path": "public/icon-512.png",
       "width": 512,
       "height": 512,
-      "sha256": "c11883707e718847e8c08f0700e967d9d281b306667cac9371a8c74c09a549e6"
+      "sha256": "830830df0c1bb04bb87e3f45becf77af141c76734b4182231d9cb22acf117947"
     },
     {
       "path": "public/icon-maskable-192.png",
       "width": 192,
       "height": 192,
-      "sha256": "c699ecde360f699dea84ed8c7630d6eb2be0d7561c8ec58cc79c9158fdcdf20e"
+      "sha256": "e5198c24e2527016179ae299a28d972afe5a730f2d4631e7248749c609f73d01"
     },
     {
       "path": "public/icon-maskable-512.png",
       "width": 512,
       "height": 512,
-      "sha256": "c11883707e718847e8c08f0700e967d9d281b306667cac9371a8c74c09a549e6"
+      "sha256": "830830df0c1bb04bb87e3f45becf77af141c76734b4182231d9cb22acf117947"
     },
     {
       "path": "android/app/src/main/res/mipmap-mdpi/ic_launcher.png",
       "width": 48,
-      "height": 48
+      "height": 48,
+      "sha256": "3f73ac01411dd20d71e5183fa663d7876a93ec46df8739f9aa7e536ee8b3502e"
     },
     {
       "path": "android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png",
       "width": 48,
-      "height": 48
+      "height": 48,
+      "sha256": "3f73ac01411dd20d71e5183fa663d7876a93ec46df8739f9aa7e536ee8b3502e"
     },
     {
       "path": "android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png",
       "width": 108,
-      "height": 108
+      "height": 108,
+      "sha256": "c0ef10e5edf49d7e964415c70f30515c80c787be3ddb1957bceeef35ca6ba31c"
     },
     {
       "path": "android/app/src/main/res/mipmap-hdpi/ic_launcher.png",
       "width": 72,
-      "height": 72
+      "height": 72,
+      "sha256": "6dddc7f16527920c4df8c4773947f3a8c45a19960684710e5e37e22b85efc606"
     },
     {
       "path": "android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png",
       "width": 72,
-      "height": 72
+      "height": 72,
+      "sha256": "6dddc7f16527920c4df8c4773947f3a8c45a19960684710e5e37e22b85efc606"
     },
     {
       "path": "android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png",
       "width": 162,
-      "height": 162
+      "height": 162,
+      "sha256": "243fc924127212954f0ea6fc100f26641a304f1b4e027d2aca25bffa5e045acd"
     },
     {
       "path": "android/app/src/main/res/mipmap-xhdpi/ic_launcher.png",
       "width": 96,
-      "height": 96
+      "height": 96,
+      "sha256": "a4a1cf487d89a06806ca7968a8653495d58a91fdf9034f7d07d9a2f6d9879dd3"
     },
     {
       "path": "android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png",
       "width": 96,
-      "height": 96
+      "height": 96,
+      "sha256": "a4a1cf487d89a06806ca7968a8653495d58a91fdf9034f7d07d9a2f6d9879dd3"
     },
     {
       "path": "android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png",
       "width": 216,
-      "height": 216
+      "height": 216,
+      "sha256": "787a8d1dcbdb5409403f639e38f4a795c2da6582a161bd471e99bd7f481c1660"
     },
     {
       "path": "android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png",
       "width": 144,
-      "height": 144
+      "height": 144,
+      "sha256": "3054d71e5b958b13763fe9efb939927bd38fc32fa1cbbe66cc25801c4e28b394"
     },
     {
       "path": "android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png",
       "width": 144,
-      "height": 144
+      "height": 144,
+      "sha256": "3054d71e5b958b13763fe9efb939927bd38fc32fa1cbbe66cc25801c4e28b394"
     },
     {
       "path": "android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png",
       "width": 324,
-      "height": 324
+      "height": 324,
+      "sha256": "56a29ebe77dc84d9e1d2aa8b42f13535758e72dbb2670e18b00bca18f988cf4d"
     },
     {
       "path": "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
       "width": 192,
       "height": 192,
-      "sha256": "c699ecde360f699dea84ed8c7630d6eb2be0d7561c8ec58cc79c9158fdcdf20e"
+      "sha256": "e5198c24e2527016179ae299a28d972afe5a730f2d4631e7248749c609f73d01"
     },
     {
       "path": "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png",
       "width": 192,
       "height": 192,
-      "sha256": "c699ecde360f699dea84ed8c7630d6eb2be0d7561c8ec58cc79c9158fdcdf20e"
+      "sha256": "e5198c24e2527016179ae299a28d972afe5a730f2d4631e7248749c609f73d01"
     },
     {
       "path": "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png",
       "width": 432,
-      "height": 432
+      "height": 432,
+      "sha256": "3b6dfc0d3a3f1cb38643cac7ca027eb915f50590b7352fa4b65d3cbdb141a64b"
     }
   ],
   "requiredFiles": [
@@ -135,7 +148,8 @@
     "android/app/src/main/java/com/seenit/app/SeenItMessagingService.java",
     "android/app/src/main/java/com/seenit/app/PlexAvailabilityWorker.java",
     "android/app/src/main/java/com/seenit/app/PlexBackgroundCredentialStore.java",
-    "android/app/src/main/java/com/seenit/app/SeenItPlexBackgroundPlugin.kt"
+    "android/app/src/main/java/com/seenit/app/SeenItPlexBackgroundPlugin.kt",
+    "android/app/src/main/res/drawable/ic_launcher_monochrome.xml"
   ],
   "requiredPermissions": [
     "android.permission.INTERNET",

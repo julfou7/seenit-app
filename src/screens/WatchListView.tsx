@@ -90,7 +90,7 @@ export function WatchListView({ model }: WatchListViewProps) {
   return (
     <div id="watchlist-container" className="home-watchlist flex-1 overflow-y-auto text-white pb-nav">
       <header className="home-header">
-        <div className="home-header__top"><span className="home-wordmark" aria-label="SeenIt">seen<span className="home-wordmark__accent">it</span><i aria-hidden="true" /></span>
+        <div className="home-header__top"><span className="home-wordmark"><img src="/brand/seenit-logo-sombre.svg" alt="SeenIt" width="148" height="48" /></span>
           <div className="home-header__tools"><HomeSyncIndicator /><HomeNotifications key={auth.currentUser?.uid || 'anonymous'} shows={allShows} onOpen={onShowClick} onSeen={show => show.mediaType === 'movie' ? markMovieAsSeen(show) : markNextEpisodeAsSeen(show)} /></div>
         </div>
         <div className="home-tabs" role="tablist" aria-label="À voir">

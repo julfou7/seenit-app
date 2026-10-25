@@ -2,7 +2,7 @@
 
 Dernière mise à jour : 23 octobre 2026
 Version applicative : **1.4.223**
-Plateformes : **PWA Web** et **APK Android Capacitor**  
+Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
 ## 1. Vision produit
@@ -1783,6 +1783,10 @@ Les consignes terrain priment sur V4 : titres de section homogènes uniquement d
 
 La preuve de total inconnu est réévaluée une fois après migration, puis au maximum après sept jours (`total_checked_at`). La lecture de réparation traverse les caches TV mémoire/disque pour obtenir la valeur fournisseur : une panne ne devient pas une nouvelle preuve fraîche et ne modifie pas la donnée connue. Les totaux déjà connus ne provoquent aucune nouvelle lecture de réparation. L’historique du jour affiche seulement l’heure sous son groupe Aujourd’hui, les autres jours gardent date et heure ; une heure absente reste explicitement inconnue.
 
+
+### Marque v3 et terrain223 — 25 octobre 2026
+
+La [marque v3 et le terrain223](../design/marque-2026-10-25.md) remplacent les anciens emblèmes écran par l’anneau fourni, y compris launcher/PWA et notifications autorisés explicitement. SEENIT-APK-001 conserve package, signature, données et deep links ; seules les empreintes des actifs changent. SEENIT-UX-014/018 : Afficher plus remplace la tuile sans modifier aucun scroll ; rubans contenus dans l’affiche ; détail et cartes partagent les preuves compactes de total/diffusion reçues par les façades de production, sans total déduit d’une liste partielle. SEENIT-UX-015 : date réelle sans « ce soir », ×N en ruban diagonal, heure sous Vu. SEENIT-UX-009 : anneau/coche commun animé après succès, réduction des animations respectée. Dialogue Plex centré, borné au viewport et défilable.
 
 ### Accueil — handoff badges/historique du 24 octobre 2026 et retour terrain222
 

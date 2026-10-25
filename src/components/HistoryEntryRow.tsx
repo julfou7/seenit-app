@@ -1,3 +1,4 @@
+import './cards/seriesEpisodeCard.css';
 import { SeenItCheckButton } from './SeenItCheckButton';
 import { Capacitor } from '@capacitor/core';
 import { dominantPosterHue, POSTER_HUE_FALLBACK, readPosterHue, rememberPosterHue } from '../features/watchlist/posterHue';
@@ -44,7 +45,7 @@ export function HistoryEntryRow({ title, episodeTitle, code, date, clock, today,
       onKeyDown={event => { if (event.key === 'ContextMenu' || event.shiftKey && event.key === 'F10') { event.preventDefault(); setMenu(true); } }} />
       <div className="history-entry__image" aria-hidden="true"><span>{title.split(/\s+/).slice(0, 2).map(word => word[0]).join('')}</span>
         {candidates[imageIndex] && <img src={imageUrl(candidates[imageIndex], 'w300')!} alt="" loading="lazy" crossOrigin={seriesCardPosterCrossOrigin(imageUrl(candidates[imageIndex], 'w300'), Capacitor.isNativePlatform())} onLoad={event => { try { const canvas = document.createElement('canvas'); canvas.width = 8; canvas.height = 8; const context = canvas.getContext('2d', { willReadFrequently: true }); if (context) { context.drawImage(event.currentTarget, 0, 0, 8, 8); const value = dominantPosterHue(context.getImageData(0, 0, 8, 8).data); rememberPosterHue(candidates[imageIndex], value); setHue(value); } } catch { /* Le poster sans CORS garde la teinte de secours. */ } }} onError={() => setImageIndex(index => index + 1)} />}
-        {groupCount > 1 && <b className="history-entry__group">×{groupCount}</b>}
+        {groupCount > 1 && <b className="series-ribbon series-ribbon--remaining history-entry__group">×{groupCount}</b>}
       </div>
       <div className="history-entry__text"><h3>{title}</h3><div>{code && <><strong>{code}</strong><span> · </span></>}<time dateTime={new Date(timestamp).toISOString()}>{date}</time></div>{episodeTitle && <p>{episodeTitle}</p>}</div>
       <div className="history-entry__action-column"><SeenItCheckButton isWatched title={`Vu ${date} à ${clock} · actions de ${title}`} onClick={() => setMenu(true)} /><time dateTime={new Date(timestamp).toISOString()}>{clock}</time></div>

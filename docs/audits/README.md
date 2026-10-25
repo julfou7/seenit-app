@@ -43,6 +43,8 @@ rapport existant et son historique.
 | AUDIT-2026-10-14-GCP-FINOPS | 2026-10-14 | 1.4.208 (`7c6ba27`) | fraîcheur des agrégats Cloud Run, egress et reprise GitHub | [Audit FinOps de reprise](./audit-finops-gcp-2026-10-14.md) | [#23](https://github.com/julfou7/seenit-app/issues/23), [#506](https://github.com/julfou7/seenit-app/issues/506) |
 | AUDIT-2026-10-21-VITE | 2026-10-21 | 1.4.211 (`bbe88b67`) | trois avis launch-editor/Vite, audit npm production et blocage de candidate APK | [Audit Vite ciblé](./dependency-vite-2026-10-21.md) | [#695](https://github.com/julfou7/seenit-app/issues/695), PR #696 |
 
+Terrain223 / marque v3 : [comparaison et preuves](./terrain223-marque-2026-10-25.md), baseline79a1fad1, #729/#741.
+
 L'audit historique des téléchargements antérieur à ce protocole reste disponible dans
 [`../audit-telechargements-2026-08-30.md`](../audit-telechargements-2026-08-30.md). Ses corrections
 déjà livrées sont couvertes par les exigences `SEENIT-DOWNLOAD-*` et leurs tests.

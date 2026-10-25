@@ -141,3 +141,6 @@
 @media(prefers-reduced-motion:reduce) { .series-ribbon { animation:none; } }
 
 .series-8f__days:disabled { opacity:1; cursor:progress; }
+
+/* Text runs between the two poster edges, including the longest label. */
+.series-ribbon { width:140px; top:23px; left:-33px; transform:rotate(-38deg); font-size:9px; letter-spacing:.025em; padding:3px 0; }

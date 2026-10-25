@@ -193,7 +193,7 @@ function HistoryRowItem({
   ];
   const grouped = row.members.length > 1;
   const clock = formatHistoryClock(item.watchedAt, item.watchedTimeKnown);
-  const dateLabel = historyLocalDayKey(item.watchedAt) === localTodayKey() ? 'ce soir' : formatHistoryRowDate(item.watchedAt);
+  const dateLabel = formatHistoryRowDate(item.watchedAt);
   const historyActions = grouped ? [{ label: 'Ouvrir la série', onSelect: () => onShowClick?.(item.showId, 'tv') }] : actionsFor(item);
   const actionGroups = grouped ? [...row.members].reverse().map(target => ({ label: `S${String(target.season).padStart(2, '0')} | E${String(target.episode).padStart(2, '0')}`, actions: actionsFor(target) })) : undefined;
 

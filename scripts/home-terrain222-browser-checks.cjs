@@ -11,16 +11,17 @@ async function testTerrain222Harness(client,root){const reports=[];for(const wid
  for(let batch=0;batch<3;batch++){
   const ids=await evaluate(client,`(()=>{const rail=document.querySelector('#home-series-0'),ids=[...rail.querySelectorAll('[data-series-id]')].map(el=>el.dataset.seriesId);rail.scrollLeft=rail.scrollWidth;return ids})()`);
   await pause(80);
+  const before=await evaluate(client,`({left:document.querySelector('#home-series-0').scrollLeft,top:window.scrollY,tile:document.querySelector('#home-series-0 .home-load-more').getBoundingClientRect().left})`);
   await evaluate(client,'document.querySelector("#home-series-0 .home-load-more").click()');
   await pause(150);
-  const next=await evaluate(client,`(()=>{const rail=document.querySelector('#home-series-0'),items=[...rail.querySelectorAll('[data-series-id]')],item=items[${ids.length}],delta=item.getBoundingClientRect().left-rail.getBoundingClientRect().left;window.__terrain222={ids:items.map(i=>i.dataset.seriesId),delta,scroll:rail.scrollLeft};return {delta,id:item.dataset.seriesId,padding:parseFloat(getComputedStyle(rail).scrollPaddingInlineStart)||16}})()`);
-  if(Math.abs(next.delta-next.padding)>2)throw Error(`Terrain222 pagination ${width}/${batch}: ${JSON.stringify(next)}`);
+  const next=await evaluate(client,`(()=>{const rail=document.querySelector('#home-series-0'),items=[...rail.querySelectorAll('[data-series-id]')],item=items[${ids.length}],delta=item.getBoundingClientRect().left-rail.getBoundingClientRect().left;window.__terrain222={ids:items.map(i=>i.dataset.seriesId),delta,scroll:rail.scrollLeft};return {scroll:rail.scrollLeft,left:item.getBoundingClientRect().left,delta,id:item.dataset.seriesId,padding:parseFloat(getComputedStyle(rail).scrollPaddingInlineStart)||16}})()`);
+  if(Math.abs(next.scroll-before.left)>1 || Math.abs(next.left-before.tile)>2)throw Error(`Terrain222 pagination ${width}/${batch}: ${JSON.stringify({before,next})}`);
  }
  for(let batch=0;batch<3;batch++){
   const count=await evaluate(client,`(()=>{const rail=document.querySelector('#films-a-voir-18c');rail.scrollLeft=rail.scrollWidth;return rail.querySelectorAll('[data-movie-ticket]').length})()`);
-  await pause(80);await evaluate(client,`document.querySelector('#films-a-voir-18c .home-load-more').click()`);await pause(120);
-  const metric=await evaluate(client,`(()=>{const rail=document.querySelector('#films-a-voir-18c'),item=rail.querySelectorAll('[data-movie-ticket]')[${count}];return {delta:item.getBoundingClientRect().left-rail.getBoundingClientRect().left,padding:parseFloat(getComputedStyle(rail).scrollPaddingInlineStart)||16}})()`);
-  if(Math.abs(metric.delta-metric.padding)>2)throw Error('Terrain222 dernier lot films '+width+': '+JSON.stringify(metric));
+  await pause(80);const movieBefore=await evaluate(client,`document.querySelector('#films-a-voir-18c').scrollLeft`);await evaluate(client,`document.querySelector('#films-a-voir-18c .home-load-more').click()`);await pause(120);
+  const metric=await evaluate(client,`(()=>{const rail=document.querySelector('#films-a-voir-18c'),item=rail.querySelectorAll('[data-movie-ticket]')[${count}];return {left:rail.scrollLeft,delta:item.getBoundingClientRect().left-rail.getBoundingClientRect().left,padding:parseFloat(getComputedStyle(rail).scrollPaddingInlineStart)||16}})()`);
+  if(Math.abs(metric.left-movieBefore)>1)throw Error('Terrain222 dernier lot films '+width+': '+JSON.stringify(metric));
  }
  await client.send('Page.navigate',{url:'http://127.0.0.1:4173/__seenit-history.html'});
  await check(client,'window.__history16d','historique prêt');
@@ -35,7 +36,7 @@ async function testTerrain222Harness(client,root){const reports=[];for(const wid
  await check(client,'window.__homeAVoir','accueil prêt');
  await evaluate(client,'window.__homeAVoir.terrain221Examples();document.fonts.ready');
  await check(client,`(()=>{const h=document.querySelector('[data-movie-ticket=movie-0] > h3'),actor=h.nextElementSibling;return actor.getBoundingClientRect().top-h.getBoundingClientRect().bottom<=8 && h.scrollHeight<=h.clientHeight+1})()`,'Vaiana sans réserve vide de trois lignes');
- await check(client,`(()=>{const series=document.querySelector('.series-8f__check .seenit-check__circle'),movie=document.querySelector('.movie-ticket__check .seenit-check__circle');return [series,movie].every(el=>el&&getComputedStyle(el).width==='42px'&&getComputedStyle(el).height==='42px'&&getComputedStyle(el).boxShadow.includes('242, 195, 107'))})()`,'même contour or et diamètre séries/films');
+ await check(client,`(()=>{const series=document.querySelector('.series-8f__check .seenit-ring-glyph'),movie=document.querySelector('.movie-ticket__check .seenit-ring-glyph');return [series,movie].every(el=>el&&getComputedStyle(el).width==='42px'&&getComputedStyle(el).height==='42px'&&el.querySelector('.brand-ring-track')&&el.querySelector('.brand-ring-tick'))})()`,'même contour or et diamètre séries/films');
  await evaluate(client,`window.__homeAVoir.progress({uid:'fixture-a',mode:'full',phase:'watched',processed:67,total:304,historyTotal:304,watchlistTotal:38,servers:[{id:'home',name:'Serveur personnel',owned:true,watchedItems:67,inventoryItems:1284},{id:'friend',name:'Serveur partagé',owned:false,reason:'hors ligne'}]})`);
  await check(client,`document.querySelector('.home-sync-button')`,'indicateur de progression monté');
  await evaluate(client,`document.querySelector('.home-sync-button').click()`);
@@ -46,6 +47,6 @@ async function testTerrain222Harness(client,root){const reports=[];for(const wid
  await check(client,`document.querySelector('.home-sync-sheet') && !document.querySelector('.home-sync-sheet__pause') && document.querySelector('.home-sync-sheet').textContent.includes('incomplète')`,'un bilan incomplet conservé ne peut pas armer une pause sans tâche active');
  await evaluate(client,`document.querySelector('[aria-label="Fermer la synchronisation"]').click()`);
  fs.writeFileSync(path.join(root,'quality-reports',`terrain222-home-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
- reports.push({width,firstNew:true,paulMinutes:59,historyPosterFullHeight:true,sharedSeenButton:true});
+ reports.push({width,scrollUnchanged:true,paulMinutes:59,historyPosterFullHeight:true,sharedSeenButton:true});
 }return reports;}
 module.exports={testTerrain222Harness};

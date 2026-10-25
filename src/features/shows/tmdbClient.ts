@@ -608,7 +608,7 @@ export class TMDBClient {
     return this.getCachedMediaDetails(id, 'tv', refresh);
   }
 
-  async getMovieDetails(id: number): Promise<Result<any>> {
+  async getMovieDetails(id: number) {
     return this.getCachedMediaDetails(id, 'movie');
   }
 
@@ -894,7 +894,7 @@ export class TMDBClient {
     return ok(keywords);
   }
 
-  async getSeasonDetails(id: number, seasonNumber: number): Promise<Result<any>> {
+  async getSeasonDetails(id: number, seasonNumber: number, refresh = false) {
     const normalizedId = Number(id);
     const normalizedSeason = Number(seasonNumber);
     const cacheKey = `${normalizedId}:${normalizedSeason}`;
@@ -908,12 +908,12 @@ export class TMDBClient {
     };
 
     const cached = await readPublicMetadataCache<any>('season', cacheKey, { allowStale: true });
-    if (cached?.fresh) return ok(await decorateForEurope(cached.data));
+    if (!refresh && cached?.fresh) return ok(await decorateForEurope(cached.data));
 
     return runPublicMetadataSingleFlight('season', cacheKey, async (): Promise<Result<any>> => {
       const queued = await readPublicMetadataCache<any>('season', cacheKey, { allowStale: true });
-      if (queued?.fresh) return ok(await decorateForEurope(queued.data));
-      const fallback = queued || cached;
+      if (!refresh && queued?.fresh) return ok(await decorateForEurope(queued.data));
+      const fallback = refresh ? null : queued || cached;
 
       const url = new URL(`${this.baseUrl}/tv/${normalizedId}/season/${normalizedSeason}?language=fr-FR&append_to_response=videos&include_video_language=fr,en,null`);
       const res = await tryCatch(authenticatedFetch(url.toString()));

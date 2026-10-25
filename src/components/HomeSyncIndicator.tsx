@@ -30,10 +30,10 @@ export function HomeSyncIndicator() {
   const successful = progress ? progress.phase === 'done' : /terminé|à jour/i.test(message);
   const percent = total && completed !== undefined ? Math.min(100, Math.max(0, Math.round(completed / total * 100))) : undefined;
   if (!plex && !details && !open) return null;
-  const ring = <span className={`home-sync-ring${percent === undefined && !settled ? ' home-sync-ring--waiting' : ''}`} role="progressbar" aria-label="Progression de la synchronisation" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} aria-valuetext={message} style={{ '--sync-progress': `${successful ? 100 : percent ?? (settled ? 0 : 25)}%` } as React.CSSProperties}><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 2h7.5l7.5 10-7.5 10H4l7.5-10L4 2z" /></svg></span></span>;
+  const ring = <span className={`home-sync-ring${percent === undefined && !settled ? ' home-sync-ring--waiting' : ''}`} role="progressbar" aria-label="Progression de la synchronisation" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} aria-valuetext={message} style={{ '--sync-progress': `${successful ? 100 : percent ?? (settled ? 0 : 25)}%` } as React.CSSProperties}><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 2H12l7.5 10L12 22H4.5L12 12 4.5 2z" /></svg></span></span>;
   return <>
     <button type="button" className="home-sync-button" aria-label={`Détails de la synchronisation ${plex ? 'Plex' : 'des métadonnées'}`} title={message} onClick={() => setOpen(true)}>{ring}</button>
-    {open && <DialogLayer label={label} onDismiss={() => setOpen(false)} className="fixed inset-0 flex items-end sm:items-center justify-center bg-black/65 p-4 pb-nav">
+    {open && <DialogLayer label={label} onDismiss={() => setOpen(false)} className="home-sync-dialog fixed inset-0 flex items-center justify-center bg-black/65 p-4">
       <section className="home-sync-sheet">
         <header>{ring}<div><h2>{label}{percent !== undefined ? ` · ${percent} %` : ''}</h2><p>Tu peux continuer à utiliser SeenIt</p></div><button type="button" data-dialog-initial-focus aria-label="Fermer la synchronisation" onClick={() => setOpen(false)}><X size={20} /></button></header>
         <p role="status">{paused ? 'En pause · la collecte en cours termine avant la pause' : message}</p>
