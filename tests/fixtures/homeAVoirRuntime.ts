@@ -50,3 +50,7 @@ export function addProgressExamples() {
 export function terrain221Examples() {
  base.useShowsStore.setState(state=>({shows:state.shows.map(show=>show.id==='series-0'?{...show,title:'A Knight of the Seven Kingdoms',seenEpisodes:['1x1'],seriesEnded:false,seasonProgress:buildSeasonProgressEvidence([{season_number:1,episode_count:6}],false),nextEpisodeToWatch:{...show.nextEpisodeToWatch,name:'Bœuf salé',episode_count:6,season_total_unknown:true}}:show.id==='movie-0'?{...show,title:'Vaiana, la légende du bout du monde'}:show.id==='upcoming-2'?{...show,title:'Le Seigneur des anneaux : Les Anneaux de Pouvoir',nextEpisodeToAir:{...show.nextEpisodeToAir,name:'Le prix de la lumière'}}:show.id==='history-0'?{...show,title:'A Knight of the Seven Kingdoms',mediaType:'tv',seenEpisodes:['1x1'],episodeRecords:{'1x1':{episodeTitle:'Le chevalier errant',watchedAt:new Date(new Date(Date.now()).setHours(8,13,0,0)).getTime(),watchedTimeKnown:true}}}:show)}));
 }
+
+export function terrain223Examples() {
+ base.useShowsStore.setState(state=>({shows:state.shows.map(show=>show.id==='series-0'||show.id==='series-1'?{...show,seenEpisodes:['1x1','1x2','1x3'],seasonProgress:buildSeasonProgressEvidence([{season_number:1,episode_count:show.id==='series-0'?6:5,episodes:Array.from({length:show.id==='series-0'?6:5},(_,index)=>({episode_number:index+1,air_date:date(-10)}))}],false),nextEpisodeToWatch:{season_number:1,episode_number:4,air_date:date(-10)}}:show)}));
+}

@@ -151,12 +151,16 @@
     },
     {
       "id": "SEENIT-APK-001",
-      "title": "Identité APK et nouvelle signature release verrouillées",
+      "title": "Identité APK et signature verrouillées, actifs marque v3 explicitement autorisés",
       "targets": [
         "apk",
         "ci"
       ],
       "tests": [
+        {
+          "file": "tests/brandV3.test.ts",
+          "contains": "SEENIT-APK-001 marque v3 autorisée"
+        },
         {
           "file": "tests/androidContract.test.ts",
           "contains": "SEENIT-APK-001 verrouille l’identité, la version et la clé de signature de l’APK"
@@ -2098,6 +2102,10 @@
       ],
       "tests": [
         {
+          "file": "tests/brandV3.test.ts",
+          "contains": "SEENIT-UX-009 marque v3 réutilise"
+        },
+        {
           "file": "tests/componentActionSemantics.test.ts",
           "contains": "SEENIT-UX-009 normalise les rôles et états des boutons communs"
         },
@@ -2123,6 +2131,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/plexResumeWorker.test.ts",
+          "contains": "SEENIT-UX-014 le vrai worker franchit une sortie"
+        },
         {
           "file": "tests/homeTerrain222.test.ts",
           "contains": "SEENIT-UX-014 B07 ruban unique utile"

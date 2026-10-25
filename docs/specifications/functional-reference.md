@@ -3,7 +3,7 @@
 Dernière vérification : 14 septembre 2026
 Mise à jour ciblée À voir : 23 octobre 2026, corrections de conformité maquettes et gestes (#729).
 Baseline observée avant correction : **1.4.150**, `main` `6189bafed525fb510c1a81c87a04e19c01f92393`
-Plateformes : **PWA Web** et **APK Android Capacitor**  
+Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : composante obligatoire de la SPEC SeenIt
 
 Ce document explique ce que fait SeenIt, où vit chaque fonction et comment les parcours s'articulent.
@@ -1013,3 +1013,6 @@ Bientôt dans la fiche acteur : le passage d’un projet non suivi à son docume
 
 
 Mise à jour terrain222 : les règles d’accueil/badges/historique du 24octobre2026 sont définies dans [le handoff intégré](../design/badges-historique-2026-10-24.md) et [les décisions d’intégration](../design/home-a-voir-v4.md). Elles priment sur les anciennes pilules emoji et l’interdiction antérieure de tout badge en pause.
+
+### Marque v3 / terrain223 (25 octobre 2026)
+Voir [marque v3](../design/marque-2026-10-25.md) : actifs fournis réutilisés sur accueil/connexion/splash, boutons Vu anneau/coche, navigation, PWA/launcher/notifications. L’extension horizontale remplace la tuile sans changer le scroll. Les preuves de saison reçues par la fiche convergent vers les cartes. Historique sans « ce soir », ×N en ruban. Bilan Plex centré et défilable.

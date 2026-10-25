@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import vm from 'node:vm';
+import type { Show } from '../src/types.ts';
 
 const bundle = build({ entryPoints: ['src/hooks/useDetailsSyncWorker.ts'], bundle: true, write: false, platform: 'node', format: 'cjs',
   plugins: [{ name: 'resume-ports', setup(builder) {
@@ -18,7 +19,7 @@ const bundle = build({ entryPoints: ['src/hooks/useDetailsSyncWorker.ts'], bundl
       export const getDoc=async()=>({exists:()=>false});export const updateDoc=async()=>{};export const addDoc=async()=>{};
       export const tmdb={};export const getTodayStr=()=>'';export const getNextEpisodeNumber=()=>null;export const computeAutoArchiveStatus=()=>false;
       export const useSyncStore={getState:()=>({setSyncStatus:()=>{},setQuotaExceeded:()=>{},isQuotaExceeded:false})};
-      export const useShowsStore={getState:()=>({shows:[]})};export const appLogger={warn:()=>{}};
+      export const useShowsStore={getState:()=>({shows:p().shows})};export const appLogger={warn:()=>{}};
       export const getStoredPlexToken=()=> 'opaque';export const getPlexLastSyncTimestamp=uid=>p().lastSuccess[uid]||0;
       export const performPlexSync=async options=>{p().plexCalls.push({uid:p().user.uid,options});return {success:true}};
     ` }));
@@ -35,7 +36,7 @@ async function harness() {
   };
   const ports = { user: { uid: 'alpha' } as { uid: string } | null, cleanup: () => {}, authListener: (_user: { uid: string } | null) => {},
     nativeListener: (_event: { isActive: boolean }) => {}, removed: 0, unsubscribed: 0,
-    plexCalls: [] as Array<{ uid: string }>, detailsReads: 0, lastSuccess: {} as Record<string, number> };
+    plexCalls: [] as Array<{ uid: string }>, detailsReads: 0, shows: [] as Show[], lastSuccess: {} as Record<string, number> };
   const window = new EventTarget(), document = Object.assign(new EventTarget(), { visibilityState: 'visible' });
   const values = new Map<string, string>();
   const localStorage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } };
@@ -61,6 +62,19 @@ async function harness() {
     visibility: (visible: boolean) => { document.visibilityState = visible ? 'visible' : 'hidden'; document.dispatchEvent(new Event('visibilitychange')); },
   };
 }
+
+test('SEENIT-UX-014 le vrai worker franchit une sortie sans attendre douze heures ni ouvrir une fiche', async () => {
+ const h = await harness(); h.mount(); await h.advance(5000);
+ assert.equal(h.ports.detailsReads,1);
+ h.ports.shows=[{id:'show',userId:'alpha',tmdbId:42,title:'Échéance connue',posterPath:null,backdropPath:null,isArchived:false,seenEpisodes:[],episodeRecords:{},createdAt:1,updatedAt:1,mediaType:'tv',status:'watching',lastSyncedAt:h.clock.now,seasonProgress:{'1':{total_evidence_version:5,total_checked_at:h.clock.now,season_number:1,episode_count:6,known_episodes_in_season:6,last_season_number:1,season_total_unknown:false,last_known_episode_type:null,last_known_episode_air_date:null}},nextEpisodeToAir:{season_number:1,episode_number:2,air_date:'2026-10-24'}} as Show];
+ await h.advance(60_000);h.focus();await h.advance(5000);
+ assert.equal(h.ports.detailsReads,1,'pas de requête supplémentaire avant l’échéance');
+ const boundary=new Date('2026-10-24T00:01:00').getTime();await h.advance(boundary-h.clock.now+5000);
+ assert.equal(h.ports.detailsReads,2,'la sortie connue court-circuite le cooldown au retour foreground');
+ h.ports.shows[0].lastSyncedAt=h.clock.now;
+ h.focus();await h.advance(5000);assert.equal(h.ports.detailsReads,2,'pas de nouvelle requête après acquittement de la frontière');
+ h.ports.cleanup();
+});
 
 test('SEENIT-PLEX-002 le worker réel regroupe et annule les reprises hors écran', async () => {
   const h = await harness(); h.mount();

@@ -19,7 +19,7 @@ test('SEENIT-UX-014 les deux synchronisations conservent la finale avant de supp
         export const getDoc=async()=>({exists:()=>true,id:'series',data:()=>p().show});
         export const getDocs=async()=>({empty:false,docs:[{id:'series',data:()=>p().show}]});
         export const updateDoc=async(_ref,value)=>p().writes.push(value);export const addDoc=async()=>{};
-        export const tmdb={getShowDetails:async()=>({ok:true,value:p().details}),getMediaDetails:async()=>({ok:true,value:p().details}),getSeasonDetails:async()=>({ok:true,value:p().season})};
+        export const tmdb={getShowDetails:async()=>({ok:true,value:p().details}),getMediaDetails:async()=>({ok:true,value:p().details}),getSeasonDetails:async()=>p().seasonFailure?({ok:false,error:new Error("503")}):({ok:true,value:p().season})};
         export const useSyncStore={getState:()=>({setSyncStatus:()=>{},setQuotaExceeded:()=>{},resetQuotaError:()=>{},isQuotaExceeded:false})};
         export const useShowsStore={getState:()=>({shows:[p().show],updateShowOptimistic:()=>{}})};
         export const performPlexSync=async()=>{}; export const getPlexLastSyncTimestamp=()=>0;export const getStoredPlexToken=()=>null;
@@ -31,7 +31,7 @@ test('SEENIT-UX-014 les deux synchronisations conservent la finale avant de supp
   const show: Show = { id: 'series', userId: 'fixture', tmdbId: 42, title: 'Finale réelle', mediaType: 'tv',
     posterPath: null, backdropPath: null, status: 'watching', isArchived: false, createdAt: 1, updatedAt: 1,
     seenEpisodes: [], episodeRecords: {}, firstAirDate: '2026-09-01' };
-  const ports = { show, writes: [] as Array<Record<string, unknown>>,
+  const ports = { show, seasonFailure:false, writes: [] as Array<Record<string, unknown>>,
     details: { status: 'Returning Series', seasons: [{ season_number: 1, episode_count: 4 }], number_of_episodes: 4 },
     season: { season_number: 1, episodes: Array.from({ length: 4 }, (_, index) => ({ episode_number: index + 1, air_date: '2026-09-01', episode_type: index === 3 ? 'finale' : 'standard' })) },
   };
@@ -136,4 +136,11 @@ test('SEENIT-UX-014 les deux synchronisations conservent la finale avant de supp
   await module.exports.performDetailsSync(false);
   assert.equal(ports.writes.length, 0, 'la réparation ne se répète pas');
   }
+  ports.seasonFailure=true; ports.writes.length=0;
+  const manualFailure=await module.exports.syncSingleItem('series',true);
+  assert.equal(manualFailure.success,false,'une saison non reçue ne fabrique pas un total diffusé');
+  assert.equal(ports.writes.length,0,'preuve précédente conservée sur panne fournisseur');
+  ports.writes.length=0; await module.exports.performDetailsSync(true);
+  assert.equal(ports.writes.length,0,'le worker automatique conserve aussi les preuves sur panne');
+
 });

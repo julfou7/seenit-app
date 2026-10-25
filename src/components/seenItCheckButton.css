@@ -1,4 +1,8 @@
-.seenit-check { width:48px; height:48px; min-width:44px; min-height:44px; border-radius:50%; padding:0; background:transparent; flex-shrink:0; }
-.seenit-check .seenit-check__circle { position:absolute; width:42px; height:42px; top:50%; left:50%; transform:translate(-50%,-50%); border-radius:50%; background:rgba(9,9,11,.55); box-shadow:inset 0 0 0 1.5px rgba(242,195,107,.7),0 4px 14px #0007; pointer-events:none; }
-.seenit-check[aria-pressed="true"] .seenit-check__circle { background:rgba(229,169,61,.16); }
-.seenit-check .seenit-screen-glyph { position:relative; z-index:1; width:26px; height:19px; flex-shrink:0; }
+.seenit-check { width:48px; height:48px; min-width:44px; min-height:44px; padding:0; background:transparent; flex-shrink:0; border-radius:50%; }
+.seenit-ring-glyph { position:relative; width:42px; height:42px; flex-shrink:0; }
+.brand-ring-fill { transition:stroke-dashoffset 200ms ease; }
+[data-active=true] .brand-ring-fill { transition:stroke-dashoffset 420ms cubic-bezier(.6,0,.3,1); }
+.brand-ring-tick { transform-origin:50px 50px; }
+.seenit-check[data-celebrate=true] .brand-ring-tick { animation:brandTickPop 220ms cubic-bezier(.3,1.7,.5,1) 360ms both; }
+@keyframes brandTickPop { 0%{transform:scale(.5)} 70%{transform:scale(1.12)} 100%{transform:scale(1)} }
+@media(prefers-reduced-motion:reduce){.brand-ring-fill,.brand-ring-tick { animation:none!important;transition:none!important; }}

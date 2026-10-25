@@ -41,3 +41,5 @@
 .history-entry--today .history-entry__action-column > time { color:#f2c36b; }
 .history-entry--today .seenit-check { animation:hdStamp .32s both; }
 @media(prefers-reduced-motion:reduce) { .history-entry--today .seenit-check { animation:none; } }
+
+.history-entry__group.series-ribbon { top:15px; bottom:auto; left:-38px; width:130px; height:18px; border-radius:0; font-size:10px; padding:3px 0; background:var(--badge-bg); }

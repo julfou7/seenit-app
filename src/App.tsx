@@ -167,7 +167,7 @@ export default function App() {
     }
   }, [isNative]);
 
-  const splashDuration = 2200;
+  const splashDuration = 0;
 
   return (
     <>

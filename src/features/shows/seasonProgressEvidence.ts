@@ -1,22 +1,32 @@
 import type { SeasonProgressEvidence, Show } from '../../types';
 
-type ConfirmedSeasonEvidence = SeasonProgressEvidence & { total_evidence_version: 2 | 3 | 4; total_checked_at?: number };
+type ConfirmedSeasonEvidence = SeasonProgressEvidence & { total_evidence_version: 2 | 3 | 4 | 5; total_checked_at?: number };
 export function isCurrentSeasonProgress(evidence: SeasonProgressEvidence | undefined): evidence is ConfirmedSeasonEvidence {
-  return Boolean(evidence && Object.hasOwn(evidence, 'episode_count') && 'total_evidence_version' in evidence && [2, 3, 4].includes(Number(evidence.total_evidence_version)));
+  return Boolean(evidence && Object.hasOwn(evidence, 'episode_count') && 'total_evidence_version' in evidence && [2, 3, 4, 5].includes(Number(evidence.total_evidence_version)));
 }
 
 /** Répare une seule fois les anciennes preuves qui confondaient liste et total. */
 export function needsSeasonProgressRefresh(show: Pick<Show, 'seasonProgress' | 'nextEpisodeToWatch' | 'nextEpisodeToAir'>): boolean {
-  return Object.values(show.seasonProgress || {}).some(evidence => !isCurrentSeasonProgress(evidence) || evidence.episode_count == null && (evidence.total_evidence_version < 4 || !evidence.total_checked_at || Date.now() - evidence.total_checked_at >= 7 * 86_400_000) || evidence.total_evidence_version === 2 && (evidence.episode_count === null || evidence.episode_count === 1 && evidence.season_number === evidence.last_season_number && evidence.last_known_episode_type !== 'finale'))
-    || [show.nextEpisodeToWatch, show.nextEpisodeToAir].some(pointer => typeof pointer?.season_total_unknown === 'boolean'
+  return Object.values(show.seasonProgress || {}).some(evidence => !isCurrentSeasonProgress(evidence) || Number(evidence.total_evidence_version) < 5 || evidence.episode_count == null && (!evidence.total_checked_at || Date.now() - evidence.total_checked_at >= 7 * 86_400_000))
+    || [show.nextEpisodeToWatch, show.nextEpisodeToAir].some(pointer => Number(pointer?.season_number) > 0
       && !isCurrentSeasonProgress(show.seasonProgress?.[String(pointer.season_number)]));
 }
 
 interface EpisodeEvidence { episode_number?: number; episode_type?: string | null; air_date?: string | null }
 interface SeasonEvidence { season_number: number; episode_count?: number; episodes?: EpisodeEvidence[] }
 
+/** A release boundary bypasses the 12h worker cooldown, without a new polling loop. */
+export function hasSeasonReleaseDue(show: Pick<Show, 'seasonProgress' | 'nextEpisodeToAir' | 'lastSyncedAt'>, now = Date.now()): boolean {
+  const dates = [show.nextEpisodeToAir?.air_date, ...Object.values(show.seasonProgress || {}).flatMap(proof => Object.values(proof.episode_air_dates || {}))];
+  return dates.some(date => {
+    if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+    const release = new Date(date + 'T00:00:00').getTime();
+    return release <= now && release > (show.lastSyncedAt || 0);
+  });
+}
+
 /** Métadonnées publiques compactes conservées lorsque seasonsCache est supprimé. */
-export function buildSeasonProgressEvidence(seasons: readonly SeasonEvidence[], ended: boolean): Record<string, ConfirmedSeasonEvidence> {
+export function buildSeasonProgressEvidence(seasons: readonly SeasonEvidence[], ended: boolean, today = new Date().toLocaleDateString('sv-SE')): Record<string, ConfirmedSeasonEvidence> {
   const lastSeason = seasons.reduce((maximum, season) => Math.max(maximum, season.season_number), 0);
   return Object.fromEntries(seasons.map(season => {
     const last = (season.episodes || []).reduce<EpisodeEvidence | null>((latest, episode) =>
@@ -26,7 +36,9 @@ export function buildSeasonProgressEvidence(seasons: readonly SeasonEvidence[], 
     const datedFinale = last?.episode_type === 'finale' && /^\d{4}-\d{2}-\d{2}$/.test(last.air_date || '') && Number(last.episode_number) >= known;
     const confirmed = total !== null && (total > 1 || ended || season.season_number < lastSeason || last?.episode_type === 'finale');
     return [String(season.season_number), {
-      total_evidence_version: 4, total_checked_at: Date.now(),
+      total_evidence_version: 5, total_checked_at: Date.now(),
+      ...(season.episodes?.length ? { aired_episodes_in_season: season.episodes.filter(episode => episode.air_date && episode.air_date <= today).length,
+        episode_air_dates: Object.fromEntries(season.episodes.filter(episode => Number(episode.episode_number) > 0).map(episode => [String(episode.episode_number), episode.air_date || null])) } : {}),
       season_number: season.season_number, episode_count: confirmed ? total : null, known_episodes_in_season: known,
       last_season_number: lastSeason,
       season_total_unknown: !confirmed && !datedFinale,

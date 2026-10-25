@@ -47,7 +47,7 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
   const isUpToDate = resume.upToDate;
   const nextEpNum = resume.episode || (isUpToDate ? lastMarkedEpisode : null);
   const cachedSeason = nextEpNum ? show.seasonsCache?.find(season => season.season_number === nextEpNum.season_number) : undefined;
-  const cachedEpisode = cachedSeason?.episodes?.find((episode: SeriesCardEpisode) => episode.episode_number === nextEpNum?.episode_number) as (SeriesCardEpisode & { still_path?: string }) | undefined;
+  const cachedEpisode = cachedSeason?.episodes?.find(episode => episode.episode_number === nextEpNum?.episode_number);
   const episodeStill = nextEpNum?.still_path || cachedEpisode?.still_path;
   const currentSeasonArtwork = cachedSeason?.poster_path || null;
   const showBackdrop = show.backdropPath;
