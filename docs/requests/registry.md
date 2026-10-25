@@ -144,3 +144,4 @@ Complément USR-2026-10-23-004 / #729 : vidéo du23octobre19h32, précisée « C
 Complément USR-2026-10-23-005 : ZIP(10) SPEC-DEV-V4.md reçue24/10, complète (frise/acteur plein écran inclus), maquette prioritaire ; derniers retours cartes films/Plex, total saison Knight/Harry et collection films À venir. Aucune APK demandée.
 
 | USR-2026-10-25-001 | 2026-10-25 | Terrain223 KO : cohérence épisodes carte/détail, pagination sans scroll, historique sans ce soir et ruban ×N, rubans Plus que2/3 ; marque v3 fournie à réutiliser partout, Plex centré/dialogue borné. | SEENIT-UX-014/015/018, SEENIT-APK-001, #729/#741 | active |
+| USR-2026-10-25-002 | 2026-10-25 | Terrain224 : animation d’ouverture complète ; nav sans point et texte abaissé ; bouton Vu film dans le talon ; bandeaux compacts au bas des affiches ; après succès bouton puis tampon puis nouvelle reprise ; dernier disponible tamponné jusqu’au rafraîchissement. | SEENIT-UX-009/014/015, #729 | active |

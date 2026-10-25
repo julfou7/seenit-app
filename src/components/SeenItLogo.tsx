@@ -6,9 +6,9 @@ export function SeenItRing({ size = 42, active = true, className = '' }: { size?
   const id = useId();
   return <svg width={size} height={size} viewBox="0 0 100 100" className={className} aria-hidden="true" data-brand-ring data-active={active}>
     <defs><linearGradient id={id} x1="10%" y1="5%" x2="90%" y2="95%"><stop offset="0%" stopColor="#FFF2B8"/><stop offset="32%" stopColor="#F5C518"/><stop offset="70%" stopColor="#E5A93D"/><stop offset="100%" stopColor="#B37812"/></linearGradient></defs>
-    <circle className="brand-ring-track" cx="50" cy="50" r="38" fill="none" stroke="#3f3f46" strokeWidth="10"/>
+    <circle className="brand-ring-track" cx="50" cy="50" r="38" fill="none" stroke="#A1A1AA" strokeWidth="10"/>
     <circle className="brand-ring-fill" cx="50" cy="50" r="38" fill="none" stroke={'url(#'+id+')'} strokeWidth="10" strokeLinecap="round" strokeDasharray="239 239" strokeDashoffset={active ? 0 : 239} transform="rotate(-90 50 50)"/>
-    <path className="brand-ring-tick" d="M36 51 L46 61 L65 40" fill="none" stroke={active ? 'url(#'+id+')' : '#52525b'} strokeWidth="9" strokeLinecap="round" strokeLinejoin="round"/>
+    <path className="brand-ring-tick" d="M36 51 L46 61 L65 40" fill="none" stroke={active ? 'url(#'+id+')' : '#A1A1AA'} strokeWidth="9" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>;
 }
 export function SeenItGlyph({ size = 32, className = '', symbol = 'check', active = true, color, navigation = false }: { size?: number; className?: string; symbol?: SeenItSymbolType; glow?: boolean; active?: boolean; idPrefix?: string; color?: 'gold' | 'blue'; navigation?: boolean }) {

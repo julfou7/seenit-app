@@ -1,0 +1,19 @@
+# Terrain224 — ouverture, Vu et bandeaux
+
+Baseline : APK1.4.224, main c4eafacf7a05c0d440071a3d396d186d9c5e97f6. Retour utilisateur du25/10/2026, suivi #729. Les deux vidéos jointes (2,73s et3,88s) ont été décodées localement ; captures et transitions observées. Aucun test sur téléphone physique par l’agent.
+
+| Retour / priorité | Frontière et changement | Preuve / critère |
+|---|---|---|
+| P2 ouverture tronquée | isReady achevait immédiatement les segments et déclenchait le fondu. La progression décorative est indépendante de la disponibilité des données :3700ms puis fermeture, résultat immédiat sous réduction des animations. | SplashScreen réel, données prêtes dès le montage et prefers-reduced-motion dans home-terrain224-browser-checks.cjs. |
+| P2 point de navigation | Pseudo-élément inférieur retiré, libellé abaissé de2px. Les badges de téléchargement et aria-current sont conservés. | Composant BottomNav réel et styles rendus. |
+| P2 Vu illisible sur film | Bouton commun déplacé sur le talon sombre, trait non vu éclairci pour tous les boutons. Année et fin à sous le titre, accessibles après déchirure ; aucun nouveau glyphe. | Géométrie du bouton sous le poster, captures360/412/1280. |
+| P2 rubans trop grands | Bandeau horizontal de17px en bas de l’affiche, partagé avec ×N historique ; aucune diagonale couvrante. | Texte contenu, largeur/hauteur/bas de l’affiche, captures de la carte et du vrai historique. |
+| P2 ordre Vu | La promesse du handler contrôlait en parallèle bouton, tampon et reprise. Transaction visuelle annulable après succès :620ms bouton,500ms tampon avec ancien épisode maintenu, puis nouvelle reprise. Le transfert Nouveautés attend cette séquence. | WatchListView → WatchNextSection → ContinueWatchingCard → SeriesEpisodeCard → markWatchCardEpisode → markEpisodeWatched, transport seul substitué. Écriture lente, erreur, reprise réelle et compte exact. |
+| P2 dernier disponible | Le tampon disparaissait par une animation CSS à durée fixe. Reçu local conservé tant que la carte à jour reste retenue, y compris retour d’onglet ; Annuler/rafraîchissement le retire. | Dernier diffusé avec4 épisodes futurs, attente après fin d’animation, annulation, erreur/réessai et reset. |
+| P2 date du jour redondante | Retirer Aujourd’hui de la ligne de métadonnées des cartes du jour ; garder l’en-tête de période et l’heure sous Vu. | Vrai HistoryFeed rendu, texte des cartes du jour et heure conservée. |
+
+Intégration explicitement demandée au retour : correctif Plex préparé dans le chat « Correction erreur Plex », source4eea78d3723682e969369e59988f0931bf707828 (#741). Sa quarantaine distante40206661320 était rouge :7 TNR anciens substituaient Capacitor Core mais pas le nouvel import App et échouaient au registerPlugin. Le code et les deux TNR lifecycle ont été repris dans le workspace sain (sans promotion/merge du SHA rouge ni mutation de sa branche), les anciens ports de test adaptés puis le lot entièrement revalidé. Catalogue SEENIT-PLEX-002/SPEC alignés. Version225 déjà préparée sur main5c3f4fb réutilisée, pas de nouveau bump. Le transport suspend la requête en vol, attend le premier plan et empêche la fuite de l’AbortError technique.
+
+Vérification locale : scénarios terrain224 et régressions terrain221/222/223 verts à360/412/1280 ; captures inspectées. TNR d’annulation du timer et branche de réduction des animations couverts. La validation canonique/CI et la publication sont des gardes distincts ; leurs preuves finales sont dans la PR et le checkpoint stable #729. Le diagnostic d’infrastructure émulateur #50 est indépendant de ce lot.
+
+Limites : images de fixtures en navigateur pour isoler la géométrie, aucune mesure de FPS sur appareil. Ni signature/package, ni métadonnées fournisseur, ni progression métier ne sont modifiés. Les hypothèses de l’ancienne orchestration Vu sont invalidées par la vidéo ; les nouveaux tests passent par les véritables composants et actions de production.
