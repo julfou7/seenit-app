@@ -68,11 +68,12 @@ async function testWatchNextHarness(client, root) {
     await check(client, 'window.__watch18c.telemetry.writes.length===1 && !document.querySelector(".series-8f__ghost") && !document.querySelector("[data-error=true]")', 'Firestore lent : aucun rollback, faux échec ou succès prématuré');
     await evaluate(client, 'window.__watch18c.releaseWrite()');
     await check(client, 'document.querySelector("#home-series-0 .series-8f__code").textContent.includes("E03") && window.__watch18c.toasts().some(toast=>toast.type==="success")', 'succès annoncé seulement après confirmation Firestore');
+    await check(client, '!document.querySelector("#home-series-0 .series-8f__check").disabled', 'séquence Vu terminée avant la nouvelle action');
     await evaluate(client, 'window.__watch18c.telemetry.failNext=true;window.__watch18c.clearToasts()');
     await click(client, seriesCheck);
     await check(client, 'document.querySelector("#home-series-0 [data-error=true]") && window.__watch18c.snapshot()[0].seenEpisodes.length===2', 'échec restauré et réessayable');
     await click(client, seriesCheck);
-    await check(client, 'document.querySelector("#home-series-0 .series-8f__check--watched")', 'état à jour conservé');
+    await check(client, 'document.querySelector("#home-series-0 .series-8f__check--watched") && !document.querySelector("#home-series-0 .series-8f__check").disabled', 'état à jour conservé');
     await click(client, seriesCheck);
     await check(client, 'window.__watch18c.snapshot()[0].seenEpisodes.length===2', 'retour Non vu du dernier épisode');
     await evaluate(client, 'window.__watch18c.clearToasts()');
