@@ -28,6 +28,9 @@ function assertEs5(source, name) {
 
 test('SEENIT-TV-POC-001 garde le widget compatible Tizen 3 et sans runtime lourd', () => {
   assert.match(config, /required_version="3\.0"/);
+  const packageMatch = config.match(/<tizen:application[^>]*\bpackage="([A-Za-z0-9]{10})"/);
+  assert.ok(packageMatch, 'Tizen package id must contain exactly 10 alphanumeric characters');
+  assert.match(config, new RegExp(`id="${packageMatch[1]}\\.SeenItTV"`));
   assert.match(config, /application\.launch/);
   assert.match(config, /tv\.inputdevice/);
   assert.match(config, /tv\.window/);
