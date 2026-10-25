@@ -70,7 +70,7 @@ test('SEENIT-UX-014 conserve les états de saison sans inventer les diffusions',
   assert.equal(progress.label, 'S5 · 3/8');
   assert.equal(progress.unknownTail, false);
   assert.deepEqual(progress.segments.map(item => item.state), ['seen', 'seen', 'seen', 'current', 'unseen', 'future', 'future', 'future']);
-  assert.equal(seriesEpisodeCode(episode), 'S05 · E04');
+  assert.equal(seriesEpisodeCode(episode), 'S05 | E04');
   const legacy = buildSeriesSeasonProgress({ ...show, seenEpisodes: ['S05E01', '5x1', 's05e02', '5x3'] }, episode, 'watch', '2026-10-21');
   assert.equal(legacy.label, progress.label, 'les clés historiques sont normalisées et dédoublonnées sans modifier les données');
   assert.deepEqual(legacy.segments, progress.segments);

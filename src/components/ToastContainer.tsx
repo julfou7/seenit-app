@@ -129,10 +129,10 @@ export function ToastContainer() {
     }
 
     // Try to extract SXXEXX pattern for subtitle
-    const seasonEpisodeMatch = action.match(/S(\d+)E(\d+)/i);
+    const seasonEpisodeMatch = action.match(/S(\d+)\s*[·|]?\s*E(\d+)/i);
     if (seasonEpisodeMatch) {
       subtitle = `S${seasonEpisodeMatch[1]} | E${seasonEpisodeMatch[2]}`;
-      action = action.replace(/S\d+E\d+/i, '').trim();
+      action = action.replace(/S\d+\s*[·|]?\s*E\d+/i, '').trim();
 
       // Strip the episode title before "marqué comme..."
       const verbMatch = action.match(/(marqué[e]?\s+comme\s+.*)$/i);
@@ -332,12 +332,12 @@ export function ToastContainer() {
           {hasPoster ? (
             /* Rich Media Toast with Poster */
             <div className="w-full relative overflow-hidden bg-zinc-900/95 backdrop-blur-xl border border-white/15 rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.85)] flex items-stretch">
-              
+
               {/* Full Poster on the left with gradient fade into background */}
               <div className="w-16 sm:w-20 shrink-0 relative bg-zinc-800 self-stretch min-h-[64px]">
-                <img 
-                  src={posterUrl!} 
-                  alt={parsed.title || "Affiche"} 
+                <img
+                  src={posterUrl!}
+                  alt={parsed.title || "Affiche"}
                   className="w-full h-full object-cover object-center"
                 />
                 {/* Smooth gradient blend into the toast card */}
@@ -361,7 +361,7 @@ export function ToastContainer() {
                     )}
                   </div>
                 )}
-                
+
                 {/* Action Text */}
                 <div className="flex items-center gap-1.5 text-zinc-300 text-xs font-normal leading-snug">
                   {renderIcon()}
@@ -420,7 +420,7 @@ export function ToastContainer() {
           ) : (
             /* Floating Compact Pill for Simple & System Notifications */
             <div className="relative overflow-hidden bg-zinc-900/95 backdrop-blur-2xl border border-white/15 rounded-2xl sm:rounded-full shadow-[0_14px_40px_rgba(0,0,0,0.85)] px-3.5 py-2 sm:px-4 sm:py-2.5 flex items-center gap-2.5 w-full sm:w-auto max-w-full">
-              
+
               {/* Icon badge - Solid 100% Opaque for Plex, Amber for Reminder, Rose for Favorite */}
               {isPlexToast ? (
                 <div className="w-6 h-6 rounded-full bg-[#E5A93D] text-zinc-950 flex items-center justify-center shrink-0 font-black shadow-md shadow-amber-500/20">

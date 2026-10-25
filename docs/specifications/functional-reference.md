@@ -1010,3 +1010,6 @@ V4, coût au lancement : l’Historique masqué ne normalise ni ne regroupe les 
 Frise V4 : les marquages de saison partagent parfois le même instant ; le tri de production départage alors leurs épisodes numériquement (saison/épisode décroissants), puis groupe et pagine les lignes. Le tri lexical ne doit pas séparer E1, E10 et E2.
 
 Bientôt dans la fiche acteur : le passage d’un projet non suivi à son document de suivi conserve l’état et l’attente de la cloche ; sa clé est l’identité TMDB avec média/épisode, jamais l’identifiant attribué pendant l’ajout.
+
+
+Mise à jour terrain222 : les règles d’accueil/badges/historique du 24octobre2026 sont définies dans [le handoff intégré](../design/badges-historique-2026-10-24.md) et [les décisions d’intégration](../design/home-a-voir-v4.md). Elles priment sur les anciennes pilules emoji et l’interdiction antérieure de tout badge en pause.

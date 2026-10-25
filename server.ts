@@ -442,7 +442,7 @@ function startCronJobs() {
     console.log("[CRON] Démarrage de la vérification des rappels d'épisodes...");
     const db = adminDb;
     const messaging = getMessaging();
-    
+
     // Obtenir la date du jour au format YYYY-MM-DD
     const todayStr = new Date().toISOString().split("T")[0];
 
@@ -541,7 +541,7 @@ async function getPlexServers(
     if (resourcesRes.ok) {
       const resources = await resourcesRes.json();
       if (Array.isArray(resources)) {
-        servers = resources.filter((r: any) => r.provides && r.provides.includes('server'));
+        servers = resources.filter((r: { provides?: string }) => r.provides && r.provides.includes('server'));
         plexServersCache.set(cacheKey, { servers, timestamp: Date.now() });
         prunePlexServersCache();
       } else {
@@ -983,7 +983,7 @@ async function startServer() {
         });
 
         const hasRemoteOrRelay = sortedConnections.some((c: any) => !c.local || c.relay);
-        const candidateConnections = hasRemoteOrRelay 
+        const candidateConnections = hasRemoteOrRelay
           ? sortedConnections.filter((c: any) => !c.local || c.relay)
           : sortedConnections;
 
@@ -1375,8 +1375,8 @@ async function startServer() {
       const usePmsHistoryInFull = !delta && !accountHistoryAvailable;
       let completeInventoryServers = 0;
       let completeHistoryServers = 0;
-      const syncedServers: Array<{ id: string; name: string; watchedItems: number; inventoryItems: number }> = [];
-      const skippedServers: Array<{ id: string; name: string; reason: string }> = [];
+      const syncedServers: Array<{ id: string; name: string; watchedItems: number; inventoryItems: number; owned: boolean }> = [];
+      const skippedServers: Array<{ id: string; name: string; reason: string; owned: boolean }> = [];
       const libraryWatchStateItems: any[] = [];
 
       const describeServerFailure = (message: unknown): string => {
@@ -1689,6 +1689,7 @@ async function startServer() {
           syncedServers.push({
             id: serverId,
             name: serverName,
+            owned: server.owned === true || server.owned === 1 || server.owned === '1',
             watchedItems: serverItemCount,
             inventoryItems: serverInventoryCount
           });
@@ -1696,6 +1697,7 @@ async function startServer() {
           skippedServers.push({
             id: serverId,
             name: serverName,
+            owned: server.owned === true || server.owned === 1 || server.owned === '1',
             reason: describeServerFailure(lastFailure)
           });
         }
@@ -2205,7 +2207,7 @@ async function startServer() {
         });
       }
 
-      return res.status(200).json({ 
+      return res.status(200).json({
         history: normalizedHistory,
         watchlist: normalizedWatchlist,
         libraryAvailability: normalizedLibraryAvailability,

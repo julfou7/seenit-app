@@ -49,8 +49,8 @@ export function historyGroupCode<T extends TimelineEntry>(row: TimelineRow<T>): 
   const first = row.members.at(-1)!, last = row.item;
   const season = (value: number) => `S${String(value).padStart(2, '0')}`;
   const episode = (value: number) => `E${String(value).padStart(2, '0')}`;
-  const start = `${season(first.season)}·${episode(first.episode)}`;
-  return row.members.length === 1 ? start : `${start} → ${first.season === last.season ? '' : season(last.season) + '·'}${episode(last.episode)}`;
+  const start = `${season(first.season)} | ${episode(first.episode)}`;
+  return row.members.length === 1 ? start : `${start} → ${first.season === last.season ? '' : season(last.season) + ' | '}${episode(last.episode)}`;
 }
 
 export function historyPeriodSummary<T extends TimelineEntry>(rows: readonly TimelineRow<T>[], minutes: (item: T) => number | null) {

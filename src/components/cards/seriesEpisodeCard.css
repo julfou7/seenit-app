@@ -41,10 +41,6 @@
 .series-8f__provider { width:44px; height:44px; margin:-9px; flex-shrink:0; position:relative; pointer-events:auto; cursor:pointer; display:grid; place-items:center; border-radius:12px; }
 .series-8f__provider img { width:26px; height:26px; object-fit:cover; border-radius:7px; box-shadow:0 2px 8px #0009; }
 .series-8f__action { position:absolute; top:50%; right:8px; width:52px; height:48px; display:flex; align-items:center; justify-content:center; transform:translateY(-50%); }
-.series-8f__check svg > path:first-of-type { opacity:0 !important; }
-.series-8f__check svg text,.series-8f__check svg circle { display:none; }
-.series-8f__check--watched svg rect { fill:#E5A93D !important; stroke:#E5A93D !important; }
-.series-8f__check--watched svg g path { stroke:#0B0B0F !important; }
 .series-8f__days { width:52px; height:56px; border-radius:14px; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; cursor:pointer; border:1px solid; }
 .series-8f__days--today { color:#FDBA74; background:#fb923c33; border-color:#fb923c99; }
 .series-8f__days--soon { color:#6EE7B7; background:#34d39924; border-color:#34d39973; }
@@ -82,12 +78,6 @@
 .series-8f__code strong { flex-shrink:0; }
 .series-8f__code .series-8f__status { align-self:auto; }
 .series-8f__check { width:48px; height:48px; display:grid; place-items:center; padding:0; border-radius:50%; background:radial-gradient(circle,#09090b8c 0 21px,transparent 22px) !important; box-shadow:none; }
-.series-8f__check > div { display:block; inset:3px; border-radius:50%; opacity:1; background:transparent; box-shadow:inset 0 0 0 1.5px #f2c36b8c,0 4px 14px #0007; backdrop-filter:blur(10px); }
-.series-8f__check svg { width:26px; height:26px; }
-.series-8f__check svg rect { fill:none !important; stroke:#f2c36b !important; stroke-width:7px !important; }
-.series-8f__check svg > path:not(:first-of-type) { stroke:#f2c36b !important; stroke-width:7px !important; }
-.series-8f__check svg g path { stroke:#fff !important; stroke-width:8.5px !important; opacity:1 !important; transform:none !important; }
-.series-8f__check--watched svg rect { fill:#e5a93d !important; }
 @media (max-width:380px) { .series-8f__code strong { font-size:11px; }.series-8f__status { font-size:10px; padding:0 4px; gap:2px; }.series-8f__status svg { width:14px; } }
 
 /* SPEC accueil v3 : rappel J-X, neutre, à la place de Vu. */
@@ -104,8 +94,6 @@
 
 /* Reference ckTop34 + target48: center of the content above the season bar. */
 .series-8f__action { top:58px; }
-.series-8f__check svg.seenit-screen-glyph { width:26px; height:19.24px; }
-.series-8f__check svg.seenit-screen-glyph > path { opacity:1 !important; }
 
 /* Terrain220 : informations utiles, sans effet glossy ni animation permanente. */
 .series-8f__status { height:18px; padding:0 5px; gap:0; border:0; border-radius:5px; font-size:10px; font-weight:700; color:#c4b5fd; background:#a78bfa1c; animation:none; }
@@ -129,3 +117,27 @@
 .series-8f[data-context="upcoming"] .series-8f__code { line-height:1.3; }
 
 .series-8f[data-context="upcoming"] .series-8f__text p { font-size:12px; line-height:1.25; }
+
+/* B07: one metallic ribbon, clipped by the poster, no availability pill. */
+.series-ribbon { --badge-bg:linear-gradient(90deg,#fff,#e4e4e7); position:absolute; top:10px; left:-26px; z-index:3; width:110px; padding:3px 0; transform:rotate(-38deg); display:flex; align-items:center; justify-content:center; gap:4px; color:#0b0b0f; background:var(--badge-bg); box-shadow:0 2px 8px #0008; font-size:9px; font-weight:900; line-height:1.2; text-transform:uppercase; letter-spacing:.06em; white-space:nowrap; pointer-events:none; }
+.series-ribbon--today { --badge-bg:linear-gradient(90deg,#fff2b8,#f5c518 45%,#e5a93d); color:#1a1206; --bdg:#f5c51899; animation:bdSheen 3.2s ease-in-out infinite,bdBreath 3.2s ease-in-out infinite; }
+.series-ribbon--yesterday { --badge-bg:linear-gradient(90deg,#fff8e7,#efd5a0); color:#1a1206; animation:bdSheen 4.8s ease-in-out 1.2s infinite; }
+.series-ribbon--today,.series-ribbon--yesterday { background:linear-gradient(105deg,transparent 40%,#ffffffcc 50%,transparent 60%) 150% 0/250% 100% no-repeat,var(--badge-bg); }
+.series-ribbon--remaining { --badge-bg:linear-gradient(90deg,#fbc59a,#dc8455); color:#1c0d05; }
+.series-ribbon--season { --badge-bg:linear-gradient(90deg,#ebcb96,#b8823a); color:#170f04; }
+.series-ribbon--final { --badge-bg:linear-gradient(90deg,#1c1c21,#0b0b0f); color:#f2c36b; box-shadow:inset 0 0 0 1px #f2c36bcc,0 2px 8px #0008; }
+.series-ribbon--pause { --badge-bg:linear-gradient(90deg,#d4d6dc,#8e929b); color:#111114; }
+.series-ribbon--never { --badge-bg:linear-gradient(90deg,#1c1c21,#0e0e12); color:#e4e4e7; box-shadow:inset 0 0 0 1px #e4e4e7b3,0 2px 8px #0008; }
+.series-8f__never { font-size:11px; font-weight:600; color:#a1a1aa; }
+.series-8f .series-8f__text h3 { -webkit-line-clamp:3; font-size:clamp(13px,3.65vw,15px); line-height:1.2; }
+.series-8f .series-8f__text p { font-size:12px; line-height:1.3; }
+.series-8f .series-8f__code { min-height:18px; line-height:1.3; }
+.series-8f .series-8f__days { width:58px; flex-shrink:0; }
+.series-8f .series-8f__days::before { inset:4px 0; }
+.series-8f .series-8f__action { width:58px; right:5px; }
+.series-8f[data-animated-badges="false"] .series-ribbon { animation:none; }
+@keyframes bdSheen { 0%,58% { background-position:150% 0,0 0; } 100% { background-position:-50% 0,0 0; } }
+@keyframes bdBreath { 50% { box-shadow:0 2px 8px #0008,0 0 12px 1px var(--bdg); } }
+@media(prefers-reduced-motion:reduce) { .series-ribbon { animation:none; } }
+
+.series-8f__days:disabled { opacity:1; cursor:progress; }

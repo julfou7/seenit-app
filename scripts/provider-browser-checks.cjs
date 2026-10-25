@@ -44,13 +44,13 @@ async function testProviderHarness(client, root) {
     await check(client, 'document.getElementById("login")', 'fixture montée');
     await evaluate(client, 'window.IntersectionObserver = undefined; document.getElementById("login").click()');
     await check(client, 'document.querySelector("#card-tv img") && window.__provider337.telemetry.reads === 1', 'cartes montées avant hydratation cloud');
-    await check(client, 'document.querySelector("#card-stale .series-8f__text").textContent.includes("Pas vu depuis") && !document.querySelector("#card-stale .series-8f__status") && !document.querySelector("#card-new-season .series-8f__text").textContent.includes("Pas vu depuis")', 'les anciennes séries gardent un texte discret sans aucun badge, sans contaminer une nouvelle saison');
+    await check(client, 'document.querySelector("#card-stale [data-series-badge=pause]") && !document.querySelector("#card-stale .series-8f__status") && !document.querySelector("#card-new-season .series-8f__text").textContent.includes("Pas vu depuis")', 'le ruban de durée des séries en pause ne contamine pas une nouvelle saison');
     await client.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
-    await check(client,'getComputedStyle(document.querySelector("#card-hot .series-8f__status")).animationName==="sbPulse"','badge chaud animé par défaut');
+    await check(client,'getComputedStyle(document.querySelector("#card-hot .series-ribbon")).animationName.includes("bdSheen")','badge chaud animé par défaut');
     await evaluate(client,'window.__provider337.setBadges(false)');
-    await check(client,'getComputedStyle(document.querySelector("#card-hot .series-8f__status")).animationName==="none"','réglage UID : animation désactivée sans remonter les cartes');
+    await check(client,'getComputedStyle(document.querySelector("#card-hot .series-ribbon")).animationName==="none"','réglage UID : animation désactivée sans remonter les cartes');
     await evaluate(client,'window.__provider337.setBadges(true)');
-    await check(client,'getComputedStyle(document.querySelector("#card-hot .series-8f__status")).animationName==="sbPulse"','réglage UID : animation rétablie');
+    await check(client,'getComputedStyle(document.querySelector("#card-hot .series-ribbon")).animationName.includes("bdSheen")','réglage UID : animation rétablie');
     await evaluate(client, 'window.__card337 = document.querySelector("#card-tv > div"); window.__provider337.finishCloud([531])');
     const logo = id => `document.querySelector('#${id} img')?.getAttribute('src') || ''`;
     await check(client, `(${logo('card-tv')}).includes('paramount.png') && (${logo('card-movie')}).includes('paramount.png') && (${logo('card-grid')}).includes('paramount.png')`, 'hydratation sans Réglages met à jour les cartes réelles et le cache hérité');
@@ -70,7 +70,7 @@ async function testProviderHarness(client, root) {
     await evaluate(client, 'window.__provider337.setPlatforms([]); window.__provider337.setPlex(false)');
     await check(client, `(${logo('card-tv')}).includes('netflix.png') && (${logo('card-unavailable')}).includes('netflix.png') && (${logo('card-grid')}).includes('netflix.png') && !document.querySelector('#card-grid-negative img')`, 'Plex absent permet le fallback public sans inventer de disponibilité');
     await check(client, 'window.__card337 === document.querySelector("#card-tv > div") && window.__provider337.telemetry.requests === 1', 'les cartes restent montées sans purge ni requête doublée');
-    await check(client, 'document.querySelector("#card-resume .series-8f__code").textContent.includes("S01 · E01") && !document.querySelector("#card-resume .series-8f__text").textContent.includes("À jour")', '#693 la carte réelle montre la reprise diffusée même sans pointeur');
+    await check(client, 'document.querySelector("#card-resume .series-8f__code").textContent.includes("S01 | E01") && !document.querySelector("#card-resume .series-8f__text").textContent.includes("À jour")', '#693 la carte réelle montre la reprise diffusée même sans pointeur');
     await evaluate(client, 'document.querySelector("#card-resume .series-8f__check").click()');
     await check(client, 'window.__provider337.telemetry.marks.length===1 && window.__provider337.telemetry.marks[0].id==="missing-resume" && window.__provider337.telemetry.marks[0].season===1 && window.__provider337.telemetry.marks[0].episode===1', '#693 la carte et la façade de production visent le même épisode sans toucher la diffusion future');
     const screenshot = await client.send('Page.captureScreenshot', { format: 'png' });

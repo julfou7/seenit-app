@@ -19,6 +19,14 @@ const app = readFileSync('src/App.tsx', 'utf8');
 const showDetail = readFileSync('src/screens/ShowDetailScreenCore.tsx', 'utf8');
 const plexStorage = readFileSync('src/features/plex/plexStorage.ts', 'utf8');
 
+test('SEENIT-UX-018 les deux notifications natives Plex exposent leur identité au fil sans token', () => {
+  const start = worker.indexOf('private static Bundle inboxExtras');
+  const payload = worker.slice(start, worker.indexOf('static void showImportNotification', start));
+  for (const key of ['ownerUidHash', 'tmdbId', 'mediaType', 'season', 'episode']) assert.ok(payload.includes(`"${key}"`));
+  assert.doesNotMatch(payload, /plexToken|accessToken|authToken|serverUri/);
+  assert.equal((worker.match(/\.addExtras\(inboxExtras\(/g) || []).length, 2, 'import et disponibilité branchés au contrat Android lu par Capacitor');
+});
+
 test('SEENIT-NOTIFICATION-003 vérifie Plex en arrière-plan sans exposer le token', () => {
   assert.ok(server.includes('deliverDownloadWebhookPresentation'));
   assert.ok(delivery.includes("platform: 'android'"));

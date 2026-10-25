@@ -192,19 +192,16 @@ function HistoryRowItem({
     ...(target.mediaType === 'tv' ? [{ label: 'Ouvrir la série', onSelect: () => onShowClick?.(target.showId, 'tv') }] : []),
   ];
   const grouped = row.members.length > 1;
-  const clocks = row.members.map(member => formatHistoryClock(member.watchedAt, member.watchedTimeKnown));
-  const latestClock = clocks[0];
-  const earliestClock = clocks.at(-1);
-  const clock = clocks.every(Boolean) ? grouped && latestClock !== earliestClock ? `${earliestClock}–${latestClock}` : latestClock : null;
-  const dateLabel = historyLocalDayKey(item.watchedAt) === localTodayKey() ? clock || 'heure inconnue' : `${formatHistoryRowDate(item.watchedAt)} · ${clock || 'heure inconnue'}`;
+  const clock = formatHistoryClock(item.watchedAt, item.watchedTimeKnown);
+  const dateLabel = historyLocalDayKey(item.watchedAt) === localTodayKey() ? 'ce soir' : formatHistoryRowDate(item.watchedAt);
   const historyActions = grouped ? [{ label: 'Ouvrir la série', onSelect: () => onShowClick?.(item.showId, 'tv') }] : actionsFor(item);
-  const actionGroups = grouped ? [...row.members].reverse().map(target => ({ label: `S${target.season} · E${target.episode}`, actions: actionsFor(target) })) : undefined;
+  const actionGroups = grouped ? [...row.members].reverse().map(target => ({ label: `S${String(target.season).padStart(2, '0')} | E${String(target.episode).padStart(2, '0')}`, actions: actionsFor(target) })) : undefined;
 
 
   return <div ref={cardRef} className="history-entry-host">
     <HistoryEntryRow title={item.showTitle} episodeTitle={grouped ? `${row.members.length} épisodes d’affilée` : item.mediaType === 'tv' ? episodeTitle || `Épisode ${item.episode}` : movieMetadata?.genres[0]}
       code={historyGroupCode(row)} groupCount={row.members.length} actionGroups={actionGroups}
-      date={dateLabel} today={historyLocalDayKey(item.watchedAt) === localTodayKey()} timestamp={item.watchedAt}
+      date={dateLabel} clock={clock || 'heure inconnue'} today={historyLocalDayKey(item.watchedAt) === localTodayKey()} timestamp={item.watchedAt}
       images={[show.posterPath, show.backdropPath]}
       label={grouped ? `${show.title}, ${row.members.length} épisodes d’affilée, ${historyGroupCode(row)}` : ariaLabel} onOpen={handleRowClick} actions={historyActions} />
   </div>;
@@ -291,7 +288,7 @@ export function HistoryFeed({
 
   const rows = useMemo(() => groupHistoryRows(historyItems, (id, season) => showsById.get(id)?.seasonProgress?.[String(season)]?.episode_count || showsById.get(id)?.seasonsCache?.find(item => item.season_number === season)?.episode_count || null), [historyItems, showsById]);
   const displayedRows = useMemo(() => rows.slice(0, page * itemsPerPage), [rows, page]);
-  const displayedItems = useMemo(() => displayedRows.map(row => row.item), [displayedRows]);
+  const displayedItems = useMemo(() => displayedRows.flatMap(row => row.members), [displayedRows]);
 
   useEffect(() => {
     let mounted = true;
@@ -302,7 +299,7 @@ export function HistoryFeed({
       void Promise.all(missing.map(item => historyDetailRequestLimiter.run(async () => {
         const key = getMetadataKey(item);
         if (item.mediaType === 'tv') {
-          const result = await tmdb.getEpisodeDetails(item.tmdbId!, item.season, item.episode);
+          const result = await tmdb.getEpisodeHistoryMetadata(item.tmdbId!, item.season, item.episode);
           const value = result.ok ? asRecord(result.value) : null;
           return [key, {
             kind: 'episode',
@@ -480,7 +477,7 @@ export function HistoryFeed({
 
     const epLabel = isMovie
       ? `« ${item.showTitle} »`
-      : `« ${item.showTitle} » S${String(item.season).padStart(2, '0')}E${String(item.episode).padStart(2, '0')}`;
+      : `« ${item.showTitle} » S${String(item.season).padStart(2, '0')} | E${String(item.episode).padStart(2, '0')}`;
     showToast(
       `${epLabel} retiré de l'historique`,
       'info',
@@ -516,7 +513,8 @@ export function HistoryFeed({
   const minutes = (item: HistoryItem): number | null => {
     const metadata = metadataByKey[getMetadataKey(item)];
     const cached = item.tmdbId ? tmdb.peekRenderableMediaDetails(item.tmdbId, item.mediaType) : null;
-    const value = metadata?.runtime || (item.mediaType === 'movie' ? cached?.runtime : cached?.episode_run_time?.[0]);
+    const record = item.mediaType === 'movie' ? showsById.get(item.showId)?.episodeRecords?.movie : historyEpisodeEntries(showsById.get(item.showId)!).find(entry => entry.key === `${item.season}x${item.episode}`)?.record;
+    const value = metadata?.runtime || asPositiveNumber(record?.runtime) || (item.mediaType === 'movie' ? cached?.runtime : cached?.episode_run_time?.[0]);
     return asPositiveNumber(value) || null;
   };
 
@@ -574,7 +572,7 @@ export function HistoryFeed({
               <h3 className="text-base font-bold text-white">Marquer comme non vu ?</h3>
             </div>
             <p className="text-zinc-300 text-xs sm:text-sm leading-relaxed">
-              Voulez-vous vraiment retirer <strong className="text-white">{unseenModalItem.showTitle}</strong> {unseenModalItem.mediaType === 'movie' ? 'de vos films vus' : `(S${String(unseenModalItem.season).padStart(2, '0')}E${String(unseenModalItem.episode).padStart(2, '0')})`} de votre historique ?
+              Voulez-vous vraiment retirer <strong className="text-white">{unseenModalItem.showTitle}</strong> {unseenModalItem.mediaType === 'movie' ? 'de vos films vus' : `(S${String(unseenModalItem.season).padStart(2, '0')} | E${String(unseenModalItem.episode).padStart(2, '0')})`} de votre historique ?
             </p>
             <div className="flex items-center justify-end gap-2.5 pt-2">
               <button type="button" onClick={() => setUnseenModalItem(null)} data-dialog-initial-focus className="min-h-11 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-bold transition-colors cursor-pointer">Annuler</button>

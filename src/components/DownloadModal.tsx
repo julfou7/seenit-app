@@ -173,7 +173,7 @@ export function DownloadModal({
     tmdb.getShowDetails(Number(tmdbId)).then(result => {
       if (result.ok && result.value && Array.isArray(result.value.seasons)) {
         const seasons = result.value.seasons
-          .filter((season: any) => season.season_number > 0)
+          .filter((season: { season_number: number }) => season.season_number > 0)
           .map((season: any) => ({
             season_number: season.season_number,
             episode_count: season.episode_count || 1,
@@ -615,7 +615,7 @@ export function DownloadModal({
                     ? 'Toute la série'
                     : scopeMode === 'season'
                       ? `Saison ${selectedSeason}`
-                      : `S${String(selectedSeason).padStart(2, '0')}E${String(selectedEpisode).padStart(2, '0')}`}
+                      : `S${String(selectedSeason).padStart(2, '0')} | E${String(selectedEpisode).padStart(2, '0')}`}
                 </span>
               </div>
 

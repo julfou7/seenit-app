@@ -1,10 +1,12 @@
+import { writeUserScopedJson } from '../../lib/userIsolation';
+import { loadPlexCloudState, persistPlexCloudState } from './plexCloudState';
 import { getPlexSyncRetryAt, PlexSyncHttpError } from './plexSyncRetry';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { db, auth } from '../../lib/firebase';
 import { collection, doc, writeBatch, getDocs, getDocFromServer, runTransaction, setDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { tmdb } from '../shows/tmdb';
 import { fetchAuthoritativeShowsForUser, useShowsStore } from '../../store/showsStore';
-import { useSyncStore } from '../../store/syncStore';
+import { type PlexSyncProgress, useSyncStore } from '../../store/syncStore';
 import { useToastStore } from '../../store/toastStore';
 import { openExternalUrl } from '../../lib/utils';
 import { appLogger } from '../../store/logStore';
@@ -75,38 +77,6 @@ import {
 } from './plexResolution';
 
 const activePlexSyncPromises = new Map<string, Promise<PlexSyncResult>>();
-
-async function loadPlexCloudState(userId: string): Promise<Record<string, any>> {
-  const snapshot = await getDocFromServer(doc(db, 'users', userId, 'settings', 'plex'));
-  return snapshot.exists() ? snapshot.data() : {};
-}
-
-async function persistPlexCloudState(
-  userId: string,
-  values: { lastSyncTimestamp?: number; resolutionCache?: Record<string, any> }
-): Promise<void> {
-  const plexRef = doc(db, 'users', userId, 'settings', 'plex');
-  await runTransaction(db, async (transaction) => {
-    const currentSnapshot = await transaction.get(plexRef);
-    const current = currentSnapshot.exists() ? currentSnapshot.data() : {};
-    const next: Record<string, any> = {};
-
-    if (values.lastSyncTimestamp !== undefined) {
-      next.lastSyncTimestamp = Math.max(
-        Number(current.lastSyncTimestamp) || 0,
-        values.lastSyncTimestamp
-      );
-    }
-    if (values.resolutionCache) {
-      next.resolutionCache = mergePlexResolutionCaches(
-        current.resolutionCache || {},
-        values.resolutionCache
-      );
-    }
-
-    transaction.set(plexRef, next, { merge: true });
-  });
-}
 
 export async function performPlexSync(options: { delta?: boolean; silent?: boolean; ignoreCooldown?: boolean } = {}): Promise<PlexSyncResult> {
   const { delta = true, silent = false, ignoreCooldown = false } = options;
@@ -185,9 +155,18 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       }
     }
 
+    const progress: PlexSyncProgress = { uid: user.uid, mode: delta ? 'delta' : 'full', phase: 'collect', processed: 0, servers: [] };
+    const publishStatus = (status: { message: string }) => useSyncStore.getState().setPlexSyncStatus({ ...status, progress: { ...progress } });
+    const waitForResume = async () => {
+      while (useSyncStore.getState().plexPauseUid === user.uid) {
+        if (auth.currentUser?.uid !== user.uid) throw new Error('Compte SeenIt modifié pendant la pause Plex');
+        await new Promise(resolve => setTimeout(resolve, 250));
+      }
+      if (auth.currentUser?.uid !== user.uid) throw new Error('Compte SeenIt modifié pendant la synchronisation Plex');
+    };
     // // appLogger.info('plex', `Démarrage de la synchronisation Plex (${delta ? 'Mode Delta / Rapide' : 'Mode Complet'})...`);
     if (!silent) {
-      useSyncStore.getState().setPlexSyncStatus({
+      publishStatus({
         message: delta
           ? 'Vérification rapide des visionnages récents...'
           : 'Scan complet : Interrogation de vos serveurs Plex...'
@@ -195,8 +174,10 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
     }
 
     const clearPlexSyncStatusDelayed = (message?: string, delayMs: number = 3000) => {
+      progress.phase = /erreur|pause|incompl/i.test(message || '') ? 'error' : 'done';
+      if (auth.currentUser?.uid === user.uid) writeUserScopedJson(user.uid, 'plex_last_sync_report_v1', { message: message || 'Synchronisation terminée', progress: { ...progress } });
       if (message && !silent) {
-        useSyncStore.getState().setPlexSyncStatus({ message });
+        publishStatus({ message });
       }
       setTimeout(() => {
         // Only clear if the status hasn't been changed by a new sync
@@ -213,6 +194,11 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         throw new Error('Compte SeenIt modifié pendant la synchronisation Plex');
       }
       const { history = [], watchlist = [], libraryAvailability = [], libraryWatchStates = [], visitedSources = [] } = plexData || {};
+      progress.historyTotal = history.length; progress.watchlistTotal = watchlist.length;
+      progress.servers = [...(plexData?.integrity?.syncedServers || []), ...(plexData?.integrity?.skippedServers || [])];
+      progress.complete = plexData?.integrity?.collectionComplete === true;
+      progress.phase = 'resolve';
+      await waitForResume();
       const nextSyncCursor = Number(plexData?.cursor) || Date.now();
       const serverSyncSummary = describePlexServerSync(plexData?.integrity);
       const serverSyncCounts = getPlexServerSyncCounts(plexData?.integrity);
@@ -288,7 +274,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       const sourcesSummary = visitedSources && visitedSources.length > 0 ? ` [Sources: ${visitedSources.join(', ')}]` : '';
       // // appLogger.info('plex', `${history?.length || 0} historique(s) + ${watchlist?.length || 0} watchlist(s) récupéré(s) depuis Plex${sourcesSummary}`, { sample: (history || []).slice(0, 5) });
       if (!silent) {
-        useSyncStore.getState().setPlexSyncStatus({
+        publishStatus({
           message: `Analyse Plex (${totalItemsCount} élément(s)...)`
         });
       }
@@ -364,7 +350,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       }
       if (resolutionCandidates.size > 0) {
         if (!silent) {
-          useSyncStore.getState().setPlexSyncStatus({
+          publishStatus({
             message: `Résolution Plex (${resolutionCandidates.size} identité(s) uniques...)`
           });
         }
@@ -469,14 +455,17 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         return true;
       };
 
+      progress.phase = 'watched'; progress.total = history.length; progress.processed = 0;
+      publishStatus({ message: 'Réconciliation des visionnages Plex…' });
       const totalItems = history.length;
       let processedCount = 0;
 
       for (const rawItem of history) {
         const item = unwrapPlexMediaItem(rawItem);
-        processedCount++;
+        await waitForResume();
+        processedCount++; progress.processed = processedCount;
         if (!silent && processedCount % 15 === 0 && processedCount < totalItems) {
-          useSyncStore.getState().setPlexSyncStatus({
+          publishStatus({
             message: `Analyse Plex (${processedCount}/${totalItems})...`
           });
         }
@@ -818,7 +807,11 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
       // Process Plex Watchlist items (auto-import to "À Voir" / "Ma Liste")
       if (hasWatchlist) {
+        progress.phase = 'watchlist'; progress.total = watchlist.length; progress.processed = 0;
         for (const rawWlItem of watchlist) {
+          await waitForResume();
+          progress.processed++;
+          if (!silent) publishStatus({ message: `Watchlist Plex (${progress.processed}/${watchlist.length})` });
           const wlItem = unwrapPlexMediaItem(rawWlItem);
           const mediaType: 'tv' | 'movie' = wlItem.type === 'show' || wlItem.type === 'series' || wlItem.type === 'tv' ? 'tv' : 'movie';
           const rawTitle = wlItem.title || wlItem.grandparentTitle || 'Média inconnu';
@@ -952,6 +945,10 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         });
       }
 
+      await waitForResume();
+      progress.phase = 'save';
+      progress.changed = syncCount; progress.alreadyWatched = alreadyWatchedCount; progress.unresolved = unresolvedCount;
+      if (!silent) publishStatus({ message: 'Enregistrement des changements Plex…' });
       if (syncCount > 0 || Object.keys(mutatedShows).length > 0 || watchlistRemovalCandidates.length > 0) {
         // 2. Save all mutated and new shows to Firestore in safe chunks of 250
         const showEntries = Object.entries(mutatedShows);
@@ -1053,10 +1050,10 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           );
         });
 
-        clearPlexSyncStatusDelayed(`Synchro terminée (${syncCount} changement(s))`, 3500);
+
       } else {
         // // appLogger.info('plex', 'Synchronisation terminée : 0 nouveau média (votre bibliothèque est déjà à jour)');
-        clearPlexSyncStatusDelayed('Sync Plex terminée (à jour)', 3500);
+
       }
 
       appLogger.success(
@@ -1099,6 +1096,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         }
       } else {
         const reason = describeIncompletePlexSync(plexData?.integrity, retryableUnresolvedCount);
+        clearPlexSyncStatusDelayed('Synchronisation Plex incomplète — nouvel essai requis', 5000);
         appLogger.warn('plex', `[Plex Sync] Curseur conservé pour permettre un nouvel essai : ${reason}.`);
         if (!silent) {
           useToastStore.getState().showToast(`Plex sera retenté automatiquement : ${reason}.`, 'info');
@@ -1136,6 +1134,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
   const promise = syncExecution().finally(() => {
     activePlexSyncPromises.delete(currentUserId);
+    if (useSyncStore.getState().plexPauseUid === currentUserId) useSyncStore.getState().setPlexPauseUid(null);
   });
   activePlexSyncPromises.set(currentUserId, promise);
   return promise;

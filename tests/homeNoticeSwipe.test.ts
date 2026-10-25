@@ -13,9 +13,9 @@ test('SEENIT-UX-018 le swipe retire une notification sans confondre scroll clic 
   const module = { exports: {} as { HomeNoticeSwipe: (props: { children: string; onDismiss: () => void }) => { props: Record<string, (event: unknown) => void> } } };
   vm.runInContext(bundle.outputFiles[0].text, vm.createContext({ module }));
   for (const gesture of [
-    { dx: -71, dy: 0, dismissed: 0 }, { dx: -100, dy: 0, dismissed: 1 },
-    { dx: 100, dy: 0, dismissed: 0 }, { dx: -10, dy: 100, dismissed: 0 },
-    { dx: -100, dy: 0, action: true, dismissed: 0 }, { dx: -100, dy: 0, cancel: true, dismissed: 0 },
+    { dx: 71, dy: 0, dismissed: 0 }, { dx: 100, dy: 0, dismissed: 1 },
+    { dx: -100, dy: 0, dismissed: 0 }, { dx: -10, dy: 100, dismissed: 0 },
+    { dx: 100, dy: 0, action: true, dismissed: 0 }, { dx: 100, dy: 0, cancel: true, dismissed: 0 },
   ]) {
     let dismissed = 0, blockedClick = false;
     const handlers = module.exports.HomeNoticeSwipe({ children: 'Une notification', onDismiss: () => dismissed++ }).props;

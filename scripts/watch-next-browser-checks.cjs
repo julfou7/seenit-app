@@ -78,8 +78,8 @@ async function testWatchNextHarness(client, root) {
     await evaluate(client, 'window.__watch18c.clearToasts()');
     const movie = '[data-movie-ticket="movie-1"]';
     await click(client, `${movie} .movie-ticket__check`);
-    await check(client, `document.querySelector('${movie}.movie-ticket--watched') && document.querySelector('${movie} .movie-ticket__undo')`, 'billet déchiré et tampon réversible');
-    await click(client, `${movie} .movie-ticket__undo`);
+    await check(client, `document.querySelector('${movie}.movie-ticket--watched') && document.querySelector('${movie} .movie-ticket__check[aria-pressed=true]')`, 'billet déchiré et tampon réversible');
+    await click(client, `${movie} .movie-ticket__check`);
     await check(client, `!document.querySelector('${movie}.movie-ticket--watched') && document.querySelector('${movie}.movie-ticket--back')`, 'tap tampon Vu recolle le billet');
     await click(client, '#films-a-voir-18c .home-load-more--tile');
     await check(client, 'document.querySelectorAll("[data-movie-ticket]").length===12', 'la tuile du rail ouvre les douze premiers films en liste');

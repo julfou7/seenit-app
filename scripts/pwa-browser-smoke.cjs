@@ -1,3 +1,4 @@
+const { testTerrain222Harness } = require('./home-terrain222-browser-checks.cjs');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -560,6 +561,7 @@ async function main() {
       watchNext: await testWatchNextHarness(client, root),
       homeV4: await testTerrain220Harness(client, root),
       homeTerrain221: await testTerrain221Harness(client, root),
+      homeTerrain222: await testTerrain222Harness(client, root),
       generatedAt: new Date().toISOString(),
       issue: config.issue,
       status: 'pass',

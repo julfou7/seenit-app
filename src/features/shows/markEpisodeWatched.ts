@@ -49,6 +49,7 @@ export async function markEpisodeWatched(
   const newSeenArray = Array.from(newSeenSet);
 
   let fetchedEpTitle: string | null = null;
+  let fetchedRuntime: number | null = null;
   let optimisticNextEp: Show['nextEpisodeToWatch'] = null;
   const totalEps = targetShow.totalAiredEpisodes || targetShow.totalEpisodes || 0;
 
@@ -56,8 +57,9 @@ export async function markEpisodeWatched(
     try {
       const seasonRes = await tmdb.getSeasonDetails(targetShow.tmdbId, sNum);
       if (seasonRes.ok && seasonRes.value?.episodes) {
-        const curEp = seasonRes.value.episodes.find((x: any) => x.episode_number === eNum);
+        const curEp = seasonRes.value.episodes.find((x: { episode_number: number; name?: string; runtime?: number }) => x.episode_number === eNum);
         if (curEp && curEp.name) fetchedEpTitle = curEp.name;
+        if (typeof curEp?.runtime === 'number' && curEp.runtime > 0) fetchedRuntime = curEp.runtime;
 
         if (totalEps > 0 && newSeenArray.length >= totalEps) {
           optimisticNextEp = null;
@@ -125,7 +127,8 @@ export async function markEpisodeWatched(
         ...prevEpisodeRecords[epKey],
         watchedAt: Date.now(),
         watchedTimeKnown: true,
-        episodeTitle
+        episodeTitle,
+        ...(fetchedRuntime ? { runtime: fetchedRuntime } : {})
       }
     },
     lastWatchedAt: Date.now(),
@@ -155,7 +158,8 @@ export async function markEpisodeWatched(
         ...prevEpisodeRecords[epKey],
         watchedAt: Date.now(),
         watchedTimeKnown: true,
-        episodeTitle: fetchedEpTitle || optimisticNextEp?.name || null
+        episodeTitle: fetchedEpTitle || optimisticNextEp?.name || null,
+        ...(fetchedRuntime ? { runtime: fetchedRuntime } : {})
       };
 
       if (optimisticNextEp !== undefined) {
@@ -200,7 +204,7 @@ export async function markEpisodeWatched(
   scrollAllCarouselsToStart();
 
   useToastStore.getState().showToast(
-    `« ${targetShow.title} » S${sNumStr}E${eNumStr} marqué comme vu !`,
+    `« ${targetShow.title} » S${sNumStr} | E${eNumStr} marqué comme vu !`,
     'success',
     targetShow,
     async () => {

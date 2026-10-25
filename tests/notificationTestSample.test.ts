@@ -69,7 +69,7 @@ test('TNR #106 : Tester choisit le prochain épisode réel plutôt que le premie
   assert.equal(sample.eventDate, '2026-09-07');
   assert.equal(sample.summaryText, '🆕 Nouvel épisode');
   assert.equal(sample.notificationTitle, 'Série la plus proche');
-  assert.match(sample.body, /S03E04/);
+  assert.match(sample.body, /S03 \| E04/);
   assert.match(sample.body, /· Demain/);
   assert.doesNotMatch(sample.body, /Série la plus proche/);
   assert.equal(sample.richImageUrl, 'https://image.tmdb.org/t/p/w500/nearest-still.jpg');

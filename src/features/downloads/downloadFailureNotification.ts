@@ -36,7 +36,7 @@ export function downloadFailurePresentation(receipt: DownloadFailureReceipt): {
   data: Record<string, string>;
 } {
   const scope = receipt.mediaType === 'movie' ? '' : receipt.episode !== undefined
-    ? ` · S${String(receipt.season).padStart(2, '0')}E${String(receipt.episode).padStart(2, '0')}`
+    ? ` · S${String(receipt.season).padStart(2, '0')} | E${String(receipt.episode).padStart(2, '0')}`
     : receipt.season !== undefined ? ` · Saison ${receipt.season}` : ' · Toute la série';
   const data: Record<string, string> = {
     type: 'NAVIGATE_SHOW', notificationKind: 'download_failure', mediaType: receipt.mediaType, tmdbId: String(receipt.tmdbId),

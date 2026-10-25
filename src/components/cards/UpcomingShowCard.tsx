@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Calendar, Bell } from 'lucide-react';
 import { type Show } from '../../types';
-import { requestNotificationPermission, auth, db, sendNativeNotification } from '../../lib/firebase';
+import { requestNotificationPermission, auth, db } from '../../lib/firebase';
 import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { useToastStore } from '../../store/toastStore';
 import { useShows } from '../../hooks/useShows';
@@ -159,18 +159,7 @@ function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, action
     setIsReminderSet(nextState);
     if (nextState) writeUserScopedJson(ownerUid, targetStorageField, true);
     else removeUserScopedValue(ownerUid, targetStorageField);
-    showToast(`« ${target.title} » S${sNumStr}E${eNumStr} • Rappel ${nextState ? 'activé' : 'désactivé'}`, 'reminder', target);
-    if (nextState) {
-      const posterUrl = target.posterPath ? target.posterPath.startsWith('http') ? target.posterPath : `https://image.tmdb.org/t/p/w185${target.posterPath}` : 'https://seenit.app/icon-192.png';
-      const still = ep.still_path || target.nextEpisodeToAir?.still_path || target.nextEpisodeToWatch?.still_path || target.backdropPath;
-      try {
-        void sendNativeNotification(`🔔 Rappel programmé : ${target.title}`, {
-          body: `Rappel enregistré pour l'épisode ${episodeString} (${ep.name || 'Prochainement'})`,
-          icon: posterUrl, image: still ? still.startsWith('http') ? still : `https://image.tmdb.org/t/p/w780${still}` : posterUrl,
-          data: { showId: target.id, tmdbId: target.tmdbId, mediaType: target.mediaType || 'tv', season: ep.season_number, episode: ep.episode_number },
-        }).catch(error => appLogger.warn('system', 'Notification locale de rappel indisponible', error));
-      } catch (error) { appLogger.warn('system', 'Notification locale de rappel indisponible', error); }
-    }
+
   };
   const toggleReminder = async (event: React.MouseEvent) => {
     event.stopPropagation();

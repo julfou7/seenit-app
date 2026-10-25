@@ -3,6 +3,7 @@ export interface PlexServerSyncEntry {
   name: string;
   watchedItems?: number;
   inventoryItems?: number;
+  owned?: boolean;
   reason?: string;
 }
 
@@ -49,7 +50,7 @@ export function isPermanentPlexResolutionMiss(error: unknown): boolean {
     ? error.message
     : typeof error === 'string'
       ? error
-      : String((error as any)?.message || error || '');
+      : String(error && typeof error === 'object' && 'message' in error ? error.message : error || '');
   return /TMDB Error:\s*404|No media found/i.test(message);
 }
 

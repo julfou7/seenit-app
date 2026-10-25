@@ -45,6 +45,22 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
   const preserveLayout = useCardLayoutAnchor();
   const [railLimits, setRailLimits] = useState<Record<number, number>>({});
   const [movieRailLimit, setMovieRailLimit] = useState(HOME_PAGE_SIZE);
+  const revealAnchor = useRef<{ rail: string; attribute: string; id: string } | null>(null);
+  useLayoutEffect(() => {
+    const anchor = revealAnchor.current;
+    if (!anchor) return;
+    revealAnchor.current = null;
+    const rail = document.getElementById(anchor.rail);
+    const item = rail && [...rail.querySelectorAll<HTMLElement>(`[${anchor.attribute}]`)].find(element => element.getAttribute(anchor.attribute) === anchor.id);
+    if (!rail || !item) return;
+    const previousSnap = rail.style.scrollSnapType;
+    rail.style.scrollSnapType = 'none';
+    const target = rail.scrollLeft + item.getBoundingClientRect().left - rail.getBoundingClientRect().left - (parseFloat(getComputedStyle(rail).scrollPaddingInlineStart) || 16);
+    const oldTail = parseFloat(rail.style.getPropertyValue('--layout-anchor-tail')) || 0;
+    rail.style.setProperty('--layout-anchor-tail', `${Math.max(0, target - (rail.scrollWidth - rail.clientWidth - oldTail))}px`);
+    rail.scrollLeft = target;
+    requestAnimationFrame(() => { rail.style.scrollSnapType = previousSnap; });
+  }, [railLimits, movieRailLimit]);
   const [expandedGroups, setExpandedGroups] = useState<Record<number, boolean>>({});
   const [groupLimits, setGroupLimits] = useState<Record<number, number>>({});
   const [movieList, setMovieList] = useState(false);
@@ -157,14 +173,14 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
     if (value === movieList) return;
     preserveLayout('films-a-voir-18c', 'data-movie-ticket', value, first => {
       if (value) setMovieCount(Math.max(3, first + 1));
-      else setMovieRailLimit(HOME_PAGE_SIZE);
+      else setMovieRailLimit(Math.max(HOME_PAGE_SIZE, first + 1));
       setMovieList(value);
     });
   };
   const start = now;
   const renderSeriesGroup = (index: number) => {
       const label = ['Continuer à regarder', 'Nouveautés', 'Pas vu depuis un moment'][index];
-      const items = series.filter(show => memberships.current.get(show.id) === index);
+      const items = series.filter(show => memberships.current.get(show.id) === index).sort((a, b) => index === 2 ? Number(Boolean(b.seenEpisodes?.length)) - Number(Boolean(a.seenEpisodes?.length)) : 0);
       if (!items.length) return null;
       const expanded = Boolean(expandedGroups[index]);
       const limit = expanded ? groupLimits[index] || 3 : railLimits[index] || HOME_PAGE_SIZE;
@@ -173,17 +189,18 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
         preserveLayout(`home-series-${index}`, 'data-series-id', value, first => {
           setExpandedGroups(previous => ({ ...previous, [index]: value }));
           if (value) setGroupLimits(previous => ({ ...previous, [index]: Math.max(3, first + 1) }));
-          else setRailLimits(previous => ({ ...previous, [index]: HOME_PAGE_SIZE }));
+          else setRailLimits(previous => ({ ...previous, [index]: Math.max(HOME_PAGE_SIZE, first + 1) }));
         });
       };
       return <section key={label} className="home-series-section" aria-labelledby={`home-section-${index}`}>
         <header className="home-section-heading"><h2 id={`home-section-${index}`}><span className="home-section-name">{label}</span><span className="home-count">{items.length}</span></h2><HomeLayoutSwitch label={label} list={expanded} onChange={switchLayout} /></header>
+        {index === 2 && <p className="home-stale-subtitle">En pause ou jamais commencées, depuis plus de 2 mois</p>}
         <div className={expanded ? 'home-series-list' : 'home-series-rail'} id={`home-series-${index}`}>
           {items.slice(0, limit).map(show => {
             const card = <ContinueWatchingCard show={show} layout={expanded ? 'list' : 'rail'} animateSeen showStaleDetail={index === 2} lastMarkedEpisode={retained[show.id]?.episode} onMarkUnseen={onUnseen} onMarkAsSeen={markSeries} onShowClick={onOpen} onEpisodeClick={onEpisode} actions={actions(show)} />;
             return expanded && index > 0 ? <HomeSwipeCard key={show.id} onArchive={() => actions(show).find(action => action.label.startsWith('Archiver'))?.onSelect()} onRemove={() => actions(show).find(action => action.destructive)?.onSelect()}>{card}</HomeSwipeCard> : <div key={show.id} className={arrivals.has(show.id) ? 'home-series-arrival' : undefined}>{card}</div>;
           })}
-          {!expanded && <HomeLoadMore tile items={items.slice(limit)} onLoad={() => setRailLimits(previous => ({ ...previous, [index]: limit + HOME_PAGE_SIZE }))} />}
+          {!expanded && <HomeLoadMore tile items={items.slice(limit)} onLoad={() => { revealAnchor.current = { rail: `home-series-${index}`, attribute: 'data-series-id', id: items[limit].id }; setRailLimits(previous => ({ ...previous, [index]: limit + HOME_PAGE_SIZE })); }} />}
         </div>
         {expanded && <HomeLoadMore items={items.slice(limit)} onLoad={() => setGroupLimits(previous => ({ ...previous, [index]: limit + HOME_PAGE_SIZE }))} />}
       </section>;
@@ -195,7 +212,7 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
       <p className="home-movie-order">Ajouts les plus récents</p>
       <div className={movieList ? 'home-movie-list' : 'movie-ticket-rail'} id="films-a-voir-18c">
         {orderedMovies.slice(0, movieList ? movieCount : movieRailLimit).map(show => <MovieTicketCard key={show.id} show={show} layout={movieList ? 'horizontal' : 'poster'} start={start} onOpen={onOpen} onToggle={toggleMovie} onRuntime={onRuntime} actor={selectTicketActor(actorMetadata.get(`movie:${show.tmdbId}`) || tmdb.peekRenderableMediaDetails(show.tmdbId, 'movie'), favorites, actorIndex)} onActor={actor => setActorSheet({ actor, origin: show })} />)}
-        {!movieList && <HomeLoadMore tile items={orderedMovies.slice(movieRailLimit)} onLoad={() => setMovieRailLimit(count => count + HOME_PAGE_SIZE)} />}
+        {!movieList && <HomeLoadMore tile items={orderedMovies.slice(movieRailLimit)} onLoad={() => { revealAnchor.current = { rail: 'films-a-voir-18c', attribute: 'data-movie-ticket', id: orderedMovies[movieRailLimit].id }; setMovieRailLimit(count => count + HOME_PAGE_SIZE); }} />}
       </div>
       {movieList && <HomeLoadMore items={orderedMovies.slice(movieCount)} onLoad={() => setMovieCount(count => count + HOME_PAGE_SIZE)} />}
     </>}

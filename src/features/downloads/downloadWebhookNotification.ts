@@ -117,7 +117,7 @@ export function buildDownloadWebhookPresentation(
   const mediaTitle = displayText(payload?.movie?.title || payload?.series?.title, 'Média');
   const tmdbId = positiveInteger(payload?.movie?.tmdbId ?? payload?.series?.tmdbId);
   const episode = mediaType === 'tv' ? firstEpisode(payload) : null;
-  const suffix = episode ? ` (S${episode.season}E${episode.episode})` : '';
+  const suffix = episode ? ` (S${String(episode.season).padStart(2, '0')} | E${String(episode.episode).padStart(2, '0')})` : '';
 
   const data: Record<string, string> = {
     ...commonData,

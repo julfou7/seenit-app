@@ -944,6 +944,24 @@ export class TMDBClient {
     });
   }
 
+  /** Compact public history evidence never masquerades as full episode/video details. */
+  async getEpisodeHistoryMetadata(id: number, seasonNumber: number, episodeNumber: number) {
+    const key = `${id}:${seasonNumber}:${episodeNumber}`;
+    const cached = await readPublicMetadataCache<TmdbEpisodeDetails>('episode', key, { allowStale: true });
+    if (cached?.fresh) return ok(cached.data);
+    const remember = (raw: TmdbEpisodeDetails) => {
+      const summary = { episode_number: episodeNumber, name: raw.name, runtime: raw.runtime, still_path: raw.still_path, air_date: raw.air_date };
+      if (typeof summary.runtime === 'number' && summary.runtime > 0) writePublicMetadataCache('episode', key, summary);
+      return summary;
+    };
+    const season = await readPublicMetadataCache<{ episodes?: TmdbEpisodeDetails[] }>('season', `${id}:${seasonNumber}`, { allowStale: true });
+    const fromSeason = season?.data.episodes?.find(item => item.episode_number === episodeNumber);
+    if (season?.fresh && fromSeason && typeof fromSeason.runtime === 'number' && fromSeason.runtime > 0) return ok(remember(fromSeason));
+    const result = await this.getEpisodeDetails(id, seasonNumber, episodeNumber);
+    if (!result.ok) return cached ? ok(cached.data) : result;
+    return ok(remember(result.value));
+  }
+
   async getEpisodeDetails(id: number, seasonNumber: number, episodeNumber: number): Promise<Result<any>> {
     const cacheKey = `${id}:${seasonNumber}:${episodeNumber}`;
     const cached = this.episodeDetailsCache.get(cacheKey);
@@ -953,10 +971,10 @@ export class TMDBClient {
 
     const url = new URL(`${this.baseUrl}/tv/${id}/season/${seasonNumber}/episode/${episodeNumber}?language=fr-FR&append_to_response=videos&include_video_language=fr,en,null`);
     const res = await tryCatch(authenticatedFetch(url.toString()));
-    if (!res.ok) return err((res as any).error);
+    if (!res.ok) return err('error' in res ? res.error : new Error('Métadonnées épisode indisponibles'));
     if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
     const data = await tryCatch(res.value.json());
-    if (!data.ok) return err((data as any).error);
+    if (!data.ok) return err('error' in data ? data.error : new Error('Réponse épisode illisible'));
     if (data.value && data.value.status_code) return err(new Error(data.value.status_message || 'TMDB Error'));
 
     if (data.value) {
