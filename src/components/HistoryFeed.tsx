@@ -514,7 +514,7 @@ export function HistoryFeed({
     const metadata = metadataByKey[getMetadataKey(item)];
     const cached = item.tmdbId ? tmdb.peekRenderableMediaDetails(item.tmdbId, item.mediaType) : null;
     const record = item.mediaType === 'movie' ? showsById.get(item.showId)?.episodeRecords?.movie : historyEpisodeEntries(showsById.get(item.showId)!).find(entry => entry.key === `${item.season}x${item.episode}`)?.record;
-    const value = metadata?.runtime || asPositiveNumber(record?.runtime) || (item.mediaType === 'movie' ? cached?.runtime : cached?.episode_run_time?.[0]);
+    const value = metadata?.runtime || asPositiveNumber(record?.runtime) || (item.mediaType === 'movie' ? cached?.runtime : null);
     return asPositiveNumber(value) || null;
   };
 

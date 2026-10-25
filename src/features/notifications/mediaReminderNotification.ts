@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import {
+  auth,
   generateNotificationNumericId,
   sendNativeNotification,
   type NativeNotificationOptions,
@@ -56,7 +57,7 @@ export async function prunePendingMediaReminderNotifications(
     const allowed = new Set(allowedNotificationIds);
     const pending = await LocalNotifications.getPending();
     const notifications = (pending.notifications || [])
-      .filter((notification: any) => (
+      .filter((notification: { extra?: Record<string, unknown>; id?: number }) => (
         String(notification?.extra?.showId ?? '') === String(showId)
         && String(notification?.extra?.mediaType ?? 'tv') === mediaType
         && !allowed.has(Number(notification?.id))
@@ -83,6 +84,7 @@ export async function sendMediaReminderNotification(
   title: string,
   options: MediaReminderNotificationOptions
 ): Promise<boolean> {
+  const ownerUid = auth.currentUser?.uid;
   if (!Capacitor.isNativePlatform()) {
     await sendNativeNotification(title, options);
     return true;
@@ -124,6 +126,7 @@ export async function sendMediaReminderNotification(
     };
     const schedule = resolveMediaReminderSchedule(options.scheduleDate);
 
+    if (ownerUid && auth.currentUser?.uid !== ownerUid) return false;
     await LocalNotifications.schedule({
       notifications: [{
         title,
@@ -138,6 +141,7 @@ export async function sendMediaReminderNotification(
         attachments,
         actionTypeId: options.allowMarkWatched ? 'EPISODE_NOTIF_ACTIONS' : undefined,
         extra: {
+          ownerUid,
           showId: extraData.showId,
           tmdbId: extraData.tmdbId,
           mediaType: extraData.mediaType || 'tv',

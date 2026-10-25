@@ -1,3 +1,4 @@
+import { canPausePlexSync, isPlexSyncTerminal } from '../features/plex/plexSyncPresentation';
 import { auth } from '../lib/firebase';
 import { useEffect, useState } from 'react';
 import { readUserScopedJson, subscribeUserScopedStorageField } from '../lib/userIsolation';
@@ -24,10 +25,12 @@ export function HomeSyncIndicator() {
   const counts = /\((\d+)\/(\d+)\)/.exec(plex?.message || '');
   const total = progress ? progress.phase === 'collect' ? undefined : (progress.historyTotal || 0) + (progress.watchlistTotal || 0) : counts ? Number(counts[2]) : details?.total;
   const completed = progress ? progress.phase === 'done' || progress.phase === 'save' ? total : progress.phase === 'watchlist' ? (progress.historyTotal || 0) + progress.processed : progress.phase === 'watched' ? progress.processed : 0 : counts ? Number(counts[1]) : details ? details.total - details.pending : undefined;
-  const settled = /terminé|à jour|erreur|pause/i.test(message);
+  const settled = isPlexSyncTerminal(progress?.phase, message);
+  const canPause = canPausePlexSync(ownedActivePlex, uid);
+  const successful = progress ? progress.phase === 'done' : /terminé|à jour/i.test(message);
   const percent = total && completed !== undefined ? Math.min(100, Math.max(0, Math.round(completed / total * 100))) : undefined;
   if (!plex && !details && !open) return null;
-  const ring = <span className={`home-sync-ring${percent === undefined && !settled ? ' home-sync-ring--waiting' : ''}`} role="progressbar" aria-label="Progression de la synchronisation" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} aria-valuetext={message} style={{ '--sync-progress': `${settled ? 100 : percent ?? 25}%` } as React.CSSProperties}><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 2h7.5l7.5 10-7.5 10H4l7.5-10L4 2z" /></svg></span></span>;
+  const ring = <span className={`home-sync-ring${percent === undefined && !settled ? ' home-sync-ring--waiting' : ''}`} role="progressbar" aria-label="Progression de la synchronisation" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} aria-valuetext={message} style={{ '--sync-progress': `${successful ? 100 : percent ?? (settled ? 0 : 25)}%` } as React.CSSProperties}><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 2h7.5l7.5 10-7.5 10H4l7.5-10L4 2z" /></svg></span></span>;
   return <>
     <button type="button" className="home-sync-button" aria-label={`Détails de la synchronisation ${plex ? 'Plex' : 'des métadonnées'}`} title={message} onClick={() => setOpen(true)}>{ring}</button>
     {open && <DialogLayer label={label} onDismiss={() => setOpen(false)} className="fixed inset-0 flex items-end sm:items-center justify-center bg-black/65 p-4 pb-nav">
@@ -40,7 +43,7 @@ export function HomeSyncIndicator() {
           <ul className="home-sync-sheet__servers">{progress.servers.map((server, index) => <li key={server.id || index}><strong>{server.name}</strong>{server.owned !== undefined && <small>{server.owned ? 'ton serveur' : 'partagé'}</small>}<span>{server.reason || `${server.watchedItems ?? 0} vus · ${server.inventoryItems ?? 0} indexés`}</span><i data-complete={!server.reason} /></li>)}</ul>
           <p>{progress.mode === 'delta' ? 'Vérification des changements récents. Le cache des disponibilités reste affiché.' : 'Scan complet des serveurs accessibles, personnels et partagés.'} Les serveurs ignorés sont indiqués ci-dessus.</p>
           {progress.changed !== undefined && <p>{progress.changed} changements · {progress.alreadyWatched || 0} déjà vus · {progress.unresolved || 0} identités non résolues</p>}
-          {!settled && <button type="button" className="home-sync-sheet__pause" onClick={() => useSyncStore.getState().setPlexPauseUid(paused ? null : auth.currentUser?.uid || null)}>{paused ? 'Reprendre' : 'Mettre en pause'}</button>}
+          {canPause && <button type="button" className="home-sync-sheet__pause" onClick={() => { if (canPausePlexSync(useSyncStore.getState().plexSyncStatus, auth.currentUser?.uid)) useSyncStore.getState().setPlexPauseUid(paused ? null : auth.currentUser?.uid || null); }}>{paused ? 'Reprendre' : 'Mettre en pause'}</button>}
         </>}
         {total !== undefined && completed !== undefined && <p className="home-sync-sheet__count">{completed} sur {total} éléments traités</p>}
         {details && plex && <p>Actualisation des séries : {details.current} · {details.pending} en attente</p>}

@@ -10,6 +10,7 @@ export async function rememberNotification(uid: string | null | undefined, raw: 
   const data = raw.data || raw.extra || {};
   if (typeof data !== 'object' || data === null) return;
   const owner = data as Record<string, unknown>;
+  if (!owner.uid && !owner.ownerUid && !owner.ownerUidHash) return;
   if (owner.uid && owner.uid !== uid || owner.ownerUid && owner.ownerUid !== uid) return;
   if (owner.ownerUidHash) {
     try {
@@ -28,7 +29,8 @@ export async function collectDeliveredNotifications(uid: string, currentUid: () 
   if (currentUid() !== uid) return;
   for (const result of results) if (result.status === 'fulfilled') for (const raw of result.value.notifications) {
     const data: Record<string, unknown> = ('data' in raw ? raw.data : raw.extra) || {};
-    // Only SeenIt media owned by this session; never read other apps' notifications.
+    // A shared media identity is never proof of ownership. Ignore legacy ownerless alerts.
+    if (!data.uid && !data.ownerUid && !data.ownerUidHash) continue;
     if (data.ownerUid && data.ownerUid !== uid || data.uid && data.uid !== uid) continue;
     if (data.ownerUidHash) {
       const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(uid));

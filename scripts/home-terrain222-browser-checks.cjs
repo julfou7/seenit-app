@@ -25,6 +25,9 @@ async function testTerrain222Harness(client,root){const reports=[];for(const wid
  await client.send('Page.navigate',{url:'http://127.0.0.1:4173/__seenit-history.html'});
  await check(client,'window.__history16d','historique prêt');
  await evaluate(client,'window.__history16d.paul()');
+ await pause(50);
+ if(await evaluate(client,`document.querySelector('.history-period__summary')?.textContent.includes('0 h 58')`))throw Error('Terrain222 une moyenne série ne prouve pas la durée des deux épisodes');
+ await evaluate(client,'window.__history16d.releasePaul()');
  await check(client,`document.querySelector('.history-period__summary')?.textContent.includes('0 h 59') && document.querySelectorAll('[data-history-row]').length===1`,'Paul29+30 dès entrée sans ouvrir la fiche');
  await check(client,`(()=>{const row=document.querySelector('[data-history-row]'),img=row.querySelector('.history-entry__image'),h=row.querySelector('h3'),clock=row.querySelector('.history-entry__action-column time');return Math.abs(img.getBoundingClientRect().height-row.getBoundingClientRect().height)<1 && clock.textContent==='09:08' && h.scrollHeight<=h.clientHeight+1 && row.querySelector('.seenit-check[aria-pressed=true]')})()`,'affiche plein cadre, heure du plus récent et bouton Vu commun');
  fs.writeFileSync(path.join(root,'quality-reports',`terrain222-history-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
@@ -39,7 +42,9 @@ async function testTerrain222Harness(client,root){const reports=[];for(const wid
  await check(client,`document.querySelector('.home-sync-sheet')?.textContent.includes('67 / 304') && document.querySelector('.home-sync-sheet__servers').textContent.includes('Serveur personnel') && document.querySelector('.home-sync-sheet__servers').textContent.includes('hors ligne')`,'bilan réel personnels/partagés et quantités reçues');
  await evaluate(client,`window.__renders222=window.__homeListRenders;document.querySelector('.home-sync-sheet__pause').click()`);
  await check(client,`document.querySelector('.home-sync-sheet__pause')?.textContent==='Reprendre' && window.__homeListRenders===window.__renders222`,'pause sans rendu supplémentaire de la liste');
- await evaluate(client,`document.querySelector('.home-sync-sheet__pause').click();document.querySelector('[aria-label="Fermer la synchronisation"]').click();window.__homeAVoir.sync(null)`);
+ await evaluate(client,`document.querySelector('.home-sync-sheet__pause').click();window.__homeAVoir.report({uid:'fixture-a',mode:'full',phase:'error',processed:0,servers:[]});window.__homeAVoir.sync(null)`);
+ await check(client,`document.querySelector('.home-sync-sheet') && !document.querySelector('.home-sync-sheet__pause') && document.querySelector('.home-sync-sheet').textContent.includes('incomplète')`,'un bilan incomplet conservé ne peut pas armer une pause sans tâche active');
+ await evaluate(client,`document.querySelector('[aria-label="Fermer la synchronisation"]').click()`);
  fs.writeFileSync(path.join(root,'quality-reports',`terrain222-home-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
  reports.push({width,firstNew:true,paulMinutes:59,historyPosterFullHeight:true,sharedSeenButton:true});
 }return reports;}

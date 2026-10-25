@@ -223,7 +223,7 @@ async function sendPushToUserDevices(
     const result = await messaging.sendEachForMulticast({
       tokens: chunk.map(device => device.token),
       ...(notification ? { notification } : {}),
-      data,
+      data: { ...data, ownerUidHash: createHash('sha256').update(uid).digest('hex').slice(0, 16) },
       ...(notification || options.androidHighPriority ? {
         android: {
           ...(options.androidHighPriority ? { priority: 'high' as const } : {}),

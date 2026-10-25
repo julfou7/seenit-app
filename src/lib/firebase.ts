@@ -188,6 +188,7 @@ export async function cancelScheduledNotification(id: number) {
 }
 
 export async function sendNativeNotification(title: string, options?: NativeNotificationOptions) {
+  const ownerUid = auth.currentUser?.uid;
   const iconUrl = options?.icon || options?.image || 'https://seenit.app/icon-192.png';
   const imageUrl = options?.image || options?.icon;
   const extraData: NativeNotificationData = options?.data || {
@@ -239,6 +240,7 @@ export async function sendNativeNotification(title: string, options?: NativeNoti
         });
       } catch (e) {}
 
+      if (ownerUid && auth.currentUser?.uid !== ownerUid) return;
       await LocalNotifications.schedule({
         notifications: [{
           title: title,
@@ -256,6 +258,7 @@ export async function sendNativeNotification(title: string, options?: NativeNoti
           attachments,
           actionTypeId: 'EPISODE_NOTIF_ACTIONS',
           extra: {
+            ownerUid,
             showId: extraData.showId,
             tmdbId: extraData.tmdbId,
             mediaType: extraData.mediaType || 'tv',
@@ -277,6 +280,7 @@ export async function sendNativeNotification(title: string, options?: NativeNoti
     const delay = options.scheduleDate.getTime() - Date.now();
     if (delay < 24 * 60 * 60 * 1000) {
       setTimeout(() => {
+        if (ownerUid && auth.currentUser?.uid !== ownerUid) return;
         sendNativeNotification(title, { ...options, scheduleDate: undefined });
       }, delay);
     }
