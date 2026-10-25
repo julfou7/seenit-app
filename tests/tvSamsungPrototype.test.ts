@@ -8,6 +8,8 @@ const css = readFileSync(new URL('../tv-samsung/styles.css', import.meta.url), '
 const app = readFileSync(new URL('../tv-samsung/app.js', import.meta.url), 'utf8');
 const device = readFileSync(new URL('../tv-samsung/tv.js', import.meta.url), 'utf8');
 const spec = readFileSync(new URL('../docs/specifications/tv-samsung-prototype.md', import.meta.url), 'utf8');
+const v2Spec = readFileSync(new URL('../docs/specifications/tv-samsung-launcher-v2.md', import.meta.url), 'utf8');
+const tvAgents = readFileSync(new URL('../tv-samsung/AGENTS.md', import.meta.url), 'utf8');
 
 function assertEs5(source, name) {
   const forbidden = [
@@ -56,4 +58,30 @@ test('SEENIT-TV-POC-001 conserve TV tuner, apps directes et Sport provider-agnos
 test('SEENIT-TV-POC-001 ne mute aucune donnée SeenIt avant appairage foyer', () => {
   assert.match(spec, /aucune mutation SeenIt/i);
   assert.doesNotMatch(app + device, /markEpisodeWatched|firebase|firestore|\/api\//i);
+});
+
+test('SEENIT-TV-V2-001 verrouille la vraie cible terrain et le rôle de Home principal', () => {
+  assert.match(spec, /QE55Q6FNA/);
+  assert.match(spec, /Tizen 4\.0/);
+  assert.match(v2Spec, /Home\/launcher principal/);
+  assert.match(v2Spec, /required_version="3\.0".*minimum/s);
+  assert.match(tvAgents, /QE55Q6FNA/);
+  assert.match(tvAgents, /Home\/launcher principal/);
+});
+
+test('SEENIT-TV-V2-001 garde 100+ apps bornées sans perdre les packages système', () => {
+  assert.match(v2Spec, /100\+ applications/);
+  assert.match(v2Spec, /USER \| SYSTEM \| UNKNOWN/);
+  assert.match(v2Spec, /6 colonnes × 3 lignes = 18 cartes par page/);
+  assert.match(v2Spec, /Ne jamais injecter 100\+ cartes simultanément/);
+  assert.match(tvAgents, /inventoriée puis classifiée/);
+});
+
+test('SEENIT-TV-V2-001 exige RAM et stockage read-only sans root', () => {
+  assert.match(v2Spec, /getTotalMemory\(\)/);
+  assert.match(v2Spec, /getAvailableMemory\(\)/);
+  assert.match(v2Spec, /getPropertyValue\('STORAGE'/);
+  assert.match(v2Spec, /Aucun root n'est nécessaire pour cette télémétrie/);
+  assert.match(v2Spec, /RAM : toutes les \*\*15 s\*\*/);
+  assert.match(v2Spec, /stockage : toutes les \*\*60 s\*\*/);
 });
