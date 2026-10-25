@@ -314,3 +314,6 @@ indépendamment de la vidéo ; une version actuelle reconnue par hash exact rest
 Une demande active sur le même scope est signalée et bloque l'envoi jusqu'à sa fin ou son annulation.
 Les notifications confirment « ✅ Import terminé », puis
 « ✅ Disponible dans Plex » uniquement après preuve Plex exacte.
+
+
+Retour terrain225 du25/10/2026 (#729), prioritaire sur les regroupements antérieurs : un visionnage = une ligne, sans ×N ni plage d’épisodes, même pour une saison marquée en une fois. Périodes, totaux, heure et actions par épisode conservés. Navigation : centres du pictogramme et du texte identiques sur tous les écrans. Vu : anneau progressif760ms puis coche240ms, tampon puis reprise ; réduction des animations immédiate. Splash : huit segments160ms, anneau1280ms, coche1640ms, signature1860ms/300ms puis lecture complète pendant1540ms ; durée3700ms et fondu500ms inchangés. Référentiel détaillé : docs/design/marque-2026-10-25.md.

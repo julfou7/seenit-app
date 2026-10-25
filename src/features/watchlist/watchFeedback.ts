@@ -1,4 +1,4 @@
-export const WATCH_BUTTON_MS = 620;
+export const WATCH_BUTTON_MS = 1040;
 export const WATCH_STAMP_MS = 500;
 export const WATCH_ADVANCE_MS = 400;
 

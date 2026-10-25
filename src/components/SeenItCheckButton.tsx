@@ -61,7 +61,7 @@ export function SeenItCheckButton({
       const result = await onClick(e);
       if (result !== false && !isWatched && celebrating === undefined) {
         setCelebrate(true);
-        successTimer.current = setTimeout(() => setCelebrate(false), 850);
+        successTimer.current = setTimeout(() => setCelebrate(false), 1100);
       }
     } finally {
       setInternalPending(false);
@@ -83,7 +83,7 @@ export function SeenItCheckButton({
       data-error={error ? 'true' : undefined}
       data-celebrate={showCelebration && !error || undefined}
       className={cn(
-        "seenit-check group relative min-h-11 min-w-11 flex items-center justify-center rounded-xl p-1.5 transition-all duration-200 cursor-pointer select-none",
+        "seenit-check group relative min-h-11 min-w-11 flex items-center justify-center rounded-xl p-1.5 transition-transform duration-200 cursor-pointer select-none",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black",
         "disabled:cursor-not-allowed disabled:opacity-55",
         error && "ring-1 ring-red-400/70",

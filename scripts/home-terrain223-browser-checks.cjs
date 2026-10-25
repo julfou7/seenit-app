@@ -19,7 +19,7 @@ async function testTerrain223Harness(client,root){const reports=[];for(const wid
  await check(client,`!document.querySelector('#home-panel-history').textContent.toLowerCase().includes('ce soir')`,'aucun ce soir dans le vrai historique');
  await client.send('Page.navigate',{url:'http://127.0.0.1:4173/__seenit-history.html'});await check(client,'window.__history16d','historique');
  await evaluate(client,'window.__history16d.paul();window.__history16d.releasePaul()');await pause(120);
- await check(client,`(()=>{const b=document.querySelector('.history-entry__group');return b?.classList.contains('series-ribbon') && b.textContent==='×2' && Math.abs(parseFloat(getComputedStyle(b).borderRadius))<1})()`,'groupe ×2 en bandeau');
+ await check(client,`!document.querySelector('.history-entry__group') && document.querySelectorAll('[data-history-row]').length===2 && [...document.querySelectorAll('.history-entry__text strong')].map(e=>e.textContent).join(',')==='S01 | E02,S01 | E01'`,'Paul conserve une ligne par épisode sans ×2');
  fs.writeFileSync(path.join(root,'quality-reports',`terrain223-historique-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
  reports.push({width,brand:true,ribbons:true,historyNoTonight:true,plexViewport:true});
  }return reports;}

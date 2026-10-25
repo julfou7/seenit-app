@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.225**
+Version applicative : **1.4.226**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -1800,3 +1800,8 @@ Les règles détaillées de [B07/historique](../design/badges-historique-2026-10
 - SEENIT-PLEX-006 : une transaction Plex applique uniquement ses changements depuis son instantané initial, sans réécrire des métadonnées actualisées entretemps. Les totaux fournisseur et leurs preuves récentes sont préservés. Les anciennes preuves inconnues susceptibles d’avoir été écrasées sont réparées une fois, puis suivent leur TTL sans boucle.
 - SEENIT-UX-018 et SEENIT-NOTIFICATION-003 : le fil réunit les événements SeenIt reçus et les alertes encore livrées du compte actif, dédoublonnés et bornés à100. Les alertes Plex natives transmettent uniquement identité média/épisode et empreinte du propriétaire dans Notification.extras, sans jeton ni URI serveur. Le compteur indique les nonlus, un swipe droit retire un élément, les titres sont or et les vignettes rectangulaires. Aucun accès aux alertes d’autres applications ni nouvelle lecture Firestore générique.
 - Le rappel réagit immédiatement par la cloche, attend la persistance réelle et revient en arrière sur erreur ; aucune notification ni toast de confirmation tardive. Le détail Plex distingue les métadonnées de séries et la collecte Plex, expose les compteurs et serveurs reçus réellement (personnels/partagés, ignorés avec raison), conserve un bilan local par UID et permet une pause aux frontières des tâches. Aucun pourcentage de serveur supposé ni nouveau polling.
+
+
+Retour terrain225 du25/10/2026 (#729), prioritaire sur les regroupements antérieurs : un visionnage = une ligne, sans ×N ni plage d’épisodes, même pour une saison marquée en une fois. Périodes, totaux, heure et actions par épisode conservés. Navigation : centres du pictogramme et du texte identiques sur tous les écrans. Vu : anneau progressif760ms puis coche240ms, tampon puis reprise ; réduction des animations immédiate. Splash : huit segments160ms, anneau1280ms, coche1640ms, signature1860ms/300ms puis lecture complète pendant1540ms ; durée3700ms et fondu500ms inchangés. Référentiel détaillé : docs/design/marque-2026-10-25.md.
+
+SEENIT-PERF-001 / SEENIT-DATA-001 : la sauvegarde locale de bibliothèque est coalescée hors du clic (120ms puis idle borné800ms), seul le snapshot le plus récent est sérialisé. UID capturé et revalidé avant écriture ; annulation au changement de compte, vidage à pagehide/visibilité cachée. Aucun changement des écritures Firestore ni du format shows_v2. Les cartes de reprise inchangées ne se recalculent pas pour une mutation voisine ; les gestionnaires stables utilisent le dernier état validé.

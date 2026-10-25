@@ -35,6 +35,21 @@ interface Props {
   onUnseen: (show: Show, episode: SeriesCardEpisode | null) => Promise<void | boolean>;
   actions: (show: Show) => SeriesCardAction[];
 }
+function useLatestCallback<Args extends unknown[], Result>(callback: (...args: Args) => Result) {
+  const latest = useRef(callback);
+  useLayoutEffect(() => { latest.current = callback; });
+  return useCallback((...args: Args) => latest.current(...args), []);
+}
+
+// Keep unchanged cards outside sibling feedback and actor-index renders.
+const WatchSeriesItem = React.memo(function WatchSeriesItem({ show, layout, stale, receipt, onOpen, onEpisode, onMark, onUnseen, onComplete, actions }: {
+  show: Show; layout: 'list' | 'rail'; stale: boolean; receipt?: SeriesCardEpisode;
+  onOpen: Props['onOpen']; onEpisode: Props['onEpisode']; onMark: Props['onMarkSeries'];
+  onUnseen: Props['onUnseen']; onComplete: (show: Show, completed: boolean) => void; actions: Props['actions'];
+}) {
+  return <ContinueWatchingCard show={show} layout={layout} animateSeen showStaleDetail={stale} lastMarkedEpisode={receipt}
+    onMarkUnseen={onUnseen} onMarkAsSeen={onMark} onSeenFeedbackComplete={onComplete} onShowClick={onOpen} onEpisodeClick={onEpisode} actions={actions(show)} />;
+});
 export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, movies, active, onOpen, onEpisode, onMarkSeries, onMarkMovie, onUnseen, actions }: Props) {
   const { index: actorIndex, metadata: actorMetadata } = useMovieActors(allShows, active);
   const favorites = useFavoritePeopleStore(state => state.people);
@@ -148,6 +163,11 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
     setSeriesOrder(previous => [show.id, ...previous.filter(id => id !== show.id)]);
     setArrivals(previous => new Set([...previous, show.id]));
   };
+  const seriesHandlers = {
+    onOpen: useLatestCallback(onOpen), onEpisode: useLatestCallback(onEpisode),
+    onMark: useLatestCallback(markSeries), onUnseen: useLatestCallback(onUnseen),
+    onComplete: useLatestCallback(finishSeriesFeedback), actions: useLatestCallback(actions),
+  };
   const toggleMovie = async (show: Show) => {
     setMovieOrder(previous => previous || orderedMovies.map(movie => movie.id));
     setRetained(previous => ({ ...previous, [show.id]: {} }));
@@ -194,7 +214,7 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
         {index === 2 && <p className="home-stale-subtitle">En pause ou jamais commencées, depuis plus de 2 mois</p>}
         <div className={expanded ? 'home-series-list' : 'home-series-rail'} id={`home-series-${index}`}>
           {items.slice(0, limit).map(show => {
-            const card = <ContinueWatchingCard show={show} layout={expanded ? 'list' : 'rail'} animateSeen showStaleDetail={index === 2} lastMarkedEpisode={retained[show.id]?.episode} onMarkUnseen={onUnseen} onMarkAsSeen={markSeries} onSeenFeedbackComplete={finishSeriesFeedback} onShowClick={onOpen} onEpisodeClick={onEpisode} actions={actions(show)} />;
+            const card = <WatchSeriesItem show={show} layout={expanded ? 'list' : 'rail'} stale={index === 2} receipt={retained[show.id]?.episode} {...seriesHandlers} />;
             return expanded && index > 0 ? <HomeSwipeCard key={show.id} onArchive={() => actions(show).find(action => action.label.startsWith('Archiver'))?.onSelect()} onRemove={() => actions(show).find(action => action.destructive)?.onSelect()}>{card}</HomeSwipeCard> : <div key={show.id} className={arrivals.has(show.id) ? 'home-series-arrival' : undefined}>{card}</div>;
           })}
           {!expanded && <HomeLoadMore tile items={items.slice(limit)} onLoad={() => { rememberReveal(`home-series-${index}`); setRailLimits(previous => ({ ...previous, [index]: limit + HOME_PAGE_SIZE })); }} />}

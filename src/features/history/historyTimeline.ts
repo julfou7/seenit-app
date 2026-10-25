@@ -20,17 +20,9 @@ export function compareHistoryEntries(left: TimelineEntry, right: TimelineEntry)
   return left.key.localeCompare(right.key);
 }
 
-/** Only adjacent viewings are grouped. A film, a gap or a new day ends a run. */
-export function groupHistoryRows<T extends TimelineEntry>(items: readonly T[], seasonTotal: (showId: string, season: number) => number | null): TimelineRow<T>[] {
-  const rows: TimelineRow<T>[] = [];
-  for (const item of items) {
-    const day = historyLocalDayKey(item.watchedAt), previous = rows.at(-1), newer = previous?.members.at(-1);
-    const consecutive = newer && (item.season === newer.season && item.episode + 1 === newer.episode
-      || item.season + 1 === newer.season && newer.episode === 1 && item.episode === seasonTotal(item.showId, item.season));
-    if (previous && previous.day === day && item.watchedTimeKnown !== false && newer?.watchedTimeKnown !== false && item.mediaType === 'tv' && newer?.mediaType === 'tv' && newer.showId === item.showId && consecutive) previous.members.push(item);
-    else rows.push({ key: item.key, item, members: [item], day });
-  }
-  return rows;
+/** One persisted viewing is one row, including bulk writes with equal timestamps. */
+export function buildHistoryRows<T extends TimelineEntry>(items: readonly T[]): TimelineRow<T>[] {
+  return items.map(item => ({ key: item.key, item, members: [item], day: historyLocalDayKey(item.watchedAt) }));
 }
 
 export function historyPeriod(watchedAt: number, now = Date.now()): { key: string; label: string; today: boolean } {
@@ -46,11 +38,10 @@ export function historyPeriod(watchedAt: number, now = Date.now()): { key: strin
 
 export function historyGroupCode<T extends TimelineEntry>(row: TimelineRow<T>): string | undefined {
   if (row.item.mediaType === 'movie') return undefined;
-  const first = row.members.at(-1)!, last = row.item;
+  const first = row.item;
   const season = (value: number) => `S${String(value).padStart(2, '0')}`;
   const episode = (value: number) => `E${String(value).padStart(2, '0')}`;
-  const start = `${season(first.season)} | ${episode(first.episode)}`;
-  return row.members.length === 1 ? start : `${start} → ${first.season === last.season ? '' : season(last.season) + ' | '}${episode(last.episode)}`;
+  return `${season(first.season)} | ${episode(first.episode)}`;
 }
 
 export function historyPeriodSummary<T extends TimelineEntry>(rows: readonly TimelineRow<T>[], minutes: (item: T) => number | null) {

@@ -83,17 +83,19 @@ async function testHistoryHarness(client, root) {
     await evaluate(client, '[...document.querySelectorAll("[role=alertdialog] button")].find(button=>button.textContent==="Oui, marquer non vu").click()');
     await check(client, 'window.__history16d.writes.at(-1).updates.episodeRecords["5x13"].watchedAt===window.__legacyDay && window.__history16d.writes.at(-1).updates.lastWatchedAt===window.__legacyDay', 'retirer un legacy ne déplace pas son voisin à aujourd’hui');
     await evaluate(client,'window.__history16d.grouped()');
-    await check(client,'document.querySelector(".history-entry__group").textContent==="×3" && document.querySelectorAll("[data-history-row]").length===3 && document.querySelector(".history-entry__text p").textContent==="3 épisodes d’affilée"', 'frise réelle : trois épisodes consécutifs forment une ligne');
+    await check(client,'!document.querySelector(".history-entry__group") && document.querySelectorAll("[data-history-row]").length===5 && document.querySelector(".history-entry__text strong").textContent==="S05 | E13"', 'trois épisodes consécutifs gardent trois lignes individuelles');
     await evaluate(client,'window.__episodeBefore=window.__history16d.episodeOpens.length;document.querySelector(".history-entry__open").click()');
-    await check(client,'window.__history16d.movieOpens.at(-1)==="tv:tv" && window.__history16d.episodeOpens.length===window.__episodeBefore', 'un groupe ouvre la série');
+    await check(client,'window.__history16d.episodeOpens.length===window.__episodeBefore+1 && window.__history16d.episodeOpens.at(-1)==="tv:5x13"', 'la ligne ouvre son épisode exact');
     await evaluate(client,'document.querySelector(".history-entry__action-column button").click()');
-    await check(client,'document.querySelectorAll(".history-entry__action-group").length===3','actions conservées pour chaque épisode du groupe');
-    await evaluate(client,'document.querySelector(".history-entry__action-group").open=true;document.querySelector(".history-entry__action-group button").click()');
+    await check(client,'!document.querySelector(".history-entry__action-group") && [...document.querySelectorAll("[role=dialog] button")].some(b=>b.textContent==="Marquer non vu")','actions individuelles sans groupe');
+    await evaluate(client,'[...document.querySelectorAll("[role=dialog] button")].find(b=>b.textContent==="Marquer non vu").click()');
     await check(client,'document.querySelector("[role=alertdialog]")','retrait individuel confirmé depuis un groupe');
     await evaluate(client,'[...document.querySelectorAll("[role=alertdialog] button")].find(button=>button.textContent==="Oui, marquer non vu").click()');
     await check(client,'window.__history16d.writes.at(-1).updates.seenEpisodes.length===2 && window.__history16d.writes.at(-1).updates.episodeRecords["5x12"].rating===9','retirer E11 préserve les autres épisodes et leurs notes');
     await evaluate(client,'window.__history16d.bulk()');
-    await check(client,'document.querySelector(".history-entry__group")?.textContent==="×12" && document.querySelectorAll("[data-history-row]").length===2 && document.querySelector(".history-entry__text strong").textContent==="S01 | E01 → E12"','saison marquée en une fois : douze horodatages identiques forment une seule ligne avant pagination');
+    await check(client,'!document.querySelector(".history-entry__group") && document.querySelectorAll("[data-history-row]").length===10 && document.querySelector(".history-entry__text strong").textContent==="S01 | E12"','saison marquée en une fois : dix lignes initiales avec tri stable');
+    await evaluate(client,'document.querySelector(".home-load-more").click()');
+    await check(client,'document.querySelectorAll("[data-history-row]").length===13 && !document.querySelector(".history-entry__group")','douze épisodes et film tous présents après pagination');
     reports.push({ width, status: 'pass', productionComponent: 'HistoryFeed', dateUndo: true, unseenUndo: true });
   }
   return reports;

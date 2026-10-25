@@ -6,6 +6,7 @@ import { handleFirestoreError, OperationType } from '../lib/firebaseErrors';
 import { useSyncStore } from './syncStore';
 import { appLogger } from './logStore';
 import { getNextEpisodeNumber, checkIsUpToDate } from '../lib/utils';
+import { createLibraryCacheWriter } from '../features/shows/libraryCacheWriter';
 import {
   buildLibraryStateSignature,
   purgeLegacyUnscopedUserData,
@@ -37,9 +38,15 @@ const loadUserCache = (uid: string): Show[] => {
   return Array.isArray(cached) ? cached : [];
 };
 
-const saveToLocalStorage = (uid: string | null | undefined, shows: Show[]) => {
-  writeUserScopedJson(uid, SHOWS_CACHE_FIELD, shows);
-};
+const libraryCache = createLibraryCacheWriter<Show[]>({
+  currentUid: () => auth.currentUser?.uid,
+  write: (uid, shows) => { writeUserScopedJson(uid, SHOWS_CACHE_FIELD, shows); },
+});
+const saveToLocalStorage = (uid: string | null | undefined, shows: Show[]) => libraryCache.save(uid, shows);
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', libraryCache.flush);
+  if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') libraryCache.flush(); });
+}
 
 const getShowReferenceKey = (show: Show): string => {
   const tmdbId = Number(show.tmdbId);
@@ -53,7 +60,7 @@ const getShowStateSignature = (show: Show): string => {
   const objectRef = show as unknown as object;
   const cached = showSignatureCache.get(objectRef);
   if (cached) return cached;
-  const signature = buildLibraryStateSignature([show as unknown as Record<string, any>]);
+  const signature = buildLibraryStateSignature([show as unknown as Record<string, unknown>]);
   showSignatureCache.set(objectRef, signature);
   return signature;
 };
@@ -528,6 +535,7 @@ export const useShowsStore = create<ShowsState>((set, get) => ({
 }));
 
 auth.onAuthStateChanged(user => {
+  libraryCache.cancel();
   purgeLegacyUnscopedUserData(user?.uid);
   if (unsubscribeRealtimeListener) {
     unsubscribeRealtimeListener();

@@ -47,6 +47,8 @@ Terrain223 / marque v3 : [comparaison et preuves](./terrain223-marque-2026-10-25
 
 Terrain224 / animations : [vidéos et corrections](./terrain224-motion-2026-10-25.md), baseline c4eafacf, #729.
 
+Terrain225 / fluidité : [causes, mesures et corrections](./terrain225-fluidite-2026-10-25.md), baseline198c0a71, #729.
+
 L'audit historique des téléchargements antérieur à ce protocole reste disponible dans
 [`../audit-telechargements-2026-08-30.md`](../audit-telechargements-2026-08-30.md). Ses corrections
 déjà livrées sont couvertes par les exigences `SEENIT-DOWNLOAD-*` et leurs tests.

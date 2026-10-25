@@ -6,7 +6,8 @@
 .navigation-tab{display:flex;position:relative;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:46px;min-width:68px;padding:0 12px;border-radius:23px;background:transparent;color:#A1A1AA;cursor:pointer;touch-action:manipulation;user-select:none;-webkit-touch-callout:none;transition:background .2s}
 .navigation-tab[aria-current=page]{background:rgba(229,169,61,.16);color:#F2C36B}
 .navigation-tab:focus-visible{outline:2px solid #F2C36B;outline-offset:2px}
-.navigation-tab__icon{position:relative;display:block;width:24px;height:24px}
+.navigation-tab__icon{position:relative;display:grid;place-items:center;width:28px;height:28px}
+.navigation-tab__icon>svg{display:block;width:28px;height:28px}
 .navigation-tab__label{font-size:clamp(10px,.625rem,12px);font-weight:700;line-height:1.2;white-space:nowrap}
 .navigation-download-dot{position:absolute;top:-2px;right:-3px;width:9px;height:9px;border-radius:50%;background:#E5A93D;box-shadow:0 0 0 2px rgba(18,18,22,.95);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#0B0B0F;line-height:1}
 .navigation-download-dot[data-kind=active]{animation:nvPulse 1.4s ease-out infinite}
