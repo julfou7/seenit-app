@@ -29,7 +29,7 @@ async function testTerrain222Harness(client,root){const reports=[];for(const wid
  await pause(50);
  if(await evaluate(client,`document.querySelector('.history-period__summary')?.textContent.includes('0 h 58')`))throw Error('Terrain222 une moyenne série ne prouve pas la durée des deux épisodes');
  await evaluate(client,'window.__history16d.releasePaul()');
- await check(client,`document.querySelector('.history-period__summary')?.textContent.includes('0 h 59') && document.querySelectorAll('[data-history-row]').length===1`,'Paul29+30 dès entrée sans ouvrir la fiche');
+ await check(client,`document.querySelector('.history-period__summary')?.textContent.includes('0 h 59') && document.querySelectorAll('[data-history-row]').length===2 && !document.querySelector('.history-entry__group')`,'Paul29+30 dès entrée avec deux visionnages individuels sans ouvrir la fiche');
  await check(client,`(()=>{const row=document.querySelector('[data-history-row]'),img=row.querySelector('.history-entry__image'),h=row.querySelector('h3'),clock=row.querySelector('.history-entry__action-column time');return Math.abs(img.getBoundingClientRect().height-row.getBoundingClientRect().height)<1 && clock.textContent==='09:08' && h.scrollHeight<=h.clientHeight+1 && row.querySelector('.seenit-check[aria-pressed=true]')})()`,'affiche plein cadre, heure du plus récent et bouton Vu commun');
  fs.writeFileSync(path.join(root,'quality-reports',`terrain222-history-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
  await client.send('Page.navigate',{url:'http://127.0.0.1:4173/__seenit-home.html'});
