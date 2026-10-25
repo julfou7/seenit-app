@@ -22,6 +22,8 @@ import {
 import { getParentalRatingOverride, getParentalRatingOverridesSnapshot } from '../../store/parentalRatingStore';
 import { convergeTrackedMediaTitleFromTmdb } from './trackedMediaTitle';
 import { convergeTrackedSeasonProgress } from './trackedSeasonProgress';
+import { readPublicMetadataCache } from './publicMetadataCache';
+import { adjustTMDBSeasonDataForEurope } from '../../lib/utils';
 import { mediaKeyFrom } from './mediaRelations';
 import { getTVDBFranchiseRelation } from '../../services/tvdb';
 import { readWatchProviderCache, writeWatchProviderCache } from '../providers/watchProviderCache';
@@ -74,8 +76,16 @@ const originalGetSeasonDetails = tmdbClient.getSeasonDetails.bind(tmdbClient);
 tmdbClient.getSeasonDetails = (async (id: number, seasonNumber: number, refresh = false) => {
   const result = await originalGetSeasonDetails(id, seasonNumber, refresh);
   if (result.ok && result.value) {
-    const details = tmdbClient.peekMediaDetails(id, 'tv');
-    if (details) convergeTrackedSeasonProgress(Number(id), details, result.value);
+    const [summary, season] = await Promise.all([
+      readPublicMetadataCache<Parameters<typeof convergeTrackedSeasonProgress>[1]>('details', `tv_${Number(id)}`, { allowStale: false }),
+      readPublicMetadataCache<typeof result.value>('season', `${Number(id)}:${Number(seasonNumber)}`, { allowStale: false }),
+    ]);
+    if (summary?.fresh && season?.fresh) {
+      // Read the matching fresh payload, not a stale fallback or timeless memory peek.
+      adjustTMDBSeasonDataForEurope(season.data, summary.data.networks);
+      convergeTrackedSeasonProgress(Number(id), summary.data, season.data, { summaryStoredAt: summary.storedAt, seasonStoredAt: season.storedAt });
+      return ok(season.data);
+    }
   }
   return result;
 }) as typeof tmdbClient.getSeasonDetails;
