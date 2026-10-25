@@ -633,6 +633,12 @@ réinstallation par désinstallation sont bloquantes.
 
 Le smoke Android 36 de la release complète privilégie la fiabilité à l'optimisation : chaque exécution
 recrée un AVD propre (`force-avd-creation: true`) et ne réutilise aucun snapshot ou cache `~/.android/avd`.
+Les deux tentatives API36 utilisent `-gpu swiftshader -feature -Vulkan` : le renderer hôte a segfaulté
+sur plusieurs AVD/runners lors de la224 sous `swiftshader_indirect`. Ce mode est déprécié depuis36.4.9 ;
+le remplacement garde toutes les assertions et le retry borné. Sources :
+[rendu Android](https://developer.android.com/studio/run/emulator-acceleration) et
+[désactivation Vulkan](https://developer.android.com/studio/run/emulator-troubleshooting).
+Un smoke incomplet reste bloquant ; une relance aveugle ne constitue pas un correctif de renderer.
 L'AVD API 36 est plafonné explicitement à `2048M`, comme l'API 31 stable, afin de réduire la pression mémoire
 hôte sans modifier les assertions du TNR. Les preuves du smoke archivent aussi `free`, les principaux RSS
 et la fin de `dmesg` pour distinguer un kill QEMU sous pression d'un défaut applicatif. Le run de release
