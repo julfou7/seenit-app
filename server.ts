@@ -1258,7 +1258,8 @@ async function startServer() {
 
         try {
           return await runQuery(PLEX_ACCOUNT_HISTORY_QUERY, 'rich');
-        } catch (richError: any) {
+        } catch (caught: unknown) {
+          const richError = caught as { message?: unknown } | null;
           console.log(`[Plex Sync] Watch History GraphQL rich query unavailable, fallback minimal: ${richError?.message || richError}`);
           try {
             return await runQuery(PLEX_ACCOUNT_HISTORY_MINIMAL_QUERY, 'minimal');

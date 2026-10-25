@@ -156,10 +156,10 @@ export const useUpdateStore = create<UpdateState>()(
             const releaseHistory = resolved.length > 0 ? resolved : fallback;
             set({ releaseHistory, isLoadingReleaseHistory: false });
             return releaseHistory;
-          } catch (err: any) {
+          } catch (err: unknown) {
             set({
               isLoadingReleaseHistory: false,
-              releaseHistoryError: err?.message || 'Historique des versions indisponible.'
+              releaseHistoryError: (err as { message?: string } | null)?.message || 'Historique des versions indisponible.'
             });
             return get().releaseHistory;
           } finally {

@@ -7,9 +7,10 @@ import { createRequire } from 'node:module';
 test('SEENIT-PERF-001 le store réel ne sérialise pas la bibliothèque dans le clic et regroupe le dernier snapshot par UID', async () => {
   const bundle = await build({ entryPoints: ['src/store/showsStore.ts'], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['zustand'],
     plugins: [{ name: 'library-cache-ports', setup(builder) {
-      builder.onResolve({ filter: /^firebase\/firestore$|\/(?:firebase|firebaseErrors|syncStore|logStore|utils)$/ }, args => ({ path: args.path, namespace: 'ports' }));
+      builder.onResolve({ filter: /^@capacitor\/(?:app|core)$|^firebase\/firestore$|\/(?:firebase|firebaseErrors|syncStore|logStore|utils)$/ }, args => ({ path: args.path, namespace: 'ports' }));
       builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: `
-        export const auth={currentUser:{uid:'a'},onAuthStateChanged:fn=>{globalThis.authChanged=fn;}};globalThis.__auth=auth;
+        export const auth=globalThis.__auth ||= {currentUser:{uid:'a'},onAuthStateChanged:fn=>{globalThis.authChanged=fn;}};
+        export const Capacitor={isNativePlatform:()=>true};export const App={addListener:(_event,fn)=>{globalThis.nativeStateChanged=fn;return Promise.resolve({remove(){}});}};
         export const db={}; export const collection=(...x)=>x;export const query=(...x)=>x;
         export const getDocs=async()=>({docs:[]});export const getDocsFromCache=getDocs;export const getDocsFromServer=getDocs;
         export const doc=(...x)=>x;export const writeBatch=()=>({set(){},commit:async()=>{}});export const onSnapshot=()=>()=>{};
@@ -47,6 +48,10 @@ test('SEENIT-PERF-001 le store réel ne sérialise pas la bibliothèque dans le 
   store.getState().updateShowOptimistic('target', { seenEpisodes: [] });
   document.visibilityState = 'hidden'; document.dispatchEvent(new Event('visibilitychange'));
   assert.deepEqual(JSON.parse(writes.at(-1)!.value)[0].seenEpisodes, [], 'Annuler est vidé avant suspension');
+  document.visibilityState = 'visible';
+  store.getState().updateShowOptimistic('target', { title: 'cache natif' });
+  vm.runInContext('nativeStateChanged({isActive:false})', context);
+  assert.equal(JSON.parse(writes.at(-1)!.value)[0].title, 'cache natif', 'le vrai événement Capacitor vide le cache même si le document est visible');
   const count = writes.length; runTimers(); runIdle(); assert.equal(writes.length, count, 'pas de réécriture après vidage');
   store.getState().updateShowOptimistic('target', { title: 'UID précédent' });
   vm.runInContext('__auth.currentUser.uid="b"', context); runTimers(); runIdle();

@@ -7,6 +7,8 @@ import { useSyncStore } from './syncStore';
 import { appLogger } from './logStore';
 import { getNextEpisodeNumber, checkIsUpToDate } from '../lib/utils';
 import { createLibraryCacheWriter } from '../features/shows/libraryCacheWriter';
+import { App } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import {
   buildLibraryStateSignature,
   purgeLegacyUnscopedUserData,
@@ -46,6 +48,9 @@ const saveToLocalStorage = (uid: string | null | undefined, shows: Show[]) => li
 if (typeof window !== 'undefined') {
   window.addEventListener('pagehide', libraryCache.flush);
   if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') libraryCache.flush(); });
+}
+if (Capacitor.isNativePlatform()) {
+  void App.addListener('appStateChange', state => { if (!state.isActive) libraryCache.flush(); }).catch(() => { /* Les signaux Web restent disponibles. */ });
 }
 
 const getShowReferenceKey = (show: Show): string => {
