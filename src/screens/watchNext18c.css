@@ -120,3 +120,10 @@
 .movie-ticket--horizontal .movie-ticket__check { top:auto; bottom:5px; right:18px; border-radius:50%; }
 .movie-ticket--horizontal.movie-ticket--watched .movie-ticket__check { visibility:visible; }
 .movie-ticket .movie-ticket__undo { display:none; }
+
+/* Terrain224: the shared SeenIt action sits on the dark ticket, off the artwork. */
+.movie-ticket--poster .movie-ticket__body { height:262px; }
+.movie-ticket--poster .movie-ticket__stub { height:48px; }
+.movie-ticket--poster .movie-ticket__check { top:214px; right:calc(50% - 24px); bottom:auto; transform:none; z-index:6; background:#0b0b0fe6; }
+.movie-ticket__metadata { display:flex; justify-content:space-between; flex-wrap:wrap; align-items:baseline; gap:2px 8px; margin-top:4px; font-size:11px; line-height:1.3; color:#a1a1aa; }
+.movie-ticket__metadata strong { color:#e4e4e7; font-weight:800; }.movie-ticket__metadata .movie-ticket__late strong { color:#FDBA74; }

@@ -13,12 +13,13 @@ test('SEENIT-APK-001 marque v3 autorisée conserve package signature et icônes 
  assert.match(fs.readFileSync('android/app/src/main/res/drawable/ic_stat_seenit.xml','utf8'),/M12,4.02 A7.98/);
 });
 
-test('SEENIT-UX-009 marque v3 réutilise les tracés sans ancien logo ni durée de splash forcée', () => {
+test('SEENIT-UX-009 marque v3 réutilise les tracés et termine la séquence de splash', () => {
  const paths=['src/components/SeenItLogo.tsx','src/screens/WatchListView.tsx','src/screens/LoginScreen.tsx','index.html'];
  for(const file of paths) assert.match(fs.readFileSync(file,'utf8'),/seenit-logo-(?:sombre|empile-sombre)|SeenItLogo variant="horizontal"/);
  const splash=fs.readFileSync('src/components/SplashScreen.tsx','utf8');
  assert.match(splash,/Array.from\(\{length:8\}/);
- assert.match(splash,/data-ready=\{isReady \|\| !animate\}/);
- assert.match(fs.readFileSync('src/App.tsx','utf8'),/const splashDuration = 0/);
+ assert.match(splash,/BRAND_SPLASH_ANIMATION_MS = 3700/);
+ assert.match(splash,/data-ready=\{timeElapsed \|\| !animate \|\| reducedMotion\}/);
+ assert.doesNotMatch(fs.readFileSync('src/App.tsx','utf8'),/minimumDisplayTime=\{0\}/);
  assert.doesNotMatch(fs.readFileSync('public/brand/seenit-logo-sombre.svg','utf8'),/<script|\bon\w+=|href=/i);
 });

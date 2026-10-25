@@ -14,6 +14,7 @@ interface Props {
   onShowClick?: (id: string, mediaType?: 'tv' | 'movie') => void;
   onEpisodeClick?: (show: Show, seasonNumber: number, episodeNumber: number) => void;
   onMarkAsSeen: (show: Show) => void | boolean | Promise<void | boolean>;
+  onSeenFeedbackComplete?: (show: Show) => void;
   onMarkUnseen?: (show: Show, episode: SeriesCardEpisode) => Promise<void | boolean>;
   lastMarkedEpisode?: SeriesCardEpisode;
   animateSeen?: boolean;
@@ -37,7 +38,7 @@ export const ContinueWatchingCard = React.memo(function ContinueWatchingCard(pro
   return <ContinueWatchingCardContent {...props} />;
 });
 
-function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMarkAsSeen, onMarkUnseen, lastMarkedEpisode, animateSeen, layout = 'rail', actions, showStaleDetail = false }: Props) {
+function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMarkAsSeen, onSeenFeedbackComplete, onMarkUnseen, lastMarkedEpisode, animateSeen, layout = 'rail', actions, showStaleDetail = false }: Props) {
   const { cardRef, providerLogo, providerName } = usePassiveWatchProvider({
     tmdbId: show.tmdbId, mediaType: 'tv', title: show.title, originalTitle: show.originalTitle,
     year: show.firstAirDate?.slice(0, 4), retainInLibraryCache: true,
@@ -61,6 +62,7 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
       show={{ ...show, backdropPath: rawPath }}
       episode={nextEpNum ? { ...nextEpNum, name: nextEpNum.name || cachedEpisode?.name } : null}
       context={{ kind: 'watch', upToDate: isUpToDate, animateSeen,
+        onFeedbackComplete: () => onSeenFeedbackComplete?.(show),
         onMarkSeen: resume.episode ? () => onMarkAsSeen(show) : undefined,
         onMarkUnseen: isUpToDate && lastMarkedEpisode && onMarkUnseen ? () => onMarkUnseen(show, lastMarkedEpisode) : undefined,
       }}

@@ -1,5 +1,6 @@
 .seenit-check { width:48px; height:48px; min-width:44px; min-height:44px; padding:0; background:transparent; flex-shrink:0; border-radius:50%; }
 .seenit-ring-glyph { position:relative; width:42px; height:42px; flex-shrink:0; }
+.seenit-check[data-celebrate=true]:disabled { opacity:1; }
 .brand-ring-fill { transition:stroke-dashoffset 200ms ease; }
 [data-active=true] .brand-ring-fill { transition:stroke-dashoffset 420ms cubic-bezier(.6,0,.3,1); }
 .brand-ring-tick { transform-origin:50px 50px; }

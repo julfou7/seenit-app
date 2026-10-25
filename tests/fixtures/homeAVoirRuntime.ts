@@ -36,7 +36,9 @@ export const requestNotificationPermission = async () => { reminderControl.permi
 export const sendNativeNotification = async () => { reminderControl.nativeNotifications++; };
 export const EpisodeDetailModal = () => createElement('div', null, 'Fiche épisode');
 export const PersonDetailModal = () => null;
+const motionSeasons = new Map<number, {season_number:number;episode_count:number;episodes:Array<{season_number:number;episode_number:number;name:string;air_date:string;runtime:number}>}>();
 export const tmdb = { ...base.tmdb,
+  getSeasonDetails: async (id:number, season:number) => motionSeasons.has(id) ? {ok:true,value:motionSeasons.get(id)!} : base.tmdb.getSeasonDetails(id,season),
   getEpisodeDetails: async (_id: number, season: number, episode: number) => ({ ok: true, value: { name: `Épisode ${episode}`, runtime: 42, season_number: season, episode_number: episode } }),
   getEpisodeHistoryMetadata: async (_id: number, season: number, episode: number) => ({ ok: true, value: { name: `Épisode ${episode}`, runtime: 42, season_number: season, episode_number: episode } }),
   getMovieDetails: async (id: number) => id===303 ? {ok:true,value:{belongs_to_collection:{id:555}}} : base.tmdb.getMovieDetails(id),
@@ -53,4 +55,14 @@ export function terrain221Examples() {
 
 export function terrain223Examples() {
  base.useShowsStore.setState(state=>({shows:state.shows.map(show=>show.id==='series-0'||show.id==='series-1'?{...show,seenEpisodes:['1x1','1x2','1x3'],seasonProgress:buildSeasonProgressEvidence([{season_number:1,episode_count:show.id==='series-0'?6:5,episodes:Array.from({length:show.id==='series-0'?6:5},(_,index)=>({episode_number:index+1,air_date:date(-10)}))}],false),nextEpisodeToWatch:{season_number:1,episode_number:4,air_date:date(-10)}}:show)}));
+}
+
+export function terrain224Examples() {
+ base.useShowsStore.setState(state=>({shows:state.shows.map(show=>{
+  if(!['series-0','series-1','series-3'].includes(show.id)) return show;
+  const episodes=Array.from({length:6},(_,index)=>({season_number:1,episode_number:index+1,name:'Épisode réel '+(index+1),air_date:date(show.id==='series-1'&&index>=2?10:-10),runtime:42}));
+  const season={season_number:1,episode_count:6,episodes};
+  motionSeasons.set(show.tmdbId,season);
+  return {...show,seriesEnded:false,totalEpisodes:6,totalAiredEpisodes:show.id==='series-1'?2:6,seenEpisodes:show.id==='series-3'?[]:['1x1'],episodeRecords:show.id==='series-3'?{}:{'1x1':{watchedAt:Date.now()-86_400_000}},seasonProgress:buildSeasonProgressEvidence([season],false),seasonsCache:[season],nextEpisodeToWatch:{...episodes[show.id==='series-3'?0:1],episode_count:6}};
+ })}));
 }

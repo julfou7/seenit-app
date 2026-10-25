@@ -725,6 +725,7 @@ pour le cache des sagas et univers.
   de 2 secondes, les détails de 5 secondes, puis les throttles habituels restent applicables.
   Le retour en arrière-plan, la déconnexion et le démontage annulent les travaux différés ;
   aucun polling du worker Plex en arrière-plan WebView. Les tâches natives dédiées restent séparées.
+  Une collecte déjà en vol suit aussi appStateChange et la visibilité : WebView interrompue puis reprise au premier plan, réponse native consommée au retour. Les AbortError restants ne sont jamais exposés bruts.
 - **SEENIT-PLEX-003** — Le curseur n'est validé qu'après collecte suffisamment complète,
   résolution sans échec transitoire et écritures Firestore réussies.
 - **SEENIT-PLEX-004** — Jeton Plex, curseur et caches de résolution/disponibilité sont cloisonnés
@@ -1788,7 +1789,7 @@ La preuve de total inconnu est réévaluée une fois après migration, puis au m
 
 ### Marque v3 et terrain223 — 25 octobre 2026
 
-La [marque v3 et le terrain223](../design/marque-2026-10-25.md) remplacent les anciens emblèmes écran par l’anneau fourni, y compris launcher/PWA et notifications autorisés explicitement. SEENIT-APK-001 conserve package, signature, données et deep links ; seules les empreintes des actifs changent. SEENIT-UX-014/018 : Afficher plus remplace la tuile sans modifier aucun scroll ; rubans contenus dans l’affiche ; détail et cartes partagent les preuves compactes de total/diffusion reçues par les façades de production, sans total déduit d’une liste partielle. SEENIT-UX-015 : date réelle sans « ce soir », ×N en ruban diagonal, heure sous Vu. SEENIT-UX-009 : anneau/coche commun animé après succès, réduction des animations respectée. Dialogue Plex centré, borné au viewport et défilable.
+La [marque v3 et les terrains223/224](../design/marque-2026-10-25.md) remplacent les anciens emblèmes écran par l’anneau fourni, y compris launcher/PWA et notifications autorisés explicitement. SEENIT-APK-001 conserve package, signature, données et deep links ; seules les empreintes des actifs changent. SEENIT-UX-014/018 : Afficher plus remplace la tuile sans modifier aucun scroll ; bandeaux compacts horizontaux au bas des affiches ; détail et cartes partagent les preuves compactes de total/diffusion reçues par les façades de production, sans total déduit d’une liste partielle. SEENIT-UX-015 : date réelle sans « ce soir », ×N en bandeau inférieur, heure sous Vu. SEENIT-UX-009 : anneau/coche commun après succès puis tampon et enfin nouvelle reprise ; dernier disponible tamponné jusqu’au rafraîchissement, Annuler le retire. Films : bouton Vu sur le talon sombre, métadonnées sous l’affiche. Navigation sans point inférieur. Le splash termine ses3700ms avant fermeture lorsque les animations sont autorisées ; sous réduction des animations résultat immédiat. Dialogue Plex centré, borné au viewport et défilable.
 
 ### Accueil — handoff badges/historique du 24 octobre 2026 et retour terrain222
 

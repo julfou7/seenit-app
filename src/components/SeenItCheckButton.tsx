@@ -4,7 +4,8 @@ import { SeenItRing } from './SeenItLogo';
 import './seenItCheckButton.css';
 
 export interface SeenItCheckButtonProps {
-  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void | Promise<void>;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void | boolean | Promise<void | boolean>;
+  celebrating?: boolean;
   isWatched?: boolean;
   pending?: boolean;
   disabled?: boolean;
@@ -21,6 +22,7 @@ export interface SeenItCheckButtonProps {
  */
 export function SeenItCheckButton({
   onClick,
+  celebrating,
   isWatched = false,
   pending = false,
   disabled = false,
@@ -56,8 +58,8 @@ export function SeenItCheckButton({
 
     setInternalPending(true);
     try {
-      await onClick(e);
-      if (!isWatched) {
+      const result = await onClick(e);
+      if (result !== false && !isWatched && celebrating === undefined) {
         setCelebrate(true);
         successTimer.current = setTimeout(() => setCelebrate(false), 850);
       }
@@ -66,7 +68,8 @@ export function SeenItCheckButton({
     }
   };
 
-  const active = !error && (isWatched || celebrate);
+  const showCelebration = celebrating ?? celebrate;
+  const active = !error && (isWatched || showCelebration);
 
   return (
     <button
@@ -78,7 +81,7 @@ export function SeenItCheckButton({
       aria-pressed={isWatched}
       aria-busy={effectivePending || undefined}
       data-error={error ? 'true' : undefined}
-      data-celebrate={celebrate && !error || undefined}
+      data-celebrate={showCelebration && !error || undefined}
       className={cn(
         "seenit-check group relative min-h-11 min-w-11 flex items-center justify-center rounded-xl p-1.5 transition-all duration-200 cursor-pointer select-none",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black",

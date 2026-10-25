@@ -10,6 +10,8 @@ interface SplashScreenProps {
   animate?: boolean;
 }
 
+export const BRAND_SPLASH_ANIMATION_MS = 3700;
+
 export function SplashScreen({
   onComplete,
   onStartClose,
@@ -17,7 +19,9 @@ export function SplashScreen({
   minimumDisplayTime = 0,
   animate = true
 }: SplashScreenProps) {
-  const [timeElapsed, setTimeElapsed] = useState(minimumDisplayTime === 0);
+  const reducedMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion:reduce)').matches;
+  const duration = Math.max(minimumDisplayTime, animate && !reducedMotion ? BRAND_SPLASH_ANIMATION_MS : 0);
+  const [timeElapsed, setTimeElapsed] = useState(duration === 0);
   const [isClosing, setIsClosing] = useState(false);
   const onCompleteRef = useRef(onComplete);
   const onStartCloseRef = useRef(onStartClose);
@@ -31,16 +35,16 @@ export function SplashScreen({
   }, [onStartClose]);
 
   useEffect(() => {
-    if (minimumDisplayTime === 0) {
+    if (duration === 0) {
       setTimeElapsed(true);
       return;
     }
     const timer = setTimeout(() => {
       setTimeElapsed(true);
-    }, minimumDisplayTime);
+    }, duration);
 
     return () => clearTimeout(timer);
-  }, [minimumDisplayTime]);
+  }, [duration]);
 
   useEffect(() => {
     if (!timeElapsed || !isReady || isClosing) return;
@@ -52,11 +56,11 @@ export function SplashScreen({
     if (!isClosing) return;
     const closeTimer = setTimeout(() => {
       onCompleteRef.current();
-    }, 500);
+    }, reducedMotion ? 0 : 500);
     return () => clearTimeout(closeTimer);
-  }, [isClosing]);
+  }, [isClosing, reducedMotion]);
 
-  return <div id="seenit-splash-screen" className={'seenit-brand-splash'+(isClosing ? ' seenit-brand-splash--closing' : '')} data-ready={isReady || !animate}>
+  return <div id="seenit-splash-screen" className={'seenit-brand-splash'+(isClosing ? ' seenit-brand-splash--closing' : '')} data-ready={timeElapsed || !animate || reducedMotion}>
     <div className="brand-stacked-logo" role="img" aria-label="SeenIt" dangerouslySetInnerHTML={{__html:brandStackedSvg}} />
     <div className="seenit-brand-splash__episodes" aria-hidden="true">{Array.from({length:8},(_,index)=><i key={index} style={{animationDelay:(index*300)+'ms'}}/>)}</div>
     <p>Chaque visionnage compte.</p>

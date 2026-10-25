@@ -627,7 +627,7 @@
     },
     {
       "id": "SEENIT-PLEX-002",
-      "title": "Serveur Plex hors ligne non bloquant et disponibilité bornée sans faux négatif",
+      "title": "Serveur Plex hors ligne non bloquant, disponibilité bornée et reprise foreground sans AbortSignal brut",
       "targets": [
         "backend",
         "pwa",
@@ -681,6 +681,14 @@
         {
           "file": "tests/plexResumeWorker.test.ts",
           "contains": "SEENIT-PLEX-002 le worker réel regroupe et annule les reprises hors écran"
+        },
+        {
+          "file": "tests/plexResumeLifecycle.test.ts",
+          "contains": "SEENIT-PLEX-002 une requête Plex WebView déjà en vol attend le retour foreground sans toast AbortSignal"
+        },
+        {
+          "file": "tests/plexResumeLifecycle.test.ts",
+          "contains": "SEENIT-PLEX-002 un AbortError transport hors cycle de vie ne fuit jamais comme message technique brut"
         }
       ]
     },
@@ -2120,6 +2128,10 @@
         {
           "file": "tests/qualityGates.test.ts",
           "contains": "SEENIT-UX-009 exécute un rendu navigateur avant/après des actions communes"
+        },
+        {
+          "file": "tests/terrain224Motion.test.ts",
+          "contains": "SEENIT-UX-009 terrain224 annule"
         }
       ]
     },
@@ -2182,6 +2194,10 @@
         {
           "file": "tests/watchCardResume.test.ts",
           "contains": "#693 la façade de production marque exactement la reprise affichée et conserve le Show original"
+        },
+        {
+          "file": "tests/terrain224Motion.test.ts",
+          "contains": "SEENIT-UX-014 terrain224 exécute"
         }
       ]
     },
