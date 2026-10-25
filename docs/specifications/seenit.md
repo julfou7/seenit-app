@@ -1655,7 +1655,9 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   l'upgrade, des données/session, des budgets et du deep link peut déclencher **un seul retry** complet
   sur un AVD neuf. Aucun échec de package, version, signature, installation N → N+1, instrumentation,
   budget, deep link ou crash SeenIt ne peut être reclassé ni retenté automatiquement. Un second incident
-  d'émulateur reste bloquant.
+  d'émulateur reste bloquant. Les deux AVD API36 utilisent le mode logiciel actuel
+  `-gpu swiftshader -feature -Vulkan`, après le segfault RenderThread hôte du25/10/2026
+  sous le mode déprécié `swiftshader_indirect`. Le changement de renderer ne retire aucune assertion.
 
 Une modification est terminée lorsque les validations applicables à sa classe sont vertes, son test
 ciblé existe si le comportement change, toute règle durable/zone sensible est reflétée dans la SPEC et

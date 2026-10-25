@@ -2572,6 +2572,10 @@
         {
           "file": "tests/androidEmulatorCache.test.ts",
           "contains": "SEENIT-QUALITY-012 retente une seule fois uniquement une disparition d’émulateur qualifiée"
+        },
+        {
+          "file": "tests/androidEmulatorCache.test.ts",
+          "contains": "SEENIT-QUALITY-012 utilise le renderer logiciel actuel sans Vulkan"
         }
       ]
     },
