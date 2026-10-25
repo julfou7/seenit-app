@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
+import { brandStackedSvg } from '../src/assets/brandStacked.ts';
 
 test('SEENIT-APK-001 marque v3 autorisée conserve package signature et icônes verrouillées', () => {
  const contract=JSON.parse(fs.readFileSync('docs/specifications/android-contract.json','utf8'));
@@ -22,4 +23,6 @@ test('SEENIT-UX-009 marque v3 réutilise les tracés et termine la séquence de 
  assert.match(splash,/data-ready=\{timeElapsed \|\| !animate \|\| reducedMotion\}/);
  assert.doesNotMatch(fs.readFileSync('src/App.tsx','utf8'),/minimumDisplayTime=\{0\}/);
  assert.doesNotMatch(fs.readFileSync('public/brand/seenit-logo-sombre.svg','utf8'),/<script|\bon\w+=|href=/i);
+ assert.doesNotMatch(fs.readFileSync('public/brand/seenit-logo-empile-sombre.svg','utf8'),/<rect/);
+ assert.doesNotMatch(brandStackedSvg,/<rect/);
 });

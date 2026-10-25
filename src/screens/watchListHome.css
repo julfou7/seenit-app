@@ -132,3 +132,6 @@
 .home-sync-sheet__servers li { flex-wrap:wrap; }
 .home-sync-ring svg { display:block; }
 .home-wordmark img { display:block; width:148px; height:auto; }
+
+/* Terrain224: keep the count above the bell glyph, on its outer corner. */
+.home-notification-bell > span { top:-5px; right:-2px; min-width:16px; height:16px; font-size:9px; border-radius:8px; box-shadow:0 0 0 2px #08080C; }

@@ -56,6 +56,7 @@ async function testTerrain224Harness(client,root) {
   await check(client,`(()=>{const bands=[...document.querySelectorAll('.series-ribbon')];return bands.length && bands.every(b=>{const r=b.getBoundingClientRect(),p=b.parentElement.getBoundingClientRect();return r.height<=22 && r.width<=p.width+2 && Math.abs(r.bottom-p.bottom)<=4 && getComputedStyle(b).transform==='none'})})()`,'bottom-band');
   await check(client,`(()=>{const btn=document.querySelector('.movie-ticket--poster .movie-ticket__check'),body=btn.parentElement,poster=body.querySelector('.movie-ticket__poster'),b=btn.getBoundingClientRect(),p=poster.getBoundingClientRect(),r=body.getBoundingClientRect();return b.top>=p.bottom-1 && b.bottom<=r.bottom+1 && /fin à|après minuit/.test(body.parentElement.querySelector('.movie-ticket__metadata')?.textContent || '')})()`,'ticket-action');
   await check(client,`getComputedStyle(document.querySelector('.navigation-tab'),'::after').content==='none'`,'navigation no bottom point');
+  await check(client,`(()=>{const bell=document.querySelector('.home-notification-bell'),badge=bell.querySelector('span').getBoundingClientRect(),glyph=bell.querySelector('svg').getBoundingClientRect();return badge.height===16 && badge.bottom<=glyph.top+1 && badge.right<=innerWidth})()`,'notification count leaves the bell visible');
   await evaluate(client,`document.querySelector('#films-a-voir-18c').scrollIntoView({block:'center'});document.querySelector('#films-a-voir-18c').scrollLeft=0`);
   await pause(80);
   fs.writeFileSync(path.join(root,'quality-reports',`terrain224-tickets-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
@@ -66,6 +67,8 @@ async function testTerrain224Harness(client,root) {
    await evaluate(client,'window.__terrain224.splash.open(true)');
    await check(client,`document.querySelector('#seenit-splash-screen')?.dataset.ready==='false'`,'splash-complete start');
    await pause(950);
+   await check(client,`!document.querySelector('.brand-stacked-logo svg > rect')`,'transparent splash artwork');
+   fs.writeFileSync(path.join(root,'quality-reports','terrain225-splash-360.png'),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
    await check(client,`document.querySelector('#seenit-splash-screen') && !document.querySelector('.seenit-brand-splash--closing')`,'splash-complete not cut by ready');
    await check(client,`document.querySelector('.seenit-brand-splash--closing')?.dataset.ready==='true'`,'splash-complete final state');
    await check(client,`!document.querySelector('#seenit-splash-screen') && window.__terrain224.splash.closed===1`,'splash-complete close once');
