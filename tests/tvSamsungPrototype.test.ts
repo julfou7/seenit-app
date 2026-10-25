@@ -29,6 +29,7 @@ function assertEs5(source, name) {
 }
 
 test('SEENIT-TV-POC-001 garde le widget compatible Tizen 3 et sans runtime lourd', () => {
+  assert.match(config, /version="0\.2\.0"/);
   assert.match(config, /required_version="3\.0"/);
   const packageMatch = config.match(/<tizen:application[^>]*\bpackage="([A-Za-z0-9]{10})"/);
   assert.ok(packageMatch, 'Tizen package id must contain exactly 10 alphanumeric characters');
@@ -44,7 +45,7 @@ test('SEENIT-TV-POC-001 garde le widget compatible Tizen 3 et sans runtime lourd
 
 test('SEENIT-TV-POC-001 conserve TV tuner, apps directes et Sport provider-agnostic', () => {
   assert.match(html, /Antenne · TNT en direct/);
-  assert.match(html, /MES APPS/);
+  assert.match(html, /APPS FAVORITES/);
   assert.match(html, /AS Monaco — Lille/);
   assert.match(app, /favoriteNames/);
   assert.match(device, /tizen\.application\.getAppsInfo/);
@@ -69,19 +70,57 @@ test('SEENIT-TV-V2-001 verrouille la vraie cible terrain et le rôle de Home pri
   assert.match(tvAgents, /Home\/launcher principal/);
 });
 
+test('SEENIT-TV-V2-001 implémente la Home éditoriale et les sources dynamiques', () => {
+  assert.match(html, /id="heroCard"/);
+  assert.match(html, /shortcut-matrix/);
+  assert.match(html, /id="telemetry"/);
+  assert.match(html, /id="screenSources"/);
+  assert.match(app, /TVDevice\.getSources/);
+  assert.match(app, /renderSources/);
+  assert.doesNotMatch(html, /data-source="HDMI[12]"/);
+  assert.match(css, /#11141b/i);
+  assert.match(css, /#241b24/i);
+});
+
 test('SEENIT-TV-V2-001 garde 100+ apps bornées sans perdre les packages système', () => {
   assert.match(v2Spec, /100\+ applications/);
   assert.match(v2Spec, /USER \| SYSTEM \| UNKNOWN/);
   assert.match(v2Spec, /6 colonnes × 3 lignes = 18 cartes par page/);
   assert.match(v2Spec, /Ne jamais injecter 100\+ cartes simultanément/);
   assert.match(tvAgents, /inventoriée puis classifiée/);
+  assert.match(device, /classification: classification/);
+  assert.match(device, /classification === 'SYSTEM'/);
+  assert.match(device, /classification === 'USER'/);
+  assert.match(app, /var APPS_PER_PAGE = 18/);
+  assert.match(app, /start = appsPage \* APPS_PER_PAGE/);
+  assert.match(app, /end = Math\.min\(list\.length, start \+ APPS_PER_PAGE\)/);
+  assert.match(html, /data-tab="favorites"/);
+  assert.match(html, /data-tab="user"/);
+  assert.match(html, /data-tab="system"/);
+  assert.match(app, /Composant système conservé pour diagnostic ; lancement désactivé par sécurité/);
+  assert.match(app, /appsKidOnly/);
+  assert.match(app, /systemTab\.style\.display = appsKidOnly \? 'none' : ''/);
+  assert.doesNotMatch(device, /show === false \|\| isSystemAppHint\(apps\[i\]\).*continue/s);
 });
 
-test('SEENIT-TV-V2-001 exige RAM et stockage read-only sans root', () => {
+test('SEENIT-TV-V2-001 implémente RAM et stockage read-only avec cadence bornée', () => {
   assert.match(v2Spec, /getTotalMemory\(\)/);
   assert.match(v2Spec, /getAvailableMemory\(\)/);
   assert.match(v2Spec, /getPropertyValue\('STORAGE'/);
   assert.match(v2Spec, /Aucun root n'est nécessaire pour cette télémétrie/);
-  assert.match(v2Spec, /RAM : toutes les \*\*15 s\*\*/);
-  assert.match(v2Spec, /stockage : toutes les \*\*60 s\*\*/);
+  assert.match(device, /getTotalMemory\(\)/);
+  assert.match(device, /getAvailableMemory\(\)/);
+  assert.match(device, /getPropertyValue\('STORAGE'/);
+  assert.match(app, /setInterval\(refreshMemory, 15000\)/);
+  assert.match(app, /setInterval\(refreshStorage, 60000\)/);
+  assert.match(app, /visibilitychange/);
+  assert.match(app, /document\.hidden === true/);
+});
+
+test('SEENIT-TV-V2-001 borne le focus télécommande et le DOM des apps', () => {
+  assert.match(app, /var NAV_DEBOUNCE_MS = 170/);
+  assert.match(app, /shouldAcceptDirectional/);
+  assert.match(css, /scale\(1\.04\)/);
+  assert.doesNotMatch(css, /animation\s*:/i);
+  assert.doesNotMatch(app, /installedApps\.forEach\([^)]*appendChild/s);
 });

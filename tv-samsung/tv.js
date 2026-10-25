@@ -11,31 +11,61 @@ var TVDevice = (function () {
   var settingsMenuId = 'org.tizen.menu';
 
   var sampleApps = [
-    { id: 'sample.plex', title: 'Plex' },
-    { id: 'sample.netflix', title: 'Netflix' },
-    { id: 'sample.youtube', title: 'YouTube' },
-    { id: 'sample.prime', title: 'Prime Video' },
-    { id: 'sample.dazn', title: 'DAZN' },
-    { id: 'sample.spotify', title: 'Spotify' }
+    { id: 'sample.plex', name: 'Plex', show: true },
+    { id: 'sample.netflix', name: 'Netflix', show: true },
+    { id: 'sample.youtube', name: 'YouTube', show: true },
+    { id: 'sample.prime', name: 'Prime Video', show: true },
+    { id: 'sample.dazn', name: 'DAZN', show: true },
+    { id: 'sample.spotify', name: 'Spotify', show: true },
+    { id: 'sample.system.viewer', name: 'TV Viewer', show: false }
   ];
 
   function safeTitle(app) {
     return String((app && (app.name || app.title)) || '').replace(/^\s+|\s+$/g, '');
   }
 
-  function isSystemApp(app) {
+  function isSystemAppHint(app) {
     var id = String((app && app.id) || '');
     if (!id) return true;
     if (id === viewerId || id === settingsMenuId) return true;
     if (/^(ise-|ug-|org\.volt\.)/.test(id)) return true;
-    if (/Service$|Daemon|Keyboard|syspopup|Helper$/.test(id)) return true;
+    if (/Service$|Daemon|Keyboard|syspopup|Helper$/i.test(id)) return true;
     if (/^com\.samsung\.tv\.(cobalt-|airplay-app|built-in-app-info-viewer|commonsearch|preview-|notification-app)/.test(id)) return true;
     return false;
   }
 
+  function normalizeApp(app) {
+    var id = String((app && app.id) || '');
+    var title = safeTitle(app);
+    var classification = 'UNKNOWN';
+    var visible = app && app.show !== false;
+    if (!id) return null;
+    if (!visible || isSystemAppHint(app)) classification = 'SYSTEM';
+    else if (title) classification = 'USER';
+    return {
+      id: id,
+      title: title || id,
+      show: visible,
+      classification: classification,
+      favorite: false,
+      hidden: false,
+      launchable: classification === 'USER',
+      iconPath: app && app.iconPath ? String(app.iconPath) : ''
+    };
+  }
+
   function listApps(done) {
+    var finish = typeof done === 'function' ? done : function () {};
     if (!samsung) {
-      setTimeout(function () { done(sampleApps.slice(0)); }, 0);
+      setTimeout(function () {
+        var preview = [];
+        var p;
+        for (p = 0; p < sampleApps.length; p++) {
+          var item = normalizeApp(sampleApps[p]);
+          if (item) preview.push(item);
+        }
+        finish(preview);
+      }, 0);
       return;
     }
     try {
@@ -43,20 +73,18 @@ var TVDevice = (function () {
         var out = [];
         var i;
         for (i = 0; i < apps.length; i++) {
-          if (!apps[i] || !apps[i].id || apps[i].show === false || isSystemApp(apps[i])) continue;
-          var title = safeTitle(apps[i]);
-          if (!title) continue;
-          out.push({ id: apps[i].id, title: title });
+          var normalized = normalizeApp(apps[i]);
+          if (normalized) out.push(normalized);
         }
         out.sort(function (a, b) {
           var aa = a.title.toLowerCase();
           var bb = b.title.toLowerCase();
           return aa < bb ? -1 : aa > bb ? 1 : 0;
         });
-        done(out);
-      }, function () { done([]); });
+        finish(out);
+      }, function () { finish([]); });
     } catch (e) {
-      done([]);
+      finish([]);
     }
   }
 
@@ -85,8 +113,14 @@ var TVDevice = (function () {
   }
 
   function getSources(done) {
+    var finish = typeof done === 'function' ? done : function () {};
     if (!samsung || !window.tizen.systeminfo || !window.tizen.tvwindow) {
-      setTimeout(function () { done([]); }, 0);
+      setTimeout(function () {
+        finish([
+          { type: 'HDMI', number: 1, connected: true },
+          { type: 'HDMI', number: 2, connected: false }
+        ]);
+      }, 0);
       return;
     }
     try {
@@ -94,15 +128,21 @@ var TVDevice = (function () {
         var out = [];
         var connected = value && value.connected ? value.connected : [];
         var disconnected = value && value.disconnected ? value.disconnected : [];
-        var all = connected.concat(disconnected);
         var i;
-        for (i = 0; i < all.length; i++) {
-          if (all[i] && all[i].type && all[i].number !== undefined) out.push(all[i]);
+        for (i = 0; i < connected.length; i++) {
+          if (connected[i] && connected[i].type && connected[i].number !== undefined) {
+            out.push({ type: connected[i].type, number: connected[i].number, connected: true });
+          }
         }
-        done(out);
-      }, function () { done([]); });
+        for (i = 0; i < disconnected.length; i++) {
+          if (disconnected[i] && disconnected[i].type && disconnected[i].number !== undefined) {
+            out.push({ type: disconnected[i].type, number: disconnected[i].number, connected: false });
+          }
+        }
+        finish(out);
+      }, function () { finish([]); });
     } catch (e) {
-      done([]);
+      finish([]);
     }
   }
 
@@ -132,6 +172,54 @@ var TVDevice = (function () {
     });
   }
 
+  function getMemoryInfo(done) {
+    var finish = typeof done === 'function' ? done : function () {};
+    if (!samsung || !window.tizen.systeminfo) {
+      setTimeout(function () { finish({ available: 612 * 1024 * 1024, total: 1536 * 1024 * 1024, preview: true }); }, 0);
+      return;
+    }
+    try {
+      var total = window.tizen.systeminfo.getTotalMemory();
+      var available = window.tizen.systeminfo.getAvailableMemory();
+      finish({ available: Number(available) || 0, total: Number(total) || 0, preview: false });
+    } catch (e) {
+      finish(null);
+    }
+  }
+
+  function selectStorageUnit(value) {
+    var units = value && value.units ? value.units : [];
+    var fallback = null;
+    var i;
+    for (i = 0; i < units.length; i++) {
+      if (!units[i]) continue;
+      if (!fallback) fallback = units[i];
+      if (units[i].isRemovable === false) return units[i];
+    }
+    return fallback;
+  }
+
+  function getStorageInfo(done) {
+    var finish = typeof done === 'function' ? done : function () {};
+    if (!samsung || !window.tizen.systeminfo) {
+      setTimeout(function () { finish({ available: 1800 * 1024 * 1024, total: 3900 * 1024 * 1024, preview: true }); }, 0);
+      return;
+    }
+    try {
+      window.tizen.systeminfo.getPropertyValue('STORAGE', function (value) {
+        var unit = selectStorageUnit(value);
+        if (!unit) { finish(null); return; }
+        finish({
+          available: Number(unit.availableCapacity) || 0,
+          total: Number(unit.capacity) || 0,
+          preview: false
+        });
+      }, function () { finish(null); });
+    } catch (e) {
+      finish(null);
+    }
+  }
+
   function openSamsungSettings(done) {
     if (!samsung) {
       if (done) setTimeout(function () { done(true); }, 0);
@@ -148,12 +236,34 @@ var TVDevice = (function () {
   }
 
   function diagnostics(done) {
-    var result = { samsung: samsung, platform: navigator.userAgent || '', apps: 0, sources: [] };
+    var result = {
+      samsung: samsung,
+      platform: navigator.userAgent || '',
+      apps: 0,
+      userApps: 0,
+      systemApps: 0,
+      unknownApps: 0,
+      sources: [],
+      memory: null,
+      storage: null
+    };
     listApps(function (apps) {
+      var i;
       result.apps = apps.length;
+      for (i = 0; i < apps.length; i++) {
+        if (apps[i].classification === 'USER') result.userApps++;
+        else if (apps[i].classification === 'SYSTEM') result.systemApps++;
+        else result.unknownApps++;
+      }
       getSources(function (sources) {
         result.sources = sources;
-        done(result);
+        getMemoryInfo(function (memory) {
+          result.memory = memory;
+          getStorageInfo(function (storage) {
+            result.storage = storage;
+            done(result);
+          });
+        });
       });
     });
   }
@@ -163,7 +273,10 @@ var TVDevice = (function () {
     listApps: listApps,
     launchApp: launchApp,
     openLiveTv: openLiveTv,
+    getSources: getSources,
     openSource: openSource,
+    getMemoryInfo: getMemoryInfo,
+    getStorageInfo: getStorageInfo,
     openSamsungSettings: openSamsungSettings,
     diagnostics: diagnostics
   };
