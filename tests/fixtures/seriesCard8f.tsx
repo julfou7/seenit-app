@@ -22,7 +22,7 @@ function Harness() {
   const [reminder, setReminder] = useState(false);
   const [pending, setPending] = useState(false);
   const show = marked ? { ...base, seenEpisodes: [...base.seenEpisodes, '5x4'] } : base;
-  const next = { ...base.nextEpisodeToWatch!, episode_number: marked ? 5 : 4 };
+  const next = { ...base.nextEpisodeToWatch!, air_date: new Date().toLocaleDateString('sv-SE'), episode_number: marked ? 5 : 4 };
   const harryEpisode = {
     season_number: 1, episode_number: 3, episode_count: 4, aired_episodes_in_season: 3,
     known_episodes_in_season: 4, season_total_unknown: true, last_season_number: 1,

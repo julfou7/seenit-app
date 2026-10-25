@@ -1,3 +1,4 @@
+import { mergePlexProgressMutation } from '../src/features/plex/plexProgressMerge.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
@@ -95,6 +96,24 @@ test('SEENIT-UX-014 les deux synchronisations conservent la finale avant de supp
   ports.show=terrainShow;ports.writes.length=0;
   await module.exports.performDetailsSync(false);
   assert.equal(ports.writes.length,0,'aucune boucle après réparation');
+  // Terrain222 : Plex démarre AVANT le worker, mais sa transaction termine APRÈS.
+  for (const title of ['A Knight of the Seven Kingdoms', 'The Madison', 'Série voisine']) {
+    const baseline = { ...show, title, seasonProgress: { '1': { total_evidence_version: 3, total_checked_at: Date.now(), season_number: 1, episode_count: null, known_episodes_in_season: 6, season_total_unknown: true, last_season_number: 1, last_known_episode_type: 'standard', last_known_episode_air_date: null } } } as Show;
+    ports.show = baseline; ports.writes.length = 0;
+    await module.exports.performDetailsSync(false);
+    const payload = ports.writes.find(value => value.seasonProgress);
+    assert.ok(payload, 'une preuve v3 inconnue potentiellement écrasée est relue une seule fois');
+    const committed = { ...baseline, ...JSON.parse(JSON.stringify(payload)) } as Show;
+    const plexCandidate = { ...baseline, seenEpisodes: ['1x1'], episodeRecords: { '1x1': { watchedAt: Date.now(), plexImported: true } } };
+    const afterPlexTransaction = mergePlexProgressMutation(committed, baseline, plexCandidate);
+    assert.equal(afterPlexTransaction.seasonProgress?.['1'].episode_count, 6);
+    assert.equal(afterPlexTransaction.seasonsCache, null);
+    assert.deepEqual(afterPlexTransaction.seenEpisodes, ['1x1']);
+    assert.equal(buildSeriesSeasonProgress(afterPlexTransaction, { season_number: 1, episode_number: 2 }, 'watch', '2026-10-24').unknownTail, false);
+    ports.show = afterPlexTransaction; ports.writes.length = 0;
+    await module.exports.performDetailsSync(false);
+    assert.equal(ports.writes.length, 0, 'aucune répétition ni migration en boucle après la transaction Plex');
+  }
   // Une installation existante doit être réparée sans pull-to-refresh, puis s'arrêter.
   for (const providerStatus of ['Returning Series', 'Ended', 'Canceled']) for (const oldFlag of [true, false]) {
   ports.details.status = providerStatus;

@@ -1,3 +1,4 @@
+import { rememberNotification } from '../features/notifications/notificationInbox';
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, persistentSingleTabManager } from 'firebase/firestore';
@@ -32,9 +33,9 @@ export const FIRESTORE_DATABASE_ID = 'default';
 
 export const db = initializeFirestore(
   app,
-  { 
-    localCache: isNative 
-      ? persistentLocalCache({ tabManager: persistentSingleTabManager({}) }) 
+  {
+    localCache: isNative
+      ? persistentLocalCache({ tabManager: persistentSingleTabManager({}) })
       : persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
     experimentalForceLongPolling: isNative
   },
@@ -72,7 +73,7 @@ if (typeof window !== 'undefined' && 'Notification' in window) {
 async function fetchImageAsDataUrl(url?: string): Promise<string | undefined> {
   if (!url || typeof window === 'undefined') return undefined;
   if (url.startsWith('data:')) return url;
-  
+
   const fullUrl = normalizeImageUrl(url);
   if (!fullUrl) return undefined;
 
@@ -81,10 +82,10 @@ async function fetchImageAsDataUrl(url?: string): Promise<string | undefined> {
     const timer = setTimeout(() => controller.abort(), 3500);
     const res = await fetch(fullUrl, { signal: controller.signal });
     clearTimeout(timer);
-    
+
     if (!res.ok) return undefined;
     const blob = await res.blob();
-    
+
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -102,7 +103,10 @@ async function fetchImageAsDataUrl(url?: string): Promise<string | undefined> {
 // Register native notification click action listener on Capacitor Native platform
 if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
   try {
+    PushNotifications.addListener('pushNotificationReceived', notification => rememberNotification(auth.currentUser?.uid, notification));
+    LocalNotifications.addListener('localNotificationReceived', notification => rememberNotification(auth.currentUser?.uid, notification));
     LocalNotifications.addListener('localNotificationActionPerformed', (notificationAction) => {
+      rememberNotification(auth.currentUser?.uid, notificationAction.notification);
       const extra = notificationAction.notification?.extra || {};
       const payload = {
         type: notificationAction.actionId === 'mark_watched' ? 'QUICK_ACTION_MARK_WATCHED' : 'NAVIGATE_SHOW',
@@ -116,6 +120,7 @@ if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
       window.dispatchEvent(new CustomEvent('capacitor-notification-action', { detail: payload }));
     });
     PushNotifications.addListener('pushNotificationActionPerformed', action => {
+      rememberNotification(auth.currentUser?.uid, action.notification);
       const data = action.notification?.data || {};
       const payload = { ...data, type: data.type || 'DOWNLOAD_EVENT' };
       queueAppUpdateAvailablePush(payload);
@@ -183,6 +188,7 @@ export async function cancelScheduledNotification(id: number) {
 }
 
 export async function sendNativeNotification(title: string, options?: NativeNotificationOptions) {
+  const ownerUid = auth.currentUser?.uid;
   const iconUrl = options?.icon || options?.image || 'https://seenit.app/icon-192.png';
   const imageUrl = options?.image || options?.icon;
   const extraData: NativeNotificationData = options?.data || {
@@ -194,7 +200,7 @@ export async function sendNativeNotification(title: string, options?: NativeNoti
   };
 
   const notificationId = options?.notificationId ?? (
-    options?.tag 
+    options?.tag
       ? generateNotificationNumericId(options.tag)
       : (options?.showId && options?.season !== undefined && options?.episode !== undefined
           ? generateNotificationNumericId(`ep_${options.showId}_S${options.season}E${options.episode}`)
@@ -234,6 +240,7 @@ export async function sendNativeNotification(title: string, options?: NativeNoti
         });
       } catch (e) {}
 
+      if (ownerUid && auth.currentUser?.uid !== ownerUid) return;
       await LocalNotifications.schedule({
         notifications: [{
           title: title,
@@ -241,7 +248,7 @@ export async function sendNativeNotification(title: string, options?: NativeNoti
           largeBody: options?.body || '',
           summaryText: 'Nouvel épisode',
           id: notificationId,
-          schedule: { 
+          schedule: {
             at: targetDate,
             allowWhileIdle: true
           },
@@ -251,6 +258,7 @@ export async function sendNativeNotification(title: string, options?: NativeNoti
           attachments,
           actionTypeId: 'EPISODE_NOTIF_ACTIONS',
           extra: {
+            ownerUid,
             showId: extraData.showId,
             tmdbId: extraData.tmdbId,
             mediaType: extraData.mediaType || 'tv',
@@ -272,6 +280,7 @@ export async function sendNativeNotification(title: string, options?: NativeNoti
     const delay = options.scheduleDate.getTime() - Date.now();
     if (delay < 24 * 60 * 60 * 1000) {
       setTimeout(() => {
+        if (ownerUid && auth.currentUser?.uid !== ownerUid) return;
         sendNativeNotification(title, { ...options, scheduleDate: undefined });
       }, delay);
     }
@@ -477,5 +486,3 @@ if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
     void syncGrantedNotificationDevice();
   });
 }
-
-

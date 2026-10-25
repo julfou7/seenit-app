@@ -32,3 +32,12 @@
 .history-entry__text h3 { white-space:normal; overflow:visible; text-overflow:clip; overflow-wrap:anywhere; line-height:1.25; }
 .history-entry__text > div { white-space:normal; line-height:1.35; }
 .history-period:last-of-type { padding-bottom:0; }
+
+/* Handoff 24oct : affiche plein cadre et colonne Vu/heure commune. */
+.history-entry__image { align-self:stretch; height:auto; min-height:96px; }
+.history-entry__text p { font-size:14px; font-weight:600; line-height:1.3; color:#f4f4f5; }
+.history-entry__action-column { position:relative; z-index:2; flex:0 0 52px; display:flex; flex-direction:column; align-items:center; gap:1px; }
+.history-entry__action-column > time { font-size:12px; font-weight:700; font-variant-numeric:tabular-nums; color:#d4d4d8; }
+.history-entry--today .history-entry__action-column > time { color:#f2c36b; }
+.history-entry--today .seenit-check { animation:hdStamp .32s both; }
+@media(prefers-reduced-motion:reduce) { .history-entry--today .seenit-check { animation:none; } }

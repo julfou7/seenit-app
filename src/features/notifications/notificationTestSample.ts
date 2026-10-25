@@ -143,7 +143,7 @@ function buildSample(
       episode: episodeNumber,
       notificationTitle: show.title,
       summaryText: '🆕 Nouvel épisode',
-      body: `S${sNum}E${eNum}${episodeName} disponible aujourd'hui.`,
+      body: `S${sNum} | E${eNum}${episodeName} disponible aujourd'hui.`,
       posterUrl,
       richImageUrl: episodeRich,
       allowMarkWatched: true,

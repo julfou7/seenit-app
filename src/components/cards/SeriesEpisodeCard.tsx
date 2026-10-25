@@ -9,7 +9,7 @@ import { dominantPosterHue, POSTER_HUE_FALLBACK, readPosterHue, rememberPosterHu
 import './seriesEpisodeCard.css';
 import { SeenItWatchedStamp } from './SeenItWatchedStamp';
 import { useAnimatedBadges } from '../../hooks/useAnimatedBadges';
-import { seriesStatus } from '../../features/watchlist/homePresentation';
+import { seriesBadge, seriesPause } from '../../features/watchlist/seriesBadges';
 
 export interface SeriesCardAction { label: string; onSelect: () => void | Promise<void>; destructive?: boolean }
 type Context =
@@ -93,17 +93,10 @@ export function SeriesEpisodeCard({ show, episode, context, detail, hideStatus =
   const requestedDetail = detail?.trim() && !REMAINING_DETAIL.test(detail) ? detail.trim() : undefined;
   const visibleDetail = requestedDetail || progress.detail;
   const detailIsBadge = visibleDetail ? BADGE_DETAIL.test(visibleDetail) : false;
-  const freshness = seriesStatus(visibleDetail);
-  const status = !hideStatus && context.kind === 'watch' && !context.upToDate ? freshness?.tone === 'today' || freshness?.tone === 'final' ? freshness : episode?.episode_type === 'finale'
-    ? { label: show.seriesEnded ? '🏁 Final' : '🎬 Fin de saison', tone: 'final' as const }
-    : !progress.totalUnknown && progress.availableUnseen > 0 && progress.availableUnseen <= 2
-      ? { label: `⚡ Plus que ${progress.availableUnseen}`, tone: 'remaining' as const }
-      : episode?.episode_number === 1 && episode.season_number > 1
-        ? { label: `🆕 S${episode.season_number} dispo`, tone: 'available' as const }
-        : progress.availableUnseen > 1 ? { label: `🍿 ${progress.availableUnseen} dispo`, tone: 'available' as const }
-          : freshness : null;
-  const staleDetail = visibleDetail && /pas vu|délaissé/i.test(visibleDetail) ? visibleDetail : null;
-  const secondaryDetail = visibleDetail && !staleDetail && !/plus que|restant|dispo/i.test(visibleDetail) ? visibleDetail : null;
+  const status = context.kind !== 'history' && !(context.kind === 'watch' && context.upToDate) ? seriesBadge(show, episode, progress, hideStatus, today) : null;
+  const pause = hideStatus ? seriesPause(show) : null;
+  const staleDetail = pause ? (layout === 'list' ? pause.description : null) : visibleDetail && /pas vu|délaissé/i.test(visibleDetail) ? visibleDetail : null;
+  const secondaryDetail = visibleDetail && !pause && !/plus que|restant|dispo|pas vu|délaissé/i.test(visibleDetail) ? visibleDetail : null;
   const watchedDate = context.kind === 'history' ? new Date(context.watchedAt) : null;
   const validWatchedDate = watchedDate && Number.isFinite(watchedDate.getTime());
   const watchedTimeKnown = context.kind === 'history' && context.watchedTimeKnown !== false;
@@ -172,15 +165,16 @@ export function SeriesEpisodeCard({ show, episode, context, detail, hideStatus =
       <div className="series-8f__poster" aria-hidden="true">
         <span>{initials}</span>
         {poster && <img src={poster} crossOrigin={posterCrossOrigin} alt="" loading="lazy" decoding="async" onLoad={event => handlePosterLoad(event.currentTarget)} onError={() => setPosterIndex(index => index + 1)} />}
+        {status && <span className={`series-ribbon series-ribbon--${status.tone}`} data-series-badge={status.tone}>{status.icon && <svg width="8" height="8" viewBox="0 0 10 10" aria-hidden="true">{status.icon === 'pause' ? <><rect x="1" y="1" width="2.5" height="8" rx="1" fill="currentColor" /><rect x="6.5" y="1" width="2.5" height="8" rx="1" fill="currentColor" /></> : <path d="M2 1H8V9L5 7 2 9Z" fill="none" stroke="currentColor" strokeWidth="1.4" />}</svg>}{status.label}</span>}
         {feedback && <SeenItWatchedStamp key={feedback.sequence} className="series-8f__stamp" />}
       </div>
       <div className="series-8f__text">
         <h3 id={titleId}>{show.title}</h3>
         <div className="series-8f__episode-block">
           <div key={feedback?.sequence || 0} className={feedback ? 'series-8f__incoming' : undefined}>
-            <div className="series-8f__code"><strong>{markingSnapshot?.code || code}</strong>{status && <span className={`series-8f__status series-8f__status--${status.tone}${status.label.length > 14 ? ' series-8f__status--long' : ''}`}>{status.label}</span>}{secondaryDetail && !status && !detailIsBadge && <span> · {secondaryDetail}</span>}</div>
+            <div className="series-8f__code"><strong>{markingSnapshot?.code || code}</strong>{secondaryDetail && !detailIsBadge && <span> · {secondaryDetail}</span>}{pause && !pause.started && <span className="series-8f__never"> · jamais commencée</span>}</div>
             {(markingSnapshot ? markingSnapshot.subtitle : subtitle) && <p>{markingSnapshot ? markingSnapshot.subtitle : subtitle}</p>}
-            {staleDetail && status?.tone !== 'stale' && <small className="series-8f__stale">{staleDetail}</small>}
+            {staleDetail && <small className="series-8f__stale">{staleDetail}</small>}
 
           </div>
           {feedback && <div key={`ghost-${feedback.sequence}`} className="series-8f__ghost" aria-hidden="true"><strong>✓ {feedback.code}</strong><p>{feedback.name}</p></div>}
@@ -195,12 +189,13 @@ export function SeriesEpisodeCard({ show, episode, context, detail, hideStatus =
       </div>
       <div className="series-8f__action">
         {context.kind === 'watch' && ((!context.upToDate && context.onMarkSeen) || reversibleComplete) && <SeenItCheckButton glyph="screen" size={34} error={markError} isWatched={reversibleComplete} className={`series-8f__check${reversibleComplete ? ' series-8f__check--watched' : ''}`} title={reversibleComplete ? `Marquer le dernier épisode de ${show.title} comme non vu` : `Marquer ${show.title} ${code} comme vu`} onClick={handleSeen} />}
-        {context.kind === 'upcoming' && <button type="button" className={`series-8f__days series-8f__days--${upcomingCardTone(context.days)}${context.days >= 100 ? ' series-8f__days--long' : ''}`} disabled={context.pending} aria-busy={context.pending || undefined} aria-pressed={context.reminder} aria-label={`${context.days === 0 ? 'Aujourd’hui' : `Dans ${context.days} jours`} · rappel ${context.reminder ? 'activé' : 'désactivé'} · ${show.title} ${code}`}  onClick={context.onToggleReminder}>
+        {context.kind === 'upcoming' && <button type="button" className={`series-8f__days series-8f__days--${upcomingCardTone(context.days)}${context.days >= 100 ? ' series-8f__days--long' : ''}`} disabled={context.pending} aria-busy={context.pending || undefined} aria-pressed={context.reminder} aria-label={`${context.pending ? 'Enregistrement du rappel · ' : ''}${context.days === 0 ? 'Aujourd’hui' : `Dans ${context.days} jours`} · rappel ${context.reminder ? 'activé' : 'désactivé'} · ${show.title} ${code}`}  onClick={context.onToggleReminder}>
           <span className={`series-8f__bell${context.reminder ? ' series-8f__bell--active' : ''}`}><Bell size={14} fill={context.reminder ? 'currentColor' : 'none'} /></span>
           <strong>{context.days <= 0 ? 'auj.' : `J-${context.days}`}</strong>
         </button>}
         {context.kind === 'history' && <div className="series-8f__history" aria-hidden="true"><span>✓</span>{watchedTime && <time dateTime={validWatchedDate ? watchedDate.toISOString() : undefined}>{watchedTime}</time>}</div>}
       </div>
+      {status && <span className="sr-only">{status.label}</span>}
       <span className="sr-only" role="status" aria-live="polite">{markError ? 'Le visionnage n’a pas pu être enregistré.' : feedback ? `${show.title} ${feedback.code} marqué vu` : ''}</span>
     </article>
     {menuOpen && <DialogLayer label={`Actions de ${show.title}`} onDismiss={() => setMenuOpen(false)} className="fixed inset-0 flex items-end sm:items-center justify-center bg-black/65 p-4 pb-nav">

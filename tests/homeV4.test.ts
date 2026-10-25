@@ -10,12 +10,12 @@ test('SEENIT-UX-015 regroupe seulement les épisodes consécutifs adjacents et d
   const items = [episode('3',3),episode('2',2,60_000),{...episode('film',0,120_000),mediaType:'movie' as const},episode('1',1,180_000),episode('old',0,86_400_000)];
   const rows = groupHistoryRows(items, () => 3);
   assert.deepEqual(rows.map(row => row.members.map(item => item.key)), [['3','2'],['film'],['1'],['old']]);
-  assert.equal(historyGroupCode(rows[0]), 'S01·E02 → E03');
+  assert.equal(historyGroupCode(rows[0]), 'S01 | E02 → E03');
   assert.equal(historyGroupCode(rows[1]), undefined);
   assert.equal(groupHistoryRows([episode('3',3),episode('1',1)],()=>3).length,2,'un trou sépare les sessions');
   assert.equal(groupHistoryRows([{...episode('2',2),watchedTimeKnown:false},episode('1',1)],()=>3).length,2,'une heure inconnue ne prouve pas une session');
   const cross = [{...episode('next',1),season:2},episode('last',3,60_000)];
-  assert.equal(historyGroupCode(groupHistoryRows(cross,()=>3)[0]),'S01·E03 → S02·E01');
+  assert.equal(historyGroupCode(groupHistoryRows(cross,()=>3)[0]),'S01 | E03 → S02 | E01');
   assert.equal(groupHistoryRows(cross,()=>null).length,2,'la fin de saison doit être confirmée');
 });
 test('SEENIT-UX-015 périodes calendaires et durées sans minutes inventées', () => {
@@ -48,7 +48,7 @@ test('SEENIT-UX-015 saison entière : les égalités du vrai tri précèdent le 
   const sorted=entries.sort(compareHistoryEntries);
   assert.deepEqual(sorted.map(item=>item.episode),[12,11,10,9,8,7,6,5,4,3,2,1]);
   const rows=groupHistoryRows(sorted,()=>12);
-  assert.equal(rows.length,1);assert.equal(rows[0].members.length,12);assert.equal(historyGroupCode(rows[0]),'S01·E01 → E12');
+  assert.equal(rows.length,1);assert.equal(rows[0].members.length,12);assert.equal(historyGroupCode(rows[0]),'S01 | E01 → E12');
   const mixed=[...entries,{...episode('film:movie',0),showId:'film',mediaType:'movie' as const}].sort(compareHistoryEntries);
   assert.equal(groupHistoryRows(mixed,()=>12).length,2,'le film ex æquo reste une ligne distincte');
   const unknown=entries.map(item=>({...item,watchedTimeKnown:false})).sort(compareHistoryEntries);

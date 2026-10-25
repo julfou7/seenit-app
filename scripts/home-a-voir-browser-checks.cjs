@@ -68,9 +68,9 @@ async function testHomeHarness(client, root) {
     await check(client,'document.querySelectorAll(".home-notice").length===window.__noticeCount','Annuler restaure la notification');
     const swipe=await evaluate(client,`(()=>{const el=document.querySelector(${JSON.stringify(notice)});el.scrollIntoView({block:'center'});const r=el.getBoundingClientRect();return{x:r.x+r.width*.6,y:r.y+r.height/2}})()`);
     await client.send('Input.dispatchMouseEvent',{type:'mousePressed',...swipe,button:'left',clickCount:1});
-    for(let distance=20;distance<=110;distance+=15) await client.send('Input.dispatchMouseEvent',{type:'mouseMoved',x:swipe.x-distance,y:swipe.y,button:'left',buttons:1});
-    await client.send('Input.dispatchMouseEvent',{type:'mouseReleased',x:swipe.x-110,y:swipe.y,button:'left',clickCount:1});
-    await check(client,'!document.querySelector(\'[data-notice-id="update:1.4.999"]\') && document.querySelector(".home-notifications") && window.__homeAVoir.telemetry.opens.length===window.__noticeOpens','swipe gauche retire une notification sans ouvrir sa fiche');
+    for(let distance=20;distance<=110;distance+=15) await client.send('Input.dispatchMouseEvent',{type:'mouseMoved',x:swipe.x+distance,y:swipe.y,button:'left',buttons:1});
+    await client.send('Input.dispatchMouseEvent',{type:'mouseReleased',x:swipe.x+110,y:swipe.y,button:'left',clickCount:1});
+    await check(client,'!document.querySelector(\'[data-notice-id="update:1.4.999"]\') && document.querySelector(".home-notifications") && window.__homeAVoir.telemetry.opens.length===window.__noticeOpens','swipe droit retire une notification sans ouvrir sa fiche');
     await client.send('Page.reload');
     await check(client,'document.querySelector(".home-notification-bell")','remontage après retrait');
     await click(client,'.home-notification-bell');

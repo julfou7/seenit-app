@@ -12,6 +12,7 @@ import android.graphics.Paint;
 import android.graphics.RectF;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Bundle;
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
@@ -354,6 +355,18 @@ public class PlexAvailabilityWorker extends Worker {
         }
     }
 
+    // Identity consumed by Capacitor getDeliveredNotifications, scoped to the owner.
+    private static Bundle inboxExtras(String ownerUidHash, int tmdbId, String mediaType, int season, int episode) {
+        Bundle extras = new Bundle();
+        extras.putString("ownerUidHash", ownerUidHash);
+        extras.putInt("tmdbId", tmdbId);
+        extras.putString("mediaType", mediaType);
+        extras.putInt("season", season);
+        extras.putInt("episode", episode);
+        extras.putString("type", "PLEX_AVAILABLE");
+        return extras;
+    }
+
     static void showImportNotification(Context context, Map<String, String> message) {
         ensureChannel(context);
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return;
@@ -372,6 +385,7 @@ public class PlexAvailabilityWorker extends Worker {
         );
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
+            .addExtras(inboxExtras(message.get("ownerUidHash"), tmdbId, mediaType, season, episode))
             .setSmallIcon(R.drawable.ic_stat_seenit)
             .setContentTitle(displayTitle(title, season, episode))
             .setContentText("✅ Import terminé")
@@ -407,6 +421,7 @@ public class PlexAvailabilityWorker extends Worker {
         );
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
+            .addExtras(inboxExtras(getInputData().getString("ownerUidHash"), tmdbId, mediaType, season, episode))
             .setSmallIcon(R.drawable.ic_stat_seenit)
             .setContentTitle(displayTitle(title, season, episode))
             .setContentText("✅ Disponible dans Plex")

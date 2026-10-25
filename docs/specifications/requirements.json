@@ -12,6 +12,10 @@
       ],
       "tests": [
         {
+          "file": "tests/notificationInbox.test.ts",
+          "contains": "SEENIT-UX-018 reprend les notifications SeenIt livrées"
+        },
+        {
           "file": "tests/homeV4.test.ts",
           "contains": "SEENIT-UX-018 fiche acteur"
         },
@@ -2119,6 +2123,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/homeTerrain222.test.ts",
+          "contains": "SEENIT-UX-014 B07 ruban unique utile"
+        },
         {
           "file": "tests/homeTerrain221.test.ts",
           "contains": "SEENIT-UX-014 la façade TMDB répare un total malgré ses caches chauds"

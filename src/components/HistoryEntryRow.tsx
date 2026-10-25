@@ -1,3 +1,4 @@
+import { SeenItCheckButton } from './SeenItCheckButton';
 import { Capacitor } from '@capacitor/core';
 import { dominantPosterHue, POSTER_HUE_FALLBACK, readPosterHue, rememberPosterHue } from '../features/watchlist/posterHue';
 import { seriesCardPosterCrossOrigin } from '../features/watchlist/seriesCardPresentation';
@@ -8,8 +9,8 @@ import type { SeriesCardAction } from './cards/SeriesEpisodeCard';
 import { imageUrl } from '../features/watchlist/seriesCardPresentation';
 import './historyEntryRow.css';
 
-export function HistoryEntryRow({ title, episodeTitle, code, date, today, timestamp, images, label, onOpen, actions, groupCount = 1, actionGroups }: {
-  title: string; episodeTitle?: string; code?: string; date: string; today: boolean;
+export function HistoryEntryRow({ title, episodeTitle, code, date, clock, today, timestamp, images, label, onOpen, actions, groupCount = 1, actionGroups }: {
+  title: string; episodeTitle?: string; code?: string; date: string; clock: string; today: boolean;
   timestamp: number; images: Array<string | null | undefined>; label: string;
   onOpen: () => void; actions: SeriesCardAction[]; groupCount?: number; actionGroups?: Array<{ label: string; actions: SeriesCardAction[] }>;
 }) {
@@ -46,9 +47,7 @@ export function HistoryEntryRow({ title, episodeTitle, code, date, today, timest
         {groupCount > 1 && <b className="history-entry__group">×{groupCount}</b>}
       </div>
       <div className="history-entry__text"><h3>{title}</h3><div>{code && <><strong>{code}</strong><span> · </span></>}<time dateTime={new Date(timestamp).toISOString()}>{date}</time></div>{episodeTitle && <p>{episodeTitle}</p>}</div>
-      <button type="button" className="history-entry__actions" aria-label={`Actions de ${title}`} aria-haspopup="dialog" onClick={() => setMenu(true)}>
-        <span aria-hidden="true"><svg viewBox="0 0 100 74" fill="none"><rect x="6" y="4" width="88" height="56" rx="16" /><path d="M33 32 45 44 67 21M36 70H64" /></svg></span>
-      </button>
+      <div className="history-entry__action-column"><SeenItCheckButton isWatched title={`Vu ${date} à ${clock} · actions de ${title}`} onClick={() => setMenu(true)} /><time dateTime={new Date(timestamp).toISOString()}>{clock}</time></div>
     </article>
     {menu && <DialogLayer label={`Actions de ${title}`} onDismiss={() => setMenu(false)} className="fixed inset-0 flex items-end sm:items-center justify-center bg-black/65 p-4 pb-nav">
       <section className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-950 p-4 shadow-2xl">

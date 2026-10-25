@@ -23,7 +23,7 @@ test('SEENIT-NOTIFICATION-004 notifie une seule fois le UID de la demande', asyn
 
 test('la notification nomme le média canonique et ouvre le scope exact sans détail torrent', () => {
   const presentation = downloadFailurePresentation(receipt);
-  assert.equal(presentation.notification.title, 'Titre SeenIt · S00E01');
+  assert.equal(presentation.notification.title, 'Titre SeenIt · S00 | E01');
   assert.equal(presentation.notification.body, 'Aucune release compatible trouvée.');
   assert.equal(presentation.data.type, 'NAVIGATE_SHOW');
   assert.equal(presentation.data.tmdbId, '11');

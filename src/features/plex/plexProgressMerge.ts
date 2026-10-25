@@ -174,7 +174,8 @@ export function mergePlexProgressMutation(
 
   const merged: Show = {
     ...(current as Show),
-    ...candidate,
+    ...Object.fromEntries(Object.entries(candidate).filter(([key, value]) =>
+      JSON.stringify(value) !== JSON.stringify((baseline as Record<string, unknown>)[key]))),
     seenEpisodes: nextSeen,
     episodeRecords: nextRecords,
     plexWatchState: {

@@ -40,7 +40,7 @@ async function testTerrain221Harness(client, root) {
       }
       if(tab==='history') {
         await click(client,'#home-panel-history .home-load-more');
-        await check(client,`(()=>{const row=[...document.querySelectorAll('[data-history-row]')].find(r=>r.textContent.includes('A Knight'));if(!row)return false;const title=row.querySelector('h3');return row.textContent.includes('08:13') && !row.textContent.includes('ce soir') && getComputedStyle(title).whiteSpace==='normal' && title.scrollHeight<=title.clientHeight+1})()`,'historique avec heure réelle et titre complet');
+        await check(client,`(()=>{const row=[...document.querySelectorAll('[data-history-row]')].find(r=>r.textContent.includes('A Knight'));if(!row)return false;const title=row.querySelector('h3');return row.textContent.includes('08:13') && row.querySelector('.history-entry__action-column time')?.textContent==='08:13' && getComputedStyle(title).whiteSpace==='normal' && title.scrollHeight<=title.clientHeight+1})()`,'historique avec heure réelle et titre complet');
         await evaluate(client,"[...document.querySelectorAll('[data-history-row]')].find(r=>r.textContent.includes('A Knight')).scrollIntoView({block:'center',behavior:'instant'})");
         fs.writeFileSync(path.join(root,'quality-reports',`terrain221-history-clock-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
         await click(client,'#home-panel-history .home-load-more');
@@ -59,6 +59,7 @@ async function testTerrain221Harness(client, root) {
     await check(client,`document.querySelector('${button}').getAttribute('aria-pressed')==='true' && document.querySelector('${button}').disabled && window.__homeAVoir.reminderControl.permissionCalls===1 && !window.__homeAVoir.telemetry.writes.some(w=>w.path.includes('reminders'))`,'cloche immédiatement active pendant le transport, sans double écriture');
     await evaluate(client,'window.__homeAVoir.reminderControl.release()');
     await check(client,`!document.querySelector('${button}').disabled && document.querySelector('${button}').getAttribute('aria-pressed')==='true' && window.__homeAVoir.telemetry.writes.filter(w=>w.path.includes('reminders')).length===1`,'rappel confirmé');
+    await check(client, `window.__homeAVoir.reminderControl.nativeNotifications===0 && !window.__homeAVoir.toasts().some(t=>JSON.stringify(t.message).includes('Rappel activé'))`, 'aucune confirmation système ni toast tardif');
     await click(client,button);
     await check(client,`!document.querySelector('${button}').disabled && document.querySelector('${button}').getAttribute('aria-pressed')==='false'`,'désactivation');
     await evaluate(client,'window.__homeAVoir.reminderControl.failWrite=true;window.__homeAVoir.reminderControl.holdPermission=false');
