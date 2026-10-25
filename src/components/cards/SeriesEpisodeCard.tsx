@@ -14,7 +14,7 @@ import { WATCH_BUTTON_MS, WATCH_STAMP_MS, WATCH_ADVANCE_MS, waitForWatchFeedback
 
 export interface SeriesCardAction { label: string; onSelect: () => void | Promise<void>; destructive?: boolean }
 type Context =
-  | { kind: 'watch'; onMarkSeen?: () => void | boolean | Promise<void | boolean>; onMarkUnseen?: () => Promise<void | boolean>; onFeedbackComplete?: () => void; upToDate?: boolean; animateSeen?: boolean }
+  | { kind: 'watch'; onMarkSeen?: () => void | boolean | Promise<void | boolean>; onMarkUnseen?: () => Promise<void | boolean>; onFeedbackComplete?: (completed: boolean) => void; upToDate?: boolean; animateSeen?: boolean }
   | { kind: 'upcoming'; days: number; reminder: boolean; pending: boolean; onToggleReminder: (event: React.MouseEvent) => void | Promise<void> }
   | { kind: 'history'; watchedAt: number; watchedTimeKnown?: boolean; onUnseen: () => void };
 
@@ -150,7 +150,7 @@ export function SeriesEpisodeCard({ show, episode, context, detail, hideStatus =
       setFeedback(null);
       return true;
     } catch { if (!controller.signal.aborted) setMarkError(true); return false; }
-    finally { markPending.current = false; if (!controller.signal.aborted) setMarkingSnapshot(null); if (acknowledged) context.onFeedbackComplete?.(); }
+    finally { markPending.current = false; if (!controller.signal.aborted) setMarkingSnapshot(null); if (acknowledged) context.onFeedbackComplete?.(!controller.signal.aborted); }
   }
   const visibleProgress = markingSnapshot?.progress ?? progress;
   const visibleStatus = markingSnapshot ? markingSnapshot.status : status;

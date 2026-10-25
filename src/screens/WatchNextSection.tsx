@@ -139,10 +139,10 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
     }
     catch (error) { originLocks.current.delete(show.id); restoreReceipt(); throw error; }
   };
-  const finishSeriesFeedback = (show: Show) => {
+  const finishSeriesFeedback = (show: Show, completed: boolean) => {
     const origin = originLocks.current.get(show.id);
     originLocks.current.delete(show.id);
-    if (origin === undefined || origin === 0 || !mounted.current || !activeRef.current) return;
+    if (!completed || origin === undefined || origin === 0 || !mounted.current || !activeRef.current) return;
     memberships.current.set(show.id, 0);
     pendingScroll.current = show.id;
     setSeriesOrder(previous => [show.id, ...previous.filter(id => id !== show.id)]);

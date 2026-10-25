@@ -41,6 +41,8 @@ async function testTerrain222Harness(client,root){const reports=[];for(const wid
  await check(client,`document.querySelector('.home-sync-button')`,'indicateur de progression monté');
  await evaluate(client,`document.querySelector('.home-sync-button').click()`);
  await check(client,`document.querySelector('.home-sync-sheet')?.textContent.includes('67 / 304') && document.querySelector('.home-sync-sheet__servers').textContent.includes('Serveur personnel') && document.querySelector('.home-sync-sheet__servers').textContent.includes('hors ligne')`,'bilan réel personnels/partagés et quantités reçues');
+ // Wait for idle/debounced metadata commits before isolating a sync-only update.
+ await evaluate(client,`(async()=>{const started=performance.now();let count=window.__homeListRenders,quietSince=started;while(performance.now()-quietSince<1500){await new Promise(requestAnimationFrame);const next=window.__homeListRenders;if(next!==count){count=next;quietSince=performance.now();}if(performance.now()-started>6000)throw Error('Liste non stabilisée avant pause Plex');}})()`);
  await evaluate(client,`window.__renders222=window.__homeListRenders;document.querySelector('.home-sync-sheet__pause').click()`);
  await check(client,`document.querySelector('.home-sync-sheet__pause')?.textContent==='Reprendre' && window.__homeListRenders===window.__renders222`,'pause sans rendu supplémentaire de la liste');
  await evaluate(client,`document.querySelector('.home-sync-sheet__pause').click();window.__homeAVoir.report({uid:'fixture-a',mode:'full',phase:'error',processed:0,servers:[]});window.__homeAVoir.sync(null)`);

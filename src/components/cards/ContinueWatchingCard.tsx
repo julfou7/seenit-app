@@ -14,7 +14,7 @@ interface Props {
   onShowClick?: (id: string, mediaType?: 'tv' | 'movie') => void;
   onEpisodeClick?: (show: Show, seasonNumber: number, episodeNumber: number) => void;
   onMarkAsSeen: (show: Show) => void | boolean | Promise<void | boolean>;
-  onSeenFeedbackComplete?: (show: Show) => void;
+  onSeenFeedbackComplete?: (show: Show, completed: boolean) => void;
   onMarkUnseen?: (show: Show, episode: SeriesCardEpisode) => Promise<void | boolean>;
   lastMarkedEpisode?: SeriesCardEpisode;
   animateSeen?: boolean;
@@ -62,7 +62,7 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
       show={{ ...show, backdropPath: rawPath }}
       episode={nextEpNum ? { ...nextEpNum, name: nextEpNum.name || cachedEpisode?.name } : null}
       context={{ kind: 'watch', upToDate: isUpToDate, animateSeen,
-        onFeedbackComplete: () => onSeenFeedbackComplete?.(show),
+        onFeedbackComplete: completed => onSeenFeedbackComplete?.(show, completed),
         onMarkSeen: resume.episode ? () => onMarkAsSeen(show) : undefined,
         onMarkUnseen: isUpToDate && lastMarkedEpisode && onMarkUnseen ? () => onMarkUnseen(show, lastMarkedEpisode) : undefined,
       }}

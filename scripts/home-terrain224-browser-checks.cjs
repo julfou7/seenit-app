@@ -44,6 +44,12 @@ async function testTerrain224Harness(client,root) {
   await check(client,`document.querySelector('${last} .seenit-check').getAttribute('aria-pressed')==='true' && !document.querySelector('${last} .seenit-check').disabled`,'retry acknowledged');
   await evaluate(client,'window.__homeAVoir.reset()');
   await check(client,`!document.querySelector('${last} .series-8f__stamp')`,'refresh');
+  await evaluate(client,'window.__homeAVoir.clear()');
+  await evaluate(client,`document.querySelector('[data-series-id="series-3"] .seenit-check').click()`);
+  await check(client,`document.querySelector('#home-series-1 [data-series-id="series-3"]')?.dataset.watchFeedback==='stamp'`,'undo during stamp ready');
+  await evaluate(client,'window.__homeAVoir.toasts().find(toast=>toast.onUndo).onUndo()');
+  await check(client,`window.__homeAVoir.snapshot().find(s=>s.id==='series-3').seenEpisodes.length===0 && !document.querySelector('[data-series-id="series-3"]').dataset.watchFeedback`,'undo during stamp settles');
+  await check(client,`document.querySelector('#home-series-1 [data-series-id="series-3"]') && !document.querySelector('#home-series-0 [data-series-id="series-3"]')`,'undo cancels transfer as well as watched record');
   await evaluate(client,`document.querySelector('[data-series-id="series-3"] .seenit-check').click()`);
   await check(client,`document.querySelector('#home-series-1 [data-series-id="series-3"]')?.dataset.watchFeedback==='stamp'`,'new arrival remains during stamp');
   await check(client,`document.querySelector('#home-series-0 [data-series-id="series-3"]') && !document.querySelector('[data-series-id="series-3"]').dataset.watchFeedback`,'transfer after real sequence completion');
