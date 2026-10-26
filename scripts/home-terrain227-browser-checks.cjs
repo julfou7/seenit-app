@@ -8,6 +8,8 @@ async function testTerrain227Harness(client,root){const reports=[];for(const wid
  await client.send('Page.navigate',{url:'http://127.0.0.1:4173/__seenit-home.html'});
  await check(client,'window.__homeAVoir && window.__terrain224','production');
  await evaluate(client,'window.__terrain224.examples();window.__homeAVoir.terrain221Examples();document.fonts.ready');await pause(500);
+ const posters=await evaluate(client,`[...document.querySelectorAll('.home-series-rail')].flatMap(rail=>[...rail.querySelectorAll('.series-8f__poster')].map(p=>({top:p.getBoundingClientRect().top,clip:rail.getBoundingClientRect().top})))`);
+ if(!posters.length||posters.some(p=>p.top<p.clip-.5))throw Error('Terrain227 affiche rognée sous le titre '+JSON.stringify(posters));
  await evaluate(client,`document.querySelector('[data-series-id="series-0"] .seenit-check').click()`);
  await check(client,`document.querySelector('[data-series-id="series-0"]').dataset.watchFeedback==='button'`,'début animation');
  const tick=await evaluate(client,`(()=>{const e=document.querySelector('[data-series-id="series-0"] .brand-ring-tick'),a=e.getAnimations()[0];if(!a)return null;a.pause();const samples=[0,759,760,1000].map(time=>{a.currentTime=time;const s=getComputedStyle(e);return {time,opacity:+s.opacity,offset:parseFloat(s.strokeDashoffset)}});a.currentTime=0;a.play();return {length:e.getTotalLength(),normal:e.pathLength.baseVal,samples}})()`);
