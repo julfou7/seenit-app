@@ -1,7 +1,7 @@
 # Registre des audits SeenIt
 
 TV Samsung : [RAM et services facultatifs du26octobre2026](./tv-ram-services-2026-10-26.md),
-  relevés matériels0.2.1/2565685 et0.2.2/c556037, #295, réglages autorisés non confirmés et vérification du root conditionnel.
+  relevés matériels0.2.1/2565685 et0.2.2/c556037, #295, AirPlay/HbbTV désactivés, gains RAM non démontrés et vérification du root conditionnel.
 
 TV Samsung : [conformité maquettes et cycle mémoire du26octobre2026](./tv-maquettes-2026-10-26.md),
 baselines2f151398/919a109, #295/#738, premier terrain V2 KO ; diagnostic natif et correctif0.2.1 en cours.

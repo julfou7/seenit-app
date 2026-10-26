@@ -2,7 +2,7 @@
 
 Date :26octobre2026,19:13UTC. Cible : Samsung QE55Q6FNA, Tizen4.0.
 Baseline : widget0.2.1, commit2565685c0363cc030b18fdd7eb25614ae8bc0bb8, PR760, #295.
-Statut : relevé matériel terminé ; désactivations autorisées mais non confirmées, gains individuels non mesurés.
+Statut : AirPlay et HbbTV désactivés par le propriétaire ; aucun interrupteur de réveil vocal utilisable, aucun gain RAM stable démontré.
 
 ## Méthode et preuves
 
@@ -49,8 +49,8 @@ observés ; l'existence d'un interrupteur exact et d'un gain RAM sur ce firmware
 Conserver les réglages initiaux et les usages nécessaires. Choisir une seule fonction facultative,
 utiliser son réglage Samsung documenté, relancer normalement puis comparer dans les mêmes conditions
 (même source, mêmes apps ouvertes, sans session debug pour la mesure finale). Relever mémoire, reprise
-des apps, télécommande, audio, HDMI et réseau ; restaurer si une fonction utile disparaît. Aucune action
-de ce protocole n'a été exécutée dans cet audit, qui ne désactive aucun service.
+des apps, télécommande, audio, HDMI et réseau ; restaurer si une fonction utile disparaît. Le relevé
+initial ne modifie aucun service ; les actions et limites du suivi sont enregistrées ci-dessous.
 
 ## Accès retrouvé pendant l'audit
 
@@ -70,7 +70,8 @@ Le propriétaire demande explicitement de désactiver **AirPlay, le réveil voca
 mesurer les gains. Cette autorisation est acquise ; leurs états initiaux ne sont toutefois pas connus.
 La présence d'un contexte d'application dans l'inventaire ne prouve pas que son interrupteur soit actif.
 Les réglages Samsung ont été ouverts par l'adapter de production. Le propriétaire indique ensuite ne
-pas trouver le réglage AirPlay. **Aucune désactivation des trois fonctions n'est donc confirmée.**
+pas trouver le réglage AirPlay. À cette étape initiale, aucune désactivation des trois fonctions n'est
+confirmée ; la désactivation HbbTV obtenue ensuite est détaillée ci-dessous.
 
 Avant ces réglages, trois échantillons0.2.2 ont été relevés sur l'accueil visible, thème Brume,
 inspector attaché, à deux secondes d'intervalle :343957504,345739264 et347680768octets disponibles
@@ -117,3 +118,40 @@ conditionnelle à une voie adaptée et à son utilité ; aucun exploit d'un autr
 Prochaine action : utiliser les réglages supportés et mesurer chaque
 changement confirmé. AirPlay absent ou déjà désactivé ne produit pas un gain mesuré. L'autorisation
 conditionnelle ne transforme pas une méthode non vérifiée sur un autre modèle en procédure fiable.
+
+## Résultat HbbTV et limites de la comparaison
+
+Le propriétaire confirme : **HbbTV était activé et vient d'être désactivé** dans les réglages Samsung.
+AirPlay était initialement non confirmé : son ID natif inventorié `NRi6kdBYJ0.AirPlayWebApp` a été lancé avec succès
+selon l'API, mais le propriétaire ne voit pas d'écran AirPlay utile. Le succès du callback ne valide
+donc ni l'affichage de ses réglages ni sa désactivation. Le propriétaire confirme ensuite avoir
+**désactivé AirPlay lui-même** : cet état est établi par sa confirmation, pas par le callback.
+Pour le réveil vocal, il répond « Option absente ou écran de configuration » ; aucun interrupteur
+utilisable n'est confirmé, aucune activation Bixby ni désactivation de TTS/guide vocal n'est effectuée.
+
+Les relevés suivants utilisent chacun trois échantillons espacés de deux secondes, SeenIt0.2.2 visible
+sur l'accueil Brume et inspector attaché. Les valeurs indiquées sont les médianes :
+
+| Relevé | Octets disponibles | MiB disponibles | Interprétation |
+|---|---:|---:|---|
+| Avant HbbTV |347123712|331,0|Référence juste avant la manipulation |
+| Premier retour SeenIt |375775232|358,4|Hausse ponctuelle de27,3MiB, non attribuable à HbbTV seul |
+| Après stabilisation |339161088|323,4|Pas de gain global stable constaté |
+| Après confirmation AirPlay et HbbTV désactivés |445804544|425,2|Hausse globale observée, non isolée |
+| Deuxième relevé après les deux réglages |390901760|372,8|+41,8MiB par rapport à la référence, mais variation encore importante |
+
+La session debug s'est fermée lors du changement de source et SeenIt a dû être relancé, du PID13547
+au PID15561. Cette différence de cycle de vie, les apps Samsung ouvertes et le cache interdisent une
+mesure causale isolée de HbbTV. **Aucun gain individuel n'est annoncé.** La fonction est bien désactivée,
+ce qui ne garantit pas le déchargement immédiat de tous ses composants en mémoire.
+
+Après confirmation des deux réglages désactivés, les trois valeurs du dernier relevé sont390901760,
+395993088 et377733120octets disponibles. Elles varient déjà d'environ17,4MiB sur quatre secondes.
+Le résultat communiqué est donc **+41,8MiB observés au dernier relevé**, sans promesse de gain durable
+ni attribution individuelle à AirPlay/HbbTV. Aucun nouveau redémarrage du widget n'a été nécessaire
+entre les relevés suivant la confirmation AirPlay ; SeenIt reste sur l'accueil Brume.
+
+Preuves privées : `ram-before-hbbtv-0.2.2.json`, `ram-after-hbbtv-0.2.2.json`,
+`ram-after-hbbtv-settled-0.2.2.json`, `ram-after-airplay-hbbtv-0.2.2.json`,
+`ram-after-airplay-hbbtv-settled-0.2.2.json` et `root-and-settings-1400.2.json`. Aucun processus système n'a été
+tué, aucun service désinstallé et aucun root tenté pour fabriquer un résultat de mémoire.
