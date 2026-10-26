@@ -106,6 +106,8 @@
 .home-load-more--tile { flex:0 0 150px; width:150px; height:156px; min-height:156px; margin:20px 0 0; border-radius:22px; padding:16px 8px; flex-direction:column; justify-content:center; gap:10px; scroll-snap-align:start; }.home-load-more--tile strong { flex:0; text-align:center; font-weight:800; }.home-load-more--tile .home-load-more__posters { padding-left:10px; }.home-load-more--tile .home-load-more__posters > span { width:40px; height:40px; margin-left:-10px; }.home-load-more--movies { margin-top:0; height:212px; min-height:212px; }
 .home-movie-order { margin-top:0; }.home-movie-list { margin:6px 0 28px; }.home-watch .movie-ticket-rail { margin-top:6px; margin-bottom:28px; padding-top:0; }
 .home-movie-list:has(+ .home-load-more) { margin-bottom:12px; }
+.home-section-heading:has(+ .home-series-rail) { margin-bottom:2px; }
+.home-stale-subtitle:has(+ .home-series-rail) { margin-bottom:8px; }
 
 .home-watch .home-section-heading h2 { align-items:center; }
 

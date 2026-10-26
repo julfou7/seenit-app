@@ -671,7 +671,7 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.227',
+        'X-Plex-Version': '1.4.228',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
@@ -889,7 +889,7 @@ async function startServer() {
         imdbId: normalizedImdbId
       });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(
         '[Plex Resolve Backend] Erreur critique:',
         error
