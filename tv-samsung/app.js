@@ -13,9 +13,9 @@
   try { storage = window.localStorage; } catch (e) { storage = { getItem: function () {}, setItem: function () {} }; }
   var prefs = TVModel.preferences(storage, '');
   var demoEvents = [
-    { when: 'Ce soir · 20:45', title: 'Monaco — Lille', meta: 'Ligue 1' },
-    { when: 'Mercredi · 21:00', title: 'Monaco — Benfica', meta: 'Champions League' },
-    { when: '14 nov. · 20:45', title: 'France — Italie', meta: 'International' }
+    { when: 'Exemple · 20:45', title: 'Monaco — Lille', meta: 'Ligue 1', home: { id: 'preview-monaco', name: 'Monaco', logo: 'assets/sport/monaco.svg' }, away: { id: 'preview-lille', name: 'Lille', logo: 'assets/sport/lille.png' } },
+    { when: 'Exemple · 21:00', title: 'Monaco — Benfica', meta: 'Champions League', home: { id: 'preview-monaco', name: 'Monaco', logo: 'assets/sport/monaco.svg' }, away: { id: 'preview-benfica', name: 'Benfica', logo: 'assets/sport/benfica.png' } },
+    { when: 'Exemple · 20:45', title: 'France — Italie', meta: 'International', home: { id: 'preview-france', name: 'France', logo: 'assets/sport/france.svg' }, away: { id: 'preview-italy', name: 'Italie', logo: 'assets/sport/italy.svg' } }
   ];
   var dynamicIds = ['appRow', 'homeSources', 'homeEvents', 'recentApps', 'filmApps', 'calendarList', 'sourceGrid', 'allAppsGrid'];
   function el(id) { return document.getElementById(id); }
@@ -160,7 +160,7 @@
     row.innerHTML = '';
     for (i = 0; i < detectedSources.length; i++) if (String(detectedSources[i].type).toUpperCase() !== 'TV') list.push(detectedSources[i]);
     list.sort(function (a, b) { return Number(b.connected) - Number(a.connected); });
-    for (i = 0; i < list.length && i < (currentScreen === 'screenHome' ? 2 : 12); i++) row.appendChild(sourceButton(list[i], currentScreen === 'screenHome'));
+    for (i = 0; i < list.length && i < (currentScreen === 'screenHome' ? 4 : 12); i++) row.appendChild(sourceButton(list[i], currentScreen === 'screenHome'));
     if (!list.length) appendText(row, 'p', 'Aucune entrée détectée', 'rail-status');
   }
   function renderHomeApps() {
@@ -183,6 +183,17 @@
     for (i = 0; i < favorites.length; i++) el('filmApps').appendChild(appButton(favorites[i], false));
     el('filmApps').appendChild(allAppsButton()); el('recentHint').style.display = recent.length ? 'none' : '';
   }
+  function appendTeam(parent, team) {
+    var name = team && team.name ? String(team.name) : 'Équipe', url = TVModel.teamArtwork(team && team.logo);
+    var group = appendText(parent, 'span', '', 'event-team'), badge = appendText(group, 'span', '', 'team-badge'), image;
+    badge.setAttribute('aria-hidden', 'true');
+    if (url) {
+      image = document.createElement('img'); image.alt = ''; image.width = 48; image.height = 48;
+      image.onerror = function () { badge.textContent = TVModel.initials(name); };
+      image.src = url; badge.appendChild(image);
+    } else badge.textContent = TVModel.initials(name);
+    appendText(group, 'span', name, 'team-name');
+  }
   function renderEvents() {
     var preview = !TVDevice.isSamsung(), events = preview ? demoEvents : [], row = el(currentScreen === 'screenHome' ? 'homeEvents' : 'calendarList'), i, b;
     row.innerHTML = '';
@@ -191,12 +202,15 @@
     el('calendarHint').textContent = preview ? 'Exemples de maquette. Le diffuseur dépend de chaque événement.' : 'Aucun calendrier connecté pour le moment.';
     for (i = 0; i < events.length && (currentScreen !== 'screenHome' || i < 2); i++) {
       b = document.createElement('button'); b.className = 'event-card focusable'; b.setAttribute('data-action', 'sport-event');
-      appendText(b, 'span', events[i].when); appendText(b, 'strong', events[i].title); appendText(b, 'small', events[i].meta); row.appendChild(b);
+      b.setAttribute('aria-label', events[i].title + ' · ' + events[i].when);
+      appendText(b, 'span', events[i].when);
+      if (events[i].home && events[i].away) {
+        var clubs = appendText(b, 'div', '', 'event-clubs');
+        appendTeam(clubs, events[i].home); appendText(clubs, 'span', '—', 'event-versus'); appendTeam(clubs, events[i].away);
+      } else appendText(b, 'strong', events[i].title);
+      appendText(b, 'small', events[i].meta); row.appendChild(b);
     }
     if (!events.length) appendText(row, 'div', 'Vos rendez-vous sportifs apparaîtront ici.', 'empty-event');
-    else if (currentScreen === 'screenHome') {
-      b = document.createElement('button'); b.className = 'event-card focusable'; b.setAttribute('data-action', 'sport'); appendText(b, 'strong', 'Tout le sport ›'); row.appendChild(b);
-    }
   }
   function updateSportTile() {
     var demo = !TVDevice.isSamsung();

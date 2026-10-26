@@ -83,6 +83,13 @@ test('SEENIT-TV-001 les logos refusent le réseau et gardent un secours généri
   assert.equal(m.localIcon('file:///opt/icon.png'), 'file:///opt/icon.png');
   assert.equal(m.brand('Netflix').file, 'netflix'); assert.equal(m.brand('Une nouvelle app'), null);
 });
+
+test('SEENIT-TV-001 les logos des équipes viennent du champ explicite avec secours sans réseau non sécurisé', () => {
+  const m = model();
+  assert.equal(m.teamArtwork('assets/sport/monaco.png'), 'assets/sport/monaco.png');
+  assert.equal(m.teamArtwork('https://cdn.example.org/team/123.png'), 'https://cdn.example.org/team/123.png');
+  for (const url of ['http://cdn.example.org/x.png', '//cdn.example.org/x.png', 'javascript:alert(1)', 'data:image/png;base64,x', 'https://trusted.example@evil.example/x.png', 'assets/sport/../../icon.png', 'https://cdn.example.org/a\n.png']) assert.equal(m.teamArtwork(url), '');
+});
 test('SEENIT-TV-001 inventorie 130 apps et conserve système et inconnu', () => {
   let result: any;
   const apps = Array.from({ length: 130 }, (_, i) => ({ id: 'id-' + i, name: 'Custom ' + i, show: true }));

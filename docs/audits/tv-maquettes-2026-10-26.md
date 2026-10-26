@@ -59,3 +59,18 @@ trois Netflix, logos minuscules/disparates et interface trop fine. Le chemin de 
 Le correctif0.2.1 conserve l'identité d'application et l'auteur de signature. Il ne change ni Home,
 ni startup, ni firmware, ni réglage d'image Samsung. Tant que le fond n'est pas validé sur la TV,
 le chantier reste ouvert et aucun gain global de RAM n'est annoncé.
+
+### Reprise matérielle et demandes complémentaires
+
+La TV a été retrouvée à192.168.1.45 ; le PC à deux interfaces requiert le chemin source192.168.1.30
+pour SDB. Un relais local temporaire suffit, sans modifier le réseau ou Developer Mode.0.2.1 a été
+installé/lancé (pid4743), version et logos SVG vérifiés dans Tizen. Le propriétaire a choisi Brume
+et envoyé une photo du fond clair : cette préférence est conservée. L'ancien rendu bleu en Crépuscule
+ne doit pas être attribué à une cause GPU/gradient non prouvée ; les tests temporaires ont disparu
+avec la mise à jour. Tous les relevés sont faits dans le widget réel, pas dans le simulateur.
+
+La demande suivante ajoute les logos d'équipes et le dépassement des deux HDMI de Home : le natif
+remonte bien HDMI1à4. Le correctif0.2.2 rend quatre sources, conserve Tout et prépare le renderer
+Sport avec logos/noms explicites et fallback. Le calendrier réel reste #738, aucun faux match sur TV.
+Le relevé RAM/services est dans [l'audit dédié](tv-ram-services-2026-10-26.md) :610MiB disponibles,
+38contextes, propositions conditionnelles et aucune désactivation.

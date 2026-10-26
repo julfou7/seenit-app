@@ -15,6 +15,12 @@ var TVModel = (function () {
     var path = String(value || '');
     return /^(?:\/(?!\/)|file:\/\/\/|wgt-package:\/\/)/i.test(path) && !/[<>\x00-\x1f]/.test(path) ? path : '';
   }
+  function teamArtwork(value) {
+    var url = String(value || '');
+    if (url.length > 1024 || /[\s<>"'\\\x00-\x1f]/.test(url)) return '';
+    if (/^assets\/sport\/[a-z0-9_-]+\.(?:png|svg)$/i.test(url)) return url;
+    return /^https:\/\/[a-z0-9][a-z0-9.-]+\.[a-z]{2,}(?::443)?\/[^@]*$/i.test(url) ? url : '';
+  }
   function initials(title) {
     var words = String(title || '?').replace(/^\s+|\s+$/g, '').split(/\s+/);
     return (words[0] ? words[0].charAt(0) : '?') + (words.length > 1 ? words[1].charAt(0) : '');
@@ -118,5 +124,5 @@ var TVModel = (function () {
     for (i = 0; i < users.length && out.length < limit; i++) if (used.indexOf(titleKey(users[i])) < 0 && blocked.indexOf(titleKey(users[i])) < 0) { out.push(users[i]); used.push(titleKey(users[i])); }
     return out.slice(0, limit);
   }
-  return { brand: brand, localIcon: localIcon, initials: initials, preferences: preferences, userApps: userApps, advancedApps: advancedApps, byIds: byIds, favorites: favorites };
+  return { brand: brand, localIcon: localIcon, teamArtwork: teamArtwork, initials: initials, preferences: preferences, userApps: userApps, advancedApps: advancedApps, byIds: byIds, favorites: favorites };
 }());

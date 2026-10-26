@@ -38,6 +38,11 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   passent par une cible vérifiée ; Retour à l'accueil demande confirmation avant de quitter SeenIt.
   Appairage du compte, Home natif et terrain sont suivis dans #295 ; aucun historique SeenIt n'est écrit
   sans profil certain. Détails et arbitrage des maquettes : [launcher TV V2](tv-samsung-launcher-v2.md).
+  L'accueil expose jusqu'à quatre sources détectées, dont tous les HDMI remontés sur la TV terrain,
+  avec accès à la liste complète. Les cartes Sport affichent les logos fournis avec les identités
+  explicites des deux équipes, puis leurs initiales si l'image manque ; aucun logo n'est résolu par
+  rapprochement de noms. L'audit RAM/services reste en lecture seule, sans arrêt ou désactivation
+  automatique ni gain chiffré déduit du seul inventaire d'applications.
 
 - **SEENIT-PLATFORM-001** — La PWA canonique servie depuis `seenit.ai.studio` conserve les routes
   SeenIt relatives au même domaine. L'APK et tout preview AI Studio dont un label d'hôte commence

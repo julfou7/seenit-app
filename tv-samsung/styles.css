@@ -98,12 +98,16 @@ button{font:inherit;color:inherit;border:2px solid transparent;background:none;t
 .home-screen .brand-netflix .app-logo img,.home-screen .brand-plex .app-logo img,.home-screen .brand-amazonprime .app-logo img{width:176px}
 .home-screen .all-apps-card .app-name{font-size:22px;color:inherit;max-width:240px}
 .home-screen .all-apps-card .app-logo{height:60px}
-.home-bottom{display:flex;margin-top:32px}.sources-rail{width:408px;margin-right:48px;flex-shrink:0}.home-sport{width:1272px}
+.home-bottom{display:flex;margin-top:32px}.sources-rail{width:840px;margin-right:48px;flex-shrink:0}.home-sport{width:840px}
 .home-screen .source-card{height:144px;background:#252a33;border-color:transparent}.home-screen .source-card strong{font-size:28px}.home-screen .source-card small{font-size:20px}
 .home-screen .footer-hint{font-size:20px}.home-screen .quick-button,.home-screen .profile-pill{font-size:23px}.home-screen .date{font-size:22px}
-.home-sport .sport-heading{margin-top:0}.home-sport .event-card{width:408px;height:124px;margin-right:24px}.home-sport .event-card:last-child{margin-right:0}
+.home-sport .sport-heading{margin-top:0}.home-sport .event-card{width:408px;height:144px;padding:16px;margin-right:24px}.home-sport .event-card:last-child{margin-right:0}
 .home-sport .event-card strong{font-size:23px}.home-sport .event-card span{margin-bottom:8px}
 .focus-detail{height:34px;margin-top:20px}.light-theme .event-card{background:#edf0f1;border-color:#bdc8d1;color:#293d51}.light-theme .event-card span,.light-theme .event-card small{color:#5b6f82}
 .light-theme .home-screen #appRow .app-card,.light-theme .home-screen .source-card{background:#eaf0f2}
 .light-theme .home-screen #appRow .brand-netflix,.light-theme .home-screen #appRow .brand-plex,.light-theme .home-screen #appRow .brand-dazn{background:#191c22}
 .light-theme .home-screen #appRow .brand-amazonprime{background:#193044}.light-theme .home-screen #appRow .brand-spotify{background:#20342c}
+.event-clubs{display:flex;align-items:center;min-height:48px;margin:4px 0}.event-card .event-team{display:flex;align-items:center;flex:1;min-width:0;margin:0;color:inherit;font-size:inherit}
+.event-card .team-badge{display:flex;align-items:center;justify-content:center;width:48px;height:48px;flex-shrink:0;margin:0 10px 0 0;font-size:20px;font-weight:bold;color:inherit}
+.team-badge img{display:block;width:48px;height:48px;object-fit:contain}.event-card .team-name{margin:0;color:inherit;font-size:21px;line-height:24px;font-weight:bold;max-height:48px;overflow:hidden}
+.event-card .event-versus{margin:0 10px;font-size:18px;color:inherit}.calendar-list .event-card{height:200px;width:520px}.home-sport .event-card small{margin-top:4px}

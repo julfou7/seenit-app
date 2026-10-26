@@ -1,5 +1,8 @@
 # Registre des audits SeenIt
 
+TV Samsung : [RAM et services facultatifs du26octobre2026](./tv-ram-services-2026-10-26.md),
+relevé matériel0.2.1/2565685, #295, recommandations conditionnelles sans désactivation.
+
 TV Samsung : [conformité maquettes et cycle mémoire du26octobre2026](./tv-maquettes-2026-10-26.md),
 baselines2f151398/919a109, #295/#738, premier terrain V2 KO ; diagnostic natif et correctif0.2.1 en cours.
 

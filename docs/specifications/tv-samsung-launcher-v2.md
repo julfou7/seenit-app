@@ -34,6 +34,26 @@ Profils : compte SeenIt propriétaire envisagé pour relier le foyer, profils TV
 
 ## 1. Objectif produit
 
+### Complément du 26 octobre — sources, logos et audit matériel
+
+Le propriétaire demande les logos des équipes dans le calendrier et signale une troisième entrée HDMI.
+Le relevé natif0.2.1 expose TV1 et HDMI1/2/3/4, ces derniers tous déconnectés à cet instant. Le défaut
+de l'accueil était sa limite de deux cartes, pas une perte de données de l'adapter. Rendre jusqu'à
+quatre sources triées par connexion, garder Tout pour la liste complète ; partager la ligne basse
+en deux rails840px, sources et Sport. Afficher au plus deux rendez-vous sur Home, le raccourci Sport
+du haut ouvre le calendrier complet.
+
+Chaque événement Sport transporte explicitement `home`/`away` avec `id`, `name`, `logo`. Le renderer
+accepte un petit asset local ou une URL HTTPS de la source, affiche les noms même sans logo et utilise
+des initiales en cas d'échec. Les images sont bornées à48px, libérées avec les cartes hors écran.
+Aucune table de rapprochement par nom ni faux match en production : le flux réel reste à connecter
+dans #738. Les logos embarqués des événements de démonstration restent des exemples de preview.
+
+L'audit RAM/services demandé reste read-only : relever mémoire totale/disponible et contextes natifs,
+proposer les fonctions facultatives avec leurs conséquences, sans kill, désinstallation, root ou
+désactivation. Un contexte d'app n'est ni un relevé RSS ni une preuve de consommation CPU. Le modèle,
+la session inspectée et les limites sont documentés dans l'audit daté.
+
 ### Référence complémentaire Luma — décision du 26 octobre
 
 Le propriétaire demande de mélanger ses planches avec [Luma](https://github.com/0xProbabillity/luma-tv),

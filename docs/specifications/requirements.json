@@ -5,7 +5,7 @@
   "requirements": [
     {
       "id": "SEENIT-TV-001",
-      "title": "Launcher TV lisible à distance, logos homogènes, variantes inventoriées et mémoire bornée",
+      "title": "Launcher TV lisible, sources détectées, logos d'apps et équipes, inventaire et mémoire bornés",
       "targets": [
         "tv"
       ],

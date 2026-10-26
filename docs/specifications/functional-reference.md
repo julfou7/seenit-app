@@ -15,6 +15,11 @@ La référence Luma ajoutée ensuite par le propriétaire modifie la hiérarchie
 compacts, les apps dominent la Home et SeenIt/Sport restent contextuels. Infos au focus, appui long OK
 pour épingler/déplacer/masquer, apparences Brume/Crépuscule/Auto statiques et mouvements désactivables.
 Une section Sport sans donnée est masquée sur la Home. Les sources restent accessibles directement.
+L'accueil rend jusqu'à quatre entrées détectées au lieu de deux ; Toutes les sources reste disponible.
+Les cartes Sport portent les logos des deux équipes fournis dans l'événement, avec initiales en secours.
+Ce rendu n'invente pas de calendrier : les exemples restent réservés à la preview, le flux réel restant #738.
+Les audits mémoire/services lisent la TV sans désactivation automatique ; un contexte actif ne fournit
+pas sa consommation individuelle ni une estimation fiable du gain après désactivation.
 Films propose de rouvrir les apps lancées avec succès ; cela ne constitue pas un historique de
 visionnage, notamment si Netflix partage son profil. Appairage du compte propriétaire encore suivi
 dans #295, sans faux catalogue ni mutation personnelle. Sport conserve un diffuseur résolu par événement

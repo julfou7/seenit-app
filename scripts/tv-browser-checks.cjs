@@ -20,6 +20,7 @@ async function buildTvHarness(root) {
     window.clearInterval=function(id){delete t.intervals[id];nativeClear(id)};
     Object.defineProperty(document,'hidden',{get:function(){return t.hidden}});
     t.visibility=function(hidden){t.hidden=hidden;document.dispatchEvent(new Event('visibilitychange'))};
+    if(location.search.indexOf('preview=1')>=0)return;
     window.tizen={ApplicationControl:function(){},application:{
       getAppsInfo:function(done){t.inventoryCalls++;setTimeout(function(){done(t.apps)},0)},
       launch:function(id,done,fail){t.launches.push(id);if(t.failLaunch)fail();else done()},
@@ -28,7 +29,7 @@ async function buildTvHarness(root) {
       launchAppControl:function(c,id,done){t.settings++;done()},
       getCurrentApplication:function(){return{appInfo:{id:'SeenItTV01.SeenItTV'},exit:function(){t.exits++}}}
     },systeminfo:{getTotalMemory:function(){return 1610612736},getAvailableMemory:function(){return 0},getPropertyValue:function(kind,done){
-      done(kind==='STORAGE'?{units:[{capacity:4000000000,availableCapacity:0,isRemovable:false}]}:{connected:[{type:'HDMI',number:1},{type:'TV',number:0}],disconnected:[{type:'HDMI',number:2}]})
+      done(kind==='STORAGE'?{units:[{capacity:4000000000,availableCapacity:0,isRemovable:false}]}:{connected:[{type:'HDMI',number:1},{type:'TV',number:0}],disconnected:[{type:'HDMI',number:2},{type:'HDMI',number:3},{type:'HDMI',number:4}]})
     }},tvwindow:{setSource:function(source,done){t.source=source;done()}}};
   })();`;
   const html = fs.readFileSync(path.join(target, 'index.html'), 'utf8').replace('<script src="tv.js">', '<script>' + mock + '</script><script src="tv.js">');
@@ -61,7 +62,7 @@ async function testTvHarness(client, root) {
     await check(client, 'window.__tv && window.TVModel && document.activeElement.dataset.profile === "Julian"', 'entrée profils');
     await key(client, 13);
     await check(client, 'document.activeElement.id === "primaryTv"', 'focus initial TV');
-    await check(client, 'document.querySelectorAll("#appRow .app-card").length===6 && document.querySelectorAll("#homeSources .source-card").length===2', 'rails 5+1 et deux sources');
+    await check(client, `document.querySelectorAll('#appRow .app-card').length===6 && document.querySelectorAll('#homeSources .source-card').length===4 && document.querySelector('#homeSources [data-source-number="4"]')`, 'rails 5+1 et quatre HDMI natifs sans perte du troisième');
     await check(client, `Array.from(document.querySelectorAll('#appRow [data-app-id]')).filter(n=>n.dataset.appTitle==='Netflix').length===1 && document.querySelector('#appRow [data-app-title=Netflix]').dataset.appId==='RN1MCdNq8t.Netflix'`, 'inventaire réel Tizen4 : une seule tuile Netflix, variante installée');
     await check(client, `Array.from(document.querySelectorAll('#appRow [data-app-id] img')).every(n=>n.getAttribute('src').startsWith('assets/apps/')&&n.naturalWidth>0)`, 'logos vectoriels homogènes avant les icônes natives');
     await check(client, `document.querySelector('#appRow .app-card').getBoundingClientRect().height>=${height / 1080 * 224} && getComputedStyle(document.querySelector('#screenHome h2')).fontSize==='28px' && document.querySelector('.settings-card svg')`, 'logos et libellés lisibles sans emoji de réglages');
@@ -145,6 +146,18 @@ async function testTvHarness(client, root) {
     await check(client, 'window.__tv.errors.length===0', 'aucune erreur JavaScript');
     reports.push({ width, height, apps: 137, distinctUserApps: 131, advancedApps: 6, libraryDomMax: 18, backgroundIntervals: 0, resumeCycles: 4, remote: 'passed', native: 'mocked-from-tizen4-fixture' });
   }
+  await client.send('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
+  await client.send('Page.navigate', { url: 'http://127.0.0.1:4173/__seenit-tv/index.html?preview=1' });
+  await check(client, 'window.TVModel && document.querySelector("[data-profile=Julian]")', 'preview sans API Samsung');
+  await click(client, '[data-profile=Julian]');
+  await check(client, 'document.querySelectorAll("#homeEvents .event-card").length===2 && Array.from(document.querySelectorAll("#homeEvents .team-badge img")).every(n=>n.naturalWidth>0)', 'logos explicites des deux équipes dans chaque rendez-vous');
+  await click(client, '#sportTile');
+  await check(client, 'document.querySelectorAll("#calendarList .team-badge img").length===6 && Array.from(document.querySelectorAll("#calendarList .team-badge img")).every(n=>n.naturalWidth>0)', 'calendrier avec six logos chargés');
+  await screenshot(client, root, 'tv-calendar-logos-1920.png');
+  await evaluate(client, 'document.querySelector("#calendarList img").dispatchEvent(new Event("error"))');
+  await check(client, 'document.querySelector("#calendarList .team-badge").textContent==="M" && document.querySelectorAll("#calendarList .team-name").length===6', 'logo manquant conserve initiale et noms');
+  await evaluate(client, 'window.__tv.visibility(true)');
+  await check(client, 'document.querySelectorAll("#calendarList img").length===0 && Object.keys(window.__tv.intervals).length===0', 'logos du calendrier libérés en arrière-plan');
   return reports;
 }
 module.exports = { buildTvHarness, testTvHarness };
