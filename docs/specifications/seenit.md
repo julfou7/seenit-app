@@ -26,7 +26,11 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 
 - **SEENIT-TV-001** — Le launcher Samsung reste séparé du runtime mobile, compatible ES5/Tizen 4.0
   et fidèle aux planches TV : quatre entrées TV, Films, Sport, Réglages ; cinq apps puis la bibliothèque
-  et les sources détectées. Les logos natifs ont un secours vectoriel local puis un monogramme générique.
+  et les sources détectées. Les marques reconnues utilisent leur SVG local homogène, puis l'icône native
+  et un monogramme générique en secours. Les variantes portant exactement le même nom ne produisent
+  qu'une tuile : épingle explicite prioritaire, sinon installation utilisateur locale avant composant
+  intégré, choix stable par ID à égalité. Tous les IDs restent inventoriés et les variantes restent en
+  vue avancée ; le regroupement d'affichage ne devient jamais une table d'IDs de lancement universels.
   Toute app utilisateur découverte peut devenir favorite par profil local. « Rouvrir » mémorise seulement
   les ouvertures réussies, jamais un visionnage Netflix partagé. Invité ne persiste rien. La bibliothèque
   conserve l'inventaire système mais borne son DOM à 18 apps. Au masquage, images hors écran et timers

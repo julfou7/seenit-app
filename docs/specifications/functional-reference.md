@@ -4,7 +4,10 @@
 
 Le runtime isolé `tv-samsung/` reprend les planches TV : TV/TNT, Films, Sport et Réglages,
 puis cinq apps favorites, Toutes les apps et les entrées réellement détectées. Les icônes viennent
-de la TV, avec secours SVG local ou initiales pour une nouvelle app. La bibliothèque paginée conserve
+des SVG locaux pour les marques reconnues, puis de la TV et des initiales pour une nouvelle app.
+Une seule tuile par nom d'app identique : installation utilisateur préférée aux variantes intégrées,
+épingle explicite prioritaire. Tous les IDs sont conservés ; les variantes restent dans Système en
+vue avancée. Aucun lancement n'utilise une table d'IDs supposée universelle. La bibliothèque paginée conserve
 USER/SYSTEM/UNKNOWN ; les favoris sont personnalisables par profil local. Invité reste éphémère.
 Milo n'affiche que les apps sélectionnées, modifiables via Organiser sans code ; Système est masqué.
 Cela ne verrouille pas les apps tierces et ne constitue pas un contrôle parental.

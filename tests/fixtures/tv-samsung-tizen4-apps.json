@@ -1,0 +1,15 @@
+[
+  { "id": "org.tizen.netflix-app", "name": "Netflix", "show": true, "iconPath": "/usr/apps/org.tizen.netflix-app/shared/res/org.tizen.netflix-app.png" },
+  { "id": "org.tizen.netflixlowmem", "name": "Netflix", "show": true, "iconPath": "/usr/apps/org.tizen.netflix-app/shared/res/org.tizen.netflix-app.png" },
+  { "id": "RN1MCdNq8t.Netflix", "name": "Netflix", "show": true, "iconPath": "/opt/usr/apps/RN1MCdNq8t/shared/res/RN1MCdNq8t.Netflix.png" },
+  { "id": "kIciSQlYEM.plex", "name": "Plex - Free Movies ＆ TV", "show": true, "iconPath": "/opt/usr/apps/kIciSQlYEM/shared/res/kIciSQlYEM.plex.png" },
+  { "id": "9Ur5IzDKqV.TizenYouTube", "name": "YouTube", "show": true, "iconPath": "/opt/usr/apps/9Ur5IzDKqV/shared/res/9Ur5IzDKqV.TizenYouTube.png" },
+  { "id": "evKhCgZelL.AmazonIgnitionLauncher2", "name": "Prime Video", "show": true, "iconPath": "/opt/usr/apps/evKhCgZelL/shared/res/evKhCgZelL.AmazonIgnitionLauncher2.png" },
+  { "id": "yu1NM3vHsU.DAZN", "name": "DAZN", "show": true, "iconPath": "/opt/usr/apps/yu1NM3vHsU/shared/res/yu1NM3vHsU.DAZN.png" },
+  { "id": "rJeHak5zRg.Spotify", "name": "Spotify - Music and Podcasts", "show": true, "iconPath": "/opt/usr/apps/rJeHak5zRg/shared/res/rJeHak5zRg.Spotify.png" },
+  { "id": "fixture.kids", "name": "YouTube Kids", "show": true, "iconPath": "/opt/usr/apps/fixture/shared/res/kids.png" },
+  { "id": "kIciSQlYEM.service", "name": "plex preview service", "show": true },
+  { "id": "org.tizen.menu", "name": "Samsung Menu", "show": false },
+  { "id": "ambiguous" },
+  { "id": "SeenItTV01.SeenItTV", "name": "SeenIt TV", "show": true }
+]

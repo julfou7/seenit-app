@@ -9,10 +9,9 @@ async function buildTvHarness(root) {
   fs.cpSync(path.join(root, 'tv-samsung/assets'), path.join(target, 'assets'), { recursive: true });
   const mock = `(function(){
     localStorage.clear();
-    var apps=[{id:'real.netflix.id',name:'Netflix',show:true},{id:'real.plex.id',name:'Plex',show:true},{id:'real.youtube.id',name:'YouTube',show:true}];
-    for(var i=0;i<127;i++)apps.push({id:'custom.'+i,name:'Custom '+('000'+i).slice(-3),show:true});
-    apps[3].iconPath='/__seenit-tv/assets/apps/netflix.svg';
-    apps.push({id:'org.tizen.menu',name:'Samsung Menu',show:false},{id:'ambiguous'});
+    var apps=${JSON.stringify(JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/tv-samsung-tizen4-apps.json'), 'utf8')))};
+    for(var i=0;i<123;i++)apps.push({id:'custom.'+i,name:'Custom '+('000'+i).slice(-3),show:true});
+    apps[13].iconPath='/__seenit-tv/assets/apps/netflix.svg';
     var t=window.__tv={apps:apps,launches:[],clicks:[],errors:[],inventoryCalls:0,settings:0,exits:0,hidden:false,intervals:{},failLaunch:false};
     document.addEventListener('click',function(e){t.clicks.push(e.target.id+':'+e.target.getAttribute('data-action'))},true);
     window.addEventListener('error',function(e){if(e.message)t.errors.push(e.message)});
@@ -27,7 +26,7 @@ async function buildTvHarness(root) {
       getAppInfo:function(id){if(id==='org.tizen.menu')return{id:id};throw Error('missing')},
       findAppControl:function(c,done){done([{id:'verified.settings'}])},
       launchAppControl:function(c,id,done){t.settings++;done()},
-      getCurrentApplication:function(){return{exit:function(){t.exits++}}}
+      getCurrentApplication:function(){return{appInfo:{id:'SeenItTV01.SeenItTV'},exit:function(){t.exits++}}}
     },systeminfo:{getTotalMemory:function(){return 1610612736},getAvailableMemory:function(){return 0},getPropertyValue:function(kind,done){
       done(kind==='STORAGE'?{units:[{capacity:4000000000,availableCapacity:0,isRemovable:false}]}:{connected:[{type:'HDMI',number:1},{type:'TV',number:0}],disconnected:[{type:'HDMI',number:2}]})
     }},tvwindow:{setSource:function(source,done){t.source=source;done()}}};
@@ -63,6 +62,9 @@ async function testTvHarness(client, root) {
     await key(client, 13);
     await check(client, 'document.activeElement.id === "primaryTv"', 'focus initial TV');
     await check(client, 'document.querySelectorAll("#appRow .app-card").length===6 && document.querySelectorAll("#homeSources .source-card").length===2', 'rails 5+1 et deux sources');
+    await check(client, `Array.from(document.querySelectorAll('#appRow [data-app-id]')).filter(n=>n.dataset.appTitle==='Netflix').length===1 && document.querySelector('#appRow [data-app-title=Netflix]').dataset.appId==='RN1MCdNq8t.Netflix'`, 'inventaire réel Tizen4 : une seule tuile Netflix, variante installée');
+    await check(client, `Array.from(document.querySelectorAll('#appRow [data-app-id] img')).every(n=>n.getAttribute('src').startsWith('assets/apps/')&&n.naturalWidth>0)`, 'logos vectoriels homogènes avant les icônes natives');
+    await check(client, `document.querySelector('#appRow .app-card').getBoundingClientRect().height>=${height / 1080 * 224} && getComputedStyle(document.querySelector('#screenHome h2')).fontSize==='28px' && document.querySelector('.settings-card svg')`, 'logos et libellés lisibles sans emoji de réglages');
     await check(client, '!document.getElementById("homeEvents").textContent.includes("Monaco")', 'aucun faux événement en mode Samsung');
     await check(client, 'getComputedStyle(document.getElementById("homeEvents")).display==="none"', 'aucun bloc sport vide sur Home');
     await check(client, `Array.from(document.querySelectorAll('.screen.active .focusable')).every(n=>{const r=n.getBoundingClientRect();return r.left>=0&&r.top>=0&&r.right<=${width}&&r.bottom<=${height}})`, 'aucune carte coupée');
@@ -95,7 +97,7 @@ async function testTvHarness(client, root) {
     await click(client, '#screenAppMenu [data-action=menu-hide]');
     await check(client, `!Array.from(document.querySelectorAll('#appRow [data-app-id]')).some(n=>n.dataset.appTitle===${JSON.stringify(hiddenId)})`, 'masquage sans réapparition automatique');
     await click(client, '#appRow [data-action=all-apps]');
-    await check(client, 'document.querySelectorAll("#allAppsGrid .app-card").length===18 && document.getElementById("appsCount").textContent==="130 apps"', '132 packages / 130 apps / 18 cartes');
+    await check(client, 'document.querySelectorAll("#allAppsGrid .app-card").length===18 && document.getElementById("appsCount").textContent==="130 apps"', '136 packages / 130 apps distinctes / 18 cartes');
     await click(client, '#pageNext'); await check(client, 'document.getElementById("pageStatus").textContent==="Page 2/8"', 'pagination accessible');
     await click(client, '#manageApps');
     const pin = await evaluate(client, 'document.querySelector("#allAppsGrid .app-card").dataset.appId');
@@ -103,9 +105,11 @@ async function testTvHarness(client, root) {
     await check(client, `TVModel.preferences(localStorage,'Julian').pins().includes(${JSON.stringify(pin)})`, 'favori de nouvelle app');
     await click(client, '#manageApps');
     await click(client, '#tabSystem');
-    await check(client, 'document.querySelectorAll("#allAppsGrid .app-card").length===2', 'système et inconnu conservés');
+    await check(client, 'document.querySelectorAll("#allAppsGrid .app-card").length===6 && document.querySelectorAll("#allAppsGrid .app-class")[0]', 'système, inconnu et variantes conservés');
     const launches = await evaluate(client, 'window.__tv.launches.length');
     await click(client, '#allAppsGrid .app-card'); await check(client, `window.__tv.launches.length===${launches}`, 'pas de lancement système');
+    await click(client, '#allAppsGrid [data-app-title=Netflix]');
+    await check(client, `window.__tv.launches.length===${launches + 1} && ['org.tizen.netflix-app','org.tizen.netflixlowmem'].includes(window.__tv.launches.at(-1))`, 'variante utilisateur accessible explicitement par son ID détecté');
     await click(client, '#tabUser');
     const launched = await evaluate(client, 'document.querySelector("#allAppsGrid .app-card").dataset.appId');
     await click(client, '#allAppsGrid .app-card');
@@ -139,7 +143,7 @@ async function testTvHarness(client, root) {
     await key(client, 8); await key(client, 39); await key(client, 13);
     await check(client, 'window.__tv.exits===1', 'sortie seulement après choix explicite');
     await check(client, 'window.__tv.errors.length===0', 'aucune erreur JavaScript');
-    reports.push({ width, height, apps: 133, libraryDomMax: 18, backgroundIntervals: 0, resumeCycles: 4, remote: 'passed', native: 'mocked' });
+    reports.push({ width, height, apps: 137, distinctUserApps: 131, advancedApps: 6, libraryDomMax: 18, backgroundIntervals: 0, resumeCycles: 4, remote: 'passed', native: 'mocked-from-tizen4-fixture' });
   }
   return reports;
 }

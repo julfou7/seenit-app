@@ -71,9 +71,11 @@ var TVDevice = (function () {
     try {
       window.tizen.application.getAppsInfo(function (apps) {
         var out = [];
-        var i;
+        var i, ownId = '';
+        try { ownId = window.tizen.application.getCurrentApplication().appInfo.id; } catch (e) {}
         for (i = 0; i < apps.length; i++) {
           var normalized = normalizeApp(apps[i]);
+          if (normalized && normalized.id === ownId) { normalized.classification = 'SYSTEM'; normalized.launchable = false; }
           if (normalized) out.push(normalized);
         }
         out.sort(function (a, b) {

@@ -125,11 +125,11 @@
     var button = document.createElement('button'), logo, nativePath = TVModel.localIcon(app.iconPath), brand = TVModel.brand(app.title), paths = [], image, next = 0;
     button.className = 'app-card focusable';
     if (brand) addClass(button, 'brand-' + brand.file);
-    button.setAttribute('data-action', system ? 'inspect-app' : (organizing && currentScreen === 'screenApps' ? 'pin-app' : 'launch-app'));
+    button.setAttribute('data-action', system && app.classification !== 'USER' ? 'inspect-app' : (organizing && currentScreen === 'screenApps' ? 'pin-app' : 'launch-app'));
     button.setAttribute('data-app-id', app.id); button.setAttribute('data-app-title', app.title); button.setAttribute('aria-label', app.title);
     logo = appendText(button, 'span', '', 'app-logo');
-    if (nativePath) paths.push(nativePath);
     if (brand) paths.push('assets/apps/' + brand.file + '.svg');
+    if (nativePath) paths.push(nativePath);
     function fallback() {
       if (hidden() || (next > 0 && !document.documentElement.contains(logo))) return;
       if (next >= paths.length) { logo.textContent = TVModel.initials(app.title); return; }
@@ -138,12 +138,14 @@
     fallback();
     appendText(button, 'span', app.title, 'app-name');
     if (prefs.pins().indexOf(app.id) >= 0) appendText(button, 'span', '★', 'pin-star');
-    if (system) appendText(button, 'span', app.classification, 'app-class');
+    if (system) appendText(button, 'span', app.classification === 'USER' ? 'VARIANTE' : app.classification, 'app-class');
     return button;
   }
   function allAppsButton() {
     var b = document.createElement('button'); b.className = 'app-card all-apps-card focusable'; b.setAttribute('data-action', 'all-apps');
-    appendText(b, 'span', '▦', 'app-logo'); appendText(b, 'span', 'Toutes les apps', 'app-name'); return b;
+    var logo = appendText(b, 'span', '', 'app-logo');
+    logo.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="3" y="15" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/></svg>';
+    appendText(b, 'span', 'Toutes les apps', 'app-name'); return b;
   }
   function sourceLabel(s) { return String(s.type).toUpperCase() + (s.number !== undefined ? ' ' + s.number : ''); }
   function sourceButton(s, compact) {
@@ -203,12 +205,11 @@
     removeClass(el('sportTile'), 'live'); if (demo && sportState !== 'normal') addClass(el('sportTile'), 'live');
   }
   function appsForTab() {
-    var list = [], i;
+    var list = [];
     if (currentProfile === 'Milo' && appsTab === 'system') return list;
     if (appsTab === 'favorites') return TVModel.byIds(installedApps, prefs.pins());
     if (currentProfile === 'Milo' && !organizing) return TVModel.byIds(installedApps, prefs.pins());
-    for (i = 0; i < installedApps.length; i++) if ((appsTab === 'user') === (installedApps[i].classification === 'USER')) list.push(installedApps[i]);
-    return list;
+    return appsTab === 'user' ? TVModel.userApps(installedApps) : TVModel.advancedApps(installedApps);
   }
   function renderAppsPage() {
     var list = appsForTab(), pageCount = Math.max(1, Math.ceil(list.length / APPS_PER_PAGE)), start, end, i, map = { favorites: 'tabFavorites', user: 'tabUser', system: 'tabSystem' }, key;

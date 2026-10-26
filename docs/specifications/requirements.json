@@ -5,7 +5,7 @@
   "requirements": [
     {
       "id": "SEENIT-TV-001",
-      "title": "Launcher TV fidèle aux planches, apps génériques et cycle mémoire borné",
+      "title": "Launcher TV lisible à distance, logos homogènes, variantes inventoriées et mémoire bornée",
       "targets": [
         "tv"
       ],

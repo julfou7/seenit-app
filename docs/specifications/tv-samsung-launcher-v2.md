@@ -8,7 +8,23 @@ Compatibilité du widget : `required_version="3.0"` reste un **minimum technique
 
 Les planches réelles de `SeenIt TV (2).html` priment sur les propositions de composition ci-dessous : Home avec quatre destinations **TV · Films · Sport · Réglages**, puis cinq apps favorites + Toutes les apps et deux accès Sources, puis rendez-vous compacts. Aucun grand Hero ne remplace ces destinations ; un événement imminent/direct met en avant la carte Sport en gardant la géométrie et le focus stables. Focus initial TV après choix adulte. Les textes techniques restent dans Diagnostic, pas dans l’accueil.
 
-Logos : icône native locale si exploitable, petits assets embarqués pour les marques reconnues, monogramme pour toute nouvelle app. La marque sert uniquement à la présentation : le lancement utilise toujours l’ID réellement inventorié, aucune table d’IDs Samsung supposée universelle. Favoris et dernières apps locales par profil ; toute app utilisateur peut être épinglée depuis la bibliothèque et les nouvelles installations apparaissent après Actualiser/reprise. Home bornée à5apps, bibliothèque18/page.
+Logos : petits SVG embarqués homogènes pour les marques reconnues, puis icône native locale si exploitable, puis monogramme. La marque sert uniquement à la présentation : le lancement utilise toujours l’ID réellement inventorié, aucune table d’IDs Samsung supposée universelle. Favoris et dernières apps locales par profil ; toute app utilisateur peut être épinglée depuis la bibliothèque et les nouvelles installations apparaissent après Actualiser/reprise. Home bornée à5apps, bibliothèque18/page.
+
+### Correctif après le terrain KO du 26 octobre
+
+Le navigateur desktop n'a pas prouvé le rendu Samsung. Le Web Inspector du widget installé confirme
+Tizen4 et1920×1080/dpr1 ; l'inventaire natif contient254packages, dont trois entrées Netflix visibles.
+L'accueil et la bibliothèque Apps regroupent les noms strictement identiques (casse/espaces ignorés)
+pour la présentation seulement. L'épingle explicite prime ; sinon le chemin d'icône d'installation
+utilisateur `/opt/usr/apps/` prime sur une variante intégrée `/usr/apps/`, puis l'ID tranche de façon
+stable. Tous les IDs d'origine restent dans l'inventaire ; les variantes utilisateur restent ouvrables
+et épinglables explicitement en avancé, contrairement aux composants système. Masquer une app empêche
+sa réapparition automatique sous un autre ID ; une nouvelle épingle explicite la réaffiche.
+YouTube et YouTube Kids restent deux apps. Aucune identité média ni cible de lancement n'est inférée.
+Les logos connus sont prioritaires sur les icônes natives disparates observées. Les glyphes d'accès
+principaux utilisent des SVG locaux, sans emoji dépendant de la police Samsung. La taille des logos,
+des sources et des libellés est augmentée pour une lecture à distance ; les bordures hors focus sont
+allégées. Aucun nouveau framework, bitmap lourd, effet continu ni contenu Sport fictif n'est ajouté.
 
 RAM : fond coloré léger, pas de grande image plein écran ni vidéo/blur ; libérer les images et grilles invisibles, arrêter horloge et télémétrie en arrière-plan, restaurer le dernier focus et seulement les éléments utiles. Aucune fermeture automatique d’une autre app et aucun gain global de RAM annoncé sans mesure matérielle. Sources : [guide mémoire Samsung](https://developer.samsung.com/smarttv/develop/guides/web-app-memory-optimization-guide.html), [multitâche Samsung](https://developer.samsung.com/smarttv/develop/guides/fundamentals/multitasking.html).
 
@@ -275,8 +291,8 @@ Ne jamais injecter 100+ cartes simultanément dans le DOM de la QE55Q6FNA.
 
 Ordre de préférence :
 
-1. icône native uniquement si son chemin est réellement lisible depuis la Web App sur la QE55Q6FNA ;
-2. asset local pour quelques services connus ;
+1. SVG local homogène pour quelques services connus ;
+2. icône native uniquement si son chemin est réellement lisible depuis la Web App sur la QE55Q6FNA ;
 3. monogramme/initiales déterministes.
 
 Ne pas coder une table universelle `appId Samsung -> marque`. L'ID détecté reste la vérité terrain.

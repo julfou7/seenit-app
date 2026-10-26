@@ -15,6 +15,40 @@ function device(application: Record<string, unknown>, extra: Record<string, unkn
   vm.runInContext(deviceSource, context);
   return context.TVDevice;
 }
+
+test('SEENIT-TV-001 le vrai adapter regroupe les variantes Tizen4 sans perdre leurs IDs ni confondre Kids', () => {
+  const nativeApps = JSON.parse(readFileSync(new URL('./fixtures/tv-samsung-tizen4-apps.json', import.meta.url), 'utf8'));
+  const m = model();
+  for (const input of [nativeApps, [...nativeApps].reverse()]) {
+    let inventory: any;
+    const d = device({ getAppsInfo(done: (apps: unknown[]) => void) { done(input); }, getCurrentApplication() { return { appInfo: { id: 'SeenItTV01.SeenItTV' } }; } });
+    d.listApps((value: any) => { inventory = value; });
+    assert.equal(inventory.length, nativeApps.length);
+    const home = m.favorites(inventory, [], 5);
+    assert.equal(home.filter((a: any) => a.title === 'Netflix').length, 1);
+    assert.equal(home.find((a: any) => a.title === 'Netflix').id, 'RN1MCdNq8t.Netflix');
+    assert.equal(m.userApps(inventory).length, 7);
+    assert.equal(m.advancedApps(inventory).length, 6);
+    assert.equal(inventory.find((a: any) => a.id === 'SeenItTV01.SeenItTV').launchable, false);
+    assert.equal(m.brand('YouTube Kids'), null);
+    assert.equal(m.brand('plex preview service'), null);
+    assert.equal(m.favorites(inventory, ['org.tizen.netflix-app', 'RN1MCdNq8t.Netflix'], 5)[0].id, 'org.tizen.netflix-app');
+    assert.equal(m.favorites(inventory, ['org.tizen.netflix-app'], 5).filter((a: any) => a.title === 'Netflix').length, 1);
+  }
+});
+
+test('SEENIT-TV-001 le regroupement de tuiles est générique, stable et ne change pas la cible épinglée', () => {
+  const m = model(), apps = [
+    { id: 'built-in', title: ' Nouvelle   App ', classification: 'USER', launchable: true, iconPath: '/usr/apps/id/icon.png' },
+    { id: 'installed', title: 'nouvelle app', classification: 'USER', launchable: true, iconPath: '/opt/usr/apps/id/icon.png' },
+    { id: 'kids', title: 'Nouvelle App Kids', classification: 'USER', launchable: true },
+  ];
+  assert.deepEqual(Array.from(m.userApps(apps), (a: any) => a.id), ['installed', 'kids']);
+  assert.deepEqual(Array.from(m.favorites(apps, ['built-in'], 5), (a: any) => a.id), ['built-in', 'kids']);
+  assert.equal(m.favorites(apps, [], 5, ['installed']).some((a: any) => a.id === 'built-in'), false);
+  assert.equal(m.favorites(apps, [], 5, ['built-in']).some((a: any) => a.id === 'installed'), false);
+  assert.equal(m.favorites(apps, ['installed'], 5, ['built-in'])[0].id, 'installed');
+});
 test('SEENIT-TV-001 isole les favoris et réouvertures par profil sans persister Invité', () => {
   const m = model(), saved: Record<string, string> = {};
   const store = { getItem: (key: string) => saved[key], setItem: (key: string, value: string) => { saved[key] = value; } };

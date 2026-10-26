@@ -2,9 +2,9 @@
 var TVModel = (function () {
   'use strict';
   var brands = [
-    { match: /netflix/i, file: 'netflix' }, { match: /plex/i, file: 'plex' },
-    { match: /youtube/i, file: 'youtube' }, { match: /prime\s*video|amazon.*prime/i, file: 'amazonprime' },
-    { match: /spotify/i, file: 'spotify' }, { match: /dazn/i, file: 'dazn' }
+    { match: /^netflix$/i, file: 'netflix' }, { match: /^plex(?:\s*[-–].*)?$/i, file: 'plex' },
+    { match: /^youtube$/i, file: 'youtube' }, { match: /^prime\s*video$/i, file: 'amazonprime' },
+    { match: /^spotify(?:\s*[-–].*)?$/i, file: 'spotify' }, { match: /^dazn$/i, file: 'dazn' }
   ];
   function brand(title) {
     var i;
@@ -73,9 +73,27 @@ var TVModel = (function () {
       }
     };
   }
+  function titleKey(app) { return String(app.title || '').replace(/^\s+|\s+$/g, '').replace(/\s+/g, ' ').toLowerCase(); }
+  function iconRank(app) {
+    var path = localIcon(app.iconPath).replace(/^file:\/\//i, '');
+    return /^\/opt\/usr\/apps\//.test(path) ? 2 : /^\/usr\/apps\//.test(path) ? 1 : 0;
+  }
   function userApps(apps) {
-    var out = [], i;
-    for (i = 0; i < apps.length; i++) if (apps[i].classification === 'USER' && apps[i].launchable) out.push(apps[i]);
+    var out = [], keys = [], i, key, index, previous;
+    for (i = 0; i < apps.length; i++) if (apps[i].classification === 'USER' && apps[i].launchable) {
+      key = titleKey(apps[i]); index = keys.indexOf(key);
+      if (index < 0) { keys.push(key); out.push(apps[i]); }
+      else {
+        previous = out[index];
+        if (iconRank(apps[i]) > iconRank(previous) || (iconRank(apps[i]) === iconRank(previous) && apps[i].id < previous.id)) out[index] = apps[i];
+      }
+    }
+    return out;
+  }
+  function advancedApps(apps) {
+    var users = userApps(apps), preferred = [], out = [], i;
+    for (i = 0; i < users.length; i++) preferred.push(users[i].id);
+    for (i = 0; i < apps.length; i++) if (preferred.indexOf(apps[i].id) < 0) out.push(apps[i]);
     return out;
   }
   function byIds(apps, wanted) {
@@ -86,14 +104,19 @@ var TVModel = (function () {
     return out;
   }
   function favorites(apps, pins, limit, hidden) {
-    var users = userApps(apps), out = byIds(users, pins), i;
-    var used = [];
+    var users = userApps(apps), pinned = byIds(apps, pins), out = [], i;
+    var used = [], blocked = [], key, hiddenApps;
     hidden = hidden || [];
-    for (i = 0; i < out.length; i++) used.push(out[i].id);
+    hiddenApps = byIds(apps, hidden);
+    for (i = 0; i < hiddenApps.length; i++) blocked.push(titleKey(hiddenApps[i]));
+    for (i = 0; i < pinned.length; i++) {
+      key = titleKey(pinned[i]);
+      if (used.indexOf(key) < 0 && hidden.indexOf(pinned[i].id) < 0) { out.push(pinned[i]); used.push(key); }
+    }
     /* Initial artwork ranking only. Any installed app can be pinned ahead of it. */
-    for (i = 0; i < users.length && out.length < limit; i++) if (brand(users[i].title) && used.indexOf(users[i].id) < 0 && hidden.indexOf(users[i].id) < 0) { out.push(users[i]); used.push(users[i].id); }
-    for (i = 0; i < users.length && out.length < limit; i++) if (used.indexOf(users[i].id) < 0 && hidden.indexOf(users[i].id) < 0) { out.push(users[i]); used.push(users[i].id); }
+    for (i = 0; i < users.length && out.length < limit; i++) if (brand(users[i].title) && used.indexOf(titleKey(users[i])) < 0 && blocked.indexOf(titleKey(users[i])) < 0) { out.push(users[i]); used.push(titleKey(users[i])); }
+    for (i = 0; i < users.length && out.length < limit; i++) if (used.indexOf(titleKey(users[i])) < 0 && blocked.indexOf(titleKey(users[i])) < 0) { out.push(users[i]); used.push(titleKey(users[i])); }
     return out.slice(0, limit);
   }
-  return { brand: brand, localIcon: localIcon, initials: initials, preferences: preferences, userApps: userApps, byIds: byIds, favorites: favorites };
+  return { brand: brand, localIcon: localIcon, initials: initials, preferences: preferences, userApps: userApps, advancedApps: advancedApps, byIds: byIds, favorites: favorites };
 }());
