@@ -1135,10 +1135,10 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   recherches, filtres ou expansions locales. Aucun suivi, progression, préférence ou téléchargement n'est
   modifié. Chaque reset abouti affiche un toast nommant la page réinitialisée. Un trajet A → B → B ne
   compte jamais le changement d'onglet comme le premier appui du double geste.
-- **SEENIT-UX-017** — La navigation 13j est un îlot verre flottant de 58 px, à 10 px de la safe area,
+- **SEENIT-UX-017** — La navigation 13j est un îlot verre flottant de 64 px, à 10 px de la safe area,
   avec fondu inférieur progressif de 96 px, sans repli au défilement. Ordre : À Voir, Explorer, Moi,
   puis séparateur et Télécharger si la fonctionnalité personnelle est activée. Les glyphes SeenIt
-  utilisent le même or, les cibles mesurent au moins 46 × 68 px, le focus et aria-current restent visibles.
+  utilisent le même or, les cibles mesurent au moins 52 × 68 px, le focus et aria-current restent visibles.
   La barre disparaît sur les fiches/dialogues plein écran ; le contenu réserve 84 px plus safe area,
   les toasts se placent à 80 px plus safe area avec la barre, 24 px sans elle. Le point Télécharger
   reflète les données live existantes : actifs or (nombre seulement au-delà de un), attention rouge,

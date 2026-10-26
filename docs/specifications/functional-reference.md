@@ -147,9 +147,9 @@ Son point indique en priorité les transferts actifs (or, nombre au-delà de un)
 aux transferts. Une navigation historique ou directe vers `downloads` alors que la fonctionnalité est
 désactivée revient sur « À Voir ».
 
-La [barre 13j](../design/navbar-13j.md) est un îlot verre flottant centré, haut de 58 px, détaché de
+La [barre 13j](../design/navbar-13j.md) est un îlot verre flottant centré, haut de 64 px, détaché de
 10 px plus safe area, avec fondu progressif inférieur de 96 px. Sans Télécharger, seul le dernier
-onglet et le séparateur disparaissent. Glyphes 24 px, libellés 10 px et cibles minimales 46 × 68 px.
+onglet et le séparateur disparaissent. Glyphes 24 px, libellés 10 px et cibles minimales 52 × 68 px.
 Pas de repli au scroll. Le contenu réserve 84 px plus safe area ; les toasts restent au-dessus à
 80 px plus safe area, ou 24 px sur une fiche/dialogue sans barre. La fiche média occupe tout le viewport.
 
