@@ -31,7 +31,14 @@ async function testTerrain226Harness(client,root){
    await check(client,'document.querySelector(".seenit-brand-splash--closing")','fermeture à durée inchangée');
    await check(client,'!document.querySelector("#seenit-splash-screen") && window.__terrain224.splash.closed===1','fermeture unique');
   }
-  reports.push({width,progressiveRing:drawing,renderIsolation:perf});
+  await evaluate(client,'window.__terrain226.calendar()');
+  await check(client,`document.querySelector('[data-series-id="series-0"] [data-series-badge=today]') && document.querySelectorAll('[data-series-id="series-0"] .series-8f__segment')[2].classList.contains('series-8f__segment--future')`,'date courante avant minuit');
+  await evaluate(client,`window.__calendarShow=window.__homeAVoir.snapshot().find(s=>s.id==='series-0');window.__calendarRealDate=Date;const day=new Date();day.setDate(day.getDate()+1);window.Date=class extends window.__calendarRealDate{constructor(...args){super(...(args.length?args:[day.getTime()]));}};window.__terrain226.advanceClock(1440);window.dispatchEvent(new Event('focus'))`);
+  await check(client,`window.__homeAVoir.snapshot().find(s=>s.id==='series-0')===window.__calendarShow && document.querySelector('[data-series-id="series-0"] [data-series-badge=yesterday]') && document.querySelectorAll('[data-series-id="series-0"] .series-8f__segment')[2].classList.contains('series-8f__segment--unseen')`,'retour le lendemain sans mutation ni fiche : date et épisode dégrisé');
+  await evaluate(client,`window.__cardRenders={};window.__terrain226.advanceClock(1);window.dispatchEvent(new Event('focus'))`);await pause(120);
+  await check(client,`Object.keys(window.__cardRenders).length===0`,'même jour : aucun rendu de carte au rafraîchissement');
+  await evaluate(client,'window.Date=window.__calendarRealDate');
+  reports.push({width,progressiveRing:drawing,renderIsolation:perf,calendarRefresh:true,sameDayRenders:0});
  }
  fs.writeFileSync(path.join(root,'quality-reports','terrain226-performance.json'),JSON.stringify(reports,null,2));
  return reports;

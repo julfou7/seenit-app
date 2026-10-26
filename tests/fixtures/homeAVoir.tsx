@@ -2,7 +2,7 @@ import { useSyncStore } from '../../src/store/syncStore';
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { WatchListView } from '../../src/screens/WatchListView';
-import { useShowsStore, telemetry, updateShow, auth, releaseWrite, addProgressExamples } from './homeAVoirRuntime';
+import { useShowsStore, telemetry, updateShow, auth, releaseWrite, addProgressExamples, advanceClock } from './homeAVoirRuntime';
 import { markMovieWatched, markWatchRecordUnseen } from '../../src/features/watchlist/watchProgressActions';
 import { markWatchCardEpisode } from '../../src/features/watchlist/watchCardResume';
 import { markEpisodeWatched } from '../../src/features/shows/markEpisodeWatched';
@@ -10,13 +10,13 @@ import { getTodayStr } from '../../src/lib/utils';
 import { useToastStore } from '../../src/store/toastStore';
 import type { Show } from '../../src/types';
 import { BottomNav } from '../../src/components/BottomNav';
-import { reminderControl, terrain221Examples, terrain223Examples, terrain224Examples } from './homeAVoirRuntime';
+import { reminderControl, terrain221Examples, terrain223Examples, terrain224Examples, terrain226CalendarExamples } from './homeAVoirRuntime';
 import { SplashScreen } from '../../src/components/SplashScreen';
 import { ToastContainer } from '../../src/components/ToastContainer';
 import { writeUserScopedJson } from '../../src/lib/userIsolation';
 Object.assign(window, { __homeAVoir: { terrain223Examples, report: (progress: unknown) => writeUserScopedJson(auth.currentUser?.uid, 'plex_last_sync_report_v1', {message:'Synchronisation Plex incomplète — nouvel essai requis',progress}), progress: (progress: unknown) => useSyncStore.getState().setPlexSyncStatus({message:"Analyse Plex",progress} as Parameters<ReturnType<typeof useSyncStore.getState>["setPlexSyncStatus"]>[0]), auth, reminderControl, terrain221Examples, examples:addProgressExamples, sync: (message:string|null) => useSyncStore.getState().setPlexSyncStatus(message?{message}:null), telemetry, releaseWrite, empty: () => useShowsStore.setState({ shows: [] }), clearDismissed: () => writeUserScopedJson(auth.currentUser?.uid, 'home_dismissed_notifications', []), snapshot: () => useShowsStore.getState().shows, reset: () => window.dispatchEvent(new Event('watchlist-reset-all')), clear: () => useToastStore.getState().clearQueue(), toasts: () => [useToastStore.getState().currentToast, ...useToastStore.getState().queue].filter(Boolean) } });
 const motionControl = { open: (_ready: boolean) => {}, ready: () => {}, closed: 0 };
-Object.assign(window, { __terrain224: { examples: terrain224Examples, splash: motionControl } });
+Object.assign(window, { __terrain224: { examples: terrain224Examples, splash: motionControl }, __terrain226: { calendar: terrain226CalendarExamples, advanceClock } });
 function Harness() {
   const [splash, setSplash] = useState<{ready:boolean;key:number} | null>(null);
   useEffect(() => {

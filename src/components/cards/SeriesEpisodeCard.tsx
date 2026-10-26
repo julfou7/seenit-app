@@ -28,6 +28,7 @@ export interface SeriesCardPresentationOverride {
 
 interface Props {
   show: Show;
+  today?: string;
   episode: SeriesCardEpisode | null;
   context: Context;
   detail?: string;
@@ -51,7 +52,7 @@ const segmentNames: Record<SeasonSegmentState, string> = {
 const BADGE_DETAIL = /^(?:🔥|🌟|🆕|🏁|⏳)/u;
 const REMAINING_DETAIL = /\brestant(?:s)?\b/i;
 
-export function SeriesEpisodeCard({ show, episode, context, detail, hideStatus = false, providerLogo, providerName, onOpen, onOpenSeries, onOpenEpisode, onProviderOpen, actions = [], historyActions, presentation, layout = 'list' }: Props) {
+export function SeriesEpisodeCard({ show, today: day, episode, context, detail, hideStatus = false, providerLogo, providerName, onOpen, onOpenSeries, onOpenEpisode, onProviderOpen, actions = [], historyActions, presentation, layout = 'list' }: Props) {
   const [animatedBadges] = useAnimatedBadges();
   const posterCandidates = seriesCardPosterCandidates(show);
   const posterCandidatesKey = posterCandidates.join('\u0000');
@@ -87,7 +88,7 @@ export function SeriesEpisodeCard({ show, episode, context, detail, hideStatus =
   useEffect(() => { setHue(readPosterHue(poster) ?? POSTER_HUE_FALLBACK); }, [poster]);
   useEffect(() => cancel, []);
   const now = new Date();
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const today = day ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const progress = presentation?.progress ?? (episode
     ? buildSeriesSeasonProgress(show, episode, context.kind, today)
     : { label: 'À actualiser', description: 'Épisode de reprise à confirmer', continuous: false, segments: [], totalUnknown: true, unknownTail: false, knownEpisodes: 0, availableUnseen: 0 });

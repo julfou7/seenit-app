@@ -11,6 +11,7 @@ import { SeriesEpisodeCard, type SeriesCardAction } from './SeriesEpisodeCard';
 interface Props {
   key?: React.Key;
   show: Show;
+  today?: string;
   onShowClick?: (id: string, mediaType?: 'tv' | 'movie') => void;
   onEpisodeClick?: (show: Show, seasonNumber: number, episodeNumber: number) => void;
   onMarkAsSeen: (show: Show) => void | boolean | Promise<void | boolean>;
@@ -33,17 +34,17 @@ function episodeFreshnessBadge(episode: SeriesCardEpisode | null | undefined, to
 }
 
 export const ContinueWatchingCard = React.memo(function ContinueWatchingCard(props: Props) {
-  const todayStr = getTodayStr();
+  const todayStr = props.today ?? getTodayStr();
   if (!hasAiredEpisodeEvidence(props.show, todayStr)) return null;
   return <ContinueWatchingCardContent {...props} />;
 });
 
-function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMarkAsSeen, onSeenFeedbackComplete, onMarkUnseen, lastMarkedEpisode, animateSeen, layout = 'rail', actions, showStaleDetail = false }: Props) {
+function ContinueWatchingCardContent({ show, today, onShowClick, onEpisodeClick, onMarkAsSeen, onSeenFeedbackComplete, onMarkUnseen, lastMarkedEpisode, animateSeen, layout = 'rail', actions, showStaleDetail = false }: Props) {
   const { cardRef, providerLogo, providerName } = usePassiveWatchProvider({
     tmdbId: show.tmdbId, mediaType: 'tv', title: show.title, originalTitle: show.originalTitle,
     year: show.firstAirDate?.slice(0, 4), retainInLibraryCache: true,
   });
-  const todayStr = getTodayStr();
+  const todayStr = today ?? getTodayStr();
   const resume = resolveWatchCardResume(show, todayStr);
   const isUpToDate = resume.upToDate;
   const nextEpNum = resume.episode || (isUpToDate ? lastMarkedEpisode : null);
@@ -60,6 +61,7 @@ function ContinueWatchingCardContent({ show, onShowClick, onEpisodeClick, onMark
   return <div ref={cardRef} className="series-8f-host">
     <SeriesEpisodeCard
       show={{ ...show, backdropPath: rawPath }}
+      today={todayStr}
       episode={nextEpNum ? { ...nextEpNum, name: nextEpNum.name || cachedEpisode?.name } : null}
       context={{ kind: 'watch', upToDate: isUpToDate, animateSeen,
         onFeedbackComplete: completed => onSeenFeedbackComplete?.(show, completed),

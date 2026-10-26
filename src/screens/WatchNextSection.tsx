@@ -42,12 +42,12 @@ function useLatestCallback<Args extends unknown[], Result>(callback: (...args: A
 }
 
 // Keep unchanged cards outside sibling feedback and actor-index renders.
-const WatchSeriesItem = React.memo(function WatchSeriesItem({ show, layout, stale, receipt, onOpen, onEpisode, onMark, onUnseen, onComplete, actions }: {
-  show: Show; layout: 'list' | 'rail'; stale: boolean; receipt?: SeriesCardEpisode;
+const WatchSeriesItem = React.memo(function WatchSeriesItem({ show, today, layout, stale, receipt, onOpen, onEpisode, onMark, onUnseen, onComplete, actions }: {
+  show: Show; today: string; layout: 'list' | 'rail'; stale: boolean; receipt?: SeriesCardEpisode;
   onOpen: Props['onOpen']; onEpisode: Props['onEpisode']; onMark: Props['onMarkSeries'];
   onUnseen: Props['onUnseen']; onComplete: (show: Show, completed: boolean) => void; actions: Props['actions'];
 }) {
-  return <ContinueWatchingCard show={show} layout={layout} animateSeen showStaleDetail={stale} lastMarkedEpisode={receipt}
+  return <ContinueWatchingCard show={show} today={today} layout={layout} animateSeen showStaleDetail={stale} lastMarkedEpisode={receipt}
     onMarkUnseen={onUnseen} onMarkAsSeen={onMark} onSeenFeedbackComplete={onComplete} onShowClick={onOpen} onEpisodeClick={onEpisode} actions={actions(show)} />;
 });
 export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, movies, active, onOpen, onEpisode, onMarkSeries, onMarkMovie, onUnseen, actions }: Props) {
@@ -90,6 +90,7 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
   const [retained, setRetained] = useState<Record<string, { episode?: SeriesCardEpisode }>>({});
   const [movieOrder, setMovieOrder] = useState<string[] | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const today = getTodayStr();
   const clearTransfers = useCallback(() => { originLocks.current.clear(); pendingScroll.current = null; }, []);
   const reset = useCallback(() => { clearTransfers(); setArrivals(new Set()); setActorSheet(null); setRetained({}); setMovieOrder(null); setExpandedGroups({}); setGroupLimits({}); setRailLimits({}); setMovieRailLimit(HOME_PAGE_SIZE); setMovieList(false); setMovieCount(3); setSeriesOrder(latestSeriesOrder.current); setNow(Date.now()); }, [clearTransfers]);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; clearTransfers(); }; }, [clearTransfers]);
@@ -109,9 +110,11 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 60_000);
     const refresh = () => { setNow(Date.now()); };
+    const visible = () => { if (document.visibilityState === 'visible') refresh(); };
     window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', visible);
     window.addEventListener('watchlist-reset-all', reset);
-    return () => { clearInterval(timer); window.removeEventListener('focus', refresh); window.removeEventListener('watchlist-reset-all', reset); };
+    return () => { clearInterval(timer); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', visible); window.removeEventListener('watchlist-reset-all', reset); };
   }, [reset]);
   // Leaving a tab is not an explicit refresh: keep the local watched receipts.
   const allById = new Map(allShows.map(show => [show.id, show]));
@@ -214,7 +217,7 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
         {index === 2 && <p className="home-stale-subtitle">En pause ou jamais commencées, depuis plus de 2 mois</p>}
         <div className={expanded ? 'home-series-list' : 'home-series-rail'} id={`home-series-${index}`}>
           {items.slice(0, limit).map(show => {
-            const card = <WatchSeriesItem show={show} layout={expanded ? 'list' : 'rail'} stale={index === 2} receipt={retained[show.id]?.episode} {...seriesHandlers} />;
+            const card = <WatchSeriesItem show={show} today={today} layout={expanded ? 'list' : 'rail'} stale={index === 2} receipt={retained[show.id]?.episode} {...seriesHandlers} />;
             return expanded && index > 0 ? <HomeSwipeCard key={show.id} onArchive={() => actions(show).find(action => action.label.startsWith('Archiver'))?.onSelect()} onRemove={() => actions(show).find(action => action.destructive)?.onSelect()}>{card}</HomeSwipeCard> : <div key={show.id} className={arrivals.has(show.id) ? 'home-series-arrival' : undefined}>{card}</div>;
           })}
           {!expanded && <HomeLoadMore tile items={items.slice(limit)} onLoad={() => { rememberReveal(`home-series-${index}`); setRailLimits(previous => ({ ...previous, [index]: limit + HOME_PAGE_SIZE })); }} />}
