@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, type RefObject } from 'react';
+import React, { Activity, startTransition, useEffect, useRef, useState, type RefObject } from 'react';
 import type { Show } from '../types';
 import { WatchNextSection } from './WatchNextSection';
 import { DialogLayer } from '../components/ui/DialogLayer';
@@ -72,6 +72,18 @@ export function WatchListView({ model }: WatchListViewProps) {
   ];
   const [online, setOnline] = useState(() => navigator.onLine);
   const [today, setToday] = useState(() => getTodayStr());
+  const [mountedHomeTabs, setMountedHomeTabs] = useState(() => new Set<WatchListTab>(['watch_next', activeTab]));
+  useEffect(() => {
+    if (mountedHomeTabs.has(activeTab)) return;
+    startTransition(() => {
+      setMountedHomeTabs(previous => {
+        if (previous.has(activeTab)) return previous;
+        const next = new Set(previous);
+        next.add(activeTab);
+        return next;
+      });
+    });
+  }, [activeTab, mountedHomeTabs]);
   useEffect(() => {
     const timer = setInterval(() => setToday(getTodayStr()), 60_000);
     return () => clearInterval(timer);
@@ -108,13 +120,19 @@ export function WatchListView({ model }: WatchListViewProps) {
           <WatchNextSection onPerson={openPersonModal} onOpenMedia={(id, type) => onShowClickProp(String(id), type)} onExplore={onExplore} key={auth.currentUser?.uid || 'anonymous'} allShows={allShows} groups={[continueWatchingShows, nouveautesShows, pasVuDepuisUnMomentShows]} movies={filmsAVoirShows} active={activeTab === 'watch_next'} onOpen={onShowClick} onEpisode={handleEpisodeClick} onMarkSeries={markNextEpisodeAsSeen} onMarkMovie={markMovieAsSeen} onUnseen={markAsUnseen} actions={seriesActions} />
         </div>
         <div ref={upcomingRef} id="home-panel-upcoming" role="tabpanel" aria-labelledby="home-tab-upcoming" hidden={activeTab !== 'upcoming'} tabIndex={0} className="home-panel-content">
-          {activeTab === 'upcoming' && (upcomingShows.length ? upcomingGroups.filter(group => group.shows.length).map(group => <section key={group.label} className="home-upcoming-group"><h2><span className="home-section-name">{group.label}</span></h2>{group.shows.map(show => <UpcomingShowCard key={show.id} show={show} onShowClick={onShowClick} onEpisodeClick={handleEpisodeClick} actions={seriesActions(show)} />)}</section>) : <div className="home-empty"><h2>Rien de prévu pour le moment</h2><p>Les prochaines sorties de vos films et séries suivis apparaîtront ici.</p>{onExplore && <button type="button" className="home-explore" onClick={onExplore}>Explorer</button>}</div>)}
+          {activeTab === 'upcoming' && !mountedHomeTabs.has('upcoming') && <div className="home-skeleton" role="status" aria-label="Chargement de À venir"><div><span /><div /></div></div>}
+          {mountedHomeTabs.has('upcoming') && <Activity mode={activeTab === 'upcoming' ? 'visible' : 'hidden'}>
+            {upcomingShows.length ? upcomingGroups.filter(group => group.shows.length).map(group => <section key={group.label} className="home-upcoming-group"><h2><span className="home-section-name">{group.label}</span></h2>{group.shows.map(show => <UpcomingShowCard key={show.id} show={show} onShowClick={onShowClick} onEpisodeClick={handleEpisodeClick} actions={seriesActions(show)} />)}</section>) : <div className="home-empty"><h2>Rien de prévu pour le moment</h2><p>Les prochaines sorties de vos films et séries suivis apparaîtront ici.</p>{onExplore && <button type="button" className="home-explore" onClick={onExplore}>Explorer</button>}</div>}
+          </Activity>}
         </div>
         <div ref={historyRef} id="home-panel-history" role="tabpanel" aria-labelledby="home-tab-history" hidden={activeTab !== 'history'} tabIndex={0} className="home-panel-content">
-          {activeTab === 'history' && <HistoryFeed active={activeTab === 'history'} onExplore={onExplore} onShowClick={onShowClick} onEpisodeClick={(showId, season, episode) => {
-            const show = allShows.find(item => item.id === showId || String(item.tmdbId) === showId);
-            if (show) handleEpisodeClick(show, season, episode); else onShowClick(showId, 'tv');
-          }} />}
+          {activeTab === 'history' && !mountedHomeTabs.has('history') && <div className="home-skeleton" role="status" aria-label="Chargement de l’historique"><div><span /><div /></div></div>}
+          {mountedHomeTabs.has('history') && <Activity mode={activeTab === 'history' ? 'visible' : 'hidden'}>
+            <HistoryFeed onExplore={onExplore} onShowClick={onShowClick} onEpisodeClick={(showId, season, episode) => {
+              const show = allShows.find(item => item.id === showId || String(item.tmdbId) === showId);
+              if (show) handleEpisodeClick(show, season, episode); else onShowClick(showId, 'tv');
+            }} />
+          </Activity>}
         </div>
       </>}
 
