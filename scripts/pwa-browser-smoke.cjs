@@ -1,6 +1,7 @@
 const { testTerrain223Harness } = require('./home-terrain223-browser-checks.cjs');
 const { testTerrain224Harness } = require('./home-terrain224-browser-checks.cjs');
 const { testTerrain226Harness } = require('./home-terrain226-browser-checks.cjs');
+const { testTerrain227Harness } = require('./home-terrain227-browser-checks.cjs');
 const { testTerrain222Harness } = require('./home-terrain222-browser-checks.cjs');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
@@ -568,6 +569,7 @@ async function main() {
       homeTerrain223: await testTerrain223Harness(client, root),
       homeTerrain224: await testTerrain224Harness(client, root),
       homeTerrain226: await testTerrain226Harness(client, root),
+      homeTerrain227: await testTerrain227Harness(client, root),
       generatedAt: new Date().toISOString(),
       issue: config.issue,
       status: 'pass',

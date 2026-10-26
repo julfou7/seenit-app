@@ -19,7 +19,7 @@ test('SEENIT-UX-009 marque v3 réutilise les tracés et termine la séquence de 
  for(const file of paths) assert.match(fs.readFileSync(file,'utf8'),/seenit-logo-(?:sombre|empile-sombre)|SeenItLogo variant="horizontal"/);
  const splash=fs.readFileSync('src/components/SplashScreen.tsx','utf8');
  assert.match(splash,/Array.from\(\{length:8\}/);
- assert.match(splash,/BRAND_SPLASH_ANIMATION_MS = 3700/);
+ assert.match(splash,/BRAND_SPLASH_ANIMATION_MS = 3500/);
  assert.match(splash,/data-ready=\{timeElapsed \|\| !animate \|\| reducedMotion\}/);
  assert.doesNotMatch(fs.readFileSync('src/App.tsx','utf8'),/minimumDisplayTime=\{0\}/);
  assert.doesNotMatch(fs.readFileSync('public/brand/seenit-logo-sombre.svg','utf8'),/<script|\bon\w+=|href=/i);

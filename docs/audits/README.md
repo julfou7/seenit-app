@@ -49,6 +49,8 @@ Terrain224 / animations : [vidéos et corrections](./terrain224-motion-2026-10-2
 
 Terrain225 / fluidité : [causes, mesures et corrections](./terrain225-fluidite-2026-10-25.md), baseline198c0a71, #729.
 
+Terrain226 / finitions : [vidéos et corrections](./terrain226-finitions-2026-10-26.md), baselineee77b193, #729.
+
 L'audit historique des téléchargements antérieur à ce protocole reste disponible dans
 [`../audit-telechargements-2026-08-30.md`](../audit-telechargements-2026-08-30.md). Ses corrections
 déjà livrées sont couvertes par les exigences `SEENIT-DOWNLOAD-*` et leurs tests.

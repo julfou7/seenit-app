@@ -147,3 +147,5 @@ Complément USR-2026-10-23-005 : ZIP(10) SPEC-DEV-V4.md reçue24/10, complète (
 | USR-2026-10-25-002 | 2026-10-25 | Terrain224 : animation d’ouverture complète ; nav sans point et texte abaissé ; bouton Vu film dans le talon ; bandeaux compacts au bas des affiches ; après succès bouton puis tampon puis nouvelle reprise ; dernier disponible tamponné jusqu’au rafraîchissement. | SEENIT-UX-009/014/015, #729 | active |
 
 - 25/10/2026 — terrain225 (#729) : historique individuel sans ×N, vérification centrage Moi, remplissage Vu progressif et fluidité globale ; splash rééquilibré à durée totale identique. Voir docs/design/marque-2026-10-25.md.
+
+- 26/10/2026 — retour226 (#729) : coche/splash réguliers, maintien final−200ms, billets et alignement des acteurs, fermeture de la dernière notification. Voir docs/design/marque-2026-10-25.md.

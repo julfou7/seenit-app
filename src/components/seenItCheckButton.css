@@ -5,7 +5,7 @@
 [data-active=true] .brand-ring-fill { transition:stroke-dashoffset 420ms cubic-bezier(.6,0,.3,1); }
 .brand-ring-tick { transform-origin:50px 50px; }
 .seenit-check[data-celebrate=true] .brand-ring-fill { animation:brandCheckRing 760ms cubic-bezier(.35,0,.3,1) both; }
-.seenit-check[data-celebrate=true] .brand-ring-tick { stroke-dasharray:40; animation:brandCheckTick 240ms ease-out 760ms both; }
+.seenit-check[data-celebrate=true] .brand-ring-tick { stroke-dasharray:1; animation:brandCheckTick 240ms ease-out 760ms both; }
 @keyframes brandCheckRing { from{stroke-dashoffset:239} to{stroke-dashoffset:0} }
-@keyframes brandCheckTick { from{stroke-dashoffset:40} to{stroke-dashoffset:0} }
+@keyframes brandCheckTick { 0%{stroke-dashoffset:1;opacity:0} 1%{opacity:1} 100%{stroke-dashoffset:0;opacity:1} }
 @media(prefers-reduced-motion:reduce){.brand-ring-fill,.brand-ring-tick { animation:none!important;transition:none!important; }}
