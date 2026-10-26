@@ -127,3 +127,17 @@
 .movie-ticket--poster .movie-ticket__check { top:214px; right:calc(50% - 24px); bottom:auto; transform:none; z-index:6; background:#0b0b0fe6; }
 .movie-ticket__metadata { display:flex; justify-content:space-between; flex-wrap:wrap; align-items:baseline; gap:2px 8px; margin-top:4px; font-size:11px; line-height:1.3; color:#a1a1aa; }
 .movie-ticket__metadata strong { color:#e4e4e7; font-weight:800; }.movie-ticket__metadata .movie-ticket__late strong { color:#FDBA74; }
+
+/* Terrain226 : perforation symétrique et contenu du talon lisible. */
+.movie-ticket--horizontal:not(.movie-ticket--watched) .movie-ticket__main { mask:radial-gradient(circle 8px at 100% 0,#0000 97%,#000) top/100% 51% no-repeat,radial-gradient(circle 8px at 100% 100%,#0000 97%,#000) bottom/100% 51% no-repeat; }
+.movie-ticket .seenit-ring-glyph { width:36px; height:36px; }
+.movie-ticket--poster .movie-ticket__check { right:4px; background:transparent; }
+.movie-ticket--poster .movie-ticket__stub { padding:0 56px 0 10px; justify-content:flex-start; }
+.movie-ticket--poster .movie-ticket__stub > span { display:flex;flex-direction:column;gap:1px;font-size:9px;line-height:1.1; }
+.movie-ticket--poster .movie-ticket__stub strong { font-size:15px;line-height:1.1; }
+.movie-ticket--poster .movie-ticket__stub .movie-ticket__late strong { color:#FDBA74; }
+.movie-ticket-rail { display:grid;grid-auto-flow:column;grid-auto-columns:max-content;grid-template-rows:262px auto auto auto;column-gap:12px;row-gap:0;align-items:start; }
+.movie-ticket-rail > .movie-ticket--poster { display:grid;grid-template-rows:subgrid;grid-row:span 4;row-gap:0; }
+.movie-ticket-rail > .home-load-more,.movie-ticket-rail::after { grid-row:1 / span 4;align-self:start; }
+.movie-ticket-rail::after { width:var(--layout-anchor-tail,0px); height:1px; }
+.movie-ticket--horizontal .movie-ticket__info h3 { min-height:36px; }

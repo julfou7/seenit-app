@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.226**
+Version applicative : **1.4.227**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -1807,3 +1807,5 @@ Retour terrain225 du25/10/2026 (#729), prioritaire sur les regroupements antéri
 SEENIT-PERF-001 / SEENIT-DATA-001 : la sauvegarde locale de bibliothèque est coalescée hors du clic (120ms puis idle borné800ms), seul le snapshot le plus récent est sérialisé. UID capturé et revalidé avant écriture ; annulation au changement de compte, vidage à pagehide/visibilité cachée. Aucun changement des écritures Firestore ni du format shows_v2. Les cartes de reprise inchangées ne se recalculent pas pour une mutation voisine ; les gestionnaires stables utilisent le dernier état validé.
 
 Le vidage du cache local écoute aussi appStateChange via Capacitor App : il ne dépend pas de visibilitychange seul dans la WebView Android. Le TNR du vrai store couvre ce signal alors que le document reste visible, ainsi que le changement d’UID avant idle et la déconnexion.
+
+Retour terrain226 du26/10 (#729) : coche entièrement masquée avant son tracé normalisé ; splash à cadence commune160ms par cran, maintien final réduit200ms (3500ms puis fondu500ms). Ticket horizontal avec découpes symétriques ; en rail, acteurs alignés par rangées communes aux titres, Vu36px dans cible44px à droite du talon, fin/heure à gauche et année sous le titre. La dernière notification retirée ferme sa feuille avec retour de focus et Annuler conservé. Voir docs/design/marque-2026-10-25.md.

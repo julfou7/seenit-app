@@ -113,6 +113,12 @@ export function HomeNotifications({ shows, onOpen, onSeen }: { shows: Show[]; on
   const isRead = (notice: Notice) => read.includes(notice.id) || Boolean(notice.newsId && readNews.includes(notice.newsId));
   const visibleNotices = notices.filter(notice => !dismissed.includes(notice.id));
   const unread = visibleNotices.filter(notice => !isRead(notice));
+  const hadVisibleNotices = useRef(false);
+  useEffect(() => {
+    if (!open) { hadVisibleNotices.current = false; return; }
+    if (visibleNotices.length) hadVisibleNotices.current = true;
+    else if (!loading && hadVisibleNotices.current) setOpen(false);
+  }, [open, loading, visibleNotices.length]);
   const dismiss = (notice: Notice) => {
     if (!uid || auth.currentUser?.uid !== uid) return;
     const next = [...new Set([...readUserScopedJson<string[]>(uid, 'home_dismissed_notifications', []), notice.id])].slice(-500);

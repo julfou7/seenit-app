@@ -12,7 +12,7 @@ import {
   type SeenItReleaseNotesEntry
 } from '../features/release/releasePolicy';
 
-export const CURRENT_APP_VERSION = '1.4.226';
+export const CURRENT_APP_VERSION = '1.4.227';
 export type AppReleaseInfo = SeenItReleaseInfo;
 let inFlightUpdateCheck: Promise<boolean> | null = null;
 let inFlightReleaseHistory: Promise<SeenItReleaseNotesEntry[]> | null = null;
@@ -124,7 +124,8 @@ export const useUpdateStore = create<UpdateState>()(
 
           result = isNewer;
           return result;
-        } catch (err: any) {
+        } catch (caught: unknown) {
+          const err = caught as { message?: string };
           console.error('[UpdateCheck] Error checking for updates:', err);
           appLogger.error('system', `Erreur lors de la recherche de mise à jour: ${err.message || String(err)}`, err);
           set({
