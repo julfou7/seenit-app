@@ -62,7 +62,7 @@ export function SplashScreen({
 
   return <div id="seenit-splash-screen" className={'seenit-brand-splash'+(isClosing ? ' seenit-brand-splash--closing' : '')} data-ready={timeElapsed || !animate || reducedMotion}>
     <div className="brand-stacked-logo" role="img" aria-label="SeenIt" dangerouslySetInnerHTML={{__html:brandStackedSvg}} />
-    <div className="seenit-brand-splash__episodes" aria-hidden="true">{Array.from({length:8},(_,index)=><i key={index} style={{animationDelay:(index*300)+'ms'}}/>)}</div>
+    <div className="seenit-brand-splash__episodes" aria-hidden="true">{Array.from({length:8},(_,index)=><i key={index} style={{animationDelay:(index*160)+'ms'}}/>)}</div>
     <p>Chaque visionnage compte.</p>
   </div>;
 }

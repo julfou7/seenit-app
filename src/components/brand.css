@@ -1,11 +1,11 @@
 .seenit-brand-splash { position:fixed;inset:0;z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:radial-gradient(ellipse at center,#e5a93d15,transparent 65%),#08080C;color:#f4f4f5;transition:opacity 500ms; }
 .seenit-brand-splash--closing{opacity:0;pointer-events:none}.seenit-brand-splash>img{object-fit:contain;width:220px;height:auto}.seenit-brand-splash p{font-size:15px;font-weight:600;color:#a1a1aa}.seenit-brand-splash__episodes{display:flex;gap:4px;width:220px}.seenit-brand-splash__episodes i{height:8px;flex:1;background:#232329;border-radius:3px;animation:brandEpisode .01s forwards}.seenit-brand-splash[data-ready=true] .seenit-brand-splash__episodes i {background:#e5a93d;animation:none}@keyframes brandEpisode{to{background:#e5a93d}}
-.navigation-tab__icon{width:28px;height:28px}.navigation-tab__icon>svg{width:28px;height:28px}.navigation-tab[aria-current=page]{background:transparent;color:#E5A93D}.navigation-tab__label{transform:translateY(2px)}
+.navigation-tab[aria-current=page]{background:transparent;color:#E5A93D}.navigation-tab__label{transform:translateY(2px)}
 @media(prefers-reduced-motion:reduce){.seenit-brand-splash,.seenit-brand-splash__episodes i {animation:none;transition:none}.seenit-brand-splash__episodes i{background:#e5a93d}}
 
 .brand-stacked-logo {width:220px;line-height:0}.brand-stacked-logo svg{display:block;width:100%;height:auto}
-.seenit-brand-splash[data-ready=false] .brand-stack-symbol circle {stroke-dasharray:239 239;stroke-dashoffset:239;animation:brandSplashRing 420ms cubic-bezier(.6,0,.3,1) 2400ms forwards}
-.seenit-brand-splash[data-ready=false] .brand-stack-symbol path {opacity:0;transform-origin:50px 50px;animation:brandSplashTick 220ms ease 2760ms forwards}
-.seenit-brand-splash[data-ready=false] p {opacity:0;animation:brandSplashTick 400ms ease 3300ms forwards}
+.seenit-brand-splash[data-ready=false] .brand-stack-symbol circle {stroke-dasharray:239 239;stroke-dashoffset:239;animation:brandSplashRing 420ms cubic-bezier(.6,0,.3,1) 1280ms forwards}
+.seenit-brand-splash[data-ready=false] .brand-stack-symbol path {opacity:0;transform-origin:50px 50px;animation:brandSplashTick 220ms ease 1640ms forwards}
+.seenit-brand-splash[data-ready=false] p {opacity:0;animation:brandSplashTick 300ms ease 1860ms forwards}
 @keyframes brandSplashRing{to{stroke-dashoffset:0}}@keyframes brandSplashTick{to{opacity:1}}
 @media(prefers-reduced-motion:reduce){.seenit-brand-splash .brand-stack-symbol circle,.seenit-brand-splash .brand-stack-symbol path,.seenit-brand-splash p{animation:none!important;stroke-dashoffset:0!important;opacity:1!important}}

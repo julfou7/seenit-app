@@ -47,3 +47,6 @@ partagent exactement la même logique métier et le même rendu responsive 360/4
 Avant une mutation, les épisodes legacy encore vus mais sans record conservent explicitement leur ancien
 jour de repli dans un record à heure inconnue. Modifier/retirer un voisin ne les déplace donc jamais à
 la nouvelle date agrégée ou à aujourd'hui. Annuler restaure les records originaux.
+
+
+Retour terrain225 du25/10/2026 (#729), prioritaire sur les regroupements antérieurs : un visionnage = une ligne, sans ×N ni plage d’épisodes, même pour une saison marquée en une fois. Périodes, totaux, heure et actions par épisode conservés. Navigation : centres du pictogramme et du texte identiques sur tous les écrans. Vu : anneau progressif760ms puis coche240ms, tampon puis reprise ; réduction des animations immédiate. Splash : huit segments160ms, anneau1280ms, coche1640ms, signature1860ms/300ms puis lecture complète pendant1540ms ; durée3700ms et fondu500ms inchangés. Référentiel détaillé : docs/design/marque-2026-10-25.md.

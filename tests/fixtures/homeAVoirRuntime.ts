@@ -66,3 +66,12 @@ export function terrain224Examples() {
   return {...show,seriesEnded:false,totalEpisodes:6,totalAiredEpisodes:show.id==='series-1'?2:6,seenEpisodes:show.id==='series-3'?[]:['1x1'],episodeRecords:show.id==='series-3'?{}:{'1x1':{watchedAt:Date.now()-86_400_000}},seasonProgress:buildSeasonProgressEvidence([season],false),seasonsCache:[season],nextEpisodeToWatch:{...episodes[show.id==='series-3'?0:1],episode_count:6}};
  })}));
 }
+
+export function terrain226CalendarExamples() {
+ base.useShowsStore.setState(state=>({shows:state.shows.map(show=>{
+  if(show.id!=='series-0') return show;
+  const episodes=Array.from({length:6},(_,index)=>({season_number:1,episode_number:index+1,name:'Calendrier '+(index+1),air_date:date(index-1),runtime:42}));
+  const season={season_number:1,episode_count:6,episodes};
+  return {...show,seenEpisodes:['1x1'],status:'watching',totalEpisodes:6,totalAiredEpisodes:2,seasonProgress:buildSeasonProgressEvidence([season],false),seasonsCache:[season],nextEpisodeToWatch:{...episodes[1],episode_count:6}};
+ })}));
+}

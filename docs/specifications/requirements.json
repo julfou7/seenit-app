@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.225",
+  "applicationVersion": "1.4.226",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -2271,7 +2271,7 @@
         },
         {
           "file": "tests/homeV4.test.ts",
-          "contains": "SEENIT-UX-015 regroupe seulement"
+          "contains": "SEENIT-UX-015 conserve une ligne par visionnage"
         },
         {
           "file": "tests/homeV4.test.ts",
@@ -2691,6 +2691,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/libraryCachePerformance.test.ts",
+          "contains": "SEENIT-PERF-001 le store réel ne sérialise pas la bibliothèque"
+        },
         {
           "file": "tests/mediaDetailPerformance.test.ts",
           "contains": "SEENIT-PERF-001 réutilise les détails et relations sans nouveau chargement"

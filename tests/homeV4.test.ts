@@ -1,26 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compareHistoryEntries, groupHistoryRows, historyGroupCode, historyPeriod, historyPeriodSummary, type TimelineEntry } from '../src/features/history/historyTimeline.ts';
+import { compareHistoryEntries, buildHistoryRows, historyGroupCode, historyPeriod, historyPeriodSummary, type TimelineEntry } from '../src/features/history/historyTimeline.ts';
 import { buildMovieCollectionProgress } from '../src/features/watchlist/movieCollectionProgress.ts';
 import { actorAge, actorCreditKey, actorRole, partitionActorCredits } from '../src/features/people/actorProfile.ts';
 
 const now = new Date(2026, 9, 24, 22).getTime();
 const episode = (key: string, number: number, offset = 0): TimelineEntry => ({key, showId:'series', mediaType:'tv', season:1, episode:number, watchedAt:now-offset});
-test('SEENIT-UX-015 regroupe seulement les épisodes consécutifs adjacents et datés', () => {
+test('SEENIT-UX-015 conserve une ligne par visionnage consécutif, film ou changement de saison', () => {
   const items = [episode('3',3),episode('2',2,60_000),{...episode('film',0,120_000),mediaType:'movie' as const},episode('1',1,180_000),episode('old',0,86_400_000)];
-  const rows = groupHistoryRows(items, () => 3);
-  assert.deepEqual(rows.map(row => row.members.map(item => item.key)), [['3','2'],['film'],['1'],['old']]);
-  assert.equal(historyGroupCode(rows[0]), 'S01 | E02 → E03');
-  assert.equal(historyGroupCode(rows[1]), undefined);
-  assert.equal(groupHistoryRows([episode('3',3),episode('1',1)],()=>3).length,2,'un trou sépare les sessions');
-  assert.equal(groupHistoryRows([{...episode('2',2),watchedTimeKnown:false},episode('1',1)],()=>3).length,2,'une heure inconnue ne prouve pas une session');
+  const rows = buildHistoryRows(items);
+  assert.deepEqual(rows.map(row => row.members.map(item => item.key)), [['3'],['2'],['film'],['1'],['old']]);
+  assert.equal(historyGroupCode(rows[0]), 'S01 | E03');
+  assert.equal(historyGroupCode(rows[2]), undefined);
+  assert.equal(buildHistoryRows([episode('3',3),episode('1',1)]).length,2,'un trou sépare les sessions');
+  assert.equal(buildHistoryRows([{...episode('2',2),watchedTimeKnown:false},episode('1',1)]).length,2,'une heure inconnue ne prouve pas une session');
   const cross = [{...episode('next',1),season:2},episode('last',3,60_000)];
-  assert.equal(historyGroupCode(groupHistoryRows(cross,()=>3)[0]),'S01 | E03 → S02 | E01');
-  assert.equal(groupHistoryRows(cross,()=>null).length,2,'la fin de saison doit être confirmée');
+  assert.equal(historyGroupCode(buildHistoryRows(cross)[0]),'S02 | E01');
+  assert.equal(buildHistoryRows(cross).length,2,'la fin de saison doit être confirmée');
 });
 test('SEENIT-UX-015 périodes calendaires et durées sans minutes inventées', () => {
   assert.deepEqual([0,1,2,6,7,13,14,40].map(days=>historyPeriod(now-days*86_400_000,now).label),['Aujourd’hui','Hier','Cette semaine','Cette semaine','La semaine dernière','La semaine dernière','Plus tôt en octobre','Septembre']);
-  const rows = groupHistoryRows([episode('2',2),episode('1',1,60_000)],()=>2);
+  const rows = buildHistoryRows([episode('2',2),episode('1',1,60_000)]);
   assert.deepEqual(historyPeriodSummary(rows,()=>42),{episodes:2,films:0,duration:'1 h 24'});
   assert.equal(historyPeriodSummary(rows,item=>item.key==='2'?42:null).duration,'≥ 0 h 42');
   assert.equal(historyPeriodSummary(rows,()=>null).duration,null);
@@ -43,14 +43,14 @@ test('SEENIT-UX-018 fiche acteur : sections disjointes, liste prioritaire et rô
   assert.equal(actorAge({birthday:'1971-02-25'},new Date(2026,1,24)),54);
 });
 
-test('SEENIT-UX-015 saison entière : les égalités du vrai tri précèdent le regroupement et la pagination', () => {
+test('SEENIT-UX-015 saison entière : les égalités conservent douze lignes avant pagination', () => {
   const entries=Array.from({length:12},(_,index)=>({...episode(`series:1x${index+1}`,index+1),watchedTimeKnown:true}));
   const sorted=entries.sort(compareHistoryEntries);
   assert.deepEqual(sorted.map(item=>item.episode),[12,11,10,9,8,7,6,5,4,3,2,1]);
-  const rows=groupHistoryRows(sorted,()=>12);
-  assert.equal(rows.length,1);assert.equal(rows[0].members.length,12);assert.equal(historyGroupCode(rows[0]),'S01 | E01 → E12');
+  const rows=buildHistoryRows(sorted);
+  assert.equal(rows.length,12);assert.ok(rows.every(row=>row.members.length===1));assert.equal(historyGroupCode(rows[0]),'S01 | E12');
   const mixed=[...entries,{...episode('film:movie',0),showId:'film',mediaType:'movie' as const}].sort(compareHistoryEntries);
-  assert.equal(groupHistoryRows(mixed,()=>12).length,2,'le film ex æquo reste une ligne distincte');
+  assert.equal(buildHistoryRows(mixed).length,13,'le film ex æquo reste une ligne distincte');
   const unknown=entries.map(item=>({...item,watchedTimeKnown:false})).sort(compareHistoryEntries);
-  assert.equal(groupHistoryRows(unknown,()=>12).length,12,'une heure non prouvée ne devient pas un visionnage consécutif');
+  assert.equal(buildHistoryRows(unknown).length,12,'une heure non prouvée ne devient pas un visionnage consécutif');
 });

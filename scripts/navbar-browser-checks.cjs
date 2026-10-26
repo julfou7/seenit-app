@@ -43,6 +43,7 @@ async function testNavbarHarness(client, root) {
     await delay(380);
     for(const tab of ['watchlist','discover','profile','downloads']) {
       if(await evaluate(client,'window.__nav13j.tab()')!==tab)await tap(client,selector(tab));
+      await check(client,'[...document.querySelectorAll("[data-navigation-tab]")].every(el=>{const a=el.querySelector("svg").getBoundingClientRect(),b=el.querySelector(".navigation-tab__label").getBoundingClientRect();return Math.abs(a.left+a.width/2-b.left-b.width/2)<.5})','centrage icône et libellé, y compris Moi actif');
       await delay(380);
       await tap(client,selector(tab));await tap(client,selector(tab));
       await check(client,`window.__nav13j.telemetry.resets.filter(t=>t===${JSON.stringify(tab)}).length===1 && document.querySelector('[data-search=${tab}]').value===''`,'double local '+tab);

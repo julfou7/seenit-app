@@ -1,4 +1,4 @@
-import { compareHistoryEntries, groupHistoryRows, historyGroupCode, historyPeriod, historyPeriodSummary, type TimelineRow } from '../features/history/historyTimeline';
+import { compareHistoryEntries, buildHistoryRows, historyGroupCode, historyPeriod, historyPeriodSummary, type TimelineRow } from '../features/history/historyTimeline';
 import { HomeLoadMore } from './cards/HomeLoadMore';
 import { DialogLayer } from './ui/DialogLayer';
 import { HISTORY_PAGE_SIZE } from '../features/watchlist/homePresentation';
@@ -45,6 +45,7 @@ interface HistoryItem {
   watchedAt: number;
   watchedTimeKnown: boolean;
   plexImported: boolean;
+  runtime?: number;
 }
 
 interface EpisodeHistoryMetadata {
@@ -163,8 +164,7 @@ function HistoryRowItem({
   const effectiveProviderName = forcePlex ? 'Plex' : providerName;
 
   const handleRowClick = () => {
-    if (row.members.length > 1) { onShowClick?.(item.showId, 'tv'); }
-    else if (item.mediaType === 'movie') {
+    if (item.mediaType === 'movie') {
       onShowClick?.(item.showId, 'movie');
     } else if (onEpisodeClick) {
       onEpisodeClick(item.showId, item.season, item.episode);
@@ -191,19 +191,16 @@ function HistoryRowItem({
     { label: 'Revoir', onSelect: () => onRewatch(target, show, effectiveProviderName) },
     ...(target.mediaType === 'tv' ? [{ label: 'Ouvrir la série', onSelect: () => onShowClick?.(target.showId, 'tv') }] : []),
   ];
-  const grouped = row.members.length > 1;
   const clock = formatHistoryClock(item.watchedAt, item.watchedTimeKnown);
   const dateLabel = formatHistoryRowDate(item.watchedAt);
-  const historyActions = grouped ? [{ label: 'Ouvrir la série', onSelect: () => onShowClick?.(item.showId, 'tv') }] : actionsFor(item);
-  const actionGroups = grouped ? [...row.members].reverse().map(target => ({ label: `S${String(target.season).padStart(2, '0')} | E${String(target.episode).padStart(2, '0')}`, actions: actionsFor(target) })) : undefined;
 
 
   return <div ref={cardRef} className="history-entry-host">
-    <HistoryEntryRow title={item.showTitle} episodeTitle={grouped ? `${row.members.length} épisodes d’affilée` : item.mediaType === 'tv' ? episodeTitle || `Épisode ${item.episode}` : movieMetadata?.genres[0]}
-      code={historyGroupCode(row)} groupCount={row.members.length} actionGroups={actionGroups}
+    <HistoryEntryRow title={item.showTitle} episodeTitle={item.mediaType === 'tv' ? episodeTitle || `Épisode ${item.episode}` : movieMetadata?.genres[0]}
+      code={historyGroupCode(row)}
       date={dateLabel} clock={clock || 'heure inconnue'} today={historyLocalDayKey(item.watchedAt) === localTodayKey()} timestamp={item.watchedAt}
       images={[show.posterPath, show.backdropPath]}
-      label={grouped ? `${show.title}, ${row.members.length} épisodes d’affilée, ${historyGroupCode(row)}` : ariaLabel} onOpen={handleRowClick} actions={historyActions} />
+      label={ariaLabel} onOpen={handleRowClick} actions={actionsFor(item)} />
   </div>;
 }
 
@@ -254,6 +251,7 @@ export function HistoryFeed({
           watchedAt: timing.watchedAt,
           watchedTimeKnown: timing.timeKnown,
           plexImported: isPlexRecord(record),
+          runtime: asPositiveNumber(record?.runtime),
         });
         continue;
       }
@@ -278,6 +276,7 @@ export function HistoryFeed({
           watchedAt: timing.watchedAt,
           watchedTimeKnown: timing.timeKnown,
           plexImported: isPlexRecord(record),
+          runtime: asPositiveNumber(record?.runtime),
         });
       }
 
@@ -286,7 +285,7 @@ export function HistoryFeed({
     return items.sort(compareHistoryEntries);
   }, [shows, active]);
 
-  const rows = useMemo(() => groupHistoryRows(historyItems, (id, season) => showsById.get(id)?.seasonProgress?.[String(season)]?.episode_count || showsById.get(id)?.seasonsCache?.find(item => item.season_number === season)?.episode_count || null), [historyItems, showsById]);
+  const rows = useMemo(() => buildHistoryRows(historyItems), [historyItems]);
   const displayedRows = useMemo(() => rows.slice(0, page * itemsPerPage), [rows, page]);
   const displayedItems = useMemo(() => displayedRows.flatMap(row => row.members), [displayedRows]);
 
@@ -513,8 +512,7 @@ export function HistoryFeed({
   const minutes = (item: HistoryItem): number | null => {
     const metadata = metadataByKey[getMetadataKey(item)];
     const cached = item.tmdbId ? tmdb.peekRenderableMediaDetails(item.tmdbId, item.mediaType) : null;
-    const record = item.mediaType === 'movie' ? showsById.get(item.showId)?.episodeRecords?.movie : historyEpisodeEntries(showsById.get(item.showId)!).find(entry => entry.key === `${item.season}x${item.episode}`)?.record;
-    const value = metadata?.runtime || asPositiveNumber(record?.runtime) || (item.mediaType === 'movie' ? cached?.runtime : null);
+    const value = metadata?.runtime || item.runtime || (item.mediaType === 'movie' ? cached?.runtime : null);
     return asPositiveNumber(value) || null;
   };
 
