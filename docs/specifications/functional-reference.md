@@ -3,7 +3,7 @@
 Dernière vérification : 14 septembre 2026
 Mise à jour ciblée À voir : 23 octobre 2026, corrections de conformité maquettes et gestes (#729).
 Baseline observée avant correction : **1.4.150**, `main` `6189bafed525fb510c1a81c87a04e19c01f92393`
-Plateformes : **PWA Web** et **APK Android Capacitor**  
+Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : composante obligatoire de la SPEC SeenIt
 
 Ce document explique ce que fait SeenIt, où vit chaque fonction et comment les parcours s'articulent.
@@ -147,9 +147,9 @@ Son point indique en priorité les transferts actifs (or, nombre au-delà de un)
 aux transferts. Une navigation historique ou directe vers `downloads` alors que la fonctionnalité est
 désactivée revient sur « À Voir ».
 
-La [barre 13j](../design/navbar-13j.md) est un îlot verre flottant centré, haut de 58 px, détaché de
+La [barre 13j](../design/navbar-13j.md) est un îlot verre flottant centré, haut de 64 px, détaché de
 10 px plus safe area, avec fondu progressif inférieur de 96 px. Sans Télécharger, seul le dernier
-onglet et le séparateur disparaissent. Glyphes 24 px, libellés 10 px et cibles minimales 46 × 68 px.
+onglet et le séparateur disparaissent. Glyphes 24 px, libellés 10 px et cibles minimales 52 × 68 px.
 Pas de repli au scroll. Le contenu réserve 84 px plus safe area ; les toasts restent au-dessus à
 80 px plus safe area, ou 24 px sur une fiche/dialogue sans barre. La fiche média occupe tout le viewport.
 
@@ -1013,3 +1013,11 @@ Bientôt dans la fiche acteur : le passage d’un projet non suivi à son docume
 
 
 Mise à jour terrain222 : les règles d’accueil/badges/historique du 24octobre2026 sont définies dans [le handoff intégré](../design/badges-historique-2026-10-24.md) et [les décisions d’intégration](../design/home-a-voir-v4.md). Elles priment sur les anciennes pilules emoji et l’interdiction antérieure de tout badge en pause.
+
+### Marque v3 / terrain223 (25 octobre 2026)
+Voir [marque v3](../design/marque-2026-10-25.md) : actifs fournis réutilisés sur accueil/connexion/splash, boutons Vu anneau/coche, navigation sans point inférieur, PWA/launcher/notifications. Le splash termine sa séquence3700ms même si l’app est prête (résultat immédiat avec réduction des animations). Un Vu réussi anime le bouton, puis le tampon sur l’affiche, puis la nouvelle reprise ; dernier disponible tamponné jusqu’au rafraîchissement, Annuler retire ce tampon. Bandeaux compacts au bas des affiches, y compris ×N dans l’historique ; bouton Vu des films sur le talon sombre et métadonnées sous l’affiche. L’extension horizontale remplace la tuile sans changer le scroll. Les preuves de saison reçues par la fiche convergent vers les cartes. Historique sans « ce soir ». Bilan Plex centré et défilable.
+
+
+Retour terrain225 du25/10/2026 (#729), prioritaire sur les regroupements antérieurs : un visionnage = une ligne, sans ×N ni plage d’épisodes, même pour une saison marquée en une fois. Périodes, totaux, heure et actions par épisode conservés. Navigation : centres du pictogramme et du texte identiques sur tous les écrans. Vu : anneau progressif760ms puis coche240ms, tampon puis reprise ; réduction des animations immédiate. Splash : huit segments160ms, anneau1280ms, coche1640ms, signature1860ms/300ms puis lecture complète pendant1540ms ; durée3700ms et fondu500ms inchangés. Référentiel détaillé : docs/design/marque-2026-10-25.md.
+
+Retour terrain226 du26/10 (#729) : coche entièrement masquée avant son tracé normalisé ; splash à cadence commune160ms par cran, maintien final réduit200ms (3500ms puis fondu500ms). Ticket horizontal avec découpes symétriques ; en rail, acteurs alignés par rangées communes aux titres, Vu36px dans cible44px à droite du talon, fin/heure à gauche et année sous le titre. La dernière notification retirée ferme sa feuille avec retour de focus et Annuler conservé. Voir docs/design/marque-2026-10-25.md.

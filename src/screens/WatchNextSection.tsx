@@ -35,6 +35,21 @@ interface Props {
   onUnseen: (show: Show, episode: SeriesCardEpisode | null) => Promise<void | boolean>;
   actions: (show: Show) => SeriesCardAction[];
 }
+function useLatestCallback<Args extends unknown[], Result>(callback: (...args: Args) => Result) {
+  const latest = useRef(callback);
+  useLayoutEffect(() => { latest.current = callback; });
+  return useCallback((...args: Args) => latest.current(...args), []);
+}
+
+// Keep unchanged cards outside sibling feedback and actor-index renders.
+const WatchSeriesItem = React.memo(function WatchSeriesItem({ show, today, layout, stale, receipt, onOpen, onEpisode, onMark, onUnseen, onComplete, actions }: {
+  show: Show; today: string; layout: 'list' | 'rail'; stale: boolean; receipt?: SeriesCardEpisode;
+  onOpen: Props['onOpen']; onEpisode: Props['onEpisode']; onMark: Props['onMarkSeries'];
+  onUnseen: Props['onUnseen']; onComplete: (show: Show, completed: boolean) => void; actions: Props['actions'];
+}) {
+  return <ContinueWatchingCard show={show} today={today} layout={layout} animateSeen showStaleDetail={stale} lastMarkedEpisode={receipt}
+    onMarkUnseen={onUnseen} onMarkAsSeen={onMark} onSeenFeedbackComplete={onComplete} onShowClick={onOpen} onEpisodeClick={onEpisode} actions={actions(show)} />;
+});
 export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, movies, active, onOpen, onEpisode, onMarkSeries, onMarkMovie, onUnseen, actions }: Props) {
   const { index: actorIndex, metadata: actorMetadata } = useMovieActors(allShows, active);
   const favorites = useFavoritePeopleStore(state => state.people);
@@ -45,21 +60,21 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
   const preserveLayout = useCardLayoutAnchor();
   const [railLimits, setRailLimits] = useState<Record<number, number>>({});
   const [movieRailLimit, setMovieRailLimit] = useState(HOME_PAGE_SIZE);
-  const revealAnchor = useRef<{ rail: string; attribute: string; id: string } | null>(null);
+  const revealAnchor = useRef<{ rail: string; left: number; top: number } | null>(null);
+  const rememberReveal = (id: string) => { const rail = document.getElementById(id); if (rail) { rail.style.scrollSnapType = 'none'; revealAnchor.current = { rail: id, left: rail.scrollLeft, top: window.scrollY }; } };
   useLayoutEffect(() => {
     const anchor = revealAnchor.current;
     if (!anchor) return;
     revealAnchor.current = null;
     const rail = document.getElementById(anchor.rail);
-    const item = rail && [...rail.querySelectorAll<HTMLElement>(`[${anchor.attribute}]`)].find(element => element.getAttribute(anchor.attribute) === anchor.id);
-    if (!rail || !item) return;
-    const previousSnap = rail.style.scrollSnapType;
-    rail.style.scrollSnapType = 'none';
-    const target = rail.scrollLeft + item.getBoundingClientRect().left - rail.getBoundingClientRect().left - (parseFloat(getComputedStyle(rail).scrollPaddingInlineStart) || 16);
+    if (!rail) return;
     const oldTail = parseFloat(rail.style.getPropertyValue('--layout-anchor-tail')) || 0;
-    rail.style.setProperty('--layout-anchor-tail', `${Math.max(0, target - (rail.scrollWidth - rail.clientWidth - oldTail))}px`);
-    rail.scrollLeft = target;
-    requestAnimationFrame(() => { rail.style.scrollSnapType = previousSnap; });
+    rail.style.setProperty('--layout-anchor-tail', `${Math.max(0, anchor.left - (rail.scrollWidth - rail.clientWidth - oldTail))}px`);
+    rail.scrollLeft = anchor.left;
+    // Re-snap only on the next deliberate gesture, never while replacing the tile.
+    const resumeSnap = () => { rail.style.scrollSnapType = ''; rail.removeEventListener('pointerdown', resumeSnap); rail.removeEventListener('wheel', resumeSnap); };
+    rail.addEventListener('pointerdown', resumeSnap, { once: true });
+    rail.addEventListener('wheel', resumeSnap, { once: true, passive: true });
   }, [railLimits, movieRailLimit]);
   const [expandedGroups, setExpandedGroups] = useState<Record<number, boolean>>({});
   const [groupLimits, setGroupLimits] = useState<Record<number, number>>({});
@@ -67,7 +82,6 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
   const activeRef = useRef(active); activeRef.current = active;
   const mounted = useRef(true);
   const originLocks = useRef(new Map<string, number>());
-  const transferTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const pendingScroll = useRef<string | null>(null);
   const [arrivals, setArrivals] = useState<Set<string>>(() => new Set());
   const memberships = useRef(new Map<string, number>());
@@ -76,7 +90,8 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
   const [retained, setRetained] = useState<Record<string, { episode?: SeriesCardEpisode }>>({});
   const [movieOrder, setMovieOrder] = useState<string[] | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const clearTransfers = useCallback(() => { for (const timer of transferTimers.current.values()) clearTimeout(timer); transferTimers.current.clear(); originLocks.current.clear(); pendingScroll.current = null; }, []);
+  const today = getTodayStr();
+  const clearTransfers = useCallback(() => { originLocks.current.clear(); pendingScroll.current = null; }, []);
   const reset = useCallback(() => { clearTransfers(); setArrivals(new Set()); setActorSheet(null); setRetained({}); setMovieOrder(null); setExpandedGroups({}); setGroupLimits({}); setRailLimits({}); setMovieRailLimit(HOME_PAGE_SIZE); setMovieList(false); setMovieCount(3); setSeriesOrder(latestSeriesOrder.current); setNow(Date.now()); }, [clearTransfers]);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; clearTransfers(); }; }, [clearTransfers]);
   useEffect(() => { if (!active) clearTransfers(); }, [active, clearTransfers]);
@@ -95,11 +110,13 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 60_000);
     const refresh = () => { setNow(Date.now()); };
+    const visible = () => { if (document.visibilityState === 'visible') refresh(); };
     window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', visible);
     window.addEventListener('watchlist-reset-all', reset);
-    return () => { clearInterval(timer); window.removeEventListener('focus', refresh); window.removeEventListener('watchlist-reset-all', reset); };
+    return () => { clearInterval(timer); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', visible); window.removeEventListener('watchlist-reset-all', reset); };
   }, [reset]);
-  useEffect(() => { if (active) reset(); }, [active, reset]);
+  // Leaving a tab is not an explicit refresh: keep the local watched receipts.
   const allById = new Map(allShows.map(show => [show.id, show]));
   const seriesById = new Map(candidates.map(show => [show.id, show]));
   const movieById = new Map(movies.map(show => [show.id, show]));
@@ -125,7 +142,6 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
     const previousReceipt = retained[show.id];
     const origin = memberships.current.get(show.id) || 0;
     originLocks.current.set(show.id, origin);
-    clearTimeout(transferTimers.current.get(show.id));
     const restoreReceipt = () => setRetained(previous => {
       const next = { ...previous };
       if (previousReceipt) next[show.id] = previousReceipt;
@@ -136,20 +152,24 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
     try {
       const result = await onMarkSeries(show);
       if (result === false) { originLocks.current.delete(show.id); restoreReceipt(); return result; }
-      if (origin > 0 && mounted.current && activeRef.current) {
-        transferTimers.current.set(show.id, setTimeout(() => {
-          transferTimers.current.delete(show.id);
-          if (!mounted.current || !activeRef.current) return;
-          originLocks.current.delete(show.id);
-          memberships.current.set(show.id, 0);
-          pendingScroll.current = show.id;
-          setSeriesOrder(previous => [show.id, ...previous.filter(id => id !== show.id)]);
-          setArrivals(previous => new Set([...previous, show.id]));
-        }, matchMedia('(prefers-reduced-motion:reduce)').matches ? 80 : 800));
-      } else originLocks.current.delete(show.id);
+      if (origin === 0) originLocks.current.delete(show.id);
       return result;
     }
     catch (error) { originLocks.current.delete(show.id); restoreReceipt(); throw error; }
+  };
+  const finishSeriesFeedback = (show: Show, completed: boolean) => {
+    const origin = originLocks.current.get(show.id);
+    originLocks.current.delete(show.id);
+    if (!completed || origin === undefined || origin === 0 || !mounted.current || !activeRef.current) return;
+    memberships.current.set(show.id, 0);
+    pendingScroll.current = show.id;
+    setSeriesOrder(previous => [show.id, ...previous.filter(id => id !== show.id)]);
+    setArrivals(previous => new Set([...previous, show.id]));
+  };
+  const seriesHandlers = {
+    onOpen: useLatestCallback(onOpen), onEpisode: useLatestCallback(onEpisode),
+    onMark: useLatestCallback(markSeries), onUnseen: useLatestCallback(onUnseen),
+    onComplete: useLatestCallback(finishSeriesFeedback), actions: useLatestCallback(actions),
   };
   const toggleMovie = async (show: Show) => {
     setMovieOrder(previous => previous || orderedMovies.map(movie => movie.id));
@@ -197,10 +217,10 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
         {index === 2 && <p className="home-stale-subtitle">En pause ou jamais commencées, depuis plus de 2 mois</p>}
         <div className={expanded ? 'home-series-list' : 'home-series-rail'} id={`home-series-${index}`}>
           {items.slice(0, limit).map(show => {
-            const card = <ContinueWatchingCard show={show} layout={expanded ? 'list' : 'rail'} animateSeen showStaleDetail={index === 2} lastMarkedEpisode={retained[show.id]?.episode} onMarkUnseen={onUnseen} onMarkAsSeen={markSeries} onShowClick={onOpen} onEpisodeClick={onEpisode} actions={actions(show)} />;
+            const card = <WatchSeriesItem show={show} today={today} layout={expanded ? 'list' : 'rail'} stale={index === 2} receipt={retained[show.id]?.episode} {...seriesHandlers} />;
             return expanded && index > 0 ? <HomeSwipeCard key={show.id} onArchive={() => actions(show).find(action => action.label.startsWith('Archiver'))?.onSelect()} onRemove={() => actions(show).find(action => action.destructive)?.onSelect()}>{card}</HomeSwipeCard> : <div key={show.id} className={arrivals.has(show.id) ? 'home-series-arrival' : undefined}>{card}</div>;
           })}
-          {!expanded && <HomeLoadMore tile items={items.slice(limit)} onLoad={() => { revealAnchor.current = { rail: `home-series-${index}`, attribute: 'data-series-id', id: items[limit].id }; setRailLimits(previous => ({ ...previous, [index]: limit + HOME_PAGE_SIZE })); }} />}
+          {!expanded && <HomeLoadMore tile items={items.slice(limit)} onLoad={() => { rememberReveal(`home-series-${index}`); setRailLimits(previous => ({ ...previous, [index]: limit + HOME_PAGE_SIZE })); }} />}
         </div>
         {expanded && <HomeLoadMore items={items.slice(limit)} onLoad={() => setGroupLimits(previous => ({ ...previous, [index]: limit + HOME_PAGE_SIZE }))} />}
       </section>;
@@ -212,7 +232,7 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
       <p className="home-movie-order">Ajouts les plus récents</p>
       <div className={movieList ? 'home-movie-list' : 'movie-ticket-rail'} id="films-a-voir-18c">
         {orderedMovies.slice(0, movieList ? movieCount : movieRailLimit).map(show => <MovieTicketCard key={show.id} show={show} layout={movieList ? 'horizontal' : 'poster'} start={start} onOpen={onOpen} onToggle={toggleMovie} onRuntime={onRuntime} actor={selectTicketActor(actorMetadata.get(`movie:${show.tmdbId}`) || tmdb.peekRenderableMediaDetails(show.tmdbId, 'movie'), favorites, actorIndex)} onActor={actor => setActorSheet({ actor, origin: show })} />)}
-        {!movieList && <HomeLoadMore tile items={orderedMovies.slice(movieRailLimit)} onLoad={() => { revealAnchor.current = { rail: 'films-a-voir-18c', attribute: 'data-movie-ticket', id: orderedMovies[movieRailLimit].id }; setMovieRailLimit(count => count + HOME_PAGE_SIZE); }} />}
+        {!movieList && <HomeLoadMore tile items={orderedMovies.slice(movieRailLimit)} onLoad={() => { rememberReveal('films-a-voir-18c'); setMovieRailLimit(count => count + HOME_PAGE_SIZE); }} />}
       </div>
       {movieList && <HomeLoadMore items={orderedMovies.slice(movieCount)} onLoad={() => setMovieCount(count => count + HOME_PAGE_SIZE)} />}
     </>}

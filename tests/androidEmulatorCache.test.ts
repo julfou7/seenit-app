@@ -35,6 +35,13 @@ test('SEENIT-QUALITY-012 garde le smoke upgrade centré sur les invariants APK',
   assert.match(upgradeSmoke, /deep-link\.txt/);
 });
 
+test('SEENIT-QUALITY-012 utilise le renderer logiciel actuel sans Vulkan sur les deux AVD API36', () => {
+  const block = workflow.slice(workflow.indexOf('name: Run N to N+1 Upgrade Smoke on Android 36'), workflow.indexOf('name: Capture Android 36 Host Diagnostics'));
+  assert.equal((block.match(/emulator-options: -no-window -gpu swiftshader -feature -Vulkan /g) || []).length, 2);
+  assert.doesNotMatch(block, /swiftshader_indirect|skip.*smoke/i);
+  assert.match(block, /verify|android-upgrade-smoke\.sh/);
+});
+
 test('SEENIT-QUALITY-012 retente une seule fois uniquement une disparition d’émulateur qualifiée', () => {
   const primaryStart = workflow.indexOf('name: Run N to N+1 Upgrade Smoke on Android 36');
   const evidenceStart = workflow.indexOf('name: Capture Android 36 Host Diagnostics', primaryStart);

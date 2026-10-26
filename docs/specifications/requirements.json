@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.223",
+  "applicationVersion": "1.4.228",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -151,12 +151,16 @@
     },
     {
       "id": "SEENIT-APK-001",
-      "title": "Identité APK et nouvelle signature release verrouillées",
+      "title": "Identité APK et signature verrouillées, actifs marque v3 explicitement autorisés",
       "targets": [
         "apk",
         "ci"
       ],
       "tests": [
+        {
+          "file": "tests/brandV3.test.ts",
+          "contains": "SEENIT-APK-001 marque v3 autorisée"
+        },
         {
           "file": "tests/androidContract.test.ts",
           "contains": "SEENIT-APK-001 verrouille l’identité, la version et la clé de signature de l’APK"
@@ -623,7 +627,7 @@
     },
     {
       "id": "SEENIT-PLEX-002",
-      "title": "Serveur Plex hors ligne non bloquant et disponibilité bornée sans faux négatif",
+      "title": "Serveur Plex hors ligne non bloquant, disponibilité bornée et reprise foreground sans AbortSignal brut",
       "targets": [
         "backend",
         "pwa",
@@ -677,6 +681,14 @@
         {
           "file": "tests/plexResumeWorker.test.ts",
           "contains": "SEENIT-PLEX-002 le worker réel regroupe et annule les reprises hors écran"
+        },
+        {
+          "file": "tests/plexResumeLifecycle.test.ts",
+          "contains": "SEENIT-PLEX-002 une requête Plex WebView déjà en vol attend le retour foreground sans toast AbortSignal"
+        },
+        {
+          "file": "tests/plexResumeLifecycle.test.ts",
+          "contains": "SEENIT-PLEX-002 un AbortError transport hors cycle de vie ne fuit jamais comme message technique brut"
         }
       ]
     },
@@ -2098,6 +2110,10 @@
       ],
       "tests": [
         {
+          "file": "tests/brandV3.test.ts",
+          "contains": "SEENIT-UX-009 marque v3 réutilise"
+        },
+        {
           "file": "tests/componentActionSemantics.test.ts",
           "contains": "SEENIT-UX-009 normalise les rôles et états des boutons communs"
         },
@@ -2112,6 +2128,10 @@
         {
           "file": "tests/qualityGates.test.ts",
           "contains": "SEENIT-UX-009 exécute un rendu navigateur avant/après des actions communes"
+        },
+        {
+          "file": "tests/terrain224Motion.test.ts",
+          "contains": "SEENIT-UX-009 terrain224 annule"
         }
       ]
     },
@@ -2123,6 +2143,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/plexResumeWorker.test.ts",
+          "contains": "SEENIT-UX-014 le vrai worker franchit une sortie"
+        },
         {
           "file": "tests/homeTerrain222.test.ts",
           "contains": "SEENIT-UX-014 B07 ruban unique utile"
@@ -2170,6 +2194,10 @@
         {
           "file": "tests/watchCardResume.test.ts",
           "contains": "#693 la façade de production marque exactement la reprise affichée et conserve le Show original"
+        },
+        {
+          "file": "tests/terrain224Motion.test.ts",
+          "contains": "SEENIT-UX-014 terrain224 exécute"
         }
       ]
     },
@@ -2243,7 +2271,7 @@
         },
         {
           "file": "tests/homeV4.test.ts",
-          "contains": "SEENIT-UX-015 regroupe seulement"
+          "contains": "SEENIT-UX-015 conserve une ligne par visionnage"
         },
         {
           "file": "tests/homeV4.test.ts",
@@ -2560,6 +2588,10 @@
         {
           "file": "tests/androidEmulatorCache.test.ts",
           "contains": "SEENIT-QUALITY-012 retente une seule fois uniquement une disparition d’émulateur qualifiée"
+        },
+        {
+          "file": "tests/androidEmulatorCache.test.ts",
+          "contains": "SEENIT-QUALITY-012 utilise le renderer logiciel actuel sans Vulkan"
         }
       ]
     },
@@ -2659,6 +2691,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/libraryCachePerformance.test.ts",
+          "contains": "SEENIT-PERF-001 le store réel ne sérialise pas la bibliothèque"
+        },
         {
           "file": "tests/mediaDetailPerformance.test.ts",
           "contains": "SEENIT-PERF-001 réutilise les détails et relations sans nouveau chargement"

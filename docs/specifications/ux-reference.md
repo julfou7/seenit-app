@@ -62,7 +62,7 @@ Le reset est local à la racine de l'onglet actif. Il ne scrolle jamais un écra
 La [navigation 13j](../design/navbar-13j.md) remplace la barre pleine largeur :
 
 - sans Téléchargements : **À Voir → Explorer → Moi** ; avec : **À Voir → Explorer → Moi │ Télécharger** ;
-- îlot centré en verre de 58 px, détaché de 10 px plus safe area, boutons 46 × 68 px minimum,
+- îlot centré en verre de 64 px, détaché de 10 px plus safe area, boutons 52 × 68 px minimum,
   glyphes 24 px, libellés 10 px, fondu inférieur progressif de 96 px ; pas de repli au défilement ;
 - le dernier onglet et son séparateur disparaissent selon le réglage personnel existant ;
 - point Télécharger actif or (nombre au-delà de un), attention rouge, puis terminé non consulté vert,
@@ -314,3 +314,6 @@ indépendamment de la vidéo ; une version actuelle reconnue par hash exact rest
 Une demande active sur le même scope est signalée et bloque l'envoi jusqu'à sa fin ou son annulation.
 Les notifications confirment « ✅ Import terminé », puis
 « ✅ Disponible dans Plex » uniquement après preuve Plex exacte.
+
+
+Retour terrain225 du25/10/2026 (#729), prioritaire sur les regroupements antérieurs : un visionnage = une ligne, sans ×N ni plage d’épisodes, même pour une saison marquée en une fois. Périodes, totaux, heure et actions par épisode conservés. Navigation : centres du pictogramme et du texte identiques sur tous les écrans. Vu : anneau progressif760ms puis coche240ms, tampon puis reprise ; réduction des animations immédiate. Splash : huit segments160ms, anneau1280ms, coche1640ms, signature1860ms/300ms puis lecture complète pendant1540ms ; durée3700ms et fondu500ms inchangés. Référentiel détaillé : docs/design/marque-2026-10-25.md.

@@ -10,9 +10,10 @@ const storage = () => {
 };
 const compileTransport = (realWebAuth = false) => build({ entryPoints: ['src/features/plex/plexHistoryTransport.ts'], bundle: true, write: false, format: 'cjs', platform: 'node',
   plugins: [{ name: 'transport-ports', setup(builder) {
-    builder.onResolve({ filter: /^@capacitor\/core$|\/(?:firebase|apiAuth|seenitApi|logStore|updateStore|clientOperationalDiagnostics\.ts)$/ }, args => realWebAuth && args.path.endsWith('/apiAuth') ? undefined : ({ path: 'ports', namespace: 'ports' }));
+    builder.onResolve({ filter: /^@capacitor\/(?:core|app)$|\/(?:firebase|apiAuth|seenitApi|logStore|updateStore|clientOperationalDiagnostics\.ts)$/ }, args => realWebAuth && args.path.endsWith('/apiAuth') ? undefined : ({ path: 'ports', namespace: 'ports' }));
     builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: `
       const p=()=>globalThis.__ports;
+      export const App={addListener:async()=>({remove:async()=>{}})};
       export const auth={get currentUser(){return p().user}};
       export const Capacitor={isNativePlatform:()=>p().native};
       export const CapacitorHttp={post:async request=>{p().nativeCalls.push(request);if(p().switchDuringReply)p().user={uid:'user-b'};if(p().allNativeDnsFailure||p().dnsFailure&&p().nativeCalls.length===1)throw new Error('Unable to resolve host');return p().reply}};
@@ -88,10 +89,11 @@ test('SEENIT-PLEX-002 distingue les refus fonctionnels du secours DNS et des ré
 async function engineHarness() {
   const compiled = await build({ entryPoints: ['src/features/plex/plexSyncEngine.ts'], bundle: true, write: false, platform: 'node', format: 'cjs',
     plugins: [{ name: 'engine-ports', setup(builder) {
-      builder.onResolve({ filter: /^(?:firebase\/firestore|@capacitor\/core)$|\/(?:firebase|tmdb|showsStore|syncStore|toastStore|utils|logStore|plex|apiAuth|seenitApi|plexStorage|plexAvailability|plexResolution|updateStore)$/ }, () => ({ path: 'ports', namespace: 'ports' }));
+      builder.onResolve({ filter: /^(?:firebase\/firestore|@capacitor\/(?:core|app))$|\/(?:firebase|tmdb|showsStore|syncStore|toastStore|utils|logStore|plex|apiAuth|seenitApi|plexStorage|plexAvailability|plexResolution|updateStore)$/ }, () => ({ path: 'ports', namespace: 'ports' }));
       builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ resolveDir: process.cwd(), contents: `
         export {fetchPlexHistoryData} from './src/features/plex/plexHistoryTransport.ts';
         const p=()=>globalThis.__ports;
+      export const App={addListener:async()=>({remove:async()=>{}})};
         export const auth={get currentUser(){return p().user}}; export const db={};
         export const Capacitor={isNativePlatform:()=>true};export const CapacitorHttp={post:async()=>{p().requests++;return {status:429,data:'Rate exceeded.',headers:{'Retry-After':'120'}}}};
         export const getAuthenticatedHeaders=async()=>({});export const authenticatedFetch=()=>{throw new Error('fallback interdit')};

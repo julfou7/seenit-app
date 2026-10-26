@@ -167,14 +167,11 @@ export default function App() {
     }
   }, [isNative]);
 
-  const splashDuration = 2200;
-
   return (
     <>
       {showSplash && (
         <SplashScreen
           isReady={isReady}
-          minimumDisplayTime={splashDuration}
           animate={true}
           onStartClose={() => setIsSplashClosing(true)}
           onComplete={() => setShowSplash(false)}

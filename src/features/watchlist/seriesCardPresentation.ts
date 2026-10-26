@@ -188,7 +188,10 @@ export function buildSeriesSeasonProgress(
 
   const aired = pointers.map(pointer => count(pointer.aired_episodes_in_season)).find(value => value !== null);
   const nextToAir = show.nextEpisodeToAir as SeriesCardEpisode | undefined;
-  const episodeDates = new Map(cached?.episodes?.map(item => [item.episode_number, item.air_date]));
+  const episodeDates = new Map([
+    ...Object.entries(currentEvidence?.episode_air_dates || {}).map(([number, date]) => [Number(number), date] as const),
+    ...(cached?.episodes?.map(item => [item.episode_number, item.air_date] as const) || []),
+  ]);
   const counts: Record<SeasonSegmentState, number> = { seen: 0, current: 0, unseen: 0, future: 0, history: 0, unknown: 0 };
   const segments: SeasonSegment[] = [];
   for (let number = 1; number <= renderTotal; number += 1) {
@@ -199,6 +202,7 @@ export function buildSeriesSeasonProgress(
     else if (seen.has(number)) state = 'seen';
     else if (isTarget && context !== 'history') state = 'current';
     else if (cachedAirDate) state = cachedAirDate > today ? 'future' : 'unseen';
+    else if (episodeDates.has(number)) state = 'unknown';
     else if (aired !== undefined && aired !== null) state = number <= aired ? 'unseen' : 'future';
     else if (nextToAir?.season_number === season && nextToAir.air_date && nextToAir.air_date > today) state = number >= nextToAir.episode_number ? 'future' : 'unseen';
     else if (episode.air_date && episode.air_date <= today && number < episode.episode_number) state = 'unseen';
@@ -208,7 +212,7 @@ export function buildSeriesSeasonProgress(
   }
 
   const watchedAired = aired === undefined || aired === null ? 0 : [...seen].filter(number => number <= aired).length;
-  const availableUnseen = aired === undefined || aired === null
+  const availableUnseen = currentEvidence?.episode_air_dates || aired === undefined || aired === null
     ? counts.unseen + (context === 'watch' && counts.current > 0 ? counts.current : 0)
     : Math.max(0, aired - watchedAired);
   const detail = unknownTail && context === 'watch'

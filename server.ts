@@ -671,7 +671,7 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.223',
+        'X-Plex-Version': '1.4.228',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
@@ -843,7 +843,8 @@ async function startServer() {
             return formatResponseItem(match, guid.replace('://', ':'));
           }
           return null;
-        } catch (error: any) {
+        } catch (caught: unknown) {
+          const error = caught as { message?: unknown } | null;
           console.warn(`[Plex Resolve Backend] [Étape 1] Erreur ${guid}:`, error?.message || error);
           return null;
         }
@@ -888,7 +889,7 @@ async function startServer() {
         imdbId: normalizedImdbId
       });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(
         '[Plex Resolve Backend] Erreur critique:',
         error
@@ -1258,7 +1259,8 @@ async function startServer() {
 
         try {
           return await runQuery(PLEX_ACCOUNT_HISTORY_QUERY, 'rich');
-        } catch (richError: any) {
+        } catch (caught: unknown) {
+          const richError = caught as { message?: unknown } | null;
           console.log(`[Plex Sync] Watch History GraphQL rich query unavailable, fallback minimal: ${richError?.message || richError}`);
           try {
             return await runQuery(PLEX_ACCOUNT_HISTORY_MINIMAL_QUERY, 'minimal');

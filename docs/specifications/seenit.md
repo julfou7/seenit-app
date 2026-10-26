@@ -1,8 +1,8 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.223**
-Plateformes : **PWA Web** et **APK Android Capacitor**  
+Version applicative : **1.4.228**
+Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
 ## 1. Vision produit
@@ -725,6 +725,7 @@ pour le cache des sagas et univers.
   de 2 secondes, les détails de 5 secondes, puis les throttles habituels restent applicables.
   Le retour en arrière-plan, la déconnexion et le démontage annulent les travaux différés ;
   aucun polling du worker Plex en arrière-plan WebView. Les tâches natives dédiées restent séparées.
+  Une collecte déjà en vol suit aussi appStateChange et la visibilité : WebView interrompue puis reprise au premier plan, réponse native consommée au retour. Les AbortError restants ne sont jamais exposés bruts.
 - **SEENIT-PLEX-003** — Le curseur n'est validé qu'après collecte suffisamment complète,
   résolution sans échec transitoire et écritures Firestore réussies.
 - **SEENIT-PLEX-004** — Jeton Plex, curseur et caches de résolution/disponibilité sont cloisonnés
@@ -1134,10 +1135,10 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   recherches, filtres ou expansions locales. Aucun suivi, progression, préférence ou téléchargement n'est
   modifié. Chaque reset abouti affiche un toast nommant la page réinitialisée. Un trajet A → B → B ne
   compte jamais le changement d'onglet comme le premier appui du double geste.
-- **SEENIT-UX-017** — La navigation 13j est un îlot verre flottant de 58 px, à 10 px de la safe area,
+- **SEENIT-UX-017** — La navigation 13j est un îlot verre flottant de 64 px, à 10 px de la safe area,
   avec fondu inférieur progressif de 96 px, sans repli au défilement. Ordre : À Voir, Explorer, Moi,
   puis séparateur et Télécharger si la fonctionnalité personnelle est activée. Les glyphes SeenIt
-  utilisent le même or, les cibles mesurent au moins 46 × 68 px, le focus et aria-current restent visibles.
+  utilisent le même or, les cibles mesurent au moins 52 × 68 px, le focus et aria-current restent visibles.
   La barre disparaît sur les fiches/dialogues plein écran ; le contenu réserve 84 px plus safe area,
   les toasts se placent à 80 px plus safe area avec la barre, 24 px sans elle. Le point Télécharger
   reflète les données live existantes : actifs or (nombre seulement au-delà de un), attention rouge,
@@ -1655,7 +1656,9 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   l'upgrade, des données/session, des budgets et du deep link peut déclencher **un seul retry** complet
   sur un AVD neuf. Aucun échec de package, version, signature, installation N → N+1, instrumentation,
   budget, deep link ou crash SeenIt ne peut être reclassé ni retenté automatiquement. Un second incident
-  d'émulateur reste bloquant.
+  d'émulateur reste bloquant. Les deux AVD API36 utilisent le mode logiciel actuel
+  `-gpu swiftshader -feature -Vulkan`, après le segfault RenderThread hôte du25/10/2026
+  sous le mode déprécié `swiftshader_indirect`. Le changement de renderer ne retire aucune assertion.
 
 Une modification est terminée lorsque les validations applicables à sa classe sont vertes, son test
 ciblé existe si le comportement change, toute règle durable/zone sensible est reflétée dans la SPEC et
@@ -1784,6 +1787,10 @@ Les consignes terrain priment sur V4 : titres de section homogènes uniquement d
 La preuve de total inconnu est réévaluée une fois après migration, puis au maximum après sept jours (`total_checked_at`). La lecture de réparation traverse les caches TV mémoire/disque pour obtenir la valeur fournisseur : une panne ne devient pas une nouvelle preuve fraîche et ne modifie pas la donnée connue. Les totaux déjà connus ne provoquent aucune nouvelle lecture de réparation. L’historique du jour affiche seulement l’heure sous son groupe Aujourd’hui, les autres jours gardent date et heure ; une heure absente reste explicitement inconnue.
 
 
+### Marque v3 et terrain223 — 25 octobre 2026
+
+La [marque v3 et les terrains223/224](../design/marque-2026-10-25.md) remplacent les anciens emblèmes écran par l’anneau fourni, y compris launcher/PWA et notifications autorisés explicitement. SEENIT-APK-001 conserve package, signature, données et deep links ; seules les empreintes des actifs changent. SEENIT-UX-014/018 : Afficher plus remplace la tuile sans modifier aucun scroll ; bandeaux compacts horizontaux au bas des affiches ; détail et cartes partagent les preuves compactes de total/diffusion reçues par les façades de production, sans total déduit d’une liste partielle. SEENIT-UX-015 : date réelle sans « ce soir », ×N en bandeau inférieur, heure sous Vu. SEENIT-UX-009 : anneau/coche commun après succès puis tampon et enfin nouvelle reprise ; dernier disponible tamponné jusqu’au rafraîchissement, Annuler le retire. Films : bouton Vu sur le talon sombre, métadonnées sous l’affiche. Navigation sans point inférieur. Le splash termine ses3700ms avant fermeture lorsque les animations sont autorisées ; sous réduction des animations résultat immédiat. Dialogue Plex centré, borné au viewport et défilable.
+
 ### Accueil — handoff badges/historique du 24 octobre 2026 et retour terrain222
 
 Les règles détaillées de [B07/historique](../design/badges-historique-2026-10-24.md) remplacent les pilules et les anciennes règles de pause. Les décisions d’intégration sont dans [Accueil V4](../design/home-a-voir-v4.md). Les codes visibles utilisent S05 | E14, les clés persistées et requêtes indexeurs gardant leur syntaxe technique.
@@ -1793,3 +1800,12 @@ Les règles détaillées de [B07/historique](../design/badges-historique-2026-10
 - SEENIT-PLEX-006 : une transaction Plex applique uniquement ses changements depuis son instantané initial, sans réécrire des métadonnées actualisées entretemps. Les totaux fournisseur et leurs preuves récentes sont préservés. Les anciennes preuves inconnues susceptibles d’avoir été écrasées sont réparées une fois, puis suivent leur TTL sans boucle.
 - SEENIT-UX-018 et SEENIT-NOTIFICATION-003 : le fil réunit les événements SeenIt reçus et les alertes encore livrées du compte actif, dédoublonnés et bornés à100. Les alertes Plex natives transmettent uniquement identité média/épisode et empreinte du propriétaire dans Notification.extras, sans jeton ni URI serveur. Le compteur indique les nonlus, un swipe droit retire un élément, les titres sont or et les vignettes rectangulaires. Aucun accès aux alertes d’autres applications ni nouvelle lecture Firestore générique.
 - Le rappel réagit immédiatement par la cloche, attend la persistance réelle et revient en arrière sur erreur ; aucune notification ni toast de confirmation tardive. Le détail Plex distingue les métadonnées de séries et la collecte Plex, expose les compteurs et serveurs reçus réellement (personnels/partagés, ignorés avec raison), conserve un bilan local par UID et permet une pause aux frontières des tâches. Aucun pourcentage de serveur supposé ni nouveau polling.
+
+
+Retour terrain225 du25/10/2026 (#729), prioritaire sur les regroupements antérieurs : un visionnage = une ligne, sans ×N ni plage d’épisodes, même pour une saison marquée en une fois. Périodes, totaux, heure et actions par épisode conservés. Navigation : centres du pictogramme et du texte identiques sur tous les écrans. Vu : anneau progressif760ms puis coche240ms, tampon puis reprise ; réduction des animations immédiate. Splash : huit segments160ms, anneau1280ms, coche1640ms, signature1860ms/300ms puis lecture complète pendant1540ms ; durée3700ms et fondu500ms inchangés. Référentiel détaillé : docs/design/marque-2026-10-25.md.
+
+SEENIT-PERF-001 / SEENIT-DATA-001 : la sauvegarde locale de bibliothèque est coalescée hors du clic (120ms puis idle borné800ms), seul le snapshot le plus récent est sérialisé. UID capturé et revalidé avant écriture ; annulation au changement de compte, vidage à pagehide/visibilité cachée. Aucun changement des écritures Firestore ni du format shows_v2. Les cartes de reprise inchangées ne se recalculent pas pour une mutation voisine ; les gestionnaires stables utilisent le dernier état validé.
+
+Le vidage du cache local écoute aussi appStateChange via Capacitor App : il ne dépend pas de visibilitychange seul dans la WebView Android. Le TNR du vrai store couvre ce signal alors que le document reste visible, ainsi que le changement d’UID avant idle et la déconnexion.
+
+Retour terrain226 du26/10 (#729) : coche entièrement masquée avant son tracé normalisé ; splash à cadence commune160ms par cran, maintien final réduit200ms (3500ms puis fondu500ms). Ticket horizontal avec découpes symétriques ; en rail, acteurs alignés par rangées communes aux titres, Vu36px dans cible44px à droite du talon, fin/heure à gauche et année sous le titre. La dernière notification retirée ferme sa feuille avec retour de focus et Annuler conservé. Voir docs/design/marque-2026-10-25.md.

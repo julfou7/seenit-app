@@ -4,7 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { getPlexSyncRetryAt } from '../features/plex/plexSyncRetry';
 import { useEffect, useRef } from 'react';
-import { buildSeasonProgressEvidence, needsSeasonProgressRefresh } from '../features/shows/seasonProgressEvidence';
+import { buildSeasonProgressEvidence, needsSeasonProgressRefresh, hasSeasonReleaseDue } from '../features/shows/seasonProgressEvidence';
 import { db, auth, sendNativeNotification } from '../lib/firebase';
 import { doc, updateDoc, getDoc, getDocs, collection, addDoc } from 'firebase/firestore';
 import { tmdb } from '../features/shows/tmdb';
@@ -79,6 +79,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
       }
 
       if (needsSeasonProgressRefresh(s)) return true;
+      if (hasSeasonReleaseDue(s)) return true;
 
       // En mode automatique, pas les séries archivées, terminées ou avec statut finalisé
       if (s.isArchived || s.seriesEnded || s.tmdbStatus === 'Ended' || s.tmdbStatus === 'Canceled' || s.status === 'completed') {
@@ -165,7 +166,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
 
       try {
         // 1. Fetch main TV show details from TMDB
-        const detailsRes = await tmdb.getMediaDetails(tmdbIdNum, showToSync.mediaType || 'tv', needsSeasonProgressRefresh(showToSync));
+        const detailsRes = await tmdb.getMediaDetails(tmdbIdNum, showToSync.mediaType || 'tv', true);
         if (!detailsRes.ok) {
           const errMsg = 'error' in detailsRes ? (typeof detailsRes.error === 'object' && detailsRes.error !== null && 'message' in detailsRes.error ? detailsRes.error.message : String(detailsRes.error)) : 'Unknown error';
           console.warn(`[SyncWorker] Could not fetch details for ${showToSync.title}: ${errMsg}`);
@@ -179,20 +180,14 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         const seasonsCache: any[] = [];
         for (const season of seasons) {
           await new Promise(resolve => setTimeout(resolve, 200));
-          const seasonDetailsRes = await tmdb.getSeasonDetails(tmdbIdNum, season.season_number);
+          const seasonDetailsRes = await tmdb.getSeasonDetails(tmdbIdNum, season.season_number, true);
           if (seasonDetailsRes.ok) {
             seasonsCache.push({
               ...seasonDetailsRes.value,
               episode_count: season.episode_count || 0
             });
           } else {
-            console.warn(`[SyncWorker] Could not fetch episodes for Season ${season.season_number} of ${showToSync.title}`);
-            seasonsCache.push({
-              season_number: season.season_number,
-              episode_count: season.episode_count || 0,
-              air_date: season.air_date || '',
-              episodes: []
-            });
+            throw new Error(`Saison ${season.season_number} indisponible : progression conservée`);
           }
         }
 
@@ -200,7 +195,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
 
         const nextEp = getNextEpisodeNumber(seasonsCache, showToSync.seenEpisodes || []);
         const isEnded = details.status === 'Ended' || details.status === 'Canceled';
-        const seasonProgress = buildSeasonProgressEvidence(seasonsCache, isEnded);
+        const seasonProgress = buildSeasonProgressEvidence(seasonsCache, isEnded, getTodayStr());
         const lastSeasonNum = Math.max(...seasonsCache.map(s => s.season_number), 0);
         const isFinalSeason = (sNum: number) => (sNum === lastSeasonNum) && (isEnded && (lastSeasonNum > 1 || details.type === 'Miniseries'));
 
@@ -435,6 +430,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         updatePayload['seasonsCache'] = null;
 
         await updateDoc(docRef, updatePayload);
+        if (auth.currentUser?.uid === userUid) useShowsStore.getState().updateShowOptimistic(showId, updatePayload);
         changesMade = true;
         syncedCount++;
 
@@ -443,11 +439,11 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         // Add a delay between shows to not hammer TMDB/Firestore
         await new Promise(resolve => setTimeout(resolve, 500));
 
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error(`[SyncWorker] Error syncing details for ${showToSync.title}:`, err);
-        const errStr = err?.message || String(err);
+        const errStr = err instanceof Error ? err.message : String(err);
         const isQuotaError =
-          err?.code === 'resource-exhausted' ||
+          (err && typeof err === 'object' && 'code' in err && err.code === 'resource-exhausted') ||
           errStr.toLowerCase().includes('quota exceeded') ||
           errStr.toLowerCase().includes('quota-exceeded') ||
           errStr.toLowerCase().includes('resource-exhausted') ||
@@ -474,6 +470,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
 export function useDetailsSyncWorker() {
   const lastRunRef = useRef(new Map<string, number>());
   const lastPlexRunRef = useRef(new Map<string, number>());
+  const runningDetailsRef = useRef(new Set<string>());
   useEffect(() => {
     let disposed = false;
     let nativeActive = true;
@@ -488,11 +485,14 @@ export function useDetailsSyncWorker() {
     };
     const runSync = () => {
       const uid = auth.currentUser?.uid;
-      if (!uid || !visible()) return;
+      if (!uid || !visible() || runningDetailsRef.current.has(uid)) return;
       const now = Date.now(), last = lastRunRef.current.get(uid);
-      if (last !== undefined && now - last < 12 * 60 * 60 * 1000) return;
+      if (last !== undefined && now - last < 60_000) return;
+      const boundaryDue = useShowsStore.getState().shows.some(show => show.mediaType === 'tv' && show.status !== 'dropped' && (needsSeasonProgressRefresh(show) || hasSeasonReleaseDue(show, now)));
+      if (last !== undefined && now - last < 12 * 60 * 60 * 1000 && !boundaryDue) return;
       lastRunRef.current.set(uid, now);
-      void performDetailsSync(false).catch(logWorkerError);
+      runningDetailsRef.current.add(uid);
+      void performDetailsSync(false).catch(logWorkerError).finally(() => runningDetailsRef.current.delete(uid));
     };
     const runPlexSync = () => {
       const uid = auth.currentUser?.uid;
@@ -583,7 +583,7 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
     }
 
     // TV Show Sync
-    const detailsRes = await tmdb.getShowDetails(tmdbIdNum, needsSeasonProgressRefresh(showToSync));
+    const detailsRes = await tmdb.getShowDetails(tmdbIdNum, true);
     if (!detailsRes.ok) {
       if (!silent) setSyncStatus(null);
       return { success: false, error: 'Erreur lors de la récupération des détails TMDB' };
@@ -595,19 +595,14 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
     const seasonsCache: any[] = [];
     for (const season of seasons) {
       await new Promise(resolve => setTimeout(resolve, 150));
-      const seasonDetailsRes = await tmdb.getSeasonDetails(tmdbIdNum, season.season_number);
+      const seasonDetailsRes = await tmdb.getSeasonDetails(tmdbIdNum, season.season_number, true);
       if (seasonDetailsRes.ok) {
         seasonsCache.push({
           ...seasonDetailsRes.value,
           episode_count: season.episode_count || 0
         });
       } else {
-        seasonsCache.push({
-          season_number: season.season_number,
-          episode_count: season.episode_count || 0,
-          air_date: season.air_date || '',
-          episodes: []
-        });
+        throw new Error(`Saison ${season.season_number} indisponible : progression conservée`);
       }
     }
 
@@ -615,7 +610,7 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
 
     const nextEp = getNextEpisodeNumber(seasonsCache, showToSync.seenEpisodes || []);
     const isEnded = details.status === 'Ended' || details.status === 'Canceled';
-    const seasonProgress = buildSeasonProgressEvidence(seasonsCache, isEnded);
+    const seasonProgress = buildSeasonProgressEvidence(seasonsCache, isEnded, getTodayStr());
     const lastSeasonNum = Math.max(...seasonsCache.map(s => s.season_number), 0);
     const isFinalSeason = (sNum: number) => (sNum === lastSeasonNum) && (isEnded && (lastSeasonNum > 1 || details.type === 'Miniseries'));
 

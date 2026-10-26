@@ -47,7 +47,7 @@ test('SEENIT-APK-005 TNR conserve un seul splash brandé visible', () => {
   assert.match(app, /import \{ SplashScreen \} from '\.\/components\/SplashScreen'/);
   assert.match(app, /<SplashScreen[\s\S]*?animate=\{true\}/);
   assert.match(webSplash, /id="seenit-splash-screen"/);
-  assert.match(webSplash, /L'expérience cinéma & séries/);
+  assert.match(webSplash, /Chaque visionnage compte\./);
 
   assert.match(app, /requestAnimationFrame\(\(\) => \{[\s\S]*?requestAnimationFrame\(\(\) => \{[\s\S]*?CapSplashScreen\.hide\(\)/);
   assert.match(capacitorConfig, /SplashScreen:\s*\{[\s\S]*?launchAutoHide: false,[\s\S]*?backgroundColor: '#040406'/);

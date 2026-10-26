@@ -141,3 +141,9 @@
 @media(prefers-reduced-motion:reduce) { .series-ribbon { animation:none; } }
 
 .series-8f__days:disabled { opacity:1; cursor:progress; }
+
+/* Terrain224: a compact bottom band leaves the poster artwork visible. */
+.series-ribbon { width:100%; top:auto; bottom:0; left:0; height:17px; transform:none; font-size:8px; letter-spacing:.025em; padding:2px 3px; }
+
+.series-8f__poster > .series-8f__stamp { animation:srStampEnter .28s both; }
+@keyframes srStampEnter { from{transform:translateX(-50%) rotate(-12deg) scale(1.4);opacity:0}to{transform:translateX(-50%);opacity:1} }

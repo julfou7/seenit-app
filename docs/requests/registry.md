@@ -142,3 +142,10 @@ Complément USR-2026-10-23-004 / #729 : vidéo du23octobre19h32, précisée « C
 | USR-2026-10-23-005 | 2026-10-23 | Terrain220 KO : cinq captures, pagination6 avec bouton illustré, FPS lancement/Plex, détail synchro, badges utiles, ancrage séries/swipe/barre, transfert animé Nouveautés→Continuer, films plus hauts. Traiter pendant la collecte, aucune APK avant nouveau feu vert. | SEENIT-UX-018, #729, #741 | active |
 
 Complément USR-2026-10-23-005 : ZIP(10) SPEC-DEV-V4.md reçue24/10, complète (frise/acteur plein écran inclus), maquette prioritaire ; derniers retours cartes films/Plex, total saison Knight/Harry et collection films À venir. Aucune APK demandée.
+
+| USR-2026-10-25-001 | 2026-10-25 | Terrain223 KO : cohérence épisodes carte/détail, pagination sans scroll, historique sans ce soir et ruban ×N, rubans Plus que2/3 ; marque v3 fournie à réutiliser partout, Plex centré/dialogue borné. | SEENIT-UX-014/015/018, SEENIT-APK-001, #729/#741 | active |
+| USR-2026-10-25-002 | 2026-10-25 | Terrain224 : animation d’ouverture complète ; nav sans point et texte abaissé ; bouton Vu film dans le talon ; bandeaux compacts au bas des affiches ; après succès bouton puis tampon puis nouvelle reprise ; dernier disponible tamponné jusqu’au rafraîchissement. | SEENIT-UX-009/014/015, #729 | active |
+
+- 25/10/2026 — terrain225 (#729) : historique individuel sans ×N, vérification centrage Moi, remplissage Vu progressif et fluidité globale ; splash rééquilibré à durée totale identique. Voir docs/design/marque-2026-10-25.md.
+
+- 26/10/2026 — retour226 (#729) : coche/splash réguliers, maintien final−200ms, billets et alignement des acteurs, fermeture de la dernière notification. Voir docs/design/marque-2026-10-25.md.

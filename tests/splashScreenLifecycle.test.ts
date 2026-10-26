@@ -13,7 +13,7 @@ test('le splash termine réellement son cycle après le début de fermeture', ()
   );
   assert.match(
     source,
-    /if \(!isClosing\) return;[\s\S]*const closeTimer = setTimeout\(\(\) => \{[\s\S]*onCompleteRef\.current\(\);[\s\S]*\}, 500\);[\s\S]*return \(\) => clearTimeout\(closeTimer\);[\s\S]*\}, \[isClosing\]\);/
+    /if \(!isClosing\) return;[\s\S]*const closeTimer = setTimeout\(\(\) => \{[\s\S]*onCompleteRef\.current\(\);[\s\S]*\}, reducedMotion \? 0 : 500\);[\s\S]*return \(\) => clearTimeout\(closeTimer\);[\s\S]*\}, \[isClosing, reducedMotion\]\);/
   );
 
   const closeStartEffect = source.match(/useEffect\(\(\) => \{\n\s*if \(!timeElapsed[\s\S]*?\n\s*\}, \[timeElapsed, isReady, isClosing\]\);/)?.[0] || '';

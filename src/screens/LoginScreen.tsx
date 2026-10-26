@@ -9,8 +9,9 @@ import { SeenItLogo } from '../components/SeenItLogo';
 import { Capacitor } from '@capacitor/core';
 import { SeenItAuth } from '../lib/auth/SeenItAuth';
 
-const isGoogleAuthCancellation = (error: any): boolean => {
-  const value = [error?.code, error?.message, typeof error === 'string' ? error : '']
+const isGoogleAuthCancellation = (error: unknown): boolean => {
+  const evidence = error && typeof error === 'object' ? error as { code?: unknown; message?: unknown } : {};
+  const value = [evidence.code, evidence.message, typeof error === 'string' ? error : '']
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
@@ -135,21 +136,10 @@ export function LoginScreen() {
           </div>
 
           <div className="relative z-10 w-full flex flex-col items-center justify-center text-center">
-            <div className="mb-6 relative group flex items-center justify-center">
-              {/* Soft gold ambient bloom behind the app icon */}
-              <div className="absolute inset-0 bg-[#E5A93D]/25 blur-[28px] rounded-full scale-110 pointer-events-none" />
-              <SeenItLogo variant="icon" size={88} animated />
-            </div>
-
-            <h1 className="text-4xl font-black text-white mb-1.5 tracking-tight flex items-center justify-center gap-1">
-              <span>Seen</span>
-              <span className="bg-gradient-to-r from-[#FFE28A] via-[#F5C518] to-[#E5A93D] bg-clip-text text-transparent">
-                It
-              </span>
-            </h1>
+            <h1 className="mb-5"><SeenItLogo variant="horizontal" size={64} /></h1>
 
             <h2 className="text-xs font-semibold text-zinc-400 mb-6 tracking-widest uppercase">
-              L'expérience cinéma & séries
+              Chaque visionnage compte.
             </h2>
 
             <p className="text-zinc-400 text-sm mb-12 max-w-[280px] leading-relaxed">

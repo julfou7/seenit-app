@@ -12,7 +12,7 @@ import {
   type SeenItReleaseNotesEntry
 } from '../features/release/releasePolicy';
 
-export const CURRENT_APP_VERSION = '1.4.223';
+export const CURRENT_APP_VERSION = '1.4.228';
 export type AppReleaseInfo = SeenItReleaseInfo;
 let inFlightUpdateCheck: Promise<boolean> | null = null;
 let inFlightReleaseHistory: Promise<SeenItReleaseNotesEntry[]> | null = null;
@@ -124,8 +124,8 @@ export const useUpdateStore = create<UpdateState>()(
 
           result = isNewer;
           return result;
-        } catch (err: any) {
-          console.error('[UpdateCheck] Error checking for updates:', err);
+        } catch (caught: unknown) {
+          const err = caught as { message?: string };
           appLogger.error('system', `Erreur lors de la recherche de mise à jour: ${err.message || String(err)}`, err);
           set({
             isChecking: false,
@@ -156,10 +156,10 @@ export const useUpdateStore = create<UpdateState>()(
             const releaseHistory = resolved.length > 0 ? resolved : fallback;
             set({ releaseHistory, isLoadingReleaseHistory: false });
             return releaseHistory;
-          } catch (err: any) {
+          } catch (err: unknown) {
             set({
               isLoadingReleaseHistory: false,
-              releaseHistoryError: err?.message || 'Historique des versions indisponible.'
+              releaseHistoryError: (err as { message?: string } | null)?.message || 'Historique des versions indisponible.'
             });
             return get().releaseHistory;
           } finally {

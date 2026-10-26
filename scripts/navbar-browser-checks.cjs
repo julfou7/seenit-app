@@ -36,13 +36,15 @@ async function testNavbarHarness(client, root) {
     await check(client,'document.querySelectorAll("[data-navigation-tab]").length===4','quatre onglets');
     await check(client,'[...document.querySelectorAll("[data-navigation-tab]")].map(el=>el.dataset.navigationTab).join(",")==="watchlist,discover,profile,downloads"','ordre 13j');
     const geometry=await evaluate(client,'(()=>{const nav=document.querySelector("nav").getBoundingClientRect();return{nav:nav.toJSON(),buttons:[...document.querySelectorAll("[data-navigation-tab]")].map(el=>el.getBoundingClientRect().toJSON()),doc:document.documentElement.scrollWidth,viewport:document.documentElement.clientWidth}})()');
-    if(geometry.buttons.some(r=>r.width<68||r.height<46||r.x<0||r.right>width)||Math.abs(geometry.nav.height-58)>1||geometry.nav.x<0||geometry.nav.right>width||geometry.doc>geometry.viewport)throw new Error('#721 géométrie '+JSON.stringify(geometry));
+    if(geometry.buttons.some(r=>r.width<68||r.height<52||r.x<0||r.right>width)||Math.abs(geometry.nav.height-64)>1||geometry.nav.x<0||geometry.nav.right>width||geometry.doc>geometry.viewport)throw new Error('#721 géométrie '+JSON.stringify(geometry));
+    await check(client,'[...document.querySelectorAll("[data-navigation-tab]")].every(el=>el.getBoundingClientRect().bottom-el.querySelector(".navigation-tab__label").getBoundingClientRect().bottom>=3.5)','air sous tous les libellés');
     // Vraie détection : A->B->B n'arme pas un double sur B.
     await tap(client,selector('discover'));await tap(client,selector('discover'));
     await check(client,'window.__nav13j.telemetry.resets.length===0','A vers B puis B ne réinitialise pas');
     await delay(380);
     for(const tab of ['watchlist','discover','profile','downloads']) {
       if(await evaluate(client,'window.__nav13j.tab()')!==tab)await tap(client,selector(tab));
+      await check(client,'[...document.querySelectorAll("[data-navigation-tab]")].every(el=>{const a=el.querySelector("svg").getBoundingClientRect(),b=el.querySelector(".navigation-tab__label").getBoundingClientRect();return Math.abs(a.left+a.width/2-b.left-b.width/2)<.5})','centrage icône et libellé, y compris Moi actif');
       await delay(380);
       await tap(client,selector(tab));await tap(client,selector(tab));
       await check(client,`window.__nav13j.telemetry.resets.filter(t=>t===${JSON.stringify(tab)}).length===1 && document.querySelector('[data-search=${tab}]').value===''`,'double local '+tab);
