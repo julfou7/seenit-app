@@ -1,154 +1,68 @@
 <!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SeenIt TV</title>
-  <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-  <div id="viewport">
-    <div id="stage">
-      <div id="offlineBadge" class="offline-badge">Hors ligne · apps, TNT et sources locales restent disponibles</div>
-      <div id="toast" class="toast"></div>
-
-      <section id="screenProfiles" class="screen active profile-screen" aria-label="Qui regarde ?">
-        <header class="profile-brand"><span class="brand-mark">S</span><span class="brand-name">SeenIt</span></header>
-        <div class="profiles-wrap">
-          <div class="eyebrow">BONSOIR</div>
-          <h1>Qui regarde ?</h1>
-          <p class="lead">Votre espace TV, sans détour par le Home Samsung.</p>
-          <div class="profile-row">
-            <button class="profile-card focusable" data-profile="Julian"><span class="avatar avatar-j">J</span><span class="profile-name">Julian</span></button>
-            <button class="profile-card focusable" data-profile="Camille"><span class="avatar avatar-c">C</span><span class="profile-name">Camille</span></button>
-            <button class="profile-card focusable" data-profile="Milo"><span class="avatar avatar-m">M</span><span class="profile-name">Milo</span><small>Mode enfant</small></button>
-            <button class="profile-card focusable" data-profile="Invité"><span class="avatar avatar-g">+</span><span class="profile-name">Invité</span><small>Sans historique</small></button>
-          </div>
-        </div>
-        <div class="footer-hint">Flèches · Naviguer &nbsp;&nbsp; OK · Sélectionner</div>
-      </section>
-
-      <section id="screenHome" class="screen home-screen" aria-label="Accueil SeenIt TV">
-        <header class="topbar">
-          <div class="brand-cluster"><span class="brand-mark small">S</span><span class="brand-name small">SeenIt</span><span id="hello" class="hello">Bonsoir Julian</span></div>
-          <div class="top-actions">
-            <span id="telemetry" class="telemetry"></span>
-            <span id="clock" class="clock">20:41</span>
-            <button class="header-button focusable" data-action="settings" aria-label="Réglages">⚙</button>
-            <button class="profile-pill focusable" data-action="switch-profile" aria-label="Changer de profil"><span id="profileInitial">J</span></button>
-          </div>
-        </header>
-
-        <main class="home-main adult-home">
-          <div class="feature-row">
-            <button id="heroCard" class="hero-card focusable" data-action="films">
-              <span id="heroEyebrow" class="hero-eyebrow">SEENIT TV</span>
-              <strong id="heroTitle">Que voulez-vous regarder ?</strong>
-              <span id="heroMeta" class="hero-meta">TNT, apps, sources et vos contenus réunis au même endroit.</span>
-              <span id="heroCta" class="hero-cta">Explorer Films & séries</span>
-              <span class="hero-orbit orbit-one"></span>
-              <span class="hero-orbit orbit-two"></span>
-            </button>
-
-            <div class="shortcut-matrix">
-              <button class="shortcut-card focusable" data-action="live-tv"><span class="shortcut-icon">TV</span><strong>Télévision</strong><small>Antenne · TNT en direct</small></button>
-              <button class="shortcut-card focusable" data-action="films"><span class="shortcut-icon">▶</span><strong>Films & séries</strong><small>Plex · à regarder</small></button>
-              <button id="sportTile" class="shortcut-card focusable" data-action="sport"><span id="sportBadge" class="mini-badge">CE SOIR</span><strong>Sport</strong><small id="sportCopy">Monaco · 20:45</small></button>
-              <button class="shortcut-card focusable" data-action="sources"><span class="shortcut-icon">↳</span><strong>Sources</strong><small id="sourcesCopy">HDMI détectés</small></button>
-            </div>
-          </div>
-
-          <div class="rail-head"><div><span class="eyebrow">APPS FAVORITES</span><span id="appsStatus" class="rail-status">Chargement…</span></div><button class="text-button focusable" data-action="all-apps">Toutes les apps ›</button></div>
-          <div id="appRow" class="app-row"></div>
-
-          <div class="home-footer">
-            <span id="sourceStatus">Source · inconnue</span>
-            <span id="networkStatus">Réseau · en ligne</span>
-            <span class="muted">Retour · revenir à SeenIt</span>
-          </div>
-        </main>
-
-        <main class="home-main kid-home" id="kidHome">
-          <div class="kid-heading"><span class="eyebrow">ESPACE MILO</span><strong>Salut Milo</strong><small>Un Home plus simple, avec seulement les apps autorisées.</small></div>
-          <div class="kid-row">
-            <button class="kid-card focusable" data-action="films"><span>▶</span><strong>Films & dessins animés</strong><small>Ouvrir l’espace vidéo</small></button>
-            <button class="kid-card focusable" data-action="kid-apps"><span>▦</span><strong>Mes apps</strong><small>Seulement celles autorisées</small></button>
-            <button class="kid-card focusable" data-action="switch-profile"><span>☺</span><strong>Changer de profil</strong><small>Retour au choix du profil</small></button>
-          </div>
-          <div class="rail-head"><div><span class="eyebrow">APPS AUTORISÉES</span></div></div>
-          <div id="kidAppRow" class="app-row"></div>
-        </main>
-      </section>
-
-      <section id="screenFilms" class="screen sub-screen" aria-label="Films et séries">
-        <header class="sub-header"><button class="back-button focusable" data-action="back">‹</button><div><div class="eyebrow">SEENIT</div><h2>Films & séries</h2></div></header>
-        <div class="sub-hero film-hero"><div class="sub-hero-copy"><span class="eyebrow">CONTINUER</span><h3>Slow Horses</h3><p>S06 E03 · reprise de démonstration — aucune mutation SeenIt.</p><button class="cta focusable" data-action="plex-demo">Ouvrir Plex</button></div><div class="sub-hero-glow"></div></div>
-        <div class="poster-row">
-          <button class="poster focusable"><span>À regarder</span><strong>Dune: Part Two</strong></button>
-          <button class="poster focusable"><span>À regarder</span><strong>Severance</strong></button>
-          <button class="poster focusable"><span>Suggestion</span><strong>Foundation</strong></button>
-          <button class="poster focusable"><span>Suggestion</span><strong>Silo</strong></button>
-        </div>
-      </section>
-
-      <section id="screenSport" class="screen sub-screen" aria-label="Sport">
-        <header class="sub-header"><button class="back-button focusable" data-action="back">‹</button><div><div class="eyebrow">SPORT</div><h2>Mes rendez-vous</h2></div></header>
-        <div class="sub-hero sport-feature"><div class="sub-hero-copy"><span id="sportFeatureBadge" class="mini-badge">PRIORITÉ</span><h3>AS Monaco — Lille</h3><p>Ligue 1 · Ce soir · 20:45 · horaire confirmé</p><button class="cta focusable" data-action="watch-match">Regarder</button><small id="watchTarget">Cible résolue au moment du match</small></div><div class="sub-hero-glow sport-glow"></div></div>
-        <div id="calendarList" class="calendar-list"></div>
-      </section>
-
-      <section id="screenSources" class="screen sub-screen" aria-label="Sources">
-        <header class="sub-header"><button class="back-button focusable" data-action="back">‹</button><div><div class="eyebrow">ENTRÉES TV</div><h2>Sources</h2></div></header>
-        <p class="sub-intro">Uniquement les entrées réellement remontées par la TV. Aucun HDMI n’est supposé par défaut.</p>
-        <div id="sourceGrid" class="source-grid"></div>
-      </section>
-
-      <section id="screenSettings" class="screen sub-screen" aria-label="Réglages SeenIt TV">
-        <header class="sub-header"><button class="back-button focusable" data-action="back">‹</button><div><div class="eyebrow">SEENIT TV</div><h2>Réglages</h2></div></header>
-        <div class="settings-layout">
-          <div class="settings-list">
-            <button class="setting-item focusable" data-action="samsung-settings"><strong>Réglages Samsung</strong><small>Ouvrir le menu natif si le firmware l’autorise</small></button>
-            <button class="setting-item focusable" data-action="diagnostics"><strong>Diagnostic TV</strong><small id="diagCopy">Tizen · apps · sources · mémoire</small></button>
-            <button class="setting-item focusable" data-action="ambient"><strong>Ambiance</strong><small>Écran calme local, sans animation GPU permanente</small></button>
-            <button class="setting-item focusable" data-action="switch-profile"><strong>Changer de profil</strong><small>Julian · Camille · Milo · Invité</small></button>
-          </div>
-          <aside class="diagnostic-panel">
-            <span class="eyebrow">ÉTAT LOCAL</span>
-            <strong id="diagMemory">RAM · —</strong>
-            <strong id="diagStorage">Stockage · —</strong>
-            <strong id="diagApps">Apps · —</strong>
-            <strong id="diagSources">Sources · —</strong>
-            <small id="diagRuntime">Runtime · en attente</small>
-          </aside>
-        </div>
-      </section>
-
-      <section id="screenApps" class="screen sub-screen apps-screen" aria-label="Applications">
-        <header class="sub-header"><button class="back-button focusable" data-action="back">‹</button><div><div class="eyebrow">BIBLIOTHÈQUE</div><h2>Applications</h2></div></header>
-        <div class="apps-toolbar">
-          <div class="tabs">
-            <button id="tabFavorites" class="tab-button focusable selected" data-action="apps-tab" data-tab="favorites">Favoris</button>
-            <button id="tabUser" class="tab-button focusable" data-action="apps-tab" data-tab="user">Apps</button>
-            <button id="tabSystem" class="tab-button focusable" data-action="apps-tab" data-tab="system">Système</button>
-          </div>
-          <div id="appsCount" class="apps-count">0 app</div>
-        </div>
-        <div id="allAppsGrid" class="all-apps-grid"></div>
-        <div class="pager">
-          <button id="pagePrev" class="pager-button" data-action="page-prev">‹ Précédent</button>
-          <span id="pageStatus">Page 1/1</span>
-          <button id="pageNext" class="pager-button" data-action="page-next">Suivant ›</button>
-        </div>
-        <div id="systemHint" class="system-hint">Vue avancée : composants système/ambigus détectés, conservés pour diagnostic.</div>
-      </section>
-
-      <section id="screenAmbient" class="screen ambient-screen" aria-label="Ambiance">
-        <div class="ambient-copy"><span class="eyebrow">AMBIANCE</span><h2>Cheminée</h2><p>Rendu local statique, léger pour le moteur Tizen 4.</p><button class="cta focusable" data-action="back">Retour</button></div>
-        <div class="fireplace"><div class="ember ember-one"></div><div class="ember ember-two"></div><div class="log"></div></div>
-      </section>
-    </div>
-  </div>
-  <script src="tv.js"></script>
-  <script src="app.js"></script>
-</body>
-</html>
+<html lang="fr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SeenIt TV</title><link rel="stylesheet" href="styles.css"></head>
+<body><div id="viewport"><div id="stage">
+<div id="offlineBadge" class="offline-badge">Hors ligne</div><div id="toast" class="toast" role="status"></div>
+<section id="screenProfiles" class="screen active profile-screen" aria-label="Qui regarde ?">
+<img class="brand" src="assets/seenit-tv.svg" alt="SeenIt TV">
+<div class="profiles-wrap"><h1>Qui regarde ?</h1><div class="profile-row">
+<button class="profile-card focusable" data-profile="Julian"><span class="avatar avatar-j">J</span><strong>Julian</strong></button>
+<button class="profile-card focusable" data-profile="Camille"><span class="avatar avatar-c">C</span><strong>Camille</strong></button>
+<button class="profile-card focusable" data-profile="Milo"><span class="avatar avatar-m">M</span><strong>Milo</strong></button>
+<button class="profile-card focusable" data-profile="Invité"><span class="avatar avatar-g">+</span><strong>Invité</strong><small>Sans sauvegarde</small></button>
+</div></div><div class="footer-hint">Flèches · Naviguer &nbsp;&nbsp; OK · Choisir</div></section>
+<section id="screenHome" class="screen home-screen" aria-label="Accueil SeenIt TV">
+<header class="topbar"><img class="brand" src="assets/seenit-tv.svg" alt="SeenIt TV"><div class="top-actions">
+<button class="quick-button focusable" data-action="quick">☷ <span>Rapide</span></button><span id="date" class="date"></span><span id="clock" class="clock"></span>
+<button class="profile-pill focusable" data-action="switch-profile" aria-label="Changer de profil"><span id="profileInitial">J</span><span id="profileName">Julian</span></button>
+</div></header>
+<main class="home-main"><div class="primary-row">
+<button id="primaryTv" class="primary-card tv-card focusable" data-action="live-tv"><span class="primary-label"><span class="tile-icon icon-tv" aria-hidden="true"></span>TV</span><strong>Télévision<br>en direct</strong><small>Antenne · TNT en direct</small></button>
+<button class="primary-card films-card focusable" data-action="films"><span class="primary-label"><span class="tile-icon" aria-hidden="true">▷</span>FILMS</span><strong id="filmsCopy">Films &amp; séries</strong><small id="filmsHint">Vos apps</small></button>
+<button id="sportTile" class="primary-card sport-card focusable" data-action="sport"><span class="primary-label"><span class="tile-icon" aria-hidden="true">◉</span>SPORT</span><span id="sportBadge" class="mini-badge"></span><strong id="sportCopy">Mes rendez-vous</strong><small>Calendrier sportif</small></button>
+<button class="primary-card settings-card focusable" data-action="settings"><span class="primary-label"><span class="tile-icon" aria-hidden="true">☼</span>RÉGLAGES</span><strong>TV &amp; profils</strong><small>Image · son · apps</small></button>
+</div><h1 id="greeting" class="home-greeting">Bonjour</h1><div class="home-rails">
+<div class="apps-rail"><div class="rail-head"><h2>Apps favorites</h2><span id="appsStatus" class="rail-status"></span></div><div id="appRow" class="app-row"></div></div>
+</div><div id="focusDetail" class="focus-detail" role="status"></div><div class="home-bottom"><div class="sources-rail"><div class="rail-head"><h2>Sources</h2><button class="text-button focusable" data-action="sources">Tout ›</button></div><div id="homeSources" class="source-row"></div></div><div class="home-sport"><div id="homeSportHeading" class="rail-head sport-heading"><h2>Sport</h2><span id="sportStatus" class="rail-status"></span></div><div id="homeEvents" class="event-row"></div></div></div></main>
+<div class="footer-hint">OK · Ouvrir &nbsp;&nbsp; Retour · Quitter<span id="networkStatus"></span></div></section>
+<section id="screenFilms" class="screen sub-screen" aria-label="Films et séries">
+<header class="sub-header"><button class="back-button focusable" data-action="back" aria-label="Retour">‹</button><h1>Films &amp; séries</h1></header>
+<div class="rail-head"><h2>Récemment ouvertes</h2></div><div id="recentApps" class="app-row recent-row"></div>
+<p id="recentHint" class="sub-intro">Ouvrez une app pour la retrouver ici.</p><div class="rail-head"><h2>Mes apps</h2></div><div id="filmApps" class="app-row"></div>
+<p class="account-note">Profils locaux · la reprise des vidéos reste dans chaque app.</p></section>
+<section id="screenSport" class="screen sub-screen" aria-label="Sport">
+<header class="sub-header"><button class="back-button focusable" data-action="back" aria-label="Retour">‹</button><h1>Sport</h1></header>
+<div id="calendarList" class="event-row calendar-list"></div><p id="calendarHint" class="sub-intro"></p></section>
+<section id="screenSources" class="screen sub-screen" aria-label="Sources">
+<header class="sub-header"><button class="back-button focusable" data-action="back" aria-label="Retour">‹</button><h1>Sources</h1><button class="text-button focusable" data-action="refresh">Actualiser</button></header><div id="sourceGrid" class="source-grid"></div></section>
+<section id="screenSettings" class="screen sub-screen" aria-label="Réglages">
+<header class="sub-header"><button class="back-button focusable" data-action="back" aria-label="Retour">‹</button><h1>Réglages</h1></header>
+<div class="settings-layout"><div class="settings-list">
+<button class="setting-item focusable" data-action="samsung-settings"><span>⚙</span><strong>Réglages Samsung</strong><small>Image, son, réseau…</small></button>
+<button class="setting-item focusable" data-action="sources"><span>↳</span><strong>Sources</strong><small>Entrées de la TV</small></button>
+<button class="setting-item focusable" data-action="manage-apps"><span>▦</span><strong>Organiser mes apps</strong><small>Favoris de ce profil</small></button>
+<button class="setting-item focusable" data-action="diagnostics"><span>ⓘ</span><strong>Diagnostic TV</strong><small>Mémoire &amp; stockage</small></button>
+<button class="setting-item focusable" data-action="appearance"><span>◐</span><strong>Apparence</strong><small>Fond &amp; mouvements</small></button>
+<button class="setting-item focusable" data-action="ambient"><span>☼</span><strong>Ambiance</strong><small>Écran calme</small></button>
+</div><aside class="settings-note"><h2>À votre rythme.</h2><p>Vos apps, vos favoris,<br>votre télécommande.</p><button class="cta focusable" data-action="switch-profile">Changer de profil</button></aside></div></section>
+<section id="screenDiagnostics" class="screen sub-screen" aria-label="Diagnostic TV">
+<header class="sub-header"><button class="back-button focusable" data-action="back" aria-label="Retour">‹</button><h1>Diagnostic TV</h1><button class="text-button focusable" data-action="refresh">Actualiser</button></header>
+<div class="diagnostic-panel"><strong id="diagMemory">RAM · —</strong><strong id="diagStorage">Stockage · —</strong><strong id="diagApps">Apps · —</strong><strong id="diagSources">Sources · —</strong><small id="diagRuntime"></small></div><p class="sub-intro">Valeurs de la TV. Aucun nettoyage ou arrêt d’app automatique.</p><span id="telemetry"></span></section>
+<section id="screenApps" class="screen sub-screen apps-screen" aria-label="Applications">
+<header class="sub-header"><button class="back-button focusable" data-action="back" aria-label="Retour">‹</button><h1>Applications</h1><button class="text-button focusable" data-action="refresh">Actualiser</button></header>
+<div class="apps-toolbar"><div class="tabs">
+<button id="tabFavorites" class="tab-button focusable selected" data-action="apps-tab" data-tab="favorites">Favoris</button>
+<button id="tabUser" class="tab-button focusable" data-action="apps-tab" data-tab="user">Apps</button>
+<button id="tabSystem" class="tab-button focusable" data-action="apps-tab" data-tab="system">Système</button>
+</div><span id="appsCount" class="apps-count"></span><button id="manageApps" class="text-button focusable" data-action="toggle-manage">Organiser</button></div>
+<div id="allAppsGrid" class="all-apps-grid"></div><div class="pager"><button id="pagePrev" class="pager-button" data-action="page-prev">‹ Précédent</button><span id="pageStatus"></span><button id="pageNext" class="pager-button" data-action="page-next">Suivant ›</button></div>
+<p id="systemHint" class="system-hint">Composants système conservés pour diagnostic.</p><p id="organizeHint" class="system-hint">OK · Ajouter ou retirer un favori</p></section>
+<section id="screenQuick" class="screen dialog-screen" aria-label="Accès rapides"><div class="dialog-panel"><h1>Rapide</h1><button class="setting-item focusable" data-action="samsung-settings">Réglages Samsung</button><button class="setting-item focusable" data-action="sources">Sources</button><button class="setting-item focusable" data-action="switch-profile">Changer de profil</button><button class="cta focusable" data-action="back">Retour</button></div></section>
+<section id="screenAppearance" class="screen sub-screen" aria-label="Apparence"><header class="sub-header"><button class="back-button focusable" data-action="back" aria-label="Retour">‹</button><h1>Apparence</h1></header><div class="appearance-row">
+<button class="theme-card focusable theme-dusk" data-action="theme" data-theme="dusk"><strong>Crépuscule</strong><small>Bleu nuit &amp; lumière chaude</small></button>
+<button class="theme-card focusable theme-mist" data-action="theme" data-theme="mist"><strong>Brume</strong><small>Clair &amp; doux</small></button>
+<button class="theme-card focusable theme-auto" data-action="theme" data-theme="auto"><strong>Automatique</strong><small>Selon l’heure de la TV</small></button></div><button class="setting-item motion-setting focusable" data-action="motion"><strong>Mouvements du focus</strong><small id="motionValue"></small></button><p class="sub-intro">Fonds statiques, aucune animation permanente.</p></section>
+<section id="screenAppMenu" class="screen dialog-screen" aria-label="Organiser une app"><div class="dialog-panel app-menu"><h1 id="appMenuTitle"></h1><button id="menuPin" class="setting-item focusable" data-action="menu-pin">Favori</button><button class="setting-item focusable" data-action="menu-left">Déplacer à gauche</button><button class="setting-item focusable" data-action="menu-right">Déplacer à droite</button><button class="setting-item focusable" data-action="menu-hide">Masquer de l’accueil</button><button class="cta focusable" data-action="back">Retour</button></div></section>
+<section id="screenExit" class="screen dialog-screen" aria-label="Quitter SeenIt"><div class="dialog-panel"><h1>Quitter SeenIt ?</h1><button id="stayButton" class="cta focusable" data-action="back">Rester ici</button><button class="cta secondary focusable" data-action="exit">Quitter</button></div></section>
+<section id="screenAmbient" class="screen ambient-screen" aria-label="Ambiance"><div class="ambient-copy"><h1>Un instant calme.</h1><button class="cta focusable" data-action="back">Retour</button></div><div class="ambient-sun"></div></section>
+</div></div><script src="tv.js"></script><script src="model.js"></script><script src="app.js"></script></body></html>

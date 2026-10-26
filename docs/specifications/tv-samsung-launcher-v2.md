@@ -4,7 +4,44 @@ Statut : **spécification de travail V2**, issue canonique #295, Sport #738.
 Matériel terrain : **Samsung QE55Q6FNA, gamme 2018, Tizen 4.0**.
 Compatibilité du widget : `required_version="3.0"` reste un **minimum technique**, pas la version réelle de la TV testée.
 
+## Décision propriétaire du 26 octobre 2026 — fidélité aux planches
+
+Les planches réelles de `SeenIt TV (2).html` priment sur les propositions de composition ci-dessous : Home avec quatre destinations **TV · Films · Sport · Réglages**, puis cinq apps favorites + Toutes les apps et deux accès Sources, puis rendez-vous compacts. Aucun grand Hero ne remplace ces destinations ; un événement imminent/direct met en avant la carte Sport en gardant la géométrie et le focus stables. Focus initial TV après choix adulte. Les textes techniques restent dans Diagnostic, pas dans l’accueil.
+
+Logos : icône native locale si exploitable, petits assets embarqués pour les marques reconnues, monogramme pour toute nouvelle app. La marque sert uniquement à la présentation : le lancement utilise toujours l’ID réellement inventorié, aucune table d’IDs Samsung supposée universelle. Favoris et dernières apps locales par profil ; toute app utilisateur peut être épinglée depuis la bibliothèque et les nouvelles installations apparaissent après Actualiser/reprise. Home bornée à5apps, bibliothèque18/page.
+
+RAM : fond coloré léger, pas de grande image plein écran ni vidéo/blur ; libérer les images et grilles invisibles, arrêter horloge et télémétrie en arrière-plan, restaurer le dernier focus et seulement les éléments utiles. Aucune fermeture automatique d’une autre app et aucun gain global de RAM annoncé sans mesure matérielle. Sources : [guide mémoire Samsung](https://developer.samsung.com/smarttv/develop/guides/web-app-memory-optimization-guide.html), [multitâche Samsung](https://developer.samsung.com/smarttv/develop/guides/fundamentals/multitasking.html).
+
+Accès permanents aux Réglages SeenIt, aux Réglages Samsung lorsqu’un handler/app installé est vérifié et à une sortie explicite avec confirmation. Aucun takeover Home/startup tant que l’échappatoire Samsung et le rollback ne sont pas prouvés sur la TV. Le root reste une décision ultérieure.
+
+Profils : compte SeenIt propriétaire envisagé pour relier le foyer, profils TV Julian/Camille/Milo séparant d’abord favoris et dernières apps locales. Une app partagée Netflix ou autre ne fournit pas à SeenIt l’identité du spectateur ni une preuve de visionnage ; ouvrir une app ne crée jamais un épisode vu ni une reprise de média inventée. L’appairage et les historiques connectés doivent être conçus/testés avant toute mutation de données ; Invité ne persiste pas d’historique. Les exemples Sport/Films restent limités à la preview tant qu’aucune donnée réelle n’est reliée.
+
 ## 1. Objectif produit
+
+### Référence complémentaire Luma — décision du 26 octobre
+
+Le propriétaire demande de mélanger ses planches avec [Luma](https://github.com/0xProbabillity/luma-tv),
+référencé par [ce post](https://x.com/0xProbabillity/status/2112177721245659590). Les captures et le README
+ont été examinés. Retenir la respiration, les logos dominants, les libellés au focus, l'organisation
+par appui long OK, et une apparence claire/sombre sélectionnable. Conserver les quatre destinations,
+les profils locaux, les sources et les fonctions SeenIt. Les sections sans donnée ne prennent pas
+un grand bloc vide sur la Home. Aucune maison 3D ni connexion domotique simulée.
+
+Précision propriétaire : **cela reste un launcher TV**, pas une application de catalogue. Les apps
+et les sources passent au premier plan ; les quatre destinations deviennent des raccourcis compacts.
+SeenIt et Sport forment des enrichissements contextuels, sans imposer un écran de contenu avant de
+lancer une app. Ce dernier arbitrage prime sur les quatre grandes cartes des planches initiales.
+
+Implémentation Tizen : fonds statiques par dégradés locaux (Brume, Crépuscule ou automatique selon
+l'heure locale 07h–20h), pas de coucher de soleil prétendument géolocalisé. Animation du focus
+désactivable, respect de la préférence de réduction des mouvements. L'appui OK court lance l'app,
+l'appui long (550 ms) ouvre Favori / Déplacer / Masquer sans lancement accidentel ; Organiser reste
+l'alternative visible. Ces choix restent locaux au profil, Invité éphémère.
+
+Luma cible Android TV et ses API Continue Watching ; cela ne prouve aucune disponibilité sur Tizen.
+Les instructions d'installation ADB/launcher de l'article sont des exemples tiers, jamais des actions
+autorisées sur la Samsung. Aucun code Java, image, animation ou procédure d'installation Luma n'est
+copié dans le widget ; inspiration visuelle uniquement, compatibilité et RAM vérifiées séparément.
 
 SeenIt TV n'est pas une application secondaire : la cible est d'en faire le **Home/launcher principal** de la TV.
 
@@ -317,11 +354,11 @@ La personnalisation ne doit jamais modifier la géométrie ni rendre la navigati
 
 ### 9.3 Milo
 
-- Home simplifiée ;
-- aucune vue `Système` ;
-- apps autorisées seulement ;
-- Sport absent sauf préférence explicite future ;
-- accès parent protégé avant toute modification sensible.
+Décision propriétaire du 26 octobre : **profil local simple, apps choisies pour lui, aucun code**.
+La Home et Films présentent uniquement ses apps sélectionnées. La bibliothèque ouvre sa sélection ;
+Organiser permet de choisir parmi les apps utilisateur détectées, sans PIN. La vue Système est masquée.
+Il ne s'agit pas d'un verrou parental : changer de profil ou accéder aux réglages reste possible.
+Les favoris Julian/Camille restent indépendants ; aucun historique de visionnage n'est inféré.
 
 ### 9.4 TV / Sources
 

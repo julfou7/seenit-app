@@ -1,741 +1,401 @@
-/* SeenIt TV launcher V2. Plain ES5 for Samsung Tizen 3+ / Chromium-era engines. */
+/* SeenIt TV: ES5, bounded DOM, no background work or personal viewing writes. */
 (function () {
   'use strict';
-
-  var DESIGN_WIDTH = 1920;
-  var DESIGN_HEIGHT = 1080;
-  var APPS_PER_PAGE = 18;
-  var NAV_DEBOUNCE_MS = 170;
-  var stage = document.getElementById('stage');
-  var currentScreen = 'screenProfiles';
-  var history = [];
-  var currentProfile = null;
-  var installedApps = [];
-  var detectedSources = [];
-  var memoryInfo = null;
-  var storageInfo = null;
-  var toastTimer = null;
-  var memoryTimer = null;
-  var storageTimer = null;
-  var sportState = 'normal';
-  var appsTab = 'favorites';
-  var appsPage = 0;
-  var appsKidOnly = false;
-  var lastDirectionalAt = 0;
-
-  var events = [
-    { when: 'Ce soir · 20:45', title: 'Monaco — Lille', meta: 'Ligue 1 · confirmé' },
-    { when: 'Mer. · 21:00', title: 'Monaco — Benfica', meta: 'Champions League · confirmé' },
-    { when: '14 nov. · 20:45', title: 'France — Italie', meta: 'International · provisoire' }
+  var DESIGN_WIDTH = 1920, DESIGN_HEIGHT = 1080;
+  var APPS_PER_PAGE = 18, NAV_DEBOUNCE_MS = 170;
+  var currentScreen = 'screenProfiles', currentProfile = null, history = [];
+  var installedApps = [], detectedSources = [], appsTab = 'favorites', appsPage = 0, organizing = false;
+  var memoryInfo = null, storageInfo = null, memoryTimer = null, storageTimer = null, clockTimer = null, toastTimer = null;
+  var focusMemory = {}, suspendedFocus = null, inventoryBusy = false, lastDiscovery = 0, lastDirectionalAt = 0;
+  var launchPending = false, sportState = 'normal';
+  var enterTimer = null, enterTarget = null, longActivated = false, selectedAppId = '';
+  var storage;
+  try { storage = window.localStorage; } catch (e) { storage = { getItem: function () {}, setItem: function () {} }; }
+  var prefs = TVModel.preferences(storage, '');
+  var demoEvents = [
+    { when: 'Ce soir · 20:45', title: 'Monaco — Lille', meta: 'Ligue 1' },
+    { when: 'Mercredi · 21:00', title: 'Monaco — Benfica', meta: 'Champions League' },
+    { when: '14 nov. · 20:45', title: 'France — Italie', meta: 'International' }
   ];
-
-  var favoriteNames = ['Plex', 'Netflix', 'YouTube', 'Prime Video', 'DAZN', 'CANAL+', 'Disney+', 'Spotify'];
-  var kidAllowed = ['YouTube Kids', 'Netflix', 'Disney+', 'Plex'];
-
-  function addClass(node, name) {
-    if (!node || new RegExp('(^|\\s)' + name + '(\\s|$)').test(node.className)) return;
-    node.className += ' ' + name;
-  }
-
-  function removeClass(node, name) {
-    if (!node) return;
-    node.className = node.className.replace(new RegExp('\\s*\\b' + name + '\\b', 'g'), '');
-  }
-
+  var dynamicIds = ['appRow', 'homeSources', 'homeEvents', 'recentApps', 'filmApps', 'calendarList', 'sourceGrid', 'allAppsGrid'];
+  function el(id) { return document.getElementById(id); }
+  function hidden() { return document.hidden === true; }
+  function addClass(node, name) { if (node && !new RegExp('(^|\\s)' + name + '(\\s|$)').test(node.className)) node.className += ' ' + name; }
+  function removeClass(node, name) { if (node) node.className = node.className.replace(new RegExp('\\s*\\b' + name + '\\b', 'g'), ''); }
   function resizeStage() {
     var scale = Math.min(window.innerWidth / DESIGN_WIDTH, window.innerHeight / DESIGN_HEIGHT);
-    var left = Math.round((window.innerWidth - DESIGN_WIDTH * scale) / 2);
-    var top = Math.round((window.innerHeight - DESIGN_HEIGHT * scale) / 2);
-    stage.style.transform = 'translate(' + left + 'px,' + top + 'px) scale(' + scale + ')';
+    el('stage').style.transform = 'translate(' + Math.round((window.innerWidth - DESIGN_WIDTH * scale) / 2) + 'px,' + Math.round((window.innerHeight - DESIGN_HEIGHT * scale) / 2) + 'px) scale(' + scale + ')';
   }
-
   function showToast(message) {
-    var toast = document.getElementById('toast');
-    toast.textContent = message;
-    toast.className = 'toast visible';
+    if (hidden()) return;
+    el('toast').textContent = message; el('toast').className = 'toast visible';
     if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { toast.className = 'toast'; }, 2800);
+    toastTimer = setTimeout(function () { el('toast').className = 'toast'; toastTimer = null; }, 2800);
   }
-
   function updateConnectivity() {
     var offline = navigator.onLine === false;
-    document.getElementById('offlineBadge').className = offline ? 'offline-badge visible' : 'offline-badge';
-    document.getElementById('networkStatus').textContent = offline ? 'Réseau · hors ligne' : 'Réseau · en ligne';
-    updateHero();
+    el('offlineBadge').className = offline ? 'offline-badge visible' : 'offline-badge';
+    el('networkStatus').textContent = offline ? 'Hors ligne' : '';
   }
-
-  function screens() {
-    return document.querySelectorAll('.screen');
-  }
-
-  function isVisible(node) {
-    return !!node && !node.disabled && (node.offsetWidth > 0 || node.offsetHeight > 0);
-  }
-
+  function isVisible(node) { return !!node && !node.disabled && (node.offsetWidth > 0 || node.offsetHeight > 0); }
   function focusables() {
-    var screen = document.getElementById(currentScreen);
-    var nodes;
-    var out = [];
-    var i;
-    if (!screen) return out;
-    nodes = screen.querySelectorAll('.focusable');
+    var nodes = el(currentScreen).querySelectorAll('.focusable'), out = [], i;
     for (i = 0; i < nodes.length; i++) if (isVisible(nodes[i])) out.push(nodes[i]);
     return out;
   }
-
-  function clearFocus() {
-    var nodes = document.querySelectorAll('.focused');
-    var i;
-    for (i = 0; i < nodes.length; i++) removeClass(nodes[i], 'focused');
+  function token(node) {
+    if (!node || !node.getAttribute) return null;
+    return { id: node.id || '', action: node.getAttribute('data-action'), app: node.getAttribute('data-app-id'), tab: node.getAttribute('data-tab'), source: node.getAttribute('data-source-type'), number: node.getAttribute('data-source-number'), profile: node.getAttribute('data-profile') };
   }
-
-  function setFocus(element) {
-    if (!element || !isVisible(element)) return;
-    clearFocus();
-    addClass(element, 'focused');
-    try { element.focus(); } catch (e) {}
+  function matches(node, saved) {
+    var t = token(node);
+    return saved && t && t.id === saved.id && t.action === saved.action && t.app === saved.app && t.tab === saved.tab && t.source === saved.source && t.number === saved.number && t.profile === saved.profile;
   }
-
-  function firstFocus() {
-    var list = focusables();
-    if (list.length) setFocus(list[0]);
+  function setFocus(node) {
+    var old = document.querySelectorAll('.focused'), i;
+    if (!isVisible(node) || hidden()) return;
+    for (i = 0; i < old.length; i++) removeClass(old[i], 'focused');
+    addClass(node, 'focused'); node.focus();
+    el('focusDetail').textContent = currentScreen === 'screenHome' && node.getAttribute('data-app-id') ? node.getAttribute('data-app-title') + '   ·   OK : ouvrir   ·   Maintenir OK : organiser' : '';
   }
-
+  function firstFocus(saved) {
+    var list = focusables(), i;
+    if (saved) for (i = 0; i < list.length; i++) if (matches(list[i], saved)) { setFocus(list[i]); return; }
+    if (currentScreen === 'screenHome') setFocus(el('primaryTv'));
+    else if (currentScreen === 'screenExit') setFocus(el('stayButton'));
+    else if (list.length) setFocus(list[0]);
+  }
   function moveFocus(direction) {
-    var list = focusables();
-    var active = document.activeElement;
-    var origin = null;
-    var i;
-    var r;
-    var ox;
-    var oy;
-    var best = null;
-    var bestScore = 9999999;
-    if (!list.length) return;
+    var list = focusables(), origin = document.activeElement, r, ox, oy, i, c, dx, dy, primary, secondary, score, best = null, bestScore = Infinity;
+    if (list.indexOf(origin) < 0) { firstFocus(); return; }
+    r = origin.getBoundingClientRect(); ox = r.left + r.width / 2; oy = r.top + r.height / 2;
     for (i = 0; i < list.length; i++) {
-      if (list[i] === active || /\bfocused\b/.test(list[i].className)) origin = list[i];
-    }
-    if (!origin) { setFocus(list[0]); return; }
-    r = origin.getBoundingClientRect();
-    ox = r.left + r.width / 2;
-    oy = r.top + r.height / 2;
-    for (i = 0; i < list.length; i++) {
-      var c;
-      var cx;
-      var cy;
-      var dx;
-      var dy;
-      var valid;
-      var primary;
-      var secondary;
-      var score;
       if (list[i] === origin) continue;
-      c = list[i].getBoundingClientRect();
-      cx = c.left + c.width / 2;
-      cy = c.top + c.height / 2;
-      dx = cx - ox;
-      dy = cy - oy;
-      valid = (direction === 'left' && dx < -6) || (direction === 'right' && dx > 6) || (direction === 'up' && dy < -6) || (direction === 'down' && dy > 6);
-      if (!valid) continue;
+      c = list[i].getBoundingClientRect(); dx = c.left + c.width / 2 - ox; dy = c.top + c.height / 2 - oy;
+      if (!((direction === 'left' && dx < -6) || (direction === 'right' && dx > 6) || (direction === 'up' && dy < -6) || (direction === 'down' && dy > 6))) continue;
       primary = direction === 'left' || direction === 'right' ? Math.abs(dx) : Math.abs(dy);
       secondary = direction === 'left' || direction === 'right' ? Math.abs(dy) : Math.abs(dx);
       score = primary + secondary * 2.15;
+      /* Keep a directional step in its row/column before crossing to another rail. */
+      if (direction === 'left' || direction === 'right') { if (c.bottom <= r.top || c.top >= r.bottom) score += 100000; }
+      else if (c.right <= r.left || c.left >= r.right) score += 100000;
       if (score < bestScore) { bestScore = score; best = list[i]; }
     }
     if (best) setFocus(best);
   }
-
-  function showScreen(id, push) {
-    var list = screens();
-    var i;
-    if (push !== false && currentScreen !== id) history.push(currentScreen);
-    for (i = 0; i < list.length; i++) {
-      removeClass(list[i], 'active');
-      if (list[i].id === id) addClass(list[i], 'active');
+  function releaseDynamic() {
+    var i, j, images;
+    for (i = 0; i < dynamicIds.length; i++) {
+      images = el(dynamicIds[i]).querySelectorAll('img');
+      for (j = 0; j < images.length; j++) {
+        images[j].onerror = null;
+        /* Detach tiny shared vectors intact; blank raster sources before dropping the grid. */
+        if (!/\.svg(?:[?#]|$)/i.test(images[j].getAttribute('src') || '')) images[j].removeAttribute('src');
+      }
+      el(dynamicIds[i]).innerHTML = '';
     }
-    currentScreen = id;
-    if (id === 'screenApps') renderAppsPage();
-    if (id === 'screenSources') renderSources();
-    if (id === 'screenSettings') updateDiagnosticPanel();
-    setTimeout(firstFocus, 0);
   }
-
+  function showScreen(id, push) {
+    var screens = document.querySelectorAll('.screen'), i;
+    focusMemory[currentScreen] = token(document.activeElement);
+    if (push !== false && currentScreen !== id) history.push(currentScreen);
+    releaseDynamic();
+    for (i = 0; i < screens.length; i++) { removeClass(screens[i], 'active'); if (screens[i].id === id) addClass(screens[i], 'active'); }
+    currentScreen = id; renderCurrent(); firstFocus(focusMemory[id]);
+  }
   function goBack() {
     if (history.length) showScreen(history.pop(), false);
-    else if (currentScreen !== 'screenProfiles') showScreen('screenHome', false);
+    else if (currentScreen === 'screenHome' || currentScreen === 'screenProfiles') showScreen('screenExit');
+    else showScreen('screenHome', false);
   }
-
-  function profileInitial(name) {
-    return name === 'Invité' ? '+' : name.charAt(0).toUpperCase();
-  }
-
   function setProfile(name) {
-    var home = document.getElementById('screenHome');
-    currentProfile = name;
-    try { localStorage.setItem('seenit.tv.profile', name); } catch (e) {}
-    document.getElementById('hello').textContent = name === 'Milo' ? 'Salut Milo' : (name === 'Invité' ? 'Mode Invité' : 'Bonsoir ' + name);
-    document.getElementById('profileInitial').textContent = profileInitial(name);
-    removeClass(home, 'kid-mode');
-    if (name === 'Milo') addClass(home, 'kid-mode');
-    history = [];
-    updateHero();
-    renderHomeApps();
+    if (['Julian', 'Camille', 'Milo', 'Invité'].indexOf(name) < 0) return;
+    currentProfile = name; prefs = TVModel.preferences(storage, name);
+    applyAppearance();
+    el('profileInitial').textContent = name === 'Invité' ? '+' : name.charAt(0);
+    el('profileName').textContent = name;
+    el('greeting').textContent = (new Date().getHours() >= 18 ? 'Bonsoir' : 'Bonjour') + (name === 'Invité' ? '' : ', ' + name);
+    history = []; focusMemory = {}; appsPage = 0; organizing = false;
     showScreen('screenHome', false);
   }
-
-  function colorForTitle(title) {
-    var t = String(title || '').toLowerCase();
-    if (t.indexOf('netflix') >= 0) return '#a72a32';
-    if (t.indexOf('plex') >= 0) return '#b88628';
-    if (t.indexOf('youtube') >= 0) return '#b63838';
-    if (t.indexOf('prime') >= 0) return '#397d9f';
-    if (t.indexOf('dazn') >= 0) return '#333640';
-    if (t.indexOf('canal') >= 0) return '#35323a';
-    if (t.indexOf('spotify') >= 0) return '#387a51';
-    if (t.indexOf('disney') >= 0) return '#405c91';
-    return '#343845';
+  function appendText(parent, tag, value, className) {
+    var node = document.createElement(tag); if (className) node.className = className; node.textContent = value; parent.appendChild(node); return node;
   }
-
-  function initials(title) {
-    var words = String(title || '?').split(/\s+/);
-    return (words[0] ? words[0].charAt(0) : '?') + (words.length > 1 ? words[1].charAt(0) : '');
-  }
-
-  function appButton(app, showClassification) {
-    var button = document.createElement('button');
-    var logo = document.createElement('span');
-    var name = document.createElement('span');
+  function appButton(app, system) {
+    var button = document.createElement('button'), logo, nativePath = TVModel.localIcon(app.iconPath), brand = TVModel.brand(app.title), paths = [], image, next = 0;
     button.className = 'app-card focusable';
-    button.setAttribute('data-action', app.launchable ? 'launch-app' : 'inspect-app');
-    button.setAttribute('data-app-id', app.id);
-    button.setAttribute('data-app-title', app.title);
-    logo.className = 'app-logo';
-    logo.style.background = colorForTitle(app.title);
-    logo.textContent = initials(app.title);
-    name.className = 'app-name';
-    name.textContent = app.title;
-    button.appendChild(logo);
-    button.appendChild(name);
-    if (showClassification) {
-      var badge = document.createElement('span');
-      badge.className = 'app-class';
-      badge.textContent = app.classification;
-      button.appendChild(badge);
+    if (brand) addClass(button, 'brand-' + brand.file);
+    button.setAttribute('data-action', system ? 'inspect-app' : (organizing && currentScreen === 'screenApps' ? 'pin-app' : 'launch-app'));
+    button.setAttribute('data-app-id', app.id); button.setAttribute('data-app-title', app.title); button.setAttribute('aria-label', app.title);
+    logo = appendText(button, 'span', '', 'app-logo');
+    if (nativePath) paths.push(nativePath);
+    if (brand) paths.push('assets/apps/' + brand.file + '.svg');
+    function fallback() {
+      if (hidden() || (next > 0 && !document.documentElement.contains(logo))) return;
+      if (next >= paths.length) { logo.textContent = TVModel.initials(app.title); return; }
+      image = document.createElement('img'); image.alt = ''; image.onerror = fallback; image.src = paths[next++]; logo.innerHTML = ''; logo.appendChild(image);
     }
+    fallback();
+    appendText(button, 'span', app.title, 'app-name');
+    if (prefs.pins().indexOf(app.id) >= 0) appendText(button, 'span', '★', 'pin-star');
+    if (system) appendText(button, 'span', app.classification, 'app-class');
     return button;
   }
-
   function allAppsButton() {
-    var button = document.createElement('button');
-    var logo = document.createElement('span');
-    var name = document.createElement('span');
-    button.className = 'app-card all-apps-card focusable';
-    button.setAttribute('data-action', 'all-apps');
-    logo.className = 'app-logo';
-    logo.textContent = '▦';
-    name.className = 'app-name';
-    name.textContent = 'Toutes les apps';
-    button.appendChild(logo);
-    button.appendChild(name);
-    return button;
+    var b = document.createElement('button'); b.className = 'app-card all-apps-card focusable'; b.setAttribute('data-action', 'all-apps');
+    appendText(b, 'span', '▦', 'app-logo'); appendText(b, 'span', 'Toutes les apps', 'app-name'); return b;
   }
-
-  function scoreFavorite(app) {
-    var i;
-    var title = String(app.title || '').toLowerCase();
-    for (i = 0; i < favoriteNames.length; i++) {
-      if (title.indexOf(favoriteNames[i].toLowerCase()) >= 0) return i;
-    }
-    return 999;
+  function sourceLabel(s) { return String(s.type).toUpperCase() + (s.number !== undefined ? ' ' + s.number : ''); }
+  function sourceButton(s, compact) {
+    var b = document.createElement('button'); b.className = 'source-card focusable'; b.setAttribute('data-action', 'source');
+    b.setAttribute('data-source-type', s.type); b.setAttribute('data-source-number', s.number);
+    appendText(b, 'strong', sourceLabel(s)); appendText(b, 'small', s.connected ? 'Connectée' : 'Non connectée');
+    if (!compact) appendText(b, 'span', 'Ouvrir cette entrée');
+    return b;
   }
-
-  function isKidAllowed(app) {
-    var title = String(app.title || '').toLowerCase();
-    var i;
-    for (i = 0; i < kidAllowed.length; i++) if (title.indexOf(kidAllowed[i].toLowerCase()) >= 0) return true;
-    return false;
-  }
-
-  function sortedUserApps() {
-    var out = [];
-    var i;
-    for (i = 0; i < installedApps.length; i++) if (installedApps[i].classification === 'USER') out.push(installedApps[i]);
-    out.sort(function (a, b) {
-      var sa = scoreFavorite(a);
-      var sb = scoreFavorite(b);
-      var aa;
-      var bb;
-      if (sa !== sb) return sa - sb;
-      aa = a.title.toLowerCase();
-      bb = b.title.toLowerCase();
-      return aa < bb ? -1 : aa > bb ? 1 : 0;
-    });
-    return out;
-  }
-
-  function countClassification(name) {
-    var count = 0;
-    var i;
-    for (i = 0; i < installedApps.length; i++) if (installedApps[i].classification === name) count++;
-    return count;
-  }
-
-  function favoriteApps() {
-    var users = sortedUserApps();
-    var out = [];
-    var used = {};
-    var i;
-    for (i = 0; i < users.length && out.length < 7; i++) {
-      if (scoreFavorite(users[i]) < 999) { out.push(users[i]); used[users[i].id] = true; }
-    }
-    for (i = 0; i < users.length && out.length < 7; i++) {
-      if (!used[users[i].id]) { out.push(users[i]); used[users[i].id] = true; }
-    }
-    return out;
-  }
-
-  function renderHomeApps() {
-    var row = document.getElementById('appRow');
-    var kidRow = document.getElementById('kidAppRow');
-    var favorites = favoriteApps();
-    var users = sortedUserApps();
-    var i;
-    row.innerHTML = '';
-    kidRow.innerHTML = '';
-    for (i = 0; i < favorites.length; i++) row.appendChild(appButton(favorites[i], false));
-    row.appendChild(allAppsButton());
-    for (i = 0; i < users.length && kidRow.children.length < 5; i++) {
-      if (isKidAllowed(users[i])) kidRow.appendChild(appButton(users[i], false));
-    }
-    document.getElementById('appsStatus').textContent = installedApps.length ? installedApps.length + ' détectées · ' + countClassification('USER') + ' utilisateur' : 'Aucune app détectée';
-  }
-
-  function appsForTab(tab) {
-    var out = [];
-    var favorites;
-    var i;
-    if (tab === 'favorites') {
-      favorites = favoriteApps();
-      if (!appsKidOnly) return favorites;
-      for (i = 0; i < favorites.length; i++) if (isKidAllowed(favorites[i])) out.push(favorites[i]);
-      return out;
-    }
-    for (i = 0; i < installedApps.length; i++) {
-      if (tab === 'user' && installedApps[i].classification === 'USER' && (!appsKidOnly || isKidAllowed(installedApps[i]))) out.push(installedApps[i]);
-      else if (tab === 'system' && !appsKidOnly && installedApps[i].classification !== 'USER') out.push(installedApps[i]);
-    }
-    out.sort(function (a, b) {
-      var aa = a.title.toLowerCase();
-      var bb = b.title.toLowerCase();
-      return aa < bb ? -1 : aa > bb ? 1 : 0;
-    });
-    return out;
-  }
-
-  function updateTabClasses() {
-    var map = { favorites: 'tabFavorites', user: 'tabUser', system: 'tabSystem' };
-    var systemTab = document.getElementById('tabSystem');
-    var key;
-    systemTab.style.display = appsKidOnly ? 'none' : '';
-    if (appsKidOnly && appsTab === 'system') appsTab = 'user';
-    for (key in map) {
-      if (map.hasOwnProperty(key)) {
-        var node = document.getElementById(map[key]);
-        removeClass(node, 'selected');
-        if (key === appsTab) addClass(node, 'selected');
-      }
-    }
-    removeClass(document.getElementById('screenApps'), 'apps-system-mode');
-    if (appsTab === 'system') addClass(document.getElementById('screenApps'), 'apps-system-mode');
-  }
-
-  function configurePager(button, enabled) {
-    button.disabled = !enabled;
-    button.className = enabled ? 'pager-button focusable' : 'pager-button';
-  }
-
-  function renderAppsPage() {
-    var grid = document.getElementById('allAppsGrid');
-    var list = appsForTab(appsTab);
-    var pageCount = Math.max(1, Math.ceil(list.length / APPS_PER_PAGE));
-    var start;
-    var end;
-    var i;
-    if (appsPage >= pageCount) appsPage = pageCount - 1;
-    if (appsPage < 0) appsPage = 0;
-    start = appsPage * APPS_PER_PAGE;
-    end = Math.min(list.length, start + APPS_PER_PAGE);
-    grid.innerHTML = '';
-    for (i = start; i < end; i++) grid.appendChild(appButton(list[i], appsTab === 'system'));
-    document.getElementById('appsCount').textContent = list.length + (list.length > 1 ? ' apps' : ' app');
-    document.getElementById('pageStatus').textContent = 'Page ' + (appsPage + 1) + '/' + pageCount;
-    configurePager(document.getElementById('pagePrev'), appsPage > 0);
-    configurePager(document.getElementById('pageNext'), appsPage + 1 < pageCount);
-    updateTabClasses();
-  }
-
-  function renderCalendar() {
-    var row = document.getElementById('calendarList');
-    var i;
-    row.innerHTML = '';
-    for (i = 0; i < events.length; i++) {
-      var b = document.createElement('button');
-      var when = document.createElement('span');
-      var title = document.createElement('strong');
-      var meta = document.createElement('small');
-      b.className = 'calendar-item focusable';
-      b.setAttribute('data-action', 'sport-event');
-      when.textContent = events[i].when;
-      title.textContent = events[i].title;
-      meta.textContent = events[i].meta;
-      b.appendChild(when);
-      b.appendChild(title);
-      b.appendChild(meta);
-      row.appendChild(b);
-    }
-  }
-
-  function sourceLabel(source) {
-    var type = String(source.type || 'SOURCE').toUpperCase();
-    return type + (source.number !== undefined ? ' ' + source.number : '');
-  }
-
   function renderSources() {
-    var grid = document.getElementById('sourceGrid');
-    var i;
-    grid.innerHTML = '';
-    if (!detectedSources.length) {
-      var empty = document.createElement('div');
-      empty.className = 'source-card';
-      empty.innerHTML = '<span>DIAGNOSTIC</span><strong>Aucune source détectée</strong><small>Le launcher ne suppose aucune entrée HDMI.</small>';
-      grid.appendChild(empty);
-      return;
+    var row = el(currentScreen === 'screenHome' ? 'homeSources' : 'sourceGrid'), list = [], i;
+    row.innerHTML = '';
+    for (i = 0; i < detectedSources.length; i++) if (String(detectedSources[i].type).toUpperCase() !== 'TV') list.push(detectedSources[i]);
+    list.sort(function (a, b) { return Number(b.connected) - Number(a.connected); });
+    for (i = 0; i < list.length && i < (currentScreen === 'screenHome' ? 2 : 12); i++) row.appendChild(sourceButton(list[i], currentScreen === 'screenHome'));
+    if (!list.length) appendText(row, 'p', 'Aucune entrée détectée', 'rail-status');
+  }
+  function renderHomeApps() {
+    var row = el('appRow'), favorites = profileApps(5), i;
+    var recent = TVModel.byIds(currentProfile === 'Milo' ? TVModel.byIds(installedApps, prefs.pins()) : installedApps, prefs.recent());
+    el('filmsCopy').textContent = recent.length ? recent[0].title : 'Films & séries';
+    el('filmsHint').textContent = recent.length ? 'Rouvrir l’app' : 'Vos apps';
+    row.innerHTML = '';
+    for (i = 0; i < favorites.length; i++) row.appendChild(appButton(favorites[i], false));
+    row.appendChild(allAppsButton()); el('appsStatus').textContent = currentProfile === 'Milo' && !favorites.length ? 'Choisissez ses apps' : '';
+  }
+  function profileApps(limit) {
+    return currentProfile === 'Milo' ? TVModel.byIds(installedApps, prefs.pins()).slice(0, limit) : TVModel.favorites(installedApps, prefs.pins(), limit, prefs.hidden());
+  }
+  function renderFilms() {
+    var allowed = currentProfile === 'Milo' ? TVModel.byIds(installedApps, prefs.pins()) : installedApps;
+    var recent = TVModel.byIds(allowed, prefs.recent()).slice(0, 5), favorites = profileApps(5), i;
+    el('recentApps').innerHTML = ''; el('filmApps').innerHTML = '';
+    for (i = 0; i < recent.length; i++) el('recentApps').appendChild(appButton(recent[i], false));
+    for (i = 0; i < favorites.length; i++) el('filmApps').appendChild(appButton(favorites[i], false));
+    el('filmApps').appendChild(allAppsButton()); el('recentHint').style.display = recent.length ? 'none' : '';
+  }
+  function renderEvents() {
+    var preview = !TVDevice.isSamsung(), events = preview ? demoEvents : [], row = el(currentScreen === 'screenHome' ? 'homeEvents' : 'calendarList'), i, b;
+    row.innerHTML = '';
+    if (currentScreen === 'screenHome') { row.style.display = events.length ? '' : 'none'; el('homeSportHeading').style.display = events.length ? '' : 'none'; }
+    el('sportStatus').textContent = preview ? 'Aperçu' : '';
+    el('calendarHint').textContent = preview ? 'Exemples de maquette. Le diffuseur dépend de chaque événement.' : 'Aucun calendrier connecté pour le moment.';
+    for (i = 0; i < events.length && (currentScreen !== 'screenHome' || i < 2); i++) {
+      b = document.createElement('button'); b.className = 'event-card focusable'; b.setAttribute('data-action', 'sport-event');
+      appendText(b, 'span', events[i].when); appendText(b, 'strong', events[i].title); appendText(b, 'small', events[i].meta); row.appendChild(b);
     }
-    for (i = 0; i < detectedSources.length; i++) {
-      var b = document.createElement('button');
-      var status = document.createElement('span');
-      var title = document.createElement('strong');
-      var meta = document.createElement('small');
-      b.className = 'source-card focusable';
-      b.setAttribute('data-action', 'source');
-      b.setAttribute('data-source-type', detectedSources[i].type);
-      b.setAttribute('data-source-number', detectedSources[i].number);
-      status.textContent = detectedSources[i].connected ? 'CONNECTÉE' : 'DÉTECTÉE';
-      title.textContent = sourceLabel(detectedSources[i]);
-      meta.textContent = detectedSources[i].connected ? 'Basculer vers cette entrée' : 'Entrée connue, périphérique non signalé';
-      b.appendChild(status);
-      b.appendChild(title);
-      b.appendChild(meta);
-      grid.appendChild(b);
+    if (!events.length) appendText(row, 'div', 'Vos rendez-vous sportifs apparaîtront ici.', 'empty-event');
+    else if (currentScreen === 'screenHome') {
+      b = document.createElement('button'); b.className = 'event-card focusable'; b.setAttribute('data-action', 'sport'); appendText(b, 'strong', 'Tout le sport ›'); row.appendChild(b);
     }
   }
-
-  function updateSourceSummary() {
-    var connected = 0;
-    var i;
-    for (i = 0; i < detectedSources.length; i++) if (detectedSources[i].connected) connected++;
-    document.getElementById('sourcesCopy').textContent = detectedSources.length ? connected + ' connectée(s) · ' + detectedSources.length + ' détectée(s)' : 'Aucune entrée détectée';
-    document.getElementById('sourceStatus').textContent = detectedSources.length ? 'Sources · ' + detectedSources.length + ' détectée(s)' : 'Sources · aucune détectée';
-  }
-
   function updateSportTile() {
-    var tile = document.getElementById('sportTile');
-    var badge = document.getElementById('sportBadge');
-    var copy = document.getElementById('sportCopy');
-    var feature = document.getElementById('sportFeatureBadge');
-    removeClass(tile, 'live');
-    if (sportState === 'live') {
-      addClass(tile, 'live');
-      badge.textContent = '● EN DIRECT';
-      copy.textContent = 'AS Monaco — Lille';
-      feature.textContent = '● EN DIRECT';
-    } else if (sportState === 'imminent') {
-      badge.textContent = 'DANS 23 MIN';
-      copy.textContent = 'AS Monaco — Lille · 20:45';
-      feature.textContent = 'DANS 23 MIN';
-    } else {
-      badge.textContent = 'CE SOIR';
-      copy.textContent = 'Monaco · 20:45';
-      feature.textContent = 'PRIORITÉ';
-    }
-    updateHero();
+    var demo = !TVDevice.isSamsung();
+    el('sportBadge').textContent = demo && sportState === 'live' ? 'EN DIRECT' : demo && sportState === 'imminent' ? 'DANS 23 MIN' : '';
+    el('sportCopy').textContent = demo && sportState !== 'normal' ? 'Monaco — Lille' : 'Mes rendez-vous';
+    removeClass(el('sportTile'), 'live'); if (demo && sportState !== 'normal') addClass(el('sportTile'), 'live');
   }
-
-  function updateHero() {
-    var hero = document.getElementById('heroCard');
-    var eyebrow = document.getElementById('heroEyebrow');
-    var title = document.getElementById('heroTitle');
-    var meta = document.getElementById('heroMeta');
-    var cta = document.getElementById('heroCta');
-    removeClass(hero, 'live');
-    if (navigator.onLine === false) {
-      hero.setAttribute('data-action', 'all-apps');
-      eyebrow.textContent = 'HORS LIGNE';
-      title.textContent = 'Le Home local reste disponible.';
-      meta.textContent = 'Apps installées, TNT et sources peuvent continuer sans service distant.';
-      cta.textContent = 'Voir les apps locales';
-    } else if (sportState === 'live') {
-      addClass(hero, 'live');
-      hero.setAttribute('data-action', 'sport');
-      eyebrow.textContent = '● EN DIRECT';
-      title.textContent = 'AS Monaco — Lille';
-      meta.textContent = 'Ligue 1 · le diffuseur reste résolu dynamiquement pour ce foyer.';
-      cta.textContent = 'Ouvrir Sport';
-    } else if (sportState === 'imminent') {
-      hero.setAttribute('data-action', 'sport');
-      eyebrow.textContent = 'DANS 23 MIN';
-      title.textContent = 'Monaco joue ce soir.';
-      meta.textContent = 'AS Monaco — Lille · 20:45 · horaire confirmé.';
-      cta.textContent = 'Voir le rendez-vous';
-    } else {
-      hero.setAttribute('data-action', 'films');
-      eyebrow.textContent = currentProfile ? 'BONSOIR ' + currentProfile.toUpperCase() : 'SEENIT TV';
-      title.textContent = 'Que voulez-vous regarder ?';
-      meta.textContent = 'TNT, apps, sources et contenus réunis dans un Home unique.';
-      cta.textContent = 'Explorer Films & séries';
-    }
+  function appsForTab() {
+    var list = [], i;
+    if (currentProfile === 'Milo' && appsTab === 'system') return list;
+    if (appsTab === 'favorites') return TVModel.byIds(installedApps, prefs.pins());
+    if (currentProfile === 'Milo' && !organizing) return TVModel.byIds(installedApps, prefs.pins());
+    for (i = 0; i < installedApps.length; i++) if ((appsTab === 'user') === (installedApps[i].classification === 'USER')) list.push(installedApps[i]);
+    return list;
   }
-
-  function formatBytes(value) {
-    var bytes = Number(value) || 0;
-    var mb;
-    var gb;
-    if (!bytes) return '';
-    mb = bytes / 1024 / 1024;
-    if (mb < 1024) return Math.round(mb) + ' Mo';
-    gb = mb / 1024;
-    return (Math.round(gb * 10) / 10).toFixed(gb < 10 ? 1 : 0).replace('.', ',') + ' Go';
+  function renderAppsPage() {
+    var list = appsForTab(), pageCount = Math.max(1, Math.ceil(list.length / APPS_PER_PAGE)), start, end, i, map = { favorites: 'tabFavorites', user: 'tabUser', system: 'tabSystem' }, key;
+    appsPage = Math.max(0, Math.min(appsPage, pageCount - 1)); start = appsPage * APPS_PER_PAGE; end = Math.min(list.length, start + APPS_PER_PAGE);
+    el('allAppsGrid').innerHTML = '';
+    for (i = start; i < end; i++) el('allAppsGrid').appendChild(appButton(list[i], appsTab === 'system'));
+    el('appsCount').textContent = list.length + ' apps';
+    el('pageStatus').textContent = 'Page ' + (appsPage + 1) + '/' + pageCount;
+    configurePager(el('pagePrev'), appsPage > 0); configurePager(el('pageNext'), appsPage + 1 < pageCount);
+    for (key in map) if (map.hasOwnProperty(key)) { removeClass(el(map[key]), 'selected'); if (key === appsTab) addClass(el(map[key]), 'selected'); }
+    removeClass(el('screenApps'), 'apps-system-mode'); removeClass(el('screenApps'), 'organizing');
+    if (appsTab === 'system') addClass(el('screenApps'), 'apps-system-mode');
+    else if (organizing) addClass(el('screenApps'), 'organizing');
+    el('manageApps').style.display = appsTab === 'system' ? 'none' : ''; el('manageApps').textContent = organizing ? 'Terminer' : 'Organiser';
+    el('tabSystem').style.display = currentProfile === 'Milo' ? 'none' : '';
   }
-
-  function renderTelemetry() {
-    var parts = [];
-    if (memoryInfo && memoryInfo.available) parts.push('RAM ' + formatBytes(memoryInfo.available));
-    if (storageInfo && storageInfo.available) parts.push('STOCK ' + formatBytes(storageInfo.available));
-    document.getElementById('telemetry').textContent = parts.join('  •  ');
-    updateDiagnosticPanel();
+  function configurePager(button, enabled) { button.disabled = !enabled; button.className = enabled ? 'pager-button focusable' : 'pager-button'; }
+  function renderCurrent() {
+    if (hidden()) return;
+    if (currentScreen === 'screenHome') { renderHomeApps(); renderSources(); renderEvents(); }
+    else if (currentScreen === 'screenFilms') renderFilms();
+    else if (currentScreen === 'screenSport') renderEvents();
+    else if (currentScreen === 'screenSources') renderSources();
+    else if (currentScreen === 'screenApps') renderAppsPage();
+    else if (currentScreen === 'screenDiagnostics') updateDiagnosticPanel();
+    else if (currentScreen === 'screenAppearance') renderAppearance();
   }
-
-  function refreshMemory() {
-    TVDevice.getMemoryInfo(function (info) { memoryInfo = info; renderTelemetry(); });
+  function applyAppearance() {
+    var hour = new Date().getHours(), theme = prefs.theme(), light = theme === 'mist' || (theme === 'auto' && hour >= 7 && hour < 20);
+    var reduced = !prefs.motion(), logos = document.querySelectorAll('.brand'), i, source = light ? 'assets/seenit-tv-dark.svg' : 'assets/seenit-tv.svg';
+    try { if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) reduced = true; } catch (e) {}
+    el('stage').className = (light ? 'light-theme' : '') + (reduced ? ' reduced-motion' : '');
+    for (i = 0; i < logos.length; i++) if (logos[i].getAttribute('src') !== source) logos[i].setAttribute('src', source);
   }
-
-  function refreshStorage() {
-    TVDevice.getStorageInfo(function (info) { storageInfo = info; renderTelemetry(); });
+  function renderAppearance() {
+    var buttons = el('screenAppearance').querySelectorAll('[data-theme]'), i;
+    for (i = 0; i < buttons.length; i++) { removeClass(buttons[i], 'selected'); buttons[i].setAttribute('aria-pressed', String(buttons[i].getAttribute('data-theme') === prefs.theme())); if (buttons[i].getAttribute('data-theme') === prefs.theme()) addClass(buttons[i], 'selected'); }
+    el('motionValue').textContent = prefs.motion() ? 'Activés' : 'Désactivés';
   }
-
-  function stopTelemetryTimers() {
-    if (memoryTimer) clearInterval(memoryTimer);
-    if (storageTimer) clearInterval(storageTimer);
-    memoryTimer = null;
-    storageTimer = null;
+  function openAppMenu(button) {
+    var app = TVModel.byIds(installedApps, [button.getAttribute('data-app-id')])[0];
+    if (!app) return;
+    selectedAppId = app.id; el('appMenuTitle').textContent = app.title;
+    el('menuPin').textContent = prefs.pins().indexOf(app.id) < 0 ? 'Ajouter aux favoris' : 'Retirer des favoris';
+    showScreen('screenAppMenu');
   }
-
-  function startTelemetryTimers() {
-    stopTelemetryTimers();
-    if (document.hidden === true) return;
-    refreshMemory();
-    refreshStorage();
-    memoryTimer = setInterval(refreshMemory, 15000);
-    storageTimer = setInterval(refreshStorage, 60000);
+  function moveApp(offset) {
+    var list = profileApps(5), pins = prefs.pins(), order = [], i, index, target, moved;
+    for (i = 0; i < list.length; i++) order.push(list[i].id);
+    for (i = 0; i < pins.length && order.length < 32; i++) if (order.indexOf(pins[i]) < 0) order.push(pins[i]);
+    index = order.indexOf(selectedAppId);
+    if (index < 0 && order.length < 32) { order.push(selectedAppId); index = order.length - 1; }
+    if (index < 0) { showToast('32 favoris maximum.'); return; }
+    target = Math.max(0, Math.min(order.length - 1, index + offset));
+    moved = order.splice(index, 1)[0]; order.splice(target, 0, moved); prefs.order(order);
   }
-
+  function formatBytes(bytes) {
+    if (typeof bytes !== 'number' || !isFinite(bytes) || bytes < 0) return '—';
+    return bytes >= 1073741824 ? (bytes / 1073741824).toFixed(1) + ' Go' : Math.round(bytes / 1048576) + ' Mo';
+  }
   function updateDiagnosticPanel() {
-    var userCount = countClassification('USER');
-    var systemCount = countClassification('SYSTEM');
-    var unknownCount = countClassification('UNKNOWN');
-    var memory = memoryInfo && memoryInfo.available ? formatBytes(memoryInfo.available) + (memoryInfo.total ? ' / ' + formatBytes(memoryInfo.total) : '') : '—';
-    var storage = storageInfo && storageInfo.available ? formatBytes(storageInfo.available) + (storageInfo.total ? ' / ' + formatBytes(storageInfo.total) : '') : '—';
-    document.getElementById('diagMemory').textContent = 'RAM · ' + memory;
-    document.getElementById('diagStorage').textContent = 'Stockage · ' + storage;
-    document.getElementById('diagApps').textContent = 'Apps · ' + userCount + ' user · ' + systemCount + ' système · ' + unknownCount + ' ambiguë(s)';
-    document.getElementById('diagSources').textContent = 'Sources · ' + detectedSources.length;
-    document.getElementById('diagRuntime').textContent = (TVDevice.isSamsung() ? 'Samsung Tizen' : 'Preview navigateur') + ' · ' + (navigator.onLine === false ? 'hors ligne' : 'en ligne');
-  }
-
-  function findAppByTitle(fragment) {
-    var needle = String(fragment || '').toLowerCase();
-    var i;
+    var users = 0, system = 0, unknown = 0, i;
     for (i = 0; i < installedApps.length; i++) {
-      if (installedApps[i].classification === 'USER' && installedApps[i].title.toLowerCase().indexOf(needle) >= 0) return installedApps[i];
+      if (installedApps[i].classification === 'USER') users++; else if (installedApps[i].classification === 'SYSTEM') system++; else unknown++;
     }
-    return null;
+    el('diagMemory').textContent = 'RAM libre · ' + (memoryInfo ? formatBytes(memoryInfo.available) + ' / ' + formatBytes(memoryInfo.total) : 'Indisponible');
+    el('diagStorage').textContent = 'Stockage libre · ' + (storageInfo ? formatBytes(storageInfo.available) + ' / ' + formatBytes(storageInfo.total) : 'Indisponible');
+    el('diagApps').textContent = 'Apps · ' + users + ' utilisateur · ' + system + ' système · ' + unknown + ' ambiguës';
+    el('diagSources').textContent = 'Sources · ' + detectedSources.length;
+    el('diagRuntime').textContent = TVDevice.isSamsung() ? 'Samsung Tizen' : 'Aperçu navigateur · valeurs simulées';
   }
-
+  function refreshMemory() { TVDevice.getMemoryInfo(function (info) { memoryInfo = info; if (!hidden()) updateDiagnosticPanel(); }); }
+  function refreshStorage() { TVDevice.getStorageInfo(function (info) { storageInfo = info; if (!hidden()) updateDiagnosticPanel(); }); }
+  function updateClock() {
+    var now = new Date(), h = now.getHours(), m = now.getMinutes();
+    el('clock').textContent = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+    el('date').textContent = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'][now.getDay()] + ' ' + now.getDate() + ' ' + ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'][now.getMonth()];
+    applyAppearance();
+  }
+  function stopTelemetryTimers() {
+    if (memoryTimer !== null) clearInterval(memoryTimer); if (storageTimer !== null) clearInterval(storageTimer); if (clockTimer !== null) clearInterval(clockTimer);
+    memoryTimer = null; storageTimer = null; clockTimer = null;
+    if (toastTimer !== null) clearTimeout(toastTimer); toastTimer = null; el('toast').className = 'toast';
+    if (enterTimer !== null) clearTimeout(enterTimer); enterTimer = null; enterTarget = null; longActivated = false;
+  }
+  function startTelemetryTimers() {
+    stopTelemetryTimers(); if (hidden()) return; refreshMemory(); refreshStorage(); updateClock();
+    memoryTimer = setInterval(refreshMemory, 15000); storageTimer = setInterval(refreshStorage, 60000); clockTimer = setInterval(updateClock, 30000);
+  }
+  function discoverDevice(force) {
+    var now = new Date().getTime(), pending = 2;
+    if (inventoryBusy || hidden() || (!force && now - lastDiscovery < 30000)) return;
+    inventoryBusy = true;
+    function complete() {
+      pending--; if (pending) return;
+      inventoryBusy = false; lastDiscovery = now;
+      if (!hidden()) { var saved = token(document.activeElement); renderCurrent(); updateDiagnosticPanel(); firstFocus(saved); }
+    }
+    TVDevice.listApps(function (apps) { if (apps) installedApps = apps; complete(); });
+    TVDevice.getSources(function (sources) { if (sources) detectedSources = sources; complete(); });
+  }
   function launchAppFromButton(button) {
-    var id = button.getAttribute('data-app-id');
-    var title = button.getAttribute('data-app-title') || 'Application';
-    TVDevice.launchApp(id, function (ok) {
-      if (!ok) showToast('Impossible d’ouvrir ' + title + ' sur cette TV.');
+    var id = button.getAttribute('data-app-id'), app = TVModel.byIds(installedApps, [id])[0], ownerPrefs = prefs;
+    if (!app || launchPending) return;
+    launchPending = true;
+    TVDevice.launchApp(app.id, function (ok) {
+      launchPending = false;
+      if (ok) ownerPrefs.opened(app.id); else showToast('Impossible d’ouvrir ' + app.title + '.');
     });
   }
-
-  function openPlex() {
-    var plex = findAppByTitle('plex');
-    if (!plex) { showToast('Plex n’est pas détecté dans les applications utilisateur.'); return; }
-    TVDevice.launchApp(plex.id, function (ok) {
-      if (!ok) showToast('Plex est détecté mais son lancement a échoué.');
-    });
-  }
-
-  function runDiagnostics() {
-    TVDevice.diagnostics(function (d) {
-      if (d.memory) memoryInfo = d.memory;
-      if (d.storage) storageInfo = d.storage;
-      if (d.sources) detectedSources = d.sources;
-      updateSourceSummary();
-      renderTelemetry();
-      document.getElementById('diagCopy').textContent = (d.samsung ? 'Samsung Tizen' : 'Preview navigateur') + ' · ' + d.apps + ' apps · ' + d.sources.length + ' sources';
-      showToast('Diagnostic local mis à jour.');
-    });
-  }
-
-  function selectAppsTab(tab) {
-    if (appsKidOnly && tab === 'system') return;
-    appsTab = tab;
-    appsPage = 0;
-    renderAppsPage();
-    setFocus(document.getElementById(tab === 'favorites' ? 'tabFavorites' : tab === 'user' ? 'tabUser' : 'tabSystem'));
-  }
-
-  function changeAppsPage(delta) {
-    var list = appsForTab(appsTab);
-    var pageCount = Math.max(1, Math.ceil(list.length / APPS_PER_PAGE));
-    var next = appsPage + delta;
-    if (next < 0 || next >= pageCount) return;
-    appsPage = next;
-    renderAppsPage();
-    setTimeout(function () {
-      var cards = document.getElementById('allAppsGrid').querySelectorAll('.focusable');
-      if (cards.length) setFocus(cards[0]);
-    }, 0);
-  }
-
-  function clickAction(element) {
-    var profile = element.getAttribute('data-profile');
-    var action;
+  function clickAction(button) {
+    var profile = button.getAttribute('data-profile'), action = button.getAttribute('data-action'), saved, first;
     if (profile) { setProfile(profile); return; }
-    action = element.getAttribute('data-action');
-    if (!action) return;
-    if (action === 'live-tv') TVDevice.openLiveTv(function (ok) { if (!ok) showToast('Impossible de basculer vers la TNT sur cette TV.'); });
+    if (action === 'live-tv') TVDevice.openLiveTv(function (ok) { if (!ok) showToast('Le tuner TV n’est pas accessible.'); });
     else if (action === 'films') showScreen('screenFilms');
-    else if (action === 'sport' || action === 'sport-event') showScreen('screenSport');
+    else if (action === 'sport') showScreen('screenSport');
+    else if (action === 'sport-event') showToast('La source de ce rendez-vous n’est pas encore connectée.');
     else if (action === 'settings') showScreen('screenSettings');
+    else if (action === 'quick') showScreen('screenQuick');
     else if (action === 'sources') showScreen('screenSources');
-    else if (action === 'switch-profile') showScreen('screenProfiles');
-    else if (action === 'all-apps') { appsKidOnly = false; appsTab = 'favorites'; appsPage = 0; showScreen('screenApps'); }
-    else if (action === 'kid-apps') { appsKidOnly = true; appsTab = 'user'; appsPage = 0; showScreen('screenApps'); }
-    else if (action === 'apps-tab') selectAppsTab(element.getAttribute('data-tab') || 'favorites');
-    else if (action === 'page-prev') changeAppsPage(-1);
-    else if (action === 'page-next') changeAppsPage(1);
-    else if (action === 'launch-app') launchAppFromButton(element);
-    else if (action === 'inspect-app') showToast('Composant système conservé pour diagnostic ; lancement désactivé par sécurité.');
-    else if (action === 'back') goBack();
-    else if (action === 'source') {
-      var type = element.getAttribute('data-source-type') || '';
-      var number = Number(element.getAttribute('data-source-number'));
-      TVDevice.openSource(type, number, function (ok) { if (!ok) showToast(sourceLabel({ type: type, number: number }) + ' n’a pas pu être ouverte.'); });
-    }
-    else if (action === 'samsung-settings') TVDevice.openSamsungSettings(function (ok) { if (!ok) showToast('Réglages Samsung non accessibles depuis ce firmware.'); });
-    else if (action === 'diagnostics') runDiagnostics();
+    else if (action === 'diagnostics') { showScreen('screenDiagnostics'); refreshMemory(); refreshStorage(); }
     else if (action === 'ambient') showScreen('screenAmbient');
-    else if (action === 'plex-demo') openPlex();
-    else if (action === 'watch-match') showToast('Diffuseur dynamique : SeenIt n’ouvre rien tant que la cible réelle du match n’est pas résolue.');
-  }
-
-  function shouldAcceptDirectional() {
-    var now = new Date().getTime();
-    if (now - lastDirectionalAt < NAV_DEBOUNCE_MS) return false;
-    lastDirectionalAt = now;
-    return true;
-  }
-
-  function handleKey(event) {
-    var code = event.keyCode || event.which;
-    var active;
-    if (code === 37 || code === 38 || code === 39 || code === 40) {
-      if (!shouldAcceptDirectional()) { event.preventDefault(); return; }
-      if (code === 37) moveFocus('left');
-      else if (code === 38) moveFocus('up');
-      else if (code === 39) moveFocus('right');
-      else moveFocus('down');
-      event.preventDefault();
-    } else if (code === 13) {
-      active = document.activeElement;
-      if (active && /\bfocusable\b/.test(active.className)) clickAction(active);
-      event.preventDefault();
-    } else if (code === 10009 || code === 461 || code === 8) {
-      goBack();
-      event.preventDefault();
-    } else if (code === 403) {
-      sportState = sportState === 'normal' ? 'imminent' : sportState === 'imminent' ? 'live' : 'normal';
-      updateSportTile();
-      showToast('Démo Sport · ' + sportState);
+    else if (action === 'appearance') showScreen('screenAppearance');
+    else if (action === 'theme') { prefs.setTheme(button.getAttribute('data-theme')); applyAppearance(); renderAppearance(); }
+    else if (action === 'motion') { prefs.toggleMotion(); applyAppearance(); renderAppearance(); }
+    else if (action === 'menu-pin') { if (!prefs.toggle(selectedAppId)) showToast('32 favoris maximum.'); else goBack(); }
+    else if (action === 'menu-hide') { prefs.hideApp(selectedAppId); goBack(); }
+    else if (action === 'menu-left' || action === 'menu-right') { moveApp(action === 'menu-left' ? -1 : 1); goBack(); }
+    else if (action === 'switch-profile') { history = []; showScreen('screenProfiles', false); }
+    else if (action === 'all-apps' || action === 'manage-apps') { organizing = action === 'manage-apps'; appsTab = currentProfile === 'Milo' && !organizing ? 'favorites' : 'user'; appsPage = 0; showScreen('screenApps'); }
+    else if (action === 'apps-tab') { appsTab = button.getAttribute('data-tab'); appsPage = 0; saved = token(button); renderAppsPage(); firstFocus(saved); }
+    else if (action === 'toggle-manage') { organizing = !organizing; if (currentProfile === 'Milo') { appsTab = organizing ? 'user' : 'favorites'; appsPage = 0; } saved = token(button); renderAppsPage(); firstFocus(saved); }
+    else if (action === 'pin-app') {
+      if (!TVModel.byIds(installedApps, [button.getAttribute('data-app-id')]).length) return;
+      saved = token(button); if (!prefs.toggle(saved.app)) { showToast('32 favoris maximum.'); return; }
+      renderAppsPage(); firstFocus(saved);
     }
+    else if (action === 'page-prev' || action === 'page-next') {
+      appsPage += action === 'page-prev' ? -1 : 1; renderAppsPage(); first = el('allAppsGrid').querySelector('.focusable'); if (first) setFocus(first); else firstFocus();
+    }
+    else if (action === 'refresh') discoverDevice(true);
+    else if (action === 'launch-app') launchAppFromButton(button);
+    else if (action === 'inspect-app') showToast('Composant système · lancement désactivé.');
+    else if (action === 'source') TVDevice.openSource(button.getAttribute('data-source-type'), Number(button.getAttribute('data-source-number')), function (ok) { if (!ok) showToast('Cette entrée n’est pas accessible.'); });
+    else if (action === 'samsung-settings') TVDevice.openSamsungSettings(function (ok) { if (!ok) showToast('Menu Samsung indisponible ici. Utilisez la touche Réglages de la TV.'); });
+    else if (action === 'exit') TVDevice.exitApp(function (ok) { if (!ok) showToast('Impossible de quitter depuis cet aperçu.'); });
+    else if (action === 'back') goBack();
   }
-
-  function attachClicks() {
+  function shouldAcceptDirectional() { var now = new Date().getTime(); if (now - lastDirectionalAt < NAV_DEBOUNCE_MS) return false; lastDirectionalAt = now; return true; }
+  function handleKey(event) {
+    var code = event.keyCode || event.which, active;
+    if (hidden()) return;
+    if (code >= 37 && code <= 40) { if (shouldAcceptDirectional()) moveFocus({ 37: 'left', 38: 'up', 39: 'right', 40: 'down' }[code]); event.preventDefault(); }
+    else if (code === 13) {
+      event.preventDefault(); if (enterTarget !== null || longActivated) return;
+      active = document.activeElement; enterTarget = token(active);
+      enterTimer = setTimeout(function () {
+        enterTimer = null;
+        if (isVisible(active) && matches(document.activeElement, enterTarget) && active.getAttribute('data-app-id')) { longActivated = true; openAppMenu(active); }
+      }, 550);
+    }
+    else if (code === 10009 || code === 461 || code === 8) { goBack(); event.preventDefault(); }
+    else if (code === 403 && !TVDevice.isSamsung()) { sportState = sportState === 'normal' ? 'imminent' : sportState === 'imminent' ? 'live' : 'normal'; updateSportTile(); }
+  }
+  function handleVisibility() {
+    if (hidden()) { suspendedFocus = token(document.activeElement); stopTelemetryTimers(); releaseDynamic(); }
+    else { launchPending = false; startTelemetryTimers(); renderCurrent(); firstFocus(suspendedFocus); discoverDevice(false); }
+  }
+  function handleKeyUp(event) {
+    if ((event.keyCode || event.which) !== 13) return;
+    event.preventDefault();
+    if (enterTimer !== null) clearTimeout(enterTimer);
+    enterTimer = null;
+    if (!hidden() && !longActivated && enterTarget && matches(document.activeElement, enterTarget)) clickAction(document.activeElement);
+    enterTarget = null; longActivated = false;
+  }
+  function init() {
+    resizeStage(); updateConnectivity(); updateSportTile(); startTelemetryTimers();
+    window.addEventListener('resize', resizeStage); window.addEventListener('online', updateConnectivity); window.addEventListener('offline', updateConnectivity);
+    document.addEventListener('visibilitychange', handleVisibility); document.addEventListener('keydown', handleKey);
+    document.addEventListener('keyup', handleKeyUp);
     document.addEventListener('click', function (event) {
       var node = event.target;
       while (node && node !== document.body && !/\bfocusable\b/.test(node.className || '')) node = node.parentNode;
-      if (node && node !== document.body && !node.disabled) { setFocus(node); clickAction(node); }
+      if (node && node !== document.body && isVisible(node) && !hidden()) { setFocus(node); clickAction(node); }
     });
+    discoverDevice(true); firstFocus();
   }
-
-  function updateClock() {
-    var now = new Date();
-    var h = now.getHours();
-    var m = now.getMinutes();
-    document.getElementById('clock').textContent = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
-  }
-
-  function registerRemoteKeys() {
-    try {
-      if (window.tizen && window.tizen.tvinputdevice) window.tizen.tvinputdevice.registerKey('ColorF0Red');
-    } catch (e) {}
-  }
-
-  function discoverDevice() {
-    TVDevice.listApps(function (apps) {
-      installedApps = apps || [];
-      renderHomeApps();
-      if (currentScreen === 'screenApps') renderAppsPage();
-      updateDiagnosticPanel();
-      if (currentScreen === 'screenProfiles') firstFocus();
-    });
-    TVDevice.getSources(function (sources) {
-      detectedSources = sources || [];
-      updateSourceSummary();
-      if (currentScreen === 'screenSources') renderSources();
-      updateDiagnosticPanel();
-    });
-  }
-
-  function handleVisibility() {
-    if (document.hidden === true) stopTelemetryTimers();
-    else startTelemetryTimers();
-  }
-
-  function init() {
-    resizeStage();
-    renderCalendar();
-    renderHomeApps();
-    updateSportTile();
-    updateConnectivity();
-    updateClock();
-    updateSourceSummary();
-    updateDiagnosticPanel();
-    setInterval(updateClock, 30000);
-    window.addEventListener('resize', resizeStage);
-    window.addEventListener('online', updateConnectivity);
-    window.addEventListener('offline', updateConnectivity);
-    document.addEventListener('visibilitychange', handleVisibility);
-    document.addEventListener('keydown', handleKey);
-    attachClicks();
-    registerRemoteKeys();
-    discoverDevice();
-    startTelemetryTimers();
-    firstFocus();
-  }
-
   init();
 }());

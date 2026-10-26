@@ -4,6 +4,23 @@
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
+      "id": "SEENIT-TV-001",
+      "title": "Launcher TV fidèle aux planches, apps génériques et cycle mémoire borné",
+      "targets": [
+        "tv"
+      ],
+      "tests": [
+        {
+          "file": "tests/tvSamsungPrototype.test.ts",
+          "contains": "SEENIT-TV-001"
+        },
+        {
+          "file": "tests/tvSamsungModel.test.ts",
+          "contains": "SEENIT-TV-001"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-UX-018",
       "title": "Accueil À voir à trois panneaux indépendants, sections et pagination dédiées",
       "targets": [

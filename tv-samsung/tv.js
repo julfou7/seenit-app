@@ -82,9 +82,9 @@ var TVDevice = (function () {
           return aa < bb ? -1 : aa > bb ? 1 : 0;
         });
         finish(out);
-      }, function () { finish([]); });
+      }, function () { finish(null); });
     } catch (e) {
-      finish([]);
+      finish(null);
     }
   }
 
@@ -109,12 +109,21 @@ var TVDevice = (function () {
       if (done) setTimeout(function () { done(true); }, 0);
       return;
     }
-    launchViewer(done);
+    getSources(function (sources) {
+      var i;
+      for (i = 0; sources && i < sources.length; i++) {
+        if (String(sources[i].type).toUpperCase() === 'TV') {
+          openSource(sources[i].type, sources[i].number, done);
+          return;
+        }
+      }
+      if (done) done(false);
+    });
   }
 
   function getSources(done) {
     var finish = typeof done === 'function' ? done : function () {};
-    if (!samsung || !window.tizen.systeminfo || !window.tizen.tvwindow) {
+    if (!samsung) {
       setTimeout(function () {
         finish([
           { type: 'HDMI', number: 1, connected: true },
@@ -123,6 +132,7 @@ var TVDevice = (function () {
       }, 0);
       return;
     }
+    if (!window.tizen.systeminfo || !window.tizen.tvwindow) { finish(null); return; }
     try {
       window.tizen.systeminfo.getPropertyValue('VIDEOSOURCE', function (value) {
         var out = [];
@@ -140,9 +150,9 @@ var TVDevice = (function () {
           }
         }
         finish(out);
-      }, function () { finish([]); });
+      }, function () { finish(null); });
     } catch (e) {
-      finish([]);
+      finish(null);
     }
   }
 
@@ -154,7 +164,7 @@ var TVDevice = (function () {
     getSources(function (sources) {
       var wanted = null;
       var i;
-      for (i = 0; i < sources.length; i++) {
+      for (i = 0; sources && i < sources.length; i++) {
         if (String(sources[i].type).toUpperCase() === String(type).toUpperCase() && Number(sources[i].number) === Number(number)) {
           wanted = sources[i];
           break;
@@ -174,10 +184,11 @@ var TVDevice = (function () {
 
   function getMemoryInfo(done) {
     var finish = typeof done === 'function' ? done : function () {};
-    if (!samsung || !window.tizen.systeminfo) {
+    if (!samsung) {
       setTimeout(function () { finish({ available: 612 * 1024 * 1024, total: 1536 * 1024 * 1024, preview: true }); }, 0);
       return;
     }
+    if (!window.tizen.systeminfo) { finish(null); return; }
     try {
       var total = window.tizen.systeminfo.getTotalMemory();
       var available = window.tizen.systeminfo.getAvailableMemory();
@@ -201,10 +212,11 @@ var TVDevice = (function () {
 
   function getStorageInfo(done) {
     var finish = typeof done === 'function' ? done : function () {};
-    if (!samsung || !window.tizen.systeminfo) {
+    if (!samsung) {
       setTimeout(function () { finish({ available: 1800 * 1024 * 1024, total: 3900 * 1024 * 1024, preview: true }); }, 0);
       return;
     }
+    if (!window.tizen.systeminfo) { finish(null); return; }
     try {
       window.tizen.systeminfo.getPropertyValue('STORAGE', function (value) {
         var unit = selectStorageUnit(value);
@@ -225,14 +237,28 @@ var TVDevice = (function () {
       if (done) setTimeout(function () { done(true); }, 0);
       return;
     }
+    function fallback() {
+      try {
+        var info = window.tizen.application.getAppInfo(settingsMenuId);
+        if (!info || info.id !== settingsMenuId) { if (done) done(false); return; }
+        launchApp(info.id, done);
+      } catch (e) { if (done) done(false); }
+    }
     try {
       var control = new window.tizen.ApplicationControl('http://tizen.org/appcontrol/operation/setting', null, null, null, []);
-      window.tizen.application.launchAppControl(control, null, function () { if (done) done(true); }, function () {
-        launchApp(settingsMenuId, done);
-      });
-    } catch (e) {
-      launchApp(settingsMenuId, done);
-    }
+      window.tizen.application.findAppControl(control, function (handlers) {
+        if (!handlers || !handlers.length || !handlers[0].id) { fallback(); return; }
+        try {
+          window.tizen.application.launchAppControl(control, handlers[0].id, function () { if (done) done(true); }, fallback);
+        } catch (e) { fallback(); }
+      }, fallback);
+    } catch (e) { fallback(); }
+  }
+
+  function exitApp(done) {
+    if (!samsung) { if (done) done(false); return; }
+    try { window.tizen.application.getCurrentApplication().exit(); if (done) done(true); }
+    catch (e) { if (done) done(false); }
   }
 
   function diagnostics(done) {
@@ -249,6 +275,7 @@ var TVDevice = (function () {
     };
     listApps(function (apps) {
       var i;
+      apps = apps || [];
       result.apps = apps.length;
       for (i = 0; i < apps.length; i++) {
         if (apps[i].classification === 'USER') result.userApps++;
@@ -256,7 +283,7 @@ var TVDevice = (function () {
         else result.unknownApps++;
       }
       getSources(function (sources) {
-        result.sources = sources;
+        result.sources = sources || [];
         getMemoryInfo(function (memory) {
           result.memory = memory;
           getStorageInfo(function (storage) {
@@ -278,6 +305,7 @@ var TVDevice = (function () {
     getMemoryInfo: getMemoryInfo,
     getStorageInfo: getStorageInfo,
     openSamsungSettings: openSamsungSettings,
+    exitApp: exitApp,
     diagnostics: diagnostics
   };
 }());

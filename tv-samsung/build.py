@@ -18,7 +18,12 @@ import zipfile
 ROOT = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(ROOT)
 WGT = os.path.join(REPO, 'SeenItTV-tizen.wgt')
-FILES = ['config.xml', 'index.html', 'styles.css', 'tv.js', 'app.js', 'icon.png', 'NOTICE-FreeMyTV.md']
+FILES = ['config.xml', 'index.html', 'styles.css', 'tv.js', 'model.js', 'app.js', 'icon.png', 'NOTICE-FreeMyTV.md']
+# Only shipped local artwork, never sources, tests, certificates or personal exports.
+for asset_root, _, asset_names in os.walk(os.path.join(ROOT, 'assets')):
+    for asset_name in sorted(asset_names):
+        if os.path.splitext(asset_name)[1].lower() in ('.svg', '.png', '.md'):
+            FILES.append(os.path.relpath(os.path.join(asset_root, asset_name), ROOT).replace(os.sep, '/'))
 
 
 def tizen_cli():

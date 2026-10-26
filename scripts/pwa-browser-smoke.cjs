@@ -17,6 +17,7 @@ const { testTerrain220Harness } = require('./home-terrain220-browser-checks.cjs'
 const { testTerrain221Harness } = require('./home-terrain221-browser-checks.cjs');
 const { buildHomeHarness, testHomeHarness } = require('./home-a-voir-browser-checks.cjs');
 const { buildNavbarHarness, testNavbarHarness } = require('./navbar-browser-checks.cjs');
+const { buildTvHarness, testTvHarness } = require('./tv-browser-checks.cjs');
 
 const root = path.resolve(__dirname, '..');
 const configPath = path.join(root, 'docs', 'specifications', 'quality-gates.json');
@@ -501,6 +502,7 @@ async function main() {
     await buildHistoryHarness(root);
     await buildWatchNextHarness(root);
     await buildNavbarHarness(root);
+    await buildTvHarness(root);
     await buildHomeHarness(root);
     const viteBin = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
     if (!fs.existsSync(viteBin)) throw new Error('Vite installé requis avant le smoke navigateur.');
@@ -561,6 +563,7 @@ async function main() {
       seriesCards: await testSeriesCardHarness(client, root),
       history: await testHistoryHarness(client, root),
       navbar: await testNavbarHarness(client, root),
+      tv: await testTvHarness(client, root),
       // L'horloge virtuelle de la minuterie 18c reste la dernière vérification du client CDP.
       watchNext: await testWatchNextHarness(client, root),
       homeV4: await testTerrain220Harness(client, root),

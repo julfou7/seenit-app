@@ -1,5 +1,26 @@
 # SeenIt — Référence fonctionnelle canonique
 
+## Extension Samsung TV — 26 octobre 2026 (#295)
+
+Le runtime isolé `tv-samsung/` reprend les planches TV : TV/TNT, Films, Sport et Réglages,
+puis cinq apps favorites, Toutes les apps et les entrées réellement détectées. Les icônes viennent
+de la TV, avec secours SVG local ou initiales pour une nouvelle app. La bibliothèque paginée conserve
+USER/SYSTEM/UNKNOWN ; les favoris sont personnalisables par profil local. Invité reste éphémère.
+Milo n'affiche que les apps sélectionnées, modifiables via Organiser sans code ; Système est masqué.
+Cela ne verrouille pas les apps tierces et ne constitue pas un contrôle parental.
+La référence Luma ajoutée ensuite par le propriétaire modifie la hiérarchie : ces quatre accès sont
+compacts, les apps dominent la Home et SeenIt/Sport restent contextuels. Infos au focus, appui long OK
+pour épingler/déplacer/masquer, apparences Brume/Crépuscule/Auto statiques et mouvements désactivables.
+Une section Sport sans donnée est masquée sur la Home. Les sources restent accessibles directement.
+Films propose de rouvrir les apps lancées avec succès ; cela ne constitue pas un historique de
+visionnage, notamment si Netflix partage son profil. Appairage du compte propriétaire encore suivi
+dans #295, sans faux catalogue ni mutation personnelle. Sport conserve un diffuseur résolu par événement
+(#738), avec exemples seulement en preview. Réglages donne accès au menu Samsung lorsqu'il est
+disponible, aux sources et au diagnostic RAM/stockage. Retour à l'accueil propose Quitter/Revenir.
+Les timers et grilles d'images sont libérés lorsque le launcher est masqué. Le remplacement du Home
+natif et le gain mémoire global restent à vérifier sur la QE55Q6FNA ; aucun root automatique.
+Voir [la règle SEENIT-TV-001](seenit.md) et [la référence TV](tv-samsung-launcher-v2.md).
+
 Dernière vérification : 14 septembre 2026
 Mise à jour ciblée À voir : 23 octobre 2026, corrections de conformité maquettes et gestes (#729).
 Baseline observée avant correction : **1.4.150**, `main` `6189bafed525fb510c1a81c87a04e19c01f92393`

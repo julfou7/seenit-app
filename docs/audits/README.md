@@ -1,5 +1,8 @@
 # Registre des audits SeenIt
 
+TV Samsung : [conformité maquettes et cycle mémoire du26octobre2026](./tv-maquettes-2026-10-26.md),
+baseline2f151398, #295/#738, validation matérielle V2 restante.
+
 Ce dossier conserve les constats historiques. La SPEC reste la source de vérité du comportement
 courant et GitHub Issues la source de vérité des actions à réaliser.
 

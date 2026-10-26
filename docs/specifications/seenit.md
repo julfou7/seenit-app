@@ -24,6 +24,17 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 
 ## 2. Règles de plateforme
 
+- **SEENIT-TV-001** — Le launcher Samsung reste séparé du runtime mobile, compatible ES5/Tizen 4.0
+  et fidèle aux planches TV : quatre entrées TV, Films, Sport, Réglages ; cinq apps puis la bibliothèque
+  et les sources détectées. Les logos natifs ont un secours vectoriel local puis un monogramme générique.
+  Toute app utilisateur découverte peut devenir favorite par profil local. « Rouvrir » mémorise seulement
+  les ouvertures réussies, jamais un visionnage Netflix partagé. Invité ne persiste rien. La bibliothèque
+  conserve l'inventaire système mais borne son DOM à 18 apps. Au masquage, images hors écran et timers
+  sont libérés ; RAM/stockage sont lus sans root ni fermeture des autres apps. Les réglages Samsung
+  passent par une cible vérifiée ; Retour à l'accueil demande confirmation avant de quitter SeenIt.
+  Appairage du compte, Home natif et terrain sont suivis dans #295 ; aucun historique SeenIt n'est écrit
+  sans profil certain. Détails et arbitrage des maquettes : [launcher TV V2](tv-samsung-launcher-v2.md).
+
 - **SEENIT-PLATFORM-001** — La PWA canonique servie depuis `seenit.ai.studio` conserve les routes
   SeenIt relatives au même domaine. L'APK et tout preview AI Studio dont un label d'hôte commence
   par `ais-dev-*` ciblent explicitement `https://seenit.ai.studio` pour les routes `/api/*` afin de

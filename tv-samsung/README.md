@@ -29,13 +29,15 @@ L'identité auteur utilisée pour la première installation réussie doit être 
 ## Ce que fait le runtime actuel
 
 - choix de profil au démarrage : Julian, Camille, Milo, Invité ;
-- Home adulte : TV / Films / Sport / Réglages ;
+- Home launcher : raccourcis TV / Films / Sport / Réglages, cinq apps + bibliothèque au premier plan, sources directes ;
 - applications installées détectées via `tizen.application.getAppsInfo()` ;
 - lancement d'une application via `tizen.application.launch()` ;
-- `TV` tente d'ouvrir le viewer Samsung pour revenir au tuner/antenne ;
+- `TV` sélectionne la source tuner détectée avant d'ouvrir le viewer Samsung ;
 - HDMI via `VIDEOSOURCE` + `tizen.tvwindow.setSource()` ;
-- Sport local de démonstration avec Monaco prioritaire, sans dépendre d'un diffuseur ;
-- Home enfant Milo simplifiée ;
+- exemples Sport uniquement dans la preview navigateur, aucun calendrier fictif sur Samsung ;
+- favoris et dernières apps par profil local, Invité éphémère ; aucune reprise de média déduite d'un lancement ;
+- logos natifs, secours SVG locaux puis initiales pour une nouvelle app ;
+- organisation des favoris et actualisation de l'inventaire, sans liste fermée d'apps ;
 - navigation télécommande, Retour, fonctionnement local sans réseau ;
 - écran diagnostic et concept Ambiance statique.
 
@@ -46,14 +48,26 @@ La V2 ne doit plus ressembler à un prototype technique.
 Contrats principaux :
 
 - fond « salle obscure » bleu nuit / prune / lumière chaude, sans grande surface noire pure ;
-- Home éditoriale avec Hero contextuel + raccourcis TV/Films/Sport/Sources ;
+- quatre raccourcis compacts selon le dernier arbitrage propriétaire, inspiré de Luma sans porter son code Android ;
 - rail Apps favorites borné ;
 - bibliothèque Apps paginée pour 100+ packages ;
 - classification `USER | SYSTEM | UNKNOWN` au lieu de supprimer tôt les apps système ;
 - vue Système avancée accessible, mais jamais polluante sur la Home ;
-- RAM disponible + stockage interne disponible affichés discrètement et mis à jour en lecture seule ;
+- RAM et stockage disponibles dans Diagnostic, mis à jour en lecture seule ;
 - navigation télécommande et focus premium compatibles vieux Chromium ;
 - aucun framework, blur, vidéo de fond ou DOM massif.
+
+Appui long OK : favori, déplacement ou masquage de l'accueil. Un OK court ouvre directement l'app.
+Les libellés apparaissent au focus. Brume/Crépuscule/Auto et les mouvements sont réglables par profil.
+Sport sans calendrier réel reste absent de la Home. L'appairage SeenIt et son vrai contenu restent à connecter.
+
+Les images des grilles et tous les timers sont libérés lorsque le launcher est masqué.
+La reprise restaure la grille utile et son focus. Le gain de RAM total et les accès TNT/menu natif
+restent à mesurer sur le matériel ; aucun arrêt d'autre app n'est effectué.
+
+Milo est un profil simple sans code : ses apps sont choisies via Organiser, sans ajouts automatiques.
+Un profil local ne constitue pas un contrôle parental des apps tierces. Appairage au compte propriétaire
+et historique connecté restent suivis dans #295.
 
 Spécification complète : `docs/specifications/tv-samsung-launcher-v2.md`.
 
