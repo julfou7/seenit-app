@@ -20,6 +20,8 @@ async function testTerrain227Harness(client,root){const reports=[];for(const wid
  fs.writeFileSync(path.join(root,'quality-reports',`terrain227-tickets-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
  await evaluate(client,`document.querySelector('[aria-label="Films en liste"]').click()`);
  await check(client,`(()=>{const e=document.querySelector('.movie-ticket--horizontal .movie-ticket__main'),s=document.querySelector('.movie-ticket--horizontal .movie-ticket__stub');return e && /at 100% 0/.test(getComputedStyle(e).maskImage) && /at 0(?:px|%) 0/.test(getComputedStyle(s).maskImage)})()`,'deux parties découpées');
+ const spacing=await evaluate(client,`(()=>{const list=document.querySelector('.home-movie-list'),more=list.nextElementSibling,next=more.nextElementSibling;return {above:more.getBoundingClientRect().top-list.getBoundingClientRect().bottom,below:next.getBoundingClientRect().top-more.getBoundingClientRect().bottom}})()`);
+ if(spacing.above<8||spacing.above>16||spacing.below<24||spacing.below>32||spacing.below<=spacing.above)throw Error('Terrain227 espaces Afficher plus '+JSON.stringify(spacing));
  fs.writeFileSync(path.join(root,'quality-reports',`terrain227-list-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
  await evaluate(client,'window.__homeAVoir.clearDismissed();document.querySelector(".home-notification-bell").focus();document.querySelector(".home-notification-bell").click()');
  await check(client,`document.querySelectorAll('.home-notice').length>0 && !document.querySelector('.home-notifications [role=status]')`,'notifications prêtes');
