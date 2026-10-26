@@ -889,7 +889,7 @@ async function startServer() {
         imdbId: normalizedImdbId
       });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(
         '[Plex Resolve Backend] Erreur critique:',
         error

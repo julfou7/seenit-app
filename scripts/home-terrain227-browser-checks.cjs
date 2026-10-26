@@ -1,5 +1,7 @@
 const fs=require('node:fs'),path=require('node:path');
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
+function assertPosterBounds(posters){if(!posters.length||posters.some(p=>p.top<p.clip-.5))throw Error('Terrain227 affiche rognée sous le titre '+JSON.stringify(posters));}
+function assertLoadMoreSpacing(spacing){if(spacing.above<8||spacing.above>16||spacing.below<24||spacing.below>32||spacing.below<=spacing.above)throw Error('Terrain227 espaces Afficher plus '+JSON.stringify(spacing));}
 async function evaluate(c,expression){const r=await c.send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);return r.result?.value;}
 async function check(c,expression,label){for(let i=0;i<100;i++){if(await evaluate(c,`Boolean(${expression})`))return;await pause(40);}throw Error('Terrain227 '+label);}
 async function testTerrain227Harness(client,root){const reports=[];for(const width of [360,412,1280]){
@@ -9,7 +11,7 @@ async function testTerrain227Harness(client,root){const reports=[];for(const wid
  await check(client,'window.__homeAVoir && window.__terrain224','production');
  await evaluate(client,'window.__terrain224.examples();window.__homeAVoir.terrain221Examples();document.fonts.ready');await pause(500);
  const posters=await evaluate(client,`[...document.querySelectorAll('.home-series-rail')].flatMap(rail=>[...rail.querySelectorAll('.series-8f__poster')].map(p=>({top:p.getBoundingClientRect().top,clip:rail.getBoundingClientRect().top})))`);
- if(!posters.length||posters.some(p=>p.top<p.clip-.5))throw Error('Terrain227 affiche rognée sous le titre '+JSON.stringify(posters));
+ assertPosterBounds(posters);
  await evaluate(client,`document.querySelector('[data-series-id="series-0"] .seenit-check').click()`);
  await check(client,`document.querySelector('[data-series-id="series-0"]').dataset.watchFeedback==='button'`,'début animation');
  const tick=await evaluate(client,`(()=>{const e=document.querySelector('[data-series-id="series-0"] .brand-ring-tick'),a=e.getAnimations()[0];if(!a)return null;a.pause();const samples=[0,759,760,1000].map(time=>{a.currentTime=time;const s=getComputedStyle(e);return {time,opacity:+s.opacity,offset:parseFloat(s.strokeDashoffset)}});a.currentTime=0;a.play();return {length:e.getTotalLength(),normal:e.pathLength.baseVal,samples}})()`);
@@ -21,7 +23,7 @@ async function testTerrain227Harness(client,root){const reports=[];for(const wid
  await evaluate(client,`document.querySelector('[aria-label="Films en liste"]').click()`);
  await check(client,`(()=>{const e=document.querySelector('.movie-ticket--horizontal .movie-ticket__main'),s=document.querySelector('.movie-ticket--horizontal .movie-ticket__stub');return e && /at 100% 0/.test(getComputedStyle(e).maskImage) && /at 0(?:px|%) 0/.test(getComputedStyle(s).maskImage)})()`,'deux parties découpées');
  const spacing=await evaluate(client,`(()=>{const list=document.querySelector('.home-movie-list'),more=list.nextElementSibling,next=more.nextElementSibling;return {above:more.getBoundingClientRect().top-list.getBoundingClientRect().bottom,below:next.getBoundingClientRect().top-more.getBoundingClientRect().bottom}})()`);
- if(spacing.above<8||spacing.above>16||spacing.below<24||spacing.below>32||spacing.below<=spacing.above)throw Error('Terrain227 espaces Afficher plus '+JSON.stringify(spacing));
+ assertLoadMoreSpacing(spacing);
  fs.writeFileSync(path.join(root,'quality-reports',`terrain227-list-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
  await evaluate(client,'window.__homeAVoir.clearDismissed();document.querySelector(".home-notification-bell").focus();document.querySelector(".home-notification-bell").click()');
  await check(client,`document.querySelectorAll('.home-notice').length>0 && !document.querySelector('.home-notifications [role=status]')`,'notifications prêtes');
@@ -44,4 +46,4 @@ async function testTerrain227Harness(client,root){const reports=[];for(const wid
  }
  reports.push({width,tick,ticket,notifications:true});
 }return reports;}
-module.exports={testTerrain227Harness};
+module.exports={testTerrain227Harness,assertPosterBounds,assertLoadMoreSpacing};

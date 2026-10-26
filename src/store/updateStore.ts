@@ -126,7 +126,6 @@ export const useUpdateStore = create<UpdateState>()(
           return result;
         } catch (caught: unknown) {
           const err = caught as { message?: string };
-          console.error('[UpdateCheck] Error checking for updates:', err);
           appLogger.error('system', `Erreur lors de la recherche de mise à jour: ${err.message || String(err)}`, err);
           set({
             isChecking: false,
