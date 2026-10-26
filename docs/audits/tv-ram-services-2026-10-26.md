@@ -1,5 +1,8 @@
 # AUDIT-2026-10-26-TV-RAM — services facultatifs
 
+Complément du27octobre2026 : [bilan des vérifications hors TV du firmware1400.2](./tv-usb-1400.2-2026-10-27/README.md).
+Il actualise les pistes USB évoquées ci-dessous sans annoncer de root matériel ni de gain RAM.
+
 Date :26octobre2026,19:13UTC. Cible : Samsung QE55Q6FNA, Tizen4.0.
 Baseline : widget0.2.1, commit2565685c0363cc030b18fdd7eb25614ae8bc0bb8, PR760, #295.
 Statut : AirPlay et HbbTV désactivés par le propriétaire ; aucun interrupteur de réveil vocal utilisable, aucun gain RAM stable démontré.

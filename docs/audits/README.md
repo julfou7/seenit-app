@@ -1,5 +1,8 @@
 # Registre des audits SeenIt
 
+TV Samsung : [vérifications hors TV du firmware1400.2](./tv-usb-1400.2-2026-10-27/README.md),
+27octobre2026, #295 : bilan, sources figées et empreintes vérifiées ; root non réalisé.
+
 TV Samsung : [RAM et services facultatifs du26octobre2026](./tv-ram-services-2026-10-26.md),
   relevés matériels0.2.1/2565685 et0.2.2/c556037, #295, AirPlay/HbbTV désactivés, gains RAM non démontrés et vérification du root conditionnel.
 
