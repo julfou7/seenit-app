@@ -151,3 +151,4 @@ Complément USR-2026-10-23-005 : ZIP(10) SPEC-DEV-V4.md reçue24/10, complète (
 - 26/10/2026 — retour226 (#729) : coche/splash réguliers, maintien final−200ms, billets et alignement des acteurs, fermeture de la dernière notification. Voir docs/design/marque-2026-10-25.md.
 
 | USR-2026-10-27-001 | 2026-10-27 | Terrain229 : l’app reste bloquée après les bascules À regarder / À venir / Historique et l’historique charge lentement. Borner les calculs des grandes bibliothèques, conserver pagination/totaux/actions et les panneaux229 ; réduire légèrement la hauteur de la nav et la police sans perdre la lisibilité. | SEENIT-PERF-001, SEENIT-UX-015/017, #729 | active |
+| USR-2026-10-27-002 | 2026-10-27 | En saisie Explorer, descendre la recherche juste au-dessus du clavier comme Samsung et masquer la nav ; restaurer la disposition à la fermeture sans effacer requête/filtres. | SEENIT-DISCOVER-003, #774 | active |

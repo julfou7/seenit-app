@@ -4,6 +4,24 @@
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
+      "id": "SEENIT-DISCOVER-003",
+      "title": "Recherche Explorer ancrée au clavier et navigation masquée pendant la saisie",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/searchKeyboardDock.test.ts",
+          "contains": "SEENIT-DISCOVER-003 place la recherche au clavier sans double compensation Android"
+        },
+        {
+          "file": "tests/searchKeyboardDock.test.ts",
+          "contains": "SEENIT-DISCOVER-003 câble le dock réel et restaure la nav sans vider la requête"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-UX-018",
       "title": "Accueil À voir à trois panneaux indépendants, sections et pagination dédiées",
       "targets": [

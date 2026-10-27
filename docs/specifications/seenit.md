@@ -235,6 +235,12 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
 
 ### 5.2 Explorer « Au cinéma » — preuve théâtrale France
 
+- **SEENIT-DISCOVER-003** — Pendant la saisie dans Explorer, la recherche se place à 8 px du clavier visible,
+  sans réserver l'espace de la navigation basse ; celle-ci et son fondu sont masqués. Le viewport visuel
+  et le redimensionnement Android sont pris en compte sans double compensation. Fermer le clavier ou
+  quitter le champ restaure la navigation et la position habituelle sans effacer la requête ni les filtres.
+  Un clavier matériel reste utilisable ; aucune recherche réseau n'est provoquée par le déplacement.
+
 - **SEENIT-DISCOVER-001** — La catégorie Explorer **« Au cinéma »** et tout badge portant ce libellé
   exigent une preuve TMDB de sortie théâtrale en France : une entrée `release_dates` de pays `FR` et de
   type `2` (Theatrical limited) ou `3` (Theatrical), dans la fenêtre courante de J-75 à J+10. Une date
