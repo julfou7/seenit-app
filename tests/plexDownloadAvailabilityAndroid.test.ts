@@ -80,7 +80,7 @@ test('SEENIT-NOTIFICATION-003 reste compatible minSdk 24 et distingue la saison 
   assert.ok(worker.includes('season >= 0 && episode > 0'));
 });
 
-test('SEENIT-NOTIFICATION-004 #778 remplace l’import par la preuve Plex exacte avec le même identifiant', () => {
+test('SEENIT-NOTIFICATION-003 présente une notification média cohérente et une action Discover exacte', () => {
   assert.ok(server.includes("icon: 'ic_stat_seenit'"));
   assert.ok(server.includes("color: '#E5A93D'"));
   assert.ok(worker.includes('.setSmallIcon(R.drawable.ic_stat_seenit)'));
