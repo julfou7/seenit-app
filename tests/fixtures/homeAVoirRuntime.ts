@@ -17,6 +17,20 @@ base.usePlexAvailabilityStore.setState({ cache: {
   'tv:10': { available: true, serverName: 'Série partielle' },
 } });
 export function useShows() { return { shows: base.useShowsStore(state => state.shows), loading: false, updateShow: base.updateShow, addShow: base.addShow }; }
+export function makeLargeHistory() {
+  const seed = base.initialShows[0];
+  const now = Date.now();
+  const shows = Array.from({ length: 50 }, (_, showIndex) => {
+    const records = Array.from({ length: 126 }, (_, index) => {
+      const number = showIndex * 126 + index;
+      return [`1x${index + 1}`, { watchedAt: now - (number % 1000) * 86_400_000, runtime: 42, episodeTitle: `Épisode ${index + 1}` }] as const;
+    });
+    return { ...seed, id: `perf-history-${showIndex}`, title: `Série historique ${showIndex}`, tmdbId: 70_000 + showIndex,
+      status: 'completed' as const, seenEpisodes: records.map(([key]) => key), episodeRecords: Object.fromEntries(records) };
+  });
+  base.useShowsStore.setState(state => ({ shows: [...state.shows.filter(show => !show.id.startsWith('perf-history-')), ...shows] }));
+  return 6300;
+}
 export const useDownloadConfigStore = create(() => ({ downloadsEnabled: false, userPlatforms: [] }));
 export const useLiveDownloadStore = create(() => ({ downloads: [] }));
 export const useUpdateStore = create(() => ({ hasUpdate: true, latestRelease: { version: '1.4.999' }, requestUpdateModal: () => base.telemetry.opens.push('update') }));

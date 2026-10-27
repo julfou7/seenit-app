@@ -62,8 +62,8 @@ Le reset est local à la racine de l'onglet actif. Il ne scrolle jamais un écra
 La [navigation 13j](../design/navbar-13j.md) remplace la barre pleine largeur :
 
 - sans Téléchargements : **À Voir → Explorer → Moi** ; avec : **À Voir → Explorer → Moi │ Télécharger** ;
-- îlot centré en verre de 64 px, détaché de 10 px plus safe area, boutons 52 × 68 px minimum,
-  glyphes 24 px, libellés 10 px, fondu inférieur progressif de 96 px ; pas de repli au défilement ;
+- îlot centré en verre de 60 px, détaché de 10 px plus safe area, boutons 48 × 68 px minimum,
+  glyphes rendus26px, libellés10–11px, fondu inférieur progressif de92px ; pas de repli au défilement ;
 - le dernier onglet et son séparateur disparaissent selon le réglage personnel existant ;
 - point Télécharger actif or (nombre au-delà de un), attention rouge, puis terminé non consulté vert,
   acquitté à l'ouverture sans modifier les transferts ; aucun polling supplémentaire ;

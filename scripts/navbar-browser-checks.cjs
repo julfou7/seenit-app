@@ -36,7 +36,7 @@ async function testNavbarHarness(client, root) {
     await check(client,'document.querySelectorAll("[data-navigation-tab]").length===4','quatre onglets');
     await check(client,'[...document.querySelectorAll("[data-navigation-tab]")].map(el=>el.dataset.navigationTab).join(",")==="watchlist,discover,profile,downloads"','ordre 13j');
     const geometry=await evaluate(client,'(()=>{const nav=document.querySelector("nav").getBoundingClientRect();return{nav:nav.toJSON(),buttons:[...document.querySelectorAll("[data-navigation-tab]")].map(el=>el.getBoundingClientRect().toJSON()),doc:document.documentElement.scrollWidth,viewport:document.documentElement.clientWidth}})()');
-    if(geometry.buttons.some(r=>r.width<68||r.height<52||r.x<0||r.right>width)||Math.abs(geometry.nav.height-64)>1||geometry.nav.x<0||geometry.nav.right>width||geometry.doc>geometry.viewport)throw new Error('#721 géométrie '+JSON.stringify(geometry));
+    if(geometry.buttons.some(r=>r.width<68||r.height<48||r.x<0||r.right>width)||Math.abs(geometry.nav.height-60)>1||geometry.nav.x<0||geometry.nav.right>width||geometry.doc>geometry.viewport)throw new Error('#721 géométrie '+JSON.stringify(geometry));
     await check(client,'[...document.querySelectorAll("[data-navigation-tab]")].every(el=>el.getBoundingClientRect().bottom-el.querySelector(".navigation-tab__label").getBoundingClientRect().bottom>=3.5)','air sous tous les libellés');
     // Vraie détection : A->B->B n'arme pas un double sur B.
     await tap(client,selector('discover'));await tap(client,selector('discover'));

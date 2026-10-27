@@ -147,9 +147,9 @@ Son point indique en priorité les transferts actifs (or, nombre au-delà de un)
 aux transferts. Une navigation historique ou directe vers `downloads` alors que la fonctionnalité est
 désactivée revient sur « À Voir ».
 
-La [barre 13j](../design/navbar-13j.md) est un îlot verre flottant centré, haut de 64 px, détaché de
-10 px plus safe area, avec fondu progressif inférieur de 96 px. Sans Télécharger, seul le dernier
-onglet et le séparateur disparaissent. Glyphes 24 px, libellés 10 px et cibles minimales 52 × 68 px.
+La [barre 13j](../design/navbar-13j.md) est un îlot verre flottant centré, haut de 60 px, détaché de
+10 px plus safe area, avec fondu progressif inférieur de 92 px. Sans Télécharger, seul le dernier
+onglet et le séparateur disparaissent. Glyphes rendus26px, libellés10–11px et cibles minimales48 ×68px.
 Pas de repli au scroll. Le contenu réserve 84 px plus safe area ; les toasts restent au-dessus à
 80 px plus safe area, ou 24 px sur une fiche/dialogue sans barre. La fiche média occupe tout le viewport.
 
@@ -1021,3 +1021,5 @@ Voir [marque v3](../design/marque-2026-10-25.md) : actifs fournis réutilisés s
 Retour terrain225 du25/10/2026 (#729), prioritaire sur les regroupements antérieurs : un visionnage = une ligne, sans ×N ni plage d’épisodes, même pour une saison marquée en une fois. Périodes, totaux, heure et actions par épisode conservés. Navigation : centres du pictogramme et du texte identiques sur tous les écrans. Vu : anneau progressif760ms puis coche240ms, tampon puis reprise ; réduction des animations immédiate. Splash : huit segments160ms, anneau1280ms, coche1640ms, signature1860ms/300ms puis lecture complète pendant1540ms ; durée3700ms et fondu500ms inchangés. Référentiel détaillé : docs/design/marque-2026-10-25.md.
 
 Retour terrain226 du26/10 (#729) : coche entièrement masquée avant son tracé normalisé ; splash à cadence commune160ms par cran, maintien final réduit200ms (3500ms puis fondu500ms). Ticket horizontal avec découpes symétriques ; en rail, acteurs alignés par rangées communes aux titres, Vu36px dans cible44px à droite du talon, fin/heure à gauche et année sous le titre. La dernière notification retirée ferme sa feuille avec retour de focus et Annuler conservé. Voir docs/design/marque-2026-10-25.md.
+
+Terrain229 : une réouverture de panneau ne suffit pas à prouver sa fluidité. Les périodes Historique et leurs totaux sont indexés et mémorisés ; aucune création de formateur de date par visionnage ni filtre intégral par période visible pendant le rendu. Le scénario navigateur mesure les composants de production sur6300visionnages, pagination et bascules répétées ; aucun historique utilisateur distant n’est modifié.
