@@ -3,7 +3,7 @@ import test from 'node:test';
 import { deliverDownloadWebhookPresentation } from '../src/features/downloads/downloadWebhookDelivery.ts';
 import { buildDownloadWebhookPresentation } from '../src/features/downloads/downloadWebhookNotification.ts';
 
-test('SEENIT-NOTIFICATION-003 garde l’import visible et ajoute la vérification Plex capable', async () => {
+test('SEENIT-NOTIFICATION-003 #778 garde l’import visible et ajoute la vérification Plex capable', async () => {
   const presentation = buildDownloadWebhookPresentation('radarr', {
     eventType: 'Download',
     downloadId: 'terrain-199',
@@ -37,15 +37,15 @@ test('SEENIT-NOTIFICATION-003 garde l’import visible et ajoute la vérificatio
     plexAvailabilityBackground: 'required',
   });
   assert.deepEqual(calls[1].notification, presentation.notification);
-  assert.equal(calls[1].notification?.body, '✅ Import terminé');
-  assert.deepEqual(calls[1].data, presentation.data);
+  assert.equal(calls[1].notification?.title, 'Terrain Movie');
+  assert.equal(calls[1].notification?.body, 'Import terminé');
+  assert.equal(calls[1].data.subText, 'Téléchargement');
   assert.deepEqual(calls[1].options, {
     platform: 'android',
     plexAvailabilityBackground: 'legacy',
   });
   assert.deepEqual(calls[2].notification, presentation.notification);
-  assert.equal(calls[2].notification?.body, '✅ Import terminé');
-  assert.deepEqual(calls[2].data, presentation.data);
+  assert.equal(calls[2].notification?.body, 'Import terminé');
   assert.deepEqual(calls[2].options, { platform: 'web' });
 
   assert.deepEqual(result, {
@@ -55,6 +55,17 @@ test('SEENIT-NOTIFICATION-003 garde l’import visible et ajoute la vérificatio
     plexCheckDelivered: 1,
     plexCheckFailed: 0,
   });
+});
+
+test('SEENIT-NOTIFICATION-003 #778 Grab ne prétend jamais que le transfert a commencé', () => {
+  const presentation = buildDownloadWebhookPresentation('sonarr', {
+    eventType: 'Grab',
+    series: { title: 'Silo' },
+  });
+  assert.equal(presentation.notification.title, 'Silo');
+  assert.equal(presentation.notification.body, 'Envoyé au client de téléchargement.');
+  assert.doesNotMatch(`${presentation.notification.title} ${presentation.notification.body}`, /démarr|[🚀✅]/iu);
+  assert.equal(presentation.plexAvailabilityData, null);
 });
 
 test('SEENIT-NOTIFICATION-003 propage un traceId uniquement au contrôle Plex', async () => {
@@ -102,5 +113,5 @@ test('SEENIT-NOTIFICATION-003 garde le reçu visible quand aucune identité Plex
 
   assert.equal(calls.length, 1);
   assert.equal(calls[0].notification?.title, 'Sans TMDB');
-  assert.equal(calls[0].notification?.body, '✅ Import terminé');
+  assert.equal(calls[0].notification?.body, 'Import terminé');
 });
