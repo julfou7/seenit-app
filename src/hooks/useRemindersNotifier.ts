@@ -27,7 +27,7 @@ import {
   buildTvSeasonReminderSummary,
 } from '../features/notifications/tvReminderCopy';
 
-const REMINDER_SCHEDULE_SCHEMA = 'v7';
+const REMINDER_SCHEDULE_SCHEMA = 'v8';
 const REMINDER_TOAST_RECEIPT_SCHEMA = 'v1';
 const localConsole = globalThis.console;
 
@@ -58,12 +58,10 @@ export function useRemindersNotifier() {
     });
 
     const processReminders = async () => {
-      // Delay execution to avoid hanging the app during startup
       await new Promise(r => setTimeout(r, 5000));
       const dueToastCandidates: ReminderToastCandidate[] = [];
 
       for (const s of shows) {
-        // Small delay between each processing to let the JS event loop breathe
         await new Promise(r => setTimeout(r, 50));
 
         if (s.isArchived || s.status === 'dropped') {
@@ -78,8 +76,6 @@ export function useRemindersNotifier() {
         }
 
         const title = s.title;
-        // Le logo SeenIt n'est jamais substitué à une affiche absente : le
-        // résolveur natif doit pouvoir choisir explicitement le fallback texte.
         const iconUrl = s.posterPath
           ? (s.posterPath.startsWith('http') ? s.posterPath : `https://image.tmdb.org/t/p/w342${s.posterPath}`)
           : undefined;
@@ -88,7 +84,6 @@ export function useRemindersNotifier() {
           ? (s.backdropPath.startsWith('http') ? s.backdropPath : `https://image.tmdb.org/t/p/w500${s.backdropPath}`)
           : iconUrl;
 
-        // --- FILMS ---
         if (s.mediaType === 'movie') {
           const tmdbId = Number(s.tmdbId);
           if (!Number.isInteger(tmdbId) || tmdbId <= 0) {
@@ -101,13 +96,8 @@ export function useRemindersNotifier() {
             continue;
           }
 
-          // Les rappels film reposent uniquement sur les release_dates FR TMDB.
-          // Une date générique ou une estimation J+N n'est jamais présentée comme
-          // une disponibilité réelle.
           const detailsResult = await tmdb.getMovieDetails(tmdbId);
           if (!detailsResult.ok || !detailsResult.value) {
-            // Fail closed : mieux vaut retirer une ancienne alarme incertaine que
-            // produire un faux positif pendant une indisponibilité de métadonnée.
             await prunePendingMediaReminderNotifications(s.id, 'movie', []);
             continue;
           }
@@ -133,8 +123,6 @@ export function useRemindersNotifier() {
           rememberFutureMovieId(theaterDateKey, 'theater');
           rememberFutureMovieId(homeDateKey, 'vod');
 
-          // Supprime les anciennes alarmes du même film (dont l'ancien J+120)
-          // lorsque leur identifiant ne correspond plus à une vraie date FR.
           await prunePendingMediaReminderNotifications(s.id, 'movie', allowedPendingMovieIds);
 
           const scheduleMovieAlert = async (
@@ -182,13 +170,8 @@ export function useRemindersNotifier() {
             if (targetDate.getTime() > now.getTime()) {
               const scheduleKey = `scheduled_9am_${REMINDER_SCHEDULE_SCHEMA}_${s.id}_${tag}_${targetStr}`;
               if (!readUserScopedJson(uid, scheduleKey, false)) {
-                // Même ID Android : on remplace explicitement une éventuelle
-                // ancienne alarme pour lui injecter le payload visuel courant.
                 await cancelMediaReminderNotificationByTag(notificationTag);
                 const result = await send(targetDate);
-                // Une alarme future programmée sans image reste volontairement
-                // réparable : tant que le fichier privé n'existe pas, le prochain
-                // passage annule/reprogramme le même ID et retente le cache.
                 if (result.delivered && result.visualReady) writeUserScopedJson(uid, scheduleKey, true);
               }
             } else if (targetStr === todayStr) {
@@ -201,8 +184,6 @@ export function useRemindersNotifier() {
                   posterPath: s.posterPath,
                   show: s,
                 });
-                // Le reçu UI est volontairement indépendant du succès natif :
-                // un échec Android pourra être retenté sans rejouer le toast.
                 if ((await send()).delivered) writeUserScopedJson(uid, notifiedKey, true);
               }
             }
@@ -213,8 +194,8 @@ export function useRemindersNotifier() {
               theaterDateKey,
               'theater',
               title,
-              '🎬 Sortie cinéma',
-              "Dans les salles aujourd'hui."
+              'Au cinéma',
+              'Dans les salles aujourd’hui.'
             );
           }
           if (homeDateKey) {
@@ -222,14 +203,13 @@ export function useRemindersNotifier() {
               homeDateKey,
               'vod',
               title,
-              '📺 Sortie DVD / VOD',
+              'Sortie vidéo',
               'Disponible en DVD / VOD aujourd’hui.'
             );
           }
           continue;
         }
 
-        // --- SÉRIES TV ---
         const upcoming = getUpcomingEpisodeInfo(s);
         if (!upcoming || !upcoming.air_date) continue;
 
@@ -301,6 +281,7 @@ export function useRemindersNotifier() {
           notificationTitle: string,
           summaryText: string,
           msgBody: string,
+          detailText?: string,
           addActions: boolean = false,
           emitInternalToast: boolean = true
         ) => {
@@ -318,6 +299,7 @@ export function useRemindersNotifier() {
               ...fullPayload,
               ...mediaVisual,
               summaryText,
+              detailText,
               allowMarkWatched: addActions,
               scheduleDate
             } as MediaReminderNotificationOptions);
@@ -328,7 +310,7 @@ export function useRemindersNotifier() {
           };
 
           if (targetDate.getTime() > now.getTime()) {
-            const contentRevision = getMediaReminderNotificationId(`copy:${summaryText}:${msgBody}`);
+            const contentRevision = getMediaReminderNotificationId(`copy:${summaryText}:${msgBody}:${detailText || ''}`);
             const scheduleKey = `scheduled_9am_${REMINDER_SCHEDULE_SCHEMA}_${s.id}_${tagPrefix}_S${sNum}E${eNum}_${targetStr}`;
             const activeContentRevision = readUserScopedJson<number | null>(uid, scheduleKey, null);
             if (activeContentRevision !== contentRevision) {
@@ -373,6 +355,7 @@ export function useRemindersNotifier() {
             title,
             episodeCopy.summaryText,
             episodeCopy.body,
+            episodeCopy.detailText,
             true,
             false
           );
