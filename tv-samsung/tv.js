@@ -37,6 +37,7 @@ var TVDevice = (function () {
     var id = String((app && app.id) || '');
     if (!id) return true;
     if (id === viewerId || id === settingsMenuId) return true;
+    if (/^org\.tizen\./.test(id) && !/^(?:Netflix|Prime Video|Internet|Browser|Samsung TV Plus)$/i.test(safeTitle(app))) return true;
     if (/^(ise-|ug-|org\.volt\.)/.test(id)) return true;
     if (/Service$|Daemon|Keyboard|syspopup|Helper$/i.test(id)) return true;
     if (/^com\.samsung\.tv\.(cobalt-|airplay-app|built-in-app-info-viewer|commonsearch|preview-|notification-app)/.test(id)) return true;

@@ -4,7 +4,8 @@ var TVModel = (function () {
   var brands = [
     { match: /^netflix$/i, file: 'netflix' }, { match: /^plex(?:\s*[-–].*)?$/i, file: 'plex' },
     { match: /^youtube$/i, file: 'youtube' }, { match: /^prime\s*video$/i, file: 'amazonprime' },
-    { match: /^spotify(?:\s*[-–].*)?$/i, file: 'spotify' }, { match: /^dazn$/i, file: 'dazn' }
+    { match: /^spotify(?:\s*[-–].*)?$/i, file: 'spotify' }, { match: /^dazn$/i, file: 'dazn' },
+    { match: /^(?:my)?canal\s*(?:\+|plus)?$/i, file: 'canalplus' }
   ];
   function brand(title) {
     var i;
@@ -122,7 +123,7 @@ var TVModel = (function () {
     }
     /* Initial artwork ranking only. Any installed app can be pinned ahead of it. */
     for (i = 0; i < users.length && out.length < limit; i++) if (brand(users[i].title) && used.indexOf(titleKey(users[i])) < 0 && blocked.indexOf(titleKey(users[i])) < 0) { out.push(users[i]); used.push(titleKey(users[i])); }
-    for (i = 0; i < users.length && out.length < limit; i++) if (used.indexOf(titleKey(users[i])) < 0 && blocked.indexOf(titleKey(users[i])) < 0) { out.push(users[i]); used.push(titleKey(users[i])); }
+    /* Unknown apps remain in All Apps and may be pinned; never auto-fill with platform utilities. */
     return out.slice(0, limit);
   }
   return { brand: brand, localIcon: localIcon, teamArtwork: teamArtwork, initials: initials, preferences: preferences, userApps: userApps, advancedApps: advancedApps, byIds: byIds, favorites: favorites };

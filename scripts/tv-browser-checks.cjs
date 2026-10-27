@@ -66,7 +66,7 @@ async function testTvHarness(client, root) {
     await check(client, 'window.__tv && window.TVModel && document.activeElement.dataset.profile === "Julian"', 'entrée profils');
     await key(client, 13);
     await check(client, 'document.activeElement.id === "primaryTv"', 'focus initial TV');
-    await check(client, `document.querySelectorAll('#appRow .app-card').length===10 && document.querySelectorAll('#homeSources .source-card').length===4 && document.querySelector('#homeSources [data-source-number="4"]')`, 'rail huit favoris plus Ajouter/Toutes et quatre HDMI réellement déclarés');
+    await check(client, `document.querySelectorAll('#appRow .app-card').length===8 && document.querySelectorAll('#homeSources .source-card').length===4 && document.querySelector('#homeSources [data-source-number="4"]')`, 'rail favoris utiles plus Ajouter/Toutes et quatre HDMI réellement déclarés');
     await check(client, `Array.from(document.querySelectorAll('#appRow [data-app-id]')).filter(n=>n.dataset.appTitle==='Netflix').length===1 && document.querySelector('#appRow [data-app-title=Netflix]').dataset.appId==='RN1MCdNq8t.Netflix'`, 'inventaire réel Tizen4 : une seule tuile Netflix, variante installée');
     await check(client, `Array.from(document.querySelectorAll('#appRow [data-app-id] img')).every(n=>n.naturalWidth>0)`, 'logos vectoriels homogènes avant les icônes natives');
     await check(client, `Math.round(document.querySelector('#appRow .app-card').getBoundingClientRect().height)>=${Math.floor(height / 1080 * 128)} && getComputedStyle(document.querySelector('.home-settings-zone h2')).fontSize==='24px' && document.querySelector('.header-settings svg')`, 'logos et libellés lisibles sans emoji de réglages');

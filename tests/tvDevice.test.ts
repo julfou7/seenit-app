@@ -32,3 +32,18 @@ test('SEENIT-TV-001 ne lance pas le menu interne connu pour capturer la téléco
   vm.runInContext(source, context);
   context.TVDevice.openSamsungSettings((ok: boolean) => assert.equal(ok, false));
 });
+
+test('SEENIT-TV-001 les utilitaires Samsung restent inventoriés sans devenir des apps utilisateur', () => {
+  const apps = [{ id: 'org.tizen.AgingApp', name: 'AgingApp', show: true },
+    { id: 'org.tizen.ambientapp', name: 'AmbientApp', show: true },
+    { id: 'org.tizen.netflix-app', name: 'Netflix', show: true }];
+  const context = vm.createContext({ window: { tizen: { application: {
+    getAppsInfo: (done: (items: unknown[]) => void) => done(apps),
+  } } }, navigator: {}, setTimeout });
+  vm.runInContext(source, context);
+  context.TVDevice.listApps((items: Array<{ classification: string; launchable: boolean }>) => {
+    assert.equal(items.length, 3);
+    assert.equal(items.filter(item => item.classification === 'SYSTEM').length, 2);
+    assert.equal(items.filter(item => item.launchable).length, 1);
+  });
+});

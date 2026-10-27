@@ -27,6 +27,9 @@ présenté comme réel. Au masquage, images inutiles et requêtes/timers sont su
 
 L'inventaire complet getAppsInfo est la seule source des apps disponibles. Conserver IDs
 et variantes pour diagnostic. Une marque ne sert jamais à inventer une présence ou un ID.
+Les suggestions automatiques n'incluent que les marques reconnues réellement présentes ;
+les autres apps utilisateur s'ajoutent explicitement. Les utilitaires org.tizen restent
+inventoriés en Système, sans devenir des suggestions d'accueil.
 CANAL+ est confirmé dans l'inventaire du 27 octobre : prévoir sa présentation sans
 l'imposer sur une autre TV. Toute nouvelle application utilisateur reste ajoutable.
 

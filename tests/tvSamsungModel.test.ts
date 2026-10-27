@@ -44,7 +44,8 @@ test('SEENIT-TV-001 le regroupement de tuiles est générique, stable et ne chan
     { id: 'kids', title: 'Nouvelle App Kids', classification: 'USER', launchable: true },
   ];
   assert.deepEqual(Array.from(m.userApps(apps), (a: any) => a.id), ['installed', 'kids']);
-  assert.deepEqual(Array.from(m.favorites(apps, ['built-in'], 5), (a: any) => a.id), ['built-in', 'kids']);
+  assert.deepEqual(Array.from(m.favorites(apps, ['built-in'], 5), (a: any) => a.id), ['built-in']);
+  assert.deepEqual(Array.from(m.favorites(apps, ['built-in', 'kids'], 5), (a: any) => a.id), ['built-in', 'kids']);
   assert.equal(m.favorites(apps, [], 5, ['installed']).some((a: any) => a.id === 'built-in'), false);
   assert.equal(m.favorites(apps, [], 5, ['built-in']).some((a: any) => a.id === 'installed'), false);
   assert.equal(m.favorites(apps, ['installed'], 5, ['built-in'])[0].id, 'installed');
@@ -72,7 +73,7 @@ test('SEENIT-TV-001 toute nouvelle app est favorite par son ID sans table de lan
   const m = model(), apps = Array.from({ length: 130 }, (_, i) => ({ id: 'id-' + i, title: 'App ' + i, classification: 'USER', launchable: true }));
   apps.push({ id: 'sys', title: 'Netflix', classification: 'SYSTEM', launchable: false });
   assert.equal(m.favorites(apps, ['id-129', 'sys', 'deleted'], 5)[0].id, 'id-129');
-  assert.equal(m.favorites(apps, [], 5).length, 5);
+  assert.equal(m.favorites(apps, [], 5).length, 0);
   assert.equal(m.byIds(apps, ['sys']).length, 0);
   assert.equal(m.initials('Nouvelle Application'), 'NA');
 });
@@ -82,6 +83,7 @@ test('SEENIT-TV-001 les logos refusent le réseau et gardent un secours généri
   assert.equal(m.localIcon('/opt/usr/apps/app/shared/res/icon.png'), '/opt/usr/apps/app/shared/res/icon.png');
   assert.equal(m.localIcon('file:///opt/icon.png'), 'file:///opt/icon.png');
   assert.equal(m.brand('Netflix').file, 'netflix'); assert.equal(m.brand('Une nouvelle app'), null);
+  assert.equal(m.brand('CANAL+').file, 'canalplus');
 });
 
 test('SEENIT-TV-001 les logos des équipes viennent du champ explicite avec secours sans réseau non sécurisé', () => {
