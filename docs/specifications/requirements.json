@@ -5,7 +5,7 @@
   "requirements": [
     {
       "id": "SEENIT-DISCOVER-003",
-      "title": "Recherche Explorer ancrée au clavier et navigation masquée pendant la saisie",
+      "title": "Recherche Explorer ancrée au clavier, navigation masquée en saisie et loupe de réouverture",
       "targets": [
         "pwa",
         "apk"
@@ -18,6 +18,10 @@
         {
           "file": "tests/searchKeyboardDock.test.ts",
           "contains": "SEENIT-DISCOVER-003 câble le dock réel et restaure la nav sans vider la requête"
+        },
+        {
+          "file": "tests/navbar13j.test.ts",
+          "contains": "SEENIT-UX-017 les raccourcis actifs et les réglages évitent les entrées historiques identiques"
         }
       ]
     },

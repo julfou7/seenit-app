@@ -26,7 +26,31 @@ async function testSearchKeyboardHarness(client,root){
   await client.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
   await client.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
   await check(client,'document.activeElement!==document.querySelector("input") && document.querySelector("input").value==="Harry Potter" && document.querySelector("input").closest("[data-discover-search-editing]").textContent.includes("1 filtre")','Entrée/clavier matériel préserve texte et filtre');
-  reports.push({width,status:'pass',keyboardGap:8,navHidden:true,androidResize:true,preservesQueryAndFilters:true});
+  for(const downloads of [true,false]){
+   await evaluate(client,`window.__searchHarness.enabled(${downloads});document.querySelector('#results').scrollTop=520;window.__searchHarness.hide()`);
+   await check(client,'document.querySelector("[data-discover-search-editing]").getBoundingClientRect().top>=innerHeight && Boolean(document.querySelector("[data-navigation-search-shortcut]"))','loupe disponible quand la recherche est repliée');
+   const target=await evaluate(client,'(()=>{const b=document.querySelector("[data-navigation-search-shortcut]").getBoundingClientRect(),n=document.querySelector(".bottom-nav-island").getBoundingClientRect();return {x:b.x+b.width/2,y:b.y+b.height/2,valid:b.width>=44&&b.height>=44&&b.left>=0&&b.right<n.left&&n.right<=innerWidth,scroll:document.querySelector("#results").scrollTop}})()');
+   if(!target.valid||target.scroll!==520)throw Error('#774 loupe/nav hors écran ou chevauchée');
+   fs.writeFileSync(path.join(root,'quality-reports',`search-shortcut-${width}-${downloads?'4':'3'}tabs.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+   await client.send('Input.dispatchMouseEvent',{type:'mousePressed',x:target.x,y:target.y,button:'left',clickCount:1});
+   await client.send('Input.dispatchMouseEvent',{type:'mouseReleased',x:target.x,y:target.y,button:'left',clickCount:1});
+   await check(client,'document.activeElement===document.querySelector("input") && document.querySelector("input").value==="Harry Potter" && document.querySelector("#results").scrollTop===520 && getComputedStyle(document.querySelector(".bottom-nav-shell")).display==="none"','appui loupe rouvre le champ sans déplacer les résultats ni effacer la requête');
+   await evaluate(client,'window.__searchViewport(560)');
+   await check(client,'Math.abs(document.querySelector("input").parentElement.parentElement.getBoundingClientRect().bottom-552)<1','recherche rouverte au clavier');
+   await evaluate(client,'window.__searchViewport(915)');
+   await check(client,'document.activeElement!==document.querySelector("input") && getComputedStyle(document.querySelector(".bottom-nav-shell")).display!=="none"','retour de la loupe après fermeture clavier');
+  }
+  await evaluate(client,'window.__searchHarness.hide();document.querySelector("[data-navigation-search-shortcut]").focus()');
+  await check(client,'document.activeElement===document.querySelector("[data-navigation-search-shortcut]")','focus clavier de la loupe');
+  await client.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r'});
+  await client.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+  await check(client,'document.activeElement===document.querySelector("input") && document.querySelector("#results").scrollTop===520','activation clavier de la loupe sans scroll');
+  await evaluate(client,'document.querySelector("input").blur()');
+  for(const tab of ['watchlist','profile','downloads']){
+   await evaluate(client,`window.__searchHarness.tab('${tab}')`);
+   await check(client,'!document.querySelector("[data-navigation-search-shortcut]")','loupe réservée à Explorer');
+  }
+  reports.push({width,status:'pass',keyboardGap:8,navHidden:true,androidResize:true,preservesQueryAndFilters:true,searchShortcut:{touch:true,keyboard:true,preservesScroll:true,threeAndFourTabs:true,onlyDiscover:true}});
  }
  return reports;
 }
