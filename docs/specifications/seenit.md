@@ -540,6 +540,8 @@ n'est rouverte que par une nouvelle décision produit explicite.
 
 ### 5.7 Réouverture et cache chaud d'une fiche média
 
+Les grandes bibliothèques de l’accueil sont aussi couvertes : Historique classe les visionnages par période en une passe mémorisée, réutilise ses formateurs de date et ne rescane pas toutes les lignes à chaque rendu ou bascule. Les totaux portent sur la période complète, les lignes restent paginées et les mises à jour Vu/non Vu/date invalident les données concernées. Le panneau masqué conserve son état et suspend ses effets ; une bascule à chaud ne relance ni indexation ni hydratation terminée. Le TNR de terrain utilise le composant réel avec plus de6300visionnages et des bascules répétées.
+
 - **SEENIT-PERF-001** — Les métadonnées publiques TMDB déjà résolues utilisent une couche de cache
   commune, bornée et typée. Les détails média sont indexés par `mediaType + tmdbId`; les requêtes
   Discover et Search utilisent une clé normalisée (chemin + paramètres triés). Les requêtes identiques
@@ -1135,10 +1137,10 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   recherches, filtres ou expansions locales. Aucun suivi, progression, préférence ou téléchargement n'est
   modifié. Chaque reset abouti affiche un toast nommant la page réinitialisée. Un trajet A → B → B ne
   compte jamais le changement d'onglet comme le premier appui du double geste.
-- **SEENIT-UX-017** — La navigation 13j est un îlot verre flottant de 64 px, à 10 px de la safe area,
-  avec fondu inférieur progressif de 96 px, sans repli au défilement. Ordre : À Voir, Explorer, Moi,
+- **SEENIT-UX-017** — La navigation 13j est un îlot verre flottant de 60 px, à 10 px de la safe area,
+  avec fondu inférieur progressif de 92 px, sans repli au défilement. Ordre : À Voir, Explorer, Moi,
   puis séparateur et Télécharger si la fonctionnalité personnelle est activée. Les glyphes SeenIt
-  utilisent le même or, les cibles mesurent au moins 52 × 68 px, le focus et aria-current restent visibles.
+  utilisent le même or, les cibles mesurent au moins 48 × 68 px, le focus et aria-current restent visibles.
   La barre disparaît sur les fiches/dialogues plein écran ; le contenu réserve 84 px plus safe area,
   les toasts se placent à 80 px plus safe area avec la barre, 24 px sans elle. Le point Télécharger
   reflète les données live existantes : actifs or (nombre seulement au-delà de un), attention rouge,

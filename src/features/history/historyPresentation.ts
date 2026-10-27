@@ -1,5 +1,18 @@
 import type { SeriesSeasonProgress, SeasonSegmentState } from '../watchlist/seriesCardPresentation';
 
+// Format local calendar fields in UTC so cached formatters remain correct after a device TZ change.
+const shortDateFormatter = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const monthFormatter = new Intl.DateTimeFormat('fr-FR', { month: 'long', timeZone: 'UTC' });
+const dayFormatter = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+const dayYearFormatter = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+function localCalendarDate(timestamp: number): number {
+  const date = new Date(timestamp);
+  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+}
+export function formatHistoryMonth(timestamp: number): string {
+  return monthFormatter.format(localCalendarDate(timestamp));
+}
+
 export interface HistoryResolvedTimestamp {
   watchedAt: number;
   timeKnown: boolean;
@@ -62,25 +75,20 @@ export function formatHistoryDayLabel(timestamp: number, now: number = Date.now(
   if (day === yesterday) return 'Hier';
 
   const date = new Date(timestamp);
-  const formatted = new Intl.DateTimeFormat('fr-FR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    ...(date.getFullYear() === current.getFullYear() ? {} : { year: 'numeric' as const }),
-  }).format(date);
+  const formatted = (date.getFullYear() === current.getFullYear() ? dayFormatter : dayYearFormatter).format(localCalendarDate(timestamp));
   return capitalize(formatted);
 }
 
 export function formatHistoryRowDate(timestamp: number, now: number = Date.now()): string {
   if (historyLocalDayKey(timestamp) === historyLocalDayKey(now)) return 'Aujourd’hui';
-  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(new Date(timestamp));
+  return shortDateFormatter.format(localCalendarDate(timestamp));
 }
 
 export function formatHistoryClock(timestamp: number, timeKnown: boolean): string | null {
   if (!timeKnown) return null;
   const date = new Date(timestamp);
   if (!Number.isFinite(date.getTime())) return null;
-  return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
 export function formatHistoryRuntime(minutes: unknown): string | null {

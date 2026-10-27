@@ -1,5 +1,8 @@
 # Registre des audits SeenIt
 
+Terrain229 / historique : [cause du gel et scénario6300visionnages](./terrain229-historique-perf-2026-10-27.md),
+baseline0c4bd8a, #729 ; dates, résumés et bascules des trois panneaux, navigation compacte.
+
 Ce dossier conserve les constats historiques. La SPEC reste la source de vérité du comportement
 courant et GitHub Issues la source de vérité des actions à réaliser.
 

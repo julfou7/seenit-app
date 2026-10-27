@@ -1,4 +1,4 @@
-import React, { Activity, startTransition, useEffect, useRef, useState, type RefObject } from 'react';
+import React, { Activity, startTransition, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { Show } from '../types';
 import { WatchNextSection } from './WatchNextSection';
 import { DialogLayer } from '../components/ui/DialogLayer';
@@ -95,10 +95,14 @@ export function WatchListView({ model }: WatchListViewProps) {
     return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update); };
   }, []);
   const refs = { watch_next: watchNextRef, upcoming: upcomingRef, history: historyRef };
-  const upcomingGroups = ['Aujourd’hui', 'Cette semaine', 'Plus tard'].map(label => ({ label, shows: upcomingShows.filter(show => {
+  const openHistoryEpisode = useCallback((showId: string, season: number, episode: number) => {
+    const show = allShows.find(item => item.id === showId || String(item.tmdbId) === showId);
+    if (show) handleEpisodeClick(show, season, episode); else onShowClick(showId, 'tv');
+  }, [allShows, handleEpisodeClick, onShowClick]);
+  const upcomingGroups = useMemo(() => ['Aujourd’hui', 'Cette semaine', 'Plus tard'].map(label => ({ label, shows: upcomingShows.filter(show => {
     const episode = getUpcomingEpisodeInfo(show);
     return episode && upcomingGroup(episode.air_date, today) === label;
-  }) }));
+  }) })), [upcomingShows, today]);
   return (
     <div id="watchlist-container" className="home-watchlist flex-1 overflow-y-auto text-white pb-nav">
       <header className="home-header">
@@ -128,10 +132,7 @@ export function WatchListView({ model }: WatchListViewProps) {
         <div ref={historyRef} id="home-panel-history" role="tabpanel" aria-labelledby="home-tab-history" hidden={activeTab !== 'history'} tabIndex={0} className="home-panel-content">
           {activeTab === 'history' && !mountedHomeTabs.has('history') && <div className="home-skeleton" role="status" aria-label="Chargement de l’historique"><div><span /><div /></div></div>}
           {mountedHomeTabs.has('history') && <Activity mode={activeTab === 'history' ? 'visible' : 'hidden'}>
-            <HistoryFeed onExplore={onExplore} onShowClick={onShowClick} onEpisodeClick={(showId, season, episode) => {
-              const show = allShows.find(item => item.id === showId || String(item.tmdbId) === showId);
-              if (show) handleEpisodeClick(show, season, episode); else onShowClick(showId, 'tv');
-            }} />
+            <HistoryFeed onExplore={onExplore} onShowClick={onShowClick} onEpisodeClick={openHistoryEpisode} />
           </Activity>}
         </div>
       </>}

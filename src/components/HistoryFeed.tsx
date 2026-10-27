@@ -1,8 +1,8 @@
-import { compareHistoryEntries, buildHistoryRows, historyGroupCode, historyPeriod, historyPeriodSummary, type TimelineRow } from '../features/history/historyTimeline';
+import { compareHistoryEntries, buildHistoryRows, historyGroupCode, indexHistoryPeriods, historyPeriodSummary, type TimelineRow } from '../features/history/historyTimeline';
 import { HomeLoadMore } from './cards/HomeLoadMore';
 import { DialogLayer } from './ui/DialogLayer';
 import { HISTORY_PAGE_SIZE } from '../features/watchlist/homePresentation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useShows } from '../hooks/useShows';
 import type { Show } from '../types';
 import { AlertCircle } from 'lucide-react';
@@ -204,7 +204,7 @@ function HistoryRowItem({
   </div>;
 }
 
-export function HistoryFeed({
+export const HistoryFeed = memo(function HistoryFeed({
   active = true,
   onExplore,
   onShowClick,
@@ -288,6 +288,28 @@ export function HistoryFeed({
   const rows = useMemo(() => buildHistoryRows(historyItems), [historyItems]);
   const displayedRows = useMemo(() => rows.slice(0, page * itemsPerPage), [rows, page]);
   const displayedItems = useMemo(() => displayedRows.flatMap(row => row.members), [displayedRows]);
+  const day = historyLocalDayKey(Date.now());
+  const periods = useMemo(() => indexHistoryPeriods(rows), [rows, day]);
+  const summaries = useMemo(() => {
+    const movieDurations = new Map<number, number | null>();
+    const minutes = (item: HistoryItem): number | null => {
+      const duration = asPositiveNumber(metadataByKey[getMetadataKey(item)]?.runtime) || asPositiveNumber(item.runtime);
+      if (duration) return duration;
+      if (item.mediaType !== 'movie' || !item.tmdbId) return null;
+      if (!movieDurations.has(item.tmdbId)) movieDurations.set(item.tmdbId, asPositiveNumber(tmdb.peekRenderableMediaDetails(item.tmdbId, 'movie')?.runtime) || null);
+      return movieDurations.get(item.tmdbId) ?? null;
+    };
+    return new Map([...periods].map(([key, period]) => [key, historyPeriodSummary(period.rows, minutes)]));
+  }, [periods, metadataByKey]);
+  const visiblePeriods = useMemo(() => {
+    let remaining = displayedRows.length;
+    return [...periods.values()].flatMap(period => {
+      if (remaining <= 0) return [];
+      const visible = period.rows.slice(0, remaining);
+      remaining -= visible.length;
+      return [{ ...period, rows: visible }];
+    });
+  }, [periods, displayedRows]);
 
   useEffect(() => {
     let mounted = true;
@@ -503,18 +525,6 @@ export function HistoryFeed({
   }
 
   const hasMore = displayedRows.length < rows.length;
-  const periods = new Map<string, { label: string; today: boolean; rows: TimelineRow<HistoryItem>[] }>();
-  for (const row of displayedRows) {
-    const period = historyPeriod(row.item.watchedAt);
-    if (!periods.has(period.key)) periods.set(period.key, { ...period, rows: [] });
-    periods.get(period.key)!.rows.push(row);
-  }
-  const minutes = (item: HistoryItem): number | null => {
-    const metadata = metadataByKey[getMetadataKey(item)];
-    const cached = item.tmdbId ? tmdb.peekRenderableMediaDetails(item.tmdbId, item.mediaType) : null;
-    const value = metadata?.runtime || item.runtime || (item.mediaType === 'movie' ? cached?.runtime : null);
-    return asPositiveNumber(value) || null;
-  };
 
   return (
     <div className="history-timeline">
@@ -522,10 +532,9 @@ export function HistoryFeed({
         <div className="home-empty"><h2>Rien de vu pour l’instant</h2>{onExplore && <button type="button" className="home-explore" onClick={onExplore}>Explorer</button>}</div>
       )}
 
-      {[...periods].map(([key, period]) => {
-        const allPeriodRows = rows.filter(row => historyPeriod(row.item.watchedAt).key === key);
-        const summary = historyPeriodSummary(allPeriodRows, minutes);
-        return <section key={key} className={`history-period${period.today ? ' history-period--today' : ''}`}>
+      {visiblePeriods.map(period => {
+        const summary = summaries.get(period.key)!;
+        return <section key={period.key} className={`history-period${period.today ? ' history-period--today' : ''}`}>
           <h2 className="history-period__heading"><span className="home-section-name">{period.label}</span></h2>
           <p className="history-period__summary">{[summary.episodes ? `${summary.episodes} épisode${summary.episodes > 1 ? 's' : ''}` : '', summary.films ? `${summary.films} film${summary.films > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ')}{summary.duration && <> · <strong>{summary.duration}</strong></>}</p>
           <div className="history-entry-list">{period.rows.map(row => {
@@ -536,7 +545,7 @@ export function HistoryFeed({
           })}</div>
         </section>;
       })}
-      {hasMore && <HomeLoadMore step={HISTORY_PAGE_SIZE} lastLabel="Afficher la dernière" items={rows.slice(displayedRows.length).flatMap(row => { const show = showsById.get(row.item.showId); return show ? [show] : []; })} onLoad={() => setPage(value => value + 1)} />}
+      {hasMore && <HomeLoadMore step={HISTORY_PAGE_SIZE} lastLabel="Afficher la dernière" remainingCount={rows.length - displayedRows.length} items={rows.slice(displayedRows.length, displayedRows.length + 3).flatMap(row => { const show = showsById.get(row.item.showId); return show ? [show] : []; })} onLoad={() => setPage(value => value + 1)} />}
 
 
       {editingItem && (
@@ -581,4 +590,4 @@ export function HistoryFeed({
       )}
     </div>
   );
-}
+});

@@ -1,4 +1,4 @@
-import { historyLocalDayKey } from './historyPresentation.ts';
+import { formatHistoryMonth, historyLocalDayKey } from './historyPresentation.ts';
 
 export interface TimelineEntry { key: string; showId: string; mediaType: 'tv' | 'movie'; season: number; episode: number; watchedAt: number; watchedTimeKnown?: boolean }
 export interface TimelineRow<T extends TimelineEntry> { key: string; item: T; members: T[]; day: string }
@@ -31,9 +31,27 @@ export function historyPeriod(watchedAt: number, now = Date.now()): { key: strin
   if (age === 1) return { key: 'yesterday', label: 'Hier', today: false };
   if (age <= 6) return { key: 'week', label: 'Cette semaine', today: false };
   if (age <= 13) return { key: 'last-week', label: 'La semaine dernière', today: false };
-  const date = new Date(watchedAt), current = new Date(now), month = date.toLocaleDateString('fr-FR', { month: 'long' });
+  const date = new Date(watchedAt), current = new Date(now), month = formatHistoryMonth(watchedAt);
   if (day.slice(0, 7) === today.slice(0, 7)) return { key: 'earlier-month', label: `Plus tôt en ${month}`, today: false };
   return { key: day.slice(0, 7), label: month[0].toUpperCase() + month.slice(1) + (date.getFullYear() !== current.getFullYear() ? ` ${date.getFullYear()}` : ''), today: false };
+}
+
+export interface TimelinePeriod<T extends TimelineEntry> {
+  key: string; label: string; today: boolean; rows: TimelineRow<T>[];
+}
+
+/** One pass per history revision; classify a calendar day only once. */
+export function indexHistoryPeriods<T extends TimelineEntry>(rows: readonly TimelineRow<T>[], now = Date.now()): Map<string, TimelinePeriod<T>> {
+  const periods = new Map<string, TimelinePeriod<T>>();
+  const days = new Map<string, ReturnType<typeof historyPeriod>>();
+  for (const row of rows) {
+    let period = days.get(row.day);
+    if (!period) { period = historyPeriod(row.item.watchedAt, now); days.set(row.day, period); }
+    let group = periods.get(period.key);
+    if (!group) { group = { ...period, rows: [] }; periods.set(period.key, group); }
+    group.rows.push(row);
+  }
+  return periods;
 }
 
 export function historyGroupCode<T extends TimelineEntry>(row: TimelineRow<T>): string | undefined {
@@ -45,9 +63,11 @@ export function historyGroupCode<T extends TimelineEntry>(row: TimelineRow<T>): 
 }
 
 export function historyPeriodSummary<T extends TimelineEntry>(rows: readonly TimelineRow<T>[], minutes: (item: T) => number | null) {
-  const items = rows.flatMap(row => row.members);
-  const episodes = items.filter(item => item.mediaType === 'tv').length, films = items.length - episodes;
-  const durations = items.map(minutes), sum = durations.reduce<number>((total, value) => total + (value || 0), 0);
-  const known = durations.some(value => value !== null), partial = durations.some(value => value === null);
+  let episodes = 0, films = 0, sum = 0, known = false, partial = false;
+  for (const row of rows) for (const item of row.members) {
+    if (item.mediaType === 'tv') episodes++; else films++;
+    const duration = minutes(item);
+    if (duration === null) partial = true; else { known = true; sum += duration; }
+  }
   return { episodes, films, duration: known ? `${partial ? '≥ ' : ''}${Math.floor(sum / 60)} h ${String(Math.round(sum % 60)).padStart(2, '0')}` : null };
 }
